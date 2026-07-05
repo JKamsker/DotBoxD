@@ -216,7 +216,7 @@ internal sealed partial class SandboxWorkerExecutor
         {
             value = 0;
             return fields.TryGetValue(key, out var text) &&
-                int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out value);
+                int.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out value);
         }
     }
 }

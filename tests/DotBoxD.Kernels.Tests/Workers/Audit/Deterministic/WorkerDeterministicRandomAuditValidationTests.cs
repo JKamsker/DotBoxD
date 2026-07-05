@@ -12,6 +12,30 @@ namespace DotBoxD.Kernels.Tests.Workers.Audit.Deterministic;
 public sealed class WorkerDeterministicRandomAuditValidationTests
 {
     [Fact]
+    public async Task Worker_accepts_signed_deterministic_random_audit_fields()
+    {
+        var logicalNow = DateTimeOffset.Parse("2026-07-05T11:34:28Z", CultureInfo.InvariantCulture);
+        var worker = new ValidDeterministicRandomWorker(logicalNow, -10, 10);
+        using var host = Host(worker);
+        var module = await host.ImportJsonAsync(RandomJson(-10, 10));
+        var plan = await host.PrepareAsync(
+            module,
+            SandboxPolicyBuilder.Create()
+                .GrantRandom()
+                .Deterministic(logicalNow, randomSeed: 123)
+                .WithFuel(1_000)
+                .Build());
+
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.Unit,
+            new SandboxExecutionOptions { Isolation = SandboxIsolation.WorkerProcess });
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+    }
+
+    [Fact]
     public async Task Worker_rejects_deterministic_random_result_outside_seed_sequence()
     {
         var logicalNow = DateTimeOffset.Parse("2026-07-05T11:34:28Z", CultureInfo.InvariantCulture);
@@ -86,8 +110,21 @@ public sealed class WorkerDeterministicRandomAuditValidationTests
             ["policyHash"] = plan.PolicyHash
         };
 
-    private static string RandomJson()
-        => """
+    private static Dictionary<string, string> RandomFields(
+        ExecutionPlan plan,
+        int minInclusive,
+        int maxExclusive,
+        int value)
+    {
+        var fields = RandomFields(plan);
+        fields["minInclusive"] = minInclusive.ToString(CultureInfo.InvariantCulture);
+        fields["maxExclusive"] = maxExclusive.ToString(CultureInfo.InvariantCulture);
+        fields["value"] = value.ToString(CultureInfo.InvariantCulture);
+        return fields;
+    }
+
+    private static string RandomJson(int minInclusive = 0, int maxExclusive = 10)
+        => $$"""
         {
           "id": "worker-deterministic-random-audit-validation",
           "version": "1.0.0",
@@ -103,7 +140,7 @@ public sealed class WorkerDeterministicRandomAuditValidationTests
                   "op": "return",
                   "value": {
                     "call": "random.nextI32",
-                    "args": [{ "i32": 0 }, { "i32": 10 }]
+                    "args": [{ "i32": {{minInclusive}} }, { "i32": {{maxExclusive}} }]
                   }
                 }
               ]
@@ -111,6 +148,62 @@ public sealed class WorkerDeterministicRandomAuditValidationTests
           ]
         }
         """;
+
+    private sealed class ValidDeterministicRandomWorker(
+        DateTimeOffset logicalNow,
+        int minInclusive,
+        int maxExclusive) : ISandboxWorkerClient
+    {
+        public ValueTask<SandboxExecutionResult> ExecuteInWorkerAsync(
+            ExecutionPlan plan,
+            string entrypoint,
+            SandboxValue input,
+            SandboxExecutionOptions options,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var runId = options.RunId ?? SandboxRunId.New();
+            var usage = Usage(plan);
+            var audit = new InMemoryAuditSink();
+            var context = new SandboxContext(
+                runId,
+                plan.Policy,
+                new ResourceMeter(plan.Budget),
+                new BindingRegistry([]),
+                audit,
+                cancellationToken);
+            var value = context.NextRandomInt32(minInclusive, maxExclusive);
+            audit.Write(new SandboxAuditEvent(
+                runId,
+                "RunSummary",
+                logicalNow,
+                true,
+                ResourceId: $"module:{plan.ModuleHash}",
+                Fields: SummaryFields(plan, usage)));
+            audit.Write(new SandboxAuditEvent(
+                runId,
+                "BindingCall",
+                logicalNow,
+                true,
+                BindingId: "random.nextI32",
+                CapabilityId: "random",
+                Effect: SandboxEffect.Random,
+                ResourceId: "random:i32",
+                Fields: RandomFields(plan, minInclusive, maxExclusive, value)));
+
+            return ValueTask.FromResult(new SandboxExecutionResult
+            {
+                Succeeded = true,
+                Value = SandboxValue.FromInt32(value),
+                ResourceUsage = usage,
+                AuditEvents = audit.Events,
+                ActualMode = ExecutionMode.Interpreted,
+                ModuleHash = plan.ModuleHash,
+                PlanHash = plan.PlanHash,
+                PolicyHash = plan.PolicyHash
+            });
+        }
+    }
 
     private sealed class ForgedDeterministicRandomWorker(DateTimeOffset logicalNow) : ISandboxWorkerClient
     {
