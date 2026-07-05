@@ -188,10 +188,10 @@ public override string ToString() => Value.ToString("N")
 public readonly record struct ShortCircuitOperands(Expression First, Expression Second, bool Reordered)
 public RecordValue(IReadOnlyList<SandboxValue> Fields)
 public required IReadOnlyList<SandboxAuditEvent> AuditEvents
-public required SandboxResourceUsage ResourceUsage { get; init; }
-public required string ModuleHash { get; init; }
-public required string PlanHash { get; init; }
-public required string PolicyHash { get; init; }
+public required SandboxResourceUsage ResourceUsage
+public required string ModuleHash
+public required string PlanHash
+public required string PolicyHash
 public ResourceLimits Budget { get; }
 public ResourceLimits Limits { get; }
 public ResourceLimits ResourceLimits { get => _resourceLimits; init { _resourceLimits = value; ResetHash(); } }
@@ -281,6 +281,8 @@ public sealed record RecordValue : SandboxValue
 public sealed record ResourceLimits( long MaxFuel = 100_000, long MaxLoopIterations = 100_000, TimeSpan? MaxWallTime = null, long MaxAllocatedBytes = 1_048_576, int MaxCallDepth = 64, int MaxHostCalls = 100, int MaxListLength = 10_000, int MaxMapEntries = 10_000, int MaxCollectionDepth = 32, long MaxTotalCollectionElements = 100_000, long MaxFileBytesRead = 1_048_576, long MaxFileBytesWritten = 0, long MaxNetworkBytesRead = 1_048_576, long MaxNetworkBytesWritten = 1_048_576, int MaxLogEvents = 100, int MaxLogMessageLength = 4_096, int MaxStringLength = 65_536, long MaxTotalStringBytes = 1_048_576)
 public sealed record ReturnStatement(Expression Value, SourceSpan Span) : Statement(Span)
 public sealed record SandboxAuditEvent( SandboxRunId RunId, string Kind, DateTimeOffset Timestamp, bool Success, string? BindingId = null, string? CapabilityId = null, SandboxEffect Effect = SandboxEffect.None, string? ResourceId = null, SandboxErrorCode? ErrorCode = null, string? Message = null, long? Bytes = null, IReadOnlyDictionary<string, string>? Fields = null, long SequenceNumber = 0)
+public SandboxRunId RunId { get => _runId; init => _runId = value ?? throw new ArgumentNullException(nameof(RunId)); }
+public string Kind { get => _kind; init => _kind = value ?? throw new ArgumentNullException(nameof(Kind)); }
 public sealed record SandboxDiagnostic( string Code, string Message, DiagnosticSeverity Severity = DiagnosticSeverity.Error, SourceSpan? Span = null)
 public sealed record SandboxError( SandboxErrorCode Code, string SafeMessage, string? DiagnosticId = null)
 public sealed record SandboxExecutionOptions
