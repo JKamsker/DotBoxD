@@ -55,7 +55,7 @@ internal static partial class MethodModelFactory
 
     private static string? EmptyConfiguredNameReason(string? configuredMethodName)
         => configuredMethodName is not null && string.IsNullOrWhiteSpace(configuredMethodName)
-            ? "[DotBoxDMethod(Name = ...)] wire name must not be empty or whitespace"
+            ? "[RpcMethod(Name = ...)] wire name must not be empty or whitespace"
             : null;
 
     private static string? UnsupportedReturnTypeReason(

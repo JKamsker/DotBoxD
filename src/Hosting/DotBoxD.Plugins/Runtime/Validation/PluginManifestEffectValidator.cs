@@ -54,7 +54,11 @@ internal static class PluginManifestEffectValidator
     }
 
     private static bool TryParseDeclaredEffect(
-        string effect,
+        string? effect,
         out SandboxEffect parsed)
-        => DeclaredEffects.TryGetValue(effect, out parsed);
+    {
+        parsed = SandboxEffect.None;
+        return effect is not null &&
+               DeclaredEffects.TryGetValue(effect, out parsed);
+    }
 }

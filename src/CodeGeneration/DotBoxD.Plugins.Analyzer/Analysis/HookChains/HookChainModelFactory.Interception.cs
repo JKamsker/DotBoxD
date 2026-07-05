@@ -145,7 +145,8 @@ internal static partial class HookChainModelFactory
         bool hasLocalDecoder)
     {
         if (projectedTypeSymbol is not INamedTypeSymbol { IsAnonymousType: true } anonymousProjection ||
-            context.Method.Parameters[0].Type is not INamedTypeSymbol handlerType)
+            context.Method.Parameters[0].Type is not INamedTypeSymbol handlerType ||
+            context.Method.ReturnType is not INamedTypeSymbol returnType)
         {
             return null;
         }
@@ -157,7 +158,7 @@ internal static partial class HookChainModelFactory
             attributeSyntax,
             RewriteWithTypeParameters(receiverType, substitution),
             RewriteWithTypeParameters(handlerType, substitution),
-            RewriteWithTypeParameters((INamedTypeSymbol)context.Method.ReturnType, substitution),
+            RewriteWithTypeParameters(returnType, substitution),
             packageFullName,
             installKind,
             hasLocalDecoder,

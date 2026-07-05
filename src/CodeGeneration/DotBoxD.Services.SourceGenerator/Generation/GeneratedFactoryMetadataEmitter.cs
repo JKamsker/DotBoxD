@@ -185,7 +185,10 @@ internal static class GeneratedFactoryMetadataEmitter
     private static string ReturnKindName(MethodReturnKind returnKind)
         => ReturnKindNames.TryGetValue(returnKind, out var name)
             ? name
-            : ServicesGeneratorMemberNames.GeneratedReturnKind.Void;
+            : throw new System.ArgumentOutOfRangeException(
+                nameof(returnKind),
+                returnKind,
+                "Unmapped MethodReturnKind.");
 
     private static string BoolLiteral(bool value) => value ? "true" : "false";
 }
