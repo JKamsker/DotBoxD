@@ -140,58 +140,49 @@ internal static class ServiceModelFactory
             var sigKey = MethodSignatureFacts.GetSignatureKey(methodSymbol, ct);
             if (seenSignatures.TryGetValue(sigKey, out var existingMethod))
             {
+                ServiceResult RejectDuplicateMethod(string reason) =>
+                    RejectedService(displayName, reason, DiagnosticLocationFactory.FromSymbol(methodSymbol), qualifiedInterfaceName);
+
                 if (!InheritedMethodDeduplicator.HasCompatibleReturnShape(existingMethod, methodSymbol, ct))
                 {
-                    return RejectedService(
-                        displayName,
-                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but an incompatible return type",
-                        DiagnosticLocationFactory.FromSymbol(methodSymbol),
-                        qualifiedInterfaceName);
+                    return RejectDuplicateMethod(
+                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but an incompatible return type");
                 }
 
                 if (!InheritedMethodDeduplicator.HasSameParameterRefKinds(existingMethod, methodSymbol))
                 {
-                    return RejectedService(
-                        displayName,
-                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible parameter ref kinds",
-                        DiagnosticLocationFactory.FromSymbol(methodSymbol),
-                        qualifiedInterfaceName);
+                    return RejectDuplicateMethod(
+                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible parameter ref kinds");
+                }
+
+                if (!InheritedMethodDeduplicator.HasSameParameterNames(existingMethod, methodSymbol))
+                {
+                    return RejectDuplicateMethod(
+                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible parameter names");
                 }
 
                 if (!MethodSignatureFacts.HaveSameGenericConstraints(existingMethod, methodSymbol, ct))
                 {
-                    return RejectedService(
-                        displayName,
-                        $"inherited generic method '{methodSymbol.Name}' has the same signature as another method but incompatible generic constraints",
-                        DiagnosticLocationFactory.FromSymbol(methodSymbol),
-                        qualifiedInterfaceName);
+                    return RejectDuplicateMethod(
+                        $"inherited generic method '{methodSymbol.Name}' has the same signature as another method but incompatible generic constraints");
                 }
 
                 if (!InheritedMethodDeduplicator.HasSameNullableAnnotations(existingMethod, methodSymbol, ct))
                 {
-                    return RejectedService(
-                        displayName,
-                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible nullable annotations",
-                        DiagnosticLocationFactory.FromSymbol(methodSymbol),
-                        qualifiedInterfaceName);
+                    return RejectDuplicateMethod(
+                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible nullable annotations");
                 }
 
                 if (!TupleElementNameComparer.HasSameElementNames(existingMethod, methodSymbol, ct))
                 {
-                    return RejectedService(
-                        displayName,
-                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible tuple element names",
-                        DiagnosticLocationFactory.FromSymbol(methodSymbol),
-                        qualifiedInterfaceName);
+                    return RejectDuplicateMethod(
+                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible tuple element names");
                 }
 
                 if (!InheritedMethodDeduplicator.HasSameEffectiveWireName(existingMethod, methodSymbol))
                 {
-                    return RejectedService(
-                        displayName,
-                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but a different wire method name",
-                        DiagnosticLocationFactory.FromSymbol(methodSymbol),
-                        qualifiedInterfaceName);
+                    return RejectDuplicateMethod(
+                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but a different wire method name");
                 }
 
                 var existingIndex = seenSignatureIndexes[sigKey];

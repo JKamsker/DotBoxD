@@ -35,6 +35,24 @@ internal static class InheritedMethodDeduplicator
         return true;
     }
 
+    public static bool HasSameParameterNames(IMethodSymbol left, IMethodSymbol right)
+    {
+        if (left.Parameters.Length != right.Parameters.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < left.Parameters.Length; i++)
+        {
+            if (left.Parameters[i].Name != right.Parameters[i].Name)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public static bool HasSameNullableAnnotations(
         IMethodSymbol left,
         IMethodSymbol right,
