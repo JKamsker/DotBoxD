@@ -45,6 +45,54 @@ public sealed class SafeHttpCancellationTests
         AssertNoPreCancellationSideEffects(context, audit, dnsCalls);
     }
 
+    [Fact]
+    public async Task GetTextAsync_with_operation_token_cancelled_after_dns_reports_cancelled()
+    {
+        using var operationCancellation = new CancellationTokenSource();
+        var audit = new InMemoryAuditSink();
+        var policy = SandboxPolicyBuilder.Create()
+            .GrantHttpGet(["api.example.com"], maxResponseBytes: 1024)
+            .WithFuel(5_000)
+            .Build();
+        var context = new SandboxContext(
+            SandboxRunId.New(),
+            policy,
+            new ResourceMeter(policy.ResourceLimits),
+            new BindingRegistryBuilder().Build(),
+            audit,
+            CancellationToken.None);
+        var dnsCalls = 0;
+        SafeDnsResolver dns = (_, _) =>
+        {
+            dnsCalls++;
+            operationCancellation.Cancel();
+            return ValueTask.FromResult<IReadOnlyList<IPAddress>>([IPAddress.Parse("93.184.216.34")]);
+        };
+
+        var ex = await Assert.ThrowsAsync<SandboxRuntimeException>(async () =>
+            await SafeHttpClient.GetTextAsync(
+                context,
+                new SandboxUri("https://api.example.com/config"),
+                new SafeInMemoryHttpMessageInvoker("remote-config"),
+                dns,
+                operationCancellation.Token));
+
+        Assert.Equal(1, dnsCalls);
+        var auditEvent = Assert.Single(audit.Events, e => e.BindingId == "net.http.get" && !e.Success);
+        var failures = new List<string>();
+        if (ex.Error.Code != SandboxErrorCode.Cancelled)
+        {
+            failures.Add($"expected exception code Cancelled, observed {ex.Error.Code}");
+        }
+
+        if (auditEvent.ErrorCode != SandboxErrorCode.Cancelled)
+        {
+            failures.Add($"expected audit error Cancelled, observed {auditEvent.ErrorCode}");
+        }
+
+        Assert.Empty(failures);
+    }
+
     private static void AssertNoPreCancellationSideEffects(
         SandboxContext context,
         InMemoryAuditSink audit,
