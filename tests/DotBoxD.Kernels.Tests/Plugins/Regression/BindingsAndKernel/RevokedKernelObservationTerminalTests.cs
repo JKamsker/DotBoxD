@@ -31,6 +31,8 @@ public sealed class RevokedKernelObservationTerminalTests
         var observation = Assert.Single(installed.ExecutionObservations);
         Assert.Equal("Handle", observation.Entrypoint);
         Assert.False(observation.Succeeded);
+        // The recorded Handle terminal result must match HandleAsync's PolicyDenied failure,
+        // not the cancellation observed by the lower-level prepared execution.
         Assert.Equal(SandboxErrorCode.PolicyDenied, observation.ErrorCode);
     }
 

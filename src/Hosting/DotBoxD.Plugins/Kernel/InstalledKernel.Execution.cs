@@ -26,9 +26,10 @@ public sealed partial class InstalledKernel
                 executionCancellation.Token,
                 ReusableNoAuditState(entrypoint))
             .ConfigureAwait(false);
-        var terminalResult = IsRevoked ? WithRevokedError(result) : result;
+        var isRevoked = IsRevoked;
+        var terminalResult = isRevoked ? WithRevokedError(result) : result;
         _executionObserver.Record(entrypoint, _executionMode, terminalResult);
-        if (IsRevoked)
+        if (isRevoked)
         {
             PluginKernelRevocation.ThrowIfRevoked(true);
         }
