@@ -1,4 +1,5 @@
 using System.Text;
+using DotBoxD.CodeGeneration.Shared.Defaults;
 using Microsoft.CodeAnalysis;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
@@ -16,6 +17,11 @@ internal static class PluginServerFlowAttributeSource
         var builder = new StringBuilder();
         foreach (var attribute in parameter.GetAttributes())
         {
+            if (CallerInfoAttributeFormatter.TryAppend(builder, attribute))
+            {
+                continue;
+            }
+
             switch (attribute.AttributeClass?.ToDisplayString())
             {
                 case "System.Diagnostics.CodeAnalysis.AllowNullAttribute":

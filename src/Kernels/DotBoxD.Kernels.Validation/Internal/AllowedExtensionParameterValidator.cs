@@ -15,7 +15,7 @@ internal static class AllowedExtensionParameterValidator
             return;
         }
 
-        if (!HasAllowedExtensionValue(value))
+        if (string.IsNullOrWhiteSpace(value) || !HasAllowedExtensionValue(value))
         {
             Add(diagnostics, grant, $"parameter '{Key}' must contain at least one extension");
             return;

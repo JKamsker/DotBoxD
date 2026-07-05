@@ -232,6 +232,7 @@ public sealed class BindingRegistry : IBindingCatalog
             binding.CostModel.AllocationFromReturnBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
             binding.CostModel.MaxCallsPerRun?.ToString(System.Globalization.CultureInfo.InvariantCulture),
             binding.AuditLevel.ToString(),
+            binding.AuditKind,
             binding.Safety.ToString(),
             binding.IsAsync.ToString(System.Globalization.CultureInfo.InvariantCulture),
             binding.Compiled.Kind,

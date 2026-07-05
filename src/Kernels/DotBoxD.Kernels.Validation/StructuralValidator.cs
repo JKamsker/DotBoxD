@@ -4,6 +4,7 @@ using DotBoxD.Kernels.Sandbox;
 namespace DotBoxD.Kernels.Validation;
 
 using DotBoxD.Kernels;
+using DotBoxD.Kernels.Validation.Internal;
 
 internal static class StructuralValidator
 {
@@ -54,18 +55,52 @@ internal static class StructuralValidator
     {
         CheckIdentifier(function.Id, "function id", diagnostics);
         CheckType(function.ReturnType, diagnostics, declaredOpaqueIdTypes);
-        CheckDuplicateParameters(function, diagnostics);
+        var hasNullParameters = CheckNullEntries(function.Parameters, "parameters", function.Id, diagnostics);
+        CheckNullEntries(function.Body, "body", function.Id, diagnostics);
 
-        foreach (var parameter in function.Parameters)
+        if (!hasNullParameters)
         {
-            CheckIdentifier(parameter.Name, "parameter name", diagnostics);
-            CheckType(parameter.Type, diagnostics, declaredOpaqueIdTypes);
+            CheckDuplicateParameters(function, diagnostics);
+            foreach (var parameter in function.Parameters)
+            {
+                CheckIdentifier(parameter.Name, "parameter name", diagnostics);
+                CheckType(parameter.Type, diagnostics, declaredOpaqueIdTypes);
+            }
         }
 
         foreach (var statement in function.Body)
         {
+            if (statement is null)
+            {
+                continue;
+            }
+
+            IrNullValidator.Scan(statement, diagnostics);
             DangerousReferenceDetector.Scan(statement, diagnostics);
         }
+    }
+
+    private static bool CheckNullEntries<T>(
+        IReadOnlyList<T> values,
+        string collectionName,
+        string functionId,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        var hasNull = false;
+        for (var i = 0; i < values.Count; i++)
+        {
+            if (values[i] is not null)
+            {
+                continue;
+            }
+
+            hasNull = true;
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-STRUCT-NULL",
+                $"function '{functionId}' {collectionName} entry at index {i} must not be null"));
+        }
+
+        return hasNull;
     }
 
     private static void CheckDuplicateCapabilityRequests(
