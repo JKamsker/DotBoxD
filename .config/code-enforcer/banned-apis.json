@@ -1,0 +1,140 @@
+{
+  "rules": [
+    {
+      "name": "No direct console IO in shipping libraries",
+      "forbiddenIn": [ "src/**" ],
+      "allowedIn": [],
+      "symbols": [
+        {
+          "name": "Console IO",
+          "pattern": "\\b(?:System\\.)?Console\\.(?:Write|WriteLine|Error|Out|Read|ReadLine|Beep)\\b"
+        }
+      ],
+      "reason": "Shipping libraries must not write to process-global console streams.",
+      "remediation": "Route diagnostics through explicit logging, audit, or caller-owned output abstractions."
+    },
+    {
+      "name": "No raw process spawning in shipping runtime code",
+      "forbiddenIn": [ "src/**" ],
+      "allowedIn": [],
+      "symbols": [
+        {
+          "name": "Process.Start",
+          "pattern": "\\b(?:System\\.Diagnostics\\.)?Process\\.Start\\s*\\("
+        }
+      ],
+      "reason": "Process spawning crosses a host security boundary and must be explicit and reviewable.",
+      "remediation": "Move process execution to approved tooling or introduce a reviewed host abstraction."
+    },
+    {
+      "name": "No direct networking outside transport layers",
+      "forbiddenIn": [ "src/**" ],
+      "allowedIn": [
+        {
+          "path": "src/Channels/DotBoxD.Transports.Tcp/**",
+          "reason": "The TCP transport package owns direct TcpClient/TcpListener usage."
+        },
+        {
+          "path": "src/Hosting/DotBoxD.Hosting.Http/**",
+          "reason": "The HTTP hosting package owns reviewed outbound HTTP/DNS/socket usage for pinned safe HTTP bindings."
+        },
+        {
+          "path": "src/Kernels/DotBoxD.Kernels/Sandbox/SandboxType.cs",
+          "reason": "The sandbox type guard lists forbidden framework type names; it does not open sockets."
+        }
+      ],
+      "symbols": [
+        {
+          "name": "TCP socket APIs",
+          "pattern": "\\b(?:TcpClient|TcpListener|Socket)\\b"
+        },
+        {
+          "name": "HTTP/DNS APIs",
+          "pattern": "\\b(?:HttpClient|Dns)\\b"
+        }
+      ],
+      "reason": "Network access must stay behind approved transport layers and kernel verifier deny-lists.",
+      "remediation": "Use an approved transport package or extend the reviewed transport abstraction."
+    },
+    {
+      "name": "No nondeterministic time or random primitives in kernel code",
+      "forbiddenIn": [ "src/Kernels/**" ],
+      "allowedIn": [
+        {
+          "path": "src/Kernels/DotBoxD.Kernels/Bindings/BindingAuditFields.cs",
+          "reason": "Binding audit fields measure host-call elapsed time at the sandbox boundary."
+        },
+        {
+          "path": "src/Kernels/DotBoxD.Kernels/Policy.cs",
+          "reason": "SandboxPolicy owns the nondeterministic grant clock fallback for non-deterministic policies."
+        },
+        {
+          "path": "src/Kernels/DotBoxD.Kernels/Sandbox/Values/SandboxContextSources.cs",
+          "reason": "SandboxContext centralizes deterministic and nondeterministic clock/random sources."
+        },
+        {
+          "path": "src/Kernels/DotBoxD.Kernels.Interpreter/SandboxInterpreter.cs",
+          "reason": "The interpreter stamps run-summary audit events at the sandbox boundary."
+        },
+        {
+          "path": "src/Kernels/DotBoxD.Kernels.Runtime/Bindings/SafeFileSystem.cs",
+          "reason": "Safe file bindings stamp audited host filesystem operations at the runtime boundary."
+        },
+        {
+          "path": "src/Kernels/DotBoxD.Kernels.Runtime/Bindings/SafeLogBindings.cs",
+          "reason": "Safe log bindings stamp audited host log operations at the runtime boundary."
+        },
+        {
+          "path": "src/Kernels/DotBoxD.Kernels.Runtime/Bindings/SafeRandomBindings.cs",
+          "reason": "Safe random bindings delegate to SandboxContext, which enforces deterministic seeds."
+        },
+        {
+          "path": "src/Kernels/DotBoxD.Kernels.Runtime/Bindings/SafeTimeBindings.cs",
+          "reason": "Safe time bindings delegate to SandboxContext, which enforces deterministic logical time."
+        },
+        {
+          "path": "src/Kernels/DotBoxD.Kernels.Compiler/PersistentCompiledArtifactCache.cs",
+          "reason": "The compiler cache stamps quarantined artifact paths outside deterministic sandbox execution."
+        },
+        {
+          "path": "src/Kernels/DotBoxD.Kernels.Compiler/Emitters/ReflectionEmitSandboxCompiler.cs",
+          "reason": "The compiler emits artifact manifest evidence after deterministic plan compilation."
+        },
+        {
+          "path": "src/Kernels/DotBoxD.Kernels.Verifier/Generated/GeneratedAssemblyVerifier.cs",
+          "reason": "The verifier stamps verification evidence after all deterministic checks complete."
+        }
+      ],
+      "symbols": [
+        {
+          "name": "wall clock",
+          "pattern": "\\bDateTime(?:Offset)?\\.(?:UtcNow|Now)\\b"
+        },
+        {
+          "name": "shared random source",
+          "pattern": "\\bRandom\\.Shared\\b|\\bnew\\s+Random\\s*\\("
+        }
+      ],
+      "reason": "Kernel execution and validation paths must not bypass the policy-owned clock/random abstractions.",
+      "remediation": "Use SandboxContext, SandboxPolicy logical time, deterministic seeds, or an approved boundary wrapper."
+    },
+    {
+      "name": "No raw filesystem access in kernel validation except policy-owned IO checks",
+      "forbiddenIn": [ "src/Kernels/DotBoxD.Kernels.Validation/**" ],
+      "allowedIn": [
+        {
+          "path": "src/Kernels/DotBoxD.Kernels.Validation/Internal/FilePolicyGrantValidator.cs",
+          "reason": "FilePolicyGrantValidator is the validation component that owns policy root filesystem checks."
+        }
+      ],
+      "symbols": [
+        {
+          "name": "File/Directory APIs",
+          "pattern": "\\b(?:File|Directory)\\.(?:Exists|Create|CreateDirectory|Delete|Enumerate|Get|Move|Open|Read|Replace|Set|Write)"
+        }
+      ],
+      "reason": "Kernel validation should not grow ad hoc filesystem probes outside the policy grant validator.",
+      "remediation": "Route filesystem validation through FilePolicyGrantValidator or document a new approved validator."
+    }
+  ]
+}
