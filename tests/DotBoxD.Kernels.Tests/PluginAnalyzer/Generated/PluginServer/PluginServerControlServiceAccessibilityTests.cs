@@ -109,7 +109,7 @@ public sealed class PluginServerControlServiceAccessibilityTests
 
         namespace Regression.Game
         {
-            [DotBoxDService]
+            [RpcService]
             public interface IGameWorldAccess;
         }
 
@@ -183,7 +183,7 @@ public sealed class PluginServerControlServiceAccessibilityTests
 
         namespace Regression.Game
         {
-            [DotBoxDService]
+            [RpcService]
             public interface IGameWorldAccess;
         }
 

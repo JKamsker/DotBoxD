@@ -19,7 +19,7 @@ public sealed class ServerExtensionClientInheritedParameterNameSurpriseTests
 
             namespace Sample;
 
-            [DotBoxDService]
+            [RpcService]
             public interface IRemoteControl
             {
             }

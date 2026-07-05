@@ -7,8 +7,6 @@ namespace DotBoxD.Services.SourceGenerator.Models;
 
 internal static class InheritedMethodDeduplicator
 {
-    private const string DotBoxDMethodAttributeName = ServicesGeneratorTypeNames.DotBoxDMethodAttribute;
-
     public static string? GetDuplicateSignatureRejectionReason(
         IMethodSymbol existingMethod,
         IMethodSymbol methodSymbol,
@@ -229,7 +227,7 @@ internal static class InheritedMethodDeduplicator
     {
         foreach (var attr in methodSymbol.GetAttributes())
         {
-            if (attr.AttributeClass?.ToDisplayString() != DotBoxDMethodAttributeName)
+            if (!ServicesGeneratorTypeNames.IsRpcMethodAttribute(attr.AttributeClass?.ToDisplayString()))
             {
                 continue;
             }

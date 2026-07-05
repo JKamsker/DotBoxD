@@ -41,7 +41,7 @@ internal static partial class PluginServerFacadeModelFactory
 
         var worldType = ResolveWorldType(type)
             ?? throw new NotSupportedException(
-                $"Generated plugin server '{type.Name}' must directly implement one [DotBoxDService] world interface.");
+                $"Generated plugin server '{type.Name}' must directly implement one [RpcService] world interface.");
         ValidateWorldType(type, compilation, worldType);
         var controlServiceType = ResolveControlService(type, compilation, worldType)
             ?? throw new NotSupportedException(
@@ -145,7 +145,7 @@ internal static partial class PluginServerFacadeModelFactory
                 : PluginServerReturnWrapperKind.ValueTask;
         }
         if (serviceType is not INamedTypeSymbol namedServiceType ||
-            !HasAttribute(namedServiceType, DotBoxDMetadataNames.DotBoxDServiceAttribute))
+            !HasAttribute(namedServiceType, DotBoxDMetadataNames.RpcServiceAttribute))
         {
             return (null, PluginServerReturnWrapperKind.None);
         }

@@ -13,8 +13,6 @@ namespace DotBoxD.Services.SourceGenerator.EntryPoint;
 [Generator(LanguageNames.CSharp)]
 public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
 {
-    private const string DotBoxDServiceAttributeName = ServicesGeneratorTypeNames.DotBoxDServiceAttribute;
-
     private static readonly DiagnosticDescriptor s_generatorErrorRule = new(
         id: "DBXS001",
         title: "DotBoxD source generator error",
@@ -51,7 +49,7 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
     {
         var results = context.SyntaxProvider
             .ForAttributeWithMetadataName(
-                DotBoxDServiceAttributeName,
+                ServicesGeneratorTypeNames.RpcServiceAttribute,
                 predicate: static (node, _) => node is InterfaceDeclarationSyntax,
                 transform: static (ctx, ct) => ServiceModelFactory.GetServiceResult(ctx, ct))
             .WithTrackingName("RawServiceResults");

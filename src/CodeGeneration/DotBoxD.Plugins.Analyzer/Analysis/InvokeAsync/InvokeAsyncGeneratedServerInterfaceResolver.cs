@@ -45,7 +45,7 @@ internal static class InvokeAsyncGeneratedServerInterfaceResolver
         foreach (var metadataName in CandidateWorldMetadataNames(type))
         {
             if (compilation.GetTypeByMetadataName(metadataName) is { } candidate &&
-                HasDotBoxDServiceAttribute(candidate) &&
+                HasRpcServiceAttribute(candidate) &&
                 string.Equals(type.Name, ServerInterfaceName(candidate), StringComparison.Ordinal))
             {
                 worldType = candidate;
@@ -136,7 +136,7 @@ internal static class InvokeAsyncGeneratedServerInterfaceResolver
         var found = false;
         foreach (var candidate in type.Interfaces)
         {
-            if (HasDotBoxDServiceAttribute(candidate))
+            if (HasRpcServiceAttribute(candidate))
             {
                 if (found)
                 {
@@ -155,8 +155,8 @@ internal static class InvokeAsyncGeneratedServerInterfaceResolver
     private static bool HasGeneratePluginServerAttribute(INamedTypeSymbol type)
         => HasAttribute(type, DotBoxDMetadataNames.GeneratePluginServerAttribute);
 
-    private static bool HasDotBoxDServiceAttribute(INamedTypeSymbol type)
-        => HasAttribute(type, DotBoxDMetadataNames.DotBoxDServiceAttribute);
+    private static bool HasRpcServiceAttribute(INamedTypeSymbol type)
+        => HasAttribute(type, DotBoxDMetadataNames.RpcServiceAttribute);
 
     private static bool HasGeneratedServerShape(INamedTypeSymbol type)
         => type.GetMembers("Services").OfType<IPropertySymbol>().Any(property =>
@@ -168,10 +168,11 @@ internal static class InvokeAsyncGeneratedServerInterfaceResolver
     {
         foreach (var attribute in type.GetAttributes())
         {
-            if (string.Equals(
-                    attribute.AttributeClass?.ToDisplayString(),
-                    metadataName,
-                    StringComparison.Ordinal))
+            var attributeName = attribute.AttributeClass?.ToDisplayString();
+            var matches = string.Equals(metadataName, DotBoxDMetadataNames.RpcServiceAttribute, StringComparison.Ordinal)
+                ? DotBoxDMetadataNames.IsRpcServiceAttribute(attributeName)
+                : string.Equals(attributeName, metadataName, StringComparison.Ordinal);
+            if (matches)
             {
                 return true;
             }
