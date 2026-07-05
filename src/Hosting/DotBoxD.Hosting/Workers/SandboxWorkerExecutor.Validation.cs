@@ -188,13 +188,13 @@ internal sealed partial class SandboxWorkerExecutor
             }
             expectedSequenceNumber++;
 
-            if (result.Succeeded && !auditEvent.Success)
-            {
-                return false;
-            }
-
             if (IsBindingAudit(auditEvent.Kind))
             {
+                if (result.Succeeded && !auditEvent.Success)
+                {
+                    return false;
+                }
+
                 observedHostCalls++;
                 observedBindingCalls ??= new Dictionary<string, int>(StringComparer.Ordinal);
                 if (!TryRecordBindingAuditEvidence(

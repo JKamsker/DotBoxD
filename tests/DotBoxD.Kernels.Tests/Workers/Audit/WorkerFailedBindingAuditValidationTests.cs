@@ -34,6 +34,28 @@ public sealed class WorkerFailedBindingAuditValidationTests
         Assert.Contains(result.AuditEvents, e => e.Kind == "WorkerIsolationFailed");
     }
 
+    [Fact]
+    public async Task Worker_accepts_successful_fallback_result_that_carries_verifier_failure_audit()
+    {
+        var worker = new VerifierFailureFallbackWorker();
+        using var host = WorkerAuditValidationTestSupport.Host(worker);
+        var plan = await WorkerAuditValidationTestSupport.PrepareAsync(host);
+
+        var result = await WorkerAuditValidationTestSupport.ExecuteAsync(host, plan);
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Equal(ExecutionMode.Interpreted, result.ActualMode);
+        Assert.Contains(result.AuditEvents, e =>
+            e.Kind == "VerifierFailure" &&
+            !e.Success &&
+            e.ErrorCode == SandboxErrorCode.VerifierFailure);
+        Assert.Contains(result.AuditEvents, e =>
+            e.Kind == "ExecutionFallback" &&
+            e.Success &&
+            e.ErrorCode == SandboxErrorCode.VerifierFailure);
+        Assert.DoesNotContain(result.AuditEvents, e => e.Kind == "WorkerIsolationFailed");
+    }
+
     private static SandboxResourceUsage Usage(ExecutionPlan plan)
         => new(
             FuelUsed: 2,
@@ -97,6 +119,60 @@ public sealed class WorkerFailedBindingAuditValidationTests
             {
                 Succeeded = true,
                 Value = SandboxValue.Unit,
+                ResourceUsage = usage,
+                AuditEvents = audit.Events,
+                ActualMode = ExecutionMode.Interpreted,
+                ModuleHash = plan.ModuleHash,
+                PlanHash = plan.PlanHash,
+                PolicyHash = plan.PolicyHash
+            });
+        }
+    }
+
+    private sealed class VerifierFailureFallbackWorker : ISandboxWorkerClient
+    {
+        public ValueTask<SandboxExecutionResult> ExecuteInWorkerAsync(
+            ExecutionPlan plan,
+            string entrypoint,
+            SandboxValue input,
+            SandboxExecutionOptions options,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var runId = options.RunId ?? SandboxRunId.New();
+            var budget = new ResourceMeter(plan.Budget);
+            var usage = budget.Snapshot();
+            var audit = new InMemoryAuditSink();
+            audit.Write(new SandboxAuditEvent(
+                runId,
+                "RunSummary",
+                DateTimeOffset.UtcNow,
+                true,
+                ResourceId: $"module:{plan.ModuleHash}",
+                Fields: new Dictionary<string, string>(
+                    RunSummaryAuditFields.Create(plan, budget, ExecutionMode.Interpreted, "None"),
+                    StringComparer.Ordinal)));
+            audit.Write(new SandboxAuditEvent(
+                runId,
+                "VerifierFailure",
+                DateTimeOffset.UtcNow,
+                false,
+                ResourceId: $"module:{plan.ModuleHash}",
+                ErrorCode: SandboxErrorCode.VerifierFailure,
+                Message: "compiled artifact failed verification"));
+            audit.Write(new SandboxAuditEvent(
+                runId,
+                "ExecutionFallback",
+                DateTimeOffset.UtcNow,
+                true,
+                ResourceId: $"module:{plan.ModuleHash}",
+                ErrorCode: SandboxErrorCode.VerifierFailure,
+                Message: "compiled artifact failed verification; fell back to interpreted mode"));
+
+            return ValueTask.FromResult(new SandboxExecutionResult
+            {
+                Succeeded = true,
+                Value = SandboxValue.FromInt32(35),
                 ResourceUsage = usage,
                 AuditEvents = audit.Events,
                 ActualMode = ExecutionMode.Interpreted,
