@@ -93,9 +93,9 @@ internal static class WorkerAuditValidator
             return false;
         }
 
-        if (plan.Policy.Deterministic && plan.Policy.LogicalNow is { } logicalNow)
+        if (plan.Policy.Deterministic)
         {
-            return timestamp == logicalNow;
+            return timestamp == (plan.Policy.LogicalNow ?? DateTimeOffset.UnixEpoch);
         }
 
         return timestamp <= DateTimeOffset.UtcNow.AddMinutes(5);
