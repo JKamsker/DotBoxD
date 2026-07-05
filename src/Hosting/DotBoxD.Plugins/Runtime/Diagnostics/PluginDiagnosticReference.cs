@@ -20,18 +20,18 @@ public sealed record PluginDiagnosticReference(
     string LikelyCause,
     string Remediation)
 {
-    private string _code = Code ?? throw new ArgumentNullException(nameof(Code));
+    private string _code = ValidateRequired(Code, nameof(Code));
     private PluginDiagnosticPhase _phase = ValidatePhase(Phase);
     private PluginDiagnosticAudience _audience = ValidateAudience(Audience);
-    private string _meaning = Meaning ?? throw new ArgumentNullException(nameof(Meaning));
-    private string _likelyCause = LikelyCause ?? throw new ArgumentNullException(nameof(LikelyCause));
-    private string _remediation = Remediation ?? throw new ArgumentNullException(nameof(Remediation));
+    private string _meaning = ValidateRequired(Meaning, nameof(Meaning));
+    private string _likelyCause = ValidateRequired(LikelyCause, nameof(LikelyCause));
+    private string _remediation = ValidateRequired(Remediation, nameof(Remediation));
 
     /// <summary>The stable <c>DBXK*</c> diagnostic code.</summary>
     public string Code
     {
         get => _code;
-        init => _code = value ?? throw new ArgumentNullException(nameof(Code));
+        init => _code = ValidateRequired(value, nameof(Code));
     }
 
     /// <summary>The runtime phase that emits the code.</summary>
@@ -52,22 +52,25 @@ public sealed record PluginDiagnosticReference(
     public string Meaning
     {
         get => _meaning;
-        init => _meaning = value ?? throw new ArgumentNullException(nameof(Meaning));
+        init => _meaning = ValidateRequired(value, nameof(Meaning));
     }
 
     /// <summary>The most common reason this code is emitted.</summary>
     public string LikelyCause
     {
         get => _likelyCause;
-        init => _likelyCause = value ?? throw new ArgumentNullException(nameof(LikelyCause));
+        init => _likelyCause = ValidateRequired(value, nameof(LikelyCause));
     }
 
     /// <summary>Guidance for the plugin author or host operator investigating the code.</summary>
     public string Remediation
     {
         get => _remediation;
-        init => _remediation = value ?? throw new ArgumentNullException(nameof(Remediation));
+        init => _remediation = ValidateRequired(value, nameof(Remediation));
     }
+
+    private static string ValidateRequired(string? value, string paramName) =>
+        value ?? throw new ArgumentNullException(paramName);
 
     private static PluginDiagnosticPhase ValidatePhase(PluginDiagnosticPhase value) =>
         Enum.IsDefined(value)
