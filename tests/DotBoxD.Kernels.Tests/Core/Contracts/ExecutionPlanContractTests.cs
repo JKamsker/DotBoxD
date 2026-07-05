@@ -11,6 +11,15 @@ public sealed class ExecutionPlanContractTests
     private static readonly Expression Literal = new LiteralExpression(SandboxValue.FromInt32(1), Span);
 
     [Fact]
+    public void Constructor_rejects_null_function_analysis_at_public_boundary()
+    {
+        var exception = Assert.ThrowsAny<ArgumentException>(() =>
+            CreatePlanWithFunctionAnalysis(null!));
+
+        Assert.Equal("functionAnalysis", exception.ParamName);
+    }
+
+    [Fact]
     public void Constructor_rejects_null_function_analysis_entries_at_public_boundary()
     {
         var functionAnalysis = ValidFunctionAnalysis();
@@ -35,7 +44,7 @@ public sealed class ExecutionPlanContractTests
     }
 
     [Fact]
-    public void Constructor_reports_null_binding_reference_sets_as_binding_references()
+    public void Constructor_rejects_null_binding_reference_sets_at_public_boundary()
     {
         var bindingReferences = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
         {
@@ -77,6 +86,21 @@ public sealed class ExecutionPlanContractTests
             new ResourceLimits(),
             functionAnalysis ?? ValidFunctionAnalysis(),
             bindingReferences);
+
+    private static ExecutionPlan CreatePlanWithFunctionAnalysis(
+        IReadOnlyDictionary<string, FunctionAnalysis>? functionAnalysis)
+        => new(
+            "module",
+            "plan",
+            new ExecutionPlanSeal("seal"),
+            "policy",
+            "bindings",
+            EmptyModule(),
+            SandboxPolicyBuilder.Create().Build(),
+            new BindingRegistryBuilder().Build(),
+            new ResourceLimits(),
+            functionAnalysis!,
+            bindingReferences: null);
 
     private static Dictionary<string, FunctionAnalysis> ValidFunctionAnalysis()
         => new(StringComparer.Ordinal)

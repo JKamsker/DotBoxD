@@ -46,7 +46,7 @@ public sealed class ExecutionPlan
         Policy = policy;
         Bindings = bindings;
         Budget = budget;
-        FunctionAnalysis = ModelCopy.Dictionary(functionAnalysis);
+        FunctionAnalysis = CopyFunctionAnalysis(functionAnalysis);
         BindingReferences = CopyBindingReferences(bindingReferences ?? BindingReferenceCollector.CollectByFunction(module, bindings));
     }
 
@@ -157,12 +157,50 @@ public sealed class ExecutionPlan
             hasHostBinding: true);
     }
 
+    private static IReadOnlyDictionary<string, FunctionAnalysis> CopyFunctionAnalysis(
+        IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis)
+    {
+        ArgumentNullException.ThrowIfNull(functionAnalysis);
+        var copy = new Dictionary<string, FunctionAnalysis>(functionAnalysis.Count, StringComparer.Ordinal);
+        foreach (var item in functionAnalysis)
+        {
+            if (string.IsNullOrWhiteSpace(item.Key))
+            {
+                throw new ArgumentException("Function analysis keys cannot be null or whitespace.", nameof(functionAnalysis));
+            }
+            if (item.Value is null)
+            {
+                throw new ArgumentException("Function analysis entries cannot be null.", nameof(functionAnalysis));
+            }
+            if (item.Value.ReturnType is null)
+            {
+                throw new ArgumentException("Function analysis entries must declare a return type.", nameof(functionAnalysis));
+            }
+            copy.Add(item.Key, item.Value);
+        }
+
+        return new System.Collections.ObjectModel.ReadOnlyDictionary<string, FunctionAnalysis>(copy);
+    }
+
     private static IReadOnlyDictionary<string, IReadOnlySet<string>> CopyBindingReferences(
         IReadOnlyDictionary<string, IReadOnlySet<string>> bindingReferences)
     {
+        ArgumentNullException.ThrowIfNull(bindingReferences);
         var copy = new Dictionary<string, IReadOnlySet<string>>(bindingReferences.Count, StringComparer.Ordinal);
         foreach (var item in bindingReferences)
         {
+            if (string.IsNullOrWhiteSpace(item.Key))
+            {
+                throw new ArgumentException("Binding reference keys cannot be null or whitespace.", nameof(bindingReferences));
+            }
+            if (item.Value is null)
+            {
+                throw new ArgumentException("Binding reference sets cannot be null.", nameof(bindingReferences));
+            }
+            if (item.Value.Contains(null!))
+            {
+                throw new ArgumentException("Binding reference entries cannot be null.", nameof(bindingReferences));
+            }
             copy.Add(item.Key, item.Value.ToFrozenSet(StringComparer.Ordinal));
         }
 
