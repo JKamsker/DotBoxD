@@ -121,27 +121,34 @@ public sealed record CompiledArtifact
     public string AssemblyHash
     {
         get => _assemblyHash;
-        init => _assemblyHash = value ?? throw new ArgumentNullException(nameof(AssemblyHash));
+        init => _assemblyHash = RequireNonNull(value, nameof(AssemblyHash));
     }
     public ArtifactManifest Manifest
     {
         get => _manifest;
-        init => _manifest = value ?? throw new ArgumentNullException(nameof(Manifest));
+        init => _manifest = RequireNonNull(value, nameof(Manifest));
     }
     public VerificationResult Verification
     {
         get => _verification;
-        init => _verification = value ?? throw new ArgumentNullException(nameof(Verification));
+        init => _verification = RequireNonNull(value, nameof(Verification));
     }
     public SandboxCompiledEntrypoint Entrypoint
     {
         get => _entrypoint;
-        init => _entrypoint = value ?? throw new ArgumentNullException(nameof(Entrypoint));
+        init => _entrypoint = RequireNonNull(value, nameof(Entrypoint));
     }
     public CompiledRuntimeFormKind RuntimeForm { get; init; }
     public CompiledCacheStatus CacheStatus { get; init; }
     public string? CacheInvalidReason { get; init; }
     public string ArtifactHash => AssemblyHash;
+
+    private static T RequireNonNull<T>(T? value, string paramName)
+        where T : class
+    {
+        ArgumentNullException.ThrowIfNull(value, paramName);
+        return value;
+    }
 }
 
 public interface ISandboxCompiler

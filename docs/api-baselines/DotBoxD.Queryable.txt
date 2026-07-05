@@ -76,7 +76,7 @@ public override void Write(Utf8JsonWriter writer, EventQueryDocument value, Json
 public override void Write(Utf8JsonWriter writer, QueryFilter value, JsonSerializerOptions options)
 public override void Write(Utf8JsonWriter writer, QueryProjection value, JsonSerializerOptions options)
 public override void Write(Utf8JsonWriter writer, QueryValue value, JsonSerializerOptions options)
-public QueryComparisonOperator Operator
+public QueryComparisonOperator Operator { get; init; }
 public QueryFilter? ResidualFilter { get; init; }
 public QueryTranslationException(string message, Exception innerException)
 public QueryTranslationException(string message)

@@ -49,9 +49,9 @@ public enum VerifierDiagnosticCategory.HostVersionMismatch
 public enum VerifierDiagnosticCategory.MalformedArtifact
 public enum VerifierDiagnosticCategory.UnsupportedGeneratedShape
 public interface IGeneratedAssemblyVerifier
-public IReadOnlyList<string> OptimizationFlags
-public IReadOnlyList<string>? OptimizationFlags
-public IReadOnlyList<VerificationDiagnostic> Diagnostics
+public IReadOnlyList<string> OptimizationFlags { get; init; }
+public IReadOnlyList<string>? OptimizationFlags { get; init; }
+public IReadOnlyList<VerificationDiagnostic> Diagnostics { get; init; }
 public IReadOnlySet<string> AllowedAssemblies { get => _allowedAssemblies; init { _allowedAssemblies = Freeze(value); InvalidateHashes(); } }
 public IReadOnlySet<string> AllowedAssemblyIdentities { get => _allowedAssemblyIdentities; init { _allowedAssemblyIdentities = Freeze(value); InvalidateHashes(); } }
 public IReadOnlySet<string> AllowedMembers { get => _allowedMembers; init { _allowedMembers = Freeze(value); InvalidateHashes(); } }

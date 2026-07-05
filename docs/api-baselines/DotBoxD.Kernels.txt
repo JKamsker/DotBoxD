@@ -136,7 +136,7 @@ public IReadOnlyDictionary<string, string> Metadata { get => _metadata; init => 
 public IReadOnlyDictionary<string, string> Parameters { get; init; } =
 public IReadOnlyDictionary<string, string>? Fields { get => _fields; init => _fields = CopyFields(value); }
 public IReadOnlyList<BindingSignature> Signatures => _signatures
-public IReadOnlyList<CapabilityGrant> Grants
+public IReadOnlyList<CapabilityGrant> Grants { get; init; }
 public IReadOnlyList<CapabilityRequest> CapabilityRequests { get => _capabilityRequests; init => _capabilityRequests = ModelCopy.List(value); }
 public IReadOnlyList<Expression> Arguments { get => _arguments; init => _arguments = ModelCopy.List(value); }
 public IReadOnlyList<Parameter> Parameters { get => _parameters; init => _parameters = ModelCopy.List(value); }
@@ -150,7 +150,7 @@ public IReadOnlyList<SandboxValue> Values { get => this; init => _values = Snaps
 public IReadOnlyList<Statement> Body { get => _body; init => _body = ModelCopy.List(value); }
 public IReadOnlyList<Statement> Else { get => _else; init => _else = ModelCopy.List(value); }
 public IReadOnlyList<Statement> Then { get => _then; init => _then = ModelCopy.List(value); }
-public IReadOnlySet<string> DeclaredOpaqueIdTypes
+public IReadOnlySet<string> DeclaredOpaqueIdTypes { get; init; }
 public long AllocatedBytes { get; private set; }
 public long AuditCheckpoint() => Audit.EventsWritten
 public long CollectionElements { get; private set; }
@@ -165,7 +165,7 @@ public long StringBytes { get; private set; }
 public override bool Equals(object? obj) => Equals(obj as ExecutionPlanSeal)
 public override int GetHashCode()
 public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(_value)
-public override SandboxType Type
+public override SandboxType Type { get; }
 public override SandboxType Type => SandboxType.Bool
 public override SandboxType Type => SandboxType.F64
 public override SandboxType Type => SandboxType.Guid
@@ -187,7 +187,7 @@ public override string ToString() => Value
 public override string ToString() => Value.ToString("N")
 public readonly record struct ShortCircuitOperands(Expression First, Expression Second, bool Reordered)
 public RecordValue(IReadOnlyList<SandboxValue> Fields)
-public required IReadOnlyList<SandboxAuditEvent> AuditEvents
+public required IReadOnlyList<SandboxAuditEvent> AuditEvents { get; init; }
 public required SandboxResourceUsage ResourceUsage { get; init; }
 public required string ModuleHash { get; init; }
 public required string PlanHash { get; init; }
@@ -432,8 +432,8 @@ public string PolicyHash { get; }
 public string PolicyId { get => _policyId; init { _policyId = value; ResetHash(); } }
 public string RelativePath { get => _relativePath; init => _relativePath = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
 public string TypeName { get => _typeName; init => _typeName = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
-public string Value
 public string Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
+public string Value { get; init; }
 public string? ArtifactHash { get; init; }
 public TimeSpan EffectiveWallTime => MaxWallTime ?? TimeSpan.FromMilliseconds(100)
 public TimeSpan RemainingWallTime()
