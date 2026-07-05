@@ -50,7 +50,8 @@ public static partial class SafeFileSystem
             SafeFileAudit.Read(context, startedAt, false, FailureResource(path, "file.read"), ObservedReadBytes(context, fileBytesReadBefore), ex.Error.Code);
             throw;
         }
-        catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested &&
+                                                !cancellationToken.IsCancellationRequested)
         {
             var error = new SandboxError(SandboxErrorCode.Timeout, "file.readText denied: request timed out");
             SafeFileAudit.Read(context, startedAt, false, FailureResource(path, "file.read"), ObservedReadBytes(context, fileBytesReadBefore), error.Code);
