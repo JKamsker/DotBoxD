@@ -72,7 +72,8 @@ internal static class WorkerAuditValidator
             "DebugTrace" => options.EnableDebugTrace && ModuleAuditMatches(plan, auditEvent),
             "CacheInvalidated" => false,
             "PolicyDenied" => false,
-            "BindingCall" or "SandboxLog" or "PluginMessage" => BindingAuditMatches(plan, entrypoint, auditEvent),
+            BindingAuditKinds.BindingCall or BindingAuditKinds.SandboxLog or BindingAuditKinds.PluginMessage =>
+                BindingAuditMatches(plan, entrypoint, auditEvent),
             _ => false
         };
     }
@@ -155,6 +156,7 @@ internal static class WorkerAuditValidator
             !plan.Bindings.TryGet(auditEvent.BindingId, out var binding) ||
             binding.AuditLevel is AuditLevel.None or AuditLevel.Summary ||
             string.IsNullOrWhiteSpace(auditEvent.ResourceId) ||
+            !AuditKindMatchesBinding(auditEvent.Kind, binding) ||
             !CapabilityMatches(auditEvent, binding) ||
             !EffectMatches(auditEvent, binding) ||
             !ResultMatches(auditEvent) ||
@@ -166,6 +168,9 @@ internal static class WorkerAuditValidator
 
         return true;
     }
+
+    private static bool AuditKindMatchesBinding(string kind, BindingSignature binding)
+        => string.Equals(kind, binding.AuditKind, StringComparison.Ordinal);
 
     private static bool CapabilityMatches(SandboxAuditEvent auditEvent, BindingSignature binding)
         => binding.RequiredCapability is null ||
@@ -188,7 +193,7 @@ internal static class WorkerAuditValidator
         => auditEvent.Success ? auditEvent.ErrorCode is null : auditEvent.ErrorCode is not null;
 
     private static bool LogAuditMatchesPolicy(ExecutionPlan plan, SandboxAuditEvent auditEvent)
-        => auditEvent.Kind != "SandboxLog" ||
+        => auditEvent.Kind != BindingAuditKinds.SandboxLog ||
            auditEvent.Message is not null &&
            auditEvent.Message.Length <= plan.Budget.MaxLogMessageLength;
 
