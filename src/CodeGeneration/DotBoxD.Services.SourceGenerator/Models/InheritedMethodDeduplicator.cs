@@ -123,13 +123,18 @@ internal static class InheritedMethodDeduplicator
     }
 
     private static string GetReturnFlowAttributeKey(IMethodSymbol method, CancellationToken ct) =>
-        GetFlowAttributeKey(method.GetReturnTypeAttributes(), includeParameterOnlyAttributes: false, ct);
+        GetFlowAttributeKey(method.GetReturnTypeAttributes(), method, includeParameterOnlyAttributes: false, ct);
 
     private static string GetParameterFlowAttributeKey(IParameterSymbol parameter, CancellationToken ct) =>
-        GetFlowAttributeKey(parameter.GetAttributes(), includeParameterOnlyAttributes: true, ct);
+        GetFlowAttributeKey(
+            parameter.GetAttributes(),
+            parameter.ContainingSymbol as IMethodSymbol,
+            includeParameterOnlyAttributes: true,
+            ct);
 
     private static string GetFlowAttributeKey(
         IEnumerable<AttributeData> attributes,
+        IMethodSymbol? containingMethod,
         bool includeParameterOnlyAttributes,
         CancellationToken ct)
     {
@@ -137,7 +142,7 @@ internal static class InheritedMethodDeduplicator
         foreach (var attr in attributes)
         {
             ct.ThrowIfCancellationRequested();
-            var key = GetFlowAttributeKey(attr, includeParameterOnlyAttributes);
+            var key = GetFlowAttributeKey(attr, containingMethod, includeParameterOnlyAttributes);
             if (key is not null)
             {
                 parts.Add(key);
@@ -148,14 +153,18 @@ internal static class InheritedMethodDeduplicator
         return string.Join(";", parts);
     }
 
-    private static string? GetFlowAttributeKey(AttributeData attr, bool includeParameterOnlyAttributes)
+    private static string? GetFlowAttributeKey(
+        AttributeData attr,
+        IMethodSymbol? containingMethod,
+        bool includeParameterOnlyAttributes)
     {
         var name = attr.AttributeClass?.ToDisplayString();
         return name switch
         {
             "System.Diagnostics.CodeAnalysis.MaybeNullAttribute" => name,
             "System.Diagnostics.CodeAnalysis.NotNullAttribute" => name,
-            "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute" => StringAttributeKey(attr, name),
+            "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute" =>
+                ParameterReferenceAttributeKey(attr, name, containingMethod),
             "System.Diagnostics.CodeAnalysis.AllowNullAttribute" when includeParameterOnlyAttributes => name,
             "System.Diagnostics.CodeAnalysis.DisallowNullAttribute" when includeParameterOnlyAttributes => name,
             "System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute" when includeParameterOnlyAttributes =>
@@ -171,10 +180,29 @@ internal static class InheritedMethodDeduplicator
             ? name + "(" + (value ? "true" : "false") + ")"
             : null;
 
-    private static string? StringAttributeKey(AttributeData attr, string name) =>
-        attr.ConstructorArguments.Length == 1 && attr.ConstructorArguments[0].Value is string value
-            ? name + "(\"" + value + "\")"
-            : null;
+    private static string? ParameterReferenceAttributeKey(
+        AttributeData attr,
+        string name,
+        IMethodSymbol? containingMethod)
+    {
+        if (attr.ConstructorArguments.Length != 1 || attr.ConstructorArguments[0].Value is not string value)
+        {
+            return null;
+        }
+
+        if (containingMethod is not null)
+        {
+            for (var i = 0; i < containingMethod.Parameters.Length; i++)
+            {
+                if (containingMethod.Parameters[i].Name == value)
+                {
+                    return name + "(#" + i.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")";
+                }
+            }
+        }
+
+        return name + "(\"" + value + "\")";
+    }
 
     public static string GetNullableTypeKey(
         ITypeSymbol type,
