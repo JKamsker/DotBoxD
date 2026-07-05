@@ -27,6 +27,26 @@ public sealed class ReflectionEmitSandboxCompilerArgumentValidationTests
     }
 
     [Fact]
+    public void CompileOptions_rejects_null_entrypoint_with_init_parameter_name()
+    {
+        var ex = Assert.Throws<ArgumentNullException>(
+            () => new CompileOptions("main") { Entrypoint = null! });
+
+        Assert.Equal("value", ex.ParamName);
+    }
+
+    [Fact]
+    public void CompileOptions_rejects_null_entrypoint_with_expression_parameter_name()
+    {
+        var options = new CompileOptions("main");
+
+        var ex = Assert.Throws<ArgumentNullException>(
+            () => options with { Entrypoint = null! });
+
+        Assert.Equal("value", ex.ParamName);
+    }
+
+    [Fact]
     public async Task CompileAsync_rejects_null_plan_with_public_parameter_name()
     {
         var compiler = CreateCompiler();

@@ -9,8 +9,14 @@ public delegate SandboxValue SandboxCompiledEntrypoint(SandboxContext context, S
 
 public sealed record CompileOptions(string Entrypoint, bool Optimize = false)
 {
-    public string Entrypoint { get; init; } =
+    private string _entrypoint =
         Entrypoint ?? throw new ArgumentNullException(nameof(Entrypoint));
+
+    public string Entrypoint
+    {
+        get => _entrypoint;
+        init => _entrypoint = value ?? throw new ArgumentNullException(nameof(value));
+    }
 }
 
 public enum CompiledRuntimeFormKind
