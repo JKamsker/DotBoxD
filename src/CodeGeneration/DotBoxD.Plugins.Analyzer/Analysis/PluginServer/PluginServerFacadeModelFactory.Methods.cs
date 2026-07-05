@@ -1,3 +1,4 @@
+using DotBoxD.CodeGeneration.Shared.Defaults;
 using Microsoft.CodeAnalysis;
 using static DotBoxD.Plugins.Analyzer.Analysis.PluginServer.PluginServerFacadeNameFormatter;
 
@@ -61,6 +62,12 @@ internal static partial class PluginServerFacadeModelFactory
                             $"Generated plugin server member '{method.ToDisplayString()}' has an inherited signature collision with different return-flow attributes.");
                     }
 
+                    if (!HasSameParameterDefaultShape(existing.Symbol, method))
+                    {
+                        throw new NotSupportedException(
+                            $"Generated plugin server member '{method.ToDisplayString()}' has an inherited optional/default parameter conflict.");
+                    }
+
                     if (IsMoreDerivedMember(method, existing.Symbol))
                     {
                         seenMethods[signature] = new SeenForwardedMethod(method, forwarded, existing.Index);
@@ -118,6 +125,38 @@ internal static partial class PluginServerFacadeModelFactory
         => method.Name + "(" + string.Join(
             ",",
             method.Parameters.Select(static parameter => TypeName(parameter.Type))) + ")";
+
+    private static bool HasSameParameterDefaultShape(IMethodSymbol left, IMethodSymbol right)
+    {
+        if (left.Parameters.Length != right.Parameters.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < left.Parameters.Length; i++)
+        {
+            var leftPreservesMetadata =
+                ShouldPreserveMetadataDefaultAttributes(left, i, out var leftDefaultClause);
+            var rightPreservesMetadata =
+                ShouldPreserveMetadataDefaultAttributes(right, i, out var rightDefaultClause);
+            if (!string.Equals(leftDefaultClause, rightDefaultClause, StringComparison.Ordinal) ||
+                leftPreservesMetadata != rightPreservesMetadata)
+            {
+                return false;
+            }
+
+            if (leftPreservesMetadata &&
+                !string.Equals(
+                    ParameterDefaultValueEmitter.FormatMetadataDefaultAttributePrefix(left.Parameters[i], true),
+                    ParameterDefaultValueEmitter.FormatMetadataDefaultAttributePrefix(right.Parameters[i], true),
+                    StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     private static bool IsMoreDerivedMember(IMethodSymbol candidate, IMethodSymbol existing)
         => !SymbolEqualityComparer.Default.Equals(candidate.ContainingType, existing.ContainingType) &&
