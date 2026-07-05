@@ -1,6 +1,6 @@
 using DotBoxD.Plugins.Runtime;
 
-namespace DotBoxD.Kernels.Tests.Plugins;
+namespace DotBoxD.Kernels.Tests.Plugins.Messaging;
 
 public sealed class PluginMessageBindingContractTests
 {
