@@ -80,6 +80,8 @@ internal sealed class RpcRemoteStream : Stream
             return 0;
         }
 
+        ct.ThrowIfCancellationRequested();
+
         while (_current is null || _offset >= _current.Payload.Length)
         {
             _current?.Dispose();

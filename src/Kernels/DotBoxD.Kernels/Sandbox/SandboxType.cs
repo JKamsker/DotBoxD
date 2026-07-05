@@ -57,10 +57,11 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
 
     public bool IsRecord => Arguments.Count > 0 && StringComparer.Ordinal.Equals(Name, RecordName);
 
-    public static bool IsForbiddenName(string name)
-        => ForbiddenNames.Contains(name) ||
-           name.StartsWith("System.", StringComparison.Ordinal) ||
-           name.StartsWith("Microsoft.", StringComparison.Ordinal);
+    public static bool IsForbiddenName(string? name)
+        => name is not null &&
+           (ForbiddenNames.Contains(name) ||
+            name.StartsWith("System.", StringComparison.Ordinal) ||
+            name.StartsWith("Microsoft.", StringComparison.Ordinal));
 
     /// <summary>
     /// Structural predicate: a name denotes an opaque-id brand when it is a well-formed
@@ -181,7 +182,9 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
 
     private static bool IsKnown(SandboxType type, int depth, int maxDepth, IReadOnlySet<string>? declaredOpaqueIdTypes)
     {
-        if (depth > maxDepth || IsForbiddenName(type.Name))
+        if (depth > maxDepth ||
+            string.IsNullOrEmpty(type.Name) ||
+            IsForbiddenName(type.Name))
         {
             return false;
         }

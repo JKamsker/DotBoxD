@@ -26,9 +26,18 @@ internal static class SafeHttpGrantReader
 
     private static HashSet<string> ReadSet(CapabilityGrant grant, string key, string[] fallback)
     {
-        var text = grant.Parameters.TryGetValue(key, out var value) ? value : string.Join(',', fallback);
-        return text.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!grant.Parameters.TryGetValue(key, out var text))
+        {
+            return fallback.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var values = text.Split(',', StringSplitOptions.TrimEntries);
+        if (values.Any(string.IsNullOrWhiteSpace))
+        {
+            throw Error($"parameter '{key}' is invalid");
+        }
+
+        return values.ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     private static bool ReadBool(CapabilityGrant grant, string key)

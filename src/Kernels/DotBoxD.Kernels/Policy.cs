@@ -27,6 +27,9 @@ public sealed record SandboxPolicy(
     ulong? RandomSeed = null,
     IReadOnlySet<string>? DeclaredOpaqueIdTypes = null)
 {
+    internal const string OpaqueIdTypeNameValidationMessage =
+        "An opaque-id type name must be a well-formed brand identifier that is not a built-in scalar.";
+
     private readonly string _policyId = PolicyId;
     private readonly SandboxEffect _allowedEffects = AllowedEffects;
     private IReadOnlyList<CapabilityGrant> _grants = ModelCopy.List(Grants);
@@ -83,9 +86,24 @@ public sealed record SandboxPolicy(
     public string Hash => (_hash ??= CreateHashCache()).Value;
 
     private static IReadOnlySet<string> NormalizeOpaqueIdTypes(IReadOnlySet<string>? declared)
-        => declared is null || declared.Count == 0
-            ? EmptyOpaqueIdTypes
-            : new HashSet<string>(declared, StringComparer.Ordinal);
+    {
+        if (declared is null || declared.Count == 0)
+        {
+            return EmptyOpaqueIdTypes;
+        }
+
+        foreach (var name in declared)
+        {
+            if (!SandboxType.IsWellFormedOpaqueIdName(name))
+            {
+                throw new ArgumentException(
+                    OpaqueIdTypeNameValidationMessage,
+                    nameof(SandboxPolicy.DeclaredOpaqueIdTypes));
+            }
+        }
+
+        return new HashSet<string>(declared, StringComparer.Ordinal);
+    }
 
     private static readonly IReadOnlySet<string> EmptyOpaqueIdTypes =
         new HashSet<string>(StringComparer.Ordinal);
@@ -169,9 +187,12 @@ public sealed record SandboxPolicy(
         var wildcards = new List<CapabilityGrant>();
         for (var i = 0; i < grants.Count; i++)
         {
-            if (CapabilityPattern.IsWildcard(grants[i].Id))
+            var grant = grants[i];
+            if (grant is not null &&
+                grant.Id is not null &&
+                CapabilityPattern.IsWildcard(grant.Id))
             {
-                wildcards.Add(grants[i]);
+                wildcards.Add(grant);
             }
         }
 
@@ -187,6 +208,11 @@ public sealed record SandboxPolicy(
         for (var i = 0; i < grants.Count; i++)
         {
             var grant = grants[i];
+            if (grant is null || grant.Id is null)
+            {
+                continue;
+            }
+
             if (!buckets.TryGetValue(grant.Id, out var bucket))
             {
                 bucket = [];

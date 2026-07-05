@@ -20,15 +20,14 @@ public sealed record QueryProjectionField
     /// <summary>Builds a field that reads a member from the source event.</summary>
     public static QueryProjectionField FromMember(string name, string path)
     {
-        ArgumentException.ThrowIfNullOrEmpty(name);
-        ArgumentException.ThrowIfNullOrEmpty(path);
-        return new QueryProjectionField { Name = name, Path = path };
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return new QueryProjectionField { Name = name, Path = QueryProjectionInvariants.MemberPathArgument(path) };
     }
 
     /// <summary>Builds a field that emits a captured constant.</summary>
     public static QueryProjectionField FromConstant(string name, QueryValue constant)
     {
-        ArgumentException.ThrowIfNullOrEmpty(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(constant);
         return new QueryProjectionField { Name = name, Constant = constant };
     }
