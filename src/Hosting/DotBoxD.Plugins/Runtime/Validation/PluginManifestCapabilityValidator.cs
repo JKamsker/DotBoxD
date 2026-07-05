@@ -202,7 +202,8 @@ internal static class PluginManifestCapabilityValidator
     }
 
     public static bool IsKnownNonBindingCapability(string? capability)
-        => !string.IsNullOrEmpty(capability) &&
+        => capability is not null &&
+           capability.Length > "event.read.".Length &&
            capability.StartsWith("event.read.", StringComparison.Ordinal) &&
            !CapabilityPattern.IsWildcard(capability);
 

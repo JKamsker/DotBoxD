@@ -5,6 +5,7 @@ using DotBoxD.Kernels.Policies;
 namespace DotBoxD.Kernels.Validation;
 
 using DotBoxD.Kernels;
+using DotBoxD.Kernels.Validation.Internal;
 
 internal static class PolicyGrantValidator
 {
@@ -18,10 +19,12 @@ internal static class PolicyGrantValidator
         List<SandboxDiagnostic> diagnostics)
     {
         var now = policy.GrantClock;
-        AddDuplicateActiveGrantDiagnostics(policy.Grants, now, diagnostics);
-        foreach (var grant in policy.Grants)
+        var grants = policy.Grants;
+        AddNullGrantDiagnostics(grants, diagnostics);
+        PolicyGrantDuplicateValidator.AddActiveGrantDiagnostics(grants, now, diagnostics);
+        foreach (var grant in grants)
         {
-            if (IsActive(grant, now))
+            if (grant is not null && IsActive(grant, now))
             {
                 ValidateGrant(grant, bindings, requiredCapabilities, requestedCapabilities, diagnostics);
             }
@@ -31,77 +34,17 @@ internal static class PolicyGrantValidator
     private static bool IsActive(CapabilityGrant grant, DateTimeOffset now)
         => grant.ExpiresAt is null || grant.ExpiresAt > now;
 
-    private static void AddDuplicateActiveGrantDiagnostics(
+    private static void AddNullGrantDiagnostics(
         IReadOnlyList<CapabilityGrant> grants,
-        DateTimeOffset now,
         List<SandboxDiagnostic> diagnostics)
     {
-        if (grants.Count < 2)
+        foreach (var grant in grants)
         {
-            return;
-        }
-
-        var counts = new Dictionary<string, int>(grants.Count, StringComparer.Ordinal);
-        var nullCount = 0;
-        for (var i = 0; i < grants.Count; i++)
-        {
-            var grant = grants[i];
-            if (IsActive(grant, now))
+            if (grant is null)
             {
-                IncrementCount(counts, grant.Id, ref nullCount);
+                diagnostics.Add(new SandboxDiagnostic("E-POLICY-GRANT", "policy grants cannot contain null entries"));
             }
         }
-
-        var reportedNull = false;
-        for (var i = 0; i < grants.Count; i++)
-        {
-            var grant = grants[i];
-            if (IsActive(grant, now) &&
-                ShouldReportDuplicate(counts, grant.Id, nullCount, ref reportedNull))
-            {
-                diagnostics.Add(new SandboxDiagnostic(
-                    "E-POLICY-GRANT",
-                    $"capability '{grant.Id}' has multiple active grants"));
-            }
-        }
-    }
-
-    private static void IncrementCount(Dictionary<string, int> counts, string? value, ref int nullCount)
-    {
-        if (value is null)
-        {
-            nullCount++;
-            return;
-        }
-
-        counts.TryGetValue(value, out var count);
-        counts[value] = count + 1;
-    }
-
-    private static bool ShouldReportDuplicate(
-        Dictionary<string, int> counts,
-        string? value,
-        int nullCount,
-        ref bool reportedNull)
-    {
-        if (value is null)
-        {
-            if (nullCount < 2 || reportedNull)
-            {
-                return false;
-            }
-
-            reportedNull = true;
-            return true;
-        }
-
-        if (!counts.TryGetValue(value, out var count) || count < 2)
-        {
-            return false;
-        }
-
-        counts[value] = 0;
-        return true;
     }
 
     private static void ValidateGrant(
@@ -111,6 +54,20 @@ internal static class PolicyGrantValidator
         IReadOnlyList<CapabilityRequest> requestedCapabilities,
         List<SandboxDiagnostic> diagnostics)
     {
+        if (grant.Id is null)
+        {
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-POLICY-GRANT",
+                "grant id must not be null"));
+            return;
+        }
+
+        if (grant.Parameters is null)
+        {
+            Add(diagnostics, grant, "parameter map must not be null");
+            return;
+        }
+
         if (CapabilityPattern.IsWildcard(grant.Id))
         {
             ValidateWildcardGrant(grant, bindings, requiredCapabilities, requestedCapabilities, diagnostics);
