@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("DotBoxD.Kernels.Runtime")]
 [assembly: InternalsVisibleTo("DotBoxD.Kernels.Interpreter")]
+[assembly: InternalsVisibleTo("DotBoxD.Kernels.Serialization.Json")]
 [assembly: InternalsVisibleTo("DotBoxD.Hosting")]
 [assembly: InternalsVisibleTo("DotBoxD.Plugins")]
 [assembly: InternalsVisibleTo("DotBoxD.Hosting.Http")]

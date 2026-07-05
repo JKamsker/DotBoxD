@@ -11,6 +11,7 @@ public static class JsonExporter
     public static string Export(SandboxModule module, bool indented = false)
     {
         ArgumentNullException.ThrowIfNull(module);
+        ModuleSerializationGuard.ThrowIfMalformed(module);
 
         var buffer = new ArrayBufferWriter<byte>();
         using var writer = new Utf8JsonWriter(buffer, new JsonWriterOptions { Indented = indented });
@@ -256,16 +257,13 @@ public static class JsonExporter
                 writer.WriteString("guid", guid.Value.ToString());
                 break;
             case OpaqueIdValue id:
-                writer.WriteStartObject("opaqueId");
-                WriteString(writer, "type", id.TypeName, "opaque id type");
-                WriteString(writer, "value", id.Value, "opaque id value");
-                writer.WriteEndObject();
+                JsonExporterLiteralWriter.WriteOpaqueId(writer, id);
                 break;
             case SandboxPathValue path:
-                WriteString(writer, "path", path.Value.RelativePath, "path");
+                JsonExporterLiteralWriter.WritePath(writer, path);
                 break;
             case SandboxUriValue uri:
-                WriteString(writer, "uri", uri.Value.Value, "uri");
+                JsonExporterLiteralWriter.WriteUri(writer, uri);
                 break;
             default:
                 throw JsonExportNames.Error("E-JSON-EXPORT", $"literal type '{value.GetType().Name}' cannot be exported");

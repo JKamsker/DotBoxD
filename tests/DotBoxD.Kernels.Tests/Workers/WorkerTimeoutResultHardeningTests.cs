@@ -125,12 +125,45 @@ public sealed class WorkerTimeoutResultHardeningTests
         Assert.Equal(0, worker.Calls);
     }
 
+    [Fact]
+    public async Task Reference_worker_client_does_not_create_worker_host_for_pre_canceled_call()
+    {
+        using var requestHost = WorkerSideHost();
+        var module = await requestHost.ImportJsonAsync(SandboxTestHost.PureScoreJson());
+        var plan = await requestHost.PrepareAsync(
+            module,
+            SandboxPolicyBuilder.Create().WithFuel(1_000).WithWallTime(TimeSpan.FromSeconds(30)).Build());
+        var factoryCalls = 0;
+        using var worker = new SandboxHostWorkerClient(() =>
+        {
+            factoryCalls++;
+            return WorkerSideHost();
+        });
+        using var caller = new CancellationTokenSource();
+        await caller.CancelAsync();
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+            await worker.ExecuteInWorkerAsync(
+                plan,
+                "main",
+                SandboxValue.FromList([SandboxValue.FromInt32(1), SandboxValue.FromInt32(1)]),
+                new SandboxExecutionOptions(),
+                caller.Token));
+        Assert.Equal(0, factoryCalls);
+    }
+
     private static SandboxHost Host(ISandboxWorkerClient worker)
         => SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();
             builder.UseWorkerClient(worker, SandboxWorkerProfile.HardenedOutOfProcess);
+        });
+
+    private static SandboxHost WorkerSideHost()
+        => SandboxHost.Create(builder =>
+        {
+            builder.AddDefaultPureBindings();
+            builder.UseInterpreter();
         });
 
     private static SandboxExecutionResult BuildSuccessResult(ExecutionPlan plan, SandboxExecutionOptions options)

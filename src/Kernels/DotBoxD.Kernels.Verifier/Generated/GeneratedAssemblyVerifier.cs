@@ -14,6 +14,8 @@ public sealed partial class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifi
         VerificationPolicy policy,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(manifest);
+        ArgumentNullException.ThrowIfNull(policy);
         cancellationToken.ThrowIfCancellationRequested();
 
         var diagnostics = new List<VerificationDiagnostic>();

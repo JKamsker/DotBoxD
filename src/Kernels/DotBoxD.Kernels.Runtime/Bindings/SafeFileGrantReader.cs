@@ -33,9 +33,13 @@ internal static class SafeFileGrantReader
             return null;
         }
 
-        return allowed
-            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var extensions = allowed.Split(',', StringSplitOptions.TrimEntries);
+        if (extensions.Any(string.IsNullOrWhiteSpace))
+        {
+            throw Error("allowedExtensions");
+        }
+
+        return extensions.ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     private static bool ReadBool(CapabilityGrant grant, string key)

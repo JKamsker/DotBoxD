@@ -19,7 +19,9 @@ internal static class PluginServerGenerationTestDriver
     public static (
         string Generated,
         Compilation OutputCompilation,
-        IReadOnlyList<Diagnostic> GeneratorDiagnostics) RunWithDiagnostics(string source)
+        IReadOnlyList<Diagnostic> GeneratorDiagnostics) RunWithDiagnostics(
+            string source,
+            params MetadataReference[] extraReferences)
     {
         var compilation = CSharpCompilation.Create(
             "DotBoxDPluginServerRegressionTest",
@@ -28,7 +30,8 @@ internal static class PluginServerGenerationTestDriver
                 .Append(MetadataReference.CreateFromFile(typeof(GeneratePluginServerAttribute).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Services.Peer.RpcPeer).Assembly.Location))
-                .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Services.Attributes.DotBoxDServiceAttribute).Assembly.Location)),
+                .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Services.Attributes.DotBoxDServiceAttribute).Assembly.Location))
+                .Concat(extraReferences),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new PluginPackageGenerator().AsSourceGenerator()],
@@ -78,6 +81,38 @@ internal static class PluginServerGenerationTestDriver
             parseOptions: ParseOptions);
 
         return driver.RunGenerators(compilation).GetRunResult().Diagnostics;
+    }
+
+    public static IReadOnlyList<Diagnostic> InputDiagnostics(
+        string source,
+        params MetadataReference[] extraReferences)
+    {
+        var compilation = CSharpCompilation.Create(
+            "DotBoxDPluginServerInputDiagnosticTest",
+            [CSharpSyntaxTree.ParseText(source, ParseOptions)],
+            TrustedPlatformReferences()
+                .Append(MetadataReference.CreateFromFile(typeof(GeneratePluginServerAttribute).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Services.Peer.RpcPeer).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Services.Attributes.DotBoxDServiceAttribute).Assembly.Location))
+                .Concat(extraReferences),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        return compilation.GetDiagnostics().Where(IsError).ToArray();
+    }
+
+    public static MetadataReference CompileReference(string source, string assemblyName)
+    {
+        var compilation = CSharpCompilation.Create(
+            assemblyName,
+            [CSharpSyntaxTree.ParseText(source, ParseOptions)],
+            TrustedPlatformReferences()
+                .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location)),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        Assert.Empty(result.Diagnostics.Where(IsError));
+        return MetadataReference.CreateFromImage(stream.ToArray());
     }
 
     public static void AssertNoCompilationErrors(Compilation compilation)
