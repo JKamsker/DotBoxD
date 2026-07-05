@@ -141,15 +141,20 @@ internal sealed class ResultHookSlot<TEvent, TContext>
         IHookResult? result;
         try
         {
-            if (entry.Filter is not null &&
-                !await entry.Filter(e, rawContext, context, cancellationToken).ConfigureAwait(false))
+            if (entry.Filter is not null)
             {
-                return null;
+                var matches = await entry.Filter(e, rawContext, context, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!matches)
+                {
+                    return null;
+                }
             }
 
             result = entry.Remote
                 ? await InvokeRemoteAsync(entry, e, rawContext, context, options, cancellationToken).ConfigureAwait(false)
                 : await entry.Invoke(e, rawContext, context, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
