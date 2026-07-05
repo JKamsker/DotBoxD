@@ -24,16 +24,19 @@ public static class ResourceLimitValidation
         ThrowIfNegative(limits.MaxLogMessageLength, nameof(ResourceLimits.MaxLogMessageLength));
         ThrowIfNegative(limits.MaxStringLength, nameof(ResourceLimits.MaxStringLength));
         ThrowIfNegative(limits.MaxTotalStringBytes, nameof(ResourceLimits.MaxTotalStringBytes));
-        if (limits.MaxWallTime is not null && limits.MaxWallTime.Value < TimeSpan.Zero)
+        if (limits.MaxWallTime is { } wallTime)
         {
-            throw new ArgumentOutOfRangeException(nameof(ResourceLimits.MaxWallTime));
-        }
+            if (wallTime < TimeSpan.Zero)
+            {
+                throw ResourceLimitValidationException.NonNegative(nameof(ResourceLimits.MaxWallTime));
+            }
 
-        if (limits.MaxWallTime is not null && limits.MaxWallTime.Value > MaxSupportedWallTime)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(ResourceLimits.MaxWallTime),
-                $"must be within the supported range from {TimeSpan.Zero:c} through {MaxSupportedWallTime:c}");
+            if (wallTime > MaxSupportedWallTime)
+            {
+                throw new ResourceLimitValidationException(
+                    nameof(ResourceLimits.MaxWallTime),
+                    $"must be within the supported range from {TimeSpan.Zero:c} through {MaxSupportedWallTime:c}");
+            }
         }
     }
 
@@ -41,7 +44,16 @@ public static class ResourceLimitValidation
     {
         if (value < 0)
         {
-            throw new ArgumentOutOfRangeException(paramName);
+            throw ResourceLimitValidationException.NonNegative(paramName);
         }
     }
+}
+
+internal sealed class ResourceLimitValidationException(string paramName, string reason)
+    : ArgumentOutOfRangeException(paramName, reason)
+{
+    public string Reason { get; } = reason;
+
+    public static ResourceLimitValidationException NonNegative(string paramName)
+        => new(paramName, "must be non-negative");
 }
