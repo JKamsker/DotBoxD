@@ -98,6 +98,17 @@ public sealed class QueryValueJsonConverter : JsonConverter<QueryValue>
     // StartObject here is unambiguously a tagged exact-kind value.
     private static QueryValue ReadTagged(ref Utf8JsonReader reader)
     {
+        var (kind, text) = ReadTaggedFields(ref reader);
+        if (text is null)
+        {
+            throw new JsonException("A tagged query value is missing its 'value'.");
+        }
+
+        return ReadTaggedValue(kind, text);
+    }
+
+    private static (string? Kind, string? Text) ReadTaggedFields(ref Utf8JsonReader reader)
+    {
         string? kind = null;
         string? text = null;
         while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
@@ -119,12 +130,11 @@ public sealed class QueryValueJsonConverter : JsonConverter<QueryValue>
             }
         }
 
-        if (text is null)
-        {
-            throw new JsonException("A tagged query value is missing its 'value'.");
-        }
+        return (kind, text);
+    }
 
-        return kind switch
+    private static QueryValue ReadTaggedValue(string? kind, string text)
+        => kind switch
         {
             "guid" => ReadGuid(kind, text),
             "decimal" => ReadDecimal(kind, text),
@@ -132,7 +142,6 @@ public sealed class QueryValueJsonConverter : JsonConverter<QueryValue>
             "timestamp" => ReadTimestamp(kind, text),
             _ => throw new JsonException($"Unknown tagged query value kind '{kind}'."),
         };
-    }
 
     private static QueryValue ReadGuid(string kind, string text) =>
         Guid.TryParse(text, out var value)

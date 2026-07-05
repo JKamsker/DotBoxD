@@ -82,28 +82,40 @@ internal static class QueryTextTokenizer
     {
         var c = text[index];
         var next = index + 1 < text.Length ? text[index + 1] : '\0';
-        switch (c)
+        if (IsTwoCharacterOperator(c, next))
         {
-            case '&' when next == '&':
-            case '|' when next == '|':
-            case '=' when next == '=':
-            case '!' when next == '=':
-            case '>' when next == '=':
-            case '<' when next == '=':
-                op = text.Substring(index, 2);
-                index += 2;
-                return true;
-            case '!' or '>' or '<':
-                op = c.ToString();
-                index++;
-                return true;
-            case '=':
-                throw new QueryTranslationException($"Unexpected '=' at position {index}; use '==' for equality.");
-            default:
-                op = string.Empty;
-                return false;
+            op = text.Substring(index, 2);
+            index += 2;
+            return true;
         }
+
+        if (IsSingleCharacterOperator(c))
+        {
+            op = c.ToString();
+            index++;
+            return true;
+        }
+
+        if (c == '=')
+        {
+            throw new QueryTranslationException($"Unexpected '=' at position {index}; use '==' for equality.");
+        }
+
+        op = string.Empty;
+        return false;
     }
+
+    private static bool IsTwoCharacterOperator(char c, char next)
+        => c switch
+        {
+            '&' => next == '&',
+            '|' => next == '|',
+            '=' or '!' or '>' or '<' => next == '=',
+            _ => false,
+        };
+
+    private static bool IsSingleCharacterOperator(char c)
+        => c is '!' or '>' or '<';
 
     private static string LexString(string text, ref int index)
     {
