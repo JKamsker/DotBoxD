@@ -6,7 +6,9 @@ namespace DotBoxD.Plugins.Runtime;
 
 public sealed class PluginEventAdapterRegistry
 {
+    private readonly object _gate = new();
     private readonly Dictionary<Type, RegisteredPluginEventAdapter> _adapters = [];
+    private volatile KeyValuePair<Type, RegisteredPluginEventAdapter>[] _adapterSnapshot = [];
 
     public void Register<TEvent>(IPluginEventAdapter<TEvent> adapter)
     {
@@ -15,18 +17,25 @@ public sealed class PluginEventAdapterRegistry
         var parameters = adapter.Parameters;
         PluginEventAdapterShapeValidator.Validate(adapter, eventName, parameters);
         var shape = new PluginEventShape(eventName, parameters);
-        ValidateEventNameShape(typeof(TEvent), shape);
-        // Capture the type-erased wire closure here — the single store site both the explicit Register path and
-        // the lazy Resolve auto-register path flow through — so the router can wire by event name with no
-        // reflection, over the SAME adapter instance Resolve returns (preserving pipeline adapter identity).
-        _adapters[typeof(TEvent)] = new(adapter, shape, new ErasedPluginEventAdapter<TEvent>(adapter));
+        lock (_gate)
+        {
+            ValidateEventNameShape(typeof(TEvent), shape);
+            // Capture the type-erased wire closure here — the single store site both the explicit Register path and
+            // the lazy Resolve auto-register path flow through — so the router can wire by event name with no
+            // reflection, over the SAME adapter instance Resolve returns (preserving pipeline adapter identity).
+            _adapters[typeof(TEvent)] = new(adapter, shape, new ErasedPluginEventAdapter<TEvent>(adapter));
+            _adapterSnapshot = _adapters.ToArray();
+        }
     }
 
     public IPluginEventAdapter<TEvent> Resolve<TEvent>()
     {
-        if (_adapters.TryGetValue(typeof(TEvent), out var registered))
+        lock (_gate)
         {
-            return (IPluginEventAdapter<TEvent>)registered.Adapter;
+            if (_adapters.TryGetValue(typeof(TEvent), out var registered))
+            {
+                return (IPluginEventAdapter<TEvent>)registered.Adapter;
+            }
         }
 
         var discovered = TryDiscoverAdapter<TEvent>() ?? ConventionEventAdapter<TEvent>.Create();
@@ -40,7 +49,7 @@ public sealed class PluginEventAdapterRegistry
         // EventName with DIFFERENT parameter shapes, so every same-name match yields the same shape — returning it
         // keeps install-time DBXK033 parameter validation running instead of silently skipping it (which would let
         // a malformed kernel install and only fail later at wiring/invocation).
-        if (TryResolveRegistered(eventName, rejectAmbiguous: false, out var registered))
+        if (TryResolveRegistered(_adapterSnapshot, eventName, rejectAmbiguous: false, out var registered))
         {
             shape = registered.Shape;
             return true;
@@ -62,7 +71,7 @@ public sealed class PluginEventAdapterRegistry
     /// </summary>
     public bool TryResolveErased(string eventName, out IErasedPluginEventAdapter adapter)
     {
-        if (TryResolveRegistered(eventName, rejectAmbiguous: true, out var registered))
+        if (TryResolveRegistered(_adapterSnapshot, eventName, rejectAmbiguous: true, out var registered))
         {
             adapter = registered.Erased;
             return true;
@@ -88,11 +97,15 @@ public sealed class PluginEventAdapterRegistry
     /// for both callers: DBXK034 does not constrain adapters whose exact names merely share a simple-name tail, so
     /// their shapes may differ and there is no well-defined shape to validate against.
     /// </summary>
-    private bool TryResolveRegistered(string eventName, bool rejectAmbiguous, out RegisteredPluginEventAdapter resolved)
+    private static bool TryResolveRegistered(
+        KeyValuePair<Type, RegisteredPluginEventAdapter>[] adapters,
+        string eventName,
+        bool rejectAmbiguous,
+        out RegisteredPluginEventAdapter resolved)
     {
         var resolution = new RegisteredPluginEventResolution(eventName);
 
-        foreach (var entry in _adapters)
+        foreach (var entry in adapters)
         {
             resolution.Add(entry.Key, entry.Value);
         }

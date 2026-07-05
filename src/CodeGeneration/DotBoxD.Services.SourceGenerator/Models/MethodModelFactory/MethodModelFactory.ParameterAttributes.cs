@@ -12,17 +12,6 @@ internal static partial class MethodModelFactory
 {
     private static readonly Dictionary<string, CallerInfoAttributeAppender> CallerInfoAttributeAppenders = new(StringComparer.Ordinal)
     {
-        ["System.Runtime.CompilerServices.CallerMemberNameAttribute"] =
-            static (attributes, _, _, _) =>
-                attributes.Append("[global::System.Runtime.CompilerServices.CallerMemberNameAttribute] "),
-        ["System.Runtime.CompilerServices.CallerFilePathAttribute"] =
-            static (attributes, _, _, _) =>
-                attributes.Append("[global::System.Runtime.CompilerServices.CallerFilePathAttribute] "),
-        ["System.Runtime.CompilerServices.CallerLineNumberAttribute"] =
-            static (attributes, _, _, _) =>
-                attributes.Append("[global::System.Runtime.CompilerServices.CallerLineNumberAttribute] "),
-        ["System.Runtime.CompilerServices.CallerArgumentExpressionAttribute"] =
-            static (attributes, _, attr, _) => AppendCallerArgumentExpressionAttribute(attributes, attr),
         ["System.Runtime.CompilerServices.DateTimeConstantAttribute"] =
             static (attributes, parameter, _, preserve) => AppendDateTimeConstantAttribute(attributes, parameter, preserve),
         ["System.Runtime.CompilerServices.DecimalConstantAttribute"] =
@@ -96,6 +85,11 @@ internal static partial class MethodModelFactory
         AttributeData attr,
         bool preserveMetadataDefaultAttributes)
     {
+        if (CallerInfoAttributeFormatter.TryAppend(attributes, attr))
+        {
+            return;
+        }
+
         var name = attr.AttributeClass?.ToDisplayString();
         if (name is not null && CallerInfoAttributeAppenders.TryGetValue(name, out var append))
         {
@@ -226,19 +220,6 @@ internal static partial class MethodModelFactory
             .Append("(\"")
             .Append(LiteralHelpers.EscapeStringLiteral(value))
             .AppendLine("\")]");
-    }
-
-    private static void AppendCallerArgumentExpressionAttribute(StringBuilder sb, AttributeData attr)
-    {
-        if (attr.ConstructorArguments.Length != 1 ||
-            attr.ConstructorArguments[0].Value is not string parameterName)
-        {
-            return;
-        }
-
-        sb.Append("[global::System.Runtime.CompilerServices.CallerArgumentExpressionAttribute(\"")
-            .Append(LiteralHelpers.EscapeStringLiteral(parameterName))
-            .Append("\")] ");
     }
 
 }

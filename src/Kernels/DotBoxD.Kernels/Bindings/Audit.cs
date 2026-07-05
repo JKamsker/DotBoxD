@@ -22,6 +22,13 @@ public enum AuditLevel
     FullInputOutput
 }
 
+public static class BindingAuditKinds
+{
+    public const string BindingCall = "BindingCall";
+    public const string SandboxLog = "SandboxLog";
+    public const string PluginMessage = "PluginMessage";
+}
+
 public sealed record SandboxAuditEvent(
     SandboxRunId RunId,
     string Kind,
@@ -138,7 +145,7 @@ public sealed class InMemoryAuditSink : IAuditSink
         string policyHash)
         => auditEvent.RunId == runId &&
            auditEvent.Success == success &&
-           IsBindingAuditKind(auditEvent.Kind) &&
+           StringComparer.Ordinal.Equals(auditEvent.Kind, descriptor.AuditKind) &&
            StringComparer.Ordinal.Equals(auditEvent.BindingId, descriptor.Id) &&
            CapabilityMatches(auditEvent, descriptor) &&
            EffectMatches(auditEvent, descriptor) &&
@@ -158,9 +165,6 @@ public sealed class InMemoryAuditSink : IAuditSink
 
         return checkpoint >= eventCount ? eventCount : (int)checkpoint;
     }
-
-    private static bool IsBindingAuditKind(string kind)
-        => kind is "BindingCall" or "SandboxLog" or "PluginMessage";
 
     private static bool CapabilityMatches(SandboxAuditEvent auditEvent, BindingDescriptor descriptor)
         => descriptor.RequiredCapability is null ||

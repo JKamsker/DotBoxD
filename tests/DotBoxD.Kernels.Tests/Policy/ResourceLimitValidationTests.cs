@@ -2,6 +2,8 @@ using DotBoxD.Hosting.Http.Policy;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
 
 namespace DotBoxD.Kernels.Tests.Policy;
 
@@ -19,6 +21,26 @@ public sealed class ResourceLimitValidationTests
     public void Resource_meter_rejects_negative_limits()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new ResourceMeter(new ResourceLimits(MaxFuel: -1)));
+    }
+
+    [Fact]
+    public async Task Prepare_rejects_direct_policy_with_null_resource_limits()
+    {
+        var host = SandboxTestHost.Create();
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
+        var policy = new SandboxPolicy(
+            "null-limits",
+            SandboxEffects.Pure,
+            [],
+            ResourceLimits: null!);
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
+            await host.PrepareAsync(module, policy));
+
+        Assert.Contains(
+            ex.Diagnostics,
+            d => d.Code == "E-POLICY-LIMIT" &&
+                 d.Message.Contains("resource limit", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

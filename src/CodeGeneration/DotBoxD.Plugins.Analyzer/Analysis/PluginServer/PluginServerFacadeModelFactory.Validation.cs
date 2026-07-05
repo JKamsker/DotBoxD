@@ -32,7 +32,7 @@ internal static partial class PluginServerFacadeModelFactory
         }
 
         var valueTaskString = valueTaskOfT.Construct(stringType);
-        ValidateLiveSettingUpdateConstructor(serverType, liveSettingUpdateType, stringType);
+        ValidateLiveSettingUpdateConstructor(serverType, compilation, liveSettingUpdateType, stringType);
         EnsureControlMethod(
             serverType,
             controlServiceType,
@@ -118,8 +118,24 @@ internal static partial class PluginServerFacadeModelFactory
 
     private static void ValidateLiveSettingUpdateConstructor(
         INamedTypeSymbol serverType,
+        Compilation compilation,
         ITypeSymbol liveSettingUpdateType,
         ITypeSymbol stringType)
+    {
+        var named = RequireLiveSettingUpdateType(serverType, compilation, liveSettingUpdateType);
+        if (HasLiveSettingUpdateConstructor(compilation, serverType, named, stringType))
+        {
+            return;
+        }
+
+        throw new NotSupportedException(
+            $"Generated plugin server '{serverType.Name}' live-setting update type '{liveSettingUpdateType.ToDisplayString()}' must expose an accessible constructor '(string name, string value)'.");
+    }
+
+    private static INamedTypeSymbol RequireLiveSettingUpdateType(
+        INamedTypeSymbol serverType,
+        Compilation compilation,
+        ITypeSymbol liveSettingUpdateType)
     {
         if (liveSettingUpdateType is not INamedTypeSymbol named)
         {
@@ -127,44 +143,47 @@ internal static partial class PluginServerFacadeModelFactory
                 $"Generated plugin server '{serverType.Name}' live-setting update type '{liveSettingUpdateType.ToDisplayString()}' must be a named type.");
         }
 
-        if (!IsAccessibleFromGeneratedServer(named))
+        if (named.TypeKind != TypeKind.Error &&
+            !named.IsFileLocal &&
+            IsAccessibleFromGeneratedServer(compilation, serverType, named))
         {
-            throw new NotSupportedException(
-                $"Generated plugin server '{serverType.Name}' live-setting update type '{liveSettingUpdateType.ToDisplayString()}' must be accessible from the generated facade.");
-        }
-
-        foreach (var constructor in named.InstanceConstructors)
-        {
-            if (constructor.Parameters.Length == 2 &&
-                constructor.Parameters[0].RefKind == RefKind.None &&
-                constructor.Parameters[1].RefKind == RefKind.None &&
-                SymbolEqualityComparer.Default.Equals(constructor.Parameters[0].Type, stringType) &&
-                SymbolEqualityComparer.Default.Equals(constructor.Parameters[1].Type, stringType) &&
-                IsAccessibleFromGeneratedServer(constructor.DeclaredAccessibility))
-            {
-                return;
-            }
+            return named;
         }
 
         throw new NotSupportedException(
-            $"Generated plugin server '{serverType.Name}' live-setting update type '{liveSettingUpdateType.ToDisplayString()}' must expose an accessible constructor '(string name, string value)'.");
+            $"Generated plugin server '{serverType.Name}' live-setting update type '{liveSettingUpdateType.ToDisplayString()}' must be accessible from the generated facade.");
     }
 
-    private static bool IsAccessibleFromGeneratedServer(Accessibility accessibility)
-        => accessibility is Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal;
-
-    private static bool IsAccessibleFromGeneratedServer(INamedTypeSymbol type)
+    private static bool HasLiveSettingUpdateConstructor(
+        Compilation compilation,
+        INamedTypeSymbol serverType,
+        INamedTypeSymbol liveSettingUpdateType,
+        ITypeSymbol stringType)
     {
-        for (INamedTypeSymbol? current = type; current is not null; current = current.ContainingType)
+        foreach (var constructor in liveSettingUpdateType.InstanceConstructors)
         {
-            if (!IsAccessibleFromGeneratedServer(current.DeclaredAccessibility))
+            if (LiveSettingUpdateConstructorMatches(compilation, serverType, constructor, stringType))
             {
-                return false;
+                return true;
             }
         }
 
-        return true;
+        return false;
     }
+
+    private static bool LiveSettingUpdateConstructorMatches(
+        Compilation compilation,
+        INamedTypeSymbol serverType,
+        IMethodSymbol constructor,
+        ITypeSymbol stringType)
+        => constructor.Parameters.Length == 2 &&
+           ConstructorParameterMatches(constructor.Parameters[0], stringType) &&
+           ConstructorParameterMatches(constructor.Parameters[1], stringType) &&
+           IsAccessibleFromGeneratedServer(compilation, serverType, constructor);
+
+    private static bool ConstructorParameterMatches(IParameterSymbol parameter, ITypeSymbol expectedType)
+        => parameter.RefKind == RefKind.None &&
+           SymbolEqualityComparer.Default.Equals(parameter.Type, expectedType);
 
     private static void ValidatePublicFacadeSignatureTypes(
         INamedTypeSymbol serverType,

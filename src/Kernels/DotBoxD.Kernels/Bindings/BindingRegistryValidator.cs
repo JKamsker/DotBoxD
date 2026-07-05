@@ -196,6 +196,9 @@ internal static partial class BindingRegistryValidator
             AuditLevel.PerResource or
             AuditLevel.FullInputOutput;
 
+    private static bool IsKnownAuditKind(string auditKind)
+        => auditKind is BindingAuditKinds.BindingCall or BindingAuditKinds.SandboxLog or BindingAuditKinds.PluginMessage;
+
     private static bool IsKnownBindingSafety(BindingSafety safety)
         => safety is BindingSafety.PureIntrinsic or
             BindingSafety.PureHostFacade or

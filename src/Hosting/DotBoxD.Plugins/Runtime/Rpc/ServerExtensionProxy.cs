@@ -41,9 +41,11 @@ public class ServerExtensionProxy : DispatchProxy
         }
 
         var method = MethodCache.GetOrAdd(targetMethod, static target => new ServerExtensionMethod(target));
+        var cancellationToken = method.CancellationToken(args);
+        cancellationToken.ThrowIfCancellationRequested();
         var arguments = ConvertPayloadArguments(args, method.PayloadParameterTypes);
 
-        return method.Materialize(_kernel.InvokeServerExtensionAsync(arguments, method.CancellationToken(args)));
+        return method.Materialize(_kernel.InvokeServerExtensionAsync(arguments, cancellationToken));
     }
 
     private static SandboxValue[] ConvertPayloadArguments(object?[]? args, Type[] payloadParameterTypes)

@@ -111,13 +111,13 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
         {
             if (!_seenMessageId)
             {
-                throw new MessagePackSerializationException(
+                throw new RpcEnvelopeValidationException(
                     "RPC response is missing required MessageId.");
             }
 
             if (!_seenIsSuccess)
             {
-                throw new MessagePackSerializationException(
+                throw new RpcEnvelopeValidationException(
                     "RPC response is missing required IsSuccess.");
             }
         }
@@ -125,16 +125,25 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
 
     private static void ValidateEnvelope(RpcResponse response)
     {
+        RpcEnvelopeStringValidation.ThrowIfMalformedUtf16(
+            response.ErrorMessage,
+            "response",
+            nameof(RpcResponse.ErrorMessage));
+        RpcEnvelopeStringValidation.ThrowIfMalformedUtf16(
+            response.ErrorType,
+            "response",
+            nameof(RpcResponse.ErrorType));
+
         if (response.IsSuccess &&
             (response.ErrorMessage is not null || response.ErrorType is not null))
         {
-            throw new MessagePackSerializationException(
+            throw new RpcEnvelopeValidationException(
                 "Successful RPC response must not contain error fields.");
         }
 
         if (!response.IsSuccess && response.Stream is not null)
         {
-            throw new MessagePackSerializationException(
+            throw new RpcEnvelopeValidationException(
                 "Error RPC response must not contain a stream handle.");
         }
     }
@@ -151,7 +160,7 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
     {
         if (alreadySeen)
         {
-            throw new MessagePackSerializationException(
+            throw new RpcEnvelopeValidationException(
                 $"RPC response contains duplicate {fieldName}.");
         }
     }

@@ -9,8 +9,6 @@ namespace DotBoxD.Services.SourceGenerator.Models;
 
 internal static partial class MethodModelFactory
 {
-    private const string DotBoxDMethodAttributeName = ServicesGeneratorTypeNames.DotBoxDMethodAttribute;
-
     private static readonly SymbolDisplayFormat s_qualifiedFormat =
         SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
             SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions |
@@ -39,9 +37,18 @@ internal static partial class MethodModelFactory
         var unsupportedLocation = methodLocation;
         var requiresUnsafeSignature = RpcTypeValidator.RequiresUnsafeContext(returnType, ct);
 
-        // An explicit empty/whitespace [DotBoxDMethod(Name = "")] compiles but throws ArgumentException on
+        // An explicit empty/whitespace [RpcMethod(Name = "")] compiles but throws ArgumentException on
         // the first call (the empty wire name fails validation), so reject it at build time.
         var configuredMethodName = GetConfiguredMethodName(methodSymbol);
+        if (configuredMethodName is not null && string.IsNullOrWhiteSpace(configuredMethodName))
+        {
+            SetUnsupported(
+                ref unsupportedReason,
+                ref unsupportedLocation,
+                "[RpcMethod(Name = ...)] wire name must not be empty or whitespace",
+                methodLocation);
+        }
+
         ValidateMethodReturn(
             configuredMethodName,
             returnType,
@@ -109,7 +116,7 @@ internal static partial class MethodModelFactory
     {
         foreach (var attr in methodSymbol.GetAttributes())
         {
-            if (attr.AttributeClass?.ToDisplayString() != DotBoxDMethodAttributeName)
+            if (!ServicesGeneratorTypeNames.IsRpcMethodAttribute(attr.AttributeClass?.ToDisplayString()))
             {
                 continue;
             }

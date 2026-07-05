@@ -191,9 +191,6 @@ internal sealed partial class SandboxWorkerExecutor
             return false;
         }
 
-        // Single pass over the audit envelope: enforce a common run id, run per-event
-        // safety/schema validation, and capture the one required run summary without
-        // allocating an intermediate summary array.
         if (!TryCollectAuditEvidence(plan, entrypoint, options, result, runId, out var evidence) ||
             !AuditSummaryMatchesResult(result, evidence))
         {
@@ -212,16 +209,18 @@ internal sealed partial class SandboxWorkerExecutor
         SandboxRunId runId,
         out WorkerAuditEvidence evidence)
     {
-        evidence = new WorkerAuditEvidence(null!, 0, 0, 0);
+        evidence = new WorkerAuditEvidence(null!, 0, 0, 0, default);
         var summaryCount = 0;
         var observedHostCalls = 0;
         var observedLogEvents = 0;
         var observedBindingBaseFuel = 0L;
+        var observedBytes = default(ObservedBindingBytes);
         Dictionary<string, int>? observedBindingCalls = null;
         var expectedSequenceNumber = 1L;
+        var grantClock = plan.Policy.GrantClock;
         foreach (var auditEvent in result.AuditEvents)
         {
-            if (!AuditEventEnvelopeMatches(plan, entrypoint, options, auditEvent, runId, expectedSequenceNumber))
+            if (!AuditEventEnvelopeMatches(plan, entrypoint, options, auditEvent, runId, expectedSequenceNumber, grantClock))
             {
                 return false;
             }
@@ -229,9 +228,20 @@ internal sealed partial class SandboxWorkerExecutor
             expectedSequenceNumber++;
             if (IsBindingAudit(auditEvent.Kind))
             {
+                if (result.Succeeded && !auditEvent.Success)
+                {
+                    return false;
+                }
+
                 observedHostCalls++;
                 observedBindingCalls ??= new Dictionary<string, int>(StringComparer.Ordinal);
-                if (!TryRecordBindingAuditEvidence(plan, auditEvent, observedBindingCalls, ref observedBindingBaseFuel))
+                if (!TryRecordBindingEvidence(
+                    plan,
+                    auditEvent,
+                    observedBindingCalls,
+                    ref observedBindingBaseFuel,
+                    ref observedBytes,
+                    grantClock))
                 {
                     return false;
                 }
@@ -246,6 +256,7 @@ internal sealed partial class SandboxWorkerExecutor
             ObservedHostCalls = observedHostCalls,
             ObservedLogEvents = observedLogEvents,
             ObservedBindingBaseFuel = observedBindingBaseFuel,
+            ObservedBytes = observedBytes,
         };
         return summaryCount == 1;
     }
@@ -256,10 +267,11 @@ internal sealed partial class SandboxWorkerExecutor
         SandboxExecutionOptions options,
         SandboxAuditEvent auditEvent,
         SandboxRunId runId,
-        long expectedSequenceNumber)
+        long expectedSequenceNumber,
+        DateTimeOffset grantClock)
         => auditEvent.SequenceNumber == expectedSequenceNumber &&
            auditEvent.RunId == runId &&
-           WorkerAuditValidator.Matches(plan, entrypoint, options, auditEvent);
+           WorkerAuditValidator.Matches(plan, entrypoint, options, auditEvent, grantClock);
 
     private static void CountAuditSummary(
         SandboxAuditEvent auditEvent,
@@ -289,7 +301,8 @@ internal sealed partial class SandboxWorkerExecutor
             result.ResourceUsage,
             evidence.ObservedHostCalls,
             evidence.ObservedLogEvents,
-            evidence.ObservedBindingBaseFuel);
+            evidence.ObservedBindingBaseFuel,
+            evidence.ObservedBytes);
     }
 
     private static bool ResultErrorMatches(SandboxExecutionResult result, SandboxAuditEvent summary)
@@ -310,51 +323,21 @@ internal sealed partial class SandboxWorkerExecutor
     private static bool IsBindingAudit(string kind)
         => kind is "BindingCall" or "SandboxLog" or "PluginMessage";
 
-    private static bool TryRecordBindingAuditEvidence(
-        ExecutionPlan plan,
-        SandboxAuditEvent auditEvent,
-        Dictionary<string, int> observedBindingCalls,
-        ref long observedBindingBaseFuel)
-    {
-        if (auditEvent.BindingId is null ||
-            !plan.Bindings.TryGet(auditEvent.BindingId, out var binding))
-        {
-            return false;
-        }
-
-        try
-        {
-            observedBindingBaseFuel = checked(observedBindingBaseFuel + binding.CostModel.BaseFuel);
-        }
-        catch (OverflowException)
-        {
-            return false;
-        }
-
-        var calls = observedBindingCalls.TryGetValue(auditEvent.BindingId, out var existing)
-            ? existing + 1
-            : 1;
-        observedBindingCalls[auditEvent.BindingId] = calls;
-        return binding.CostModel.MaxCallsPerRun is not { } maxCalls ||
-            calls <= maxCalls;
-    }
-
     private static bool AuditEvidenceUsageMatches(
         SandboxResourceUsage usage,
         int observedHostCalls,
         int observedLogEvents,
-        long observedBindingBaseFuel)
+        long observedBindingBaseFuel,
+        ObservedBindingBytes observedBytes)
         => usage.HostCalls >= observedHostCalls &&
            usage.LogEvents >= observedLogEvents &&
-           usage.FuelUsed >= observedBindingBaseFuel;
+           usage.FuelUsed >= observedBindingBaseFuel &&
+           usage.FileBytesRead >= observedBytes.FileBytesRead &&
+           usage.FileBytesWritten >= observedBytes.FileBytesWritten &&
+           usage.NetworkBytesRead >= observedBytes.NetworkBytesRead &&
+           usage.NetworkBytesWritten >= observedBytes.NetworkBytesWritten;
 
-    private readonly record struct ResourceUsageLimit(
-        Func<SandboxResourceUsage, long> Value,
-        Func<ResourceLimits, long> Maximum);
+    private readonly record struct ResourceUsageLimit(Func<SandboxResourceUsage, long> Value, Func<ResourceLimits, long> Maximum);
 
-    private readonly record struct WorkerAuditEvidence(
-        SandboxAuditEvent Summary,
-        int ObservedHostCalls,
-        int ObservedLogEvents,
-        long ObservedBindingBaseFuel);
+    private readonly record struct WorkerAuditEvidence(SandboxAuditEvent Summary, int ObservedHostCalls, int ObservedLogEvents, long ObservedBindingBaseFuel, ObservedBindingBytes ObservedBytes);
 }

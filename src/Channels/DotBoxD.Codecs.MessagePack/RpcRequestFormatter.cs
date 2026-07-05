@@ -34,6 +34,10 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
     {
         ThrowIfMissingRequiredName(value.ServiceName, nameof(RpcRequest.ServiceName));
         ThrowIfMissingRequiredName(value.MethodName, nameof(RpcRequest.MethodName));
+        RpcEnvelopeStringValidation.ThrowIfMalformedUtf16(
+            value.InstanceId,
+            "request",
+            nameof(RpcRequest.InstanceId));
         RpcRequestNameCache.Register(value.ServiceName);
         RpcRequestNameCache.Register(value.MethodName);
 
@@ -114,12 +118,16 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
         {
             if (!_seenMessageId)
             {
-                throw new MessagePackSerializationException(
+                throw new RpcEnvelopeValidationException(
                     "RPC request is missing required MessageId.");
             }
 
             ThrowIfMissingRequiredName(_seenServiceName ? _request.ServiceName : null, nameof(RpcRequest.ServiceName));
             ThrowIfMissingRequiredName(_seenMethodName ? _request.MethodName : null, nameof(RpcRequest.MethodName));
+            RpcEnvelopeStringValidation.ThrowIfMalformedUtf16(
+                _request.InstanceId,
+                "request",
+                nameof(RpcRequest.InstanceId));
         }
     }
 
@@ -135,7 +143,7 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
     {
         if (alreadySeen)
         {
-            throw new MessagePackSerializationException(
+            throw new RpcEnvelopeValidationException(
                 $"RPC request contains duplicate {fieldName}.");
         }
     }
@@ -144,7 +152,7 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
     {
         if (value.Length == 0)
         {
-            throw new MessagePackSerializationException(
+            throw new RpcEnvelopeValidationException(
                 $"RPC request contains empty required {fieldName}.");
         }
     }
@@ -153,11 +161,12 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
     {
         if (value is null)
         {
-            throw new MessagePackSerializationException(
+            throw new RpcEnvelopeValidationException(
                 $"RPC request is missing required {fieldName}.");
         }
 
         ThrowIfEmptyRequiredName(value, fieldName);
+        RpcEnvelopeStringValidation.ThrowIfMalformedUtf16(value, "request", fieldName);
     }
 
     private static void WriteNullableString(ref MessagePackWriter writer, string? value)

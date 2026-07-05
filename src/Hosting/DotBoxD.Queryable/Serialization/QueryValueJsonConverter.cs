@@ -7,13 +7,11 @@ using DotBoxD.Queryable.Ast;
 namespace DotBoxD.Queryable.Serialization;
 
 /// <summary>
-/// Serializes a <see cref="QueryValue"/>. The five original kinds (null/bool/integer/number/string) are written
-/// as raw JSON scalars (<c>"player-1"</c>, <c>5</c>, <c>true</c>, <c>null</c>) and read back by token type, so
-/// their wire form — and therefore every existing fingerprint — is unchanged. The exact kinds added later
-/// (Guid, Decimal, UnsignedInteger, Timestamp) cannot ride a bare scalar without colliding (a Guid/Timestamp
-/// looks like a String; a Decimal/UnsignedInteger like a Number/Integer and would lose scale/range), so they
-/// use a tagged object <c>{"kind":"…","value":"…"}</c> with the value as a canonical string. Capture provenance
-/// (<see cref="QueryValue.ParameterKey"/>) is runtime-only and is not part of the wire form.
+/// Serializes a <see cref="QueryValue"/>. The original scalar kinds are written as raw JSON scalars when the
+/// scalar token can round-trip the kind. Integral-valued doubles are tagged because a bare <c>1</c> is
+/// indistinguishable from an integer on read. The exact kinds added later (Guid, Decimal, UnsignedInteger,
+/// Timestamp) also use a tagged object <c>{"kind":"…","value":"…"}</c> with the value as a canonical string.
+/// Capture provenance (<see cref="QueryValue.ParameterKey"/>) is runtime-only and is not part of the wire form.
 /// </summary>
 public sealed class QueryValueJsonConverter : JsonConverter<QueryValue>
 {
@@ -47,7 +45,7 @@ public sealed class QueryValueJsonConverter : JsonConverter<QueryValue>
                 writer.WriteNumberValue(value.Integer);
                 break;
             case QueryValueKind.Number:
-                writer.WriteNumberValue(value.Number);
+                WriteNumber(writer, value.Number);
                 break;
             case QueryValueKind.String:
                 WriteStringValue(writer, value.String);
@@ -85,6 +83,17 @@ public sealed class QueryValueJsonConverter : JsonConverter<QueryValue>
         writer.WriteString("kind", kind);
         writer.WriteString("value", value);
         writer.WriteEndObject();
+    }
+
+    private static void WriteNumber(Utf8JsonWriter writer, double value)
+    {
+        if (value == Math.Truncate(value))
+        {
+            WriteTagged(writer, "number", value.ToString("R", CultureInfo.InvariantCulture));
+            return;
+        }
+
+        writer.WriteNumberValue(value);
     }
 
     private static string? ReadString(ref Utf8JsonReader reader, string name)
@@ -146,6 +155,7 @@ public sealed class QueryValueJsonConverter : JsonConverter<QueryValue>
     private static QueryValue ReadTaggedValue(string? kind, string text)
         => kind switch
         {
+            "number" => ReadTaggedNumber(kind, text),
             "guid" => ReadGuid(kind, text),
             "decimal" => ReadDecimal(kind, text),
             "ulong" => ReadUnsignedInteger(kind, text),
@@ -156,6 +166,11 @@ public sealed class QueryValueJsonConverter : JsonConverter<QueryValue>
     private static QueryValue ReadGuid(string kind, string text) =>
         Guid.TryParse(text, out var value)
             ? QueryValue.FromGuid(value)
+            : throw InvalidTaggedValue(kind, text);
+
+    private static QueryValue ReadTaggedNumber(string kind, string text) =>
+        double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) && double.IsFinite(value)
+            ? QueryValue.FromNumber(value)
             : throw InvalidTaggedValue(kind, text);
 
     private static QueryValue ReadDecimal(string kind, string text) =>

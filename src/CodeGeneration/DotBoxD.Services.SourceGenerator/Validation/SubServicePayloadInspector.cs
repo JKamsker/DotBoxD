@@ -7,26 +7,24 @@ namespace DotBoxD.Services.SourceGenerator.Validation;
 
 internal static class SubServicePayloadInspector
 {
-    private const string DotBoxDServiceAttributeName = ServicesGeneratorTypeNames.DotBoxDServiceAttribute;
-
-    public static bool ContainsDotBoxDServiceInterface(ITypeSymbol type, CancellationToken ct) =>
-        ContainsDotBoxDServiceInterface(
+    public static bool ContainsRpcServiceInterface(ITypeSymbol type, CancellationToken ct) =>
+        ContainsRpcServiceInterface(
             type,
             ct,
             new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default),
             cache: null);
 
-    public static bool ContainsDotBoxDServiceInterface(
+    public static bool ContainsRpcServiceInterface(
         ITypeSymbol type,
         CancellationToken ct,
         RpcTypeValidationCache cache) =>
-        ContainsDotBoxDServiceInterface(
+        ContainsRpcServiceInterface(
             type,
             ct,
             new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default),
             cache);
 
-    private static bool ContainsDotBoxDServiceInterface(
+    private static bool ContainsRpcServiceInterface(
         ITypeSymbol type,
         CancellationToken ct,
         HashSet<INamedTypeSymbol> visitedOriginalDefinitions,
@@ -36,18 +34,18 @@ internal static class SubServicePayloadInspector
 
         if (type is INamedTypeSymbol named)
         {
-            return ContainsDotBoxDServiceInterface(named, ct, visitedOriginalDefinitions, cache);
+            return ContainsRpcServiceInterface(named, ct, visitedOriginalDefinitions, cache);
         }
 
         if (type is IArrayTypeSymbol array)
         {
-            return ContainsDotBoxDServiceInterface(array.ElementType, ct, visitedOriginalDefinitions, cache);
+            return ContainsRpcServiceInterface(array.ElementType, ct, visitedOriginalDefinitions, cache);
         }
 
         return false;
     }
 
-    private static bool ContainsDotBoxDServiceInterface(
+    private static bool ContainsRpcServiceInterface(
         INamedTypeSymbol named,
         CancellationToken ct,
         HashSet<INamedTypeSymbol> visitedOriginalDefinitions,
@@ -55,7 +53,7 @@ internal static class SubServicePayloadInspector
     {
         ct.ThrowIfCancellationRequested();
 
-        if (named.TypeKind == TypeKind.Interface && HasDotBoxDServiceAttribute(named, ct))
+        if (named.TypeKind == TypeKind.Interface && HasRpcServiceAttribute(named, ct))
         {
             return true;
         }
@@ -69,7 +67,7 @@ internal static class SubServicePayloadInspector
         {
             ct.ThrowIfCancellationRequested();
 
-            if (ContainsDotBoxDServiceInterface(arg, ct, visitedOriginalDefinitions, cache))
+            if (ContainsRpcServiceInterface(arg, ct, visitedOriginalDefinitions, cache))
             {
                 if (cache is not null)
                 {
@@ -85,7 +83,7 @@ internal static class SubServicePayloadInspector
             ct,
             visitedOriginalDefinitions,
             (memberType, memberCt, memberVisited) =>
-                ContainsDotBoxDServiceInterface(memberType, memberCt, memberVisited, cache));
+                ContainsRpcServiceInterface(memberType, memberCt, memberVisited, cache));
 
         // Only positive results are cycle-independent and safe to cache. A false computed here may
         // be a cycle-break artifact (the type's traversal hit an in-progress ancestor and returned
@@ -98,13 +96,13 @@ internal static class SubServicePayloadInspector
         return contains;
     }
 
-    private static bool HasDotBoxDServiceAttribute(INamedTypeSymbol type, CancellationToken ct)
+    private static bool HasRpcServiceAttribute(INamedTypeSymbol type, CancellationToken ct)
     {
         foreach (var attr in type.GetAttributes())
         {
             ct.ThrowIfCancellationRequested();
 
-            if (attr.AttributeClass?.ToDisplayString() == DotBoxDServiceAttributeName)
+            if (ServicesGeneratorTypeNames.IsRpcServiceAttribute(attr.AttributeClass?.ToDisplayString()))
             {
                 return true;
             }

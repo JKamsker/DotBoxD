@@ -66,11 +66,11 @@ internal static partial class ServiceModelFactory
         var serviceName = GetConfiguredServiceName(context) ?? interfaceSymbol.Name;
         if (string.IsNullOrWhiteSpace(serviceName))
         {
-            // An explicit empty/whitespace [DotBoxDService(Name = "")] compiles but no inbound call can ever
+            // An explicit empty/whitespace [RpcService(Name = "")] compiles but no inbound call can ever
             // match the empty wire name, so every dispatch fails at runtime. Reject it at build time.
             return RejectedService(
                 buildContext.DisplayName,
-                "[DotBoxDService(Name = ...)] wire name must not be empty or whitespace",
+                "[RpcService(Name = ...)] wire name must not be empty or whitespace",
                 buildContext.ServiceLocation,
                 buildContext.QualifiedInterfaceName);
         }
@@ -201,5 +201,4 @@ internal static partial class ServiceModelFactory
 
         return string.Join(".", parts);
     }
-
 }

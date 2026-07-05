@@ -106,6 +106,7 @@ internal static class InvokeAsyncGeneratedTypeValidator
         HashSet<ITypeSymbol> visiting)
     {
         RejectAnonymousType(named, role);
+        RejectFileLocalType(named, role);
         RejectInaccessibleType(named, compilation, role);
         foreach (var typeArgument in named.TypeArguments)
         {
@@ -119,6 +120,15 @@ internal static class InvokeAsyncGeneratedTypeValidator
         {
             throw new NotSupportedException(
                 $"InvokeAsync {role} '{named.ToDisplayString()}' cannot be anonymous because generated interceptors must name the type.");
+        }
+    }
+
+    private static void RejectFileLocalType(INamedTypeSymbol named, string role)
+    {
+        if (FileLocalType(named) is { } fileLocalType)
+        {
+            throw new NotSupportedException(
+                $"InvokeAsync {role} '{fileLocalType.ToDisplayString()}' is file-local; generated interceptors and readers cannot name file-local types.");
         }
     }
 
@@ -215,4 +225,18 @@ internal static class InvokeAsyncGeneratedTypeValidator
 
     private static HashSet<ITypeSymbol> NewVisitingSet()
         => new(SymbolEqualityComparer.Default);
+
+    private static INamedTypeSymbol? FileLocalType(INamedTypeSymbol type)
+    {
+        for (var current = type; current is not null; current = current.ContainingType)
+        {
+            // Nested types inherit the file-scoped visibility of an enclosing file-local type.
+            if (current.IsFileLocal)
+            {
+                return current;
+            }
+        }
+
+        return null;
+    }
 }

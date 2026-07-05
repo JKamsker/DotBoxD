@@ -17,13 +17,13 @@ public sealed class PluginServerWrapperSurfaceCollisionRegressionTests
 
                 namespace WrapperCollision.Game
                 {
-                    [DotBoxDService]
+                    [RpcService]
                     public interface IGameWorldAccess
                     {
                         IMonsterControl Monsters { get; }
                     }
 
-                    [DotBoxDService]
+                    [RpcService]
                     public interface IMonsterControl
                     {
                         int _owner { get; }

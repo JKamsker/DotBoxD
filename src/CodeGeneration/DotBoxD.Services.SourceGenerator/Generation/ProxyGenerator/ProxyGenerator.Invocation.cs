@@ -21,12 +21,21 @@ internal static partial class ProxyGenerator
         string ctArg,
         GeneratedLocalNames locals,
         CancellationToken ct,
-        string indent = "            ")
+        string indent = "            ",
+        bool checkCancellationBeforeStreamReserve = true)
     {
         var hasReturn = NamingHelpers.HasReturnValue(method.ReturnKind);
         var returnType = ClientReturnType(method);
         var requestParameters = ProxyGenerationHelpers.GetRequestParameters(method.Parameters, ct);
-        var streamSetup = ProxyStreamSetupEmitter.Emit(sb, method, requestParameters, locals, ct, indent);
+        var streamSetup = ProxyStreamSetupEmitter.Emit(
+            sb,
+            method,
+            requestParameters,
+            ctArg,
+            checkCancellationBeforeStreamReserve,
+            locals,
+            ct,
+            indent);
         var streamArgument = streamSetup.ArgumentName;
         var useStreamAwareTaskValueInvocation =
             streamArgument is not null && (method.ReturnKind is MethodReturnKind.ValueTask or MethodReturnKind.ValueTaskOf);

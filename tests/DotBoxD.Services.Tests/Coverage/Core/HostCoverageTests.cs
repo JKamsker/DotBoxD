@@ -51,6 +51,17 @@ public sealed partial class HostCoverageTests
         Assert.Throws<ArgumentNullException>(() => host.ForEachPeer(null!));
     }
 
+    [Fact]
+    public async Task ForEachPeer_AfterDispose_ThrowsObjectDisposedException()
+    {
+        var connection = new ScriptedConnection();
+        var host = RpcHost.Listen(new SingleConnectionServerTransport(connection), NewSerializer());
+
+        await host.DisposeAsync();
+
+        Assert.Throws<ObjectDisposedException>(() => host.ForEachPeer(_ => { }));
+    }
+
     // ----- StartAsync lifecycle guards (RpcHost 80-81, 84-86, 125-128, 134-140, 167-169, 174) -----
 
     [Fact]

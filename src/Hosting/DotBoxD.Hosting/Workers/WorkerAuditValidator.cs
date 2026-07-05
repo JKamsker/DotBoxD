@@ -12,15 +12,21 @@ internal static class WorkerAuditValidator
     private static readonly DateTimeOffset EarliestAcceptedTimestamp = DateTimeOffset.UnixEpoch;
     private static readonly Dictionary<string, AuditKindValidator> AuditKindValidators = new(StringComparer.Ordinal)
     {
-        ["RunSummary"] = static (plan, _, _, auditEvent) => RunSummarySchemaMatches(plan, auditEvent),
-        ["WorkerExecution"] = static (plan, _, _, auditEvent) => ModuleAuditMatches(plan, auditEvent),
-        ["ExecutionFallback"] = static (plan, _, _, auditEvent) => ExecutionFallbackAuditMatches(plan, auditEvent),
-        ["VerifierFailure"] = static (plan, _, _, auditEvent) => VerifierFailureAuditMatches(plan, auditEvent),
-        ["DebugTrace"] = static (plan, _, options, auditEvent) =>
+        ["RunSummary"] = static (plan, _, _, auditEvent, _) => RunSummarySchemaMatches(plan, auditEvent),
+        ["WorkerExecution"] = static (plan, _, _, auditEvent, _) => ModuleAuditMatches(plan, auditEvent),
+        ["ExecutionFallback"] = static (plan, _, _, auditEvent, _) => ExecutionFallbackAuditMatches(plan, auditEvent),
+        ["VerifierFailure"] = static (plan, _, _, auditEvent, _) => VerifierFailureAuditMatches(plan, auditEvent),
+        ["DebugTrace"] = static (plan, _, options, auditEvent, _) =>
             options.EnableDebugTrace && ModuleAuditMatches(plan, auditEvent),
-        ["BindingCall"] = static (plan, entrypoint, _, auditEvent) => BindingAuditMatches(plan, entrypoint, auditEvent),
-        ["SandboxLog"] = static (plan, entrypoint, _, auditEvent) => BindingAuditMatches(plan, entrypoint, auditEvent),
-        ["PluginMessage"] = static (plan, entrypoint, _, auditEvent) => BindingAuditMatches(plan, entrypoint, auditEvent),
+        ["CacheInvalidated"] = static (plan, entrypoint, _, auditEvent, _) =>
+            WorkerCacheInvalidationAuditValidator.Matches(plan, entrypoint, auditEvent),
+        ["PolicyDenied"] = static (_, _, _, _, _) => false,
+        [BindingAuditKinds.BindingCall] = static (plan, entrypoint, _, auditEvent, grantClock) =>
+            BindingAuditMatches(plan, entrypoint, auditEvent, grantClock),
+        [BindingAuditKinds.SandboxLog] = static (plan, entrypoint, _, auditEvent, grantClock) =>
+            BindingAuditMatches(plan, entrypoint, auditEvent, grantClock),
+        [BindingAuditKinds.PluginMessage] = static (plan, entrypoint, _, auditEvent, grantClock) =>
+            BindingAuditMatches(plan, entrypoint, auditEvent, grantClock),
     };
 
     private static readonly HashSet<string> CommonRunSummaryFields = [
@@ -62,13 +68,15 @@ internal static class WorkerAuditValidator
         ExecutionPlan plan,
         string entrypoint,
         SandboxExecutionOptions options,
-        SandboxAuditEvent auditEvent);
+        SandboxAuditEvent auditEvent,
+        DateTimeOffset grantClock);
 
     public static bool Matches(
         ExecutionPlan plan,
         string entrypoint,
         SandboxExecutionOptions options,
-        SandboxAuditEvent auditEvent)
+        SandboxAuditEvent auditEvent,
+        DateTimeOffset grantClock)
     {
         if (!CommonEnvelopeMatches(plan, auditEvent))
         {
@@ -76,7 +84,7 @@ internal static class WorkerAuditValidator
         }
 
         return AuditKindValidators.TryGetValue(auditEvent.Kind, out var validate) &&
-            validate(plan, entrypoint, options, auditEvent);
+            validate(plan, entrypoint, options, auditEvent, grantClock);
     }
 
     private static bool CommonEnvelopeMatches(ExecutionPlan plan, SandboxAuditEvent auditEvent)
@@ -175,7 +183,8 @@ internal static class WorkerAuditValidator
     private static bool BindingAuditMatches(
         ExecutionPlan plan,
         string entrypoint,
-        SandboxAuditEvent auditEvent)
+        SandboxAuditEvent auditEvent,
+        DateTimeOffset grantClock)
     {
         if (!TryGetAuditedBinding(plan, entrypoint, auditEvent, out var binding))
         {
@@ -183,10 +192,12 @@ internal static class WorkerAuditValidator
         }
 
         return !string.IsNullOrWhiteSpace(auditEvent.ResourceId) &&
+            AuditKindMatchesBinding(auditEvent.Kind, binding) &&
             CapabilityMatches(auditEvent, binding) &&
             EffectMatches(auditEvent, binding) &&
             ResultMatches(auditEvent) &&
             LogAuditMatchesPolicy(plan, auditEvent) &&
+            WorkerPluginMessageAuditPolicy.Matches(plan, auditEvent, grantClock) &&
             RequiredBindingFieldsMatch(plan, auditEvent);
     }
 
@@ -209,6 +220,9 @@ internal static class WorkerAuditValidator
         return binding.AuditLevel is not (AuditLevel.None or AuditLevel.Summary);
     }
 
+    private static bool AuditKindMatchesBinding(string kind, BindingSignature binding)
+        => string.Equals(kind, binding.AuditKind, StringComparison.Ordinal);
+
     private static bool CapabilityMatches(SandboxAuditEvent auditEvent, BindingSignature binding)
         => binding.RequiredCapability is null ||
            string.Equals(auditEvent.CapabilityId, binding.RequiredCapability, StringComparison.Ordinal);
@@ -230,7 +244,7 @@ internal static class WorkerAuditValidator
         => auditEvent.Success ? auditEvent.ErrorCode is null : auditEvent.ErrorCode is not null;
 
     private static bool LogAuditMatchesPolicy(ExecutionPlan plan, SandboxAuditEvent auditEvent)
-        => auditEvent.Kind != "SandboxLog" ||
+        => auditEvent.Kind != BindingAuditKinds.SandboxLog ||
            auditEvent.Message is not null &&
            auditEvent.Message.Length <= plan.Budget.MaxLogMessageLength;
 

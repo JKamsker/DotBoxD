@@ -58,9 +58,36 @@ public static class KernelRpcValueConverter
             return scalar;
         }
 
+        return FromSandboxCollectionValue(value);
+    }
+
+    internal static void RequireDeclaredType(SandboxValue value, SandboxType expectedType)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        ArgumentNullException.ThrowIfNull(expectedType);
+        if (!value.Type.Equals(expectedType))
+        {
+            throw new ArgumentException(
+                "Server extension IPC cannot marshal a sandbox collection whose declared type does not match its contents.",
+                nameof(value));
+        }
+    }
+
+    private static KernelRpcValue FromValidatedSandboxValue(SandboxValue value)
+    {
+        if (TryScalarFromSandboxValue(value, out var scalar))
+        {
+            return scalar;
+        }
+
+        return FromSandboxCollectionValue(value);
+    }
+
+    private static KernelRpcValue FromSandboxCollectionValue(SandboxValue value)
+    {
         return value switch
         {
-            ListValue list => KernelRpcValue.ListFromOwnedItems(ConvertList(list.Values)),
+            ListValue list => KernelRpcValue.ListFromOwnedItems(ConvertList(list)),
             RecordValue record => KernelRpcValue.RecordFromOwnedFields(ConvertList(record.Fields)),
             MapValue map => KernelRpcValue.MapFromOwnedEntries(ConvertMap(map)),
             _ => throw new NotSupportedException(
@@ -201,7 +228,25 @@ public static class KernelRpcValueConverter
         var converted = new KernelRpcValue[values.Count];
         for (var i = 0; i < values.Count; i++)
         {
-            converted[i] = FromSandboxValue(values[i]);
+            converted[i] = FromValidatedSandboxValue(values[i]);
+        }
+
+        return converted;
+    }
+
+    private static KernelRpcValue[] ConvertList(ListValue values)
+    {
+        if (values.Values.Count == 0)
+        {
+            return Array.Empty<KernelRpcValue>();
+        }
+
+        var converted = new KernelRpcValue[values.Values.Count];
+        for (var i = 0; i < values.Values.Count; i++)
+        {
+            var item = values.Values[i];
+            RequireDeclaredType(item, values.ItemType);
+            converted[i] = FromValidatedSandboxValue(item);
         }
 
         return converted;
@@ -220,8 +265,10 @@ public static class KernelRpcValueConverter
         var index = 0;
         foreach (var pair in values.Entries)
         {
-            entries[index++] = FromSandboxValue(pair.Key);
-            entries[index++] = FromSandboxValue(pair.Value);
+            RequireDeclaredType(pair.Key, values.KeyType);
+            RequireDeclaredType(pair.Value, values.ValueType);
+            entries[index++] = FromValidatedSandboxValue(pair.Key);
+            entries[index++] = FromValidatedSandboxValue(pair.Value);
         }
 
         return entries;

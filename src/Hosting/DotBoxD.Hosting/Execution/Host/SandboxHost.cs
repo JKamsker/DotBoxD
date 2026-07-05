@@ -53,6 +53,7 @@ public sealed partial class SandboxHost : IDisposable
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(policy);
         cancellationToken.ThrowIfCancellationRequested();
         ExecutionPlanGuard.EnsurePolicyLimits(policy);
         var validation = new ModuleValidator().Validate(module, _bindings, policy);
@@ -103,6 +104,8 @@ public sealed partial class SandboxHost : IDisposable
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(entrypoint);
+        ArgumentNullException.ThrowIfNull(input);
         options ??= DefaultExecutionOptions;
         ExecutionPlanGuard.EnsurePrepared(plan, _bindings, _planSigningKey, _preparedPlans);
         if (TryGetPreDispatchResult(plan, entrypoint, options, out var preDispatchResult))
