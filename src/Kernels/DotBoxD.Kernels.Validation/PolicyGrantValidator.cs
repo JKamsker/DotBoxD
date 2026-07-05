@@ -135,6 +135,12 @@ internal static class PolicyGrantValidator
             return;
         }
 
+        if (grant.Parameters is null)
+        {
+            Add(diagnostics, grant, "parameter map must not be null");
+            return;
+        }
+
         if (CapabilityPattern.IsWildcard(grant.Id))
         {
             ValidateWildcardGrant(grant, bindings, requiredCapabilities, requestedCapabilities, diagnostics);
