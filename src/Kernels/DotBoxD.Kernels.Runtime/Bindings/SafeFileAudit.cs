@@ -5,6 +5,8 @@ namespace DotBoxD.Kernels.Runtime.Bindings;
 
 internal static class SafeFileAudit
 {
+    private const string PathExtensionField = "pathExtension";
+
     public static void Read(
         SandboxContext context,
         DateTimeOffset startedAt,
@@ -34,11 +36,19 @@ internal static class SafeFileAudit
         long? bytes,
         SandboxErrorCode? error)
     {
-        var fields = context.BindingAuditFields(
+        var fields = BindingAuditFields.CreateMutable(
             "file",
             startedAt,
+            context.ModuleHash,
+            context.PolicyHash,
+            context.Policy.Deterministic,
+            extraCapacity: success ? 1 : 0,
             bytesRead: bindingId == "file.readText" ? bytes : null,
             bytesWritten: bindingId == "file.writeText" ? bytes : null);
+        if (success)
+        {
+            AddPathExtension(fields, resource);
+        }
 
         context.Audit.Write(new SandboxAuditEvent(
             context.RunId,
@@ -56,4 +66,13 @@ internal static class SafeFileAudit
 
     private static string Sanitize(string value)
         => AuditTextSanitizer.RedactPathSegments(value.Replace('\\', '/'));
+
+    private static void AddPathExtension(IDictionary<string, string> fields, string resource)
+    {
+        var extension = Path.GetExtension(resource);
+        if (!string.IsNullOrEmpty(extension))
+        {
+            fields[PathExtensionField] = extension;
+        }
+    }
 }

@@ -1,5 +1,3 @@
-using System.Buffers;
-using DotBoxD.Services.Serialization;
 using DotBoxD.Services.Server;
 using Xunit;
 
@@ -157,122 +155,39 @@ public sealed class RegistryGuardCoverageTests
         Assert.Contains(nameof(INullDispatcherFactoryService), ex.Message, StringComparison.Ordinal);
     }
 
-    // --- Throwaway service surfaces (no generator runs for these) ---
-
-    public interface IDefaultMetadataService
+    [Fact]
+    public void Register_MetadataOverloadRejectsConcreteServiceType()
     {
-        Task DoAsync(CancellationToken ct = default);
+        var metadata = new GeneratedService(
+            typeof(ConcreteRegisteredService),
+            typeof(ConcreteRegisteredService),
+            typeof(ProbeDispatcher),
+            nameof(ConcreteRegisteredService));
+
+        var ex = Assert.Throws<ArgumentException>(() =>
+            GeneratedServiceRegistry.Register<ConcreteRegisteredService>(
+                _ => new ConcreteRegisteredService(),
+                _ => new ProbeDispatcher(),
+                metadata));
+
+        Assert.Contains("interface", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(
+            ex.ParamName is "service" or "serviceInterface",
+            $"Expected ParamName to identify the service contract, but was '{ex.ParamName}'.");
     }
 
-    public interface IValidationProbeService
+    [Fact]
+    public void Register_TwoArgOverloadRejectsConcreteServiceType()
     {
-        Task DoAsync(CancellationToken ct = default);
+        var ex = Assert.Throws<ArgumentException>(() =>
+            GeneratedServiceRegistry.Register<ConcreteRegisteredService>(
+                _ => new ConcreteRegisteredService(),
+                _ => new ProbeDispatcher()));
+
+        Assert.Contains("interface", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(
+            ex.ParamName is "service" or "serviceInterface",
+            $"Expected ParamName to identify the service contract, but was '{ex.ParamName}'.");
     }
 
-    public interface INullProxyFactoryService
-    {
-        Task DoAsync(CancellationToken ct = default);
-    }
-
-    public interface INullDispatcherFactoryService
-    {
-        Task DoAsync(CancellationToken ct = default);
-    }
-
-    private sealed class DefaultMetadataImpl : IDefaultMetadataService
-    {
-        public Task DoAsync(CancellationToken ct = default) => Task.CompletedTask;
-    }
-
-    private sealed class DefaultMetadataProxy : IDefaultMetadataService
-    {
-        public Task DoAsync(CancellationToken ct = default) => Task.CompletedTask;
-    }
-
-    private sealed class ProbeProxy : IValidationProbeService
-    {
-        public Task DoAsync(CancellationToken ct = default) => Task.CompletedTask;
-    }
-
-    private sealed class NullDispatcherFactoryImpl : INullDispatcherFactoryService
-    {
-        public Task DoAsync(CancellationToken ct = default) => Task.CompletedTask;
-    }
-
-    private sealed class NullDispatcherFactoryProxy : INullDispatcherFactoryService
-    {
-        public Task DoAsync(CancellationToken ct = default) => Task.CompletedTask;
-    }
-
-    private sealed class DefaultMetadataDispatcher : IServiceDispatcher
-    {
-        public string ServiceName => nameof(IDefaultMetadataService);
-
-        public Task DispatchAsync(
-            string method,
-            ReadOnlyMemory<byte> payload,
-            ISerializer serializer,
-            IInstanceRegistry registry,
-            IBufferWriter<byte> output,
-            CancellationToken ct = default) => Task.CompletedTask;
-    }
-
-    private sealed class NullProxyFactoryDispatcher : IServiceDispatcher
-    {
-        public string ServiceName => nameof(INullProxyFactoryService);
-
-        public Task DispatchAsync(
-            string method,
-            ReadOnlyMemory<byte> payload,
-            ISerializer serializer,
-            IInstanceRegistry registry,
-            IBufferWriter<byte> output,
-            CancellationToken ct = default) => Task.CompletedTask;
-    }
-
-    private sealed class ProbeDispatcher : IServiceDispatcher
-    {
-        public string ServiceName => "Probe";
-
-        public Task DispatchAsync(
-            string method,
-            ReadOnlyMemory<byte> payload,
-            ISerializer serializer,
-            IInstanceRegistry registry,
-            IBufferWriter<byte> output,
-            CancellationToken ct = default) => Task.CompletedTask;
-    }
-
-    /// <summary>An <see cref="IRpcInvoker"/> that is never actually invoked by these tests.</summary>
-    private sealed class NoopInvoker : IRpcInvoker
-    {
-        public Task<TResponse> InvokeAsync<TRequest, TResponse>(
-            string service, string method, TRequest request, CancellationToken ct = default) =>
-            Task.FromResult(default(TResponse)!);
-
-        public Task<TResponse> InvokeAsync<TResponse>(string service, string method, CancellationToken ct = default) =>
-            Task.FromResult(default(TResponse)!);
-
-        public Task InvokeAsync<TRequest>(string service, string method, TRequest request, CancellationToken ct = default) =>
-            Task.CompletedTask;
-
-        public Task InvokeAsync(string service, string method, CancellationToken ct = default) =>
-            Task.CompletedTask;
-
-        public Task<TResponse> InvokeOnInstanceAsync<TRequest, TResponse>(
-            string service, string instanceId, string method, TRequest request, CancellationToken ct = default) =>
-            Task.FromResult(default(TResponse)!);
-
-        public Task<TResponse> InvokeOnInstanceAsync<TResponse>(
-            string service, string instanceId, string method, CancellationToken ct = default) =>
-            Task.FromResult(default(TResponse)!);
-
-        public Task InvokeOnInstanceAsync<TRequest>(
-            string service, string instanceId, string method, TRequest request, CancellationToken ct = default) =>
-            Task.CompletedTask;
-
-        public Task InvokeOnInstanceAsync(
-            string service, string instanceId, string method, CancellationToken ct = default) =>
-            Task.CompletedTask;
-    }
 }

@@ -76,6 +76,7 @@ internal static class RpcKernelDirectClientExtensionEmitter
             builder.AppendLine("            throw new global::System.InvalidOperationException(\"Server extension calls require a generated plugin facade receiver.\");");
             builder.AppendLine("        }");
 
+            builder.Append("        ").Append(cancellationToken).AppendLine(".ThrowIfCancellationRequested();");
             builder.Append("        var ").Append(arguments).Append($" = new {DotBoxDRpcValueNames.GlobalKernelRpcValue}[")
                 .Append(userParameterCount + argumentOffset).AppendLine("];");
             if (hasReceiverId)
