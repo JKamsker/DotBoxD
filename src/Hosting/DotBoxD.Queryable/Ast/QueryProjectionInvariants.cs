@@ -39,7 +39,9 @@ internal static class QueryProjectionInvariants
     }
 
     public static string MemberPath(QueryProjection projection)
-        => NonEmpty(projection.Path, "QueryProjection Member nodes require Path to be non-empty and non-whitespace.");
+        => RequireValidMemberPath(
+            projection.Path,
+            "QueryProjection Member nodes require a valid path with identifier segments.");
 
     public static string ConstructTypeName(QueryProjection projection)
         => NonEmpty(
@@ -63,9 +65,22 @@ internal static class QueryProjectionInvariants
     }
 
     public static string FieldPath(QueryProjectionField field)
-        => NonEmpty(
+        => RequireValidMemberPath(
             field.Path,
-            $"QueryProjection Construct field '{field.Name}' requires Path to be non-empty and non-whitespace.");
+            $"QueryProjection Construct field '{field.Name}' requires a valid path with identifier segments.");
+
+    public static string MemberPathArgument(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        if (!HasValidMemberPath(path))
+        {
+            throw new ArgumentException(
+                $"Invalid QueryProjection path '{path}'; each '.'-separated segment must be an identifier.",
+                nameof(path));
+        }
+
+        return path;
+    }
 
     public static QueryValue FieldConstant(QueryProjectionField field)
         => field.Constant ?? throw new InvalidOperationException(
@@ -115,4 +130,10 @@ internal static class QueryProjectionInvariants
 
     private static string NonEmpty(string? value, string message)
         => string.IsNullOrWhiteSpace(value) ? throw new InvalidOperationException(message) : value;
+
+    private static string RequireValidMemberPath(string? path, string message)
+        => HasValidMemberPath(path) ? path! : throw new InvalidOperationException(message);
+
+    private static bool HasValidMemberPath(string? path)
+        => !string.IsNullOrWhiteSpace(path) && QueryFilterInvariants.IsValidFieldPath(path);
 }

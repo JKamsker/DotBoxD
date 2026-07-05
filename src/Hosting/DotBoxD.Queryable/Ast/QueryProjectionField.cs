@@ -21,8 +21,7 @@ public sealed record QueryProjectionField
     public static QueryProjectionField FromMember(string name, string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        return new QueryProjectionField { Name = name, Path = path };
+        return new QueryProjectionField { Name = name, Path = QueryProjectionInvariants.MemberPathArgument(path) };
     }
 
     /// <summary>Builds a field that emits a captured constant.</summary>
