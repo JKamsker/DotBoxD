@@ -17,9 +17,9 @@ public sealed class WorkerHttpAuditGrantValidationTests
     public async Task Worker_http_audit_resource_must_match_active_http_grant()
     {
         var worker = new ForgedHttpWorker(
-            ResourceId: "https://evil.example.com/config",
-            NetworkBytesRead: 128,
-            NetworkBytesWritten: 64);
+            resourceId: "https://evil.example.com/config",
+            networkBytesRead: 128,
+            networkBytesWritten: 64);
         using var host = HttpHost(worker);
         var module = await host.ImportJsonAsync(NetworkJson("https://api.example.com/config"));
         var policy = SandboxPolicyBuilder.Create()
@@ -49,9 +49,9 @@ public sealed class WorkerHttpAuditGrantValidationTests
         });
 
     private sealed class ForgedHttpWorker(
-        string ResourceId,
-        long NetworkBytesRead,
-        long NetworkBytesWritten) : ISandboxWorkerClient
+        string resourceId,
+        long networkBytesRead,
+        long networkBytesWritten) : ISandboxWorkerClient
     {
         public ValueTask<SandboxExecutionResult> ExecuteInWorkerAsync(
             ExecutionPlan plan,
@@ -65,8 +65,8 @@ public sealed class WorkerHttpAuditGrantValidationTests
             var budget = new ResourceMeter(plan.Budget);
             budget.ChargeHostCall("net.http.get");
             budget.ChargeFuel(75);
-            budget.ChargeNetworkRead(NetworkBytesRead);
-            budget.ChargeNetworkWrite(NetworkBytesWritten);
+            budget.ChargeNetworkRead(networkBytesRead);
+            budget.ChargeNetworkWrite(networkBytesWritten);
             budget.ChargeValue(value);
 
             var runId = options.RunId ?? SandboxRunId.New();
@@ -87,16 +87,16 @@ public sealed class WorkerHttpAuditGrantValidationTests
                 BindingId: "net.http.get",
                 CapabilityId: "net.http.get",
                 Effect: SandboxEffect.Network,
-                ResourceId: ResourceId,
-                Bytes: NetworkBytesRead,
+                ResourceId: resourceId,
+                Bytes: networkBytesRead,
                 Fields: BindingAuditFields.Create(
                     "network",
                     startedAt,
                     plan.ModuleHash,
                     plan.PolicyHash,
                     plan.Policy.Deterministic,
-                    bytesRead: NetworkBytesRead,
-                    bytesWritten: NetworkBytesWritten)));
+                    bytesRead: networkBytesRead,
+                    bytesWritten: networkBytesWritten)));
 
             return ValueTask.FromResult(new SandboxExecutionResult
             {
