@@ -161,6 +161,7 @@ internal static class WorkerAuditValidator
             !EffectMatches(auditEvent, binding) ||
             !ResultMatches(auditEvent) ||
             !LogAuditMatchesPolicy(plan, auditEvent) ||
+            !WorkerPluginMessageAuditPolicy.Matches(plan, auditEvent) ||
             !RequiredBindingFieldsMatch(plan, auditEvent))
         {
             return false;
