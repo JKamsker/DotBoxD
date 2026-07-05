@@ -120,36 +120,35 @@ internal static class QueryTextParser
             case QueryTokenKind.Number:
                 cursor.Advance();
                 return ParseNumber(token.Text);
-            case QueryTokenKind.Word when token.Text is "guid" or "ts":
-                return ParseTaggedValue(cursor, token.Text);
             case QueryTokenKind.Word:
-                cursor.Advance();
-                return token.Text switch
-                {
-                    "true" => QueryValue.FromBoolean(true),
-                    "false" => QueryValue.FromBoolean(false),
-                    "null" => QueryValue.Null,
-                    _ => throw new QueryTranslationException($"Expected a value but found '{token.Text}'."),
-                };
+                return ParseWordValue(cursor, token);
             default:
                 throw new QueryTranslationException("Expected a value in query text.");
         }
     }
 
-    private static QueryValue ParseNumber(string raw)
+    private static QueryValue ParseWordValue(Cursor cursor, QueryToken token)
     {
-        if (raw.Length > 1 && raw[^1] is 'm' or 'M')
+        if (token.Text is "guid" or "ts")
         {
-            return decimal.TryParse(raw[..^1], NumberStyles.Number, CultureInfo.InvariantCulture, out var dec)
-                ? QueryValue.FromDecimal(dec)
-                : throw new QueryTranslationException($"Invalid decimal '{raw}' in query text.");
+            return ParseTaggedValue(cursor, token.Text);
         }
 
-        if (raw.Length > 1 && raw[^1] is 'u' or 'U')
+        cursor.Advance();
+        return token.Text switch
         {
-            return ulong.TryParse(raw[..^1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var unsigned)
-                ? QueryValue.FromUnsignedInteger(unsigned)
-                : throw new QueryTranslationException($"Invalid unsigned integer '{raw}' in query text.");
+            "true" => QueryValue.FromBoolean(true),
+            "false" => QueryValue.FromBoolean(false),
+            "null" => QueryValue.Null,
+            _ => throw new QueryTranslationException($"Expected a value but found '{token.Text}'."),
+        };
+    }
+
+    private static QueryValue ParseNumber(string raw)
+    {
+        if (TryParseSuffixedNumber(raw, out var suffixed))
+        {
+            return suffixed;
         }
 
         if (long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var integer))
@@ -163,6 +162,28 @@ internal static class QueryTextParser
         }
 
         throw new QueryTranslationException($"Invalid number '{raw}' in query text.");
+    }
+
+    private static bool TryParseSuffixedNumber(string raw, out QueryValue value)
+    {
+        if (raw.Length > 1 && raw[^1] is 'm' or 'M')
+        {
+            value = decimal.TryParse(raw[..^1], NumberStyles.Number, CultureInfo.InvariantCulture, out var dec)
+                ? QueryValue.FromDecimal(dec)
+                : throw new QueryTranslationException($"Invalid decimal '{raw}' in query text.");
+            return true;
+        }
+
+        if (raw.Length > 1 && raw[^1] is 'u' or 'U')
+        {
+            value = ulong.TryParse(raw[..^1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var unsigned)
+                ? QueryValue.FromUnsignedInteger(unsigned)
+                : throw new QueryTranslationException($"Invalid unsigned integer '{raw}' in query text.");
+            return true;
+        }
+
+        value = null!;
+        return false;
     }
 
     // Tag-prefixed value literals: guid("…") and ts("…"). The quoted form keeps the value's '-'/':' from

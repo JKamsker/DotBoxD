@@ -220,25 +220,23 @@ public sealed partial record QueryValue
     /// machines. The canonical form this type emits always includes <c>Z</c>, so only malformed input is rejected.
     /// </summary>
     internal static bool HasExplicitTimestampOffset(string text)
+        => HasUtcTimestampSuffix(text) || HasNumericTimestampOffset(text);
+
+    private static bool HasUtcTimestampSuffix(string text)
+        => text.EndsWith('Z') || text.EndsWith('z');
+
+    private static bool HasNumericTimestampOffset(string text)
     {
-        if (text.EndsWith('Z') || text.EndsWith('z'))
+        if (text.Length < 6)
         {
-            return true;
+            return false;
         }
 
-        if (text.Length >= 6)
-        {
-            var tail = text.AsSpan(text.Length - 6);
-            if ((tail[0] == '+' || tail[0] == '-') &&
-                char.IsAsciiDigit(tail[1]) && char.IsAsciiDigit(tail[2]) &&
-                tail[3] == ':' &&
-                char.IsAsciiDigit(tail[4]) && char.IsAsciiDigit(tail[5]))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        var tail = text.AsSpan(text.Length - 6);
+        return (tail[0] == '+' || tail[0] == '-') &&
+            char.IsAsciiDigit(tail[1]) && char.IsAsciiDigit(tail[2]) &&
+            tail[3] == ':' &&
+            char.IsAsciiDigit(tail[4]) && char.IsAsciiDigit(tail[5]);
     }
 
     private static DateTimeOffset ToOffset(DateTime value) => value.Kind switch

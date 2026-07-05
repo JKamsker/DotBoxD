@@ -105,40 +105,26 @@ public sealed partial class SandboxHost : IDisposable
         ThrowIfDisposed();
         options ??= DefaultExecutionOptions;
         ExecutionPlanGuard.EnsurePrepared(plan, _bindings, _planSigningKey, _preparedPlans);
-        if (!Enum.IsDefined(options.Mode))
+        if (TryGetPreDispatchResult(plan, entrypoint, options, out var preDispatchResult))
         {
-            return Publish(InvalidExecutionOptionsResult(
-                plan,
-                options,
-                $"execution mode '{(int)options.Mode}' is not supported"));
+            return Publish(preDispatchResult);
         }
 
-        if (!Enum.IsDefined(options.Isolation))
-        {
-            return Publish(InvalidExecutionOptionsResult(
-                plan,
-                options,
-                $"sandbox isolation '{(int)options.Isolation}' is not supported"));
-        }
-
-        if (TryGetCapabilityDenial(plan, entrypoint, out var denial))
-        {
-            return Publish(CapabilityDeniedResult(plan, options, denial));
-        }
-
-        if (options.RequireDeterministic && !plan.Policy.Deterministic)
-        {
-            return Publish(DeterminismRequiredResult(plan, options));
-        }
-
-        if (options.Isolation == SandboxIsolation.WorkerProcess)
-        {
-            var workerResult = await _workerExecutor.ExecuteAsync(plan, entrypoint, input, options, cancellationToken)
+        var result = options.Isolation == SandboxIsolation.WorkerProcess
+            ? await _workerExecutor.ExecuteAsync(plan, entrypoint, input, options, cancellationToken)
+                .ConfigureAwait(false)
+            : await ExecuteSelectedModeAsync(plan, entrypoint, input, options, cancellationToken)
                 .ConfigureAwait(false);
-            return Publish(workerResult);
-        }
+        return Publish(result);
+    }
 
-        var result = options.Mode switch
+    private async ValueTask<SandboxExecutionResult> ExecuteSelectedModeAsync(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxValue input,
+        SandboxExecutionOptions options,
+        CancellationToken cancellationToken)
+        => options.Mode switch
         {
             ExecutionMode.Compiled => await ExecuteCompiledAsync(plan, entrypoint, input, options, cancellationToken)
                 .ConfigureAwait(false),
@@ -153,7 +139,45 @@ public sealed partial class SandboxHost : IDisposable
                 .ConfigureAwait(false),
             _ => CompilerUnavailableResult(plan, options)
         };
-        return Publish(result);
+
+    private bool TryGetPreDispatchResult(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxExecutionOptions options,
+        out SandboxExecutionResult result)
+    {
+        if (!Enum.IsDefined(options.Mode))
+        {
+            result = InvalidExecutionOptionsResult(
+                plan,
+                options,
+                $"execution mode '{(int)options.Mode}' is not supported");
+            return true;
+        }
+
+        if (!Enum.IsDefined(options.Isolation))
+        {
+            result = InvalidExecutionOptionsResult(
+                plan,
+                options,
+                $"sandbox isolation '{(int)options.Isolation}' is not supported");
+            return true;
+        }
+
+        if (TryGetCapabilityDenial(plan, entrypoint, out var denial))
+        {
+            result = CapabilityDeniedResult(plan, options, denial);
+            return true;
+        }
+
+        if (options.RequireDeterministic && !plan.Policy.Deterministic)
+        {
+            result = DeterminismRequiredResult(plan, options);
+            return true;
+        }
+
+        result = null!;
+        return false;
     }
 
     private SandboxExecutionResult Publish(SandboxExecutionResult result)

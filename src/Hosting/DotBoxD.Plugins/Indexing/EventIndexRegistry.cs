@@ -190,32 +190,50 @@ public sealed partial class EventIndexRegistry
             return;
         }
 
-        bool shouldHandle;
+        if (!await ShouldDispatchAsync(adapter, entry, value, cancellationToken, onFault).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        await HandleDispatchAsync(adapter, entry, value, cancellationToken, onFault).ConfigureAwait(false);
+    }
+
+    private static async Task<bool> ShouldDispatchAsync<TEvent>(
+        IPluginEventAdapter<TEvent> adapter,
+        EventIndexEntry<TEvent> entry,
+        TEvent value,
+        CancellationToken cancellationToken,
+        Action<SubscriptionDeliveryFault>? onFault)
+    {
         try
         {
             // The verified IR predicate remains the authority; manifest coverage claims are not trusted.
-            shouldHandle = entry.FullyCovered ||
-                await entry.Kernel.ShouldHandleAsync(adapter, value, cancellationToken).ConfigureAwait(false);
+            return (entry.FullyCovered ||
+                    await entry.Kernel.ShouldHandleAsync(adapter, value, cancellationToken).ConfigureAwait(false)) &&
+                !cancellationToken.IsCancellationRequested;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return;
+            return false;
         }
         catch (SandboxRuntimeException ex) when (WasCallerCancelled(ex, cancellationToken))
         {
-            return;
+            return false;
         }
         catch (Exception ex)
         {
             Report<TEvent>(onFault, ex, SubscriptionDeliveryStage.Filter);
-            return;
+            return false;
         }
+    }
 
-        if (!shouldHandle || cancellationToken.IsCancellationRequested)
-        {
-            return;
-        }
-
+    private static async Task HandleDispatchAsync<TEvent>(
+        IPluginEventAdapter<TEvent> adapter,
+        EventIndexEntry<TEvent> entry,
+        TEvent value,
+        CancellationToken cancellationToken,
+        Action<SubscriptionDeliveryFault>? onFault)
+    {
         try
         {
             await entry.Kernel.HandleAsync(adapter, value, cancellationToken).ConfigureAwait(false);

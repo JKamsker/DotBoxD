@@ -52,6 +52,16 @@ public sealed class QueryValueJsonConverter : JsonConverter<QueryValue>
             case QueryValueKind.String:
                 WriteStringValue(writer, value.String);
                 break;
+            default:
+                WriteTaggedOrThrow(writer, value);
+                break;
+        }
+    }
+
+    private static void WriteTaggedOrThrow(Utf8JsonWriter writer, QueryValue value)
+    {
+        switch (value.Kind)
+        {
             case QueryValueKind.Guid:
                 WriteTagged(writer, "guid", value.Guid.ToString("D"));
                 break;
@@ -199,46 +209,54 @@ public sealed class QueryValueJsonConverter : JsonConverter<QueryValue>
                 continue;
             }
 
-            index++;
-            if (index >= value.Length)
-            {
-                return;
-            }
-
-            if (value[index] != (byte)'u')
-            {
-                index++;
-                continue;
-            }
-
-            var codeUnit = ReadUnicodeEscape(value, index + 1);
-            if (char.IsHighSurrogate((char)codeUnit))
-            {
-                var nextEscape = index + 5;
-                if (nextEscape + 5 >= value.Length ||
-                    value[nextEscape] != (byte)'\\' ||
-                    value[nextEscape + 1] != (byte)'u')
-                {
-                    throw MalformedUtf16(name);
-                }
-
-                var nextCodeUnit = ReadUnicodeEscape(value, nextEscape + 2);
-                if (!char.IsLowSurrogate((char)nextCodeUnit))
-                {
-                    throw MalformedUtf16(name);
-                }
-
-                index = nextEscape + 6;
-                continue;
-            }
-
-            if (char.IsLowSurrogate((char)codeUnit))
-            {
-                throw MalformedUtf16(name);
-            }
-
-            index += 5;
+            index = AdvanceEscapedUtf16(value, name, index);
         }
+    }
+
+    private static int AdvanceEscapedUtf16(ReadOnlySpan<byte> value, string name, int backslashIndex)
+    {
+        var index = backslashIndex + 1;
+        if (index >= value.Length)
+        {
+            return value.Length;
+        }
+
+        if (value[index] != (byte)'u')
+        {
+            return index + 1;
+        }
+
+        var codeUnit = ReadUnicodeEscape(value, index + 1);
+        if (char.IsHighSurrogate((char)codeUnit))
+        {
+            return AdvanceSurrogatePair(value, name, index);
+        }
+
+        if (char.IsLowSurrogate((char)codeUnit))
+        {
+            throw MalformedUtf16(name);
+        }
+
+        return index + 5;
+    }
+
+    private static int AdvanceSurrogatePair(ReadOnlySpan<byte> value, string name, int unicodeEscapeIndex)
+    {
+        var nextEscape = unicodeEscapeIndex + 5;
+        if (nextEscape + 5 >= value.Length ||
+            value[nextEscape] != (byte)'\\' ||
+            value[nextEscape + 1] != (byte)'u')
+        {
+            throw MalformedUtf16(name);
+        }
+
+        var nextCodeUnit = ReadUnicodeEscape(value, nextEscape + 2);
+        if (!char.IsLowSurrogate((char)nextCodeUnit))
+        {
+            throw MalformedUtf16(name);
+        }
+
+        return nextEscape + 6;
     }
 
     private static int ReadUnicodeEscape(ReadOnlySpan<byte> value, int hexStart)

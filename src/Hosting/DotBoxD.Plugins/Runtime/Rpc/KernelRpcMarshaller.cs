@@ -44,29 +44,44 @@ public static partial class KernelRpcMarshaller
             return frameworkStruct;
         }
 
+        if (TryStructuredToSandboxValue(value, type, out var structured))
+        {
+            return structured;
+        }
+
+        throw new NotSupportedException($"Server extension cannot marshal type '{type}' to a sandbox value.");
+    }
+
+    private static bool TryStructuredToSandboxValue(object value, Type type, out SandboxValue result)
+    {
         if (type.IsEnum)
         {
-            return EnumUsesI64(type)
+            result = EnumUsesI64(type)
                 ? SandboxValue.FromInt64(EnumToInt64(value, type))
                 : SandboxValue.FromInt32(Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture));
+            return true;
         }
 
         if (ElementType(type) is { } elementType)
         {
-            return EnumerableToSandboxValue(value, type, elementType);
+            result = EnumerableToSandboxValue(value, type, elementType);
+            return true;
         }
 
         if (MapTypes(type) is { } mapTypes)
         {
-            return DictionaryToSandboxValue(value, type, mapTypes);
+            result = DictionaryToSandboxValue(value, type, mapTypes);
+            return true;
         }
 
         if (DtoShape(type) is { } shape)
         {
-            return DtoToSandboxValue(value, shape);
+            result = DtoToSandboxValue(value, shape);
+            return true;
         }
 
-        throw new NotSupportedException($"Server extension cannot marshal type '{type}' to a sandbox value.");
+        result = null!;
+        return false;
     }
 
     private static SandboxValue EnumerableToSandboxValue(object value, Type type, Type elementType)

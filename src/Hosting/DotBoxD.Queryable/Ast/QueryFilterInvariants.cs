@@ -26,19 +26,22 @@ internal static class QueryFilterInvariants
     }
 
     public static QueryComparisonOperator RequireKnownCompareOperator(QueryComparisonOperator op)
-        => op switch
-        {
-            QueryComparisonOperator.Equal or
+        => IsEqualityOrOrderingOperator(op) || IsStringOperator(op)
+            ? op
+            : throw UnknownCompareOperator(op);
+
+    private static bool IsEqualityOrOrderingOperator(QueryComparisonOperator op)
+        => op is QueryComparisonOperator.Equal or
             QueryComparisonOperator.NotEqual or
             QueryComparisonOperator.GreaterThan or
             QueryComparisonOperator.GreaterThanOrEqual or
             QueryComparisonOperator.LessThan or
-            QueryComparisonOperator.LessThanOrEqual or
-            QueryComparisonOperator.StringContains or
+            QueryComparisonOperator.LessThanOrEqual;
+
+    private static bool IsStringOperator(QueryComparisonOperator op)
+        => op is QueryComparisonOperator.StringContains or
             QueryComparisonOperator.StringStartsWith or
-            QueryComparisonOperator.StringEndsWith => op,
-            _ => throw UnknownCompareOperator(op),
-        };
+            QueryComparisonOperator.StringEndsWith;
 
     public static void RequireCompareValues(QueryFilter filter)
     {
