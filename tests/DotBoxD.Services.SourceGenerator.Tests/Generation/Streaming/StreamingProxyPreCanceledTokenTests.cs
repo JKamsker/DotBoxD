@@ -8,19 +8,14 @@ using FluentAssertions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
-namespace DotBoxD.Services.SourceGenerator.Tests.Generation;
+namespace DotBoxD.Services.SourceGenerator.Tests.Generation.Streaming;
 
 public sealed class StreamingProxyPreCanceledTokenTests
 {
     [Fact]
     public async Task GeneratedProxy_DoesNotReserveRequestStreams_WhenMethodTokenIsAlreadyCanceled()
     {
-        var assembly = CompileWithGenerator(UploadServiceSource);
-        var proxyType = assembly.GetType("Behavior.StreamingPreCancel.UploadProxy")!;
-        var interfaceType = assembly.GetType("Behavior.StreamingPreCancel.IUpload")!;
-        var invoker = new RecordingInvoker();
-        var proxy = Activator.CreateInstance(proxyType, invoker)!;
-        var upload = interfaceType.GetMethod("UploadAsync")!;
+        var (proxy, upload, invoker) = CreateUploadProxy();
         using var bytes = new MemoryStream(new byte[] { 1, 2, 3 });
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
@@ -37,12 +32,7 @@ public sealed class StreamingProxyPreCanceledTokenTests
     [Fact]
     public async Task GeneratedProxy_ReportsCancellationInsteadOfNullStream_WhenMethodTokenIsAlreadyCanceled()
     {
-        var assembly = CompileWithGenerator(UploadServiceSource);
-        var proxyType = assembly.GetType("Behavior.StreamingPreCancel.UploadProxy")!;
-        var interfaceType = assembly.GetType("Behavior.StreamingPreCancel.IUpload")!;
-        var invoker = new RecordingInvoker();
-        var proxy = Activator.CreateInstance(proxyType, invoker)!;
-        var upload = interfaceType.GetMethod("UploadAsync")!;
+        var (proxy, upload, invoker) = CreateUploadProxy();
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
@@ -53,6 +43,17 @@ public sealed class StreamingProxyPreCanceledTokenTests
         invoker.ReserveCount.Should().Be(0);
         invoker.ReleaseCount.Should().Be(0);
         invoker.StreamedInvokeCount.Should().Be(0);
+    }
+
+    private static (object Proxy, MethodInfo Upload, RecordingInvoker Invoker) CreateUploadProxy()
+    {
+        var assembly = CompileWithGenerator(UploadServiceSource);
+        var proxyType = assembly.GetType("Behavior.StreamingPreCancel.UploadProxy")!;
+        var interfaceType = assembly.GetType("Behavior.StreamingPreCancel.IUpload")!;
+        var invoker = new RecordingInvoker();
+        var proxy = Activator.CreateInstance(proxyType, invoker)!;
+        var upload = interfaceType.GetMethod("UploadAsync")!;
+        return (proxy, upload, invoker);
     }
 
     private const string UploadServiceSource = """
