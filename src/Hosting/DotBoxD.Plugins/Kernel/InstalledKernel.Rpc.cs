@@ -64,7 +64,13 @@ public sealed partial class InstalledKernel
         cancellationToken.ThrowIfCancellationRequested();
         var rpcArguments = DecodeRpcArguments(arguments);
         var callerCount = _rpcCallerArgumentCount;
-        if (callerCount < 0 || rpcArguments.Length != callerCount)
+        if (callerCount < 0)
+        {
+            throw new SandboxRuntimeException(new SandboxError(
+                SandboxErrorCode.ValidationError, "server extension entrypoint declares fewer parameters than live settings"));
+        }
+
+        if (rpcArguments.Length != callerCount)
         {
             throw RpcInvalidInput(
                 $"server extension '{Manifest.PluginId}' expects {callerCount} argument(s) but received {rpcArguments.Length}.");
@@ -176,10 +182,6 @@ public sealed partial class InstalledKernel
             return KernelRpcValueConverter.ToSandboxValue(value, expectedType);
         }
         catch (FormatException ex)
-        {
-            throw RpcInvalidInput(ex.Message);
-        }
-        catch (NotSupportedException ex)
         {
             throw RpcInvalidInput(ex.Message);
         }
