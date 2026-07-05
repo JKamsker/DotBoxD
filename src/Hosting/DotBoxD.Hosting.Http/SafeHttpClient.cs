@@ -117,7 +117,7 @@ public static class SafeHttpClient
             grantOptions,
             uri,
             grantOptions.MaxRequestBytes ?? context.Budget.Limits.MaxNetworkBytesWritten,
-            grantOptions.MaxResponseBytes ?? context.Budget.Limits.MaxNetworkBytesRead,
+            grantOptions.MaxResponseBytes,
             grantOptions.Timeout);
     }
 

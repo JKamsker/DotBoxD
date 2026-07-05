@@ -4,7 +4,7 @@ using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 using static DotBoxD.Kernels.Tests._TestSupport.NetworkTestFixtures;
 
-namespace DotBoxD.Kernels.Tests.Runtime.Network;
+namespace DotBoxD.Kernels.Tests.Runtime.Network.GrantValidation;
 
 public sealed class SafeHttpMissingResponseLimitTests
 {
