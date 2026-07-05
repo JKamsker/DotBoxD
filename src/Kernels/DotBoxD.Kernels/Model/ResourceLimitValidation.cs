@@ -28,12 +28,12 @@ public static class ResourceLimitValidation
         {
             if (wallTime < TimeSpan.Zero)
             {
-                throw ResourceLimitValidationException.NonNegative(nameof(ResourceLimits.MaxWallTime));
+                throw ResourceLimitValidationReasons.NonNegative(nameof(ResourceLimits.MaxWallTime));
             }
 
             if (wallTime > MaxSupportedWallTime)
             {
-                throw new ResourceLimitValidationException(
+                throw ResourceLimitValidationReasons.OutOfRange(
                     nameof(ResourceLimits.MaxWallTime),
                     $"must be within the supported range from {TimeSpan.Zero:c} through {MaxSupportedWallTime:c}");
             }
@@ -44,16 +44,25 @@ public static class ResourceLimitValidation
     {
         if (value < 0)
         {
-            throw ResourceLimitValidationException.NonNegative(paramName);
+            throw ResourceLimitValidationReasons.NonNegative(paramName);
         }
     }
 }
 
-internal sealed class ResourceLimitValidationException(string paramName, string reason)
-    : ArgumentOutOfRangeException(paramName, reason)
+internal static class ResourceLimitValidationReasons
 {
-    public string Reason { get; } = reason;
+    private const string ReasonKey = "DotBoxD.Kernels.Model.ResourceLimitValidationReason";
 
-    public static ResourceLimitValidationException NonNegative(string paramName)
-        => new(paramName, "must be non-negative");
+    public static string? GetReason(ArgumentOutOfRangeException exception)
+        => exception.Data[ReasonKey] as string;
+
+    public static ArgumentOutOfRangeException NonNegative(string paramName)
+        => OutOfRange(paramName, "must be non-negative");
+
+    public static ArgumentOutOfRangeException OutOfRange(string paramName, string reason)
+    {
+        var exception = new ArgumentOutOfRangeException(paramName, reason);
+        exception.Data[ReasonKey] = reason;
+        return exception;
+    }
 }

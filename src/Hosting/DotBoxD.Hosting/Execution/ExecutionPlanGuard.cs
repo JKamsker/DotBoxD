@@ -84,9 +84,7 @@ internal static class ExecutionPlanGuard
 
     private static SandboxDiagnostic CreatePolicyLimitDiagnostic(ArgumentOutOfRangeException ex)
     {
-        var reason = ex is ResourceLimitValidationException validationException
-            ? validationException.Reason
-            : "must be non-negative";
+        var reason = ResourceLimitValidationReasons.GetReason(ex) ?? "must be non-negative";
         return new SandboxDiagnostic("E-POLICY-LIMIT", $"policy resource limit '{ex.ParamName}' {reason}");
     }
 
