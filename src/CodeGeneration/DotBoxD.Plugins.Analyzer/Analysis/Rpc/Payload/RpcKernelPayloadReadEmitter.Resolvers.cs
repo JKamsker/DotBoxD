@@ -152,10 +152,16 @@ internal sealed partial class RpcKernelPayloadReadEmitter
         ITypeSymbol type,
         string reader,
         out string result)
-        => TryReadWhen(
-            DotBoxDRpcTypeMapper.ListElementType(type) is not null,
-            $"{emitter.EnsureListReader(type)}(ref {reader})",
-            out result);
+    {
+        if (DotBoxDRpcTypeMapper.ListElementType(type) is null)
+        {
+            result = string.Empty;
+            return false;
+        }
+
+        result = $"{emitter.EnsureListReader(type)}(ref {reader})";
+        return true;
+    }
 
     private static bool TryReadMap(
         RpcKernelPayloadReadEmitter emitter,

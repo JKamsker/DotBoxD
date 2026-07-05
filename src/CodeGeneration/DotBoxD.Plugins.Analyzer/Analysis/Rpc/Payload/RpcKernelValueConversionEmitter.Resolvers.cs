@@ -157,10 +157,16 @@ internal sealed partial class RpcKernelValueConversionEmitter
         ITypeSymbol type,
         string expression,
         out string result)
-        => TryWriteWhen(
-            DotBoxDRpcTypeMapper.ListElementType(type) is not null,
-            $"{emitter.EnsureListWriter(type)}({expression})",
-            out result);
+    {
+        if (DotBoxDRpcTypeMapper.ListElementType(type) is null)
+        {
+            result = string.Empty;
+            return false;
+        }
+
+        result = $"{emitter.EnsureListWriter(type)}({expression})";
+        return true;
+    }
 
     private static bool TryWriteMap(
         RpcKernelValueConversionEmitter emitter,
