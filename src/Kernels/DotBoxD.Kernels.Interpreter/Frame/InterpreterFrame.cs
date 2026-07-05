@@ -266,30 +266,43 @@ internal sealed partial class InterpreterFrame
         // FunctionFrameLayout.Build), so positional arguments map directly.
         for (var i = 0; i < function.Parameters.Count; i++)
         {
-            if (layout.IsI32Slot(i))
-            {
-                i32Slots[i] = ((I32Value)args[i]).Value;
-            }
-            else if (layout.IsF64Slot(i))
-            {
-                f64Slots[i] = ((F64Value)args[i]).Value;
-            }
-            else if (layout.IsI64Slot(i))
-            {
-                i64Slots[i] = ((I64Value)args[i]).Value;
-            }
-            else
-            {
-                slots[i] = args[i];
-            }
-
-            if (layout.HasRawSlots)
-            {
-                assigned[i] = true;
-            }
+            AssignArgumentSlot(layout, args[i], i, slots, i32Slots, i64Slots, f64Slots, assigned);
         }
 
         return new InterpreterFrame(layout, slots, i32Slots, i64Slots, f64Slots, assigned);
+    }
+
+    private static void AssignArgumentSlot(
+        FunctionFrameLayout layout,
+        SandboxValue argument,
+        int slot,
+        SandboxValue?[] slots,
+        int[] i32Slots,
+        long[] i64Slots,
+        double[] f64Slots,
+        bool[] assigned)
+    {
+        if (layout.IsI32Slot(slot))
+        {
+            i32Slots[slot] = ((I32Value)argument).Value;
+        }
+        else if (layout.IsF64Slot(slot))
+        {
+            f64Slots[slot] = ((F64Value)argument).Value;
+        }
+        else if (layout.IsI64Slot(slot))
+        {
+            i64Slots[slot] = ((I64Value)argument).Value;
+        }
+        else
+        {
+            slots[slot] = argument;
+        }
+
+        if (layout.HasRawSlots)
+        {
+            assigned[slot] = true;
+        }
     }
 
     private static SandboxRuntimeException Unassigned(string name)

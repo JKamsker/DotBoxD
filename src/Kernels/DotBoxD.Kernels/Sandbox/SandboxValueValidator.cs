@@ -224,6 +224,16 @@ public static class SandboxValueValidator
 
     private static bool TryBuiltInScalarType(SandboxValue value, out SandboxType type)
     {
+        if (TryPrimitiveScalarType(value, out type))
+        {
+            return true;
+        }
+
+        return TryResourceScalarType(value, out type);
+    }
+
+    private static bool TryPrimitiveScalarType(SandboxValue value, out SandboxType type)
+    {
         type = value switch
         {
             UnitValue => SandboxType.Unit,
@@ -233,6 +243,15 @@ public static class SandboxValueValidator
             F64Value => SandboxType.F64,
             StringValue => SandboxType.String,
             GuidValue => SandboxType.Guid,
+            _ => null!
+        };
+        return type is not null;
+    }
+
+    private static bool TryResourceScalarType(SandboxValue value, out SandboxType type)
+    {
+        type = value switch
+        {
             SandboxPathValue => SandboxType.SandboxPath,
             SandboxUriValue => SandboxType.SandboxUri,
             _ => null!

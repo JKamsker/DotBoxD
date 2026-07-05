@@ -161,16 +161,19 @@ internal sealed class I32ModuloBranchAccumulatorLoopFastPathEmitter
     private bool TryCreatePlan(ForRangeStatement range, out BranchPlan plan)
     {
         plan = default;
-        if (_stackPlan.LocalKind(range.LocalName) != StackKind.I32 ||
-            range.Start is not LiteralExpression { Value: I32Value { Value: 0 } } ||
-            range.Body is not [IfStatement branch] ||
-            !TryGetModuloCondition(branch.Condition, range.LocalName, out var divisor, out var match) ||
+        if (!TryGetPlanShape(range, out var branch))
+        {
+            return false;
+        }
+
+        if (!TryGetModuloCondition(branch.Condition, range.LocalName, out var divisor, out var match) ||
             !TryGetDelta(branch.Then, out var target, out var thenDelta) ||
-            !TryGetDelta(branch.Else, out var elseTarget, out var elseDelta) ||
-            !string.Equals(target, elseTarget, StringComparison.Ordinal) ||
-            string.Equals(target, range.LocalName, StringComparison.Ordinal) ||
-            _stackPlan.LocalKind(target) != StackKind.I32 ||
-            divisor <= 0)
+            !TryGetDelta(branch.Else, out var elseTarget, out var elseDelta))
+        {
+            return false;
+        }
+
+        if (!CanUsePlan(range, target, elseTarget, divisor))
         {
             return false;
         }
@@ -178,6 +181,34 @@ internal sealed class I32ModuloBranchAccumulatorLoopFastPathEmitter
         plan = new BranchPlan(target, divisor, match, thenDelta, elseDelta);
         return true;
     }
+
+    private bool TryGetPlanShape(ForRangeStatement range, out IfStatement branch)
+    {
+        branch = null!;
+        if (_stackPlan.LocalKind(range.LocalName) != StackKind.I32)
+        {
+            return false;
+        }
+
+        if (range.Start is not LiteralExpression { Value: I32Value { Value: 0 } })
+        {
+            return false;
+        }
+
+        if (range.Body is not [IfStatement candidate])
+        {
+            return false;
+        }
+
+        branch = candidate;
+        return true;
+    }
+
+    private bool CanUsePlan(ForRangeStatement range, string target, string elseTarget, int divisor)
+        => string.Equals(target, elseTarget, StringComparison.Ordinal) &&
+           !string.Equals(target, range.LocalName, StringComparison.Ordinal) &&
+           _stackPlan.LocalKind(target) == StackKind.I32 &&
+           divisor > 0;
 
     private static bool TryGetModuloCondition(Expression expression, string loopLocal, out int divisor, out int match)
     {

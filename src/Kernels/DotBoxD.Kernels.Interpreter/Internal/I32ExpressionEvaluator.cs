@@ -78,10 +78,13 @@ internal static class I32ExpressionEvaluator
             LiteralExpression { Value: I32Value } => 1,
             VariableExpression => 1,
             UnaryExpression { Operator: "-" } unary => 1 + FuelCost(unary.Operand),
-            BinaryExpression binary when binary.Operator is "+" or "-" or "*" or "/" or "%"
+            BinaryExpression binary when IsFuelCostBinaryOperator(binary.Operator)
                 => 1 + FuelCost(binary.Left) + FuelCost(binary.Right),
             _ => throw Unsupported()
         };
+
+    private static bool IsFuelCostBinaryOperator(string op)
+        => op is "+" or "-" or "*" or "/" or "%";
 
     public static int EvaluateUnmetered(Expression expression, InterpreterFrame frame)
         => expression switch

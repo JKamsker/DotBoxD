@@ -56,12 +56,12 @@ internal static partial class CompiledBindingDispatcher
             return ScalarTypeMatches(value, expected.Name);
         }
 
-        if (expected.Name == "List" && expected.Arguments.Count == 1)
+        if (IsListType(expected))
         {
             return value is ListValue list && list.ItemType.Equals(expected.Arguments[0]);
         }
 
-        if (expected.Name == "Map" && expected.Arguments.Count == 2)
+        if (IsMapType(expected))
         {
             return value is MapValue map &&
                    map.KeyType.Equals(expected.Arguments[0]) &&
@@ -75,6 +75,12 @@ internal static partial class CompiledBindingDispatcher
 
         return false;
     }
+
+    private static bool IsListType(SandboxType type)
+        => type.Name == "List" && type.Arguments.Count == 1;
+
+    private static bool IsMapType(SandboxType type)
+        => type.Name == "Map" && type.Arguments.Count == 2;
 
     private static bool ScalarTypeMatches(SandboxValue value, string expectedName)
     {

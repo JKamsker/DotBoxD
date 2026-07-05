@@ -13,12 +13,12 @@ internal static class SandboxValueTypeMatcher
             return ScalarMatches(value, expectedType.Name);
         }
 
-        if (expectedType.Name == "List" && expectedType.Arguments.Count == 1)
+        if (IsListType(expectedType))
         {
             return value is ListValue list && list.ItemType.Equals(expectedType.Arguments[0]);
         }
 
-        if (expectedType.Name == "Map" && expectedType.Arguments.Count == 2)
+        if (IsMapType(expectedType))
         {
             return value is MapValue map &&
                    map.KeyType.Equals(expectedType.Arguments[0]) &&
@@ -29,6 +29,12 @@ internal static class SandboxValueTypeMatcher
                value is RecordValue record &&
                record.Fields.Count == expectedType.Arguments.Count;
     }
+
+    private static bool IsListType(SandboxType type)
+        => type.Name == "List" && type.Arguments.Count == 1;
+
+    private static bool IsMapType(SandboxType type)
+        => type.Name == "Map" && type.Arguments.Count == 2;
 
     public static bool MatchesExactType(SandboxValue value, SandboxType expectedType)
     {

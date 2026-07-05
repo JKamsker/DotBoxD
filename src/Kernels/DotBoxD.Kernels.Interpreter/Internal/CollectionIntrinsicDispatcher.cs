@@ -117,6 +117,12 @@ internal static class CollectionIntrinsicDispatcher
         SandboxContext context,
         out SandboxValue result)
     {
+        if (!IsMapCall(call.Name))
+        {
+            result = SandboxValue.Unit;
+            return false;
+        }
+
         result = call.Name switch
         {
             "map.empty" => CollectionOperations.CreateMap(
@@ -128,6 +134,9 @@ internal static class CollectionIntrinsicDispatcher
             "map.remove" => CollectionOperations.RemoveMapValue(arg1, arg0, context),
             _ => SandboxValue.Unit
         };
-        return call.Name is "map.empty" or "map.containsKey" or "map.get" or "map.set" or "map.remove";
+        return true;
     }
+
+    private static bool IsMapCall(string name)
+        => name is "map.empty" or "map.containsKey" or "map.get" or "map.set" or "map.remove";
 }

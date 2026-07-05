@@ -35,12 +35,18 @@ internal sealed class I64ExpressionPlan
             ExpressionKind.Literal => _literal,
             ExpressionKind.RawVariable => frame.ReadRawInt64Slot(_slot),
             ExpressionKind.Negate => SandboxInt64Math.Negate(_left!.Evaluate(frame)),
+            ExpressionKind.RemainderByConst => FastRemainder(_left!.Evaluate(frame), _literal, _magic),
+            _ => EvaluateBinary(frame)
+        };
+
+    private long EvaluateBinary(InterpreterFrame frame)
+        => _kind switch
+        {
             ExpressionKind.Add => SandboxInt64Math.Add(_left!.Evaluate(frame), _right!.Evaluate(frame)),
             ExpressionKind.Subtract => SandboxInt64Math.Subtract(_left!.Evaluate(frame), _right!.Evaluate(frame)),
             ExpressionKind.Multiply => SandboxInt64Math.Multiply(_left!.Evaluate(frame), _right!.Evaluate(frame)),
             ExpressionKind.Divide => SandboxInt64Math.Divide(_left!.Evaluate(frame), _right!.Evaluate(frame)),
             ExpressionKind.Remainder => SandboxInt64Math.Remainder(_left!.Evaluate(frame), _right!.Evaluate(frame)),
-            ExpressionKind.RemainderByConst => FastRemainder(_left!.Evaluate(frame), _literal, _magic),
             _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported i64 expression"))
         };
 
