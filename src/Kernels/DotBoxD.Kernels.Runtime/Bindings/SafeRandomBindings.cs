@@ -1,3 +1,4 @@
+using System.Globalization;
 using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
@@ -33,8 +34,29 @@ public static class SafeRandomBindings
                 CapabilityId: "random",
                 Effect: SandboxEffect.Random,
                 ResourceId: "random:i32",
-                Fields: context.BindingAuditFields("random", startedAt)));
+                Fields: RandomAuditFields(context, startedAt, min, max, value)));
             return ValueTask.FromResult(SandboxValue.FromInt32(value));
         },
         CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+
+    private static IReadOnlyDictionary<string, string> RandomAuditFields(
+        SandboxContext context,
+        DateTimeOffset startedAt,
+        int minInclusive,
+        int maxExclusive,
+        int value)
+    {
+        var fields = context.BindingAuditFields("random", startedAt);
+        if (!context.Policy.Deterministic)
+        {
+            return fields;
+        }
+
+        return new Dictionary<string, string>(fields, StringComparer.Ordinal)
+        {
+            ["minInclusive"] = minInclusive.ToString(CultureInfo.InvariantCulture),
+            ["maxExclusive"] = maxExclusive.ToString(CultureInfo.InvariantCulture),
+            ["value"] = value.ToString(CultureInfo.InvariantCulture)
+        };
+    }
 }

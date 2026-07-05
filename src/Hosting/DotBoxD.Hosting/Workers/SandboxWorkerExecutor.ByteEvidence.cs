@@ -1,5 +1,6 @@
 using System.Globalization;
 using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Hosting;
@@ -12,6 +13,7 @@ internal sealed partial class SandboxWorkerExecutor
         Dictionary<string, int> observedBindingCalls,
         ref long observedBindingBaseFuel,
         ref ObservedBindingBytes observedBytes,
+        ref DeterministicRandomAuditSequence deterministicRandom,
         DateTimeOffset grantClock)
     {
         if (auditEvent.BindingId is null ||
@@ -35,6 +37,7 @@ internal sealed partial class SandboxWorkerExecutor
         observedBindingCalls[auditEvent.BindingId] = calls;
         return (binding.CostModel.MaxCallsPerRun is not { } maxCalls || calls <= maxCalls) &&
             TryRecordBindingByteEvidence(auditEvent, ref observedBytes) &&
+            deterministicRandom.Matches(auditEvent) &&
             WorkerFileAuditGrantValidator.Matches(plan, auditEvent, grantClock);
     }
 
@@ -161,5 +164,59 @@ internal sealed partial class SandboxWorkerExecutor
         public long FileBytesWritten;
         public long NetworkBytesRead;
         public long NetworkBytesWritten;
+    }
+
+    private struct DeterministicRandomAuditSequence
+    {
+        private SandboxContext? _context;
+
+        public static DeterministicRandomAuditSequence Create(ExecutionPlan plan)
+            => plan.Policy is { Deterministic: true, RandomSeed: not null }
+                ? new DeterministicRandomAuditSequence
+                {
+                    _context = new SandboxContext(
+                        SandboxRunId.New(),
+                        plan.Policy,
+                        new ResourceMeter(plan.Budget),
+                        new BindingRegistry([]),
+                        new InMemoryAuditSink(),
+                        CancellationToken.None)
+                }
+                : default;
+
+        public bool Matches(SandboxAuditEvent auditEvent)
+        {
+            if (_context is null ||
+                !auditEvent.Success ||
+                !string.Equals(auditEvent.BindingId, "random.nextI32", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            if (auditEvent.Fields is null ||
+                !TryGetInt32Field(auditEvent.Fields, "minInclusive", out var minInclusive) ||
+                !TryGetInt32Field(auditEvent.Fields, "maxExclusive", out var maxExclusive) ||
+                !TryGetInt32Field(auditEvent.Fields, "value", out var value) ||
+                minInclusive >= maxExclusive)
+            {
+                return false;
+            }
+
+            try
+            {
+                return value == _context.NextRandomInt32(minInclusive, maxExclusive);
+            }
+            catch (SandboxRuntimeException)
+            {
+                return false;
+            }
+        }
+
+        private static bool TryGetInt32Field(IReadOnlyDictionary<string, string> fields, string key, out int value)
+        {
+            value = 0;
+            return fields.TryGetValue(key, out var text) &&
+                int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out value);
+        }
     }
 }
