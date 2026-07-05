@@ -19,6 +19,7 @@ public sealed partial class RpcHost : IAsyncDisposable
     private readonly RpcHostAcceptLoop _acceptLoop;
     private readonly object _lifecycleLock = new();
     private readonly RpcHostPeerConfiguration _configure = new();
+    private readonly RpcHostPeerAdmission _admission;
     private readonly RpcHostPeerCollection _peers = new();
     private CancellationTokenSource? _cts;
     private Task? _acceptTask;
@@ -31,12 +32,14 @@ public sealed partial class RpcHost : IAsyncDisposable
     // lifecycle lock. Null (inert) in production. Lets a test deterministically run StopCoreAsync
     // to completion in the gap so the second lock observes a cleared _cts.
     internal Func<Task>? _onListenerStartedForTest;
+    internal Func<IRpcChannel, RpcPeer>? _peerFactoryForTest;
 
     private RpcHost(IServerTransport listener, ISerializer serializer, RpcPeerOptions options)
     {
         _listener = listener;
         _serializer = serializer;
         _options = options;
+        _admission = new RpcHostPeerAdmission(options.MaxAcceptedPeers);
         _acceptLoop = new RpcHostAcceptLoop(listener, AddPeerAsync, RaiseAcceptError);
     }
 
@@ -66,7 +69,21 @@ public sealed partial class RpcHost : IAsyncDisposable
     /// </remarks>
     public RpcHost ForEachPeer(Action<RpcPeer> configure)
     {
-        _configure.Add(configure ?? throw new ArgumentNullException(nameof(configure)));
+        if (configure is null)
+        {
+            throw new ArgumentNullException(nameof(configure));
+        }
+
+        lock (_lifecycleLock)
+        {
+            if (Volatile.Read(ref _disposed) != 0)
+            {
+                throw new ObjectDisposedException(nameof(RpcHost));
+            }
+
+            _configure.Add(configure);
+        }
+
         return this;
     }
 
@@ -81,7 +98,24 @@ public sealed partial class RpcHost : IAsyncDisposable
 
     private async Task AddPeerAsync(IRpcChannel connection)
     {
-        var peer = RpcPeer.Over(connection, _serializer, _options);
+        if (!_admission.TryAcquire(out var admission))
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+            return;
+        }
+
+        RpcPeer peer;
+        try
+        {
+            peer = _peerFactoryForTest?.Invoke(connection) ?? RpcPeer.Over(connection, _serializer, _options);
+        }
+        catch
+        {
+            admission.Dispose();
+            await connection.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
+
         var configure = _configure.Snapshot();
         try
         {
@@ -94,6 +128,7 @@ public sealed partial class RpcHost : IAsyncDisposable
         {
             RpcDiagnostics.Report("Accepted peer configuration failed", ex);
             RpcEventHandlerInvoker.Raise(AcceptError, this, new RpcHostErrorEventArgs(ex));
+            admission.Dispose();
             await peer.DisposeAsync().ConfigureAwait(false);
             return;
         }
@@ -110,13 +145,14 @@ public sealed partial class RpcHost : IAsyncDisposable
             registered = Volatile.Read(ref _disposed) == 0 && _stopTask is null && _cts is not null;
             if (registered)
             {
-                _peers.Add(peer);
+                registered = _peers.TryAdd(peer, admission);
             }
         }
 
         if (!registered)
         {
             peer.Disconnected -= OnPeerDisconnected;
+            admission.Dispose();
             await peer.DisposeAsync().ConfigureAwait(false);
             return;
         }
@@ -136,10 +172,18 @@ public sealed partial class RpcHost : IAsyncDisposable
             // A PeerConnected handler disposed the peer (a documented access-control gesture). peer.Start()
             // then throws on the disposed peer — this is not an accept/transport failure, so do NOT raise
             // AcceptError. Unsubscribe and drop it from the host's collection (the read loop never started,
-            // so OnPeerDisconnected will never run to do this); the peer/channel disposal is already in
-            // flight from the handler.
+            // so OnPeerDisconnected will never run to do this); DisposeAsync is idempotent and awaits the
+            // handler-started cleanup if it is already in flight.
             peer.Disconnected -= OnPeerDisconnected;
             _peers.Remove(peer);
+            await peer.DisposeAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            peer.Disconnected -= OnPeerDisconnected;
+            _peers.Remove(peer);
+            await peer.DisposeAsync().ConfigureAwait(false);
+            throw;
         }
     }
 

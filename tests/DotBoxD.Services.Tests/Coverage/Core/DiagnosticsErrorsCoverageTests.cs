@@ -160,6 +160,15 @@ public sealed partial class DiagnosticsErrorsCoverageTests
         Assert.IsAssignableFrom<EventArgs>(args);
     }
 
+    [Fact]
+    public void RpcDiagnosticErrorEventArgs_RejectsNullConstructorArguments()
+    {
+        DiagnosticAssert.ArgumentNull(
+            () => new RpcDiagnosticErrorEventArgs(null!, new InvalidOperationException("kaboom")),
+            "operation");
+        DiagnosticAssert.ArgumentNull(() => new RpcDiagnosticErrorEventArgs("teardown", null!), "error");
+    }
+
     // --- InstanceRegistry observable behavior gaps ---
 
     [Fact]
@@ -216,4 +225,14 @@ public sealed partial class DiagnosticsErrorsCoverageTests
 
     // --- IServiceDispatcher interface default member ---
 
+}
+
+internal static class DiagnosticAssert
+{
+    public static void ArgumentNull(Action action, string paramName)
+    {
+        var ex = Assert.Throws<ArgumentNullException>(action);
+
+        Assert.Equal(paramName, ex.ParamName);
+    }
 }

@@ -19,6 +19,12 @@ public sealed partial class PluginSession : IDisposable, IAsyncDisposable
 
     internal PluginSession(PluginServer server) => _server = server;
 
+    private void ThrowIfDisposed()
+    {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+        _server.ThrowIfDisposed();
+    }
+
     /// <summary>
     /// Updates live settings for a kernel this session owns. Rejects ids the session does not own so
     /// one plugin cannot tune another plugin's kernel.
@@ -36,7 +42,7 @@ public sealed partial class PluginSession : IDisposable, IAsyncDisposable
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+            ThrowIfDisposed();
             if (!_server.Kernels.TryGet(pluginId, out var ownedKernel) ||
                 !ReferenceEquals(ownedKernel.OwnerId, this) ||
                 !_ownedInstallIds.Contains(ownedKernel.InstallId))
@@ -65,6 +71,7 @@ public sealed partial class PluginSession : IDisposable, IAsyncDisposable
         _gate.Wait();
         try
         {
+            _server.ThrowIfDisposed();
             if (Volatile.Read(ref _disposed) != 0 ||
                 !_server.Kernels.TryGet(pluginId, out var kernel) ||
                 !ReferenceEquals(kernel.OwnerId, this))
@@ -92,6 +99,7 @@ public sealed partial class PluginSession : IDisposable, IAsyncDisposable
         _gate.Wait();
         try
         {
+            _server.ThrowIfDisposed();
             if (Volatile.Read(ref _disposed) == 0 &&
                 _server.Kernels.TryGet(pluginId, out var owned) &&
                 ReferenceEquals(owned.OwnerId, this) &&
@@ -117,7 +125,7 @@ public sealed partial class PluginSession : IDisposable, IAsyncDisposable
         _gate.Wait();
         try
         {
-            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+            ThrowIfDisposed();
             if (!_server.Kernels.TryGet(pluginId, out var kernel) ||
                 !ReferenceEquals(kernel.OwnerId, this) ||
                 !_ownedInstallIds.Remove(kernel.InstallId))

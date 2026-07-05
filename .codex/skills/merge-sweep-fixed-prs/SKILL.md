@@ -26,13 +26,7 @@ description: Merge GitHub pull requests matching the sweep fixed queue, especial
    - Commit the merge, push the integration branch, then close the source PR with a comment such as `Integrated into #<aggregate-pr>.`
 
 4. Create the aggregate PR after the first pushed merge.
-   Open one PR from the integration branch to the intended base. Its body must reference every source PR in the ledger and include a checklist. Mark only completed merges checked.
-   ```markdown
-   ## Source PRs
-   - [x] #123 Short title
-   - [ ] #124 Short title
-   ```
-   After every later source PR is pushed and closed, edit the body to check that PR off. If new matching PRs appear, append them unchecked, merge them, and check them off as completed.
+   Open one PR from the integration branch to the intended base. Before drafting the body, read `references/pr-131-description.md` and `references/pr-176-description.md` for concrete examples. Always compose the PR body in a temporary Markdown file and pass it with `--body-file`; do not inline multiline PR descriptions through shell arguments. The body must follow the aggregate PR description rules below. Keep the summary accurate as later PRs are integrated. After every later source PR is pushed and closed, edit the body through a temporary Markdown file to check that PR off. If new matching PRs appear, append them unchecked, merge them, and check them off as completed.
 
 5. Keep the aggregate PR current.
    If the base branch moves or GitHub reports conflicts, merge or rebase the latest base into the integration branch, resolve conflicts, run validation, commit, and push. Prefer a normal merge commit for an aggregate branch unless the user asked for a rebase.
@@ -66,6 +60,39 @@ description: Merge GitHub pull requests matching the sweep fixed queue, especial
    - The aggregate PR is open, non-draft unless requested otherwise, mergeable, and all required checks are green.
    - The local worktree is clean and pushed.
 
+## Aggregate PR Description
+
+The ideal aggregate PR description is a human summary first, then the source PR ledger. It combines the useful parts of the reference examples:
+- `references/pr-131-description.md` shows the desired summary depth: a concise lead-in plus grouped change areas and concrete validation notes.
+- `references/pr-176-description.md` shows the desired source PR checklist: every source PR is referenced by number and title, and completed integrations are checked off.
+
+Use this layout:
+```markdown
+## Summary
+
+<Concise lead-in explaining the integrated sweep and why the changes belong together.>
+
+### <Changed area>
+- <Concrete behavior, hardening, or test coverage integrated from the source PRs.>
+- <Another concrete change, grouped with related work rather than listed by PR number.>
+
+Checklist:
+- [x] #123 Short title
+- [ ] #124 Short title
+
+## Validation
+
+- `<command that was run>`
+```
+
+Rules:
+- `## Summary` must describe the actual integrated changes. Do not make it a flat copy of the checklist.
+- Use grouped bullets or subsections when the sweep spans multiple areas.
+- The checklist must appear immediately after the summary and must include every source PR in the ledger.
+- Check off only source PRs that have already been merged, pushed, and closed.
+- Add or update `## Validation` after the checklist once local or CI validation has been run.
+- Do not manually write CodeRabbit's auto-generated release-notes block. If CodeRabbit later appends one, leave it alone unless it interferes with the intended body.
+
 ## Command Patterns
 
 Fetch and merge a source PR:
@@ -76,9 +103,38 @@ git merge --no-ff codex/tmp-pr-<source-pr> \
   -m "Integrate <short fix description> from #<source-pr> into the aggregate sweep branch so <why>."
 ```
 
-Create or update the aggregate checklist with a temporary body file:
+Create the aggregate PR body with a temporary Markdown file:
 ```bash
-body_file=$(mktemp)
+body_file=$(mktemp "${TMPDIR:-/tmp}/aggregate-pr-body.XXXXXX.md")
+cat > "$body_file" <<'EOF'
+## Summary
+
+<Concise lead-in explaining the integrated sweep and why the changes belong together.>
+
+### <Changed area>
+- <Concrete behavior, hardening, or test coverage integrated from the source PRs.>
+- <Another concrete change, grouped with related work rather than listed by PR number.>
+
+Checklist:
+- [x] #123 Short title
+- [ ] #124 Short title
+
+## Validation
+
+- `<command that was run>`
+EOF
+
+gh pr create \
+  --base <base-branch> \
+  --head <integration-branch> \
+  --title "<aggregate PR title>" \
+  --body-file "$body_file"
+rm "$body_file"
+```
+
+Update the aggregate body with a temporary Markdown file:
+```bash
+body_file=$(mktemp "${TMPDIR:-/tmp}/aggregate-pr-body.XXXXXX.md")
 gh pr view <aggregate-pr> --json body --jq '.body' > "$body_file"
 perl -0pi -e 's/- \[ \] #<source-pr> /- [x] #<source-pr> /' "$body_file"
 gh pr edit <aggregate-pr> --body-file "$body_file"

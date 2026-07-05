@@ -85,6 +85,30 @@ public sealed class PluginConnectionHostLifecycleTests
         Assert.Equal(1, transport.DisposeCount);
     }
 
+    [Fact]
+    public async Task StartAsync_rejects_disposed_server_before_starting_transport()
+    {
+        using var server = PluginServer.Create();
+        server.Dispose();
+        var transport = new StartTrackingServerTransport();
+        PluginConnectionHost<object>? host = null;
+        try
+        {
+            var exception = await Record.ExceptionAsync(
+                async () => host = await PluginConnectionHost<object>.StartAsync(server, transport, Configure));
+
+            Assert.Equal(0, transport.StartCount);
+            Assert.IsType<ObjectDisposedException>(exception);
+        }
+        finally
+        {
+            if (host is not null)
+            {
+                await host.DisposeAsync();
+            }
+        }
+    }
+
     private static object Configure(DotBoxD.Services.Peer.RpcPeer peer, PluginSession session) => new();
 
     // A high-entropy pipe name (>= 32 chars with an unguessable random component) so it passes the safe-name
@@ -137,6 +161,43 @@ public sealed class PluginConnectionHostLifecycleTests
                 throw _disposeFailure;
             }
 
+            return default;
+        }
+    }
+
+    private sealed class StartTrackingServerTransport : IServerTransport
+    {
+        private readonly TaskCompletionSource<bool> _stopped =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _startCount;
+
+        public int StartCount => Volatile.Read(ref _startCount);
+
+        public Task StartAsync(CancellationToken ct = default)
+        {
+            Interlocked.Increment(ref _startCount);
+            return Task.CompletedTask;
+        }
+
+        public async Task<IRpcChannel> AcceptAsync(CancellationToken ct = default)
+        {
+            using (ct.Register(static s => ((TaskCompletionSource<bool>)s!).TrySetResult(true), _stopped))
+            {
+                await _stopped.Task.ConfigureAwait(false);
+            }
+
+            throw new OperationCanceledException(ct);
+        }
+
+        public Task StopAsync(CancellationToken ct = default)
+        {
+            _stopped.TrySetResult(true);
+            return Task.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            _stopped.TrySetResult(true);
             return default;
         }
     }

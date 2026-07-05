@@ -11,6 +11,7 @@ public static class JsonExporter
     public static string Export(SandboxModule module, bool indented = false)
     {
         ArgumentNullException.ThrowIfNull(module);
+        ModuleSerializationGuard.ThrowIfMalformed(module);
 
         var buffer = new ArrayBufferWriter<byte>();
         using var writer = new Utf8JsonWriter(buffer, new JsonWriterOptions { Indented = indented });
@@ -22,7 +23,7 @@ public static class JsonExporter
     internal static void Write(Utf8JsonWriter writer, SandboxModule module)
     {
         writer.WriteStartObject();
-        writer.WriteString("id", module.Id);
+        WriteString(writer, "id", module.Id, "module id");
         writer.WriteString("version", module.Version.ToString());
         writer.WriteString("targetSandboxVersion", module.TargetSandboxVersion.ToString());
         WriteCapabilityRequests(writer, module.CapabilityRequests);
@@ -38,10 +39,10 @@ public static class JsonExporter
         foreach (var request in requests)
         {
             writer.WriteStartObject();
-            writer.WriteString("id", request.Id);
+            WriteString(writer, "id", request.Id, "capability request id");
             if (request.Reason is not null)
             {
-                writer.WriteString("reason", request.Reason);
+                WriteString(writer, "reason", request.Reason, "capability request reason");
             }
 
             writer.WriteEndObject();
@@ -56,6 +57,8 @@ public static class JsonExporter
         writer.WriteStartObject();
         foreach (var item in metadata.OrderBy(item => item.Key, StringComparer.Ordinal))
         {
+            JsonStringSafety.RequireWellFormedUtf16(item.Key, "metadata key");
+            JsonStringSafety.RequireWellFormedUtf16(item.Value, "metadata value");
             writer.WriteString(item.Key, item.Value);
         }
 
@@ -77,7 +80,7 @@ public static class JsonExporter
     private static void WriteFunction(Utf8JsonWriter writer, SandboxFunction function)
     {
         writer.WriteStartObject();
-        writer.WriteString("id", function.Id);
+        WriteString(writer, "id", function.Id, "function id");
         writer.WriteString("visibility", function.IsEntrypoint ? "entrypoint" : "private");
         WriteParameters(writer, function.Parameters);
         writer.WritePropertyName("returnType");
@@ -94,7 +97,7 @@ public static class JsonExporter
         foreach (var parameter in parameters)
         {
             writer.WriteStartObject();
-            writer.WriteString("name", parameter.Name);
+            WriteString(writer, "name", parameter.Name, "parameter name");
             writer.WritePropertyName("type");
             WriteType(writer, parameter.Type);
             writer.WriteEndObject();
@@ -121,7 +124,7 @@ public static class JsonExporter
         {
             case AssignmentStatement assignment:
                 writer.WriteString("op", "set");
-                writer.WriteString("name", assignment.Name);
+                WriteString(writer, "name", assignment.Name, "assignment local name");
                 writer.WritePropertyName("value");
                 WriteExpression(writer, assignment.Value);
                 break;
@@ -153,7 +156,7 @@ public static class JsonExporter
                 break;
             case ForRangeStatement range:
                 writer.WriteString("op", "forRange");
-                writer.WriteString("local", range.LocalName);
+                WriteString(writer, "local", range.LocalName, "for-range local name");
                 writer.WritePropertyName("start");
                 WriteExpression(writer, range.Start);
                 writer.WritePropertyName("end");
@@ -180,7 +183,7 @@ public static class JsonExporter
         switch (expression)
         {
             case VariableExpression variable:
-                writer.WriteString("var", variable.Name);
+                WriteString(writer, "var", variable.Name, "variable name");
                 break;
             case LiteralExpression literal:
                 WriteLiteral(writer, literal.Value);
@@ -209,7 +212,7 @@ public static class JsonExporter
 
     private static void WriteCall(Utf8JsonWriter writer, CallExpression call)
     {
-        writer.WriteString("call", call.Name);
+        WriteString(writer, "call", call.Name, "call name");
         if (call.GenericType is not null)
         {
             writer.WritePropertyName("genericType");
@@ -254,16 +257,13 @@ public static class JsonExporter
                 writer.WriteString("guid", guid.Value.ToString());
                 break;
             case OpaqueIdValue id:
-                writer.WriteStartObject("opaqueId");
-                writer.WriteString("type", id.TypeName);
-                writer.WriteString("value", id.Value);
-                writer.WriteEndObject();
+                JsonExporterLiteralWriter.WriteOpaqueId(writer, id);
                 break;
             case SandboxPathValue path:
-                writer.WriteString("path", path.Value.RelativePath);
+                JsonExporterLiteralWriter.WritePath(writer, path);
                 break;
             case SandboxUriValue uri:
-                writer.WriteString("uri", uri.Value.Value);
+                JsonExporterLiteralWriter.WriteUri(writer, uri);
                 break;
             default:
                 throw JsonExportNames.Error("E-JSON-EXPORT", $"literal type '{value.GetType().Name}' cannot be exported");
@@ -271,25 +271,14 @@ public static class JsonExporter
     }
 
     private static void WriteType(Utf8JsonWriter writer, SandboxType type)
-    {
-        if (type.Arguments.Count == 0)
-        {
-            writer.WriteStringValue(type.Name);
-            return;
-        }
+        => JsonExporterTypeWriter.WriteType(writer, type);
 
-        writer.WriteStartObject();
-        writer.WriteString("name", type.Name);
-        writer.WritePropertyName("arguments");
-        writer.WriteStartArray();
-        foreach (var argument in type.Arguments)
-        {
-            WriteType(writer, argument);
-        }
+    private static void WriteString(Utf8JsonWriter writer, string propertyName, string value, string diagnosticName)
+        => JsonExporterTypeWriter.WriteString(writer, propertyName, value, diagnosticName);
 
-        writer.WriteEndArray();
-        writer.WriteEndObject();
-    }
+    private static void WriteStringValue(Utf8JsonWriter writer, string value, string diagnosticName)
+        => JsonExporterTypeWriter.WriteStringValue(writer, value, diagnosticName);
 
-    private static SandboxValidationException Error(string code, string message) => JsonExportNames.Error(code, message);
+    private static SandboxValidationException Error(string code, string message)
+        => JsonExporterTypeWriter.Error(code, message);
 }

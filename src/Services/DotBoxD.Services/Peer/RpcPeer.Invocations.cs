@@ -1,4 +1,5 @@
 using System.IO.Pipelines;
+using DotBoxD.Services.Exceptions;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Streaming.Frames;
 
@@ -79,7 +80,26 @@ public sealed partial class RpcPeer
     public Task<IAsyncEnumerable<T>> InvokeAsyncEnumerableOnInstanceAsync<TRequest, T>(string service, string instanceId, string method, TRequest request, RpcStreamAttachment[]? streams = null, CancellationToken ct = default) =>
         _outbound.InvokeAsyncEnumerableOnInstanceAsync<TRequest, T>(service, instanceId, method, request, streams, ct);
     public RpcStreamHandle ReserveStream(RpcStreamKind kind) =>
-        _outbound.ReserveStream(kind);
+        ReserveStreamChecked(kind);
+
+    private RpcStreamHandle ReserveStreamChecked(RpcStreamKind kind)
+    {
+        lock (_lifecycleLock)
+        {
+            if (_disposed != 0)
+            {
+                throw new ObjectDisposedException(nameof(RpcPeer));
+            }
+
+            if (_closed != 0)
+            {
+                throw new ServiceConnectionException("Connection closed.");
+            }
+
+            return _outbound.ReserveStream(kind);
+        }
+    }
+
     public void ReleaseStream(RpcStreamHandle handle) =>
         _outbound.ReleaseStream(handle);
 }

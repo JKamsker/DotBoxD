@@ -16,8 +16,9 @@ public static class SafeTimeBindings
         BindingCostModel.Fixed(2),
         AuditLevel.PerCall,
         BindingSafety.ReadOnlyExternal,
-        (context, _, _) =>
+        (context, _, cancellationToken) =>
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var startedAt = DateTimeOffset.UtcNow;
             var timestamp = context.UtcNow();
             var value = timestamp.ToUnixTimeMilliseconds();

@@ -14,7 +14,13 @@ public sealed class LiveSettingStore
         _settings = new Dictionary<string, ILiveSetting>(StringComparer.Ordinal);
         foreach (var setting in settings)
         {
-            _settings.Add(setting.Name, setting);
+            ArgumentNullException.ThrowIfNull(setting, nameof(settings));
+            var name = setting.Name;
+            ArgumentNullException.ThrowIfNull(name);
+            if (!_settings.TryAdd(name, setting))
+            {
+                throw new ArgumentException($"Duplicate live setting name '{name}'.", nameof(settings));
+            }
         }
     }
 
@@ -43,9 +49,7 @@ public sealed class LiveSettingStore
     {
         lock (_gate)
         {
-            return _settings.TryGetValue(name, out var setting)
-                ? (T)LiveSettingTypeConverter.CoerceClr(typeof(T), setting.CurrentValue)!
-                : throw new KeyNotFoundException($"Live setting '{name}' is not registered.");
+            return (T)LiveSettingTypeConverter.CoerceClr(typeof(T), Resolve(name).CurrentValue)!;
         }
     }
 
@@ -53,9 +57,7 @@ public sealed class LiveSettingStore
     {
         lock (_gate)
         {
-            return _settings.TryGetValue(name, out var setting)
-                ? setting.CurrentValue
-                : throw new KeyNotFoundException($"Live setting '{name}' is not registered.");
+            return Resolve(name).CurrentValue;
         }
     }
 
@@ -77,6 +79,7 @@ public sealed class LiveSettingStore
 
     public void SetMany(IReadOnlyDictionary<string, object?> values)
     {
+        ArgumentNullException.ThrowIfNull(values);
         lock (_gate)
         {
             // Resolve every slot first so an unknown setting fails before any value is applied,
@@ -226,9 +229,12 @@ public sealed class LiveSettingStore
     }
 
     private ILiveSetting Resolve(string name)
-        => _settings.TryGetValue(name, out var setting)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        return _settings.TryGetValue(name, out var setting)
             ? setting
             : throw new KeyNotFoundException($"Live setting '{name}' is not registered.");
+    }
 
     private sealed class LiveSettingSlot(LiveSettingDefinition definition, object? value) : ICoercibleLiveSetting
     {

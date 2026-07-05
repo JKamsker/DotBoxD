@@ -84,8 +84,9 @@ internal static class ListGetI32LoopFastPathEmitter
         il.Emit(OpCodes.Bge, finish);
 
         CompiledMeterEmitter.Fuel(il, 1);
+        il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldloc, declare(plan.Source).Local);
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ListI32ReaderRaw)));
+        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.CreateMeteredListI32ReaderRaw)));
         il.Emit(OpCodes.Stloc, reader);
         il.Emit(OpCodes.Ldloc, declare(plan.Source).Local);
         il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ListCountRaw)));

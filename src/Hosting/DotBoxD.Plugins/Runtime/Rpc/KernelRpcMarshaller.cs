@@ -34,6 +34,11 @@ public static partial class KernelRpcMarshaller
             return dateTime;
         }
 
+        if (TryDecimalToSandboxValue(value, type, out var decimalValue))
+        {
+            return decimalValue;
+        }
+
         if (TryFrameworkStructToSandboxValue(value, type, out var frameworkStruct))
         {
             return frameworkStruct;
@@ -114,10 +119,12 @@ public static partial class KernelRpcMarshaller
         {
             shape.RejectUnmatchedRequiredConstructor();
             var fields = shape.Fields;
+            var fieldValues = shape.GetValues(value);
+            shape.RejectUnreconstructibleOutboundValue(fieldValues);
             var values = new SandboxValue[fields.Count];
             for (var i = 0; i < fields.Count; i++)
             {
-                values[i] = MarshalChild(shape.GetValue(value, i), fields[i].Type, $"DTO field '{fields[i].Name}'");
+                values[i] = MarshalChild(fieldValues[i], fields[i].Type, $"DTO field '{fields[i].Name}'");
             }
 
             return SandboxValue.FromOwnedRecord(values);
@@ -156,6 +163,11 @@ public static partial class KernelRpcMarshaller
         if (TryDateTimeFromSandboxValue(value, type, out var dateTime))
         {
             return dateTime;
+        }
+
+        if (TryDecimalFromSandboxValue(value, type, out var decimalValue))
+        {
+            return decimalValue;
         }
 
         if (TryFrameworkStructFromSandboxValue(value, type, out var frameworkStruct))

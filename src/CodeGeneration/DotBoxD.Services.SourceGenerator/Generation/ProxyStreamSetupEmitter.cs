@@ -14,6 +14,8 @@ internal static class ProxyStreamSetupEmitter
         StringBuilder sb,
         MethodModel method,
         System.Collections.Generic.List<ParameterModel> requestParameters,
+        string ctArg,
+        bool checkCancellationBeforeReserve,
         GeneratedLocalNames locals,
         CancellationToken ct,
         string indent)
@@ -55,7 +57,16 @@ internal static class ProxyStreamSetupEmitter
             sb.AppendLine($"{indent}var {reservedName} = false;");
         }
 
-        EmitReservationBlock(sb, method, reservations, locals, ct, indent, streamArgumentName);
+        EmitReservationBlock(
+            sb,
+            method,
+            reservations,
+            ctArg,
+            checkCancellationBeforeReserve,
+            locals,
+            ct,
+            indent,
+            streamArgumentName);
         return (streamArgumentName, handles, reservationFlags);
     }
 
@@ -80,6 +91,8 @@ internal static class ProxyStreamSetupEmitter
         StringBuilder sb,
         MethodModel method,
         System.Collections.Generic.List<(string HandleName, string ReservedName, string Kind, string AttachmentExpression)> reservations,
+        string ctArg,
+        bool checkCancellationBeforeReserve,
         GeneratedLocalNames locals,
         CancellationToken ct,
         string indent,
@@ -91,6 +104,11 @@ internal static class ProxyStreamSetupEmitter
         sb.AppendLine($"{indent}{argumentType} {streamArgumentName};");
         sb.AppendLine($"{indent}try");
         sb.AppendLine($"{indent}{{");
+        if (checkCancellationBeforeReserve && ctArg != "default")
+        {
+            sb.AppendLine($"{indent}    {ctArg}.ThrowIfCancellationRequested();");
+        }
+
         foreach (var reservation in reservations)
         {
             ct.ThrowIfCancellationRequested();

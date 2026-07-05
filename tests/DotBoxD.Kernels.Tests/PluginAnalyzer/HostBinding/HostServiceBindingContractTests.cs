@@ -79,6 +79,33 @@ public sealed class HostServiceBindingContractTests
         Assert.Contains("host.probe.value", ex.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void AddBindingsFrom_rejects_explicit_host_binding_indexer_properties()
+    {
+        var builder = new SandboxHostBuilder();
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => builder.AddBindingsFrom<IIndexedPropertyProbeWorld>(new IndexedPropertyProbeWorld()));
+
+        Assert.Contains("HostBinding", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("indexer", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("host.probe.indexed", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AddBindingsFrom_rejects_explicit_generic_host_binding_methods()
+    {
+        var builder = new SandboxHostBuilder();
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => builder.AddBindingsFrom<IGenericHostBindingProbeWorld>(new GenericHostBindingProbeWorld()));
+
+        Assert.Contains("generic", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("HostBinding", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("host.probe.echo", ex.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(IGenericHostBindingProbeWorld.Echo), ex.Message, StringComparison.Ordinal);
+    }
+
     private sealed class ConcreteProbeWorld
     {
         [HostBinding("probe.read.value", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
@@ -177,6 +204,31 @@ public sealed class HostServiceBindingContractTests
         public int CurrentValue => 1;
 
         public int PreviousValue => 2;
+    }
+
+    private interface IIndexedPropertyProbeWorld
+    {
+        [HostBinding(
+            "host.probe.indexed",
+            "probe.read.indexed",
+            SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+        int this[int id] { get; }
+    }
+
+    private sealed class IndexedPropertyProbeWorld : IIndexedPropertyProbeWorld
+    {
+        public int this[int id] => id;
+    }
+
+    private interface IGenericHostBindingProbeWorld
+    {
+        [HostBinding("host.probe.echo", "probe.read.value", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+        int Echo<T>(T value);
+    }
+
+    private sealed class GenericHostBindingProbeWorld : IGenericHostBindingProbeWorld
+    {
+        public int Echo<T>(T value) => value?.GetHashCode() ?? 0;
     }
 }
 

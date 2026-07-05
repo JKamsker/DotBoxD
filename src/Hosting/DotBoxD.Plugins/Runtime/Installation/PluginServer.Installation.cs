@@ -95,6 +95,7 @@ public sealed partial class PluginServer
             // Register as a non-current instance only; the caller wires it and then promotes it (which revokes the
             // incumbent). A wiring failure rolls this instance back with the incumbent untouched.
             Kernels.AddInstance(kernel);
+            RegisterKernelRevocationCleanup(kernel);
             return kernel;
         }
 
@@ -111,11 +112,29 @@ public sealed partial class PluginServer
     {
         if (!LocalTerminalIdentity.IsLocalTerminal(kernel.Manifest))
         {
-            return Kernels.Add(kernel);
+            var replaced = Kernels.Add(kernel);
+            RegisterKernelRevocationCleanup(kernel);
+            return replaced;
         }
 
         Kernels.AddInstance(kernel);
+        RegisterKernelRevocationCleanup(kernel);
         return null;
+    }
+
+    private void RegisterKernelRevocationCleanup(InstalledKernel kernel)
+        => kernel.RegisterRevocationCallback(RemoveRevokedKernel);
+
+    private void RemoveRevokedKernel(InstalledKernel kernel)
+    {
+        var removed = Kernels.Remove(kernel);
+        if (removed is null)
+        {
+            return;
+        }
+
+        RemoveKernelReferences(removed);
+        ClearServerExtensionRegistrations(removed.Manifest.PluginId);
     }
 
     /// <summary>

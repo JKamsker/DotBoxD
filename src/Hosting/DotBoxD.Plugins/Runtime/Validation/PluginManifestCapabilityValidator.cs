@@ -1,4 +1,6 @@
 using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Plugins.Runtime.Validation;
 
@@ -11,10 +13,11 @@ internal static class PluginManifestCapabilityValidator
         IReadOnlyList<string> entrypoints,
         List<SandboxDiagnostic> diagnostics,
         bool allowNonBindingCapabilities = true,
-        bool includeModuleNonBindingCapabilities = true)
+        bool includeModuleNonBindingCapabilities = true,
+        bool includeModuleCapabilityRequests = true)
     {
         var declared = new HashSet<string>(manifest.RequiredCapabilities, StringComparer.Ordinal);
-        var expected = RequiredCapabilities(plan, entrypoints);
+        var expected = RequiredCapabilities(plan, entrypoints, includeModuleCapabilityRequests);
         AddModuleNonBindingRequiredCapabilities(module, expected, includeModuleNonBindingCapabilities);
         var missing = expected
             .Except(declared, StringComparer.Ordinal)
@@ -75,6 +78,33 @@ internal static class PluginManifestCapabilityValidator
         }
     }
 
+    public static IEnumerable<string> NonBindingRequiredCapabilities(PluginManifest manifest, SandboxModule module)
+        => manifest.RequiredCapabilities
+            .Concat(ModuleNonBindingRequiredCapabilities(module))
+            .Where(IsKnownNonBindingCapability);
+
+    public static void ValidateConcreteRequiredCapabilityEntries(
+        PluginManifest manifest,
+        SandboxModule module,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        foreach (var capability in manifest.RequiredCapabilities)
+        {
+            AddWildcardRequiredCapabilityDiagnostic("Plugin manifest", capability, diagnostics);
+        }
+
+        if (!module.Metadata.TryGetValue(PluginManifestNames.ModuleMetadata.RequiredCapabilities, out var metadata) ||
+            string.IsNullOrWhiteSpace(metadata))
+        {
+            return;
+        }
+
+        foreach (var capability in metadata.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            AddWildcardRequiredCapabilityDiagnostic("Plugin module metadata", capability, diagnostics);
+        }
+    }
+
     public static void ValidateRequiredCapabilityGrants(
         PluginManifest manifest,
         SandboxModule module,
@@ -99,15 +129,60 @@ internal static class PluginManifestCapabilityValidator
         }
     }
 
-    private static HashSet<string> RequiredCapabilities(ExecutionPlan plan, IReadOnlyList<string> entrypoints)
+    private static HashSet<string> RequiredCapabilities(
+        ExecutionPlan plan,
+        IReadOnlyList<string> entrypoints,
+        bool includeModuleCapabilityRequests)
     {
         var required = new HashSet<string>(StringComparer.Ordinal);
+        if (includeModuleCapabilityRequests)
+        {
+            AddModuleCapabilityRequests(plan.Module, required);
+        }
+
         foreach (var entrypoint in entrypoints)
         {
-            required.UnionWith(plan.GetEntrypointMetadata(entrypoint).RequiredCapabilities);
+            AddEntrypointBindingCapabilities(plan, entrypoint, required);
         }
 
         return required;
+    }
+
+    private static void AddModuleCapabilityRequests(SandboxModule module, HashSet<string> capabilities)
+    {
+        foreach (var request in module.CapabilityRequests)
+        {
+            capabilities.Add(request.Id);
+        }
+    }
+
+    private static void AddEntrypointBindingCapabilities(
+        ExecutionPlan plan,
+        string entrypoint,
+        HashSet<string> capabilities)
+    {
+        if (!plan.BindingReferences.TryGetValue(entrypoint, out var bindingReferences))
+        {
+            return;
+        }
+
+        foreach (var bindingId in bindingReferences)
+        {
+            if (!plan.Bindings.TryGet(bindingId, out var binding))
+            {
+                continue;
+            }
+
+            if (binding.RequiredCapability is not null)
+            {
+                capabilities.Add(binding.RequiredCapability);
+            }
+
+            if (binding.IsAsync || (binding.Effects & SandboxEffect.Concurrency) != 0)
+            {
+                capabilities.Add(RuntimeCapabilityIds.Async);
+            }
+        }
     }
 
     private static void AddModuleNonBindingRequiredCapabilities(
@@ -126,6 +201,30 @@ internal static class PluginManifestCapabilityValidator
         }
     }
 
-    private static bool IsKnownNonBindingCapability(string capability)
-        => capability.StartsWith("event.read.", StringComparison.Ordinal);
+    public static bool IsKnownNonBindingCapability(string? capability)
+        => capability is not null &&
+           capability.Length > "event.read.".Length &&
+           capability.StartsWith("event.read.", StringComparison.Ordinal) &&
+           !CapabilityPattern.IsWildcard(capability);
+
+    private static void AddWildcardRequiredCapabilityDiagnostic(
+        string source,
+        string? capability,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        if (string.IsNullOrEmpty(capability))
+        {
+            return;
+        }
+
+        if (!CapabilityPattern.IsWildcard(capability))
+        {
+            return;
+        }
+
+        diagnostics.Add(new SandboxDiagnostic(
+            "DBXK051",
+            source + " requiredCapabilities must contain concrete capability ids; " +
+            $"wildcard required capability '{capability}' is not allowed."));
+    }
 }

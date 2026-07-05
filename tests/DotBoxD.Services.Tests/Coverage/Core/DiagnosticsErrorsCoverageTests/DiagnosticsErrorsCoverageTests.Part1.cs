@@ -80,6 +80,14 @@ public sealed class RpcErrorTypesCoverageTests
     }
 
     [Fact]
+    public void RpcErrorInfo_FromException_RejectsNullException()
+    {
+        var ex = Assert.Throws<ArgumentNullException>(() => RpcErrorInfo.FromException(null!));
+
+        Assert.Equal("exception", ex.ParamName);
+    }
+
+    [Fact]
     public void RpcErrorInfo_Constructor_StoresMessageAndType()
     {
         var info = new RpcErrorInfo("safe message", "AppError");

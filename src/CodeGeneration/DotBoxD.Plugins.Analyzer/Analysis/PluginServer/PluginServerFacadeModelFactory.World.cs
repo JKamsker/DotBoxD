@@ -27,6 +27,71 @@ internal static partial class PluginServerFacadeModelFactory
         return worldType;
     }
 
+    private static void ValidateWorldType(
+        INamedTypeSymbol serverType,
+        Compilation compilation,
+        INamedTypeSymbol worldType)
+    {
+        if (worldType.TypeKind != TypeKind.Error &&
+            !worldType.IsFileLocal &&
+            IsAccessibleFromGeneratedServer(compilation, serverType, worldType))
+        {
+            return;
+        }
+
+        throw new NotSupportedException(
+            $"Generated plugin server '{serverType.Name}' world interface '{worldType.ToDisplayString()}' " +
+            "is file-local or inaccessible and cannot be named from the generated facade.");
+    }
+
+    private static bool IsAccessibleFromGeneratedServer(
+        Compilation compilation,
+        INamedTypeSymbol serverType,
+        ISymbol symbol)
+        => compilation.IsSymbolAccessibleWithin(symbol, serverType) &&
+           !CrossesUnfriendlyInternalBoundary(symbol, serverType.ContainingAssembly);
+
+    private static bool CrossesUnfriendlyInternalBoundary(ISymbol symbol, IAssemblySymbol generatedAssembly)
+    {
+        if (IsUnfriendlyInternal(symbol, generatedAssembly))
+        {
+            return true;
+        }
+
+        for (var type = symbol.ContainingType; type is not null; type = type.ContainingType)
+        {
+            if (IsUnfriendlyInternal(type, generatedAssembly))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsUnfriendlyInternal(ISymbol symbol, IAssemblySymbol generatedAssembly)
+        => symbol.DeclaredAccessibility is Accessibility.Internal or Accessibility.ProtectedOrInternal &&
+           symbol.ContainingAssembly is { } assembly &&
+           !SymbolEqualityComparer.Default.Equals(assembly, generatedAssembly) &&
+           !assembly.GivesAccessTo(generatedAssembly);
+
+    private static void ValidateControlServiceAccessibility(
+        INamedTypeSymbol serverType,
+        Compilation compilation,
+        INamedTypeSymbol controlServiceType)
+    {
+        if (controlServiceType.TypeKind != TypeKind.Error &&
+            !controlServiceType.IsFileLocal &&
+            IsAccessibleFromGeneratedServer(compilation, serverType, controlServiceType))
+        {
+            return;
+        }
+
+        throw new NotSupportedException(
+            $"Generated plugin server '{serverType.Name}' control-plane contract '{controlServiceType.ToDisplayString()}' " +
+            "is file-local or inaccessible and cannot be named from the generated facade.");
+    }
+
     private static INamedTypeSymbol? ResolveControlService(
         INamedTypeSymbol serverType,
         Compilation compilation,

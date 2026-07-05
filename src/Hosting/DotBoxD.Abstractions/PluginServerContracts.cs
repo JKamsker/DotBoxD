@@ -149,6 +149,27 @@ public enum GeneratedPluginServerRegistryKind
     Subscription,
 }
 
+/// <summary>Explicit host-service effects for analyzer-visible auto bindings.</summary>
+[Flags]
+public enum HostBindingEffect
+{
+    None = 0,
+    HostStateRead = 1,
+    HostStateWrite = 2,
+    Allocates = 4
+}
+
+/// <summary>
+/// Declares the capability and host-state effects required by an analyzer-visible host binding contract.
+/// </summary>
+[AttributeUsage(AttributeTargets.Method, Inherited = false)]
+public sealed class HostCapabilityAttribute(string capability, HostBindingEffect effects) : Attribute
+{
+    public string Capability { get; } = capability;
+
+    public HostBindingEffect Effects { get; } = effects;
+}
+
 /// <summary>Wire client used by generated server-extension proxies.</summary>
 public interface IServerExtensionWireClient
 {

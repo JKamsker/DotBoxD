@@ -9,7 +9,7 @@ namespace DotBoxD.Transports.NamedPipes;
 public sealed class NamedPipeServerTransport : IServerTransport
 {
     /// <summary>
-    /// Default inter-read idle timeout applied to accepted connections' in-progress frame body reads
+    /// Default idle timeout applied to accepted connections' frame reads
     /// (30 seconds). Mirrors <c>TcpConnection.DefaultFrameReadIdleTimeout</c> so accepted pipe
     /// connections get the same finite slow-loris defense the TCP transport applies by default.
     /// </summary>
@@ -35,7 +35,7 @@ public sealed class NamedPipeServerTransport : IServerTransport
         _maxMessageSize = ValidateMaxMessageSize(maxMessageSize, nameof(maxMessageSize));
     }
     /// <summary>
-    /// Inter-read idle timeout applied to accepted connections' in-progress frame body reads (slow-loris
+    /// Idle timeout applied to accepted connections' frame reads (slow-loris
     /// defense). <see langword="null"/> uses <see cref="DefaultFrameReadIdleTimeout"/>;
     /// <see cref="Timeout.InfiniteTimeSpan"/> disables it. See <see cref="StreamConnection"/>.
     /// </summary>

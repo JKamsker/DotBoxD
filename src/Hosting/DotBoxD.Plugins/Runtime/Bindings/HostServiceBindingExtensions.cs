@@ -5,10 +5,6 @@ namespace DotBoxD.Hosting.Execution;
 
 public static class HostServiceBindingExtensions
 {
-    private const string ExtensibleControlType = "DotBoxD.Abstractions.IExtensibleControl";
-    private const string ServiceControlType = "DotBoxD.Abstractions.IServiceControl";
-    private const string RpcServiceAttributeType = "DotBoxD.Services.Attributes.RpcServiceAttribute";
-
     public static SandboxHostBuilder AddBindingsFrom<TService>(
         this SandboxHostBuilder builder,
         TService implementation)
@@ -41,9 +37,10 @@ public static class HostServiceBindingExtensions
             return;
         }
 
-        foreach (var method in ServiceMethods(serviceType))
+        foreach (var method in HostServiceBindingMemberDiscovery.ServiceMethods(serviceType))
         {
-            if (ShouldSkipMethod(method))
+            HostServiceBindingMemberDiscovery.RejectUnsupportedGenericHostBindingMethod(method);
+            if (HostServiceBindingMemberDiscovery.ShouldSkipMethod(method))
             {
                 continue;
             }
@@ -55,23 +52,33 @@ public static class HostServiceBindingExtensions
 
             var declaringType = method.DeclaringType ?? serviceType;
             var target = ResolveTargetMethod(declaringType, implementation.GetType(), method);
+            var capability = method.GetCustomAttribute<HostCapabilityAttribute>();
             var binding = method.GetCustomAttribute<HostBindingAttribute>();
-            if (binding is null)
+
+            if (binding is not null)
             {
-                throw new InvalidOperationException(
-                    $"Host service method '{declaringType.FullName}.{method.Name}' must declare [HostBinding] on its service contract.");
+                AddBinding(
+                    builder,
+                    registeredBindings,
+                    HostServiceBindingFactory.CreateBinding(method, target, implementation, capability, binding),
+                    HostServiceBindingRouteSignature.ForMethod(method));
             }
 
-            AddBinding(
-                builder,
-                registeredBindings,
-                HostServiceBindingFactory.CreateBinding(method, target, implementation, binding),
-                HostServiceBindingRouteSignature.ForMethod(method));
+            if (capability is not null || binding is null)
+            {
+                AddBinding(
+                    builder,
+                    registeredBindings,
+                    HostServiceBindingFactory.CreateBinding(method, target, implementation, capability, binding: null),
+                    HostServiceBindingRouteSignature.ForMethod(method));
+            }
         }
 
-        foreach (var property in ServiceProperties(serviceType))
+        foreach (var property in HostServiceBindingMemberDiscovery.ServiceProperties(serviceType))
         {
-            if (ShouldSkipProperty(property))
+            HostServiceBindingMemberDiscovery.RejectUnsupportedExplicitPropertyBinding(property);
+
+            if (HostServiceBindingMemberDiscovery.ShouldSkipProperty(property))
             {
                 continue;
             }
@@ -81,7 +88,7 @@ public static class HostServiceBindingExtensions
                 continue;
             }
 
-            if (!HasRpcServiceAttribute(property.PropertyType))
+            if (!HostServiceBindingMemberDiscovery.HasRpcServiceAttribute(property.PropertyType))
             {
                 continue;
             }
@@ -105,7 +112,7 @@ public static class HostServiceBindingExtensions
         Dictionary<string, HostServiceBindingRegistration> registeredBindings)
     {
         if (HostServiceBindingFactory.UnwrapReturnType(factoryMethod.ReturnType) is not { } handleServiceType ||
-            !HasRpcServiceAttribute(handleServiceType))
+            !HostServiceBindingMemberDiscovery.HasRpcServiceAttribute(handleServiceType))
         {
             return false;
         }
@@ -118,18 +125,39 @@ public static class HostServiceBindingExtensions
 
         var factoryDeclaringType = factoryMethod.DeclaringType ?? parentServiceType;
         var targetFactory = ResolveTargetMethod(factoryDeclaringType, parentImplementation.GetType(), factoryMethod);
-        foreach (var handleMethod in ServiceMethods(handleServiceType))
+        foreach (var handleMethod in HostServiceBindingMemberDiscovery.ServiceMethods(handleServiceType))
         {
-            if (ShouldSkipMethod(handleMethod))
+            HostServiceBindingMemberDiscovery.RejectUnsupportedGenericHostBindingMethod(handleMethod);
+            if (HostServiceBindingMemberDiscovery.ShouldSkipMethod(handleMethod))
             {
                 continue;
             }
 
             var binding = handleMethod.GetCustomAttribute<HostBindingAttribute>();
-            if (binding is null)
+            var capability = handleMethod.GetCustomAttribute<HostCapabilityAttribute>();
+            if (binding is null && capability is null)
             {
                 throw new InvalidOperationException(
-                    $"Host service handle method '{handleServiceType.FullName}.{handleMethod.Name}' must declare [HostBinding].");
+                    $"Host service handle method '{handleServiceType.FullName}.{handleMethod.Name}' must declare [HostBinding] or [HostCapability].");
+            }
+
+            if (binding is not null)
+            {
+                AddBinding(
+                    builder,
+                    registeredBindings,
+                    HostServiceBindingFactory.CreateHandleBinding(
+                        factoryMethod,
+                        targetFactory,
+                        parentImplementation,
+                        handleMethod,
+                        binding),
+                    HostServiceBindingRouteSignature.ForHandle(factoryMethod, handleMethod));
+            }
+
+            if (capability is null)
+            {
+                continue;
             }
 
             AddBinding(
@@ -140,7 +168,7 @@ public static class HostServiceBindingExtensions
                     targetFactory,
                     parentImplementation,
                     handleMethod,
-                    binding),
+                    capability),
                 HostServiceBindingRouteSignature.ForHandle(factoryMethod, handleMethod));
         }
 
@@ -245,43 +273,4 @@ public static class HostServiceBindingExtensions
         var targetGetter = ResolveTargetMethod(getterDeclaringType, implementation.GetType(), getter);
         return targetGetter.Invoke(implementation, null);
     }
-
-    private static IEnumerable<MethodInfo> ServiceMethods(Type serviceType)
-        => ServiceTypes(serviceType).SelectMany(static type => type.GetMethods());
-
-    private static IEnumerable<PropertyInfo> ServiceProperties(Type serviceType)
-        => ServiceTypes(serviceType).SelectMany(static type => type.GetProperties());
-
-    private static IEnumerable<Type> ServiceTypes(Type serviceType)
-    {
-        foreach (var inherited in serviceType.GetInterfaces().OrderBy(static type => type.FullName, StringComparer.Ordinal))
-        {
-            yield return inherited;
-        }
-
-        yield return serviceType;
-    }
-
-    private static bool ShouldSkipMethod(MethodInfo method)
-        => method.IsSpecialName ||
-           method.IsGenericMethodDefinition ||
-           IsControlType(method.DeclaringType);
-
-    private static bool ShouldSkipProperty(PropertyInfo property)
-        => property.GetMethod is null ||
-           property.GetMethod.IsStatic ||
-           property.GetIndexParameters().Length != 0 ||
-           IsControlType(property.DeclaringType);
-
-    private static bool IsControlType(MemberInfo? type)
-        => type is Type t &&
-           (string.Equals(t.FullName, ExtensibleControlType, StringComparison.Ordinal) ||
-            string.Equals(t.FullName, ServiceControlType, StringComparison.Ordinal));
-
-    private static bool HasRpcServiceAttribute(Type type)
-        => HasDirectRpcServiceAttribute(type) || type.GetInterfaces().Any(HasDirectRpcServiceAttribute);
-
-    private static bool HasDirectRpcServiceAttribute(Type type)
-        => type.GetCustomAttributes(inherit: false)
-            .Any(attribute => string.Equals(attribute.GetType().FullName, RpcServiceAttributeType, StringComparison.Ordinal));
 }

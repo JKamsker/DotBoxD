@@ -96,6 +96,21 @@ public sealed class PluginRevocationTests
     }
 
     [Fact]
+    public async Task Direct_revoke_removes_kernel_from_public_registry()
+    {
+        using var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
+        var kernel = await server.InstallAsync(FireDamagePluginPackage.Create());
+        Assert.True((bool)server.Kernels.TryGet("fire-damage", out _));
+        Assert.Single(server.Kernels.Snapshot());
+
+        kernel.Revoke();
+
+        Assert.True((bool)kernel.IsRevoked);
+        Assert.False((bool)server.Kernels.TryGet("fire-damage", out _));
+        Assert.Empty(server.Kernels.Snapshot());
+    }
+
+    [Fact]
     public async Task Uninstall_between_filter_and_handler_skips_handler()
     {
         var messages = new InMemoryPluginMessageSink();

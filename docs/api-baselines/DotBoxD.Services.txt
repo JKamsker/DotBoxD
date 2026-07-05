@@ -29,7 +29,10 @@ public class ServiceNotFoundException : ServiceException
 public class ServiceProtocolException : ServiceException
 public class ServiceTimeoutException : ServiceException
 public const int DefaultInboundQueueCapacity = 1024
+public const int DefaultMaxAcceptedPeers = 1024
 public const int DefaultMaxConcurrentInboundDispatch = 1
+public const int DefaultMaxInboundStreamsPerPeer = 1024
+public const int DefaultMaxInboundStreamsPerRequest = 32
 public const int DefaultMaxPendingRequests = 4096
 public const int EnvelopeLengthSize = 4
 public const int HeaderSize = 9
@@ -102,14 +105,17 @@ public IAsyncEnumerable<T> InvokeAsyncEnumerableOnInstance<TRequest, T>(string s
 public InstanceRegistry() : this(DefaultMaxInstances) { }
 public InstanceRegistry(int maxInstances)
 public int Length => _length
-public int Length => _memory.Length
+public int Length => Memory.Length
 public int MaxConcurrentInboundDispatch
+public int MaxInboundStreamsPerPeer
+public int MaxInboundStreamsPerRequest
 public int MaxPendingRequests
 public int MessageId { get; }
 public int MessageId { get; set; }
 public int StreamId { get; set; }
-public int WrittenCount => _written
+public int WrittenCount
 public int? InboundQueueCapacity
+public int? MaxAcceptedPeers
 public interface IInstanceRegistry
 public interface INonStreamingServiceDispatcher
 public interface IRpcChannel : IAsyncDisposable
@@ -140,7 +146,7 @@ public readonly record struct GeneratedMethod( string Name, string WireName, Typ
 public readonly record struct GeneratedParameter( string Name, Type Type, int Position, bool IsCancellationToken, bool HasDefaultValue, object? DefaultValue)
 public readonly record struct GeneratedService( Type ServiceType, Type ProxyType, Type DispatcherType, string ServiceName)
 public readonly record struct RpcErrorInfo(string Message, string Type)
-public ReadOnlyMemory<byte> Memory => _memory
+public ReadOnlyMemory<byte> Memory
 public ReadOnlyMemory<byte> WrittenMemory =>
 public ReadOnlySpan<byte> Span =>
 public RemoteServiceException(string message, string remoteExceptionType)
@@ -202,6 +208,7 @@ public SingleConnectionTransport(IRpcChannel connection, bool ownsConnection = f
 public Span<byte> GetSpan(int sizeHint = 0)
 public static async Task WriteMessageAsync( Stream stream, int messageId, MessageType type, ReadOnlyMemory<byte> payload, CancellationToken ct = default)
 public static async Task<FramedMessage?> ReadMessageAsync( Stream stream, CancellationToken ct = default)
+public static async Task<FramedMessage?> ReadMessageAsync( Stream stream, TimeSpan frameReadIdleTimeout, CancellationToken ct = default)
 public static bool TryReadFrame( ReadOnlyMemory<byte> source, out int messageId, out MessageType type, out ReadOnlyMemory<byte> envelope, out ReadOnlyMemory<byte> payload)
 public static bool TryReadFrameHeader( ReadOnlyMemory<byte> source, out int messageId, out MessageType type)
 public static class GeneratedServiceRegistry

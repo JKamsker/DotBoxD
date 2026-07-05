@@ -81,6 +81,12 @@ internal enum HookChainNotLoweredKind
     RunChain
 }
 
+internal enum HookChainReceiverKind
+{
+    Local,
+    Remote
+}
+
 internal enum HookChainInterceptorInstallKind
 {
     GeneratedChain,

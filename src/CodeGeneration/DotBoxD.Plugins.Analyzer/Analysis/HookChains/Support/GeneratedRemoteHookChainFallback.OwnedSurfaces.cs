@@ -70,19 +70,21 @@ internal static partial class GeneratedRemoteHookChainFallback
         string HookRegistryFullName,
         string SubscriptionRegistryName,
         string SubscriptionRegistryFullName,
-        string ContextFullName)
+        string ContextFullName,
+        INamedTypeSymbol ContextType)
     {
         public static OwnedGeneratedSurface? Create(
             INamedTypeSymbol serverType,
             INamedTypeSymbol worldType,
             Compilation compilation)
         {
-            var contextFullName = GeneratedContextTypeFullName(serverType, compilation);
-            if (contextFullName is null)
+            var contextType = GeneratedContextType(serverType, compilation);
+            if (contextType is null)
             {
                 return null;
             }
 
+            var contextFullName = contextType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             var ns = serverType.ContainingNamespace.IsGlobalNamespace
                 ? string.Empty
                 : serverType.ContainingNamespace.ToDisplayString();
@@ -97,7 +99,8 @@ internal static partial class GeneratedRemoteHookChainFallback
                 prefix + hookRegistryName,
                 subscriptionRegistryName,
                 prefix + subscriptionRegistryName,
-                contextFullName);
+                contextFullName,
+                contextType);
         }
     }
 }

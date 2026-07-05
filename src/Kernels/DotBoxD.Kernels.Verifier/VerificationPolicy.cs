@@ -168,10 +168,14 @@ public sealed record VerificationPolicy(
                 RuntimeMember("ListCountRaw", SandboxValueName, Int32Name),
                 RuntimeMember("ListReadFuelRaw", Int32Name, Int64Name),
                 RuntimeMember("ListGetI32Raw", $"{SandboxValueName},{Int32Name}", Int32Name),
-                RuntimeMember("ListI32ReaderRaw", SandboxValueName, ObjectName),
+                RuntimeMember("CreateMeteredListI32ReaderRaw", $"{SandboxContextName},{SandboxValueName}", ObjectName),
                 RuntimeMember("ListI32ReaderGetRaw", $"{ObjectName},{Int32Name}", Int32Name),
                 RuntimeMember("ListI32ReaderGetRemainderRaw", $"{ObjectName},{Int32Name},{Int32Name}", Int32Name),
                 RuntimeMember("ListI32ReaderAddRemainderCycleFromZeroRaw", $"{SandboxContextName},{ObjectName},{Int32Name},{Int32Name},{Int32Name},{Int32Name},{Int64Name}", Int32Name),
+                RuntimeMember("CanUseModuloBranchAccumulatorRaw", $"{SandboxContextName},{Int32Name},{Int32Name},{Int32Name},{Int32Name},{Int32Name},{Int32Name},{Int32Name},{Int32Name},{Int32Name}", BooleanName),
+                RuntimeMember("AddModuloBranchDeltasI32LoopRaw", $"{SandboxContextName},{Int32Name},{Int32Name},{Int32Name},{Int32Name},{Int32Name},{Int32Name},{Int32Name},{Int32Name},{Int32Name}", Int32Name),
+                RuntimeMember("CanUseModuloIndexAccumulatorRaw", $"{SandboxContextName},{Int32Name},{Int32Name},{Int32Name},{Int32Name},{Int32Name},{Int32Name}", BooleanName),
+                RuntimeMember("AddModuloIndexAccumulatorI32LoopRaw", $"{SandboxContextName},{Int32Name},{Int32Name},{Int32Name},{Int32Name},{Int32Name},{Int32Name}", Int32Name),
                 RuntimeMember("MapCountRaw", SandboxValueName, Int32Name),
                 RuntimeMember("MapGetI32Raw", $"{SandboxValueName},{SandboxValueName}", Int32Name),
                 RuntimeMember("ConcatString", $"{SandboxContextName},{SandboxValueName},{SandboxValueName}", SandboxValueName),
@@ -218,7 +222,7 @@ public sealed record VerificationPolicy(
                 "System.Linq.Expressions.", "Microsoft.CSharp."
             },
             RuntimeFacadeIdentityDefaults(),
-            "dotboxd-verifier-8");
+            "dotboxd-verifier-9");
 
     public bool IsMemberAllowed(string memberSignature) => AllowedMembers.Contains(memberSignature);
 
@@ -248,9 +252,23 @@ public sealed record VerificationPolicy(
     }
 
     private static string Hash(string prefix, IEnumerable<string> values)
-        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
-            prefix + "|" + string.Join('|', values.Order(StringComparer.Ordinal)))))
-            .ToLowerInvariant();
+    {
+        var builder = new StringBuilder();
+        AppendHashPart(builder, prefix);
+
+        foreach (var value in values.Order(StringComparer.Ordinal))
+        {
+            AppendHashPart(builder, value);
+        }
+
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString()))).ToLowerInvariant();
+    }
+
+    private static void AppendHashPart(StringBuilder builder, string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        builder.Append(value.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append(':').Append(value);
+    }
 
     private static IReadOnlySet<string> Freeze(IEnumerable<string> values)
     {

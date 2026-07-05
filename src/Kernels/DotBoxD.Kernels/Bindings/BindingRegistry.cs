@@ -81,6 +81,7 @@ public sealed class BindingRegistry : IBindingCatalog
             var index = 0;
             foreach (var binding in bindings)
             {
+                EnsureDescriptor(binding, nameof(bindings));
                 frozen[index++] = Freeze(binding);
             }
 
@@ -90,10 +91,19 @@ public sealed class BindingRegistry : IBindingCatalog
         var list = new List<BindingDescriptor>();
         foreach (var binding in bindings)
         {
+            EnsureDescriptor(binding, nameof(bindings));
             list.Add(Freeze(binding));
         }
 
         return list.ToArray();
+    }
+
+    private static void EnsureDescriptor(BindingDescriptor? binding, string parameterName)
+    {
+        if (binding is null)
+        {
+            throw new ArgumentException("Binding registry bindings cannot contain null descriptors.", parameterName);
+        }
     }
 
     private static Dictionary<string, BindingDescriptor> CreateBindingDictionary(IReadOnlyList<BindingDescriptor> bindings)
@@ -222,6 +232,7 @@ public sealed class BindingRegistry : IBindingCatalog
             binding.CostModel.AllocationFromReturnBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
             binding.CostModel.MaxCallsPerRun?.ToString(System.Globalization.CultureInfo.InvariantCulture),
             binding.AuditLevel.ToString(),
+            binding.AuditKind,
             binding.Safety.ToString(),
             binding.IsAsync.ToString(System.Globalization.CultureInfo.InvariantCulture),
             binding.Compiled.Kind,

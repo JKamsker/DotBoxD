@@ -15,25 +15,24 @@ public sealed class TcpServerTransport : IServerTransport
     private int _disposed;
     private int _started;
     private int _freshAcceptStartsForTest;
-    public TcpServerTransport(int port) : this(IPAddress.Any, port)
-    {
-    }
+    public TcpServerTransport(int port) : this(IPAddress.Any, port) { }
     public TcpServerTransport(IPAddress address, int port)
     {
         _address = address ?? throw new ArgumentNullException(nameof(address));
-        _port = port;
+        _port = EnsurePort(port);
     }
     public TcpServerTransport(string address, int port)
     {
-        _address = IPAddress.Parse(address);
-        _port = port;
+        _address = IPAddress.Parse(address ?? throw new ArgumentNullException(nameof(address)));
+        _port = EnsurePort(port);
     }
+    private static int EnsurePort(int port) => (uint)port <= 65535 ? port : throw new ArgumentOutOfRangeException(nameof(port));
     /// <summary>
     /// Gets the bound endpoint after <see cref="StartAsync"/> succeeds.
     /// </summary>
     public IPEndPoint? LocalEndpoint => _listener?.LocalEndpoint as IPEndPoint;
     /// <summary>
-    /// Inter-read idle timeout applied to accepted connections' in-progress frame reads (slow-loris
+    /// Idle timeout applied to accepted connections' frame reads (slow-loris
     /// defense). <see langword="null"/> uses <see cref="TcpConnection.DefaultFrameReadIdleTimeout"/>;
     /// <see cref="Timeout.InfiniteTimeSpan"/> disables it. See <see cref="TcpConnection"/>.
     /// </summary>

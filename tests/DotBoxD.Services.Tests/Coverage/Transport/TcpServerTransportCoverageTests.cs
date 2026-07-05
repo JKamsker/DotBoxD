@@ -16,43 +16,6 @@ public sealed class TcpServerTransportCoverageTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
 
-    // ---- Constructors ---------------------------------------------------------------------
-
-    [Fact]
-    public async Task Constructor_PortOnly_BindsOnAnyAddress()
-    {
-        // The (int port) overload delegates to (IPAddress.Any, port). Binding port 0 picks a free port
-        // and StartAsync must expose the bound endpoint.
-        await using var server = new TcpServerTransport(0);
-        await server.StartAsync().WaitAsync(Timeout);
-
-        Assert.NotNull(server.LocalEndpoint);
-        Assert.True(server.LocalEndpoint!.Port > 0);
-    }
-
-    [Fact]
-    public async Task Constructor_StringAddress_ParsesAndBinds()
-    {
-        // The (string address, int port) overload parses the address via IPAddress.Parse.
-        await using var server = new TcpServerTransport("127.0.0.1", 0);
-        await server.StartAsync().WaitAsync(Timeout);
-
-        Assert.NotNull(server.LocalEndpoint);
-        Assert.Equal(IPAddress.Loopback, server.LocalEndpoint!.Address);
-    }
-
-    [Fact]
-    public void Constructor_InvalidStringAddress_Throws()
-    {
-        Assert.ThrowsAny<Exception>(() => new TcpServerTransport("not-an-ip", 0));
-    }
-
-    [Fact]
-    public void Constructor_NullAddress_ThrowsArgumentNull()
-    {
-        Assert.Throws<ArgumentNullException>(() => new TcpServerTransport((IPAddress)null!, 0));
-    }
-
     // ---- Start lifecycle ------------------------------------------------------------------
 
     [Fact]

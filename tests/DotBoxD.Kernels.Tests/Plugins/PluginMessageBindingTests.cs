@@ -11,6 +11,14 @@ namespace DotBoxD.Kernels.Tests.Plugins;
 public sealed class PluginMessageBindingTests
 {
     [Fact]
+    public void Plugin_message_binding_declares_plugin_message_audit_kind()
+    {
+        var binding = PluginMessageBindings.CreateSend(new InMemoryPluginMessageSink());
+
+        Assert.Equal(BindingAuditKinds.PluginMessage, binding.AuditKind);
+    }
+
+    [Fact]
     public async Task Kernel_handler_capability_is_required_by_policy()
     {
         var server = DotBoxD.Plugins.PluginServer.Create();
@@ -207,7 +215,26 @@ public sealed class PluginMessageBindingTests
         Assert.NotSame(message, sink.Message);
     }
 
-    private static SandboxContext MessageContext(BindingDescriptor binding)
+    [Fact]
+    public async Task Plugin_message_binding_observes_context_cancellation_before_sink_send()
+    {
+        var sink = new NonCooperativeMessageSink();
+        var binding = PluginMessageBindings.CreateSend(sink);
+        using var caller = new CancellationTokenSource();
+        caller.Cancel();
+
+        var exception = await Record.ExceptionAsync(
+            async () => await binding.Invoke(
+                    MessageContext(binding, caller.Token),
+                    [SandboxValue.FromString("player-1"), SandboxValue.FromString("message")],
+                    CancellationToken.None)
+                .AsTask());
+
+        Assert.Equal(0, sink.Calls);
+        Assert.IsAssignableFrom<OperationCanceledException>(exception);
+    }
+
+    private static SandboxContext MessageContext(BindingDescriptor binding, CancellationToken cancellationToken = default)
     {
         var policy = SandboxPolicyBuilder.Create()
             .GrantHostMessageWrite()
@@ -219,7 +246,7 @@ public sealed class PluginMessageBindingTests
             new ResourceMeter(policy.ResourceLimits),
             new BindingRegistry([binding]),
             new InMemoryAuditSink(),
-            CancellationToken.None,
+            cancellationToken,
             moduleHash: "module",
             policyHash: "policy");
     }
@@ -237,6 +264,20 @@ public sealed class PluginMessageBindingTests
             cancellationToken.ThrowIfCancellationRequested();
             TargetId = targetId;
             Message = message;
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class NonCooperativeMessageSink : IPluginMessageSink
+    {
+        public int Calls { get; private set; }
+
+        public ValueTask SendAsync(
+            string targetId,
+            string message,
+            CancellationToken cancellationToken = default)
+        {
+            Calls++;
             return ValueTask.CompletedTask;
         }
     }

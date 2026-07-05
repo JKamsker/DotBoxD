@@ -11,6 +11,7 @@ public sealed record QueryFilter
 {
     private static readonly IReadOnlyList<QueryFilter> NoChildren = [];
     private static readonly IReadOnlyList<QueryValue> NoValues = [];
+    private QueryComparisonOperator _operator;
 
     /// <summary>The node kind.</summary>
     public required QueryFilterKind Kind { get; init; }
@@ -19,7 +20,17 @@ public sealed record QueryFilter
     public string Field { get; init; } = string.Empty;
 
     /// <summary>The operator for a <see cref="QueryFilterKind.Compare"/> node.</summary>
-    public QueryComparisonOperator Operator { get; init; }
+    public QueryComparisonOperator Operator
+    {
+        get => _operator;
+        init
+        {
+            _operator = value;
+            HasOperator = true;
+        }
+    }
+
+    internal bool HasOperator { get; private init; }
 
     /// <summary>The right-hand literal for a <see cref="QueryFilterKind.Compare"/> node.</summary>
     public QueryValue? Value { get; init; }

@@ -11,13 +11,20 @@ public delegate ValueTask<TReturn> RemoteServerInvocation<TWorld, TCaptures, TRe
 public enum GeneratedPluginServerRegistryKind
 public enum GeneratedPluginServerRegistryKind.Hook
 public enum GeneratedPluginServerRegistryKind.Subscription
+public enum HostBindingEffect
+public enum HostBindingEffect.Allocates = 4
+public enum HostBindingEffect.HostStateRead = 1
+public enum HostBindingEffect.HostStateWrite = 2
+public enum HostBindingEffect.None = 0
 public GeneratedPluginServerRegistryKind Kind { get; } = kind
 public HandleSubtypeAttribute( Type subtype, string discriminator, string bindingPrefix, string capability)
 public HookAttribute(string name, Type resultType)
 public HookContext(IPluginMessageSink messages, CancellationToken cancellationToken)
 public HostBindingAttribute(string bindingId, string capability, SandboxEffect effects)
 public HostBindingAttribute(string capability, SandboxEffect effects)
+public HostBindingEffect Effects { get; } = effects
 public InMemoryPluginMessageSink()
+public InMemoryPluginMessageSink(int maxMessages)
 public int Version { get; } = version
 public interface IEventKernel<TEvent>
 public interface IExtensibleControl
@@ -32,7 +39,7 @@ public interface IServerExtensionClientRegistry : IServerExtensionWireClient
 public interface IServerExtensionWireClient
 public interface IServiceControl : IExtensibleControl
 public IPluginMessageSink Messages { get; }
-public IReadOnlyList<PluginMessage> Messages => _readOnlyMessages
+public IReadOnlyList<PluginMessage> Messages
 public PluginAttribute(string? id = null) => Id = id
 public PolymorphicHandleAttribute(string keyMember)
 public SandboxEffect Effects { get; }
@@ -47,6 +54,7 @@ public sealed class HookAttribute : Attribute
 public sealed class HookContext
 public sealed class HookResultAttribute : Attribute
 public sealed class HostBindingAttribute : Attribute
+public sealed class HostCapabilityAttribute(string capability, HostBindingEffect effects) : Attribute
 public sealed class InMemoryPluginMessageSink : IPluginMessageSink
 public sealed class KernelMethodAttribute : Attribute
 public sealed class LiveSettingAttribute : Attribute
@@ -64,6 +72,7 @@ public string AccumulatorName { get; } = accumulatorName
 public string BindingId { get; }
 public string BindingPrefix { get; }
 public string Capability { get; }
+public string Capability { get; } = capability
 public string DescriptorHash { get; } = descriptorHash
 public string DescriptorPayload { get; } = descriptorPayload
 public string Discriminator { get; }

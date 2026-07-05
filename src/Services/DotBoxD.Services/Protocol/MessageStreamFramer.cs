@@ -9,14 +9,30 @@ internal static class MessageStreamFramer
     public static async Task<MessageFramer.FramedMessage?> ReadMessageAsync(
         Stream stream,
         CancellationToken ct)
+        => await ReadMessageAsync(stream, FrameReadTimeoutSource.DefaultIdleTimeout, ct).ConfigureAwait(false);
+
+    public static async Task<MessageFramer.FramedMessage?> ReadMessageAsync(
+        Stream stream,
+        TimeSpan frameReadIdleTimeout,
+        CancellationToken ct)
     {
+        ct.ThrowIfCancellationRequested();
+
+        var idleTimeout = FrameReadTimeoutSource.Validate(
+            frameReadIdleTimeout,
+            nameof(frameReadIdleTimeout));
+        using var readTimeout = idleTimeout == Timeout.InfiniteTimeSpan
+            ? null
+            : new FrameReadTimeoutSource();
         var headerBuffer = ArrayPool<byte>.Shared.Rent(MessageFramer.HeaderSize);
         try
         {
             var bytesRead = await ReadExactAsync(
                 stream,
                 headerBuffer.AsMemory(0, MessageFramer.HeaderSize),
-                ct).ConfigureAwait(false);
+                ct,
+                readTimeout,
+                idleTimeout).ConfigureAwait(false);
             if (bytesRead == 0)
             {
                 return null;
@@ -41,7 +57,8 @@ internal static class MessageStreamFramer
             }
 
             var messageId = BinaryPrimitives.ReadInt32LittleEndian(headerBuffer.AsSpan(4, 4));
-            var payload = await ReadPayloadAsync(stream, totalLength, ct).ConfigureAwait(false);
+            var payload = await ReadPayloadAsync(stream, totalLength, ct, readTimeout, idleTimeout)
+                .ConfigureAwait(false);
             return new MessageFramer.FramedMessage(messageId, messageType, payload);
         }
         finally
@@ -57,6 +74,8 @@ internal static class MessageStreamFramer
         ReadOnlyMemory<byte> payload,
         CancellationToken ct)
     {
+        ct.ThrowIfCancellationRequested();
+
         var totalLength = MessageFrameReader.GetOutgoingFrameLength(payload.Length);
         using var writer = PooledBufferWriter.Rent(totalLength);
         MessageFramer.WriteFrame(writer, messageId, type, payload.Span);
@@ -64,7 +83,12 @@ internal static class MessageStreamFramer
         await stream.FlushAsync(ct).ConfigureAwait(false);
     }
 
-    private static async Task<Payload> ReadPayloadAsync(Stream stream, int totalLength, CancellationToken ct)
+    private static async Task<Payload> ReadPayloadAsync(
+        Stream stream,
+        int totalLength,
+        CancellationToken ct,
+        FrameReadTimeoutSource? readTimeout,
+        TimeSpan idleTimeout)
     {
         var payloadLength = totalLength - MessageFramer.HeaderSize;
         var payload = Payload.Rent(payloadLength);
@@ -76,7 +100,8 @@ internal static class MessageStreamFramer
 
         try
         {
-            var bytesRead = await ReadExactAsync(stream, payload.Memory, ct).ConfigureAwait(false);
+            var bytesRead = await ReadExactAsync(stream, payload.Memory, ct, readTimeout, idleTimeout)
+                .ConfigureAwait(false);
             if (bytesRead < payloadLength)
             {
                 payload.Dispose();
@@ -93,12 +118,20 @@ internal static class MessageStreamFramer
         return payload;
     }
 
-    private static async Task<int> ReadExactAsync(Stream stream, Memory<byte> buffer, CancellationToken ct)
+    private static async Task<int> ReadExactAsync(
+        Stream stream,
+        Memory<byte> buffer,
+        CancellationToken ct,
+        FrameReadTimeoutSource? readTimeout,
+        TimeSpan idleTimeout)
     {
         var totalRead = 0;
         while (totalRead < buffer.Length)
         {
-            var read = await stream.ReadAsync(buffer.Slice(totalRead), ct).ConfigureAwait(false);
+            var remaining = buffer.Slice(totalRead);
+            var read = readTimeout is null
+                ? await stream.ReadAsync(remaining, ct).ConfigureAwait(false)
+                : await readTimeout.ReadAsync(stream, remaining, ct, idleTimeout).ConfigureAwait(false);
             if (read == 0)
             {
                 return totalRead;
