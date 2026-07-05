@@ -2,6 +2,7 @@ using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Plugins;
+using DotBoxD.Plugins.Kernel;
 using DotBoxD.Plugins.Runtime;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Runtime;
@@ -10,32 +11,25 @@ public sealed class PluginEventAdapterMutableOutputTests
 {
     [Fact]
     public async Task HandleAsync_rejects_adapter_values_that_change_after_validation()
-    {
-        var messages = new InMemoryPluginMessageSink();
-        var server = PluginAddendumTestPolicies.CreateServer(messages);
-        var kernel = await server.InstallAsync(MutableInputPackage());
-
-        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
-            async () => await kernel.HandleAsync(
+        => await AssertMutableOutputRejectedAsync(
+            kernel => kernel.HandleAsync(
                 new MutableOutputEventAdapter(),
                 new MutableOutputEvent("player-1")).AsTask());
-
-        Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK036");
-        Assert.Empty(messages.Messages);
-        Assert.Empty(kernel.ExecutionObservations);
-    }
 
     [Fact]
     public async Task ShouldHandleAsync_rejects_adapter_values_that_change_after_validation()
+        => await AssertMutableOutputRejectedAsync(
+            kernel => kernel.ShouldHandleAsync(
+                new MutableOutputEventAdapter(),
+                new MutableOutputEvent("player-1")).AsTask());
+
+    private static async Task AssertMutableOutputRejectedAsync(Func<InstalledKernel, Task> invoke)
     {
         var messages = new InMemoryPluginMessageSink();
         var server = PluginAddendumTestPolicies.CreateServer(messages);
         var kernel = await server.InstallAsync(MutableInputPackage());
 
-        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
-            async () => await kernel.ShouldHandleAsync(
-                new MutableOutputEventAdapter(),
-                new MutableOutputEvent("player-1")).AsTask());
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(() => invoke(kernel));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK036");
         Assert.Empty(messages.Messages);

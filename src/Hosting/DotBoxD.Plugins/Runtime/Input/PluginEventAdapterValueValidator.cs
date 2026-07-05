@@ -16,6 +16,22 @@ internal static class PluginEventAdapterValueValidator
         }
     }
 
+    public static SandboxValue[] CopyValidatedValues(
+        IReadOnlyList<Parameter> parameters,
+        IReadOnlyList<SandboxValue> values)
+    {
+        EnsureValueCountMatches(values.Count, parameters.Count);
+        var copy = new SandboxValue[values.Count];
+        for (var i = 0; i < parameters.Count; i++)
+        {
+            var value = values[i];
+            RequireType(value, parameters[i], i);
+            copy[i] = value;
+        }
+
+        return copy;
+    }
+
     public static void ValidateValue(
         IReadOnlyList<Parameter> parameters,
         int eventValueCount,
