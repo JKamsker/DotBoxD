@@ -1,6 +1,6 @@
 using DotBoxD.Plugins.Runtime;
 
-namespace DotBoxD.Kernels.Tests.Plugins.Hooks;
+namespace DotBoxD.Kernels.Tests.Plugins.Hooks.Cancellation;
 
 public sealed class SubscriptionDeliveryMidCancellationTests
 {
