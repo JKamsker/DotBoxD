@@ -143,24 +143,34 @@ internal static class ParameterDefaultValueEmitter
     {
         if (parameter.HasExplicitDefaultValue)
         {
-            var explicitDefaultValue = parameter.ExplicitDefaultValue;
-            if (explicitDefaultValue is not null ||
-                parameter.Type.IsReferenceType ||
-                parameter.Type.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
-            {
-                value = explicitDefaultValue;
-                return true;
-            }
+            return TryGetExplicitRuntimeDefaultValue(parameter, out value);
+        }
 
-            if (TryGetRuntimeDefaultValue(parameter.Type, out value))
-            {
-                return true;
-            }
+        return TryGetMetadataRuntimeDefaultValue(parameter, out value);
+    }
 
+    private static bool TryGetExplicitRuntimeDefaultValue(IParameterSymbol parameter, out object? value)
+    {
+        var explicitDefaultValue = parameter.ExplicitDefaultValue;
+        if (explicitDefaultValue is not null ||
+            parameter.Type.IsReferenceType ||
+            parameter.Type.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
+        {
             value = explicitDefaultValue;
             return true;
         }
 
+        if (TryGetRuntimeDefaultValue(parameter.Type, out value))
+        {
+            return true;
+        }
+
+        value = explicitDefaultValue;
+        return true;
+    }
+
+    private static bool TryGetMetadataRuntimeDefaultValue(IParameterSymbol parameter, out object? value)
+    {
         if (!ParameterDefaultMetadataReader.HasOptionalMetadata(parameter))
         {
             value = null;
