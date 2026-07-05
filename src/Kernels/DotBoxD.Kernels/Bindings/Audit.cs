@@ -44,9 +44,35 @@ public sealed record SandboxAuditEvent(
     IReadOnlyDictionary<string, string>? Fields = null,
     long SequenceNumber = 0)
 {
+    private SandboxEffect _effect = RequireKnownEffect(Effect, nameof(Effect));
+    private SandboxErrorCode? _errorCode = RequireKnownErrorCode(ErrorCode, nameof(ErrorCode));
+    private long? _bytes = RequireNonNegative(Bytes, nameof(Bytes));
     private IReadOnlyDictionary<string, string>? _fields = CopyFields(Fields);
 
+    public SandboxEffect Effect { get => _effect; init => _effect = RequireKnownEffect(value, nameof(Effect)); }
+    public SandboxErrorCode? ErrorCode { get => _errorCode; init => _errorCode = RequireKnownErrorCode(value, nameof(ErrorCode)); }
+    public long? Bytes { get => _bytes; init => _bytes = RequireNonNegative(value, nameof(Bytes)); }
     public IReadOnlyDictionary<string, string>? Fields { get => _fields; init => _fields = CopyFields(value); }
+
+    private static SandboxEffect RequireKnownEffect(SandboxEffect effect, string paramName)
+        => effect.ContainsOnlyKnownBits()
+            ? effect
+            : throw new ArgumentException("Audit event effects must contain only known effect bits.", paramName);
+
+    private static SandboxErrorCode? RequireKnownErrorCode(SandboxErrorCode? errorCode, string paramName)
+        => errorCode is null || Enum.IsDefined(errorCode.Value)
+            ? errorCode
+            : throw new ArgumentException("Audit event error codes must be defined.", paramName);
+
+    private static long? RequireNonNegative(long? value, string paramName)
+    {
+        if (value < 0)
+        {
+            throw new ArgumentOutOfRangeException(paramName, value, "audit byte counters must be non-negative.");
+        }
+
+        return value;
+    }
 
     private static IReadOnlyDictionary<string, string>? CopyFields(IReadOnlyDictionary<string, string>? fields)
         => fields is null ? null : ModelCopy.StringDictionary(fields);

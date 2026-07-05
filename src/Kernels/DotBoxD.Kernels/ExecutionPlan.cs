@@ -226,6 +226,7 @@ public enum SandboxIsolation
 public sealed record SandboxExecutionResult
 {
     private IReadOnlyList<SandboxAuditEvent> _auditEvents = [];
+    private ExecutionMode _actualMode;
 
     public bool Succeeded { get; init; }
     public SandboxValue? Value { get; init; }
@@ -245,10 +246,15 @@ public sealed record SandboxExecutionResult
             ? owned
             : ModelCopy.List(value);
 
-    public ExecutionMode ActualMode { get; init; }
+    public ExecutionMode ActualMode { get => _actualMode; init => _actualMode = RequireDefinedMode(value, nameof(ActualMode)); }
     public bool ExecutionDispatched { get; init; }
     public required string ModuleHash { get; init; }
     public required string PlanHash { get; init; }
     public required string PolicyHash { get; init; }
     public string? ArtifactHash { get; init; }
+
+    private static ExecutionMode RequireDefinedMode(ExecutionMode mode, string paramName)
+        => Enum.IsDefined(mode)
+            ? mode
+            : throw new ArgumentException("Execution result mode must be defined.", paramName);
 }
