@@ -1,3 +1,4 @@
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 using DotBoxD.Plugins;
@@ -157,6 +158,29 @@ public sealed partial class RpcKernelGenerationTests
 
         await Assert.ThrowsAsync<OperationCanceledException>(
             () => kernel.InvokeServerExtensionRpcAsync([0x80], cts.Token).AsTask());
+    }
+
+    [Fact]
+    public async Task Server_extension_wire_wrong_argument_count_reports_sandbox_invalid_input()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create(
+            ControlStringSource,
+            "Sample.ControlStringPluginPackage");
+
+        using var server = PluginServer.Create(defaultPolicy: PurePolicy());
+        var kernel = await server.InstallServerExtensionAsync(package);
+
+        var raw = await Assert.ThrowsAsync<SandboxRuntimeException>(
+            () => kernel.InvokeServerExtensionAsync([SandboxValue.FromString("extra")]).AsTask());
+        Assert.Equal(SandboxErrorCode.InvalidInput, raw.Error.Code);
+
+        var payload = KernelRpcBinaryCodec.EncodeArguments([KernelRpcValue.String("extra")]);
+        var wire = await Assert.ThrowsAsync<SandboxRuntimeException>(
+            () => kernel.InvokeServerExtensionRpcAsync(payload).AsTask());
+
+        Assert.Equal(SandboxErrorCode.InvalidInput, wire.Error.Code);
+        Assert.Contains("expects 0 argument(s)", wire.Error.SafeMessage, StringComparison.Ordinal);
+        Assert.Contains("received 1", wire.Error.SafeMessage, StringComparison.Ordinal);
     }
 
     [Fact]
