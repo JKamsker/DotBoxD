@@ -39,6 +39,30 @@ public sealed class WorkerHttpAuditGrantValidationTests
         Assert.Contains(result.AuditEvents, e => e.Kind == "WorkerIsolationFailed");
     }
 
+    [Fact]
+    public async Task Worker_http_audit_resource_allows_query_and_fragment_when_grant_matches()
+    {
+        var worker = new ForgedHttpWorker(
+            resourceId: "https://api.example.com/config?env=prod#v1",
+            networkBytesRead: 128,
+            networkBytesWritten: 64);
+        using var host = HttpHost(worker);
+        var module = await host.ImportJsonAsync(NetworkJson("https://api.example.com/config?env=prod#v1"));
+        var policy = SandboxPolicyBuilder.Create()
+            .GrantHttpGet(["api.example.com"], maxResponseBytes: 1024)
+            .WithFuel(5_000)
+            .Build();
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.Unit,
+            new SandboxExecutionOptions { Isolation = SandboxIsolation.WorkerProcess });
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+    }
+
     private static SandboxHost HttpHost(ISandboxWorkerClient worker)
         => SandboxHost.Create(builder =>
         {

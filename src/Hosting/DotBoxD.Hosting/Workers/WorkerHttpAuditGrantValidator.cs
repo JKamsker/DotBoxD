@@ -12,8 +12,6 @@ internal static class WorkerHttpAuditGrantValidator
         if (auditEvent.ResourceId is not { } resource ||
             !Uri.TryCreate(resource, UriKind.Absolute, out var uri) ||
             !string.IsNullOrEmpty(uri.UserInfo) ||
-            !string.IsNullOrEmpty(uri.Query) ||
-            !string.IsNullOrEmpty(uri.Fragment) ||
             !plan.Policy.TryGetGrant(CapabilityId, out var grant))
         {
             return false;
