@@ -55,7 +55,7 @@ internal static class DotBoxDPackageSourceEmitter
         builder.AppendLine($"            {TypeNames.GlobalExecutionMode}.Auto,");
         EmitEffects(builder, model.ManifestEffects);
         builder.AppendLine("            settings,");
-        EmitSubscriptions(builder, model);
+        DotBoxDSubscriptionSourceEmitter.Emit(builder, model);
         EmitRequiredCapabilities(builder, model.RequiredCapabilities);
         builder.Append("        return ").Append(TypeNames.GlobalPluginPackage).AppendLine(".Create(manifest, CreateModule(settings));");
         builder.AppendLine("    }");
@@ -124,87 +124,6 @@ internal static class DotBoxDPackageSourceEmitter
 
         builder.AppendLine("],");
     }
-
-    // Emits the single hook-subscription manifest. When the lowered .Where(...) chain yielded index
-    // metadata, it rides along in an object initializer; otherwise the output is identical to the
-    // pre-feature two-argument form so unrelated chains generate byte-for-byte the same source.
-    private static void EmitSubscriptions(StringBuilder builder, PluginKernelModel model)
-    {
-        var head = $"            [new {TypeNames.GlobalHookSubscriptionManifest}(" +
-            $"{LiteralReader.StringLiteral(model.EventName)}, {LiteralReader.StringLiteral(model.KernelName)})";
-        var hasPredicates = model.IndexPredicates.Count > 0;
-        var hasResultMetadata = model.ResultType is not null || model.ResultLocalTerminal;
-        // No index metadata and not a local-terminal chain → emit the pre-feature two-argument form so
-        // ordinary (incl. .Run) chains generate byte-for-byte the same source.
-        if (!hasPredicates && !model.LocalTerminal && !hasResultMetadata)
-        {
-            builder.Append(head).AppendLine("])");
-            return;
-        }
-
-        builder.AppendLine(head);
-        builder.AppendLine("            {");
-        if (hasPredicates)
-        {
-            builder.Append("                ").Append(IndexedPredicatesProperty).Append(" = [");
-            for (var i = 0; i < model.IndexPredicates.Count; i++)
-            {
-                if (i > 0)
-                {
-                    builder.Append(", ");
-                }
-
-                var predicate = model.IndexPredicates[i];
-                builder.Append("new ").Append(TypeNames.GlobalIndexedPredicate).Append('(')
-                    .Append(LiteralReader.StringLiteral(predicate.Path)).Append(", ")
-                    .Append(TypeNames.GlobalIndexPredicateOperator).Append('.').Append(predicate.Operator).Append(", ")
-                    .Append(predicate.ValueLiteral).Append(", ")
-                    .Append(LiteralReader.StringLiteral(predicate.ValueType)).Append(')');
-            }
-
-            builder.AppendLine("],");
-            builder.Append("                ").Append(IndexCoversPredicateProperty).Append(" = ")
-                .Append(model.IndexCoversPredicate
-                    ? DotBoxDGenerationNames.CSharpLiterals.True
-                    : DotBoxDGenerationNames.CSharpLiterals.False)
-                .AppendLine(",");
-        }
-
-        // Host-readable mark for a lowered RunLocal chain: persisted so the runtime pushes rather than
-        // re-deriving from IR. No-Select RunLocal chains are emitted as explicit event-record projections, so
-        // every generated local terminal declares a non-null projected type.
-        if (model.LocalTerminal)
-        {
-            builder.Append("                ").Append(LocalTerminalProperty).Append(" = ")
-                .Append(DotBoxDGenerationNames.CSharpLiterals.True).AppendLine(",");
-            if (model.ProjectedType is not null)
-            {
-                builder.Append("                ").Append(ProjectedTypeProperty).Append(" = ")
-                    .Append(LiteralReader.StringLiteral(model.ProjectedType)).AppendLine(",");
-            }
-        }
-
-        if (model.ResultType is not null)
-        {
-            builder.Append("                ").Append(ResultTypeProperty).Append(" = ")
-                .Append(LiteralReader.StringLiteral(model.ResultType)).AppendLine(",");
-        }
-
-        if (model.ResultLocalTerminal)
-        {
-            builder.Append("                ").Append(ResultLocalTerminalProperty).Append(" = ")
-                .Append(DotBoxDGenerationNames.CSharpLiterals.True).AppendLine(",");
-        }
-
-        builder.AppendLine("            }])");
-    }
-
-    private const string IndexedPredicatesProperty = "IndexedPredicates";
-    private const string IndexCoversPredicateProperty = "IndexCoversPredicate";
-    private const string LocalTerminalProperty = "LocalTerminal";
-    private const string ProjectedTypeProperty = "ProjectedType";
-    private const string ResultTypeProperty = "ResultType";
-    private const string ResultLocalTerminalProperty = "ResultLocalTerminal";
 
     private static void EmitRequiredCapabilities(StringBuilder builder, EquatableArray<string> capabilities)
     {

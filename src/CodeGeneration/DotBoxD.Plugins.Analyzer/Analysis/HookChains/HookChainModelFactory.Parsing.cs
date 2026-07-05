@@ -14,6 +14,24 @@ internal static partial class HookChainModelFactory
             [RegisterMethod] = RegisterInstallKind,
             [RegisterLocalMethod] = RegisterLocalInstallKind,
         };
+    private static readonly string[] RemoteReceiverOriginals =
+    [
+        DotBoxDGenerationNames.TypeNames.RemoteHookPipelineOriginal,
+        DotBoxDGenerationNames.TypeNames.RemoteHookPipelineWithContextOriginal,
+        DotBoxDGenerationNames.TypeNames.RemoteHookStageOriginal,
+        DotBoxDGenerationNames.TypeNames.RemoteHookStageWithContextOriginal,
+        DotBoxDGenerationNames.TypeNames.RemoteSubscriptionPipelineOriginal,
+        DotBoxDGenerationNames.TypeNames.RemoteSubscriptionPipelineWithContextOriginal,
+        DotBoxDGenerationNames.TypeNames.RemoteSubscriptionStageOriginal,
+        DotBoxDGenerationNames.TypeNames.RemoteSubscriptionStageWithContextOriginal
+    ];
+    private static readonly string[] LocalReceiverOriginals =
+    [
+        DotBoxDGenerationNames.TypeNames.HookPipelineWithContextOriginal,
+        DotBoxDGenerationNames.TypeNames.HookStageWithContextOriginal,
+        DotBoxDGenerationNames.TypeNames.SubscriptionPipelineWithContextOriginal,
+        DotBoxDGenerationNames.TypeNames.SubscriptionStageWithContextOriginal
+    ];
 
     private delegate HookChainInterceptorInstallKind? InstallKindResolver(
         HookChainReceiverKind? receiverKind,
@@ -143,27 +161,30 @@ internal static partial class HookChainModelFactory
     internal static HookChainReceiverKind? ReceiverKind(INamedTypeSymbol type)
     {
         var original = type.OriginalDefinition.ToDisplayString();
-        if (string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteHookPipelineOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteHookPipelineWithContextOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteHookStageOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteHookStageWithContextOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteSubscriptionPipelineOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteSubscriptionPipelineWithContextOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteSubscriptionStageOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteSubscriptionStageWithContextOriginal, StringComparison.Ordinal))
+        if (ContainsOriginal(RemoteReceiverOriginals, original))
         {
             return HookChainReceiverKind.Remote;
         }
 
-        if (string.Equals(original, DotBoxDGenerationNames.TypeNames.HookPipelineWithContextOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.HookStageWithContextOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.SubscriptionPipelineWithContextOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.SubscriptionStageWithContextOriginal, StringComparison.Ordinal))
+        if (ContainsOriginal(LocalReceiverOriginals, original))
         {
             return HookChainReceiverKind.Local;
         }
 
         return null;
+    }
+
+    private static bool ContainsOriginal(string[] candidates, string original)
+    {
+        foreach (var candidate in candidates)
+        {
+            if (string.Equals(candidate, original, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // Accepts both lambda forms a fluent stage can take: a parenthesized lambda (e), (e, ctx) or (),
