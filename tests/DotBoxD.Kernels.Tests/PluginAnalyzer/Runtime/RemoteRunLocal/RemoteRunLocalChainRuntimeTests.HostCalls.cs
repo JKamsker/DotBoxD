@@ -87,9 +87,10 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
     [Fact]
     public async Task Guid_returning_auto_binding_in_a_select_installs_and_round_trips()
     {
-        // Regression for the DBXK041 mismatch: an auto-binding ([RpcService], no [HostBinding]) returning a
-        // Guid is classified as allocating by the runtime, so the manifest must also carry the Alloc effect or
-        // install fails. PushFirstMatching installs the package (asserting no effect-mismatch) and pushes the Guid.
+        // Regression for the DBXK041 mismatch: an auto-binding ([RpcService], [HostBinding] with an
+        // auto-derived route) returning a Guid is classified as allocating by the runtime, so the manifest must
+        // also carry the Alloc effect or install fails. PushFirstMatching installs the package (asserting no
+        // effect-mismatch) and pushes the Guid.
         var payload = await PushFirstMatchingHosted(GuidAutoBindingSource, Matching, Filtered);
 
         Assert.Equal(SampleId, DecodeReflective<Guid>(payload));
@@ -162,9 +163,10 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         builder.AddBinding(GenerateIdBinding());   // host.ChainSample.IIdWorld.GenerateId -> Guid (probe.read.id)
     }
 
-    // An AUTO-binding ([RpcService], no explicit [HostBinding]) returning a Guid. The id is the analyzer's
-    // auto-derived route host.{ns}.{Type}.{Method}; the effects include Alloc because the runtime classifies a Guid
-    // return as allocating — the manifest must agree (the fix under test) or install fails DBXK041.
+    // An AUTO-binding ([RpcService], [HostBinding] with an auto-derived route) returning a Guid. The id is the
+    // analyzer's auto-derived route host.{ns}.{Type}.{Method}; the effects include Alloc because the runtime
+    // classifies a Guid return as allocating — the manifest must agree (the fix under test) or install fails
+    // DBXK041.
     private static BindingDescriptor GenerateIdBinding()
         => new(
             "host.ChainSample.IIdWorld.GenerateId",

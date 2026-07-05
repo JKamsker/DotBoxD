@@ -171,9 +171,10 @@ reasons).
 
 ### 3.2 — med — Capability requirements are invisible where install fails **[wf]**
 
-By design caps live on the server impl (`GameWorldAccess` `[HostBinding]`), an assembly the plugin author
-never opens. A server-extension kernel can legally `await _world.Monsters.GetThreatAsync(id)` (compiles against
-the pure interface) yet **fail closed at install with no local signal**.
+By design caps live on the shared contract (`IGameWorldAccess` members annotated with `[HostBinding]`), while
+`GameWorldAccess` implements those bindings. A server-extension kernel can legally
+`await _world.Monsters.GetThreatAsync(id)` (compiles against the pure interface) yet **fail closed at install
+with no local signal**.
 
 **Fix:** analyzer diagnostic at the kernel call site when a referenced method's capability falls outside the
 kernel's grantable prefix. Scope to server-extension + `InvokeAsync` kernels (sync event hooks can't await

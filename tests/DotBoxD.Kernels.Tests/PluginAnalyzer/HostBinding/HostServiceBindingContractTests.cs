@@ -54,6 +54,15 @@ public sealed class HostServiceBindingContractTests
     }
 
     [Fact]
+    public void HostBindingAttribute_rejects_null_explicit_binding_id()
+    {
+        var ex = Assert.Throws<ArgumentNullException>(
+            () => new HostBindingAttribute(null!, "probe.read.value", SandboxEffect.Cpu | SandboxEffect.HostStateRead));
+
+        Assert.Equal("bindingId", ex.ParamName);
+    }
+
+    [Fact]
     public void AddBindingsFrom_rejects_duplicate_route_with_same_dto_fields_and_different_clr_types()
     {
         var builder = new SandboxHostBuilder();

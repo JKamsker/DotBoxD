@@ -27,6 +27,8 @@ public sealed class HostBindingAttribute : Attribute
 {
     public HostBindingAttribute(string bindingId, string capability, SandboxEffect effects)
     {
+        ArgumentNullException.ThrowIfNull(bindingId);
+
         BindingId = bindingId;
         Capability = capability;
         Effects = effects;

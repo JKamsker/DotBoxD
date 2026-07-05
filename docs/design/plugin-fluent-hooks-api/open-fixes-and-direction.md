@@ -484,7 +484,7 @@ both." A shared runtime object is not buildable: the analyzer is `netstandard2.0
   with an **explicit effect declaration**, so effects are no longer inferred from method names on two sides
   (a method named `Patch` or `Spawn` is silently read-only today on both).
 - Concrete authoring shape: add a dependency-free `[Flags] SandboxEffect` enum in `DotBoxD.Abstractions`
-  with `None`, `HostStateRead`, `HostStateWrite`, and `Allocates`, and make host-capability declarations
+  with `None`, `Cpu`, `HostStateRead`, `HostStateWrite`, and `Allocates`, and make host-capability declarations
   explicit, e.g. `[HostBinding("game.world.monster.write.position", SandboxEffect.Cpu | SandboxEffect.HostStateWrite)]`.
   `Concurrency` and the `runtime.async` capability are derived from async/Task-returning shape; `Cpu` remains
   module-execution overhead; audit/cost/safety stay runtime descriptor metadata. A declared flag that
@@ -639,7 +639,8 @@ Every item verified against head `41ec9172`.
    auto-binding helper at :195), while the runtime reads `[HostBinding]` off the **implementation**
    method and throws if absent
    ([HostServiceBindingExtensions.cs:52,55-56](../../../src/Hosting/DotBoxD.Plugins/Runtime/Bindings/HostServiceBindingExtensions.cs)).
-   The GameServer abstractions carry `[HostBinding]` **without** `[HostBinding]` (the auto-binding path).
+   The GameServer abstractions carry `[HostBinding]` **without explicit `[HostBinding(...)]` metadata**
+   (the auto-binding path).
    **Correction:** a blanket implementation-first rule is not currently implementable on both sides. The
    analyzer sees the SDK/interface symbol, not the host implementation; handle bindings are also created from
    handle interface methods. §3.4 must define an analyzer-visible, server-owned metadata source per binding
