@@ -3,10 +3,10 @@ namespace DotBoxD.Services.Generated;
 /// <summary>
 /// Receives source-generated service registrations without scanning generated types.
 /// </summary>
-public interface IDotBoxDServiceRegistrationSink
+public interface IRpcServiceRegistrationSink
 {
     /// <summary>
-    /// Adds one generated proxy implementation for a DotBoxD service interface.
+    /// Adds one generated proxy implementation for an RPC service interface.
     /// </summary>
     void AddService<TService, TImplementation>()
         where TService : class

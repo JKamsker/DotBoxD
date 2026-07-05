@@ -64,7 +64,7 @@ public sealed class StreamingProxyPreCanceledTokenTests
 
         namespace Behavior.StreamingPreCancel
         {
-            [DotBoxDService]
+            [RpcService]
             public interface IUpload
             {
                 Task<int> UploadAsync(Stream bytes, CancellationToken ct = default);

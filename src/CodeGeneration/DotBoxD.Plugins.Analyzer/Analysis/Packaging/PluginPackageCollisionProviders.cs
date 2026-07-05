@@ -8,12 +8,10 @@ internal static class PluginPackageCollisionProviders
     public static IncrementalValueProvider<EquatableArray<GeneratedPluginPackageIdentity>> RegisterBlockedIdentities(
         IncrementalGeneratorInitializationContext context,
         IncrementalValueProvider<ImmutableArray<GeneratedPluginPackageIdentity>> pluginPackageIdentities,
-        IncrementalValueProvider<ImmutableArray<GeneratedPluginPackageIdentity>> eventKernelPackageIdentities,
         IncrementalValueProvider<ImmutableArray<GeneratedPluginPackageIdentity>> chainPackageIdentities,
         IncrementalValueProvider<ImmutableArray<GeneratedPluginPackageIdentity>> rpcPackageIdentities)
     {
         var packageIdentityGroups = pluginPackageIdentities
-            .Combine(eventKernelPackageIdentities)
             .Combine(chainPackageIdentities)
             .Combine(rpcPackageIdentities);
         var duplicateIdentities = GeneratorGuard.TransformValueOrDefault(
@@ -21,8 +19,7 @@ internal static class PluginPackageCollisionProviders
             packageIdentityGroups,
             "plugin package duplicate detection",
             static (pair, _) => PluginPackageDuplicateDetector.FindDuplicates(
-                pair.Left.Left.Left,
-                pair.Left.Left.Right,
+                pair.Left.Left,
                 pair.Left.Right,
                 pair.Right));
         RegisterDiagnostics(context, duplicateIdentities, PluginPackageDuplicateDetector.Diagnostics, "duplicate");
@@ -33,8 +30,7 @@ internal static class PluginPackageCollisionProviders
             "plugin package source collision detection",
             static (pair, _) => PluginPackageDuplicateDetector.FindSourceCollisions(
                 pair.Left,
-                pair.Right.Left.Left.Left,
-                pair.Right.Left.Left.Right,
+                pair.Right.Left.Left,
                 pair.Right.Left.Right,
                 pair.Right.Right));
         RegisterDiagnostics(

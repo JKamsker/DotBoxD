@@ -93,7 +93,7 @@ public sealed class ServerExtensionClientCancellationEncodingSurpriseTests
 
         namespace Sample;
 
-        [DotBoxDService]
+        [RpcService]
         public interface IRemoteControl
         {
         }
@@ -139,7 +139,7 @@ public sealed class ServerExtensionClientCancellationEncodingSurpriseTests
 
         namespace Sample;
 
-        [DotBoxDService]
+        [RpcService]
         public interface IRemoteControl
         {
         }

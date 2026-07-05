@@ -14,13 +14,13 @@ public sealed class PluginServerParameterContractSurpriseTests
 
             namespace Regression.Game
             {
-                [DotBoxDService]
+                [RpcService]
                 public interface IBaseWorld
                 {
                     ValueTask<int> SpendAsync(int count, CancellationToken ct = default);
                 }
 
-                [DotBoxDService]
+                [RpcService]
                 public interface IGameWorldAccess : IBaseWorld
                 {
                     new ValueTask<int> SpendAsync(int amount, CancellationToken ct = default);
@@ -88,13 +88,13 @@ public sealed class PluginServerParameterContractSurpriseTests
 
             namespace Regression.Game
             {
-                [DotBoxDService]
+                [RpcService]
                 public interface IBaseWorld
                 {
                     int Tag(string[] values);
                 }
 
-                [DotBoxDService]
+                [RpcService]
                 public interface IGameWorldAccess : IBaseWorld
                 {
                     new int Tag(params string[] values);
@@ -162,7 +162,7 @@ public sealed class PluginServerParameterContractSurpriseTests
 
             namespace Regression.Game
             {
-                [DotBoxDService]
+                [RpcService]
                 public interface IGameWorldAccess
                 {
                     ValueTask<int> SumAsync(params int[] values);
@@ -170,7 +170,7 @@ public sealed class PluginServerParameterContractSurpriseTests
                     IMonsterControl Monsters { get; }
                 }
 
-                [DotBoxDService]
+                [RpcService]
                 public interface IMonsterControl
                 {
                     int Sum(params int[] values);

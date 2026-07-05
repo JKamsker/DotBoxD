@@ -141,20 +141,20 @@ internal static partial class RpcTypeValidator
         string role,
         CancellationToken ct,
         RpcTypeValidationCache? cache = null) =>
-        ContainsDotBoxDServiceInterface(type, ct, cache)
+        ContainsRpcServiceInterface(type, ct, cache)
             ? $"{role} contains a sub-service type; sub-services are only supported as direct TService, Task<TService>, or ValueTask<TService> return values"
             : null;
 
     public static bool RequiresUnsafeContext(ITypeSymbol type, CancellationToken ct) =>
         ContainsPointerType(type, ct) || ContainsFunctionPointerType(type, ct);
 
-    private static bool ContainsDotBoxDServiceInterface(
+    private static bool ContainsRpcServiceInterface(
         ITypeSymbol type,
         CancellationToken ct,
         RpcTypeValidationCache? cache) =>
         cache is null
-            ? SubServicePayloadInspector.ContainsDotBoxDServiceInterface(type, ct)
-            : cache.ContainsDotBoxDServiceInterface(type, ct);
+            ? SubServicePayloadInspector.ContainsRpcServiceInterface(type, ct)
+            : cache.ContainsRpcServiceInterface(type, ct);
 
     private static bool ContainsTaskLikePayloadType(
         ITypeSymbol type,
