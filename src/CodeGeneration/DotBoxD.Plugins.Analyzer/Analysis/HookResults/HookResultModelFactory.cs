@@ -29,6 +29,11 @@ internal static partial class HookResultModelFactory
             return null;
         }
 
+        if (ShouldSkipGeneration(type, declaration, context.SemanticModel.Compilation))
+        {
+            return null;
+        }
+
         if (TryGetInvalidDeclarationResult(type, declaration, context.SemanticModel.Compilation) is { } invalid)
         {
             return invalid;
@@ -47,6 +52,13 @@ internal static partial class HookResultModelFactory
 
         return CreateModel(type, declaration, primary);
     }
+
+    private static bool ShouldSkipGeneration(
+        INamedTypeSymbol type,
+        TypeDeclarationSyntax declaration,
+        Compilation compilation)
+        => !declaration.Modifiers.Any(SyntaxKind.PartialKeyword) &&
+           IsValueTypeImplementingHookResult(type, compilation);
 
     private static HookResultModel Invalid(INamedTypeSymbol type, TypeDeclarationSyntax declaration, string message, bool useUnsupportedShapeRule = false)
         => new(
