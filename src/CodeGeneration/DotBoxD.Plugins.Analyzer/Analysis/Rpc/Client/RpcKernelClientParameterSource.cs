@@ -1,4 +1,3 @@
-using System.Text;
 using DotBoxD.CodeGeneration.Shared.Defaults;
 using DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 using Microsoft.CodeAnalysis;
@@ -92,8 +91,7 @@ internal static class RpcKernelClientParameterSource
 
     private static string AttributePrefix(IParameterSymbol parameter, bool preserveMetadataDefaultAttributes)
     {
-        var prefix = PluginServerFlowAttributeSource.ParameterAttributePrefix(parameter) +
-            CallerInfoAttributePrefix(parameter);
+        var prefix = PluginServerFlowAttributeSource.ParameterAttributePrefix(parameter);
         if (preserveMetadataDefaultAttributes)
         {
             prefix += ParameterDefaultValueEmitter.FormatMetadataDefaultAttributePrefix(
@@ -102,17 +100,6 @@ internal static class RpcKernelClientParameterSource
         }
 
         return prefix;
-    }
-
-    private static string CallerInfoAttributePrefix(IParameterSymbol parameter)
-    {
-        var builder = new StringBuilder();
-        foreach (var attr in parameter.GetAttributes())
-        {
-            CallerInfoAttributeFormatter.TryAppend(builder, attr);
-        }
-
-        return builder.ToString();
     }
 
     private static bool HasMetadataDefaultAttribute(IParameterSymbol parameter)
