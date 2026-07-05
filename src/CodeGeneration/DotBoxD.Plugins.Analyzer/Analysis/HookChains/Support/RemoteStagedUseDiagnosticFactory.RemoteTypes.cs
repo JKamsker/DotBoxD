@@ -182,18 +182,24 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         var ns = named.ContainingNamespace.ToDisplayString();
         return ns switch
         {
-            "DotBoxD.Plugins.Runtime" => name is
-                "RemoteHookPipeline" or
-                "RemoteHookPipelineWithContext" or
-                "RemoteSubscriptionPipeline" or
-                "RemoteSubscriptionPipelineWithContext",
-            "DotBoxD.Plugins.Runtime.Hooks" => name is "RemoteHookStage" or "RemoteHookStageWithContext",
-            "DotBoxD.Plugins.Runtime.Subscriptions" => name is
-                "RemoteSubscriptionStage" or
-                "RemoteSubscriptionStageWithContext",
+            "DotBoxD.Plugins.Runtime" => IsRemotePipelineTypeName(name),
+            "DotBoxD.Plugins.Runtime.Hooks" => IsRemoteHookStageTypeName(name),
+            "DotBoxD.Plugins.Runtime.Subscriptions" => IsRemoteSubscriptionStageTypeName(name),
             _ => false
         };
     }
+
+    private static bool IsRemotePipelineTypeName(string name)
+        => name is "RemoteHookPipeline" or
+            "RemoteHookPipelineWithContext" or
+            "RemoteSubscriptionPipeline" or
+            "RemoteSubscriptionPipelineWithContext";
+
+    private static bool IsRemoteHookStageTypeName(string name)
+        => name is "RemoteHookStage" or "RemoteHookStageWithContext";
+
+    private static bool IsRemoteSubscriptionStageTypeName(string name)
+        => name is "RemoteSubscriptionStage" or "RemoteSubscriptionStageWithContext";
 
     private static bool IsRemoteStageType(ITypeSymbol? type)
     {

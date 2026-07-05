@@ -55,25 +55,16 @@ internal static partial class RpcTypeValidator
         ITypeSymbol? cancellationTokenSymbol = null,
         bool inspectDtoMembers = true)
     {
-        if (ContainsTaskLikePayloadType(type, ct, allowCurrent: allowTopLevelAsyncWrapper))
-        {
-            return $"{role} uses Task or ValueTask as an RPC payload type; Task and ValueTask are only supported as top-level return wrappers";
-        }
-
-        if (StreamingShapeTypeValidator.ContainsConcreteStreamingShape(type, ct, out var streamingReplacement))
-        {
-            return $"{role} uses a concrete streaming-compatible type; use {streamingReplacement} directly in RPC signatures";
-        }
-
-        if (ContainsStreamingOrControlPayloadType(
+        if (GetUnsupportedAsyncOrStreamingReason(
                 type,
+                role,
                 ct,
+                allowTopLevelAsyncWrapper,
                 allowCurrentTransportShape,
                 allowCurrentCancellationToken,
-                allowTopLevelAsyncWrapper,
-                cancellationTokenSymbol))
+                cancellationTokenSymbol) is { } asyncOrStreamingReason)
         {
-            return $"{role} uses a streaming or control type as an RPC payload; Stream, Pipe, IAsyncEnumerable<T>, RpcStreamHandle, and CancellationToken are only supported as direct streaming/control RPC shapes";
+            return asyncOrStreamingReason;
         }
 
         if (ContainsOpenEndedPayloadType(type, ct))
@@ -117,6 +108,39 @@ internal static partial class RpcTypeValidator
                 allowCurrentCancellationToken,
                 cancellationTokenSymbol)
             : null;
+    }
+
+    private static string? GetUnsupportedAsyncOrStreamingReason(
+        ITypeSymbol type,
+        string role,
+        CancellationToken ct,
+        bool allowTopLevelAsyncWrapper,
+        bool allowCurrentTransportShape,
+        bool allowCurrentCancellationToken,
+        ITypeSymbol? cancellationTokenSymbol)
+    {
+        if (ContainsTaskLikePayloadType(type, ct, allowCurrent: allowTopLevelAsyncWrapper))
+        {
+            return $"{role} uses Task or ValueTask as an RPC payload type; Task and ValueTask are only supported as top-level return wrappers";
+        }
+
+        if (StreamingShapeTypeValidator.ContainsConcreteStreamingShape(type, ct, out var streamingReplacement))
+        {
+            return $"{role} uses a concrete streaming-compatible type; use {streamingReplacement} directly in RPC signatures";
+        }
+
+        if (ContainsStreamingOrControlPayloadType(
+                type,
+                ct,
+                allowCurrentTransportShape,
+                allowCurrentCancellationToken,
+                allowTopLevelAsyncWrapper,
+                cancellationTokenSymbol))
+        {
+            return $"{role} uses a streaming or control type as an RPC payload; Stream, Pipe, IAsyncEnumerable<T>, RpcStreamHandle, and CancellationToken are only supported as direct streaming/control RPC shapes";
+        }
+
+        return null;
     }
 
     public static string? GetUnsupportedSubServicePayloadReason(

@@ -88,31 +88,27 @@ internal static partial class RemoteStagedUseDiagnosticFactory
     {
         var transparentExpression = UnwrapTransparentParent(invocation);
         ExpressionSyntax discardedExpression = transparentExpression;
-        if (transparentExpression.Parent is AssignmentExpressionSyntax assignment &&
-            assignment.Right == transparentExpression &&
-            assignment.Parent is ExpressionStatementSyntax)
+        if (TryHandleAssignmentDiscard(
+                invocation,
+                access,
+                model,
+                cancellationToken,
+                transparentExpression,
+                ref discardedExpression,
+                out var assignmentDiagnostic))
         {
-            var assignsLocal = model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is ILocalSymbol;
-            if (CreateAssignedStageDiagnostic(invocation, assignment, access, model, cancellationToken) is { } assigned)
-            {
-                return assigned;
-            }
-
-            if (assignsLocal)
-            {
-                return null;
-            }
-
-            discardedExpression = assignment;
+            return assignmentDiagnostic;
         }
 
-        if (transparentExpression.Parent is EqualsValueClauseSyntax
-            {
-                Parent: VariableDeclaratorSyntax declarator
-            } &&
-            model.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol local)
+        if (TryCreateLocalDeclarationDiagnostic(
+                invocation,
+                access,
+                model,
+                cancellationToken,
+                transparentExpression,
+                out var localDiagnostic))
         {
-            return CreateStagedLocalDiagnostic(invocation, access, model, local, cancellationToken);
+            return localDiagnostic;
         }
 
         if (discardedExpression.Parent is not ExpressionStatementSyntax)
@@ -130,6 +126,61 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         return new PluginKernelDiagnostic(
             DiscardedStageMessage,
             PluginDiagnosticLocation.From(access.Name.GetLocation()));
+    }
+
+    private static bool TryHandleAssignmentDiscard(
+        InvocationExpressionSyntax invocation,
+        MemberAccessExpressionSyntax access,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        ExpressionSyntax transparentExpression,
+        ref ExpressionSyntax discardedExpression,
+        out PluginKernelDiagnostic? diagnostic)
+    {
+        diagnostic = null;
+        if (transparentExpression.Parent is not AssignmentExpressionSyntax assignment ||
+            assignment.Right != transparentExpression ||
+            assignment.Parent is not ExpressionStatementSyntax)
+        {
+            return false;
+        }
+
+        var assignsLocal = model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is ILocalSymbol;
+        if (CreateAssignedStageDiagnostic(invocation, assignment, access, model, cancellationToken) is { } assigned)
+        {
+            diagnostic = assigned;
+            return true;
+        }
+
+        if (assignsLocal)
+        {
+            return true;
+        }
+
+        discardedExpression = assignment;
+        return false;
+    }
+
+    private static bool TryCreateLocalDeclarationDiagnostic(
+        InvocationExpressionSyntax invocation,
+        MemberAccessExpressionSyntax access,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        ExpressionSyntax transparentExpression,
+        out PluginKernelDiagnostic? diagnostic)
+    {
+        diagnostic = null;
+        if (transparentExpression.Parent is not EqualsValueClauseSyntax
+            {
+                Parent: VariableDeclaratorSyntax declarator
+            } ||
+            model.GetDeclaredSymbol(declarator, cancellationToken) is not ILocalSymbol local)
+        {
+            return false;
+        }
+
+        diagnostic = CreateStagedLocalDiagnostic(invocation, access, model, local, cancellationToken);
+        return true;
     }
 
     private static PluginKernelDiagnostic? CreateStagedLocalDiagnostic(

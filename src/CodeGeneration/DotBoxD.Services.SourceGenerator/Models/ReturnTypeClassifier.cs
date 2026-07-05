@@ -289,7 +289,24 @@ internal static partial class ReturnTypeClassifier
             return false;
         }
 
-        AttributeData? serviceAttr = null;
+        if (!TryGetDotBoxDServiceAttribute(named, ct, out var serviceAttr))
+        {
+            return false;
+        }
+
+        info = new SubServiceInfo(
+            QualifiedInterfaceName: named.ToDisplayString(s_qualifiedIdentityFormat),
+            ServiceName: LiteralHelpers.EscapeStringLiteral(ReadServiceName(named, serviceAttr, ct)),
+            AllowsNull: named.NullableAnnotation == NullableAnnotation.Annotated,
+            HasProxyCompanion: HasGeneratedProxyCompanion(named, ct));
+        return true;
+    }
+
+    private static bool TryGetDotBoxDServiceAttribute(
+        INamedTypeSymbol named,
+        CancellationToken ct,
+        out AttributeData serviceAttr)
+    {
         foreach (var attr in named.GetAttributes())
         {
             ct.ThrowIfCancellationRequested();
@@ -297,13 +314,17 @@ internal static partial class ReturnTypeClassifier
             if (attr.AttributeClass?.ToDisplayString() == DotBoxDServiceAttributeName)
             {
                 serviceAttr = attr;
-                break;
+                return true;
             }
         }
-        if (serviceAttr is null)
-            return false;
 
-        string serviceName = named.Name;
+        serviceAttr = null!;
+        return false;
+    }
+
+    private static string ReadServiceName(INamedTypeSymbol named, AttributeData serviceAttr, CancellationToken ct)
+    {
+        var serviceName = named.Name;
         foreach (var arg in serviceAttr.NamedArguments)
         {
             ct.ThrowIfCancellationRequested();
@@ -314,11 +335,6 @@ internal static partial class ReturnTypeClassifier
             }
         }
 
-        info = new SubServiceInfo(
-            QualifiedInterfaceName: named.ToDisplayString(s_qualifiedIdentityFormat),
-            ServiceName: LiteralHelpers.EscapeStringLiteral(serviceName),
-            AllowsNull: named.NullableAnnotation == NullableAnnotation.Annotated,
-            HasProxyCompanion: HasGeneratedProxyCompanion(named, ct));
-        return true;
+        return serviceName;
     }
 }

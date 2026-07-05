@@ -137,43 +137,57 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         builder.Append('"');
         foreach (var ch in value)
         {
-            switch (ch)
+            if (TryAppendEscapedChar(builder, ch))
             {
-                case '"':
-                    builder.Append("\\\"");
-                    break;
-                case '\\':
-                    builder.Append("\\\\");
-                    break;
-                case '\b':
-                    builder.Append("\\b");
-                    break;
-                case '\f':
-                    builder.Append("\\f");
-                    break;
-                case '\n':
-                    builder.Append("\\n");
-                    break;
-                case '\r':
-                    builder.Append("\\r");
-                    break;
-                case '\t':
-                    builder.Append("\\t");
-                    break;
-                default:
-                    if (ch < ' ')
-                    {
-                        builder.Append("\\u")
-                            .Append(((int)ch).ToString("x4", CultureInfo.InvariantCulture));
-                        break;
-                    }
-
-                    builder.Append(ch);
-                    break;
+                continue;
             }
+
+            AppendJsonChar(builder, ch);
         }
 
         builder.Append('"');
         return builder.ToString();
+    }
+
+    private static bool TryAppendEscapedChar(System.Text.StringBuilder builder, char ch)
+    {
+        switch (ch)
+        {
+            case '"':
+                builder.Append("\\\"");
+                return true;
+            case '\\':
+                builder.Append("\\\\");
+                return true;
+            case '\b':
+                builder.Append("\\b");
+                return true;
+            case '\f':
+                builder.Append("\\f");
+                return true;
+            case '\n':
+                builder.Append("\\n");
+                return true;
+            case '\r':
+                builder.Append("\\r");
+                return true;
+            case '\t':
+                builder.Append("\\t");
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static void AppendJsonChar(System.Text.StringBuilder builder, char ch)
+    {
+        if (ch < ' ')
+        {
+            builder.Append("\\u")
+                .Append(((int)ch).ToString("x4", CultureInfo.InvariantCulture));
+            return;
+        }
+
+        builder.Append(ch);
     }
 }

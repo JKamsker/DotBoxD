@@ -160,47 +160,87 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
     private void LowerExpressionStatement(ExpressionSyntax expression, List<string> output)
     {
-        switch (expression)
+        if (TryLowerAssignmentStatement(expression, output) ||
+            TryLowerIncrementStatement(expression, output) ||
+            TryLowerInvocationStatement(expression, output))
         {
-            case AssignmentExpressionSyntax { Left: IdentifierNameSyntax target } assignment:
-                var value = assignment.Kind() == SyntaxKind.SimpleAssignmentExpression
-                    ? LowerExpressionWithPrelude(assignment.Right, output)
-                    : LowerCompound(assignment, target, output);
-                output.Add(SetStatement(target.Identifier.ValueText, value));
-                return;
-            case AssignmentExpressionSyntax { Left: ElementAccessExpressionSyntax element } assignment
-                when assignment.Kind() == SyntaxKind.SimpleAssignmentExpression &&
-                     TryLowerMapIndexSet(element, assignment.Right, output) is { } mapSet:
-                output.Add(mapSet);
-                return;
-            case AssignmentExpressionSyntax assignment
-                when _assignmentOverride?.Invoke(assignment, expression => LowerExpressionWithPrelude(expression, output)) is { } lowered:
-                output.Add(lowered);
-                return;
-            case PostfixUnaryExpressionSyntax { Operand: IdentifierNameSyntax inc } postfix
-                when postfix.Kind() is SyntaxKind.PostIncrementExpression or SyntaxKind.PostDecrementExpression:
-                output.Add(IncrementStatement(inc, postfix.Kind()));
-                return;
-            case PrefixUnaryExpressionSyntax { Operand: IdentifierNameSyntax inc } prefix
-                when prefix.Kind() is SyntaxKind.PreIncrementExpression or SyntaxKind.PreDecrementExpression:
-                output.Add(IncrementStatement(inc, prefix.Kind()));
-                return;
-            case InvocationExpressionSyntax invocation when TryLowerListAdd(invocation, output) is { } listAdd:
-                output.Add(listAdd);
-                return;
-            case InvocationExpressionSyntax invocation:
-                output.Add(SetStatement(
-                    NextDiscardLocal(),
-                    LowerExpressionWithPrelude(invocation, output)));
-                return;
-            case AwaitExpressionSyntax { Expression: InvocationExpressionSyntax invocation }:
-                output.Add(SetStatement(
-                    NextDiscardLocal(),
-                    LowerExpressionWithPrelude(invocation, output)));
-                return;
-            default:
-                throw new NotSupportedException($"Server extension statement expression '{expression}' is not supported.");
+            return;
         }
+
+        throw new NotSupportedException($"Server extension statement expression '{expression}' is not supported.");
+    }
+
+    private bool TryLowerAssignmentStatement(ExpressionSyntax expression, List<string> output)
+    {
+        if (expression is not AssignmentExpressionSyntax assignment)
+        {
+            return false;
+        }
+
+        if (assignment.Left is IdentifierNameSyntax target)
+        {
+            var value = assignment.Kind() == SyntaxKind.SimpleAssignmentExpression
+                ? LowerExpressionWithPrelude(assignment.Right, output)
+                : LowerCompound(assignment, target, output);
+            output.Add(SetStatement(target.Identifier.ValueText, value));
+            return true;
+        }
+
+        if (assignment.Kind() == SyntaxKind.SimpleAssignmentExpression &&
+            assignment.Left is ElementAccessExpressionSyntax element &&
+            TryLowerMapIndexSet(element, assignment.Right, output) is { } mapSet)
+        {
+            output.Add(mapSet);
+            return true;
+        }
+
+        if (_assignmentOverride?.Invoke(assignment, expression => LowerExpressionWithPrelude(expression, output)) is { } lowered)
+        {
+            output.Add(lowered);
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryLowerIncrementStatement(ExpressionSyntax expression, List<string> output)
+    {
+        if (expression is PostfixUnaryExpressionSyntax { Operand: IdentifierNameSyntax postfixTarget } postfix &&
+            postfix.Kind() is SyntaxKind.PostIncrementExpression or SyntaxKind.PostDecrementExpression)
+        {
+            output.Add(IncrementStatement(postfixTarget, postfix.Kind()));
+            return true;
+        }
+
+        if (expression is PrefixUnaryExpressionSyntax { Operand: IdentifierNameSyntax prefixTarget } prefix &&
+            prefix.Kind() is SyntaxKind.PreIncrementExpression or SyntaxKind.PreDecrementExpression)
+        {
+            output.Add(IncrementStatement(prefixTarget, prefix.Kind()));
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryLowerInvocationStatement(ExpressionSyntax expression, List<string> output)
+    {
+        if (expression is InvocationExpressionSyntax invocation)
+        {
+            output.Add(TryLowerListAdd(invocation, output) ?? SetStatement(
+                NextDiscardLocal(),
+                LowerExpressionWithPrelude(invocation, output)));
+            return true;
+        }
+
+        if (expression is AwaitExpressionSyntax { Expression: InvocationExpressionSyntax awaitedInvocation })
+        {
+            output.Add(SetStatement(
+                NextDiscardLocal(),
+                LowerExpressionWithPrelude(awaitedInvocation, output)));
+            return true;
+        }
+
+        return false;
     }
 
     private string LowerCompound(AssignmentExpressionSyntax assignment, IdentifierNameSyntax target, List<string> output)

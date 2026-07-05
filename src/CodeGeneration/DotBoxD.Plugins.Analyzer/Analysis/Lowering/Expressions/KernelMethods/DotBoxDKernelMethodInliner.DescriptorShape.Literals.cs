@@ -92,21 +92,32 @@ internal static partial class DotBoxDKernelMethodInliner
 
     private static bool TryInt64LiteralValue(ExpressionSyntax expression, out long value)
     {
-        var negative = false;
-        if (expression is PrefixUnaryExpressionSyntax prefix &&
-            prefix.OperatorToken.IsKind(SyntaxKind.MinusToken))
-        {
-            negative = true;
-            expression = prefix.Operand;
-        }
-
+        expression = UnwrapNegativeLiteral(expression, out var negative);
         if (expression is not LiteralExpressionSyntax literal)
         {
             value = 0;
             return false;
         }
 
-        switch (literal.Token.Value)
+        return TryInt64LiteralTokenValue(literal.Token.Value, negative, out value);
+    }
+
+    private static ExpressionSyntax UnwrapNegativeLiteral(ExpressionSyntax expression, out bool negative)
+    {
+        negative = false;
+        if (expression is PrefixUnaryExpressionSyntax prefix &&
+            prefix.OperatorToken.IsKind(SyntaxKind.MinusToken))
+        {
+            negative = true;
+            return prefix.Operand;
+        }
+
+        return expression;
+    }
+
+    private static bool TryInt64LiteralTokenValue(object? tokenValue, bool negative, out long value)
+    {
+        switch (tokenValue)
         {
             case int number:
                 value = negative ? -number : number;

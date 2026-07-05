@@ -188,31 +188,9 @@ internal static partial class DotBoxDExpressionModelFactory
         var memberName = member.Name.Identifier.ValueText;
         if (member.Expression is IdentifierNameSyntax identifier)
         {
-            // Projected record fields win over same-named event properties.
-            if (context.ProjectedElementName is { } projectedName &&
-                string.Equals(identifier.Identifier.ValueText, projectedName, StringComparison.Ordinal))
+            if (TryLowerIdentifierMemberAccess(identifier, member, memberName, context) is { } identifierMember)
             {
-                if (TryLowerProjectedRecordField(memberName, context) is { } projectedField)
-                {
-                    return projectedField;
-                }
-            }
-            else if (string.Equals(identifier.Identifier.ValueText, context.EventParameterName, StringComparison.Ordinal))
-            {
-                for (var i = 0; i < context.EventProperties.Count; i++)
-                {
-                    var property = context.EventProperties[i];
-                    if (string.Equals(property.Name, memberName, StringComparison.Ordinal))
-                    {
-                        CollectEventPropertyCapability(member, context);
-                        return new DotBoxDExpressionModel(
-                            $"{DotBoxDGenerationNames.Helpers.Var}({LiteralReader.StringLiteral(EventVariable(memberName))})",
-                            property.Type,
-                            false);
-                    }
-                }
-
-                throw new NotSupportedException($"Unknown event property '{memberName}'.");
+                return identifierMember;
             }
         }
 
@@ -233,6 +211,48 @@ internal static partial class DotBoxDExpressionModelFactory
         }
 
         return Unsupported(member);
+    }
+
+    private static DotBoxDExpressionModel? TryLowerIdentifierMemberAccess(
+        IdentifierNameSyntax identifier,
+        MemberAccessExpressionSyntax member,
+        string memberName,
+        DotBoxDExpressionLoweringContext context)
+    {
+        // Projected record fields win over same-named event properties.
+        if (context.ProjectedElementName is { } projectedName &&
+            string.Equals(identifier.Identifier.ValueText, projectedName, StringComparison.Ordinal))
+        {
+            return TryLowerProjectedRecordField(memberName, context);
+        }
+
+        if (!string.Equals(identifier.Identifier.ValueText, context.EventParameterName, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        return LowerEventParameterMember(member, memberName, context);
+    }
+
+    private static DotBoxDExpressionModel LowerEventParameterMember(
+        MemberAccessExpressionSyntax member,
+        string memberName,
+        DotBoxDExpressionLoweringContext context)
+    {
+        for (var i = 0; i < context.EventProperties.Count; i++)
+        {
+            var property = context.EventProperties[i];
+            if (string.Equals(property.Name, memberName, StringComparison.Ordinal))
+            {
+                CollectEventPropertyCapability(member, context);
+                return new DotBoxDExpressionModel(
+                    $"{DotBoxDGenerationNames.Helpers.Var}({LiteralReader.StringLiteral(EventVariable(memberName))})",
+                    property.Type,
+                    false);
+            }
+        }
+
+        throw new NotSupportedException($"Unknown event property '{memberName}'.");
     }
 
     public static string EventVariable(string name) => DotBoxDGenerationNames.GeneratedVariables.EventPrefix + name;

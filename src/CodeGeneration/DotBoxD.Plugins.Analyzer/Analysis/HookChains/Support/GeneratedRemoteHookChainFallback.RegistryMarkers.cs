@@ -103,14 +103,7 @@ internal static partial class GeneratedRemoteHookChainFallback
             : DotBoxDGenerationNames.TypeNames.RemoteSubscriptionPipelineWithContextOriginal;
         foreach (var member in registryType.GetMembers("On").OfType<IMethodSymbol>())
         {
-            if (member.Arity != 1 ||
-                !SymbolEqualityComparer.Default.Equals(member.ContainingType, registryType) ||
-                member.Parameters.Length != 0 ||
-                member.ReturnType is not INamedTypeSymbol returnType ||
-                !string.Equals(returnType.OriginalDefinition.ToDisplayString(), expectedOriginal, StringComparison.Ordinal) ||
-                returnType.TypeArguments.Length != 2 ||
-                !SymbolEqualityComparer.Default.Equals(returnType.TypeArguments[0], member.TypeParameters[0]) ||
-                !SymbolEqualityComparer.Default.Equals(returnType.TypeArguments[1], contextType))
+            if (!RegistryOnMemberShapeMatches(member, registryType, contextType, expectedOriginal))
             {
                 continue;
             }
@@ -119,5 +112,25 @@ internal static partial class GeneratedRemoteHookChainFallback
         }
 
         return false;
+    }
+
+    private static bool RegistryOnMemberShapeMatches(
+        IMethodSymbol member,
+        INamedTypeSymbol registryType,
+        INamedTypeSymbol contextType,
+        string expectedOriginal)
+    {
+        if (member.Arity != 1 ||
+            !SymbolEqualityComparer.Default.Equals(member.ContainingType, registryType) ||
+            member.Parameters.Length != 0 ||
+            member.ReturnType is not INamedTypeSymbol returnType)
+        {
+            return false;
+        }
+
+        return string.Equals(returnType.OriginalDefinition.ToDisplayString(), expectedOriginal, StringComparison.Ordinal) &&
+            returnType.TypeArguments.Length == 2 &&
+            SymbolEqualityComparer.Default.Equals(returnType.TypeArguments[0], member.TypeParameters[0]) &&
+            SymbolEqualityComparer.Default.Equals(returnType.TypeArguments[1], contextType);
     }
 }
