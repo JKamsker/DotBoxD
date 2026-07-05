@@ -188,6 +188,22 @@ internal static partial class DotBoxDKernelMethodInliner
     }
 
     private static bool IsDotBoxDAttribute(AttributeData attribute, Compilation compilation, string metadataName)
-        => compilation.GetTypeByMetadataName(metadataName) is { } expected &&
-           SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected);
+        => IsAnyDotBoxDAttribute(attribute, compilation, metadataName);
+
+    private static bool IsAnyDotBoxDAttribute(
+        AttributeData attribute,
+        Compilation compilation,
+        params string[] metadataNames)
+    {
+        foreach (var metadataName in metadataNames)
+        {
+            if (compilation.GetTypeByMetadataName(metadataName) is { } expected &&
+                SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
