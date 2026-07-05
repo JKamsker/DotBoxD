@@ -67,7 +67,7 @@ internal static class WorkerFileAuditGrantValidator
 
     private static bool BytesMatch(SafeFileGrantOptions options, long bytes)
         => bytes >= 0 &&
-           (options.MaxBytesPerRun is not { } maxBytes || bytes <= maxBytes);
+           bytes <= options.MaxBytesPerRun;
 
     private static bool ExtensionMatches(SafeFileGrantOptions options, SandboxAuditEvent auditEvent)
     {

@@ -2,6 +2,7 @@ using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Runtime.Bindings;
 using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests.Runtime.File;
 
 namespace DotBoxD.Kernels.Tests.Runtime.GrantReader;
 
@@ -80,29 +81,5 @@ public sealed class SafeFileGrantReaderRequiredLimitTests
             new BindingRegistry([]),
             new InMemoryAuditSink(),
             CancellationToken.None);
-    }
-
-    private sealed class TempDirectory : IDisposable
-    {
-        private TempDirectory(string path) => Path = path;
-
-        public string Path { get; }
-
-        public static TempDirectory Create()
-        {
-            var path = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(),
-                "dotboxd-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(path);
-            return new TempDirectory(path);
-        }
-
-        public void Dispose()
-        {
-            if (Directory.Exists(Path))
-            {
-                Directory.Delete(Path, recursive: true);
-            }
-        }
     }
 }
