@@ -44,9 +44,8 @@ public sealed class RpcEnvelopeValidationTests
 
         var ex = Assert.Throws<MessagePackSerializationException>(
             () => serializer.Deserialize<RpcRequest>(payload));
-        var message = Assert.IsType<MessagePackSerializationException>(ex.InnerException).Message;
-        Assert.Contains(fieldName, message);
-        Assert.Contains("empty", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(fieldName, ex.Message);
+        Assert.Contains("empty", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

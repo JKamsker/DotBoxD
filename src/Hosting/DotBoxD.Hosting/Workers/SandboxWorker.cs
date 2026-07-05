@@ -64,6 +64,7 @@ public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
     {
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentNullException.ThrowIfNull(options);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var workerHost = WorkerHost();
         var workerPlan = await PrepareWorkerPlanAsync(workerHost, plan, cancellationToken)

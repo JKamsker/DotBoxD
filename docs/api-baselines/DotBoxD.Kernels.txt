@@ -47,9 +47,12 @@ public CapabilityGrant GetGrant(string capabilityId)
 public const int MaxTextLiteralLength = 65_536
 public const SandboxEffect Pure = SandboxEffect.Cpu | SandboxEffect.Alloc
 public const string Async = "dotboxd.runtime.async"
+public const string BindingCall = "BindingCall"
 public const string CanonicalizerVersion = "dotboxd-canonicalizer-1"
+public const string PluginMessage = "PluginMessage"
 public const string RecordName = "Record"
 public const string Reentrant = "dotboxd.runtime.reentrant"
+public const string SandboxLog = "SandboxLog"
 public DateTimeOffset AuditTimestamp()
 public DateTimeOffset GrantClock
 public DateTimeOffset UtcNow()
@@ -200,6 +203,7 @@ public SandboxError Error { get; }
 public SandboxError? Error { get; init; }
 public SandboxIsolation Isolation { get; init; } = SandboxIsolation.InProcess
 public SandboxModule Module { get; }
+public SandboxPath Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
 public SandboxPolicy Build()
 public SandboxPolicy Policy { get; }
 public SandboxPolicyBuilder AllowIntraKernelReentrancy()
@@ -234,6 +238,7 @@ public SandboxResourceUsage Snapshot()
 public SandboxRunId RunId { get; }
 public SandboxRunId? RunId { get; init; }
 public SandboxRuntimeException(SandboxError error)
+public SandboxUri Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
 public SandboxValue ChargeBindingReturn(BindingDescriptor descriptor, SandboxValue value)
 public SandboxValue this[int index] => _values[index]
 public SandboxValue? Value { get; init; }
@@ -303,7 +308,7 @@ public static BindingCostModel PerReturnedByte(long baseFuel, long perByteFuel)
 public static bool ContainsForbiddenDescriptor(string value)
 public static bool ContainsOnlyKnownBits(this SandboxEffect effects)
 public static bool IsCollectionIntrinsic(string callName)
-public static bool IsForbiddenName(string name)
+public static bool IsForbiddenName(string? name)
 public static bool IsKnownOpaqueId(string name)
 public static bool IsOpaqueId(string? value)
 public static bool IsPortableRelativePath(string? path)
@@ -315,6 +320,7 @@ public static bool RequiresCapability(this SandboxEffect effects)
 public static bool Supports(SemVersion target)
 public static bool TryParse(string text, out SemVersion version)
 public static class BindingAuditFields
+public static class BindingAuditKinds
 public static class BindingReferenceCollector
 public static class CanonicalModuleHasher
 public static class CapabilityPattern
@@ -414,6 +420,7 @@ public static void RequireType( SandboxValue value, SandboxType expectedType, Sa
 public static void RequireType(SandboxValue value, SandboxType expectedType, string message)
 public static void Validate(ResourceLimits limits)
 public static void ValidateInputShape(SandboxValue input, int parameterCount)
+public string AuditKind { get; init; } = BindingAuditKinds.BindingCall
 public string BindingManifestHash { get; }
 public string CreateChargedStringConcat(string left, string right)
 public string CreateChargedSubstring(string value, int startIndex, int length)
@@ -423,7 +430,10 @@ public string ModuleHash { get; }
 public string PlanHash { get; }
 public string PolicyHash { get; }
 public string PolicyId { get => _policyId; init { _policyId = value; ResetHash(); } }
+public string RelativePath { get => _relativePath; init => _relativePath = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
+public string TypeName { get => _typeName; init => _typeName = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
 public string Value
+public string Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
 public string? ArtifactHash { get; init; }
 public TimeSpan EffectiveWallTime => MaxWallTime ?? TimeSpan.FromMilliseconds(100)
 public TimeSpan RemainingWallTime()
