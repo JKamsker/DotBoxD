@@ -1,13 +1,11 @@
 using System.Globalization;
+using DotBoxD.Kernels.Runtime.Bindings;
 using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Hosting;
 
 internal sealed partial class SandboxWorkerExecutor
 {
-    private const string TimeNowUnixMillisBindingId = "time.nowUnixMillis";
-    private const string TimeNowUnixMillisAuditField = "unixMillis";
-
     private static bool WorkerDeterministicBindingResultMatches(
         ExecutionPlan plan,
         string entrypoint,
@@ -33,7 +31,7 @@ internal sealed partial class SandboxWorkerExecutor
            {
                Value: CallExpression call
            } &&
-           call.Name == TimeNowUnixMillisBindingId &&
+           call.Name == SafeTimeBindingNames.NowUnixMillisId &&
            call.Arguments.Count == 0 &&
            call.GenericType is null;
 
@@ -46,7 +44,7 @@ internal sealed partial class SandboxWorkerExecutor
         foreach (var auditEvent in result.AuditEvents)
         {
             if (auditEvent.Kind != "BindingCall" ||
-                auditEvent.BindingId != TimeNowUnixMillisBindingId ||
+                auditEvent.BindingId != SafeTimeBindingNames.NowUnixMillisId ||
                 !auditEvent.Success)
             {
                 continue;
@@ -54,7 +52,7 @@ internal sealed partial class SandboxWorkerExecutor
 
             if (matched ||
                 auditEvent.Fields is null ||
-                !auditEvent.Fields.TryGetValue(TimeNowUnixMillisAuditField, out var raw) ||
+                !auditEvent.Fields.TryGetValue(SafeTimeBindingNames.NowUnixMillisAuditField, out var raw) ||
                 !long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out value))
             {
                 return false;

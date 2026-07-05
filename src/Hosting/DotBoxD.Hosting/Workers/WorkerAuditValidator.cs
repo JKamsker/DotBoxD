@@ -7,6 +7,7 @@ using System.Globalization;
 using DotBoxD.Kernels;
 using DotBoxD.Kernels.Compiler;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Runtime.Bindings;
 using DotBoxD.Kernels.Verifier;
 
 internal static class WorkerAuditValidator
@@ -279,23 +280,20 @@ internal static class WorkerAuditValidator
             parsedDuration >= 0;
     }
 
-    private static bool DeterministicTimeBindingFieldsMatch(
-        ExecutionPlan plan,
-        SandboxAuditEvent auditEvent)
+    private static bool DeterministicTimeBindingFieldsMatch(ExecutionPlan plan, SandboxAuditEvent auditEvent)
     {
         if (!plan.Policy.Deterministic ||
-            auditEvent.BindingId != "time.nowUnixMillis")
+            auditEvent.BindingId != SafeTimeBindingNames.NowUnixMillisId)
         {
             return true;
         }
 
         return plan.Policy.LogicalNow is { } logicalNow &&
-               auditEvent.Fields!.TryGetValue("unixMillis", out var unixMillis) &&
+               auditEvent.Fields!.TryGetValue(SafeTimeBindingNames.NowUnixMillisAuditField, out var unixMillis) &&
                long.TryParse(unixMillis, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) &&
                value == logicalNow.ToUnixTimeMilliseconds();
     }
 
     private static bool TextIsSafe(string? value)
-        => value is null ||
-           string.Equals(AuditTextSanitizer.SanitizeAndRedact(value), value, StringComparison.Ordinal);
+        => value is null || string.Equals(AuditTextSanitizer.SanitizeAndRedact(value), value, StringComparison.Ordinal);
 }

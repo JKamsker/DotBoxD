@@ -7,7 +7,7 @@ namespace DotBoxD.Kernels.Runtime.Bindings;
 public static class SafeTimeBindings
 {
     public static BindingDescriptor NowUnixMillis { get; } = new(
-        "time.nowUnixMillis",
+        SafeTimeBindingNames.NowUnixMillisId,
         SemVersion.One,
         [],
         SandboxType.I64,
@@ -26,14 +26,15 @@ public static class SafeTimeBindings
                 context.BindingAuditFields("clock", startedAt),
                 StringComparer.Ordinal)
             {
-                ["unixMillis"] = value.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                [SafeTimeBindingNames.NowUnixMillisAuditField] =
+                    value.ToString(System.Globalization.CultureInfo.InvariantCulture)
             };
             context.Audit.Write(new SandboxAuditEvent(
                 context.RunId,
                 "BindingCall",
                 timestamp,
                 true,
-                BindingId: "time.nowUnixMillis",
+                BindingId: SafeTimeBindingNames.NowUnixMillisId,
                 CapabilityId: "time.now",
                 Effect: SandboxEffect.Time,
                 ResourceId: "clock:utc",
