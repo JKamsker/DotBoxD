@@ -159,39 +159,91 @@ internal static partial class ProxyGenerator
         bool isInstanceScoped,
         bool useStreamAwareTaskValueInvocation = false)
     {
+        if (TryGetStreamingInvoker(returnKind, isInstanceScoped, out var streamingInvoker))
+        {
+            return streamingInvoker;
+        }
+
+        if (TryGetValueTaskInvoker(
+                returnKind,
+                isInstanceScoped,
+                useStreamAwareTaskValueInvocation,
+                out var valueTaskInvoker))
+        {
+            return valueTaskInvoker;
+        }
+
+        return StandardInvoker(isInstanceScoped);
+    }
+
+    private static bool TryGetStreamingInvoker(
+        MethodReturnKind returnKind,
+        bool isInstanceScoped,
+        out string invoker)
+    {
         if (NamingHelpers.IsStreamReturn(returnKind))
         {
-            return isInstanceScoped
+            invoker = isInstanceScoped
                 ? ServicesGeneratorMemberNames.RpcInvoker.InvokeStreamOnInstanceAsync
                 : ServicesGeneratorMemberNames.RpcInvoker.InvokeStreamAsync;
+            return true;
         }
 
         if (NamingHelpers.IsPipeReturn(returnKind))
         {
-            return isInstanceScoped
+            invoker = isInstanceScoped
                 ? ServicesGeneratorMemberNames.RpcInvoker.InvokePipeOnInstanceAsync
                 : ServicesGeneratorMemberNames.RpcInvoker.InvokePipeAsync;
+            return true;
         }
 
         if (NamingHelpers.IsAsyncEnumerableReturn(returnKind))
         {
-            var eager = returnKind == MethodReturnKind.TaskOfAsyncEnumerable ||
-                returnKind == MethodReturnKind.ValueTaskOfAsyncEnumerable;
-            return isInstanceScoped
-                ? eager ? ServicesGeneratorMemberNames.RpcInvoker.InvokeAsyncEnumerableOnInstanceAsync : ServicesGeneratorMemberNames.RpcInvoker.InvokeAsyncEnumerableOnInstance
-                : eager ? ServicesGeneratorMemberNames.RpcInvoker.InvokeAsyncEnumerableAsync : ServicesGeneratorMemberNames.RpcInvoker.InvokeAsyncEnumerable;
+            invoker = AsyncEnumerableInvoker(returnKind, isInstanceScoped);
+            return true;
         }
 
+        invoker = string.Empty;
+        return false;
+    }
+
+    private static string AsyncEnumerableInvoker(MethodReturnKind returnKind, bool isInstanceScoped)
+    {
+        var eager = returnKind == MethodReturnKind.TaskOfAsyncEnumerable ||
+            returnKind == MethodReturnKind.ValueTaskOfAsyncEnumerable;
+        if (isInstanceScoped)
+        {
+            return eager
+                ? ServicesGeneratorMemberNames.RpcInvoker.InvokeAsyncEnumerableOnInstanceAsync
+                : ServicesGeneratorMemberNames.RpcInvoker.InvokeAsyncEnumerableOnInstance;
+        }
+
+        return eager
+            ? ServicesGeneratorMemberNames.RpcInvoker.InvokeAsyncEnumerableAsync
+            : ServicesGeneratorMemberNames.RpcInvoker.InvokeAsyncEnumerable;
+    }
+
+    private static bool TryGetValueTaskInvoker(
+        MethodReturnKind returnKind,
+        bool isInstanceScoped,
+        bool useStreamAwareTaskValueInvocation,
+        out string invoker)
+    {
         if (returnKind is MethodReturnKind.ValueTask or MethodReturnKind.ValueTaskOf &&
             !useStreamAwareTaskValueInvocation)
         {
-            return isInstanceScoped
+            invoker = isInstanceScoped
                 ? ServicesGeneratorMemberNames.RpcInvoker.InvokeValueOnInstanceAsync
                 : ServicesGeneratorMemberNames.RpcInvoker.InvokeValueAsync;
+            return true;
         }
 
-        return isInstanceScoped
+        invoker = string.Empty;
+        return false;
+    }
+
+    private static string StandardInvoker(bool isInstanceScoped)
+        => isInstanceScoped
             ? ServicesGeneratorMemberNames.RpcInvoker.InvokeOnInstanceAsync
             : ServicesGeneratorMemberNames.RpcInvoker.InvokeAsync;
-    }
 }

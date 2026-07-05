@@ -35,6 +35,14 @@ internal static class MethodCallFilterTranslator
         typeof(ISet<>)
     ];
 
+    private static readonly Dictionary<string, QueryComparisonOperator> StringOperators = new(StringComparer.Ordinal)
+    {
+        [nameof(string.Contains)] = QueryComparisonOperator.StringContains,
+        [nameof(string.StartsWith)] = QueryComparisonOperator.StringStartsWith,
+        [nameof(string.EndsWith)] = QueryComparisonOperator.StringEndsWith,
+        [nameof(string.Equals)] = QueryComparisonOperator.Equal
+    };
+
     public static QueryFilter Translate(
         MethodCallExpression call,
         ParameterExpression parameter,
@@ -72,24 +80,8 @@ internal static class MethodCallFilterTranslator
             return TryTranslateStaticStringEquals(call, parameter, makeValue, out filter);
         }
 
-        if (!MemberPathReader.TryReadPath(call.Object, parameter, out var path) ||
-            call.Arguments.Count is not 1 and not 2 ||
-            !QueryValueFactory.TryEvaluateObject(call.Arguments[0], parameter, out var raw) ||
-            raw is not string)
-        {
-            return false;
-        }
-
-        var op = call.Method.Name switch
-        {
-            nameof(string.Contains) => QueryComparisonOperator.StringContains,
-            nameof(string.StartsWith) => QueryComparisonOperator.StringStartsWith,
-            nameof(string.EndsWith) => QueryComparisonOperator.StringEndsWith,
-            nameof(string.Equals) => QueryComparisonOperator.Equal,
-            _ => (QueryComparisonOperator)(-1),
-        };
-
-        if ((int)op < 0)
+        if (!TryReadInstanceStringCall(call, parameter, out var path, out var raw) ||
+            !StringOperators.TryGetValue(call.Method.Name, out var op))
         {
             return false;
         }
@@ -98,6 +90,20 @@ internal static class MethodCallFilterTranslator
         var ignoreCase = ReadIgnoreCase(call, op, comparisonArgument, parameter);
         filter = QueryFilter.Compare(path, op, makeValue(raw, call.Arguments[0]), ignoreCase);
         return true;
+    }
+
+    private static bool TryReadInstanceStringCall(
+        MethodCallExpression call,
+        ParameterExpression parameter,
+        out string path,
+        out object? raw)
+    {
+        path = "";
+        raw = null;
+        return MemberPathReader.TryReadPath(call.Object!, parameter, out path) &&
+               call.Arguments.Count is 1 or 2 &&
+               QueryValueFactory.TryEvaluateObject(call.Arguments[0], parameter, out raw) &&
+               raw is string;
     }
 
     private static bool TryTranslateStaticStringEquals(

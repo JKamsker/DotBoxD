@@ -65,64 +65,158 @@ internal sealed partial class RawI32ExpressionPlan
     {
         switch (expression)
         {
-            case LiteralExpression { Value: I32Value value }:
-                plan = new RawI32ExpressionPlan(ExpressionKind.Literal, literal: value.Value);
-                return true;
-            case VariableExpression variable when substitutions?.TryGetValue(variable.Name, out var substitution) == true:
-                plan = substitution;
-                return true;
-            case VariableExpression variable when stackPlan.LocalKind(variable.Name) == StackKind.I32:
-                plan = new RawI32ExpressionPlan(ExpressionKind.Variable, name: variable.Name);
-                return true;
-            case UnaryExpression { Operator: "-" } unary
-                when TryCreate(unary.Operand, stackPlan, functions, bindings, substitutions, out var operand):
-                plan = new RawI32ExpressionPlan(ExpressionKind.Negate, left: operand);
-                return true;
-            case BinaryExpression binary when binary.Operator is "+" or "-" or "*" or "/" or "%":
-                return TryCreateAddRemainder(binary, stackPlan, functions, substitutions, out plan) ||
-                       TryCreateBinary(binary, stackPlan, functions, bindings, substitutions, out plan);
+            case LiteralExpression literal:
+                return TryCreateLiteral(literal, out plan);
+            case VariableExpression variable:
+                return TryCreateVariable(variable, stackPlan, substitutions, out plan);
+            case UnaryExpression unary:
+                return TryCreateUnary(unary, stackPlan, functions, bindings, substitutions, out plan);
+            case BinaryExpression binary:
+                return TryCreateBinaryExpression(binary, stackPlan, functions, bindings, substitutions, out plan);
             case CallExpression call:
-                return bindings is not null && TryCreateMathIntrinsic(call, stackPlan, functions, bindings, substitutions, out plan) ||
-                       TryCreateInlineCall(call, stackPlan, functions, bindings, out plan);
+                return TryCreateCallExpression(call, stackPlan, functions, bindings, substitutions, out plan);
             default:
                 plan = null!;
                 return false;
         }
     }
 
+    private static bool TryCreateLiteral(LiteralExpression literal, out RawI32ExpressionPlan plan)
+    {
+        if (literal.Value is I32Value value)
+        {
+            plan = new RawI32ExpressionPlan(ExpressionKind.Literal, literal: value.Value);
+            return true;
+        }
+
+        plan = null!;
+        return false;
+    }
+
+    private static bool TryCreateVariable(
+        VariableExpression variable,
+        LocalStackKindPlanner stackPlan,
+        IReadOnlyDictionary<string, RawI32ExpressionPlan>? substitutions,
+        out RawI32ExpressionPlan plan)
+    {
+        if (substitutions is not null && substitutions.TryGetValue(variable.Name, out var substitution))
+        {
+            plan = substitution;
+            return true;
+        }
+
+        if (stackPlan.LocalKind(variable.Name) == StackKind.I32)
+        {
+            plan = new RawI32ExpressionPlan(ExpressionKind.Variable, name: variable.Name);
+            return true;
+        }
+
+        plan = null!;
+        return false;
+    }
+
+    private static bool TryCreateUnary(
+        UnaryExpression unary,
+        LocalStackKindPlanner stackPlan,
+        IReadOnlyDictionary<string, SandboxFunction> functions,
+        IBindingCatalog? bindings,
+        IReadOnlyDictionary<string, RawI32ExpressionPlan>? substitutions,
+        out RawI32ExpressionPlan plan)
+    {
+        if (unary.Operator != "-" ||
+            !TryCreate(unary.Operand, stackPlan, functions, bindings, substitutions, out var operand))
+        {
+            plan = null!;
+            return false;
+        }
+
+        plan = new RawI32ExpressionPlan(ExpressionKind.Negate, left: operand);
+        return true;
+    }
+
+    private static bool TryCreateBinaryExpression(
+        BinaryExpression binary,
+        LocalStackKindPlanner stackPlan,
+        IReadOnlyDictionary<string, SandboxFunction> functions,
+        IBindingCatalog? bindings,
+        IReadOnlyDictionary<string, RawI32ExpressionPlan>? substitutions,
+        out RawI32ExpressionPlan plan)
+    {
+        if (binary.Operator is not ("+" or "-" or "*" or "/" or "%"))
+        {
+            plan = null!;
+            return false;
+        }
+
+        return TryCreateAddRemainder(binary, stackPlan, functions, substitutions, out plan) ||
+               TryCreateBinary(binary, stackPlan, functions, bindings, substitutions, out plan);
+    }
+
+    private static bool TryCreateCallExpression(
+        CallExpression call,
+        LocalStackKindPlanner stackPlan,
+        IReadOnlyDictionary<string, SandboxFunction> functions,
+        IBindingCatalog? bindings,
+        IReadOnlyDictionary<string, RawI32ExpressionPlan>? substitutions,
+        out RawI32ExpressionPlan plan)
+    {
+        return bindings is not null &&
+               TryCreateMathIntrinsic(call, stackPlan, functions, bindings, substitutions, out plan) ||
+               TryCreateInlineCall(call, stackPlan, functions, bindings, out plan);
+    }
+
     public void Emit(ILGenerator il, Func<string, (LocalBuilder Local, StackKind Kind)> declare)
+    {
+        if (TryEmitTerminal(il, declare) ||
+            TryEmitUnaryOrIntrinsic(il, declare) ||
+            TryEmitArithmetic(il, declare))
+        {
+            return;
+        }
+    }
+
+    private bool TryEmitTerminal(ILGenerator il, Func<string, (LocalBuilder Local, StackKind Kind)> declare)
     {
         switch (_kind)
         {
             case ExpressionKind.Literal:
                 EmitInt32(il, _literal);
-                break;
+                return true;
             case ExpressionKind.Variable:
                 il.Emit(OpCodes.Ldloc, declare(_name!).Local);
-                break;
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private bool TryEmitUnaryOrIntrinsic(ILGenerator il, Func<string, (LocalBuilder Local, StackKind Kind)> declare)
+    {
+        switch (_kind)
+        {
             case ExpressionKind.Negate:
                 _left!.Emit(il, declare);
                 il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.NegI32Raw)));
-                break;
+                return true;
             case ExpressionKind.Abs:
                 _left!.Emit(il, declare);
                 EmitChargeBindingCall(il, _name!);
                 il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.AbsI32Raw)));
-                break;
+                return true;
             case ExpressionKind.Min:
             case ExpressionKind.Max:
                 _left!.Emit(il, declare);
                 _right!.Emit(il, declare);
                 EmitChargeBindingCall(il, _name!);
                 il.Emit(OpCodes.Call, Runtime(RuntimeMethod(_kind)));
-                break;
+                return true;
             case ExpressionKind.Clamp:
                 _left!.Emit(il, declare);
                 _right!.Emit(il, declare);
                 _third!.Emit(il, declare);
                 EmitChargeBindingCall(il, _name!);
                 il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ClampI32Raw)));
-                break;
+                return true;
             case ExpressionKind.InlineCall:
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.EnterInlineCall)));
@@ -132,7 +226,16 @@ internal sealed partial class RawI32ExpressionPlan
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.ExitInlineCall)));
                 il.Emit(OpCodes.Ldloc, value);
-                break;
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private bool TryEmitArithmetic(ILGenerator il, Func<string, (LocalBuilder Local, StackKind Kind)> declare)
+    {
+        switch (_kind)
+        {
             case ExpressionKind.Add:
             case ExpressionKind.Subtract:
             case ExpressionKind.Multiply:
@@ -141,13 +244,15 @@ internal sealed partial class RawI32ExpressionPlan
                 _left!.Emit(il, declare);
                 _right!.Emit(il, declare);
                 il.Emit(OpCodes.Call, Runtime(RuntimeMethod(_kind)));
-                break;
+                return true;
             case ExpressionKind.AddRemainder:
                 _left!.Emit(il, declare);
                 _right!.Emit(il, declare);
                 _third!.Emit(il, declare);
                 il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.AddRemI32Raw)));
-                break;
+                return true;
+            default:
+                return false;
         }
     }
 
