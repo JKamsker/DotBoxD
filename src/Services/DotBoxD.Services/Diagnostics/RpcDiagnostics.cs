@@ -30,31 +30,15 @@ public static class RpcDiagnostics
         }
 
         var args = new RpcDiagnosticErrorEventArgs(operation, error);
-        try
+        foreach (var subscriber in handler.GetInvocationList())
         {
-            handler.Invoke(null, args);
-        }
-        catch (Exception firstEx)
-        {
-            var subscribers = handler.GetInvocationList();
-            if (subscribers.Length == 1)
+            try
             {
-                SafeTrace("DotBoxD diagnostic handler failed", firstEx);
-                return;
+                ((EventHandler<RpcDiagnosticErrorEventArgs>)subscriber).Invoke(null, args);
             }
-
-            foreach (var subscriber in subscribers)
+            catch (Exception subscriberError)
             {
-                try
-                {
-                    // Match the primary dispatch above (sender: null) so a subscriber sees the same
-                    // sender whether or not an earlier subscriber threw and forced this retry path.
-                    ((EventHandler<RpcDiagnosticErrorEventArgs>)subscriber).Invoke(null, args);
-                }
-                catch (Exception subscriberError)
-                {
-                    SafeTrace("DotBoxD diagnostic handler failed", subscriberError);
-                }
+                SafeTrace("DotBoxD diagnostic handler failed", subscriberError);
             }
         }
     }

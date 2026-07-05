@@ -17,6 +17,8 @@ public sealed record SemVersion(int Major, int Minor, int Patch)
 
     public static SemVersion Parse(string text)
     {
+        ArgumentNullException.ThrowIfNull(text);
+
         if (!TryParse(text, out var version))
         {
             throw new FormatException($"Invalid semantic version '{text}'.");
@@ -28,6 +30,11 @@ public sealed record SemVersion(int Major, int Minor, int Patch)
     public static bool TryParse(string text, out SemVersion version)
     {
         version = One;
+        if (text is null)
+        {
+            return false;
+        }
+
         var value = text.StartsWith('v') ? text[1..] : text;
         var parts = value.Split('.');
 

@@ -150,10 +150,10 @@ public sealed partial class ResourceMeter
                 AddTextShape(ref shape, SandboxLiteralConstraints.TextShape(id.Value));
                 return true;
             case SandboxPathValue path:
-                AddTextShape(ref shape, SandboxLiteralConstraints.TextShape(path.Value.RelativePath));
+                AddTextShape(ref shape, SandboxLiteralConstraints.TextShape(path.Value?.RelativePath));
                 return true;
             case SandboxUriValue uri:
-                AddTextShape(ref shape, SandboxLiteralConstraints.TextShape(uri.Value.Value));
+                AddTextShape(ref shape, SandboxLiteralConstraints.TextShape(uri.Value?.Value));
                 return true;
             default:
                 return false;
