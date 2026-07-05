@@ -4,6 +4,7 @@ using DotBoxD.Kernels.Sandbox;
 namespace DotBoxD.Kernels.Validation;
 
 using DotBoxD.Kernels;
+using DotBoxD.Kernels.Validation.Internal;
 
 internal static class StructuralValidator
 {
@@ -55,7 +56,7 @@ internal static class StructuralValidator
         CheckIdentifier(function.Id, "function id", diagnostics);
         CheckType(function.ReturnType, diagnostics, declaredOpaqueIdTypes);
         var hasNullParameters = CheckNullEntries(function.Parameters, "parameters", function.Id, diagnostics);
-        var hasNullBody = CheckNullEntries(function.Body, "body", function.Id, diagnostics);
+        CheckNullEntries(function.Body, "body", function.Id, diagnostics);
 
         if (!hasNullParameters)
         {
@@ -67,12 +68,15 @@ internal static class StructuralValidator
             }
         }
 
-        if (!hasNullBody)
+        foreach (var statement in function.Body)
         {
-            foreach (var statement in function.Body)
+            if (statement is null)
             {
-                DangerousReferenceDetector.Scan(statement, diagnostics);
+                continue;
             }
+
+            IrNullValidator.Scan(statement, diagnostics);
+            DangerousReferenceDetector.Scan(statement, diagnostics);
         }
     }
 
