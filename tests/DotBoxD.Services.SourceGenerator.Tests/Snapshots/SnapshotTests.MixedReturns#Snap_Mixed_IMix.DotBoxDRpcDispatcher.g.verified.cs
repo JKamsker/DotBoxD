@@ -52,6 +52,8 @@ namespace Snap.Mixed
         private async global::System.Threading.Tasks.Task DispatchCoreAsync(global::Snap.Mixed.IMix receiver, string? instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::DotBoxD.Services.Streaming.Remote.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct)
 #pragma warning restore CS1998
         {
+            ct.ThrowIfCancellationRequested();
+
             switch (method)
             {
                 case "GetNameAsync":
