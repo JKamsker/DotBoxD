@@ -70,7 +70,7 @@ internal static class QueryProjectionInvariants
     public static string MemberPathArgument(string path)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
-        if (!IsValidMemberPath(path))
+        if (!HasValidMemberPath(path))
         {
             throw new ArgumentException(
                 $"Invalid QueryProjection path '{path}'; each '.'-separated segment must be an identifier.",
@@ -130,15 +130,8 @@ internal static class QueryProjectionInvariants
         => string.IsNullOrEmpty(value) ? throw new InvalidOperationException(message) : value;
 
     private static string RequireValidMemberPath(string? path, string message)
-    {
-        if (string.IsNullOrEmpty(path) || !QueryFilterInvariants.IsValidFieldPath(path))
-        {
-            throw new InvalidOperationException(message);
-        }
+        => HasValidMemberPath(path) ? path! : throw new InvalidOperationException(message);
 
-        return path;
-    }
-
-    private static bool IsValidMemberPath(string? path)
+    private static bool HasValidMemberPath(string? path)
         => !string.IsNullOrEmpty(path) && QueryFilterInvariants.IsValidFieldPath(path);
 }

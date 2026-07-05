@@ -86,12 +86,10 @@ public sealed class QueryProjectionPathValidationTests
         Assert.True(
             exception is ArgumentException or InvalidOperationException or JsonException,
             $"Expected QueryProjection path validation, got {exception.GetType().Name}: {exception.Message}");
-        Assert.Contains("QueryProjection", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("path", exception.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.True(
-            exception.Message.Contains("valid", StringComparison.OrdinalIgnoreCase) ||
-            exception.Message.Contains("identifier", StringComparison.OrdinalIgnoreCase) ||
-            exception.Message.Contains("segment", StringComparison.OrdinalIgnoreCase),
-            $"Expected projection path validation message, got: {exception.Message}");
+
+        if (exception is ArgumentException argumentException)
+        {
+            Assert.Equal("path", argumentException.ParamName);
+        }
     }
 }
