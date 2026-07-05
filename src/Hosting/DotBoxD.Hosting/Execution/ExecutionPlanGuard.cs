@@ -8,6 +8,11 @@ internal static class ExecutionPlanGuard
 {
     public static void EnsurePolicyLimits(SandboxPolicy policy)
     {
+        if (policy.ResourceLimits is null)
+        {
+            throw new SandboxValidationException([MissingResourceLimitsDiagnostic()]);
+        }
+
         try
         {
             ResourceLimitValidation.Validate(policy.ResourceLimits);
@@ -72,6 +77,12 @@ internal static class ExecutionPlanGuard
 
     private static void EnsurePolicyLimits(SandboxPolicy policy, List<SandboxDiagnostic> diagnostics)
     {
+        if (policy.ResourceLimits is null)
+        {
+            diagnostics.Add(MissingResourceLimitsDiagnostic());
+            return;
+        }
+
         try
         {
             ResourceLimitValidation.Validate(policy.ResourceLimits);
@@ -83,6 +94,9 @@ internal static class ExecutionPlanGuard
                 $"policy resource limit '{ex.ParamName}' must be non-negative"));
         }
     }
+
+    private static SandboxDiagnostic MissingResourceLimitsDiagnostic()
+        => new("E-POLICY-LIMIT", "policy resource limits are required");
 
     private static bool IsTrustedPreparedPlan(
         ExecutionPlan plan,
