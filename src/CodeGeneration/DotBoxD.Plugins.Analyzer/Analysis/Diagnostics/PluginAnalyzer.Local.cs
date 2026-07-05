@@ -99,26 +99,49 @@ public sealed partial class PluginAnalyzer
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        if (containingSymbol is IMethodSymbol method &&
-            HasAttribute(method, DotBoxDMetadataNames.ServerExtensionMethodAttribute))
+        if (IsServerExtensionMethod(containingSymbol))
         {
             return true;
         }
 
         foreach (var lambda in syntax.AncestorsAndSelf().OfType<LambdaExpressionSyntax>())
         {
-            if (lambda.Parent is ArgumentSyntax argument &&
-                argument.Parent is ArgumentListSyntax argumentList &&
-                argumentList.Parent is InvocationExpressionSyntax invocation &&
-                invocation.Expression is MemberAccessExpressionSyntax member)
+            if (IsForbiddenHookChainLambda(lambda, model, cancellationToken))
             {
-                return member.Name.Identifier.ValueText is "Where" or "Select" or "Run" or "Register" &&
-                    IsHookChainReceiver(member.Expression, model, cancellationToken);
+                return true;
             }
         }
 
         return false;
     }
+
+    private static bool IsServerExtensionMethod(ISymbol? symbol)
+        => symbol is IMethodSymbol method &&
+           HasAttribute(method, DotBoxDMetadataNames.ServerExtensionMethodAttribute);
+
+    private static bool IsForbiddenHookChainLambda(
+        LambdaExpressionSyntax lambda,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (lambda.Parent is not ArgumentSyntax argument ||
+            argument.Parent is not ArgumentListSyntax argumentList ||
+            argumentList.Parent is not InvocationExpressionSyntax invocation ||
+            invocation.Expression is not MemberAccessExpressionSyntax member)
+        {
+            return false;
+        }
+
+        if (!IsForbiddenHookChainMethod(member.Name.Identifier.ValueText))
+        {
+            return false;
+        }
+
+        return IsHookChainReceiver(member.Expression, model, cancellationToken);
+    }
+
+    private static bool IsForbiddenHookChainMethod(string name)
+        => name is "Where" or "Select" or "Run" or "Register";
 
     private static bool IsHookChainReceiver(
         ExpressionSyntax receiver,

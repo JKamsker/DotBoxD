@@ -1,5 +1,3 @@
-using System.Globalization;
-using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -178,66 +176,18 @@ internal static class HookChainIndexPredicateExtractor
             return false;
         }
 
-        if (TryFormatValue(property.Type, constant, out var literal, out var valueType) is false)
+        if (HookChainIndexPredicateFormatting.TryFormatValue(property.Type, constant, out var literal, out var valueType) is false)
         {
             return false;
         }
 
         predicate = new IndexPredicateModel(
             property.Path,
-            OperatorName(binary.Kind(), constantOnLeft),
+            HookChainIndexPredicateFormatting.OperatorName(binary.Kind(), constantOnLeft),
             literal,
             valueType);
         return true;
     }
-
-    // Coerces the captured constant to the event property's manifest type and produces the C# literal the
-    // emitter writes (so the boxed IndexedPredicate.Value has the property's runtime type). Mirrors
-    // DotBoxDConstantExpressionLowerer's type rules. Returns false for anything not index-eligible.
-    private static bool TryFormatValue(string propertyType, object? value, out string literal, out string valueType)
-    {
-        literal = string.Empty;
-        valueType = propertyType;
-        switch (propertyType)
-        {
-            case DotBoxDGenerationNames.ManifestTypes.Bool when value is bool boolean:
-                literal = boolean
-                    ? DotBoxDGenerationNames.CSharpLiterals.True
-                    : DotBoxDGenerationNames.CSharpLiterals.False;
-                return true;
-            case DotBoxDGenerationNames.ManifestTypes.Int when value is int number:
-                literal = number.ToString(CultureInfo.InvariantCulture);
-                return true;
-            case DotBoxDGenerationNames.ManifestTypes.Long when value is int number:
-                literal = ((long)number).ToString(CultureInfo.InvariantCulture) +
-                    DotBoxDGenerationNames.CSharpLiterals.Int64Suffix;
-                return true;
-            case DotBoxDGenerationNames.ManifestTypes.Long when value is long number:
-                literal = number.ToString(CultureInfo.InvariantCulture) +
-                    DotBoxDGenerationNames.CSharpLiterals.Int64Suffix;
-                return true;
-            case DotBoxDGenerationNames.ManifestTypes.Double when value is int number:
-                literal = Double((double)number);
-                return true;
-            case DotBoxDGenerationNames.ManifestTypes.Double when value is long number:
-                literal = Double((double)number);
-                return true;
-            case DotBoxDGenerationNames.ManifestTypes.Double when value is double number && IsFinite(number):
-                literal = Double(number);
-                return true;
-            case DotBoxDGenerationNames.ManifestTypes.String when value is string text:
-                literal = LiteralReader.StringLiteral(text);
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    private static string Double(double value)
-        => value.ToString(DotBoxDGenerationNames.CSharpLiterals.DoubleRoundTripFormat, CultureInfo.InvariantCulture) +
-           DotBoxDGenerationNames.CSharpLiterals.DoubleSuffix;
-
-    private static bool IsFinite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
 
     private static bool IsComparison(SyntaxKind kind)
         => kind is SyntaxKind.EqualsExpression
@@ -246,21 +196,6 @@ internal static class HookChainIndexPredicateExtractor
             or SyntaxKind.GreaterThanOrEqualExpression
             or SyntaxKind.LessThanExpression
             or SyntaxKind.LessThanOrEqualExpression;
-
-    // Normalizes so the event property is always the left operand: "5 <= e.Damage" reports the same
-    // operator as "e.Damage >= 5". The strings are the DotBoxD.Plugins.IndexPredicateOperator member
-    // names verbatim (used both to serialize and to emit IndexPredicateOperator.<name> source).
-    private static string OperatorName(SyntaxKind kind, bool constantOnLeft)
-        => kind switch
-        {
-            SyntaxKind.EqualsExpression => "Equals",
-            SyntaxKind.NotEqualsExpression => "NotEquals",
-            SyntaxKind.GreaterThanExpression => constantOnLeft ? "LessThan" : "GreaterThan",
-            SyntaxKind.GreaterThanOrEqualExpression => constantOnLeft ? "LessThanOrEqual" : "GreaterThanOrEqual",
-            SyntaxKind.LessThanExpression => constantOnLeft ? "GreaterThan" : "LessThan",
-            SyntaxKind.LessThanOrEqualExpression => constantOnLeft ? "GreaterThanOrEqual" : "LessThanOrEqual",
-            _ => throw new NotSupportedException(),
-        };
 
     private static ExpressionSyntax Unwrap(ExpressionSyntax expression)
     {
