@@ -36,12 +36,13 @@ Measured local baselines with Stryker.NET 4.16.0:
 | Scope | Measured | Mutants tested | Killed | Survived | Timeout | No coverage | Killed/tested | Stryker score | Break threshold |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Kernel validation policy scope | 2026-07-05 | 227 | 217 | 10 | 0 | 5 | 95.59% | 93.53% | 85% |
-| Services protocol/framing scope | 2026-07-05 | 289 | 220 | 57 | 12 | 0 | 76.12% | 75.82% | 0% |
+| Services protocol/framing scope | 2026-07-05 | 305 | 263 | 36 | 6 | 1 | 86.23% | 87.91% | 85% |
 
 `Killed/tested` is the raw killed mutant count divided by the table's tested count. `Stryker score`
 is the tool-reported mutation score from the same run and remains the value used as the baseline
 signal.
 
-The kernel validation policy scope now has a supported `thresholds.break` ratchet of 85. The services
-protocol/framing scope remains informational until its measured score supports an 85% break threshold.
-Tool crashes and invalid configs should still fail.
+Both focused scopes now have supported `thresholds.break` ratchets of 85. The remaining services
+protocol/framing undetected mutants are concentrated in equivalent empty-payload copies, `ConfigureAwait`
+continuation flags, defensive disposal paths, and redundant frame-minimum guards that are validated by
+later length checks. Tool crashes and invalid configs should still fail.
