@@ -35,6 +35,36 @@ public sealed class SafeFileReadCancellationRegressionTests
         AssertNoPreCancellationFileReadSideEffects(scenario.Context, scenario.Audit);
     }
 
+    [Fact]
+    public async Task ReadTextAsync_with_pre_canceled_operation_token_wraps_and_audits_cancellation()
+    {
+        using var scenario = await CreateOperationCanceledReadScenarioAsync();
+
+        var ex = await Assert.ThrowsAsync<SandboxRuntimeException>(async () =>
+            await SafeFileSystem.ReadTextAsync(
+                scenario.Context,
+                new SandboxPath("settings.json"),
+                scenario.Token));
+
+        Assert.Equal(SandboxErrorCode.Cancelled, ex.Error.Code);
+        AssertReadCancellationAudit(scenario.Context, scenario.Audit);
+    }
+
+    [Fact]
+    public async Task ReadText_descriptor_with_pre_canceled_operation_token_wraps_and_audits_cancellation()
+    {
+        using var scenario = await CreateOperationCanceledReadScenarioAsync();
+
+        var ex = await Assert.ThrowsAsync<SandboxRuntimeException>(async () =>
+            await SafeFileBindings.ReadText.Invoke(
+                scenario.Context,
+                [SandboxValue.FromPath("settings.json")],
+                scenario.Token));
+
+        Assert.Equal(SandboxErrorCode.Cancelled, ex.Error.Code);
+        AssertReadCancellationAudit(scenario.Context, scenario.Audit);
+    }
+
     private static async Task<PreCanceledReadScenario> CreatePreCanceledReadScenarioAsync()
     {
         var temp = TempDirectory.Create();
@@ -43,6 +73,17 @@ public sealed class SafeFileReadCancellationRegressionTests
         cancellation.Cancel();
         var audit = new InMemoryAuditSink();
         var context = CreateContext(temp.Path, audit, cancellation.Token);
+        return new PreCanceledReadScenario(temp, cancellation, audit, context);
+    }
+
+    private static async Task<PreCanceledReadScenario> CreateOperationCanceledReadScenarioAsync()
+    {
+        var temp = TempDirectory.Create();
+        await System.IO.File.WriteAllTextAsync(Path.Combine(temp.Path, "settings.json"), "tenant-settings");
+        var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var audit = new InMemoryAuditSink();
+        var context = CreateContext(temp.Path, audit, CancellationToken.None);
         return new PreCanceledReadScenario(temp, cancellation, audit, context);
     }
 
@@ -81,6 +122,14 @@ public sealed class SafeFileReadCancellationRegressionTests
         }
 
         Assert.Empty(failures);
+    }
+
+    private static void AssertReadCancellationAudit(SandboxContext context, InMemoryAuditSink audit)
+    {
+        Assert.Equal(0, context.Budget.FileBytesRead);
+        var auditEvent = Assert.Single(audit.Events, e => e.BindingId == "file.readText");
+        Assert.False(auditEvent.Success);
+        Assert.Equal(SandboxErrorCode.Cancelled, auditEvent.ErrorCode);
     }
 
     private sealed class PreCanceledReadScenario(
