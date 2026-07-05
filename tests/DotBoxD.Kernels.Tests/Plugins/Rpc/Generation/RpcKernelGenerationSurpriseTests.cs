@@ -173,6 +173,8 @@ public sealed partial class RpcKernelGenerationTests
         var raw = await Assert.ThrowsAsync<SandboxRuntimeException>(
             () => kernel.InvokeServerExtensionAsync([SandboxValue.FromString("extra")]).AsTask());
         Assert.Equal(SandboxErrorCode.InvalidInput, raw.Error.Code);
+        Assert.Contains("expects 0 argument(s)", raw.Error.SafeMessage, StringComparison.Ordinal);
+        Assert.Contains("received 1", raw.Error.SafeMessage, StringComparison.Ordinal);
 
         var payload = KernelRpcBinaryCodec.EncodeArguments([KernelRpcValue.String("extra")]);
         var wire = await Assert.ThrowsAsync<SandboxRuntimeException>(

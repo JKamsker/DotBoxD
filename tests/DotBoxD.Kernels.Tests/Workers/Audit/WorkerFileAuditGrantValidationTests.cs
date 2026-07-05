@@ -57,6 +57,41 @@ public sealed class WorkerFileAuditGrantValidationTests
             });
     }
 
+    [Fact]
+    public async Task Worker_accepts_redacted_file_write_audit_with_extension_evidence()
+    {
+        using var temp = TempDirectory.Create();
+        var worker = new ForgedFileWriteWorker("[redacted]", "ok", ".txt");
+        using var host = FileHost(worker);
+        var module = await host.ImportJsonAsync(FileWriteJson("token.txt", "ok"));
+        var policy = SandboxPolicyBuilder.Create()
+            .AllowRuntimeAsync()
+            .Grant(
+                "file.write",
+                new Dictionary<string, string>
+                {
+                    ["root"] = temp.Path,
+                    ["allowCreate"] = "true",
+                    ["allowOverwrite"] = "false",
+                    ["maxBytesPerRun"] = "1024",
+                    ["allowedExtensions"] = ".txt"
+                },
+                SandboxEffect.FileWrite | SandboxEffect.Audit,
+                limits => limits with { MaxFileBytesWritten = 1024 })
+            .WithFuel(1_000)
+            .Build();
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.Unit,
+            new SandboxExecutionOptions { Isolation = SandboxIsolation.WorkerProcess });
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.DoesNotContain(result.AuditEvents, e => e.Kind == "WorkerIsolationFailed");
+    }
+
     private static SandboxHost FileHost(ISandboxWorkerClient worker)
         => SandboxHost.Create(builder =>
         {
@@ -95,7 +130,10 @@ public sealed class WorkerFileAuditGrantValidationTests
         }
         """;
 
-    private sealed class ForgedFileWriteWorker(string auditPath, string text) : ISandboxWorkerClient
+    private sealed class ForgedFileWriteWorker(
+        string auditPath,
+        string text,
+        string? pathExtension = null) : ISandboxWorkerClient
     {
         public SandboxExecutionResult? Result { get; private set; }
 
@@ -130,13 +168,7 @@ public sealed class WorkerFileAuditGrantValidationTests
                 Effect: SandboxEffect.FileWrite,
                 ResourceId: $"sandbox://file.write/{auditPath}",
                 Bytes: byteCount,
-                Fields: BindingAuditFields.Create(
-                    "file",
-                    timestamp,
-                    plan.ModuleHash,
-                    plan.PolicyHash,
-                    plan.Policy.Deterministic,
-                    bytesWritten: byteCount)));
+                Fields: BindingFields(plan, timestamp, byteCount, pathExtension)));
 
             Result = new SandboxExecutionResult
             {
@@ -177,6 +209,29 @@ public sealed class WorkerFileAuditGrantValidationTests
                 ["hostCalls"] = "1",
                 ["fileBytesWritten"] = fileBytesWritten.ToString(System.Globalization.CultureInfo.InvariantCulture)
             };
+            return fields;
+        }
+
+        private static Dictionary<string, string> BindingFields(
+            ExecutionPlan plan,
+            DateTimeOffset timestamp,
+            long byteCount,
+            string? pathExtension)
+        {
+            var fields = new Dictionary<string, string>(
+                BindingAuditFields.Create(
+                    "file",
+                    timestamp,
+                    plan.ModuleHash,
+                    plan.PolicyHash,
+                    plan.Policy.Deterministic,
+                    bytesWritten: byteCount),
+                StringComparer.Ordinal);
+            if (pathExtension is not null)
+            {
+                fields["pathExtension"] = pathExtension;
+            }
+
             return fields;
         }
     }

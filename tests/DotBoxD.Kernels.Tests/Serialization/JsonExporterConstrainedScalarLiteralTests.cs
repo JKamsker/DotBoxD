@@ -9,7 +9,7 @@ public sealed class JsonExporterConstrainedScalarLiteralTests
 
     [Theory]
     [MemberData(nameof(InvalidConstrainedScalarLiterals))]
-    public void Export_rejects_or_round_trips_invalid_constrained_scalar_literals(
+    public void Export_or_import_rejects_invalid_constrained_scalar_literals(
         SandboxType returnType,
         SandboxValue value,
         string expectedDiagnostic)
@@ -24,8 +24,7 @@ public sealed class JsonExporterConstrainedScalarLiteralTests
             return;
         }
 
-        SandboxModule? roundTrip = null;
-        var importError = Record.Exception(() => roundTrip = JsonImporter.Import(json!));
+        var importError = Record.Exception(() => JsonImporter.Import(json!));
         if (importError is not null)
         {
             var validation = Assert.IsType<SandboxValidationException>(importError);
@@ -33,8 +32,7 @@ public sealed class JsonExporterConstrainedScalarLiteralTests
             return;
         }
 
-        var returned = ReturnedLiteral(roundTrip!);
-        AssertConstrainedScalarEqual(value, returned);
+        Assert.Fail($"Expected diagnostic '{expectedDiagnostic}' but export and import both succeeded.");
     }
 
     public static TheoryData<SandboxType, SandboxValue, string> InvalidConstrainedScalarLiterals()
@@ -73,29 +71,4 @@ public sealed class JsonExporterConstrainedScalarLiteralTests
             ],
             new Dictionary<string, string>());
 
-    private static SandboxValue ReturnedLiteral(SandboxModule module)
-    {
-        var ret = Assert.IsType<ReturnStatement>(Assert.Single(Assert.Single(module.Functions).Body));
-        return Assert.IsType<LiteralExpression>(ret.Value).Value;
-    }
-
-    private static void AssertConstrainedScalarEqual(SandboxValue expected, SandboxValue actual)
-    {
-        switch (expected)
-        {
-            case SandboxPathValue path:
-                Assert.Equal(path.Value.RelativePath, Assert.IsType<SandboxPathValue>(actual).Value.RelativePath);
-                break;
-            case SandboxUriValue uri:
-                Assert.Equal(uri.Value.Value, Assert.IsType<SandboxUriValue>(actual).Value.Value);
-                break;
-            case OpaqueIdValue id:
-                var actualId = Assert.IsType<OpaqueIdValue>(actual);
-                Assert.Equal(id.TypeName, actualId.TypeName);
-                Assert.Equal(id.Value, actualId.Value);
-                break;
-            default:
-                throw new InvalidOperationException("Expected a constrained scalar value.");
-        }
-    }
 }

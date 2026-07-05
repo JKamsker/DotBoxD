@@ -31,6 +31,24 @@ public sealed class WorkerPluginMessageAuditGrantValidationTests
         Assert.Contains(result.AuditEvents, e => e.Kind == "WorkerIsolationFailed");
     }
 
+    [Fact]
+    public async Task Worker_rejects_plugin_message_audit_when_message_exceeds_reported_length()
+    {
+        var worker = new ForgedPluginMessageWorker("allowed", "toolong", reportedMessageLength: 2);
+        using var host = Host(worker);
+        var module = await host.ImportJsonAsync(HostMessageJson());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create()
+            .GrantHostMessageWrite(allowedTargets: ["allowed"], maxMessageLength: 2)
+            .WithFuel(1_000)
+            .Build());
+
+        var result = await ExecuteAsync(host, plan);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.HostFailure, result.Error!.Code);
+        Assert.Contains(result.AuditEvents, e => e.Kind == "WorkerIsolationFailed");
+    }
+
     private static SandboxHost Host(ISandboxWorkerClient worker)
         => SandboxHost.Create(builder =>
         {
@@ -74,14 +92,15 @@ public sealed class WorkerPluginMessageAuditGrantValidationTests
 
     private static Dictionary<string, string> PluginMessageFields(
         ExecutionPlan plan,
-        string message)
+        string message,
+        int? reportedMessageLength)
         => new(StringComparer.Ordinal)
         {
             ["resourceKind"] = "plugin-message",
             ["durationMs"] = "0",
             ["moduleHash"] = plan.ModuleHash,
             ["policyHash"] = plan.PolicyHash,
-            ["messageLength"] = message.Length.ToString(CultureInfo.InvariantCulture)
+            ["messageLength"] = (reportedMessageLength ?? message.Length).ToString(CultureInfo.InvariantCulture)
         };
 
     private static string HostMessageJson()
@@ -113,7 +132,10 @@ public sealed class WorkerPluginMessageAuditGrantValidationTests
         }
         """;
 
-    private sealed class ForgedPluginMessageWorker(string TargetId, string Message) : ISandboxWorkerClient
+    private sealed class ForgedPluginMessageWorker(
+        string TargetId,
+        string Message,
+        int? reportedMessageLength = null) : ISandboxWorkerClient
     {
         public ValueTask<SandboxExecutionResult> ExecuteInWorkerAsync(
             ExecutionPlan plan,
@@ -142,7 +164,7 @@ public sealed class WorkerPluginMessageAuditGrantValidationTests
                 Effect: SandboxEffect.HostStateWrite,
                 ResourceId: $"target:{TargetId}",
                 Message: Message,
-                Fields: PluginMessageFields(plan, Message)));
+                Fields: PluginMessageFields(plan, Message, reportedMessageLength)));
 
             return ValueTask.FromResult(new SandboxExecutionResult
             {

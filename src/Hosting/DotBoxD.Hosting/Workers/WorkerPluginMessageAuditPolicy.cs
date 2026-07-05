@@ -11,7 +11,7 @@ internal static class WorkerPluginMessageAuditPolicy
     private const string CapabilityId = "host.message.write";
     private const string TargetPrefix = "target:";
 
-    public static bool Matches(ExecutionPlan plan, SandboxAuditEvent auditEvent)
+    public static bool Matches(ExecutionPlan plan, SandboxAuditEvent auditEvent, DateTimeOffset grantClock)
     {
         if (auditEvent.Kind != PluginMessageKind)
         {
@@ -21,7 +21,7 @@ internal static class WorkerPluginMessageAuditPolicy
         if (!string.Equals(auditEvent.BindingId, SendBindingId, StringComparison.Ordinal) ||
             !string.Equals(auditEvent.CapabilityId, CapabilityId, StringComparison.Ordinal) ||
             !TryReadTargetId(auditEvent.ResourceId, out var targetId) ||
-            !plan.Policy.TryGetGrant(CapabilityId, out var grant))
+            !plan.Policy.TryGetGrant(CapabilityId, grantClock, out var grant))
         {
             return false;
         }
@@ -86,6 +86,7 @@ internal static class WorkerPluginMessageAuditPolicy
         return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var maxMessageLength) &&
             maxMessageLength >= 0 &&
             TryReadMessageLength(auditEvent, out var messageLength) &&
+            MessageLengthEvidenceMatches(auditEvent, messageLength) &&
             messageLength <= maxMessageLength;
     }
 
@@ -97,6 +98,10 @@ internal static class WorkerPluginMessageAuditPolicy
             int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out messageLength) &&
             messageLength >= 0;
     }
+
+    private static bool MessageLengthEvidenceMatches(SandboxAuditEvent auditEvent, int messageLength)
+        => auditEvent.Message is { } message &&
+           message.Length <= messageLength;
 
     private static IReadOnlySet<string>? ReadCsv(CapabilityGrant grant, string key)
         => grant.Parameters.TryGetValue(key, out var value)

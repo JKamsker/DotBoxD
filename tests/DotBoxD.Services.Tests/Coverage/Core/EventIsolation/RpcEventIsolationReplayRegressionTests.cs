@@ -28,7 +28,8 @@ public sealed class RpcEventIsolationReplayRegressionTests
     [Fact]
     public async Task RpcDiagnostics_Report_DoesNotReplaySubscribersThatAlreadyRanBeforeFailure()
     {
-        await s_diagnosticsGate.WaitAsync(TimeSpan.FromSeconds(30));
+        var gateAcquired = await s_diagnosticsGate.WaitAsync(TimeSpan.FromSeconds(30));
+        Assert.True(gateAcquired);
         try
         {
             var operation = "diagnostic isolation " + Guid.NewGuid().ToString("N");
@@ -78,7 +79,10 @@ public sealed class RpcEventIsolationReplayRegressionTests
         }
         finally
         {
-            s_diagnosticsGate.Release();
+            if (gateAcquired)
+            {
+                s_diagnosticsGate.Release();
+            }
         }
     }
 }

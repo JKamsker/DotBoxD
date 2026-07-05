@@ -56,6 +56,29 @@ public sealed class PolicyGrantValidationRegressionTests
             d.Message.Contains("grant", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public async Task Prepare_reports_duplicate_null_grant_ids_with_clear_diagnostic()
+    {
+        var host = SandboxTestHost.Create();
+        var module = await host.ImportJsonAsync(LogModuleJson("duplicate-null-grant-id-policy"));
+        var policy = new SandboxPolicy(
+            "duplicate-null-grant-id",
+            SandboxEffects.Pure | SandboxEffect.Audit,
+            [
+                new CapabilityGrant(null!, new Dictionary<string, string>()),
+                new CapabilityGrant(null!, new Dictionary<string, string>()),
+                new CapabilityGrant("log.write", new Dictionary<string, string>())
+            ],
+            new ResourceLimits(MaxFuel: 5_000));
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
+            await host.PrepareAsync(module, policy));
+
+        Assert.Contains(ex.Diagnostics, d =>
+            d.Code == "E-POLICY-GRANT" &&
+            d.Message.Contains("multiple active grants with a null capability id", StringComparison.Ordinal));
+    }
+
     private static string LogModuleJson(string id)
         => $$"""
         {

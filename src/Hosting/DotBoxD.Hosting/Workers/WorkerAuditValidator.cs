@@ -51,7 +51,8 @@ internal static class WorkerAuditValidator
         ExecutionPlan plan,
         string entrypoint,
         SandboxExecutionOptions options,
-        SandboxAuditEvent auditEvent)
+        SandboxAuditEvent auditEvent,
+        DateTimeOffset grantClock)
     {
         if (string.IsNullOrWhiteSpace(auditEvent.Kind) ||
             !TextIsSafe(auditEvent.Kind) ||
@@ -75,7 +76,7 @@ internal static class WorkerAuditValidator
             "CacheInvalidated" => CacheInvalidatedAuditMatches(plan, entrypoint, auditEvent),
             "PolicyDenied" => false,
             BindingAuditKinds.BindingCall or BindingAuditKinds.SandboxLog or BindingAuditKinds.PluginMessage =>
-                BindingAuditMatches(plan, entrypoint, auditEvent),
+                BindingAuditMatches(plan, entrypoint, auditEvent, grantClock),
             _ => false
         };
     }
@@ -194,7 +195,8 @@ internal static class WorkerAuditValidator
     private static bool BindingAuditMatches(
         ExecutionPlan plan,
         string entrypoint,
-        SandboxAuditEvent auditEvent)
+        SandboxAuditEvent auditEvent,
+        DateTimeOffset grantClock)
     {
         if (string.IsNullOrWhiteSpace(auditEvent.BindingId) ||
             !plan.BindingReferences.TryGetValue(entrypoint, out var entrypointBindings) ||
@@ -207,7 +209,7 @@ internal static class WorkerAuditValidator
             !EffectMatches(auditEvent, binding) ||
             !ResultMatches(auditEvent) ||
             !LogAuditMatchesPolicy(plan, auditEvent) ||
-            !WorkerPluginMessageAuditPolicy.Matches(plan, auditEvent) ||
+            !WorkerPluginMessageAuditPolicy.Matches(plan, auditEvent, grantClock) ||
             !RequiredBindingFieldsMatch(plan, auditEvent))
         {
             return false;

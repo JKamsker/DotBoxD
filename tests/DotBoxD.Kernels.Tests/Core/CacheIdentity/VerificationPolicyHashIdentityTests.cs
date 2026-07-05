@@ -40,6 +40,15 @@ public sealed class VerificationPolicyHashIdentityTests
             CacheKeyBuilder.Build(plan, "main", second, optimize: false));
     }
 
+    [Fact]
+    public void Allowlist_hash_rejects_null_entries_with_clear_exception()
+    {
+        var members = new HashSet<string>(StringComparer.Ordinal) { null! };
+        var policy = VerificationPolicy.BoxedValueDefaults() with { AllowedMembers = members };
+
+        Assert.Throws<ArgumentNullException>(() => _ = policy.AllowlistHash);
+    }
+
     private static VerificationPolicy PolicyWithAllowlist(string[] allowedMembers)
         => PolicyWithAllowlistAndRuntimeFacades(allowedMembers, []);
 

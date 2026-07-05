@@ -265,7 +265,10 @@ public sealed record VerificationPolicy(
     }
 
     private static void AppendHashPart(StringBuilder builder, string value)
-        => builder.Append(value.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append(':').Append(value);
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        builder.Append(value.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append(':').Append(value);
+    }
 
     private static IReadOnlySet<string> Freeze(IEnumerable<string> values)
     {

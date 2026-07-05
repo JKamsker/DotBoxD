@@ -37,10 +37,15 @@ internal static class PolicyGrantDuplicateValidator
             {
                 diagnostics.Add(new SandboxDiagnostic(
                     "E-POLICY-GRANT",
-                    $"capability '{grant.Id}' has multiple active grants"));
+                    DuplicateGrantMessage(grant.Id)));
             }
         }
     }
+
+    private static string DuplicateGrantMessage(string? id)
+        => id is null
+            ? "policy declares multiple active grants with a null capability id"
+            : $"capability '{id}' has multiple active grants";
 
     private static bool IsActive(CapabilityGrant grant, DateTimeOffset now)
         => grant.ExpiresAt is null || grant.ExpiresAt > now;

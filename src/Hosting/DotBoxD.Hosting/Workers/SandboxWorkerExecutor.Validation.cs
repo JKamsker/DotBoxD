@@ -184,7 +184,7 @@ internal sealed partial class SandboxWorkerExecutor
         {
             if (auditEvent.SequenceNumber != expectedSequenceNumber ||
                 auditEvent.RunId != runId ||
-                !WorkerAuditValidator.Matches(plan, entrypoint, options, auditEvent))
+                !WorkerAuditValidator.Matches(plan, entrypoint, options, auditEvent, grantClock))
             {
                 return false;
             }

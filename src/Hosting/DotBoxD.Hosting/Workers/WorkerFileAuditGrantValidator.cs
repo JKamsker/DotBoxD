@@ -11,6 +11,8 @@ internal static class WorkerFileAuditGrantValidator
 {
     private const string FileRead = "file.read";
     private const string FileWrite = "file.write";
+    private const string PathExtensionField = "pathExtension";
+    private const string RedactedSegment = "[redacted]";
 
     public static bool Matches(ExecutionPlan plan, SandboxAuditEvent auditEvent, DateTimeOffset grantClock)
     {
@@ -55,7 +57,7 @@ internal static class WorkerFileAuditGrantValidator
         {
             var options = SafeFileGrantReader.Read(grant);
             return BytesMatch(options, bytes) &&
-                ExtensionMatches(options, auditEvent.ResourceId!);
+                ExtensionMatches(options, auditEvent);
         }
         catch (SandboxRuntimeException)
         {
@@ -64,16 +66,52 @@ internal static class WorkerFileAuditGrantValidator
     }
 
     private static bool BytesMatch(SafeFileGrantOptions options, long bytes)
-        => options.MaxBytesPerRun is not { } maxBytes || bytes <= maxBytes;
+        => bytes >= 0 &&
+           (options.MaxBytesPerRun is not { } maxBytes || bytes <= maxBytes);
 
-    private static bool ExtensionMatches(SafeFileGrantOptions options, string resource)
+    private static bool ExtensionMatches(SafeFileGrantOptions options, SandboxAuditEvent auditEvent)
     {
         if (options.AllowedExtensions is null)
         {
             return true;
         }
 
-        var extension = Path.GetExtension(resource);
-        return options.AllowedExtensions.Contains(extension);
+        var resource = auditEvent.ResourceId!;
+        var resourceExtension = Path.GetExtension(resource);
+        if (auditEvent.Fields?.TryGetValue(PathExtensionField, out var evidence) == true)
+        {
+            if (!IsValidExtension(evidence))
+            {
+                return false;
+            }
+
+            return options.AllowedExtensions.Contains(evidence) &&
+                (ResourceContainsRedaction(resource) ||
+                 string.Equals(resourceExtension, evidence, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return options.AllowedExtensions.Contains(resourceExtension);
     }
+
+    private static bool IsValidExtension(string extension)
+    {
+        if (extension.Length <= 1 || extension[0] != '.')
+        {
+            return false;
+        }
+
+        for (var i = 1; i < extension.Length; i++)
+        {
+            var c = extension[i];
+            if (char.IsControl(c) || char.IsWhiteSpace(c) || c is '/' or '\\' or '.')
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool ResourceContainsRedaction(string resource)
+        => resource.Contains("/" + RedactedSegment, StringComparison.Ordinal);
 }
