@@ -163,25 +163,46 @@ public static partial class KernelRpcMarshaller
             return IsSupportedNullableUnderlying(underlying) ? null : underlying;
         }
 
-        if (ElementType(type) is { } elementType &&
-            UnsupportedNullableValueType(elementType, visited) is { } unsupportedElement)
+        return UnsupportedNestedNullableValueType(type, visited);
+    }
+
+    private static Type? UnsupportedNestedNullableValueType(Type type, HashSet<Type> visited)
+    {
+        if (UnsupportedNullableElementType(type, visited) is { } unsupportedElement)
         {
             return unsupportedElement;
         }
 
-        if (MapTypes(type) is { } mapTypes)
+        if (UnsupportedNullableMapType(type, visited) is { } unsupportedMap)
         {
-            if (UnsupportedNullableValueType(mapTypes.Key, visited) is { } unsupportedKey)
-            {
-                return unsupportedKey;
-            }
-
-            if (UnsupportedNullableValueType(mapTypes.Value, visited) is { } unsupportedValue)
-            {
-                return unsupportedValue;
-            }
+            return unsupportedMap;
         }
 
+        return UnsupportedNullableDtoFieldType(type, visited);
+    }
+
+    private static Type? UnsupportedNullableElementType(Type type, HashSet<Type> visited)
+        => ElementType(type) is { } elementType
+            ? UnsupportedNullableValueType(elementType, visited)
+            : null;
+
+    private static Type? UnsupportedNullableMapType(Type type, HashSet<Type> visited)
+    {
+        if (MapTypes(type) is not { } mapTypes)
+        {
+            return null;
+        }
+
+        if (UnsupportedNullableValueType(mapTypes.Key, visited) is { } unsupportedKey)
+        {
+            return unsupportedKey;
+        }
+
+        return UnsupportedNullableValueType(mapTypes.Value, visited);
+    }
+
+    private static Type? UnsupportedNullableDtoFieldType(Type type, HashSet<Type> visited)
+    {
         if (DtoShape(type) is { } shape)
         {
             foreach (var field in shape.Fields)
@@ -208,18 +229,39 @@ public static partial class KernelRpcMarshaller
             return true;
         }
 
-        if (ElementType(type) is { } elementType && ContainsNullableValueType(elementType, visited))
+        if (ContainsNullableElementType(type, visited))
         {
             return true;
         }
 
-        if (MapTypes(type) is { } mapTypes &&
-            (ContainsNullableValueType(mapTypes.Key, visited) ||
-             ContainsNullableValueType(mapTypes.Value, visited)))
+        if (ContainsNullableMapType(type, visited))
         {
             return true;
         }
 
+        return ContainsNullableDtoFieldType(type, visited);
+    }
+
+    private static bool ContainsNullableElementType(Type type, HashSet<Type> visited)
+        => ElementType(type) is { } elementType && ContainsNullableValueType(elementType, visited);
+
+    private static bool ContainsNullableMapType(Type type, HashSet<Type> visited)
+    {
+        if (MapTypes(type) is not { } mapTypes)
+        {
+            return false;
+        }
+
+        if (ContainsNullableValueType(mapTypes.Key, visited))
+        {
+            return true;
+        }
+
+        return ContainsNullableValueType(mapTypes.Value, visited);
+    }
+
+    private static bool ContainsNullableDtoFieldType(Type type, HashSet<Type> visited)
+    {
         if (DtoShape(type) is { } shape)
         {
             foreach (var field in shape.Fields)

@@ -53,21 +53,50 @@ public static class KernelRpcValueConverter
     public static KernelRpcValue FromSandboxValue(SandboxValue value)
     {
         ArgumentNullException.ThrowIfNull(value);
+        if (TryScalarFromSandboxValue(value, out var scalar))
+        {
+            return scalar;
+        }
+
         return value switch
         {
-            UnitValue => KernelRpcValue.Unit(),
-            BoolValue boolean => KernelRpcValue.Bool(boolean.Value),
-            I32Value number => KernelRpcValue.Int32(number.Value),
-            I64Value number => KernelRpcValue.Int64(number.Value),
-            F64Value number => KernelRpcValue.Double(number.Value),
-            StringValue text => KernelRpcValue.String(text.Value),
-            GuidValue guid => KernelRpcValue.Guid(guid.Value),
             ListValue list => KernelRpcValue.ListFromOwnedItems(ConvertList(list.Values)),
             RecordValue record => KernelRpcValue.RecordFromOwnedFields(ConvertList(record.Fields)),
             MapValue map => KernelRpcValue.MapFromOwnedEntries(ConvertMap(map)),
             _ => throw new NotSupportedException(
                 $"Server extension IPC cannot marshal sandbox value '{value.GetType().Name}'.")
         };
+    }
+
+    private static bool TryScalarFromSandboxValue(SandboxValue value, out KernelRpcValue converted)
+    {
+        switch (value)
+        {
+            case UnitValue:
+                converted = KernelRpcValue.Unit();
+                return true;
+            case BoolValue boolean:
+                converted = KernelRpcValue.Bool(boolean.Value);
+                return true;
+            case I32Value number:
+                converted = KernelRpcValue.Int32(number.Value);
+                return true;
+            case I64Value number:
+                converted = KernelRpcValue.Int64(number.Value);
+                return true;
+            case F64Value number:
+                converted = KernelRpcValue.Double(number.Value);
+                return true;
+            case StringValue text:
+                converted = KernelRpcValue.String(text.Value);
+                return true;
+            case GuidValue guid:
+                converted = KernelRpcValue.Guid(guid.Value);
+                return true;
+            default:
+                converted = default;
+                return false;
+        }
     }
 
     public static SandboxValue ToSandboxValue(KernelRpcValue value, SandboxType expectedType)

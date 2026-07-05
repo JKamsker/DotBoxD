@@ -29,49 +29,90 @@ public static partial class KernelRpcMarshaller
             return nullable;
         }
 
+        if (TryWellKnownFromKernelRpcValue(value, type, out var wellKnown))
+        {
+            return wellKnown;
+        }
+
+        if (TryEnumFromKernelRpcValue(value, type, out var enumValue))
+        {
+            return enumValue;
+        }
+
+        if (TryStructuredFromKernelRpcValue(value, type, out var structured))
+        {
+            return structured;
+        }
+
+        throw new NotSupportedException($"Server extension cannot marshal a kernel RPC value to type '{type}'.");
+    }
+
+    private static bool TryWellKnownFromKernelRpcValue(KernelRpcValue value, Type type, out object? result)
+    {
         if (TryScalarFromKernel(value, type, out var scalar))
         {
-            return scalar;
+            result = scalar;
+            return true;
         }
 
         if (TryDateTimeFromKernelRpcValue(value, type, out var dateTime))
         {
-            return dateTime;
+            result = dateTime;
+            return true;
         }
 
         if (TryDecimalFromKernelRpcValue(value, type, out var decimalValue))
         {
-            return decimalValue;
+            result = decimalValue;
+            return true;
         }
 
         if (TryFrameworkStructFromKernelRpcValue(value, type, out var frameworkStruct))
         {
-            return frameworkStruct;
+            result = frameworkStruct;
+            return true;
         }
 
-        if (type.IsEnum)
+        result = null;
+        return false;
+    }
+
+    private static bool TryEnumFromKernelRpcValue(KernelRpcValue value, Type type, out object? result)
+    {
+        if (!type.IsEnum)
         {
-            return EnumUsesI64(type)
-                ? EnumFromInt64(type, value.Int64Value)
-                : EnumFromInt32(type, value.Int32Value);
+            result = null;
+            return false;
         }
 
+        result = EnumUsesI64(type)
+            ? EnumFromInt64(type, value.Int64Value)
+            : EnumFromInt32(type, value.Int32Value);
+        return true;
+    }
+
+    private static bool TryStructuredFromKernelRpcValue(KernelRpcValue value, Type type, out object? result)
+    {
         if (value.Kind == KernelRpcValueKind.Record && DtoShape(type) is { } shape)
         {
-            return DtoFromKernelRpcValue(value, type, shape);
+            result = DtoFromKernelRpcValue(value, type, shape);
+            return true;
         }
 
         if (ElementType(type) is { } elementType)
         {
-            return ListFromKernelRpcValue(value, type, elementType);
+            result = ListFromKernelRpcValue(value, type, elementType);
+            return true;
         }
 
         if (MapTypes(type) is { } mapTypes)
         {
-            return MapFromKernelRpcValue(value, type, mapTypes);
+            result = MapFromKernelRpcValue(value, type, mapTypes);
+            return true;
         }
 
-        throw new NotSupportedException($"Server extension cannot marshal a kernel RPC value to type '{type}'.");
+        result = null;
+        return false;
     }
 
     private static object DtoFromKernelRpcValue(KernelRpcValue value, Type type, RecordShape shape)
