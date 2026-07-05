@@ -20,7 +20,7 @@ internal static class ExecutionPlanGuard
         catch (ArgumentOutOfRangeException ex)
         {
             throw new SandboxValidationException([
-                new SandboxDiagnostic("E-POLICY-LIMIT", $"policy resource limit '{ex.ParamName}' must be non-negative")
+                CreatePolicyLimitDiagnostic(ex)
             ]);
         }
     }
@@ -89,14 +89,18 @@ internal static class ExecutionPlanGuard
         }
         catch (ArgumentOutOfRangeException ex)
         {
-            diagnostics.Add(new SandboxDiagnostic(
-                "E-POLICY-LIMIT",
-                $"policy resource limit '{ex.ParamName}' must be non-negative"));
+            diagnostics.Add(CreatePolicyLimitDiagnostic(ex));
         }
     }
 
     private static SandboxDiagnostic MissingResourceLimitsDiagnostic()
         => new("E-POLICY-LIMIT", "policy resource limits are required");
+
+    private static SandboxDiagnostic CreatePolicyLimitDiagnostic(ArgumentOutOfRangeException ex)
+    {
+        var reason = ResourceLimitValidationReasons.GetReason(ex) ?? "must be non-negative";
+        return new SandboxDiagnostic("E-POLICY-LIMIT", $"policy resource limit '{ex.ParamName}' {reason}");
+    }
 
     private static bool IsTrustedPreparedPlan(
         ExecutionPlan plan,
