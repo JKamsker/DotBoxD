@@ -107,41 +107,10 @@ internal static class RpcKernelClientParameterSource
         var builder = new StringBuilder();
         foreach (var attr in parameter.GetAttributes())
         {
-            switch (attr.AttributeClass?.ToDisplayString())
-            {
-                case "System.Runtime.CompilerServices.CallerMemberNameAttribute":
-                    builder.Append("[global::System.Runtime.CompilerServices.CallerMemberNameAttribute] ");
-                    break;
-
-                case "System.Runtime.CompilerServices.CallerFilePathAttribute":
-                    builder.Append("[global::System.Runtime.CompilerServices.CallerFilePathAttribute] ");
-                    break;
-
-                case "System.Runtime.CompilerServices.CallerLineNumberAttribute":
-                    builder.Append("[global::System.Runtime.CompilerServices.CallerLineNumberAttribute] ");
-                    break;
-
-                case "System.Runtime.CompilerServices.CallerArgumentExpressionAttribute":
-                    AppendCallerArgumentExpressionAttribute(builder, attr);
-                    break;
-            }
+            CallerInfoAttributeFormatter.TryAppend(builder, attr);
         }
 
         return builder.ToString();
-    }
-
-    private static void AppendCallerArgumentExpressionAttribute(StringBuilder builder, AttributeData attr)
-    {
-        if (attr.ConstructorArguments.Length != 1 ||
-            attr.ConstructorArguments[0].Value is not string parameterName)
-        {
-            return;
-        }
-
-        builder
-            .Append("[global::System.Runtime.CompilerServices.CallerArgumentExpressionAttribute(\"")
-            .Append(CSharpLiteralFormatter.EscapeStringLiteral(parameterName))
-            .Append("\")] ");
     }
 
     private static bool HasMetadataDefaultAttribute(IParameterSymbol parameter)
