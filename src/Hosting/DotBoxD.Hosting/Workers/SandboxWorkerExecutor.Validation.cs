@@ -73,6 +73,16 @@ internal sealed partial class SandboxWorkerExecutor
             return false;
         }
 
+        if (!RequestedWorkerModeMatches(options, result))
+        {
+            return false;
+        }
+
+        return WorkerArtifactHashMatches(result);
+    }
+
+    private static bool RequestedWorkerModeMatches(SandboxExecutionOptions options, SandboxExecutionResult result)
+    {
         if (options.Mode == ExecutionMode.Compiled &&
             !options.AllowFallbackToInterpreter &&
             result.ActualMode != ExecutionMode.Compiled)
@@ -80,6 +90,11 @@ internal sealed partial class SandboxWorkerExecutor
             return false;
         }
 
+        return true;
+    }
+
+    private static bool WorkerArtifactHashMatches(SandboxExecutionResult result)
+    {
         if (result.ActualMode == ExecutionMode.Interpreted)
         {
             return string.IsNullOrWhiteSpace(result.ArtifactHash);

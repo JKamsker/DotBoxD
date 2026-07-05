@@ -66,7 +66,10 @@ internal static class SafeIpAddressClassifier
            address.Equals(IPAddress.IPv6Any) ||
            address.IsIPv6LinkLocal ||
            address.IsIPv6SiteLocal ||
-           bytes[0] == 0xff ||
+           HasNonGlobalIpv6Prefix(bytes);
+
+    private static bool HasNonGlobalIpv6Prefix(ReadOnlySpan<byte> bytes)
+        => bytes[0] == 0xff ||
            (bytes[0] & 0xfe) == 0xfc ||
            (bytes[0] & 0xe0) != 0x20 ||
            IsIetfProtocolAssignment(bytes) ||

@@ -1,4 +1,5 @@
 using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Hosting.Worker;
@@ -7,6 +8,21 @@ internal static class WorkerEnvelopeValidators
 {
     private const int MaxSafeMessageLength = 1_024;
     private const int MaxDiagnosticIdLength = 128;
+
+    private static readonly BudgetField[] BudgetFields =
+    [
+        new("maxFuel", static budget => budget.MaxFuel),
+        new("maxLoopIterations", static budget => budget.MaxLoopIterations),
+        new("maxAllocatedBytes", static budget => budget.MaxAllocatedBytes),
+        new("maxHostCalls", static budget => budget.MaxHostCalls),
+        new("maxFileBytesRead", static budget => budget.MaxFileBytesRead),
+        new("maxFileBytesWritten", static budget => budget.MaxFileBytesWritten),
+        new("maxNetworkBytesRead", static budget => budget.MaxNetworkBytesRead),
+        new("maxNetworkBytesWritten", static budget => budget.MaxNetworkBytesWritten),
+        new("maxLogEvents", static budget => budget.MaxLogEvents),
+        new("maxCollectionElements", static budget => budget.MaxTotalCollectionElements),
+        new("maxStringBytes", static budget => budget.MaxTotalStringBytes),
+    ];
 
     private static readonly string[] SecretMarkers =
     [
@@ -33,17 +49,17 @@ internal static class WorkerEnvelopeValidators
            IsSafeOptionalDiagnosticId(error.DiagnosticId);
 
     internal static bool BudgetFieldsMatch(ExecutionPlan plan, SandboxAuditEvent summary)
-        => FieldEquals(summary, "maxFuel", plan.Budget.MaxFuel) &&
-           FieldEquals(summary, "maxLoopIterations", plan.Budget.MaxLoopIterations) &&
-           FieldEquals(summary, "maxAllocatedBytes", plan.Budget.MaxAllocatedBytes) &&
-           FieldEquals(summary, "maxHostCalls", plan.Budget.MaxHostCalls) &&
-           FieldEquals(summary, "maxFileBytesRead", plan.Budget.MaxFileBytesRead) &&
-           FieldEquals(summary, "maxFileBytesWritten", plan.Budget.MaxFileBytesWritten) &&
-           FieldEquals(summary, "maxNetworkBytesRead", plan.Budget.MaxNetworkBytesRead) &&
-           FieldEquals(summary, "maxNetworkBytesWritten", plan.Budget.MaxNetworkBytesWritten) &&
-           FieldEquals(summary, "maxLogEvents", plan.Budget.MaxLogEvents) &&
-           FieldEquals(summary, "maxCollectionElements", plan.Budget.MaxTotalCollectionElements) &&
-           FieldEquals(summary, "maxStringBytes", plan.Budget.MaxTotalStringBytes);
+    {
+        foreach (var field in BudgetFields)
+        {
+            if (!FieldEquals(summary, field.Key, field.Value(plan.Budget)))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     private static bool IsSafeOptionalDiagnosticId(string? value)
         => value is null || IsSafeText(value, MaxDiagnosticIdLength, allowColon: false);
@@ -88,4 +104,6 @@ internal static class WorkerEnvelopeValidators
 
         return false;
     }
+
+    private readonly record struct BudgetField(string Key, Func<ResourceLimits, long> Value);
 }

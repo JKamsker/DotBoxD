@@ -121,21 +121,14 @@ internal static class WorkerAuditValidator
 
     private static bool RunSummarySchemaMatches(ExecutionPlan plan, SandboxAuditEvent auditEvent)
     {
-        if (auditEvent.BindingId is not null ||
-            auditEvent.CapabilityId is not null ||
-            auditEvent.Effect != SandboxEffect.None ||
-            auditEvent.Fields is null ||
-            !string.Equals(auditEvent.ResourceId, $"module:{plan.ModuleHash}", StringComparison.Ordinal))
+        if (!RunSummaryEnvelopeMatches(plan, auditEvent))
         {
             return false;
         }
 
-        foreach (var field in auditEvent.Fields)
+        foreach (var field in auditEvent.Fields!)
         {
-            if (!FieldNameAllowed(plan, field.Key) ||
-                string.IsNullOrWhiteSpace(field.Key) ||
-                !TextIsSafe(field.Key) ||
-                !TextIsSafe(field.Value))
+            if (!RunSummaryFieldMatches(plan, field))
             {
                 return false;
             }
@@ -143,6 +136,19 @@ internal static class WorkerAuditValidator
 
         return true;
     }
+
+    private static bool RunSummaryEnvelopeMatches(ExecutionPlan plan, SandboxAuditEvent auditEvent)
+        => auditEvent.BindingId is null &&
+           auditEvent.CapabilityId is null &&
+           auditEvent.Effect == SandboxEffect.None &&
+           auditEvent.Fields is not null &&
+           string.Equals(auditEvent.ResourceId, $"module:{plan.ModuleHash}", StringComparison.Ordinal);
+
+    private static bool RunSummaryFieldMatches(ExecutionPlan plan, KeyValuePair<string, string> field)
+        => FieldNameAllowed(plan, field.Key) &&
+           !string.IsNullOrWhiteSpace(field.Key) &&
+           TextIsSafe(field.Key) &&
+           TextIsSafe(field.Value);
 
     private static bool FieldNameAllowed(ExecutionPlan plan, string key)
         => CommonRunSummaryFields.Contains(key) ||
