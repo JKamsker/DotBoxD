@@ -1,4 +1,4 @@
-namespace DotBoxD.Kernels.Tests.Plugins;
+namespace DotBoxD.Kernels.Tests.Plugins.Messaging;
 
 public sealed class PluginMessageSinkContractTests
 {
@@ -18,6 +18,20 @@ public sealed class PluginMessageSinkContractTests
             () => new PluginMessage("target-1", null!));
 
         Assert.Equal("message", ex.ParamName);
+    }
+
+    [Fact]
+    public void Plugin_message_init_rejects_null_inputs()
+    {
+        var targetEx = Assert.Throws<ArgumentNullException>(
+            () => new PluginMessage("target-1", "message") { TargetId = null! });
+
+        Assert.Equal("value", targetEx.ParamName);
+
+        var messageEx = Assert.Throws<ArgumentNullException>(
+            () => new PluginMessage("target-1", "message") { Message = null! });
+
+        Assert.Equal("value", messageEx.ParamName);
     }
 
     [Fact]
