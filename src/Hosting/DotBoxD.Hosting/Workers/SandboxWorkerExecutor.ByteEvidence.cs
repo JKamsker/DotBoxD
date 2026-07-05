@@ -6,6 +6,43 @@ namespace DotBoxD.Hosting;
 
 internal sealed partial class SandboxWorkerExecutor
 {
+    private static bool TryRecordBindingEvidence(
+        ExecutionPlan plan,
+        SandboxAuditEvent auditEvent,
+        Dictionary<string, int> observedBindingCalls,
+        ref long observedBindingBaseFuel,
+        ref ObservedBindingBytes observedBytes,
+        DateTimeOffset grantClock)
+    {
+        if (auditEvent.BindingId is null ||
+            !plan.Bindings.TryGet(auditEvent.BindingId, out var binding))
+        {
+            return false;
+        }
+
+        try
+        {
+            observedBindingBaseFuel = checked(observedBindingBaseFuel + binding.CostModel.BaseFuel);
+        }
+        catch (OverflowException)
+        {
+            return false;
+        }
+
+        var calls = observedBindingCalls.TryGetValue(auditEvent.BindingId, out var existing)
+            ? existing + 1
+            : 1;
+        observedBindingCalls[auditEvent.BindingId] = calls;
+        return (binding.CostModel.MaxCallsPerRun is not { } maxCalls || calls <= maxCalls) &&
+            TryRecordBindingByteEvidence(auditEvent, ref observedBytes) &&
+            WorkerFileAuditGrantValidator.Matches(plan, auditEvent, grantClock);
+    }
+
+    private static bool TryRecordBindingByteEvidence(
+        SandboxAuditEvent auditEvent,
+        ref ObservedBindingBytes observedBytes)
+        => TryRecordBindingByteEvidenceCore(auditEvent, ref observedBytes);
+
     private static bool TryRecordBindingByteEvidenceCore(
         SandboxAuditEvent auditEvent,
         ref ObservedBindingBytes observedBytes)

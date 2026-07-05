@@ -199,7 +199,7 @@ internal sealed partial class SandboxWorkerExecutor
 
                 observedHostCalls++;
                 observedBindingCalls ??= new Dictionary<string, int>(StringComparer.Ordinal);
-                if (!TryRecordBindingAuditEvidence(
+                if (!TryRecordBindingEvidence(
                     plan,
                     auditEvent,
                     observedBindingCalls,
@@ -250,43 +250,6 @@ internal sealed partial class SandboxWorkerExecutor
 
     private static bool IsBindingAudit(string kind)
         => kind is "BindingCall" or "SandboxLog" or "PluginMessage";
-
-    private static bool TryRecordBindingAuditEvidence(
-        ExecutionPlan plan,
-        SandboxAuditEvent auditEvent,
-        Dictionary<string, int> observedBindingCalls,
-        ref long observedBindingBaseFuel,
-        ref ObservedBindingBytes observedBytes,
-        DateTimeOffset grantClock)
-    {
-        if (auditEvent.BindingId is null ||
-            !plan.Bindings.TryGet(auditEvent.BindingId, out var binding))
-        {
-            return false;
-        }
-
-        try
-        {
-            observedBindingBaseFuel = checked(observedBindingBaseFuel + binding.CostModel.BaseFuel);
-        }
-        catch (OverflowException)
-        {
-            return false;
-        }
-
-        var calls = observedBindingCalls.TryGetValue(auditEvent.BindingId, out var existing)
-            ? existing + 1
-            : 1;
-        observedBindingCalls[auditEvent.BindingId] = calls;
-        return (binding.CostModel.MaxCallsPerRun is not { } maxCalls || calls <= maxCalls) &&
-            TryRecordBindingByteEvidence(auditEvent, ref observedBytes) &&
-            WorkerFileAuditGrantValidator.Matches(plan, auditEvent, grantClock);
-    }
-
-    private static bool TryRecordBindingByteEvidence(
-        SandboxAuditEvent auditEvent,
-        ref ObservedBindingBytes observedBytes)
-        => TryRecordBindingByteEvidenceCore(auditEvent, ref observedBytes);
 
     private static bool AuditEvidenceUsageMatches(
         SandboxResourceUsage usage,

@@ -151,69 +151,8 @@ internal static class InheritedMethodDeduplicator
     public static string GetNullableTypeKey(
         ITypeSymbol type,
         IMethodSymbol method,
-        CancellationToken ct)
-    {
-        ct.ThrowIfCancellationRequested();
-
-        if (type is ITypeParameterSymbol typeParameter &&
-            typeParameter.TypeParameterKind == TypeParameterKind.Method)
-        {
-            return "!!" + typeParameter.Ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture) +
-                NullableSuffix(typeParameter.NullableAnnotation);
-        }
-
-        if (type.TypeKind == TypeKind.Dynamic)
-        {
-            return ServicesGeneratorTypeNames.GlobalObject + NullableSuffix(type.NullableAnnotation);
-        }
-
-        if (type is IArrayTypeSymbol array)
-        {
-            return GetNullableTypeKey(array.ElementType, method, ct) +
-                "[" + new string(',', array.Rank - 1) + "]" +
-                NullableSuffix(array.NullableAnnotation);
-        }
-
-        if (type is INamedTypeSymbol named)
-        {
-            return GetNullableNamedTypeKey(named, method, ct);
-        }
-
-        return type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
-            NullableSuffix(type.NullableAnnotation);
-    }
-
-    private static string GetNullableNamedTypeKey(
-        INamedTypeSymbol type,
-        IMethodSymbol method,
-        CancellationToken ct)
-    {
-        var name = type.ContainingType is null
-            ? GetNamespacePrefix(type) + type.MetadataName
-            : GetNullableNamedTypeKey(type.ContainingType, method, ct) + "." + type.MetadataName;
-        name += NullableSuffix(type.NullableAnnotation);
-        if (type.TypeArguments.Length == 0)
-        {
-            return name;
-        }
-
-        var args = new List<string>();
-        foreach (var arg in type.TypeArguments)
-        {
-            ct.ThrowIfCancellationRequested();
-            args.Add(GetNullableTypeKey(arg, method, ct));
-        }
-
-        return name + "<" + string.Join(",", args) + ">";
-    }
-
-    private static string GetNamespacePrefix(INamedTypeSymbol type) =>
-        type.ContainingNamespace.IsGlobalNamespace
-            ? ServicesGeneratorTypeNames.GlobalPrefix
-            : ServicesGeneratorTypeNames.GlobalPrefix + type.ContainingNamespace.ToDisplayString() + ".";
-
-    private static string NullableSuffix(NullableAnnotation annotation) =>
-        annotation == NullableAnnotation.Annotated ? "?" : string.Empty;
+        CancellationToken ct) =>
+        InheritedNullableTypeKey.Get(type, method, ct);
 
     private static string GetCallerInfoKey(IParameterSymbol parameter, CancellationToken ct)
     {

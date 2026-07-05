@@ -5,6 +5,7 @@ using DotBoxD.Kernels.Policies;
 namespace DotBoxD.Kernels.Validation;
 
 using DotBoxD.Kernels;
+using DotBoxD.Kernels.Validation.Internal;
 
 internal static class PolicyGrantValidator
 {
@@ -20,7 +21,7 @@ internal static class PolicyGrantValidator
         var now = policy.GrantClock;
         var grants = policy.Grants;
         AddNullGrantDiagnostics(grants, diagnostics);
-        AddDuplicateActiveGrantDiagnostics(grants, now, diagnostics);
+        PolicyGrantDuplicateValidator.AddActiveGrantDiagnostics(grants, now, diagnostics);
         foreach (var grant in grants)
         {
             if (grant is not null && IsActive(grant, now))
@@ -33,42 +34,6 @@ internal static class PolicyGrantValidator
     private static bool IsActive(CapabilityGrant grant, DateTimeOffset now)
         => grant.ExpiresAt is null || grant.ExpiresAt > now;
 
-    private static void AddDuplicateActiveGrantDiagnostics(
-        IReadOnlyList<CapabilityGrant> grants,
-        DateTimeOffset now,
-        List<SandboxDiagnostic> diagnostics)
-    {
-        if (grants.Count < 2)
-        {
-            return;
-        }
-
-        var counts = new Dictionary<string, int>(grants.Count, StringComparer.Ordinal);
-        var nullCount = 0;
-        for (var i = 0; i < grants.Count; i++)
-        {
-            var grant = grants[i];
-            if (grant is not null && IsActive(grant, now))
-            {
-                IncrementCount(counts, grant.Id, ref nullCount);
-            }
-        }
-
-        var reportedNull = false;
-        for (var i = 0; i < grants.Count; i++)
-        {
-            var grant = grants[i];
-            if (grant is not null &&
-                IsActive(grant, now) &&
-                ShouldReportDuplicate(counts, grant.Id, nullCount, ref reportedNull))
-            {
-                diagnostics.Add(new SandboxDiagnostic(
-                    "E-POLICY-GRANT",
-                    $"capability '{grant.Id}' has multiple active grants"));
-            }
-        }
-    }
-
     private static void AddNullGrantDiagnostics(
         IReadOnlyList<CapabilityGrant> grants,
         List<SandboxDiagnostic> diagnostics)
@@ -80,44 +45,6 @@ internal static class PolicyGrantValidator
                 diagnostics.Add(new SandboxDiagnostic("E-POLICY-GRANT", "policy grants cannot contain null entries"));
             }
         }
-    }
-
-    private static void IncrementCount(Dictionary<string, int> counts, string? value, ref int nullCount)
-    {
-        if (value is null)
-        {
-            nullCount++;
-            return;
-        }
-
-        counts.TryGetValue(value, out var count);
-        counts[value] = count + 1;
-    }
-
-    private static bool ShouldReportDuplicate(
-        Dictionary<string, int> counts,
-        string? value,
-        int nullCount,
-        ref bool reportedNull)
-    {
-        if (value is null)
-        {
-            if (nullCount < 2 || reportedNull)
-            {
-                return false;
-            }
-
-            reportedNull = true;
-            return true;
-        }
-
-        if (!counts.TryGetValue(value, out var count) || count < 2)
-        {
-            return false;
-        }
-
-        counts[value] = 0;
-        return true;
     }
 
     private static void ValidateGrant(
