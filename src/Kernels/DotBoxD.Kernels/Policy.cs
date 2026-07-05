@@ -169,10 +169,12 @@ public sealed record SandboxPolicy(
         var wildcards = new List<CapabilityGrant>();
         for (var i = 0; i < grants.Count; i++)
         {
-            if (grants[i].Id is not null &&
-                CapabilityPattern.IsWildcard(grants[i].Id))
+            var grant = grants[i];
+            if (grant is not null &&
+                grant.Id is not null &&
+                CapabilityPattern.IsWildcard(grant.Id))
             {
-                wildcards.Add(grants[i]);
+                wildcards.Add(grant);
             }
         }
 
@@ -188,7 +190,7 @@ public sealed record SandboxPolicy(
         for (var i = 0; i < grants.Count; i++)
         {
             var grant = grants[i];
-            if (grant.Id is null)
+            if (grant is null || grant.Id is null)
             {
                 continue;
             }

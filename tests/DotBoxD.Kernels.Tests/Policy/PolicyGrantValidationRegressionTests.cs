@@ -11,24 +11,7 @@ public sealed class PolicyGrantValidationRegressionTests
     public async Task Prepare_rejects_null_capability_grant_ids_with_policy_diagnostic()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ImportJsonAsync("""
-        {
-          "id": "null-grant-id-policy",
-          "version": "1.0.0",
-          "capabilityRequests": [{ "id": "log.write", "reason": "test logs" }],
-          "functions": [
-            {
-              "id": "main",
-              "visibility": "entrypoint",
-              "parameters": [],
-              "returnType": "Unit",
-              "body": [
-                { "op": "return", "value": { "call": "log.info", "args": [{ "string": "hello" }] } }
-              ]
-            }
-          ]
-        }
-        """);
+        var module = await host.ImportJsonAsync(LogModuleJson("null-grant-id-policy"));
         var policy = new SandboxPolicy(
             "null-grant-id",
             SandboxEffects.Pure | SandboxEffect.Audit,
@@ -49,4 +32,53 @@ public sealed class PolicyGrantValidationRegressionTests
                 diagnostic.Message.Contains("id", StringComparison.OrdinalIgnoreCase) &&
                 diagnostic.Message.Contains("null", StringComparison.OrdinalIgnoreCase));
     }
+
+    [Fact]
+    public async Task Prepare_rejects_null_capability_grant_entries_with_policy_diagnostic()
+    {
+        var host = SandboxTestHost.Create();
+        var module = await host.ImportJsonAsync(LogModuleJson("null-grant-entry-policy"));
+        var policy = new SandboxPolicy(
+            "null-grant-entry",
+            SandboxEffects.Pure | SandboxEffect.Audit,
+            [
+                null!,
+                new CapabilityGrant("log.write", new Dictionary<string, string>())
+            ],
+            new ResourceLimits(MaxFuel: 1_000));
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
+            await host.PrepareAsync(module, policy));
+
+        Assert.Contains(ex.Diagnostics, d =>
+            d.Code == "E-POLICY-GRANT" &&
+            d.Message.Contains("null", StringComparison.OrdinalIgnoreCase) &&
+            d.Message.Contains("grant", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string LogModuleJson(string id)
+        => $$"""
+        {
+          "id": "{{id}}",
+          "version": "1.0.0",
+          "capabilityRequests": [{ "id": "log.write", "reason": "test logs" }],
+          "functions": [
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [],
+              "returnType": "Unit",
+              "body": [
+                {
+                  "op": "return",
+                  "value": {
+                    "call": "log.info",
+                    "args": [{ "string": "hello" }]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+        """;
 }
