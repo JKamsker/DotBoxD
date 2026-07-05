@@ -20,7 +20,7 @@ internal sealed class ResultHookSlot<TEvent, TContext>
 {
     private readonly object _gate = new();
     private readonly IPluginEventAdapter<TEvent> _adapter;
-    private readonly Action<ResultHookFault>? _onFault;
+    private readonly ResultHookEntryInvoker<TEvent, TContext> _invoker;
     private readonly Func<long> _nextOrder;
     private volatile Entry[] _entries = [];
 
@@ -30,7 +30,7 @@ internal sealed class ResultHookSlot<TEvent, TContext>
         Func<long>? nextOrder = null)
     {
         _adapter = adapter;
-        _onFault = onFault;
+        _invoker = new ResultHookEntryInvoker<TEvent, TContext>(onFault);
         _nextOrder = nextOrder ?? NextLocalOrder;
     }
 
@@ -152,7 +152,8 @@ internal sealed class ResultHookSlot<TEvent, TContext>
             }
 
             result = entry.Remote
-                ? await InvokeRemoteAsync(entry, e, rawContext, context, options, cancellationToken).ConfigureAwait(false)
+                ? await _invoker.InvokeRemoteAsync(entry, e, rawContext, context, options, cancellationToken)
+                    .ConfigureAwait(false)
                 : await entry.Invoke(e, rawContext, context, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
         }
@@ -162,7 +163,7 @@ internal sealed class ResultHookSlot<TEvent, TContext>
         }
         catch (Exception ex)
         {
-            Report(ex);
+            _invoker.Report(ex);
             return null;
         }
 
@@ -176,68 +177,10 @@ internal sealed class ResultHookSlot<TEvent, TContext>
             return typed;
         }
 
-        Report(new InvalidCastException(
+        _invoker.Report(new InvalidCastException(
             $"Result hook for '{typeof(TEvent).FullName}' returned '{result.GetType().FullName}', " +
             $"but '{typeof(TResult).FullName}' was requested."));
         return null;
-    }
-
-    private async ValueTask<IHookResult?> InvokeRemoteAsync<TResult>(
-        Entry entry,
-        TEvent e,
-        HookContext rawContext,
-        TContext context,
-        ResultHookDispatchOptions<TResult> options,
-        CancellationToken cancellationToken)
-        where TResult : struct, IHookResult
-    {
-        if (options.RemoteHandlerTimeout == Timeout.InfiniteTimeSpan)
-        {
-            var pending = entry.Invoke(e, rawContext, context, cancellationToken);
-            return pending.IsCompletedSuccessfully
-                ? pending.Result
-                : await pending.ConfigureAwait(false);
-        }
-
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(options.RemoteHandlerTimeout);
-        try
-        {
-            var pending = entry.Invoke(e, rawContext, context, timeoutCts.Token);
-            if (pending.IsCompletedSuccessfully)
-            {
-                return pending.Result;
-            }
-
-            return await pending.AsTask()
-                .WaitAsync(timeoutCts.Token)
-                .ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (
-            timeoutCts.IsCancellationRequested &&
-            !cancellationToken.IsCancellationRequested)
-        {
-            Report(new TimeoutException(
-                $"Remote result hook for '{typeof(TEvent).Name}' timed out after {options.RemoteHandlerTimeout}."));
-            return options.RemoteTimeoutResult is { } result ? result : null;
-        }
-    }
-
-    private void Report(Exception exception)
-    {
-        if (_onFault is null)
-        {
-            return;
-        }
-
-        try
-        {
-            _onFault(new ResultHookFault(typeof(TEvent), exception));
-        }
-        catch
-        {
-            // A faulty fault observer must never escalate into or abort dispatch.
-        }
     }
 
     public void RemoveKernel(InstalledKernel kernel)
