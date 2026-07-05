@@ -45,21 +45,21 @@ public sealed class VerifierArgumentValidationTests
         var hash = Convert.ToHexString(SHA256.HashData(bytes.Span)).ToLowerInvariant();
         var policy = VerificationPolicy.BoxedValueDefaults();
         return new ArtifactManifest(
-            1,
-            "cache",
-            "module",
-            "plan",
-            "policy",
-            "bindings",
-            policy.RuntimeFacadeHash,
-            "compiler",
-            "type-system",
-            "effect-analysis",
-            policy.VerifierVersion,
-            "1.0.0",
-            "net10.0",
-            ["boxed-values"],
-            hash,
-            DateTimeOffset.UtcNow);
+            ArtifactVersion: 1,
+            CacheKey: "cache",
+            ModuleHash: "module",
+            PlanHash: "plan",
+            PolicyHash: "policy",
+            BindingManifestHash: "bindings",
+            RuntimeFacadeHash: policy.RuntimeFacadeHash,
+            CompilerVersion: "compiler",
+            TypeSystemVersion: "type-system",
+            EffectAnalysisVersion: "effect-analysis",
+            VerifierVersion: policy.VerifierVersion,
+            LanguageVersion: "1.0.0",
+            TargetFramework: "net10.0",
+            OptimizationFlags: ["boxed-values"],
+            AssemblyHash: hash,
+            CreatedAt: DateTimeOffset.UtcNow);
     }
 }
