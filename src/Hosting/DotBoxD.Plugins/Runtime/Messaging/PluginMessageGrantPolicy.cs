@@ -117,16 +117,27 @@ internal sealed record PluginMessageGrantOptions(
 {
     public bool AllowsTarget(string targetId)
     {
-        if (AllowedTargets is null && TargetPrefixes is null)
+        if (HasNoTargetRestrictions())
         {
             return true;
         }
 
-        if (AllowedTargets is not null && AllowedTargets.Contains(targetId))
+        if (IsExplicitlyAllowedTarget(targetId))
         {
             return true;
         }
 
+        return HasAllowedPrefix(targetId);
+    }
+
+    private bool HasNoTargetRestrictions()
+        => AllowedTargets is null && TargetPrefixes is null;
+
+    private bool IsExplicitlyAllowedTarget(string targetId)
+        => AllowedTargets is not null && AllowedTargets.Contains(targetId);
+
+    private bool HasAllowedPrefix(string targetId)
+    {
         if (TargetPrefixes is null)
         {
             return false;
@@ -134,11 +145,7 @@ internal sealed record PluginMessageGrantOptions(
 
         for (var i = 0; i < TargetPrefixes.Count; i++)
         {
-            var prefix = TargetPrefixes[i];
-            if (targetId.StartsWith(prefix, StringComparison.Ordinal) &&
-                (targetId.Length == prefix.Length ||
-                 prefix[^1] is '.' or ':' ||
-                 targetId[prefix.Length] is '.' or ':'))
+            if (IsAllowedPrefixMatch(targetId, TargetPrefixes[i]))
             {
                 return true;
             }
@@ -146,4 +153,32 @@ internal sealed record PluginMessageGrantOptions(
 
         return false;
     }
+
+    private static bool IsAllowedPrefixMatch(string targetId, string prefix)
+    {
+        if (!targetId.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return IsPrefixBoundary(targetId, prefix);
+    }
+
+    private static bool IsPrefixBoundary(string targetId, string prefix)
+    {
+        if (targetId.Length == prefix.Length)
+        {
+            return true;
+        }
+
+        if (IsTargetSeparator(prefix[prefix.Length - 1]))
+        {
+            return true;
+        }
+
+        return IsTargetSeparator(targetId[prefix.Length]);
+    }
+
+    private static bool IsTargetSeparator(char value)
+        => value is '.' or ':';
 }
