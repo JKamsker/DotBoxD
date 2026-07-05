@@ -177,6 +177,11 @@ public sealed class HookChainIndexMetadataTests
             }
             """;
 
+        return CompilePackage(source);
+    }
+
+    private static PluginPackage CompilePackage(string source)
+    {
         var assembly = Compile(source);
         var packageType = assembly.GetTypes().Single(type =>
             type.Name.StartsWith("HookChain_", StringComparison.Ordinal) &&
