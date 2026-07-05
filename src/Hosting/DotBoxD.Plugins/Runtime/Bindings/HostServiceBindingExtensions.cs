@@ -37,6 +37,16 @@ public static class HostServiceBindingExtensions
             return;
         }
 
+        AddServiceMethodBindings(builder, serviceType, implementation, registeredBindings);
+        AddNestedServiceBindings(builder, serviceType, implementation, visited, registeredBindings);
+    }
+
+    private static void AddServiceMethodBindings(
+        SandboxHostBuilder builder,
+        Type serviceType,
+        object implementation,
+        Dictionary<string, HostServiceBindingRegistration> registeredBindings)
+    {
         foreach (var method in HostServiceBindingMemberDiscovery.ServiceMethods(serviceType))
         {
             HostServiceBindingMemberDiscovery.RejectUnsupportedGenericHostBindingMethod(method);
@@ -73,7 +83,15 @@ public static class HostServiceBindingExtensions
                     HostServiceBindingRouteSignature.ForMethod(method));
             }
         }
+    }
 
+    private static void AddNestedServiceBindings(
+        SandboxHostBuilder builder,
+        Type serviceType,
+        object implementation,
+        HashSet<Type> visited,
+        Dictionary<string, HostServiceBindingRegistration> registeredBindings)
+    {
         foreach (var property in HostServiceBindingMemberDiscovery.ServiceProperties(serviceType))
         {
             HostServiceBindingMemberDiscovery.RejectUnsupportedExplicitPropertyBinding(property);

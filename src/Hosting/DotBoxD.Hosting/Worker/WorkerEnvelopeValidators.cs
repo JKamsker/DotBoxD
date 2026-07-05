@@ -8,6 +8,24 @@ internal static class WorkerEnvelopeValidators
     private const int MaxSafeMessageLength = 1_024;
     private const int MaxDiagnosticIdLength = 128;
 
+    private static readonly string[] SecretMarkers =
+    [
+        "authorization",
+        "bearer",
+        "password",
+        "passwd",
+        "secret",
+        "token",
+        "api-key",
+        "apikey",
+        "client-key",
+        "client_key",
+        "client-secret",
+        "client_secret",
+        "private-key",
+        "private_key"
+    ];
+
     internal static bool ErrorMatches(SandboxError? error)
         => error is not null &&
            Enum.IsDefined(error.Code) &&
@@ -60,19 +78,14 @@ internal static class WorkerEnvelopeValidators
     private static bool ContainsSecretMarker(string value)
     {
         var normalized = value.ToLowerInvariant();
-        return normalized.Contains("authorization", StringComparison.Ordinal) ||
-               normalized.Contains("bearer", StringComparison.Ordinal) ||
-               normalized.Contains("password", StringComparison.Ordinal) ||
-               normalized.Contains("passwd", StringComparison.Ordinal) ||
-               normalized.Contains("secret", StringComparison.Ordinal) ||
-               normalized.Contains("token", StringComparison.Ordinal) ||
-               normalized.Contains("api-key", StringComparison.Ordinal) ||
-               normalized.Contains("apikey", StringComparison.Ordinal) ||
-               normalized.Contains("client-key", StringComparison.Ordinal) ||
-               normalized.Contains("client_key", StringComparison.Ordinal) ||
-               normalized.Contains("client-secret", StringComparison.Ordinal) ||
-               normalized.Contains("client_secret", StringComparison.Ordinal) ||
-               normalized.Contains("private-key", StringComparison.Ordinal) ||
-               normalized.Contains("private_key", StringComparison.Ordinal);
+        foreach (var marker in SecretMarkers)
+        {
+            if (normalized.Contains(marker, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

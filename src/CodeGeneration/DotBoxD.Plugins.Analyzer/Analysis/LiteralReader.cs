@@ -44,26 +44,52 @@ internal static class LiteralReader
     }
 
     public static string ObjectLiteral(object? value)
+        => NullOrBooleanLiteral(value) ??
+           NumericLiteral(value) ??
+           TextLiteral(value) ??
+           Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture) ??
+           DotBoxDGenerationNames.CSharpLiterals.Null;
+
+    private static string? NullOrBooleanLiteral(object? value)
         => value switch
         {
             null => DotBoxDGenerationNames.CSharpLiterals.Null,
             bool boolean => boolean
                 ? DotBoxDGenerationNames.CSharpLiterals.True
                 : DotBoxDGenerationNames.CSharpLiterals.False,
+            _ => null
+        };
+
+    private static string? NumericLiteral(object? value)
+        => value switch
+        {
             int number => number.ToString(System.Globalization.CultureInfo.InvariantCulture),
             long number => number.ToString(System.Globalization.CultureInfo.InvariantCulture) +
                 DotBoxDGenerationNames.CSharpLiterals.Int64Suffix,
-            double number when !double.IsNaN(number) && !double.IsInfinity(number) =>
-                number.ToString(
-                    DotBoxDGenerationNames.CSharpLiterals.DoubleRoundTripFormat,
-                    System.Globalization.CultureInfo.InvariantCulture) +
-                DotBoxDGenerationNames.CSharpLiterals.DoubleSuffix,
-            double => throw new NotSupportedException("Double literal values must be finite."),
+            double number => DoubleLiteral(number),
             decimal number => number.ToString(System.Globalization.CultureInfo.InvariantCulture) + "m",
+            _ => null
+        };
+
+    private static string DoubleLiteral(double number)
+    {
+        if (double.IsNaN(number) || double.IsInfinity(number))
+        {
+            throw new NotSupportedException("Double literal values must be finite.");
+        }
+
+        return number.ToString(
+            DotBoxDGenerationNames.CSharpLiterals.DoubleRoundTripFormat,
+            System.Globalization.CultureInfo.InvariantCulture) +
+            DotBoxDGenerationNames.CSharpLiterals.DoubleSuffix;
+    }
+
+    private static string? TextLiteral(object? value)
+        => value switch
+        {
             char character => SymbolDisplay.FormatLiteral(character, quote: true),
             string text => SymbolDisplay.FormatLiteral(text, quote: true),
-            _ => Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture) ??
-                DotBoxDGenerationNames.CSharpLiterals.Null
+            _ => null
         };
 
     public static string StringLiteral(string value) => SymbolDisplay.FormatLiteral(value, quote: true);

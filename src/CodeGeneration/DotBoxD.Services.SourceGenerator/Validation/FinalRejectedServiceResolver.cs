@@ -93,53 +93,106 @@ internal static class FinalRejectedServiceResolver
         RejectedServiceIndex rejected,
         CancellationToken ct)
     {
-        var blockedSignatures = new HashSet<string>(System.StringComparer.Ordinal);
-        var originalSignatures = new HashSet<string>(System.StringComparer.Ordinal);
+        var collision = BuildAsyncSiblingCollisionState(input, rejected, ct);
+        CountAsyncSiblingCandidates(input, rejected, collision, ct);
+        return HasViableAsyncSiblingCandidate(collision, ct);
+    }
+
+    private static AsyncSiblingCollisionState BuildAsyncSiblingCollisionState(
+        FinalRejectionInput input,
+        RejectedServiceIndex rejected,
+        CancellationToken ct)
+    {
+        var collision = new AsyncSiblingCollisionState();
         foreach (var method in input.Methods.Array)
         {
             ct.ThrowIfCancellationRequested();
 
-            originalSignatures.Add(method.OriginalSignatureKey);
+            collision.OriginalSignatures.Add(method.OriginalSignatureKey);
             if (IsUnsupported(method, rejected, ct))
             {
-                blockedSignatures.Add(method.OriginalSignatureKey);
+                collision.BlockedSignatures.Add(method.OriginalSignatureKey);
             }
         }
 
-        var candidateCounts = new Dictionary<string, int>(System.StringComparer.Ordinal);
-        var candidateHasReusableOriginal = new Dictionary<string, bool>(System.StringComparer.Ordinal);
+        return collision;
+    }
+
+    private static void CountAsyncSiblingCandidates(
+        FinalRejectionInput input,
+        RejectedServiceIndex rejected,
+        AsyncSiblingCollisionState collision,
+        CancellationToken ct)
+    {
         foreach (var method in input.Methods.Array)
         {
             ct.ThrowIfCancellationRequested();
 
-            if (IsUnsupported(method, rejected, ct) ||
-                method.RequiresExtraProxyMethod &&
-                (blockedSignatures.Contains(method.CandidateSignatureKey) ||
-                    originalSignatures.Contains(method.CandidateSignatureKey)))
+            if (ShouldSkipAsyncSiblingCandidate(method, rejected, collision, ct))
             {
                 continue;
             }
 
-            candidateCounts.TryGetValue(method.CandidateSignatureKey, out var count);
-            candidateCounts[method.CandidateSignatureKey] = count + 1;
-            candidateHasReusableOriginal[method.CandidateSignatureKey] =
-                candidateHasReusableOriginal.TryGetValue(method.CandidateSignatureKey, out var hasReusable) &&
-                hasReusable ||
-                !method.RequiresExtraProxyMethod;
+            AddAsyncSiblingCandidate(method, collision);
         }
+    }
 
-        foreach (var entry in candidateCounts)
+    private static bool ShouldSkipAsyncSiblingCandidate(
+        FinalRejectionMethod method,
+        RejectedServiceIndex rejected,
+        AsyncSiblingCollisionState collision,
+        CancellationToken ct)
+        => IsUnsupported(method, rejected, ct) ||
+           method.RequiresExtraProxyMethod &&
+           (collision.BlockedSignatures.Contains(method.CandidateSignatureKey) ||
+            collision.OriginalSignatures.Contains(method.CandidateSignatureKey));
+
+    private static void AddAsyncSiblingCandidate(
+        FinalRejectionMethod method,
+        AsyncSiblingCollisionState collision)
+    {
+        collision.CandidateCounts.TryGetValue(method.CandidateSignatureKey, out var count);
+        collision.CandidateCounts[method.CandidateSignatureKey] = count + 1;
+        collision.CandidateHasReusableOriginal[method.CandidateSignatureKey] =
+            ExistingReusableOriginal(method, collision) ||
+            !method.RequiresExtraProxyMethod;
+    }
+
+    private static bool ExistingReusableOriginal(
+        FinalRejectionMethod method,
+        AsyncSiblingCollisionState collision)
+        => collision.CandidateHasReusableOriginal.TryGetValue(
+               method.CandidateSignatureKey,
+               out var hasReusable) &&
+           hasReusable;
+
+    private static bool HasViableAsyncSiblingCandidate(
+        AsyncSiblingCollisionState collision,
+        CancellationToken ct)
+    {
+        foreach (var entry in collision.CandidateCounts)
         {
             ct.ThrowIfCancellationRequested();
 
             if (entry.Value == 1 ||
-                candidateHasReusableOriginal.TryGetValue(entry.Key, out var hasReusable) && hasReusable)
+                collision.CandidateHasReusableOriginal.TryGetValue(entry.Key, out var hasReusable) && hasReusable)
             {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private sealed class AsyncSiblingCollisionState
+    {
+        public HashSet<string> BlockedSignatures { get; } = new(System.StringComparer.Ordinal);
+
+        public HashSet<string> OriginalSignatures { get; } = new(System.StringComparer.Ordinal);
+
+        public Dictionary<string, int> CandidateCounts { get; } = new(System.StringComparer.Ordinal);
+
+        public Dictionary<string, bool> CandidateHasReusableOriginal { get; } = new(System.StringComparer.Ordinal);
     }
 
     private static bool IsUnsupported(

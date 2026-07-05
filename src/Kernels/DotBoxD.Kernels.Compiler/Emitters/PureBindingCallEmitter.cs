@@ -9,7 +9,46 @@ using static DotBoxD.Kernels.Compiler.IlEmitterPrimitives;
 
 internal static class PureBindingCallEmitter
 {
+    private static readonly HashSet<string> ListCalls = new(StringComparer.Ordinal)
+    {
+        "list.empty",
+        "list.of",
+        "list.count",
+        "list.get",
+        "list.add"
+    };
+
+    private static readonly HashSet<string> RecordCalls = new(StringComparer.Ordinal)
+    {
+        "record.new",
+        "record.get"
+    };
+
+    private static readonly HashSet<string> MapCalls = new(StringComparer.Ordinal)
+    {
+        "map.empty",
+        "map.containsKey",
+        "map.get",
+        "map.set",
+        "map.remove"
+    };
+
     public static bool TryEmit(CallExpression call, ILGenerator il, Action<Expression> emitExpression)
+    {
+        if (ListCalls.Contains(call.Name))
+        {
+            return TryEmitListCall(call, il, emitExpression);
+        }
+
+        if (RecordCalls.Contains(call.Name))
+        {
+            return TryEmitRecordCall(call, il, emitExpression);
+        }
+
+        return MapCalls.Contains(call.Name) && TryEmitMapCall(call, il, emitExpression);
+    }
+
+    private static bool TryEmitListCall(CallExpression call, ILGenerator il, Action<Expression> emitExpression)
     {
         switch (call.Name)
         {
@@ -32,6 +71,15 @@ internal static class PureBindingCallEmitter
                 EmitArguments(call, emitExpression);
                 il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.ListAdd)));
                 return true;
+            default:
+                return false;
+        }
+    }
+
+    private static bool TryEmitRecordCall(CallExpression call, ILGenerator il, Action<Expression> emitExpression)
+    {
+        switch (call.Name)
+        {
             case "record.new":
                 il.Emit(OpCodes.Ldarg_0);
                 ValueArrayEmitter.Emit(il, call.Arguments, emitExpression);
@@ -40,6 +88,15 @@ internal static class PureBindingCallEmitter
             case "record.get":
                 EmitContextCall(il, emitExpression, call, nameof(Kernels.Runtime.CompiledRuntime.RecordGet));
                 return true;
+            default:
+                return false;
+        }
+    }
+
+    private static bool TryEmitMapCall(CallExpression call, ILGenerator il, Action<Expression> emitExpression)
+    {
+        switch (call.Name)
+        {
             case "map.empty":
                 EmitMapEmpty(call, il);
                 return true;

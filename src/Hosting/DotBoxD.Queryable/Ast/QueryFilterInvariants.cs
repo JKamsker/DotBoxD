@@ -153,34 +153,19 @@ internal static class QueryFilterInvariants
         bool hasIgnoreCase)
     {
         string? inactive = null;
-        if (hasField && !string.IsNullOrEmpty(filter.Field))
+        foreach (var property in InactiveProperties(
+            filter,
+            hasField,
+            hasOperator,
+            hasValue,
+            hasValues,
+            hasChildren,
+            hasIgnoreCase))
         {
-            inactive = AddInactive(inactive, nameof(QueryFilter.Field));
-        }
-
-        if (hasOperator && filter.HasOperator)
-        {
-            inactive = AddInactive(inactive, nameof(QueryFilter.Operator));
-        }
-
-        if (hasValue && filter.Value is not null)
-        {
-            inactive = AddInactive(inactive, nameof(QueryFilter.Value));
-        }
-
-        if (hasValues && filter.Values.Count > 0)
-        {
-            inactive = AddInactive(inactive, nameof(QueryFilter.Values));
-        }
-
-        if (hasChildren && filter.Children.Count > 0)
-        {
-            inactive = AddInactive(inactive, nameof(QueryFilter.Children));
-        }
-
-        if (hasIgnoreCase && filter.IgnoreCase)
-        {
-            inactive = AddInactive(inactive, nameof(QueryFilter.IgnoreCase));
+            if (property.IsInactive)
+            {
+                inactive = AddInactive(inactive, property.Name);
+            }
         }
 
         if (inactive is not null)
@@ -190,8 +175,27 @@ internal static class QueryFilterInvariants
         }
     }
 
+    private static InactiveProperty[] InactiveProperties(
+        QueryFilter filter,
+        bool hasField,
+        bool hasOperator,
+        bool hasValue,
+        bool hasValues,
+        bool hasChildren,
+        bool hasIgnoreCase) =>
+        [
+            new(nameof(QueryFilter.Field), hasField && !string.IsNullOrEmpty(filter.Field)),
+            new(nameof(QueryFilter.Operator), hasOperator && filter.HasOperator),
+            new(nameof(QueryFilter.Value), hasValue && filter.Value is not null),
+            new(nameof(QueryFilter.Values), hasValues && filter.Values.Count > 0),
+            new(nameof(QueryFilter.Children), hasChildren && filter.Children.Count > 0),
+            new(nameof(QueryFilter.IgnoreCase), hasIgnoreCase && filter.IgnoreCase)
+        ];
+
     private static string AddInactive(string? inactive, string property)
         => inactive is null ? property : $"{inactive}, {property}";
+
+    private readonly record struct InactiveProperty(string Name, bool IsInactive);
 
     private static void RequireNotChild(QueryFilter filter)
     {
