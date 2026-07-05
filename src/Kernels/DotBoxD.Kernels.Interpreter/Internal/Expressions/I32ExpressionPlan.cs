@@ -98,59 +98,6 @@ internal sealed partial class I32ExpressionPlan
         return false;
     }
 
-    public static bool TryCreate(
-        Expression expression,
-        InterpreterFrame frame,
-        string assumedInt32Local,
-        out I32ExpressionPlan plan)
-        => TryCreate(expression, frame, assumedInt32Local, calls: null, substitutions: null, out plan);
-
-    public static bool TryCreate(
-        Expression expression,
-        InterpreterFrame frame,
-        string assumedInt32Local,
-        I32CallEvaluator calls,
-        out I32ExpressionPlan plan)
-        => TryCreate(expression, frame, assumedInt32Local, calls, substitutions: null, out plan);
-
-    public static bool TryCreate(
-        Expression expression,
-        InterpreterFrame frame,
-        string assumedInt32Local,
-        I32CallEvaluator? calls,
-        IReadOnlyDictionary<string, I32ExpressionPlan>? substitutions,
-        out I32ExpressionPlan plan)
-    {
-        switch (expression)
-        {
-            case LiteralExpression { Value: I32Value value }:
-                plan = new I32ExpressionPlan(ExpressionKind.Literal, value.Value);
-                return true;
-            case VariableExpression variable when substitutions?.TryGetValue(variable.Name, out var substitution) == true:
-                plan = substitution;
-                return true;
-            case VariableExpression variable when CanReadVariable(frame, variable.Name, assumedInt32Local):
-                var slot = frame.GetSlot(variable.Name);
-                plan = new I32ExpressionPlan(
-                    frame.IsInt32Slot(slot) ? ExpressionKind.RawVariable : ExpressionKind.BoxedVariable,
-                    slot);
-                return true;
-            case UnaryExpression { Operator: "-" } unary
-                when TryCreate(unary.Operand, frame, assumedInt32Local, calls, substitutions, out var operand):
-                plan = new I32ExpressionPlan(ExpressionKind.Negate, 0, operand);
-                return true;
-            case BinaryExpression binary when binary.Operator is "+" or "-" or "*" or "/" or "%":
-                return TryCreateSpecialBinary(binary, frame, assumedInt32Local, substitutions, out plan) ||
-                       TryCreateBinary(binary, frame, assumedInt32Local, calls, substitutions, out plan);
-            case CallExpression call when calls?.TryCreateInt32CallPlan(call, frame, assumedInt32Local, out var callPlan) == true:
-                plan = callPlan;
-                return true;
-            default:
-                plan = null!;
-                return false;
-        }
-    }
-
     private int EvaluateInlineCall(InterpreterFrame frame, SandboxContext context)
     {
         // No try/finally: the inline body is pure i32 arithmetic whose only throws (overflow / fuel /

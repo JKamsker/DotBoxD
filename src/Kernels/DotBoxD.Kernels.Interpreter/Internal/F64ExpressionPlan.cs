@@ -39,23 +39,64 @@ internal sealed class F64ExpressionPlan
     public bool PreservesNonNegative { get; }
 
     public double Evaluate(InterpreterFrame frame)
-        => _kind switch
+    {
+        if (TryEvaluateLeaf(frame, out var leaf))
+        {
+            return leaf;
+        }
+
+        if (TryEvaluateUnary(frame, out var unary))
+        {
+            return unary;
+        }
+
+        if (TryEvaluateBinary(frame, out var binary))
+        {
+            return binary;
+        }
+
+        throw Unsupported();
+    }
+
+    private bool TryEvaluateLeaf(InterpreterFrame frame, out double value)
+    {
+        value = _kind switch
         {
             ExpressionKind.Literal => _literal,
             ExpressionKind.RawVariable => frame.ReadRawDoubleSlot(_slot),
             ExpressionKind.BoxedVariable => frame.ReadDoubleSlot(_slot),
+            _ => double.NaN
+        };
+        return _kind is ExpressionKind.Literal or ExpressionKind.RawVariable or ExpressionKind.BoxedVariable;
+    }
+
+    private bool TryEvaluateUnary(InterpreterFrame frame, out double value)
+    {
+        value = _kind switch
+        {
             ExpressionKind.Sqrt => Math.Sqrt(_operand!.Evaluate(frame)),
             ExpressionKind.Floor => Math.Floor(_operand!.Evaluate(frame)),
             ExpressionKind.Ceil => Math.Ceiling(_operand!.Evaluate(frame)),
             ExpressionKind.Round => Math.Round(_operand!.Evaluate(frame), MidpointRounding.ToEven),
-            // Arithmetic goes through SandboxFloat64Math (finiteness-enforced), matching the boxed interpreter
-            // path and the compiled *F64Raw helpers exactly.
+            _ => double.NaN
+        };
+        return _kind is ExpressionKind.Sqrt or ExpressionKind.Floor or ExpressionKind.Ceil or ExpressionKind.Round;
+    }
+
+    private bool TryEvaluateBinary(InterpreterFrame frame, out double value)
+    {
+        // Arithmetic goes through SandboxFloat64Math (finiteness-enforced), matching the boxed interpreter
+        // path and the compiled *F64Raw helpers exactly.
+        value = _kind switch
+        {
             ExpressionKind.Add => SandboxFloat64Math.Add(_operand!.Evaluate(frame), _right!.Evaluate(frame)),
             ExpressionKind.Sub => SandboxFloat64Math.Subtract(_operand!.Evaluate(frame), _right!.Evaluate(frame)),
             ExpressionKind.Mul => SandboxFloat64Math.Multiply(_operand!.Evaluate(frame), _right!.Evaluate(frame)),
             ExpressionKind.Div => SandboxFloat64Math.Divide(_operand!.Evaluate(frame), _right!.Evaluate(frame)),
-            _ => throw Unsupported()
+            _ => double.NaN
         };
+        return _kind is ExpressionKind.Add or ExpressionKind.Sub or ExpressionKind.Mul or ExpressionKind.Div;
+    }
 
     public static bool TryCreate(
         Expression expression,
