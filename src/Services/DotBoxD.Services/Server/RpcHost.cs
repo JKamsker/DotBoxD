@@ -69,7 +69,21 @@ public sealed partial class RpcHost : IAsyncDisposable
     /// </remarks>
     public RpcHost ForEachPeer(Action<RpcPeer> configure)
     {
-        _configure.Add(configure ?? throw new ArgumentNullException(nameof(configure)));
+        if (configure is null)
+        {
+            throw new ArgumentNullException(nameof(configure));
+        }
+
+        lock (_lifecycleLock)
+        {
+            if (Volatile.Read(ref _disposed) != 0)
+            {
+                throw new ObjectDisposedException(nameof(RpcHost));
+            }
+
+            _configure.Add(configure);
+        }
+
         return this;
     }
 

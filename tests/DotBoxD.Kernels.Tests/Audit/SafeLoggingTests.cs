@@ -1,5 +1,7 @@
+using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Runtime.Bindings;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Serialization.Json.Hosting;
 using DotBoxD.Kernels.Tests._TestSupport;
@@ -8,6 +10,13 @@ namespace DotBoxD.Kernels.Tests.Audit;
 
 public sealed class SafeLoggingTests
 {
+    [Fact]
+    public void Safe_log_bindings_declare_log_audit_kind()
+    {
+        Assert.Equal(BindingAuditKinds.SandboxLog, SafeLogBindings.Info.AuditKind);
+        Assert.Equal(BindingAuditKinds.SandboxLog, SafeLogBindings.Warn.AuditKind);
+    }
+
     [Fact]
     public async Task Log_info_writes_sanitized_audit_event()
     {

@@ -103,9 +103,7 @@ public sealed class SandboxPolicyBuilder
     {
         if (!SandboxType.IsWellFormedOpaqueIdName(name))
         {
-            throw new ArgumentException(
-                "An opaque-id type name must be a well-formed brand identifier that is not a built-in scalar.",
-                nameof(name));
+            throw new ArgumentException(SandboxPolicy.OpaqueIdTypeNameValidationMessage, nameof(name));
         }
 
         _declaredOpaqueIdTypes.Add(name);

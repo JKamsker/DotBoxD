@@ -123,6 +123,13 @@ internal static partial class RpcKernelClientProxyEmitter
                 .Append(Identifier(_serviceMethod.Name)).Append('(')
                 .Append(RpcKernelClientParameterSource.ParameterList(_serviceMethod)).AppendLine(")");
             builder.AppendLine("    {");
+            if (RpcKernelClientParameters.TryGetCancellationToken(_serviceMethod, out var cancellationToken))
+            {
+                builder.Append("        ")
+                    .Append(Identifier(cancellationToken.Name))
+                    .AppendLine(".ThrowIfCancellationRequested();");
+            }
+
             builder.Append("        var ").Append(arguments).Append($" = new {DotBoxDRpcValueNames.GlobalKernelRpcValue}[")
                 .Append(payloadParameterCount).AppendLine("];");
             for (var i = 0; i < payloadParameterCount; i++)
