@@ -72,6 +72,11 @@ internal static class RpcKernelClientServiceMethodResolver
         IMethodSymbol first,
         IMethodSymbol next)
     {
+        if (first.Parameters.Length != next.Parameters.Length)
+        {
+            throw UnsupportedServiceShape(serviceType);
+        }
+
         for (var i = 0; i < first.Parameters.Length; i++)
         {
             if (!string.Equals(first.Parameters[i].Name, next.Parameters[i].Name, StringComparison.Ordinal))
