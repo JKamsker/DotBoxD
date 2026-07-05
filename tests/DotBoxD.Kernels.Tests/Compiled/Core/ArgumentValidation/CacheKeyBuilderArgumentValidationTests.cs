@@ -13,33 +13,30 @@ public sealed class CacheKeyBuilderArgumentValidationTests
     [InlineData("entrypoint")]
     [InlineData("policy")]
     public async Task Build_rejects_null_public_inputs(string parameterName)
-    {
-        var plan = await CreatePlanAsync();
-        var policy = VerificationPolicy.BoxedValueDefaults();
-        Action action = parameterName switch
-        {
-            "plan" => () => CacheKeyBuilder.Build(null!, "main", policy, optimize: false),
-            "entrypoint" => () => CacheKeyBuilder.Build(plan, null!, policy, optimize: false),
-            "policy" => () => CacheKeyBuilder.Build(plan, "main", null!, optimize: false),
-            _ => throw new ArgumentOutOfRangeException(nameof(parameterName), parameterName, null)
-        };
-
-        AssertArgumentNull(parameterName, action);
-    }
+        => await AssertBuilderRejectsNullAsync(
+            parameterName,
+            (plan, entrypoint, policy) => () => CacheKeyBuilder.Build(plan!, entrypoint!, policy!, optimize: false));
 
     [Theory]
     [InlineData("plan")]
     [InlineData("entrypoint")]
     [InlineData("policy")]
     public async Task BuildManifestIdentity_rejects_null_public_inputs(string parameterName)
+        => await AssertBuilderRejectsNullAsync(
+            parameterName,
+            (plan, entrypoint, policy) => () => CacheKeyBuilder.BuildManifestIdentity(plan!, entrypoint!, policy!, optimize: false));
+
+    private static async Task AssertBuilderRejectsNullAsync(
+        string parameterName,
+        Func<ExecutionPlan?, string?, VerificationPolicy?, Action> actionFactory)
     {
         var plan = await CreatePlanAsync();
         var policy = VerificationPolicy.BoxedValueDefaults();
-        Action action = parameterName switch
+        var action = parameterName switch
         {
-            "plan" => () => CacheKeyBuilder.BuildManifestIdentity(null!, "main", policy, optimize: false),
-            "entrypoint" => () => CacheKeyBuilder.BuildManifestIdentity(plan, null!, policy, optimize: false),
-            "policy" => () => CacheKeyBuilder.BuildManifestIdentity(plan, "main", null!, optimize: false),
+            "plan" => actionFactory(null, "main", policy),
+            "entrypoint" => actionFactory(plan, null, policy),
+            "policy" => actionFactory(plan, "main", null),
             _ => throw new ArgumentOutOfRangeException(nameof(parameterName), parameterName, null)
         };
 
