@@ -39,17 +39,7 @@ internal static partial class DotBoxDKernelMethodInliner
         string returnType,
         KernelMethodDescriptorPayload descriptor)
     {
-        if (descriptor.Version != KernelMethodDescriptorPayload.CurrentVersion ||
-            !string.Equals(descriptor.ContextType, TypeName(method.ContainingType), StringComparison.Ordinal) ||
-            !string.Equals(descriptor.MethodMetadataName, method.MetadataName, StringComparison.Ordinal) ||
-            !string.Equals(descriptor.NormalizedSignature, KernelMethodSignature.Create(method), StringComparison.Ordinal) ||
-            !string.Equals(descriptor.ReturnType, returnType, StringComparison.Ordinal) ||
-            descriptor.Parameters.Count != method.Parameters.Length)
-        {
-            throw new NotSupportedException(
-                $"Generated descriptor for context [KernelMethod] '{method.Name}' does not match the referenced method.");
-        }
-
+        ValidateDescriptorHeader(method, returnType, descriptor);
         var occurrences = ValidateDescriptorParameters(method, descriptor);
         ValidateDescriptorArgumentUses(method, occurrences, call, context.SemanticModel, context.CancellationToken);
         var recomputed = RecomputeDescriptorRequirements(method, context, descriptor);
@@ -83,6 +73,53 @@ internal static partial class DotBoxDKernelMethodInliner
         AddAll(context.Effects, recomputed.Effects);
         var source = ReplaceDescriptorPlaceholders(descriptor.Source, replacements);
         return new DotBoxDExpressionModel(source, returnType, allocates);
+    }
+
+    private static void ValidateDescriptorHeader(
+        IMethodSymbol method,
+        string returnType,
+        KernelMethodDescriptorPayload descriptor)
+    {
+        if (DescriptorHeaderMatches(method, returnType, descriptor))
+        {
+            return;
+        }
+
+        throw new NotSupportedException(
+            $"Generated descriptor for context [KernelMethod] '{method.Name}' does not match the referenced method.");
+    }
+
+    private static bool DescriptorHeaderMatches(
+        IMethodSymbol method,
+        string returnType,
+        KernelMethodDescriptorPayload descriptor)
+    {
+        if (descriptor.Version != KernelMethodDescriptorPayload.CurrentVersion)
+        {
+            return false;
+        }
+
+        if (!string.Equals(descriptor.ContextType, TypeName(method.ContainingType), StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (!string.Equals(descriptor.MethodMetadataName, method.MetadataName, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (!string.Equals(descriptor.NormalizedSignature, KernelMethodSignature.Create(method), StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (!string.Equals(descriptor.ReturnType, returnType, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return descriptor.Parameters.Count == method.Parameters.Length;
     }
 
     private static bool DescriptorAttribute(

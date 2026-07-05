@@ -37,26 +37,68 @@ internal static class DotBoxDConstantExpressionLowerer
             throw new NotSupportedException($"Unsupported plugin constant expression '{expression}'.");
         }
 
-        // An enum constant (e.g. GamePhase.Battle) lowers to its underlying integer literal — the same I32/I64
-        // representation an enum event property or enum DTO field carries (by underlying width). Convert handles
-        // narrow (byte/short/…) and wide (uint/long/ulong) backing types. Only applied when the caller imposes no
-        // explicit target type. This is what lets `e.Phase == GamePhase.Battle` filters and
-        // `Select(e => new Dto(e.Id, GamePhase.Battle))` projections lower.
-        if (targetType is null && type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
+        if (TryLowerEnumConstant(targetType, constant.Value, type, out var enumConstant))
         {
-            return DotBoxDRpcTypeMapper.EnumUsesI64(enumType)
-                ? Int64(EnumConstantToInt64(constant.Value, enumType))
-                : Int32(Convert.ToInt32(constant.Value, System.Globalization.CultureInfo.InvariantCulture));
+            return enumConstant;
         }
 
-        if (DotBoxDRpcTypeMapper.IsDecimalWireType(type) &&
-            constant.Value is decimal decimalValue &&
-            (targetType is null || string.Equals(targetType, DotBoxDGenerationNames.ManifestTypes.Record, StringComparison.Ordinal)))
+        if (TryLowerDecimalConstant(targetType, constant.Value, type, out var decimalConstant))
         {
-            return DecimalRecord(decimalValue, type);
+            return decimalConstant;
         }
 
         return Lower(expression, constant.Value, targetType ?? DotBoxDTypeNameReader.SandboxTypeName(type));
+    }
+
+    private static bool TryLowerEnumConstant(
+        string? targetType,
+        object? value,
+        ITypeSymbol type,
+        out DotBoxDExpressionModel model)
+    {
+        model = null!;
+        if (targetType is not null)
+        {
+            return false;
+        }
+
+        if (type.TypeKind != TypeKind.Enum || type is not INamedTypeSymbol enumType)
+        {
+            return false;
+        }
+
+        // An enum constant lowers to the same I32/I64 representation an enum property or DTO field carries.
+        model = DotBoxDRpcTypeMapper.EnumUsesI64(enumType)
+            ? Int64(EnumConstantToInt64(value, enumType))
+            : Int32(Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture));
+        return true;
+    }
+
+    private static bool TryLowerDecimalConstant(
+        string? targetType,
+        object? value,
+        ITypeSymbol type,
+        out DotBoxDExpressionModel model)
+    {
+        model = null!;
+        if (!DotBoxDRpcTypeMapper.IsDecimalWireType(type))
+        {
+            return false;
+        }
+
+        if (value is not decimal decimalValue)
+        {
+            return false;
+        }
+
+        if (targetType is not null &&
+            !string.Equals(targetType, DotBoxDGenerationNames.ManifestTypes.Record, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        model = DecimalRecord(decimalValue, type);
+        return true;
     }
 
     private static DotBoxDExpressionModel Lower(ExpressionSyntax expression, object? value, string type)

@@ -18,7 +18,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 /// materialised once with no quadratic <c>record.get</c> copying. Only a chain whose seed is a marshaller-eligible
 /// <c>[HookResult]</c> record lowers; anything else returns null so the caller can try the next handler.
 /// </summary>
-internal static class DotBoxDResultBuilderExpressionLowerer
+internal static partial class DotBoxDResultBuilderExpressionLowerer
 {
     private const string OkMethod = "Ok";
     private const string RejectMethod = "Reject";
@@ -73,49 +73,6 @@ internal static class DotBoxDResultBuilderExpressionLowerer
 
     private static bool IsWithName(string name)
         => name.Length > WithPrefix.Length && name.StartsWith(WithPrefix, StringComparison.Ordinal);
-
-    // Walks the chain to its Ok()/Reject() seed and resolves the type the seed is called on (e.g. the
-    // `CombatDamageResult` in `CombatDamageResult.Ok()`), requiring it to carry [HookResult]. The seed's receiver
-    // is a TYPE reference, which exists in the pre-generation compilation even though Ok/Reject themselves do not.
-    internal static INamedTypeSymbol? ResolveSeedResultType(
-        InvocationExpressionSyntax invocation,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        if (!IsBuilderInvocation(invocation))
-        {
-            return null;
-        }
-
-        var current = invocation;
-        while (true)
-        {
-            if (current.Expression is not MemberAccessExpressionSyntax member)
-            {
-                return null;
-            }
-
-            var name = member.Name.Identifier.ValueText;
-            if (string.Equals(name, OkMethod, StringComparison.Ordinal) || string.Equals(name, RejectMethod, StringComparison.Ordinal))
-            {
-                var resultType = semanticModel.GetSymbolInfo(member.Expression, cancellationToken).Symbol as INamedTypeSymbol;
-                return resultType is not null &&
-                    HasHookResultAttribute(resultType) &&
-                    !UsesAuthorDefinedBuilderMember(invocation, resultType)
-                    ? resultType
-                    : null;
-            }
-
-            if (name.Length > WithPrefix.Length && name.StartsWith(WithPrefix, StringComparison.Ordinal) &&
-                member.Expression is InvocationExpressionSyntax inner)
-            {
-                current = inner;
-                continue;
-            }
-
-            return null;
-        }
-    }
 
     // Applies one builder call to the field-source array, recursing into the receiver for a With<Field> hop.
     private static bool TryApply(

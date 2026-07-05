@@ -92,50 +92,84 @@ internal static partial class HookChainModelFactory
         }
 
         receiver = HookChainAliasResolver.UnwrapTransparentExpression(receiver);
-
         if (HookChainAliasResolver.Initializer(receiver, model, cancellationToken) is { } initializer)
         {
             return WalkToSeed(initializer, stages, model, cancellationToken, depth + 1);
         }
 
         var current = receiver;
-        while (true)
+        while (TryWalkStage(current, stages, model, cancellationToken, out var seed, out var next))
         {
-            current = HookChainAliasResolver.UnwrapTransparentExpression(current);
-            if (HookChainAliasResolver.Initializer(current, model, cancellationToken) is { } currentInitializer)
+            if (seed is not null)
             {
-                current = currentInitializer;
-                continue;
+                return seed;
             }
 
-            if (current is not InvocationExpressionSyntax invocation ||
-                invocation.Expression is not MemberAccessExpressionSyntax access)
-            {
-                return null;
-            }
-
-            var name = access.Name.Identifier.ValueText;
-            if (string.Equals(name, OnMethod, StringComparison.Ordinal))
-            {
-                return invocation;
-            }
-
-            var isSelect = string.Equals(name, SelectMethod, StringComparison.Ordinal);
-            if ((isSelect || string.Equals(name, WhereMethod, StringComparison.Ordinal)) &&
-                TryLambda(invocation, out var lambda))
-            {
-                if (IsResolvedNonDotBoxDStageMethodInvocation(invocation, model, cancellationToken))
-                {
-                    return null;
-                }
-
-                stages.Add(new HookChainStage(isSelect, lambda));
-                current = HookChainAliasResolver.UnwrapTransparentExpression(access.Expression);
-                continue;
-            }
-
-            return null;
+            current = next!;
         }
+
+        return null;
+    }
+
+    private static bool TryWalkStage(
+        ExpressionSyntax current,
+        List<HookChainStage> stages,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        out InvocationExpressionSyntax? seed,
+        out ExpressionSyntax? next)
+    {
+        seed = null;
+        next = null;
+        current = HookChainAliasResolver.UnwrapTransparentExpression(current);
+        if (HookChainAliasResolver.Initializer(current, model, cancellationToken) is { } currentInitializer)
+        {
+            next = currentInitializer;
+            return true;
+        }
+
+        if (current is not InvocationExpressionSyntax invocation ||
+            invocation.Expression is not MemberAccessExpressionSyntax access)
+        {
+            return false;
+        }
+
+        var name = access.Name.Identifier.ValueText;
+        if (string.Equals(name, OnMethod, StringComparison.Ordinal))
+        {
+            seed = invocation;
+            return true;
+        }
+
+        if (!TryStageKind(name, out var isSelect))
+        {
+            return false;
+        }
+
+        if (!TryLambda(invocation, out var lambda))
+        {
+            return false;
+        }
+
+        if (IsResolvedNonDotBoxDStageMethodInvocation(invocation, model, cancellationToken))
+        {
+            return false;
+        }
+
+        stages.Add(new HookChainStage(isSelect, lambda));
+        next = HookChainAliasResolver.UnwrapTransparentExpression(access.Expression);
+        return true;
+    }
+
+    private static bool TryStageKind(string name, out bool isSelect)
+    {
+        isSelect = string.Equals(name, SelectMethod, StringComparison.Ordinal);
+        if (isSelect)
+        {
+            return true;
+        }
+
+        return string.Equals(name, WhereMethod, StringComparison.Ordinal);
     }
 
     private static bool IsResolvedNonDotBoxDStageMethodInvocation(

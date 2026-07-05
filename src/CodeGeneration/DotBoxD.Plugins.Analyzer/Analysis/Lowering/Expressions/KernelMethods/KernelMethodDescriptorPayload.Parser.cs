@@ -23,32 +23,32 @@ internal static partial class KernelMethodDescriptorPayloadParser
     public static bool TryParse(string payload, out KernelMethodDescriptorPayload? descriptor)
     {
         descriptor = null;
-        if (!TryObject(payload, RootPropertyNames, out var properties) ||
-            !TryBool(properties, "allocates", out var allocates) ||
-            !TryStringArray(properties, "capabilities", out var capabilities) ||
-            !TryString(properties, "contextType", out var contextType) ||
-            !TryStringArray(properties, "effects", out var effects) ||
-            !TryString(properties, "methodMetadataName", out var methodMetadataName) ||
-            !TryString(properties, "normalizedSignature", out var normalizedSignature) ||
-            !TryParameters(properties, out var parameters) ||
-            !TryString(properties, "returnType", out var returnType) ||
-            !TryString(properties, "source", out var source) ||
-            !TryInt(properties, "version", out var version))
+        if (!TryObject(payload, RootPropertyNames, out var properties))
+        {
+            return false;
+        }
+
+        if (!TryDescriptorScalars(properties, out var scalars))
+        {
+            return false;
+        }
+
+        if (!TryDescriptorCollections(properties, out var collections))
         {
             return false;
         }
 
         descriptor = new KernelMethodDescriptorPayload(
-            version,
-            contextType,
-            methodMetadataName,
-            normalizedSignature,
-            returnType,
-            allocates,
-            new EquatableArray<string>(capabilities),
-            new EquatableArray<string>(effects),
-            new EquatableArray<KernelMethodDescriptorParameter>(parameters),
-            source);
+            scalars.Version,
+            scalars.ContextType,
+            scalars.MethodMetadataName,
+            scalars.NormalizedSignature,
+            scalars.ReturnType,
+            scalars.Allocates,
+            new EquatableArray<string>(collections.Capabilities),
+            new EquatableArray<string>(collections.Effects),
+            new EquatableArray<KernelMethodDescriptorParameter>(collections.Parameters),
+            scalars.Source);
         return true;
     }
 
@@ -257,20 +257,30 @@ internal static partial class KernelMethodDescriptorPayloadParser
             }
 
             items.Add(json.Substring(valueStart, index - valueStart));
-            index = SkipWhitespace(json, index);
-            if (index < json.Length && json[index] == ',')
-            {
-                index++;
-                continue;
-            }
-
-            if (index < json.Length && json[index] == ']')
+            if (TryReadArraySeparator(json, ref index))
             {
                 continue;
             }
 
             return false;
         }
+    }
+
+    private static bool TryReadArraySeparator(string json, ref int index)
+    {
+        index = SkipWhitespace(json, index);
+        if (index >= json.Length)
+        {
+            return false;
+        }
+
+        if (json[index] == ',')
+        {
+            index++;
+            return true;
+        }
+
+        return json[index] == ']';
     }
 
     private static bool ContainsName(IReadOnlyList<string> allowedNames, string name)
