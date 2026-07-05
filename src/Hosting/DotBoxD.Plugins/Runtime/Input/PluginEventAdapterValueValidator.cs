@@ -9,6 +9,11 @@ internal static class PluginEventAdapterValueValidator
         IReadOnlyList<Parameter> parameters,
         IReadOnlyList<SandboxValue> values)
     {
+        if (values is null)
+        {
+            throw CreateException("Plugin event adapter values must be non-null.");
+        }
+
         EnsureValueCountMatches(values.Count, parameters.Count);
         for (var i = 0; i < parameters.Count; i++)
         {

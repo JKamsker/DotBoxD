@@ -2,8 +2,9 @@ using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Plugins;
+using DotBoxD.Plugins.Runtime.Input;
 
-namespace DotBoxD.Kernels.Tests.Plugins.Runtime;
+namespace DotBoxD.Kernels.Tests.Plugins.Runtime.AdapterValidation;
 
 public sealed class PluginEventAdapterOutputValidationTests
 {
@@ -18,7 +19,7 @@ public sealed class PluginEventAdapterOutputValidationTests
                 new NullValueListAdapter(),
                 new NullValueListEvent("player-1")).AsTask());
 
-        Assert.Contains(ex.Diagnostics, diagnostic => diagnostic.Code == "DBXK036");
+        Assert.Contains(ex.Diagnostics, diagnostic => diagnostic.Code == PluginEventAdapterShapeValidator.DiagnosticCode);
         Assert.Empty(kernel.ExecutionObservations);
         Assert.Null(kernel.LastExecution);
     }
