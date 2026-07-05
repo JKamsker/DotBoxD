@@ -21,14 +21,14 @@ public enum SubscriptionDeliveryStage
 /// <param name="EventType">The event type whose delivery faulted.</param>
 /// <param name="Stage">The delivery stage that threw.</param>
 /// <param name="Exception">The exception that was caught.</param>
-public readonly record struct SubscriptionDeliveryFault(
+public sealed record SubscriptionDeliveryFault(
     Type EventType,
     SubscriptionDeliveryStage Stage,
     Exception Exception)
 {
-    private readonly Type _eventType = EventType ?? throw new ArgumentNullException(nameof(EventType));
-    private readonly SubscriptionDeliveryStage _stage = Defined(Stage);
-    private readonly Exception _exception = Exception ?? throw new ArgumentNullException(nameof(Exception));
+    private Type _eventType = EventType ?? throw new ArgumentNullException(nameof(EventType));
+    private SubscriptionDeliveryStage _stage = Defined(Stage);
+    private Exception _exception = Exception ?? throw new ArgumentNullException(nameof(Exception));
 
     public Type EventType
     {

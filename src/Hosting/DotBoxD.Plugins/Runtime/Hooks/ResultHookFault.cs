@@ -12,10 +12,10 @@ namespace DotBoxD.Plugins.Runtime;
 /// </summary>
 /// <param name="EventType">The hook context/event type whose dispatch faulted.</param>
 /// <param name="Exception">The exception that was caught and isolated.</param>
-public readonly record struct ResultHookFault(Type EventType, Exception Exception)
+public sealed record ResultHookFault(Type EventType, Exception Exception)
 {
-    private readonly Type _eventType = EventType ?? throw new ArgumentNullException(nameof(EventType));
-    private readonly Exception _exception = Exception ?? throw new ArgumentNullException(nameof(Exception));
+    private Type _eventType = EventType ?? throw new ArgumentNullException(nameof(EventType));
+    private Exception _exception = Exception ?? throw new ArgumentNullException(nameof(Exception));
 
     public Type EventType
     {

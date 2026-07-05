@@ -122,6 +122,22 @@ public sealed class PluginRuntimeTelemetryContractTests
         Assert.Equal(memberName, exception.ParamName);
     }
 
+    [Fact]
+    public void Result_hook_fault_has_no_zero_initialized_contract_instance()
+    {
+        ResultHookFault fault = default!;
+
+        Assert.Null(fault);
+    }
+
+    [Fact]
+    public void Subscription_delivery_fault_has_no_zero_initialized_contract_instance()
+    {
+        SubscriptionDeliveryFault fault = default!;
+
+        Assert.Null(fault);
+    }
+
     private static PluginExecutionObservation ValidObservation()
         => new(
             "Handle",
