@@ -179,6 +179,7 @@ internal sealed partial class SandboxWorkerExecutor
         var observedBytes = default(ObservedBindingBytes);
         Dictionary<string, int>? observedBindingCalls = null;
         var expectedSequenceNumber = 1L;
+        var grantClock = plan.Policy.GrantClock;
         foreach (var auditEvent in result.AuditEvents)
         {
             if (auditEvent.SequenceNumber != expectedSequenceNumber ||
@@ -203,7 +204,8 @@ internal sealed partial class SandboxWorkerExecutor
                     auditEvent,
                     observedBindingCalls,
                     ref observedBindingBaseFuel,
-                    ref observedBytes))
+                    ref observedBytes,
+                    grantClock))
                 {
                     return false;
                 }
@@ -254,7 +256,8 @@ internal sealed partial class SandboxWorkerExecutor
         SandboxAuditEvent auditEvent,
         Dictionary<string, int> observedBindingCalls,
         ref long observedBindingBaseFuel,
-        ref ObservedBindingBytes observedBytes)
+        ref ObservedBindingBytes observedBytes,
+        DateTimeOffset grantClock)
     {
         if (auditEvent.BindingId is null ||
             !plan.Bindings.TryGet(auditEvent.BindingId, out var binding))
@@ -276,7 +279,8 @@ internal sealed partial class SandboxWorkerExecutor
             : 1;
         observedBindingCalls[auditEvent.BindingId] = calls;
         return (binding.CostModel.MaxCallsPerRun is not { } maxCalls || calls <= maxCalls) &&
-            TryRecordBindingByteEvidence(auditEvent, ref observedBytes);
+            TryRecordBindingByteEvidence(auditEvent, ref observedBytes) &&
+            WorkerFileAuditGrantValidator.Matches(plan, auditEvent, grantClock);
     }
 
     private static bool TryRecordBindingByteEvidence(
