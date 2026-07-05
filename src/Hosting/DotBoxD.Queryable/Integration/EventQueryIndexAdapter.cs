@@ -83,12 +83,16 @@ public static class EventQueryIndexAdapter
         ArgumentNullException.ThrowIfNull(source);
         if (string.IsNullOrEmpty(source.Path))
         {
+#pragma warning disable CA2208 // Preserve the malformed IndexedPredicate member name in the public exception.
             throw new ArgumentException("Predicate paths cannot be null or empty.", nameof(IndexedPredicate.Path));
+#pragma warning restore CA2208
         }
 
         if (source.Value is null)
         {
+#pragma warning disable CA2208 // Preserve the malformed IndexedPredicate member name in the public exception.
             throw new ArgumentException("Predicate values cannot be null.", nameof(IndexedPredicate.Value));
+#pragma warning restore CA2208
         }
 
         var (value, valueType) = ConvertValue(source.Value);
