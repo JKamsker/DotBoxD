@@ -144,64 +144,19 @@ internal static partial class ServiceModelFactory
         CancellationToken ct,
         out ServiceResult rejected)
     {
-        if (InheritedMethodCompatibilityFailure(context, existingMethod, methodSymbol, ct) is { } failure)
+        var reason = InheritedMethodDeduplicator.GetDuplicateSignatureRejectionReason(existingMethod, methodSymbol, ct);
+        if (reason is null)
         {
-            rejected = failure;
-            return true;
+            rejected = default;
+            return false;
         }
 
-        rejected = default;
-        return false;
-    }
-
-    private static ServiceResult? InheritedMethodCompatibilityFailure(
-        ServiceBuildContext context,
-        IMethodSymbol existingMethod,
-        IMethodSymbol methodSymbol,
-        CancellationToken ct)
-    {
-        if (!InheritedMethodDeduplicator.HasCompatibleReturnShape(existingMethod, methodSymbol, ct))
-        {
-            return RejectedInheritedMethod(context, methodSymbol, "an incompatible return type");
-        }
-
-        if (!InheritedMethodDeduplicator.HasSameParameterRefKinds(existingMethod, methodSymbol))
-        {
-            return RejectedInheritedMethod(context, methodSymbol, "incompatible parameter ref kinds");
-        }
-
-        if (!MethodSignatureFacts.HaveSameGenericConstraints(existingMethod, methodSymbol, ct))
-        {
-            return RejectedInheritedMethod(context, methodSymbol, "incompatible generic constraints", generic: true);
-        }
-
-        if (!InheritedMethodDeduplicator.HasSameNullableAnnotations(existingMethod, methodSymbol, ct))
-        {
-            return RejectedInheritedMethod(context, methodSymbol, "incompatible nullable annotations");
-        }
-
-        if (!TupleElementNameComparer.HasSameElementNames(existingMethod, methodSymbol, ct))
-        {
-            return RejectedInheritedMethod(context, methodSymbol, "incompatible tuple element names");
-        }
-
-        return !InheritedMethodDeduplicator.HasSameEffectiveWireName(existingMethod, methodSymbol)
-            ? RejectedInheritedMethod(context, methodSymbol, "a different wire method name")
-            : null;
-    }
-
-    private static ServiceResult RejectedInheritedMethod(
-        ServiceBuildContext context,
-        IMethodSymbol methodSymbol,
-        string reason,
-        bool generic = false)
-    {
-        var methodKind = generic ? "inherited generic method" : "inherited method";
-        return RejectedService(
+        rejected = RejectedService(
             context.DisplayName,
-            $"{methodKind} '{methodSymbol.Name}' has the same signature as another method but {reason}",
+            reason,
             DiagnosticLocationFactory.FromSymbol(methodSymbol),
             context.QualifiedInterfaceName);
+        return true;
     }
 
     private sealed record ServiceBuildContext(
