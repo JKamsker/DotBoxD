@@ -62,12 +62,12 @@ public sealed partial class InstalledKernel
             $"Kernel '{Manifest.PluginId}' is not a server extension (no rpcEntrypoint).");
 
         cancellationToken.ThrowIfCancellationRequested();
-        var rpcArguments = KernelRpcBinaryCodec.DecodeArguments(arguments);
+        var rpcArguments = DecodeRpcArguments(arguments);
         var callerCount = _rpcCallerArgumentCount;
         if (callerCount < 0 || rpcArguments.Length != callerCount)
         {
-            throw new InvalidOperationException(
-                $"Server extension '{Manifest.PluginId}' expects {callerCount} argument(s) but received {rpcArguments.Length}.");
+            throw RpcInvalidInput(
+                $"server extension '{Manifest.PluginId}' expects {callerCount} argument(s) but received {rpcArguments.Length}.");
         }
 
         var sandboxArguments = rpcArguments.Length == 0
@@ -75,7 +75,7 @@ public sealed partial class InstalledKernel
             : new SandboxValue[rpcArguments.Length];
         for (var i = 0; i < rpcArguments.Length; i++)
         {
-            sandboxArguments[i] = KernelRpcValueConverter.ToSandboxValue(rpcArguments[i], function.Parameters[i].Type);
+            sandboxArguments[i] = ConvertRpcArgument(rpcArguments[i], function.Parameters[i].Type);
         }
 
         var result = await InvokeServerExtensionAsync(sandboxArguments, cancellationToken).ConfigureAwait(false);
@@ -157,8 +157,39 @@ public sealed partial class InstalledKernel
         return null;
     }
 
+    private static KernelRpcValue[] DecodeRpcArguments(byte[] arguments)
+    {
+        try
+        {
+            return KernelRpcBinaryCodec.DecodeArguments(arguments);
+        }
+        catch (FormatException ex)
+        {
+            throw RpcInvalidInput(ex.Message);
+        }
+    }
+
+    private static SandboxValue ConvertRpcArgument(KernelRpcValue value, SandboxType expectedType)
+    {
+        try
+        {
+            return KernelRpcValueConverter.ToSandboxValue(value, expectedType);
+        }
+        catch (FormatException ex)
+        {
+            throw RpcInvalidInput(ex.Message);
+        }
+        catch (NotSupportedException ex)
+        {
+            throw RpcInvalidInput(ex.Message);
+        }
+    }
+
     private static SandboxRuntimeException RpcEntrypointNotFound(string entrypoint)
         => new(new SandboxError(
             SandboxErrorCode.ValidationError,
             $"server extension entrypoint '{entrypoint}' was not found"));
+
+    private static SandboxRuntimeException RpcInvalidInput(string message)
+        => new(new SandboxError(SandboxErrorCode.InvalidInput, message));
 }
