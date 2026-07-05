@@ -200,6 +200,7 @@ public SandboxError Error { get; }
 public SandboxError? Error { get; init; }
 public SandboxIsolation Isolation { get; init; } = SandboxIsolation.InProcess
 public SandboxModule Module { get; }
+public SandboxPath Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
 public SandboxPolicy Build()
 public SandboxPolicy Policy { get; }
 public SandboxPolicyBuilder AllowIntraKernelReentrancy()
@@ -234,6 +235,7 @@ public SandboxResourceUsage Snapshot()
 public SandboxRunId RunId { get; }
 public SandboxRunId? RunId { get; init; }
 public SandboxRuntimeException(SandboxError error)
+public SandboxUri Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
 public SandboxValue ChargeBindingReturn(BindingDescriptor descriptor, SandboxValue value)
 public SandboxValue this[int index] => _values[index]
 public SandboxValue? Value { get; init; }
@@ -303,7 +305,7 @@ public static BindingCostModel PerReturnedByte(long baseFuel, long perByteFuel)
 public static bool ContainsForbiddenDescriptor(string value)
 public static bool ContainsOnlyKnownBits(this SandboxEffect effects)
 public static bool IsCollectionIntrinsic(string callName)
-public static bool IsForbiddenName(string name)
+public static bool IsForbiddenName(string? name)
 public static bool IsKnownOpaqueId(string name)
 public static bool IsOpaqueId(string? value)
 public static bool IsPortableRelativePath(string? path)
@@ -423,7 +425,10 @@ public string ModuleHash { get; }
 public string PlanHash { get; }
 public string PolicyHash { get; }
 public string PolicyId { get => _policyId; init { _policyId = value; ResetHash(); } }
+public string RelativePath { get => _relativePath; init => _relativePath = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
+public string TypeName { get => _typeName; init => _typeName = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
 public string Value
+public string Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
 public string? ArtifactHash { get; init; }
 public TimeSpan EffectiveWallTime => MaxWallTime ?? TimeSpan.FromMilliseconds(100)
 public TimeSpan RemainingWallTime()
