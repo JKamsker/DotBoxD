@@ -17,6 +17,8 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime;
 public sealed partial class RemoteRunLocalChainRuntimeTests
 {
     private const string HostScalarSource = HostPrelude + """
+        using DotBoxD.Kernels.Sandbox;
+
         public interface IScalarWorld
         {
             [HostBinding("host.probe.getValue", "probe.read.value", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
@@ -33,6 +35,8 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         """;
 
     private const string HostListCountSource = HostPrelude + """
+        using DotBoxD.Kernels.Sandbox;
+
         public interface ITagWorld
         {
             [HostBinding("host.probe.getTags", "probe.read.tags", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
@@ -62,10 +66,12 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
     }
 
     private const string GuidAutoBindingSource = HostPrelude + """
-        [global::DotBoxD.Services.Attributes.DotBoxDService]
+        using DotBoxD.Kernels.Sandbox;
+
+        [global::DotBoxD.Services.Attributes.RpcService]
         public interface IIdWorld
         {
-            [HostCapability("probe.read.id", HostBindingEffect.HostStateRead | HostBindingEffect.Allocates)]
+            [HostBinding("probe.read.id", SandboxEffect.Cpu | SandboxEffect.Alloc | SandboxEffect.HostStateRead)]
             System.Guid GenerateId(string zone);
         }
 
@@ -81,9 +87,10 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
     [Fact]
     public async Task Guid_returning_auto_binding_in_a_select_installs_and_round_trips()
     {
-        // Regression for the DBXK041 mismatch: an auto-binding ([DotBoxDService], no [HostBinding]) returning a
-        // Guid is classified as allocating by the runtime, so the manifest must also carry the Alloc effect or
-        // install fails. PushFirstMatching installs the package (asserting no effect-mismatch) and pushes the Guid.
+        // Regression for the DBXK041 mismatch: an auto-binding ([RpcService], [HostBinding] with an
+        // auto-derived route) returning a Guid is classified as allocating by the runtime, so the manifest must
+        // also carry the Alloc effect or install fails. PushFirstMatching installs the package (asserting no
+        // effect-mismatch) and pushes the Guid.
         var payload = await PushFirstMatchingHosted(GuidAutoBindingSource, Matching, Filtered);
 
         Assert.Equal(SampleId, DecodeReflective<Guid>(payload));
@@ -156,9 +163,10 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         builder.AddBinding(GenerateIdBinding());   // host.ChainSample.IIdWorld.GenerateId -> Guid (probe.read.id)
     }
 
-    // An AUTO-binding ([DotBoxDService], no explicit [HostBinding]) returning a Guid. The id is the analyzer's
-    // auto-derived route host.{ns}.{Type}.{Method}; the effects include Alloc because the runtime classifies a Guid
-    // return as allocating — the manifest must agree (the fix under test) or install fails DBXK041.
+    // An AUTO-binding ([RpcService], [HostBinding] with an auto-derived route) returning a Guid. The id is the
+    // analyzer's auto-derived route host.{ns}.{Type}.{Method}; the effects include Alloc because the runtime
+    // classifies a Guid return as allocating — the manifest must agree (the fix under test) or install fails
+    // DBXK041.
     private static BindingDescriptor GenerateIdBinding()
         => new(
             "host.ChainSample.IIdWorld.GenerateId",

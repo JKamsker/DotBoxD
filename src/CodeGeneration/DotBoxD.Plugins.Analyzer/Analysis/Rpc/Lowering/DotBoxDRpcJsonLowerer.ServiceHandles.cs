@@ -126,7 +126,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
     /// <summary>
     /// Recognizes a scoped-handle accessor call — <c>control.Get(key)</c> whose return type is a
-    /// <c>[DotBoxDService]</c> handle — and lowers the captured key (its first argument). Shared by the local
+    /// <c>[RpcService]</c> handle — and lowers the captured key (its first argument). Shared by the local
     /// declaration path (<see cref="TryLowerServiceHandleLocal"/>) and the inline receiver path so both capture
     /// the scope key identically.
     /// </summary>
@@ -136,7 +136,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         List<string>? output = null)
     {
         if (_model.GetSymbolInfo(invocation, _cancellationToken).Symbol is not IMethodSymbol method ||
-            !HasDotBoxDServiceAttribute(method.ReturnType) ||
+            !HasRpcServiceAttribute(method.ReturnType) ||
             IsHookContextHostMarker(method))
         {
             handleId = string.Empty;

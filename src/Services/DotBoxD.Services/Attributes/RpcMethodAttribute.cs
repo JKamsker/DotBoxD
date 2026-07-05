@@ -1,12 +1,11 @@
 namespace DotBoxD.Services.Attributes;
 
 /// <summary>
-/// Marks a method as a DotBoxD endpoint. This attribute is optional -
-/// all methods in a [DotBoxDService] interface are included by default.
-/// Use this attribute to customize method behavior.
+/// Marks a method as an RPC endpoint. This attribute is optional: all methods in an
+/// <see cref="RpcServiceAttribute"/> interface are included by default.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
-public sealed class DotBoxDMethodAttribute : Attribute
+public class RpcMethodAttribute : Attribute
 {
     /// <summary>
     /// Optional custom method name. If not specified, the method name is used.

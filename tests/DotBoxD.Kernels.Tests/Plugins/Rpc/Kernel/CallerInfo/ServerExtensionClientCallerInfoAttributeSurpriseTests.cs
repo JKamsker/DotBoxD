@@ -69,7 +69,7 @@ public sealed class ServerExtensionClientCallerInfoAttributeSurpriseTests
 
         namespace Sample;
 
-        [DotBoxDService]
+        [RpcService]
         public interface IRemoteControl;
 
         public sealed class RemoteControl : IRemoteControl, IServerExtensionClientAccessor
