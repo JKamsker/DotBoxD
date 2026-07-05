@@ -57,7 +57,7 @@ function New-CoverageBucket(
     }
 }
 
-function Add-ConfiguredBuckets($Target, [string] $Kind, [string] $ContextPrefix) {
+function Add-ConfiguredBucket($Target, [string] $Kind, [string] $ContextPrefix) {
     foreach ($area in @($Target)) {
         $name = [string] $area.name
         if ([string]::IsNullOrWhiteSpace($name)) {
@@ -86,8 +86,8 @@ $globalBranchFloor = if ($MinimumBranchCoverage -ge 0) {
 
 $buckets = [System.Collections.Generic.List[object]]::new()
 $buckets.Add((New-CoverageBucket "Global shipping assemblies" "global" @("DotBoxD*") $globalLineFloor $globalBranchFloor))
-Add-ConfiguredBuckets $config.areas "area" "coverage area"
-Add-ConfiguredBuckets $config.criticalAreas "critical" "critical coverage area"
+Add-ConfiguredBucket $config.areas "area" "coverage area"
+Add-ConfiguredBucket $config.criticalAreas "critical" "critical coverage area"
 
 $reports = @(Get-ChildItem -Path $coverageRoot -Recurse -Filter "*.cobertura.xml" -ErrorAction SilentlyContinue)
 if ($reports.Count -eq 0) {
@@ -113,7 +113,7 @@ function Test-PackagePattern([string] $name, [string[]] $patterns) {
     return $false
 }
 
-function Get-BranchCounts($line) {
+function Get-BranchCount($line) {
     $conditionCoverage = [string] $line."condition-coverage"
     if ($conditionCoverage -match '\((?<covered>\d+)\/(?<valid>\d+)\)') {
         return [pscustomobject] @{ Covered = [int] $Matches["covered"]; Valid = [int] $Matches["valid"] }
@@ -121,7 +121,7 @@ function Get-BranchCounts($line) {
     return [pscustomobject] @{ Covered = 0; Valid = 0 }
 }
 
-function Ensure-FileBucket($bucket, [string] $file) {
+function Initialize-FileBucket($bucket, [string] $file) {
     if ($bucket.ValidLines.ContainsKey($file)) {
         return
     }
@@ -132,7 +132,7 @@ function Ensure-FileBucket($bucket, [string] $file) {
 }
 
 function Add-LineCoverage($bucket, [string] $file, [int] $lineNumber, [bool] $covered) {
-    Ensure-FileBucket $bucket $file
+    Initialize-FileBucket $bucket $file
     [void] $bucket.ValidLines[$file].Add($lineNumber)
     if ($covered) {
         [void] $bucket.CoveredLines[$file].Add($lineNumber)
@@ -143,6 +143,10 @@ function Add-BranchCoverage($bucket, [string] $file, [int] $lineNumber, [int] $v
     if ($valid -le 0) {
         return
     }
+
+    # Cobertura does not expose stable branch identities across independent test-project reports.
+    # The best observed count per source line is a conservative lower bound; summing would double
+    # count repeated reports for the same branch point.
     $existingValid = if ($bucket.ValidBranches[$file].ContainsKey($lineNumber)) {
         $bucket.ValidBranches[$file][$lineNumber]
     } else {
@@ -181,7 +185,7 @@ foreach ($report in $reports) {
                 $lineNumber = [int] $line.number
                 $lineCovered = [int] $line.hits -gt 0
                 $branchCounts = if ([string] $line.branch -eq "True" -or [string] $line.branch -eq "true") {
-                    Get-BranchCounts $line
+                    Get-BranchCount $line
                 } else {
                     [pscustomobject] @{ Covered = 0; Valid = 0 }
                 }

@@ -55,8 +55,8 @@
     {
       "name": "Critical services",
       "packagePatterns": [ "DotBoxD.Services" ],
-      "minimumLineCoverage": 80,
-      "minimumBranchCoverage": 78
+      "minimumLineCoverage": 82,
+      "minimumBranchCoverage": 80
     }
   ],
   "_comment": "Coverage thresholds are conservative ratchets over shipping DotBoxD assemblies (src/) using merged Cobertura reports from the Kernels and Services coverage suites. Measured local baseline on 2026-07-05: global line 85.15%, global branch 77.80%; area baselines are intentionally rounded down so normal noise does not fail unrelated PRs. Raise thresholds toward the current values as tests improve."

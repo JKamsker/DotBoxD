@@ -23,12 +23,12 @@ if (-not (Test-Path -LiteralPath $policyFile)) {
 
 $policy = Get-Content -Raw -LiteralPath $policyFile | ConvertFrom-Json
 
-function Normalize-RelativePath([string] $path) {
+function ConvertTo-RelativePath([string] $path) {
     return $path.Replace('\', '/').TrimStart('/')
 }
 
 function Convert-GlobToRegex([string] $glob) {
-    $normalized = Normalize-RelativePath $glob
+    $normalized = ConvertTo-RelativePath -path $glob
     $escaped = [regex]::Escape($normalized)
     $escaped = $escaped.Replace('\*\*', '.*')
     $escaped = $escaped.Replace('\*', '[^/]*')
@@ -38,7 +38,7 @@ function Convert-GlobToRegex([string] $glob) {
 
 function Test-GlobMatch([string] $relativePath, [string[]] $patterns) {
     foreach ($pattern in $patterns) {
-        if ($relativePath -match (Convert-GlobToRegex $pattern)) {
+        if ($relativePath -match (Convert-GlobToRegex -glob $pattern)) {
             return $true
         }
     }
@@ -78,10 +78,10 @@ function Get-Allowlist($Rule, [string] $Context) {
             throw "$Context allowlist entry '$entry' must include a reason."
         }
 
-        $path = Get-RequiredText $entry "path" "$Context allowlist entry"
-        $reason = Get-RequiredText $entry "reason" "$Context allowlist entry '$path'"
+        $path = Get-RequiredText -Object $entry -PropertyName "path" -Context "$Context allowlist entry"
+        $reason = Get-RequiredText -Object $entry -PropertyName "reason" -Context "$Context allowlist entry '$path'"
         $entries.Add([pscustomobject] @{
-            Path = Normalize-RelativePath $path
+            Path = ConvertTo-RelativePath -path $path
             Reason = $reason
         })
     }
@@ -91,7 +91,7 @@ function Get-Allowlist($Rule, [string] $Context) {
 
 function Test-Allowlisted([string] $relativePath, $allowlist) {
     foreach ($entry in $allowlist) {
-        if ($relativePath -match (Convert-GlobToRegex $entry.Path)) {
+        if ($relativePath -match (Convert-GlobToRegex -glob $entry.Path)) {
             return $true
         }
     }
@@ -100,8 +100,44 @@ function Test-Allowlisted([string] $relativePath, $allowlist) {
 }
 
 function Test-SkippedDirectory([string] $path) {
-    $normalized = Normalize-RelativePath ([System.IO.Path]::GetRelativePath($root, $path))
+    $normalized = ConvertTo-RelativePath -path ([System.IO.Path]::GetRelativePath($root, $path))
     return $normalized -match '(^|/)(\.git|bin|obj|artifacts|StrykerOutput)(/|$)'
+}
+
+function Remove-CommentText([string] $line, [ref] $inBlockComment) {
+    $remaining = $line
+    $result = [System.Text.StringBuilder]::new()
+
+    while ($remaining.Length -gt 0) {
+        if ($inBlockComment.Value) {
+            $blockEnd = $remaining.IndexOf("*/", [System.StringComparison]::Ordinal)
+            if ($blockEnd -lt 0) {
+                return $result.ToString()
+            }
+
+            $remaining = $remaining.Substring($blockEnd + 2)
+            $inBlockComment.Value = $false
+            continue
+        }
+
+        $lineComment = $remaining.IndexOf("//", [System.StringComparison]::Ordinal)
+        $blockStart = $remaining.IndexOf("/*", [System.StringComparison]::Ordinal)
+        if ($lineComment -ge 0 -and ($blockStart -lt 0 -or $lineComment -lt $blockStart)) {
+            [void] $result.Append($remaining.Substring(0, $lineComment))
+            return $result.ToString()
+        }
+
+        if ($blockStart -lt 0) {
+            [void] $result.Append($remaining)
+            return $result.ToString()
+        }
+
+        [void] $result.Append($remaining.Substring(0, $blockStart))
+        $remaining = $remaining.Substring($blockStart + 2)
+        $inBlockComment.Value = $true
+    }
+
+    return $result.ToString()
 }
 
 if ($null -eq $policy.rules) {
@@ -110,17 +146,17 @@ if ($null -eq $policy.rules) {
 
 $rules = [System.Collections.Generic.List[object]]::new()
 foreach ($rule in @($policy.rules)) {
-    $name = Get-RequiredText $rule "name" "Banned API rule"
+    $name = Get-RequiredText -Object $rule -PropertyName "name" -Context "Banned API rule"
     $context = "Banned API rule '$name'"
-    $forbiddenIn = Get-RequiredStringArray $rule "forbiddenIn" $context
-    $reason = Get-RequiredText $rule "reason" $context
-    $remediation = Get-RequiredText $rule "remediation" $context
-    $allowlist = Get-Allowlist $rule $context
+    $forbiddenIn = Get-RequiredStringArray -Object $rule -PropertyName "forbiddenIn" -Context $context
+    $reason = Get-RequiredText -Object $rule -PropertyName "reason" -Context $context
+    $remediation = Get-RequiredText -Object $rule -PropertyName "remediation" -Context $context
+    $allowlist = Get-Allowlist -Rule $rule -Context $context
 
     $symbols = [System.Collections.Generic.List[object]]::new()
     foreach ($symbol in @($rule.symbols)) {
-        $symbolName = Get-RequiredText $symbol "name" "$context symbol"
-        $pattern = Get-RequiredText $symbol "pattern" "$context symbol '$symbolName'"
+        $symbolName = Get-RequiredText -Object $symbol -PropertyName "name" -Context "$context symbol"
+        $pattern = Get-RequiredText -Object $symbol -PropertyName "pattern" -Context "$context symbol '$symbolName'"
         try {
             $regex = [regex]::new($pattern)
         } catch {
@@ -148,42 +184,43 @@ foreach ($rule in @($policy.rules)) {
 }
 
 $sourceFiles = Get-ChildItem -Path $root -Recurse -Filter "*.cs" -File | Where-Object {
-    -not (Test-SkippedDirectory $_.DirectoryName)
+    -not (Test-SkippedDirectory -path $_.DirectoryName)
 }
 
 $violations = [System.Collections.Generic.List[string]]::new()
 foreach ($file in $sourceFiles) {
-    $relativePath = Normalize-RelativePath ([System.IO.Path]::GetRelativePath($root, $file.FullName))
-    foreach ($rule in $rules) {
-        if (-not (Test-GlobMatch $relativePath $rule.ForbiddenIn)) {
+    $relativePath = ConvertTo-RelativePath -path ([System.IO.Path]::GetRelativePath($root, $file.FullName))
+    $activeRules = @($rules | Where-Object {
+        (Test-GlobMatch -relativePath $relativePath -patterns $_.ForbiddenIn) -and
+            -not (Test-Allowlisted -relativePath $relativePath -allowlist $_.Allowlist)
+    })
+    if ($activeRules.Count -eq 0) {
+        continue
+    }
+
+    $inBlockComment = $false
+    $lineNumber = 0
+    foreach ($line in [System.IO.File]::ReadLines($file.FullName)) {
+        $lineNumber++
+        $scannableLine = Remove-CommentText -line $line -inBlockComment ([ref] $inBlockComment)
+        if ([string]::IsNullOrWhiteSpace($scannableLine)) {
             continue
         }
 
-        if (Test-Allowlisted $relativePath $rule.Allowlist) {
-            continue
-        }
-
-        $lineNumber = 0
-        foreach ($line in [System.IO.File]::ReadLines($file.FullName)) {
-            $lineNumber++
-            $trimmed = $line.TrimStart()
-            if ($trimmed.StartsWith("//", [System.StringComparison]::Ordinal) -or
-                $trimmed.StartsWith("///", [System.StringComparison]::Ordinal) -or
-                $trimmed.StartsWith("*", [System.StringComparison]::Ordinal)) {
-                continue
-            }
-
+        foreach ($rule in $activeRules) {
             foreach ($symbol in $rule.Symbols) {
-                if ($symbol.Regex.IsMatch($line)) {
-                    $violations.Add((
-                        "{0}:{1}: {2} matched {3}. Reason: {4} Remediation: {5}" -f `
-                            $relativePath,
-                            $lineNumber,
-                            $rule.Name,
-                            $symbol.Name,
-                            $rule.Reason,
-                            $rule.Remediation))
+                if (-not $symbol.Regex.IsMatch($scannableLine)) {
+                    continue
                 }
+
+                $violations.Add((
+                    "{0}:{1}: {2} matched {3}. Reason: {4} Remediation: {5}" -f `
+                        $relativePath,
+                        $lineNumber,
+                        $rule.Name,
+                        $symbol.Name,
+                        $rule.Reason,
+                        $rule.Remediation))
             }
         }
     }

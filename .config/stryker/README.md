@@ -33,10 +33,14 @@ dotnet tool run dotnet-stryker -- \
 
 Initial local baselines recorded on 2026-07-05 with Stryker.NET 4.16.0:
 
-| Scope | Mutants tested | Killed | Survived | Timeout | Mutation score |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Kernel validation policy scope | 111 | 71 | 40 | 0 | 30.60% |
-| Services protocol/framing scope | 289 | 220 | 57 | 12 | 75.82% |
+| Scope | Mutants tested | Killed | Survived | Timeout | Killed/tested | Stryker score |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Kernel validation policy scope | 111 | 71 | 40 | 0 | 63.96% | 30.60% |
+| Services protocol/framing scope | 289 | 220 | 57 | 12 | 76.12% | 75.82% |
+
+`Killed/tested` is the raw killed mutant count divided by the table's tested count. `Stryker score`
+is the tool-reported mutation score from the same run and remains the value used as the baseline
+signal.
 
 The first phase is informational: both configs set `thresholds.break` to `0`, so low mutation
 scores do not fail the workflow. Tool crashes and invalid configs should still fail. Once the

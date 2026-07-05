@@ -112,7 +112,7 @@
         },
         {
           "name": "shared random source",
-          "pattern": "\\bRandom\\.Shared\\b|\\bnew\\s+Random\\s*\\("
+          "pattern": "\\b(?:(?:global::)?System\\.)?Random\\.Shared\\b|\\bnew\\s+(?:(?:global::)?System\\.)?Random\\s*\\("
         }
       ],
       "reason": "Kernel execution and validation paths must not bypass the policy-owned clock/random abstractions.",

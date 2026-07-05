@@ -64,6 +64,58 @@ public sealed class BannedApiPolicyTests
         Assert.Contains("Banned API policy passed.", result.Output, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("new Random();")]
+    [InlineData("new System.Random();")]
+    [InlineData("new global::System.Random();")]
+    public async Task Guard_reports_qualified_random_construction(string expression)
+    {
+        using var repo = TempRepo.Create();
+        repo.Write(".config/code-enforcer/banned-apis.json", RandomPolicy("[]"));
+        repo.Write(
+            "src/Kernels/ForbiddenRandom.cs",
+            $$"""
+            namespace Sample;
+            public static class ForbiddenRandom
+            {
+                public static object Run()
+                {
+                    return {{expression}}
+                }
+            }
+            """);
+
+        var result = await RunGuardAsync(repo.Path);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("No nondeterministic random", result.Output, StringComparison.Ordinal);
+        Assert.Contains("shared random source", result.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Guard_scans_code_lines_that_start_with_asterisk()
+    {
+        using var repo = TempRepo.Create();
+        repo.Write(".config/code-enforcer/banned-apis.json", ProcessPolicy("[]"));
+        repo.Write(
+            "src/Kernels/PointerCode.cs",
+            """
+            namespace Sample;
+            public static unsafe class PointerCode
+            {
+                public static void Run(delegate*<void> start)
+                {
+            *System.Diagnostics.Process.Start("tool");
+                }
+            }
+            """);
+
+        var result = await RunGuardAsync(repo.Path);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("No process spawning", result.Output, StringComparison.Ordinal);
+    }
+
     private static string ProcessPolicy(string allowedIn)
         => """
            {
@@ -80,6 +132,27 @@ public sealed class BannedApiPolicyTests
                  ],
                  "reason": "Process spawning is not allowed in this layer.",
                  "remediation": "Use an approved abstraction."
+               }
+             ]
+           }
+           """.Replace("__ALLOWED_IN__", allowedIn, StringComparison.Ordinal);
+
+    private static string RandomPolicy(string allowedIn)
+        => """
+           {
+             "rules": [
+               {
+                 "name": "No nondeterministic random",
+                 "forbiddenIn": [ "src/Kernels/**" ],
+                 "allowedIn": __ALLOWED_IN__,
+                 "symbols": [
+                   {
+                     "name": "shared random source",
+                     "pattern": "\\b(?:(?:global::)?System\\.)?Random\\.Shared\\b|\\bnew\\s+(?:(?:global::)?System\\.)?Random\\s*\\("
+                   }
+                 ],
+                 "reason": "Random construction is not allowed in this layer.",
+                 "remediation": "Use a deterministic random source."
                }
              ]
            }
