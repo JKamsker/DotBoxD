@@ -44,12 +44,31 @@ public sealed record SandboxAuditEvent(
     IReadOnlyDictionary<string, string>? Fields = null,
     long SequenceNumber = 0)
 {
+    private SandboxRunId _runId = RunId ?? throw new ArgumentNullException(nameof(RunId));
+    private string _kind = Kind ?? throw new ArgumentNullException(nameof(Kind));
     private IReadOnlyDictionary<string, string>? _fields = CopyFields(Fields);
 
+    public SandboxRunId RunId { get => _runId; init => _runId = value ?? throw new ArgumentNullException(nameof(RunId)); }
+    public string Kind { get => _kind; init => _kind = value ?? throw new ArgumentNullException(nameof(Kind)); }
     public IReadOnlyDictionary<string, string>? Fields { get => _fields; init => _fields = CopyFields(value); }
 
     private static IReadOnlyDictionary<string, string>? CopyFields(IReadOnlyDictionary<string, string>? fields)
-        => fields is null ? null : ModelCopy.StringDictionary(fields);
+    {
+        if (fields is null)
+        {
+            return null;
+        }
+
+        foreach (var field in fields)
+        {
+            if (field.Value is null)
+            {
+                throw new ArgumentException("Audit event fields cannot contain null values.", nameof(Fields));
+            }
+        }
+
+        return ModelCopy.StringDictionary(fields);
+    }
 }
 
 internal sealed class OwnedAuditEventSnapshot(IList<SandboxAuditEvent> list)
@@ -96,6 +115,8 @@ public sealed class InMemoryAuditSink : IAuditSink
 
     public void Write(SandboxAuditEvent auditEvent)
     {
+        ArgumentNullException.ThrowIfNull(auditEvent);
+
         var sequence = ++_sequence;
         _events ??= new List<SandboxAuditEvent>();
         _events.Add(auditEvent with { SequenceNumber = sequence });
