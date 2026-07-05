@@ -187,7 +187,13 @@ internal static class RpcKernelPackageValidator
 
     private static void ValidateLiveSettings(PluginManifest manifest, List<SandboxDiagnostic> diagnostics)
     {
-        foreach (var group in manifest.LiveSettings.GroupBy(s => s.Name, StringComparer.Ordinal))
+        var liveSettings = manifest.LiveSettings;
+        if (!PluginManifestElementValidator.ValidateNoNullElements(liveSettings, "liveSettings", diagnostics))
+        {
+            return;
+        }
+
+        foreach (var group in liveSettings.GroupBy(s => s.Name, StringComparer.Ordinal))
         {
             if (group.Skip(1).Any())
             {
@@ -195,7 +201,7 @@ internal static class RpcKernelPackageValidator
             }
         }
 
-        foreach (var setting in manifest.LiveSettings)
+        foreach (var setting in liveSettings)
         {
             PluginManifestTextValidator.ValidateText(setting.Name, "live setting name", diagnostics);
             PluginManifestTextValidator.ValidateText(setting.Type, "live setting type", diagnostics);
