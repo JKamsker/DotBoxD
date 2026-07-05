@@ -258,6 +258,10 @@ jobs:
         shell: pwsh
         run: ./eng/scripts/check-csharp-folder-layout.ps1
 
+      - name: Banned API policy
+        shell: pwsh
+        run: ./eng/scripts/check-banned-apis.ps1
+
       - name: Spec manifest integrity
         shell: pwsh
         run: ./eng/scripts/check-spec-manifest.ps1
@@ -269,6 +273,10 @@ jobs:
       - name: Release workflow security
         shell: pwsh
         run: ./eng/scripts/check-release-workflow-security.ps1
+
+      - name: CodeQL workflow security
+        shell: pwsh
+        run: ./eng/scripts/check-codeql-workflow.ps1
 
       - name: Release readiness
         shell: pwsh
@@ -504,7 +512,7 @@ jobs:
         run: ./eng/scripts/check-docs-smoke.ps1 -Configuration Release
 
   coverage:
-    name: Coverage threshold
+    name: Coverage thresholds
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
@@ -532,9 +540,9 @@ jobs:
       - name: Build coverage prerequisites
         run: dotnet build samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj -c Release --no-restore
 
-      # Collect coverage from the two suites that exercise the bulk of the shipping
-      # code, then enforce the line-coverage floor (.config/code-enforcer/coverage.json).
-      - name: Coverage threshold
+      # Collect line and branch coverage from the two suites that exercise the bulk of
+      # the shipping code, then enforce the global, area, and critical-component floors.
+      - name: Coverage thresholds
         shell: pwsh
         run: |
           # Native `dotnet test` failures do not stop a pwsh script on their own, so check
@@ -550,6 +558,17 @@ jobs:
             --collect "XPlat Code Coverage" --results-directory artifacts/coverage
           if ($LASTEXITCODE -ne 0) { throw "Services coverage test run failed (exit $LASTEXITCODE)." }
           ./eng/scripts/check-coverage.ps1 -CoverageDirectory artifacts/coverage
+
+      - name: Upload coverage summary
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-summary
+          path: |
+            artifacts/coverage/coverage-summary.md
+            artifacts/coverage/**/*.cobertura.xml
+          if-no-files-found: warn
+          retention-days: 7
 
   pack-packages:
     name: Pack NuGet packages

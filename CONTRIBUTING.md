@@ -53,10 +53,12 @@ the .NET 8/9/10 SDKs.
 | Rebrand completeness | `check-rebrand-complete.ps1` | No legacy `ShaRPC`/`SafeIR`/`SGP#` tokens in active source |
 | Formatting | `dotnet format whitespace --verify-no-changes` | Code matches `.editorconfig` |
 | C# file-length / layout | `check-csharp-file-lines.ps1` | File and folder size limits + a ratcheting soft-limit budget (see `AGENTS.md`) |
+| Banned API policy | `check-banned-apis.ps1` | Layer-aware bans for console I/O, process spawning, direct networking, nondeterministic kernel primitives, and raw validation filesystem access |
 | Spec manifest integrity | `check-spec-manifest.ps1` | The sandbox spec manifest is consistent |
 | Public API baseline | `check-api-compat-baseline.ps1` | Public package API matches `docs/api-baselines/*.txt` |
+| CodeQL workflow security | `check-codeql-workflow.ps1` | CodeQL remains SHA-pinned and uploads SARIF to GitHub code scanning |
 | Security-boundary tests | `run-required-tests.ps1` | A required allowlist of sandbox/security tests passes |
-| Coverage threshold | `check-coverage.ps1` | Line coverage over the `DotBoxD.*` assemblies stays above the floor in `.config/code-enforcer/coverage.json` |
+| Coverage thresholds | `check-coverage.ps1` | Line and branch coverage over `DotBoxD.*` shipping assemblies stay above the global, area, and critical-component floors in `.config/code-enforcer/coverage.json` |
 | Docs & examples smoke | `check-docs-smoke.ps1` | Doc commands point at real paths; the GameServer sample runs on Windows |
 
 The `tests/DotBoxD.Architecture.Tests` project additionally enforces layer dependencies, naming
@@ -67,8 +69,13 @@ test matrix.
 `check-package-metadata.ps1`, runs the package consumer smoke test, and uploads the package artifact.
 Pushes to `main` in `JKamsker/DotBoxD` then publish `0.1.0-ci.<run>` prerelease packages to NuGet.org.
 
-Additional workflows: **CodeQL** (`codeql.yml`, C# static analysis on push/PR + weekly) and
-**benchmarks** (`benchmarks.yml`, scheduled and on PRs labeled `benchmark`). The **release**
+Coverage floors and current baselines are documented in [`.config/code-enforcer/README.md`](.config/code-enforcer/README.md).
+
+Additional workflows: **CodeQL** (`codeql.yml`, C# static analysis on push/PR + weekly),
+**mutation-tests** (`mutation-tests.yml`, Stryker.NET on schedule/manual dispatch and PRs labeled
+`run-mutation-tests`), and **benchmarks** (`benchmarks.yml`, scheduled and on PRs labeled
+`benchmark`). Mutation testing commands and the first measured baselines are documented in
+[`.config/stryker/README.md`](.config/stryker/README.md). The **release**
 workflow reuses the full `ci` workflow before packing, attesting provenance, and publishing.
 
 If you change a public API on purpose, update the baseline with
