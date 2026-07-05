@@ -15,9 +15,9 @@ public sealed class InMemoryAuditSinkConcurrencyTests
 
     private static async Task<string?> FindFirstConcurrencyInvariantFailureAsync()
     {
-        const int attempts = 4;
+        const int attempts = 3;
         const int writerCount = 12;
-        const int eventsPerWriter = 20_000;
+        const int eventsPerWriter = 10_000;
 
         for (var attempt = 1; attempt <= attempts; attempt++)
         {

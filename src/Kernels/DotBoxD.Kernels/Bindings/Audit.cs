@@ -79,10 +79,7 @@ public sealed class InMemoryAuditSink : IAuditSink
     {
         get
         {
-            lock (_gate)
-            {
-                return _events is null ? Array.Empty<SandboxAuditEvent>() : _events.ToArray();
-            }
+            return CopyEvents();
         }
     }
 
@@ -104,11 +101,19 @@ public sealed class InMemoryAuditSink : IAuditSink
     /// </summary>
     internal IReadOnlyList<SandboxAuditEvent> SnapshotEvents()
     {
+        var events = CopyEvents();
+        return events.Length == 0
+            ? EmptySnapshot
+            : new OwnedAuditEventSnapshot(events);
+    }
+
+    private SandboxAuditEvent[] CopyEvents()
+    {
         lock (_gate)
         {
             return _events is null || _events.Count == 0
-                ? EmptySnapshot
-                : new OwnedAuditEventSnapshot(_events.ToArray());
+                ? Array.Empty<SandboxAuditEvent>()
+                : _events.ToArray();
         }
     }
 
