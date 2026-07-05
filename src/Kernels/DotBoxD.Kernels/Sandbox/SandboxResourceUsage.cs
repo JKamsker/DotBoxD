@@ -14,6 +14,8 @@ public sealed record SandboxResourceUsage(
     long CollectionElements,
     long StringBytes)
 {
+    private const string ResourceUsageCounterMessage = "resource usage counters must be non-negative.";
+
     private long _fuelUsed = RequireNonNegative(FuelUsed, nameof(FuelUsed));
     private long _maxFuel = RequireNonNegative(MaxFuel, nameof(MaxFuel));
     private long _loopIterations = RequireNonNegative(LoopIterations, nameof(LoopIterations));
@@ -41,22 +43,8 @@ public sealed record SandboxResourceUsage(
     public long StringBytes { get => _stringBytes; init => _stringBytes = RequireNonNegative(value, nameof(StringBytes)); }
 
     private static long RequireNonNegative(long value, string paramName)
-    {
-        if (value < 0)
-        {
-            throw new ArgumentOutOfRangeException(paramName, value, "resource usage counters must be non-negative.");
-        }
-
-        return value;
-    }
+        => SandboxCounterGuards.RequireNonNegative(value, paramName, ResourceUsageCounterMessage);
 
     private static int RequireNonNegative(int value, string paramName)
-    {
-        if (value < 0)
-        {
-            throw new ArgumentOutOfRangeException(paramName, value, "resource usage counters must be non-negative.");
-        }
-
-        return value;
-    }
+        => SandboxCounterGuards.RequireNonNegative(value, paramName, ResourceUsageCounterMessage);
 }

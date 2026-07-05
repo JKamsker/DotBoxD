@@ -44,6 +44,8 @@ public sealed record SandboxAuditEvent(
     IReadOnlyDictionary<string, string>? Fields = null,
     long SequenceNumber = 0)
 {
+    private const string AuditByteCounterMessage = "audit byte counters must be non-negative.";
+
     private SandboxEffect _effect = RequireKnownEffect(Effect, nameof(Effect));
     private SandboxErrorCode? _errorCode = RequireKnownErrorCode(ErrorCode, nameof(ErrorCode));
     private long? _bytes = RequireNonNegative(Bytes, nameof(Bytes));
@@ -65,14 +67,7 @@ public sealed record SandboxAuditEvent(
             : throw new ArgumentException("Audit event error codes must be defined.", paramName);
 
     private static long? RequireNonNegative(long? value, string paramName)
-    {
-        if (value < 0)
-        {
-            throw new ArgumentOutOfRangeException(paramName, value, "audit byte counters must be non-negative.");
-        }
-
-        return value;
-    }
+        => SandboxCounterGuards.RequireNonNegative(value, paramName, AuditByteCounterMessage);
 
     private static IReadOnlyDictionary<string, string>? CopyFields(IReadOnlyDictionary<string, string>? fields)
         => fields is null ? null : ModelCopy.StringDictionary(fields);
