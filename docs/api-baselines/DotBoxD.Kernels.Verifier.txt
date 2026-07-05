@@ -72,6 +72,20 @@ public static IReadOnlyList<VerifierDiagnosticReference> All => References
 public static VerificationManifestIdentity FromManifest(ArtifactManifest manifest)
 public static VerificationPolicy BoxedValueDefaults()
 public string AllowlistHash
+public string AssemblyHash
+public string BindingManifestHash
+public string CacheKey
+public string Code
+public string CompilerVersion
+public string EffectAnalysisVersion
+public string LanguageVersion
+public string Message
+public string ModuleHash
+public string PlanHash
+public string PolicyHash
 public string RuntimeFacadeHash
+public string TargetFramework
+public string TypeSystemVersion
+public string VerifierVersion
 public ValueTask<VerificationResult> VerifyAsync( ReadOnlyMemory<byte> assemblyBytes, ArtifactManifest manifest, VerificationPolicy policy, CancellationToken cancellationToken)
 public VerificationPolicy WithExpectedManifest(VerificationManifestIdentity identity)
