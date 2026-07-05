@@ -12,27 +12,12 @@ internal static partial class GeneratedRemoteHookChainFallback
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        if (expression is CastExpressionSyntax { Type: { } castType })
+        foreach (var resolver in DeclaredTypeExpressionResolvers)
         {
-            return castType;
-        }
-
-        if (expression is BinaryExpressionSyntax asExpression &&
-            asExpression.IsKind(SyntaxKind.AsExpression) &&
-            asExpression.Right is TypeSyntax asType)
-        {
-            return asType;
-        }
-
-        if (expression is AwaitExpressionSyntax awaitExpression)
-        {
-            return AwaitedTypeSyntax(awaitExpression, model, cancellationToken);
-        }
-
-        if (expression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Result" } resultAccess &&
-            TaskResultTypeSyntax(resultAccess, model, cancellationToken) is { } resultType)
-        {
-            return resultType;
+            if (resolver(expression, model, cancellationToken) is { } type)
+            {
+                return type;
+            }
         }
 
         var symbol = model.GetSymbolInfo(expression, cancellationToken).Symbol;
@@ -42,16 +27,25 @@ internal static partial class GeneratedRemoteHookChainFallback
             symbol = model.GetSymbolInfo(name, cancellationToken).Symbol;
         }
 
-        return symbol switch
-        {
-            IParameterSymbol parameter => ParameterTypeSyntax(parameter, cancellationToken),
-            ILocalSymbol local => LocalTypeSyntax(local, model, cancellationToken),
-            IFieldSymbol field => FieldTypeSyntax(field, cancellationToken),
-            IPropertySymbol property => PropertyTypeSyntax(property, cancellationToken),
-            IMethodSymbol method => MethodReturnTypeSyntax(method, cancellationToken),
-            _ => null
-        };
+        return DeclaredTypeSyntax(symbol, model, cancellationToken);
     }
+
+    private static TypeSyntax? DeclaredTypeSyntax(
+        ISymbol? symbol,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        foreach (var resolver in DeclaredTypeSymbolResolvers)
+        {
+            if (resolver(symbol, model, cancellationToken) is { } type)
+            {
+                return type;
+            }
+        }
+
+        return null;
+    }
+
 
     private static TypeSyntax? ParameterTypeSyntax(IParameterSymbol parameter, CancellationToken cancellationToken)
     {

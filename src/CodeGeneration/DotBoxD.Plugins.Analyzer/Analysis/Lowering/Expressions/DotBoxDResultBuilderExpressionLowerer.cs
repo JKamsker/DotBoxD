@@ -69,7 +69,10 @@ internal static class DotBoxDResultBuilderExpressionLowerer
     private static bool IsBuilderName(string name)
         => string.Equals(name, OkMethod, StringComparison.Ordinal)
             || string.Equals(name, RejectMethod, StringComparison.Ordinal)
-            || (name.Length > WithPrefix.Length && name.StartsWith(WithPrefix, StringComparison.Ordinal));
+            || IsWithName(name);
+
+    private static bool IsWithName(string name)
+        => name.Length > WithPrefix.Length && name.StartsWith(WithPrefix, StringComparison.Ordinal);
 
     // Walks the chain to its Ok()/Reject() seed and resolves the type the seed is called on (e.g. the
     // `CombatDamageResult` in `CombatDamageResult.Ok()`), requiring it to carry [HookResult]. The seed's receiver
@@ -130,70 +133,129 @@ internal static class DotBoxDResultBuilderExpressionLowerer
         var name = member.Name.Identifier.ValueText;
         var arguments = invocation.ArgumentList.Arguments;
 
-        if (string.Equals(name, OkMethod, StringComparison.Ordinal) && arguments.Count == 0)
+        if (string.Equals(name, OkMethod, StringComparison.Ordinal))
         {
-            return SetByName(fields, sources, SuccessField, BoolSource(value: true));
+            return arguments.Count == 0 &&
+                SetByName(fields, sources, SuccessField, BoolSource(value: true));
         }
 
-        if (string.Equals(name, RejectMethod, StringComparison.Ordinal) && arguments.Count <= 1)
+        if (string.Equals(name, RejectMethod, StringComparison.Ordinal))
         {
-            if (!SetByName(fields, sources, SuccessField, BoolSource(value: false)))
-            {
-                return false;
-            }
-
-            if (arguments.Count != 1)
-            {
-                return true;
-            }
-
-            var reason = lowerExpression(arguments[0].Expression);
-            return string.Equals(reason.Type, ManifestTypes.String, StringComparison.Ordinal)
-                && SetByName(fields, sources, ReasonField, reason.Source);
+            return TryApplyReject(fields, sources, arguments, lowerExpression);
         }
 
-        if (name.Length > WithPrefix.Length && name.StartsWith(WithPrefix, StringComparison.Ordinal) && arguments.Count == 1)
+        return IsWithName(name) &&
+            TryApplyWith(member, name, arguments, fields, sources, context, lowerExpression);
+    }
+
+    private static bool TryApplyReject(
+        IReadOnlyList<RecordMember> fields,
+        string?[] sources,
+        SeparatedSyntaxList<ArgumentSyntax> arguments,
+        System.Func<ExpressionSyntax, DotBoxDExpressionModel> lowerExpression)
+    {
+        if (arguments.Count > 1 ||
+            !SetByName(fields, sources, SuccessField, BoolSource(value: false)))
         {
-            var fieldName = name.Substring(WithPrefix.Length);
-            if (string.Equals(fieldName, SuccessField, StringComparison.Ordinal) ||
-                string.Equals(fieldName, ReasonField, StringComparison.Ordinal))
-            {
-                return false;
-            }
+            return false;
+        }
 
-            var index = FieldIndex(fields, fieldName);
-            if (index < 0 ||
-                member.Expression is not InvocationExpressionSyntax receiver ||
-                !TryApply(receiver, fields, sources, context, lowerExpression))
-            {
-                return false;
-            }
-
-            var expectedType = SandboxTypeSourceEmitter.ManifestTag(fields[index].Type);
-            var argument = DotBoxDNullableScalarExpressionLowerer.TryLower(
-                arguments[0].Expression,
-                fields[index].Type,
-                context,
-                lowerExpression,
-                out var nullable)
-                ? nullable
-                : lowerExpression(arguments[0].Expression);
-            if (!string.Equals(argument.Type, expectedType, StringComparison.Ordinal))
-            {
-                if (!DotBoxDGenerationNames.ManifestTypes.IsNumeric(expectedType) ||
-                    DotBoxDNumericConstantPromoter.TryPromoteConstant(arguments[0].Expression, context, expectedType) is not { } promoted)
-                {
-                    return false;
-                }
-
-                argument = promoted;
-            }
-
-            sources[index] = argument.Source;
+        if (arguments.Count != 1)
+        {
             return true;
         }
 
-        return false;
+        var reason = lowerExpression(arguments[0].Expression);
+        return string.Equals(reason.Type, ManifestTypes.String, StringComparison.Ordinal)
+            && SetByName(fields, sources, ReasonField, reason.Source);
+    }
+
+    private static bool TryApplyWith(
+        MemberAccessExpressionSyntax member,
+        string name,
+        SeparatedSyntaxList<ArgumentSyntax> arguments,
+        IReadOnlyList<RecordMember> fields,
+        string?[] sources,
+        DotBoxDExpressionLoweringContext context,
+        System.Func<ExpressionSyntax, DotBoxDExpressionModel> lowerExpression)
+    {
+        if (!TryGetWritableFieldIndex(name, arguments, fields, out var index))
+        {
+            return false;
+        }
+
+        if (member.Expression is not InvocationExpressionSyntax receiver ||
+            !TryApply(receiver, fields, sources, context, lowerExpression))
+        {
+            return false;
+        }
+
+        if (!TryLowerBuilderFieldArgument(arguments[0].Expression, fields[index], context, lowerExpression, out var argument))
+        {
+            return false;
+        }
+
+        sources[index] = argument.Source;
+        return true;
+    }
+
+    private static bool TryGetWritableFieldIndex(
+        string name,
+        SeparatedSyntaxList<ArgumentSyntax> arguments,
+        IReadOnlyList<RecordMember> fields,
+        out int index)
+    {
+        index = -1;
+        if (arguments.Count != 1)
+        {
+            return false;
+        }
+
+        var fieldName = name.Substring(WithPrefix.Length);
+        if (string.Equals(fieldName, SuccessField, StringComparison.Ordinal) ||
+            string.Equals(fieldName, ReasonField, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        index = FieldIndex(fields, fieldName);
+        return index >= 0;
+    }
+
+    private static bool TryLowerBuilderFieldArgument(
+        ExpressionSyntax expression,
+        RecordMember field,
+        DotBoxDExpressionLoweringContext context,
+        System.Func<ExpressionSyntax, DotBoxDExpressionModel> lowerExpression,
+        out DotBoxDExpressionModel argument)
+    {
+        var expectedType = SandboxTypeSourceEmitter.ManifestTag(field.Type);
+        argument = DotBoxDNullableScalarExpressionLowerer.TryLower(
+            expression,
+            field.Type,
+            context,
+            lowerExpression,
+            out var nullable)
+            ? nullable
+            : lowerExpression(expression);
+        return string.Equals(argument.Type, expectedType, StringComparison.Ordinal) ||
+            TryPromoteBuilderFieldArgument(expression, context, expectedType, ref argument);
+    }
+
+    private static bool TryPromoteBuilderFieldArgument(
+        ExpressionSyntax expression,
+        DotBoxDExpressionLoweringContext context,
+        string expectedType,
+        ref DotBoxDExpressionModel argument)
+    {
+        if (!DotBoxDGenerationNames.ManifestTypes.IsNumeric(expectedType) ||
+            DotBoxDNumericConstantPromoter.TryPromoteConstant(expression, context, expectedType) is not { } promoted)
+        {
+            return false;
+        }
+
+        argument = promoted;
+        return true;
     }
 
     private static bool UsesAuthorDefinedBuilderMember(

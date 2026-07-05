@@ -4,6 +4,23 @@ namespace DotBoxD.Plugins.Runtime.Rpc;
 
 public static partial class KernelRpcMarshaller
 {
+    private static readonly Dictionary<Type, KernelScalarFromValueConverter> KernelScalarFromValueConverters = new()
+    {
+        [typeof(bool)] = static value => value.BoolValue,
+        [typeof(int)] = static value => value.Int32Value,
+        [typeof(long)] = static value => value.Int64Value,
+        [typeof(float)] = static value => DoubleToSingle(value.DoubleValue),
+        [typeof(double)] = static value => value.DoubleValue,
+        [typeof(string)] = static value => value.TextValue,
+        [typeof(Guid)] = static value => value.GuidValue,
+        [typeof(DateOnly)] = static value => DateOnlyFromDayNumber(value.Int32Value),
+        [typeof(TimeOnly)] = static value => TimeOnlyFromTicks(value.Int64Value),
+        [typeof(TimeSpan)] = static value => new TimeSpan(value.Int64Value),
+        [typeof(CancellationToken)] = static value => new CancellationToken(value.BoolValue),
+    };
+
+    private delegate object KernelScalarFromValueConverter(KernelRpcValue value);
+
     internal static object? FromKernelRpcValue(KernelRpcValue value, Type type)
     {
         ArgumentNullException.ThrowIfNull(type);
@@ -41,58 +58,65 @@ public static partial class KernelRpcMarshaller
 
         if (value.Kind == KernelRpcValueKind.Record && DtoShape(type) is { } shape)
         {
-            if (value.ItemCount != shape.Fields.Count)
-            {
-                throw new NotSupportedException(
-                    $"Server extension record has {value.ItemCount} fields but '{type}' expects {shape.Fields.Count}.");
-            }
-
-            return shape.Construct(value);
+            return DtoFromKernelRpcValue(value, type, shape);
         }
 
         if (ElementType(type) is { } elementType)
         {
-            value.RequireKind(KernelRpcValueKind.List);
-            if (type.IsArray)
-            {
-                return ToArray(value.ItemSpan, elementType);
-            }
-
-            return CompleteList(type, elementType, ToList(value.ItemSpan, elementType));
+            return ListFromKernelRpcValue(value, type, elementType);
         }
 
         if (MapTypes(type) is { } mapTypes)
         {
-            value.RequireKind(KernelRpcValueKind.Map);
-            RejectUnsupportedMapKeyType(mapTypes.Key);
-            return CompleteDictionary(
-                type,
-                mapTypes.Key,
-                mapTypes.Value,
-                ToDictionary(value.ItemSpan, mapTypes.Key, mapTypes.Value));
+            return MapFromKernelRpcValue(value, type, mapTypes);
         }
 
         throw new NotSupportedException($"Server extension cannot marshal a kernel RPC value to type '{type}'.");
     }
 
+    private static object DtoFromKernelRpcValue(KernelRpcValue value, Type type, RecordShape shape)
+    {
+        if (value.ItemCount != shape.Fields.Count)
+        {
+            throw new NotSupportedException(
+                $"Server extension record has {value.ItemCount} fields but '{type}' expects {shape.Fields.Count}.");
+        }
+
+        return shape.Construct(value);
+    }
+
+    private static object ListFromKernelRpcValue(KernelRpcValue value, Type type, Type elementType)
+    {
+        value.RequireKind(KernelRpcValueKind.List);
+        return type.IsArray
+            ? ToArray(value.ItemSpan, elementType)
+            : CompleteList(type, elementType, ToList(value.ItemSpan, elementType));
+    }
+
+    private static object MapFromKernelRpcValue(
+        KernelRpcValue value,
+        Type type,
+        (Type Key, Type Value) mapTypes)
+    {
+        value.RequireKind(KernelRpcValueKind.Map);
+        RejectUnsupportedMapKeyType(mapTypes.Key);
+        return CompleteDictionary(
+            type,
+            mapTypes.Key,
+            mapTypes.Value,
+            ToDictionary(value.ItemSpan, mapTypes.Key, mapTypes.Value));
+    }
+
     private static bool TryScalarFromKernel(KernelRpcValue value, Type type, out object? result)
     {
-        result = type switch
+        if (KernelScalarFromValueConverters.TryGetValue(type, out var convert))
         {
-            var t when t == typeof(bool) => value.BoolValue,
-            var t when t == typeof(int) => value.Int32Value,
-            var t when t == typeof(long) => value.Int64Value,
-            var t when t == typeof(float) => DoubleToSingle(value.DoubleValue),
-            var t when t == typeof(double) => value.DoubleValue,
-            var t when t == typeof(string) => value.TextValue,
-            var t when t == typeof(Guid) => value.GuidValue,
-            var t when t == typeof(DateOnly) => DateOnlyFromDayNumber(value.Int32Value),
-            var t when t == typeof(TimeOnly) => TimeOnlyFromTicks(value.Int64Value),
-            var t when t == typeof(TimeSpan) => new TimeSpan(value.Int64Value),
-            var t when t == typeof(CancellationToken) => new CancellationToken(value.BoolValue),
-            _ => null
-        };
-        return result is not null;
+            result = convert(value);
+            return true;
+        }
+
+        result = null;
+        return false;
     }
 
     private static Array ToArray(ReadOnlySpan<KernelRpcValue> values, Type elementType)

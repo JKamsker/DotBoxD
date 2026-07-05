@@ -6,25 +6,53 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
 internal static partial class HookChainModelFactory
 {
+    private static readonly Dictionary<string, InstallKindResolver> InstallKindResolvers =
+        new(StringComparer.Ordinal)
+        {
+            [RunMethod] = static (_, _) => HookChainInterceptorInstallKind.GeneratedChain,
+            [RunLocalMethod] = RunLocalInstallKind,
+            [RegisterMethod] = RegisterInstallKind,
+            [RegisterLocalMethod] = RegisterLocalInstallKind,
+        };
+
+    private delegate HookChainInterceptorInstallKind? InstallKindResolver(
+        HookChainReceiverKind? receiverKind,
+        GeneratedRemoteHookChainKind? generatedRemoteKind);
+
     private static HookChainInterceptorInstallKind? InstallKind(
         string terminalMethod,
         HookChainReceiverKind? receiverKind,
         GeneratedRemoteHookChainKind? generatedRemoteKind)
-        => terminalMethod switch
-        {
-            RunMethod => HookChainInterceptorInstallKind.GeneratedChain,
-            RunLocalMethod when receiverKind == HookChainReceiverKind.Remote || generatedRemoteKind is not null =>
-                HookChainInterceptorInstallKind.LocalCallback,
-            RegisterMethod when receiverKind is HookChainReceiverKind.Local or HookChainReceiverKind.Remote =>
-                HookChainInterceptorInstallKind.ResultChain,
-            RegisterMethod when generatedRemoteKind == GeneratedRemoteHookChainKind.Hook =>
-                HookChainInterceptorInstallKind.ResultChain,
-            RegisterLocalMethod when receiverKind is HookChainReceiverKind.Local or HookChainReceiverKind.Remote =>
-                HookChainInterceptorInstallKind.LocalResultChain,
-            RegisterLocalMethod when generatedRemoteKind == GeneratedRemoteHookChainKind.Hook =>
-                HookChainInterceptorInstallKind.LocalResultChain,
-            _ => null
-        };
+        => InstallKindResolvers.TryGetValue(terminalMethod, out var resolver)
+            ? resolver(receiverKind, generatedRemoteKind)
+            : null;
+
+    private static HookChainInterceptorInstallKind? RunLocalInstallKind(
+        HookChainReceiverKind? receiverKind,
+        GeneratedRemoteHookChainKind? generatedRemoteKind)
+        => receiverKind == HookChainReceiverKind.Remote || generatedRemoteKind is not null
+            ? HookChainInterceptorInstallKind.LocalCallback
+            : null;
+
+    private static HookChainInterceptorInstallKind? RegisterInstallKind(
+        HookChainReceiverKind? receiverKind,
+        GeneratedRemoteHookChainKind? generatedRemoteKind)
+        => IsResultChainReceiver(receiverKind, generatedRemoteKind)
+            ? HookChainInterceptorInstallKind.ResultChain
+            : null;
+
+    private static HookChainInterceptorInstallKind? RegisterLocalInstallKind(
+        HookChainReceiverKind? receiverKind,
+        GeneratedRemoteHookChainKind? generatedRemoteKind)
+        => IsResultChainReceiver(receiverKind, generatedRemoteKind)
+            ? HookChainInterceptorInstallKind.LocalResultChain
+            : null;
+
+    private static bool IsResultChainReceiver(
+        HookChainReceiverKind? receiverKind,
+        GeneratedRemoteHookChainKind? generatedRemoteKind)
+        => receiverKind is HookChainReceiverKind.Local or HookChainReceiverKind.Remote ||
+           generatedRemoteKind == GeneratedRemoteHookChainKind.Hook;
 
     private static InvocationExpressionSyntax? WalkToSeed(
         ExpressionSyntax receiver,

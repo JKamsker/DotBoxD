@@ -37,74 +37,12 @@ internal sealed partial class RpcKernelPayloadReadEmitter
 
     private string ReadComplexExpression(ITypeSymbol type, string reader)
     {
-        if (DotBoxDNullableScalarType.TryGetSupportedUnderlying(type, out var nullableUnderlying))
+        foreach (var resolver in ComplexReadResolvers)
         {
-            return $"{EnsureNullablePayloadReader(type, nullableUnderlying)}(ref {reader})";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsGuid(type))
-        {
-            return $"{reader}.ReadGuid()";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsDateTimeWireType(type))
-        {
-            return $"{EnsureDateTimePayloadReader(type)}(ref {reader})";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsDecimalWireType(type))
-        {
-            return $"{EnsureDecimalPayloadReader()}(ref {reader})";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsDateOnlyWireType(type))
-        {
-            return $"{EnsureDateOnlyPayloadReader()}({reader}.ReadInt32())";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsTimeOnlyWireType(type))
-        {
-            return $"{EnsureTimeOnlyPayloadReader()}({reader}.ReadInt64())";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsTimeSpanWireType(type))
-        {
-            return $"new global::System.TimeSpan({reader}.ReadInt64())";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsCancellationTokenWireType(type))
-        {
-            return $"new global::System.Threading.CancellationToken({reader}.ReadBool())";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsIndexWireType(type))
-        {
-            return $"{EnsureIndexPayloadReader()}(ref {reader})";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsRangeWireType(type))
-        {
-            return $"{EnsureRangePayloadReader()}(ref {reader})";
-        }
-
-        if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
-        {
-            return $"{EnsureEnumReader(enumType)}(ref {reader})";
-        }
-
-        if (DotBoxDRpcTypeMapper.ListElementType(type) is not null)
-        {
-            return $"{EnsureListReader(type)}(ref {reader})";
-        }
-
-        if (DotBoxDRpcTypeMapper.MapTypes(type) is { } map)
-        {
-            return $"{EnsureMapReader(type, map.Key, map.Value)}(ref {reader})";
-        }
-
-        if (type is INamedTypeSymbol named && DotBoxDRpcTypeMapper.IsRecordDto(named))
-        {
-            return $"{EnsureDtoReader(named)}(ref {reader})";
+            if (resolver(this, type, reader, out var result))
+            {
+                return result;
+            }
         }
 
         throw new NotSupportedException($"Server extension type '{type.ToDisplayString()}' is not supported.");

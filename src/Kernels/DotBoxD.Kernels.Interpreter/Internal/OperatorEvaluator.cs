@@ -16,6 +16,25 @@ using DotBoxD.Kernels;
 /// </summary>
 internal static class OperatorEvaluator
 {
+    private static readonly Dictionary<string, BinaryOperator> BinaryOperators = new(StringComparer.Ordinal)
+    {
+        ["-"] = static (left, right, _) => SandboxNumericOperations.Subtract(left, right),
+        ["*"] = static (left, right, _) => SandboxNumericOperations.Multiply(left, right),
+        ["/"] = static (left, right, _) => SandboxNumericOperations.Divide(left, right),
+        ["%"] = static (left, right, _) => SandboxNumericOperations.Remainder(left, right),
+        ["=="] = static (left, right, _) => SandboxValue.FromBool(Equals(left, right)),
+        ["!="] = static (left, right, _) => SandboxValue.FromBool(!Equals(left, right)),
+        ["<"] = static (left, right, _) => SandboxNumericOperations.LessThan(left, right),
+        ["<="] = static (left, right, _) => SandboxNumericOperations.LessThanOrEqual(left, right),
+        [">"] = static (left, right, _) => SandboxNumericOperations.GreaterThan(left, right),
+        [">="] = static (left, right, _) => SandboxNumericOperations.GreaterThanOrEqual(left, right),
+    };
+
+    private delegate SandboxValue BinaryOperator(
+        SandboxValue left,
+        SandboxValue right,
+        SandboxContext context);
+
     /// <summary>
     /// Applies <paramref name="unary"/>'s operator to its already-evaluated operand
     /// <paramref name="value"/>, matching <see cref="ExpressionEvaluator"/>'s original
@@ -40,22 +59,21 @@ internal static class OperatorEvaluator
         SandboxValue left,
         SandboxValue right,
         SandboxContext context)
-        => binary.Operator switch
+    {
+        if (string.Equals(binary.Operator, "+", StringComparison.Ordinal))
         {
-            "+" when left is StringValue l && right is StringValue r => Concat(l.Value, r.Value, context),
-            "+" => SandboxNumericOperations.Add(left, right),
-            "-" => SandboxNumericOperations.Subtract(left, right),
-            "*" => SandboxNumericOperations.Multiply(left, right),
-            "/" => SandboxNumericOperations.Divide(left, right),
-            "%" => SandboxNumericOperations.Remainder(left, right),
-            "==" => SandboxValue.FromBool(Equals(left, right)),
-            "!=" => SandboxValue.FromBool(!Equals(left, right)),
-            "<" => SandboxNumericOperations.LessThan(left, right),
-            "<=" => SandboxNumericOperations.LessThanOrEqual(left, right),
-            ">" => SandboxNumericOperations.GreaterThan(left, right),
-            ">=" => SandboxNumericOperations.GreaterThanOrEqual(left, right),
-            _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported binary operator"))
-        };
+            return ApplyAdd(left, right, context);
+        }
+
+        return BinaryOperators.TryGetValue(binary.Operator, out var operation)
+            ? operation(left, right, context)
+            : throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported binary operator"));
+    }
+
+    private static SandboxValue ApplyAdd(SandboxValue left, SandboxValue right, SandboxContext context)
+        => left is StringValue l && right is StringValue r
+            ? Concat(l.Value, r.Value, context)
+            : SandboxNumericOperations.Add(left, right);
 
     private static SandboxValue Concat(string left, string right, SandboxContext context)
     {

@@ -151,35 +151,6 @@ internal sealed partial class I32ExpressionPlan
         }
     }
 
-    public int Evaluate(InterpreterFrame frame, SandboxContext context)
-        => _kind switch
-        {
-            ExpressionKind.Literal => _value,
-            ExpressionKind.RawVariable => frame.ReadRawInt32Slot(_value),
-            ExpressionKind.BoxedVariable => frame.ReadInt32Slot(_value),
-            ExpressionKind.Negate => SandboxInt32Math.Negate(_left!.Evaluate(frame, context)),
-            ExpressionKind.InlineCall => EvaluateInlineCall(frame, context),
-            ExpressionKind.RemainderAddRawRawConst => FastRemainder(
-                SandboxInt32Math.Add(frame.ReadRawInt32Slot(_value), frame.ReadRawInt32Slot(_value2)),
-                _value3,
-                _magic),
-            ExpressionKind.RemainderAddRawConstConst => FastRemainder(
-                SandboxInt32Math.Add(frame.ReadRawInt32Slot(_value), _value2),
-                _value3,
-                _magic),
-            ExpressionKind.RemainderByConst => FastRemainder(_left!.Evaluate(frame, context), _value3, _magic),
-            ExpressionKind.DivideByConst => FastDivide(_left!.Evaluate(frame, context), _value3, _magic),
-            ExpressionKind.AddRawMultiplyRawConst => SandboxInt32Math.Add(
-                frame.ReadRawInt32Slot(_value),
-                SandboxInt32Math.Multiply(frame.ReadRawInt32Slot(_value2), _value3)),
-            ExpressionKind.Add => SandboxInt32Math.Add(_left!.Evaluate(frame, context), _right!.Evaluate(frame, context)),
-            ExpressionKind.Subtract => SandboxInt32Math.Subtract(_left!.Evaluate(frame, context), _right!.Evaluate(frame, context)),
-            ExpressionKind.Multiply => SandboxInt32Math.Multiply(_left!.Evaluate(frame, context), _right!.Evaluate(frame, context)),
-            ExpressionKind.Divide => SandboxInt32Math.Divide(_left!.Evaluate(frame, context), _right!.Evaluate(frame, context)),
-            ExpressionKind.Remainder => SandboxInt32Math.Remainder(_left!.Evaluate(frame, context), _right!.Evaluate(frame, context)),
-            _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported i32 expression"))
-        };
-
     private int EvaluateInlineCall(InterpreterFrame frame, SandboxContext context)
     {
         // No try/finally: the inline body is pure i32 arithmetic whose only throws (overflow / fuel /

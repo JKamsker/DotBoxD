@@ -9,6 +9,21 @@ using DotBoxD.Kernels;
 
 internal sealed partial class SandboxWorkerExecutor
 {
+    private static readonly ResourceUsageLimit[] WorkerResourceUsageLimits =
+    [
+        new(static usage => usage.FuelUsed, static budget => budget.MaxFuel),
+        new(static usage => usage.LoopIterations, static budget => budget.MaxLoopIterations),
+        new(static usage => usage.AllocatedBytes, static budget => budget.MaxAllocatedBytes),
+        new(static usage => usage.HostCalls, static budget => budget.MaxHostCalls),
+        new(static usage => usage.FileBytesRead, static budget => budget.MaxFileBytesRead),
+        new(static usage => usage.FileBytesWritten, static budget => budget.MaxFileBytesWritten),
+        new(static usage => usage.NetworkBytesRead, static budget => budget.MaxNetworkBytesRead),
+        new(static usage => usage.NetworkBytesWritten, static budget => budget.MaxNetworkBytesWritten),
+        new(static usage => usage.LogEvents, static budget => budget.MaxLogEvents),
+        new(static usage => usage.CollectionElements, static budget => budget.MaxTotalCollectionElements),
+        new(static usage => usage.StringBytes, static budget => budget.MaxTotalStringBytes),
+    ];
+
     private static bool ValidateWorkerResult(
         ExecutionPlan plan,
         string entrypoint,
@@ -117,29 +132,22 @@ internal sealed partial class SandboxWorkerExecutor
     {
         var usage = result.ResourceUsage;
         return usage.MaxFuel == plan.Budget.MaxFuel &&
-               usage.FuelUsed >= 0 &&
-               usage.FuelUsed <= plan.Budget.MaxFuel &&
-               usage.LoopIterations >= 0 &&
-               usage.LoopIterations <= plan.Budget.MaxLoopIterations &&
-               usage.AllocatedBytes >= 0 &&
-               usage.AllocatedBytes <= plan.Budget.MaxAllocatedBytes &&
-               usage.HostCalls >= 0 &&
-               usage.HostCalls <= plan.Budget.MaxHostCalls &&
-               usage.FileBytesRead >= 0 &&
-               usage.FileBytesRead <= plan.Budget.MaxFileBytesRead &&
-               usage.FileBytesWritten >= 0 &&
-               usage.FileBytesWritten <= plan.Budget.MaxFileBytesWritten &&
-               usage.NetworkBytesRead >= 0 &&
-               usage.NetworkBytesRead <= plan.Budget.MaxNetworkBytesRead &&
-               usage.NetworkBytesWritten >= 0 &&
-               usage.NetworkBytesWritten <= plan.Budget.MaxNetworkBytesWritten &&
-               usage.LogEvents >= 0 &&
-               usage.LogEvents <= plan.Budget.MaxLogEvents &&
-               usage.CollectionElements >= 0 &&
-               usage.CollectionElements <= plan.Budget.MaxTotalCollectionElements &&
-               usage.StringBytes >= 0 &&
-               usage.StringBytes <= plan.Budget.MaxTotalStringBytes &&
-               WorkerResultShapeUsageMatches(usage, resultShapeUsage);
+            ResourceUsageWithinLimits(usage, plan.Budget) &&
+            WorkerResultShapeUsageMatches(usage, resultShapeUsage);
+    }
+
+    private static bool ResourceUsageWithinLimits(SandboxResourceUsage usage, ResourceLimits budget)
+    {
+        foreach (var limit in WorkerResourceUsageLimits)
+        {
+            var value = limit.Value(usage);
+            if (value < 0 || value > limit.Maximum(budget))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool WorkerResultShapeUsageMatches(
@@ -171,7 +179,25 @@ internal sealed partial class SandboxWorkerExecutor
         // Single pass over the audit envelope: enforce a common run id, run per-event
         // safety/schema validation, and capture the one required run summary without
         // allocating an intermediate summary array.
-        SandboxAuditEvent? summary = null;
+        if (!TryCollectAuditEvidence(plan, entrypoint, options, result, runId, out var evidence) ||
+            !AuditSummaryMatchesResult(result, evidence))
+        {
+            return false;
+        }
+
+        return WorkerRunSummaryValidator.RunSummaryMatches(plan, result, evidence.Summary) &&
+            ResultErrorMatches(result, evidence.Summary);
+    }
+
+    private static bool TryCollectAuditEvidence(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxExecutionOptions options,
+        SandboxExecutionResult result,
+        SandboxRunId runId,
+        out WorkerAuditEvidence evidence)
+    {
+        evidence = new WorkerAuditEvidence(null!, 0, 0, 0);
         var summaryCount = 0;
         var observedHostCalls = 0;
         var observedLogEvents = 0;
@@ -180,62 +206,90 @@ internal sealed partial class SandboxWorkerExecutor
         var expectedSequenceNumber = 1L;
         foreach (var auditEvent in result.AuditEvents)
         {
-            if (auditEvent.SequenceNumber != expectedSequenceNumber ||
-                auditEvent.RunId != runId ||
-                !WorkerAuditValidator.Matches(plan, entrypoint, options, auditEvent))
+            if (!AuditEventEnvelopeMatches(plan, entrypoint, options, auditEvent, runId, expectedSequenceNumber))
             {
                 return false;
             }
-            expectedSequenceNumber++;
 
+            expectedSequenceNumber++;
             if (IsBindingAudit(auditEvent.Kind))
             {
                 observedHostCalls++;
                 observedBindingCalls ??= new Dictionary<string, int>(StringComparer.Ordinal);
-                if (!TryRecordBindingAuditEvidence(
-                    plan,
-                    auditEvent,
-                    observedBindingCalls,
-                    ref observedBindingBaseFuel))
+                if (!TryRecordBindingAuditEvidence(plan, auditEvent, observedBindingCalls, ref observedBindingBaseFuel))
                 {
                     return false;
                 }
             }
 
-            if (auditEvent.Kind == "SandboxLog")
-            {
-                observedLogEvents++;
-            }
-
-            if (auditEvent.Kind == "RunSummary")
-            {
-                summaryCount++;
-                if (summaryCount > 1)
-                {
-                    return false;
-                }
-
-                summary = auditEvent;
-            }
+            CountAuditSummary(auditEvent, ref summaryCount, ref evidence);
+            observedLogEvents += auditEvent.Kind == "SandboxLog" ? 1 : 0;
         }
 
-        if (summaryCount != 1 ||
-            summary!.Success != result.Succeeded ||
-            !AuditEvidenceUsageMatches(
-                result.ResourceUsage,
-                observedHostCalls,
-                observedLogEvents,
-                observedBindingBaseFuel))
+        evidence = evidence with
+        {
+            ObservedHostCalls = observedHostCalls,
+            ObservedLogEvents = observedLogEvents,
+            ObservedBindingBaseFuel = observedBindingBaseFuel,
+        };
+        return summaryCount == 1;
+    }
+
+    private static bool AuditEventEnvelopeMatches(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxExecutionOptions options,
+        SandboxAuditEvent auditEvent,
+        SandboxRunId runId,
+        long expectedSequenceNumber)
+        => auditEvent.SequenceNumber == expectedSequenceNumber &&
+           auditEvent.RunId == runId &&
+           WorkerAuditValidator.Matches(plan, entrypoint, options, auditEvent);
+
+    private static void CountAuditSummary(
+        SandboxAuditEvent auditEvent,
+        ref int summaryCount,
+        ref WorkerAuditEvidence evidence)
+    {
+        if (auditEvent.Kind != "RunSummary")
+        {
+            return;
+        }
+
+        summaryCount++;
+        if (summaryCount == 1)
+        {
+            evidence = evidence with { Summary = auditEvent };
+        }
+    }
+
+    private static bool AuditSummaryMatchesResult(SandboxExecutionResult result, WorkerAuditEvidence evidence)
+    {
+        if (evidence.Summary.Success != result.Succeeded)
         {
             return false;
         }
 
-        return WorkerRunSummaryValidator.RunSummaryMatches(plan, result, summary) &&
-            (result.Succeeded
-            ? summary.ErrorCode is null
-            : summary.ErrorCode == result.Error!.Code &&
-              summary.ErrorCode is { } code &&
-              Enum.IsDefined(code));
+        return AuditEvidenceUsageMatches(
+            result.ResourceUsage,
+            evidence.ObservedHostCalls,
+            evidence.ObservedLogEvents,
+            evidence.ObservedBindingBaseFuel);
+    }
+
+    private static bool ResultErrorMatches(SandboxExecutionResult result, SandboxAuditEvent summary)
+    {
+        if (result.Succeeded)
+        {
+            return summary.ErrorCode is null;
+        }
+
+        if (summary.ErrorCode != result.Error!.Code)
+        {
+            return false;
+        }
+
+        return summary.ErrorCode is { } code && Enum.IsDefined(code);
     }
 
     private static bool IsBindingAudit(string kind)
@@ -278,4 +332,14 @@ internal sealed partial class SandboxWorkerExecutor
         => usage.HostCalls >= observedHostCalls &&
            usage.LogEvents >= observedLogEvents &&
            usage.FuelUsed >= observedBindingBaseFuel;
+
+    private readonly record struct ResourceUsageLimit(
+        Func<SandboxResourceUsage, long> Value,
+        Func<ResourceLimits, long> Maximum);
+
+    private readonly record struct WorkerAuditEvidence(
+        SandboxAuditEvent Summary,
+        int ObservedHostCalls,
+        int ObservedLogEvents,
+        long ObservedBindingBaseFuel);
 }

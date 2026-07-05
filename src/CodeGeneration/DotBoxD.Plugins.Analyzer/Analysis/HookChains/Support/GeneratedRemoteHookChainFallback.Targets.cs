@@ -35,62 +35,16 @@ internal static partial class GeneratedRemoteHookChainFallback
         }
 
         expression = HookChainAliasResolver.UnwrapTransparentExpression(expression);
-        if (model.GetTypeInfo(expression, cancellationToken).Type is INamedTypeSymbol registryType &&
-            TargetFromRegistryMarker(registryType, model.Compilation) is { } marked)
+        var context = new RegistryTargetContext(expression, model, cancellationToken, depth);
+        foreach (var resolver in RegistryTargetResolvers)
         {
-            return marked;
+            if (resolver(context) is { } target)
+            {
+                return target;
+            }
         }
 
-        if (expression is MemberAccessExpressionSyntax registryAccess &&
-            TargetFromGeneratedServerMember(registryAccess, model, cancellationToken) is { } generated)
-        {
-            return generated;
-        }
-
-        if (expression is ConditionalAccessExpressionSyntax conditionalAccess &&
-            TargetFromConditionalAccessGeneratedServerMember(conditionalAccess, model, cancellationToken) is { } conditionalGenerated)
-        {
-            return conditionalGenerated;
-        }
-
-        if (expression is MemberAccessExpressionSyntax tupleElementAccess &&
-            TargetFromTupleElementAccess(tupleElementAccess, model, cancellationToken, depth) is { } tupleElementTarget)
-        {
-            return tupleElementTarget;
-        }
-
-        if (expression is MemberAccessExpressionSyntax anonymousObjectAccess &&
-            TargetFromAnonymousObjectPropertyAccess(anonymousObjectAccess, model, cancellationToken, depth) is { } anonymousTarget)
-        {
-            return anonymousTarget;
-        }
-
-        if (expression is ConditionalExpressionSyntax conditional &&
-            TargetFromConditionalRegistryExpression(conditional, model, cancellationToken, depth) is { } conditionalTarget)
-        {
-            return conditionalTarget;
-        }
-
-        if (expression is BinaryExpressionSyntax coalesce &&
-            TargetFromCoalesceRegistryExpression(coalesce, model, cancellationToken, depth) is { } coalesceTarget)
-        {
-            return coalesceTarget;
-        }
-
-        if (expression is SwitchExpressionSyntax switchExpression &&
-            TargetFromSwitchRegistryExpression(switchExpression, model, cancellationToken, depth) is { } switchTarget)
-        {
-            return switchTarget;
-        }
-
-        if (expression is AssignmentExpressionSyntax assignment &&
-            TargetFromAssignmentRegistryExpression(assignment, model, cancellationToken, depth) is { } assignmentTarget)
-        {
-            return assignmentTarget;
-        }
-
-        return TargetFromDeclaredRegistryExpression(expression, model, cancellationToken) ??
-            TargetFromLocalAlias(expression, model, cancellationToken, depth);
+        return null;
     }
 
     private static GeneratedRemoteHookChainTarget? TargetFromAssignmentRegistryExpression(

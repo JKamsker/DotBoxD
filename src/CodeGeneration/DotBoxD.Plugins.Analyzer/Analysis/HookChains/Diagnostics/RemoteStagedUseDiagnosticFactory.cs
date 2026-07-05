@@ -16,6 +16,19 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         "Remote Where/Select stages assigned to an existing local are not lowered into a later terminal; " +
         "keep the stage in the fluent chain or initialize a new local with the staged expression.";
 
+    private static readonly HashSet<string> TerminalOrUseNames = new(StringComparer.Ordinal)
+    {
+        "Run",
+        "RunLocal",
+        "Register",
+        "RegisterLocal",
+        "Use",
+        "UseGeneratedChain",
+        "UseGeneratedLocalChain",
+        "UseGeneratedResultChain",
+        "UseGeneratedLocalResultChain",
+    };
+
     public static bool IsCandidate(SyntaxNode node)
         => node is InvocationExpressionSyntax
         {
@@ -181,26 +194,17 @@ internal static partial class RemoteStagedUseDiagnosticFactory
             .OfType<InvocationExpressionSyntax>())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (terminal == invocation || terminal.SpanStart <= invocation.SpanStart)
+            if (IsPriorOrCurrentInvocation(terminal, invocation))
             {
                 continue;
             }
 
-            if (!TryTerminalReceiver(terminal, out var terminalName, out var terminalReceiver) ||
-                terminalName is not
-                ("Run" or "RunLocal" or "Register" or "RegisterLocal" or
-                 "Use" or "UseGeneratedChain" or "UseGeneratedLocalChain" or
-                 "UseGeneratedResultChain" or "UseGeneratedLocalResultChain"))
+            if (!TrySupportedTerminalReceiver(terminal, out var terminalReceiver))
             {
                 continue;
             }
 
-            if (HookChainAliasResolver.HasMutationBetween(
-                local,
-                invocation.SpanStart,
-                terminal.SpanStart,
-                model,
-                cancellationToken))
+            if (HasMutationBeforeTerminal(local, invocation, terminal, model, cancellationToken))
             {
                 continue;
             }
@@ -213,6 +217,38 @@ internal static partial class RemoteStagedUseDiagnosticFactory
 
         return false;
     }
+
+    private static bool IsPriorOrCurrentInvocation(
+        InvocationExpressionSyntax terminal,
+        InvocationExpressionSyntax invocation)
+        => terminal == invocation || terminal.SpanStart <= invocation.SpanStart;
+
+    private static bool TrySupportedTerminalReceiver(
+        InvocationExpressionSyntax terminal,
+        out ExpressionSyntax terminalReceiver)
+    {
+        if (TryTerminalReceiver(terminal, out var terminalName, out terminalReceiver) &&
+            TerminalOrUseNames.Contains(terminalName))
+        {
+            return true;
+        }
+
+        terminalReceiver = null!;
+        return false;
+    }
+
+    private static bool HasMutationBeforeTerminal(
+        ILocalSymbol local,
+        InvocationExpressionSyntax invocation,
+        InvocationExpressionSyntax terminal,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+        => HookChainAliasResolver.HasMutationBetween(
+            local,
+            invocation.SpanStart,
+            terminal.SpanStart,
+            model,
+            cancellationToken);
 
     private static bool ExpressionReferencesLocal(
         ExpressionSyntax expression,

@@ -32,28 +32,15 @@ internal static partial class DotBoxDConditionBodyModelFactory
         DotBoxDExpressionLoweringContext context)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
-        return expression switch
+        foreach (var lowerer in ConditionLowerers)
         {
-            ParenthesizedExpressionSyntax parenthesized =>
-                LowerCondition(parenthesized.Expression, whenTrue, whenFalse, context),
-            ConditionalExpressionSyntax conditional =>
-                LowerConditional(conditional, whenTrue, whenFalse, context),
-            PrefixUnaryExpressionSyntax unary when unary.Kind() == SyntaxKind.LogicalNotExpression =>
-                LowerNot(unary, whenTrue, whenFalse, context),
-            BinaryExpressionSyntax binary when binary.Kind() == SyntaxKind.LogicalAndExpression =>
-                LowerAnd(binary, whenTrue, whenFalse, context),
-            BinaryExpressionSyntax binary when binary.Kind() == SyntaxKind.LogicalOrExpression =>
-                LowerOr(binary, whenTrue, whenFalse, context),
-            BinaryExpressionSyntax binary when IsEagerAnd(binary, context) =>
-                LowerEagerAnd(binary, whenTrue, whenFalse, context),
-            BinaryExpressionSyntax binary when IsEagerOr(binary, context) =>
-                LowerEagerOr(binary, whenTrue, whenFalse, context),
-            BinaryExpressionSyntax binary when IsBoolXor(binary, context) =>
-                LowerBoolXor(binary, whenTrue, whenFalse, context),
-            BinaryExpressionSyntax binary when IsBoolEquality(binary, context) =>
-                LowerBoolEquality(binary, whenTrue, whenFalse, context),
-            _ => LowerLeafCondition(expression, whenTrue, whenFalse, context)
-        };
+            if (lowerer(expression, whenTrue, whenFalse, context, out var lowered))
+            {
+                return lowered;
+            }
+        }
+
+        return LowerLeafCondition(expression, whenTrue, whenFalse, context);
     }
 
     private static DotBoxDStatementBodyModel LowerConditional(

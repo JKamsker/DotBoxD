@@ -12,6 +12,18 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 internal static partial class DotBoxDRpcTypeMapper
 {
     private const int MaxJsonTypeDepth = 8;
+    private static readonly JsonTypeResolver[] JsonTypeResolvers =
+    [
+        TryNullableScalarJsonType,
+        TrySpecialScalarJsonType,
+        TryFrameworkJsonType,
+        TryEnumJsonType,
+        TryListJsonType,
+        TryMapJsonType,
+        TryRecordDtoJsonType,
+    ];
+
+    private delegate string? JsonTypeResolver(JsonTypeContext context);
 
     public static string JsonType(ITypeSymbol type, Compilation compilation)
         => JsonType(type, compilation, 0, new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default));
@@ -22,29 +34,65 @@ internal static partial class DotBoxDRpcTypeMapper
         int depth,
         HashSet<ITypeSymbol> visiting)
     {
-        if (type.SpecialType == SpecialType.System_Void ||
-            DotBoxDRpcReturnType.IsTaskLike(type, compilation))
+        RejectTopLevelOnlyTypes(type, compilation);
+        RejectNullableReferenceType(type);
+        var context = new JsonTypeContext(type, compilation, depth, visiting);
+        foreach (var resolver in JsonTypeResolvers)
+        {
+            if (resolver(context) is { } json)
+            {
+                return json;
+            }
+        }
+
+        throw new NotSupportedException($"Server extension type '{type.ToDisplayString()}' is not supported.");
+    }
+
+    private readonly record struct JsonTypeContext(
+        ITypeSymbol Type,
+        Compilation Compilation,
+        int Depth,
+        HashSet<ITypeSymbol> Visiting);
+
+    private static void RejectTopLevelOnlyTypes(ITypeSymbol type, Compilation compilation)
+    {
+        if (type.SpecialType == SpecialType.System_Void || DotBoxDRpcReturnType.IsTaskLike(type, compilation))
         {
             throw new NotSupportedException(
                 $"Server extension type '{type.ToDisplayString()}' is only supported as a top-level return type.");
         }
-        if (DotBoxDNullableScalarType.IsNullableValueType(type))
-        {
-            if (!DotBoxDNullableScalarType.TryGetSupportedUnderlying(type, out var nullableUnderlying))
-            {
-                throw new NotSupportedException($"Server extension nullable type '{type.ToDisplayString()}' is not supported.");
-            }
+    }
 
-            RejectTooDeep(type, depth);
-            return $"{{\"name\":\"Record\",\"arguments\":[\"Bool\",{JsonType(nullableUnderlying, compilation, depth + 1, visiting)}]}}";
-        }
+    private static void RejectNullableReferenceType(ITypeSymbol type)
+    {
         if (type.NullableAnnotation == NullableAnnotation.Annotated && type.IsReferenceType)
         {
             throw new NotSupportedException(
                 $"Server extension nullable reference type '{type.ToDisplayString()}' is not supported; " +
                 "kernel RPC does not encode null reference values.");
         }
-        switch (type.SpecialType)
+    }
+
+    private static string? TryNullableScalarJsonType(JsonTypeContext context)
+    {
+        if (!DotBoxDNullableScalarType.IsNullableValueType(context.Type))
+        {
+            return null;
+        }
+
+        if (!DotBoxDNullableScalarType.TryGetSupportedUnderlying(context.Type, out var nullableUnderlying))
+        {
+            throw new NotSupportedException($"Server extension nullable type '{context.Type.ToDisplayString()}' is not supported.");
+        }
+
+        RejectTooDeep(context.Type, context.Depth);
+        var valueType = JsonType(nullableUnderlying, context.Compilation, context.Depth + 1, context.Visiting);
+        return $"{{\"name\":\"Record\",\"arguments\":[\"Bool\",{valueType}]}}";
+    }
+
+    private static string? TrySpecialScalarJsonType(JsonTypeContext context)
+    {
+        switch (context.Type.SpecialType)
         {
             case SpecialType.System_Boolean:
                 return Scalar("Bool");
@@ -53,96 +101,128 @@ internal static partial class DotBoxDRpcTypeMapper
             case SpecialType.System_Int64:
                 return Scalar("I64");
             case SpecialType.System_Double:
-                return Scalar("F64");
             case SpecialType.System_Single:
                 return Scalar("F64");
             case SpecialType.System_Decimal:
-                RejectTooDeep(type, depth);
+                RejectTooDeep(context.Type, context.Depth);
                 return DecimalWireJsonType();
             case SpecialType.System_String:
                 return Scalar("String");
+            default:
+                return null;
         }
-        if (IsGuid(type))
-        {
-            return Scalar("Guid");
-        }
-        if (IsDateTimeWireType(type))
-        {
-            RejectTooDeep(type, depth);
-            return DateTimeWireJsonType();
-        }
-        if (IsDateOnlyWireType(type))
-        {
-            return Scalar("I32");
-        }
-        if (IsTimeOnlyWireType(type))
-        {
-            return Scalar("I64");
-        }
-        if (IsTimeSpanWireType(type))
-        {
-            return Scalar("I64");
-        }
-        if (IsCancellationTokenWireType(type))
-        {
-            return Scalar("Bool");
-        }
-        if (IsIndexWireType(type))
-        {
-            RejectTooDeep(type, depth);
-            return IndexWireJsonType();
-        }
-        if (IsRangeWireType(type))
-        {
-            RejectTooDeep(type, depth + 1);
-            return RangeWireJsonType();
-        }
-        if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
-        {
-            return Scalar(EnumUsesI64(enumType) ? "I64" : "I32");
-        }
-        if (ListElementType(type) is { } elementType)
-        {
-            RejectTooDeep(type, depth);
-            return $"{{\"name\":\"List\",\"arguments\":[{JsonType(elementType, compilation, depth + 1, visiting)}]}}";
-        }
-        if (MapTypes(type) is { } map)
-        {
-            RejectTooDeep(type, depth);
-            if (!IsSupportedMapKey(map.Key))
-            {
-                throw new NotSupportedException(
-                    $"Server extension map key type '{map.Key.ToDisplayString()}' is not supported; " +
-                    "map keys must be bool, int, long, string, DateOnly, TimeOnly, TimeSpan, or an enum.");
-            }
-            return $"{{\"name\":\"Map\",\"arguments\":[{JsonType(map.Key, compilation, depth + 1, visiting)},{JsonType(map.Value, compilation, depth + 1, visiting)}]}}";
-        }
-        if (type is INamedTypeSymbol named && IsRecordDto(named))
-        {
-            RejectTooDeep(type, depth);
-            if (!visiting.Add(named))
-            {
-                throw new NotSupportedException(
-                    $"Server extension DTO type '{named.ToDisplayString()}' is cyclic; recursive DTO shapes are not supported.");
-            }
+    }
 
-            RejectInheritedDtoProperties(named);
-            try
-            {
-                var fields = RecordFields(named);
-                var fieldTypes = new List<string>(fields.Count);
-                foreach (var field in fields)
-                {
-                    fieldTypes.Add(JsonType(field.Type, compilation, depth + 1, visiting));
-                }
-                return $"{{\"name\":\"Record\",\"arguments\":[{string.Join(",", fieldTypes)}]}}";
-            }
-            finally
-            {
-                visiting.Remove(named);
-            }
+    private static string? TryFrameworkJsonType(JsonTypeContext context)
+    {
+        if (IsGuid(context.Type))
+            return Scalar("Guid");
+
+        if (IsDateTimeWireType(context.Type))
+            return BoundedJsonType(context.Type, context.Depth, DateTimeWireJsonType());
+
+        if (IsDateOnlyWireType(context.Type))
+            return Scalar("I32");
+
+        if (IsTimeOnlyWireType(context.Type) || IsTimeSpanWireType(context.Type))
+            return Scalar("I64");
+
+        if (IsCancellationTokenWireType(context.Type))
+            return Scalar("Bool");
+
+        if (IsIndexWireType(context.Type))
+            return BoundedJsonType(context.Type, context.Depth, IndexWireJsonType());
+
+        return IsRangeWireType(context.Type)
+            ? BoundedJsonType(context.Type, context.Depth + 1, RangeWireJsonType())
+            : null;
+    }
+
+    private static string BoundedJsonType(ITypeSymbol type, int depth, string json)
+    {
+        RejectTooDeep(type, depth);
+        return json;
+    }
+
+    private static string? TryEnumJsonType(JsonTypeContext context)
+        => context.Type is INamedTypeSymbol { TypeKind: TypeKind.Enum } enumType
+            ? Scalar(EnumUsesI64(enumType) ? "I64" : "I32")
+            : null;
+
+    private static string? TryListJsonType(JsonTypeContext context)
+    {
+        if (ListElementType(context.Type) is not { } elementType)
+            return null;
+
+        RejectTooDeep(context.Type, context.Depth);
+        var json = JsonType(elementType, context.Compilation, context.Depth + 1, context.Visiting);
+        return $"{{\"name\":\"List\",\"arguments\":[{json}]}}";
+    }
+
+    private static string? TryMapJsonType(JsonTypeContext context)
+    {
+        if (MapTypes(context.Type) is not { } map)
+            return null;
+
+        RejectTooDeep(context.Type, context.Depth);
+        RejectUnsupportedMapKey(map.Key);
+        var key = JsonType(map.Key, context.Compilation, context.Depth + 1, context.Visiting);
+        var value = JsonType(map.Value, context.Compilation, context.Depth + 1, context.Visiting);
+        return $"{{\"name\":\"Map\",\"arguments\":[{key},{value}]}}";
+    }
+
+    private static void RejectUnsupportedMapKey(ITypeSymbol key)
+    {
+        if (!IsSupportedMapKey(key))
+        {
+            throw new NotSupportedException(
+                $"Server extension map key type '{key.ToDisplayString()}' is not supported; " +
+                "map keys must be bool, int, long, string, DateOnly, TimeOnly, TimeSpan, or an enum.");
         }
-        throw new NotSupportedException($"Server extension type '{type.ToDisplayString()}' is not supported.");
+    }
+
+    private static string? TryRecordDtoJsonType(JsonTypeContext context)
+    {
+        if (context.Type is not INamedTypeSymbol named || !IsRecordDto(named))
+            return null;
+
+        RejectTooDeep(context.Type, context.Depth);
+        RejectRecursiveDto(named, context.Visiting);
+        return RecordDtoJsonType(named, context);
+    }
+
+    private static void RejectRecursiveDto(INamedTypeSymbol named, HashSet<ITypeSymbol> visiting)
+    {
+        if (!visiting.Add(named))
+        {
+            throw new NotSupportedException(
+                $"Server extension DTO type '{named.ToDisplayString()}' is cyclic; recursive DTO shapes are not supported.");
+        }
+    }
+
+    private static string RecordDtoJsonType(INamedTypeSymbol named, JsonTypeContext context)
+    {
+        try
+        {
+            return RecordDtoJsonTypeCore(named, context);
+        }
+        finally
+        {
+            context.Visiting.Remove(named);
+        }
+    }
+
+    private static string RecordDtoJsonTypeCore(INamedTypeSymbol named, JsonTypeContext context)
+    {
+        RejectInheritedDtoProperties(named);
+        var fields = RecordFields(named);
+        var fieldTypes = new List<string>(fields.Count);
+        foreach (var field in fields)
+        {
+            fieldTypes.Add(JsonType(field.Type, context.Compilation, context.Depth + 1, context.Visiting));
+        }
+
+        return $"{{\"name\":\"Record\",\"arguments\":[{string.Join(",", fieldTypes)}]}}";
     }
 
     private static void RejectTooDeep(ITypeSymbol type, int depth)

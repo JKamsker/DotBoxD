@@ -59,87 +59,15 @@ internal static partial class ReturnTypeClassifier
 
         subService = null;
 
-        if (returnType is INamedTypeSymbol named && named.IsGenericType)
+        if (TryClassifyGenericTaskLike(returnType, ct, out var genericKind, out unwrappedReturnType, out subService))
         {
-            var nsName = named.ContainingNamespace?.ToDisplayString();
-            if (nsName == SystemThreadingTasks)
-            {
-                if (named.Name == "Task")
-                {
-                    var arg = named.TypeArguments[0];
-                    if (TryGetAsyncEnumerableItemType(arg, out var itemType))
-                    {
-                        unwrappedReturnType = itemType.ToDisplayString(s_qualifiedFormat);
-                        return MethodReturnKind.TaskOfAsyncEnumerable;
-                    }
-
-                    if (IsStream(arg))
-                    {
-                        unwrappedReturnType = arg.ToDisplayString(s_qualifiedFormat);
-                        return MethodReturnKind.TaskOfStream;
-                    }
-
-                    if (IsPipe(arg))
-                    {
-                        unwrappedReturnType = arg.ToDisplayString(s_qualifiedFormat);
-                        return MethodReturnKind.TaskOfPipe;
-                    }
-
-                    unwrappedReturnType = arg.ToDisplayString(s_qualifiedFormat);
-                    if (TryGetSubServiceInfo(arg, ct, out var sub))
-                    {
-                        subService = sub;
-                        return MethodReturnKind.TaskOfSubService;
-                    }
-                    return MethodReturnKind.TaskOf;
-                }
-
-                if (named.Name == "ValueTask")
-                {
-                    var arg = named.TypeArguments[0];
-                    if (TryGetAsyncEnumerableItemType(arg, out var itemType))
-                    {
-                        unwrappedReturnType = itemType.ToDisplayString(s_qualifiedFormat);
-                        return MethodReturnKind.ValueTaskOfAsyncEnumerable;
-                    }
-
-                    if (IsStream(arg))
-                    {
-                        unwrappedReturnType = arg.ToDisplayString(s_qualifiedFormat);
-                        return MethodReturnKind.ValueTaskOfStream;
-                    }
-
-                    if (IsPipe(arg))
-                    {
-                        unwrappedReturnType = arg.ToDisplayString(s_qualifiedFormat);
-                        return MethodReturnKind.ValueTaskOfPipe;
-                    }
-
-                    unwrappedReturnType = arg.ToDisplayString(s_qualifiedFormat);
-                    if (TryGetSubServiceInfo(arg, ct, out var sub))
-                    {
-                        subService = sub;
-                        return MethodReturnKind.ValueTaskOfSubService;
-                    }
-                    return MethodReturnKind.ValueTaskOf;
-                }
-            }
+            return genericKind;
         }
 
-        var rNs = returnType.ContainingNamespace?.ToDisplayString();
-        if (rNs == SystemThreadingTasks)
+        if (TryClassifyNonGenericTaskLike(returnType, out var taskKind))
         {
-            if (returnType.Name == "Task")
-            {
-                unwrappedReturnType = null;
-                return MethodReturnKind.Task;
-            }
-
-            if (returnType.Name == "ValueTask")
-            {
-                unwrappedReturnType = null;
-                return MethodReturnKind.ValueTask;
-            }
+            unwrappedReturnType = null;
+            return taskKind;
         }
 
         if (returnType.SpecialType == SpecialType.System_Void)
@@ -148,22 +76,9 @@ internal static partial class ReturnTypeClassifier
             return MethodReturnKind.Void;
         }
 
-        if (TryGetAsyncEnumerableItemType(returnType, out var enumerableItemType))
+        if (TryClassifyDirectShape(returnType, out var directKind, out unwrappedReturnType))
         {
-            unwrappedReturnType = enumerableItemType.ToDisplayString(s_qualifiedFormat);
-            return MethodReturnKind.AsyncEnumerable;
-        }
-
-        if (IsStream(returnType))
-        {
-            unwrappedReturnType = returnType.ToDisplayString(s_qualifiedFormat);
-            return MethodReturnKind.Stream;
-        }
-
-        if (IsPipe(returnType))
-        {
-            unwrappedReturnType = returnType.ToDisplayString(s_qualifiedFormat);
-            return MethodReturnKind.Pipe;
+            return directKind;
         }
 
         unwrappedReturnType = returnType.ToDisplayString(s_qualifiedFormat);
@@ -174,6 +89,122 @@ internal static partial class ReturnTypeClassifier
         }
 
         return MethodReturnKind.Sync;
+    }
+
+    private static bool TryClassifyGenericTaskLike(
+        ITypeSymbol returnType,
+        CancellationToken ct,
+        out MethodReturnKind kind,
+        out string? unwrappedReturnType,
+        out SubServiceInfo? subService)
+    {
+        kind = default;
+        unwrappedReturnType = null;
+        subService = null;
+        if (returnType is not INamedTypeSymbol { IsGenericType: true } named ||
+            named.ContainingNamespace?.ToDisplayString() != SystemThreadingTasks)
+        {
+            return false;
+        }
+
+        if (named.Name == "Task")
+        {
+            kind = ClassifyTaskPayload(named.TypeArguments[0], valueTask: false, ct, out unwrappedReturnType, out subService);
+            return true;
+        }
+
+        if (named.Name == "ValueTask")
+        {
+            kind = ClassifyTaskPayload(named.TypeArguments[0], valueTask: true, ct, out unwrappedReturnType, out subService);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static MethodReturnKind ClassifyTaskPayload(
+        ITypeSymbol payloadType,
+        bool valueTask,
+        CancellationToken ct,
+        out string unwrappedReturnType,
+        out SubServiceInfo? subService)
+    {
+        subService = null;
+        if (TryGetAsyncEnumerableItemType(payloadType, out var itemType))
+        {
+            unwrappedReturnType = itemType.ToDisplayString(s_qualifiedFormat);
+            return valueTask ? MethodReturnKind.ValueTaskOfAsyncEnumerable : MethodReturnKind.TaskOfAsyncEnumerable;
+        }
+
+        if (IsStream(payloadType))
+        {
+            unwrappedReturnType = payloadType.ToDisplayString(s_qualifiedFormat);
+            return valueTask ? MethodReturnKind.ValueTaskOfStream : MethodReturnKind.TaskOfStream;
+        }
+
+        if (IsPipe(payloadType))
+        {
+            unwrappedReturnType = payloadType.ToDisplayString(s_qualifiedFormat);
+            return valueTask ? MethodReturnKind.ValueTaskOfPipe : MethodReturnKind.TaskOfPipe;
+        }
+
+        unwrappedReturnType = payloadType.ToDisplayString(s_qualifiedFormat);
+        return ClassifyTaskPayloadCore(payloadType, valueTask, ct, ref subService);
+    }
+
+    private static MethodReturnKind ClassifyTaskPayloadCore(
+        ITypeSymbol payloadType,
+        bool valueTask,
+        CancellationToken ct,
+        ref SubServiceInfo? subService)
+    {
+        if (TryGetSubServiceInfo(payloadType, ct, out var sub))
+        {
+            subService = sub;
+            return valueTask ? MethodReturnKind.ValueTaskOfSubService : MethodReturnKind.TaskOfSubService;
+        }
+
+        return valueTask ? MethodReturnKind.ValueTaskOf : MethodReturnKind.TaskOf;
+    }
+
+    private static bool TryClassifyNonGenericTaskLike(ITypeSymbol returnType, out MethodReturnKind kind)
+    {
+        kind = default;
+        if (returnType.ContainingNamespace?.ToDisplayString() != SystemThreadingTasks)
+        {
+            return false;
+        }
+
+        if (returnType.Name == "Task")
+        {
+            kind = MethodReturnKind.Task;
+            return true;
+        }
+
+        if (returnType.Name == "ValueTask")
+        {
+            kind = MethodReturnKind.ValueTask;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryClassifyDirectShape(
+        ITypeSymbol returnType,
+        out MethodReturnKind kind,
+        out string? unwrappedReturnType)
+    {
+        if (TryGetAsyncEnumerableItemType(returnType, out var enumerableItemType))
+        {
+            kind = MethodReturnKind.AsyncEnumerable;
+            unwrappedReturnType = enumerableItemType.ToDisplayString(s_qualifiedFormat);
+            return true;
+        }
+
+        kind = IsStream(returnType) ? MethodReturnKind.Stream : MethodReturnKind.Pipe;
+        unwrappedReturnType = returnType.ToDisplayString(s_qualifiedFormat);
+        return IsStream(returnType) || IsPipe(returnType);
     }
 
     public static bool TryGetAsyncEnumerableItemType(ITypeSymbol type, out ITypeSymbol itemType)

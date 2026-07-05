@@ -157,10 +157,9 @@ internal static partial class DotBoxDKernelMethodInliner
            string.Equals(type.ElementType.ToString(), DotBoxDGenerationNames.TypeNames.GlobalSandboxType, StringComparison.Ordinal);
 
     private static bool AllowedHelper(string name)
-        => name is "Var" or "Str" or "Int32ToStr" or "ConcatString" or "StringLength" or
-            "StringSubstring" or "StringEquals" or "I32" or "I64" or "F64" or "Bool" or "Not" or
-            "Neg" or "Eq" or "Ne" or "Ge" or "Gt" or "Le" or "Lt" or "And" or "Or" or
-            "Add" or "Sub" or "Mul" or "Div" or "Mod";
+        => string.Equals(name, "Var", StringComparison.Ordinal) ||
+           PrimitiveLiteralHelpers.Contains(name) ||
+           InvocationShapeResolvers.ContainsKey(name);
 
     private static bool IsCallExpression(TypeSyntax type)
     {

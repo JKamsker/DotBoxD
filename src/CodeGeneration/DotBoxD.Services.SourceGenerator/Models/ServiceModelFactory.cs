@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis;
 
 namespace DotBoxD.Services.SourceGenerator.Models;
 
-internal static class ServiceModelFactory
+internal static partial class ServiceModelFactory
 {
     private const string CancellationTokenFullName = ServicesGeneratorTypeNames.CancellationTokenMetadata;
 
@@ -50,63 +50,15 @@ internal static class ServiceModelFactory
             serviceNamespace,
             interfaceSymbol.Name);
 
-        if (interfaceSymbol.IsGenericType)
+        var buildContext = new ServiceBuildContext(displayName, serviceLocation, serviceNamespace, qualifiedInterfaceName);
+        if (ValidateInterfaceSymbol(interfaceSymbol, buildContext) is { } rejectedInterface)
         {
-            return RejectedService(
-                displayName,
-                "generic service interfaces are not supported; declare a non-generic interface and forward to a generic helper if needed",
-                serviceLocation,
-                qualifiedInterfaceName);
+            return rejectedInterface;
         }
 
-        if (interfaceSymbol.ContainingType is not null)
+        if (!TryCollectServiceMembers(interfaceSymbol, buildContext, ct, out var members, out var rejectedMembers))
         {
-            return RejectedService(
-                displayName,
-                "nested service interfaces are not supported; declare the interface at namespace scope",
-                serviceLocation,
-                qualifiedInterfaceName);
-        }
-
-        if (interfaceSymbol.DeclaredAccessibility != Accessibility.Public)
-        {
-            return RejectedService(
-                displayName,
-                "service interfaces must be public because generated proxy, dispatcher, and extension APIs are public",
-                serviceLocation,
-                qualifiedInterfaceName);
-        }
-
-        var interfaceMethods = new List<IMethodSymbol>();
-        var interfaceProperties = new List<IPropertySymbol>();
-        var unsupportedMemberDiagnostic = ServiceShapeValidator.CollectMembers(
-            interfaceSymbol,
-            interfaceMethods,
-            interfaceProperties,
-            ct);
-        if (unsupportedMemberDiagnostic is not null)
-        {
-            return RejectedService(
-                displayName,
-                unsupportedMemberDiagnostic.Value.Reason,
-                unsupportedMemberDiagnostic.Value.Location,
-                qualifiedInterfaceName);
-        }
-
-        var effectiveProperties = new List<IPropertySymbol>();
-        var duplicatePropertyDiagnostic = InheritedPropertyDeduplicator.CollectUnique(
-            interfaceProperties,
-            interfaceMethods,
-            NamingHelpers.StripInterfacePrefix(interfaceSymbol.Name) + "Proxy",
-            effectiveProperties,
-            ct);
-        if (duplicatePropertyDiagnostic is not null)
-        {
-            return RejectedService(
-                displayName,
-                duplicatePropertyDiagnostic.Value.Reason,
-                duplicatePropertyDiagnostic.Value.Location,
-                qualifiedInterfaceName);
+            return rejectedMembers;
         }
 
         ct.ThrowIfCancellationRequested();
@@ -117,10 +69,10 @@ internal static class ServiceModelFactory
             // An explicit empty/whitespace [DotBoxDService(Name = "")] compiles but no inbound call can ever
             // match the empty wire name, so every dispatch fails at runtime. Reject it at build time.
             return RejectedService(
-                displayName,
+                buildContext.DisplayName,
                 "[DotBoxDService(Name = ...)] wire name must not be empty or whitespace",
-                serviceLocation,
-                qualifiedInterfaceName);
+                buildContext.ServiceLocation,
+                buildContext.QualifiedInterfaceName);
         }
 
         var cancellationTokenSymbol = context.SemanticModel.Compilation.GetTypeByMetadataName(CancellationTokenFullName);
@@ -133,78 +85,35 @@ internal static class ServiceModelFactory
         var seenSignatureIndexes = new Dictionary<string, int>(StringComparer.Ordinal);
         var validationCache = SharedRpcTypeValidationCache.Get(context.SemanticModel.Compilation);
 
-        foreach (var methodSymbol in interfaceMethods)
+        foreach (var methodSymbol in members.Methods)
         {
             ct.ThrowIfCancellationRequested();
 
             var sigKey = MethodSignatureFacts.GetSignatureKey(methodSymbol, ct);
-            if (seenSignatures.TryGetValue(sigKey, out var existingMethod))
+            if (TryApplyInheritedMethod(
+                    buildContext,
+                    methodSymbol,
+                    sigKey,
+                    seenSignatures,
+                    seenSignatureIndexes,
+                    methods,
+                    ct,
+                    out var rejectedMethod,
+                    out var hasRejectedMethod))
             {
-                if (!InheritedMethodDeduplicator.HasCompatibleReturnShape(existingMethod, methodSymbol, ct))
+                if (hasRejectedMethod)
                 {
-                    return RejectedService(
-                        displayName,
-                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but an incompatible return type",
-                        DiagnosticLocationFactory.FromSymbol(methodSymbol),
-                        qualifiedInterfaceName);
+                    return rejectedMethod;
                 }
 
-                if (!InheritedMethodDeduplicator.HasSameParameterRefKinds(existingMethod, methodSymbol))
-                {
-                    return RejectedService(
-                        displayName,
-                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible parameter ref kinds",
-                        DiagnosticLocationFactory.FromSymbol(methodSymbol),
-                        qualifiedInterfaceName);
-                }
-
-                if (!MethodSignatureFacts.HaveSameGenericConstraints(existingMethod, methodSymbol, ct))
-                {
-                    return RejectedService(
-                        displayName,
-                        $"inherited generic method '{methodSymbol.Name}' has the same signature as another method but incompatible generic constraints",
-                        DiagnosticLocationFactory.FromSymbol(methodSymbol),
-                        qualifiedInterfaceName);
-                }
-
-                if (!InheritedMethodDeduplicator.HasSameNullableAnnotations(existingMethod, methodSymbol, ct))
-                {
-                    return RejectedService(
-                        displayName,
-                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible nullable annotations",
-                        DiagnosticLocationFactory.FromSymbol(methodSymbol),
-                        qualifiedInterfaceName);
-                }
-
-                if (!TupleElementNameComparer.HasSameElementNames(existingMethod, methodSymbol, ct))
-                {
-                    return RejectedService(
-                        displayName,
-                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible tuple element names",
-                        DiagnosticLocationFactory.FromSymbol(methodSymbol),
-                        qualifiedInterfaceName);
-                }
-
-                if (!InheritedMethodDeduplicator.HasSameEffectiveWireName(existingMethod, methodSymbol))
-                {
-                    return RejectedService(
-                        displayName,
-                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but a different wire method name",
-                        DiagnosticLocationFactory.FromSymbol(methodSymbol),
-                        qualifiedInterfaceName);
-                }
-
-                var existingIndex = seenSignatureIndexes[sigKey];
-                methods[existingIndex] = InheritedMethodDeduplicator.AddAdditionalExplicitImplementation(
-                    methods[existingIndex],
-                    methodSymbol.ContainingType);
                 continue;
             }
+
             seenSignatures[sigKey] = methodSymbol;
             seenSignatureIndexes[sigKey] = methods.Count;
 
             var method = MethodModelFactory.Build(
-                displayName,
+                buildContext.DisplayName,
                 methodSymbol,
                 cancellationTokenSymbol,
                 validationCache,
@@ -216,7 +125,7 @@ internal static class ServiceModelFactory
             methodLocations.Add(methodLocation);
         }
 
-        foreach (var propertySymbol in effectiveProperties)
+        foreach (var propertySymbol in members.Properties)
         {
             if (!ServicePropertyModelFactory.TryBuild(propertySymbol, ct, out var property, out var propertyLocation))
             {
@@ -231,7 +140,7 @@ internal static class ServiceModelFactory
 
         return new ServiceResult(
             Model: new ServiceModel(
-                Namespace: serviceNamespace,
+                Namespace: buildContext.ServiceNamespace,
                 InterfaceName: interfaceSymbol.Name,
                 ServiceName: LiteralHelpers.EscapeStringLiteral(serviceName),
                 Methods: methods.ToEquatableArray(),
@@ -241,8 +150,8 @@ internal static class ServiceModelFactory
             MethodDiagnostics: methodDiagnostics.ToEquatableArray(),
             MethodLocations: methodLocations.ToEquatableArray(),
             PropertyLocations: propertyLocations.ToEquatableArray(),
-            ServiceLocation: serviceLocation,
-            QualifiedInterfaceName: qualifiedInterfaceName,
+            ServiceLocation: buildContext.ServiceLocation,
+            QualifiedInterfaceName: buildContext.QualifiedInterfaceName,
             ServiceDiagnostic: null);
     }
 

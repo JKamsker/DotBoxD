@@ -9,6 +9,15 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 
 internal static class DotBoxDNullableScalarExpressionLowerer
 {
+    private static readonly ZeroSourceResolver[] ZeroSourceResolvers =
+    [
+        TrySpecialZeroSource,
+        TryFrameworkZeroSource,
+        TryEnumZeroSource,
+    ];
+
+    private delegate string? ZeroSourceResolver(ITypeSymbol underlying);
+
     public static bool TryLower(
         ExpressionSyntax expression,
         ITypeSymbol targetType,
@@ -118,6 +127,19 @@ internal static class DotBoxDNullableScalarExpressionLowerer
     }
 
     private static string ZeroSource(ITypeSymbol underlying)
+    {
+        foreach (var resolver in ZeroSourceResolvers)
+        {
+            if (resolver(underlying) is { } source)
+            {
+                return source;
+            }
+        }
+
+        throw new NotSupportedException();
+    }
+
+    private static string? TrySpecialZeroSource(ITypeSymbol underlying)
         => underlying.SpecialType switch
         {
             SpecialType.System_Boolean => BoolSource(value: false),
@@ -125,23 +147,50 @@ internal static class DotBoxDNullableScalarExpressionLowerer
             SpecialType.System_Int64 => $"{Helpers.I64}({DotBoxDGenerationNames.CSharpLiterals.Int64Default})",
             SpecialType.System_Double or SpecialType.System_Single =>
                 $"{Helpers.F64}({DotBoxDGenerationNames.CSharpLiterals.DoubleDefault})",
-            _ when DotBoxDRpcTypeMapper.IsGuid(underlying) =>
-                $"new {TypeNames.GlobalLiteralExpression}({TypeNames.GlobalSandboxValue}.FromGuid(global::System.Guid.Empty), Span)",
-            _ when DotBoxDRpcTypeMapper.IsDateTimeWireType(underlying) => DateTimeZeroSource(underlying),
-            _ when DotBoxDRpcTypeMapper.IsDecimalWireType(underlying) => DecimalZeroSource(underlying),
-            _ when DotBoxDRpcTypeMapper.IsDateOnlyWireType(underlying) =>
-                $"{Helpers.I32}({DotBoxDGenerationNames.CSharpLiterals.Int32Default})",
-            _ when DotBoxDRpcTypeMapper.IsTimeOnlyWireType(underlying) ||
-                   DotBoxDRpcTypeMapper.IsTimeSpanWireType(underlying) =>
-                $"{Helpers.I64}({DotBoxDGenerationNames.CSharpLiterals.Int64Default})",
-            _ when DotBoxDRpcTypeMapper.IsCancellationTokenWireType(underlying) =>
-                BoolSource(value: false),
-            _ when underlying.TypeKind == TypeKind.Enum && underlying is INamedTypeSymbol enumType =>
-                DotBoxDRpcTypeMapper.EnumUsesI64(enumType)
-                    ? $"{Helpers.I64}({DotBoxDGenerationNames.CSharpLiterals.Int64Default})"
-                    : $"{Helpers.I32}({DotBoxDGenerationNames.CSharpLiterals.Int32Default})",
-            _ => throw new NotSupportedException()
+            _ => null,
         };
+
+    private static string? TryFrameworkZeroSource(ITypeSymbol underlying)
+    {
+        if (DotBoxDRpcTypeMapper.IsGuid(underlying))
+        {
+            return $"new {TypeNames.GlobalLiteralExpression}({TypeNames.GlobalSandboxValue}.FromGuid(global::System.Guid.Empty), Span)";
+        }
+
+        if (DotBoxDRpcTypeMapper.IsDateTimeWireType(underlying))
+        {
+            return DateTimeZeroSource(underlying);
+        }
+
+        if (DotBoxDRpcTypeMapper.IsDecimalWireType(underlying))
+        {
+            return DecimalZeroSource(underlying);
+        }
+
+        if (DotBoxDRpcTypeMapper.IsDateOnlyWireType(underlying))
+        {
+            return $"{Helpers.I32}({DotBoxDGenerationNames.CSharpLiterals.Int32Default})";
+        }
+
+        if (DotBoxDRpcTypeMapper.IsTimeOnlyWireType(underlying))
+        {
+            return $"{Helpers.I64}({DotBoxDGenerationNames.CSharpLiterals.Int64Default})";
+        }
+
+        if (DotBoxDRpcTypeMapper.IsTimeSpanWireType(underlying))
+        {
+            return $"{Helpers.I64}({DotBoxDGenerationNames.CSharpLiterals.Int64Default})";
+        }
+
+        return DotBoxDRpcTypeMapper.IsCancellationTokenWireType(underlying) ? BoolSource(value: false) : null;
+    }
+
+    private static string? TryEnumZeroSource(ITypeSymbol underlying)
+        => underlying.TypeKind == TypeKind.Enum && underlying is INamedTypeSymbol enumType
+            ? DotBoxDRpcTypeMapper.EnumUsesI64(enumType)
+                ? $"{Helpers.I64}({DotBoxDGenerationNames.CSharpLiterals.Int64Default})"
+                : $"{Helpers.I32}({DotBoxDGenerationNames.CSharpLiterals.Int32Default})"
+            : null;
 
     private static string DateTimeZeroSource(ITypeSymbol underlying)
         => DotBoxDRecordCreationExpressionLowerer.RecordNew(

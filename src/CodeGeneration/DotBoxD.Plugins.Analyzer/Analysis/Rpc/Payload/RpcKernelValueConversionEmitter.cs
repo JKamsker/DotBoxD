@@ -58,76 +58,12 @@ internal sealed partial class RpcKernelValueConversionEmitter
 
     private string WriteComplexExpression(ITypeSymbol type, string expression)
     {
-        if (DotBoxDNullableScalarType.TryGetSupportedUnderlying(type, out var nullableUnderlying))
+        foreach (var resolver in ComplexWriteResolvers)
         {
-            return $"{EnsureNullableValueWriter(type, nullableUnderlying)}({expression})";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsGuid(type))
-        {
-            return $"{DotBoxDRpcValueNames.GlobalKernelRpcValue}.Guid({expression})";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsDateTimeWireType(type))
-        {
-            return $"{EnsureDateTimeValueWriter(type)}({expression})";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsDecimalWireType(type))
-        {
-            return $"{EnsureDecimalValueWriter()}({expression})";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsDateOnlyWireType(type))
-        {
-            return $"{DotBoxDRpcValueNames.GlobalKernelRpcValue}.Int32({expression}.DayNumber)";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsTimeOnlyWireType(type))
-        {
-            return $"{DotBoxDRpcValueNames.GlobalKernelRpcValue}.Int64({expression}.Ticks)";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsTimeSpanWireType(type))
-        {
-            return $"{DotBoxDRpcValueNames.GlobalKernelRpcValue}.Int64({expression}.Ticks)";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsCancellationTokenWireType(type))
-        {
-            return $"{DotBoxDRpcValueNames.GlobalKernelRpcValue}.Bool({expression}.IsCancellationRequested)";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsIndexWireType(type))
-        {
-            return $"{EnsureIndexValueWriter()}({expression})";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsRangeWireType(type))
-        {
-            return $"{EnsureRangeValueWriter()}({expression})";
-        }
-
-        if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
-        {
-            return DotBoxDRpcTypeMapper.EnumUsesI64(enumType)
-                ? $"{DotBoxDRpcValueNames.GlobalKernelRpcValue}.Int64(unchecked((long){expression}))"
-                : $"{DotBoxDRpcValueNames.GlobalKernelRpcValue}.Int32(unchecked((int){expression}))";
-        }
-
-        if (DotBoxDRpcTypeMapper.ListElementType(type) is not null)
-        {
-            return $"{EnsureListWriter(type)}({expression})";
-        }
-
-        if (DotBoxDRpcTypeMapper.MapTypes(type) is { } map)
-        {
-            return $"{EnsureMapWriter(type, map.Key, map.Value)}({expression})";
-        }
-
-        if (type is INamedTypeSymbol named && DotBoxDRpcTypeMapper.IsRecordDto(named))
-        {
-            return $"{EnsureDtoWriter(named)}({expression})";
+            if (resolver(this, type, expression, out var result))
+            {
+                return result;
+            }
         }
 
         throw new NotSupportedException($"Server extension type '{type.ToDisplayString()}' is not supported.");
@@ -135,74 +71,12 @@ internal sealed partial class RpcKernelValueConversionEmitter
 
     private string ReadComplexExpression(ITypeSymbol type, string expression)
     {
-        if (DotBoxDNullableScalarType.TryGetSupportedUnderlying(type, out var nullableUnderlying))
+        foreach (var resolver in ComplexReadResolvers)
         {
-            return $"{EnsureNullableValueReader(type, nullableUnderlying)}({expression})";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsGuid(type))
-        {
-            return $"{expression}.GuidValue";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsDateTimeWireType(type))
-        {
-            return $"{EnsureDateTimeValueReader(type)}({expression})";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsDecimalWireType(type))
-        {
-            return $"{EnsureDecimalValueReader()}({expression})";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsDateOnlyWireType(type))
-        {
-            return $"{EnsureDateOnlyValueReader()}({expression}.Int32Value)";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsTimeOnlyWireType(type))
-        {
-            return $"{EnsureTimeOnlyValueReader()}({expression}.Int64Value)";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsTimeSpanWireType(type))
-        {
-            return $"new global::System.TimeSpan({expression}.Int64Value)";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsCancellationTokenWireType(type))
-        {
-            return $"new global::System.Threading.CancellationToken({expression}.BoolValue)";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsIndexWireType(type))
-        {
-            return $"{EnsureIndexValueReader()}({expression})";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsRangeWireType(type))
-        {
-            return $"{EnsureRangeValueReader()}({expression})";
-        }
-
-        if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
-        {
-            return $"{EnsureEnumValueReader(enumType)}({expression})";
-        }
-
-        if (DotBoxDRpcTypeMapper.ListElementType(type) is not null)
-        {
-            return $"{EnsureListReader(type)}({expression})";
-        }
-
-        if (DotBoxDRpcTypeMapper.MapTypes(type) is { } map)
-        {
-            return $"{EnsureMapReader(type, map.Key, map.Value)}({expression})";
-        }
-
-        if (type is INamedTypeSymbol named && DotBoxDRpcTypeMapper.IsRecordDto(named))
-        {
-            return $"{EnsureDtoReader(named)}({expression})";
+            if (resolver(this, type, expression, out var result))
+            {
+                return result;
+            }
         }
 
         throw new NotSupportedException($"Server extension type '{type.ToDisplayString()}' is not supported.");
