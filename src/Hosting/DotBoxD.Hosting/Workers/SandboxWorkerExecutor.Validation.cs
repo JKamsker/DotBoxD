@@ -43,7 +43,13 @@ internal sealed partial class SandboxWorkerExecutor
         }
 
         error = new SandboxError(SandboxErrorCode.HostFailure, "worker audit envelope was malformed");
-        return WorkerAuditMatches(plan, entrypoint, options, result);
+        if (!WorkerAuditMatches(plan, entrypoint, options, result))
+        {
+            return false;
+        }
+
+        error = new SandboxError(SandboxErrorCode.HostFailure, "worker deterministic binding result did not match audit evidence");
+        return WorkerDeterministicBindingResultMatches(plan, entrypoint, result);
     }
 
     private static bool WorkerModeMatches(SandboxExecutionOptions options, SandboxExecutionResult result)

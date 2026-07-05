@@ -201,7 +201,8 @@ internal static class WorkerAuditValidator
             !auditEvent.Fields.TryGetValue("moduleHash", out var moduleHash) ||
             !string.Equals(moduleHash, plan.ModuleHash, StringComparison.Ordinal) ||
             !auditEvent.Fields.TryGetValue("policyHash", out var policyHash) ||
-            !string.Equals(policyHash, plan.PolicyHash, StringComparison.Ordinal))
+            !string.Equals(policyHash, plan.PolicyHash, StringComparison.Ordinal) ||
+            !DeterministicTimeBindingFieldsMatch(plan, auditEvent))
         {
             return false;
         }
@@ -222,6 +223,22 @@ internal static class WorkerAuditValidator
                 CultureInfo.InvariantCulture,
                 out var parsedDuration) &&
             parsedDuration >= 0;
+    }
+
+    private static bool DeterministicTimeBindingFieldsMatch(
+        ExecutionPlan plan,
+        SandboxAuditEvent auditEvent)
+    {
+        if (!plan.Policy.Deterministic ||
+            auditEvent.BindingId != "time.nowUnixMillis")
+        {
+            return true;
+        }
+
+        return plan.Policy.LogicalNow is { } logicalNow &&
+               auditEvent.Fields!.TryGetValue("unixMillis", out var unixMillis) &&
+               long.TryParse(unixMillis, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) &&
+               value == logicalNow.ToUnixTimeMilliseconds();
     }
 
     private static bool TextIsSafe(string? value)

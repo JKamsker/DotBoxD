@@ -6,7 +6,7 @@ using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Serialization.Json.Hosting;
 using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests.Workers;
+namespace DotBoxD.Kernels.Tests.Workers.Audit;
 
 public sealed class WorkerDeterministicTimeAuditValidationTests
 {
