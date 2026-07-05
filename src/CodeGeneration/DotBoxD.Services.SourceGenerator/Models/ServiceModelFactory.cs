@@ -140,65 +140,15 @@ internal static class ServiceModelFactory
             var sigKey = MethodSignatureFacts.GetSignatureKey(methodSymbol, ct);
             if (seenSignatures.TryGetValue(sigKey, out var existingMethod))
             {
-                if (!InheritedMethodDeduplicator.HasCompatibleReturnShape(existingMethod, methodSymbol, ct))
+                if (DuplicateMethodSignatureValidator.TryGetConflictReason(
+                    existingMethod,
+                    methodSymbol,
+                    ct,
+                    out var conflictReason))
                 {
                     return RejectedService(
                         displayName,
-                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but an incompatible return type",
-                        DiagnosticLocationFactory.FromSymbol(methodSymbol),
-                        qualifiedInterfaceName);
-                }
-
-                if (!InheritedMethodDeduplicator.HasSameParameterRefKinds(existingMethod, methodSymbol))
-                {
-                    return RejectedService(
-                        displayName,
-                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible parameter ref kinds",
-                        DiagnosticLocationFactory.FromSymbol(methodSymbol),
-                        qualifiedInterfaceName);
-                }
-
-                if (!InheritedMethodDeduplicator.HasSameParameterDefaults(existingMethod, methodSymbol))
-                {
-                    return RejectedService(
-                        displayName,
-                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible optional parameter defaults",
-                        DiagnosticLocationFactory.FromSymbol(methodSymbol),
-                        qualifiedInterfaceName);
-                }
-
-                if (!MethodSignatureFacts.HaveSameGenericConstraints(existingMethod, methodSymbol, ct))
-                {
-                    return RejectedService(
-                        displayName,
-                        $"inherited generic method '{methodSymbol.Name}' has the same signature as another method but incompatible generic constraints",
-                        DiagnosticLocationFactory.FromSymbol(methodSymbol),
-                        qualifiedInterfaceName);
-                }
-
-                if (!InheritedMethodDeduplicator.HasSameNullableAnnotations(existingMethod, methodSymbol, ct))
-                {
-                    return RejectedService(
-                        displayName,
-                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible nullable annotations",
-                        DiagnosticLocationFactory.FromSymbol(methodSymbol),
-                        qualifiedInterfaceName);
-                }
-
-                if (!TupleElementNameComparer.HasSameElementNames(existingMethod, methodSymbol, ct))
-                {
-                    return RejectedService(
-                        displayName,
-                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible tuple element names",
-                        DiagnosticLocationFactory.FromSymbol(methodSymbol),
-                        qualifiedInterfaceName);
-                }
-
-                if (!InheritedMethodDeduplicator.HasSameEffectiveWireName(existingMethod, methodSymbol))
-                {
-                    return RejectedService(
-                        displayName,
-                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but a different wire method name",
+                        conflictReason,
                         DiagnosticLocationFactory.FromSymbol(methodSymbol),
                         qualifiedInterfaceName);
                 }
@@ -301,5 +251,4 @@ internal static class ServiceModelFactory
 
         return string.Join(".", parts);
     }
-
 }
