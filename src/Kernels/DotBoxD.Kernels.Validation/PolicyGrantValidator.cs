@@ -111,6 +111,14 @@ internal static class PolicyGrantValidator
         IReadOnlyList<CapabilityRequest> requestedCapabilities,
         List<SandboxDiagnostic> diagnostics)
     {
+        if (grant.Id is null)
+        {
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-POLICY-GRANT",
+                "grant id must not be null"));
+            return;
+        }
+
         if (CapabilityPattern.IsWildcard(grant.Id))
         {
             ValidateWildcardGrant(grant, bindings, requiredCapabilities, requestedCapabilities, diagnostics);

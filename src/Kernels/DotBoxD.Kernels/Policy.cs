@@ -169,7 +169,8 @@ public sealed record SandboxPolicy(
         var wildcards = new List<CapabilityGrant>();
         for (var i = 0; i < grants.Count; i++)
         {
-            if (CapabilityPattern.IsWildcard(grants[i].Id))
+            if (grants[i].Id is not null &&
+                CapabilityPattern.IsWildcard(grants[i].Id))
             {
                 wildcards.Add(grants[i]);
             }
@@ -187,6 +188,11 @@ public sealed record SandboxPolicy(
         for (var i = 0; i < grants.Count; i++)
         {
             var grant = grants[i];
+            if (grant.Id is null)
+            {
+                continue;
+            }
+
             if (!buckets.TryGetValue(grant.Id, out var bucket))
             {
                 bucket = [];
