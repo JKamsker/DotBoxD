@@ -3,7 +3,7 @@ using DotBoxD.Services.Serialization;
 using MessagePack;
 using Xunit;
 
-namespace DotBoxD.Services.Tests.Protocol;
+namespace DotBoxD.Services.Tests.Protocol.MessagePack;
 
 public sealed class MessagePackPayloadUtf16RegressionTests
 {
