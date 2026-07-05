@@ -61,16 +61,11 @@ internal static class F64MathIntrinsicEmitter
 
         rawMethod = intrinsic.RawMethod;
         return bindings.TryGet(call.Name, out var binding) &&
-           binding.Compiled is { Kind: "RuntimeStub" } &&
-           binding.Compiled.Type == typeof(Runtime.CompiledRuntime).FullName &&
-           binding.Compiled.Method == intrinsic.BoxedMethod &&
-           binding.Parameters.Count == 1 &&
-           binding.Parameters[0].Equals(SandboxType.F64) &&
-           binding.ReturnType.Equals(SandboxType.F64) &&
-           binding.RequiredCapability is null &&
-           binding.Safety == BindingSafety.PureIntrinsic &&
-           binding.AuditLevel == AuditLevel.None &&
-           (binding.Effects & ~(SandboxEffect.Cpu | SandboxEffect.Alloc)) == SandboxEffect.None;
+               CompiledIntrinsicBindingMatcher.IsPureRuntimeStub(
+                   binding,
+                   intrinsic.BoxedMethod,
+                   SandboxType.F64,
+                   [SandboxType.F64]);
     }
 
     private readonly record struct F64Intrinsic(string RawMethod, string BoxedMethod);
@@ -148,30 +143,21 @@ internal static class I32MathIntrinsicEmitter
         rawMethod = intrinsic.RawMethod;
         argumentCount = intrinsic.ArgumentCount;
         return bindings.TryGet(call.Name, out var binding) &&
-           binding.Compiled is { Kind: "RuntimeStub" } &&
-           binding.Compiled.Type == typeof(Runtime.CompiledRuntime).FullName &&
-           binding.Compiled.Method == intrinsic.BoxedMethod &&
-           binding.Parameters.Count == argumentCount &&
-           ParametersAreI32(binding.Parameters) &&
-           binding.ReturnType.Equals(SandboxType.I32) &&
-           binding.RequiredCapability is null &&
-           binding.Safety == BindingSafety.PureIntrinsic &&
-           binding.AuditLevel == AuditLevel.None &&
-           (binding.Effects & ~(SandboxEffect.Cpu | SandboxEffect.Alloc)) == SandboxEffect.None;
+               CompiledIntrinsicBindingMatcher.IsPureRuntimeStub(
+                   binding,
+                   intrinsic.BoxedMethod,
+                   SandboxType.I32,
+                   I32Parameters(argumentCount));
     }
 
-    private static bool ParametersAreI32(IReadOnlyList<SandboxType> parameters)
-    {
-        for (var i = 0; i < parameters.Count; i++)
+    private static SandboxType[] I32Parameters(int count)
+        => count switch
         {
-            if (!parameters[i].Equals(SandboxType.I32))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
+            1 => [SandboxType.I32],
+            2 => [SandboxType.I32, SandboxType.I32],
+            3 => [SandboxType.I32, SandboxType.I32, SandboxType.I32],
+            _ => []
+        };
 
     private readonly record struct I32Intrinsic(string RawMethod, string BoxedMethod, int ArgumentCount);
 }

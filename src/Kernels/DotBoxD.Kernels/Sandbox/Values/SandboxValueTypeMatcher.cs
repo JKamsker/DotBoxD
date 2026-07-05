@@ -59,18 +59,44 @@ internal static class SandboxValueTypeMatcher
     }
 
     private static bool ScalarMatches(SandboxValue value, string expectedName)
-        => value switch
+    {
+        if (value is OpaqueIdValue id)
         {
-            UnitValue => expectedName == SandboxType.Unit.Name,
-            BoolValue => expectedName == SandboxType.Bool.Name,
-            I32Value => expectedName == SandboxType.I32.Name,
-            I64Value => expectedName == SandboxType.I64.Name,
-            F64Value => expectedName == SandboxType.F64.Name,
-            StringValue => expectedName == SandboxType.String.Name,
-            GuidValue => expectedName == SandboxType.Guid.Name,
-            OpaqueIdValue id => string.Equals(id.TypeName, expectedName, StringComparison.Ordinal),
-            SandboxPathValue => expectedName == SandboxType.SandboxPath.Name,
-            SandboxUriValue => expectedName == SandboxType.SandboxUri.Name,
-            _ => false
+            return string.Equals(id.TypeName, expectedName, StringComparison.Ordinal);
+        }
+
+        if (TryPrimitiveScalarName(value, out var scalarName))
+        {
+            return expectedName == scalarName;
+        }
+
+        return TryResourceScalarName(value, out scalarName) && expectedName == scalarName;
+    }
+
+    private static bool TryPrimitiveScalarName(SandboxValue value, out string name)
+    {
+        name = value switch
+        {
+            UnitValue => SandboxType.Unit.Name,
+            BoolValue => SandboxType.Bool.Name,
+            I32Value => SandboxType.I32.Name,
+            I64Value => SandboxType.I64.Name,
+            F64Value => SandboxType.F64.Name,
+            StringValue => SandboxType.String.Name,
+            GuidValue => SandboxType.Guid.Name,
+            _ => string.Empty
         };
+        return name.Length != 0;
+    }
+
+    private static bool TryResourceScalarName(SandboxValue value, out string name)
+    {
+        name = value switch
+        {
+            SandboxPathValue => SandboxType.SandboxPath.Name,
+            SandboxUriValue => SandboxType.SandboxUri.Name,
+            _ => string.Empty
+        };
+        return name.Length != 0;
+    }
 }

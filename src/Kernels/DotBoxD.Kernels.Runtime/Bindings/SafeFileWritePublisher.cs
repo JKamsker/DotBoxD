@@ -62,27 +62,7 @@ internal static class SafeFileWritePublisher
             new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
             StringSplitOptions.RemoveEmptyEntries))
         {
-            current = Path.Combine(current, part);
-            if (Directory.Exists(current) || File.Exists(current))
-            {
-                SafeFileSystem.EnsureNoReparsePoint(rootFull, current);
-                continue;
-            }
-
-            if (!permission.AllowCreate)
-            {
-                throw Error(SandboxErrorCode.PermissionDenied, "file.writeText denied: create is not allowed");
-            }
-
-            FileSystem.SafeFileSystem.InvokeBeforeDirectoryCreateForTests(current);
-            if (Directory.Exists(current) || File.Exists(current))
-            {
-                SafeFileSystem.EnsureNoReparsePoint(rootFull, current);
-                continue;
-            }
-
-            Directory.CreateDirectory(current);
-            SafeFileSystem.EnsureNoReparsePoint(rootFull, current);
+            current = EnsureParentPart(rootFull, current, part, permission);
         }
 
         if (!Directory.Exists(directory))
@@ -91,6 +71,36 @@ internal static class SafeFileWritePublisher
         }
 
         SafeFileSystem.EnsureNoReparsePoint(rootFull, fullPath);
+    }
+
+    private static string EnsureParentPart(
+        string rootFull,
+        string current,
+        string part,
+        SafeFileWritePermission permission)
+    {
+        var next = Path.Combine(current, part);
+        if (Directory.Exists(next) || File.Exists(next))
+        {
+            SafeFileSystem.EnsureNoReparsePoint(rootFull, next);
+            return next;
+        }
+
+        if (!permission.AllowCreate)
+        {
+            throw Error(SandboxErrorCode.PermissionDenied, "file.writeText denied: create is not allowed");
+        }
+
+        FileSystem.SafeFileSystem.InvokeBeforeDirectoryCreateForTests(next);
+        if (Directory.Exists(next) || File.Exists(next))
+        {
+            SafeFileSystem.EnsureNoReparsePoint(rootFull, next);
+            return next;
+        }
+
+        Directory.CreateDirectory(next);
+        SafeFileSystem.EnsureNoReparsePoint(rootFull, next);
+        return next;
     }
 
     public static void PublishTempFile(

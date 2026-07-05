@@ -119,15 +119,7 @@ public sealed class InMemoryAuditSink : IAuditSink
         for (var index = StartIndexAfter(checkpoint, events.Count); index < events.Count; index++)
         {
             var e = events[index];
-            if (e.RunId == runId &&
-                e.Success == success &&
-                IsBindingAuditKind(e.Kind) &&
-                StringComparer.Ordinal.Equals(e.BindingId, descriptor.Id) &&
-                CapabilityMatches(e, descriptor) &&
-                EffectMatches(e, descriptor) &&
-                !string.IsNullOrWhiteSpace(e.ResourceId) &&
-                HasRequiredFields(e, moduleHash, policyHash) &&
-                ResultMatches(e, success, expectedErrorCode))
+            if (BindingAuditMatches(e, descriptor, success, expectedErrorCode, runId, moduleHash, policyHash))
             {
                 return true;
             }
@@ -135,6 +127,24 @@ public sealed class InMemoryAuditSink : IAuditSink
 
         return false;
     }
+
+    private static bool BindingAuditMatches(
+        SandboxAuditEvent auditEvent,
+        BindingDescriptor descriptor,
+        bool success,
+        SandboxErrorCode? expectedErrorCode,
+        SandboxRunId runId,
+        string moduleHash,
+        string policyHash)
+        => auditEvent.RunId == runId &&
+           auditEvent.Success == success &&
+           IsBindingAuditKind(auditEvent.Kind) &&
+           StringComparer.Ordinal.Equals(auditEvent.BindingId, descriptor.Id) &&
+           CapabilityMatches(auditEvent, descriptor) &&
+           EffectMatches(auditEvent, descriptor) &&
+           !string.IsNullOrWhiteSpace(auditEvent.ResourceId) &&
+           HasRequiredFields(auditEvent, moduleHash, policyHash) &&
+           ResultMatches(auditEvent, success, expectedErrorCode);
 
     private static int StartIndexAfter(long checkpoint, int eventCount)
     {

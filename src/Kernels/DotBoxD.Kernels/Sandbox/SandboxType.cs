@@ -74,12 +74,7 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
 
     public static bool IsWellFormedOpaqueIdName(string name)
     {
-        if (string.IsNullOrEmpty(name) ||
-            name.Length > MaxOpaqueIdNameLength ||
-            AllowedScalars.Contains(name) ||
-            name is "List" or "Map" or RecordName ||
-            IsForbiddenName(name) ||
-            !char.IsAsciiLetterUpper(name[0]))
+        if (HasInvalidOpaqueIdNamePrefix(name))
         {
             return false;
         }
@@ -94,6 +89,26 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
         }
 
         return true;
+    }
+
+    private static bool HasInvalidOpaqueIdNamePrefix(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            return true;
+        }
+
+        if (name.Length > MaxOpaqueIdNameLength || AllowedScalars.Contains(name))
+        {
+            return true;
+        }
+
+        if (name is "List" or "Map" or RecordName)
+        {
+            return true;
+        }
+
+        return IsForbiddenName(name) || !char.IsAsciiLetterUpper(name[0]);
     }
 
     // Open structural check: any well-formed opaque-id brand is accepted. Used by runtime value
