@@ -25,11 +25,41 @@ public sealed record EventQueryDocument
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(eventName);
         ArgumentNullException.ThrowIfNull(projection);
-        return new EventQueryDocument
+        var document = new EventQueryDocument
         {
             EventName = eventName,
             Filter = filter ?? QueryFilter.MatchAll,
             Projection = projection,
         };
+
+        EventQueryDocumentInvariants.RequireValidShape(document);
+        return document;
+    }
+}
+
+internal static class EventQueryDocumentInvariants
+{
+    public static void RequireValidShape(EventQueryDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+
+        if (string.IsNullOrWhiteSpace(document.EventName))
+        {
+            throw new InvalidOperationException(
+                "EventQueryDocument property 'EventName' must not be null, empty, or whitespace.");
+        }
+
+        if (document.Filter is null)
+        {
+            throw new InvalidOperationException("EventQueryDocument property 'Filter' must not be null.");
+        }
+
+        if (document.Projection is null)
+        {
+            throw new InvalidOperationException("EventQueryDocument property 'Projection' must not be null.");
+        }
+
+        QueryFilterInvariants.RequireValidShape(document.Filter);
+        QueryProjectionInvariants.RequireValidShape(document.Projection);
     }
 }

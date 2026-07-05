@@ -42,10 +42,7 @@ public sealed class EventQueryDocumentJsonConverter : JsonConverter<EventQueryDo
         ArgumentNullException.ThrowIfNull(value);
         ArgumentNullException.ThrowIfNull(options);
 
-        if (string.IsNullOrWhiteSpace(value.EventName))
-        {
-            throw new JsonException("EventQueryDocument property 'event' must not be null, empty, or whitespace.");
-        }
+        EventQueryDocumentInvariants.RequireValidShape(value);
 
         writer.WriteStartObject();
         writer.WriteNumber("version", CurrentVersion);
