@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading;
+using DotBoxD.CodeGeneration.Shared.Defaults;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
 using Microsoft.CodeAnalysis;
 
@@ -25,6 +26,11 @@ internal static class InheritedMethodDeduplicator
         if (!HasSameParameterNames(existingMethod, methodSymbol))
         {
             return $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible parameter names";
+        }
+
+        if (!HasSameParameterDefaultValues(existingMethod, methodSymbol))
+        {
+            return $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible optional/default values";
         }
 
         if (!MethodSignatureFacts.HaveSameGenericConstraints(existingMethod, methodSymbol, ct))
@@ -91,6 +97,27 @@ internal static class InheritedMethodDeduplicator
         for (var i = 0; i < left.Parameters.Length; i++)
         {
             if (left.Parameters[i].Name != right.Parameters[i].Name)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public static bool HasSameParameterDefaultValues(IMethodSymbol left, IMethodSymbol right)
+    {
+        if (left.Parameters.Length != right.Parameters.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < left.Parameters.Length; i++)
+        {
+            if (!ParameterDefaultValueComparer.HasSameContract(
+                left.Parameters[i],
+                right.Parameters[i],
+                DefaultLiteralOptions.SourceGenerator))
             {
                 return false;
             }

@@ -2,6 +2,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 using System.Collections.Generic;
 using System.Text;
+using DotBoxD.CodeGeneration.Shared.Defaults;
 using Microsoft.CodeAnalysis;
 
 internal static class RpcKernelClientServiceMethodResolver
@@ -31,6 +32,7 @@ internal static class RpcKernelClientServiceMethodResolver
                 }
 
                 ValidateDuplicateParameterNames(serviceType, existing, method);
+                ValidateDuplicateDefaultValues(serviceType, existing, method);
                 continue;
             }
 
@@ -83,6 +85,29 @@ internal static class RpcKernelClientServiceMethodResolver
             {
                 throw new NotSupportedException(
                     $"Server extension interface '{serviceType.ToDisplayString()}' inherits method '{next.Name}' with the same signature but different parameter names; generated clients cannot preserve both named-argument contracts.");
+            }
+        }
+    }
+
+    private static void ValidateDuplicateDefaultValues(
+        INamedTypeSymbol serviceType,
+        IMethodSymbol first,
+        IMethodSymbol next)
+    {
+        if (first.Parameters.Length != next.Parameters.Length)
+        {
+            throw UnsupportedServiceShape(serviceType);
+        }
+
+        for (var i = 0; i < first.Parameters.Length; i++)
+        {
+            if (!ParameterDefaultValueComparer.HasSameContract(
+                first.Parameters[i],
+                next.Parameters[i],
+                DefaultLiteralOptions.Analyzer))
+            {
+                throw new NotSupportedException(
+                    $"Server extension interface '{serviceType.ToDisplayString()}' has inherited method '{next.Name}' with the same signature but different optional/default values; generated clients cannot preserve both default-value contracts.");
             }
         }
     }
