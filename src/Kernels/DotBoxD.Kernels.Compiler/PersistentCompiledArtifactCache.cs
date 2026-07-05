@@ -36,6 +36,11 @@ public sealed partial class PersistentCompiledArtifactCache
         CancellationToken cancellationToken)
     {
         PersistentCompiledArtifactCacheValidator.ValidateCacheKey(cacheKey);
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(entrypoint);
+        ArgumentNullException.ThrowIfNull(verifier);
+        ArgumentNullException.ThrowIfNull(policy);
+
         return await WithEntryLockAsync(
                 cacheKey,
                 () => TryReadCoreAsync(cacheKey, plan, entrypoint, verifier, policy, cancellationToken),
@@ -53,6 +58,13 @@ public sealed partial class PersistentCompiledArtifactCache
         CancellationToken cancellationToken)
     {
         PersistentCompiledArtifactCacheValidator.ValidateCacheKey(cacheKey);
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(entrypoint);
+        ArgumentNullException.ThrowIfNull(assemblyBytes);
+        ArgumentNullException.ThrowIfNull(manifest);
+        ArgumentNullException.ThrowIfNull(verification);
+        ArgumentNullException.ThrowIfNull(policy);
+
         await WithEntryLockAsync(
                 cacheKey,
                 () => WriteCoreAsync(cacheKey, plan, entrypoint, assemblyBytes, manifest, verification, policy, cancellationToken),

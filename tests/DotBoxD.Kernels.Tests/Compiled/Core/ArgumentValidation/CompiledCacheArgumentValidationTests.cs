@@ -6,7 +6,7 @@ using DotBoxD.Kernels.Verifier;
 using DotBoxD.Kernels.Verifier.Generated;
 using PersistentCompiledArtifactCache = DotBoxD.Kernels.Compiler.PersistentCompiledArtifactCache;
 
-namespace DotBoxD.Kernels.Tests.Compiled.Core;
+namespace DotBoxD.Kernels.Tests.Compiled.Core.ArgumentValidation;
 
 public sealed class CompiledCacheArgumentValidationTests
 {
@@ -187,7 +187,7 @@ public sealed class CompiledCacheArgumentValidationTests
 
     private static async Task<ExecutionPlan> PreparePlanAsync()
     {
-        var host = SandboxTestHost.Create(compiler: true);
+        using var host = SandboxTestHost.Create(compiler: true);
         var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         return await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
     }

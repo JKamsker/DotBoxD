@@ -11,6 +11,8 @@ internal static class PersistentCompiledArtifactCacheValidator
 {
     public static void ValidateCacheKey(string cacheKey)
     {
+        ArgumentNullException.ThrowIfNull(cacheKey);
+
         if (cacheKey.Length != 64 || !cacheKey.All(Uri.IsHexDigit))
         {
             throw CacheInvalid("cache key is not path safe");
