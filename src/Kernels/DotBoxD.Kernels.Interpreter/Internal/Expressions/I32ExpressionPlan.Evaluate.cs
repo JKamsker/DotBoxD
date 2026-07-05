@@ -6,48 +6,66 @@ namespace DotBoxD.Kernels.Interpreter.Internal.Expressions;
 
 internal sealed partial class I32ExpressionPlan
 {
-    private static readonly Dictionary<ExpressionKind, PlanEvaluator> Evaluators = new()
-    {
-        [ExpressionKind.Literal] = static (plan, _, _) => plan._value,
-        [ExpressionKind.RawVariable] = static (plan, frame, _) => frame.ReadRawInt32Slot(plan._value),
-        [ExpressionKind.BoxedVariable] = static (plan, frame, _) => frame.ReadInt32Slot(plan._value),
-        [ExpressionKind.Negate] = static (plan, frame, context) =>
-            SandboxInt32Math.Negate(plan._left!.Evaluate(frame, context)),
-        [ExpressionKind.InlineCall] = static (plan, frame, context) => plan.EvaluateInlineCall(frame, context),
-        [ExpressionKind.RemainderAddRawRawConst] = static (plan, frame, _) => FastRemainder(
-            SandboxInt32Math.Add(frame.ReadRawInt32Slot(plan._value), frame.ReadRawInt32Slot(plan._value2)),
-            plan._value3,
-            plan._magic),
-        [ExpressionKind.RemainderAddRawConstConst] = static (plan, frame, _) => FastRemainder(
-            SandboxInt32Math.Add(frame.ReadRawInt32Slot(plan._value), plan._value2),
-            plan._value3,
-            plan._magic),
-        [ExpressionKind.RemainderByConst] = static (plan, frame, context) =>
-            FastRemainder(plan._left!.Evaluate(frame, context), plan._value3, plan._magic),
-        [ExpressionKind.DivideByConst] = static (plan, frame, context) =>
-            FastDivide(plan._left!.Evaluate(frame, context), plan._value3, plan._magic),
-        [ExpressionKind.AddRawMultiplyRawConst] = static (plan, frame, _) => SandboxInt32Math.Add(
-            frame.ReadRawInt32Slot(plan._value),
-            SandboxInt32Math.Multiply(frame.ReadRawInt32Slot(plan._value2), plan._value3)),
-        [ExpressionKind.Add] = static (plan, frame, context) =>
-            SandboxInt32Math.Add(plan._left!.Evaluate(frame, context), plan._right!.Evaluate(frame, context)),
-        [ExpressionKind.Subtract] = static (plan, frame, context) =>
-            SandboxInt32Math.Subtract(plan._left!.Evaluate(frame, context), plan._right!.Evaluate(frame, context)),
-        [ExpressionKind.Multiply] = static (plan, frame, context) =>
-            SandboxInt32Math.Multiply(plan._left!.Evaluate(frame, context), plan._right!.Evaluate(frame, context)),
-        [ExpressionKind.Divide] = static (plan, frame, context) =>
-            SandboxInt32Math.Divide(plan._left!.Evaluate(frame, context), plan._right!.Evaluate(frame, context)),
-        [ExpressionKind.Remainder] = static (plan, frame, context) =>
-            SandboxInt32Math.Remainder(plan._left!.Evaluate(frame, context), plan._right!.Evaluate(frame, context)),
-    };
-
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
     public int Evaluate(InterpreterFrame frame, SandboxContext context)
-        => Evaluators.TryGetValue(_kind, out var evaluator)
-            ? evaluator(this, frame, context)
-            : throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported i32 expression"));
+    {
+        if (_kind <= ExpressionKind.BoxedVariable)
+        {
+            return EvaluateLeaf(frame);
+        }
 
-    private delegate int PlanEvaluator(
-        I32ExpressionPlan plan,
-        InterpreterFrame frame,
-        SandboxContext context);
+        if (_kind <= ExpressionKind.AddRawMultiplyRawConst)
+        {
+            return EvaluateSpecial(frame, context);
+        }
+
+        return EvaluateBinary(frame, context);
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private int EvaluateLeaf(InterpreterFrame frame)
+        => _kind switch
+        {
+            ExpressionKind.Literal => _value,
+            ExpressionKind.RawVariable => frame.ReadRawInt32Slot(_value),
+            ExpressionKind.BoxedVariable => frame.ReadInt32Slot(_value),
+            _ => throw UnsupportedExpression()
+        };
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private int EvaluateSpecial(InterpreterFrame frame, SandboxContext context)
+        => _kind switch
+        {
+            ExpressionKind.Negate => SandboxInt32Math.Negate(_left!.Evaluate(frame, context)),
+            ExpressionKind.InlineCall => EvaluateInlineCall(frame, context),
+            ExpressionKind.RemainderAddRawRawConst => FastRemainder(
+                SandboxInt32Math.Add(frame.ReadRawInt32Slot(_value), frame.ReadRawInt32Slot(_value2)),
+                _value3,
+                _magic),
+            ExpressionKind.RemainderAddRawConstConst => FastRemainder(
+                SandboxInt32Math.Add(frame.ReadRawInt32Slot(_value), _value2),
+                _value3,
+                _magic),
+            ExpressionKind.RemainderByConst => FastRemainder(_left!.Evaluate(frame, context), _value3, _magic),
+            ExpressionKind.DivideByConst => FastDivide(_left!.Evaluate(frame, context), _value3, _magic),
+            ExpressionKind.AddRawMultiplyRawConst => SandboxInt32Math.Add(
+                frame.ReadRawInt32Slot(_value),
+                SandboxInt32Math.Multiply(frame.ReadRawInt32Slot(_value2), _value3)),
+            _ => throw UnsupportedExpression()
+        };
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private int EvaluateBinary(InterpreterFrame frame, SandboxContext context)
+        => _kind switch
+        {
+            ExpressionKind.Add => SandboxInt32Math.Add(_left!.Evaluate(frame, context), _right!.Evaluate(frame, context)),
+            ExpressionKind.Subtract => SandboxInt32Math.Subtract(_left!.Evaluate(frame, context), _right!.Evaluate(frame, context)),
+            ExpressionKind.Multiply => SandboxInt32Math.Multiply(_left!.Evaluate(frame, context), _right!.Evaluate(frame, context)),
+            ExpressionKind.Divide => SandboxInt32Math.Divide(_left!.Evaluate(frame, context), _right!.Evaluate(frame, context)),
+            ExpressionKind.Remainder => SandboxInt32Math.Remainder(_left!.Evaluate(frame, context), _right!.Evaluate(frame, context)),
+            _ => throw UnsupportedExpression()
+        };
+
+    private static SandboxRuntimeException UnsupportedExpression()
+        => new(new SandboxError(SandboxErrorCode.ValidationError, "unsupported i32 expression"));
 }
