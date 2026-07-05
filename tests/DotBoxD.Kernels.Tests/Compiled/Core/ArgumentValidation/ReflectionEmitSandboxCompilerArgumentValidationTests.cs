@@ -29,7 +29,7 @@ public sealed class ReflectionEmitSandboxCompilerArgumentValidationTests
     [Fact]
     public async Task CompileAsync_rejects_null_plan_with_public_parameter_name()
     {
-        var compiler = new ReflectionEmitSandboxCompiler(new GeneratedAssemblyVerifier());
+        var compiler = CreateCompiler();
 
         var ex = await Assert.ThrowsAsync<ArgumentNullException>(
             async () => await compiler.CompileAsync(
@@ -45,7 +45,7 @@ public sealed class ReflectionEmitSandboxCompilerArgumentValidationTests
     public async Task CompileAsync_rejects_null_options_with_public_parameter_name()
     {
         var plan = await PreparePlanAsync();
-        var compiler = new ReflectionEmitSandboxCompiler(new GeneratedAssemblyVerifier());
+        var compiler = CreateCompiler();
 
         var ex = await Assert.ThrowsAsync<ArgumentNullException>(
             async () => await compiler.CompileAsync(
@@ -56,6 +56,9 @@ public sealed class ReflectionEmitSandboxCompilerArgumentValidationTests
 
         Assert.Equal("options", ex.ParamName);
     }
+
+    private static ReflectionEmitSandboxCompiler CreateCompiler()
+        => new(new GeneratedAssemblyVerifier());
 
     private static async Task<ExecutionPlan> PreparePlanAsync()
     {

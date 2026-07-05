@@ -7,7 +7,11 @@ using DotBoxD.Kernels;
 
 public delegate SandboxValue SandboxCompiledEntrypoint(SandboxContext context, SandboxValue input);
 
-public sealed record CompileOptions(string Entrypoint, bool Optimize = false);
+public sealed record CompileOptions(string Entrypoint, bool Optimize = false)
+{
+    public string Entrypoint { get; init; } =
+        Entrypoint ?? throw new ArgumentNullException(nameof(Entrypoint));
+}
 
 public enum CompiledRuntimeFormKind
 {
