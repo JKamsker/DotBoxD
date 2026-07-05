@@ -14,71 +14,38 @@ public sealed class SafeHttpCancellationTests
     {
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
-        var audit = new InMemoryAuditSink();
-        var policy = SandboxPolicyBuilder.Create()
-            .GrantHttpGet(["api.example.com"], maxResponseBytes: 1024)
-            .WithFuel(5_000)
-            .Build();
-        var context = new SandboxContext(
-            SandboxRunId.New(),
-            policy,
-            new ResourceMeter(policy.ResourceLimits),
-            new BindingRegistryBuilder().Build(),
-            audit,
-            cancellation.Token);
-        var dnsCalls = 0;
-        SafeDnsResolver dns = (_, _) =>
-        {
-            dnsCalls++;
-            return ValueTask.FromResult<IReadOnlyList<IPAddress>>([IPAddress.Parse("93.184.216.34")]);
-        };
+        var scenario = CreateScenario(cancellation.Token);
 
         var ex = await Assert.ThrowsAsync<SandboxRuntimeException>(async () =>
             await SafeHttpClient.GetTextAsync(
-                context,
+                scenario.Context,
                 new SandboxUri("https://api.example.com/config"),
                 new SafeInMemoryHttpMessageInvoker("remote-config"),
-                dns,
+                scenario.Dns,
                 cancellation.Token));
 
         Assert.Equal(SandboxErrorCode.Cancelled, ex.Error.Code);
-        AssertNoPreCancellationSideEffects(context, audit, dnsCalls);
+        AssertNoPreCancellationSideEffects(scenario);
     }
 
     [Fact]
     public async Task GetTextAsync_with_operation_token_cancelled_after_dns_reports_cancelled()
     {
         using var operationCancellation = new CancellationTokenSource();
-        var audit = new InMemoryAuditSink();
-        var policy = SandboxPolicyBuilder.Create()
-            .GrantHttpGet(["api.example.com"], maxResponseBytes: 1024)
-            .WithFuel(5_000)
-            .Build();
-        var context = new SandboxContext(
-            SandboxRunId.New(),
-            policy,
-            new ResourceMeter(policy.ResourceLimits),
-            new BindingRegistryBuilder().Build(),
-            audit,
-            CancellationToken.None);
-        var dnsCalls = 0;
-        SafeDnsResolver dns = (_, _) =>
-        {
-            dnsCalls++;
-            operationCancellation.Cancel();
-            return ValueTask.FromResult<IReadOnlyList<IPAddress>>([IPAddress.Parse("93.184.216.34")]);
-        };
+        var scenario = CreateScenario(
+            CancellationToken.None,
+            onDnsResolved: operationCancellation.Cancel);
 
         var ex = await Assert.ThrowsAsync<SandboxRuntimeException>(async () =>
             await SafeHttpClient.GetTextAsync(
-                context,
+                scenario.Context,
                 new SandboxUri("https://api.example.com/config"),
                 new SafeInMemoryHttpMessageInvoker("remote-config"),
-                dns,
+                scenario.Dns,
                 operationCancellation.Token));
 
-        Assert.Equal(1, dnsCalls);
-        var auditEvent = Assert.Single(audit.Events, e => e.BindingId == "net.http.get" && !e.Success);
+        Assert.Equal(1, scenario.DnsCalls);
+        var auditEvent = Assert.Single(scenario.Audit.Events, e => e.BindingId == "net.http.get" && !e.Success);
         var failures = new List<string>();
         if (ex.Error.Code != SandboxErrorCode.Cancelled)
         {
@@ -93,33 +60,72 @@ public sealed class SafeHttpCancellationTests
         Assert.Empty(failures);
     }
 
-    private static void AssertNoPreCancellationSideEffects(
-        SandboxContext context,
-        InMemoryAuditSink audit,
-        int dnsCalls)
+    private static SafeHttpCancellationScenario CreateScenario(
+        CancellationToken contextToken,
+        Action? onDnsResolved = null)
+    {
+        var audit = new InMemoryAuditSink();
+        var policy = SandboxPolicyBuilder.Create()
+            .GrantHttpGet(["api.example.com"], maxResponseBytes: 1024)
+            .WithFuel(5_000)
+            .Build();
+        var context = new SandboxContext(
+            SandboxRunId.New(),
+            policy,
+            new ResourceMeter(policy.ResourceLimits),
+            new BindingRegistryBuilder().Build(),
+            audit,
+            contextToken);
+
+        var scenario = new SafeHttpCancellationScenario(context, audit);
+        scenario.Dns = (_, _) =>
+        {
+            scenario.DnsCalls++;
+            onDnsResolved?.Invoke();
+            return ValueTask.FromResult<IReadOnlyList<IPAddress>>([IPAddress.Parse("93.184.216.34")]);
+        };
+
+        return scenario;
+    }
+
+    private static void AssertNoPreCancellationSideEffects(SafeHttpCancellationScenario scenario)
     {
         var failures = new List<string>();
-        if (dnsCalls != 0)
+        if (scenario.DnsCalls != 0)
         {
-            failures.Add($"expected no DNS calls, observed {dnsCalls}");
+            failures.Add($"expected no DNS calls, observed {scenario.DnsCalls}");
         }
 
-        if (context.Budget.NetworkBytesWritten != 0)
+        if (scenario.Context.Budget.NetworkBytesWritten != 0)
         {
-            failures.Add($"expected no network bytes written, observed {context.Budget.NetworkBytesWritten}");
+            failures.Add($"expected no network bytes written, observed {scenario.Context.Budget.NetworkBytesWritten}");
         }
 
-        if (context.Budget.NetworkBytesRead != 0)
+        if (scenario.Context.Budget.NetworkBytesRead != 0)
         {
-            failures.Add($"expected no network bytes read, observed {context.Budget.NetworkBytesRead}");
+            failures.Add($"expected no network bytes read, observed {scenario.Context.Budget.NetworkBytesRead}");
         }
 
-        var httpAuditCount = audit.Events.Count(e => e.BindingId == "net.http.get");
+        var httpAuditCount = scenario.Audit.Events.Count(e => e.BindingId == "net.http.get");
         if (httpAuditCount != 0)
         {
             failures.Add($"expected no net.http.get audit events, observed {httpAuditCount}");
         }
 
         Assert.Empty(failures);
+    }
+
+    private sealed class SafeHttpCancellationScenario(
+        SandboxContext context,
+        InMemoryAuditSink audit)
+    {
+        public SandboxContext Context { get; } = context;
+
+        public InMemoryAuditSink Audit { get; } = audit;
+
+        public SafeDnsResolver Dns { get; set; } = (_, _) =>
+            ValueTask.FromResult<IReadOnlyList<IPAddress>>([]);
+
+        public int DnsCalls { get; set; }
     }
 }
