@@ -28,7 +28,7 @@ public sealed class MessagePackComputedDtoRegressionTests
 
         Assert.Equal(6, value.Id);
 
-        using var payload = SerializeOrAssertRejected(serializer, value);
+        using var payload = TrySerializeOrNull(serializer, value);
         if (payload is null)
         {
             return;
@@ -39,7 +39,7 @@ public sealed class MessagePackComputedDtoRegressionTests
         Assert.Equal(value.Id, roundTrip.Id);
     }
 
-    private static Payload? SerializeOrAssertRejected(
+    private static Payload? TrySerializeOrNull(
         MessagePackRpcSerializer serializer,
         ComputedGetOnlyDto value)
     {
