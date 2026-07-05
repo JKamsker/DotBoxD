@@ -213,19 +213,32 @@ public static class SandboxValueValidator
         => new(new SandboxError(code, message));
 
     private static bool IsBuiltInScalarType(SandboxValue value, SandboxType expectedType)
-        => value switch
+    {
+        if (TryBuiltInScalarType(value, out var actualType))
         {
-            UnitValue => ReferenceEquals(expectedType, SandboxType.Unit),
-            BoolValue => ReferenceEquals(expectedType, SandboxType.Bool),
-            I32Value => ReferenceEquals(expectedType, SandboxType.I32),
-            I64Value => ReferenceEquals(expectedType, SandboxType.I64),
-            F64Value => ReferenceEquals(expectedType, SandboxType.F64),
-            StringValue => ReferenceEquals(expectedType, SandboxType.String),
-            GuidValue => ReferenceEquals(expectedType, SandboxType.Guid),
-            SandboxPathValue => ReferenceEquals(expectedType, SandboxType.SandboxPath),
-            SandboxUriValue => ReferenceEquals(expectedType, SandboxType.SandboxUri),
-            _ => false
+            return ReferenceEquals(expectedType, actualType);
+        }
+
+        return false;
+    }
+
+    private static bool TryBuiltInScalarType(SandboxValue value, out SandboxType type)
+    {
+        type = value switch
+        {
+            UnitValue => SandboxType.Unit,
+            BoolValue => SandboxType.Bool,
+            I32Value => SandboxType.I32,
+            I64Value => SandboxType.I64,
+            F64Value => SandboxType.F64,
+            StringValue => SandboxType.String,
+            GuidValue => SandboxType.Guid,
+            SandboxPathValue => SandboxType.SandboxPath,
+            SandboxUriValue => SandboxType.SandboxUri,
+            _ => null!
         };
+        return type is not null;
+    }
 
     internal static void RequireScalarInvariants(
         SandboxValue value,

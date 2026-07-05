@@ -105,8 +105,7 @@ internal static class ServiceShapeValidator
                 $"static interface method '{method.Name}' is not supported; DotBoxD services may declare instance methods only");
         }
 
-        if (method.MethodKind is not MethodKind.Ordinary and not MethodKind.PropertyGet
-            and not MethodKind.PropertySet and not MethodKind.EventAdd and not MethodKind.EventRemove)
+        if (!IsSupportedInterfaceMethodKind(method.MethodKind))
         {
             return CreateDiagnostic(
                 method,
@@ -125,11 +124,7 @@ internal static class ServiceShapeValidator
                 $"interface indexer '{property.Name}' is not supported; DotBoxD service properties must be named public get-only sub-service controls");
         }
 
-        if (property.GetMethod is null ||
-            property.GetMethod.DeclaredAccessibility != Accessibility.Public ||
-            property.GetMethod.IsStatic ||
-            property.Parameters.Length != 0 ||
-            property.SetMethod is not null)
+        if (!IsSupportedSubServicePropertyShape(property))
         {
             return CreateDiagnostic(
                 property,
@@ -157,6 +152,16 @@ internal static class ServiceShapeValidator
 
         return null;
     }
+
+    private static bool IsSupportedInterfaceMethodKind(MethodKind kind)
+        => kind is MethodKind.Ordinary or MethodKind.PropertyGet or MethodKind.PropertySet or MethodKind.EventAdd or MethodKind.EventRemove;
+
+    private static bool IsSupportedSubServicePropertyShape(IPropertySymbol property)
+        => property.GetMethod is not null &&
+           property.GetMethod.DeclaredAccessibility == Accessibility.Public &&
+           !property.GetMethod.IsStatic &&
+           property.Parameters.Length == 0 &&
+           property.SetMethod is null;
 
     internal static bool IsInstanceIdProperty(IPropertySymbol property) =>
         string.Equals(property.Name, "Id", StringComparison.Ordinal) &&

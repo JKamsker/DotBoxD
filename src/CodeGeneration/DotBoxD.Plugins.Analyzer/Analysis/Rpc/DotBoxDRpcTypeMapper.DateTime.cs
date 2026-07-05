@@ -5,13 +5,16 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 internal static partial class DotBoxDRpcTypeMapper
 {
     public static bool IsScalar(ITypeSymbol type)
-        => type.SpecialType is SpecialType.System_Boolean or SpecialType.System_Int32
-            or SpecialType.System_Int64 or SpecialType.System_Double or SpecialType.System_Single
-            or SpecialType.System_Decimal or SpecialType.System_String ||
+        => IsSpecialScalar(type.SpecialType) ||
            IsDateOnlyWireType(type) ||
            IsTimeOnlyWireType(type) ||
            IsTimeSpanWireType(type) ||
            IsCancellationTokenWireType(type);
+
+    private static bool IsSpecialScalar(SpecialType specialType)
+        => specialType is SpecialType.System_Boolean or SpecialType.System_Int32
+            or SpecialType.System_Int64 or SpecialType.System_Double or SpecialType.System_Single
+            or SpecialType.System_Decimal or SpecialType.System_String;
 
     /// <summary>
     /// <see cref="System.Guid"/> is a first-class 16-byte scalar (sandbox <c>Guid</c> kind), distinct from
