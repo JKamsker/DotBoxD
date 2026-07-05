@@ -18,7 +18,7 @@ public sealed class HostServiceExplicitMethodBindingTests
 
         // This plugin-local contract intentionally differs from the host contract below. Both share
         // the same HostBinding id to prove binding resolution is keyed by id, not CLR type identity.
-        [DotBoxDService]
+        [RpcService]
         public interface IProbeWorld
         {
             [HostCapability("probe.read.value", HostBindingEffect.HostStateRead)]
