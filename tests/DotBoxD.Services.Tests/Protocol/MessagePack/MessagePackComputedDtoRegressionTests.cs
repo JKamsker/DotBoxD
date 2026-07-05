@@ -39,6 +39,34 @@ public sealed class MessagePackComputedDtoRegressionTests
         Assert.Equal(value.Id, roundTrip.Id);
     }
 
+    [Fact]
+    public void Computed_get_only_dto_hidden_as_object_fails_closed()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        object value = new ComputedGetOnlyDto(5);
+
+        var exception = Assert.Throws<MessagePackSerializationException>(
+            () => serializer.SerializeToPayload(value));
+
+        Assert.Contains(
+            "cannot be serialized without changing constructor-bound get-only values",
+            exception.Message);
+    }
+
+    [Fact]
+    public void Computed_get_only_dto_hidden_as_interface_fails_closed()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        IComputedDto value = new ComputedGetOnlyDto(5);
+
+        var exception = Assert.Throws<MessagePackSerializationException>(
+            () => serializer.SerializeToPayload(value));
+
+        Assert.Contains(
+            "cannot be serialized without changing constructor-bound get-only values",
+            exception.Message);
+    }
+
     private static Payload? TrySerializeOrNull(
         MessagePackRpcSerializer serializer,
         ComputedGetOnlyDto value)
@@ -63,7 +91,12 @@ public sealed class MessagePackComputedDtoRegressionTests
         public int Id { get; }
     }
 
-    public sealed class ComputedGetOnlyDto
+    private interface IComputedDto
+    {
+        int Id { get; }
+    }
+
+    public sealed class ComputedGetOnlyDto : IComputedDto
     {
         public ComputedGetOnlyDto(int id)
         {

@@ -1,6 +1,4 @@
 using System.Buffers;
-using System.Collections.Concurrent;
-using System.Reflection;
 using DotBoxD.Services.Serialization;
 using MessagePack;
 using MessagePack.Formatters;
@@ -13,7 +11,6 @@ namespace DotBoxD.Codecs.MessagePack;
 /// </summary>
 public sealed class MessagePackRpcSerializer : ISerializer
 {
-    private static readonly ConcurrentDictionary<Type, bool> ConstructorReplayValidatedTypes = new();
     private readonly MessagePackSerializerOptions _options;
 
     /// <summary>
@@ -102,9 +99,8 @@ public sealed class MessagePackRpcSerializer : ISerializer
     {
         try
         {
-            if (RequiresConstructorReplayValidation(value))
+            if (ConstructorReplayGuard.TrySerialize(writer, value, _options))
             {
-                SerializeWithConstructorReplayValidation(writer, value);
                 return;
             }
 
@@ -119,47 +115,6 @@ public sealed class MessagePackRpcSerializer : ISerializer
 
             throw;
         }
-    }
-
-    private void SerializeWithConstructorReplayValidation<T>(IBufferWriter<byte> writer, T value)
-    {
-        var serialized = new ArrayBufferWriter<byte>();
-        MessagePackSerializer.Serialize(serialized, value, _options);
-        var replayed = MessagePackSerializer.Deserialize<T>(
-            serialized.WrittenMemory,
-            _options,
-            out var bytesRead,
-            CancellationToken.None);
-        ThrowIfTrailingBytes(serialized.WrittenCount, bytesRead);
-
-        var replayedSerialized = new ArrayBufferWriter<byte>();
-        MessagePackSerializer.Serialize(replayedSerialized, replayed, _options);
-        if (!serialized.WrittenSpan.SequenceEqual(replayedSerialized.WrittenSpan))
-        {
-            throw new MessagePackSerializationException(
-                $"Type '{typeof(T).FullName}' cannot be serialized without changing constructor-bound get-only values.");
-        }
-
-        writer.Write(serialized.WrittenSpan);
-    }
-
-    private static bool RequiresConstructorReplayValidation<T>(T value)
-    {
-        if (value is null)
-        {
-            return false;
-        }
-
-        var type = typeof(T);
-        return type != typeof(object) &&
-            ConstructorReplayValidatedTypes.GetOrAdd(type, static candidate =>
-                candidate.IsClass &&
-                candidate != typeof(string) &&
-                candidate.GetConstructors().Any(static constructor => constructor.GetParameters().Length > 0) &&
-                candidate.GetProperties(BindingFlags.Public | BindingFlags.Instance).Any(static property =>
-                    property.GetMethod is { IsStatic: false } &&
-                    property.SetMethod is null &&
-                    property.GetIndexParameters().Length == 0));
     }
 
     public T Deserialize<T>(ReadOnlyMemory<byte> data)
