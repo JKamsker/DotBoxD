@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using DotBoxD.Kernels.Compiler;
@@ -39,7 +40,7 @@ public sealed class CacheKeyIdentityTests
         var policy = VerificationPolicy.BoxedValueDefaults();
 
         var expected = HashParts(
-            "dotboxd-cache-v1",
+            "dotboxd-cache-v2",
             plan.ModuleHash,
             CacheKeyBuilder.CanonicalizerVersion,
             "main",
@@ -135,5 +136,18 @@ public sealed class CacheKeyIdentityTests
     }
 
     private static string HashParts(params string[] parts)
-        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('|', parts)))).ToLowerInvariant();
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        Span<byte> lengthBuffer = stackalloc byte[sizeof(int)];
+
+        foreach (var part in parts)
+        {
+            var bytes = Encoding.UTF8.GetBytes(part);
+            BinaryPrimitives.WriteInt32LittleEndian(lengthBuffer, bytes.Length);
+            hash.AppendData(lengthBuffer);
+            hash.AppendData(bytes);
+        }
+
+        return Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
+    }
 }
