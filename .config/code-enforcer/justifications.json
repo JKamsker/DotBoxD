@@ -1,6 +1,30 @@
 {
   "version": 1,
   "files": [
+    {
+      "path": "src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/HookChains/Diagnostics/RemoteStagedUseDiagnosticFactory.cs",
+      "justification": "Remote staged-use diagnostics centralize ordered analyzer message construction for hook-chain generation; splitting this file should happen with a dedicated diagnostics layout refactor."
+    },
+    {
+      "path": "src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginServer/PluginServerFacadeModelFactory.Validation.cs",
+      "justification": "Plugin server facade validation keeps cross-field contract checks together so generated server shape failures report consistent diagnostics; this merge preserves behavior until the validator is decomposed by contract area."
+    },
+    {
+      "path": "src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Rpc/DotBoxDRpcTypeMapper.cs",
+      "justification": "RPC type mapping owns the shared scalar, collection, map, and DTO classifier tables used by multiple emitters; splitting it needs a coordinated mapper API cleanup."
+    },
+    {
+      "path": "src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Rpc/Lowering/DotBoxDRpcJsonLowerer.cs",
+      "justification": "The JSON RPC lowerer coordinates service-handle and expression lowering state across generated fragments; existing size is accepted pending a lowerer state decomposition."
+    },
+    {
+      "path": "src/Hosting/DotBoxD.Queryable/Translation/MethodCallFilterTranslator.cs",
+      "justification": "Queryable method-call translation keeps the supported method matrix and diagnostics together to avoid divergent translation behavior; split when adding a method-family registry."
+    },
+    {
+      "path": "src/Kernels/DotBoxD.Kernels.Compiler/Emitters/Loops/RawI32ExpressionPlan.cs",
+      "justification": "Raw I32 loop expression planning is a compact decision-table implementation for compiler loop emission; split after introducing a shared raw-operation planning abstraction."
+    }
   ],
   "folders": [
     {
@@ -8,12 +32,52 @@
       "justification": "InvokeAsync lowering is split by receiver, capture, payload, and result-reader concerns; existing folder remains dense until the analyzer layout is reorganized."
     },
     {
+      "path": "src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis",
+      "justification": "Top-level plugin analyzer coordination contains shared readers, package generation, diagnostics, and model factories that are being split gradually by feature area."
+    },
+    {
+      "path": "src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/HookChains",
+      "justification": "Hook-chain analysis contains separate model, diagnostic, lowering, and support helpers; folder density is accepted until hook-chain features move under a deeper layout."
+    },
+    {
+      "path": "src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/HookChains/Support",
+      "justification": "Hook-chain support helpers are intentionally separated by generated surface and ownership concern; folder density is existing analyzer organization debt."
+    },
+    {
+      "path": "src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions",
+      "justification": "Expression lowering is split by syntax and runtime binding concern; folder density is tolerated until a deeper lowering namespace layout is introduced."
+    },
+    {
+      "path": "src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/KernelMethods",
+      "justification": "Kernel method expression lowering uses focused files for descriptor, host-binding, and intrinsic cases that share one lowering namespace."
+    },
+    {
       "path": "src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginServer",
       "justification": "PluginServer facade generation is split by controls, validation, world, properties, and emit support; existing folder remains dense until the analyzer layout is reorganized."
     },
     {
+      "path": "src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Rpc",
+      "justification": "Plugin analyzer RPC support contains client, lowerer, graft, mapper, and payload emission entry points that are still organized under one RPC feature area."
+    },
+    {
+      "path": "src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Rpc/Payload",
+      "justification": "RPC payload generation is split by reader, writer, DTO, resolver, and value conversion concern while sharing mapper conventions."
+    },
+    {
+      "path": "src/CodeGeneration/DotBoxD.Services.SourceGenerator/Models",
+      "justification": "Service generator models contain method, service, signature, inheritance, and return classifiers that share incremental-model contracts."
+    },
+    {
       "path": "src/Hosting/DotBoxD.Plugins/Runtime/Rpc",
       "justification": "Runtime RPC support contains codecs, marshalling, DTO shape handling, and service registration helpers that share one public runtime area."
+    },
+    {
+      "path": "src/Kernels/DotBoxD.Kernels.Compiler/Emitters",
+      "justification": "Compiler emitters are split by value, control-flow, loop, and method emission concerns but still share one low-level emission namespace."
+    },
+    {
+      "path": "src/Services/DotBoxD.Services/Client",
+      "justification": "Service client runtime helpers are split by proxy, stream, peer, and transport concerns within one public client feature area."
     },
     {
       "path": "tests/DotBoxD.Kernels.Tests/PluginAnalyzer/KernelMethod",
