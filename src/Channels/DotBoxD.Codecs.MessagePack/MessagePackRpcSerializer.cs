@@ -65,7 +65,7 @@ public sealed class MessagePackRpcSerializer : ISerializer
         }
 
         var extraCount = resolvers.Length;
-        var effectiveResolvers = new IFormatterResolver[extraCount + 2];
+        var effectiveResolvers = new IFormatterResolver[extraCount + 3];
         for (var i = 0; i < extraCount; i++)
         {
             // Reject null elements eagerly: a null slipped into CompositeResolver.Create otherwise
@@ -74,8 +74,9 @@ public sealed class MessagePackRpcSerializer : ISerializer
                 ?? throw new ArgumentException("Resolvers must not contain null elements.", nameof(resolvers));
         }
 
-        effectiveResolvers[extraCount] = StandardResolver.Instance;
-        effectiveResolvers[extraCount + 1] = ContractlessStandardResolver.Instance;
+        effectiveResolvers[extraCount] = NativeDateTimeResolver.Instance;
+        effectiveResolvers[extraCount + 1] = StandardResolver.Instance;
+        effectiveResolvers[extraCount + 2] = ContractlessStandardResolver.Instance;
 
         return MessagePackSerializerOptions.Standard
             .WithResolver(CompositeResolver.Create(

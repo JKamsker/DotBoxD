@@ -2,7 +2,7 @@ using System.Buffers;
 using DotBoxD.Codecs.MessagePack;
 using Xunit;
 
-namespace DotBoxD.Services.Tests.Protocol;
+namespace DotBoxD.Services.Tests.Protocol.MessagePack;
 
 public class MessagePackDateTimeKindRegressionTests
 {
