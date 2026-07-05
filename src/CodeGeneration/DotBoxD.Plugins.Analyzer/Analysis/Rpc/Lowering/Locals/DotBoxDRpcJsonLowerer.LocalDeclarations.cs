@@ -11,7 +11,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             ?? throw new NotSupportedException(
                 $"Server extension local '{declarator.Identifier.ValueText}' could not be resolved.");
 
-        if (HasDotBoxDServiceAttribute(local.Type))
+        if (HasRpcServiceAttribute(local.Type))
         {
             throw new NotSupportedException(
                 $"Scoped service handle local '{declarator.Identifier.ValueText}' must be initialized at declaration.");

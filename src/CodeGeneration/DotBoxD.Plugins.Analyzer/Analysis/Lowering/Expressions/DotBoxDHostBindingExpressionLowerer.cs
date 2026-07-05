@@ -129,7 +129,7 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         if (method.MethodKind != MethodKind.Ordinary ||
             method.IsStatic ||
             method.IsGenericMethod ||
-            !HasDotBoxDServiceAttribute(method.ContainingType, compilation))
+            !HasRpcServiceAttribute(method.ContainingType, compilation))
         {
             return null;
         }
@@ -149,7 +149,7 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
             IsTaskLike(method.ReturnType));
     }
 
-    private static bool HasDotBoxDServiceAttribute(INamedTypeSymbol type, Compilation compilation)
+    private static bool HasRpcServiceAttribute(INamedTypeSymbol type, Compilation compilation)
     {
         foreach (var attribute in type.GetAttributes())
         {
@@ -191,18 +191,7 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
     }
 
     private static bool IsDotBoxDAttribute(AttributeData attribute, Compilation compilation, string metadataName)
-    {
-        if (string.Equals(metadataName, DotBoxDMetadataNames.RpcServiceAttribute, StringComparison.Ordinal))
-        {
-            return IsAnyDotBoxDAttribute(
-                attribute,
-                compilation,
-                DotBoxDMetadataNames.RpcServiceAttribute,
-                DotBoxDMetadataNames.DotBoxDServiceAttribute);
-        }
-
-        return IsAnyDotBoxDAttribute(attribute, compilation, metadataName);
-    }
+        => IsAnyDotBoxDAttribute(attribute, compilation, metadataName);
 
     private static bool IsAnyDotBoxDAttribute(
         AttributeData attribute,

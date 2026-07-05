@@ -150,10 +150,6 @@ For the same `IChatService`, the generated method emits a direct generic call:
 sink.AddService<IChatService, ChatServiceProxy, ChatServiceDispatcher>();
 ```
 
-The obsolete compatibility aliases `IDotBoxDServiceRegistrationSink` and
-`IDotBoxDGeneratedServiceRegistrationSink` remain for one release and forward to
-the `IRpc...` interfaces. New code should use the `IRpc...` names.
-
 ## Dynamic Factory Usage
 
 When the service type is known only at runtime, use the non-generic overloads:

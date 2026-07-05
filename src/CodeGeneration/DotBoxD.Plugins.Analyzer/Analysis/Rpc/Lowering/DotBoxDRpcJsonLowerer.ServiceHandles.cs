@@ -136,7 +136,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         List<string>? output = null)
     {
         if (_model.GetSymbolInfo(invocation, _cancellationToken).Symbol is not IMethodSymbol method ||
-            !HasDotBoxDServiceAttribute(method.ReturnType) ||
+            !HasRpcServiceAttribute(method.ReturnType) ||
             IsHookContextHostMarker(method))
         {
             handleId = string.Empty;

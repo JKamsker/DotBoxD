@@ -47,23 +47,11 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        var rpcServiceResults = context.SyntaxProvider
+        var results = context.SyntaxProvider
             .ForAttributeWithMetadataName(
                 ServicesGeneratorTypeNames.RpcServiceAttribute,
                 predicate: static (node, _) => node is InterfaceDeclarationSyntax,
                 transform: static (ctx, ct) => ServiceModelFactory.GetServiceResult(ctx, ct))
-            .WithTrackingName("RawRpcServiceResults");
-        var legacyServiceResults = context.SyntaxProvider
-            .ForAttributeWithMetadataName(
-                ServicesGeneratorTypeNames.DotBoxDServiceAttribute,
-                predicate: static (node, _) => node is InterfaceDeclarationSyntax,
-                transform: static (ctx, ct) => ServiceModelFactory.GetServiceResult(ctx, ct))
-            .WithTrackingName("RawLegacyServiceResults");
-
-        var results = rpcServiceResults
-            .Collect()
-            .Combine(legacyServiceResults.Collect())
-            .SelectMany(static (pair, ct) => ServiceResultMerger.Merge(pair.Left, pair.Right, ct))
             .WithTrackingName("RawServiceResults");
 
         var existingTypeDeclarations = context.SyntaxProvider

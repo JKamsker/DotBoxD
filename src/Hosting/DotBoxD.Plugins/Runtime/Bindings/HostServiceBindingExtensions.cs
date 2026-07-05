@@ -8,7 +8,6 @@ public static class HostServiceBindingExtensions
     private const string ExtensibleControlType = "DotBoxD.Abstractions.IExtensibleControl";
     private const string ServiceControlType = "DotBoxD.Abstractions.IServiceControl";
     private const string RpcServiceAttributeType = "DotBoxD.Services.Attributes.RpcServiceAttribute";
-    private const string DotBoxDServiceAttributeType = "DotBoxD.Services.Attributes.DotBoxDServiceAttribute";
 
     public static SandboxHostBuilder AddBindingsFrom<TService>(
         this SandboxHostBuilder builder,
@@ -82,7 +81,7 @@ public static class HostServiceBindingExtensions
                 continue;
             }
 
-            if (!HasDotBoxDServiceAttribute(property.PropertyType))
+            if (!HasRpcServiceAttribute(property.PropertyType))
             {
                 continue;
             }
@@ -106,7 +105,7 @@ public static class HostServiceBindingExtensions
         Dictionary<string, HostServiceBindingRegistration> registeredBindings)
     {
         if (HostServiceBindingFactory.UnwrapReturnType(factoryMethod.ReturnType) is not { } handleServiceType ||
-            !HasDotBoxDServiceAttribute(handleServiceType))
+            !HasRpcServiceAttribute(handleServiceType))
         {
             return false;
         }
@@ -279,10 +278,10 @@ public static class HostServiceBindingExtensions
            (string.Equals(t.FullName, ExtensibleControlType, StringComparison.Ordinal) ||
             string.Equals(t.FullName, ServiceControlType, StringComparison.Ordinal));
 
-    private static bool HasDotBoxDServiceAttribute(Type type)
-        => HasDirectDotBoxDServiceAttribute(type) || type.GetInterfaces().Any(HasDirectDotBoxDServiceAttribute);
+    private static bool HasRpcServiceAttribute(Type type)
+        => HasDirectRpcServiceAttribute(type) || type.GetInterfaces().Any(HasDirectRpcServiceAttribute);
 
-    private static bool HasDirectDotBoxDServiceAttribute(Type type)
+    private static bool HasDirectRpcServiceAttribute(Type type)
         => type.GetCustomAttributes(inherit: false)
-            .Any(attribute => attribute.GetType().FullName is RpcServiceAttributeType or DotBoxDServiceAttributeType);
+            .Any(attribute => string.Equals(attribute.GetType().FullName, RpcServiceAttributeType, StringComparison.Ordinal));
 }

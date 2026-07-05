@@ -39,7 +39,7 @@ internal static class PluginServerEventCallbackResolver
         var callback = compilation.GetTypeByMetadataName(worldNamespace + ".Ipc.IPluginEventCallback");
         if (callback is null ||
             callback.TypeKind != TypeKind.Interface ||
-            !HasDotBoxDServiceAttribute(callback))
+            !HasRpcServiceAttribute(callback))
         {
             return null;
         }
@@ -178,7 +178,7 @@ internal static class PluginServerEventCallbackResolver
         SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, rpcPeerType) &&
         SymbolEqualityComparer.Default.Equals(method.Parameters[1].Type, callbackType);
 
-    private static bool HasDotBoxDServiceAttribute(INamedTypeSymbol type)
+    private static bool HasRpcServiceAttribute(INamedTypeSymbol type)
     {
         foreach (var attribute in type.GetAttributes())
         {

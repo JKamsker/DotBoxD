@@ -21,7 +21,6 @@ internal static class DotBoxDGenerationNames
         public const string GeneratedInterceptorsNamespace = "DotBoxD.Plugins.Generated";
 
         public const string PluginAttribute = "DotBoxD.Abstractions.PluginAttribute";
-        public const string EventKernelAttribute = "DotBoxD.Abstractions.EventKernelAttribute";
         public const string LiveSettingAttribute = "DotBoxD.Abstractions.LiveSettingAttribute";
         public const string EventKernelInterface = "DotBoxD.Abstractions.IEventKernel<TEvent>";
         public const string RangeAttribute = "System.ComponentModel.DataAnnotations.RangeAttribute";
@@ -38,7 +37,6 @@ internal static class DotBoxDGenerationNames
         public const string PolymorphicHandleAttribute = "DotBoxD.Abstractions.PolymorphicHandleAttribute";
         public const string HandleSubtypeAttribute = "DotBoxD.Abstractions.HandleSubtypeAttribute";
         public const string RpcServiceAttribute = "DotBoxD.Services.Attributes.RpcServiceAttribute";
-        public const string DotBoxDServiceAttribute = "DotBoxD.Services.Attributes.DotBoxDServiceAttribute";
         public const string HookContext = "DotBoxD.Abstractions.HookContext";
         public const string ServerInvocationDelegateType = "DotBoxD.Abstractions.RemoteServerInvocation";
         public const string ServerInvocationDelegateOriginal = ServerInvocationDelegateType + "<TWorld, TCaptures, TReturn>";

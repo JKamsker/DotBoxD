@@ -27,7 +27,7 @@ internal static partial class ReturnTypeClassifier
         ct.ThrowIfCancellationRequested();
 
         if (!TryGetAsyncPayloadType(returnType, out var payloadType) ||
-            !IsDotBoxDServiceInterface(payloadType, ct))
+            !IsRpcServiceInterface(payloadType, ct))
         {
             return null;
         }
@@ -220,7 +220,7 @@ internal static partial class ReturnTypeClassifier
         return true;
     }
 
-    private static bool IsDotBoxDServiceInterface(ITypeSymbol type, CancellationToken ct)
+    private static bool IsRpcServiceInterface(ITypeSymbol type, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
 

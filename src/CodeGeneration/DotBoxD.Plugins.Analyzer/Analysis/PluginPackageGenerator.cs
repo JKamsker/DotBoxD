@@ -21,20 +21,9 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
             static (node, _) => node is ClassDeclarationSyntax,
             "plugin kernel model",
             static (ctx, ct) => PluginKernelModelFactory.Create(ctx, ct));
-        var eventKernelAttributeResults = GeneratorGuard.AttributeValues(
-            context,
-            DotBoxDMetadataNames.EventKernelAttribute,
-            static (node, _) => node is ClassDeclarationSyntax,
-            "event kernel model",
-            static (ctx, ct) => PluginKernelModelFactory.Create(ctx, ct));
         PluginPackageGeneratorOutput.RegisterDiagnostics(context, pluginAttributeResults);
-        PluginPackageGeneratorOutput.RegisterDiagnostics(context, eventKernelAttributeResults);
 
         var pluginModels = pluginAttributeResults
-            .Where(static result => result.Model is not null)
-            .Select(static (result, _) => result.Model!)
-            .WithTrackingName(DotBoxDPluginPackageGeneratorTrackingNames.ModelResult);
-        var eventKernelModels = eventKernelAttributeResults
             .Where(static result => result.Model is not null)
             .Select(static (result, _) => result.Model!)
             .WithTrackingName(DotBoxDPluginPackageGeneratorTrackingNames.ModelResult);
@@ -45,17 +34,8 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
                 "plugin package source",
                 static (model, _) => DotBoxDPackageSourceEmitter.Emit(model))
             .WithTrackingName(DotBoxDPluginPackageGeneratorTrackingNames.PackageResult);
-        var eventKernelPackages = GeneratorGuard.TransformValues(
-                context,
-                eventKernelModels,
-                "event kernel package source",
-                static (model, _) => DotBoxDPackageSourceEmitter.Emit(model))
-            .WithTrackingName(DotBoxDPluginPackageGeneratorTrackingNames.PackageResult);
 
         var pluginPackageIdentities = pluginPackages
-            .Select(static (package, _) => GeneratedPluginPackageIdentity.From(package))
-            .Collect();
-        var eventKernelPackageIdentities = eventKernelPackages
             .Select(static (package, _) => GeneratedPluginPackageIdentity.From(package))
             .Collect();
 
@@ -200,11 +180,9 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
         var blockedIdentities = PluginPackageCollisionProviders.RegisterBlockedIdentities(
             context,
             pluginPackageIdentities,
-            eventKernelPackageIdentities,
             chainPackageIdentities,
             rpcPackageIdentities);
         PluginPackageGeneratorOutput.RegisterPackageSources(context, pluginPackages, blockedIdentities);
-        PluginPackageGeneratorOutput.RegisterPackageSources(context, eventKernelPackages, blockedIdentities);
         PluginPackageGeneratorOutput.RegisterPackageSources(context, chainPackages, blockedIdentities);
         PluginPackageGeneratorOutput.RegisterPackageSources(context, rpcPackages, blockedIdentities);
 

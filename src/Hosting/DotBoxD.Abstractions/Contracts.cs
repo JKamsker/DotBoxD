@@ -12,13 +12,6 @@ public sealed class PluginAttribute : Attribute
     public string? Id { get; }
 }
 
-[AttributeUsage(AttributeTargets.Class, Inherited = false)]
-[Obsolete("Use PluginAttribute.")]
-public sealed class EventKernelAttribute(string? id = null) : Attribute
-{
-    public string? Id { get; } = id;
-}
-
 [AttributeUsage(AttributeTargets.Property)]
 public sealed class LiveSettingAttribute : Attribute;
 

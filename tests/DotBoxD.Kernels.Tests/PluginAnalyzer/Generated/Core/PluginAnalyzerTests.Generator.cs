@@ -93,10 +93,8 @@ public sealed partial class PluginAnalyzerTests
         Assert.Empty(driver.GetRunResult().GeneratedTrees);
     }
 
-    [Theory]
-    [InlineData("Plugin(\"nested-plugin\")")]
-    [InlineData("EventKernel(\"nested-event\")")]
-    public void Generator_rejects_nested_package_owner_kernels(string attribute)
+    [Fact]
+    public void Generator_rejects_nested_package_owner_kernels()
     {
         var compilation = CreateCompilation($$"""
             using DotBoxD.Plugins;
@@ -108,7 +106,7 @@ public sealed partial class PluginAnalyzerTests
 
             public sealed class Outer
             {
-                [{{attribute}}]
+                [Plugin("nested-plugin")]
                 public sealed partial class DamageKernel : IEventKernel<DamageEvent>
                 {
                     public bool ShouldHandle(DamageEvent e, HookContext ctx) => e.DamageType == "fire";

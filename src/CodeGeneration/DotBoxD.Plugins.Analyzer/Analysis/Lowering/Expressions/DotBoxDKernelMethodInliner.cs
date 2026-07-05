@@ -188,18 +188,7 @@ internal static partial class DotBoxDKernelMethodInliner
     }
 
     private static bool IsDotBoxDAttribute(AttributeData attribute, Compilation compilation, string metadataName)
-    {
-        if (string.Equals(metadataName, DotBoxDMetadataNames.RpcServiceAttribute, StringComparison.Ordinal))
-        {
-            return IsAnyDotBoxDAttribute(
-                attribute,
-                compilation,
-                DotBoxDMetadataNames.RpcServiceAttribute,
-                DotBoxDMetadataNames.DotBoxDServiceAttribute);
-        }
-
-        return IsAnyDotBoxDAttribute(attribute, compilation, metadataName);
-    }
+        => IsAnyDotBoxDAttribute(attribute, compilation, metadataName);
 
     private static bool IsAnyDotBoxDAttribute(
         AttributeData attribute,

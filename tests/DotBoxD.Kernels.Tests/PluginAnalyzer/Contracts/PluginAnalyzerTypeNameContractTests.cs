@@ -49,7 +49,6 @@ public sealed class PluginAnalyzerTypeNameContractTests
             [nameof(TypeNames.GeneratedInterceptorsNamespace)] = "DotBoxD.Plugins.Generated",
 
             [nameof(TypeNames.PluginAttribute)] = TypeName(typeof(PluginAttribute)),
-            [nameof(TypeNames.EventKernelAttribute)] = "DotBoxD.Abstractions.EventKernelAttribute",
             [nameof(TypeNames.LiveSettingAttribute)] = TypeName(typeof(LiveSettingAttribute)),
             [nameof(TypeNames.EventKernelInterface)] = OriginalTypeName(typeof(IEventKernel<>), "TEvent"),
             [nameof(TypeNames.RangeAttribute)] = TypeName(typeof(RangeAttribute)),
@@ -66,7 +65,6 @@ public sealed class PluginAnalyzerTypeNameContractTests
             [nameof(TypeNames.PolymorphicHandleAttribute)] = TypeName(typeof(PolymorphicHandleAttribute)),
             [nameof(TypeNames.HandleSubtypeAttribute)] = TypeName(typeof(HandleSubtypeAttribute)),
             [nameof(TypeNames.RpcServiceAttribute)] = TypeName(typeof(RpcServiceAttribute)),
-            [nameof(TypeNames.DotBoxDServiceAttribute)] = "DotBoxD.Services.Attributes.DotBoxDServiceAttribute",
             [nameof(TypeNames.HookContext)] = TypeName(typeof(HookContext)),
             [nameof(TypeNames.ServerInvocationDelegateType)] = RemoteServerInvocationTypeName(),
             [nameof(TypeNames.ServerInvocationDelegateOriginal)] = RemoteServerInvocationOriginalName(),

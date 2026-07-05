@@ -38,10 +38,10 @@ public const long DefaultMaxInboundBytes = 64L * 1024 * 1024
 public const string InboundRejected = "RpcInboundRejected"
 public const string InstanceNotFound = "RpcInstanceNotFound"
 public const string InternalError = "RpcInternalError"
-public const string MethodNotFound = "DotBoxDMethodNotFound"
+public const string MethodNotFound = "RpcMethodNotFound"
 public const string ProtocolError = "RpcProtocolError"
 public const string QueueFull = "RpcQueueFull"
-public const string ServiceNotFound = "DotBoxDServiceNotFound"
+public const string ServiceNotFound = "RpcServiceNotFound"
 public enum GeneratedReturnKind
 public enum GeneratedReturnKind.AsyncEnumerable
 public enum GeneratedReturnKind.Pipe
@@ -110,8 +110,6 @@ public int MessageId { get; set; }
 public int StreamId { get; set; }
 public int WrittenCount => _written
 public int? InboundQueueCapacity
-public interface IDotBoxDGeneratedServiceRegistrationSink : IRpcGeneratedServiceRegistrationSink
-public interface IDotBoxDServiceRegistrationSink : IRpcServiceRegistrationSink
 public interface IInstanceRegistry
 public interface INonStreamingServiceDispatcher
 public interface IRpcChannel : IAsyncDisposable
@@ -169,8 +167,6 @@ public RpcStreamHandle? Stream { get; set; }
 public RpcStreamHandle(int streamId, RpcStreamKind kind)
 public RpcStreamHandle[]? Streams { get; set; }
 public RpcStreamKind Kind { get; set; }
-public sealed class DotBoxDMethodAttribute : RpcMethodAttribute
-public sealed class DotBoxDServiceAttribute : RpcServiceAttribute
 public sealed class InstanceRegistry : IInstanceRegistry
 public sealed class Payload : IMemoryOwner<byte>
 public sealed class PooledBufferWriter : IBufferWriter<byte>, IDisposable

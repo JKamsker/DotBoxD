@@ -6,8 +6,6 @@ internal static class ServicesGeneratorTypeNames
 
     public const string RpcServiceAttribute = "DotBoxD.Services.Attributes.RpcServiceAttribute";
     public const string RpcMethodAttribute = "DotBoxD.Services.Attributes.RpcMethodAttribute";
-    public const string DotBoxDServiceAttribute = "DotBoxD.Services.Attributes.DotBoxDServiceAttribute";
-    public const string DotBoxDMethodAttribute = "DotBoxD.Services.Attributes.DotBoxDMethodAttribute";
     public const string CancellationTokenMetadata = "System.Threading.CancellationToken";
 
     public const string GeneratedNamespace = "DotBoxD.Services.Generated";
@@ -85,8 +83,8 @@ internal static class ServicesGeneratorTypeNames
     public static string NullableOf(string typeName) => typeName + "?";
 
     public static bool IsRpcServiceAttribute(string? typeName) =>
-        typeName is RpcServiceAttribute or DotBoxDServiceAttribute;
+        typeName is RpcServiceAttribute;
 
     public static bool IsRpcMethodAttribute(string? typeName) =>
-        typeName is RpcMethodAttribute or DotBoxDMethodAttribute;
+        typeName is RpcMethodAttribute;
 }

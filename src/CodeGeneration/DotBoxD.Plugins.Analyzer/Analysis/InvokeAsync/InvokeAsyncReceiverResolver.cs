@@ -182,7 +182,7 @@ internal static partial class InvokeAsyncReceiverResolver
         var found = false;
         foreach (var candidate in type.Interfaces)
         {
-            if (HasDotBoxDServiceAttribute(candidate))
+            if (HasRpcServiceAttribute(candidate))
             {
                 if (found)
                 {
@@ -201,6 +201,6 @@ internal static partial class InvokeAsyncReceiverResolver
     private static bool HasGeneratePluginServerAttribute(INamedTypeSymbol type)
         => InvokeAsyncAttributeMatcher.HasGeneratePluginServerAttribute(type);
 
-    private static bool HasDotBoxDServiceAttribute(INamedTypeSymbol type)
+    private static bool HasRpcServiceAttribute(INamedTypeSymbol type)
         => InvokeAsyncAttributeMatcher.HasRpcServiceAttribute(type);
 }

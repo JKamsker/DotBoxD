@@ -141,7 +141,7 @@ internal static class RpcPayloadReconstructibilityInspector
         string role,
         CancellationToken ct)
     {
-        if (!IsUserDtoNamespace(type) || HasDotBoxDServiceAttribute(type, ct))
+        if (!IsUserDtoNamespace(type) || HasRpcServiceAttribute(type, ct))
         {
             return null;
         }
@@ -178,7 +178,7 @@ internal static class RpcPayloadReconstructibilityInspector
         return ns is null || ns.IsGlobalNamespace || !IsSystemNamespace(ns);
     }
 
-    private static bool HasDotBoxDServiceAttribute(INamedTypeSymbol type, CancellationToken ct)
+    private static bool HasRpcServiceAttribute(INamedTypeSymbol type, CancellationToken ct)
     {
         foreach (var attr in type.GetAttributes())
         {

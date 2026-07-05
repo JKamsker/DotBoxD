@@ -45,7 +45,7 @@ internal static class InvokeAsyncGeneratedServerInterfaceResolver
         foreach (var metadataName in CandidateWorldMetadataNames(type))
         {
             if (compilation.GetTypeByMetadataName(metadataName) is { } candidate &&
-                HasDotBoxDServiceAttribute(candidate) &&
+                HasRpcServiceAttribute(candidate) &&
                 string.Equals(type.Name, ServerInterfaceName(candidate), StringComparison.Ordinal))
             {
                 worldType = candidate;
@@ -136,7 +136,7 @@ internal static class InvokeAsyncGeneratedServerInterfaceResolver
         var found = false;
         foreach (var candidate in type.Interfaces)
         {
-            if (HasDotBoxDServiceAttribute(candidate))
+            if (HasRpcServiceAttribute(candidate))
             {
                 if (found)
                 {
@@ -155,7 +155,7 @@ internal static class InvokeAsyncGeneratedServerInterfaceResolver
     private static bool HasGeneratePluginServerAttribute(INamedTypeSymbol type)
         => HasAttribute(type, DotBoxDMetadataNames.GeneratePluginServerAttribute);
 
-    private static bool HasDotBoxDServiceAttribute(INamedTypeSymbol type)
+    private static bool HasRpcServiceAttribute(INamedTypeSymbol type)
         => HasAttribute(type, DotBoxDMetadataNames.RpcServiceAttribute);
 
     private static bool HasGeneratedServerShape(INamedTypeSymbol type)

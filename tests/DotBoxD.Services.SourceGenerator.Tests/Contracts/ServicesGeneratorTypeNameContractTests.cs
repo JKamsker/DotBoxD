@@ -40,10 +40,6 @@ public sealed class ServicesGeneratorTypeNameContractTests
 
             [nameof(ServicesGeneratorTypeNames.RpcServiceAttribute)] = TypeName(typeof(RpcServiceAttribute)),
             [nameof(ServicesGeneratorTypeNames.RpcMethodAttribute)] = TypeName(typeof(RpcMethodAttribute)),
-            [nameof(ServicesGeneratorTypeNames.DotBoxDServiceAttribute)] =
-                "DotBoxD.Services.Attributes.DotBoxDServiceAttribute",
-            [nameof(ServicesGeneratorTypeNames.DotBoxDMethodAttribute)] =
-                "DotBoxD.Services.Attributes.DotBoxDMethodAttribute",
             [nameof(ServicesGeneratorTypeNames.CancellationTokenMetadata)] = TypeName(typeof(CancellationToken)),
 
             [nameof(ServicesGeneratorTypeNames.GeneratedNamespace)] = typeof(GeneratedService).Namespace!,

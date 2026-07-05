@@ -26,7 +26,7 @@ internal sealed record RpcServerExtensionGraft(
 
     public static void ValidateServerOwnedReceiver(INamedTypeSymbol receiverType, string description)
     {
-        if (receiverType.TypeKind != TypeKind.Interface || !IsDotBoxDService(receiverType))
+        if (receiverType.TypeKind != TypeKind.Interface || !IsRpcService(receiverType))
         {
             throw new NotSupportedException(
                 $"{description} '{receiverType.ToDisplayString()}' must be a server-owned [RpcService] interface.");
@@ -121,7 +121,7 @@ internal sealed record RpcServerExtensionGraft(
         return false;
     }
 
-    private static bool IsDotBoxDService(INamedTypeSymbol type)
+    private static bool IsRpcService(INamedTypeSymbol type)
     {
         foreach (var attribute in type.GetAttributes())
         {

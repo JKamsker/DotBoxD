@@ -153,7 +153,7 @@ public partial class CodegenRegressionTests
     /// a BASE interface method must propagate to the wire name used by the DERIVED proxy.
     /// </summary>
     [Fact]
-    public void InheritedDotBoxDMethodNameAttribute_IsUsedAsWireMethodName()
+    public void InheritedRpcMethodNameAttribute_IsUsedAsWireMethodName()
     {
         const string source = """
             using DotBoxD.Services.Attributes;

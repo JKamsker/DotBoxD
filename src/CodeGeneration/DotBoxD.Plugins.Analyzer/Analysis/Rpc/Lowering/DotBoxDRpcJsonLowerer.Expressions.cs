@@ -280,7 +280,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             _ => false
         };
 
-    private static bool HasDotBoxDServiceAttribute(ITypeSymbol type)
+    private static bool HasRpcServiceAttribute(ITypeSymbol type)
     {
         foreach (var attribute in type.GetAttributes())
         {
