@@ -42,12 +42,21 @@ public sealed class InMemoryAuditSinkConcurrencyTests
 
         var snapshotReader = Task.Run(() =>
         {
+            var snapshotsRead = 0;
             while (!snapshotCancellation.IsCancellationRequested)
             {
                 try
                 {
                     _ = sink.Events.Count;
-                    Thread.Yield();
+                    snapshotsRead++;
+                    if (snapshotsRead % 32 == 0)
+                    {
+                        Thread.Sleep(1);
+                    }
+                    else
+                    {
+                        Thread.Yield();
+                    }
                 }
                 catch (Exception ex)
                 {
