@@ -25,18 +25,18 @@ internal static class CompiledArtifactGuard
         new();
     private static readonly ManifestMatchRule[] ManifestMatchRules =
     [
-        new(static (manifest, _) => manifest.ArtifactVersion, static _ => 1),
-        new(static (manifest, _) => manifest.ModuleHash, static plan => plan.ModuleHash),
-        new(static (manifest, _) => manifest.PlanHash, static plan => plan.PlanHash),
-        new(static (manifest, _) => manifest.PolicyHash, static plan => plan.PolicyHash),
-        new(static (manifest, _) => manifest.BindingManifestHash, static plan => plan.BindingManifestHash),
-        new(static (manifest, _) => manifest.CompilerVersion, static _ => CacheKeyBuilder.CompilerVersion),
-        new(static (manifest, _) => manifest.TypeSystemVersion, static _ => CacheKeyBuilder.TypeSystemVersion),
-        new(static (manifest, _) => manifest.EffectAnalysisVersion, static _ => CacheKeyBuilder.EffectAnalysisVersion),
-        new(static (manifest, _) => manifest.VerifierVersion, static _ => DefaultVerificationPolicy.VerifierVersion),
-        new(static (manifest, _) => manifest.RuntimeFacadeHash, static _ => DefaultVerificationPolicy.RuntimeFacadeHash),
-        new(static (manifest, _) => manifest.LanguageVersion, static _ => CacheKeyBuilder.LanguageVersion),
-        new(static (manifest, _) => manifest.TargetFramework, static _ => CacheKeyBuilder.TargetFramework),
+        new(static (manifest, _) => manifest.ArtifactVersion == 1),
+        new(static (manifest, plan) => StringComparer.Ordinal.Equals(manifest.ModuleHash, plan.ModuleHash)),
+        new(static (manifest, plan) => StringComparer.Ordinal.Equals(manifest.PlanHash, plan.PlanHash)),
+        new(static (manifest, plan) => StringComparer.Ordinal.Equals(manifest.PolicyHash, plan.PolicyHash)),
+        new(static (manifest, plan) => StringComparer.Ordinal.Equals(manifest.BindingManifestHash, plan.BindingManifestHash)),
+        new(static (manifest, _) => StringComparer.Ordinal.Equals(manifest.CompilerVersion, CacheKeyBuilder.CompilerVersion)),
+        new(static (manifest, _) => StringComparer.Ordinal.Equals(manifest.TypeSystemVersion, CacheKeyBuilder.TypeSystemVersion)),
+        new(static (manifest, _) => StringComparer.Ordinal.Equals(manifest.EffectAnalysisVersion, CacheKeyBuilder.EffectAnalysisVersion)),
+        new(static (manifest, _) => StringComparer.Ordinal.Equals(manifest.VerifierVersion, DefaultVerificationPolicy.VerifierVersion)),
+        new(static (manifest, _) => StringComparer.Ordinal.Equals(manifest.RuntimeFacadeHash, DefaultVerificationPolicy.RuntimeFacadeHash)),
+        new(static (manifest, _) => StringComparer.Ordinal.Equals(manifest.LanguageVersion, CacheKeyBuilder.LanguageVersion)),
+        new(static (manifest, _) => StringComparer.Ordinal.Equals(manifest.TargetFramework, CacheKeyBuilder.TargetFramework)),
     ];
 
     public static async ValueTask<MaterializedCompiledArtifact> MaterializeExecutableAsync(
@@ -148,7 +148,7 @@ internal static class CompiledArtifactGuard
     {
         foreach (var rule in ManifestMatchRules)
         {
-            if (!Equals(rule.Actual(manifest, plan), rule.Expected(plan)))
+            if (!rule.Matches(manifest, plan))
             {
                 return false;
             }
@@ -183,9 +183,7 @@ internal static class CompiledArtifactGuard
 
     private readonly record struct ExpectedCacheKeys(string BoxedValues, string Optimized);
 
-    private readonly record struct ManifestMatchRule(
-        Func<ArtifactManifest, ExecutionPlan, object> Actual,
-        Func<ExecutionPlan, object> Expected);
+    private readonly record struct ManifestMatchRule(Func<ArtifactManifest, ExecutionPlan, bool> Matches);
 
     private static void EnsureAssemblyBytesMatchHash(CompiledArtifact artifact)
     {
