@@ -1,3 +1,4 @@
+using System.Text;
 using DotBoxD.CodeGeneration.Shared.Defaults;
 using Microsoft.CodeAnalysis;
 
@@ -89,11 +90,72 @@ internal static class RpcKernelClientParameterSource
         => preserveMetadataDefaultAttributes || defaultLiteral is null ? string.Empty : " = " + defaultLiteral;
 
     private static string AttributePrefix(IParameterSymbol parameter, bool preserveMetadataDefaultAttributes)
-        => preserveMetadataDefaultAttributes
-            ? ParameterDefaultValueEmitter.FormatMetadataDefaultAttributePrefix(
-                parameter,
-                includeOptionalAttribute: true)
-            : string.Empty;
+    {
+        var attributes = CallerInfoAttributePrefix(parameter);
+        if (preserveMetadataDefaultAttributes)
+        {
+            attributes.Append(
+                ParameterDefaultValueEmitter.FormatMetadataDefaultAttributePrefix(
+                    parameter,
+                    includeOptionalAttribute: true));
+        }
+
+        return attributes.ToString();
+    }
+
+    private static StringBuilder CallerInfoAttributePrefix(IParameterSymbol parameter)
+    {
+        var attributes = new StringBuilder();
+        foreach (var attribute in parameter.GetAttributes())
+        {
+            switch (attribute.AttributeClass?.ToDisplayString())
+            {
+                case "System.Runtime.CompilerServices.CallerMemberNameAttribute":
+                    AppendSimpleAttribute(
+                        attributes,
+                        "global::System.Runtime.CompilerServices.CallerMemberNameAttribute");
+                    break;
+
+                case "System.Runtime.CompilerServices.CallerFilePathAttribute":
+                    AppendSimpleAttribute(
+                        attributes,
+                        "global::System.Runtime.CompilerServices.CallerFilePathAttribute");
+                    break;
+
+                case "System.Runtime.CompilerServices.CallerLineNumberAttribute":
+                    AppendSimpleAttribute(
+                        attributes,
+                        "global::System.Runtime.CompilerServices.CallerLineNumberAttribute");
+                    break;
+
+                case "System.Runtime.CompilerServices.CallerArgumentExpressionAttribute":
+                    AppendCallerArgumentExpressionAttribute(attributes, attribute);
+                    break;
+            }
+        }
+
+        return attributes;
+    }
+
+    private static void AppendSimpleAttribute(StringBuilder attributes, string attributeType)
+    {
+        attributes.Append('[')
+            .Append(attributeType)
+            .Append("] ");
+    }
+
+    private static void AppendCallerArgumentExpressionAttribute(StringBuilder attributes, AttributeData attribute)
+    {
+        if (attribute.ConstructorArguments.Length != 1 ||
+            attribute.ConstructorArguments[0].Value is not string parameterName)
+        {
+            return;
+        }
+
+        attributes.Append("[global::System.Runtime.CompilerServices.CallerArgumentExpressionAttribute(")
+            .Append(LiteralReader.StringLiteral(parameterName))
+            .Append(")] ");
+    }
 
     private static bool HasMetadataDefaultAttribute(IParameterSymbol parameter)
         => ParameterDefaultValueEmitter.HasDateTimeConstantAttribute(parameter) ||

@@ -18,6 +18,31 @@ internal static class PluginServerFlowAttributeSource
         {
             switch (attribute.AttributeClass?.ToDisplayString())
             {
+                case "System.Runtime.CompilerServices.CallerMemberNameAttribute":
+                    AppendSimpleAttributePrefix(
+                        builder,
+                        "global::System.Runtime.CompilerServices.CallerMemberNameAttribute");
+                    break;
+
+                case "System.Runtime.CompilerServices.CallerFilePathAttribute":
+                    AppendSimpleAttributePrefix(
+                        builder,
+                        "global::System.Runtime.CompilerServices.CallerFilePathAttribute");
+                    break;
+
+                case "System.Runtime.CompilerServices.CallerLineNumberAttribute":
+                    AppendSimpleAttributePrefix(
+                        builder,
+                        "global::System.Runtime.CompilerServices.CallerLineNumberAttribute");
+                    break;
+
+                case "System.Runtime.CompilerServices.CallerArgumentExpressionAttribute":
+                    AppendStringAttributePrefix(
+                        builder,
+                        attribute,
+                        "global::System.Runtime.CompilerServices.CallerArgumentExpressionAttribute");
+                    break;
+
                 case "System.Diagnostics.CodeAnalysis.AllowNullAttribute":
                     AppendSimpleAttributePrefix(
                         builder,
