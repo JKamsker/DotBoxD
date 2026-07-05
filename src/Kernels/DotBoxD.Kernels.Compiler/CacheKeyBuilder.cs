@@ -4,6 +4,7 @@ using DotBoxD.Kernels.Verifier.Generated;
 
 namespace DotBoxD.Kernels.Compiler;
 
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using DotBoxD.Kernels;
@@ -22,9 +23,8 @@ public static class CacheKeyBuilder
     public static string RuntimeFacadeHash => VerificationPolicy.BoxedValueDefaults().RuntimeFacadeHash;
 
     public static string Build(ExecutionPlan plan, string entrypoint, VerificationPolicy policy, bool optimize)
-    {
-        var parts = new[] {
-            "dotboxd-cache-v1",
+        => HashParts(
+            "dotboxd-cache-v2",
             plan.ModuleHash,
             CanonicalizerVersion,
             entrypoint,
@@ -39,11 +39,7 @@ public static class CacheKeyBuilder
             plan.PolicyHash,
             TargetFramework,
             optimize ? "opt" : "boxed-values",
-            plan.Policy.Deterministic ? "deterministic" : "nondeterministic"
-        };
-
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('|', parts)))).ToLowerInvariant();
-    }
+            plan.Policy.Deterministic ? "deterministic" : "nondeterministic");
 
     public static VerificationManifestIdentity BuildManifestIdentity(
         ExecutionPlan plan,
@@ -65,4 +61,20 @@ public static class CacheKeyBuilder
             LanguageVersion,
             TargetFramework,
             [optimize ? "opt" : "boxed-values"]);
+
+    private static string HashParts(params string[] parts)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        Span<byte> lengthBuffer = stackalloc byte[sizeof(int)];
+
+        foreach (var part in parts)
+        {
+            var bytes = Encoding.UTF8.GetBytes(part);
+            BinaryPrimitives.WriteInt32LittleEndian(lengthBuffer, bytes.Length);
+            hash.AppendData(lengthBuffer);
+            hash.AppendData(bytes);
+        }
+
+        return Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
+    }
 }
