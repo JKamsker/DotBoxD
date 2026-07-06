@@ -114,11 +114,11 @@ internal static class ServiceModelFactory
         var serviceName = GetConfiguredServiceName(context) ?? interfaceSymbol.Name;
         if (string.IsNullOrWhiteSpace(serviceName))
         {
-            // An explicit empty/whitespace [DotBoxDService(Name = "")] compiles but no inbound call can ever
+            // An explicit empty/whitespace [RpcService(Name = "")] compiles but no inbound call can ever
             // match the empty wire name, so every dispatch fails at runtime. Reject it at build time.
             return RejectedService(
                 displayName,
-                "[DotBoxDService(Name = ...)] wire name must not be empty or whitespace",
+                "[RpcService(Name = ...)] wire name must not be empty or whitespace",
                 serviceLocation,
                 qualifiedInterfaceName);
         }
@@ -140,15 +140,15 @@ internal static class ServiceModelFactory
             var sigKey = MethodSignatureFacts.GetSignatureKey(methodSymbol, ct);
             if (seenSignatures.TryGetValue(sigKey, out var existingMethod))
             {
-                var conflictReason = InheritedMethodDeduplicator.GetConflictReason(
+                var duplicateReason = InheritedMethodDeduplicator.GetDuplicateSignatureRejectionReason(
                     existingMethod,
                     methodSymbol,
                     ct);
-                if (conflictReason is not null)
+                if (duplicateReason is not null)
                 {
                     return RejectedService(
                         displayName,
-                        conflictReason,
+                        duplicateReason,
                         DiagnosticLocationFactory.FromSymbol(methodSymbol),
                         qualifiedInterfaceName);
                 }
@@ -251,5 +251,4 @@ internal static class ServiceModelFactory
 
         return string.Join(".", parts);
     }
-
 }

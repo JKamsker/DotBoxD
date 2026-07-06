@@ -4,6 +4,7 @@ using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Sandbox.Values;
 using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Kernels.Validation.Model;
 
 namespace DotBoxD.Kernels.Tests.Validation;
 
@@ -89,6 +90,38 @@ public sealed class ProgrammaticIrValidationTests
 
         Assert.False(result.Succeeded);
         Assert.Contains(result.Diagnostics, d => d.Code == "E-CONST-F64");
+    }
+
+    [Fact]
+    public void ModuleValidator_reports_null_function_parameter_entries()
+    {
+        var module = ModuleWithFunction(new SandboxFunction(
+            "main",
+            IsEntrypoint: true,
+            [null!],
+            SandboxType.Unit,
+            [new ReturnStatement(new LiteralExpression(SandboxValue.Unit, new SourceSpan(0, 0)), new SourceSpan(0, 0))]));
+
+        var validation = ValidateWithoutException(module);
+
+        Assert.False(validation.Succeeded);
+        Assert.Contains(validation.Diagnostics, d => MentionsNullEntry(d, "parameters"));
+    }
+
+    [Fact]
+    public void ModuleValidator_reports_null_function_body_entries()
+    {
+        var module = ModuleWithFunction(new SandboxFunction(
+            "main",
+            IsEntrypoint: true,
+            [],
+            SandboxType.Unit,
+            [null!]));
+
+        var validation = ValidateWithoutException(module);
+
+        Assert.False(validation.Succeeded);
+        Assert.Contains(validation.Diagnostics, d => MentionsNullEntry(d, "body"));
     }
 
     [Fact]
@@ -185,6 +218,15 @@ public sealed class ProgrammaticIrValidationTests
             ],
             new Dictionary<string, string>());
 
+    private static SandboxModule ModuleWithFunction(SandboxFunction function)
+        => new(
+            "programmatic-ir-validation",
+            SemVersion.One,
+            SandboxLanguage.CurrentVersion,
+            [],
+            [function],
+            new Dictionary<string, string>());
+
     private static SandboxModule ModuleWithValue(SandboxType returnType, SandboxValue value)
         => ModuleWithBody(
             returnType,
@@ -193,6 +235,25 @@ public sealed class ProgrammaticIrValidationTests
                     new LiteralExpression(value, new SourceSpan(0, 0)),
                     new SourceSpan(0, 0))
             ]);
+
+    private static ModuleValidationResult ValidateWithoutException(SandboxModule module)
+    {
+        ModuleValidationResult? validation = null;
+        var exception = Record.Exception(() => validation = ValidateModule(module));
+
+        Assert.Null(exception);
+        Assert.NotNull(validation);
+        return validation!;
+    }
+
+    private static ModuleValidationResult ValidateModule(SandboxModule module)
+        => new DotBoxD.Kernels.Validation.ModuleValidator().Validate(
+            module,
+            new BindingRegistryBuilder().Build());
+
+    private static bool MentionsNullEntry(SandboxDiagnostic diagnostic, string collectionName)
+        => diagnostic.Message.Contains(collectionName, StringComparison.OrdinalIgnoreCase)
+            && diagnostic.Message.Contains("null", StringComparison.OrdinalIgnoreCase);
 
     private sealed record UnknownStatement(SourceSpan Span) : Statement(Span);
 

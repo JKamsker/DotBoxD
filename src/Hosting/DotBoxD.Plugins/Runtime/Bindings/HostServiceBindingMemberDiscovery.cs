@@ -6,7 +6,7 @@ internal static class HostServiceBindingMemberDiscovery
 {
     private const string ExtensibleControlType = "DotBoxD.Abstractions.IExtensibleControl";
     private const string ServiceControlType = "DotBoxD.Abstractions.IServiceControl";
-    private const string DotBoxDServiceAttributeType = "DotBoxD.Services.Attributes.DotBoxDServiceAttribute";
+    private const string RpcServiceAttributeType = "DotBoxD.Services.Attributes.RpcServiceAttribute";
 
     public static IEnumerable<MethodInfo> ServiceMethods(Type serviceType)
         => ServiceTypes(serviceType).SelectMany(static type => type.GetMethods());
@@ -51,8 +51,8 @@ internal static class HostServiceBindingMemberDiscovery
             $"[HostBinding] route '{binding.BindingId}', but generic HostBinding methods are not supported.");
     }
 
-    public static bool HasDotBoxDServiceAttribute(Type type)
-        => HasDirectDotBoxDServiceAttribute(type) || type.GetInterfaces().Any(HasDirectDotBoxDServiceAttribute);
+    public static bool HasRpcServiceAttribute(Type type)
+        => HasDirectRpcServiceAttribute(type) || type.GetInterfaces().Any(HasDirectRpcServiceAttribute);
 
     private static IEnumerable<Type> ServiceTypes(Type serviceType)
     {
@@ -69,10 +69,10 @@ internal static class HostServiceBindingMemberDiscovery
            (string.Equals(t.FullName, ExtensibleControlType, StringComparison.Ordinal) ||
             string.Equals(t.FullName, ServiceControlType, StringComparison.Ordinal));
 
-    private static bool HasDirectDotBoxDServiceAttribute(Type type)
+    private static bool HasDirectRpcServiceAttribute(Type type)
         => type.GetCustomAttributes(inherit: false)
             .Any(attribute => string.Equals(
                 attribute.GetType().FullName,
-                DotBoxDServiceAttributeType,
+                RpcServiceAttributeType,
                 StringComparison.Ordinal));
 }

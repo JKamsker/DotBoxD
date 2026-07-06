@@ -28,7 +28,7 @@ public class InheritedFlowAttributeConflictTests
                     string? Normalize(string? input);
                 }
 
-                [DotBoxDService]
+                [RpcService]
                 public interface ICombined : ILeft, IRight
                 {
                 }
@@ -65,7 +65,7 @@ public class InheritedFlowAttributeConflictTests
                     void Save([DisallowNull] string? value);
                 }
 
-                [DotBoxDService]
+                [RpcService]
                 public interface ICombined : ILeft, IRight
                 {
                 }
