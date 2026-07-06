@@ -41,7 +41,7 @@ internal static class StructuralValidator
 
         if (!hasNullCapabilityRequests)
         {
-            CheckDuplicateCapabilityRequests(module.CapabilityRequests, diagnostics);
+            StructuralDuplicateValidator.CheckCapabilityRequests(module.CapabilityRequests, diagnostics);
         }
 
         foreach (var item in module.Metadata)
@@ -82,7 +82,7 @@ internal static class StructuralValidator
 
         if (!hasNullParameters)
         {
-            CheckDuplicateParameters(function, diagnostics);
+            StructuralDuplicateValidator.CheckParameters(function, diagnostics);
             foreach (var parameter in function.Parameters)
             {
                 CheckIdentifier(parameter.Name, "parameter name", diagnostics);
@@ -130,100 +130,6 @@ internal static class StructuralValidator
         }
 
         return hasNull;
-    }
-
-    private static void CheckDuplicateCapabilityRequests(
-        IReadOnlyList<CapabilityRequest> requests,
-        List<SandboxDiagnostic> diagnostics)
-    {
-        if (requests.Count < 2)
-        {
-            return;
-        }
-
-        var counts = new Dictionary<string, int>(requests.Count, StringComparer.Ordinal);
-        var nullCount = 0;
-        for (var i = 0; i < requests.Count; i++)
-        {
-            IncrementCount(counts, requests[i].Id, ref nullCount);
-        }
-
-        var reportedNull = false;
-        for (var i = 0; i < requests.Count; i++)
-        {
-            var id = requests[i].Id;
-            if (ShouldReportDuplicate(counts, id, nullCount, ref reportedNull))
-            {
-                diagnostics.Add(new SandboxDiagnostic("E-STRUCT-DUP-CAP", $"duplicate capability request '{id}'"));
-            }
-        }
-    }
-
-    private static void CheckDuplicateParameters(
-        SandboxFunction function,
-        List<SandboxDiagnostic> diagnostics)
-    {
-        if (function.Parameters.Count < 2)
-        {
-            return;
-        }
-
-        var counts = new Dictionary<string, int>(function.Parameters.Count, StringComparer.Ordinal);
-        var nullCount = 0;
-        for (var i = 0; i < function.Parameters.Count; i++)
-        {
-            IncrementCount(counts, function.Parameters[i].Name, ref nullCount);
-        }
-
-        var reportedNull = false;
-        for (var i = 0; i < function.Parameters.Count; i++)
-        {
-            var name = function.Parameters[i].Name;
-            if (ShouldReportDuplicate(counts, name, nullCount, ref reportedNull))
-            {
-                diagnostics.Add(new SandboxDiagnostic(
-                    "E-STRUCT-DUP-PARAM",
-                    $"duplicate parameter '{name}' in function '{function.Id}'"));
-            }
-        }
-    }
-
-    private static void IncrementCount(Dictionary<string, int> counts, string? value, ref int nullCount)
-    {
-        if (value is null)
-        {
-            nullCount++;
-            return;
-        }
-
-        counts.TryGetValue(value, out var count);
-        counts[value] = count + 1;
-    }
-
-    private static bool ShouldReportDuplicate(
-        Dictionary<string, int> counts,
-        string? value,
-        int nullCount,
-        ref bool reportedNull)
-    {
-        if (value is null)
-        {
-            if (nullCount < 2 || reportedNull)
-            {
-                return false;
-            }
-
-            reportedNull = true;
-            return true;
-        }
-
-        if (!counts.TryGetValue(value, out var count) || count < 2)
-        {
-            return false;
-        }
-
-        counts[value] = 0;
-        return true;
     }
 
     private static void CheckCapabilityRequest(CapabilityRequest request, List<SandboxDiagnostic> diagnostics)
