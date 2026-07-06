@@ -42,7 +42,8 @@ public class SubServicePropertyFlowAttributeTests
 
         var proxy = runResult.Results.Single().GeneratedSources
             .Single(g => g.HintName.EndsWith("IRoot.DotBoxDRpcProxy.g.cs"))
-            .SourceText.ToString();
+            .SourceText.ToString()
+            .Replace("\r\n", "\n");
         proxy.Should().Contain(
             """
                     [global::System.Diagnostics.CodeAnalysis.MaybeNullAttribute]
