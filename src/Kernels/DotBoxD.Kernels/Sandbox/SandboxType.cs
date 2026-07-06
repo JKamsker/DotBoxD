@@ -5,9 +5,11 @@ namespace DotBoxD.Kernels.Sandbox;
 
 public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Arguments)
 {
-    private IReadOnlyList<SandboxType> _arguments = ModelCopy.List(Arguments);
+    private IReadOnlyList<SandboxType> _arguments = CopyArguments(Arguments);
 
-    public IReadOnlyList<SandboxType> Arguments { get => _arguments; init => _arguments = ModelCopy.List(value); }
+    public string Name { get; init; } = Name ?? throw new ArgumentNullException(nameof(Name));
+
+    public IReadOnlyList<SandboxType> Arguments { get => _arguments; init => _arguments = CopyArguments(value); }
 
     private const int MaxOpaqueIdNameLength = 64;
 
@@ -42,11 +44,24 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
 
     public const string RecordName = "Record";
 
-    public static SandboxType Scalar(string name) => new(name, []);
+    public static SandboxType Scalar(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        return new(name, []);
+    }
 
-    public static SandboxType List(SandboxType item) => new("List", [item]);
+    public static SandboxType List(SandboxType item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        return new("List", [item]);
+    }
 
-    public static SandboxType Map(SandboxType key, SandboxType value) => new("Map", [key, value]);
+    public static SandboxType Map(SandboxType key, SandboxType value)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(value);
+        return new("Map", [key, value]);
+    }
 
     /// <summary>
     /// A composite record/object type: an ordered, positional list of field types (≥ 1). Field names are
@@ -120,6 +135,20 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
 
     private static readonly IReadOnlySet<string> EmptyOpaqueIdTypes =
         new HashSet<string>(StringComparer.Ordinal);
+
+    private static IReadOnlyList<SandboxType> CopyArguments(IReadOnlyList<SandboxType> arguments)
+    {
+        var snapshot = ModelCopy.List(arguments);
+        for (var i = 0; i < snapshot.Count; i++)
+        {
+            if (snapshot[i] is null)
+            {
+                throw new ArgumentException("Type arguments must not contain null elements.", nameof(arguments));
+            }
+        }
+
+        return snapshot;
+    }
 
     private static bool IsAcceptedOpaqueIdBrand(string name, IReadOnlySet<string>? declaredOpaqueIdTypes)
         => IsWellFormedOpaqueIdName(name) &&
