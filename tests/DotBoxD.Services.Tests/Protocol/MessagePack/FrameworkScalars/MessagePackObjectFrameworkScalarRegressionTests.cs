@@ -2,7 +2,6 @@ using DotBoxD.Codecs.MessagePack;
 using DotBoxD.Services.Serialization;
 using MessagePack;
 using Xunit;
-using BufferPayload = DotBoxD.Services.Buffers.Payload;
 
 namespace DotBoxD.Services.Tests.Protocol.MessagePack;
 
@@ -11,22 +10,26 @@ public sealed class MessagePackObjectFrameworkScalarRegressionTests
     [Theory]
     [MemberData(nameof(FrameworkScalarValues))]
     public void Object_typed_framework_scalar_payloads_round_trip_or_fail_closed(
-        object value,
-        Type expectedType)
+        FrameworkScalarCase scenario)
     {
         var serializer = new MessagePackRpcSerializer();
 
-        using var payload = SerializeObjectOrAllowClosedFailure(serializer, value);
-        if (payload is null)
+        if (scenario.ExpectsSerializationFailure)
         {
+            Assert.Throws<MessagePackSerializationException>(() =>
+            {
+                using var payload = serializer.SerializeToPayload<object?>(scenario.Value);
+            });
+
             return;
         }
 
+        using var payload = serializer.SerializeToPayload<object?>(scenario.Value);
         var roundTrip = serializer.Deserialize<object?>(payload.Memory);
 
         Assert.NotNull(roundTrip);
-        Assert.Equal(expectedType, roundTrip.GetType());
-        Assert.Equal(value, roundTrip);
+        Assert.Equal(scenario.ExpectedType, roundTrip.GetType());
+        Assert.Equal(scenario.Value, roundTrip);
     }
 
     [Theory]
@@ -44,24 +47,29 @@ public sealed class MessagePackObjectFrameworkScalarRegressionTests
         Assert.Equal(value, typed);
     }
 
-    public static TheoryData<object, Type> FrameworkScalarValues()
+    public static TheoryData<FrameworkScalarCase> FrameworkScalarValues()
         => new()
         {
-            { Guid.Parse("11111111-2222-3333-4444-555555555555"), typeof(Guid) },
-            { new DateTimeOffset(2026, 7, 6, 13, 30, 42, TimeSpan.FromHours(2)), typeof(DateTimeOffset) },
+            FrameworkScalarCase.FailsSerialization(
+                "guid",
+                Guid.Parse("11111111-2222-3333-4444-555555555555")),
+            FrameworkScalarCase.FailsSerialization(
+                "date time offset",
+                new DateTimeOffset(2026, 7, 6, 13, 30, 42, TimeSpan.FromHours(2))),
         };
 
-    private static BufferPayload? SerializeObjectOrAllowClosedFailure(
-        MessagePackRpcSerializer serializer,
-        object value)
+    public sealed record FrameworkScalarCase(
+        string Name,
+        object Value,
+        Type? ExpectedType,
+        bool ExpectsSerializationFailure)
     {
-        try
-        {
-            return serializer.SerializeToPayload<object?>(value);
-        }
-        catch (MessagePackSerializationException)
-        {
-            return null;
-        }
+        public static FrameworkScalarCase PreservesShape(string name, object value, Type expectedType) =>
+            new(name, value, expectedType, ExpectsSerializationFailure: false);
+
+        public static FrameworkScalarCase FailsSerialization(string name, object value) =>
+            new(name, value, ExpectedType: null, ExpectsSerializationFailure: true);
+
+        public override string ToString() => Name;
     }
 }

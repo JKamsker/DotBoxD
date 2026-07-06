@@ -2,7 +2,6 @@ using DotBoxD.Codecs.MessagePack;
 using DotBoxD.Services.Serialization;
 using MessagePack;
 using Xunit;
-using ServicePayload = DotBoxD.Services.Buffers.Payload;
 
 namespace DotBoxD.Services.Tests.Protocol.MessagePack;
 
@@ -14,6 +13,8 @@ public sealed class MessagePackObjectPayloadRegressionTests
     {
         var serializer = new MessagePackRpcSerializer();
 
+        // The selected primitive values must preserve exact CLR runtime type through
+        // MessagePack's primitive object formatter, not just value equality.
         using var payload = serializer.SerializeToPayload<object?>(value);
         var roundTrip = serializer.Deserialize<object?>(payload.Memory);
 
@@ -29,25 +30,30 @@ public sealed class MessagePackObjectPayloadRegressionTests
     {
         var serializer = new MessagePackRpcSerializer();
 
-        var payload = TrySerializeObject(serializer, scenario.Value);
-        if (payload is null)
+        if (scenario.ExpectsSerializationFailure)
         {
+            Assert.Throws<MessagePackSerializationException>(() =>
+            {
+                using var payload = serializer.SerializeToPayload<object?>(scenario.Value);
+            });
+
             return;
         }
 
-        using (payload)
-        {
-            var roundTrip = serializer.Deserialize<object?>(payload.Memory);
+        using var payload = serializer.SerializeToPayload<object?>(scenario.Value);
+        var roundTrip = serializer.Deserialize<object?>(payload.Memory);
 
-            Assert.NotNull(roundTrip);
-            Assert.Equal(scenario.ExpectedType, roundTrip.GetType());
-            AssertEquivalent(scenario.Value, roundTrip);
-        }
+        Assert.NotNull(roundTrip);
+        Assert.Equal(scenario.ExpectedType, roundTrip.GetType());
+        AssertEquivalent(scenario.Value, roundTrip);
     }
 
     public static TheoryData<object> PrimitiveObjectPayloads()
         => new()
         {
+            // Avoid MessagePack fixint-overlap values, such as small positive short/int cases,
+            // when adding values here. The cases are intentionally chosen to keep wire-format
+            // type fidelity stable under MessagePackRpcSerializer's current object behavior.
             "player-one",
             (byte)42,
             (sbyte)-7,
@@ -65,27 +71,14 @@ public sealed class MessagePackObjectPayloadRegressionTests
     public static TheoryData<ObjectPayloadCase> EnumAndAggregateObjectPayloads()
         => new()
         {
-            new ObjectPayloadCase("enum", ProbeEnum.Beta, typeof(ProbeEnum)),
-            new ObjectPayloadCase("flags enum", ProbeFlags.A | ProbeFlags.High, typeof(ProbeFlags)),
-            new ObjectPayloadCase("tuple", (1, 2), typeof((int, int))),
-            new ObjectPayloadCase("string array", new[] { "left", "right" }, typeof(string[])),
-            new ObjectPayloadCase(
+            ObjectPayloadCase.FailsSerialization("enum", ProbeEnum.Beta),
+            ObjectPayloadCase.FailsSerialization("flags enum", ProbeFlags.A | ProbeFlags.High),
+            ObjectPayloadCase.FailsSerialization("tuple", (1, 2)),
+            ObjectPayloadCase.FailsSerialization("string array", new[] { "left", "right" }),
+            ObjectPayloadCase.FailsSerialization(
                 "dictionary",
-                new Dictionary<string, int> { ["left"] = 1, ["right"] = 2 },
-                typeof(Dictionary<string, int>)),
+                new Dictionary<string, int> { ["left"] = 1, ["right"] = 2 }),
         };
-
-    private static ServicePayload? TrySerializeObject(MessagePackRpcSerializer serializer, object value)
-    {
-        try
-        {
-            return serializer.SerializeToPayload<object?>(value);
-        }
-        catch (MessagePackSerializationException)
-        {
-            return null;
-        }
-    }
 
     private static void AssertEquivalent(object expected, object actual)
     {
@@ -111,8 +104,18 @@ public sealed class MessagePackObjectPayloadRegressionTests
         }
     }
 
-    public sealed record ObjectPayloadCase(string Name, object Value, Type ExpectedType)
+    public sealed record ObjectPayloadCase(
+        string Name,
+        object Value,
+        Type? ExpectedType,
+        bool ExpectsSerializationFailure)
     {
+        public static ObjectPayloadCase PreservesShape(string name, object value, Type expectedType) =>
+            new(name, value, expectedType, ExpectsSerializationFailure: false);
+
+        public static ObjectPayloadCase FailsSerialization(string name, object value) =>
+            new(name, value, ExpectedType: null, ExpectsSerializationFailure: true);
+
         public override string ToString() => Name;
     }
 
