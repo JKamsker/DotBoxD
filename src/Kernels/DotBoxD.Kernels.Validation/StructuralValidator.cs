@@ -53,10 +53,7 @@ internal static class StructuralValidator
         }
     }
 
-    private static void CheckRequiredVersion(
-        SemVersion? version,
-        string description,
-        List<SandboxDiagnostic> diagnostics)
+    private static void CheckRequiredVersion(SemVersion? version, string description, List<SandboxDiagnostic> diagnostics)
     {
         if (version is null)
         {
