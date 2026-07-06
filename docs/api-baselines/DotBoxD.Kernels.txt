@@ -151,16 +151,16 @@ public IReadOnlyList<Statement> Body { get => _body; init => _body = ModelCopy.L
 public IReadOnlyList<Statement> Else { get => _else; init => _else = ModelCopy.List(value); }
 public IReadOnlyList<Statement> Then { get => _then; init => _then = ModelCopy.List(value); }
 public IReadOnlySet<string> DeclaredOpaqueIdTypes
-public long AllocatedBytes { get; private set; }
+public long AllocatedBytes => _allocatedBytes
 public long AuditCheckpoint() => Audit.EventsWritten
 public long CollectionElements { get; private set; }
 public long EventsWritten => _sequence
-public long FileBytesRead { get; private set; }
-public long FileBytesWritten { get; private set; }
+public long FileBytesRead => _fileBytesRead
+public long FileBytesWritten => _fileBytesWritten
 public long FuelUsed { get; private set; }
 public long LoopIterations { get; private set; }
-public long NetworkBytesRead { get; private set; }
-public long NetworkBytesWritten { get; private set; }
+public long NetworkBytesRead => _networkBytesRead
+public long NetworkBytesWritten => _networkBytesWritten
 public long StringBytes { get; private set; }
 public override bool Equals(object? obj) => Equals(obj as ExecutionPlanSeal)
 public override int GetHashCode()
