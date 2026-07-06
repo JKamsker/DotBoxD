@@ -174,6 +174,43 @@ public sealed class ResultHookSlotTests
     }
 
     [Fact]
+    public async Task Filter_cancellation_stops_before_result_handler()
+    {
+        var slot = NewSlot();
+        using var cts = new CancellationTokenSource();
+        var handlerInvoked = false;
+        var entry = new ResultHookSlot<DamageCtx, HookContext>.Entry(
+            Priority: 0,
+            Order: 0,
+            Kernel: null,
+            Remote: false,
+            Invoke: (_, _, _, _) =>
+            {
+                handlerInvoked = true;
+                return Ok(1);
+            },
+            Filter: (_, _, _, _) =>
+            {
+                cts.Cancel();
+                return ValueTask.FromResult(true);
+            });
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () =>
+            {
+                var context = new HookContext(new InMemoryPluginMessageSink(), cts.Token);
+                await slot.FireEntryAsync<TestResult>(
+                    entry,
+                    new DamageCtx(10),
+                    context,
+                    context,
+                    ResultHookDispatchOptions<TestResult>.Default,
+                    cts.Token);
+            });
+        Assert.False(handlerInvoked);
+    }
+
+    [Fact]
     public async Task Remote_timeout_returns_configured_fail_closed_result_and_reports_fault()
     {
         var faults = new List<ResultHookFault>();

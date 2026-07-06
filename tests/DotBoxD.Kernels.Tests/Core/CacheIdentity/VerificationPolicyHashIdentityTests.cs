@@ -41,12 +41,14 @@ public sealed class VerificationPolicyHashIdentityTests
     }
 
     [Fact]
-    public void Allowlist_hash_rejects_null_entries_with_clear_exception()
+    public void Allowlist_rejects_null_entries_with_clear_exception()
     {
         var members = new HashSet<string>(StringComparer.Ordinal) { null! };
-        var policy = VerificationPolicy.BoxedValueDefaults() with { AllowedMembers = members };
 
-        Assert.Throws<ArgumentNullException>(() => _ = policy.AllowlistHash);
+        var exception = Assert.Throws<ArgumentException>(
+            () => VerificationPolicy.BoxedValueDefaults() with { AllowedMembers = members });
+
+        Assert.Equal("AllowedMembers", exception.ParamName);
     }
 
     private static VerificationPolicy PolicyWithAllowlist(string[] allowedMembers)

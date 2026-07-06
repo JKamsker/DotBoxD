@@ -21,14 +21,14 @@ public struct RpcFrame : IDisposable
 
     public RpcFrame(Payload payload)
     {
-        _payload = payload;
+        _payload = payload ?? throw new ArgumentNullException(nameof(payload));
         _writer = null;
     }
 
     public RpcFrame(PooledBufferWriter writer)
     {
         _payload = null;
-        _writer = writer;
+        _writer = writer ?? throw new ArgumentNullException(nameof(writer));
     }
 
     public ReadOnlyMemory<byte> Memory

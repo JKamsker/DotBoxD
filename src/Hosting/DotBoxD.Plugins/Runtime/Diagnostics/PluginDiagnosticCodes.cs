@@ -1,4 +1,3 @@
-using DotBoxD.Kernels.Model;
 using DotBoxD.Plugins.Runtime.Lifecycle;
 
 namespace DotBoxD.Plugins.Runtime.Diagnostics;
@@ -47,24 +46,6 @@ public enum PluginDiagnosticAudience
     /// <summary>The host or operator must fix the value or registration they supplied at runtime.</summary>
     HostOperator,
 }
-
-/// <summary>
-/// Public reference entry for a single runtime plugin diagnostic
-/// <see cref="SandboxDiagnostic.Code"/> emitted by the <c>DotBoxD.Plugins</c> package.
-/// </summary>
-/// <param name="Code">The stable <c>DBXK*</c> diagnostic code.</param>
-/// <param name="Phase">The runtime phase that emits the code.</param>
-/// <param name="Audience">Who must act on the diagnostic.</param>
-/// <param name="Meaning">A short human-readable description of the rule that was violated.</param>
-/// <param name="LikelyCause">The most common reason this code is emitted.</param>
-/// <param name="Remediation">Guidance for the plugin author or host operator investigating the code.</param>
-public sealed record PluginDiagnosticReference(
-    string Code,
-    PluginDiagnosticPhase Phase,
-    PluginDiagnosticAudience Audience,
-    string Meaning,
-    string LikelyCause,
-    string Remediation);
 
 /// <summary>
 /// Public, maintained reference for the runtime <c>DBXK*</c> diagnostic codes emitted by the

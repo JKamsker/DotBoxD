@@ -117,6 +117,43 @@ public sealed class EventQueryIndexAdapterTests
                 Predicate(QueryComparisonOperator.Equal, QueryValue.Null)));
 
     [Fact]
+    public void ToIndexedPredicate_rejects_null_value_with_public_boundary_exception()
+        => AssertPublicBoundaryRejection(
+            () => EventQueryIndexAdapter.ToIndexedPredicate(
+                new IndexedPredicate
+                {
+                    Path = "Damage",
+                    Operator = QueryComparisonOperator.Equal,
+                    Value = null!,
+                }),
+            "Value");
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void ToIndexedPredicate_rejects_malformed_paths_with_public_boundary_exception(string? path)
+        => AssertPublicBoundaryRejection(
+            () => EventQueryIndexAdapter.ToIndexedPredicate(
+                new IndexedPredicate
+                {
+                    Path = path!,
+                    Operator = QueryComparisonOperator.Equal,
+                    Value = QueryValue.FromInteger(5),
+                }),
+            "Path");
+
+    [Fact]
+    public void ToIndexedPredicates_rejects_null_collection_entries_as_collection_boundary()
+        => AssertPublicBoundaryRejection(
+            () => EventQueryIndexAdapter.ToIndexedPredicates(
+                [
+                    Predicate(QueryComparisonOperator.Equal, QueryValue.FromInteger(5)),
+                    null!,
+                ]),
+            "predicates");
+
+    [Fact]
     public void Adapted_predicates_feed_the_host_matcher_and_prefilter_correctly()
     {
         var plan = EventQueryPlanner.Plan(
@@ -147,5 +184,12 @@ public sealed class EventQueryIndexAdapterTests
         var matcher = EventIndexMatcher<IndexedAttack>.Create(EventQueryIndexAdapter.ToIndexedPredicates(plan));
         Assert.False(matcher.HasIndex);
         Assert.Empty(matcher.HonoredPredicates);
+    }
+
+    private static void AssertPublicBoundaryRejection(Action action, string expectedParamName)
+    {
+        var exception = Assert.Throws<ArgumentException>(action);
+
+        Assert.Equal(expectedParamName, exception.ParamName);
     }
 }

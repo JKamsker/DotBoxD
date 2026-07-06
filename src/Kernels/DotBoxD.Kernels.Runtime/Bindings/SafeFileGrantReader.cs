@@ -9,7 +9,7 @@ namespace DotBoxD.Kernels.Runtime.Bindings;
 // so the byte limit, create/overwrite flags, and allowed-extension set are decoded
 // once per grant and cached. Runtime file bindings reuse the typed options instead of
 // reparsing raw CapabilityGrant.Parameters strings (and re-splitting the extension CSV)
-// on every file.readText / file.writeText call. Invalid parameters still fail closed
+// on every file.readText / file.writeText call. Missing or invalid parameters fail closed
 // with the same PermissionDenied error on first decode. Mirrors the grant-reader
 // caching pattern used by the transport addon's HTTP grant reader.
 internal static class SafeFileGrantReader
@@ -21,7 +21,7 @@ internal static class SafeFileGrantReader
 
     private static SafeFileGrantOptions CreateOptions(CapabilityGrant grant)
         => new(
-            ReadOptionalLong(grant, "maxBytesPerRun"),
+            ReadRequiredLong(grant, "maxBytesPerRun"),
             ReadBool(grant, "allowCreate"),
             ReadBool(grant, "allowOverwrite"),
             ReadExtensions(grant));
@@ -57,11 +57,11 @@ internal static class SafeFileGrantReader
         return parsed;
     }
 
-    private static long? ReadOptionalLong(CapabilityGrant grant, string key)
+    private static long ReadRequiredLong(CapabilityGrant grant, string key)
     {
         if (!grant.Parameters.TryGetValue(key, out var value))
         {
-            return null;
+            throw Error(key);
         }
 
         if (!long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) || parsed < 0)
@@ -77,7 +77,7 @@ internal static class SafeFileGrantReader
 }
 
 internal sealed record SafeFileGrantOptions(
-    long? MaxBytesPerRun,
+    long MaxBytesPerRun,
     bool AllowCreate,
     bool AllowOverwrite,
     IReadOnlySet<string>? AllowedExtensions);

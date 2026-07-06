@@ -1,6 +1,22 @@
 namespace DotBoxD.Abstractions;
 
-public sealed record PluginMessage(string TargetId, string Message);
+public sealed record PluginMessage(string TargetId, string Message)
+{
+    private readonly string _targetId = TargetId ?? throw new ArgumentNullException("targetId");
+    private readonly string _message = Message ?? throw new ArgumentNullException("message");
+
+    public string TargetId
+    {
+        get => _targetId;
+        init => _targetId = value ?? throw new ArgumentNullException(nameof(value));
+    }
+
+    public string Message
+    {
+        get => _message;
+        init => _message = value ?? throw new ArgumentNullException(nameof(value));
+    }
+}
 
 public interface IPluginMessageSink
 {
@@ -56,6 +72,9 @@ public sealed class InMemoryPluginMessageSink : IPluginMessageSink
 
     private void AddMessage(string targetId, string message)
     {
+        ArgumentNullException.ThrowIfNull(targetId);
+        ArgumentNullException.ThrowIfNull(message);
+
         lock (_gate)
         {
             if (_messages.Count >= _maxMessages)

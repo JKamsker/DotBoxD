@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading;
+using DotBoxD.CodeGeneration.Shared.Defaults;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
 using Microsoft.CodeAnalysis;
 
@@ -8,6 +9,15 @@ namespace DotBoxD.Services.SourceGenerator.Models;
 internal static class InheritedMethodDeduplicator
 {
     public static string? GetDuplicateSignatureRejectionReason(
+        IMethodSymbol existingMethod,
+        IMethodSymbol methodSymbol,
+        CancellationToken ct)
+    {
+        var shapeReason = GetShapeRejectionReason(existingMethod, methodSymbol, ct);
+        return shapeReason ?? GetContractRejectionReason(existingMethod, methodSymbol, ct);
+    }
+
+    private static string? GetShapeRejectionReason(
         IMethodSymbol existingMethod,
         IMethodSymbol methodSymbol,
         CancellationToken ct)
@@ -27,14 +37,32 @@ internal static class InheritedMethodDeduplicator
             return $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible parameter names";
         }
 
+        if (!HasSameParameterDefaultValues(existingMethod, methodSymbol))
+        {
+            return $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible optional/default values";
+        }
+
         if (!MethodSignatureFacts.HaveSameGenericConstraints(existingMethod, methodSymbol, ct))
         {
             return $"inherited generic method '{methodSymbol.Name}' has the same signature as another method but incompatible generic constraints";
         }
 
+        return null;
+    }
+
+    private static string? GetContractRejectionReason(
+        IMethodSymbol existingMethod,
+        IMethodSymbol methodSymbol,
+        CancellationToken ct)
+    {
         if (!HasSameNullableAnnotations(existingMethod, methodSymbol, ct))
         {
             return $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible nullable annotations";
+        }
+
+        if (!InheritedMethodFlowAttributeComparer.HasSameFlowAttributes(existingMethod, methodSymbol, ct))
+        {
+            return $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible flow attributes";
         }
 
         if (!HasSameCallerInfoAttributes(existingMethod, methodSymbol, ct))
@@ -91,6 +119,27 @@ internal static class InheritedMethodDeduplicator
         for (var i = 0; i < left.Parameters.Length; i++)
         {
             if (left.Parameters[i].Name != right.Parameters[i].Name)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public static bool HasSameParameterDefaultValues(IMethodSymbol left, IMethodSymbol right)
+    {
+        if (left.Parameters.Length != right.Parameters.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < left.Parameters.Length; i++)
+        {
+            if (!ParameterDefaultValueComparer.HasSameContract(
+                left.Parameters[i],
+                right.Parameters[i],
+                DefaultLiteralOptions.SourceGenerator))
             {
                 return false;
             }
@@ -243,4 +292,5 @@ internal static class InheritedMethodDeduplicator
 
         return null;
     }
+
 }
