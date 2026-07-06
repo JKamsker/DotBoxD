@@ -252,9 +252,23 @@ public sealed record VerificationPolicy(
     }
 
     private static string Hash(string prefix, IEnumerable<string> values)
-        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
-            prefix + "|" + string.Join('|', values.Order(StringComparer.Ordinal)))))
-            .ToLowerInvariant();
+    {
+        var builder = new StringBuilder();
+        AppendHashPart(builder, prefix);
+
+        foreach (var value in values.Order(StringComparer.Ordinal))
+        {
+            AppendHashPart(builder, value);
+        }
+
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString()))).ToLowerInvariant();
+    }
+
+    private static void AppendHashPart(StringBuilder builder, string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        builder.Append(value.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append(':').Append(value);
+    }
 
     private static IReadOnlySet<string> Freeze(IEnumerable<string> values)
     {

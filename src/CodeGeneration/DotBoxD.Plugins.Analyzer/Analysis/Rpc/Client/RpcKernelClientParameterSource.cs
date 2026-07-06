@@ -1,4 +1,5 @@
 using DotBoxD.CodeGeneration.Shared.Defaults;
+using DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 using Microsoft.CodeAnalysis;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
@@ -89,11 +90,17 @@ internal static class RpcKernelClientParameterSource
         => preserveMetadataDefaultAttributes || defaultLiteral is null ? string.Empty : " = " + defaultLiteral;
 
     private static string AttributePrefix(IParameterSymbol parameter, bool preserveMetadataDefaultAttributes)
-        => preserveMetadataDefaultAttributes
-            ? ParameterDefaultValueEmitter.FormatMetadataDefaultAttributePrefix(
+    {
+        var prefix = PluginServerFlowAttributeSource.ParameterAttributePrefix(parameter);
+        if (preserveMetadataDefaultAttributes)
+        {
+            prefix += ParameterDefaultValueEmitter.FormatMetadataDefaultAttributePrefix(
                 parameter,
-                includeOptionalAttribute: true)
-            : string.Empty;
+                includeOptionalAttribute: true);
+        }
+
+        return prefix;
+    }
 
     private static bool HasMetadataDefaultAttribute(IParameterSymbol parameter)
         => ParameterDefaultValueEmitter.HasDateTimeConstantAttribute(parameter) ||

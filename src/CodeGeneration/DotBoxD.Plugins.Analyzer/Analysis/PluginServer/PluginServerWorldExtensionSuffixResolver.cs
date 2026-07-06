@@ -61,7 +61,7 @@ internal static class PluginServerWorldExtensionSuffixResolver
             if (type.TypeKind == TypeKind.Interface &&
                 type.ContainingType is null &&
                 type.Locations.Any(static location => location.IsInSource) &&
-                IsDotBoxDService(type))
+                IsRpcService(type))
             {
                 services.Add(new ServiceExtensionCandidate(
                     NamespaceName(type.ContainingNamespace),
@@ -112,10 +112,7 @@ internal static class PluginServerWorldExtensionSuffixResolver
     {
         foreach (var attribute in type.GetAttributes())
         {
-            if (!string.Equals(
-                    attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDMetadataNames.DotBoxDServiceAttribute,
-                    StringComparison.Ordinal))
+            if (!DotBoxDMetadataNames.IsRpcServiceAttribute(attribute.AttributeClass?.ToDisplayString()))
             {
                 continue;
             }
@@ -133,14 +130,11 @@ internal static class PluginServerWorldExtensionSuffixResolver
         return type.Name;
     }
 
-    private static bool IsDotBoxDService(INamedTypeSymbol type)
+    private static bool IsRpcService(INamedTypeSymbol type)
     {
         foreach (var attribute in type.GetAttributes())
         {
-            if (string.Equals(
-                    attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDMetadataNames.DotBoxDServiceAttribute,
-                    StringComparison.Ordinal))
+            if (DotBoxDMetadataNames.IsRpcServiceAttribute(attribute.AttributeClass?.ToDisplayString()))
             {
                 return true;
             }

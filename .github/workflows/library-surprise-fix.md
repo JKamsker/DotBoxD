@@ -87,6 +87,11 @@ safe-outputs:
   missing-data: false
   report-incomplete:
     create-issue: false
+  # Do not open an "[aw] ... failed" issue on engine failure. These are dominated
+  # by transient sandbox-proxy 502s (e.g. #462: connect EHOSTUNREACH to squid) and
+  # self-heal: the fix-dispatcher re-dispatches the PR (retry cap 4), so a genuinely
+  # stuck PR surfaces as one that stays unfixed past the cap, not as per-blip noise.
+  report-failure-as-issue: false
 
 engine:
   id: codex
@@ -625,21 +630,33 @@ be resolved. Never resolve a thread you are leaving genuinely open.
 
 ## Summary comment (always, both modes)
 
-Post exactly one `add_comment` on the PR. Its body MUST:
+Post exactly one `add_comment` on the PR. The dispatcher parses this comment to
+know a polish pass ran and which CodeRabbit threads to resolve, so its shape is
+load-bearing. Its body MUST:
 
-- start with the marker line `<!-- surprise-fix:polished -->` on its own line,
-- summarize the mode, what you changed (CI fixes + fix), and each CodeRabbit
-  disposition,
-- end with a machine-readable block listing ONLY the inline-thread node ids you
-  handled, exactly in this form (the dispatcher resolves these threads on a later
-  tick, after this comment has passed threat detection):
+1. **Start with a `Mode:` line** — literally `Mode: FIX` or `Mode: GREEN/POLISH`
+   as the very first line. (This is what the dispatcher reads to stop re-picking
+   the PR — do not omit or reword it.)
+2. Summarize what you changed (CI fixes + the production fix) and give a
+   per-thread CodeRabbit disposition: `fixed`, or `dismissed` with a one-line
+   reason.
+3. **List the thread node ids you handled** (fixed, or consciously
+   dismissed-with-reason) verbatim — e.g. `` `PRRT_kwABC...` `` — under a clear
+   `Resolved threads:` heading. The dispatcher resolves exactly the `PRRT_...`
+   ids it finds here that are still open, on a later tick, after this comment has
+   passed threat detection. List ONLY threads you actually handled; never list a
+   thread you are leaving genuinely open.
 
-  ```
-  <!-- surprise-fix:resolve {"resolve":["<threadNodeId>","<threadNodeId>"]} -->
-  ```
+You SHOULD also append the machine block below (it is the precise channel and
+takes priority over the prose ids when present); if you handled no threads use
+`{"resolve":[]}`:
 
-  Use the `id` values from `coderabbit.json`. If you handled no threads, emit
-  `<!-- surprise-fix:resolve {"resolve":[]} -->`.
+```
+<!-- surprise-fix:polished -->
+<!-- surprise-fix:resolve {"resolve":["<threadNodeId>","<threadNodeId>"]} -->
+```
+
+Use the `id` values from `coderabbit.json`.
 
 If the PR is no longer eligible, leave the workspace unchanged and call `noop`.
 

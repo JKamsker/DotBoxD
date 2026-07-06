@@ -99,7 +99,7 @@ public sealed class GeneratePluginServerAttribute : Attribute
 
 /// <summary>Marks a server-authored context helper as native-only and unavailable to lowered IR.</summary>
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Property, Inherited = false)]
-public sealed class LocalAttribute : Attribute;
+public sealed class NativeOnlyAttribute : Attribute;
 
 /// <summary>Analyzer-visible generated IR for server-authored SDK context <c>[KernelMethod]</c> helpers.</summary>
 [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true, Inherited = false)]

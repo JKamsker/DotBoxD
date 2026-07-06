@@ -1,0 +1,92 @@
+name: mutation-tests
+
+# Stryker.NET mutation testing for focused security/runtime surfaces. This is intentionally
+# informational at first: it runs on schedule/manual dispatch, and on PRs only when explicitly
+# requested with the run-mutation-tests label.
+
+on:
+  schedule:
+    # Sundays 04:17 UTC.
+    - cron: '17 4 * * 0'
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+concurrency:
+  group: mutation-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+  NUGET_XMLDOC_MODE: skip
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+permissions:
+  contents: read
+
+jobs:
+  stryker:
+    name: Stryker (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: >-
+      ${{
+        github.event_name != 'pull_request' ||
+        contains(github.event.pull_request.labels.*.name, 'run-mutation-tests')
+      }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: kernels-validation
+            working-directory: src/Kernels/DotBoxD.Kernels.Validation
+            config-file: ../../../.config/stryker/kernels-validation.json
+            output-directory: ../../../artifacts/mutation/kernels-validation
+          - name: services-protocol
+            working-directory: src/Services/DotBoxD.Services
+            config-file: ../../../.config/stryker/services-protocol.json
+            output-directory: ../../../artifacts/mutation/services-protocol
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET SDKs
+        uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: Restore local tools
+        run: dotnet tool restore
+
+      - name: Restore solution
+        run: dotnet restore DotBoxD.slnx
+
+      - name: Run Stryker
+        id: stryker
+        working-directory: ${{ matrix.working-directory }}
+        run: >-
+          dotnet tool run dotnet-stryker --
+          --config-file "${{ matrix.config-file }}"
+          --output "${{ matrix.output-directory }}"
+          --skip-version-check
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mutation-report-${{ matrix.name }}
+          path: artifacts/mutation/${{ matrix.name }}/**/*
+          if-no-files-found: warn
+          retention-days: 14

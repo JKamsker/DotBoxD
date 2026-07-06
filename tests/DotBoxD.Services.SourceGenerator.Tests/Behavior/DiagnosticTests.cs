@@ -18,7 +18,7 @@ public class DiagnosticTests
 
             namespace Diag.Empty
             {
-                [DotBoxDService]
+                [RpcService]
                 public interface IEmpty
                 {
                 }
@@ -59,7 +59,7 @@ public class DiagnosticTests
 
             namespace Diag.Broken
             {
-                [DotBoxDService]
+                [RpcService]
                 public interface IBroken
                 {
                     Task<UnknownType> DoSomethingAsync(UnknownType input);
@@ -92,7 +92,7 @@ public class DiagnosticTests
 
             namespace Diag.Location
             {
-                [DotBoxDService]
+                [RpcService]
                 public interface IRefParam
                 {
                     void Bad(ref int value);
@@ -119,7 +119,7 @@ public class DiagnosticTests
 
             namespace Diag.Location
             {
-                [DotBoxDService]
+                [RpcService]
                 public interface IWithProperty
                 {
                     int Count { get; }
