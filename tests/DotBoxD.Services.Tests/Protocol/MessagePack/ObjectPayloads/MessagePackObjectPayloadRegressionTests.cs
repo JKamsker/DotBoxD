@@ -1,8 +1,8 @@
 using DotBoxD.Codecs.MessagePack;
-using DotBoxD.Services.Buffers;
 using DotBoxD.Services.Serialization;
 using MessagePack;
 using Xunit;
+using ServicePayload = DotBoxD.Services.Buffers.Payload;
 
 namespace DotBoxD.Services.Tests.Protocol.MessagePack;
 
@@ -75,7 +75,7 @@ public sealed class MessagePackObjectPayloadRegressionTests
                 typeof(Dictionary<string, int>)),
         };
 
-    private static Payload? TrySerializeObject(MessagePackRpcSerializer serializer, object value)
+    private static ServicePayload? TrySerializeObject(MessagePackRpcSerializer serializer, object value)
     {
         try
         {
