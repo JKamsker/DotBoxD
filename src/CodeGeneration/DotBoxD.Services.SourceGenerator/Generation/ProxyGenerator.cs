@@ -98,7 +98,7 @@ internal static partial class ProxyGenerator
         {
             ct.ThrowIfCancellationRequested();
             sb.AppendLine();
-            AppendAttributeLines(sb, property.MemberAttributePrefix);
+            ProxyGenerationHelpers.AppendAttributeLines(sb, property.MemberAttributePrefix);
             if (property.IsInstanceId)
             {
                 sb.AppendLine($"        public {property.Type} {property.Name} => this._instanceId ?? string.Empty;");
@@ -179,7 +179,7 @@ internal static partial class ProxyGenerator
         var access = explicitInterface ? string.Empty : "public ";
         var target = explicitInterface ? method.ExplicitImplementationType + "." + method.Name : method.Name;
 
-        AppendAttributeLines(sb, method.MemberAttributePrefix);
+        ProxyGenerationHelpers.AppendAttributeLines(sb, method.MemberAttributePrefix);
         AppendReturnAttributes(sb, method.ReturnAttributePrefix);
         sb.AppendLine($"        {access}{unsafeKeyword}{asyncKeyword}{method.ReturnRefKindKeyword}{declaredReturn} {target}{method.TypeParameterList}({paramList}){method.ConstraintClauses}");
         sb.AppendLine("        {");
@@ -235,7 +235,7 @@ internal static partial class ProxyGenerator
         var target = explicitInterface ? qualifiedAsyncSibling + "." + s.Name : s.Name;
 
         var asyncKeyword = RequiresAsyncStateMachine(s.SiblingReturnKind) ? "async " : string.Empty;
-        AppendAttributeLines(sb, s.Source.MemberAttributePrefix);
+        ProxyGenerationHelpers.AppendAttributeLines(sb, s.Source.MemberAttributePrefix);
         sb.AppendLine($"        {access}{asyncKeyword}{declaredReturn} {target}({paramList})");
         sb.AppendLine("        {");
 
@@ -273,19 +273,5 @@ internal static partial class ProxyGenerator
         returnKind is MethodReturnKind.TaskOfSubService or MethodReturnKind.ValueTaskOfSubService;
 
     private static void AppendReturnAttributes(StringBuilder sb, string attributes)
-        => AppendAttributeLines(sb, attributes);
-
-    private static void AppendAttributeLines(StringBuilder sb, string attributes)
-    {
-        if (attributes.Length == 0)
-        {
-            return;
-        }
-
-        var lines = attributes.Split(['\n'], System.StringSplitOptions.RemoveEmptyEntries);
-        foreach (var line in lines)
-        {
-            sb.Append("        ").AppendLine(line.TrimEnd('\r'));
-        }
-    }
+        => ProxyGenerationHelpers.AppendAttributeLines(sb, attributes);
 }

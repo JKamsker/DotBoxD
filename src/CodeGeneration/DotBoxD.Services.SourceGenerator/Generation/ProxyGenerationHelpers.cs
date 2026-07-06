@@ -37,6 +37,20 @@ internal static class ProxyGenerationHelpers
         AppendDefaultValue(sb, p);
     }
 
+    public static void AppendAttributeLines(StringBuilder sb, string attributes)
+    {
+        if (attributes.Length == 0)
+        {
+            return;
+        }
+
+        var lines = attributes.Split(['\n'], System.StringSplitOptions.RemoveEmptyEntries);
+        foreach (var line in lines)
+        {
+            sb.Append("        ").AppendLine(line.TrimEnd('\r'));
+        }
+    }
+
     /// <summary>
     /// Appends a parameter's default-value clause to a generated signature: <c>= default</c> for a
     /// cancellation token, the captured literal for any other defaulted parameter, and nothing when

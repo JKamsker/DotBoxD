@@ -68,13 +68,22 @@ public sealed class ProxyObsoleteAttributeTests
 
     private static void AssertChild2IsNotObsolete(string proxy)
     {
+        const string childDeclaration =
+            "        public global::Regress.ObsoleteProxyMembers.IChild Child =>";
         const string child2Declaration =
             "        public global::Regress.ObsoleteProxyMembers.IChild Child2 =>";
+        var childIndex = proxy.IndexOf(childDeclaration, StringComparison.Ordinal);
         var child2Index = proxy.IndexOf(child2Declaration, StringComparison.Ordinal);
+        childIndex.Should().BeGreaterThanOrEqualTo(0);
         child2Index.Should().BeGreaterThanOrEqualTo(0);
+        child2Index.Should().BeGreaterThan(childIndex);
 
-        var prefixStart = Math.Max(0, child2Index - 120);
-        var child2Prefix = proxy.Substring(prefixStart, child2Index - prefixStart);
+        var childDeclarationEnd = proxy.IndexOf('\n', childIndex);
+        childDeclarationEnd.Should().BeGreaterThanOrEqualTo(0);
+
+        var child2Prefix = proxy.Substring(
+            childDeclarationEnd + 1,
+            child2Index - childDeclarationEnd - 1);
         child2Prefix.Should().NotContain("ObsoleteAttribute");
     }
 
