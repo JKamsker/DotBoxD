@@ -17,7 +17,7 @@ public sealed class PluginServerControlFlowAttributeOrderRegressionTests
 
                 namespace Regression.Game
                 {
-                    [DotBoxDService]
+                    [RpcService]
                     public interface IBaseWorld
                     {
                         [MaybeNull]
@@ -25,7 +25,7 @@ public sealed class PluginServerControlFlowAttributeOrderRegressionTests
                         IMonsterControl Monsters { get; }
                     }
 
-                    [DotBoxDService]
+                    [RpcService]
                     public interface IGameWorldAccess : IBaseWorld
                     {
                         [NotNull]
@@ -33,7 +33,7 @@ public sealed class PluginServerControlFlowAttributeOrderRegressionTests
                         new IMonsterControl Monsters { get; }
                     }
 
-                    [DotBoxDService]
+                    [RpcService]
                     public interface IMonsterControl
                     {
                         ValueTask<int> CountAsync();

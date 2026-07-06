@@ -95,24 +95,24 @@ public sealed class PluginServerReturnFlowAttributeSurpriseTests
 
                 namespace Regression.Game
                 {
-                    [DotBoxDService]
+                    [RpcService]
                     public interface ILeftWorld
                     {
                         [MaybeNull]
                         IMonsterControl Monsters { get; }
                     }
 
-                    [DotBoxDService]
+                    [RpcService]
                     public interface IRightWorld
                     {
                         [NotNull]
                         IMonsterControl Monsters { get; }
                     }
 
-                    [DotBoxDService]
+                    [RpcService]
                     public interface IGameWorldAccess : ILeftWorld, IRightWorld;
 
-                    [DotBoxDService]
+                    [RpcService]
                     public interface IMonsterControl
                     {
                         ValueTask<int> CountAsync();
