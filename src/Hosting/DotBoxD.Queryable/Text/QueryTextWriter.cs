@@ -109,23 +109,13 @@ internal static class QueryTextWriter
 
     private static void Write(QueryValue value, StringBuilder builder)
     {
+        if (TryWriteCoreValue(value, builder))
+        {
+            return;
+        }
+
         switch (value.Kind)
         {
-            case QueryValueKind.Null:
-                builder.Append("null");
-                break;
-            case QueryValueKind.Boolean:
-                builder.Append(value.Boolean ? "true" : "false");
-                break;
-            case QueryValueKind.Integer:
-                builder.Append(value.Integer.ToString(CultureInfo.InvariantCulture));
-                break;
-            case QueryValueKind.Number:
-                WriteNumber(value.Number, builder);
-                break;
-            case QueryValueKind.String:
-                WriteString(value.String ?? string.Empty, builder);
-                break;
             case QueryValueKind.Decimal:
                 builder.Append(QueryValue.CanonicalDecimal(value.Decimal)).Append('m');
                 break;
@@ -140,6 +130,30 @@ internal static class QueryTextWriter
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(value), value.Kind, "Unknown value kind.");
+        }
+    }
+
+    private static bool TryWriteCoreValue(QueryValue value, StringBuilder builder)
+    {
+        switch (value.Kind)
+        {
+            case QueryValueKind.Null:
+                builder.Append("null");
+                return true;
+            case QueryValueKind.Boolean:
+                builder.Append(value.Boolean ? "true" : "false");
+                return true;
+            case QueryValueKind.Integer:
+                builder.Append(value.Integer.ToString(CultureInfo.InvariantCulture));
+                return true;
+            case QueryValueKind.Number:
+                WriteNumber(value.Number, builder);
+                return true;
+            case QueryValueKind.String:
+                WriteString(value.String ?? string.Empty, builder);
+                return true;
+            default:
+                return false;
         }
     }
 

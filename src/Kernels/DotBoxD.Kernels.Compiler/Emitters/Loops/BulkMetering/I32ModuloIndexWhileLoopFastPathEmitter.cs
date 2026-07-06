@@ -127,15 +127,19 @@ internal sealed class I32ModuloIndexWhileLoopFastPathEmitter
     {
         plan = default;
         if (!TryGetCondition(loop.Condition, out var index, out var end) ||
-            loop.Body is not [AssignmentStatement totalAssignment, AssignmentStatement indexAssignment] ||
-            _stackPlan.LocalKind(index) != StackKind.I32 ||
-            !IsI32Bound(end) ||
+            loop.Body is not [AssignmentStatement totalAssignment, AssignmentStatement indexAssignment])
+        {
+            return false;
+        }
+
+        if (!CanUseLoopBounds(index, end) ||
             !TryGetModuloAssignment(totalAssignment, index, out var target, out var divisor) ||
-            !TryGetIncrement(indexAssignment, index) ||
-            string.Equals(target, index, StringComparison.Ordinal) ||
-            _stackPlan.LocalKind(target) != StackKind.I32 ||
-            IsAssignedBound(end, target, index) ||
-            divisor <= 0)
+            !TryGetIncrement(indexAssignment, index))
+        {
+            return false;
+        }
+
+        if (!CanUsePlan(index, end, target, divisor))
         {
             return false;
         }
@@ -143,6 +147,15 @@ internal sealed class I32ModuloIndexWhileLoopFastPathEmitter
         plan = new WhilePlan(index, end, target, divisor);
         return true;
     }
+
+    private bool CanUseLoopBounds(string index, Expression end)
+        => _stackPlan.LocalKind(index) == StackKind.I32 && IsI32Bound(end);
+
+    private bool CanUsePlan(string index, Expression end, string target, int divisor)
+        => !string.Equals(target, index, StringComparison.Ordinal) &&
+           _stackPlan.LocalKind(target) == StackKind.I32 &&
+           !IsAssignedBound(end, target, index) &&
+           divisor > 0;
 
     private bool IsI32Bound(Expression end)
         => end is LiteralExpression { Value: I32Value } ||

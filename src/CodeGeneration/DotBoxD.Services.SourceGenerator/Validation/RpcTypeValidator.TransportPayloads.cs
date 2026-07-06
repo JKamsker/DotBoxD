@@ -32,6 +32,23 @@ internal static partial class RpcTypeValidator
             return false;
         }
 
+        return ContainsNamedStreamingOrControlPayloadType(
+            named,
+            ct,
+            allowCurrentTransportShape,
+            allowCurrentCancellationToken,
+            allowCurrentTaskWrapper,
+            cancellationTokenSymbol);
+    }
+
+    private static bool ContainsNamedStreamingOrControlPayloadType(
+        INamedTypeSymbol named,
+        CancellationToken ct,
+        bool allowCurrentTransportShape,
+        bool allowCurrentCancellationToken,
+        bool allowCurrentTaskWrapper,
+        ITypeSymbol? cancellationTokenSymbol)
+    {
         if (IsCancellationToken(named, cancellationTokenSymbol))
         {
             return !allowCurrentCancellationToken;

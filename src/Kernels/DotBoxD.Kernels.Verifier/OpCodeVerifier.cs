@@ -91,51 +91,19 @@ internal static class OpCodeVerifier
         var opcode = instruction.Opcode;
         if (opcode is ILOpCode.Call or ILOpCode.Callvirt or ILOpCode.Newobj)
         {
-            if (instruction.OperandHandle is not { } handle)
-            {
-                return;
-            }
-
-            if (opcode == ILOpCode.Call && handle.Kind == HandleKind.MethodDefinition)
-            {
-                VerifyLocalCall(reader, (MethodDefinitionHandle)handle, diagnostics);
-                return;
-            }
-
-            // Reuse the member signature decoded once during IL reading
-            // (GeneratedInstruction.CalledMember) instead of decoding it again here.
-            var signature = instruction.CalledMember ?? MetadataName.MemberSignature(reader, handle).Signature;
-            if (!policy.IsMemberAllowed(signature))
-            {
-                diagnostics.Add(new VerificationDiagnostic("V-MEMBER", $"member '{signature}' is not allowed"));
-            }
-
+            VerifyCallOperand(reader, policy, instruction, diagnostics);
             return;
         }
 
         if (opcode == ILOpCode.Newarr)
         {
-            if (instruction.OperandHandle is not { } handle)
-            {
-                return;
-            }
-
-            var name = MetadataName.Type(reader, handle);
-            if (!StringComparer.Ordinal.Equals(name, VerifierTypeNames.SandboxValueName))
-            {
-                diagnostics.Add(new VerificationDiagnostic("V-ARRAY", $"array element type '{name}' is not allowed"));
-            }
-
+            VerifyNewArrayOperand(reader, instruction, diagnostics);
             return;
         }
 
         if (opcode == ILOpCode.Switch)
         {
-            foreach (var target in instruction.SwitchTargets)
-            {
-                AddBranchTarget(ref branchTargets, target);
-            }
-
+            AddSwitchTargets(instruction, ref branchTargets);
             return;
         }
 
@@ -145,6 +113,59 @@ internal static class OpCodeVerifier
             {
                 AddBranchTarget(ref branchTargets, target);
             }
+        }
+    }
+
+    private static void VerifyCallOperand(
+        MetadataReader reader,
+        VerificationPolicy policy,
+        GeneratedInstruction instruction,
+        List<VerificationDiagnostic> diagnostics)
+    {
+        if (instruction.OperandHandle is not { } handle)
+        {
+            return;
+        }
+
+        if (instruction.Opcode == ILOpCode.Call && handle.Kind == HandleKind.MethodDefinition)
+        {
+            VerifyLocalCall(reader, (MethodDefinitionHandle)handle, diagnostics);
+            return;
+        }
+
+        // Reuse the member signature decoded once during IL reading
+        // (GeneratedInstruction.CalledMember) instead of decoding it again here.
+        var signature = instruction.CalledMember ?? MetadataName.MemberSignature(reader, handle).Signature;
+        if (!policy.IsMemberAllowed(signature))
+        {
+            diagnostics.Add(new VerificationDiagnostic("V-MEMBER", $"member '{signature}' is not allowed"));
+        }
+    }
+
+    private static void VerifyNewArrayOperand(
+        MetadataReader reader,
+        GeneratedInstruction instruction,
+        List<VerificationDiagnostic> diagnostics)
+    {
+        if (instruction.OperandHandle is not { } handle)
+        {
+            return;
+        }
+
+        var name = MetadataName.Type(reader, handle);
+        if (!StringComparer.Ordinal.Equals(name, VerifierTypeNames.SandboxValueName))
+        {
+            diagnostics.Add(new VerificationDiagnostic("V-ARRAY", $"array element type '{name}' is not allowed"));
+        }
+    }
+
+    private static void AddSwitchTargets(
+        GeneratedInstruction instruction,
+        ref HashSet<int>? branchTargets)
+    {
+        foreach (var target in instruction.SwitchTargets)
+        {
+            AddBranchTarget(ref branchTargets, target);
         }
     }
 

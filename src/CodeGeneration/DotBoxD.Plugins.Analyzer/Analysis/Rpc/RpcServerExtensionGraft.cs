@@ -40,27 +40,58 @@ internal sealed record RpcServerExtensionGraft(
         {
             foreach (var member in current.GetMembers())
             {
-                if (member is IFieldSymbol { IsStatic: false } field &&
-                    IsVisibleReceiverMember(field, kernelType) &&
-                    CanStoreReceiver(field.Type, receiverType) &&
-                    seen.Add(field.Name))
+                if (TryGetReceiverHandleFieldName(member, kernelType, receiverType, seen, out var fieldName))
                 {
-                    yield return field.Name;
-                }
-                else if (member is IPropertySymbol
-                {
-                    IsStatic: false,
-                    GetMethod: not null,
-                    SetMethod: null
-                } property &&
-                    IsVisibleReceiverMember(property, kernelType) &&
-                    CanStoreReceiver(property.Type, receiverType) &&
-                    seen.Add(property.Name))
-                {
-                    yield return property.Name;
+                    yield return fieldName;
                 }
             }
         }
+    }
+
+    private static bool TryGetReceiverHandleFieldName(
+        ISymbol member,
+        INamedTypeSymbol kernelType,
+        INamedTypeSymbol receiverType,
+        HashSet<string> seen,
+        out string fieldName)
+    {
+        fieldName = string.Empty;
+        if (member is IFieldSymbol { IsStatic: false } field)
+        {
+            return TryGetReceiverHandleMemberName(field, field.Type, kernelType, receiverType, seen, out fieldName);
+        }
+
+        if (member is IPropertySymbol
+            {
+                IsStatic: false,
+                GetMethod: not null,
+                SetMethod: null
+            } property)
+        {
+            return TryGetReceiverHandleMemberName(property, property.Type, kernelType, receiverType, seen, out fieldName);
+        }
+
+        return false;
+    }
+
+    private static bool TryGetReceiverHandleMemberName(
+        ISymbol member,
+        ITypeSymbol memberType,
+        INamedTypeSymbol kernelType,
+        INamedTypeSymbol receiverType,
+        HashSet<string> seen,
+        out string fieldName)
+    {
+        fieldName = string.Empty;
+        if (!IsVisibleReceiverMember(member, kernelType) ||
+            !CanStoreReceiver(memberType, receiverType) ||
+            !seen.Add(member.Name))
+        {
+            return false;
+        }
+
+        fieldName = member.Name;
+        return true;
     }
 
     private static bool IsVisibleReceiverMember(ISymbol member, INamedTypeSymbol kernelType)

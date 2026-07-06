@@ -10,7 +10,7 @@ namespace DotBoxD.Queryable.Ast;
 /// <c>double</c> values use the inexact <see cref="QueryValueKind.Number"/> kind. <see cref="ParameterKey"/>
 /// records the capture origin (a stable <c>p0</c>, <c>p1</c>… ordinal) and is not part of value equality.
 /// </summary>
-public sealed record QueryValue
+public sealed partial record QueryValue
 {
     private QueryValue(QueryValueKind kind, bool boolean, long integer, double number, string? text)
     {
@@ -165,76 +165,33 @@ public sealed record QueryValue
     /// (<c>DateTime</c>/<c>DateTimeOffset</c>/<c>DateOnly</c>, normalized to a UTC instant). Returns
     /// <see langword="false"/> for unsupported types.
     /// </summary>
-    public static bool TryFromObject(object? value, out QueryValue result)
-    {
-        switch (value)
-        {
-            case null:
-                result = Null;
-                return true;
-            case bool b:
-                result = FromBoolean(b);
-                return true;
-            case string s:
-                result = FromString(s);
-                return true;
-            case sbyte or byte or short or ushort or int or uint or long:
-                result = FromInteger(Convert.ToInt64(value, CultureInfo.InvariantCulture));
-                return true;
-            case ulong u:
-                result = FromUnsignedInteger(u);
-                return true;
-            case float or double:
-                var number = Convert.ToDouble(value, CultureInfo.InvariantCulture);
-                if (!double.IsFinite(number))
-                {
-                    result = Null;
-                    return false;
-                }
+    /// <summary>Renders a stable, culture-invariant textual form used for In-list sort ordering and diagnostics.</summary>
+    public string ToCanonicalText()
+        => TryCoreCanonicalText(out var text) ? text : ToExactCanonicalText();
 
-                result = FromNumber(number);
-                return true;
-            case decimal m:
-                result = FromDecimal(m);
-                return true;
-            case Guid g:
-                result = FromGuid(g);
-                return true;
-            case DateTimeOffset dto:
-                result = FromTimestamp(dto);
-                return true;
-            case DateTime dt:
-                result = FromTimestamp(ToOffset(dt));
-                return true;
-            case DateOnly d:
-                result = FromTimestamp(new DateTimeOffset(d.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero));
-                return true;
-            case Enum e:
-                // Carry a ulong-backed enum exactly (its value may exceed long.MaxValue); other enums are signed.
-                result = Enum.GetUnderlyingType(e.GetType()) == typeof(ulong)
-                    ? FromUnsignedInteger(Convert.ToUInt64(e, CultureInfo.InvariantCulture))
-                    : FromInteger(Convert.ToInt64(e, CultureInfo.InvariantCulture));
-                return true;
-            default:
-                result = Null;
-                return false;
-        }
+    private bool TryCoreCanonicalText(out string text)
+    {
+        text = Kind switch
+        {
+            QueryValueKind.Null => "null",
+            QueryValueKind.Boolean => Boolean ? "true" : "false",
+            QueryValueKind.Integer => Integer.ToString(CultureInfo.InvariantCulture),
+            QueryValueKind.Number => Number.ToString("R", CultureInfo.InvariantCulture),
+            QueryValueKind.String => String ?? string.Empty,
+            _ => string.Empty,
+        };
+        return text.Length != 0 || Kind == QueryValueKind.String;
     }
 
-    /// <summary>Renders a stable, culture-invariant textual form used for In-list sort ordering and diagnostics.</summary>
-    public string ToCanonicalText() => Kind switch
-    {
-        QueryValueKind.Null => "null",
-        QueryValueKind.Boolean => Boolean ? "true" : "false",
-        QueryValueKind.Integer => Integer.ToString(CultureInfo.InvariantCulture),
-        QueryValueKind.Number => Number.ToString("R", CultureInfo.InvariantCulture),
-        QueryValueKind.String => String ?? string.Empty,
-        QueryValueKind.Guid => Guid.ToString("D"),
-        QueryValueKind.Decimal => CanonicalDecimal(Decimal),
-        QueryValueKind.UnsignedInteger => UnsignedInteger.ToString(CultureInfo.InvariantCulture),
-        QueryValueKind.Timestamp => CanonicalTimestamp(Timestamp),
-        _ => string.Empty,
-    };
+    private string ToExactCanonicalText()
+        => Kind switch
+        {
+            QueryValueKind.Guid => Guid.ToString("D"),
+            QueryValueKind.Decimal => CanonicalDecimal(Decimal),
+            QueryValueKind.UnsignedInteger => UnsignedInteger.ToString(CultureInfo.InvariantCulture),
+            QueryValueKind.Timestamp => CanonicalTimestamp(Timestamp),
+            _ => string.Empty,
+        };
 
     /// <summary>
     /// The scale-insensitive canonical text of a decimal (trailing zeros stripped) so <c>1.10m</c> and
@@ -263,25 +220,23 @@ public sealed record QueryValue
     /// machines. The canonical form this type emits always includes <c>Z</c>, so only malformed input is rejected.
     /// </summary>
     internal static bool HasExplicitTimestampOffset(string text)
+        => HasUtcTimestampSuffix(text) || HasNumericTimestampOffset(text);
+
+    private static bool HasUtcTimestampSuffix(string text)
+        => text.EndsWith('Z') || text.EndsWith('z');
+
+    private static bool HasNumericTimestampOffset(string text)
     {
-        if (text.EndsWith('Z') || text.EndsWith('z'))
+        if (text.Length < 6)
         {
-            return true;
+            return false;
         }
 
-        if (text.Length >= 6)
-        {
-            var tail = text.AsSpan(text.Length - 6);
-            if ((tail[0] == '+' || tail[0] == '-') &&
-                char.IsAsciiDigit(tail[1]) && char.IsAsciiDigit(tail[2]) &&
-                tail[3] == ':' &&
-                char.IsAsciiDigit(tail[4]) && char.IsAsciiDigit(tail[5]))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        var tail = text.AsSpan(text.Length - 6);
+        return (tail[0] == '+' || tail[0] == '-') &&
+            char.IsAsciiDigit(tail[1]) && char.IsAsciiDigit(tail[2]) &&
+            tail[3] == ':' &&
+            char.IsAsciiDigit(tail[4]) && char.IsAsciiDigit(tail[5]);
     }
 
     private static DateTimeOffset ToOffset(DateTime value) => value.Kind switch

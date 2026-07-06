@@ -121,74 +121,18 @@ public sealed class TcpServerTransport : IServerTransport
         // DisposeAsync (any thread) reclaim _pendingAccept via Interlocked, so consume it atomically
         // here too -- a plain read+null could let both this call and ObservePendingAccept take the same
         // stashed accept, returning a TcpClient that is also disposed at shutdown.
-        var claimed = ClaimPendingAccept();
-        Task<TcpClient> acceptTask;
-        if (claimed is not null)
-        {
-            acceptTask = claimed;
-        }
-        else
-        {
-            // Count fresh OS-level accepts so a deterministic test can prove that a pre-cancelled token
-            // does not start (and orphan) one. Inert in production beyond a single Interlocked increment.
-            Interlocked.Increment(ref _freshAcceptStartsForTest);
-            acceptTask = listener.AcceptTcpClientAsync();
-            // Fire the fresh-accept seam (null/no-op in production) so a deterministic test can race a
-            // concurrent cancellation into the window between starting this fresh accept and the in-body
-            // IsCancellationRequested check below.
-            _onFreshAcceptStartedForTest?.Invoke();
-        }
+        var acceptTask = StartOrClaimAccept(listener);
         // Honour an already-cancelled token before the IsCompleted short-circuit below can return a
         // completed (e.g. stashed) accept. If the accept came from the stash, re-stash it first so the
         // in-flight accept (and any socket it completes with) is reclaimed by the shutdown observation
         // path instead of being leaked, mirroring the cancellation re-stash logic below.
         if (ct.IsCancellationRequested)
         {
-            // Re-stash whatever accept we hold — a claimed one OR a freshly-started one — so the
-            // in-flight accept (and any socket it completes with) is reclaimed by the shutdown
-            // observation path instead of being orphaned. A fresh accept (claimed == null) was
-            // previously left untracked here, leaking its TcpClient if the OS delivered one.
-            _ = Interlocked.Exchange(ref _pendingAccept, acceptTask);
-            if (Volatile.Read(ref _started) == 0 || Volatile.Read(ref _disposed) != 0)
-            {
-                ObservePendingAccept();
-            }
+            RestashAcceptForCancellation(acceptTask);
             throw new OperationCanceledException(ct);
         }
-        if (ct.CanBeCanceled && !acceptTask.IsCompleted)
-        {
-            var cancelled = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            using var registration = ct.Register(
-                static state => ((TaskCompletionSource<bool>)state!).TrySetResult(true),
-                cancelled);
-            var completed = await Task.WhenAny(acceptTask, cancelled.Task).ConfigureAwait(false);
-            if (completed != acceptTask)
-            {
-                // Discard the previous value (always null on this path) — the explicit _ also avoids the
-                // CS4014 "un-awaited task" warning that a bare Interlocked.Exchange of a Task would raise.
-                _ = Interlocked.Exchange(ref _pendingAccept, acceptTask);
-                // If Stop/Dispose already ran ObservePendingAccept before we re-stashed, reclaim now so
-                // the in-flight accept (and any socket it completes with) is not leaked past shutdown.
-                if (Volatile.Read(ref _started) == 0 || Volatile.Read(ref _disposed) != 0)
-                {
-                    ObservePendingAccept();
-                }
-                throw new OperationCanceledException(ct);
-            }
-        }
-        TcpClient client;
-        try
-        {
-            client = await acceptTask.ConfigureAwait(false);
-        }
-        catch (Exception) when (ct.IsCancellationRequested)
-        {
-            throw new OperationCanceledException(ct);
-        }
-        catch (Exception) when (Volatile.Read(ref _started) == 0 || Volatile.Read(ref _disposed) != 0)
-        {
-            throw new OperationCanceledException();
-        }
+        await WaitForAcceptOrCancellationAsync(acceptTask, ct).ConfigureAwait(false);
+        var client = await CompleteAcceptAsync(acceptTask, ct).ConfigureAwait(false);
         try
         {
             return new TcpConnection(client, FrameReadIdleTimeout);
@@ -201,6 +145,73 @@ public sealed class TcpServerTransport : IServerTransport
             // catch in NamedPipeServerTransport.AcceptAsync.
             client.Dispose();
             throw;
+        }
+    }
+
+    private Task<TcpClient> StartOrClaimAccept(TcpListener listener)
+    {
+        if (ClaimPendingAccept() is { } claimed)
+        {
+            return claimed;
+        }
+
+        // Count fresh OS-level accepts so a deterministic test can prove that a pre-cancelled token
+        // does not start (and orphan) one. Inert in production beyond a single Interlocked increment.
+        Interlocked.Increment(ref _freshAcceptStartsForTest);
+        var acceptTask = listener.AcceptTcpClientAsync();
+        // Fire the fresh-accept seam (null/no-op in production) so a deterministic test can race a
+        // concurrent cancellation into the window between starting this fresh accept and the in-body
+        // IsCancellationRequested check below.
+        _onFreshAcceptStartedForTest?.Invoke();
+        return acceptTask;
+    }
+
+    private async Task WaitForAcceptOrCancellationAsync(Task<TcpClient> acceptTask, CancellationToken ct)
+    {
+        if (!ct.CanBeCanceled || acceptTask.IsCompleted)
+        {
+            return;
+        }
+
+        var cancelled = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = ct.Register(
+            static state => ((TaskCompletionSource<bool>)state!).TrySetResult(true),
+            cancelled);
+        var completed = await Task.WhenAny(acceptTask, cancelled.Task).ConfigureAwait(false);
+        if (completed == acceptTask)
+        {
+            return;
+        }
+
+        RestashAcceptForCancellation(acceptTask);
+        throw new OperationCanceledException(ct);
+    }
+
+    private void RestashAcceptForCancellation(Task<TcpClient> acceptTask)
+    {
+        // Re-stash whatever accept we hold — a claimed one OR a freshly-started one — so the
+        // in-flight accept (and any socket it completes with) is reclaimed by the shutdown
+        // observation path instead of being orphaned.
+        _ = Interlocked.Exchange(ref _pendingAccept, acceptTask);
+        if (Volatile.Read(ref _started) == 0 || Volatile.Read(ref _disposed) != 0)
+        {
+            ObservePendingAccept();
+        }
+    }
+
+    private async Task<TcpClient> CompleteAcceptAsync(Task<TcpClient> acceptTask, CancellationToken ct)
+    {
+        try
+        {
+            return await acceptTask.ConfigureAwait(false);
+        }
+        catch (Exception) when (ct.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(ct);
+        }
+        catch (Exception) when (Volatile.Read(ref _started) == 0 || Volatile.Read(ref _disposed) != 0)
+        {
+            throw new OperationCanceledException();
         }
     }
     public Task StopAsync(CancellationToken ct = default)
@@ -227,35 +238,7 @@ public sealed class TcpServerTransport : IServerTransport
         return default;
     }
     private void ObservePendingAccept()
-    {
-        // Reclaim an in-flight accept we stashed on cancellation. Stopping the listener usually
-        // faults it (observe the exception), but a client can connect in the window between the
-        // cancellation and Stop(), completing the accept with a live TcpClient — close that socket
-        // so it is not leaked at shutdown.
-        var pending = Interlocked.Exchange(ref _pendingAccept, null);
-        _ = pending?.ContinueWith(
-            static t =>
-            {
-                if (t.IsFaulted)
-                {
-                    _ = t.Exception;
-                }
-                else if (t.Status == TaskStatus.RanToCompletion)
-                {
-                    try
-                    {
-                        t.Result?.Dispose();
-                    }
-                    catch
-                    {
-                        // Best-effort close of a socket accepted during shutdown.
-                    }
-                }
-            },
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
-    }
+        => TcpPendingAcceptObserver.Observe(Interlocked.Exchange(ref _pendingAccept, null));
     /// <summary>
     /// Atomically claims any stashed in-flight accept. Reads the field, fires the test seam (a no-op in
     /// production), then claims the stashed task with a <see cref="Interlocked.CompareExchange{T}"/> —

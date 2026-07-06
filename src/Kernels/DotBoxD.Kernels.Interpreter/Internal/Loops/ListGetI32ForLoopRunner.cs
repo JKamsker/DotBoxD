@@ -17,9 +17,12 @@ internal static class ListGetI32ForLoopRunner
         SandboxContext context,
         SandboxExecutionOptions options)
     {
-        if (options.EnableDebugTrace ||
-            start >= end ||
-            !TryCreatePlan(statement, frame, out var plan))
+        if (!CanUseFastPath(options, start, end))
+        {
+            return false;
+        }
+
+        if (!TryCreatePlan(statement, frame, out var plan))
         {
             return false;
         }
@@ -60,6 +63,9 @@ internal static class ListGetI32ForLoopRunner
 
         return true;
     }
+
+    private static bool CanUseFastPath(SandboxExecutionOptions options, int start, int end)
+        => !options.EnableDebugTrace && start < end;
 
     private static int ReadItem(int[] items, int index)
     {

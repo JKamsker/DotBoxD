@@ -38,18 +38,35 @@ internal sealed class F64ExpressionPlan
     public int BindingCallCount { get; }
     public bool PreservesNonNegative { get; }
 
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
     public double Evaluate(InterpreterFrame frame)
+    {
+        if (_kind <= ExpressionKind.BoxedVariable)
+        {
+            return EvaluateLeaf(frame);
+        }
+
+        return EvaluateNonLeaf(frame);
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private double EvaluateLeaf(InterpreterFrame frame)
         => _kind switch
         {
             ExpressionKind.Literal => _literal,
             ExpressionKind.RawVariable => frame.ReadRawDoubleSlot(_slot),
             ExpressionKind.BoxedVariable => frame.ReadDoubleSlot(_slot),
+            _ => throw Unsupported()
+        };
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private double EvaluateNonLeaf(InterpreterFrame frame)
+        => _kind switch
+        {
             ExpressionKind.Sqrt => Math.Sqrt(_operand!.Evaluate(frame)),
             ExpressionKind.Floor => Math.Floor(_operand!.Evaluate(frame)),
             ExpressionKind.Ceil => Math.Ceiling(_operand!.Evaluate(frame)),
             ExpressionKind.Round => Math.Round(_operand!.Evaluate(frame), MidpointRounding.ToEven),
-            // Arithmetic goes through SandboxFloat64Math (finiteness-enforced), matching the boxed interpreter
-            // path and the compiled *F64Raw helpers exactly.
             ExpressionKind.Add => SandboxFloat64Math.Add(_operand!.Evaluate(frame), _right!.Evaluate(frame)),
             ExpressionKind.Sub => SandboxFloat64Math.Subtract(_operand!.Evaluate(frame), _right!.Evaluate(frame)),
             ExpressionKind.Mul => SandboxFloat64Math.Multiply(_operand!.Evaluate(frame), _right!.Evaluate(frame)),
@@ -155,19 +172,7 @@ internal sealed class F64ExpressionPlan
         ExpressionKind kind,
         out BindingDescriptor descriptor)
     {
-        if (bindings is BindingRegistry registry &&
-            registry.TryGet(id, out var binding) &&
-            binding.Compiled is { Kind: "RuntimeStub" } &&
-            binding.Compiled.Type == typeof(Runtime.CompiledRuntime).FullName &&
-            binding.Compiled.Method == RuntimeMethod(kind) &&
-            binding.Parameters.Count == 1 &&
-            binding.Parameters[0].Equals(SandboxType.F64) &&
-            binding.ReturnType.Equals(SandboxType.F64) &&
-            binding.RequiredCapability is null &&
-            binding.Safety == BindingSafety.PureIntrinsic &&
-            binding.AuditLevel == AuditLevel.None &&
-            binding.CostModel.MaxCallsPerRun is null &&
-            (binding.Effects & ~(SandboxEffect.Cpu | SandboxEffect.Alloc)) == SandboxEffect.None)
+        if (TryGetDirectIntrinsicBinding(bindings, id, kind, out var registry, out _))
         {
             descriptor = registry.GetDescriptor(id);
             return true;
@@ -176,6 +181,44 @@ internal sealed class F64ExpressionPlan
         descriptor = null!;
         return false;
     }
+
+    private static bool TryGetDirectIntrinsicBinding(
+        IBindingCatalog bindings,
+        string id,
+        ExpressionKind kind,
+        out BindingRegistry registry,
+        out BindingSignature binding)
+    {
+        registry = null!;
+        binding = null!;
+        if (bindings is not BindingRegistry candidate ||
+            !candidate.TryGet(id, out binding))
+        {
+            return false;
+        }
+
+        registry = candidate;
+        return BindingRuntimeStubMatches(binding, kind) &&
+               BindingSignatureMatches(binding) &&
+               BindingPolicyMatches(binding);
+    }
+
+    private static bool BindingRuntimeStubMatches(BindingSignature binding, ExpressionKind kind)
+        => binding.Compiled is { Kind: "RuntimeStub" } &&
+           binding.Compiled.Type == typeof(Runtime.CompiledRuntime).FullName &&
+           binding.Compiled.Method == RuntimeMethod(kind);
+
+    private static bool BindingSignatureMatches(BindingSignature binding)
+        => binding.Parameters.Count == 1 &&
+           binding.Parameters[0].Equals(SandboxType.F64) &&
+           binding.ReturnType.Equals(SandboxType.F64);
+
+    private static bool BindingPolicyMatches(BindingSignature binding)
+        => binding.RequiredCapability is null &&
+           binding.Safety == BindingSafety.PureIntrinsic &&
+           binding.AuditLevel == AuditLevel.None &&
+           binding.CostModel.MaxCallsPerRun is null &&
+           (binding.Effects & ~(SandboxEffect.Cpu | SandboxEffect.Alloc)) == SandboxEffect.None;
 
     private static bool TryGetKind(string id, out ExpressionKind kind)
     {

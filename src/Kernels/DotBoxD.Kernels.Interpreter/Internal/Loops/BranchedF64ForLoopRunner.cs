@@ -22,26 +22,25 @@ internal static class BranchedF64ForLoopRunner
         SandboxExecutionOptions options,
         I32CallEvaluator calls)
     {
-        if (options.EnableDebugTrace ||
-            start >= end ||
-            statement.Body.Count != 1 ||
-            statement.Body[0] is not IfStatement branch ||
-            !I32ComparisonPlan.TryCreate(branch.Condition, frame, statement.LocalName, calls, out var condition) ||
-            !TryCreateBranch(branch.Then, frame, context.Bindings, out var thenBranch) ||
-            !TryCreateBranch(branch.Else, frame, context.Bindings, out var elseBranch))
+        if (options.EnableDebugTrace)
+        {
+            return false;
+        }
+
+        if (!TryCreateLoopPlan(statement, start, end, frame, context, calls, out var plan))
         {
             return false;
         }
 
         var loopSlot = frame.GetSlot(statement.LocalName);
-        long conditionFuel = 1 + condition.FuelCost;
+        long conditionFuel = 1 + plan.Condition.FuelCost;
         var checkpoint = 4096;
         for (var i = start; i < end; i++)
         {
             context.ChargeLoopIteration(LoopFuel);
             context.ChargeFuel(conditionFuel);
             frame.WriteRawInt32Slot(loopSlot, i);
-            var taken = condition.Evaluate(frame, context) ? thenBranch : elseBranch;
+            var taken = plan.Condition.Evaluate(frame, context) ? plan.Then : plan.Else;
             context.ChargeFuel(taken.Fuel);
             var assignments = taken.Assignments;
             for (var statementIndex = 0; statementIndex < assignments.Length; statementIndex++)
@@ -57,6 +56,45 @@ internal static class BranchedF64ForLoopRunner
             }
         }
 
+        return true;
+    }
+
+    private static bool TryCreateLoopPlan(
+        ForRangeStatement statement,
+        int start,
+        int end,
+        InterpreterFrame frame,
+        SandboxContext context,
+        I32CallEvaluator calls,
+        out BranchedLoopPlan plan)
+    {
+        plan = default;
+        if (start >= end)
+        {
+            return false;
+        }
+
+        if (statement.Body.Count != 1 || statement.Body[0] is not IfStatement branch)
+        {
+            return false;
+        }
+
+        if (!I32ComparisonPlan.TryCreate(branch.Condition, frame, statement.LocalName, calls, out var condition))
+        {
+            return false;
+        }
+
+        if (!TryCreateBranch(branch.Then, frame, context.Bindings, out var thenBranch))
+        {
+            return false;
+        }
+
+        if (!TryCreateBranch(branch.Else, frame, context.Bindings, out var elseBranch))
+        {
+            return false;
+        }
+
+        plan = new BranchedLoopPlan(condition, thenBranch, elseBranch);
         return true;
     }
 
@@ -95,4 +133,9 @@ internal static class BranchedF64ForLoopRunner
     private readonly record struct AssignmentPlan(int TargetSlot, F64ExpressionPlan Expression);
 
     private readonly record struct Branch(AssignmentPlan[] Assignments, long Fuel);
+
+    private readonly record struct BranchedLoopPlan(
+        I32ComparisonPlan Condition,
+        Branch Then,
+        Branch Else);
 }

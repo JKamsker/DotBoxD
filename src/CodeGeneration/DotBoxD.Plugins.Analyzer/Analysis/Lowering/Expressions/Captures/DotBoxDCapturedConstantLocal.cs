@@ -114,14 +114,42 @@ internal static class DotBoxDCapturedConstantLocal
                 ExpressionNamesLocal(assignment.Left, local, model, cancellationToken),
             ArgumentSyntax argument when IsWritableByRef(argument) =>
                 ExpressionNamesLocal(argument.Expression, local, model, cancellationToken),
-            PrefixUnaryExpressionSyntax prefix when prefix.IsKind(SyntaxKind.PreIncrementExpression) ||
-                prefix.IsKind(SyntaxKind.PreDecrementExpression) =>
-                ExpressionNamesLocal(prefix.Operand, local, model, cancellationToken),
-            PostfixUnaryExpressionSyntax postfix when postfix.IsKind(SyntaxKind.PostIncrementExpression) ||
-                postfix.IsKind(SyntaxKind.PostDecrementExpression) =>
-                ExpressionNamesLocal(postfix.Operand, local, model, cancellationToken),
+            PrefixUnaryExpressionSyntax prefix =>
+                IsPrefixMutationOfLocal(prefix, local, model, cancellationToken),
+            PostfixUnaryExpressionSyntax postfix =>
+                IsPostfixMutationOfLocal(postfix, local, model, cancellationToken),
             _ => false
         };
+
+    private static bool IsPrefixMutationOfLocal(
+        PrefixUnaryExpressionSyntax prefix,
+        ILocalSymbol local,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (!prefix.IsKind(SyntaxKind.PreIncrementExpression) &&
+            !prefix.IsKind(SyntaxKind.PreDecrementExpression))
+        {
+            return false;
+        }
+
+        return ExpressionNamesLocal(prefix.Operand, local, model, cancellationToken);
+    }
+
+    private static bool IsPostfixMutationOfLocal(
+        PostfixUnaryExpressionSyntax postfix,
+        ILocalSymbol local,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (!postfix.IsKind(SyntaxKind.PostIncrementExpression) &&
+            !postfix.IsKind(SyntaxKind.PostDecrementExpression))
+        {
+            return false;
+        }
+
+        return ExpressionNamesLocal(postfix.Operand, local, model, cancellationToken);
+    }
 
     private static bool IsWritableByRef(ArgumentSyntax argument)
         => argument.RefKindKeyword.IsKind(SyntaxKind.RefKeyword) ||

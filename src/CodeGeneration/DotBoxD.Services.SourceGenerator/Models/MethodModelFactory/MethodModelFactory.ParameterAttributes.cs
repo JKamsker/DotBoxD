@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using DotBoxD.CodeGeneration.Shared.Defaults;
@@ -8,6 +10,43 @@ namespace DotBoxD.Services.SourceGenerator.Models;
 
 internal static partial class MethodModelFactory
 {
+    private static readonly Dictionary<string, CallerInfoAttributeAppender> CallerInfoAttributeAppenders = new(StringComparer.Ordinal)
+    {
+        ["System.Runtime.CompilerServices.DateTimeConstantAttribute"] =
+            static (attributes, parameter, _, preserve) => AppendDateTimeConstantAttribute(attributes, parameter, preserve),
+        ["System.Runtime.CompilerServices.DecimalConstantAttribute"] =
+            static (attributes, parameter, _, preserve) => AppendDecimalConstantAttribute(attributes, parameter, preserve),
+        ["System.Runtime.InteropServices.DefaultParameterValueAttribute"] =
+            static (attributes, parameter, _, preserve) => AppendDefaultParameterValueAttribute(attributes, parameter, preserve),
+        ["System.Diagnostics.CodeAnalysis.AllowNullAttribute"] =
+            static (attributes, _, _, _) =>
+                AppendSimpleAttribute(attributes, "global::System.Diagnostics.CodeAnalysis.AllowNullAttribute"),
+        ["System.Diagnostics.CodeAnalysis.DisallowNullAttribute"] =
+            static (attributes, _, _, _) =>
+                AppendSimpleAttribute(attributes, "global::System.Diagnostics.CodeAnalysis.DisallowNullAttribute"),
+        ["System.Diagnostics.CodeAnalysis.MaybeNullAttribute"] =
+            static (attributes, _, _, _) =>
+                AppendSimpleAttribute(attributes, "global::System.Diagnostics.CodeAnalysis.MaybeNullAttribute"),
+        ["System.Diagnostics.CodeAnalysis.NotNullAttribute"] =
+            static (attributes, _, _, _) =>
+                AppendSimpleAttribute(attributes, "global::System.Diagnostics.CodeAnalysis.NotNullAttribute"),
+        ["System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute"] =
+            static (attributes, _, attr, _) =>
+                AppendBooleanArgumentAttribute(attributes, attr, "global::System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute"),
+        ["System.Diagnostics.CodeAnalysis.NotNullWhenAttribute"] =
+            static (attributes, _, attr, _) =>
+                AppendBooleanArgumentAttribute(attributes, attr, "global::System.Diagnostics.CodeAnalysis.NotNullWhenAttribute"),
+        ["System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute"] =
+            static (attributes, _, attr, _) =>
+                AppendStringArgumentAttribute(attributes, attr, "global::System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute"),
+    };
+
+    private delegate void CallerInfoAttributeAppender(
+        StringBuilder attributes,
+        IParameterSymbol parameter,
+        AttributeData attr,
+        bool preserveMetadataDefaultAttributes);
+
     private static string BuildCallerInfoAttributePrefix(
         IParameterSymbol parameter,
         CancellationToken ct,
@@ -34,86 +73,52 @@ internal static partial class MethodModelFactory
         foreach (var attr in parameter.GetAttributes())
         {
             ct.ThrowIfCancellationRequested();
-
-            if (CallerInfoAttributeFormatter.TryAppend(attributes, attr))
-            {
-                continue;
-            }
-
-            switch (attr.AttributeClass?.ToDisplayString())
-            {
-                case "System.Runtime.CompilerServices.DateTimeConstantAttribute":
-                    if (preserveMetadataDefaultAttributes)
-                    {
-                        attributes.Append(ParameterDefaultValueEmitter.FormatDateTimeConstantAttribute(parameter));
-                    }
-
-                    break;
-
-                case "System.Runtime.CompilerServices.DecimalConstantAttribute":
-                    if (preserveMetadataDefaultAttributes)
-                    {
-                        attributes.Append(ParameterDefaultValueEmitter.FormatDecimalConstantAttribute(parameter));
-                    }
-
-                    break;
-
-                case "System.Runtime.InteropServices.DefaultParameterValueAttribute":
-                    if (preserveMetadataDefaultAttributes)
-                    {
-                        attributes.Append(ParameterDefaultValueEmitter.FormatDefaultParameterValueAttribute(parameter));
-                    }
-
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.AllowNullAttribute":
-                    AppendSimpleAttribute(
-                        attributes,
-                        "global::System.Diagnostics.CodeAnalysis.AllowNullAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.DisallowNullAttribute":
-                    AppendSimpleAttribute(
-                        attributes,
-                        "global::System.Diagnostics.CodeAnalysis.DisallowNullAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.MaybeNullAttribute":
-                    AppendSimpleAttribute(
-                        attributes,
-                        "global::System.Diagnostics.CodeAnalysis.MaybeNullAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.NotNullAttribute":
-                    AppendSimpleAttribute(
-                        attributes,
-                        "global::System.Diagnostics.CodeAnalysis.NotNullAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute":
-                    AppendBooleanArgumentAttribute(
-                        attributes,
-                        attr,
-                        "global::System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute":
-                    AppendBooleanArgumentAttribute(
-                        attributes,
-                        attr,
-                        "global::System.Diagnostics.CodeAnalysis.NotNullWhenAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute":
-                    AppendStringArgumentAttribute(
-                        attributes,
-                        attr,
-                        "global::System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute");
-                    break;
-            }
+            AppendCallerInfoAttribute(attributes, parameter, attr, preserveMetadataDefaultAttributes);
         }
 
         return attributes.ToString();
+    }
+
+    private static void AppendCallerInfoAttribute(
+        StringBuilder attributes,
+        IParameterSymbol parameter,
+        AttributeData attr,
+        bool preserveMetadataDefaultAttributes)
+    {
+        if (CallerInfoAttributeFormatter.TryAppend(attributes, attr))
+        {
+            return;
+        }
+
+        var name = attr.AttributeClass?.ToDisplayString();
+        if (name is not null && CallerInfoAttributeAppenders.TryGetValue(name, out var append))
+        {
+            append(attributes, parameter, attr, preserveMetadataDefaultAttributes);
+        }
+    }
+
+    private static void AppendDateTimeConstantAttribute(StringBuilder attributes, IParameterSymbol parameter, bool preserve)
+    {
+        if (preserve)
+        {
+            attributes.Append(ParameterDefaultValueEmitter.FormatDateTimeConstantAttribute(parameter));
+        }
+    }
+
+    private static void AppendDecimalConstantAttribute(StringBuilder attributes, IParameterSymbol parameter, bool preserve)
+    {
+        if (preserve)
+        {
+            attributes.Append(ParameterDefaultValueEmitter.FormatDecimalConstantAttribute(parameter));
+        }
+    }
+
+    private static void AppendDefaultParameterValueAttribute(StringBuilder attributes, IParameterSymbol parameter, bool preserve)
+    {
+        if (preserve)
+        {
+            attributes.Append(ParameterDefaultValueEmitter.FormatDefaultParameterValueAttribute(parameter));
+        }
     }
 
     private static string BuildReturnFlowAttributePrefix(IMethodSymbol method, CancellationToken ct)

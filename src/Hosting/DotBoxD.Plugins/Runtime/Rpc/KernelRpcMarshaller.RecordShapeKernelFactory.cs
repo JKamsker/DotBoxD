@@ -228,40 +228,67 @@ public static partial class KernelRpcMarshaller
 
     private static LinqExpression ReadKernelRecordField(LinqExpression kernelField, Type fieldType)
     {
-        if (fieldType == typeof(bool))
-            return LinqExpression.Property(kernelField, nameof(KernelRpcValue.BoolValue));
-        if (fieldType == typeof(int))
-            return LinqExpression.Property(kernelField, nameof(KernelRpcValue.Int32Value));
-        if (fieldType == typeof(long))
-            return LinqExpression.Property(kernelField, nameof(KernelRpcValue.Int64Value));
-        if (fieldType == typeof(float))
+        if (TryReadKernelScalarRecordField(kernelField, fieldType, out var scalar))
         {
-            return LinqExpression.Call(
-                DoubleToSingleMethod,
-                LinqExpression.Property(kernelField, nameof(KernelRpcValue.DoubleValue)));
+            return scalar;
         }
-        if (fieldType == typeof(double))
-            return LinqExpression.Property(kernelField, nameof(KernelRpcValue.DoubleValue));
-        if (fieldType == typeof(string))
-            return LinqExpression.Property(kernelField, nameof(KernelRpcValue.TextValue));
-        if (fieldType == typeof(Guid))
-            return LinqExpression.Property(kernelField, nameof(KernelRpcValue.GuidValue));
+
         if (fieldType.IsEnum)
         {
-            var propertyName = EnumUsesI64(fieldType) ? nameof(KernelRpcValue.Int64Value) : nameof(KernelRpcValue.Int32Value);
-            var method = EnumUsesI64(fieldType) ? EnumFromInt64Method : EnumFromInt32Method;
-            return LinqExpression.Convert(
-                LinqExpression.Call(
-                    method,
-                    LinqExpression.Constant(fieldType, typeof(Type)),
-                    LinqExpression.Property(kernelField, propertyName)),
-                fieldType);
+            return ReadKernelEnumRecordField(kernelField, fieldType);
         }
 
         return LinqExpression.Call(
             FromKernelRpcValueMethod,
             kernelField,
             LinqExpression.Constant(fieldType, typeof(Type)));
+    }
+
+    private static bool TryReadKernelScalarRecordField(
+        LinqExpression kernelField,
+        Type fieldType,
+        out LinqExpression result)
+    {
+        if (fieldType == typeof(bool))
+            return Property(kernelField, nameof(KernelRpcValue.BoolValue), out result);
+        if (fieldType == typeof(int))
+            return Property(kernelField, nameof(KernelRpcValue.Int32Value), out result);
+        if (fieldType == typeof(long))
+            return Property(kernelField, nameof(KernelRpcValue.Int64Value), out result);
+        if (fieldType == typeof(float))
+        {
+            result = LinqExpression.Call(
+                DoubleToSingleMethod,
+                LinqExpression.Property(kernelField, nameof(KernelRpcValue.DoubleValue)));
+            return true;
+        }
+        if (fieldType == typeof(double))
+            return Property(kernelField, nameof(KernelRpcValue.DoubleValue), out result);
+        if (fieldType == typeof(string))
+            return Property(kernelField, nameof(KernelRpcValue.TextValue), out result);
+        if (fieldType == typeof(Guid))
+            return Property(kernelField, nameof(KernelRpcValue.GuidValue), out result);
+
+        result = null!;
+        return false;
+    }
+
+    private static LinqExpression ReadKernelEnumRecordField(LinqExpression kernelField, Type fieldType)
+    {
+        var propertyName = EnumUsesI64(fieldType) ? nameof(KernelRpcValue.Int64Value) : nameof(KernelRpcValue.Int32Value);
+        var method = EnumUsesI64(fieldType) ? EnumFromInt64Method : EnumFromInt32Method;
+        return LinqExpression.Convert(
+            LinqExpression.Call(
+                method,
+                LinqExpression.Constant(fieldType, typeof(Type)),
+                LinqExpression.Property(kernelField, propertyName)),
+            fieldType);
+    }
+
+    private static bool Property(LinqExpression instance, string propertyName, out LinqExpression result)
+    {
+        result = LinqExpression.Property(instance, propertyName);
+        return true;
     }
 
     private static MethodInfo ScalarReader(string name)

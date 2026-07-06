@@ -23,6 +23,21 @@ internal static class BindingCompiledTargetValidator
         "CeilF64",
         "RoundF64"
     };
+    private static readonly IReadOnlyDictionary<string, (SandboxType Return, SandboxType[] Parameters)> DirectCompiledSignatures =
+        new Dictionary<string, (SandboxType Return, SandboxType[] Parameters)>(StringComparer.Ordinal)
+        {
+            ["Int32ToStringInvariant"] = (SandboxType.String, [SandboxType.I32]),
+            ["StringLength"] = (SandboxType.I32, [SandboxType.String]),
+            ["ConcatString"] = (SandboxType.String, [SandboxType.String, SandboxType.String]),
+            ["AbsI32"] = (SandboxType.I32, [SandboxType.I32]),
+            ["MinI32"] = (SandboxType.I32, [SandboxType.I32, SandboxType.I32]),
+            ["MaxI32"] = (SandboxType.I32, [SandboxType.I32, SandboxType.I32]),
+            ["ClampI32"] = (SandboxType.I32, [SandboxType.I32, SandboxType.I32, SandboxType.I32]),
+            ["SqrtF64"] = (SandboxType.F64, [SandboxType.F64]),
+            ["FloorF64"] = (SandboxType.F64, [SandboxType.F64]),
+            ["CeilF64"] = (SandboxType.F64, [SandboxType.F64]),
+            ["RoundF64"] = (SandboxType.F64, [SandboxType.F64])
+        };
 
     public static void Validate(BindingDescriptor binding, List<SandboxDiagnostic> diagnostics)
     {
@@ -84,17 +99,9 @@ internal static class BindingCompiledTargetValidator
     }
 
     private static (SandboxType Return, SandboxType[] Parameters) DirectCompiledSignature(string method)
-        => method switch
-        {
-            "Int32ToStringInvariant" => (SandboxType.String, [SandboxType.I32]),
-            "StringLength" => (SandboxType.I32, [SandboxType.String]),
-            "ConcatString" => (SandboxType.String, [SandboxType.String, SandboxType.String]),
-            "AbsI32" => (SandboxType.I32, [SandboxType.I32]),
-            "MinI32" or "MaxI32" => (SandboxType.I32, [SandboxType.I32, SandboxType.I32]),
-            "ClampI32" => (SandboxType.I32, [SandboxType.I32, SandboxType.I32, SandboxType.I32]),
-            "SqrtF64" or "FloorF64" or "CeilF64" or "RoundF64" => (SandboxType.F64, [SandboxType.F64]),
-            _ => (SandboxType.Unit, [])
-        };
+        => DirectCompiledSignatures.TryGetValue(method, out var signature)
+            ? signature
+            : (SandboxType.Unit, []);
 
     private static SandboxDiagnostic DirectSignatureDiagnostic(BindingDescriptor binding)
         => new(

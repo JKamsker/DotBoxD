@@ -47,51 +47,68 @@ internal static class MethodSignatureFormatter
         foreach (var typeParameter in method.TypeParameters)
         {
             ct.ThrowIfCancellationRequested();
-
-            var constraints = new List<string>();
-            if (typeParameter.HasReferenceTypeConstraint)
+            var clause = GetConstraintClause(typeParameter, ct);
+            if (clause.Length > 0)
             {
-                constraints.Add(
-                    typeParameter.ReferenceTypeConstraintNullableAnnotation == NullableAnnotation.Annotated
-                        ? "class?"
-                        : "class");
-            }
-            else if (typeParameter.HasUnmanagedTypeConstraint)
-            {
-                constraints.Add("unmanaged");
-            }
-            else if (typeParameter.HasValueTypeConstraint)
-            {
-                constraints.Add("struct");
-            }
-            else if (typeParameter.HasNotNullConstraint)
-            {
-                constraints.Add("notnull");
-            }
-
-            foreach (var constraintType in typeParameter.ConstraintTypes)
-            {
-                ct.ThrowIfCancellationRequested();
-                constraints.Add(constraintType.ToDisplayString(s_qualifiedFormat));
-            }
-
-            if (typeParameter.HasConstructorConstraint)
-            {
-                constraints.Add("new()");
-            }
-
-            if (AllowsRefLikeType(typeParameter))
-            {
-                constraints.Add("allows ref struct");
-            }
-
-            if (constraints.Count > 0)
-            {
-                clauses.Add($" where {IdentifierHelpers.EscapeIdentifier(typeParameter.Name)} : {string.Join(", ", constraints)}");
+                clauses.Add(clause);
             }
         }
 
         return string.Concat(clauses);
+    }
+
+    private static string GetConstraintClause(ITypeParameterSymbol typeParameter, CancellationToken ct)
+    {
+        var constraints = new List<string>();
+        AddPrimaryConstraint(typeParameter, constraints);
+        foreach (var constraintType in typeParameter.ConstraintTypes)
+        {
+            ct.ThrowIfCancellationRequested();
+            constraints.Add(constraintType.ToDisplayString(s_qualifiedFormat));
+        }
+
+        if (typeParameter.HasConstructorConstraint)
+        {
+            constraints.Add("new()");
+        }
+
+        if (AllowsRefLikeType(typeParameter))
+        {
+            constraints.Add("allows ref struct");
+        }
+
+        return constraints.Count == 0
+            ? string.Empty
+            : $" where {IdentifierHelpers.EscapeIdentifier(typeParameter.Name)} : {string.Join(", ", constraints)}";
+    }
+
+    private static void AddPrimaryConstraint(ITypeParameterSymbol typeParameter, ICollection<string> constraints)
+    {
+        if (typeParameter.HasReferenceTypeConstraint)
+        {
+            constraints.Add(
+                typeParameter.ReferenceTypeConstraintNullableAnnotation == NullableAnnotation.Annotated
+                    ? "class?"
+                    : "class");
+            return;
+        }
+
+        if (typeParameter.HasUnmanagedTypeConstraint)
+        {
+            constraints.Add("unmanaged");
+            return;
+        }
+
+        if (typeParameter.HasValueTypeConstraint)
+        {
+            constraints.Add("struct");
+            return;
+        }
+
+        if (typeParameter.HasNotNullConstraint)
+        {
+            constraints.Add("notnull");
+        }
     }
 
     private static bool AllowsRefLikeType(ITypeParameterSymbol typeParameter) =>

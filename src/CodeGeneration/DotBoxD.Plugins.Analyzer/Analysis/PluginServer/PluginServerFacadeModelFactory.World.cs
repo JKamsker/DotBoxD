@@ -44,7 +44,7 @@ internal static partial class PluginServerFacadeModelFactory
             "is file-local or inaccessible and cannot be named from the generated facade.");
     }
 
-    private static bool IsAccessibleFromGeneratedServer(
+    internal static bool IsAccessibleFromGeneratedServer(
         Compilation compilation,
         INamedTypeSymbol serverType,
         ISymbol symbol)

@@ -7,6 +7,23 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 internal sealed partial class DotBoxDRpcJsonLowerer
 {
+    private static readonly Dictionary<SyntaxKind, string> BinaryOperatorJsonNames = new()
+    {
+        [SyntaxKind.AddExpression] = "add",
+        [SyntaxKind.SubtractExpression] = "sub",
+        [SyntaxKind.MultiplyExpression] = "mul",
+        [SyntaxKind.DivideExpression] = "div",
+        [SyntaxKind.ModuloExpression] = "rem",
+        [SyntaxKind.EqualsExpression] = "eq",
+        [SyntaxKind.NotEqualsExpression] = "ne",
+        [SyntaxKind.LessThanExpression] = "lt",
+        [SyntaxKind.LessThanOrEqualExpression] = "lte",
+        [SyntaxKind.GreaterThanExpression] = "gt",
+        [SyntaxKind.GreaterThanOrEqualExpression] = "gte",
+        [SyntaxKind.LogicalAndExpression] = "and",
+        [SyntaxKind.LogicalOrExpression] = "or"
+    };
+
     private static string LiteralJson(object? value)
         => value switch
         {
@@ -32,30 +49,16 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     internal static string Var(string name) => Obj(("var", Str(name)));
 
     private static string JsonBinaryOperator(BinaryExpressionSyntax binary)
-        => binary.Kind() switch
-        {
-            SyntaxKind.AddExpression => "add",
-            SyntaxKind.SubtractExpression => "sub",
-            SyntaxKind.MultiplyExpression => "mul",
-            SyntaxKind.DivideExpression => "div",
-            SyntaxKind.ModuloExpression => "rem",
-            SyntaxKind.EqualsExpression => "eq",
-            SyntaxKind.NotEqualsExpression => "ne",
-            SyntaxKind.LessThanExpression => "lt",
-            SyntaxKind.LessThanOrEqualExpression => "lte",
-            SyntaxKind.GreaterThanExpression => "gt",
-            SyntaxKind.GreaterThanOrEqualExpression => "gte",
-            SyntaxKind.LogicalAndExpression => "and",
-            SyntaxKind.LogicalOrExpression => "or",
-            _ => throw new NotSupportedException($"Server extension operator '{binary.OperatorToken.ValueText}' is not supported.")
-        };
+        => BinaryOperatorJsonNames.TryGetValue(binary.Kind(), out var op)
+            ? op
+            : throw new NotSupportedException($"Server extension operator '{binary.OperatorToken.ValueText}' is not supported.");
 
     internal static string RecordGet(string receiver, int index)
         => Call("record.get", null, receiver, I32(index));
 
-    private static string Unit() => Obj(("unit", "true"));
+    internal static string Unit() => Obj(("unit", "true"));
 
-    private static string I32(int value) => Obj(("i32", value.ToString(CultureInfo.InvariantCulture)));
+    internal static string I32(int value) => Obj(("i32", value.ToString(CultureInfo.InvariantCulture)));
 
     private static string I64(long value) => Obj(("i64", value.ToString(CultureInfo.InvariantCulture)));
 
@@ -99,10 +102,10 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 $"Kernel RPC service enum literal '{enumType.ToDisplayString()}' is not supported.")
         };
 
-    private static string BinaryJson(string op, string left, string right)
+    internal static string BinaryJson(string op, string left, string right)
         => Obj(("op", Str(op)), ("left", left), ("right", right));
 
-    private static string Call(string name, string? genericType, params string[] args)
+    internal static string Call(string name, string? genericType, params string[] args)
     {
         var fields = new List<(string, string)>(3) { ("call", Str(name)) };
         if (genericType is not null)
@@ -114,10 +117,10 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return Obj(fields.ToArray());
     }
 
-    private static string SetStatement(string name, string value)
+    internal static string SetStatement(string name, string value)
         => Obj(("op", Str("set")), ("name", Str(name)), ("value", value));
 
-    private static string Obj(params (string Key, string Value)[] fields)
+    internal static string Obj(params (string Key, string Value)[] fields)
     {
         var parts = new string[fields.Length];
         for (var i = 0; i < fields.Length; i++)
@@ -134,43 +137,57 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         builder.Append('"');
         foreach (var ch in value)
         {
-            switch (ch)
+            if (TryAppendEscapedChar(builder, ch))
             {
-                case '"':
-                    builder.Append("\\\"");
-                    break;
-                case '\\':
-                    builder.Append("\\\\");
-                    break;
-                case '\b':
-                    builder.Append("\\b");
-                    break;
-                case '\f':
-                    builder.Append("\\f");
-                    break;
-                case '\n':
-                    builder.Append("\\n");
-                    break;
-                case '\r':
-                    builder.Append("\\r");
-                    break;
-                case '\t':
-                    builder.Append("\\t");
-                    break;
-                default:
-                    if (ch < ' ')
-                    {
-                        builder.Append("\\u")
-                            .Append(((int)ch).ToString("x4", CultureInfo.InvariantCulture));
-                        break;
-                    }
-
-                    builder.Append(ch);
-                    break;
+                continue;
             }
+
+            AppendJsonChar(builder, ch);
         }
 
         builder.Append('"');
         return builder.ToString();
+    }
+
+    private static bool TryAppendEscapedChar(System.Text.StringBuilder builder, char ch)
+    {
+        switch (ch)
+        {
+            case '"':
+                builder.Append("\\\"");
+                return true;
+            case '\\':
+                builder.Append("\\\\");
+                return true;
+            case '\b':
+                builder.Append("\\b");
+                return true;
+            case '\f':
+                builder.Append("\\f");
+                return true;
+            case '\n':
+                builder.Append("\\n");
+                return true;
+            case '\r':
+                builder.Append("\\r");
+                return true;
+            case '\t':
+                builder.Append("\\t");
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static void AppendJsonChar(System.Text.StringBuilder builder, char ch)
+    {
+        if (ch < ' ')
+        {
+            builder.Append("\\u")
+                .Append(((int)ch).ToString("x4", CultureInfo.InvariantCulture));
+            return;
+        }
+
+        builder.Append(ch);
     }
 }

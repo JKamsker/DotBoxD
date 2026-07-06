@@ -21,10 +21,7 @@ internal static class PolicyResolver
             return;
         }
 
-        if (!policy.AllowedEffects.ContainsOnlyKnownBits())
-        {
-            diagnostics.Add(new SandboxDiagnostic("E-POLICY-EFFECT", "policy declares unknown effects"));
-        }
+        ValidateKnownEffects(policy, diagnostics);
 
         PolicyGrantValidator.Validate(
             policy,
@@ -37,7 +34,26 @@ internal static class PolicyResolver
         // shares a single consistent snapshot instead of re-reading DateTimeOffset.UtcNow
         // per requested/required capability over the cached grant index.
         var now = policy.GrantClock;
+        ValidateRequestedCapabilities(module, policy, now, diagnostics);
+        ValidateRequiredCapabilities(requiredCapabilities, policy, now, diagnostics);
+        ValidateDeniedEffects(requiredEffects, policy, diagnostics);
+        ValidateDeterministicPolicy(policy, requiredEffects, now, diagnostics);
+    }
 
+    private static void ValidateKnownEffects(SandboxPolicy policy, List<SandboxDiagnostic> diagnostics)
+    {
+        if (!policy.AllowedEffects.ContainsOnlyKnownBits())
+        {
+            diagnostics.Add(new SandboxDiagnostic("E-POLICY-EFFECT", "policy declares unknown effects"));
+        }
+    }
+
+    private static void ValidateRequestedCapabilities(
+        SandboxModule module,
+        SandboxPolicy policy,
+        DateTimeOffset now,
+        List<SandboxDiagnostic> diagnostics)
+    {
         foreach (var request in module.CapabilityRequests)
         {
             if (!policy.GrantsCapability(request.Id, now))
@@ -45,7 +61,14 @@ internal static class PolicyResolver
                 diagnostics.Add(new SandboxDiagnostic("E-POLICY-CAP", $"requested capability '{request.Id}' is not granted"));
             }
         }
+    }
 
+    private static void ValidateRequiredCapabilities(
+        IReadOnlySet<string> requiredCapabilities,
+        SandboxPolicy policy,
+        DateTimeOffset now,
+        List<SandboxDiagnostic> diagnostics)
+    {
         foreach (var capability in requiredCapabilities)
         {
             if (!policy.GrantsCapability(capability, now))
@@ -53,39 +76,54 @@ internal static class PolicyResolver
                 diagnostics.Add(new SandboxDiagnostic("E-POLICY-CAP", $"required capability '{capability}' is not granted"));
             }
         }
+    }
 
+    private static void ValidateDeniedEffects(
+        SandboxEffect requiredEffects,
+        SandboxPolicy policy,
+        List<SandboxDiagnostic> diagnostics)
+    {
         var deniedEffects = requiredEffects & ~policy.AllowedEffects;
         if (deniedEffects != SandboxEffect.None)
         {
             diagnostics.Add(new SandboxDiagnostic("E-POLICY-EFFECT", $"policy denies effects {deniedEffects}"));
         }
+    }
 
-        if (policy.Deterministic)
+    private static void ValidateDeterministicPolicy(
+        SandboxPolicy policy,
+        SandboxEffect requiredEffects,
+        DateTimeOffset now,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        if (!policy.Deterministic)
         {
-            if (policy.GrantsCapability(RuntimeCapabilityIds.Async, now))
-            {
-                diagnostics.Add(new SandboxDiagnostic(
-                    "E-POLICY-DETERMINISM",
-                    "deterministic policy cannot grant runtime async until serialized async limits are configurable"));
-            }
+            return;
+        }
 
-            if ((requiredEffects & SandboxEffect.Time) != 0 && policy.LogicalNow is null)
-            {
-                diagnostics.Add(new SandboxDiagnostic("E-POLICY-DETERMINISM", "deterministic policy requires logical time for Time effects"));
-            }
+        if (policy.GrantsCapability(RuntimeCapabilityIds.Async, now))
+        {
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-POLICY-DETERMINISM",
+                "deterministic policy cannot grant runtime async until serialized async limits are configurable"));
+        }
 
-            if ((requiredEffects & SandboxEffect.Random) != 0 && policy.RandomSeed is null)
-            {
-                diagnostics.Add(new SandboxDiagnostic("E-POLICY-DETERMINISM", "deterministic policy requires a random seed for Random effects"));
-            }
+        if ((requiredEffects & SandboxEffect.Time) != 0 && policy.LogicalNow is null)
+        {
+            diagnostics.Add(new SandboxDiagnostic("E-POLICY-DETERMINISM", "deterministic policy requires logical time for Time effects"));
+        }
 
-            var externalEffects = ExternalEffects(requiredEffects | policy.AllowedEffects);
-            if (externalEffects != SandboxEffect.None)
-            {
-                diagnostics.Add(new SandboxDiagnostic(
-                    "E-POLICY-DETERMINISM",
-                    $"deterministic policy denies external effects {externalEffects}"));
-            }
+        if ((requiredEffects & SandboxEffect.Random) != 0 && policy.RandomSeed is null)
+        {
+            diagnostics.Add(new SandboxDiagnostic("E-POLICY-DETERMINISM", "deterministic policy requires a random seed for Random effects"));
+        }
+
+        var externalEffects = ExternalEffects(requiredEffects | policy.AllowedEffects);
+        if (externalEffects != SandboxEffect.None)
+        {
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-POLICY-DETERMINISM",
+                $"deterministic policy denies external effects {externalEffects}"));
         }
     }
 

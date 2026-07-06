@@ -1,12 +1,11 @@
 using System.Threading;
-using DotBoxD.Services.SourceGenerator.Infrastructure;
 using Microsoft.CodeAnalysis;
 
 namespace DotBoxD.Services.SourceGenerator.Models;
 
 internal static partial class ReturnTypeClassifier
 {
-    private static bool HasGeneratedProxyCompanion(INamedTypeSymbol serviceType, CancellationToken ct)
+    internal static bool HasGeneratedProxyCompanion(INamedTypeSymbol serviceType, CancellationToken ct)
     {
         var proxyName = NamingHelpers.StripInterfacePrefix(serviceType.Name) + "Proxy";
         foreach (var candidate in serviceType.ContainingNamespace.GetTypeMembers(proxyName))
@@ -24,8 +23,7 @@ internal static partial class ReturnTypeClassifier
                 ct.ThrowIfCancellationRequested();
 
                 if (constructor is { DeclaredAccessibility: Accessibility.Public, Parameters.Length: 2 } &&
-                    constructor.Parameters[0].Type.ToDisplayString(s_qualifiedIdentityFormat) ==
-                    ServicesGeneratorTypeNames.GlobalRpcInvoker &&
+                    SubServiceReturnTypeReader.IsRpcInvokerType(constructor.Parameters[0].Type) &&
                     constructor.Parameters[1].Type.SpecialType == SpecialType.System_String)
                 {
                     return true;

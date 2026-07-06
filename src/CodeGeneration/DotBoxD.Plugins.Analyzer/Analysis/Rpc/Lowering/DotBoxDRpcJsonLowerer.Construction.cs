@@ -32,73 +32,178 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     private string LowerRecordCreation(BaseObjectCreationExpressionSyntax creation)
     {
         var created = TypeOf(creation);
-        if (DotBoxDRpcTypeMapper.ListElementType(created) is { } elementType &&
-            creation.Initializer is null &&
-            (creation.ArgumentList is null || creation.ArgumentList.Arguments.Count == 0))
+        if (TryLowerEmptyListCreation(creation, created) is { } emptyList)
         {
-            Allocates = true;
-            return Call("list.empty", DotBoxDRpcTypeMapper.JsonType(elementType, _model.Compilation));
+            return emptyList;
         }
+
         if (TryLowerMapCreation(creation, created) is { } emptyMap)
         {
             return emptyMap;
         }
-        if (created is not INamedTypeSymbol named || !DotBoxDRpcTypeMapper.IsRecordDto(named))
-        {
-            throw new NotSupportedException(
-                $"Server extension '{CreationText(creation)}' must construct a supported DTO or empty list.");
-        }
+
+        var named = RequireRecordDto(creation, created);
         Allocates = true;
         var fields = DotBoxDRpcTypeMapper.RecordFields(named);
-        var args = new string[fields.Count];
-        if (creation.ArgumentList is { Arguments.Count: > 0 } argumentList)
-        {
-            if (_model.GetSymbolInfo(creation, _cancellationToken).Symbol is not IMethodSymbol constructor ||
-                constructor.Parameters.Length > fields.Count)
-            {
-                throw new NotSupportedException($"Server extension constructor for '{named.Name}' must map each constructor parameter to a record field.");
-            }
-            var lowered = LowerArgumentsInParameterOrder(
-                argumentList.Arguments,
-                constructor.Parameters,
-                $"Server extension constructor for '{named.Name}'");
-            var assigned = new bool[fields.Count];
-            for (var i = 0; i < constructor.Parameters.Length; i++)
-            {
-                var fieldIndex = ConstructorFieldIndex(fields, constructor.Parameters[i], named);
-                if (assigned[fieldIndex])
-                {
-                    throw new NotSupportedException(
-                        $"Server extension constructor for '{named.Name}' must map one argument per field.");
-                }
-                args[fieldIndex] = lowered[i];
-                assigned[fieldIndex] = true;
-            }
-            if (creation.Initializer is { } initializer)
-            {
-                BindInitializer(initializer, fields, named, args, assigned, requireAllFields: false);
-            }
-            while (TryLowerDerivedField(fields, assigned, args, named))
-            {
-            }
-
-            for (var i = 0; i < fields.Count; i++)
-            {
-                if (!assigned[i])
-                {
-                    args[i] = LowerDerivedField(fields, assigned, args, named, fields[i]);
-                }
-            }
-        }
-        else if (creation.Initializer is { } initializer)
-        {
-            BindInitializer(initializer, fields, named, args, assigned: null, requireAllFields: true);
-        }
-        else
-        {
-            throw new NotSupportedException($"Server extension 'new {named.Name}' must use constructor arguments or an object initializer.");
-        }
+        var args = LowerRecordCreationArguments(creation, named, fields);
         return Call("record.new", DotBoxDRpcTypeMapper.JsonType(named, _model.Compilation), args);
+    }
+
+    private string? TryLowerEmptyListCreation(
+        BaseObjectCreationExpressionSyntax creation,
+        ITypeSymbol created)
+    {
+        if (DotBoxDRpcTypeMapper.ListElementType(created) is not { } elementType ||
+            creation.Initializer is not null ||
+            creation.ArgumentList is { Arguments.Count: > 0 })
+        {
+            return null;
+        }
+
+        Allocates = true;
+        return Call("list.empty", DotBoxDRpcTypeMapper.JsonType(elementType, _model.Compilation));
+    }
+
+    private static INamedTypeSymbol RequireRecordDto(
+        BaseObjectCreationExpressionSyntax creation,
+        ITypeSymbol created)
+    {
+        if (created is INamedTypeSymbol named && DotBoxDRpcTypeMapper.IsRecordDto(named))
+        {
+            return named;
+        }
+
+        throw new NotSupportedException(
+            $"Server extension '{CreationText(creation)}' must construct a supported DTO or empty list.");
+    }
+
+    private string[] LowerRecordCreationArguments(
+        BaseObjectCreationExpressionSyntax creation,
+        INamedTypeSymbol named,
+        IReadOnlyList<RecordMember> fields)
+    {
+        var args = new string[fields.Count];
+        if (TryBindConstructorCreation(creation, named, fields, args))
+        {
+            return args;
+        }
+
+        if (TryBindInitializerCreation(creation, named, fields, args))
+        {
+            return args;
+        }
+
+        throw new NotSupportedException($"Server extension 'new {named.Name}' must use constructor arguments or an object initializer.");
+    }
+
+    private bool TryBindConstructorCreation(
+        BaseObjectCreationExpressionSyntax creation,
+        INamedTypeSymbol named,
+        IReadOnlyList<RecordMember> fields,
+        string[] args)
+    {
+        if (creation.ArgumentList is not { Arguments.Count: > 0 } argumentList)
+        {
+            return false;
+        }
+
+        var constructor = ConstructorForCreation(creation, named, fields);
+        var lowered = LowerArgumentsInParameterOrder(
+            argumentList.Arguments,
+            constructor.Parameters,
+            $"Server extension constructor for '{named.Name}'");
+        var assigned = new bool[fields.Count];
+        BindConstructorArguments(constructor, fields, named, lowered, args, assigned);
+        if (creation.Initializer is { } initializer)
+        {
+            BindInitializer(initializer, fields, named, args, assigned, requireAllFields: false);
+        }
+
+        FillDerivedFields(fields, named, args, assigned);
+        return true;
+    }
+
+    private IMethodSymbol ConstructorForCreation(
+        BaseObjectCreationExpressionSyntax creation,
+        INamedTypeSymbol named,
+        IReadOnlyList<RecordMember> fields)
+    {
+        if (_model.GetSymbolInfo(creation, _cancellationToken).Symbol is IMethodSymbol constructor &&
+            constructor.Parameters.Length <= fields.Count)
+        {
+            return constructor;
+        }
+
+        throw new NotSupportedException($"Server extension constructor for '{named.Name}' must map each constructor parameter to a record field.");
+    }
+
+    private static void BindConstructorArguments(
+        IMethodSymbol constructor,
+        IReadOnlyList<RecordMember> fields,
+        INamedTypeSymbol named,
+        IReadOnlyList<string> lowered,
+        string[] args,
+        bool[] assigned)
+    {
+        for (var i = 0; i < constructor.Parameters.Length; i++)
+        {
+            BindConstructorArgument(constructor.Parameters[i], fields, named, lowered[i], args, assigned);
+        }
+    }
+
+    private static void BindConstructorArgument(
+        IParameterSymbol parameter,
+        IReadOnlyList<RecordMember> fields,
+        INamedTypeSymbol named,
+        string lowered,
+        string[] args,
+        bool[] assigned)
+    {
+        var fieldIndex = ConstructorFieldIndex(fields, parameter, named);
+        if (assigned[fieldIndex])
+        {
+            throw new NotSupportedException(
+                $"Server extension constructor for '{named.Name}' must map one argument per field.");
+        }
+
+        args[fieldIndex] = lowered;
+        assigned[fieldIndex] = true;
+    }
+
+    private bool TryBindInitializerCreation(
+        BaseObjectCreationExpressionSyntax creation,
+        INamedTypeSymbol named,
+        IReadOnlyList<RecordMember> fields,
+        string[] args)
+    {
+        if (creation.Initializer is not { } initializer)
+        {
+            return false;
+        }
+
+        BindInitializer(initializer, fields, named, args, assigned: null, requireAllFields: true);
+        return true;
+    }
+
+    private string[] FillDerivedFields(
+        IReadOnlyList<RecordMember> fields,
+        INamedTypeSymbol named,
+        string[] args,
+        bool[] assigned)
+    {
+        while (TryLowerDerivedField(fields, assigned, args, named))
+        {
+        }
+
+        for (var i = 0; i < fields.Count; i++)
+        {
+            if (!assigned[i])
+            {
+                args[i] = LowerDerivedField(fields, assigned, args, named, fields[i]);
+            }
+        }
+
+        return args;
     }
 
     private static string CreationText(BaseObjectCreationExpressionSyntax creation)

@@ -108,21 +108,33 @@ internal static partial class HookChainModelFactory
             return null;
         }
 
-        if (type is IArrayTypeSymbol arrayType)
+        return type switch
         {
-            return FindFileLocalType(arrayType.ElementType, visited);
-        }
+            IArrayTypeSymbol arrayType => FindFileLocalType(arrayType.ElementType, visited),
+            INamedTypeSymbol namedType => FindFileLocalNamedType(namedType, visited),
+            _ => null
+        };
+    }
 
-        if (type is not INamedTypeSymbol namedType)
-        {
-            return null;
-        }
-
+    private static INamedTypeSymbol? FindFileLocalNamedType(INamedTypeSymbol namedType, HashSet<ITypeSymbol> visited)
+    {
         if (IsFileLocal(namedType))
         {
             return namedType;
         }
 
+        if (FindFileLocalTypeArgument(namedType, visited) is { } fileLocalType)
+        {
+            return fileLocalType;
+        }
+
+        return namedType.IsAnonymousType
+            ? FindFileLocalAnonymousMemberType(namedType, visited)
+            : null;
+    }
+
+    private static INamedTypeSymbol? FindFileLocalTypeArgument(INamedTypeSymbol namedType, HashSet<ITypeSymbol> visited)
+    {
         foreach (var typeArgument in namedType.TypeArguments)
         {
             if (FindFileLocalType(typeArgument, visited) is { } fileLocalType)
@@ -131,11 +143,13 @@ internal static partial class HookChainModelFactory
             }
         }
 
-        if (!namedType.IsAnonymousType)
-        {
-            return null;
-        }
+        return null;
+    }
 
+    private static INamedTypeSymbol? FindFileLocalAnonymousMemberType(
+        INamedTypeSymbol namedType,
+        HashSet<ITypeSymbol> visited)
+    {
         foreach (var member in namedType.GetMembers())
         {
             if (member is IPropertySymbol { IsStatic: false } property &&

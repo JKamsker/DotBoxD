@@ -6,11 +6,74 @@ namespace DotBoxD.CodeGeneration.Shared.Defaults;
 
 internal static class CSharpLiteralFormatter
 {
+    private static readonly System.Collections.Generic.Dictionary<System.Type, PrimitiveLiteralFormatter> s_primitiveFormatters = new()
+    {
+        [typeof(bool)] = static (value, _) => (bool)value ? "true" : "false",
+        [typeof(string)] = static (value, _) => "\"" + EscapeStringLiteral((string)value) + "\"",
+        [typeof(char)] = static (value, _) => "'" + EscapeCharLiteral((char)value) + "'",
+        [typeof(sbyte)] = static (value, _) => ((sbyte)value).ToString(CultureInfo.InvariantCulture),
+        [typeof(byte)] = static (value, _) => ((byte)value).ToString(CultureInfo.InvariantCulture),
+        [typeof(short)] = static (value, _) => ((short)value).ToString(CultureInfo.InvariantCulture),
+        [typeof(ushort)] = static (value, _) => ((ushort)value).ToString(CultureInfo.InvariantCulture),
+        [typeof(int)] = static (value, _) => ((int)value).ToString(CultureInfo.InvariantCulture),
+        [typeof(uint)] = static (value, options) => ((uint)value).ToString(CultureInfo.InvariantCulture) + Suffix("U", options),
+        [typeof(long)] = static (value, options) => ((long)value).ToString(CultureInfo.InvariantCulture) + Suffix("L", options),
+        [typeof(ulong)] = static (value, options) => ((ulong)value).ToString(CultureInfo.InvariantCulture) + Suffix("UL", options),
+        [typeof(float)] = static (value, options) => FormatSingleLiteral((float)value, options),
+        [typeof(double)] = static (value, options) => FormatDoubleLiteral((double)value, options),
+        [typeof(decimal)] = static (value, options) => ((decimal)value).ToString(CultureInfo.InvariantCulture) + Suffix("M", options),
+    };
+
+    private static readonly System.Collections.Generic.Dictionary<SpecialType, System.Func<object, long>> s_signedEnumConverters = new()
+    {
+        [SpecialType.System_UInt64] = static value => unchecked((long)(ulong)value),
+        [SpecialType.System_UInt32] = static value => unchecked((int)(uint)value),
+        [SpecialType.System_Int64] = static value => (long)value,
+        [SpecialType.System_Int32] = static value => (int)value,
+        [SpecialType.System_UInt16] = static value => (ushort)value,
+        [SpecialType.System_Int16] = static value => (short)value,
+        [SpecialType.System_Byte] = static value => (byte)value,
+        [SpecialType.System_SByte] = static value => (sbyte)value,
+    };
+
+    private static readonly System.Collections.Generic.Dictionary<char, string> s_charEscapes = new()
+    {
+        ['\''] = "\\'",
+        ['\\'] = "\\\\",
+        ['\0'] = "\\0",
+        ['\a'] = "\\a",
+        ['\b'] = "\\b",
+        ['\f'] = "\\f",
+        ['\n'] = "\\n",
+        ['\r'] = "\\r",
+        ['\t'] = "\\t",
+        ['\v'] = "\\v",
+    };
+
+    private static readonly System.Collections.Generic.Dictionary<char, string> s_stringEscapes = new()
+    {
+        ['\\'] = "\\\\",
+        ['"'] = "\\\"",
+        ['\a'] = "\\a",
+        ['\b'] = "\\b",
+        ['\f'] = "\\f",
+        ['\v'] = "\\v",
+        ['\r'] = "\\r",
+        ['\n'] = "\\n",
+        ['\u0085'] = "\\u0085",
+        ['\u2028'] = "\\u2028",
+        ['\u2029'] = "\\u2029",
+        ['\t'] = "\\t",
+        ['\0'] = "\\0",
+    };
+
     private static readonly SymbolDisplayFormat s_qualifiedFormat =
         SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
             SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions |
             SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers |
             SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
+
+    private delegate string PrimitiveLiteralFormatter(object value, DefaultLiteralOptions options);
 
     public static string? FormatValue(object? value, ITypeSymbol type, DefaultLiteralOptions options)
     {
@@ -64,24 +127,9 @@ internal static class CSharpLiteralFormatter
     }
 
     public static string? FormatPrimitiveLiteral(object value, DefaultLiteralOptions options)
-        => value switch
-        {
-            bool b => b ? "true" : "false",
-            string s => "\"" + EscapeStringLiteral(s) + "\"",
-            char c => "'" + EscapeCharLiteral(c) + "'",
-            sbyte v => v.ToString(CultureInfo.InvariantCulture),
-            byte v => v.ToString(CultureInfo.InvariantCulture),
-            short v => v.ToString(CultureInfo.InvariantCulture),
-            ushort v => v.ToString(CultureInfo.InvariantCulture),
-            int v => v.ToString(CultureInfo.InvariantCulture),
-            uint v => v.ToString(CultureInfo.InvariantCulture) + Suffix("U", options),
-            long v => v.ToString(CultureInfo.InvariantCulture) + Suffix("L", options),
-            ulong v => v.ToString(CultureInfo.InvariantCulture) + Suffix("UL", options),
-            float v => FormatSingleLiteral(v, options),
-            double v => FormatDoubleLiteral(v, options),
-            decimal v => v.ToString(CultureInfo.InvariantCulture) + Suffix("M", options),
-            _ => null,
-        };
+        => s_primitiveFormatters.TryGetValue(value.GetType(), out var formatter)
+            ? formatter(value, options)
+            : null;
 
     public static string EscapeStringLiteral(string value)
     {
@@ -132,19 +180,14 @@ internal static class CSharpLiteralFormatter
         object value,
         DefaultLiteralOptions options)
     {
-        var raw = enumType.EnumUnderlyingType?.SpecialType switch
+        var underlying = enumType.EnumUnderlyingType?.SpecialType;
+        if (underlying is null || !s_signedEnumConverters.TryGetValue(underlying.Value, out var converter))
         {
-            SpecialType.System_UInt64 => unchecked((long)(ulong)value),
-            SpecialType.System_UInt32 => unchecked((int)(uint)value),
-            SpecialType.System_Int64 => (long)value,
-            SpecialType.System_Int32 => (int)value,
-            SpecialType.System_UInt16 => (ushort)value,
-            SpecialType.System_Int16 => (short)value,
-            SpecialType.System_Byte => (byte)value,
-            SpecialType.System_SByte => (sbyte)value,
-            _ => throw new System.NotSupportedException(
-                $"Enum literal values for '{enumType.ToDisplayString()}' are not supported.")
-        };
+            throw new System.NotSupportedException(
+                $"Enum literal values for '{enumType.ToDisplayString()}' are not supported.");
+        }
+
+        var raw = converter(value);
         return raw.ToString(CultureInfo.InvariantCulture) +
             (enumType.EnumUnderlyingType?.SpecialType is SpecialType.System_Int64 or SpecialType.System_UInt64
                 ? Suffix("L", options)
@@ -192,79 +235,30 @@ internal static class CSharpLiteralFormatter
     }
 
     private static string EscapeCharLiteral(char c)
-        => c switch
+    {
+        if (s_charEscapes.TryGetValue(c, out var escaped))
         {
-            '\'' => "\\'",
-            '\\' => "\\\\",
-            '\0' => "\\0",
-            '\a' => "\\a",
-            '\b' => "\\b",
-            '\f' => "\\f",
-            '\n' => "\\n",
-            '\r' => "\\r",
-            '\t' => "\\t",
-            '\v' => "\\v",
-            _ => char.IsControl(c) || c == 0x2028 || c == 0x2029
-                ? "\\u" + ((int)c).ToString("x4", CultureInfo.InvariantCulture)
-                : c.ToString(),
-        };
+            return escaped;
+        }
+
+        return char.IsControl(c) || c is '\u2028' or '\u2029'
+            ? UnicodeEscape(c)
+            : c.ToString();
+    }
 
     private static void AppendEscapedStringCharacter(StringBuilder builder, char c)
     {
-        switch (c)
+        if (s_stringEscapes.TryGetValue(c, out var escaped))
         {
-            case '\\':
-                builder.Append("\\\\");
-                break;
-            case '"':
-                builder.Append("\\\"");
-                break;
-            case '\a':
-                builder.Append("\\a");
-                break;
-            case '\b':
-                builder.Append("\\b");
-                break;
-            case '\f':
-                builder.Append("\\f");
-                break;
-            case '\v':
-                builder.Append("\\v");
-                break;
-            case '\r':
-                builder.Append("\\r");
-                break;
-            case '\n':
-                builder.Append("\\n");
-                break;
-            case '\u0085':
-                builder.Append("\\u0085");
-                break;
-            case '\u2028':
-                builder.Append("\\u2028");
-                break;
-            case '\u2029':
-                builder.Append("\\u2029");
-                break;
-            case '\t':
-                builder.Append("\\t");
-                break;
-            case '\0':
-                builder.Append("\\0");
-                break;
-            default:
-                if (char.IsControl(c))
-                {
-                    builder.Append("\\u").Append(((int)c).ToString("x4", CultureInfo.InvariantCulture));
-                }
-                else
-                {
-                    builder.Append(c);
-                }
-
-                break;
+            builder.Append(escaped);
+            return;
         }
+
+        builder.Append(char.IsControl(c) ? UnicodeEscape(c) : c);
     }
+
+    private static string UnicodeEscape(char c)
+        => "\\u" + ((int)c).ToString("x4", CultureInfo.InvariantCulture);
 
     private static bool IsRuntimeDefaultValue(object value)
     {

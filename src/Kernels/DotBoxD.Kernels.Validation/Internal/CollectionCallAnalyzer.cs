@@ -35,6 +35,24 @@ internal sealed class CollectionCallAnalyzer
             type = SandboxType.Unit;
             return false;
         }
+        if (TryAnalyzeListCall(call, scope, ref effects, ref canReorder, out type) ||
+            TryAnalyzeMapCall(call, scope, ref effects, ref canReorder, out type) ||
+            TryAnalyzeRecordCall(call, scope, ref effects, ref canReorder, out type))
+        {
+            return true;
+        }
+
+        type = SandboxType.Unit;
+        return true;
+    }
+
+    private bool TryAnalyzeListCall(
+        CallExpression call,
+        FunctionScope scope,
+        ref SandboxEffect effects,
+        ref bool canReorder,
+        out SandboxType type)
+    {
         type = call.Name switch
         {
             "list.empty" => AnalyzeListEmpty(call, ref effects),
@@ -42,16 +60,44 @@ internal sealed class CollectionCallAnalyzer
             "list.count" => AnalyzeListCount(call, scope, ref effects, ref canReorder),
             "list.get" => AnalyzeListGet(call, scope, ref effects, ref canReorder),
             "list.add" => AnalyzeListAdd(call, scope, ref effects, ref canReorder),
+            _ => null!
+        };
+        return type is not null;
+    }
+
+    private bool TryAnalyzeMapCall(
+        CallExpression call,
+        FunctionScope scope,
+        ref SandboxEffect effects,
+        ref bool canReorder,
+        out SandboxType type)
+    {
+        type = call.Name switch
+        {
             "map.empty" => _mapCalls.AnalyzeMapEmpty(call, ref effects),
             "map.containsKey" => _mapCalls.AnalyzeMapContainsKey(call, scope, ref effects, ref canReorder),
             "map.get" => _mapCalls.AnalyzeMapGet(call, scope, ref effects, ref canReorder),
             "map.set" => _mapCalls.AnalyzeMapSet(call, scope, ref effects, ref canReorder),
             "map.remove" => _mapCalls.AnalyzeMapRemove(call, scope, ref effects, ref canReorder),
+            _ => null!
+        };
+        return type is not null;
+    }
+
+    private bool TryAnalyzeRecordCall(
+        CallExpression call,
+        FunctionScope scope,
+        ref SandboxEffect effects,
+        ref bool canReorder,
+        out SandboxType type)
+    {
+        type = call.Name switch
+        {
             "record.new" => _recordCalls.AnalyzeRecordNew(call, scope, ref effects, ref canReorder),
             "record.get" => _recordCalls.AnalyzeRecordGet(call, scope, ref effects, ref canReorder),
-            _ => SandboxType.Unit
+            _ => null!
         };
-        return true;
+        return type is not null;
     }
     private SandboxType AnalyzeListEmpty(CallExpression call, ref SandboxEffect effects)
     {
@@ -177,7 +223,6 @@ internal sealed class CollectionCallAnalyzer
             Span: call.Span));
 
     private static bool IsCollectionCall(string name)
-        => name is "list.empty" or "list.of" or "list.count" or "list.get" or "list.add"
-            or "map.empty" or "map.containsKey" or "map.get" or "map.set" or "map.remove"
-            or "record.new" or "record.get";
+        => SandboxCollectionFuel.IsCollectionIntrinsic(name) ||
+           name is "record.new" or "record.get";
 }

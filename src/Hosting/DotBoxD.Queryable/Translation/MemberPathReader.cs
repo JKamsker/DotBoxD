@@ -9,6 +9,47 @@ namespace DotBoxD.Queryable.Translation;
 /// </summary>
 internal static class MemberPathReader
 {
+    private static readonly HashSet<(TypeCode Source, TypeCode Target)> ExactNumericWidenings =
+    [
+        (TypeCode.SByte, TypeCode.Int16),
+        (TypeCode.SByte, TypeCode.Int32),
+        (TypeCode.SByte, TypeCode.Int64),
+        (TypeCode.SByte, TypeCode.Single),
+        (TypeCode.SByte, TypeCode.Double),
+        (TypeCode.SByte, TypeCode.Decimal),
+        (TypeCode.Byte, TypeCode.Int16),
+        (TypeCode.Byte, TypeCode.UInt16),
+        (TypeCode.Byte, TypeCode.Int32),
+        (TypeCode.Byte, TypeCode.UInt32),
+        (TypeCode.Byte, TypeCode.Int64),
+        (TypeCode.Byte, TypeCode.UInt64),
+        (TypeCode.Byte, TypeCode.Single),
+        (TypeCode.Byte, TypeCode.Double),
+        (TypeCode.Byte, TypeCode.Decimal),
+        (TypeCode.Int16, TypeCode.Int32),
+        (TypeCode.Int16, TypeCode.Int64),
+        (TypeCode.Int16, TypeCode.Single),
+        (TypeCode.Int16, TypeCode.Double),
+        (TypeCode.Int16, TypeCode.Decimal),
+        (TypeCode.UInt16, TypeCode.Int32),
+        (TypeCode.UInt16, TypeCode.UInt32),
+        (TypeCode.UInt16, TypeCode.Int64),
+        (TypeCode.UInt16, TypeCode.UInt64),
+        (TypeCode.UInt16, TypeCode.Single),
+        (TypeCode.UInt16, TypeCode.Double),
+        (TypeCode.UInt16, TypeCode.Decimal),
+        (TypeCode.Int32, TypeCode.Int64),
+        (TypeCode.Int32, TypeCode.Double),
+        (TypeCode.Int32, TypeCode.Decimal),
+        (TypeCode.UInt32, TypeCode.Int64),
+        (TypeCode.UInt32, TypeCode.UInt64),
+        (TypeCode.UInt32, TypeCode.Double),
+        (TypeCode.UInt32, TypeCode.Decimal),
+        (TypeCode.Int64, TypeCode.Decimal),
+        (TypeCode.UInt64, TypeCode.Decimal),
+        (TypeCode.Single, TypeCode.Double),
+    ];
+
     /// <summary>
     /// Attempts to read the dotted path of a member chain rooted directly at <paramref name="parameter"/>.
     /// Returns <see langword="false"/> for any expression that is not a pure parameter-rooted member chain.
@@ -118,25 +159,7 @@ internal static class MemberPathReader
     }
 
     private static bool IsExactNumericWidening(Type source, Type target)
-    {
-        var targetCode = Type.GetTypeCode(target);
-        return Type.GetTypeCode(source) switch
-        {
-            TypeCode.SByte => targetCode is TypeCode.Int16 or TypeCode.Int32 or TypeCode.Int64 or TypeCode.Single or
-                TypeCode.Double or TypeCode.Decimal,
-            TypeCode.Byte => targetCode is TypeCode.Int16 or TypeCode.UInt16 or TypeCode.Int32 or TypeCode.UInt32 or
-                TypeCode.Int64 or TypeCode.UInt64 or TypeCode.Single or TypeCode.Double or TypeCode.Decimal,
-            TypeCode.Int16 => targetCode is TypeCode.Int32 or TypeCode.Int64 or TypeCode.Single or TypeCode.Double or
-                TypeCode.Decimal,
-            TypeCode.UInt16 => targetCode is TypeCode.Int32 or TypeCode.UInt32 or TypeCode.Int64 or TypeCode.UInt64 or
-                TypeCode.Single or TypeCode.Double or TypeCode.Decimal,
-            TypeCode.Int32 => targetCode is TypeCode.Int64 or TypeCode.Double or TypeCode.Decimal,
-            TypeCode.UInt32 => targetCode is TypeCode.Int64 or TypeCode.UInt64 or TypeCode.Double or TypeCode.Decimal,
-            TypeCode.Int64 or TypeCode.UInt64 => targetCode is TypeCode.Decimal,
-            TypeCode.Single => targetCode is TypeCode.Double,
-            _ => false,
-        };
-    }
+        => ExactNumericWidenings.Contains((Type.GetTypeCode(source), Type.GetTypeCode(target)));
 
     private sealed class ParameterFinder(ParameterExpression parameter) : ExpressionVisitor
     {

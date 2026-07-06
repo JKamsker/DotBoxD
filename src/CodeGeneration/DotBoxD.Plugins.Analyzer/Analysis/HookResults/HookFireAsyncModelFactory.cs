@@ -21,16 +21,7 @@ internal static class HookFireAsyncModelFactory
 
         foreach (var attribute in context.Attributes)
         {
-            if (!string.Equals(
-                    attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDMetadataNames.HookAttribute,
-                    StringComparison.Ordinal) ||
-                attribute.ConstructorArguments.Length != 2 ||
-                attribute.ConstructorArguments[1].Value is not INamedTypeSymbol resultType ||
-                !HookResultModelFactory.CanSatisfyHookResult(
-                    resultType,
-                    context.SemanticModel.Compilation,
-                    cancellationToken))
+            if (!TryGetHookResultType(attribute, context.SemanticModel.Compilation, cancellationToken, out var resultType))
             {
                 continue;
             }
@@ -55,6 +46,40 @@ internal static class HookFireAsyncModelFactory
         }
 
         return null;
+    }
+
+    private static bool TryGetHookResultType(
+        AttributeData attribute,
+        Compilation compilation,
+        CancellationToken cancellationToken,
+        out INamedTypeSymbol resultType)
+    {
+        resultType = null!;
+        if (!string.Equals(
+                attribute.AttributeClass?.ToDisplayString(),
+                DotBoxDMetadataNames.HookAttribute,
+                StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (attribute.ConstructorArguments.Length != 2)
+        {
+            return false;
+        }
+
+        if (attribute.ConstructorArguments[1].Value is not INamedTypeSymbol candidate)
+        {
+            return false;
+        }
+
+        if (!HookResultModelFactory.CanSatisfyHookResult(candidate, compilation, cancellationToken))
+        {
+            return false;
+        }
+
+        resultType = candidate;
+        return true;
     }
 
     private static bool IsFileLocalOrNestedInFileLocal(
