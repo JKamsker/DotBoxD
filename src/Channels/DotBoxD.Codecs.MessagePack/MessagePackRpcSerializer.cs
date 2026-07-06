@@ -98,6 +98,8 @@ public sealed class MessagePackRpcSerializer : ISerializer
 
     public void Serialize<T>(System.Buffers.IBufferWriter<byte> writer, T value)
     {
+        ThrowIfUnsupportedObjectDeclaredScalar(typeof(T), value);
+
         try
         {
             if (ConstructorReplayGuard.TrySerialize(writer, value, _options))
@@ -115,6 +117,22 @@ public sealed class MessagePackRpcSerializer : ISerializer
             }
 
             throw;
+        }
+    }
+
+    private static void ThrowIfUnsupportedObjectDeclaredScalar<T>(Type declaredType, T value)
+    {
+        if (declaredType != typeof(object) || value is null)
+        {
+            return;
+        }
+
+        var runtimeType = value.GetType();
+        if (runtimeType == typeof(Guid) || runtimeType == typeof(DateTimeOffset))
+        {
+            throw new MessagePackSerializationException(
+                $"{runtimeType.FullName} cannot be serialized through an object-declared payload " +
+                "because MessagePack cannot deserialize it back to the same CLR type without a declared target type.");
         }
     }
 
