@@ -127,7 +127,7 @@ internal static partial class PluginServerFacadeModelFactory
         }
     }
 
-    private static bool IsPartialClass(INamedTypeSymbol type, CancellationToken cancellationToken)
+    internal static bool IsPartialClass(INamedTypeSymbol type, CancellationToken cancellationToken)
     {
         foreach (var reference in type.DeclaringSyntaxReferences)
         {

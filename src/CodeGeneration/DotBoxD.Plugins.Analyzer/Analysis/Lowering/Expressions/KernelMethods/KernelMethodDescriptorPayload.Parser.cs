@@ -23,32 +23,32 @@ internal static partial class KernelMethodDescriptorPayloadParser
     public static bool TryParse(string payload, out KernelMethodDescriptorPayload? descriptor)
     {
         descriptor = null;
-        if (!TryObject(payload, RootPropertyNames, out var properties) ||
-            !TryBool(properties, "allocates", out var allocates) ||
-            !TryStringArray(properties, "capabilities", out var capabilities) ||
-            !TryString(properties, "contextType", out var contextType) ||
-            !TryStringArray(properties, "effects", out var effects) ||
-            !TryString(properties, "methodMetadataName", out var methodMetadataName) ||
-            !TryString(properties, "normalizedSignature", out var normalizedSignature) ||
-            !TryParameters(properties, out var parameters) ||
-            !TryString(properties, "returnType", out var returnType) ||
-            !TryString(properties, "source", out var source) ||
-            !TryInt(properties, "version", out var version))
+        if (!TryObject(payload, RootPropertyNames, out var properties))
+        {
+            return false;
+        }
+
+        if (!TryDescriptorScalars(properties, out var scalars))
+        {
+            return false;
+        }
+
+        if (!TryDescriptorCollections(properties, out var collections))
         {
             return false;
         }
 
         descriptor = new KernelMethodDescriptorPayload(
-            version,
-            contextType,
-            methodMetadataName,
-            normalizedSignature,
-            returnType,
-            allocates,
-            new EquatableArray<string>(capabilities),
-            new EquatableArray<string>(effects),
-            new EquatableArray<KernelMethodDescriptorParameter>(parameters),
-            source);
+            scalars.Version,
+            scalars.ContextType,
+            scalars.MethodMetadataName,
+            scalars.NormalizedSignature,
+            scalars.ReturnType,
+            scalars.Allocates,
+            new EquatableArray<string>(collections.Capabilities),
+            new EquatableArray<string>(collections.Effects),
+            new EquatableArray<KernelMethodDescriptorParameter>(collections.Parameters),
+            scalars.Source);
         return true;
     }
 
@@ -59,7 +59,7 @@ internal static partial class KernelMethodDescriptorPayloadParser
     {
         properties = new Dictionary<string, string>(StringComparer.Ordinal);
         var index = SkipWhitespace(json, 0);
-        if (index >= json.Length || json[index++] != '{')
+        if (!TryReadObjectStart(json, ref index))
         {
             return false;
         }
@@ -67,50 +67,82 @@ internal static partial class KernelMethodDescriptorPayloadParser
         while (true)
         {
             index = SkipWhitespace(json, index);
-            if (index < json.Length && json[index] == '}')
+            if (TryFinishObject(json, index, out index))
             {
-                index++;
                 return SkipWhitespace(json, index) == json.Length;
             }
 
-            if (!TryReadString(json, ref index, out var name))
+            if (!TryReadObjectProperty(json, allowedNames, properties, ref index) ||
+                !TryReadObjectSeparator(json, ref index))
             {
                 return false;
             }
+        }
+    }
 
-            if (!ContainsName(allowedNames, name) || properties.ContainsKey(name))
-            {
-                return false;
-            }
-
-            index = SkipWhitespace(json, index);
-            if (index >= json.Length || json[index++] != ':')
-            {
-                return false;
-            }
-
-            index = SkipWhitespace(json, index);
-            var valueStart = index;
-            if (!SkipValue(json, ref index))
-            {
-                return false;
-            }
-
-            properties.Add(name, json.Substring(valueStart, index - valueStart));
-            index = SkipWhitespace(json, index);
-            if (index < json.Length && json[index] == ',')
-            {
-                index++;
-                continue;
-            }
-
-            if (index < json.Length && json[index] == '}')
-            {
-                continue;
-            }
-
+    private static bool TryReadObjectStart(string json, ref int index)
+    {
+        if (index >= json.Length || json[index] != '{')
+        {
             return false;
         }
+
+        index++;
+        return true;
+    }
+
+    private static bool TryFinishObject(string json, int index, out int nextIndex)
+    {
+        nextIndex = index;
+        if (index >= json.Length || json[index] != '}')
+        {
+            return false;
+        }
+
+        nextIndex++;
+        return true;
+    }
+
+    private static bool TryReadObjectProperty(
+        string json,
+        IReadOnlyList<string> allowedNames,
+        Dictionary<string, string> properties,
+        ref int index)
+    {
+        if (!TryReadString(json, ref index, out var name) ||
+            !ContainsName(allowedNames, name) ||
+            properties.ContainsKey(name))
+        {
+            return false;
+        }
+
+        index = SkipWhitespace(json, index);
+        if (index >= json.Length || json[index++] != ':')
+        {
+            return false;
+        }
+
+        index = SkipWhitespace(json, index);
+        var valueStart = index;
+        if (!SkipValue(json, ref index))
+        {
+            return false;
+        }
+
+        properties.Add(name, json.Substring(valueStart, index - valueStart));
+        return true;
+    }
+
+    private static bool TryReadObjectSeparator(string json, ref int index)
+    {
+        index = SkipWhitespace(json, index);
+        if (index < json.Length && json[index] == ',')
+        {
+            index++;
+            return true;
+        }
+
+        return index < json.Length && json[index] == '}';
     }
 
     private static bool TryParameters(
@@ -225,20 +257,30 @@ internal static partial class KernelMethodDescriptorPayloadParser
             }
 
             items.Add(json.Substring(valueStart, index - valueStart));
-            index = SkipWhitespace(json, index);
-            if (index < json.Length && json[index] == ',')
-            {
-                index++;
-                continue;
-            }
-
-            if (index < json.Length && json[index] == ']')
+            if (TryReadArraySeparator(json, ref index))
             {
                 continue;
             }
 
             return false;
         }
+    }
+
+    private static bool TryReadArraySeparator(string json, ref int index)
+    {
+        index = SkipWhitespace(json, index);
+        if (index >= json.Length)
+        {
+            return false;
+        }
+
+        if (json[index] == ',')
+        {
+            index++;
+            return true;
+        }
+
+        return json[index] == ']';
     }
 
     private static bool ContainsName(IReadOnlyList<string> allowedNames, string name)

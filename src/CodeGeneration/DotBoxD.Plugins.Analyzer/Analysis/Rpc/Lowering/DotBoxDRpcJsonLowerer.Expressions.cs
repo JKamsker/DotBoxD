@@ -18,31 +18,57 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             return ApplyNumericConversion(expression, overridden);
         }
 
-        if (_model.GetConstantValue(expression, _cancellationToken) is { HasValue: true } constant)
+        if (TryLowerConstantExpression(expression, out var constant))
         {
-            if (constant.Value is string)
-            {
-                Allocates = true;
-            }
-            return LiteralJson(expression, constant.Value);
+            return constant;
         }
-        var lowered = expression switch
+
+        var lowered = TryLowerSimpleExpression(expression) ??
+                      TryLowerStructuredExpression(expression) ??
+                      throw new NotSupportedException($"Server extension expression '{expression}' is not supported.");
+        return ApplyNumericConversion(expression, lowered);
+    }
+
+    private bool TryLowerConstantExpression(ExpressionSyntax expression, out string lowered)
+    {
+        lowered = string.Empty;
+        if (_model.GetConstantValue(expression, _cancellationToken) is not { HasValue: true } constant)
+        {
+            return false;
+        }
+
+        if (constant.Value is string)
+        {
+            Allocates = true;
+        }
+
+        lowered = LiteralJson(expression, constant.Value);
+        return true;
+    }
+
+    private string? TryLowerSimpleExpression(ExpressionSyntax expression)
+        => expression switch
         {
             ParenthesizedExpressionSyntax parenthesized => LowerExpression(parenthesized.Expression),
             AwaitExpressionSyntax awaited => LowerExpression(awaited.Expression),
             IdentifierNameSyntax identifier => LowerIdentifier(identifier),
             PrefixUnaryExpressionSyntax unary => LowerUnary(unary),
             CastExpressionSyntax cast => LowerCast(cast),
+            _ => null
+        };
+
+    private string? TryLowerStructuredExpression(ExpressionSyntax expression)
+        => expression switch
+        {
             BinaryExpressionSyntax binary => LowerBinary(binary),
             InvocationExpressionSyntax invocation => LowerInvocation(invocation),
             ObjectCreationExpressionSyntax creation => LowerRecordCreation(creation),
             ImplicitObjectCreationExpressionSyntax creation => LowerRecordCreation(creation),
             ElementAccessExpressionSyntax element => LowerElementAccess(element),
             MemberAccessExpressionSyntax member => LowerMemberAccess(member),
-            _ => throw new NotSupportedException($"Server extension expression '{expression}' is not supported.")
+            _ => null
         };
-        return ApplyNumericConversion(expression, lowered);
-    }
+
     private string LowerUnary(PrefixUnaryExpressionSyntax unary)
         => unary.Kind() switch
         {
@@ -254,7 +280,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return TryLowerMapElementGet(element, receiverType)
             ?? throw new NotSupportedException($"Server extension indexing '{element}' is not supported.");
     }
-    private ITypeSymbol TypeOf(ExpressionSyntax expression)
+    internal ITypeSymbol TypeOf(ExpressionSyntax expression)
     {
         if (IsServerContextExpression(expression) && _serverContextType is { } serverContextType)
         {
@@ -267,7 +293,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                ?? throw new NotSupportedException($"Server extension could not resolve the type of '{expression}'.");
     }
 
-    private bool IsStringExpression(ExpressionSyntax expression)
+    internal bool IsStringExpression(ExpressionSyntax expression)
         => TypeOf(expression).SpecialType == SpecialType.System_String;
 
     private bool IsServerContextExpression(ExpressionSyntax expression)

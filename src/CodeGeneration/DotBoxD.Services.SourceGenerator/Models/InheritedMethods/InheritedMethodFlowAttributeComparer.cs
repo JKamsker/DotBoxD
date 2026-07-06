@@ -6,6 +6,31 @@ namespace DotBoxD.Services.SourceGenerator.Models;
 
 internal static class InheritedMethodFlowAttributeComparer
 {
+    private static readonly IReadOnlyDictionary<string, FlowAttributeKeyReader> CommonFlowAttributeKeyReaders =
+        new Dictionary<string, FlowAttributeKeyReader>(System.StringComparer.Ordinal)
+        {
+            ["System.Diagnostics.CodeAnalysis.MaybeNullAttribute"] = static (_, name, _) => name,
+            ["System.Diagnostics.CodeAnalysis.NotNullAttribute"] = static (_, name, _) => name,
+            ["System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute"] =
+                static (attr, name, method) => ParameterReferenceAttributeKey(attr, name, method),
+        };
+
+    private static readonly IReadOnlyDictionary<string, FlowAttributeKeyReader> ParameterOnlyFlowAttributeKeyReaders =
+        new Dictionary<string, FlowAttributeKeyReader>(System.StringComparer.Ordinal)
+        {
+            ["System.Diagnostics.CodeAnalysis.AllowNullAttribute"] = static (_, name, _) => name,
+            ["System.Diagnostics.CodeAnalysis.DisallowNullAttribute"] = static (_, name, _) => name,
+            ["System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute"] =
+                static (attr, name, _) => BooleanAttributeKey(attr, name),
+            ["System.Diagnostics.CodeAnalysis.NotNullWhenAttribute"] =
+                static (attr, name, _) => BooleanAttributeKey(attr, name),
+        };
+
+    private delegate string? FlowAttributeKeyReader(
+        AttributeData attr,
+        string name,
+        IMethodSymbol? containingMethod);
+
     public static bool HasSameFlowAttributes(
         IMethodSymbol left,
         IMethodSymbol right,
@@ -66,20 +91,23 @@ internal static class InheritedMethodFlowAttributeComparer
         bool includeParameterOnlyAttributes)
     {
         var name = attr.AttributeClass?.ToDisplayString();
-        return name switch
+        if (name is null)
         {
-            "System.Diagnostics.CodeAnalysis.MaybeNullAttribute" => name,
-            "System.Diagnostics.CodeAnalysis.NotNullAttribute" => name,
-            "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute" =>
-                ParameterReferenceAttributeKey(attr, name, containingMethod),
-            "System.Diagnostics.CodeAnalysis.AllowNullAttribute" when includeParameterOnlyAttributes => name,
-            "System.Diagnostics.CodeAnalysis.DisallowNullAttribute" when includeParameterOnlyAttributes => name,
-            "System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute" when includeParameterOnlyAttributes =>
-                BooleanAttributeKey(attr, name),
-            "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute" when includeParameterOnlyAttributes =>
-                BooleanAttributeKey(attr, name),
-            _ => null,
-        };
+            return null;
+        }
+
+        if (CommonFlowAttributeKeyReaders.TryGetValue(name, out var readCommonKey))
+        {
+            return readCommonKey(attr, name, containingMethod);
+        }
+
+        if (includeParameterOnlyAttributes &&
+            ParameterOnlyFlowAttributeKeyReaders.TryGetValue(name, out var readParameterKey))
+        {
+            return readParameterKey(attr, name, containingMethod);
+        }
+
+        return null;
     }
 
     private static string? BooleanAttributeKey(AttributeData attr, string name) =>

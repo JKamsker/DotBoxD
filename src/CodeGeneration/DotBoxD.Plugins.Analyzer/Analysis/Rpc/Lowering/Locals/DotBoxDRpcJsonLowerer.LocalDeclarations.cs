@@ -5,7 +5,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 internal sealed partial class DotBoxDRpcJsonLowerer
 {
-    private void ValidateUninitializedLocalDeclaration(VariableDeclaratorSyntax declarator)
+    internal void ValidateUninitializedLocalDeclaration(VariableDeclaratorSyntax declarator)
     {
         var local = _model.GetDeclaredSymbol(declarator, _cancellationToken) as ILocalSymbol
             ?? throw new NotSupportedException(

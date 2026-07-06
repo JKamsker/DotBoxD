@@ -9,6 +9,20 @@ namespace DotBoxD.Queryable.Authoring;
 /// </summary>
 public static class EventQueryDiagnostics
 {
+    private static readonly IReadOnlyDictionary<QueryComparisonOperator, string> OperatorSymbols =
+        new Dictionary<QueryComparisonOperator, string>
+        {
+            [QueryComparisonOperator.Equal] = "==",
+            [QueryComparisonOperator.NotEqual] = "!=",
+            [QueryComparisonOperator.GreaterThan] = ">",
+            [QueryComparisonOperator.GreaterThanOrEqual] = ">=",
+            [QueryComparisonOperator.LessThan] = "<",
+            [QueryComparisonOperator.LessThanOrEqual] = "<=",
+            [QueryComparisonOperator.StringContains] = "contains",
+            [QueryComparisonOperator.StringStartsWith] = "startsWith",
+            [QueryComparisonOperator.StringEndsWith] = "endsWith"
+        };
+
     /// <summary>Produces the diagnostic fact lines for a subscription handle.</summary>
     public static IReadOnlyList<string> Describe(EventQuerySubscriptionHandle handle)
     {
@@ -47,19 +61,8 @@ public static class EventQueryDiagnostics
         _ => projection.Kind.ToString(),
     };
 
-    private static string Symbol(QueryComparisonOperator op) => op switch
-    {
-        QueryComparisonOperator.Equal => "==",
-        QueryComparisonOperator.NotEqual => "!=",
-        QueryComparisonOperator.GreaterThan => ">",
-        QueryComparisonOperator.GreaterThanOrEqual => ">=",
-        QueryComparisonOperator.LessThan => "<",
-        QueryComparisonOperator.LessThanOrEqual => "<=",
-        QueryComparisonOperator.StringContains => "contains",
-        QueryComparisonOperator.StringStartsWith => "startsWith",
-        QueryComparisonOperator.StringEndsWith => "endsWith",
-        _ => op.ToString(),
-    };
+    private static string Symbol(QueryComparisonOperator op)
+        => OperatorSymbols.TryGetValue(op, out var symbol) ? symbol : op.ToString();
 
     private static string ShortName(string? fullName)
     {

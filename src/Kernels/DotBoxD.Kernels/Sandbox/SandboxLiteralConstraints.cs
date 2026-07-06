@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using DotBoxD.Kernels.Model;
 
 namespace DotBoxD.Kernels.Sandbox;
@@ -14,12 +15,7 @@ public static class SandboxLiteralConstraints
 
     public static bool IsPortableRelativePath(string? path)
     {
-        if (string.IsNullOrWhiteSpace(path) ||
-            path.Contains('\\') ||
-            path.Contains(':') ||
-            path.StartsWith("/", StringComparison.Ordinal) ||
-            Uri.TryCreate(path, UriKind.Absolute, out _) ||
-            Path.IsPathRooted(path))
+        if (HasInvalidPortablePathPrefix(path))
         {
             return false;
         }
@@ -42,6 +38,14 @@ public static class SandboxLiteralConstraints
 
         return true;
     }
+
+    private static bool HasInvalidPortablePathPrefix([NotNullWhen(false)] string? path)
+        => string.IsNullOrWhiteSpace(path) ||
+           path.Contains('\\') ||
+           path.Contains(':') ||
+           path.StartsWith("/", StringComparison.Ordinal) ||
+           Uri.TryCreate(path, UriKind.Absolute, out _) ||
+           Path.IsPathRooted(path);
 
     private static bool IsValidPathSegment(ReadOnlySpan<char> segment)
     {

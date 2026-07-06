@@ -21,13 +21,7 @@ internal static partial class DotBoxDKernelMethodInliner
         InvocationExpressionSyntax invocation,
         DotBoxDExpressionLoweringContext context)
     {
-        if (context.ServerContextType is not INamedTypeSymbol contextType ||
-            invocation.Expression is not MemberAccessExpressionSyntax
-            {
-                Expression: IdentifierNameSyntax receiver,
-                Name: SimpleNameSyntax methodName
-            } ||
-            !string.Equals(receiver.Identifier.ValueText, context.ServerContextParameterName, StringComparison.Ordinal))
+        if (!TryGetServerContextInvocation(context, invocation, out var contextType, out var methodName))
         {
             return null;
         }
@@ -52,6 +46,30 @@ internal static partial class DotBoxDKernelMethodInliner
             _ => throw new NotSupportedException(
                 $"[KernelMethod] context call '{methodName.Identifier.ValueText}' is ambiguous before generated APIs bind.")
         };
+    }
+
+    private static bool TryGetServerContextInvocation(
+        DotBoxDExpressionLoweringContext context,
+        InvocationExpressionSyntax invocation,
+        out INamedTypeSymbol contextType,
+        out SimpleNameSyntax methodName)
+    {
+        contextType = null!;
+        methodName = null!;
+        if (context.ServerContextType is not INamedTypeSymbol candidate ||
+            invocation.Expression is not MemberAccessExpressionSyntax
+            {
+                Expression: IdentifierNameSyntax receiver,
+                Name: SimpleNameSyntax candidateName
+            } ||
+            !string.Equals(receiver.Identifier.ValueText, context.ServerContextParameterName, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        contextType = candidate;
+        methodName = candidateName;
+        return true;
     }
 
     private static bool CanBind(InvocationExpressionSyntax invocation, IMethodSymbol method, Compilation compilation)

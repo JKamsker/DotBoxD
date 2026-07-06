@@ -5,7 +5,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 
 internal static partial class PluginServerFacadeModelFactory
 {
-    private static HashSet<string> GeneratedReservedMemberNames()
+    internal static HashSet<string> GeneratedReservedMemberNames()
         => new(StringComparer.Ordinal)
         {
             "Services",
@@ -44,7 +44,7 @@ internal static partial class PluginServerFacadeModelFactory
             "ToString",
         };
 
-    private static void ValidateGeneratedSiblingTypeCollisions(
+    internal static void ValidateGeneratedSiblingTypeCollisions(
         INamedTypeSymbol serverType,
         INamedTypeSymbol worldType,
         IReadOnlyList<PluginServerControlProperty> controls)
@@ -75,7 +75,7 @@ internal static partial class PluginServerFacadeModelFactory
         }
     }
 
-    private static void AddGeneratedNestedTypeNames(
+    internal static void AddGeneratedNestedTypeNames(
         HashSet<string> generatedMembers,
         INamedTypeSymbol worldType,
         IReadOnlyList<PluginServerServiceWrapper> worldServiceWrappers,
@@ -115,7 +115,7 @@ internal static partial class PluginServerFacadeModelFactory
         }
     }
 
-    private static void AddGeneratedFieldNames(
+    internal static void AddGeneratedFieldNames(
         HashSet<string> generatedMembers,
         IReadOnlyList<PluginServerControlProperty> controls,
         bool emitsRemoteLocalEventSink)
@@ -203,7 +203,7 @@ internal static partial class PluginServerFacadeModelFactory
         => string.Equals(memberName, PluginServerWrapperBackingFieldNames.Owner, StringComparison.Ordinal) ||
            string.Equals(memberName, PluginServerWrapperBackingFieldNames.Inner, StringComparison.Ordinal);
 
-    private static bool IsGeneratedInvokeAsyncSignature(IMethodSymbol method, INamedTypeSymbol worldType)
+    internal static bool IsGeneratedInvokeAsyncSignature(IMethodSymbol method, INamedTypeSymbol worldType)
         => IsGeneratedSimpleInvokeAsyncSignature(method, worldType) ||
            IsGeneratedCaptureInvokeAsyncSignature(method, worldType);
 

@@ -14,6 +14,16 @@ internal sealed class WhileI32LoopFastPathEmitter
 {
     private const int LoopFuel = 5;
 
+    private static readonly Dictionary<string, string> ConditionMethods = new(StringComparer.Ordinal)
+    {
+        ["<"] = nameof(CompiledRuntime.LtI32Raw),
+        ["<="] = nameof(CompiledRuntime.LteI32Raw),
+        [">"] = nameof(CompiledRuntime.GtI32Raw),
+        [">="] = nameof(CompiledRuntime.GteI32Raw),
+        ["=="] = nameof(CompiledRuntime.EqI32Raw),
+        ["!="] = nameof(CompiledRuntime.NeI32Raw)
+    };
+
     private readonly ILGenerator _il;
     private readonly LocalStackKindPlanner _stackPlan;
     private readonly ExpressionEmitter _expressions;
@@ -67,22 +77,14 @@ internal sealed class WhileI32LoopFastPathEmitter
     private bool TryCreateCondition(Expression expression, out Condition condition)
     {
         condition = default;
-        if (expression is not BinaryExpression { Operator: "==" or "!=" or "<" or "<=" or ">" or ">=" } binary ||
+        if (expression is not BinaryExpression binary ||
+            !ConditionMethods.TryGetValue(binary.Operator, out var method) ||
             !RawI32ExpressionPlan.TryCreate(binary.Left, _stackPlan, _functions, out var left) ||
             !RawI32ExpressionPlan.TryCreate(binary.Right, _stackPlan, _functions, out var right))
         {
             return false;
         }
 
-        var method = binary.Operator switch
-        {
-            "<" => nameof(CompiledRuntime.LtI32Raw),
-            "<=" => nameof(CompiledRuntime.LteI32Raw),
-            ">" => nameof(CompiledRuntime.GtI32Raw),
-            ">=" => nameof(CompiledRuntime.GteI32Raw),
-            "==" => nameof(CompiledRuntime.EqI32Raw),
-            _ => nameof(CompiledRuntime.NeI32Raw)
-        };
         condition = new Condition(left, right, method, 1 + left.FuelCost + right.FuelCost);
         return true;
     }

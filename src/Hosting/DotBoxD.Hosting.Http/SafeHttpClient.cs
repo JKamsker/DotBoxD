@@ -51,20 +51,7 @@ public static class SafeHttpClient
             var response = pinnedResponse.Message;
             var metadataBytes = SafeHttpResponseAccounting.ChargeMetadata(context, response, request.MaxResponseBytes);
             responseBytes = metadataBytes;
-            if (response.RequestMessage?.RequestUri is { } finalUri && !SafeHttpUriAudit.SameUri(finalUri, request.Uri))
-            {
-                throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: redirects are not allowed");
-            }
-
-            if (IsRedirect(response.StatusCode))
-            {
-                throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: redirects are not allowed");
-            }
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw Error(SandboxErrorCode.HostFailure, "net.http.get failed: response status was not successful");
-            }
+            RequireSuccessfulFinalResponse(response, request.Uri);
 
             var body = await SafeHttpBodyReader.ReadLimitedTextAsync(
                     context,
@@ -230,6 +217,24 @@ public static class SafeHttpClient
         }
     }
 
+    private static void RequireSuccessfulFinalResponse(HttpResponseMessage response, Uri requestedUri)
+    {
+        if (response.RequestMessage?.RequestUri is { } finalUri && !SafeHttpUriAudit.SameUri(finalUri, requestedUri))
+        {
+            throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: redirects are not allowed");
+        }
+
+        if (IsRedirect(response.StatusCode))
+        {
+            throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: redirects are not allowed");
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw Error(SandboxErrorCode.HostFailure, "net.http.get failed: response status was not successful");
+        }
+    }
+
     private static bool IsRedirect(HttpStatusCode statusCode)
         => statusCode is HttpStatusCode.MultipleChoices or
             HttpStatusCode.Moved or
@@ -244,9 +249,7 @@ public static class SafeHttpClient
         return remaining < requestTimeout ? remaining : requestTimeout;
     }
 
-    private static async ValueTask<IReadOnlyList<IPAddress>> ResolveDnsAsync(
-        string host,
-        CancellationToken cancellationToken)
+    private static async ValueTask<IReadOnlyList<IPAddress>> ResolveDnsAsync(string host, CancellationToken cancellationToken)
         => await Dns.GetHostAddressesAsync(host, cancellationToken).ConfigureAwait(false);
 
     private static void Audit(
@@ -291,10 +294,5 @@ public static class SafeHttpClient
     private static SandboxRuntimeException Error(SandboxErrorCode code, string message) => new(new SandboxError(code, message));
 
     private sealed record SafeHttpRequest(
-        SafeHttpGrantOptions Grant,
-        Uri Uri,
-        long MaxRequestBytes,
-        long MaxResponseBytes,
-        TimeSpan Timeout);
-
+        SafeHttpGrantOptions Grant, Uri Uri, long MaxRequestBytes, long MaxResponseBytes, TimeSpan Timeout);
 }

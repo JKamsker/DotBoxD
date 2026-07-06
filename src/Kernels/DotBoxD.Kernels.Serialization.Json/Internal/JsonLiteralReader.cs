@@ -13,6 +13,27 @@ internal static class JsonLiteralReader
         out SandboxValue value,
         out string literalName)
     {
+        if (TryReadCoreLiteral(element, source, out value, out literalName))
+        {
+            return true;
+        }
+
+        if (TryReadExtendedLiteral(element, source, out value, out literalName))
+        {
+            return true;
+        }
+
+        value = SandboxValue.Unit;
+        literalName = "";
+        return false;
+    }
+
+    private static bool TryReadCoreLiteral(
+        JsonElement element,
+        JsonSourceMap source,
+        out SandboxValue value,
+        out string literalName)
+    {
         if (element.TryGetProperty("unit", out var unit))
         {
             if (!ReadBoolValue(unit, "unit", source))
@@ -60,6 +81,17 @@ internal static class JsonLiteralReader
             return true;
         }
 
+        value = SandboxValue.Unit;
+        literalName = "";
+        return false;
+    }
+
+    private static bool TryReadExtendedLiteral(
+        JsonElement element,
+        JsonSourceMap source,
+        out SandboxValue value,
+        out string literalName)
+    {
         if (element.TryGetProperty("guid", out var guid))
         {
             value = SandboxValue.FromGuid(ReadGuidValue(guid, "guid", source));

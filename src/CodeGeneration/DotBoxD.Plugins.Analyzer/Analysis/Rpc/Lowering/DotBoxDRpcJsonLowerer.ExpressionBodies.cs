@@ -16,7 +16,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             var parts = new List<string>();
             if (returnsVoid)
             {
-                LowerExpressionStatement(expression, parts);
+                RpcJsonExpressionStatementLowerer.LowerExpressionStatement(this, expression, parts);
             }
             else
             {

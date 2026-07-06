@@ -30,70 +30,92 @@ internal static class QueryTextTokenizer
                 continue;
             }
 
-            if (c is '(' or ')' or '[' or ']' or ',' or '*' or '~')
-            {
-                tokens.Add(new QueryToken(QueryTokenKind.Symbol, c.ToString()));
-                index++;
-                continue;
-            }
-
-            if (TryLexOperator(text, ref index, out var op))
-            {
-                tokens.Add(new QueryToken(QueryTokenKind.Symbol, op));
-                continue;
-            }
-
-            if (c == '"')
-            {
-                tokens.Add(new QueryToken(QueryTokenKind.String, LexString(text, ref index)));
-                continue;
-            }
-
-            if (c == '-' || char.IsDigit(c))
-            {
-                tokens.Add(new QueryToken(QueryTokenKind.Number, LexNumber(text, ref index)));
-                continue;
-            }
-
-            if (char.IsLetter(c) || c == '_')
-            {
-                tokens.Add(new QueryToken(QueryTokenKind.Word, LexWord(text, ref index)));
-                continue;
-            }
-
-            throw new QueryTranslationException($"Unexpected character '{c}' at position {index} in query text.");
+            tokens.Add(LexToken(text, ref index));
         }
 
         tokens.Add(new QueryToken(QueryTokenKind.End, string.Empty));
         return tokens;
     }
 
+    private static QueryToken LexToken(string text, ref int index)
+    {
+        var c = text[index];
+        if (IsSingleCharacterSymbol(c))
+        {
+            index++;
+            return new QueryToken(QueryTokenKind.Symbol, c.ToString());
+        }
+
+        if (TryLexOperator(text, ref index, out var op))
+        {
+            return new QueryToken(QueryTokenKind.Symbol, op);
+        }
+
+        if (c == '"')
+        {
+            return new QueryToken(QueryTokenKind.String, LexString(text, ref index));
+        }
+
+        if (CanStartNumber(c))
+        {
+            return new QueryToken(QueryTokenKind.Number, LexNumber(text, ref index));
+        }
+
+        if (CanStartWord(c))
+        {
+            return new QueryToken(QueryTokenKind.Word, LexWord(text, ref index));
+        }
+
+        throw new QueryTranslationException($"Unexpected character '{c}' at position {index} in query text.");
+    }
+
+    private static bool IsSingleCharacterSymbol(char c)
+        => c is '(' or ')' or '[' or ']' or ',' or '*' or '~';
+
+    private static bool CanStartNumber(char c)
+        => c == '-' || char.IsDigit(c);
+
+    private static bool CanStartWord(char c)
+        => char.IsLetter(c) || c == '_';
+
     private static bool TryLexOperator(string text, ref int index, out string op)
     {
         var c = text[index];
         var next = index + 1 < text.Length ? text[index + 1] : '\0';
-        switch (c)
+        if (IsTwoCharacterOperator(c, next))
         {
-            case '&' when next == '&':
-            case '|' when next == '|':
-            case '=' when next == '=':
-            case '!' when next == '=':
-            case '>' when next == '=':
-            case '<' when next == '=':
-                op = text.Substring(index, 2);
-                index += 2;
-                return true;
-            case '!' or '>' or '<':
-                op = c.ToString();
-                index++;
-                return true;
-            case '=':
-                throw new QueryTranslationException($"Unexpected '=' at position {index}; use '==' for equality.");
-            default:
-                op = string.Empty;
-                return false;
+            op = text.Substring(index, 2);
+            index += 2;
+            return true;
         }
+
+        if (IsSingleCharacterOperator(c))
+        {
+            op = c.ToString();
+            index++;
+            return true;
+        }
+
+        if (c == '=')
+        {
+            throw new QueryTranslationException($"Unexpected '=' at position {index}; use '==' for equality.");
+        }
+
+        op = string.Empty;
+        return false;
     }
+
+    private static bool IsTwoCharacterOperator(char c, char next)
+        => c switch
+        {
+            '&' => next == '&',
+            '|' => next == '|',
+            '=' or '!' or '>' or '<' => next == '=',
+            _ => false,
+        };
+
+    private static bool IsSingleCharacterOperator(char c)
+        => c is '!' or '>' or '<';
 
     private static string LexString(string text, ref int index)
     {
@@ -136,46 +158,75 @@ internal static class QueryTextTokenizer
     private static string LexNumber(string text, ref int index)
     {
         var start = index;
+        ConsumeLeadingMinus(text, ref index);
+        ConsumeNumberBody(text, ref index);
+        ConsumeExponent(text, ref index);
+        ConsumeNumericSuffix(text, ref index);
+        return text[start..index];
+    }
+
+    private static void ConsumeLeadingMinus(string text, ref int index)
+    {
         if (text[index] == '-')
         {
             index++;
         }
+    }
 
+    private static void ConsumeNumberBody(string text, ref int index)
+    {
         while (index < text.Length && (char.IsDigit(text[index]) || text[index] == '.'))
         {
             index++;
         }
+    }
 
-        if (index < text.Length && (text[index] == 'e' || text[index] == 'E'))
+    private static void ConsumeExponent(string text, ref int index)
+    {
+        if (index >= text.Length || text[index] is not ('e' or 'E'))
         {
-            var exponent = index + 1;
-            if (exponent < text.Length && (text[exponent] == '+' || text[exponent] == '-'))
-            {
-                exponent++;
-            }
-
-            if (exponent < text.Length && char.IsDigit(text[exponent]))
-            {
-                index = exponent + 1;
-                while (index < text.Length && char.IsDigit(text[index]))
-                {
-                    index++;
-                }
-            }
+            return;
         }
 
+        var exponent = index + 1;
+        ConsumeExponentSign(text, ref exponent);
+        if (exponent < text.Length && char.IsDigit(text[exponent]))
+        {
+            index = exponent + 1;
+            ConsumeExponentDigits(text, ref index);
+        }
+    }
+
+    private static void ConsumeExponentSign(string text, ref int exponent)
+    {
+        if (exponent < text.Length && text[exponent] is '+' or '-')
+        {
+            exponent++;
+        }
+    }
+
+    private static void ConsumeExponentDigits(string text, ref int index)
+    {
+        while (index < text.Length && char.IsDigit(text[index]))
+        {
+            index++;
+        }
+    }
+
+    private static void ConsumeNumericSuffix(string text, ref int index)
+    {
         // Typed numeric suffix: 'm'/'M' (decimal) or 'u'/'U' (unsigned). Consume one into the token so the
         // parser can disambiguate it (e.g. 1.10m -> decimal, 42u -> ulong). Guard against eating into a word.
-        if (index < text.Length && text[index] is 'm' or 'M' or 'u' or 'U')
+        if (index < text.Length && text[index] is 'm' or 'M' or 'u' or 'U' && !StartsWordAfterSuffix(text, index))
         {
-            var after = index + 1;
-            if (after >= text.Length || !(char.IsLetterOrDigit(text[after]) || text[after] == '_'))
-            {
-                index++;
-            }
+            index++;
         }
+    }
 
-        return text[start..index];
+    private static bool StartsWordAfterSuffix(string text, int index)
+    {
+        var after = index + 1;
+        return after < text.Length && (char.IsLetterOrDigit(text[after]) || text[after] == '_');
     }
 
     private static string LexWord(string text, ref int index)

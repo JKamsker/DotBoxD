@@ -15,98 +15,136 @@ internal static partial class PluginServerFacadeModelFactory
         var seenMethods = new Dictionary<string, SeenForwardedMethod>(StringComparer.Ordinal);
         foreach (var member in MembersIncludingInherited(controlType))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (member.ContainingType is not null &&
-                IsControlPlaneMember(member.ContainingType))
-            {
-                continue;
-            }
-
-            if (member is IEventSymbol eventSymbol)
-            {
-                throw new NotSupportedException(
-                    $"Generated plugin server member '{eventSymbol.ToDisplayString()}' is an event; events are not supported on generated plugin server facades.");
-            }
-
-            if (member is IMethodSymbol { MethodKind: MethodKind.Ordinary } method)
-            {
-                RejectErrorObsoleteForwarder(method);
-                ValidateForwardedMethod(method);
-                var (returnWrapperName, returnWrapperKind) = ResolveReturnWrapper(
-                    method.ReturnType,
-                    serviceWrappers,
-                    cancellationToken);
-                var forwarded = new PluginServerForwardedMethod(
-                    method.Name,
-                    TypeName(method.ContainingType),
-                    TypeName(method.ReturnType),
-                    PluginServerFlowAttributeSource.MemberAttributes(method),
-                    PluginServerFlowAttributeSource.ReturnAttributes(method),
-                    PluginServerXmlDocumentation.FromSymbol(
-                        method,
-                        "Forwards " + method.Name + " to the remote domain service.",
-                        cancellationToken),
-                    returnWrapperName,
-                    returnWrapperKind,
-                    new EquatableArray<PluginServerParameter>(ResolveParameters(method)));
-                var signature = PluginServerForwardedMethodSignature.Key(method);
-                if (seenMethods.TryGetValue(signature, out var existing))
-                {
-                    if (!PluginServerForwardedMethodSignature.HasSameTupleElementNames(
-                        existing.Symbol,
-                        method,
-                        cancellationToken))
-                    {
-                        throw new NotSupportedException(
-                            $"Generated plugin server member '{method.ToDisplayString()}' has an inherited signature collision with incompatible tuple element names.");
-                    }
-
-                    if (!string.Equals(existing.Method.ReturnType, forwarded.ReturnType, StringComparison.Ordinal))
-                    {
-                        throw new NotSupportedException(
-                            $"Generated plugin server member '{method.ToDisplayString()}' has an inherited signature collision with a different return type.");
-                    }
-
-                    if (!existing.Method.Attributes.Equals(forwarded.Attributes))
-                    {
-                        throw new NotSupportedException(
-                            $"Generated plugin server member '{method.ToDisplayString()}' has an inherited signature collision with different member attributes.");
-                    }
-
-                    if (!existing.Method.ReturnAttributes.Equals(forwarded.ReturnAttributes))
-                    {
-                        throw new NotSupportedException(
-                            $"Generated plugin server member '{method.ToDisplayString()}' has an inherited signature collision with different return-flow attributes.");
-                    }
-
-                    if (!HasSameParameterDefaultShape(existing.Symbol, method))
-                    {
-                        throw new NotSupportedException(
-                            $"Generated plugin server member '{method.ToDisplayString()}' has an inherited optional/default parameter conflict.");
-                    }
-
-                    if (!HasSameCallerInfoAttributes(existing.Symbol, method, cancellationToken))
-                    {
-                        throw new NotSupportedException(
-                            $"Generated plugin server member '{method.ToDisplayString()}' has an inherited signature collision with incompatible caller info attributes.");
-                    }
-
-                    if (IsMoreDerivedMember(method, existing.Symbol))
-                    {
-                        seenMethods[signature] = new SeenForwardedMethod(method, forwarded, existing.Index);
-                        methods[existing.Index] = forwarded;
-                    }
-
-                    continue;
-                }
-
-                seenMethods.Add(signature, new SeenForwardedMethod(method, forwarded, methods.Count));
-                methods.Add(forwarded);
-            }
+            ResolveMemberMethods(member, serviceWrappers, methods, seenMethods, cancellationToken);
         }
 
         return methods.ToArray();
     }
+
+    private static void ResolveMemberMethods(
+        ISymbol member,
+        Dictionary<string, ServiceWrapperBuilder> serviceWrappers,
+        List<PluginServerForwardedMethod> methods,
+        Dictionary<string, SeenForwardedMethod> seenMethods,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (ShouldSkipForwardedMember(member))
+        {
+            return;
+        }
+
+        if (member is IEventSymbol eventSymbol)
+        {
+            ThrowUnsupportedEvent(eventSymbol);
+        }
+
+        if (member is not IMethodSymbol { MethodKind: MethodKind.Ordinary } method)
+        {
+            return;
+        }
+
+        RejectErrorObsoleteForwarder(method);
+        ValidateForwardedMethod(method);
+        var forwarded = CreateForwardedMethod(method, serviceWrappers, cancellationToken);
+        AddOrReplaceForwardedMethod(method, forwarded, methods, seenMethods, cancellationToken);
+    }
+
+    private static bool ShouldSkipForwardedMember(ISymbol member)
+        => member.ContainingType is not null && IsControlPlaneMember(member.ContainingType);
+
+    private static void ThrowUnsupportedEvent(IEventSymbol eventSymbol)
+        => throw new NotSupportedException(
+            $"Generated plugin server member '{eventSymbol.ToDisplayString()}' is an event; events are not supported on generated plugin server facades.");
+
+    private static PluginServerForwardedMethod CreateForwardedMethod(
+        IMethodSymbol method,
+        Dictionary<string, ServiceWrapperBuilder> serviceWrappers,
+        CancellationToken cancellationToken)
+    {
+        var (returnWrapperName, returnWrapperKind) = ResolveReturnWrapper(
+            method.ReturnType,
+            serviceWrappers,
+            cancellationToken);
+        return new PluginServerForwardedMethod(
+            method.Name,
+            TypeName(method.ContainingType),
+            TypeName(method.ReturnType),
+            PluginServerFlowAttributeSource.MemberAttributes(method),
+            PluginServerFlowAttributeSource.ReturnAttributes(method),
+            PluginServerXmlDocumentation.FromSymbol(
+                method,
+                "Forwards " + method.Name + " to the remote domain service.",
+                cancellationToken),
+            returnWrapperName,
+            returnWrapperKind,
+            new EquatableArray<PluginServerParameter>(ResolveParameters(method)));
+    }
+
+    private static void AddOrReplaceForwardedMethod(
+        IMethodSymbol method,
+        PluginServerForwardedMethod forwarded,
+        List<PluginServerForwardedMethod> methods,
+        Dictionary<string, SeenForwardedMethod> seenMethods,
+        CancellationToken cancellationToken)
+    {
+        var signature = PluginServerForwardedMethodSignature.Key(method);
+        if (!seenMethods.TryGetValue(signature, out var existing))
+        {
+            seenMethods.Add(signature, new SeenForwardedMethod(method, forwarded, methods.Count));
+            methods.Add(forwarded);
+            return;
+        }
+
+        ValidateInheritedForwardedMethod(method, forwarded, existing, cancellationToken);
+        if (IsMoreDerivedMember(method, existing.Symbol))
+        {
+            seenMethods[signature] = new SeenForwardedMethod(method, forwarded, existing.Index);
+            methods[existing.Index] = forwarded;
+        }
+    }
+
+    private static void ValidateInheritedForwardedMethod(
+        IMethodSymbol method,
+        PluginServerForwardedMethod forwarded,
+        SeenForwardedMethod existing,
+        CancellationToken cancellationToken)
+    {
+        if (!PluginServerForwardedMethodSignature.HasSameTupleElementNames(existing.Symbol, method, cancellationToken))
+        {
+            ThrowInheritedCollision(method, "incompatible tuple element names");
+        }
+
+        if (!string.Equals(existing.Method.ReturnType, forwarded.ReturnType, StringComparison.Ordinal))
+        {
+            ThrowInheritedCollision(method, "a different return type");
+        }
+
+        if (!existing.Method.Attributes.Equals(forwarded.Attributes))
+        {
+            ThrowInheritedCollision(method, "different member attributes");
+        }
+
+        if (!existing.Method.ReturnAttributes.Equals(forwarded.ReturnAttributes))
+        {
+            ThrowInheritedCollision(method, "different return-flow attributes");
+        }
+
+        if (!HasSameParameterDefaultShape(existing.Symbol, method))
+        {
+            throw new NotSupportedException(
+                $"Generated plugin server member '{method.ToDisplayString()}' has an inherited optional/default parameter conflict.");
+        }
+
+        if (!HasSameCallerInfoAttributes(existing.Symbol, method, cancellationToken))
+        {
+            ThrowInheritedCollision(method, "incompatible caller info attributes");
+        }
+    }
+
+    private static void ThrowInheritedCollision(IMethodSymbol method, string reason)
+        => throw new NotSupportedException(
+            $"Generated plugin server member '{method.ToDisplayString()}' has an inherited signature collision with {reason}.");
 
     private static void ValidateForwardedMethod(IMethodSymbol method)
     {

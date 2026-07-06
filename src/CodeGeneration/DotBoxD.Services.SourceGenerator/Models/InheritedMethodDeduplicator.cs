@@ -13,6 +13,15 @@ internal static class InheritedMethodDeduplicator
         IMethodSymbol methodSymbol,
         CancellationToken ct)
     {
+        var shapeReason = GetShapeRejectionReason(existingMethod, methodSymbol, ct);
+        return shapeReason ?? GetContractRejectionReason(existingMethod, methodSymbol, ct);
+    }
+
+    private static string? GetShapeRejectionReason(
+        IMethodSymbol existingMethod,
+        IMethodSymbol methodSymbol,
+        CancellationToken ct)
+    {
         if (!HasCompatibleReturnShape(existingMethod, methodSymbol, ct))
         {
             return $"inherited method '{methodSymbol.Name}' has the same signature as another method but an incompatible return type";
@@ -38,6 +47,14 @@ internal static class InheritedMethodDeduplicator
             return $"inherited generic method '{methodSymbol.Name}' has the same signature as another method but incompatible generic constraints";
         }
 
+        return null;
+    }
+
+    private static string? GetContractRejectionReason(
+        IMethodSymbol existingMethod,
+        IMethodSymbol methodSymbol,
+        CancellationToken ct)
+    {
         if (!HasSameNullableAnnotations(existingMethod, methodSymbol, ct))
         {
             return $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible nullable annotations";
