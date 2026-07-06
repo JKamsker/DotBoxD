@@ -17,8 +17,7 @@ public sealed class HostServiceBindingByRefParameterContractTests
 
         Assert.Contains("HostBinding", ex.Message, StringComparison.Ordinal);
         Assert.Contains(memberName, ex.Message, StringComparison.Ordinal);
-        Assert.Contains(parameterShape, ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("parameter", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains($"{parameterShape} parameter", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     public static TheoryData<Action<SandboxHostBuilder>, string, string> ByRefHostBindingCases()
