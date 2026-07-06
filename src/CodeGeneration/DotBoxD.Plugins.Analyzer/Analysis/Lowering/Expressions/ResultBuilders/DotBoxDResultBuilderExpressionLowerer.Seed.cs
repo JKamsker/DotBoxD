@@ -56,12 +56,14 @@ internal static partial class DotBoxDResultBuilderExpressionLowerer
             return null;
         }
 
-        if (!HasHookResultAttribute(resultType))
+        if (!ResultBuilderMemberInspector.HasHookResultAttribute(resultType))
         {
             return null;
         }
 
-        return UsesAuthorDefinedBuilderMember(invocation, resultType) ? null : resultType;
+        return ResultBuilderMemberInspector.UsesAuthorDefinedBuilderMember(invocation, resultType)
+            ? null
+            : resultType;
     }
 
     private static bool TryGetWithReceiver(

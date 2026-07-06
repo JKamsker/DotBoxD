@@ -103,7 +103,10 @@ internal static partial class HookChainModelFactory
             : null;
         var installKind = generatedRemoteTarget is null && receiverKind is null
             ? null
-            : InstallKind(terminalAccess.Name.Identifier.ValueText, receiverKind, generatedRemoteKind);
+            : HookChainInstallKindResolver.Resolve(
+                terminalAccess.Name.Identifier.ValueText,
+                receiverKind,
+                generatedRemoteKind);
 
         return new HookChainResolution(
             receiverKind,

@@ -1,12 +1,9 @@
 using System.Reflection.Emit;
 using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
-using DotBoxD.Kernels.Runtime;
 using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Kernels.Compiler.Emitters.Loops;
-
-using static Compiler.IlEmitterPrimitives;
 
 // Unboxed i32 expression plan for loop fast paths: builds a small tree from an i32 expression and emits raw IL
 // (via the *I32Raw runtime helpers) with no per-node fuel metering — the loop runner charges the statically
@@ -15,12 +12,12 @@ internal sealed partial class RawI32ExpressionPlan
 {
     private static readonly IReadOnlyDictionary<string, SandboxFunction> NoFunctions = new Dictionary<string, SandboxFunction>(StringComparer.Ordinal);
 
-    private readonly ExpressionKind _kind;
-    private readonly string? _name;
-    private readonly int _literal;
-    private readonly RawI32ExpressionPlan? _left;
-    private readonly RawI32ExpressionPlan? _right;
-    private readonly RawI32ExpressionPlan? _third;
+    internal ExpressionKind Kind { get; }
+    internal string? Name { get; }
+    internal int Literal { get; }
+    internal RawI32ExpressionPlan? Left { get; }
+    internal RawI32ExpressionPlan? Right { get; }
+    internal RawI32ExpressionPlan? Third { get; }
 
     private RawI32ExpressionPlan(
         ExpressionKind kind,
@@ -31,15 +28,15 @@ internal sealed partial class RawI32ExpressionPlan
         RawI32ExpressionPlan? third = null,
         int extraFuel = 0)
     {
-        _kind = kind;
-        _name = name;
-        _literal = literal;
-        _left = left;
-        _right = right;
-        _third = third;
+        Kind = kind;
+        Name = name;
+        Literal = literal;
+        Left = left;
+        Right = right;
+        Third = third;
         FuelCost = 1 + extraFuel + (left?.FuelCost ?? 0) + (right?.FuelCost ?? 0) + (third?.FuelCost ?? 0);
         InstructionCost =
-            BaseInstructionCost(kind) +
+            RawI32ExpressionPlanEmitter.BaseInstructionCost(kind) +
             (left?.InstructionCost ?? 0) +
             (right?.InstructionCost ?? 0) +
             (third?.InstructionCost ?? 0);
@@ -166,95 +163,7 @@ internal sealed partial class RawI32ExpressionPlan
     }
 
     public void Emit(ILGenerator il, Func<string, (LocalBuilder Local, StackKind Kind)> declare)
-    {
-        if (TryEmitTerminal(il, declare) ||
-            TryEmitUnaryOrIntrinsic(il, declare) ||
-            TryEmitArithmetic(il, declare))
-        {
-            return;
-        }
-    }
-
-    private bool TryEmitTerminal(ILGenerator il, Func<string, (LocalBuilder Local, StackKind Kind)> declare)
-    {
-        switch (_kind)
-        {
-            case ExpressionKind.Literal:
-                EmitInt32(il, _literal);
-                return true;
-            case ExpressionKind.Variable:
-                il.Emit(OpCodes.Ldloc, declare(_name!).Local);
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    private bool TryEmitUnaryOrIntrinsic(ILGenerator il, Func<string, (LocalBuilder Local, StackKind Kind)> declare)
-    {
-        switch (_kind)
-        {
-            case ExpressionKind.Negate:
-                _left!.Emit(il, declare);
-                il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.NegI32Raw)));
-                return true;
-            case ExpressionKind.Abs:
-                _left!.Emit(il, declare);
-                EmitChargeBindingCall(il, _name!);
-                il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.AbsI32Raw)));
-                return true;
-            case ExpressionKind.Min:
-            case ExpressionKind.Max:
-                _left!.Emit(il, declare);
-                _right!.Emit(il, declare);
-                EmitChargeBindingCall(il, _name!);
-                il.Emit(OpCodes.Call, Runtime(RuntimeMethod(_kind)));
-                return true;
-            case ExpressionKind.Clamp:
-                _left!.Emit(il, declare);
-                _right!.Emit(il, declare);
-                _third!.Emit(il, declare);
-                EmitChargeBindingCall(il, _name!);
-                il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ClampI32Raw)));
-                return true;
-            case ExpressionKind.InlineCall:
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.EnterInlineCall)));
-                _left!.Emit(il, declare);
-                var value = il.DeclareLocal(typeof(int));
-                il.Emit(OpCodes.Stloc, value);
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.ExitInlineCall)));
-                il.Emit(OpCodes.Ldloc, value);
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    private bool TryEmitArithmetic(ILGenerator il, Func<string, (LocalBuilder Local, StackKind Kind)> declare)
-    {
-        switch (_kind)
-        {
-            case ExpressionKind.Add:
-            case ExpressionKind.Subtract:
-            case ExpressionKind.Multiply:
-            case ExpressionKind.Divide:
-            case ExpressionKind.Remainder:
-                _left!.Emit(il, declare);
-                _right!.Emit(il, declare);
-                il.Emit(OpCodes.Call, Runtime(RuntimeMethod(_kind)));
-                return true;
-            case ExpressionKind.AddRemainder:
-                _left!.Emit(il, declare);
-                _right!.Emit(il, declare);
-                _third!.Emit(il, declare);
-                il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.AddRemI32Raw)));
-                return true;
-            default:
-                return false;
-        }
-    }
+        => RawI32ExpressionPlanEmitter.Emit(this, il, declare);
 
     private static bool TryCreateAddRemainder(BinaryExpression binary, LocalStackKindPlanner stackPlan, IReadOnlyDictionary<string, SandboxFunction> functions, IReadOnlyDictionary<string, RawI32ExpressionPlan>? substitutions, out RawI32ExpressionPlan plan)
     {
@@ -308,18 +217,6 @@ internal sealed partial class RawI32ExpressionPlan
         return true;
     }
 
-    private static void EmitChargeBindingCall(ILGenerator il, string bindingId)
-    {
-        il.Emit(OpCodes.Ldarg_0);
-        il.Emit(OpCodes.Ldstr, bindingId);
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ChargeBindingCall)));
-    }
-
-    private static int BaseInstructionCost(ExpressionKind kind)
-        => kind is ExpressionKind.Abs or ExpressionKind.Min or ExpressionKind.Max or ExpressionKind.Clamp
-            ? 4
-            : 1;
-
     private static ExpressionKind BinaryKind(string op)
         => op switch
         {
@@ -331,20 +228,7 @@ internal sealed partial class RawI32ExpressionPlan
             _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported i32 expression"))
         };
 
-    private static string RuntimeMethod(ExpressionKind kind)
-        => kind switch
-        {
-            ExpressionKind.Add => nameof(CompiledRuntime.AddI32Raw),
-            ExpressionKind.Subtract => nameof(CompiledRuntime.SubI32Raw),
-            ExpressionKind.Multiply => nameof(CompiledRuntime.MulI32Raw),
-            ExpressionKind.Divide => nameof(CompiledRuntime.DivI32Raw),
-            ExpressionKind.Remainder => nameof(CompiledRuntime.RemI32Raw),
-            ExpressionKind.Min => nameof(CompiledRuntime.MinI32Raw),
-            ExpressionKind.Max => nameof(CompiledRuntime.MaxI32Raw),
-            _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported i32 expression"))
-        };
-
-    private enum ExpressionKind
+    internal enum ExpressionKind
     {
         Literal,
         Variable,

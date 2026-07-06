@@ -280,7 +280,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return TryLowerMapElementGet(element, receiverType)
             ?? throw new NotSupportedException($"Server extension indexing '{element}' is not supported.");
     }
-    private ITypeSymbol TypeOf(ExpressionSyntax expression)
+    internal ITypeSymbol TypeOf(ExpressionSyntax expression)
     {
         if (IsServerContextExpression(expression) && _serverContextType is { } serverContextType)
         {
@@ -293,7 +293,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                ?? throw new NotSupportedException($"Server extension could not resolve the type of '{expression}'.");
     }
 
-    private bool IsStringExpression(ExpressionSyntax expression)
+    internal bool IsStringExpression(ExpressionSyntax expression)
         => TypeOf(expression).SpecialType == SpecialType.System_String;
 
     private bool IsServerContextExpression(ExpressionSyntax expression)

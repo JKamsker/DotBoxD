@@ -11,7 +11,7 @@ internal sealed partial class InterpreterFrame
     private readonly long[] _i64Slots;
     private readonly double[] _f64Slots;
     private readonly bool[] _assigned;
-    private InterpreterFrame(
+    internal InterpreterFrame(
         FunctionFrameLayout layout,
         SandboxValue?[] slots,
         int[] i32Slots,
@@ -253,57 +253,7 @@ internal sealed partial class InterpreterFrame
         FunctionFrameLayout layout,
         SandboxFunction function,
         IReadOnlyList<SandboxValue> args)
-    {
-        var slots = layout.SlotCount == 0
-            ? System.Array.Empty<SandboxValue?>()
-            : new SandboxValue?[layout.SlotCount];
-        var i32Slots = layout.HasI32Slots ? new int[layout.SlotCount] : System.Array.Empty<int>();
-        var i64Slots = layout.HasI64Slots ? new long[layout.SlotCount] : System.Array.Empty<long>();
-        var f64Slots = layout.HasF64Slots ? new double[layout.SlotCount] : System.Array.Empty<double>();
-        var assigned = layout.HasRawSlots ? new bool[layout.SlotCount] : System.Array.Empty<bool>();
-
-        // Parameters occupy the leading slots in declaration order (see
-        // FunctionFrameLayout.Build), so positional arguments map directly.
-        for (var i = 0; i < function.Parameters.Count; i++)
-        {
-            AssignArgumentSlot(layout, args[i], i, slots, i32Slots, i64Slots, f64Slots, assigned);
-        }
-
-        return new InterpreterFrame(layout, slots, i32Slots, i64Slots, f64Slots, assigned);
-    }
-
-    private static void AssignArgumentSlot(
-        FunctionFrameLayout layout,
-        SandboxValue argument,
-        int slot,
-        SandboxValue?[] slots,
-        int[] i32Slots,
-        long[] i64Slots,
-        double[] f64Slots,
-        bool[] assigned)
-    {
-        if (layout.IsI32Slot(slot))
-        {
-            i32Slots[slot] = ((I32Value)argument).Value;
-        }
-        else if (layout.IsF64Slot(slot))
-        {
-            f64Slots[slot] = ((F64Value)argument).Value;
-        }
-        else if (layout.IsI64Slot(slot))
-        {
-            i64Slots[slot] = ((I64Value)argument).Value;
-        }
-        else
-        {
-            slots[slot] = argument;
-        }
-
-        if (layout.HasRawSlots)
-        {
-            assigned[slot] = true;
-        }
-    }
+        => InterpreterFrameBuilder.Create(layout, function, args);
 
     private static SandboxRuntimeException Unassigned(string name)
         => new(new SandboxError(SandboxErrorCode.ValidationError, $"local '{name}' read before assignment"));

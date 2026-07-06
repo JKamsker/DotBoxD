@@ -56,9 +56,9 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     internal static string RecordGet(string receiver, int index)
         => Call("record.get", null, receiver, I32(index));
 
-    private static string Unit() => Obj(("unit", "true"));
+    internal static string Unit() => Obj(("unit", "true"));
 
-    private static string I32(int value) => Obj(("i32", value.ToString(CultureInfo.InvariantCulture)));
+    internal static string I32(int value) => Obj(("i32", value.ToString(CultureInfo.InvariantCulture)));
 
     private static string I64(long value) => Obj(("i64", value.ToString(CultureInfo.InvariantCulture)));
 
@@ -102,10 +102,10 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 $"Kernel RPC service enum literal '{enumType.ToDisplayString()}' is not supported.")
         };
 
-    private static string BinaryJson(string op, string left, string right)
+    internal static string BinaryJson(string op, string left, string right)
         => Obj(("op", Str(op)), ("left", left), ("right", right));
 
-    private static string Call(string name, string? genericType, params string[] args)
+    internal static string Call(string name, string? genericType, params string[] args)
     {
         var fields = new List<(string, string)>(3) { ("call", Str(name)) };
         if (genericType is not null)
@@ -117,10 +117,10 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return Obj(fields.ToArray());
     }
 
-    private static string SetStatement(string name, string value)
+    internal static string SetStatement(string name, string value)
         => Obj(("op", Str("set")), ("name", Str(name)), ("value", value));
 
-    private static string Obj(params (string Key, string Value)[] fields)
+    internal static string Obj(params (string Key, string Value)[] fields)
     {
         var parts = new string[fields.Length];
         for (var i = 0; i < fields.Length; i++)

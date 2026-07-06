@@ -5,14 +5,13 @@ namespace DotBoxD.Hosting;
 
 using System.Globalization;
 using DotBoxD.Kernels;
-using DotBoxD.Kernels.Runtime;
 
 internal static class WorkerAuditValidator
 {
     private static readonly DateTimeOffset EarliestAcceptedTimestamp = DateTimeOffset.UnixEpoch;
     private static readonly Dictionary<string, AuditKindValidator> AuditKindValidators = new(StringComparer.Ordinal)
     {
-        ["RunSummary"] = static (plan, _, _, auditEvent, _) => RunSummarySchemaMatches(plan, auditEvent),
+        ["RunSummary"] = static (plan, _, _, auditEvent, _) => WorkerRunSummaryAuditValidator.Matches(plan, auditEvent),
         ["WorkerExecution"] = static (plan, _, _, auditEvent, _) => ModuleAuditMatches(plan, auditEvent),
         ["ExecutionFallback"] = static (plan, _, _, auditEvent, _) => ExecutionFallbackAuditMatches(plan, auditEvent),
         ["VerifierFailure"] = static (plan, _, _, auditEvent, _) => VerifierFailureAuditMatches(plan, auditEvent),
@@ -28,41 +27,6 @@ internal static class WorkerAuditValidator
         [BindingAuditKinds.PluginMessage] = static (plan, entrypoint, _, auditEvent, grantClock) =>
             BindingAuditMatches(plan, entrypoint, auditEvent, grantClock),
     };
-
-    private static readonly HashSet<string> CommonRunSummaryFields = [
-        "mode",
-        "executionMode",
-        "executionDispatched",
-        "cacheStatus",
-        "moduleHash",
-        "planHash",
-        "policyId",
-        "policyHash",
-        "bindingManifestHash",
-        "fuelUsed",
-        "maxFuel",
-        "loopIterations",
-        "maxLoopIterations",
-        "allocatedBytes",
-        "allocationCharged",
-        "maxAllocatedBytes",
-        "hostCalls",
-        "maxHostCalls",
-        "fileBytesRead",
-        "maxFileBytesRead",
-        "fileBytesWritten",
-        "maxFileBytesWritten",
-        "networkBytesRead",
-        "maxNetworkBytesRead",
-        "networkBytesWritten",
-        "maxNetworkBytesWritten",
-        "logEvents",
-        "maxLogEvents",
-        "collectionElements",
-        "maxCollectionElements",
-        "stringBytes",
-        "maxStringBytes"
-    ];
 
     private delegate bool AuditKindValidator(
         ExecutionPlan plan,
@@ -90,9 +54,9 @@ internal static class WorkerAuditValidator
     private static bool CommonEnvelopeMatches(ExecutionPlan plan, SandboxAuditEvent auditEvent)
     {
         if (string.IsNullOrWhiteSpace(auditEvent.Kind) ||
-            !TextIsSafe(auditEvent.Kind) ||
-            !TextIsSafe(auditEvent.ResourceId) ||
-            !TextIsSafe(auditEvent.Message) ||
+            !WorkerAuditTextSafety.TextIsSafe(auditEvent.Kind) ||
+            !WorkerAuditTextSafety.TextIsSafe(auditEvent.ResourceId) ||
+            !WorkerAuditTextSafety.TextIsSafe(auditEvent.Message) ||
             auditEvent.Bytes is < 0)
         {
             return false;
@@ -126,42 +90,6 @@ internal static class WorkerAuditValidator
 
         return timestamp <= DateTimeOffset.UtcNow.AddMinutes(5);
     }
-
-    private static bool RunSummarySchemaMatches(ExecutionPlan plan, SandboxAuditEvent auditEvent)
-    {
-        if (!RunSummaryEnvelopeMatches(plan, auditEvent))
-        {
-            return false;
-        }
-
-        foreach (var field in auditEvent.Fields!)
-        {
-            if (!RunSummaryFieldMatches(plan, field))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static bool RunSummaryEnvelopeMatches(ExecutionPlan plan, SandboxAuditEvent auditEvent)
-        => auditEvent.BindingId is null &&
-           auditEvent.CapabilityId is null &&
-           auditEvent.Effect == SandboxEffect.None &&
-           auditEvent.Fields is not null &&
-           string.Equals(auditEvent.ResourceId, $"module:{plan.ModuleHash}", StringComparison.Ordinal);
-
-    private static bool RunSummaryFieldMatches(ExecutionPlan plan, KeyValuePair<string, string> field)
-        => FieldNameAllowed(plan, field.Key) &&
-           !string.IsNullOrWhiteSpace(field.Key) &&
-           TextIsSafe(field.Key) &&
-           TextIsSafe(field.Value);
-
-    private static bool FieldNameAllowed(ExecutionPlan plan, string key)
-        => CommonRunSummaryFields.Contains(key) ||
-           (plan.Policy.Deterministic && key == "logicalNow") ||
-           key is "runtimeForm" or "cacheKey" or "artifactHash" or "materializationStatus";
 
     private static bool ModuleAuditMatches(ExecutionPlan plan, SandboxAuditEvent auditEvent)
         => auditEvent.BindingId is null &&
@@ -302,8 +230,8 @@ internal static class WorkerAuditValidator
         foreach (var field in fields)
         {
             if (string.IsNullOrWhiteSpace(field.Key) ||
-                !TextIsSafe(field.Key) ||
-                !TextIsSafe(field.Value))
+                !WorkerAuditTextSafety.TextIsSafe(field.Key) ||
+                !WorkerAuditTextSafety.TextIsSafe(field.Value))
             {
                 return false;
             }
@@ -320,7 +248,4 @@ internal static class WorkerAuditValidator
             out var parsedDuration) &&
             parsedDuration >= 0;
 
-    private static bool TextIsSafe(string? value)
-        => value is null ||
-           string.Equals(AuditTextSanitizer.SanitizeAndRedact(value), value, StringComparison.Ordinal);
 }

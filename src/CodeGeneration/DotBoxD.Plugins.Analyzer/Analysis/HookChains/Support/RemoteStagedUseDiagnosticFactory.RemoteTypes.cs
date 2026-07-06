@@ -22,7 +22,7 @@ internal static partial class RemoteStagedUseDiagnosticFactory
             return false;
         }
 
-        if (ContainsStageInvocation(expression))
+        if (RemoteStagedUseFlowAnalyzer.ContainsStageInvocation(expression))
         {
             return true;
         }

@@ -37,7 +37,7 @@ public sealed partial class EventIndexRegistry
         public EventIndexEntry<TEvent>[] Snapshot() => _entries;
     }
 
-    private sealed record EventIndexEntry<TEvent>(
+    internal sealed record EventIndexEntry<TEvent>(
         EventIndexMatcher<TEvent> Matcher,
         InstalledKernel Kernel,
         bool FullyCovered);

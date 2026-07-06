@@ -16,19 +16,6 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         "Remote Where/Select stages assigned to an existing local are not lowered into a later terminal; " +
         "keep the stage in the fluent chain or initialize a new local with the staged expression.";
 
-    private static readonly HashSet<string> TerminalOrUseNames = new(StringComparer.Ordinal)
-    {
-        "Run",
-        "RunLocal",
-        "Register",
-        "RegisterLocal",
-        "Use",
-        "UseGeneratedChain",
-        "UseGeneratedLocalChain",
-        "UseGeneratedResultChain",
-        "UseGeneratedLocalResultChain",
-    };
-
     public static bool IsCandidate(SyntaxNode node)
         => node is InvocationExpressionSyntax
         {
@@ -193,7 +180,7 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         var receiverType = model.GetTypeInfo(access.Expression, cancellationToken).Type;
         if ((!IsRemoteChainOrStageType(receiverType) &&
              !IsGeneratedRemoteChain(access.Expression, model, cancellationToken)) ||
-            LocalFlowsIntoTerminalOrUse(invocation, local, model, cancellationToken))
+            RemoteStagedUseFlowAnalyzer.LocalFlowsIntoTerminalOrUse(invocation, local, model, cancellationToken))
         {
             return null;
         }
@@ -218,7 +205,7 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         }
 
         if (model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not ILocalSymbol local ||
-            !LocalFlowsIntoTerminalOrUse(invocation, local, model, cancellationToken))
+            !RemoteStagedUseFlowAnalyzer.LocalFlowsIntoTerminalOrUse(invocation, local, model, cancellationToken))
         {
             return null;
         }
@@ -228,131 +215,4 @@ internal static partial class RemoteStagedUseDiagnosticFactory
             PluginDiagnosticLocation.From(access.Name.GetLocation()));
     }
 
-    private static bool LocalFlowsIntoTerminalOrUse(
-        InvocationExpressionSyntax invocation,
-        ILocalSymbol local,
-        SemanticModel model,
-        CancellationToken cancellationToken)
-    {
-        var block = invocation.FirstAncestorOrSelf<BlockSyntax>();
-        if (block is null)
-        {
-            return false;
-        }
-
-        foreach (var terminal in block.DescendantNodes(static node =>
-                node is not LambdaExpressionSyntax and not LocalFunctionStatementSyntax)
-            .OfType<InvocationExpressionSyntax>())
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (IsPriorOrCurrentInvocation(terminal, invocation))
-            {
-                continue;
-            }
-
-            if (!TrySupportedTerminalReceiver(terminal, out var terminalReceiver))
-            {
-                continue;
-            }
-
-            if (HasMutationBeforeTerminal(local, invocation, terminal, model, cancellationToken))
-            {
-                continue;
-            }
-
-            if (ExpressionReferencesLocal(terminalReceiver, local, model, cancellationToken, depth: 0))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool IsPriorOrCurrentInvocation(
-        InvocationExpressionSyntax terminal,
-        InvocationExpressionSyntax invocation)
-        => terminal == invocation || terminal.SpanStart <= invocation.SpanStart;
-
-    private static bool TrySupportedTerminalReceiver(
-        InvocationExpressionSyntax terminal,
-        out ExpressionSyntax terminalReceiver)
-    {
-        if (TryTerminalReceiver(terminal, out var terminalName, out terminalReceiver) &&
-            TerminalOrUseNames.Contains(terminalName))
-        {
-            return true;
-        }
-
-        terminalReceiver = null!;
-        return false;
-    }
-
-    private static bool HasMutationBeforeTerminal(
-        ILocalSymbol local,
-        InvocationExpressionSyntax invocation,
-        InvocationExpressionSyntax terminal,
-        SemanticModel model,
-        CancellationToken cancellationToken)
-        => HookChainAliasResolver.HasMutationBetween(
-            local,
-            invocation.SpanStart,
-            terminal.SpanStart,
-            model,
-            cancellationToken);
-
-    private static bool ExpressionReferencesLocal(
-        ExpressionSyntax expression,
-        ILocalSymbol local,
-        SemanticModel model,
-        CancellationToken cancellationToken,
-        int depth)
-    {
-        if (depth > 8)
-        {
-            return false;
-        }
-
-        expression = HookChainAliasResolver.UnwrapTransparentExpression(expression);
-        if (expression is IdentifierNameSyntax identifier &&
-            SymbolEqualityComparer.Default.Equals(model.GetSymbolInfo(identifier, cancellationToken).Symbol, local))
-        {
-            return true;
-        }
-
-        if (HookChainAliasResolver.Initializer(expression, model, cancellationToken) is { } initializer &&
-            ExpressionReferencesLocal(initializer, local, model, cancellationToken, depth + 1))
-        {
-            return true;
-        }
-
-        if (expression is InvocationExpressionSyntax
-            {
-                Expression: MemberAccessExpressionSyntax chained
-            })
-        {
-            return ExpressionReferencesLocal(chained.Expression, local, model, cancellationToken, depth + 1);
-        }
-
-        return expression is MemberAccessExpressionSyntax access &&
-            ExpressionReferencesLocal(access.Expression, local, model, cancellationToken, depth + 1);
-    }
-
-    private static bool ContainsStageInvocation(ExpressionSyntax expression)
-    {
-        expression = HookChainAliasResolver.UnwrapTransparentExpression(expression);
-
-        if (expression is InvocationExpressionSyntax
-            {
-                Expression: MemberAccessExpressionSyntax stageAccess
-            })
-        {
-            var stageName = stageAccess.Name.Identifier.ValueText;
-            return stageName is "Where" or "Select" ||
-                ContainsStageInvocation(stageAccess.Expression);
-        }
-
-        return expression is MemberAccessExpressionSyntax access &&
-            ContainsStageInvocation(access.Expression);
-    }
 }

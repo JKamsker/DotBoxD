@@ -238,35 +238,7 @@ public sealed class TcpServerTransport : IServerTransport
         return default;
     }
     private void ObservePendingAccept()
-    {
-        // Reclaim an in-flight accept we stashed on cancellation. Stopping the listener usually
-        // faults it (observe the exception), but a client can connect in the window between the
-        // cancellation and Stop(), completing the accept with a live TcpClient — close that socket
-        // so it is not leaked at shutdown.
-        var pending = Interlocked.Exchange(ref _pendingAccept, null);
-        _ = pending?.ContinueWith(
-            static t =>
-            {
-                if (t.IsFaulted)
-                {
-                    _ = t.Exception;
-                }
-                else if (t.Status == TaskStatus.RanToCompletion)
-                {
-                    try
-                    {
-                        t.Result?.Dispose();
-                    }
-                    catch
-                    {
-                        // Best-effort close of a socket accepted during shutdown.
-                    }
-                }
-            },
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
-    }
+        => TcpPendingAcceptObserver.Observe(Interlocked.Exchange(ref _pendingAccept, null));
     /// <summary>
     /// Atomically claims any stashed in-flight accept. Reads the field, fires the test seam (a no-op in
     /// production), then claims the stashed task with a <see cref="Interlocked.CompareExchange{T}"/> —
