@@ -2,6 +2,7 @@ using DotBoxD.Codecs.MessagePack;
 using DotBoxD.Services.Serialization;
 using MessagePack;
 using Xunit;
+using BufferPayload = DotBoxD.Services.Buffers.Payload;
 
 namespace DotBoxD.Services.Tests.Protocol.MessagePack;
 
@@ -50,7 +51,7 @@ public sealed class MessagePackObjectFrameworkScalarRegressionTests
             { new DateTimeOffset(2026, 7, 6, 13, 30, 42, TimeSpan.FromHours(2)), typeof(DateTimeOffset) },
         };
 
-    private static Payload? SerializeObjectOrAllowClosedFailure(
+    private static BufferPayload? SerializeObjectOrAllowClosedFailure(
         MessagePackRpcSerializer serializer,
         object value)
     {

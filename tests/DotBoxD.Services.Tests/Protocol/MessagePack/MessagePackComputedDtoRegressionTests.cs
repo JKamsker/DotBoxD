@@ -2,6 +2,7 @@ using DotBoxD.Codecs.MessagePack;
 using DotBoxD.Services.Serialization;
 using MessagePack;
 using Xunit;
+using BufferPayload = DotBoxD.Services.Buffers.Payload;
 
 namespace DotBoxD.Services.Tests.Protocol.MessagePack;
 
@@ -66,7 +67,7 @@ public sealed class MessagePackComputedDtoRegressionTests
             exception.Message);
     }
 
-    private static Payload? TrySerializeOrNull(
+    private static BufferPayload? TrySerializeOrNull(
         MessagePackRpcSerializer serializer,
         ComputedGetOnlyDto value)
     {
