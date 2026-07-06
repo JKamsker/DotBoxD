@@ -201,6 +201,7 @@ public SandboxContext( SandboxRunId runId, SandboxPolicy policy, ResourceMeter b
 public SandboxEffect AllowedEffects { get => _allowedEffects; init { _allowedEffects = value; ResetHash(); } }
 public SandboxError Error { get; }
 public SandboxError? Error { get; init; }
+public SandboxErrorCode Code
 public SandboxIsolation Isolation { get; init; } = SandboxIsolation.InProcess
 public SandboxModule Module { get; }
 public SandboxPath Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
@@ -431,6 +432,7 @@ public string PlanHash { get; }
 public string PolicyHash { get; }
 public string PolicyId { get => _policyId; init { _policyId = value; ResetHash(); } }
 public string RelativePath { get => _relativePath; init => _relativePath = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
+public string SafeMessage
 public string TypeName { get => _typeName; init => _typeName = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
 public string Value
 public string Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }

@@ -1,28 +1,19 @@
 namespace DotBoxD.Kernels.Sandbox;
 
-public sealed record SandboxError
+public sealed record SandboxError(
+    SandboxErrorCode Code,
+    string SafeMessage,
+    string? DiagnosticId = null)
 {
-    private SandboxErrorCode _code;
-    private string _safeMessage = string.Empty;
-
-    public SandboxError(SandboxErrorCode Code, string SafeMessage, string? DiagnosticId = null)
-    {
-        this.Code = Code;
-        this.SafeMessage = SafeMessage;
-        this.DiagnosticId = DiagnosticId;
-    }
+    private SandboxErrorCode _code = ValidateCode(Code);
+    private string _safeMessage = ValidateSafeMessage(SafeMessage);
 
     public SandboxErrorCode Code
     {
         get => _code;
         init
         {
-            if (!Enum.IsDefined(value))
-            {
-                throw new ArgumentOutOfRangeException(nameof(Code), value, "Unknown sandbox error code.");
-            }
-
-            _code = value;
+            _code = ValidateCode(value);
         }
     }
 
@@ -31,18 +22,24 @@ public sealed record SandboxError
         get => _safeMessage;
         init
         {
-            ArgumentException.ThrowIfNullOrEmpty(value, nameof(SafeMessage));
-            _safeMessage = value;
+            _safeMessage = ValidateSafeMessage(value);
         }
     }
 
-    public string? DiagnosticId { get; init; }
-
-    public void Deconstruct(out SandboxErrorCode Code, out string SafeMessage, out string? DiagnosticId)
+    private static SandboxErrorCode ValidateCode(SandboxErrorCode value)
     {
-        Code = this.Code;
-        SafeMessage = this.SafeMessage;
-        DiagnosticId = this.DiagnosticId;
+        if (!Enum.IsDefined(value))
+        {
+            throw new ArgumentOutOfRangeException(nameof(Code), value, "Unknown sandbox error code.");
+        }
+
+        return value;
+    }
+
+    private static string ValidateSafeMessage(string value)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(value, nameof(SafeMessage));
+        return value;
     }
 }
 
