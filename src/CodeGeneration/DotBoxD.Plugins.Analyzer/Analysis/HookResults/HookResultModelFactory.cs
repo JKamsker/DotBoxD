@@ -19,6 +19,7 @@ internal static partial class HookResultModelFactory
     private static readonly SymbolDisplayFormat FieldTypeFormat = SymbolDisplayFormat.FullyQualifiedFormat
         .WithMiscellaneousOptions(
             SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions
+            | SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers
             | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
 
     public static HookResultModel? Create(GeneratorAttributeSyntaxContext context, CancellationToken cancellationToken)
