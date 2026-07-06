@@ -235,6 +235,7 @@ internal static partial class ProxyGenerator
         var target = explicitInterface ? qualifiedAsyncSibling + "." + s.Name : s.Name;
 
         var asyncKeyword = RequiresAsyncStateMachine(s.SiblingReturnKind) ? "async " : string.Empty;
+        AppendAttributeLines(sb, s.Source.MemberAttributePrefix);
         sb.AppendLine($"        {access}{asyncKeyword}{declaredReturn} {target}({paramList})");
         sb.AppendLine("        {");
 

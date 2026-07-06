@@ -50,9 +50,20 @@ public sealed class ProxyObsoleteAttributeTests
             "[global::System.ObsoleteAttribute(\"Use NewAsync\")]\n" +
             "        public global::System.Threading.Tasks.Task LegacyAsync()");
         proxy.Should().Contain(
+            "[global::System.ObsoleteAttribute(\"Use NewAsync\")]\n" +
+            "        public global::System.Threading.Tasks.Task LegacyAsync(global::System.Threading.CancellationToken ct = default)");
+        proxy.Should().Contain(
             "[global::System.ObsoleteAttribute(\"Use Child2\")]\n" +
             "        public global::Regress.ObsoleteProxyMembers.IChild Child =>");
         AssertChild2IsNotObsolete(proxy);
+
+        var asyncSibling = runResult.Results.Single().GeneratedSources
+            .Single(g => g.HintName.EndsWith("IRoot.DotBoxDRpcAsync.g.cs", StringComparison.Ordinal))
+            .SourceText.ToString();
+
+        asyncSibling.Should().Contain(
+            "[global::System.ObsoleteAttribute(\"Use NewAsync\")]\n" +
+            "        global::System.Threading.Tasks.Task LegacyAsync(global::System.Threading.CancellationToken ct = default);");
     }
 
     private static void AssertChild2IsNotObsolete(string proxy)
