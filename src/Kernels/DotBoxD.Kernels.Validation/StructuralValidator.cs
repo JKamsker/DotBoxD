@@ -14,7 +14,12 @@ internal static class StructuralValidator
         IReadOnlySet<string> declaredOpaqueIdTypes)
     {
         CheckIdentifier(module.Id, "module id", diagnostics);
-        if (!SandboxLanguage.Supports(module.TargetSandboxVersion))
+        CheckRequiredVersion(module.Version, "module version", diagnostics);
+        if (module.TargetSandboxVersion is null)
+        {
+            diagnostics.Add(new SandboxDiagnostic("E-IR-VERSION", "target sandbox version must not be null"));
+        }
+        else if (!SandboxLanguage.Supports(module.TargetSandboxVersion))
         {
             diagnostics.Add(new SandboxDiagnostic(
                 "E-IR-VERSION",
@@ -45,6 +50,17 @@ internal static class StructuralValidator
         foreach (var function in module.Functions)
         {
             ValidateFunction(function, diagnostics, declaredOpaqueIdTypes);
+        }
+    }
+
+    private static void CheckRequiredVersion(
+        SemVersion? version,
+        string description,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        if (version is null)
+        {
+            diagnostics.Add(new SandboxDiagnostic("E-IR-VERSION", $"{description} must not be null"));
         }
     }
 
