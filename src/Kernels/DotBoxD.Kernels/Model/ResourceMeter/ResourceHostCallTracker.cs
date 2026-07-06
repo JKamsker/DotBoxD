@@ -1,24 +1,21 @@
 namespace DotBoxD.Kernels.Model;
 
-public sealed partial class ResourceMeter
+using static ResourceMeterMath;
+
+internal sealed class ResourceHostCallTracker
 {
-    public void ChargeHostCall(string bindingId, int? maxCallsPerRun = null)
+    private Dictionary<string, int>? _callsByBinding;
+    private string? _lastLimitedBindingId;
+    private int _lastLimitedBindingCalls;
+
+    public void Reset()
     {
-        HostCalls = AddHostCallCount(HostCalls, 1, bindingId);
-        if (HostCalls > Limits.MaxHostCalls)
-        {
-            throw HostCallQuota(bindingId);
-        }
-
-        if (maxCallsPerRun is null)
-        {
-            return;
-        }
-
-        ChargeLimitedBindingCall(bindingId, maxCallsPerRun.Value);
+        _callsByBinding?.Clear();
+        _lastLimitedBindingId = null;
+        _lastLimitedBindingCalls = 0;
     }
 
-    private void ChargeLimitedBindingCall(string bindingId, int maxCallsPerRun)
+    public void ChargeLimitedBindingCall(string bindingId, int maxCallsPerRun)
     {
         if (string.Equals(_lastLimitedBindingId, bindingId, StringComparison.Ordinal))
         {
@@ -45,6 +42,21 @@ public sealed partial class ResourceMeter
         }
     }
 
+    public static SandboxRuntimeException HostCallQuota(string bindingId)
+        => Quota($"host call budget exhausted at {bindingId}");
+
+    public static int AddHostCallCount(int current, int amount, string bindingId)
+    {
+        try
+        {
+            return checked(current + amount);
+        }
+        catch (OverflowException)
+        {
+            throw HostCallQuota(bindingId);
+        }
+    }
+
     private void FlushLastLimitedBinding()
     {
         if (_lastLimitedBindingId is null)
@@ -60,23 +72,8 @@ public sealed partial class ResourceMeter
     private Dictionary<string, int> CallsByBinding
         => _callsByBinding ??= new Dictionary<string, int>(StringComparer.Ordinal);
 
-    private static SandboxRuntimeException HostCallQuota(string bindingId)
-        => Quota($"host call budget exhausted at {bindingId}");
-
     private static SandboxRuntimeException BindingCallQuota(string bindingId)
         => Quota($"binding call budget exhausted at {bindingId}");
-
-    private static int AddHostCallCount(int current, int amount, string bindingId)
-    {
-        try
-        {
-            return checked(current + amount);
-        }
-        catch (OverflowException)
-        {
-            throw HostCallQuota(bindingId);
-        }
-    }
 
     private static int AddBindingCallCount(int current, int amount, string bindingId)
     {
