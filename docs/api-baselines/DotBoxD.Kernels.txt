@@ -236,6 +236,7 @@ public SandboxPolicyBuilder WithMaxTotalStringBytes(long bytes)
 public SandboxPolicyBuilder WithPolicyId(string policyId)
 public SandboxPolicyBuilder WithWallTime(TimeSpan maxWallTime)
 public SandboxResourceUsage Snapshot()
+public SandboxRunId RunId { get => _runId; init => _runId = value ?? throw new ArgumentNullException(nameof(RunId)); }
 public SandboxRunId RunId { get; }
 public SandboxRunId? RunId { get; init; }
 public SandboxRuntimeException(SandboxError error)
@@ -426,6 +427,7 @@ public string BindingManifestHash { get; }
 public string CreateChargedStringConcat(string left, string right)
 public string CreateChargedSubstring(string value, int startIndex, int length)
 public string Hash => (_hash ??= CreateHashCache()).Value
+public string Kind { get => _kind; init => _kind = value ?? throw new ArgumentNullException(nameof(Kind)); }
 public string ManifestHash { get; }
 public string ModuleHash { get; }
 public string Name { get; init; } = Name ?? throw new ArgumentNullException(nameof(Name))

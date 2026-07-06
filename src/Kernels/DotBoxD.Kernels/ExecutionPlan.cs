@@ -226,11 +226,20 @@ public enum SandboxIsolation
 public sealed record SandboxExecutionResult
 {
     private IReadOnlyList<SandboxAuditEvent> _auditEvents = [];
+    private SandboxResourceUsage _resourceUsage = null!;
+    private string _moduleHash = null!;
+    private string _planHash = null!;
+    private string _policyHash = null!;
 
     public bool Succeeded { get; init; }
     public SandboxValue? Value { get; init; }
     public SandboxError? Error { get; init; }
-    public required SandboxResourceUsage ResourceUsage { get; init; }
+    public required SandboxResourceUsage ResourceUsage
+    {
+        get => _resourceUsage;
+        init => _resourceUsage = value ?? throw new ArgumentNullException(nameof(ResourceUsage));
+    }
+
     public required IReadOnlyList<SandboxAuditEvent> AuditEvents
     {
         get => _auditEvents;
@@ -241,14 +250,47 @@ public sealed record SandboxExecutionResult
     // hot path) can be adopted directly; any other input is still defensively copied so
     // external list/array identity never escapes into the public result.
     private static IReadOnlyList<SandboxAuditEvent> AdoptOrCopy(IReadOnlyList<SandboxAuditEvent> value)
-        => value is OwnedAuditEventSnapshot owned
-            ? owned
-            : ModelCopy.List(value);
+    {
+        ArgumentNullException.ThrowIfNull(value, nameof(AuditEvents));
+        if (value is OwnedAuditEventSnapshot owned)
+        {
+            return owned;
+        }
+
+        ValidateExternalAuditEvents(value);
+        return ModelCopy.List(value);
+    }
+
+    private static void ValidateExternalAuditEvents(IReadOnlyList<SandboxAuditEvent> value)
+    {
+        foreach (var auditEvent in value)
+        {
+            if (auditEvent is null)
+            {
+                throw new ArgumentException("Audit events cannot contain null entries.", nameof(AuditEvents));
+            }
+        }
+    }
 
     public ExecutionMode ActualMode { get; init; }
     public bool ExecutionDispatched { get; init; }
-    public required string ModuleHash { get; init; }
-    public required string PlanHash { get; init; }
-    public required string PolicyHash { get; init; }
+    public required string ModuleHash
+    {
+        get => _moduleHash;
+        init => _moduleHash = value ?? throw new ArgumentNullException(nameof(ModuleHash));
+    }
+
+    public required string PlanHash
+    {
+        get => _planHash;
+        init => _planHash = value ?? throw new ArgumentNullException(nameof(PlanHash));
+    }
+
+    public required string PolicyHash
+    {
+        get => _policyHash;
+        init => _policyHash = value ?? throw new ArgumentNullException(nameof(PolicyHash));
+    }
+
     public string? ArtifactHash { get; init; }
 }
