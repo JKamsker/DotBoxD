@@ -43,6 +43,11 @@ internal static class InheritedMethodDeduplicator
             return $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible nullable annotations";
         }
 
+        if (!InheritedMethodFlowAttributeComparer.HasSameFlowAttributes(existingMethod, methodSymbol, ct))
+        {
+            return $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible flow attributes";
+        }
+
         if (!HasSameCallerInfoAttributes(existingMethod, methodSymbol, ct))
         {
             return $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible caller info attributes";
