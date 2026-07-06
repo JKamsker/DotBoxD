@@ -3,9 +3,9 @@ using DotBoxD.Plugins.Runtime.Validation;
 
 namespace DotBoxD.Plugins.Runtime;
 
-internal static partial class PluginPackageValidator
+internal static class PluginPackageValidationPhases
 {
-    private static void ValidateManifestIdentity(
+    public static void ValidateManifestIdentity(
         PluginPackage package,
         List<SandboxDiagnostic> diagnostics)
     {
@@ -18,6 +18,77 @@ internal static partial class PluginPackageValidator
         PluginManifestTextValidator.ValidateText(package.Manifest.Contract, "plugin contract", diagnostics);
         ValidateManifestModuleId(package, diagnostics);
         ValidateMetadataPluginId(package, diagnostics);
+    }
+
+    public static void ValidateRpcEntrypoint(
+        PluginManifest manifest,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        if (manifest.RpcEntrypoint is not null)
+        {
+            diagnostics.Add(new SandboxDiagnostic(
+                "DBXK073",
+                "Hook kernel manifests must not declare rpcEntrypoint."));
+        }
+    }
+
+    public static void ValidateManifestDetails(
+        PluginPackage package,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        PluginManifestEffectValidator.Validate(package.Manifest, diagnostics);
+        PluginPackageValidator.ValidateRequiredCapabilities(package.Manifest, diagnostics);
+        PluginManifestCapabilityValidator.ValidateConcreteRequiredCapabilityEntries(
+            package.Manifest,
+            package.Module,
+            diagnostics);
+        PluginPackageValidator.ValidateEntrypoints(package, PluginEntrypointIndex.Build(package), diagnostics);
+    }
+
+    public static void ValidateLiveSettings(
+        IReadOnlyList<LiveSettingDefinition> liveSettings,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        if (!PluginManifestElementValidator.ValidateNoNullElements(liveSettings, "liveSettings", diagnostics))
+        {
+            return;
+        }
+
+        ValidateDuplicateLiveSettings(liveSettings, diagnostics);
+        foreach (var setting in liveSettings)
+        {
+            ValidateLiveSetting(setting, diagnostics);
+        }
+    }
+
+    public static void ValidateSubscriptions(
+        IReadOnlyList<HookSubscriptionManifest> subscriptions,
+        string? metadataKernel,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        var subscriptionsValid = PluginManifestElementValidator.ValidateNoNullElements(
+            subscriptions,
+            "subscriptions",
+            diagnostics);
+        ValidateSubscriptionCount(subscriptions, diagnostics);
+        if (!subscriptionsValid)
+        {
+            PluginPackageValidator.ThrowIfErrors(diagnostics);
+            return;
+        }
+
+        foreach (var subscription in subscriptions)
+        {
+            ValidateSubscription(subscription, metadataKernel, diagnostics);
+        }
+    }
+
+    public static void ValidateManifestMode(PluginManifest manifest, List<SandboxDiagnostic> diagnostics)
+    {
+        if (!Enum.IsDefined(manifest.Mode))
+        {
+            diagnostics.Add(new SandboxDiagnostic("DBXK042", "Plugin manifest execution mode is not supported."));
+        }
     }
 
     private static void ValidateManifestModuleId(
@@ -41,47 +112,6 @@ internal static partial class PluginPackageValidator
         }
     }
 
-    private static void ValidateRpcEntrypoint(
-        PluginManifest manifest,
-        List<SandboxDiagnostic> diagnostics)
-    {
-        if (manifest.RpcEntrypoint is not null)
-        {
-            diagnostics.Add(new SandboxDiagnostic(
-                "DBXK073",
-                "Hook kernel manifests must not declare rpcEntrypoint."));
-        }
-    }
-
-    private static void ValidateManifestDetails(
-        PluginPackage package,
-        List<SandboxDiagnostic> diagnostics)
-    {
-        PluginManifestEffectValidator.Validate(package.Manifest, diagnostics);
-        ValidateRequiredCapabilities(package.Manifest, diagnostics);
-        PluginManifestCapabilityValidator.ValidateConcreteRequiredCapabilityEntries(
-            package.Manifest,
-            package.Module,
-            diagnostics);
-        ValidateEntrypoints(package, PluginEntrypointIndex.Build(package), diagnostics);
-    }
-
-    private static void ValidateLiveSettings(
-        IReadOnlyList<LiveSettingDefinition> liveSettings,
-        List<SandboxDiagnostic> diagnostics)
-    {
-        if (!PluginManifestElementValidator.ValidateNoNullElements(liveSettings, "liveSettings", diagnostics))
-        {
-            return;
-        }
-
-        ValidateDuplicateLiveSettings(liveSettings, diagnostics);
-        foreach (var setting in liveSettings)
-        {
-            ValidateLiveSetting(setting, diagnostics);
-        }
-    }
-
     private static void ValidateDuplicateLiveSettings(
         IReadOnlyList<LiveSettingDefinition> liveSettings,
         List<SandboxDiagnostic> diagnostics)
@@ -101,29 +131,7 @@ internal static partial class PluginPackageValidator
     {
         PluginManifestTextValidator.ValidateText(setting.Name, "live setting name", diagnostics);
         PluginManifestTextValidator.ValidateText(setting.Type, "live setting type", diagnostics);
-        ValidateSetting(setting, diagnostics);
-    }
-
-    private static void ValidateSubscriptions(
-        IReadOnlyList<HookSubscriptionManifest> subscriptions,
-        string? metadataKernel,
-        List<SandboxDiagnostic> diagnostics)
-    {
-        var subscriptionsValid = PluginManifestElementValidator.ValidateNoNullElements(
-            subscriptions,
-            "subscriptions",
-            diagnostics);
-        ValidateSubscriptionCount(subscriptions, diagnostics);
-        if (!subscriptionsValid)
-        {
-            ThrowIfErrors(diagnostics);
-            return;
-        }
-
-        foreach (var subscription in subscriptions)
-        {
-            ValidateSubscription(subscription, metadataKernel, diagnostics);
-        }
+        PluginPackageValidator.ValidateSetting(setting, diagnostics);
     }
 
     private static void ValidateSubscriptionCount(
@@ -150,7 +158,7 @@ internal static partial class PluginPackageValidator
         List<SandboxDiagnostic> diagnostics)
     {
         ValidateSubscriptionShape(subscription, diagnostics);
-        ValidateResultMetadata(subscription, diagnostics);
+        PluginPackageValidator.ValidateResultMetadata(subscription, diagnostics);
         ValidateSubscriptionKernelMetadata(subscription, metadataKernel, diagnostics);
         PluginManifestPredicateValidator.ValidateIndexedPredicates(subscription, diagnostics);
     }

@@ -4,24 +4,24 @@ using DotBoxD.Plugins.Runtime.Validation;
 
 namespace DotBoxD.Plugins.Runtime;
 
-internal static partial class PluginPackageValidator
+internal static class PluginPackageValidator
 {
     public static void Validate(PluginPackage package)
     {
         var diagnostics = new List<SandboxDiagnostic>();
-        ValidateManifestIdentity(package, diagnostics);
+        PluginPackageValidationPhases.ValidateManifestIdentity(package, diagnostics);
         var metadataKernel = ValidateModuleKernelMetadata(package, diagnostics);
-        ValidateManifestMode(package.Manifest, diagnostics);
+        PluginPackageValidationPhases.ValidateManifestMode(package.Manifest, diagnostics);
         var hasModuleCollectionErrors = PluginModuleCollectionValidator.Validate(package.Module, diagnostics);
-        ValidateRpcEntrypoint(package.Manifest, diagnostics);
+        PluginPackageValidationPhases.ValidateRpcEntrypoint(package.Manifest, diagnostics);
         if (hasModuleCollectionErrors)
         {
             ThrowIfErrors(diagnostics);
         }
 
-        ValidateManifestDetails(package, diagnostics);
-        ValidateLiveSettings(package.Manifest.LiveSettings, diagnostics);
-        ValidateSubscriptions(package.Manifest.Subscriptions, metadataKernel, diagnostics);
+        PluginPackageValidationPhases.ValidateManifestDetails(package, diagnostics);
+        PluginPackageValidationPhases.ValidateLiveSettings(package.Manifest.LiveSettings, diagnostics);
+        PluginPackageValidationPhases.ValidateSubscriptions(package.Manifest.Subscriptions, metadataKernel, diagnostics);
         ThrowIfErrors(diagnostics);
     }
 
@@ -45,7 +45,7 @@ internal static partial class PluginPackageValidator
         return metadataKernel;
     }
 
-    private static void ValidateRequiredCapabilities(
+    internal static void ValidateRequiredCapabilities(
         PluginManifest manifest,
         List<SandboxDiagnostic> diagnostics)
     {
@@ -57,7 +57,7 @@ internal static partial class PluginPackageValidator
         }
     }
 
-    private static void ValidateResultMetadata(
+    internal static void ValidateResultMetadata(
         HookSubscriptionManifest subscription,
         List<SandboxDiagnostic> diagnostics)
     {
@@ -100,7 +100,7 @@ internal static partial class PluginPackageValidator
         }
     }
 
-    private static void ValidateEntrypoints(
+    internal static void ValidateEntrypoints(
         PluginPackage package,
         PluginEntrypointIndex entrypointIndex,
         List<SandboxDiagnostic> diagnostics)
@@ -115,14 +115,6 @@ internal static partial class PluginPackageValidator
             package.Entrypoints.Handle,
             PluginManifestNames.Entrypoints.Handle,
             diagnostics);
-    }
-
-    private static void ValidateManifestMode(PluginManifest manifest, List<SandboxDiagnostic> diagnostics)
-    {
-        if (!Enum.IsDefined(manifest.Mode))
-        {
-            diagnostics.Add(new SandboxDiagnostic("DBXK042", "Plugin manifest execution mode is not supported."));
-        }
     }
 
     private static void ValidateEntrypoint(
@@ -145,7 +137,7 @@ internal static partial class PluginPackageValidator
         }
     }
 
-    private static void ValidateSetting(LiveSettingDefinition setting, List<SandboxDiagnostic> diagnostics)
+    internal static void ValidateSetting(LiveSettingDefinition setting, List<SandboxDiagnostic> diagnostics)
     {
         try
         {
@@ -161,7 +153,7 @@ internal static partial class PluginPackageValidator
         }
     }
 
-    private static void ThrowIfErrors(IReadOnlyList<SandboxDiagnostic> diagnostics)
+    internal static void ThrowIfErrors(IReadOnlyList<SandboxDiagnostic> diagnostics)
     {
         if (diagnostics.Count > 0)
         {
