@@ -161,3 +161,14 @@ internal static class ProxyGenerationHelpers
         return candidate;
     }
 }
+
+internal static class ObsoleteAttributeEmitter
+{
+    public static void AppendIfPresent(StringBuilder sb, string obsoleteAttribute, string indent)
+    {
+        if (obsoleteAttribute.Length > 0)
+        {
+            sb.Append(indent).AppendLine(obsoleteAttribute);
+        }
+    }
+}

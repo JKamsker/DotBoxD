@@ -39,7 +39,7 @@ internal static class ExtensionsGenerator
             sb.AppendLine("        /// <summary>");
             sb.AppendLine($"        /// Provides a {service.InterfaceName} implementation for the other peer to call.");
             sb.AppendLine("        /// </summary>");
-            AppendMemberObsoleteAttribute(sb, service);
+            ObsoleteAttributeEmitter.AppendIfPresent(sb, service.ObsoleteAttribute, "        ");
             sb.AppendLine($"        public static {ServicesGeneratorTypeNames.GlobalRpcPeer} Provide{extensionSuffix}(this {ServicesGeneratorTypeNames.GlobalRpcPeer} peer, {fullInterfaceName} implementation)");
             if (!HasSubServiceProperties(service, ct) && service.MethodSubServices.Array.Length == 0)
             {
@@ -92,7 +92,7 @@ internal static class ExtensionsGenerator
             sb.AppendLine("        /// <summary>");
             sb.AppendLine($"        /// Gets a proxy to call {service.InterfaceName} on the other peer.");
             sb.AppendLine("        /// </summary>");
-            AppendMemberObsoleteAttribute(sb, service);
+            ObsoleteAttributeEmitter.AppendIfPresent(sb, service.ObsoleteAttribute, "        ");
             sb.AppendLine($"        public static {fullInterfaceName} Get{extensionSuffix}(this {ServicesGeneratorTypeNames.GlobalRpcPeer} peer)");
             sb.AppendLine($"            => peer.{ServicesGeneratorMemberNames.RpcPeer.Get}<{fullInterfaceName}>();");
         }
@@ -115,14 +115,6 @@ internal static class ExtensionsGenerator
         }
 
         return false;
-    }
-
-    private static void AppendMemberObsoleteAttribute(StringBuilder sb, ServiceExtensionModel service)
-    {
-        if (service.ObsoleteAttribute.Length > 0)
-        {
-            sb.Append("        ").AppendLine(service.ObsoleteAttribute);
-        }
     }
 
     private static Dictionary<string, string> BuildExtensionSuffixes(

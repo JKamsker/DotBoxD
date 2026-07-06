@@ -35,8 +35,10 @@ public sealed class ServiceTypeObsoleteAttributeTests
             "Regress.ServiceTypeObsolete",
             "ILegacy",
             GeneratorTestHelper.GeneratedKind.Proxy));
-        var asyncSibling = generated.Single(g =>
-            g.HintName == "Regress_ServiceTypeObsolete_ILegacy.DotBoxDRpcAsync.g.cs");
+        var asyncSibling = generated.Single(g => g.HintName == GeneratorTestHelper.HintName(
+            "Regress.ServiceTypeObsolete",
+            "ILegacy",
+            GeneratorTestHelper.GeneratedKind.Async));
 
         var finalCompilation = ((CSharpCompilation)compilation).AddSyntaxTrees(runResult.GeneratedTrees);
         var obsoleteDiagnostics = finalCompilation.GetDiagnostics()
