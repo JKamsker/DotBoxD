@@ -66,12 +66,7 @@ public sealed record ModuleValidationResult(
         var copy = new List<T>();
         foreach (var value in values)
         {
-            if (value is null)
-            {
-                throw new ArgumentException("Collection values cannot be null.", paramName);
-            }
-
-            copy.Add(value);
+            copy.Add(RequireNonNull(value, paramName, "Collection values cannot be null."));
         }
 
         return new ReadOnlyCollection<T>(copy);
@@ -86,17 +81,9 @@ public sealed record ModuleValidationResult(
         var copy = new Dictionary<string, TValue>(values.Count, StringComparer.Ordinal);
         foreach (var item in values)
         {
-            if (item.Key is null)
-            {
-                throw new ArgumentException("Dictionary keys cannot be null.", paramName);
-            }
-
-            if (item.Value is null)
-            {
-                throw new ArgumentException("Dictionary values cannot be null.", paramName);
-            }
-
-            copy.Add(item.Key, item.Value);
+            copy.Add(
+                RequireNonNull(item.Key, paramName, "Dictionary keys cannot be null."),
+                RequireNonNull(item.Value, paramName, "Dictionary values cannot be null."));
         }
 
         return new ReadOnlyDictionary<string, TValue>(
@@ -110,12 +97,7 @@ public sealed record ModuleValidationResult(
         var copy = new HashSet<string>(StringComparer.Ordinal);
         foreach (var value in values)
         {
-            if (value is null)
-            {
-                throw new ArgumentException("Set values cannot be null.", paramName);
-            }
-
-            copy.Add(value);
+            copy.Add(RequireNonNull(value, paramName, "Set values cannot be null."));
         }
 
         return copy.ToFrozenSet(StringComparer.Ordinal);
@@ -130,12 +112,9 @@ public sealed record ModuleValidationResult(
         var copy = new Dictionary<string, IReadOnlySet<string>>(values.Count, StringComparer.Ordinal);
         foreach (var item in values)
         {
-            if (item.Key is null)
-            {
-                throw new ArgumentException("Dictionary keys cannot be null.", paramName);
-            }
-
-            copy.Add(item.Key, CopySet(item.Value, paramName));
+            copy.Add(
+                RequireNonNull(item.Key, paramName, "Dictionary keys cannot be null."),
+                CopySet(RequireNonNull(item.Value, paramName, "Dictionary values cannot be null."), paramName));
         }
 
         return new ReadOnlyDictionary<string, IReadOnlySet<string>>(copy);
@@ -149,5 +128,15 @@ public sealed record ModuleValidationResult(
         }
 
         return effects;
+    }
+
+    private static T RequireNonNull<T>(T value, string paramName, string message)
+    {
+        if (value is null)
+        {
+            throw new ArgumentException(message, paramName);
+        }
+
+        return value;
     }
 }

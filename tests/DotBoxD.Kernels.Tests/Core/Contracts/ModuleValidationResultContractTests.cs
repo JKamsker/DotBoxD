@@ -105,6 +105,17 @@ public sealed class ModuleValidationResultContractTests
         ];
     }
 
+    public static IEnumerable<object[]> MalformedInitEvidenceInputs()
+    {
+        yield return ["Diagnostics", ThrowingAction(() => ValidResult() with { Diagnostics = [null!] })];
+        yield return ["Functions", ThrowingAction(() => ValidResult() with { Functions = new NullKeyDictionary<FunctionAnalysis>(Analysis()) })];
+        yield return ["Functions", ThrowingAction(() => ValidResult() with { Functions = new Dictionary<string, FunctionAnalysis>(StringComparer.Ordinal) { ["main"] = null! } })];
+        yield return ["RequiredCapabilities", ThrowingAction(() => ValidResult() with { RequiredCapabilities = new HashSet<string>(StringComparer.Ordinal) { null! } })];
+        yield return ["BindingReferences", ThrowingAction(() => ValidResult() with { BindingReferences = new NullKeyDictionary<IReadOnlySet<string>>(References()) })];
+        yield return ["BindingReferences", ThrowingAction(() => ValidResult() with { BindingReferences = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal) { ["main"] = null! } })];
+        yield return ["BindingReferences", ThrowingAction(() => ValidResult() with { BindingReferences = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal) { ["main"] = new HashSet<string>(StringComparer.Ordinal) { null! } } })];
+    }
+
     [Theory]
     [MemberData(nameof(NullConstructorEvidenceInputs))]
     public void Constructor_rejects_null_evidence_collections_with_public_parameter_name(
@@ -130,6 +141,17 @@ public sealed class ModuleValidationResultContractTests
     [Theory]
     [MemberData(nameof(MalformedEvidenceInputs))]
     public void Constructor_rejects_malformed_evidence_values_with_public_parameter_name(
+        string expectedParamName,
+        Action action)
+    {
+        var exception = Assert.ThrowsAny<ArgumentException>(action);
+
+        Assert.Equal(expectedParamName, exception.ParamName);
+    }
+
+    [Theory]
+    [MemberData(nameof(MalformedInitEvidenceInputs))]
+    public void Init_setters_reject_malformed_evidence_values_with_public_property_name(
         string expectedParamName,
         Action action)
     {
