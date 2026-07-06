@@ -110,7 +110,8 @@ internal static class DispatcherGenerator
         sb.AppendLine($"        private async {ServicesGeneratorTypeNames.GlobalTask} DispatchCoreAsync({qualifiedInterface} receiver, string? instanceId, string method, {ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalReadOnlyMemory, "byte")} payload, {ServicesGeneratorTypeNames.GlobalSerializer} serializer, {ServicesGeneratorTypeNames.GlobalInstanceRegistry} registry, {ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalBufferWriter, "byte")} output, {ServicesGeneratorTypeNames.GlobalRpcStreamingContextInterface} streaming, {ServicesGeneratorTypeNames.GlobalCancellationToken} ct)");
         sb.AppendLine("#pragma warning restore CS1998");
         sb.AppendLine("        {");
-
+        sb.AppendLine("            ct.ThrowIfCancellationRequested();");
+        sb.AppendLine();
         sb.AppendLine("            switch (method)");
         sb.AppendLine("            {");
 

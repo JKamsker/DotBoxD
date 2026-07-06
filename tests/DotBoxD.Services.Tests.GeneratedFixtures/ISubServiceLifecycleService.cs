@@ -2,13 +2,13 @@ using DotBoxD.Services.Attributes;
 
 namespace DotBoxD.Services.Tests.GeneratedFixtures;
 
-[DotBoxDService]
+[RpcService]
 public interface ISubServiceLifecycleRoot
 {
     Task<ISubServiceLifecycleChild> CreateAsync(CancellationToken ct = default);
 }
 
-[DotBoxDService]
+[RpcService]
 public interface ISubServiceLifecycleChild : IAsyncDisposable
 {
     Task<int> PingAsync(CancellationToken ct = default);

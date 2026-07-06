@@ -23,7 +23,7 @@ public sealed record EventQueryDocument
         QueryFilter? filter,
         QueryProjection projection)
     {
-        ArgumentException.ThrowIfNullOrEmpty(eventName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventName);
         ArgumentNullException.ThrowIfNull(projection);
         return new EventQueryDocument
         {

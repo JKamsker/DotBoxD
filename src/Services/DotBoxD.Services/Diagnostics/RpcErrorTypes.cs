@@ -12,10 +12,10 @@ public static class RpcErrorTypes
     public const string InboundRejected = "RpcInboundRejected";
 
     /// <summary>Remote type name used when the requested service is not registered.</summary>
-    public const string ServiceNotFound = "DotBoxDServiceNotFound";
+    public const string ServiceNotFound = "RpcServiceNotFound";
 
     /// <summary>Remote type name used when the requested method is not found on the service.</summary>
-    public const string MethodNotFound = "DotBoxDMethodNotFound";
+    public const string MethodNotFound = "RpcMethodNotFound";
 
     /// <summary>Remote type name used when a sub-service instance is missing or has expired.</summary>
     public const string InstanceNotFound = "RpcInstanceNotFound";

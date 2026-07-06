@@ -41,11 +41,12 @@ internal static partial class PluginServerFacadeModelFactory
 
         var worldType = ResolveWorldType(type)
             ?? throw new NotSupportedException(
-                $"Generated plugin server '{type.Name}' must directly implement one [DotBoxDService] world interface.");
-        ValidateWorldType(type, worldType);
+                $"Generated plugin server '{type.Name}' must directly implement one [RpcService] world interface.");
+        ValidateWorldType(type, compilation, worldType);
         var controlServiceType = ResolveControlService(type, compilation, worldType)
             ?? throw new NotSupportedException(
                 $"Generated plugin server '{type.Name}' could not resolve a control-plane contract. Set ControlService = typeof(TControlService), or declare {worldType.ContainingNamespace}.Ipc.IGamePluginControlService.");
+        ValidateControlServiceAccessibility(type, compilation, controlServiceType);
         var liveSettingUpdateType = ResolveLiveSettingUpdateType(controlServiceType, cancellationToken)
             ?? throw new NotSupportedException(
                 $"Generated plugin server '{type.Name}' control-plane contract '{controlServiceType.ToDisplayString()}' must declare UpdateSettingsAsync with a typed array parameter carrying the live-setting updates.");
@@ -144,7 +145,7 @@ internal static partial class PluginServerFacadeModelFactory
                 : PluginServerReturnWrapperKind.ValueTask;
         }
         if (serviceType is not INamedTypeSymbol namedServiceType ||
-            !HasAttribute(namedServiceType, DotBoxDMetadataNames.DotBoxDServiceAttribute))
+            !HasAttribute(namedServiceType, DotBoxDMetadataNames.RpcServiceAttribute))
         {
             return (null, PluginServerReturnWrapperKind.None);
         }

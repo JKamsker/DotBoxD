@@ -22,6 +22,24 @@ public sealed class ServerExtensionProxyCancellationTests
         Assert.Equal([new KillResult(4, true), new KillResult(5, false)], results);
     }
 
+    [Fact]
+    public async Task Runtime_proxy_observes_pre_canceled_token_before_payload_marshalling()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create(
+            ServerExtensionProxyTests.MonsterKillerWithGeneratedClientSource,
+            "Sample.MonsterKillerPluginPackage");
+        using var server = DotBoxD.Plugins.PluginServer.Create(
+            configureHost: RpcKernelTestPackages.AddKillBinding,
+            defaultPolicy: RpcKernelTestPackages.KillPolicy());
+        var kernel = await server.InstallServerExtensionAsync(package);
+        var service = ServerExtensionProxy.Create<ICancellableMonsterKillerService>(kernel);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await service.KillMonstersAsync(null!, cts.Token));
+    }
+
     private interface ICancellableMonsterKillerService
     {
         ValueTask<List<KillResult>> KillMonstersAsync(

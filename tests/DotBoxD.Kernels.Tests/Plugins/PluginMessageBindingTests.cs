@@ -11,6 +11,14 @@ namespace DotBoxD.Kernels.Tests.Plugins;
 public sealed class PluginMessageBindingTests
 {
     [Fact]
+    public void Plugin_message_binding_declares_plugin_message_audit_kind()
+    {
+        var binding = PluginMessageBindings.CreateSend(new InMemoryPluginMessageSink());
+
+        Assert.Equal(BindingAuditKinds.PluginMessage, binding.AuditKind);
+    }
+
+    [Fact]
     public async Task Kernel_handler_capability_is_required_by_policy()
     {
         var server = DotBoxD.Plugins.PluginServer.Create();

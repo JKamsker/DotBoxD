@@ -59,9 +59,7 @@ jobs:
         with:
           category: '/language:csharp'
           output: codeql-results
-          # This private repository does not currently have GitHub code scanning enabled.
-          # Keep CodeQL extraction/query failures in CI, and publish the SARIF as a normal artifact.
-          upload: never
+          upload: always
 
       - name: Upload CodeQL SARIF artifact
         if: always()
