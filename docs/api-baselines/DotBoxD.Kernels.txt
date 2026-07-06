@@ -154,7 +154,7 @@ public IReadOnlySet<string> DeclaredOpaqueIdTypes
 public long AllocatedBytes { get; private set; }
 public long AuditCheckpoint() => Audit.EventsWritten
 public long CollectionElements { get; private set; }
-public long EventsWritten => _sequence
+public long EventsWritten
 public long FileBytesRead { get; private set; }
 public long FileBytesWritten { get; private set; }
 public long FuelUsed { get; private set; }
