@@ -24,6 +24,11 @@ internal static class SubscriptionDelivery
         {
             for (var i = 0; i < filters.Length; i++)
             {
+                if (rawContext.CancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+
                 if (!await filters[i](e, context).ConfigureAwait(false))
                 {
                     return;
