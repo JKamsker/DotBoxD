@@ -41,7 +41,7 @@ internal static class StructuralValidator
         foreach (var item in module.Metadata)
         {
             CheckIdentifier(item.Key, "metadata key", diagnostics);
-            CheckText(item.Value, "metadata value", diagnostics);
+            CheckText(item.Value, $"metadata value for key '{item.Key}'", diagnostics);
         }
 
         FunctionCollectionValidator.Validate(module.Functions, diagnostics);
@@ -245,8 +245,14 @@ internal static class StructuralValidator
         }
     }
 
-    private static void CheckText(string value, string description, List<SandboxDiagnostic> diagnostics)
+    private static void CheckText(string? value, string description, List<SandboxDiagnostic> diagnostics)
     {
+        if (value is null)
+        {
+            diagnostics.Add(new SandboxDiagnostic("E-STRUCT-NULL", $"{description} must not be null"));
+            return;
+        }
+
         if (DangerousReferenceDetector.IsDangerousReference(value))
         {
             diagnostics.Add(new SandboxDiagnostic("E-IR-CLR-REF", $"{description} '{value}' looks like a forbidden CLR reference"));
