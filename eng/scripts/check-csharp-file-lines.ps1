@@ -5,7 +5,10 @@ param(
     [int] $MaxFilesInProjectFolder = 5,
     # Ratcheting budget for soft-limit (CE0002, > $WarnAt lines) files. -1 reads
     # `maxSoftLimitViolations` from .config/code-enforcer/code-enforcer.json.
-    [int] $MaxSoftLimitViolations = -1
+    [int] $MaxSoftLimitViolations = -1,
+    # Ratcheting budget for mechanical split files named *.Part*.cs. -1 reads
+    # `maxPartFileCount` from .config/code-enforcer/code-enforcer.json.
+    [int] $MaxPartFileCount = -1
 )
 
 $ErrorActionPreference = "Stop"
@@ -144,6 +147,27 @@ function Get-Folder([string] $relativePath) {
     return Normalize-PathText $folder
 }
 
+function Get-CodeEnforcerConfigInt([string] $propertyName, [int] $fallback) {
+    $configPath = [System.IO.Path]::Combine($root, ".config/code-enforcer/code-enforcer.json")
+    if (-not [System.IO.File]::Exists($configPath)) {
+        return $fallback
+    }
+
+    $configDocument = [System.Text.Json.JsonDocument]::Parse([System.IO.File]::ReadAllText($configPath))
+    try {
+        $field = [System.Text.Json.JsonElement]::new()
+        if ($configDocument.RootElement.TryGetProperty($propertyName, [ref] $field) -and
+            $field.ValueKind -eq [System.Text.Json.JsonValueKind]::Number) {
+            return $field.GetInt32()
+        }
+    }
+    finally {
+        $configDocument.Dispose()
+    }
+
+    return $fallback
+}
+
 $justifiedFiles = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 $justifiedFolders = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 $justifiedRootFolders = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
@@ -161,6 +185,20 @@ if ([System.IO.File]::Exists($justificationPath)) {
 }
 
 $csharpFiles = @(Get-RepositoryCSharpFiles | Where-Object { -not (Test-GeneratedFile $_) })
+$partFileBudget = $MaxPartFileCount
+if ($partFileBudget -lt 0) {
+    $partFileBudget = Get-CodeEnforcerConfigInt "maxPartFileCount" 0
+}
+
+$partFiles = @($csharpFiles | Where-Object { [System.IO.Path]::GetFileName($_) -like "*.Part*.cs" })
+if ($partFiles.Count -gt $partFileBudget) {
+    $sample = ($partFiles | Sort-Object | Select-Object -First 10) -join ", "
+    $violations.Add("CE0007 mechanical partial split budget exceeded: $($partFiles.Count) file(s) named *.Part*.cs, budget is $partFileBudget. Rename/refactor split files around behavior or support types instead of Class.PartN.cs. Sample: $sample")
+}
+elseif ($partFiles.Count -lt $partFileBudget) {
+    [System.Console]::Out.WriteLine("CodeEnforcer: *.Part*.cs count ($($partFiles.Count)) is below the budget ($partFileBudget). Lower maxPartFileCount in .config/code-enforcer/code-enforcer.json to lock in the improvement.")
+}
+
 $filesByFolder = @{}
 foreach ($file in $csharpFiles) {
     $lineCount = Get-LineCount $file
@@ -220,20 +258,7 @@ foreach ($warning in $warnings) {
 $softLimitCount = $warnings.Count
 $budget = $MaxSoftLimitViolations
 if ($budget -lt 0) {
-    $configPath = [System.IO.Path]::Combine($root, ".config/code-enforcer/code-enforcer.json")
-    if ([System.IO.File]::Exists($configPath)) {
-        $configDocument = [System.Text.Json.JsonDocument]::Parse([System.IO.File]::ReadAllText($configPath))
-        try {
-            $field = [System.Text.Json.JsonElement]::new()
-            if ($configDocument.RootElement.TryGetProperty("maxSoftLimitViolations", [ref] $field) -and
-                $field.ValueKind -eq [System.Text.Json.JsonValueKind]::Number) {
-                $budget = $field.GetInt32()
-            }
-        }
-        finally {
-            $configDocument.Dispose()
-        }
-    }
+    $budget = Get-CodeEnforcerConfigInt "maxSoftLimitViolations" $budget
 }
 
 if ($budget -ge 0) {

@@ -51,3 +51,15 @@ Current policy covers direct console I/O, process spawning, direct networking ou
 owners, nondeterministic time/random primitives in kernel code, and raw filesystem access in kernel
 validation outside the policy-owned validator. Existing intentional boundary owners are allowlisted
 with reasons in `banned-apis.json`.
+
+## C# File Shape
+
+`eng/scripts/check-csharp-file-lines.ps1` enforces line-count, folder-size, and mechanical split
+budgets for non-generated C# files.
+
+The `maxPartFileCount` budget forbids tracked or new files named `*.Part*.cs`. When a test or
+implementation grows past the size guard, split by behavior or extract named support types instead
+of creating `Class.PartN.cs` continuations.
+
+The current production partial-type audit is documented in
+[`docs/architecture/partial-type-audit.md`](../../docs/architecture/partial-type-audit.md).
