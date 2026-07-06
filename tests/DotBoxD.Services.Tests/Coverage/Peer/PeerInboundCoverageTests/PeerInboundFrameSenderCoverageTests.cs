@@ -3,10 +3,11 @@ using DotBoxD.Services.Peer;
 using DotBoxD.Services.Server;
 using DotBoxD.Services.Streaming.Core;
 using Xunit;
+using static DotBoxD.Services.Tests.Coverage.Peer.PeerInboundTestSupport;
 
 namespace DotBoxD.Services.Tests.Coverage.Peer;
 
-public sealed partial class PeerInboundCoverageTests
+public sealed class PeerInboundFrameSenderCoverageTests
 {
     [Fact]
     public async Task InboundDispatch_WithFrameSender_DetachesOriginalResponseWriter()
