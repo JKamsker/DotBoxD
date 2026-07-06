@@ -27,6 +27,10 @@ public enum CompiledCacheStatus
 public sealed record CompiledArtifact
 {
     private byte[] _assemblyBytes = [];
+    private string _assemblyHash = string.Empty;
+    private ArtifactManifest _manifest = null!;
+    private VerificationResult _verification = null!;
+    private SandboxCompiledEntrypoint _entrypoint = null!;
 
     public CompiledArtifact(
         byte[] assemblyBytes,
@@ -98,10 +102,10 @@ public sealed record CompiledArtifact
         }
 
         _assemblyBytes = copyAssemblyBytes ? assemblyBytes.ToArray() : assemblyBytes;
-        AssemblyHash = assemblyHash;
-        Manifest = manifest;
-        Verification = verification;
-        Entrypoint = entrypoint;
+        _assemblyHash = assemblyHash;
+        _manifest = manifest;
+        _verification = verification;
+        _entrypoint = entrypoint;
         RuntimeForm = runtimeForm;
         CacheStatus = cacheStatus;
         CacheInvalidReason = cacheInvalidReason;
@@ -114,14 +118,37 @@ public sealed record CompiledArtifact
     }
     internal ReadOnlyMemory<byte> AssemblyBytesMemory => _assemblyBytes;
     internal byte[] AssemblyBytesUnsafe => _assemblyBytes;
-    public string AssemblyHash { get; init; }
-    public ArtifactManifest Manifest { get; init; }
-    public VerificationResult Verification { get; init; }
-    public SandboxCompiledEntrypoint Entrypoint { get; init; }
+    public string AssemblyHash
+    {
+        get => _assemblyHash;
+        init => _assemblyHash = RequireNonNull(value, nameof(AssemblyHash));
+    }
+    public ArtifactManifest Manifest
+    {
+        get => _manifest;
+        init => _manifest = RequireNonNull(value, nameof(Manifest));
+    }
+    public VerificationResult Verification
+    {
+        get => _verification;
+        init => _verification = RequireNonNull(value, nameof(Verification));
+    }
+    public SandboxCompiledEntrypoint Entrypoint
+    {
+        get => _entrypoint;
+        init => _entrypoint = RequireNonNull(value, nameof(Entrypoint));
+    }
     public CompiledRuntimeFormKind RuntimeForm { get; init; }
     public CompiledCacheStatus CacheStatus { get; init; }
     public string? CacheInvalidReason { get; init; }
     public string ArtifactHash => AssemblyHash;
+
+    private static T RequireNonNull<T>(T? value, string paramName)
+        where T : class
+    {
+        ArgumentNullException.ThrowIfNull(value, paramName);
+        return value;
+    }
 }
 
 public interface ISandboxCompiler

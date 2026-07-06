@@ -39,7 +39,7 @@ public interface IServerExtensionClientRegistry : IServerExtensionWireClient
 public interface IServerExtensionWireClient
 public interface IServiceControl : IExtensibleControl
 public IPluginMessageSink Messages { get; }
-public IReadOnlyList<PluginMessage> Messages
+public IReadOnlyList<PluginMessage> Messages { get; }
 public PluginAttribute(string? id = null) => Id = id
 public PolymorphicHandleAttribute(string keyMember)
 public SandboxEffect Effects { get; }

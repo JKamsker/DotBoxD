@@ -49,9 +49,9 @@ public enum VerifierDiagnosticCategory.HostVersionMismatch
 public enum VerifierDiagnosticCategory.MalformedArtifact
 public enum VerifierDiagnosticCategory.UnsupportedGeneratedShape
 public interface IGeneratedAssemblyVerifier
-public IReadOnlyList<string> OptimizationFlags
-public IReadOnlyList<string>? OptimizationFlags
-public IReadOnlyList<VerificationDiagnostic> Diagnostics
+public IReadOnlyList<string> OptimizationFlags { get; init; }
+public IReadOnlyList<string>? OptimizationFlags { get; init; }
+public IReadOnlyList<VerificationDiagnostic> Diagnostics { get; init; }
 public IReadOnlySet<string> AllowedAssemblies { get => _allowedAssemblies; init { _allowedAssemblies = Freeze(value, nameof(AllowedAssemblies)); InvalidateHashes(); } }
 public IReadOnlySet<string> AllowedAssemblyIdentities { get => _allowedAssemblyIdentities; init { _allowedAssemblyIdentities = Freeze(value, nameof(AllowedAssemblyIdentities)); InvalidateHashes(); } }
 public IReadOnlySet<string> AllowedMembers { get => _allowedMembers; init { _allowedMembers = Freeze(value, nameof(AllowedMembers)); InvalidateHashes(); } }
@@ -72,20 +72,21 @@ public static IReadOnlyList<VerifierDiagnosticReference> All => References
 public static VerificationManifestIdentity FromManifest(ArtifactManifest manifest)
 public static VerificationPolicy BoxedValueDefaults()
 public string AllowlistHash
-public string AssemblyHash
-public string BindingManifestHash
-public string CacheKey
-public string Code
-public string CompilerVersion
-public string EffectAnalysisVersion
-public string LanguageVersion
-public string Message
-public string ModuleHash
-public string PlanHash
-public string PolicyHash
+public string AssemblyHash { get; init; }
+public string BindingManifestHash { get; init; }
+public string CacheKey { get; init; }
+public string Code { get; init; }
+public string CompilerVersion { get; init; }
+public string EffectAnalysisVersion { get; init; }
+public string LanguageVersion { get; init; }
+public string Message { get; init; }
+public string ModuleHash { get; init; }
+public string PlanHash { get; init; }
+public string PolicyHash { get; init; }
 public string RuntimeFacadeHash
-public string TargetFramework
-public string TypeSystemVersion
-public string VerifierVersion
+public string RuntimeFacadeHash { get; init; }
+public string TargetFramework { get; init; }
+public string TypeSystemVersion { get; init; }
+public string VerifierVersion { get; init; }
 public ValueTask<VerificationResult> VerifyAsync( ReadOnlyMemory<byte> assemblyBytes, ArtifactManifest manifest, VerificationPolicy policy, CancellationToken cancellationToken)
 public VerificationPolicy WithExpectedManifest(VerificationManifestIdentity identity)
