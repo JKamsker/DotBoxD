@@ -51,9 +51,9 @@ public sealed class MessagePackObjectFrameworkScalarRegressionTests
             { new DateTimeOffset(2026, 7, 6, 13, 30, 42, TimeSpan.FromHours(2)), typeof(DateTimeOffset) },
         };
 
-    private static Payload? SerializeObjectOrAllowClosedFailure<T>(
+    private static Payload? SerializeObjectOrAllowClosedFailure(
         MessagePackRpcSerializer serializer,
-        T value)
+        object value)
     {
         try
         {
