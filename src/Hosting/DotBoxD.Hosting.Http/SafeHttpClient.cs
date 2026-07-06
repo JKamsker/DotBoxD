@@ -27,12 +27,15 @@ public static class SafeHttpClient
         var networkBytesWrittenBefore = context.Budget.NetworkBytesWritten;
         long? responseBytes = null;
         long? requestBytes = null;
+        CancellationTokenSource? requestTimeout = null;
+        CancellationTokenSource? timeout = null;
         try
         {
             var request = ResolveRequest(context, uri);
             requestBytes = ChargeRequestBytes(context, request);
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeout.CancelAfter(EffectiveTimeout(context, request.Timeout));
+            requestTimeout = new CancellationTokenSource();
+            requestTimeout.CancelAfter(EffectiveTimeout(context, request.Timeout));
+            timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, requestTimeout.Token);
             var addresses = await ResolveVettedAddressesAsync(
                     request.Grant,
                     request.Uri.Host,
@@ -75,7 +78,10 @@ public static class SafeHttpClient
             Audit(context, startedAt, false, resource, ObservedResponseBytes(context, networkBytesReadBefore, responseBytes), ObservedRequestBytes(context, networkBytesWrittenBefore, requestBytes), ex.Error.Code);
             throw;
         }
-        catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (IsRequestTimeout(
+                                                   context,
+                                                   cancellationToken,
+                                                   requestTimeout?.IsCancellationRequested == true))
         {
             var error = new SandboxError(SandboxErrorCode.Timeout, "net.http.get denied: request timed out");
             Audit(context, startedAt, false, resource, ObservedResponseBytes(context, networkBytesReadBefore, responseBytes), ObservedRequestBytes(context, networkBytesWrittenBefore, requestBytes), error.Code);
@@ -93,6 +99,38 @@ public static class SafeHttpClient
             Audit(context, startedAt, false, resource, ObservedResponseBytes(context, networkBytesReadBefore, responseBytes), ObservedRequestBytes(context, networkBytesWrittenBefore, requestBytes), error.Code);
             throw new SandboxRuntimeException(error);
         }
+        finally
+        {
+            timeout?.Dispose();
+            requestTimeout?.Dispose();
+        }
+    }
+
+    private static bool IsRequestTimeout(
+        SandboxContext context,
+        CancellationToken cancellationToken,
+        bool requestTimeoutExpired)
+    {
+        if (requestTimeoutExpired)
+        {
+            return true;
+        }
+
+        try
+        {
+            context.Budget.CheckDeadline();
+        }
+        catch (SandboxRuntimeException ex) when (ex.Error.Code == SandboxErrorCode.Timeout)
+        {
+            return true;
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+
+        return !context.CancellationToken.IsCancellationRequested;
     }
 
     private static SafeHttpRequest ResolveRequest(SandboxContext context, SandboxUri sandboxUri)
