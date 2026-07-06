@@ -16,7 +16,7 @@ public sealed class PluginServerParameterFlowAttributeSurpriseTests
 
             namespace Regression.Game
             {
-                [DotBoxDService]
+                [RpcService]
                 public interface IGameWorldAccess
                 {
                     string? Inspect(
@@ -27,7 +27,7 @@ public sealed class PluginServerParameterFlowAttributeSurpriseTests
                     IMonsterControl Monsters { get; }
                 }
 
-                [DotBoxDService]
+                [RpcService]
                 public interface IMonsterControl
                 {
                     bool TryRename(

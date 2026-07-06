@@ -18,7 +18,7 @@ internal static partial class InvokeAsyncGenerationTestSources
                 .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
-                .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Services.Attributes.DotBoxDServiceAttribute).Assembly.Location)),
+                .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Services.Attributes.RpcServiceAttribute).Assembly.Location)),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
@@ -39,6 +39,34 @@ internal static partial class InvokeAsyncGenerationTestSources
             string.Join(Environment.NewLine, emit.Diagnostics.Select(diagnostic => diagnostic.ToString())));
 
         return driver.GetRunResult();
+    }
+
+    internal static IReadOnlyList<Diagnostic> RunGeneratorAndGetErrorDiagnostics(string source)
+    {
+        var parseOptions = ParseOptions.WithFeatures(
+            [new KeyValuePair<string, string>("InterceptorsNamespaces", "DotBoxD.Plugins.Generated")]);
+        var compilation = CSharpCompilation.Create(
+            "DotBoxDInvokeAsyncGeneratedDiagnosticTest",
+            [CSharpSyntaxTree.ParseText(source, parseOptions)],
+            CompileReferences()
+                .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Services.Attributes.RpcServiceAttribute).Assembly.Location)),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            [new PluginPackageGenerator().AsSourceGenerator()],
+            parseOptions: parseOptions);
+        driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var outputCompilation,
+            out var generatorDiagnostics);
+
+        return generatorDiagnostics
+            .Concat(outputCompilation.GetDiagnostics())
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .ToArray();
     }
 
     private static IEnumerable<MetadataReference> CompileReferences()

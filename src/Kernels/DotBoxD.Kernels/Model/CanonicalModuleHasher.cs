@@ -12,6 +12,8 @@ public static class CanonicalModuleHasher
 
     public static string Serialize(SandboxModule module)
     {
+        ModuleSerializationGuard.ThrowIfMalformed(module);
+
         var writer = new CanonicalWriter();
         writer.Write("canonicalizer", CanonicalizerVersion);
         writer.Write("module", module.Id, module.Version.ToString(), module.TargetSandboxVersion.ToString());

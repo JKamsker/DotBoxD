@@ -6,13 +6,11 @@ internal static class PluginPackageDuplicateDetector
 {
     public static EquatableArray<GeneratedPluginPackageIdentity> FindDuplicates(
         ImmutableArray<GeneratedPluginPackageIdentity> pluginPackages,
-        ImmutableArray<GeneratedPluginPackageIdentity> eventKernelPackages,
         ImmutableArray<GeneratedPluginPackageIdentity> chainPackages,
         ImmutableArray<GeneratedPluginPackageIdentity> rpcPackages)
     {
         var counts = new Dictionary<GeneratedPluginPackageIdentity, int>();
         CountPackages(counts, pluginPackages);
-        CountPackages(counts, eventKernelPackages);
         CountPackages(counts, chainPackages);
         CountPackages(counts, rpcPackages);
 
@@ -31,14 +29,12 @@ internal static class PluginPackageDuplicateDetector
     public static EquatableArray<GeneratedPluginPackageIdentity> FindSourceCollisions(
         ImmutableArray<GeneratedPluginPackageIdentity> sourceTypes,
         ImmutableArray<GeneratedPluginPackageIdentity> pluginPackages,
-        ImmutableArray<GeneratedPluginPackageIdentity> eventKernelPackages,
         ImmutableArray<GeneratedPluginPackageIdentity> chainPackages,
         ImmutableArray<GeneratedPluginPackageIdentity> rpcPackages)
     {
         var sourceTypeSet = new HashSet<GeneratedPluginPackageIdentity>(sourceTypes);
         var collisions = new List<GeneratedPluginPackageIdentity>();
         AddSourceCollisions(collisions, sourceTypeSet, pluginPackages);
-        AddSourceCollisions(collisions, sourceTypeSet, eventKernelPackages);
         AddSourceCollisions(collisions, sourceTypeSet, chainPackages);
         AddSourceCollisions(collisions, sourceTypeSet, rpcPackages);
 

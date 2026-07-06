@@ -140,13 +140,13 @@ public static partial class KernelRpcBinaryCodec
                 var listDepth = EnterEncodeCollection(depth);
                 ReserveEncodeItems(list.Values.Count, ref itemCount);
                 WriteByte(writer, (byte)KernelRpcValueKind.List);
-                WriteListValues(writer, list.Values, listDepth, ref itemCount);
+                WriteListValues(writer, list.Values, list.ItemType, listDepth, ref itemCount);
                 return;
             case RecordValue record:
                 var recordDepth = EnterEncodeCollection(depth);
                 ReserveEncodeItems(record.Fields.Count, ref itemCount);
                 WriteByte(writer, (byte)KernelRpcValueKind.Record);
-                WriteListValues(writer, record.Fields, recordDepth, ref itemCount);
+                WriteRecordValues(writer, record.Fields, recordDepth, ref itemCount);
                 return;
             case MapValue map:
                 var mapDepth = EnterEncodeCollection(depth);
@@ -162,6 +162,22 @@ public static partial class KernelRpcBinaryCodec
     }
 
     private static void WriteListValues(
+        IBufferWriter<byte> writer,
+        IReadOnlyList<SandboxValue> values,
+        SandboxType itemType,
+        int depth,
+        ref int itemCount)
+    {
+        WriteLength(writer, values.Count);
+        for (var i = 0; i < values.Count; i++)
+        {
+            var item = values[i];
+            KernelRpcValueConverter.RequireDeclaredType(item, itemType);
+            WriteSandboxValue(item, writer, depth, ref itemCount);
+        }
+    }
+
+    private static void WriteRecordValues(
         IBufferWriter<byte> writer,
         IReadOnlyList<SandboxValue> values,
         int depth,
@@ -184,6 +200,8 @@ public static partial class KernelRpcBinaryCodec
         WriteLength(writer, itemCount);
         foreach (var pair in values.Entries)
         {
+            KernelRpcValueConverter.RequireDeclaredType(pair.Key, values.KeyType);
+            KernelRpcValueConverter.RequireDeclaredType(pair.Value, values.ValueType);
             WriteSandboxValue(pair.Key, writer, depth, ref aggregateItemCount);
             WriteSandboxValue(pair.Value, writer, depth, ref aggregateItemCount);
         }

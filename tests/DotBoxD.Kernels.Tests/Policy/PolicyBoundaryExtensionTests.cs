@@ -39,4 +39,32 @@ public sealed partial class PolicyBoundaryTests
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-POLICY-GRANT-PARAM");
     }
+
+    [Fact]
+    public async Task Prepare_rejects_null_file_grant_extensions_with_policy_diagnostic()
+    {
+        using var temp = TempDirectory.Create();
+        var host = SandboxTestHost.Create();
+        var module = await host.ImportJsonAsync(FileWriteJson("out.txt", "x"));
+        var policy = new SandboxPolicy(
+            "null-file-extensions",
+            SandboxEffects.Pure | SandboxEffect.FileWrite | SandboxEffect.Audit,
+            [
+                new CapabilityGrant("file.write", new Dictionary<string, string> {
+                    ["root"] = temp.Path,
+                    ["maxBytesPerRun"] = "1024",
+                    ["allowCreate"] = "true",
+                    ["allowOverwrite"] = "true",
+                    ["allowedExtensions"] = null!
+                })
+            ],
+            new ResourceLimits(MaxFuel: 5_000, MaxFileBytesWritten: 1024));
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
+            await host.PrepareAsync(module, policy));
+
+        Assert.Contains(ex.Diagnostics, d =>
+            d.Code == "E-POLICY-GRANT-PARAM" &&
+            d.Message.Contains("allowedExtensions", StringComparison.Ordinal));
+    }
 }

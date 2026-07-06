@@ -10,6 +10,36 @@ namespace DotBoxD.Kernels.Tests.Compiled.Core.ArgumentValidation;
 
 public sealed class CompiledCacheArgumentValidationTests
 {
+    [Fact]
+    public void Constructor_rejects_null_root_directory_with_public_parameter_name()
+    {
+        var ex = Assert.Throws<ArgumentNullException>(() => new PersistentCompiledArtifactCache(null!));
+
+        Assert.Equal("rootDirectory", ex.ParamName);
+    }
+
+    [Fact]
+    public void EntryPath_rejects_null_cache_key_with_public_parameter_name()
+    {
+        using var temp = TempDirectory.Create();
+        var cache = new PersistentCompiledArtifactCache(temp.Path);
+
+        var ex = Assert.Throws<ArgumentNullException>(() => cache.EntryPath(null!));
+
+        Assert.Equal("cacheKey", ex.ParamName);
+    }
+
+    [Fact]
+    public void EntryExists_rejects_null_cache_key_with_public_parameter_name()
+    {
+        using var temp = TempDirectory.Create();
+        var cache = new PersistentCompiledArtifactCache(temp.Path);
+
+        var ex = Assert.Throws<ArgumentNullException>(() => cache.EntryExists(null!));
+
+        Assert.Equal("cacheKey", ex.ParamName);
+    }
+
     [Theory]
     [MemberData(nameof(TryReadNullCollaborators))]
     public async Task TryReadAsync_rejects_null_collaborators_before_cache_miss(
@@ -224,7 +254,7 @@ public sealed class CompiledCacheArgumentValidationTests
         {
             var path = System.IO.Path.Combine(
                 System.IO.Path.GetTempPath(),
-                "dotboxd-cache-" + Guid.NewGuid().ToString("N"));
+                "dotboxd-cache-args-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(path);
             return new TempDirectory(path);
         }

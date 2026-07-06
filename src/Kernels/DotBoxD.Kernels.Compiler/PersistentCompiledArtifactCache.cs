@@ -17,6 +17,7 @@ public sealed partial class PersistentCompiledArtifactCache
     private readonly ConcurrentDictionary<string, EntryLock> _entryLocks = new(StringComparer.Ordinal);
     public PersistentCompiledArtifactCache(string rootDirectory)
     {
+        ArgumentNullException.ThrowIfNull(rootDirectory);
         _rootDirectory = Path.GetFullPath(rootDirectory);
         Directory.CreateDirectory(_rootDirectory);
         PersistentCompiledArtifactCacheRootGuard.Validate(_rootDirectory);
@@ -209,7 +210,6 @@ public sealed partial class PersistentCompiledArtifactCache
             PersistentCompiledArtifactCachePublisher.DeleteEntryIfExists(tempPath);
         }
     }
-
     private void Quarantine(string entryPath)
     {
         if (!Directory.Exists(entryPath))

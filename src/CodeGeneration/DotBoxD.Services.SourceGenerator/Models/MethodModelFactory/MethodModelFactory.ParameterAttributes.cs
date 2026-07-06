@@ -35,24 +35,13 @@ internal static partial class MethodModelFactory
         {
             ct.ThrowIfCancellationRequested();
 
+            if (CallerInfoAttributeFormatter.TryAppend(attributes, attr))
+            {
+                continue;
+            }
+
             switch (attr.AttributeClass?.ToDisplayString())
             {
-                case "System.Runtime.CompilerServices.CallerMemberNameAttribute":
-                    attributes.Append("[global::System.Runtime.CompilerServices.CallerMemberNameAttribute] ");
-                    break;
-
-                case "System.Runtime.CompilerServices.CallerFilePathAttribute":
-                    attributes.Append("[global::System.Runtime.CompilerServices.CallerFilePathAttribute] ");
-                    break;
-
-                case "System.Runtime.CompilerServices.CallerLineNumberAttribute":
-                    attributes.Append("[global::System.Runtime.CompilerServices.CallerLineNumberAttribute] ");
-                    break;
-
-                case "System.Runtime.CompilerServices.CallerArgumentExpressionAttribute":
-                    AppendCallerArgumentExpressionAttribute(attributes, attr);
-                    break;
-
                 case "System.Runtime.CompilerServices.DateTimeConstantAttribute":
                     if (preserveMetadataDefaultAttributes)
                     {
@@ -226,19 +215,6 @@ internal static partial class MethodModelFactory
             .Append("(\"")
             .Append(LiteralHelpers.EscapeStringLiteral(value))
             .AppendLine("\")]");
-    }
-
-    private static void AppendCallerArgumentExpressionAttribute(StringBuilder sb, AttributeData attr)
-    {
-        if (attr.ConstructorArguments.Length != 1 ||
-            attr.ConstructorArguments[0].Value is not string parameterName)
-        {
-            return;
-        }
-
-        sb.Append("[global::System.Runtime.CompilerServices.CallerArgumentExpressionAttribute(\"")
-            .Append(LiteralHelpers.EscapeStringLiteral(parameterName))
-            .Append("\")] ");
     }
 
 }

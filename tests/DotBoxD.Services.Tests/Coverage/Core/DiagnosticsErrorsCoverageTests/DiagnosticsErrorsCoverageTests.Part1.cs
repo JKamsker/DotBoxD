@@ -124,7 +124,7 @@ public sealed class RpcErrorTypesCoverageTests
         Assert.All(names, n => Assert.False(string.IsNullOrEmpty(n)));
         Assert.Equal(names.Length, names.Distinct().Count());
         Assert.Equal("RpcInternalError", RpcErrorTypes.InternalError);
-        Assert.Equal("DotBoxDServiceNotFound", RpcErrorTypes.ServiceNotFound);
+        Assert.Equal("RpcServiceNotFound", RpcErrorTypes.ServiceNotFound);
     }
 }
 
@@ -221,48 +221,48 @@ public sealed class ServiceExceptionCoverageTests
 }
 
 /// <summary>
-/// Coverage for the DotBoxD marker attributes and their optional custom-name properties.
+/// Coverage for the RPC marker attributes and their optional custom-name properties.
 /// </summary>
 public sealed class AttributeCoverageTests
 {
     [Fact]
-    public void DotBoxDServiceAttribute_DefaultName_IsNull()
+    public void RpcServiceAttribute_DefaultName_IsNull()
     {
-        var attribute = new DotBoxDServiceAttribute();
+        var attribute = new RpcServiceAttribute();
 
         Assert.Null(attribute.Name);
     }
 
     [Fact]
-    public void DotBoxDServiceAttribute_WithCustomName_ExposesName()
+    public void RpcServiceAttribute_WithCustomName_ExposesName()
     {
-        var attribute = new DotBoxDServiceAttribute { Name = "Custom.Service" };
+        var attribute = new RpcServiceAttribute { Name = "Custom.Service" };
 
         Assert.Equal("Custom.Service", attribute.Name);
     }
 
     [Fact]
-    public void DotBoxDServiceAttribute_AppliedToInterface_IsDiscoverableViaReflection()
+    public void RpcServiceAttribute_AppliedToInterface_IsDiscoverableViaReflection()
     {
-        var attribute = typeof(IDecoratedService).GetCustomAttributes(typeof(DotBoxDServiceAttribute), false)
-            .Cast<DotBoxDServiceAttribute>()
+        var attribute = typeof(IDecoratedService).GetCustomAttributes(typeof(RpcServiceAttribute), false)
+            .Cast<RpcServiceAttribute>()
             .Single();
 
         Assert.Equal("decorated-wire", attribute.Name);
     }
 
     [Fact]
-    public void DotBoxDMethodAttribute_DefaultName_IsNull()
+    public void RpcMethodAttribute_DefaultName_IsNull()
     {
-        var attribute = new DotBoxDMethodAttribute();
+        var attribute = new RpcMethodAttribute();
 
         Assert.Null(attribute.Name);
     }
 
     [Fact]
-    public void DotBoxDMethodAttribute_WithCustomName_ExposesName()
+    public void RpcMethodAttribute_WithCustomName_ExposesName()
     {
-        var attribute = new DotBoxDMethodAttribute { Name = "CustomMethod" };
+        var attribute = new RpcMethodAttribute { Name = "CustomMethod" };
 
         Assert.Equal("CustomMethod", attribute.Name);
     }
