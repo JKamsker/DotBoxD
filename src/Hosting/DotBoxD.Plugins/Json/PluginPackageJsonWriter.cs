@@ -9,13 +9,12 @@ namespace DotBoxD.Plugins.Json;
 using static JsonImport;
 
 /// <summary>
-/// The write (export) half of <see cref="PluginPackageJsonSerializer"/>. The read half (with the strict
-/// <c>RequireAllowedProperties</c> shape that the schema-sync regression pins) stays in the main file.
+/// Writes the plugin package JSON shape consumed by <see cref="PluginPackageJsonSerializer"/>.
 /// The optional <see cref="PluginManifest.RpcEntrypoint"/> is emitted only for server extension kernels.
 /// </summary>
-public static partial class PluginPackageJsonSerializer
+internal static class PluginPackageJsonWriter
 {
-    private static void ValidatePackageForExport(PluginPackage package)
+    public static void ValidatePackageForExport(PluginPackage package)
     {
         if (package.Manifest.RpcEntrypoint is not null)
         {
@@ -26,7 +25,7 @@ public static partial class PluginPackageJsonSerializer
         PluginPackageValidator.Validate(package);
     }
 
-    private static void WritePackage(Utf8JsonWriter writer, PluginPackage package)
+    public static void WritePackage(Utf8JsonWriter writer, PluginPackage package)
     {
         writer.WriteStartObject();
         WriteManifest(writer, package.Manifest);

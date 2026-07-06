@@ -11,16 +11,16 @@ namespace DotBoxD.Plugins.Json;
 
 using static JsonImport;
 
-public static partial class PluginPackageJsonSerializer
+public static class PluginPackageJsonSerializer
 {
     public static string Export(PluginPackage package, bool indented = false)
     {
         ArgumentNullException.ThrowIfNull(package);
-        ValidatePackageForExport(package);
+        PluginPackageJsonWriter.ValidatePackageForExport(package);
 
         var buffer = new ArrayBufferWriter<byte>();
         using var writer = new Utf8JsonWriter(buffer, new JsonWriterOptions { Indented = indented });
-        WritePackage(writer, package);
+        PluginPackageJsonWriter.WritePackage(writer, package);
         writer.Flush();
         return Encoding.UTF8.GetString(buffer.WrittenSpan);
     }

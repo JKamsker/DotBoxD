@@ -7,9 +7,9 @@ namespace DotBoxD.Hosting;
 
 using DotBoxD.Kernels;
 
-internal sealed partial class SandboxWorkerExecutor
+internal static class SandboxWorkerResultValidator
 {
-    private static bool ValidateWorkerResult(
+    public static bool Validate(
         ExecutionPlan plan,
         string entrypoint,
         SandboxExecutionOptions options,
@@ -176,7 +176,7 @@ internal sealed partial class SandboxWorkerExecutor
         var observedHostCalls = 0;
         var observedLogEvents = 0;
         var observedBindingBaseFuel = 0L;
-        var observedBytes = default(ObservedBindingBytes);
+        var observedBytes = default(SandboxWorkerBindingEvidence.ObservedBindingBytes);
         Dictionary<string, int>? observedBindingCalls = null;
         var expectedSequenceNumber = 1L;
         var grantClock = plan.Policy.GrantClock;
@@ -199,7 +199,7 @@ internal sealed partial class SandboxWorkerExecutor
 
                 observedHostCalls++;
                 observedBindingCalls ??= new Dictionary<string, int>(StringComparer.Ordinal);
-                if (!TryRecordBindingEvidence(
+                if (!SandboxWorkerBindingEvidence.TryRecordBindingEvidence(
                     plan,
                     auditEvent,
                     observedBindingCalls,
@@ -256,7 +256,7 @@ internal sealed partial class SandboxWorkerExecutor
         int observedHostCalls,
         int observedLogEvents,
         long observedBindingBaseFuel,
-        ObservedBindingBytes observedBytes)
+        SandboxWorkerBindingEvidence.ObservedBindingBytes observedBytes)
         => usage.HostCalls >= observedHostCalls &&
            usage.LogEvents >= observedLogEvents &&
            usage.FuelUsed >= observedBindingBaseFuel &&

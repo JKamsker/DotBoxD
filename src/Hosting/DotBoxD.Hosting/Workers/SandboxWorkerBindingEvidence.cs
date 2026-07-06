@@ -4,9 +4,9 @@ using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Hosting;
 
-internal sealed partial class SandboxWorkerExecutor
+internal static class SandboxWorkerBindingEvidence
 {
-    private static bool TryRecordBindingEvidence(
+    public static bool TryRecordBindingEvidence(
         ExecutionPlan plan,
         SandboxAuditEvent auditEvent,
         Dictionary<string, int> observedBindingCalls,
@@ -155,7 +155,7 @@ internal sealed partial class SandboxWorkerExecutor
         => (effect & expected) != SandboxEffect.None &&
            (effect & (SandboxEffect.FileRead | SandboxEffect.FileWrite | SandboxEffect.Network)) == expected;
 
-    private struct ObservedBindingBytes
+    internal struct ObservedBindingBytes
     {
         public long FileBytesRead;
         public long FileBytesWritten;
