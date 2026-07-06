@@ -188,6 +188,7 @@ internal static partial class PluginServerFacadeEmitter
         foreach (var method in model.WorldMethods)
         {
             PluginServerXmlDocumentation.Append(builder, "    ", method.Documentation);
+            PluginServerFlowAttributeSource.Append(builder, "    ", method.Attributes);
             PluginServerFlowAttributeSource.Append(builder, "    ", method.ReturnAttributes);
             builder.Append("    public ");
             if (method.ReturnWrapperKind is PluginServerReturnWrapperKind.Task or PluginServerReturnWrapperKind.ValueTask)
