@@ -132,19 +132,134 @@ function Test-GeneratedFile([string] $relativePath) {
     return $false
 }
 
-function Get-PartialTypeDeclarations([string] $relativePath) {
-    $declarations = @{}
-    $namespacePattern = '^\s*namespace\s+([A-Za-z_][A-Za-z0-9_.]*)\s*(?:;|\{)?'
-    $typePattern = '^\s*(?:(?:public|internal|private|protected|sealed|static|abstract|readonly|ref|unsafe|partial)\s+)*partial\s+(?:class|interface|struct|record(?:\s+(?:class|struct))?)\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*<([^>{}]*)>)?\b'
-    $fullPath = [System.IO.Path]::Combine($root, $relativePath)
-    $currentNamespace = ""
+function Get-CSharpLineForDeclarationScan([string] $line, [ref] $inBlockComment) {
+    $builder = [System.Text.StringBuilder]::new($line.Length)
+    $inString = $false
+    $stringQuote = [char] 0
 
-    foreach ($line in [System.IO.File]::ReadLines($fullPath)) {
-        $namespaceMatch = [System.Text.RegularExpressions.Regex]::Match($line, $namespacePattern)
-        if ($namespaceMatch.Success) {
-            $currentNamespace = $namespaceMatch.Groups[1].Value
+    for ($i = 0; $i -lt $line.Length; $i++) {
+        $current = $line[$i]
+        $next = if ($i + 1 -lt $line.Length) { $line[$i + 1] } else { [char] 0 }
+
+        if ($inBlockComment.Value) {
+            if ($current -eq "*" -and $next -eq "/") {
+                $inBlockComment.Value = $false
+                $i++
+            }
+
+            [void] $builder.Append(" ")
+            continue
         }
 
+        if ($inString) {
+            if ($current -eq "\\" -and $stringQuote -eq '"' -and $i + 1 -lt $line.Length) {
+                $i++
+            }
+            elseif ($current -eq $stringQuote) {
+                $inString = $false
+            }
+
+            [void] $builder.Append(" ")
+            continue
+        }
+
+        if ($current -eq "/" -and $next -eq "/") {
+            break
+        }
+
+        if ($current -eq "/" -and $next -eq "*") {
+            $inBlockComment.Value = $true
+            $i++
+            [void] $builder.Append(" ")
+            continue
+        }
+
+        if ($current -eq '"' -or $current -eq "'") {
+            $inString = $true
+            $stringQuote = $current
+            [void] $builder.Append(" ")
+            continue
+        }
+
+        [void] $builder.Append($current)
+    }
+
+    return $builder.ToString()
+}
+
+function Join-NamespaceName([string] $parentNamespace, [string] $declaredNamespace) {
+    if ([string]::IsNullOrWhiteSpace($parentNamespace)) {
+        return $declaredNamespace
+    }
+
+    if ([string]::IsNullOrWhiteSpace($declaredNamespace)) {
+        return $parentNamespace
+    }
+
+    return "$parentNamespace.$declaredNamespace"
+}
+
+function Get-ActiveNamespace([System.Collections.Generic.List[object]] $namespaceScopes, [string] $fileScopedNamespace) {
+    if ($namespaceScopes.Count -gt 0) {
+        return $namespaceScopes[$namespaceScopes.Count - 1].Name
+    }
+
+    return $fileScopedNamespace
+}
+
+function Pop-ClosedNamespaces([System.Collections.Generic.List[object]] $namespaceScopes, [int] $braceDepth) {
+    while ($namespaceScopes.Count -gt 0 -and $braceDepth -lt $namespaceScopes[$namespaceScopes.Count - 1].Depth) {
+        $namespaceScopes.RemoveAt($namespaceScopes.Count - 1)
+    }
+}
+
+function Get-PartialTypeDeclarations([string] $relativePath) {
+    $declarations = @{}
+    $namespacePattern = '^\s*namespace\s+([A-Za-z_][A-Za-z0-9_.]*)\s*(;|\{)?'
+    $typePattern = '^\s*(?:(?:public|internal|private|protected|sealed|static|abstract|readonly|ref|unsafe|partial)\s+)*partial\s+(?:class|interface|struct|record(?:\s+(?:class|struct))?)\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*<([^>{}]*)>)?\b'
+    $fullPath = [System.IO.Path]::Combine($root, $relativePath)
+    $fileScopedNamespace = ""
+    $namespaceScopes = [System.Collections.Generic.List[object]]::new()
+    $pendingNamespace = $null
+    $braceDepth = 0
+    $inBlockComment = $false
+
+    foreach ($rawLine in [System.IO.File]::ReadLines($fullPath)) {
+        $line = Get-CSharpLineForDeclarationScan $rawLine ([ref] $inBlockComment)
+        Pop-ClosedNamespaces $namespaceScopes $braceDepth
+
+        $namespaceMatch = [System.Text.RegularExpressions.Regex]::Match($line, $namespacePattern)
+        if ($namespaceMatch.Success) {
+            $declaredNamespace = $namespaceMatch.Groups[1].Value
+            $namespaceDelimiter = $namespaceMatch.Groups[2].Value
+
+            if ($namespaceDelimiter -eq ";") {
+                $fileScopedNamespace = $declaredNamespace
+                $namespaceScopes.Clear()
+                $pendingNamespace = $null
+            }
+            elseif ($line.Contains("{")) {
+                $parentNamespace = Get-ActiveNamespace $namespaceScopes $fileScopedNamespace
+                $namespaceScopes.Add([pscustomobject]@{
+                        Name = Join-NamespaceName $parentNamespace $declaredNamespace
+                        Depth = $braceDepth + 1
+                    })
+                $pendingNamespace = $null
+            }
+            else {
+                $pendingNamespace = $declaredNamespace
+            }
+        }
+        elseif ($null -ne $pendingNamespace -and $line.Contains("{")) {
+            $parentNamespace = Get-ActiveNamespace $namespaceScopes $fileScopedNamespace
+            $namespaceScopes.Add([pscustomobject]@{
+                    Name = Join-NamespaceName $parentNamespace $pendingNamespace
+                    Depth = $braceDepth + 1
+                })
+            $pendingNamespace = $null
+        }
+
+        $currentNamespace = Get-ActiveNamespace $namespaceScopes $fileScopedNamespace
         $match = [System.Text.RegularExpressions.Regex]::Match($line, $typePattern)
         if ($match.Success) {
             $typeName = $match.Groups[1].Value
@@ -168,6 +283,15 @@ function Get-PartialTypeDeclarations([string] $relativePath) {
 
             $declarations[$key] = $displayName
         }
+
+        $openBraces = ([System.Text.RegularExpressions.Regex]::Matches($line, "\{")).Count
+        $closeBraces = ([System.Text.RegularExpressions.Regex]::Matches($line, "\}")).Count
+        $braceDepth += $openBraces - $closeBraces
+        if ($braceDepth -lt 0) {
+            $braceDepth = 0
+        }
+
+        Pop-ClosedNamespaces $namespaceScopes $braceDepth
     }
 
     $result = [System.Collections.Generic.List[object]]::new()
