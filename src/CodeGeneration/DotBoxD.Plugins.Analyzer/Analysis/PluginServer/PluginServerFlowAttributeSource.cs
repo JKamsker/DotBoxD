@@ -6,6 +6,9 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 
 internal static class PluginServerFlowAttributeSource
 {
+    public static EquatableArray<string> MemberAttributes(IMethodSymbol method)
+        => AttributeLines(method.GetAttributes(), targetReturn: false);
+
     public static EquatableArray<string> ReturnAttributes(IMethodSymbol method)
         => AttributeLines(method.GetReturnTypeAttributes(), targetReturn: true);
 
@@ -113,6 +116,15 @@ internal static class PluginServerFlowAttributeSource
                     }
 
                     break;
+
+                case "System.ObsoleteAttribute":
+                    if (!targetReturn &&
+                        ObsoleteAttribute(attribute) is { } obsoleteSource)
+                    {
+                        lines.Add(obsoleteSource);
+                    }
+
+                    break;
             }
         }
 
@@ -137,6 +149,39 @@ internal static class PluginServerFlowAttributeSource
 
         var prefix = targetReturn ? "[return: " : "[";
         return prefix + attributeType + "(" + LiteralReader.StringLiteral(value) + ")]";
+    }
+
+    private static string? ObsoleteAttribute(AttributeData attribute)
+    {
+        if (attribute.ConstructorArguments.Length > 2)
+        {
+            return null;
+        }
+
+        var arguments = new List<string>();
+        foreach (var argument in attribute.ConstructorArguments)
+        {
+            if (argument.Value is not (null or string or bool))
+            {
+                return null;
+            }
+
+            arguments.Add(LiteralReader.ObjectLiteral(argument.Value));
+        }
+
+        foreach (var argument in attribute.NamedArguments)
+        {
+            if (argument.Value.Value is not (null or string))
+            {
+                return null;
+            }
+
+            arguments.Add(argument.Key + " = " + LiteralReader.ObjectLiteral(argument.Value.Value));
+        }
+
+        return arguments.Count == 0
+            ? "[global::System.ObsoleteAttribute]"
+            : "[global::System.ObsoleteAttribute(" + string.Join(", ", arguments) + ")]";
     }
 
     private static void AppendSimpleAttributePrefix(StringBuilder builder, string attributeType)

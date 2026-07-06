@@ -38,6 +38,7 @@ internal static partial class PluginServerFacadeModelFactory
                     method.Name,
                     TypeName(method.ContainingType),
                     TypeName(method.ReturnType),
+                    PluginServerFlowAttributeSource.MemberAttributes(method),
                     PluginServerFlowAttributeSource.ReturnAttributes(method),
                     PluginServerXmlDocumentation.FromSymbol(
                         method,
@@ -53,6 +54,12 @@ internal static partial class PluginServerFacadeModelFactory
                     {
                         throw new NotSupportedException(
                             $"Generated plugin server member '{method.ToDisplayString()}' has an inherited signature collision with a different return type.");
+                    }
+
+                    if (!existing.Method.Attributes.Equals(forwarded.Attributes))
+                    {
+                        throw new NotSupportedException(
+                            $"Generated plugin server member '{method.ToDisplayString()}' has an inherited signature collision with different member attributes.");
                     }
 
                     if (!existing.Method.ReturnAttributes.Equals(forwarded.ReturnAttributes))
