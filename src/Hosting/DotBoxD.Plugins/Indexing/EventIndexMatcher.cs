@@ -56,6 +56,11 @@ public sealed class EventIndexMatcher<TEvent>
         var honored = new List<IndexedPredicate>();
         foreach (var predicate in predicates)
         {
+            if (predicate is null)
+            {
+                throw new ArgumentException("The predicates list cannot contain null entries.", nameof(predicates));
+            }
+
             if (IndexKeys.TryGetValue(predicate.Path, out var key) &&
                 TryReconcile(predicate.Value, key.Type, out var value))
             {

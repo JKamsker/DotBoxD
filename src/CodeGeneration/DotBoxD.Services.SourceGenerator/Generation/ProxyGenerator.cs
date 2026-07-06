@@ -62,7 +62,7 @@ internal static partial class ProxyGenerator
         var access = explicitInterface ? string.Empty : "public ";
         var target = explicitInterface ? method.ExplicitImplementationType + "." + method.Name : method.Name;
 
-        AppendReturnAttributes(sb, method.ReturnAttributePrefix);
+        AppendAttributes(sb, method.ReturnAttributePrefix);
         sb.AppendLine($"        {access}{unsafeKeyword}{asyncKeyword}{method.ReturnRefKindKeyword}{declaredReturn} {target}{method.TypeParameterList}({paramList}){method.ConstraintClauses}");
         sb.AppendLine("        {");
 
@@ -153,7 +153,7 @@ internal static partial class ProxyGenerator
     private static bool RequiresAsyncStateMachine(MethodReturnKind returnKind) =>
         returnKind is MethodReturnKind.TaskOfSubService or MethodReturnKind.ValueTaskOfSubService;
 
-    private static void AppendReturnAttributes(StringBuilder sb, string attributes)
+    private static void AppendAttributes(StringBuilder sb, string attributes)
     {
         if (attributes.Length == 0)
         {

@@ -50,6 +50,7 @@ internal sealed record PluginServerForwardedMethod(
     string Name,
     string ReceiverType,
     string ReturnType,
+    EquatableArray<string> Attributes,
     EquatableArray<string> ReturnAttributes,
     string Documentation,
     string? ReturnWrapperName,

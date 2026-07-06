@@ -23,6 +23,8 @@ public sealed class ReflectionEmitSandboxCompiler : ISandboxCompiler
         VerificationPolicy? verificationPolicy = null,
         PersistentCompiledArtifactCache? cache = null)
     {
+        ArgumentNullException.ThrowIfNull(verifier);
+
         _verifier = verifier;
         _verificationPolicy = verificationPolicy ?? VerificationPolicy.BoxedValueDefaults();
         _cache = cache;
@@ -36,6 +38,9 @@ public sealed class ReflectionEmitSandboxCompiler : ISandboxCompiler
         CompileOptions options,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(options);
+
         cancellationToken.ThrowIfCancellationRequested();
         var function = ResolveSupportedFunction(plan, options.Entrypoint);
         var cacheKey = CacheKeyBuilder.Build(plan, options.Entrypoint, _verificationPolicy, options.Optimize);

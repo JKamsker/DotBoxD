@@ -58,7 +58,13 @@ internal sealed partial class SandboxWorkerExecutor
         }
 
         error = new SandboxError(SandboxErrorCode.HostFailure, "worker audit envelope was malformed");
-        return WorkerAuditMatches(plan, entrypoint, options, result);
+        if (!WorkerAuditMatches(plan, entrypoint, options, result))
+        {
+            return false;
+        }
+
+        error = new SandboxError(SandboxErrorCode.HostFailure, "worker deterministic binding result did not match audit evidence");
+        return WorkerDeterministicBindingResultMatches(plan, entrypoint, result);
     }
 
     private static bool WorkerModeMatches(SandboxExecutionOptions options, SandboxExecutionResult result)
@@ -201,95 +207,6 @@ internal sealed partial class SandboxWorkerExecutor
             ResultErrorMatches(result, evidence.Summary);
     }
 
-    private static bool TryCollectAuditEvidence(
-        ExecutionPlan plan,
-        string entrypoint,
-        SandboxExecutionOptions options,
-        SandboxExecutionResult result,
-        SandboxRunId runId,
-        out WorkerAuditEvidence evidence)
-    {
-        evidence = new WorkerAuditEvidence(null!, 0, 0, 0, default);
-        var summaryCount = 0;
-        var observedHostCalls = 0;
-        var observedLogEvents = 0;
-        var observedBindingBaseFuel = 0L;
-        var observedBytes = default(ObservedBindingBytes);
-        Dictionary<string, int>? observedBindingCalls = null;
-        var expectedSequenceNumber = 1L;
-        var grantClock = plan.Policy.GrantClock;
-        foreach (var auditEvent in result.AuditEvents)
-        {
-            if (!AuditEventEnvelopeMatches(plan, entrypoint, options, auditEvent, runId, expectedSequenceNumber, grantClock))
-            {
-                return false;
-            }
-
-            expectedSequenceNumber++;
-            if (IsBindingAudit(auditEvent.Kind))
-            {
-                if (result.Succeeded && !auditEvent.Success)
-                {
-                    return false;
-                }
-
-                observedHostCalls++;
-                observedBindingCalls ??= new Dictionary<string, int>(StringComparer.Ordinal);
-                if (!TryRecordBindingEvidence(
-                    plan,
-                    auditEvent,
-                    observedBindingCalls,
-                    ref observedBindingBaseFuel,
-                    ref observedBytes,
-                    grantClock))
-                {
-                    return false;
-                }
-            }
-
-            CountAuditSummary(auditEvent, ref summaryCount, ref evidence);
-            observedLogEvents += auditEvent.Kind == "SandboxLog" ? 1 : 0;
-        }
-
-        evidence = evidence with
-        {
-            ObservedHostCalls = observedHostCalls,
-            ObservedLogEvents = observedLogEvents,
-            ObservedBindingBaseFuel = observedBindingBaseFuel,
-            ObservedBytes = observedBytes,
-        };
-        return summaryCount == 1;
-    }
-
-    private static bool AuditEventEnvelopeMatches(
-        ExecutionPlan plan,
-        string entrypoint,
-        SandboxExecutionOptions options,
-        SandboxAuditEvent auditEvent,
-        SandboxRunId runId,
-        long expectedSequenceNumber,
-        DateTimeOffset grantClock)
-        => auditEvent.SequenceNumber == expectedSequenceNumber &&
-           auditEvent.RunId == runId &&
-           WorkerAuditValidator.Matches(plan, entrypoint, options, auditEvent, grantClock);
-
-    private static void CountAuditSummary(
-        SandboxAuditEvent auditEvent,
-        ref int summaryCount,
-        ref WorkerAuditEvidence evidence)
-    {
-        if (auditEvent.Kind != "RunSummary")
-        {
-            return;
-        }
-
-        summaryCount++;
-        if (summaryCount == 1)
-        {
-            evidence = evidence with { Summary = auditEvent };
-        }
-    }
-
     private static bool AuditSummaryMatchesResult(SandboxExecutionResult result, WorkerAuditEvidence evidence)
     {
         if (evidence.Summary.Success != result.Succeeded)
@@ -320,24 +237,5 @@ internal sealed partial class SandboxWorkerExecutor
         return summary.ErrorCode is { } code && Enum.IsDefined(code);
     }
 
-    private static bool IsBindingAudit(string kind)
-        => kind is "BindingCall" or "SandboxLog" or "PluginMessage";
-
-    private static bool AuditEvidenceUsageMatches(
-        SandboxResourceUsage usage,
-        int observedHostCalls,
-        int observedLogEvents,
-        long observedBindingBaseFuel,
-        ObservedBindingBytes observedBytes)
-        => usage.HostCalls >= observedHostCalls &&
-           usage.LogEvents >= observedLogEvents &&
-           usage.FuelUsed >= observedBindingBaseFuel &&
-           usage.FileBytesRead >= observedBytes.FileBytesRead &&
-           usage.FileBytesWritten >= observedBytes.FileBytesWritten &&
-           usage.NetworkBytesRead >= observedBytes.NetworkBytesRead &&
-           usage.NetworkBytesWritten >= observedBytes.NetworkBytesWritten;
-
     private readonly record struct ResourceUsageLimit(Func<SandboxResourceUsage, long> Value, Func<ResourceLimits, long> Maximum);
-
-    private readonly record struct WorkerAuditEvidence(SandboxAuditEvent Summary, int ObservedHostCalls, int ObservedLogEvents, long ObservedBindingBaseFuel, ObservedBindingBytes ObservedBytes);
 }

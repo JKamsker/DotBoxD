@@ -130,6 +130,24 @@ internal static partial class PluginServerFacadeModelFactory
         PopulateServiceWrapper(serviceType, wrapper, serviceWrappers, cancellationToken);
         return wrapper.WrapperName;
     }
+
+    private static void RejectErrorObsoleteForwarder(ISymbol member)
+    {
+        if (PluginServerFlowAttributeSource.HasErrorObsoleteAttribute(member.GetAttributes()) ||
+            HasErrorObsoleteAccessorAttribute(member))
+        {
+            throw new NotSupportedException(
+                $"Generated plugin server member '{member.ToDisplayString()}' is marked [Obsolete(..., error: true)]; generated plugin server facades cannot forward compiler-error obsolete members.");
+        }
+    }
+
+    private static bool HasErrorObsoleteAccessorAttribute(ISymbol member)
+        => member is IPropertySymbol property &&
+           ((property.GetMethod is not null &&
+             PluginServerFlowAttributeSource.HasErrorObsoleteAttribute(property.GetMethod.GetAttributes())) ||
+            (property.SetMethod is not null &&
+             PluginServerFlowAttributeSource.HasErrorObsoleteAttribute(property.SetMethod.GetAttributes())));
+
     private static (string? Name, PluginServerReturnWrapperKind Kind) ResolveReturnWrapper(
         ITypeSymbol returnType,
         Dictionary<string, ServiceWrapperBuilder> serviceWrappers,

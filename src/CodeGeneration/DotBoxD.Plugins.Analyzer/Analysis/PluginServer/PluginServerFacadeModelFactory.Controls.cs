@@ -11,7 +11,7 @@ internal static partial class PluginServerFacadeModelFactory
         CancellationToken cancellationToken)
     {
         var controls = new List<PluginServerControlProperty>();
-        var seenProperties = new Dictionary<string, string>(StringComparer.Ordinal);
+        var seenProperties = new Dictionary<string, SeenControlProperty>(StringComparer.Ordinal);
         var fieldNames = new HashSet<string>(ReservedFacadeFieldNames(), StringComparer.Ordinal);
         var accumulatorNames = new HashSet<string>(StringComparer.Ordinal);
         foreach (var member in MembersIncludingInherited(worldType))
@@ -29,25 +29,33 @@ internal static partial class PluginServerFacadeModelFactory
                 continue;
             }
 
+            RejectErrorObsoleteForwarder(property);
             var propertyTypeName = TypeName(propertyType);
-            if (seenProperties.TryGetValue(property.Name, out var existingType))
+            var attributes = PluginServerFlowAttributeSource.PropertyAttributes(property);
+            if (seenProperties.TryGetValue(property.Name, out var existing))
             {
-                if (!string.Equals(existingType, propertyTypeName, StringComparison.Ordinal))
+                if (!string.Equals(existing.Type, propertyTypeName, StringComparison.Ordinal))
                 {
                     throw new NotSupportedException(
                         $"Generated plugin server control '{property.Name}' has an inherited property collision with a different type.");
                 }
 
+                if (!existing.Attributes.Equals(attributes))
+                {
+                    throw new NotSupportedException(
+                        $"Generated plugin server control '{property.Name}' has an inherited property collision with different flow attributes.");
+                }
+
                 continue;
             }
 
-            seenProperties.Add(property.Name, propertyTypeName);
+            seenProperties.Add(property.Name, new SeenControlProperty(propertyTypeName, attributes));
             var serviceWrappers = new Dictionary<string, ServiceWrapperBuilder>(StringComparer.Ordinal);
             controls.Add(new PluginServerControlProperty(
                 property.Name,
                 UniqueFieldName(property.Name, fieldNames),
                 propertyTypeName,
-                PluginServerFlowAttributeSource.PropertyAttributes(property),
+                attributes,
                 PluginServerXmlDocumentation.FromSymbol(
                     property,
                     "Accesses the server's " + property.Name + " domain control after StartAsync.",
@@ -127,4 +135,8 @@ internal static partial class PluginServerFacadeModelFactory
             }
         }
     }
+
+    private readonly record struct SeenControlProperty(
+        string Type,
+        EquatableArray<string> Attributes);
 }

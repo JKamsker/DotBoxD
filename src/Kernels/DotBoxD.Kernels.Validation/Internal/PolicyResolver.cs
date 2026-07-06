@@ -23,6 +23,11 @@ internal static class PolicyResolver
 
         ValidateKnownEffects(policy, diagnostics);
 
+        if (!requiredEffects.ContainsOnlyKnownBits())
+        {
+            diagnostics.Add(new SandboxDiagnostic("E-POLICY-EFFECT", "module has declared unknown effects"));
+        }
+
         PolicyGrantValidator.Validate(
             policy,
             bindings,
@@ -86,7 +91,7 @@ internal static class PolicyResolver
         var deniedEffects = requiredEffects & ~policy.AllowedEffects;
         if (deniedEffects != SandboxEffect.None)
         {
-            diagnostics.Add(new SandboxDiagnostic("E-POLICY-EFFECT", $"policy denies effects {deniedEffects}"));
+            diagnostics.Add(new SandboxDiagnostic("E-POLICY-EFFECT", $"policy denies declared effects {deniedEffects}"));
         }
     }
 

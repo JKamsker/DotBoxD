@@ -72,7 +72,7 @@ public sealed partial class SandboxHost
             Error = error,
             ResourceUsage = budget.Snapshot(),
             AuditEvents = audit.OwnedEventSnapshot(),
-            ActualMode = options.Mode,
+            ActualMode = ExecutionMode.Auto,
             ExecutionDispatched = false,
             ModuleHash = plan.ModuleHash,
             PlanHash = plan.PlanHash,
