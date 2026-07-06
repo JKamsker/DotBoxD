@@ -62,6 +62,7 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
 
         foreach (var group in snapshot.Groups)
         {
+            context.CancellationToken.ThrowIfCancellationRequested();
             if (!Snapshot.TryEventKey(group.Paths, e, reader, out var key) ||
                 !group.TryGet(key, out var bucket))
             {
@@ -80,6 +81,7 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
         TEvent e,
         HookContext context)
     {
+        context.CancellationToken.ThrowIfCancellationRequested();
         entry.Handle.RecordFilterEvaluation();
         if (!TryEvaluate(entry, e))
         {
@@ -107,7 +109,6 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
             // matching this event — they share a single forwarding host handler at the registry layer.
         }
     }
-
     private bool TryEvaluate(EventQuerySubscriptionEntry<TEvent> entry, TEvent e)
     {
         try
@@ -119,7 +120,6 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
             return false;
         }
     }
-
     private static bool TryProject(EventQuerySubscriptionEntry<TEvent> entry, TEvent e, out object? projected)
     {
         try
