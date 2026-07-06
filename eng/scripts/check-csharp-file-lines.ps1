@@ -8,7 +8,10 @@ param(
     [int] $MaxSoftLimitViolations = -1,
     # Ratcheting budget for mechanical split files named *.Part*.cs. -1 reads
     # `maxPartFileCount` from .config/code-enforcer/code-enforcer.json.
-    [int] $MaxPartFileCount = -1
+    [int] $MaxPartFileCount = -1,
+    # Ratcheting budget for non-generated source partial types that span multiple files.
+    # -1 reads `maxSourceMultiFilePartialTypeCount` from .config/code-enforcer/code-enforcer.json.
+    [int] $MaxSourceMultiFilePartialTypeCount = -1
 )
 
 $ErrorActionPreference = "Stop"
@@ -129,6 +132,23 @@ function Test-GeneratedFile([string] $relativePath) {
     return $false
 }
 
+function Get-PartialTypeDeclarations([string] $relativePath) {
+    $names = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    $pattern = '^\s*(?:(?:public|internal|private|protected|sealed|static|abstract|readonly|ref|unsafe|partial)\s+)*partial\s+(?:class|interface|struct|record(?:\s+(?:class|struct))?)\s+([A-Za-z_][A-Za-z0-9_]*)\b'
+    $fullPath = [System.IO.Path]::Combine($root, $relativePath)
+
+    foreach ($line in [System.IO.File]::ReadLines($fullPath)) {
+        $match = [System.Text.RegularExpressions.Regex]::Match($line, $pattern)
+        if ($match.Success) {
+            [void] $names.Add($match.Groups[1].Value)
+        }
+    }
+
+    $result = [string[]]::new($names.Count)
+    $names.CopyTo($result)
+    return $result
+}
+
 function Get-LineCount([string] $relativePath) {
     $count = 0
     foreach ($line in [System.IO.File]::ReadLines([System.IO.Path]::Combine($root, $relativePath))) {
@@ -197,6 +217,45 @@ if ($partFiles.Count -gt $partFileBudget) {
 }
 elseif ($partFiles.Count -lt $partFileBudget) {
     [System.Console]::Out.WriteLine("CodeEnforcer: *.Part*.cs count ($($partFiles.Count)) is below the budget ($partFileBudget). Lower maxPartFileCount in .config/code-enforcer/code-enforcer.json to lock in the improvement.")
+}
+
+$sourcePartialTypeBudget = $MaxSourceMultiFilePartialTypeCount
+if ($sourcePartialTypeBudget -lt 0) {
+    $sourcePartialTypeBudget = Get-CodeEnforcerConfigInt "maxSourceMultiFilePartialTypeCount" 0
+}
+
+$sourcePartialTypeFiles = @{}
+foreach ($file in ($csharpFiles | Where-Object { $_ -like "src/*" })) {
+    foreach ($typeName in (Get-PartialTypeDeclarations $file)) {
+        if (-not $sourcePartialTypeFiles.ContainsKey($typeName)) {
+            $sourcePartialTypeFiles[$typeName] =
+                [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        }
+
+        [void] $sourcePartialTypeFiles[$typeName].Add($file)
+    }
+}
+
+$sourceMultiFilePartialTypes = [System.Collections.Generic.List[object]]::new()
+foreach ($typeName in $sourcePartialTypeFiles.Keys) {
+    $fileCount = $sourcePartialTypeFiles[$typeName].Count
+    if ($fileCount -gt 1) {
+        $sourceMultiFilePartialTypes.Add([pscustomobject]@{
+                TypeName = $typeName
+                FileCount = $fileCount
+            })
+    }
+}
+
+if ($sourceMultiFilePartialTypes.Count -gt $sourcePartialTypeBudget) {
+    $sample = ($sourceMultiFilePartialTypes |
+        Sort-Object -Property @{ Expression = "FileCount"; Descending = $true }, TypeName |
+        Select-Object -First 10 |
+        ForEach-Object { "$($_.TypeName) ($($_.FileCount) files)" }) -join ", "
+    $violations.Add("CE0008 source multi-file partial type budget exceeded: $($sourceMultiFilePartialTypes.Count) type(s), budget is $sourcePartialTypeBudget. Extract collaborators or document and intentionally ratchet the budget. Sample: $sample")
+}
+elseif ($sourceMultiFilePartialTypes.Count -lt $sourcePartialTypeBudget) {
+    [System.Console]::Out.WriteLine("CodeEnforcer: source multi-file partial type count ($($sourceMultiFilePartialTypes.Count)) is below the budget ($sourcePartialTypeBudget). Lower maxSourceMultiFilePartialTypeCount in .config/code-enforcer/code-enforcer.json to lock in the improvement.")
 }
 
 $filesByFolder = @{}

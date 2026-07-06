@@ -61,5 +61,10 @@ The `maxPartFileCount` budget forbids tracked or new files named `*.Part*.cs`. W
 implementation grows past the size guard, split by behavior or extract named support types instead
 of creating `Class.PartN.cs` continuations.
 
+The `maxSourceMultiFilePartialTypeCount` budget ratchets non-generated `src/` partial types that
+span multiple files. Source-generation contracts and meaningful domain slices can remain partial,
+but adding a new multi-file source partial now requires either extracting collaborators or
+intentionally raising the budget with a justification.
+
 The current production partial-type audit is documented in
 [`docs/architecture/partial-type-audit.md`](../../docs/architecture/partial-type-audit.md).
