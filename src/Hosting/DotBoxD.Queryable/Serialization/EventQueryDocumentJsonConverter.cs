@@ -42,7 +42,7 @@ public sealed class EventQueryDocumentJsonConverter : JsonConverter<EventQueryDo
         ArgumentNullException.ThrowIfNull(value);
         ArgumentNullException.ThrowIfNull(options);
 
-        EventQueryDocumentInvariants.RequireValidShape(value);
+        RequireValidJsonShape(value);
 
         writer.WriteStartObject();
         writer.WriteNumber("version", CurrentVersion);
@@ -76,5 +76,17 @@ public sealed class EventQueryDocumentJsonConverter : JsonConverter<EventQueryDo
 
         return element.Deserialize<QueryProjection>(options)
             ?? throw new JsonException("EventQueryDocument property 'projection' could not be read.");
+    }
+
+    private static void RequireValidJsonShape(EventQueryDocument value)
+    {
+        try
+        {
+            EventQueryDocumentInvariants.RequireValidShape(value);
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new JsonException(ex.Message, ex);
+        }
     }
 }
