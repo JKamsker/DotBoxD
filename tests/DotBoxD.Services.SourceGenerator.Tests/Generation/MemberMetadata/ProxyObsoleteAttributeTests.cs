@@ -52,6 +52,19 @@ public sealed class ProxyObsoleteAttributeTests
         proxy.Should().Contain(
             "[global::System.ObsoleteAttribute(\"Use Child2\")]\n" +
             "        public global::Regress.ObsoleteProxyMembers.IChild Child =>");
+        AssertChild2IsNotObsolete(proxy);
+    }
+
+    private static void AssertChild2IsNotObsolete(string proxy)
+    {
+        const string child2Declaration =
+            "        public global::Regress.ObsoleteProxyMembers.IChild Child2 =>";
+        var child2Index = proxy.IndexOf(child2Declaration, StringComparison.Ordinal);
+        child2Index.Should().BeGreaterThanOrEqualTo(0);
+
+        var prefixStart = Math.Max(0, child2Index - 120);
+        var child2Prefix = proxy.Substring(prefixStart, child2Index - prefixStart);
+        child2Prefix.Should().NotContain("ObsoleteAttribute");
     }
 
     private static (CSharpCompilation Final, GeneratorDriverRunResult RunResult) Run(string source)

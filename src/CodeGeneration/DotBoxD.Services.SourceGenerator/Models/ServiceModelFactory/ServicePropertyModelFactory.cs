@@ -31,7 +31,8 @@ internal static class ServicePropertyModelFactory
                 propertySymbol.Type.ToDisplayString(s_qualifiedFormat),
                 ProxyType: null,
                 IsInstanceId: true,
-                SubService: null);
+                SubService: null,
+                MemberAttributePrefix: MemberAttributeFormatter.BuildPrefix(propertySymbol, ct));
             return true;
         }
 
@@ -51,7 +52,8 @@ internal static class ServicePropertyModelFactory
             propertyType.ToDisplayString(s_qualifiedFormat),
             IdentifierHelpers.QualifyTypeName(propertyNamespace, proxyName),
             IsInstanceId: false,
-            subService);
+            subService,
+            MemberAttributeFormatter.BuildPrefix(propertySymbol, ct));
         return true;
     }
 
