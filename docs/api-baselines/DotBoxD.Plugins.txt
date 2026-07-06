@@ -86,11 +86,11 @@ public enum SubscriptionDeliveryStage.Handler
 public EventIndexRegistry? IndexRegistry { get; init; }
 public EventIndexRegistry(Action<SubscriptionDeliveryFault>? onFault = null)
 public EventIndexStats Stats => new(
-public Exception Exception
+public Exception Exception { get; init; }
 public Exception? LastAsyncUpdateError => _pendingLiveUpdates.LastError
 public Exception? LastAsyncUpdateError => Kernel.LastAsyncUpdateError
-public ExecutionMode ActualMode
-public ExecutionMode RequestedMode
+public ExecutionMode ActualMode { get; init; }
+public ExecutionMode RequestedMode { get; init; }
 public Func<KernelWireTerminal, KernelWireTerminal>? ClassifyOverride { get; init; }
 public Guid ReadGuid()
 public HookPipeline<TEvent, HookContext> On<TEvent>()
@@ -205,18 +205,16 @@ public object? GetObject(string name)
 public object? OwnerId => _ownerId
 public partial class HookPipeline<TEvent, TContext>
 public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
+public PluginDiagnosticAudience Audience { get; init; }
+public PluginDiagnosticPhase Phase { get; init; }
 public PluginEventAdapterRegistry Events { get; }
 public PluginExecutionObservation? LastExecution => _executionObserver.Last
 public PluginManifest Manifest { get; }
 public PluginPackage Package { get; }
 public PluginServer RegisterEventAdapter<TEvent>(IPluginEventAdapter<TEvent> adapter)
 public PluginSession CreateSession()
-public SandboxErrorCode? ErrorCode
-public SandboxErrorCode? FallbackReason
 public readonly record struct EventIndexStats(long Considered, long Prefiltered, long Dispatched)
 public readonly record struct KernelWireTerminal( KernelWireKind Kind, string? CallbackSubscriptionId, Type? ResultType, int Priority)
-public sealed record ResultHookFault(Type EventType, Exception Exception)
-public sealed record SubscriptionDeliveryFault( Type EventType, SubscriptionDeliveryStage Stage, Exception Exception)
 public readonly record struct WireCallbacks(RemoteLocalPush? LocalPush, RemoteLocalResultRequest? LocalResult)
 public readonly record struct WireResult(Type EventType, string EventName, KernelWireTerminal Terminal)
 public readonly struct KernelRpcValue
@@ -479,6 +477,8 @@ public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>(Func<TCurrent, HookC
 public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>(Func<TCurrent, TNext> projection)
 public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>(Func<TEvent, HookContext, TNext> projection)
 public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>(Func<TEvent, TNext> projection)
+public SandboxErrorCode? ErrorCode { get; init; }
+public SandboxErrorCode? FallbackReason { get; init; }
 public SandboxValue ToSandboxValue()
 public sealed class EventIndexKeyAttribute : Attribute
 public sealed class EventIndexMatcher<TEvent>
@@ -517,9 +517,9 @@ public sealed record PluginDiagnosticReference( string Code, PluginDiagnosticPha
 public sealed record PluginExecutionObservation( string Entrypoint, ExecutionMode RequestedMode, ExecutionMode ActualMode, bool Succeeded, SandboxErrorCode? ErrorCode, SandboxErrorCode? FallbackReason, string CacheStatus, string? RuntimeForm, string? CacheKey, string? ArtifactHash, string? MaterializationStatus)
 public sealed record PluginManifest( string PluginId, string Contract, ExecutionMode Mode, IReadOnlyList<string> Effects, IReadOnlyList<LiveSettingDefinition> LiveSettings, IReadOnlyList<HookSubscriptionManifest> Subscriptions)
 public sealed record PluginPackage( PluginManifest Manifest, SandboxModule Module, KernelEntrypoints Entrypoints)
+public sealed record ResultHookFault(Type EventType, Exception Exception)
+public sealed record SubscriptionDeliveryFault( Type EventType, SubscriptionDeliveryStage Stage, Exception Exception)
 public sealed record WireOptions
-public string CacheStatus
-public string Entrypoint
 public static BindingDescriptor CreateSend(IPluginMessageSink sink)
 public static bool TryGetReference(string code, out PluginDiagnosticReference reference)
 public static byte[] EncodeArguments(IReadOnlyList<KernelRpcValue> arguments)
@@ -535,7 +535,6 @@ public static class PluginPackageJsonSchemas
 public static class PluginServerJsonExtensions
 public static EventIndexMatcher<TEvent> Create(IReadOnlyList<IndexedPredicate> predicates)
 public static IReadOnlyCollection<string> IndexKeyNames => (IReadOnlyCollection<string>)IndexKeys.Keys
-public SubscriptionDeliveryStage Stage
 public static IReadOnlyList<PluginDiagnosticReference> All => References
 public static KernelRpcValue Bool(bool value)
 public static KernelRpcValue DecodeValue(ReadOnlyMemory<byte> payload)
@@ -579,17 +578,24 @@ public static void EncodeArguments(IReadOnlyList<KernelRpcValue> arguments, IBuf
 public static void EncodeValue(KernelRpcValue value, IBufferWriter<byte> writer)
 public static void EncodeValue(SandboxValue value, IBufferWriter<byte> writer)
 public static void Register(Type kernelType, Func<PluginPackage> factory)
+public string CacheStatus { get; init; }
+public string Code { get; init; }
+public string Entrypoint { get; init; }
 public string InstallId { get; }
+public string LikelyCause { get; init; }
+public string Meaning { get; init; }
 public string Name { get; }
 public string Name => Definition.Name
 public string PluginId { get; }
 public string ReadString()
+public string Remediation { get; init; }
 public string TextValue { get; }
 public string? CallbackSubscriptionId => LocalTerminalIdentity.CallbackSubscriptionId(this)
 public string? CallbackSubscriptionId => Package.CallbackSubscriptionId
 public string? ProjectedType { get; init; }
 public string? ResultType { get; init; }
 public string? RpcEntrypoint { get; init; }
+public SubscriptionDeliveryStage Stage { get; init; }
 public SubscriptionPipeline<TEvent, HookContext> On<TEvent>()
 public SubscriptionPipeline<TEvent, HookContext> On<TEvent>(IPluginEventAdapter<TEvent> adapter)
 public SubscriptionPipeline<TEvent, TContext> InvokeHostHandler(Action<TEvent, TContext> handler)
@@ -638,9 +644,9 @@ public T Value { get; }
 public T Value { get; set; }
 public TimeSpan RemoteHandlerTimeout { get; init; } = TimeSpan.FromSeconds(30)
 public TResult? RemoteTimeoutResult { get; init; }
-public Type EventType
 public TService ServerExtension<TService>() where TService : class
 public TSettings Value { get; }
+public Type EventType { get; init; }
 public TypedInstalledKernel<TSettings> As<TSettings>() where TSettings : class => new(this)
 public TypedInstalledKernel<TState> Get<TState>(string pluginId) where TState : class
 public ValueTask DisposeAsync()
