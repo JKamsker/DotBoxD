@@ -32,6 +32,18 @@ public sealed class ModuleValidatorCustomCatalogCapabilityValidationTests
         Assert.Contains(ex.Diagnostics, diagnostic => diagnostic.Code == "E-BINDING-CAP");
     }
 
+    [Fact]
+    public void ModuleValidator_rejects_custom_catalog_pure_alloc_binding_with_capability()
+    {
+        var result = new ModuleValidator().Validate(
+            ModuleCallingCustomWrite(),
+            new CustomCatalog(CustomPureAllocCapabilitySignature()),
+            PurePolicyWithTimeGrant());
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "E-BINDING-EFFECT");
+    }
+
     private static SandboxModule ModuleCallingCustomWrite()
         => new(
             "custom-catalog-capability-validation",
@@ -58,6 +70,13 @@ public sealed class ModuleValidatorCustomCatalogCapabilityValidationTests
             [],
             new ResourceLimits());
 
+    private static SandboxPolicy PurePolicyWithTimeGrant()
+        => new(
+            "custom-catalog-capability-validation",
+            SandboxEffects.Pure,
+            [new CapabilityGrant("time.now", new Dictionary<string, string>())],
+            new ResourceLimits());
+
     private static BindingSignature CustomWriteSignature()
         => new(
             "custom.write",
@@ -69,6 +88,19 @@ public sealed class ModuleValidatorCustomCatalogCapabilityValidationTests
             BindingCostModel.Fixed(1),
             AuditLevel.PerCall,
             BindingSafety.SideEffectingExternal,
+            CompiledBinding.RuntimeStub("Probe", "Write"));
+
+    private static BindingSignature CustomPureAllocCapabilitySignature()
+        => new(
+            "custom.write",
+            SemVersion.One,
+            [],
+            SandboxType.Unit,
+            SandboxEffects.Pure,
+            RequiredCapability: "time.now",
+            BindingCostModel.Fixed(1),
+            AuditLevel.None,
+            BindingSafety.PureHostFacade,
             CompiledBinding.RuntimeStub("Probe", "Write"));
 
     private static BindingDescriptor CustomWriteDescriptor()

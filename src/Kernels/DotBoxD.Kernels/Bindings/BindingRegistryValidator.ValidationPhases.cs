@@ -61,11 +61,11 @@ internal static partial class BindingRegistryValidator
         }
 
         if (!string.IsNullOrWhiteSpace(binding.RequiredCapability) &&
-            (binding.Effects & ~SandboxEffect.Cpu) == SandboxEffect.None)
+            (binding.Effects & ~SandboxEffects.Pure) == SandboxEffect.None)
         {
             diagnostics.Add(new SandboxDiagnostic(
                 "E-BINDING-EFFECT",
-                $"binding '{binding.Id}' requires a capability but declares only pure CPU effects"));
+                $"binding '{binding.Id}' requires a capability but declares only pure effects"));
         }
     }
 

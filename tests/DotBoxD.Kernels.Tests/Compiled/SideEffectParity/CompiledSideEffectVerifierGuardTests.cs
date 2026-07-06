@@ -94,7 +94,7 @@ public sealed class CompiledSideEffectVerifierGuardTests
     // -------------------------------------------------------------------------
     // Guard 5: BindingRegistryValidator must reject a binding that declares only
     // Cpu effects (no side effects) but still requires a capability.
-    // Rule: "requires a capability but declares only pure CPU effects" → E-BINDING-EFFECT.
+    // Rule: "requires a capability but declares only pure effects" -> E-BINDING-EFFECT.
     // This ensures a binding cannot claim a capability "for free" without
     // declaring the matching effect in its signature.
     // -------------------------------------------------------------------------
