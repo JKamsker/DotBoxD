@@ -17,19 +17,19 @@ public sealed class PluginServerInheritedDefaultConflictSurpriseTests
 
                 namespace Regression.Game
                 {
-                    [DotBoxDService]
+                    [RpcService]
                     public interface ILeftWorld
                     {
                         ValueTask<int> CountAsync(int value = 1, CancellationToken ct = default);
                     }
 
-                    [DotBoxDService]
+                    [RpcService]
                     public interface IRightWorld
                     {
                         ValueTask<int> CountAsync(int value = 2, CancellationToken ct = default);
                     }
 
-                    [DotBoxDService]
+                    [RpcService]
                     public interface IGameWorldAccess : ILeftWorld, IRightWorld;
                 }
 

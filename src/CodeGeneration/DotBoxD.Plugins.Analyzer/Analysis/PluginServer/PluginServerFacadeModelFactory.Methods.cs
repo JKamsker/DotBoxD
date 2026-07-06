@@ -68,6 +68,12 @@ internal static partial class PluginServerFacadeModelFactory
                             $"Generated plugin server member '{method.ToDisplayString()}' has an inherited optional/default parameter conflict.");
                     }
 
+                    if (!HasSameCallerInfoAttributes(existing.Symbol, method, cancellationToken))
+                    {
+                        throw new NotSupportedException(
+                            $"Generated plugin server member '{method.ToDisplayString()}' has an inherited signature collision with incompatible caller info attributes.");
+                    }
+
                     if (IsMoreDerivedMember(method, existing.Symbol))
                     {
                         seenMethods[signature] = new SeenForwardedMethod(method, forwarded, existing.Index);
@@ -162,6 +168,72 @@ internal static partial class PluginServerFacadeModelFactory
         => !SymbolEqualityComparer.Default.Equals(candidate.ContainingType, existing.ContainingType) &&
            candidate.ContainingType.AllInterfaces.Any(
                interfaceType => SymbolEqualityComparer.Default.Equals(interfaceType, existing.ContainingType));
+
+    private static bool HasSameCallerInfoAttributes(
+        IMethodSymbol left,
+        IMethodSymbol right,
+        CancellationToken cancellationToken)
+    {
+        if (left.Parameters.Length != right.Parameters.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < left.Parameters.Length; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (CallerInfoKey(left.Parameters[i], cancellationToken) !=
+                CallerInfoKey(right.Parameters[i], cancellationToken))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static string CallerInfoKey(IParameterSymbol parameter, CancellationToken cancellationToken)
+    {
+        var attributes = new List<string>();
+        foreach (var attribute in parameter.GetAttributes())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            switch (attribute.AttributeClass?.ToDisplayString())
+            {
+                case "System.Runtime.CompilerServices.CallerMemberNameAttribute":
+                    attributes.Add("member");
+                    break;
+
+                case "System.Runtime.CompilerServices.CallerFilePathAttribute":
+                    attributes.Add("file");
+                    break;
+
+                case "System.Runtime.CompilerServices.CallerLineNumberAttribute":
+                    attributes.Add("line");
+                    break;
+
+                case "System.Runtime.CompilerServices.CallerArgumentExpressionAttribute":
+                    attributes.Add("argument:" + CallerArgumentExpressionTarget(attribute));
+                    break;
+            }
+        }
+
+        attributes.Sort(StringComparer.Ordinal);
+        return string.Join("|", attributes);
+    }
+
+    private static string CallerArgumentExpressionTarget(AttributeData attribute)
+    {
+        if (attribute.ConstructorArguments.Length == 1 &&
+            attribute.ConstructorArguments[0].Value is string target)
+        {
+            return target;
+        }
+
+        return string.Empty;
+    }
 
     private readonly record struct SeenForwardedMethod(
         IMethodSymbol Symbol,
