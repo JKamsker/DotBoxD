@@ -27,6 +27,7 @@ public static bool StringEqualsRaw(SandboxValue left, SandboxValue right)
 public static class DefaultSandboxBindings
 public static class MathBindings
 public static class SafeFileBindings
+public static class SafeFileSystem
 public static class SafeRandomBindings
 public static class SafeTimeBindings
 public static class StringBindings
@@ -54,7 +55,6 @@ public static object CreateMeteredListI32ReaderRaw(SandboxContext context, Sandb
 public static object ListI32ReaderRaw(SandboxValue value)
 public static partial class AuditTextSanitizer
 public static partial class CompiledRuntime
-public static partial class SafeFileSystem
 public static partial class SafeLogBindings
 public static SandboxType TypeList(SandboxType itemType) => SandboxType.List(itemType)
 public static SandboxType TypeMap(SandboxType keyType, SandboxType valueType) => SandboxType.Map(keyType, valueType)

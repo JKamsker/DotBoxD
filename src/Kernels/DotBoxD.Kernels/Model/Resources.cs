@@ -12,11 +12,6 @@ public sealed class ResourceMeter
     private const int LoopDeadlineCheckInterval = 4096;
 
     private readonly ResourceHostCallTracker _hostCallTracker = new();
-    private long _allocatedBytes;
-    private long _fileBytesRead;
-    private long _fileBytesWritten;
-    private long _networkBytesRead;
-    private long _networkBytesWritten;
     private long _deadline;
     private int _chargesSinceDeadlineCheck;
 
@@ -30,12 +25,12 @@ public sealed class ResourceMeter
     public ResourceLimits Limits { get; }
     public long FuelUsed { get; private set; }
     public long LoopIterations { get; private set; }
-    public long AllocatedBytes => _allocatedBytes;
+    public long AllocatedBytes { get; private set; }
     public int HostCalls { get; private set; }
-    public long FileBytesRead => _fileBytesRead;
-    public long FileBytesWritten => _fileBytesWritten;
-    public long NetworkBytesRead => _networkBytesRead;
-    public long NetworkBytesWritten => _networkBytesWritten;
+    public long FileBytesRead { get; private set; }
+    public long FileBytesWritten { get; private set; }
+    public long NetworkBytesRead { get; private set; }
+    public long NetworkBytesWritten { get; private set; }
     public int LogEvents { get; private set; }
     public long CollectionElements { get; private set; }
     public long StringBytes { get; private set; }
@@ -62,12 +57,12 @@ public sealed class ResourceMeter
         _chargesSinceDeadlineCheck = 0;
         FuelUsed = 0;
         LoopIterations = 0;
-        _allocatedBytes = 0;
+        AllocatedBytes = 0;
         HostCalls = 0;
-        _fileBytesRead = 0;
-        _fileBytesWritten = 0;
-        _networkBytesRead = 0;
-        _networkBytesWritten = 0;
+        FileBytesRead = 0;
+        FileBytesWritten = 0;
+        NetworkBytesRead = 0;
+        NetworkBytesWritten = 0;
         LogEvents = 0;
         CollectionElements = 0;
         StringBytes = 0;
@@ -139,7 +134,7 @@ public sealed class ResourceMeter
         => amount >= 0 && FuelUsed <= Limits.MaxFuel - amount;
 
     public void ChargeAllocation(long bytes)
-        => ChargeByteCounter(ref _allocatedBytes, bytes, Limits.MaxAllocatedBytes, "allocation budget exhausted");
+        => AllocatedBytes = ChargeByteCounter(AllocatedBytes, bytes, Limits.MaxAllocatedBytes, "allocation budget exhausted");
 
     public void ChargeCollection(SandboxValue value) => ChargeCollection(value, CancellationToken.None);
 
@@ -186,7 +181,7 @@ public sealed class ResourceMeter
     internal void ChargeStringValues(string value, long count)
     {
         var usage = ResourceMeterUsageCharges.ChargeStringValues(value, count, Limits, AllocatedBytes, StringBytes);
-        _allocatedBytes = usage.AllocatedBytes;
+        AllocatedBytes = usage.AllocatedBytes;
         StringBytes = usage.StringBytes;
     }
 
@@ -219,16 +214,16 @@ public sealed class ResourceMeter
     }
 
     public void ChargeFileRead(long bytes)
-        => ChargeByteCounter(ref _fileBytesRead, bytes, Limits.MaxFileBytesRead, "file read byte budget exhausted");
+        => FileBytesRead = ChargeByteCounter(FileBytesRead, bytes, Limits.MaxFileBytesRead, "file read byte budget exhausted");
 
     public void ChargeFileWrite(long bytes)
-        => ChargeByteCounter(ref _fileBytesWritten, bytes, Limits.MaxFileBytesWritten, "file write byte budget exhausted");
+        => FileBytesWritten = ChargeByteCounter(FileBytesWritten, bytes, Limits.MaxFileBytesWritten, "file write byte budget exhausted");
 
     public void ChargeNetworkRead(long bytes)
-        => ChargeByteCounter(ref _networkBytesRead, bytes, Limits.MaxNetworkBytesRead, "network read byte budget exhausted");
+        => NetworkBytesRead = ChargeByteCounter(NetworkBytesRead, bytes, Limits.MaxNetworkBytesRead, "network read byte budget exhausted");
 
     public void ChargeNetworkWrite(long bytes)
-        => ChargeByteCounter(ref _networkBytesWritten, bytes, Limits.MaxNetworkBytesWritten, "network write byte budget exhausted");
+        => NetworkBytesWritten = ChargeByteCounter(NetworkBytesWritten, bytes, Limits.MaxNetworkBytesWritten, "network write byte budget exhausted");
 
     public void ChargeLogEvent(string message)
     {
@@ -284,12 +279,14 @@ public sealed class ResourceMeter
         }
     }
 
-    private static void ChargeByteCounter(ref long current, long bytes, long max, string quotaMessage)
+    private static long ChargeByteCounter(long current, long bytes, long max, string quotaMessage)
     {
-        current = ResourceMeterUsageCharges.AddBytes(current, bytes, quotaMessage);
-        if (current > max)
+        var next = ResourceMeterUsageCharges.AddBytes(current, bytes, quotaMessage);
+        if (next > max)
         {
             throw Quota(quotaMessage);
         }
+
+        return next;
     }
 }
