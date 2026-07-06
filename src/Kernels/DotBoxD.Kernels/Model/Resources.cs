@@ -89,10 +89,16 @@ public sealed partial class ResourceMeter
     }
     public void ChargeCollection(SandboxValue value) => ChargeCollection(value, CancellationToken.None);
     public void ChargeCollection(SandboxValue value, CancellationToken cancellationToken)
-        => ChargeMeasuredShape(SandboxValueShapeMeter.Measure(value, Limits, cancellationToken, this));
+    {
+        ArgumentNullException.ThrowIfNull(value);
+
+        ChargeMeasuredShape(SandboxValueShapeMeter.Measure(value, Limits, cancellationToken, this));
+    }
     public void ChargeValue(SandboxValue value) => ChargeValue(value, CancellationToken.None);
     public void ChargeValue(SandboxValue value, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(value);
+
         if (value is RecordValue && ValueShapeCache.TryGet(value, out var cachedRecordShape))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -112,6 +118,8 @@ public sealed partial class ResourceMeter
 
     public void ChargeString(string value)
     {
+        ArgumentNullException.ThrowIfNull(value);
+
         var bytes = SandboxLiteralConstraints.StringByteCount(value.Length);
         ChargeStringShape(new ValueShape(0, 0, 0, 0, value.Length, bytes));
     }
@@ -169,6 +177,8 @@ public sealed partial class ResourceMeter
 
     public void ChargeLogEvent(string message)
     {
+        ArgumentNullException.ThrowIfNull(message);
+
         if (message.Length > Limits.MaxLogMessageLength)
         {
             throw Quota("log message length budget exhausted");
