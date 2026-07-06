@@ -53,17 +53,11 @@ public sealed record BindingSignature(
     BindingSafety Safety,
     CompiledBinding Compiled)
 {
-    private IReadOnlyList<SandboxType> _parameters = CopyParameterTypes(Parameters);
+    private IReadOnlyList<SandboxType> _parameters = BindingParameterTypes.Copy(Parameters, nameof(Parameters));
 
-    public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = CopyParameterTypes(value); }
+    public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = BindingParameterTypes.Copy(value, nameof(Parameters)); }
     public bool IsAsync { get; init; }
     public string AuditKind { get; init; } = BindingAuditKinds.BindingCall;
-
-    private static IReadOnlyList<SandboxType> CopyParameterTypes(IReadOnlyList<SandboxType>? parameters)
-    {
-        ArgumentNullException.ThrowIfNull(parameters, nameof(Parameters));
-        return ModelCopy.List(parameters);
-    }
 }
 
 public sealed record BindingDescriptor(
@@ -80,9 +74,9 @@ public sealed record BindingDescriptor(
     CompiledBinding Compiled,
     CapabilityGrantValidator? GrantValidator = null)
 {
-    private IReadOnlyList<SandboxType> _parameters = CopyParameterTypes(Parameters);
+    private IReadOnlyList<SandboxType> _parameters = BindingParameterTypes.Copy(Parameters, nameof(Parameters));
 
-    public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = CopyParameterTypes(value); }
+    public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = BindingParameterTypes.Copy(value, nameof(Parameters)); }
 
     public BindingSignature Signature => new(
         Id, Version, CopyParameters(Parameters), ReturnType, Effects, RequiredCapability, CostModel, AuditLevel, Safety, Compiled)
@@ -109,10 +103,13 @@ public sealed record BindingDescriptor(
 
         return copy;
     }
+}
 
-    private static IReadOnlyList<SandboxType> CopyParameterTypes(IReadOnlyList<SandboxType>? parameters)
+internal static class BindingParameterTypes
+{
+    public static IReadOnlyList<SandboxType> Copy(IReadOnlyList<SandboxType>? parameters, string paramName)
     {
-        ArgumentNullException.ThrowIfNull(parameters, nameof(Parameters));
+        ArgumentNullException.ThrowIfNull(parameters, paramName);
         return ModelCopy.List(parameters);
     }
 }
