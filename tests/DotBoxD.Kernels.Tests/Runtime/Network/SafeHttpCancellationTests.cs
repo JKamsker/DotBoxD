@@ -60,6 +60,28 @@ public sealed class SafeHttpCancellationTests
         Assert.Empty(failures);
     }
 
+    [Fact]
+    public async Task GetTextAsync_with_context_token_cancelled_after_dns_reports_cancelled()
+    {
+        using var contextCancellation = new CancellationTokenSource();
+        var scenario = CreateScenario(
+            contextCancellation.Token,
+            onDnsResolved: contextCancellation.Cancel);
+
+        var ex = await Assert.ThrowsAsync<SandboxRuntimeException>(async () =>
+            await SafeHttpClient.GetTextAsync(
+                scenario.Context,
+                new SandboxUri("https://api.example.com/config"),
+                new SafeInMemoryHttpMessageInvoker("remote-config"),
+                scenario.Dns,
+                CancellationToken.None));
+
+        Assert.Equal(SandboxErrorCode.Cancelled, ex.Error.Code);
+        Assert.Equal(1, scenario.DnsCalls);
+        var auditEvent = Assert.Single(scenario.Audit.Events, e => e.BindingId == "net.http.get" && !e.Success);
+        Assert.Equal(SandboxErrorCode.Cancelled, auditEvent.ErrorCode);
+    }
+
     private static SafeHttpCancellationScenario CreateScenario(
         CancellationToken contextToken,
         Action? onDnsResolved = null)

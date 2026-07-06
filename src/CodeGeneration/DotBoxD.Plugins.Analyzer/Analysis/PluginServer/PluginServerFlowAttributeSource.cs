@@ -85,6 +85,21 @@ internal static class PluginServerFlowAttributeSource
         }
     }
 
+    public static bool HasErrorObsoleteAttribute(IEnumerable<AttributeData> attributes)
+    {
+        foreach (var attribute in attributes)
+        {
+            if (attribute.AttributeClass?.ToDisplayString() == "System.ObsoleteAttribute" &&
+                attribute.ConstructorArguments.Length >= 2 &&
+                attribute.ConstructorArguments[1].Value is true)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static EquatableArray<string> AttributeLines(
         IEnumerable<AttributeData> attributes,
         bool targetReturn)

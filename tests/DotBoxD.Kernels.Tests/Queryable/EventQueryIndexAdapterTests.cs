@@ -131,6 +131,7 @@ public sealed class EventQueryIndexAdapterTests
     [Theory]
     [InlineData(null)]
     [InlineData("")]
+    [InlineData(" ")]
     public void ToIndexedPredicate_rejects_malformed_paths_with_public_boundary_exception(string? path)
         => AssertPublicBoundaryRejection(
             () => EventQueryIndexAdapter.ToIndexedPredicate(

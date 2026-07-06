@@ -54,11 +54,27 @@ public sealed class PluginEventAdapterOutputValidationTests
         Assert.Empty(kernel.ExecutionObservations);
     }
 
+    [Fact]
+    public void CopyValidatedValues_rejects_null_adapter_value_list_as_validation()
+    {
+        var ex = Assert.Throws<SandboxValidationException>(
+            () => PluginEventAdapterValueValidator.CopyValidatedValues(StringParameter, null!));
+
+        Assert.Contains(ex.Diagnostics, diagnostic => diagnostic.Code == PluginEventAdapterShapeValidator.DiagnosticCode);
+    }
+
+    [Fact]
+    public void CopyValidatedValues_preserves_adapter_value_cancellation()
+        => Assert.Throws<OperationCanceledException>(
+            () => PluginEventAdapterValueValidator.CopyValidatedValues(StringParameter, new CancellingValueList()));
+
     private static async Task<InstalledKernel> InstallKernelAsync(InMemoryPluginMessageSink messages)
     {
         var server = PluginAddendumTestPolicies.CreateServer(messages);
         return await server.InstallAsync(ThrowingValuePackage());
     }
+
+    private static Parameter[] StringParameter { get; } = [new("e_TargetId", SandboxType.String)];
 
     private static PluginPackage NullValueListPackage()
     {
@@ -186,6 +202,19 @@ public sealed class PluginEventAdapterOutputValidationTests
 
         public IEnumerator<SandboxValue> GetEnumerator()
             => ((IEnumerable<SandboxValue>)Values).GetEnumerator();
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+            => GetEnumerator();
+    }
+
+    private sealed class CancellingValueList : IReadOnlyList<SandboxValue>
+    {
+        public int Count => throw new OperationCanceledException();
+
+        public SandboxValue this[int index] => throw new OperationCanceledException();
+
+        public IEnumerator<SandboxValue> GetEnumerator()
+            => throw new OperationCanceledException();
 
         System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
             => GetEnumerator();

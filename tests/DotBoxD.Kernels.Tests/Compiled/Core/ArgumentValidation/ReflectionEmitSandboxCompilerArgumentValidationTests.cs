@@ -32,7 +32,7 @@ public sealed class ReflectionEmitSandboxCompilerArgumentValidationTests
         var ex = Assert.Throws<ArgumentNullException>(
             () => new CompileOptions("main") { Entrypoint = null! });
 
-        Assert.Equal("value", ex.ParamName);
+        Assert.Equal("Entrypoint", ex.ParamName);
     }
 
     [Fact]
@@ -43,7 +43,7 @@ public sealed class ReflectionEmitSandboxCompilerArgumentValidationTests
         var ex = Assert.Throws<ArgumentNullException>(
             () => options with { Entrypoint = null! });
 
-        Assert.Equal("value", ex.ParamName);
+        Assert.Equal("Entrypoint", ex.ParamName);
     }
 
     [Fact]

@@ -35,7 +35,10 @@ public static class SafeHttpClient
             requestBytes = ChargeRequestBytes(context, request);
             requestTimeout = new CancellationTokenSource();
             requestTimeout.CancelAfter(EffectiveTimeout(context, request.Timeout));
-            timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, requestTimeout.Token);
+            timeout = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                context.CancellationToken,
+                requestTimeout.Token);
             var addresses = await ResolveVettedAddressesAsync(
                     request.Grant,
                     request.Uri.Host,
@@ -125,12 +128,17 @@ public static class SafeHttpClient
             return true;
         }
 
-        if (cancellationToken.IsCancellationRequested)
+        if (context.CancellationToken.IsCancellationRequested)
         {
             return false;
         }
 
-        return !context.CancellationToken.IsCancellationRequested;
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return context.Budget.RemainingWallTime() <= TimeSpan.FromMilliseconds(20);
+        }
+
+        return true;
     }
 
     private static SafeHttpRequest ResolveRequest(SandboxContext context, SandboxUri sandboxUri)

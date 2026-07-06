@@ -29,6 +29,7 @@ internal static partial class PluginServerFacadeModelFactory
                 continue;
             }
 
+            RejectErrorObsoleteForwarder(property);
             var propertyTypeName = TypeName(propertyType);
             var attributes = PluginServerFlowAttributeSource.PropertyAttributes(property);
             if (seenProperties.TryGetValue(property.Name, out var existing))

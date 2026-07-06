@@ -81,7 +81,7 @@ public static class EventQueryIndexAdapter
     public static HostIndexedPredicate ToIndexedPredicate(IndexedPredicate source)
     {
         ArgumentNullException.ThrowIfNull(source);
-        if (string.IsNullOrEmpty(source.Path))
+        if (string.IsNullOrWhiteSpace(source.Path))
         {
 #pragma warning disable CA2208 // Preserve the malformed IndexedPredicate member name in the public exception.
             throw new ArgumentException("Predicate paths cannot be null or empty.", nameof(IndexedPredicate.Path));

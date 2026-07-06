@@ -43,15 +43,10 @@ internal static class FunctionCollectionValidator
             return;
         }
 
-        var counts = new Dictionary<string, int>(functions.Count, StringComparer.Ordinal);
-        var nullCount = 0;
-        for (var i = 0; i < functions.Count; i++)
-        {
-            if (functions[i] is { } function)
-            {
-                IncrementCount(counts, function.Id, ref nullCount);
-            }
-        }
+        var counts = StructuralDuplicateValidator.CountValues(
+            functions,
+            static function => function?.Id,
+            out var nullCount);
 
         var reportedNull = false;
         for (var i = 0; i < functions.Count; i++)
@@ -62,49 +57,11 @@ internal static class FunctionCollectionValidator
             }
 
             var id = function.Id;
-            if (ShouldReportDuplicate(counts, id, nullCount, ref reportedNull))
+            if (StructuralDuplicateValidator.ShouldReportDuplicate(counts, id, nullCount, ref reportedNull))
             {
                 diagnostics.Add(new SandboxDiagnostic("E-STRUCT-DUP-FN", $"duplicate function id '{id}'"));
             }
         }
-    }
-
-    private static void IncrementCount(Dictionary<string, int> counts, string? value, ref int nullCount)
-    {
-        if (value is null)
-        {
-            nullCount++;
-            return;
-        }
-
-        counts.TryGetValue(value, out var count);
-        counts[value] = count + 1;
-    }
-
-    private static bool ShouldReportDuplicate(
-        Dictionary<string, int> counts,
-        string? value,
-        int nullCount,
-        ref bool reportedNull)
-    {
-        if (value is null)
-        {
-            if (nullCount < 2 || reportedNull)
-            {
-                return false;
-            }
-
-            reportedNull = true;
-            return true;
-        }
-
-        if (!counts.TryGetValue(value, out var count) || count < 2)
-        {
-            return false;
-        }
-
-        counts[value] = 0;
-        return true;
     }
 
     private static bool HasEntrypoint(IReadOnlyList<SandboxFunction> functions)

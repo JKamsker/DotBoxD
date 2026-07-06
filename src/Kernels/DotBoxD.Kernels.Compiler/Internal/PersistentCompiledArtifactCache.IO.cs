@@ -6,7 +6,13 @@ public sealed partial class PersistentCompiledArtifactCache
 {
     private static async ValueTask<T> ReadJsonAsync<T>(string path, CancellationToken cancellationToken)
     {
-        var stream = File.OpenRead(path);
+        var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize: 4096,
+            FileOptions.Asynchronous);
         await using (stream.ConfigureAwait(false))
         {
             try
@@ -62,5 +68,5 @@ public sealed partial class PersistentCompiledArtifactCache
             FileAccess.Write,
             FileShare.None,
             bufferSize: 4096,
-            FileOptions.WriteThrough);
+            FileOptions.Asynchronous | FileOptions.WriteThrough);
 }

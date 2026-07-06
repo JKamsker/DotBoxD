@@ -104,7 +104,11 @@ public sealed class WorkerDeterministicRandomAuditTimestampValidationTests
                 CapabilityId: "random",
                 Effect: SandboxEffect.Random,
                 ResourceId: "random:i32",
-                Fields: WorkerAuditValidationTestSupport.BindingFields(plan, "random")));
+                Fields: RandomFields(
+                    plan,
+                    minInclusive: 0,
+                    maxExclusive: 10,
+                    value: FirstDeterministicRandomInt32(seed: 123, minInclusive: 0, maxExclusive: 10))));
 
             return ValueTask.FromResult(new SandboxExecutionResult
             {
@@ -143,6 +147,19 @@ public sealed class WorkerDeterministicRandomAuditTimestampValidationTests
                 StringComparer.Ordinal);
             fields["fuelUsed"] = usage.FuelUsed.ToString(System.Globalization.CultureInfo.InvariantCulture);
             fields["hostCalls"] = usage.HostCalls.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return fields;
+        }
+
+        private static Dictionary<string, string> RandomFields(
+            ExecutionPlan plan,
+            int minInclusive,
+            int maxExclusive,
+            int value)
+        {
+            var fields = WorkerAuditValidationTestSupport.BindingFields(plan, "random");
+            fields["minInclusive"] = minInclusive.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            fields["maxExclusive"] = maxExclusive.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            fields["value"] = value.ToString(System.Globalization.CultureInfo.InvariantCulture);
             return fields;
         }
 

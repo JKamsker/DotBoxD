@@ -15,7 +15,7 @@ public sealed record CompileOptions(string Entrypoint, bool Optimize = false)
     public string Entrypoint
     {
         get => _entrypoint;
-        init => _entrypoint = value ?? throw new ArgumentNullException(nameof(value));
+        init => _entrypoint = value ?? throw new ArgumentNullException(nameof(Entrypoint));
     }
 }
 

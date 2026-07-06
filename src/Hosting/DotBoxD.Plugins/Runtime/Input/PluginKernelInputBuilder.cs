@@ -84,6 +84,7 @@ internal static class PluginKernelInputBuilder
         LiveSettingStore value)
     {
         var eventValueCount = PluginEventAdapterShapeValidator.ReadEventValueCount(writer);
+        PluginEventAdapterValueValidator.ValidateValueCount(parameters, eventValueCount);
         var valueCount = eventValueCount + liveSettings.Count;
         return valueCount switch
         {
@@ -91,7 +92,7 @@ internal static class PluginKernelInputBuilder
             1 => eventValueCount == 1
                 ? ReadWriterValue(writer, e, parameters, eventValueCount, 0)
                 : value.ToSandboxValue(liveSettings[0]),
-            _ => BuildList(writer, e, parameters, liveSettings, value)
+            _ => BuildList(writer, e, parameters, eventValueCount, liveSettings, value)
         };
     }
 
@@ -119,10 +120,10 @@ internal static class PluginKernelInputBuilder
         IPluginEventValueWriter<TEvent> writer,
         TEvent e,
         IReadOnlyList<Parameter> parameters,
+        int eventValueCount,
         IReadOnlyList<LiveSettingDefinition> liveSettings,
         LiveSettingStore value)
     {
-        var eventValueCount = PluginEventAdapterShapeValidator.ReadEventValueCount(writer);
         var values = new SandboxValue[eventValueCount + liveSettings.Count];
         CopyWriterValues(writer, e, values, 0);
         PluginEventAdapterValueValidator.ValidateCopiedValues(parameters, eventValueCount, values, 0);
@@ -175,6 +176,7 @@ internal static class PluginKernelInputBuilder
         ref ListValue? list)
     {
         var eventValueCount = PluginEventAdapterShapeValidator.ReadEventValueCount(writer);
+        PluginEventAdapterValueValidator.ValidateValueCount(parameters, eventValueCount);
         var valueCount = eventValueCount + liveSettings.Count;
         return valueCount switch
         {
@@ -182,7 +184,7 @@ internal static class PluginKernelInputBuilder
             1 => eventValueCount == 1
                 ? ReadWriterValue(writer, e, parameters, eventValueCount, 0)
                 : value.ToSandboxValue(liveSettings[0]),
-            _ => BuildListWithReusableBuffer(writer, e, parameters, liveSettings, value, ref buffer, ref list)
+            _ => BuildListWithReusableBuffer(writer, e, parameters, eventValueCount, liveSettings, value, ref buffer, ref list)
         };
     }
 
@@ -207,12 +209,12 @@ internal static class PluginKernelInputBuilder
         IPluginEventValueWriter<TEvent> writer,
         TEvent e,
         IReadOnlyList<Parameter> parameters,
+        int eventValueCount,
         IReadOnlyList<LiveSettingDefinition> liveSettings,
         LiveSettingStore value,
         ref SandboxValue[]? buffer,
         ref ListValue? list)
     {
-        var eventValueCount = PluginEventAdapterShapeValidator.ReadEventValueCount(writer);
         var values = RentBuffer(eventValueCount + liveSettings.Count, ref buffer);
         CopyWriterValues(writer, e, values, 0);
         PluginEventAdapterValueValidator.ValidateCopiedValues(parameters, eventValueCount, values, 0);

@@ -46,7 +46,7 @@ internal static class StructuralDuplicateValidator
         }
     }
 
-    private static Dictionary<string, int> CountValues<T>(
+    internal static Dictionary<string, int> CountValues<T>(
         IReadOnlyList<T> values,
         Func<T, string?> selector,
         out int nullCount)
@@ -73,7 +73,7 @@ internal static class StructuralDuplicateValidator
         counts[value] = count + 1;
     }
 
-    private static bool ShouldReportDuplicate(
+    internal static bool ShouldReportDuplicate(
         Dictionary<string, int> counts,
         string? value,
         int nullCount,

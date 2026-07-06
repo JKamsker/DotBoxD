@@ -2,6 +2,7 @@ using DotBoxD.Hosting;
 using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Runtime.Bindings;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Serialization.Json.Hosting;
 using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
@@ -88,6 +89,18 @@ public sealed class WorkerDeterministicTimeAuditValidationTests
                 true,
                 ResourceId: $"module:{plan.ModuleHash}",
                 Fields: RunSummaryAuditFields.Create(plan, budget, ExecutionMode.Interpreted, "None")));
+            var fields = new Dictionary<string, string>(
+                BindingAuditFields.Create(
+                    "clock",
+                    logicalNow,
+                    plan.ModuleHash,
+                    plan.PolicyHash,
+                    deterministic: true),
+                StringComparer.Ordinal)
+            {
+                [SafeTimeBindingNames.NowUnixMillisAuditField] =
+                    logicalNow.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture)
+            };
             audit.Write(new SandboxAuditEvent(
                 runId,
                 "BindingCall",
@@ -97,12 +110,7 @@ public sealed class WorkerDeterministicTimeAuditValidationTests
                 CapabilityId: "time.now",
                 Effect: SandboxEffect.Time,
                 ResourceId: "clock:utc",
-                Fields: BindingAuditFields.Create(
-                    "clock",
-                    logicalNow,
-                    plan.ModuleHash,
-                    plan.PolicyHash,
-                    deterministic: true)));
+                Fields: fields));
 
             return ValueTask.FromResult(new SandboxExecutionResult
             {

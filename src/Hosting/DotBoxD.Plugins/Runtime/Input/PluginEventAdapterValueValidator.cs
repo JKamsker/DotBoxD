@@ -25,11 +25,17 @@ internal static class PluginEventAdapterValueValidator
         IReadOnlyList<Parameter> parameters,
         IReadOnlyList<SandboxValue> values)
     {
-        EnsureValueCountMatches(values.Count, parameters.Count);
-        var copy = new SandboxValue[values.Count];
-        for (var i = 0; i < parameters.Count; i++)
+        if (values is null)
         {
-            var value = values[i];
+            throw CreateException("Plugin event adapter values must be non-null.");
+        }
+
+        var valueCount = ReadValueCount(values);
+        EnsureValueCountMatches(valueCount, parameters.Count);
+        var copy = new SandboxValue[valueCount];
+        for (var i = 0; i < valueCount; i++)
+        {
+            var value = ReadValue(values, i);
             RequireType(value, parameters[i], i);
             copy[i] = value;
         }
@@ -43,7 +49,7 @@ internal static class PluginEventAdapterValueValidator
         int index,
         SandboxValue value)
     {
-        EnsureValueCountMatches(eventValueCount, parameters.Count);
+        ValidateValueCount(parameters, eventValueCount);
         if ((uint)index >= (uint)parameters.Count)
         {
             throw CreateException("Plugin event adapter value index is outside adapter parameters.");
@@ -67,12 +73,15 @@ internal static class PluginEventAdapterValueValidator
         SandboxValue[] values,
         int destinationIndex)
     {
-        EnsureValueCountMatches(eventValueCount, parameters.Count);
+        ValidateValueCount(parameters, eventValueCount);
         for (var i = 0; i < parameters.Count; i++)
         {
             RequireType(values[destinationIndex + i], parameters[i], i);
         }
     }
+
+    public static void ValidateValueCount(IReadOnlyList<Parameter> parameters, int eventValueCount)
+        => EnsureValueCountMatches(eventValueCount, parameters.Count);
 
     private static void EnsureValueCountMatches(int valueCount, int parameterCount)
     {
@@ -88,7 +97,7 @@ internal static class PluginEventAdapterValueValidator
         {
             return values.Count;
         }
-        catch (Exception)
+        catch (Exception ex) when (PluginEventAdapterShapeValidator.IsAdapterCallbackFailure(ex))
         {
             throw CreateException("Plugin event adapter output count could not be read.");
         }
@@ -100,7 +109,7 @@ internal static class PluginEventAdapterValueValidator
         {
             return values[index];
         }
-        catch (Exception)
+        catch (Exception ex) when (PluginEventAdapterShapeValidator.IsAdapterCallbackFailure(ex))
         {
             throw CreateException(
                 "Plugin event adapter output at index " +

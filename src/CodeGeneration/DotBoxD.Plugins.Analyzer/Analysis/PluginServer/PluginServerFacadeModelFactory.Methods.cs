@@ -30,6 +30,7 @@ internal static partial class PluginServerFacadeModelFactory
 
             if (member is IMethodSymbol { MethodKind: MethodKind.Ordinary } method)
             {
+                RejectErrorObsoleteForwarder(method);
                 ValidateForwardedMethod(method);
                 var (returnWrapperName, returnWrapperKind) = ResolveReturnWrapper(
                     method.ReturnType,

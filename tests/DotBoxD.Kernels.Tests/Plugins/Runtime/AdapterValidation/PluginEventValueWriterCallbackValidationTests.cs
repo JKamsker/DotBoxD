@@ -4,6 +4,7 @@ using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Kernel;
 using DotBoxD.Plugins.Runtime;
+using DotBoxD.Plugins.Runtime.Input;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Runtime;
 
@@ -27,6 +28,24 @@ public sealed class PluginEventValueWriterCallbackValidationTests
         Assert.Contains(ex.Diagnostics, diagnostic => diagnostic.Code == "DBXK036");
         Assert.Empty(messages.Messages);
         Assert.Empty(kernel.ExecutionObservations);
+    }
+
+    [Fact]
+    public void Writer_value_count_is_validated_before_zero_value_fast_path()
+    {
+        var adapter = new ZeroCountWriterAdapter();
+
+        var ex = Assert.Throws<SandboxValidationException>(
+            () => PluginKernelInputBuilder.Build(
+                adapter,
+                new WriterCallbackEvent("player-1", 7),
+                adapter.Parameters,
+                [],
+                [],
+                LiveSettingStore.FromDefinitions([]),
+                _ => throw new InvalidOperationException("No deferred updates are expected.")));
+
+        Assert.Contains(ex.Diagnostics, diagnostic => diagnostic.Code == "DBXK036");
     }
 
     public static IEnumerable<object[]> WriterCallbackCases()
@@ -202,6 +221,24 @@ public sealed class PluginEventValueWriterCallbackValidationTests
                 1 => SandboxValue.FromInt32(e.Count),
                 _ => throw new ArgumentOutOfRangeException(nameof(index))
             };
+    }
+
+    private sealed class ZeroCountWriterAdapter : IPluginEventValueWriter<WriterCallbackEvent>
+    {
+        public string EventName => nameof(WriterCallbackEvent);
+
+        public IReadOnlyList<Parameter> Parameters { get; } = SingleValueParameters;
+
+        public int EventValueCount => 0;
+
+        public IReadOnlyList<SandboxValue> ToSandboxValues(WriterCallbackEvent e)
+            => throw new InvalidOperationException("Writer adapters should not allocate event value lists.");
+
+        public SandboxValue ToSandboxValue(WriterCallbackEvent e, int index)
+            => throw new InvalidOperationException("The zero-value fast path must reject before reading values.");
+
+        public void CopySandboxValues(WriterCallbackEvent e, SandboxValue[] destination, int destinationIndex)
+            => throw new InvalidOperationException("The zero-value fast path must reject before copying values.");
     }
 
     public enum KernelOperation
