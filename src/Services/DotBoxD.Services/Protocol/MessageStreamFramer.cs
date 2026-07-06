@@ -16,6 +16,8 @@ internal static class MessageStreamFramer
         TimeSpan frameReadIdleTimeout,
         CancellationToken ct)
     {
+        ProtocolArgumentGuard.ThrowIfNull(stream, nameof(stream));
+
         ct.ThrowIfCancellationRequested();
 
         var idleTimeout = FrameReadTimeoutSource.Validate(
@@ -74,6 +76,8 @@ internal static class MessageStreamFramer
         ReadOnlyMemory<byte> payload,
         CancellationToken ct)
     {
+        ProtocolArgumentGuard.ThrowIfNull(stream, nameof(stream));
+
         ct.ThrowIfCancellationRequested();
 
         var totalLength = MessageFrameReader.GetOutgoingFrameLength(payload.Length);
