@@ -81,6 +81,7 @@ internal sealed record ServicePropertyModel(
     string ImplementationType,
     string Type,
     string? ProxyType,
+    string PropertyAttributePrefix,
     bool IsInstanceId,
     SubServiceInfo? SubService);
 

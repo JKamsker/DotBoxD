@@ -2,7 +2,7 @@ using FluentAssertions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
-namespace DotBoxD.Services.SourceGenerator.Tests.SubServices;
+namespace DotBoxD.Services.SourceGenerator.Tests.SubServices.Flow;
 
 public class SubServicePropertyFlowAttributeTests
 {
