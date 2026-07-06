@@ -33,7 +33,7 @@ public sealed class PluginServerReturnFlowAttributeSurpriseTests
                     IMonsterControl Monsters { get; }
             """, """
 
-                [DotBoxDService]
+                [RpcService]
                 public interface IMonsterControl
                 {
                     [MaybeNull]
@@ -45,7 +45,7 @@ public sealed class PluginServerReturnFlowAttributeSurpriseTests
                     IInventory Inventory { get; }
                 }
 
-                [DotBoxDService]
+                [RpcService]
                 public interface IInventory
                 {
                     [MaybeNull]
@@ -199,7 +199,7 @@ public sealed class PluginServerReturnFlowAttributeSurpriseTests
 
             namespace Regression.Game
             {
-                [DotBoxDService]
+                [RpcService]
                 public interface IGameWorldAccess
                 {
             {{worldMembers}}

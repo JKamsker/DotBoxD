@@ -24,7 +24,7 @@ public class InheritedCallerInfoConflictTests
                     void Trace([CallerFilePath] string member = "");
                 }
 
-                [DotBoxDService]
+                [RpcService]
                 public interface ICombined : ILeft, IRight
                 {
                 }

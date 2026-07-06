@@ -15,10 +15,6 @@ internal static class PluginSymbolReader
             if (string.Equals(
                     attribute.AttributeClass?.ToDisplayString(),
                     DotBoxDMetadataNames.PluginAttribute,
-                    StringComparison.Ordinal) ||
-                string.Equals(
-                    attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDMetadataNames.EventKernelAttribute,
                     StringComparison.Ordinal))
             {
                 return attribute.ConstructorArguments.Length > 0

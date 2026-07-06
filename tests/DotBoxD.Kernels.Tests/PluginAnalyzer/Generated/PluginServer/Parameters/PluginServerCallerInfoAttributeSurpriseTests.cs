@@ -15,7 +15,7 @@ public sealed class PluginServerCallerInfoAttributeSurpriseTests
 
             namespace Regression.Game
             {
-                [DotBoxDService]
+                [RpcService]
                 public interface IGameWorldAccess
                 {
                     ValueTask<string> TraceAsync(
@@ -28,7 +28,7 @@ public sealed class PluginServerCallerInfoAttributeSurpriseTests
                     IMonsterControl Monsters { get; }
                 }
 
-                [DotBoxDService]
+                [RpcService]
                 public interface IMonsterControl
                 {
                     ValueTask<string> InspectAsync(

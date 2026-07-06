@@ -10,8 +10,8 @@ internal sealed class RpcTypeValidationCache
     private readonly Dictionary<ITypeSymbol, bool> _subServicePayloadResults =
         new(SymbolEqualityComparer.Default);
 
-    public bool ContainsDotBoxDServiceInterface(ITypeSymbol type, CancellationToken ct) =>
-        SubServicePayloadInspector.ContainsDotBoxDServiceInterface(
+    public bool ContainsRpcServiceInterface(ITypeSymbol type, CancellationToken ct) =>
+        SubServicePayloadInspector.ContainsRpcServiceInterface(
             type,
             ct,
             this);

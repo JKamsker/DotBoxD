@@ -21,7 +21,7 @@ public sealed class InvokeAsyncFileLocalReturnRegressionTests
 
             namespace DotBoxD.Kernels.Game.Server.Abstractions
             {
-                [DotBoxDService]
+                [RpcService]
                 public interface IGameWorldAccess
                 {
                     [HostBinding("host.world.getHealth", "game.world.monster.read.health", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]

@@ -23,7 +23,7 @@ public class InheritedParameterNameTests
                     int CountAsync(int right);
                 }
 
-                [DotBoxDService]
+                [RpcService]
                 public interface ICombined : ILeft, IRight
                 {
                 }
