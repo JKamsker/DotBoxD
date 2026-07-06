@@ -65,67 +65,10 @@ internal static class ServicePropertyModelFactory
         {
             ct.ThrowIfCancellationRequested();
 
-            switch (attr.AttributeClass?.ToDisplayString())
-            {
-                case "System.Diagnostics.CodeAnalysis.AllowNullAttribute":
-                    AppendSimpleAttribute(
-                        attributes,
-                        "global::System.Diagnostics.CodeAnalysis.AllowNullAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.DisallowNullAttribute":
-                    AppendSimpleAttribute(
-                        attributes,
-                        "global::System.Diagnostics.CodeAnalysis.DisallowNullAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.MaybeNullAttribute":
-                    AppendSimpleAttribute(
-                        attributes,
-                        "global::System.Diagnostics.CodeAnalysis.MaybeNullAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.NotNullAttribute":
-                    AppendSimpleAttribute(
-                        attributes,
-                        "global::System.Diagnostics.CodeAnalysis.NotNullAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute":
-                    AppendStringArgumentAttribute(
-                        attributes,
-                        attr,
-                        "global::System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute");
-                    break;
-            }
+            NullableFlowAttributeFormatter.TryAppendMemberAttribute(attributes, attr);
         }
 
         return attributes.ToString();
-    }
-
-    private static void AppendSimpleAttribute(StringBuilder sb, string attributeType)
-    {
-        sb.Append("[")
-            .Append(attributeType)
-            .AppendLine("]");
-    }
-
-    private static void AppendStringArgumentAttribute(
-        StringBuilder sb,
-        AttributeData attr,
-        string attributeType)
-    {
-        if (attr.ConstructorArguments.Length != 1 ||
-            attr.ConstructorArguments[0].Value is not string value)
-        {
-            return;
-        }
-
-        sb.Append("[")
-            .Append(attributeType)
-            .Append("(\"")
-            .Append(LiteralHelpers.EscapeStringLiteral(value))
-            .AppendLine("\")]");
     }
 
     private static string GetImplementationType(IPropertySymbol propertySymbol) =>
