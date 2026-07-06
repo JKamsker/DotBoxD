@@ -1,5 +1,4 @@
 using System.Buffers.Binary;
-using DotBoxD.Codecs.MessagePack;
 using DotBoxD.Services.Diagnostics;
 using DotBoxD.Services.Peer;
 using DotBoxD.Services.Protocol;
@@ -20,13 +19,6 @@ namespace DotBoxD.Services.Tests.Coverage.Peer;
 /// </summary>
 public sealed class PeerInboundFrameProcessingCoverageTests
 {
-    // Hang-guard ceiling only (used for .WaitAsync(...) and as a never-expected-to-fire
-    // RequestTimeout). Kept generous so 2-core CI runners under parallel load don't trip it;
-    // negative timeout tests assert against their own small RequestTimeout literals elsewhere.
-    private static readonly TimeSpan ShortTimeout = TimeSpan.FromSeconds(30);
-
-    private static MessagePackRpcSerializer NewSerializer() => new();
-
     // ---- RpcPeerInboundDispatcher.AddDispatcher: duplicate service (65-66) --------------------
 
     [Fact]

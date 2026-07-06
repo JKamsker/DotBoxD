@@ -191,3 +191,69 @@ internal static class CodegenRegressionTestSupport
             => InvokeAsync(s, m, ct);
     }
 }
+
+/// <summary>A minimal IRpcInvoker that does nothing for generated proxy construction and stub tests.</summary>
+internal sealed class NullClient : global::DotBoxD.Services.Server.IRpcInvoker
+{
+    public bool IsConnected => true;
+
+    public Task ConnectAsync(System.Threading.CancellationToken ct = default) => Task.CompletedTask;
+
+    public Task<TR> InvokeAsync<TQ, TR>(
+        string service,
+        string method,
+        TQ request,
+        System.Threading.CancellationToken ct = default) =>
+        Task.FromResult(default(TR)!);
+
+    public Task<TR> InvokeAsync<TR>(
+        string service,
+        string method,
+        System.Threading.CancellationToken ct = default) =>
+        Task.FromResult(default(TR)!);
+
+    public Task InvokeAsync<TQ>(
+        string service,
+        string method,
+        TQ request,
+        System.Threading.CancellationToken ct = default) =>
+        Task.CompletedTask;
+
+    public Task InvokeAsync(
+        string service,
+        string method,
+        System.Threading.CancellationToken ct = default) =>
+        Task.CompletedTask;
+
+    public System.Threading.Tasks.ValueTask DisposeAsync() => default;
+
+    public Task<TR> InvokeOnInstanceAsync<TQ, TR>(
+        string service,
+        string instanceId,
+        string method,
+        TQ request,
+        System.Threading.CancellationToken ct = default) =>
+        InvokeAsync<TQ, TR>(service, method, request, ct);
+
+    public Task<TR> InvokeOnInstanceAsync<TR>(
+        string service,
+        string instanceId,
+        string method,
+        System.Threading.CancellationToken ct = default) =>
+        InvokeAsync<TR>(service, method, ct);
+
+    public Task InvokeOnInstanceAsync<TQ>(
+        string service,
+        string instanceId,
+        string method,
+        TQ request,
+        System.Threading.CancellationToken ct = default) =>
+        InvokeAsync(service, method, request, ct);
+
+    public Task InvokeOnInstanceAsync(
+        string service,
+        string instanceId,
+        string method,
+        System.Threading.CancellationToken ct = default) =>
+        InvokeAsync(service, method, ct);
+}

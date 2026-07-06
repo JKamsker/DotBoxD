@@ -242,7 +242,7 @@ if ($partFileBudget -lt 0) {
     $partFileBudget = Get-CodeEnforcerConfigInt "maxPartFileCount" 0
 }
 
-$partFiles = @($csharpFiles | Where-Object { [System.IO.Path]::GetFileName($_) -like "*.Part*.cs" })
+$partFiles = @($csharpFiles | Where-Object { [System.IO.Path]::GetFileName($_) -match '(?i)\.Part\d+\.cs$' })
 if ($partFiles.Count -gt $partFileBudget) {
     $sample = ($partFiles | Sort-Object | Select-Object -First 10) -join ", "
     $violations.Add("CE0007 mechanical partial split budget exceeded: $($partFiles.Count) file(s) named *.Part*.cs, budget is $partFileBudget. Rename/refactor split files around behavior or support types instead of Class.PartN.cs. Sample: $sample")

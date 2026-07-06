@@ -49,29 +49,6 @@ public class CodegenRegressionDispatchTests
             "Task<TResponse> InvokeAsync<TResponse>(...) is wrong for void — it would force the serializer to deserialize an empty response body");
     }
 
-    /// <summary>A minimal IRpcInvoker that does nothing — for DBXS002 stub testing.</summary>
-    private sealed class NullClient : global::DotBoxD.Services.Server.IRpcInvoker
-    {
-        public bool IsConnected => true;
-        public Task ConnectAsync(System.Threading.CancellationToken ct = default) => Task.CompletedTask;
-        public Task<TR> InvokeAsync<TQ, TR>(string s, string m, TQ q, System.Threading.CancellationToken ct = default) => Task.FromResult(default(TR)!);
-        public Task<TR> InvokeAsync<TR>(string s, string m, System.Threading.CancellationToken ct = default) => Task.FromResult(default(TR)!);
-        public Task InvokeAsync<TQ>(string s, string m, TQ q, System.Threading.CancellationToken ct = default) => Task.CompletedTask;
-        public Task InvokeAsync(string s, string m, System.Threading.CancellationToken ct = default) => Task.CompletedTask;
-        public System.Threading.Tasks.ValueTask DisposeAsync() => default;
-
-        // Feature-2 instance overloads forward to the singleton ones so the existing
-        // assertions still observe sub-routed calls if a test were to exercise them.
-        public Task<TR> InvokeOnInstanceAsync<TQ, TR>(string s, string id, string m, TQ q, System.Threading.CancellationToken ct = default)
-            => InvokeAsync<TQ, TR>(s, m, q, ct);
-        public Task<TR> InvokeOnInstanceAsync<TR>(string s, string id, string m, System.Threading.CancellationToken ct = default)
-            => InvokeAsync<TR>(s, m, ct);
-        public Task InvokeOnInstanceAsync<TQ>(string s, string id, string m, TQ q, System.Threading.CancellationToken ct = default)
-            => InvokeAsync<TQ>(s, m, q, ct);
-        public Task InvokeOnInstanceAsync(string s, string id, string m, System.Threading.CancellationToken ct = default)
-            => InvokeAsync(s, m, ct);
-    }
-
     /// <summary>
     /// Regression: a service interface declared inside the <c>DotBoxD.Services.*</c> namespace
     /// must still compile. The generated code references `global::DotBoxD.Services.IRpcInvoker`
