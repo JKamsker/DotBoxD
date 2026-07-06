@@ -76,6 +76,7 @@ internal static class StructuralValidator
     {
         CheckIdentifier(function.Id, "function id", diagnostics);
         CheckType(function.ReturnType, $"function '{function.Id}' return type", diagnostics, declaredOpaqueIdTypes);
+        CheckDeclaredEffects(function, diagnostics);
         var hasNullParameters = CheckNullEntries(function.Parameters, "parameters", function.Id, diagnostics);
         CheckNullEntries(function.Body, "body", function.Id, diagnostics);
 
@@ -234,6 +235,16 @@ internal static class StructuralValidator
             diagnostics.Add(new SandboxDiagnostic(
                 "E-IR-CAPABILITY",
                 $"capability request '{request.Id}' must be concrete"));
+        }
+    }
+
+    private static void CheckDeclaredEffects(SandboxFunction function, List<SandboxDiagnostic> diagnostics)
+    {
+        if (function.DeclaredEffects is { } effects && !effects.ContainsOnlyKnownBits())
+        {
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-POLICY-EFFECT",
+                $"function '{function.Id}' has declared unknown effects"));
         }
     }
 
