@@ -49,7 +49,16 @@ public sealed class MessagePackObjectPayloadRegressionTests
         => new()
         {
             "player-one",
+            (byte)42,
+            (sbyte)-7,
+            (short)-1234,
+            (ushort)1234,
+            123456789,
+            123456789U,
             9876543210L,
+            9876543210UL,
+            12.5F,
+            12.5D,
             true,
         };
 
