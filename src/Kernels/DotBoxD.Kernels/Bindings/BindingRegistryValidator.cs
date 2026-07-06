@@ -39,6 +39,11 @@ internal static class BindingRegistryValidator
 
     private static void ValidateBinding(BindingDescriptor binding, List<SandboxDiagnostic> diagnostics)
     {
+        if (!BindingDescriptorRequiredFieldValidator.Validate(binding, diagnostics))
+        {
+            return;
+        }
+
         ValidateIdentifier(binding.Id, "binding id", "E-BINDING-ID", diagnostics);
         if (binding.RequiredCapability is not null)
         {
@@ -260,21 +265,15 @@ internal static class BindingRegistryValidator
         => safety is BindingSafety.ReadOnlyExternal or BindingSafety.SideEffectingExternal;
 
     private static bool IsKnownAuditLevel(AuditLevel auditLevel)
-        => auditLevel is AuditLevel.None or
-            AuditLevel.Summary or
-            AuditLevel.PerCall or
-            AuditLevel.PerResource or
-            AuditLevel.FullInputOutput;
+        => auditLevel is AuditLevel.None or AuditLevel.Summary or AuditLevel.PerCall or
+            AuditLevel.PerResource or AuditLevel.FullInputOutput;
 
     private static bool IsKnownAuditKind(string auditKind)
         => auditKind is BindingAuditKinds.BindingCall or BindingAuditKinds.SandboxLog or BindingAuditKinds.PluginMessage;
 
     private static bool IsKnownBindingSafety(BindingSafety safety)
-        => safety is BindingSafety.PureIntrinsic or
-            BindingSafety.PureHostFacade or
-            BindingSafety.ReadOnlyExternal or
-            BindingSafety.SideEffectingExternal or
-            BindingSafety.DangerousRequiresReview;
+        => safety is BindingSafety.PureIntrinsic or BindingSafety.PureHostFacade or
+            BindingSafety.ReadOnlyExternal or BindingSafety.SideEffectingExternal or BindingSafety.DangerousRequiresReview;
 
     private static void ValidateBuiltInCapabilityEffect(
         BindingDescriptor binding,

@@ -53,8 +53,7 @@ public sealed class BindingDescriptorRequiredFieldContractTests
     {
         if (ex is ArgumentException argumentException)
         {
-            return string.Equals(argumentException.ParamName, expectedContractName, StringComparison.Ordinal) ||
-                string.Equals(argumentException.ParamName, "descriptor", StringComparison.Ordinal);
+            return string.Equals(argumentException.ParamName, expectedContractName, StringComparison.Ordinal);
         }
 
         if (ex is not SandboxValidationException validationException)

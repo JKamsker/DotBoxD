@@ -53,11 +53,17 @@ public sealed record BindingSignature(
     BindingSafety Safety,
     CompiledBinding Compiled)
 {
-    private IReadOnlyList<SandboxType> _parameters = ModelCopy.List(Parameters);
+    private IReadOnlyList<SandboxType> _parameters = CopyParameterTypes(Parameters);
 
-    public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = ModelCopy.List(value); }
+    public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = CopyParameterTypes(value); }
     public bool IsAsync { get; init; }
     public string AuditKind { get; init; } = BindingAuditKinds.BindingCall;
+
+    private static IReadOnlyList<SandboxType> CopyParameterTypes(IReadOnlyList<SandboxType>? parameters)
+    {
+        ArgumentNullException.ThrowIfNull(parameters, nameof(Parameters));
+        return ModelCopy.List(parameters);
+    }
 }
 
 public sealed record BindingDescriptor(
@@ -74,9 +80,9 @@ public sealed record BindingDescriptor(
     CompiledBinding Compiled,
     CapabilityGrantValidator? GrantValidator = null)
 {
-    private IReadOnlyList<SandboxType> _parameters = ModelCopy.List(Parameters);
+    private IReadOnlyList<SandboxType> _parameters = CopyParameterTypes(Parameters);
 
-    public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = ModelCopy.List(value); }
+    public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = CopyParameterTypes(value); }
 
     public BindingSignature Signature => new(
         Id, Version, CopyParameters(Parameters), ReturnType, Effects, RequiredCapability, CostModel, AuditLevel, Safety, Compiled)
@@ -102,6 +108,12 @@ public sealed record BindingDescriptor(
         }
 
         return copy;
+    }
+
+    private static IReadOnlyList<SandboxType> CopyParameterTypes(IReadOnlyList<SandboxType>? parameters)
+    {
+        ArgumentNullException.ThrowIfNull(parameters, nameof(Parameters));
+        return ModelCopy.List(parameters);
     }
 }
 
