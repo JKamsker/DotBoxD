@@ -230,6 +230,7 @@ public sealed record SandboxExecutionResult
     private string _moduleHash = null!;
     private string _planHash = null!;
     private string _policyHash = null!;
+    private ExecutionMode _actualMode;
 
     public bool Succeeded { get; init; }
     public SandboxValue? Value { get; init; }
@@ -272,7 +273,7 @@ public sealed record SandboxExecutionResult
         }
     }
 
-    public ExecutionMode ActualMode { get; init; }
+    public ExecutionMode ActualMode { get => _actualMode; init => _actualMode = RequireDefinedMode(value, nameof(ActualMode)); }
     public bool ExecutionDispatched { get; init; }
     public required string ModuleHash
     {
@@ -293,4 +294,9 @@ public sealed record SandboxExecutionResult
     }
 
     public string? ArtifactHash { get; init; }
+
+    private static ExecutionMode RequireDefinedMode(ExecutionMode mode, string paramName)
+        => Enum.IsDefined(mode)
+            ? mode
+            : throw new ArgumentException("Execution result mode must be defined.", paramName);
 }

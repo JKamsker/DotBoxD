@@ -109,7 +109,7 @@ public enum SandboxErrorCode.VerifierFailure
 public enum SandboxIsolation
 public enum SandboxIsolation.InProcess
 public enum SandboxIsolation.WorkerProcess
-public ExecutionMode ActualMode { get; init; }
+public ExecutionMode ActualMode { get => _actualMode; init => _actualMode = RequireDefinedMode(value, nameof(ActualMode)); }
 public ExecutionMode Mode { get; init; } = ExecutionMode.Auto
 public ExecutionPlan( string moduleHash, string planHash, ExecutionPlanSeal planSeal, string policyHash, string bindingManifestHash, SandboxModule module, SandboxPolicy policy, BindingRegistry bindings, ResourceLimits budget, IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis, IReadOnlyDictionary<string, IReadOnlySet<string>>? bindingReferences = null)
 public ExecutionPlanSeal PlanSeal { get; }
@@ -120,7 +120,9 @@ public IEnumerator<SandboxValue> GetEnumerator()
 public int AutoCompileThreshold { get; init; } = 20
 public int CompareTo(SemVersion? other)
 public int Count => _values.Count
+public int HostCalls { get => _hostCalls; init => _hostCalls = RequireNonNegative(value, nameof(HostCalls)); }
 public int HostCalls { get; private set; }
+public int LogEvents { get => _logEvents; init => _logEvents = RequireNonNegative(value, nameof(LogEvents)); }
 public int LogEvents { get; private set; }
 public int Major { get => _major; init => _major = RequireNonNegative(value, nameof(Major)); }
 public int Minor { get => _minor; init => _minor = RequireNonNegative(value, nameof(Minor)); }
@@ -152,17 +154,28 @@ public IReadOnlyList<Statement> Body { get => _body; init => _body = ModelCopy.L
 public IReadOnlyList<Statement> Else { get => _else; init => _else = ModelCopy.List(value); }
 public IReadOnlyList<Statement> Then { get => _then; init => _then = ModelCopy.List(value); }
 public IReadOnlySet<string> DeclaredOpaqueIdTypes { get; init; }
+public long AllocatedBytes { get => _allocatedBytes; init => _allocatedBytes = RequireNonNegative(value, nameof(AllocatedBytes)); }
 public long AllocatedBytes { get; private set; }
 public long AuditCheckpoint() => Audit.EventsWritten
+public long CollectionElements { get => _collectionElements; init => _collectionElements = RequireNonNegative(value, nameof(CollectionElements)); }
 public long CollectionElements { get; private set; }
 public long EventsWritten { get; }
+public long FileBytesRead { get => _fileBytesRead; init => _fileBytesRead = RequireNonNegative(value, nameof(FileBytesRead)); }
 public long FileBytesRead { get; private set; }
+public long FileBytesWritten { get => _fileBytesWritten; init => _fileBytesWritten = RequireNonNegative(value, nameof(FileBytesWritten)); }
 public long FileBytesWritten { get; private set; }
+public long FuelUsed { get => _fuelUsed; init => _fuelUsed = RequireNonNegative(value, nameof(FuelUsed)); }
 public long FuelUsed { get; private set; }
+public long LoopIterations { get => _loopIterations; init => _loopIterations = RequireNonNegative(value, nameof(LoopIterations)); }
 public long LoopIterations { get; private set; }
+public long MaxFuel { get => _maxFuel; init => _maxFuel = RequireNonNegative(value, nameof(MaxFuel)); }
+public long NetworkBytesRead { get => _networkBytesRead; init => _networkBytesRead = RequireNonNegative(value, nameof(NetworkBytesRead)); }
 public long NetworkBytesRead { get; private set; }
+public long NetworkBytesWritten { get => _networkBytesWritten; init => _networkBytesWritten = RequireNonNegative(value, nameof(NetworkBytesWritten)); }
 public long NetworkBytesWritten { get; private set; }
+public long StringBytes { get => _stringBytes; init => _stringBytes = RequireNonNegative(value, nameof(StringBytes)); }
 public long StringBytes { get; private set; }
+public long? Bytes { get => _bytes; init => _bytes = RequireNonNegative(value, nameof(Bytes)); }
 public override bool Equals(object? obj) => Equals(obj as ExecutionPlanSeal)
 public override int GetHashCode()
 public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(_value)
@@ -200,8 +213,10 @@ public ResourceMeter Budget { get; }
 public ResourceMeter(ResourceLimits limits)
 public SandboxContext( SandboxRunId runId, SandboxPolicy policy, ResourceMeter budget, BindingRegistry bindings, IAuditSink audit, CancellationToken cancellationToken, IReadOnlySet<string>? allowedBindingIds = null, string? moduleHash = null, string? policyHash = null)
 public SandboxEffect AllowedEffects { get => _allowedEffects; init { _allowedEffects = value; ResetHash(); } }
+public SandboxEffect Effect { get => _effect; init => _effect = RequireKnownEffect(value, nameof(Effect)); }
 public SandboxError Error { get; }
 public SandboxError? Error { get; init; }
+public SandboxErrorCode? ErrorCode { get => _errorCode; init => _errorCode = RequireKnownErrorCode(value, nameof(ErrorCode)); }
 public SandboxIsolation Isolation { get; init; } = SandboxIsolation.InProcess
 public SandboxModule Module { get; }
 public SandboxPath Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
