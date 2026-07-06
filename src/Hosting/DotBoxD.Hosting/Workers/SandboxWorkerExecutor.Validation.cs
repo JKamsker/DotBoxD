@@ -186,6 +186,7 @@ internal sealed partial class SandboxWorkerExecutor
         Dictionary<string, int>? observedBindingCalls = null;
         var expectedSequenceNumber = 1L;
         var grantClock = plan.Policy.GrantClock;
+        var deterministicRandom = DeterministicRandomAuditSequence.Create(plan);
         foreach (var auditEvent in result.AuditEvents)
         {
             if (auditEvent.SequenceNumber != expectedSequenceNumber ||
@@ -211,6 +212,7 @@ internal sealed partial class SandboxWorkerExecutor
                     observedBindingCalls,
                     ref observedBindingBaseFuel,
                     ref observedBytes,
+                    ref deterministicRandom,
                     grantClock))
                 {
                     return false;

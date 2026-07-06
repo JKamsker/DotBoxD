@@ -43,6 +43,6 @@ public static VerificationManifestIdentity BuildManifestIdentity( ExecutionPlan 
 public string ArtifactHash => AssemblyHash
 public string AssemblyHash { get; init; }
 public string EntryPath(string cacheKey)
-public string Entrypoint
+public string Entrypoint { get; init; }
 public string? CacheInvalidReason { get; init; }
 public VerificationResult Verification { get; init; }
