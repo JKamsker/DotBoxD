@@ -48,7 +48,7 @@ public sealed class PolicyGrantMutationTests
             [new CapabilityGrant("event.read.health", new Dictionary<string, string>())],
             new ResourceLimits(MaxFuel: 1_000));
 
-        var plan = await PolicyMutationTestSupport.DefaultHost.PrepareAsync(
+        var plan = await PolicyMutationTestSupport.CreateDefaultHost().PrepareAsync(
             PolicyMutationTestSupport.EventRequestModule("event.read.health"),
             policy);
 
@@ -83,7 +83,7 @@ public sealed class PolicyGrantMutationTests
             [new CapabilityGrant("event.read.*", new Dictionary<string, string>())],
             new ResourceLimits(MaxFuel: 1_000));
 
-        var plan = await PolicyMutationTestSupport.DefaultHost.PrepareAsync(
+        var plan = await PolicyMutationTestSupport.CreateDefaultHost().PrepareAsync(
             PolicyMutationTestSupport.EventRequestModule("event.read.health"),
             policy);
 
@@ -188,7 +188,7 @@ public sealed class PolicyGrantMutationTests
             [new CapabilityGrant("file.read", PolicyMutationTestSupport.FileReadParameters(temp.Path))],
             new ResourceLimits(MaxFuel: 1_000, MaxFileBytesRead: 1024));
 
-        var plan = await PolicyMutationTestSupport.DefaultHost.PrepareAsync(
+        var plan = await PolicyMutationTestSupport.CreateDefaultHost().PrepareAsync(
             await PolicyMutationTestSupport.PureModuleAsync(),
             policy);
 

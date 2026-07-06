@@ -114,7 +114,7 @@ public sealed class PolicyResolverMutationTests
             LogicalNow: null,
             RandomSeed: null);
 
-        var plan = await PolicyMutationTestSupport.DefaultHost.PrepareAsync(
+        var plan = await PolicyMutationTestSupport.CreateDefaultHost().PrepareAsync(
             await PolicyMutationTestSupport.PureModuleAsync(),
             policy);
 

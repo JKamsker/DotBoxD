@@ -64,7 +64,7 @@ public sealed class PolicyFileGrantMutationTests
             ],
             new ResourceLimits(MaxFuel: 1_000, MaxFileBytesRead: 1024));
 
-        var plan = await PolicyMutationTestSupport.DefaultHost.PrepareAsync(
+        var plan = await PolicyMutationTestSupport.CreateDefaultHost().PrepareAsync(
             await PolicyMutationTestSupport.FileReadModuleAsync(),
             policy);
 

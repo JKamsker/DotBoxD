@@ -10,12 +10,12 @@ namespace DotBoxD.Kernels.Tests.Policy;
 
 internal static class PolicyMutationTestSupport
 {
-    public static SandboxHost DefaultHost => SandboxTestHost.Create();
+    public static SandboxHost CreateDefaultHost() => SandboxTestHost.Create();
 
     public static async Task<SandboxValidationException> PrepareThrowsAsync(
         SandboxModule module,
         SandboxPolicy policy)
-        => await PrepareThrowsAsync(DefaultHost, module, policy);
+        => await PrepareThrowsAsync(CreateDefaultHost(), module, policy);
 
     public static async Task<SandboxValidationException> PrepareThrowsAsync(
         SandboxHost host,
@@ -25,19 +25,19 @@ internal static class PolicyMutationTestSupport
             await host.PrepareAsync(module, policy));
 
     public static async Task<SandboxModule> PureModuleAsync()
-        => await DefaultHost.ImportJsonAsync(SandboxTestHost.PureScoreJson("policy-mutation-pure"));
+        => await CreateDefaultHost().ImportJsonAsync(SandboxTestHost.PureScoreJson("policy-mutation-pure"));
 
     public static async Task<SandboxModule> FileReadModuleAsync()
-        => await DefaultHost.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("settings.json"));
+        => await CreateDefaultHost().ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("settings.json"));
 
     public static async Task<SandboxModule> FileWriteModuleAsync()
-        => await DefaultHost.ImportJsonAsync(FileWriteJson("out.txt", "x"));
+        => await CreateDefaultHost().ImportJsonAsync(FileWriteJson("out.txt", "x"));
 
     public static async Task<SandboxModule> TimeModuleAsync()
-        => await DefaultHost.ImportJsonAsync(TimeJson());
+        => await CreateDefaultHost().ImportJsonAsync(TimeJson());
 
     public static async Task<SandboxModule> RandomModuleAsync()
-        => await DefaultHost.ImportJsonAsync(RandomJson());
+        => await CreateDefaultHost().ImportJsonAsync(RandomJson());
 
     public static async Task<SandboxModule> CustomBindingModuleAsync()
         => await CustomCapabilityHost().ImportJsonAsync(CustomBindingJson());
@@ -220,9 +220,18 @@ internal static class PolicyMutationTestSupport
 
         public void Dispose()
         {
-            if (Directory.Exists(Path))
+            try
             {
-                Directory.Delete(Path, recursive: true);
+                if (Directory.Exists(Path))
+                {
+                    Directory.Delete(Path, recursive: true);
+                }
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
             }
         }
     }
