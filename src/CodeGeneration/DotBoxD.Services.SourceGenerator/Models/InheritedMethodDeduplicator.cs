@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading;
+using DotBoxD.CodeGeneration.Shared.Defaults;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
 using Microsoft.CodeAnalysis;
 
@@ -25,6 +26,11 @@ internal static class InheritedMethodDeduplicator
         if (!HasSameParameterNames(existingMethod, methodSymbol))
         {
             return $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible parameter names";
+        }
+
+        if (!HasSameParameterDefaults(existingMethod, methodSymbol))
+        {
+            return $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible optional parameter defaults";
         }
 
         if (!MethodSignatureFacts.HaveSameGenericConstraints(existingMethod, methodSymbol, ct))
@@ -91,6 +97,24 @@ internal static class InheritedMethodDeduplicator
         for (var i = 0; i < left.Parameters.Length; i++)
         {
             if (left.Parameters[i].Name != right.Parameters[i].Name)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public static bool HasSameParameterDefaults(IMethodSymbol left, IMethodSymbol right)
+    {
+        if (left.Parameters.Length != right.Parameters.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < left.Parameters.Length; i++)
+        {
+            if (GetParameterDefaultKey(left.Parameters[i]) != GetParameterDefaultKey(right.Parameters[i]))
             {
                 return false;
             }
@@ -242,5 +266,23 @@ internal static class InheritedMethodDeduplicator
         }
 
         return null;
+    }
+
+    private static string GetParameterDefaultKey(IParameterSymbol parameter)
+    {
+        var hasDefaultValue = ParameterDefaultValueEmitter.HasDefaultValue(parameter);
+        if (!hasDefaultValue)
+        {
+            return string.Empty;
+        }
+
+        var literal = ParameterDefaultValueEmitter.FormatSignatureDefaultLiteral(
+            parameter,
+            hasDefaultValue,
+            DefaultLiteralOptions.SourceGenerator) ?? string.Empty;
+        return ParameterDefaultValueEmitter.FormatMetadataDefaultValueExpression(
+            parameter,
+            hasDefaultValue,
+            literal);
     }
 }
