@@ -46,24 +46,38 @@ public sealed class ProxyObsoleteAttributeTests
                 GeneratorTestHelper.GeneratedKind.Proxy))
             .SourceText.ToString();
 
-        proxy.Should().Contain(
-            "[global::System.ObsoleteAttribute(\"Use NewAsync\")]\n" +
-            "        public global::System.Threading.Tasks.Task LegacyAsync()");
-        proxy.Should().Contain(
-            "[global::System.ObsoleteAttribute(\"Use NewAsync\")]\n" +
-            "        public global::System.Threading.Tasks.Task LegacyAsync(global::System.Threading.CancellationToken ct = default)");
-        proxy.Should().Contain(
-            "[global::System.ObsoleteAttribute(\"Use Child2\")]\n" +
-            "        public global::Regress.ObsoleteProxyMembers.IChild Child =>");
+        AssertMemberHasObsoleteAttribute(
+            proxy,
+            "public global::System.Threading.Tasks.Task LegacyAsync()",
+            "Use NewAsync");
+        AssertMemberHasObsoleteAttribute(
+            proxy,
+            "public global::System.Threading.Tasks.Task LegacyAsync(global::System.Threading.CancellationToken ct = default)",
+            "Use NewAsync");
+        AssertMemberHasObsoleteAttribute(
+            proxy,
+            "public global::Regress.ObsoleteProxyMembers.IChild Child =>",
+            "Use Child2");
         AssertChild2IsNotObsolete(proxy);
 
         var asyncSibling = runResult.Results.Single().GeneratedSources
             .Single(g => g.HintName.EndsWith("IRoot.DotBoxDRpcAsync.g.cs", StringComparison.Ordinal))
             .SourceText.ToString();
 
-        asyncSibling.Should().Contain(
-            "[global::System.ObsoleteAttribute(\"Use NewAsync\")]\n" +
-            "        global::System.Threading.Tasks.Task LegacyAsync(global::System.Threading.CancellationToken ct = default);");
+        AssertMemberHasObsoleteAttribute(
+            asyncSibling,
+            "global::System.Threading.Tasks.Task LegacyAsync(global::System.Threading.CancellationToken ct = default);",
+            "Use NewAsync");
+    }
+
+    private static void AssertMemberHasObsoleteAttribute(string source, string declaration, string message)
+    {
+        var declarationIndex = source.IndexOf(declaration, StringComparison.Ordinal);
+        declarationIndex.Should().BeGreaterThanOrEqualTo(0);
+
+        var declarationLineStart = FindLineStart(source, declarationIndex);
+        var previousLine = GetPreviousLine(source, declarationLineStart);
+        previousLine.Should().Be($"[global::System.ObsoleteAttribute(\"{message}\")]");
     }
 
     private static void AssertChild2IsNotObsolete(string proxy)
@@ -86,6 +100,33 @@ public sealed class ProxyObsoleteAttributeTests
             child2Index - childDeclarationEnd - 1);
         child2Prefix.Should().NotContain("ObsoleteAttribute");
     }
+
+    private static int FindLineStart(string source, int index)
+    {
+        var previousNewLine = source.LastIndexOf('\n', index);
+        return previousNewLine < 0 ? 0 : previousNewLine + 1;
+    }
+
+    private static string GetPreviousLine(string source, int lineStart)
+    {
+        var previousLineEnd = lineStart;
+        while (previousLineEnd > 0 && IsLineBreak(source[previousLineEnd - 1]))
+        {
+            previousLineEnd--;
+        }
+
+        if (previousLineEnd == 0)
+        {
+            return string.Empty;
+        }
+
+        var previousLineStart = source.LastIndexOf('\n', previousLineEnd - 1);
+        previousLineStart = previousLineStart < 0 ? 0 : previousLineStart + 1;
+        return source.Substring(previousLineStart, previousLineEnd - previousLineStart).Trim();
+    }
+
+    private static bool IsLineBreak(char value) =>
+        value is '\r' or '\n';
 
     private static (CSharpCompilation Final, GeneratorDriverRunResult RunResult) Run(string source)
     {
