@@ -12,6 +12,10 @@ public delegate void CapabilityGrantValidator(
     CapabilityGrant grant,
     ICollection<SandboxDiagnostic> diagnostics);
 
+public delegate bool BindingAuditResourceValidator(
+    CapabilityGrant grant,
+    SandboxAuditEvent auditEvent);
+
 public enum BindingSafety
 {
     PureIntrinsic,
@@ -72,7 +76,8 @@ public sealed record BindingDescriptor(
     BindingSafety Safety,
     BindingInvoker Invoke,
     CompiledBinding Compiled,
-    CapabilityGrantValidator? GrantValidator = null)
+    CapabilityGrantValidator? GrantValidator = null,
+    BindingAuditResourceValidator? AuditResourceValidator = null)
 {
     private IReadOnlyList<SandboxType> _parameters = ModelCopy.List(Parameters);
 
