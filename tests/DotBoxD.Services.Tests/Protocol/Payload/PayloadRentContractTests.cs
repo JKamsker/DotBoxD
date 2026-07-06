@@ -1,5 +1,5 @@
-using BufferPayload = DotBoxD.Services.Buffers.Payload;
 using Xunit;
+using BufferPayload = DotBoxD.Services.Buffers.Payload;
 
 namespace DotBoxD.Services.Tests.Protocol.Payload;
 
