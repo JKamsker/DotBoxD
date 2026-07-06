@@ -15,15 +15,18 @@ public sealed record SandboxDiagnostic(
     DiagnosticSeverity Severity = DiagnosticSeverity.Error,
     SourceSpan? Span = null)
 {
-    private string _code = Code ?? throw new ArgumentNullException(nameof(Code));
-    private string _message = Message ?? throw new ArgumentNullException(nameof(Message));
+    private string _code = ValidateNotNull(Code, nameof(Code));
+    private string _message = ValidateNotNull(Message, nameof(Message));
     private DiagnosticSeverity _severity = ValidateSeverity(Severity);
 
-    public string Code { get => _code; init => _code = value ?? throw new ArgumentNullException(nameof(value)); }
+    public string Code { get => _code; init => _code = ValidateNotNull(value, nameof(Code)); }
 
-    public string Message { get => _message; init => _message = value ?? throw new ArgumentNullException(nameof(value)); }
+    public string Message { get => _message; init => _message = ValidateNotNull(value, nameof(Message)); }
 
     public DiagnosticSeverity Severity { get => _severity; init => _severity = ValidateSeverity(value); }
+
+    private static string ValidateNotNull(string? value, string paramName)
+        => value ?? throw new ArgumentNullException(paramName);
 
     private static DiagnosticSeverity ValidateSeverity(DiagnosticSeverity severity)
         => Enum.IsDefined(severity)
@@ -36,9 +39,9 @@ public sealed record SourceSpan(int Line, int Column)
     private int _line = ValidateCoordinate(Line, nameof(Line));
     private int _column = ValidateCoordinate(Column, nameof(Column));
 
-    public int Line { get => _line; init => _line = ValidateCoordinate(value, nameof(value)); }
+    public int Line { get => _line; init => _line = ValidateCoordinate(value, nameof(Line)); }
 
-    public int Column { get => _column; init => _column = ValidateCoordinate(value, nameof(value)); }
+    public int Column { get => _column; init => _column = ValidateCoordinate(value, nameof(Column)); }
 
     private static int ValidateCoordinate(int value, string paramName)
         => value >= 0

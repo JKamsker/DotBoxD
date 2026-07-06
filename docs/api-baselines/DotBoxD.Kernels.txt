@@ -59,6 +59,7 @@ public DateTimeOffset UtcNow()
 public DateTimeOffset? LogicalNow { get => _logicalNow; init { _logicalNow = value; ResetHash(); } }
 public delegate ValueTask<SandboxValue> BindingInvoker( SandboxContext context, IReadOnlyList<SandboxValue> args, CancellationToken cancellationToken)
 public delegate void CapabilityGrantValidator( CapabilityGrant grant, ICollection<SandboxDiagnostic> diagnostics)
+public DiagnosticSeverity Severity { get => _severity; init => _severity = ValidateSeverity(value); }
 public enum AuditLevel
 public enum AuditLevel.FullInputOutput
 public enum AuditLevel.None
@@ -117,9 +118,11 @@ public IAuditSink Audit { get; }
 public IDisposable BeginBindingReturnCreditScope() => ReturnCredits.BeginScope()
 public IEnumerator<SandboxValue> GetEnumerator()
 public int AutoCompileThreshold { get; init; } = 20
+public int Column { get => _column; init => _column = ValidateCoordinate(value, nameof(Column)); }
 public int CompareTo(SemVersion? other)
 public int Count => _values.Count
 public int HostCalls { get; private set; }
+public int Line { get => _line; init => _line = ValidateCoordinate(value, nameof(Line)); }
 public int LogEvents { get; private set; }
 public int Major { get => _major; init => _major = RequireNonNegative(value, nameof(Major)); }
 public int Minor { get => _minor; init => _minor = RequireNonNegative(value, nameof(Minor)); }
@@ -141,7 +144,7 @@ public IReadOnlyList<CapabilityRequest> CapabilityRequests { get => _capabilityR
 public IReadOnlyList<Expression> Arguments { get => _arguments; init => _arguments = ModelCopy.List(value); }
 public IReadOnlyList<Parameter> Parameters { get => _parameters; init => _parameters = ModelCopy.List(value); }
 public IReadOnlyList<SandboxAuditEvent> Events
-public IReadOnlyList<SandboxDiagnostic> Diagnostics { get; } = ModelCopy.List(diagnostics)
+public IReadOnlyList<SandboxDiagnostic> Diagnostics { get; }
 public IReadOnlyList<SandboxFunction> Functions { get => _functions; init => _functions = ModelCopy.List(value); }
 public IReadOnlyList<SandboxType> Arguments { get => _arguments; init => _arguments = ModelCopy.List(value); }
 public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = ModelCopy.List(value); }
@@ -239,6 +242,7 @@ public SandboxRunId RunId { get; }
 public SandboxRunId? RunId { get; init; }
 public SandboxRuntimeException(SandboxError error)
 public SandboxUri Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
+public SandboxValidationException(IReadOnlyList<SandboxDiagnostic> diagnostics)
 public SandboxValue ChargeBindingReturn(BindingDescriptor descriptor, SandboxValue value)
 public SandboxValue this[int index] => _values[index]
 public SandboxValue? Value { get; init; }
@@ -249,7 +253,7 @@ public sealed class ExecutionPlanSeal : IEquatable<ExecutionPlanSeal>
 public sealed class InMemoryAuditSink : IAuditSink
 public sealed class SandboxPolicyBuilder
 public sealed class SandboxRuntimeException : Exception
-public sealed class SandboxValidationException( IReadOnlyList<SandboxDiagnostic> diagnostics)
+public sealed class SandboxValidationException : Exception
 public sealed partial class ResourceMeter
 public sealed partial class SandboxContext
 public sealed record AssignmentStatement(string Name, Expression Value, SourceSpan Span) : Statement(Span)
@@ -422,10 +426,12 @@ public static void Validate(ResourceLimits limits)
 public static void ValidateInputShape(SandboxValue input, int parameterCount)
 public string AuditKind { get; init; } = BindingAuditKinds.BindingCall
 public string BindingManifestHash { get; }
+public string Code { get => _code; init => _code = ValidateNotNull(value, nameof(Code)); }
 public string CreateChargedStringConcat(string left, string right)
 public string CreateChargedSubstring(string value, int startIndex, int length)
 public string Hash => (_hash ??= CreateHashCache()).Value
 public string ManifestHash { get; }
+public string Message { get => _message; init => _message = ValidateNotNull(value, nameof(Message)); }
 public string ModuleHash { get; }
 public string PlanHash { get; }
 public string PolicyHash { get; }
