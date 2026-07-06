@@ -133,58 +133,38 @@ function Test-GeneratedFile([string] $relativePath) {
 }
 
 function Get-CSharpLineForDeclarationScan([string] $line, [ref] $inBlockComment) {
-    $builder = [System.Text.StringBuilder]::new($line.Length)
-    $inString = $false
-    $stringQuote = [char] 0
-
-    for ($i = 0; $i -lt $line.Length; $i++) {
-        $current = $line[$i]
-        $next = if ($i + 1 -lt $line.Length) { $line[$i + 1] } else { [char] 0 }
-
-        if ($inBlockComment.Value) {
-            if ($current -eq "*" -and $next -eq "/") {
-                $inBlockComment.Value = $false
-                $i++
-            }
-
-            [void] $builder.Append(" ")
-            continue
+    if ($inBlockComment.Value) {
+        $blockEnd = $line.IndexOf("*/", [StringComparison]::Ordinal)
+        if ($blockEnd -lt 0) {
+            return ""
         }
 
-        if ($inString) {
-            if ($current -eq "\\" -and $stringQuote -eq '"' -and $i + 1 -lt $line.Length) {
-                $i++
-            }
-            elseif ($current -eq $stringQuote) {
-                $inString = $false
-            }
+        $line = $line.Substring($blockEnd + 2)
+        $inBlockComment.Value = $false
+    }
 
-            [void] $builder.Append(" ")
-            continue
-        }
-
-        if ($current -eq "/" -and $next -eq "/") {
+    while ($true) {
+        $blockStart = $line.IndexOf("/*", [StringComparison]::Ordinal)
+        if ($blockStart -lt 0) {
             break
         }
 
-        if ($current -eq "/" -and $next -eq "*") {
+        $blockEnd = $line.IndexOf("*/", $blockStart + 2, [StringComparison]::Ordinal)
+        if ($blockEnd -lt 0) {
+            $line = $line.Substring(0, $blockStart)
             $inBlockComment.Value = $true
-            $i++
-            [void] $builder.Append(" ")
-            continue
+            break
         }
 
-        if ($current -eq '"' -or $current -eq "'") {
-            $inString = $true
-            $stringQuote = $current
-            [void] $builder.Append(" ")
-            continue
-        }
-
-        [void] $builder.Append($current)
+        $line = $line.Remove($blockStart, $blockEnd - $blockStart + 2)
     }
 
-    return $builder.ToString()
+    $lineComment = $line.IndexOf("//", [StringComparison]::Ordinal)
+    if ($lineComment -ge 0) {
+        $line = $line.Substring(0, $lineComment)
+    }
+
+    return $line
 }
 
 function Join-NamespaceName([string] $parentNamespace, [string] $declaredNamespace) {
@@ -218,6 +198,21 @@ function Get-PartialTypeDeclarations([string] $relativePath) {
     $namespacePattern = '^\s*namespace\s+([A-Za-z_][A-Za-z0-9_.]*)\s*(;|\{)?'
     $typePattern = '^\s*(?:(?:public|internal|private|protected|sealed|static|abstract|readonly|ref|unsafe|partial)\s+)*partial\s+(?:class|interface|struct|record(?:\s+(?:class|struct))?)\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*<([^>{}]*)>)?\b'
     $fullPath = [System.IO.Path]::Combine($root, $relativePath)
+
+    $containsPartial = $false
+    foreach ($rawLine in [System.IO.File]::ReadLines($fullPath)) {
+        if ($rawLine.Contains("partial", [StringComparison]::Ordinal)) {
+            $containsPartial = $true
+            break
+        }
+    }
+
+    if (-not $containsPartial) {
+        return [System.Collections.Generic.List[object]]::new()
+    }
+
+    $namespaceRegex = [System.Text.RegularExpressions.Regex]::new($namespacePattern)
+    $typeRegex = [System.Text.RegularExpressions.Regex]::new($typePattern)
     $fileScopedNamespace = ""
     $namespaceScopes = [System.Collections.Generic.List[object]]::new()
     $pendingNamespace = $null
@@ -228,7 +223,7 @@ function Get-PartialTypeDeclarations([string] $relativePath) {
         $line = Get-CSharpLineForDeclarationScan $rawLine ([ref] $inBlockComment)
         Pop-ClosedNamespaces $namespaceScopes $braceDepth
 
-        $namespaceMatch = [System.Text.RegularExpressions.Regex]::Match($line, $namespacePattern)
+        $namespaceMatch = $namespaceRegex.Match($line)
         if ($namespaceMatch.Success) {
             $declaredNamespace = $namespaceMatch.Groups[1].Value
             $namespaceDelimiter = $namespaceMatch.Groups[2].Value
@@ -260,7 +255,7 @@ function Get-PartialTypeDeclarations([string] $relativePath) {
         }
 
         $currentNamespace = Get-ActiveNamespace $namespaceScopes $fileScopedNamespace
-        $match = [System.Text.RegularExpressions.Regex]::Match($line, $typePattern)
+        $match = $typeRegex.Match($line)
         if ($match.Success) {
             $typeName = $match.Groups[1].Value
             $genericParameters = $match.Groups[2].Value
@@ -284,8 +279,8 @@ function Get-PartialTypeDeclarations([string] $relativePath) {
             $declarations[$key] = $displayName
         }
 
-        $openBraces = ([System.Text.RegularExpressions.Regex]::Matches($line, "\{")).Count
-        $closeBraces = ([System.Text.RegularExpressions.Regex]::Matches($line, "\}")).Count
+        $openBraces = $line.Length - $line.Replace("{", "").Length
+        $closeBraces = $line.Length - $line.Replace("}", "").Length
         $braceDepth += $openBraces - $closeBraces
         if ($braceDepth -lt 0) {
             $braceDepth = 0
