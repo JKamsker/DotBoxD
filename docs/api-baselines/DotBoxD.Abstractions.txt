@@ -78,10 +78,12 @@ public string DescriptorPayload { get; } = descriptorPayload
 public string Discriminator { get; }
 public string Id { get; } = id
 public string KeyMember { get; }
+public string Message
 public string MethodMetadataName { get; } = methodMetadataName
 public string MethodName { get; } = methodName
 public string Name { get; }
 public string NormalizedSignature { get; } = normalizedSignature
+public string TargetId
 public string? ContextFactory { get; set; }
 public string? Id { get; }
 public string? Name { get; } = name
