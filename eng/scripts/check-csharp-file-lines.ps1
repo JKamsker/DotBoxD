@@ -133,19 +133,51 @@ function Test-GeneratedFile([string] $relativePath) {
 }
 
 function Get-PartialTypeDeclarations([string] $relativePath) {
-    $names = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    $pattern = '^\s*(?:(?:public|internal|private|protected|sealed|static|abstract|readonly|ref|unsafe|partial)\s+)*partial\s+(?:class|interface|struct|record(?:\s+(?:class|struct))?)\s+([A-Za-z_][A-Za-z0-9_]*)\b'
+    $declarations = @{}
+    $namespacePattern = '^\s*namespace\s+([A-Za-z_][A-Za-z0-9_.]*)\s*(?:;|\{)?'
+    $typePattern = '^\s*(?:(?:public|internal|private|protected|sealed|static|abstract|readonly|ref|unsafe|partial)\s+)*partial\s+(?:class|interface|struct|record(?:\s+(?:class|struct))?)\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*<([^>{}]*)>)?\b'
     $fullPath = [System.IO.Path]::Combine($root, $relativePath)
+    $currentNamespace = ""
 
     foreach ($line in [System.IO.File]::ReadLines($fullPath)) {
-        $match = [System.Text.RegularExpressions.Regex]::Match($line, $pattern)
+        $namespaceMatch = [System.Text.RegularExpressions.Regex]::Match($line, $namespacePattern)
+        if ($namespaceMatch.Success) {
+            $currentNamespace = $namespaceMatch.Groups[1].Value
+        }
+
+        $match = [System.Text.RegularExpressions.Regex]::Match($line, $typePattern)
         if ($match.Success) {
-            [void] $names.Add($match.Groups[1].Value)
+            $typeName = $match.Groups[1].Value
+            $genericParameters = $match.Groups[2].Value
+            $arity = 0
+            if (-not [string]::IsNullOrWhiteSpace($genericParameters)) {
+                $arity = @($genericParameters -split "," | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count
+            }
+
+            $key = if ([string]::IsNullOrWhiteSpace($currentNamespace)) {
+                '{0}`{1}' -f $typeName, $arity
+            }
+            else {
+                '{0}.{1}`{2}' -f $currentNamespace, $typeName, $arity
+            }
+
+            $displayName = if ([string]::IsNullOrWhiteSpace($currentNamespace)) { $typeName } else { "$currentNamespace.$typeName" }
+            if ($arity -gt 0) {
+                $displayName += "<" + (($genericParameters -split "," | ForEach-Object { $_.Trim() }) -join ", ") + ">"
+            }
+
+            $declarations[$key] = $displayName
         }
     }
 
-    $result = [string[]]::new($names.Count)
-    $names.CopyTo($result)
+    $result = [System.Collections.Generic.List[object]]::new()
+    foreach ($key in $declarations.Keys) {
+        $result.Add([pscustomobject]@{
+                Key = $key
+                DisplayName = $declarations[$key]
+            })
+    }
+
     return $result
 }
 
@@ -226,22 +258,25 @@ if ($sourcePartialTypeBudget -lt 0) {
 
 $sourcePartialTypeFiles = @{}
 foreach ($file in ($csharpFiles | Where-Object { $_ -like "src/*" })) {
-    foreach ($typeName in (Get-PartialTypeDeclarations $file)) {
-        if (-not $sourcePartialTypeFiles.ContainsKey($typeName)) {
-            $sourcePartialTypeFiles[$typeName] =
-                [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($declaration in (Get-PartialTypeDeclarations $file)) {
+        if (-not $sourcePartialTypeFiles.ContainsKey($declaration.Key)) {
+            $sourcePartialTypeFiles[$declaration.Key] = [pscustomobject]@{
+                DisplayName = $declaration.DisplayName
+                Files = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+            }
         }
 
-        [void] $sourcePartialTypeFiles[$typeName].Add($file)
+        [void] $sourcePartialTypeFiles[$declaration.Key].Files.Add($file)
     }
 }
 
 $sourceMultiFilePartialTypes = [System.Collections.Generic.List[object]]::new()
-foreach ($typeName in $sourcePartialTypeFiles.Keys) {
-    $fileCount = $sourcePartialTypeFiles[$typeName].Count
+foreach ($typeKey in $sourcePartialTypeFiles.Keys) {
+    $entry = $sourcePartialTypeFiles[$typeKey]
+    $fileCount = $entry.Files.Count
     if ($fileCount -gt 1) {
         $sourceMultiFilePartialTypes.Add([pscustomobject]@{
-                TypeName = $typeName
+                TypeName = $entry.DisplayName
                 FileCount = $fileCount
             })
     }
