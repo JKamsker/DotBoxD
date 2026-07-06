@@ -1,7 +1,7 @@
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 
-namespace DotBoxD.Kernels.Tests.Policy;
+namespace DotBoxD.Kernels.Tests.Policy.Surprise;
 
 public sealed class EventReadCapabilityRequestValidationTests
 {
