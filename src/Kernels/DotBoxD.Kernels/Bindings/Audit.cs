@@ -78,7 +78,6 @@ public sealed class InMemoryAuditSink : IAuditSink
 
     internal static IReadOnlyList<SandboxAuditEvent> EmptyEventSnapshot => EmptySnapshot;
 
-    private readonly object _gate = new();
     private List<SandboxAuditEvent>? _events;
     private long _sequence;
 
@@ -94,7 +93,13 @@ public sealed class InMemoryAuditSink : IAuditSink
     {
         get
         {
-            lock (_gate)
+            var events = Volatile.Read(ref _events);
+            if (events is null)
+            {
+                return 0;
+            }
+
+            lock (events)
             {
                 return _sequence;
             }
@@ -116,21 +121,31 @@ public sealed class InMemoryAuditSink : IAuditSink
 
     private SandboxAuditEvent[] CopyEvents()
     {
-        lock (_gate)
+        var events = Volatile.Read(ref _events);
+        if (events is null)
         {
-            return _events is null || _events.Count == 0
-                ? Array.Empty<SandboxAuditEvent>()
-                : _events.ToArray();
+            return Array.Empty<SandboxAuditEvent>();
+        }
+
+        lock (events)
+        {
+            return events.Count == 0 ? Array.Empty<SandboxAuditEvent>() : events.ToArray();
         }
     }
 
     public void Write(SandboxAuditEvent auditEvent)
     {
-        lock (_gate)
+        var events = Volatile.Read(ref _events);
+        if (events is null)
+        {
+            var created = new List<SandboxAuditEvent>();
+            events = Interlocked.CompareExchange(ref _events, created, null) ?? created;
+        }
+
+        lock (events)
         {
             var sequence = ++_sequence;
-            _events ??= new List<SandboxAuditEvent>();
-            _events.Add(auditEvent with { SequenceNumber = sequence });
+            events.Add(auditEvent with { SequenceNumber = sequence });
         }
     }
 
@@ -143,7 +158,13 @@ public sealed class InMemoryAuditSink : IAuditSink
         string moduleHash,
         string policyHash)
     {
-        lock (_gate)
+        var events = Volatile.Read(ref _events);
+        if (events is null)
+        {
+            return false;
+        }
+
+        lock (events)
         {
             // Sequence numbers are assigned monotonically on append (Write sets
             // SequenceNumber = ++_sequence) and _events is never reordered or
@@ -152,12 +173,6 @@ public sealed class InMemoryAuditSink : IAuditSink
             // the first event with SequenceNumber > checkpoint lives at list index
             // checkpoint. Start enumeration there instead of rescanning prior
             // events, avoiding O(N^2) enforcement work over a run.
-            var events = _events;
-            if (events is null)
-            {
-                return false;
-            }
-
             for (var index = StartIndexAfter(checkpoint, events.Count); index < events.Count; index++)
             {
                 var e = events[index];
