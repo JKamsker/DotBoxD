@@ -112,6 +112,7 @@ public sealed partial class PluginSession
         {
             ThrowIfDisposed();
             validate?.Invoke(package);
+            cancellationToken.ThrowIfCancellationRequested();
 
             if (TryReuseOwnedLocalTerminal(package, out var existing))
             {
@@ -119,6 +120,7 @@ public sealed partial class PluginSession
             }
 
             var installPolicy = policy?.Invoke(package);
+            cancellationToken.ThrowIfCancellationRequested();
             // Stage as a non-current instance, wire, then promote — all while holding the gate. Dispose takes the
             // same gate, so it cannot interleave between the install and the wire to revoke the kernel out from
             // under us (it tears the kernel down only after we release), and the incumbent is displaced only once
@@ -126,8 +128,10 @@ public sealed partial class PluginSession
             staged = await _server.InstallOwnedStagedAsync(this, package, installPolicy, cancellationToken)
                 .ConfigureAwait(false);
             _ownedInstallIds.Add(staged.InstallId);
+            cancellationToken.ThrowIfCancellationRequested();
 
             wire(staged);
+            cancellationToken.ThrowIfCancellationRequested();
 
             _server.PromoteOwned(this, staged);
             return staged;
