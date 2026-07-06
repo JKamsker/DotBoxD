@@ -82,12 +82,14 @@ internal static class PluginKernelInputBuilder
         IReadOnlyList<LiveSettingDefinition> liveSettings,
         LiveSettingStore value)
     {
-        var eventValueCount = writer.EventValueCount;
+        var eventValueCount = PluginEventAdapterShapeValidator.ReadEventValueCount(writer);
         var valueCount = eventValueCount + liveSettings.Count;
         return valueCount switch
         {
             0 => SandboxValue.Unit,
-            1 => eventValueCount == 1 ? ReadWriterValue(writer, e, parameters, 0) : value.ToSandboxValue(liveSettings[0]),
+            1 => eventValueCount == 1
+                ? ReadWriterValue(writer, e, parameters, eventValueCount, 0)
+                : value.ToSandboxValue(liveSettings[0]),
             _ => BuildList(writer, e, parameters, liveSettings, value)
         };
     }
@@ -119,9 +121,9 @@ internal static class PluginKernelInputBuilder
         IReadOnlyList<LiveSettingDefinition> liveSettings,
         LiveSettingStore value)
     {
-        var eventValueCount = writer.EventValueCount;
+        var eventValueCount = PluginEventAdapterShapeValidator.ReadEventValueCount(writer);
         var values = new SandboxValue[eventValueCount + liveSettings.Count];
-        writer.CopySandboxValues(e, values, 0);
+        CopyWriterValues(writer, e, values, 0);
         PluginEventAdapterValueValidator.ValidateCopiedValues(parameters, eventValueCount, values, 0);
         if (liveSettings.Count > 0)
         {
@@ -170,12 +172,14 @@ internal static class PluginKernelInputBuilder
         ref SandboxValue[]? buffer,
         ref ListValue? list)
     {
-        var eventValueCount = writer.EventValueCount;
+        var eventValueCount = PluginEventAdapterShapeValidator.ReadEventValueCount(writer);
         var valueCount = eventValueCount + liveSettings.Count;
         return valueCount switch
         {
             0 => SandboxValue.Unit,
-            1 => eventValueCount == 1 ? ReadWriterValue(writer, e, parameters, 0) : value.ToSandboxValue(liveSettings[0]),
+            1 => eventValueCount == 1
+                ? ReadWriterValue(writer, e, parameters, eventValueCount, 0)
+                : value.ToSandboxValue(liveSettings[0]),
             _ => BuildListWithReusableBuffer(writer, e, parameters, liveSettings, value, ref buffer, ref list)
         };
     }
@@ -206,9 +210,9 @@ internal static class PluginKernelInputBuilder
         ref SandboxValue[]? buffer,
         ref ListValue? list)
     {
-        var eventValueCount = writer.EventValueCount;
+        var eventValueCount = PluginEventAdapterShapeValidator.ReadEventValueCount(writer);
         var values = RentBuffer(eventValueCount + liveSettings.Count, ref buffer);
-        writer.CopySandboxValues(e, values, 0);
+        CopyWriterValues(writer, e, values, 0);
         PluginEventAdapterValueValidator.ValidateCopiedValues(parameters, eventValueCount, values, 0);
         if (liveSettings.Count > 0)
         {
@@ -227,11 +231,43 @@ internal static class PluginKernelInputBuilder
         IPluginEventValueWriter<TEvent> writer,
         TEvent e,
         IReadOnlyList<Parameter> parameters,
+        int eventValueCount,
         int index)
     {
-        var eventValue = writer.ToSandboxValue(e, index);
-        PluginEventAdapterValueValidator.ValidateValue(parameters, writer.EventValueCount, index, eventValue);
+        var eventValue = ReadWriterValue(writer, e, index);
+        PluginEventAdapterValueValidator.ValidateValue(parameters, eventValueCount, index, eventValue);
         return eventValue;
+    }
+
+    private static SandboxValue ReadWriterValue<TEvent>(
+        IPluginEventValueWriter<TEvent> writer,
+        TEvent e,
+        int index)
+    {
+        try
+        {
+            return writer.ToSandboxValue(e, index);
+        }
+        catch (Exception ex) when (PluginEventAdapterShapeValidator.IsAdapterCallbackFailure(ex))
+        {
+            throw PluginEventAdapterShapeValidator.CallbackException(nameof(IPluginEventValueWriter<TEvent>.ToSandboxValue));
+        }
+    }
+
+    private static void CopyWriterValues<TEvent>(
+        IPluginEventValueWriter<TEvent> writer,
+        TEvent e,
+        SandboxValue[] destination,
+        int destinationIndex)
+    {
+        try
+        {
+            writer.CopySandboxValues(e, destination, destinationIndex);
+        }
+        catch (Exception ex) when (PluginEventAdapterShapeValidator.IsAdapterCallbackFailure(ex))
+        {
+            throw PluginEventAdapterShapeValidator.CallbackException(nameof(IPluginEventValueWriter<TEvent>.CopySandboxValues));
+        }
     }
 
     private static ListValue ReusableList(

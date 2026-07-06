@@ -10,13 +10,16 @@ namespace DotBoxD.Kernels.Tests.Plugins.Runtime;
 public sealed class PluginEventValueWriterCallbackValidationTests
 {
     [Theory]
-    [InlineData(KernelOperation.Handle)]
-    [InlineData(KernelOperation.ShouldHandle)]
-    public async Task Writer_ToSandboxValue_failures_are_reported_as_adapter_validation(KernelOperation operation)
+    [MemberData(nameof(WriterCallbackCases))]
+    public async Task Writer_callback_failures_are_reported_as_adapter_validation(
+        KernelOperation operation,
+        ThrowingWriterCallback callback,
+        Parameter[] parameters,
+        Func<PluginPackage> packageFactory)
     {
         var messages = new InMemoryPluginMessageSink();
-        var kernel = await InstallAsync(messages, SingleValuePackage());
-        var adapter = new ThrowingWriterAdapter(ThrowingWriterCallback.ToSandboxValue, SingleValueParameters);
+        var kernel = await InstallAsync(messages, packageFactory());
+        var adapter = new ThrowingWriterAdapter(callback, parameters);
 
         var ex = await Assert.ThrowsAsync<SandboxValidationException>(
             async () => await InvokeAsync(kernel, adapter, operation));
@@ -26,38 +29,44 @@ public sealed class PluginEventValueWriterCallbackValidationTests
         Assert.Empty(kernel.ExecutionObservations);
     }
 
-    [Theory]
-    [InlineData(KernelOperation.Handle)]
-    [InlineData(KernelOperation.ShouldHandle)]
-    public async Task Writer_CopySandboxValues_failures_are_reported_as_adapter_validation(KernelOperation operation)
+    public static IEnumerable<object[]> WriterCallbackCases()
     {
-        var messages = new InMemoryPluginMessageSink();
-        var kernel = await InstallAsync(messages, MultiValuePackage());
-        var adapter = new ThrowingWriterAdapter(ThrowingWriterCallback.CopySandboxValues, MultiValueParameters);
-
-        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
-            async () => await InvokeAsync(kernel, adapter, operation));
-
-        Assert.Contains(ex.Diagnostics, diagnostic => diagnostic.Code == "DBXK036");
-        Assert.Empty(messages.Messages);
-        Assert.Empty(kernel.ExecutionObservations);
-    }
-
-    [Theory]
-    [InlineData(KernelOperation.Handle)]
-    [InlineData(KernelOperation.ShouldHandle)]
-    public async Task Writer_EventValueCount_failures_are_reported_as_adapter_validation(KernelOperation operation)
-    {
-        var messages = new InMemoryPluginMessageSink();
-        var kernel = await InstallAsync(messages, SingleValuePackage());
-        var adapter = new ThrowingWriterAdapter(ThrowingWriterCallback.EventValueCount, SingleValueParameters);
-
-        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
-            async () => await InvokeAsync(kernel, adapter, operation));
-
-        Assert.Contains(ex.Diagnostics, diagnostic => diagnostic.Code == "DBXK036");
-        Assert.Empty(messages.Messages);
-        Assert.Empty(kernel.ExecutionObservations);
+        yield return [
+            KernelOperation.Handle,
+            ThrowingWriterCallback.ToSandboxValue,
+            SingleValueParameters,
+            (Func<PluginPackage>)SingleValuePackage
+        ];
+        yield return [
+            KernelOperation.ShouldHandle,
+            ThrowingWriterCallback.ToSandboxValue,
+            SingleValueParameters,
+            (Func<PluginPackage>)SingleValuePackage
+        ];
+        yield return [
+            KernelOperation.Handle,
+            ThrowingWriterCallback.CopySandboxValues,
+            MultiValueParameters,
+            (Func<PluginPackage>)MultiValuePackage
+        ];
+        yield return [
+            KernelOperation.ShouldHandle,
+            ThrowingWriterCallback.CopySandboxValues,
+            MultiValueParameters,
+            (Func<PluginPackage>)MultiValuePackage
+        ];
+        yield return [
+            KernelOperation.Handle,
+            ThrowingWriterCallback.EventValueCount,
+            SingleValueParameters,
+            (Func<PluginPackage>)SingleValuePackage
+        ];
+        yield return [
+            KernelOperation.ShouldHandle,
+            ThrowingWriterCallback.EventValueCount,
+            SingleValueParameters,
+            (Func<PluginPackage>)SingleValuePackage
+        ];
     }
 
     private static Parameter[] SingleValueParameters { get; } = [new("e_TargetId", SandboxType.String)];
@@ -201,7 +210,7 @@ public sealed class PluginEventValueWriterCallbackValidationTests
         ShouldHandle
     }
 
-    private enum ThrowingWriterCallback
+    public enum ThrowingWriterCallback
     {
         EventValueCount,
         ToSandboxValue,
