@@ -47,9 +47,18 @@ internal static partial class PluginServerFacadeModelFactory
                     returnWrapperName,
                     returnWrapperKind,
                     new EquatableArray<PluginServerParameter>(ResolveParameters(method)));
-                var signature = MethodSignatureKey(method);
+                var signature = PluginServerForwardedMethodSignature.Key(method);
                 if (seenMethods.TryGetValue(signature, out var existing))
                 {
+                    if (!PluginServerForwardedMethodSignature.HasSameTupleElementNames(
+                        existing.Symbol,
+                        method,
+                        cancellationToken))
+                    {
+                        throw new NotSupportedException(
+                            $"Generated plugin server member '{method.ToDisplayString()}' has an inherited signature collision with incompatible tuple element names.");
+                    }
+
                     if (!string.Equals(existing.Method.ReturnType, forwarded.ReturnType, StringComparison.Ordinal))
                     {
                         throw new NotSupportedException(
@@ -126,11 +135,6 @@ internal static partial class PluginServerFacadeModelFactory
             }
         }
     }
-
-    private static string MethodSignatureKey(IMethodSymbol method)
-        => method.Name + "(" + string.Join(
-            ",",
-            method.Parameters.Select(static parameter => TypeName(parameter.Type))) + ")";
 
     private static bool HasSameParameterDefaultShape(IMethodSymbol left, IMethodSymbol right)
     {
