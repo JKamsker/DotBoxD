@@ -2,9 +2,9 @@ using DotBoxD.Kernels.Model;
 
 namespace DotBoxD.Kernels.Sandbox.Values;
 
-internal static partial class SandboxValidatedValueShapeMeter
+internal static class SandboxValidatedScalarShapeMeter
 {
-    private static bool TryMeasureScalar(
+    public static bool TryMeasureScalar(
         SandboxValue value,
         SandboxType expectedType,
         ValidationFailure failure,
@@ -32,7 +32,10 @@ internal static partial class SandboxValidatedValueShapeMeter
                 return true;
             case StringValue text:
                 RequireScalarType(expectedType, "String", failure);
-                shape = AddText(shape, SandboxLiteralConstraints.TextShape(text.Value), limits);
+                shape = SandboxValidatedValueShapeLimits.AddText(
+                    shape,
+                    SandboxLiteralConstraints.TextShape(text.Value),
+                    limits);
                 return true;
             case GuidValue:
                 RequireScalarType(expectedType, "Guid", failure);
@@ -40,22 +43,69 @@ internal static partial class SandboxValidatedValueShapeMeter
             case OpaqueIdValue id:
                 RequireScalarType(expectedType, id.TypeName, failure);
                 RequireOpaqueId(id, failure);
-                shape = AddText(shape, SandboxLiteralConstraints.TextShape(id.Value), limits);
+                shape = SandboxValidatedValueShapeLimits.AddText(
+                    shape,
+                    SandboxLiteralConstraints.TextShape(id.Value),
+                    limits);
                 return true;
             case SandboxPathValue path:
                 RequireScalarType(expectedType, "SandboxPath", failure);
                 RequireScalarInvariants(value, failure);
-                shape = AddText(shape, SandboxLiteralConstraints.TextShape(path.Value.RelativePath), limits);
+                shape = SandboxValidatedValueShapeLimits.AddText(
+                    shape,
+                    SandboxLiteralConstraints.TextShape(path.Value.RelativePath),
+                    limits);
                 return true;
             case SandboxUriValue uri:
                 RequireScalarType(expectedType, "SandboxUri", failure);
                 RequireScalarInvariants(value, failure);
-                shape = AddText(shape, SandboxLiteralConstraints.TextShape(uri.Value.Value), limits);
+                shape = SandboxValidatedValueShapeLimits.AddText(
+                    shape,
+                    SandboxLiteralConstraints.TextShape(uri.Value.Value),
+                    limits);
                 return true;
             case ListValue or MapValue or RecordValue:
                 return false;
             default:
-                throw Error(failure);
+                throw SandboxValidatedValueShapeErrors.Error(failure);
+        }
+    }
+
+    public static void RequireOpaqueId(
+        OpaqueIdValue id,
+        ValidationFailure failure)
+    {
+        if (!SandboxType.IsKnownOpaqueId(id.TypeName) ||
+            !SandboxLiteralConstraints.IsOpaqueId(id.Value))
+        {
+            throw SandboxValidatedValueShapeErrors.Error(failure);
+        }
+    }
+
+    public static void RequireScalarInvariants(
+        SandboxValue value,
+        ValidationFailure failure)
+    {
+        switch (value)
+        {
+            case F64Value number when !double.IsFinite(number.Value):
+                throw SandboxValidatedValueShapeErrors.Error(failure);
+            case SandboxPathValue path:
+                if (path.Value?.RelativePath is not { } relativePath ||
+                    !SandboxLiteralConstraints.IsPortableRelativePath(relativePath))
+                {
+                    throw SandboxValidatedValueShapeErrors.Error(failure);
+                }
+
+                break;
+            case SandboxUriValue uri:
+                if (uri.Value?.Value is not { } valueText ||
+                    !SandboxLiteralConstraints.IsSandboxUri(valueText))
+                {
+                    throw SandboxValidatedValueShapeErrors.Error(failure);
+                }
+
+                break;
         }
     }
 
@@ -68,45 +118,7 @@ internal static partial class SandboxValidatedValueShapeMeter
             !string.Equals(expectedType.Name, typeName, StringComparison.Ordinal) ||
             !expectedType.IsKnown())
         {
-            throw Error(failure);
-        }
-    }
-
-    private static void RequireOpaqueId(
-        OpaqueIdValue id,
-        ValidationFailure failure)
-    {
-        if (!SandboxType.IsKnownOpaqueId(id.TypeName) ||
-            !SandboxLiteralConstraints.IsOpaqueId(id.Value))
-        {
-            throw Error(failure);
-        }
-    }
-
-    private static void RequireScalarInvariants(
-        SandboxValue value,
-        ValidationFailure failure)
-    {
-        switch (value)
-        {
-            case F64Value number when !double.IsFinite(number.Value):
-                throw Error(failure);
-            case SandboxPathValue path:
-                if (path.Value?.RelativePath is not { } relativePath ||
-                    !SandboxLiteralConstraints.IsPortableRelativePath(relativePath))
-                {
-                    throw Error(failure);
-                }
-
-                break;
-            case SandboxUriValue uri:
-                if (uri.Value?.Value is not { } valueText ||
-                    !SandboxLiteralConstraints.IsSandboxUri(valueText))
-                {
-                    throw Error(failure);
-                }
-
-                break;
+            throw SandboxValidatedValueShapeErrors.Error(failure);
         }
     }
 }
