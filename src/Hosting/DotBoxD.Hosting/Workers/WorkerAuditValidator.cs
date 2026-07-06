@@ -209,7 +209,7 @@ internal static class WorkerAuditValidator
             !EffectMatches(auditEvent, binding) ||
             !ResultMatches(auditEvent) ||
             !LogAuditMatchesPolicy(plan, auditEvent) ||
-            !BindingResourceMatchesGrant(plan, auditEvent, binding) ||
+            !WorkerBindingAuditResourceValidator.Matches(plan, auditEvent, binding, grantClock) ||
             !WorkerPluginMessageAuditPolicy.Matches(plan, auditEvent, grantClock) ||
             !RequiredBindingFieldsMatch(plan, auditEvent))
         {
@@ -246,15 +246,6 @@ internal static class WorkerAuditValidator
         => auditEvent.Kind != BindingAuditKinds.SandboxLog ||
            auditEvent.Message is not null &&
            auditEvent.Message.Length <= plan.Budget.MaxLogMessageLength;
-
-    private static bool BindingResourceMatchesGrant(
-        ExecutionPlan plan,
-        SandboxAuditEvent auditEvent,
-        BindingSignature binding)
-        => !auditEvent.Success ||
-           auditEvent.Kind != BindingAuditKinds.BindingCall ||
-           !string.Equals(binding.RequiredCapability, WorkerHttpAuditGrantValidator.CapabilityId, StringComparison.Ordinal) ||
-           WorkerHttpAuditGrantValidator.Matches(plan, auditEvent);
 
     private static bool RequiredBindingFieldsMatch(ExecutionPlan plan, SandboxAuditEvent auditEvent)
     {
