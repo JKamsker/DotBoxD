@@ -134,6 +134,8 @@ public sealed partial class EventIndexRegistry
                 couldMatch = true;
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (!couldMatch)
             {
                 Interlocked.Increment(ref _prefiltered);

@@ -102,6 +102,38 @@ public sealed partial class EventIndexCancellationTests
         Assert.False(reported.Task.IsCompleted, $"caller cancellation during {stage} was reported as a fault");
     }
 
+    [Fact]
+    public async Task Index_registry_rechecks_cancellation_after_indexed_getters()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var handlerRuns = 0;
+        using var server = DotBoxD.Plugins.PluginServer.Create(
+            configureHost: builder => builder.AddBinding(RecordBinding(() => Interlocked.Increment(ref handlerRuns))),
+            defaultPolicy: ChainPolicy());
+        var adapter = new GetterCancelsEventAdapter();
+        server.RegisterEventAdapter(adapter);
+        var package = GetterCancellationPackage();
+        var kernel = await server.InstallAsync(package, ChainPolicy());
+        var subscription = Assert.Single(package.Manifest.Subscriptions);
+        var registry = new EventIndexRegistry();
+        Assert.True(registry.Register(
+            adapter,
+            kernel,
+            subscription.IndexedPredicates,
+            subscription.IndexCoversPredicate));
+
+        var exception = Record.Exception(
+            () => registry.Publish(new GetterCancelsEvent(cancellation), cancellation.Token));
+        await registry.DrainAsync();
+
+        Assert.IsType<OperationCanceledException>(exception);
+        Assert.True(cancellation.IsCancellationRequested);
+        Assert.Equal(1, registry.Stats.Considered);
+        Assert.Equal(0, registry.Stats.Prefiltered);
+        Assert.Equal(0, registry.Stats.Dispatched);
+        Assert.Equal(0, Volatile.Read(ref handlerRuns));
+    }
+
     private static PluginPackage GeneratedAttackPackage()
     {
         const string chain = """
@@ -207,5 +239,33 @@ public sealed partial class EventIndexCancellationTests
                 SandboxValue.FromInt32(e.Damage),
                 SandboxValue.FromInt32(e.AttackerLevel)
             ];
+    }
+
+    private sealed class GetterCancelsEvent(CancellationTokenSource cancellation)
+    {
+        [EventIndexKey]
+        public string AttackerId
+        {
+            get
+            {
+                cancellation.Cancel();
+                return "player-1";
+            }
+        }
+    }
+
+    private sealed class GetterCancelsEventAdapter : IPluginEventAdapter<GetterCancelsEvent>
+    {
+        public string EventName => typeof(GetterCancelsEvent).FullName!;
+
+        public IReadOnlyList<KernelParameter> Parameters { get; } =
+        [
+            new("e_AttackerId", SandboxType.String)
+        ];
+
+        public IReadOnlyList<SandboxValue> ToSandboxValues(GetterCancelsEvent e) =>
+        [
+            SandboxValue.FromString(e.AttackerId)
+        ];
     }
 }
