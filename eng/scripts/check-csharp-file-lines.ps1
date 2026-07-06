@@ -21,6 +21,8 @@ $justificationPath = [System.IO.Path]::Combine($root, ".config/code-enforcer/jus
 $violations = [System.Collections.Generic.List[string]]::new()
 $warnings = [System.Collections.Generic.List[string]]::new()
 
+. ([System.IO.Path]::Combine($PSScriptRoot, "code-enforcer-csharp-scan.ps1"))
+
 function Normalize-PathText([string] $path) {
     return $path.Replace("\", "/").Trim("/")
 }
@@ -132,67 +134,6 @@ function Test-GeneratedFile([string] $relativePath) {
     return $false
 }
 
-function Get-CSharpLineForDeclarationScan([string] $line, [ref] $inBlockComment) {
-    if ($inBlockComment.Value) {
-        $blockEnd = $line.IndexOf("*/", [StringComparison]::Ordinal)
-        if ($blockEnd -lt 0) {
-            return ""
-        }
-
-        $line = $line.Substring($blockEnd + 2)
-        $inBlockComment.Value = $false
-    }
-
-    while ($true) {
-        $blockStart = $line.IndexOf("/*", [StringComparison]::Ordinal)
-        if ($blockStart -lt 0) {
-            break
-        }
-
-        $blockEnd = $line.IndexOf("*/", $blockStart + 2, [StringComparison]::Ordinal)
-        if ($blockEnd -lt 0) {
-            $line = $line.Substring(0, $blockStart)
-            $inBlockComment.Value = $true
-            break
-        }
-
-        $line = $line.Remove($blockStart, $blockEnd - $blockStart + 2)
-    }
-
-    $lineComment = $line.IndexOf("//", [StringComparison]::Ordinal)
-    if ($lineComment -ge 0) {
-        $line = $line.Substring(0, $lineComment)
-    }
-
-    return $line
-}
-
-function Join-NamespaceName([string] $parentNamespace, [string] $declaredNamespace) {
-    if ([string]::IsNullOrWhiteSpace($parentNamespace)) {
-        return $declaredNamespace
-    }
-
-    if ([string]::IsNullOrWhiteSpace($declaredNamespace)) {
-        return $parentNamespace
-    }
-
-    return "$parentNamespace.$declaredNamespace"
-}
-
-function Get-ActiveNamespace([System.Collections.Generic.List[object]] $namespaceScopes, [string] $fileScopedNamespace) {
-    if ($namespaceScopes.Count -gt 0) {
-        return $namespaceScopes[$namespaceScopes.Count - 1].Name
-    }
-
-    return $fileScopedNamespace
-}
-
-function Pop-ClosedNamespaces([System.Collections.Generic.List[object]] $namespaceScopes, [int] $braceDepth) {
-    while ($namespaceScopes.Count -gt 0 -and $braceDepth -lt $namespaceScopes[$namespaceScopes.Count - 1].Depth) {
-        $namespaceScopes.RemoveAt($namespaceScopes.Count - 1)
-    }
-}
-
 function Get-PartialTypeDeclarations([string] $relativePath) {
     $declarations = @{}
     $namespacePattern = '^\s*namespace\s+([A-Za-z_][A-Za-z0-9_.]*)\s*(;|\{)?'
@@ -218,9 +159,15 @@ function Get-PartialTypeDeclarations([string] $relativePath) {
     $pendingNamespace = $null
     $braceDepth = 0
     $inBlockComment = $false
+    $inVerbatimString = $false
+    $rawStringQuoteCount = 0
 
     foreach ($rawLine in [System.IO.File]::ReadLines($fullPath)) {
-        $line = Get-CSharpLineForDeclarationScan $rawLine ([ref] $inBlockComment)
+        $line = Get-CSharpLineForDeclarationScan `
+            $rawLine `
+            ([ref] $inBlockComment) `
+            ([ref] $inVerbatimString) `
+            ([ref] $rawStringQuoteCount)
         Pop-ClosedNamespaces $namespaceScopes $braceDepth
 
         $namespaceMatch = $namespaceRegex.Match($line)
