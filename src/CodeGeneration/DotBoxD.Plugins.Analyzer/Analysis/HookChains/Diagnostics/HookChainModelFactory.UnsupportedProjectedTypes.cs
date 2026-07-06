@@ -1,3 +1,4 @@
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -31,6 +32,73 @@ internal static partial class HookChainModelFactory
             "Use a named payload type that is visible to generated code, or project to supported scalar/record fields.";
         throw new HookChainUnsupportedDiagnosticException(
             new PluginKernelDiagnostic(message, PluginDiagnosticLocation.From(terminalName.GetLocation())));
+    }
+
+    private static void RejectUnsupportedServerContextType(
+        ITypeSymbol? contextType,
+        InvocationExpressionSyntax seed,
+        SimpleNameSyntax terminalName)
+    {
+        if (contextType is null ||
+            FindFileLocalType(contextType, new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default)) is not { } fileLocalType)
+        {
+            return;
+        }
+
+        var message = "Hook chain server context type '" +
+            fileLocalType.ToDisplayString() +
+            "' is file-local; generated hook-chain sources cannot name file-local types. " +
+            "Use a named context type that is visible to generated code, or use the default HookContext.";
+        throw new HookChainUnsupportedDiagnosticException(
+            new PluginKernelDiagnostic(
+                message,
+                ServerContextTypeLocation(seed) ?? PluginDiagnosticLocation.From(terminalName.GetLocation())));
+    }
+
+    private static ITypeSymbol? ServerContextType(
+        SemanticModel model,
+        ExpressionSyntax receiver,
+        InvocationExpressionSyntax seed,
+        GeneratedRemoteHookChainTarget? generatedRemoteTarget,
+        CancellationToken cancellationToken)
+    {
+        if (generatedRemoteTarget is { } target)
+        {
+            return GeneratedRemoteHookChainFallback.ServerContextType(model, seed, target, cancellationToken);
+        }
+
+        return model.GetTypeInfo(receiver, cancellationToken).Type is INamedTypeSymbol receiverType
+            ? ReceiverServerContextType(receiverType)
+            : null;
+    }
+
+    private static ITypeSymbol? ReceiverServerContextType(INamedTypeSymbol receiverType)
+    {
+        var original = receiverType.OriginalDefinition.ToDisplayString();
+        return original switch
+        {
+            DotBoxDGenerationNames.TypeNames.HookPipelineWithContextOriginal or
+            DotBoxDGenerationNames.TypeNames.HookStageWithContextOriginal or
+            DotBoxDGenerationNames.TypeNames.RemoteHookPipelineWithContextOriginal or
+            DotBoxDGenerationNames.TypeNames.RemoteHookStageWithContextOriginal or
+            DotBoxDGenerationNames.TypeNames.SubscriptionPipelineWithContextOriginal or
+            DotBoxDGenerationNames.TypeNames.SubscriptionStageWithContextOriginal or
+            DotBoxDGenerationNames.TypeNames.RemoteSubscriptionPipelineWithContextOriginal or
+            DotBoxDGenerationNames.TypeNames.RemoteSubscriptionStageWithContextOriginal =>
+                receiverType.TypeArguments[receiverType.TypeArguments.Length - 1],
+            _ => null,
+        };
+    }
+
+    private static PluginDiagnosticLocation? ServerContextTypeLocation(InvocationExpressionSyntax seed)
+    {
+        if (seed.Expression is MemberAccessExpressionSyntax { Name: GenericNameSyntax onName } &&
+            onName.TypeArgumentList.Arguments.Count > 1)
+        {
+            return PluginDiagnosticLocation.From(onName.TypeArgumentList.Arguments[1].GetLocation());
+        }
+
+        return null;
     }
 
     private static INamedTypeSymbol? FindFileLocalType(ITypeSymbol type, HashSet<ITypeSymbol> visited)

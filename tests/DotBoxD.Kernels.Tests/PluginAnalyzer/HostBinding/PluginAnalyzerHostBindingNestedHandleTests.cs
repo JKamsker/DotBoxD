@@ -1,3 +1,4 @@
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
@@ -9,8 +10,11 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.HostBinding
 {
     public sealed class PluginAnalyzerHostBindingNestedHandleTests
     {
+        private static readonly SourceSpan Span = new(1, 1);
+
         private const string NestedHandleSource = """
         using DotBoxD.Abstractions;
+        using DotBoxD.Kernels.Sandbox;
         using DotBoxD.Kernels;
         using DotBoxD.Plugins;
         using DotBoxD.Plugins.Runtime;
@@ -18,17 +22,17 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.HostBinding
 
         namespace Sample;
 
-        [DotBoxDService]
+        [RpcService]
         public interface IMonsterHandle
         {
-            [HostCapability("probe.read.monster.threat", HostBindingEffect.HostStateRead)]
+            [HostBinding("probe.read.monster.threat", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
             int GetThreat();
         }
 
-        [DotBoxDService]
+        [RpcService]
         public interface IProbeWorld
         {
-            [HostCapability("probe.read.monster", HostBindingEffect.HostStateRead)]
+            [HostBinding("probe.read.monster", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
             IMonsterHandle GetMonster(string id);
         }
 
@@ -62,6 +66,39 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.HostBinding
             Assert.True(await kernel.ShouldHandleAsync(adapter, new ProbeEvent("monster-42", 40)));
         }
 
+        [Fact]
+        public async Task Async_handle_factory_returned_service_handle_is_awaited_before_method_invocation()
+        {
+            var world = new Sample.AsyncProbeWorld();
+            using var host = SandboxHost.Create(
+                builder => builder.AddBindingsFrom<Sample.IAsyncProbeWorld>(world));
+            var module = AsyncHandleBindingModule();
+            var plan = await host.PrepareAsync(module, AsyncProbeReadPolicy(allowAsync: true));
+
+            var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+            Assert.True(result.Succeeded, result.Error?.SafeMessage);
+            Assert.Equal(73, Assert.IsType<I32Value>(result.Value).Value);
+            Assert.Equal(1, world.FactoryCalls);
+            Assert.Equal(1, world.HandleCalls);
+        }
+
+        [Fact]
+        public async Task Async_handle_factory_requires_runtime_async_capability_even_when_handle_method_is_sync()
+        {
+            using var host = SandboxHost.Create(
+                builder => builder.AddBindingsFrom<Sample.IAsyncProbeWorld>(new Sample.AsyncProbeWorld()));
+            var module = AsyncHandleBindingModule();
+
+            var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
+                await host.PrepareAsync(module, AsyncProbeReadPolicy(allowAsync: false)));
+
+            Assert.Contains(
+                ex.Diagnostics,
+                diagnostic => diagnostic.Code == "E-POLICY-CAP" &&
+                              diagnostic.Message.Contains("dotboxd.runtime.async", StringComparison.Ordinal));
+        }
+
         private static SandboxPolicy ProbeReadPolicy()
             => SandboxPolicyBuilder.Create()
                 .GrantLogging()
@@ -71,6 +108,46 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.HostBinding
                 .WithMaxHostCalls(1_000)
                 .WithWallTime(TimeSpan.FromSeconds(10))
                 .Build();
+
+        private static SandboxPolicy AsyncProbeReadPolicy(bool allowAsync)
+        {
+            var builder = SandboxPolicyBuilder.Create()
+                .Grant("probe.read.handle.value", new { }, SandboxEffect.HostStateRead)
+                .WithFuel(100_000)
+                .WithMaxHostCalls(1_000)
+                .WithWallTime(TimeSpan.FromSeconds(10));
+
+            if (allowAsync)
+            {
+                builder.AllowRuntimeAsync();
+            }
+
+            return builder.Build();
+        }
+
+        private static SandboxModule AsyncHandleBindingModule()
+            => new(
+                "async-host-binding-handle",
+                SemVersion.One,
+                SemVersion.One,
+                [],
+                [
+                    new SandboxFunction(
+                        "main",
+                        true,
+                        [],
+                        SandboxType.I32,
+                        [
+                            new ReturnStatement(
+                                new CallExpression(
+                                    "host.Sample.IAsyncProbeHandle.GetValue",
+                                    [new LiteralExpression(SandboxValue.FromString("monster-42"), Span)],
+                                    null,
+                                    Span),
+                                Span)
+                        ])
+                ],
+                new Dictionary<string, string>(StringComparer.Ordinal));
 
         private sealed record ProbeEvent(string TargetId, int Threshold);
 
@@ -98,17 +175,17 @@ namespace Sample
 {
     using DotBoxD.Abstractions;
 
-    [DotBoxDService]
+    [RpcService]
     public interface IMonsterHandle
     {
-        [HostCapability("probe.read.monster.threat", HostBindingEffect.HostStateRead)]
+        [HostBinding("probe.read.monster.threat", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
         int GetThreat();
     }
 
-    [DotBoxDService]
+    [RpcService]
     public interface IProbeWorld
     {
-        [HostCapability("probe.read.monster", HostBindingEffect.HostStateRead)]
+        [HostBinding("probe.read.monster", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
         IMonsterHandle GetMonster(string id);
     }
 
@@ -120,5 +197,43 @@ namespace Sample
     public sealed class ProbeWorld : IProbeWorld
     {
         public IMonsterHandle GetMonster(string id) => new MonsterHandle(id);
+    }
+
+    [RpcService]
+    public interface IAsyncProbeHandle
+    {
+        [HostCapability("probe.read.handle.value", HostBindingEffect.HostStateRead)]
+        int GetValue();
+    }
+
+    [RpcService]
+    public interface IAsyncProbeWorld
+    {
+        [HostCapability("probe.read.handle", HostBindingEffect.HostStateRead)]
+        Task<IAsyncProbeHandle> GetHandle(string id);
+    }
+
+    public sealed class AsyncProbeWorld : IAsyncProbeWorld
+    {
+        public int FactoryCalls { get; private set; }
+
+        public int HandleCalls { get; private set; }
+
+        public Task<IAsyncProbeHandle> GetHandle(string id)
+        {
+            FactoryCalls++;
+            return Task.FromResult<IAsyncProbeHandle>(new AsyncProbeHandle(id, this));
+        }
+
+        private void RecordHandleCall() => HandleCalls++;
+
+        private sealed class AsyncProbeHandle(string id, AsyncProbeWorld owner) : IAsyncProbeHandle
+        {
+            public int GetValue()
+            {
+                owner.RecordHandleCall();
+                return id == "monster-42" ? 73 : 0;
+            }
+        }
     }
 }

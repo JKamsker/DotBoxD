@@ -28,14 +28,13 @@ public sealed record QueryProjection
     /// <summary>Builds a single-member projection.</summary>
     public static QueryProjection Member(string path)
     {
-        ArgumentException.ThrowIfNullOrEmpty(path);
-        return new QueryProjection { Kind = QueryProjectionKind.Member, Path = path };
+        return new QueryProjection { Kind = QueryProjectionKind.Member, Path = QueryProjectionInvariants.MemberPathArgument(path) };
     }
 
     /// <summary>Builds a DTO/anonymous-construction projection.</summary>
     public static QueryProjection Construct(string typeName, IReadOnlyList<QueryProjectionField> fields)
     {
-        ArgumentException.ThrowIfNullOrEmpty(typeName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(typeName);
         ArgumentNullException.ThrowIfNull(fields);
         return new QueryProjection
         {

@@ -54,6 +54,15 @@ public sealed class HostServiceBindingContractTests
     }
 
     [Fact]
+    public void HostBindingAttribute_rejects_null_explicit_binding_id()
+    {
+        var ex = Assert.Throws<ArgumentNullException>(
+            () => new HostBindingAttribute(null!, "probe.read.value", SandboxEffect.Cpu | SandboxEffect.HostStateRead));
+
+        Assert.Equal("bindingId", ex.ParamName);
+    }
+
+    [Fact]
     public void AddBindingsFrom_rejects_duplicate_route_with_same_dto_fields_and_different_clr_types()
     {
         var builder = new SandboxHostBuilder();
@@ -79,15 +88,42 @@ public sealed class HostServiceBindingContractTests
         Assert.Contains("host.probe.value", ex.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void AddBindingsFrom_rejects_explicit_host_binding_indexer_properties()
+    {
+        var builder = new SandboxHostBuilder();
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => builder.AddBindingsFrom<IIndexedPropertyProbeWorld>(new IndexedPropertyProbeWorld()));
+
+        Assert.Contains("HostBinding", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("indexer", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("host.probe.indexed", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AddBindingsFrom_rejects_explicit_generic_host_binding_methods()
+    {
+        var builder = new SandboxHostBuilder();
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => builder.AddBindingsFrom<IGenericHostBindingProbeWorld>(new GenericHostBindingProbeWorld()));
+
+        Assert.Contains("generic", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("HostBinding", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("host.probe.echo", ex.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(IGenericHostBindingProbeWorld.Echo), ex.Message, StringComparison.Ordinal);
+    }
+
     private sealed class ConcreteProbeWorld
     {
-        [HostCapability("probe.read.value", HostBindingEffect.HostStateRead)]
+        [HostBinding("probe.read.value", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
         public int Read() => 1;
     }
 
     private interface IConcreteHandleProbeWorld
     {
-        [HostCapability("probe.read.handle", HostBindingEffect.HostStateRead)]
+        [HostBinding("probe.read.handle", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
         ConcreteProbeHandle GetHandle(string id);
     }
 
@@ -103,10 +139,10 @@ public sealed class HostServiceBindingContractTests
 
     private interface IOverloadedProbeWorld
     {
-        [HostCapability("probe.read.text", HostBindingEffect.HostStateRead)]
+        [HostBinding("probe.read.text", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
         int Read(string id);
 
-        [HostCapability("probe.read.number", HostBindingEffect.HostStateRead)]
+        [HostBinding("probe.read.number", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
         int Read(int id);
     }
 
@@ -119,10 +155,10 @@ public sealed class HostServiceBindingContractTests
 
     private interface IDtoShapeProbeWorld
     {
-        [HostCapability("probe.read.value", HostBindingEffect.HostStateRead)]
+        [HostBinding("probe.read.value", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
         int Read(ProbeById probe);
 
-        [HostCapability("probe.read.value", HostBindingEffect.HostStateRead)]
+        [HostBinding("probe.read.value", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
         int Read(ProbeByStats probe);
     }
 
@@ -139,10 +175,10 @@ public sealed class HostServiceBindingContractTests
 
     private interface IDtoIdentityProbeWorld
     {
-        [HostCapability("probe.read.value", HostBindingEffect.HostStateRead)]
+        [HostBinding("probe.read.value", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
         int Read(ProbeIdentityA probe);
 
-        [HostCapability("probe.read.value", HostBindingEffect.HostStateRead)]
+        [HostBinding("probe.read.value", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
         int Read(ProbeIdentityB probe);
     }
 
@@ -178,11 +214,36 @@ public sealed class HostServiceBindingContractTests
 
         public int PreviousValue => 2;
     }
+
+    private interface IIndexedPropertyProbeWorld
+    {
+        [HostBinding(
+            "host.probe.indexed",
+            "probe.read.indexed",
+            SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+        int this[int id] { get; }
+    }
+
+    private sealed class IndexedPropertyProbeWorld : IIndexedPropertyProbeWorld
+    {
+        public int this[int id] => id;
+    }
+
+    private interface IGenericHostBindingProbeWorld
+    {
+        [HostBinding("host.probe.echo", "probe.read.value", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+        int Echo<T>(T value);
+    }
+
+    private sealed class GenericHostBindingProbeWorld : IGenericHostBindingProbeWorld
+    {
+        public int Echo<T>(T value) => value?.GetHashCode() ?? 0;
+    }
 }
 
-[DotBoxDService]
+[RpcService]
 public interface IConcreteProbeHandle
 {
-    [HostCapability("probe.read.handle.value", HostBindingEffect.HostStateRead)]
+    [HostBinding("probe.read.handle.value", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
     int GetValue();
 }

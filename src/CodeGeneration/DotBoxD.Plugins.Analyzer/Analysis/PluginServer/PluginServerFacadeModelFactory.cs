@@ -22,7 +22,10 @@ internal static partial class PluginServerFacadeModelFactory
         try
         {
             var model = CreateModel(type, context.SemanticModel.Compilation, cancellationToken);
-            return new PluginServerFacadeResult(PluginServerFacadeEmitter.Emit(model), null);
+            var diagnostic = GeneratedWrapperSurfaceCollisionMessage(model.WorldServiceWrappers, model.Controls) is { } message
+                ? PluginKernelDiagnostic.Create(declaration.Identifier, message)
+                : null;
+            return new PluginServerFacadeResult(PluginServerFacadeEmitter.Emit(model), diagnostic);
         }
         catch (NotSupportedException ex)
         {
@@ -38,11 +41,12 @@ internal static partial class PluginServerFacadeModelFactory
 
         var worldType = ResolveWorldType(type)
             ?? throw new NotSupportedException(
-                $"Generated plugin server '{type.Name}' must directly implement one [DotBoxDService] world interface.");
-        ValidateWorldType(type, worldType);
+                $"Generated plugin server '{type.Name}' must directly implement one [RpcService] world interface.");
+        ValidateWorldType(type, compilation, worldType);
         var controlServiceType = ResolveControlService(type, compilation, worldType)
             ?? throw new NotSupportedException(
                 $"Generated plugin server '{type.Name}' could not resolve a control-plane contract. Set ControlService = typeof(TControlService), or declare {worldType.ContainingNamespace}.Ipc.IGamePluginControlService.");
+        ValidateControlServiceAccessibility(type, compilation, controlServiceType);
         var liveSettingUpdateType = ResolveLiveSettingUpdateType(controlServiceType, cancellationToken)
             ?? throw new NotSupportedException(
                 $"Generated plugin server '{type.Name}' control-plane contract '{controlServiceType.ToDisplayString()}' must declare UpdateSettingsAsync with a typed array parameter carrying the live-setting updates.");
@@ -110,19 +114,19 @@ internal static partial class PluginServerFacadeModelFactory
         Dictionary<string, ServiceWrapperBuilder> serviceWrappers,
         CancellationToken cancellationToken)
     {
-        var typeName = TypeName(serviceType);
-        if (serviceWrappers.TryGetValue(typeName, out var existing))
+        var identityName = TypeIdentityName(serviceType);
+        if (serviceWrappers.TryGetValue(identityName, out var existing))
         {
             return existing.WrapperName;
         }
         var wrapper = new ServiceWrapperBuilder(
-            typeName,
+            identityName,
             UniqueServiceWrapperName(serviceType, serviceWrappers.Values.Select(w => w.WrapperName)),
             PluginServerXmlDocumentation.FromSymbol(
                 serviceType,
                 "Generated scoped client for the remote " + serviceType.Name + " domain service.",
                 cancellationToken));
-        serviceWrappers.Add(typeName, wrapper);
+        serviceWrappers.Add(identityName, wrapper);
         PopulateServiceWrapper(serviceType, wrapper, serviceWrappers, cancellationToken);
         return wrapper.WrapperName;
     }
@@ -141,7 +145,7 @@ internal static partial class PluginServerFacadeModelFactory
                 : PluginServerReturnWrapperKind.ValueTask;
         }
         if (serviceType is not INamedTypeSymbol namedServiceType ||
-            !HasAttribute(namedServiceType, DotBoxDMetadataNames.DotBoxDServiceAttribute))
+            !HasAttribute(namedServiceType, DotBoxDMetadataNames.RpcServiceAttribute))
         {
             return (null, PluginServerReturnWrapperKind.None);
         }
@@ -180,14 +184,18 @@ internal static partial class PluginServerFacadeModelFactory
             var parameter = method.Parameters[i];
             var preserveMetadataDefaultAttributes =
                 ShouldPreserveMetadataDefaultAttributes(method, i, out var defaultClause);
+            var attributePrefix = PluginServerFlowAttributeSource.ParameterAttributePrefix(parameter);
+            if (preserveMetadataDefaultAttributes)
+            {
+                attributePrefix += ParameterDefaultValueEmitter.FormatMetadataDefaultAttributePrefix(
+                    parameter,
+                    includeOptionalAttribute: true);
+            }
+
             parameters[i] = new PluginServerParameter(
                 parameter.Name,
                 TypeName(parameter.Type),
-                preserveMetadataDefaultAttributes
-                    ? ParameterDefaultValueEmitter.FormatMetadataDefaultAttributePrefix(
-                        parameter,
-                        includeOptionalAttribute: true)
-                    : string.Empty,
+                attributePrefix,
                 defaultClause,
                 parameter.IsParams);
         }

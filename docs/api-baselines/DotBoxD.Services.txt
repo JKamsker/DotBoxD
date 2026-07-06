@@ -21,6 +21,8 @@ public bool IsSuccess { get; set; }
 public bool RejectInboundCalls { get; init; }
 public bool TryGet(string serviceName, string instanceId, out object instance)
 public class RemoteServiceException : ServiceException
+public class RpcMethodAttribute : Attribute
+public class RpcServiceAttribute : Attribute
 public class ServiceConnectionException : ServiceException
 public class ServiceException : Exception
 public class ServiceNotFoundException : ServiceException
@@ -39,10 +41,10 @@ public const long DefaultMaxInboundBytes = 64L * 1024 * 1024
 public const string InboundRejected = "RpcInboundRejected"
 public const string InstanceNotFound = "RpcInstanceNotFound"
 public const string InternalError = "RpcInternalError"
-public const string MethodNotFound = "DotBoxDMethodNotFound"
+public const string MethodNotFound = "RpcMethodNotFound"
 public const string ProtocolError = "RpcProtocolError"
 public const string QueueFull = "RpcQueueFull"
-public const string ServiceNotFound = "DotBoxDServiceNotFound"
+public const string ServiceNotFound = "RpcServiceNotFound"
 public enum GeneratedReturnKind
 public enum GeneratedReturnKind.AsyncEnumerable
 public enum GeneratedReturnKind.Pipe
@@ -114,12 +116,12 @@ public int StreamId { get; set; }
 public int WrittenCount
 public int? InboundQueueCapacity
 public int? MaxAcceptedPeers
-public interface IDotBoxDGeneratedServiceRegistrationSink
-public interface IDotBoxDServiceRegistrationSink
 public interface IInstanceRegistry
 public interface INonStreamingServiceDispatcher
 public interface IRpcChannel : IAsyncDisposable
 public interface IRpcFrameChannel : IRpcValueTaskChannel
+public interface IRpcGeneratedServiceRegistrationSink
+public interface IRpcServiceRegistrationSink
 public interface IRpcStreamingContext
 public interface IRpcValueTaskChannel : IRpcChannel
 public interface ISerializer
@@ -171,8 +173,6 @@ public RpcStreamHandle? Stream { get; set; }
 public RpcStreamHandle(int streamId, RpcStreamKind kind)
 public RpcStreamHandle[]? Streams { get; set; }
 public RpcStreamKind Kind { get; set; }
-public sealed class DotBoxDMethodAttribute : Attribute
-public sealed class DotBoxDServiceAttribute : Attribute
 public sealed class InstanceRegistry : IInstanceRegistry
 public sealed class Payload : IMemoryOwner<byte>
 public sealed class PooledBufferWriter : IBufferWriter<byte>, IDisposable
@@ -245,8 +245,8 @@ public static Task<RpcPeerSession> ConnectPeerAsync( this ITransport transport, 
 public static TService CreateProxy<TService>(IRpcInvoker invoker) where TService : class
 public static void Register<TService>( Func<IRpcInvoker, TService> proxyFactory, Func<object, IServiceDispatcher> dispatcherFactory, GeneratedService service) where TService : class
 public static void Register<TService>( Func<IRpcInvoker, TService> proxyFactory, Func<object, IServiceDispatcher> dispatcherFactory) where TService : class
-public static void RegisterGeneratedServices( IEnumerable<Assembly> assemblies, IDotBoxDGeneratedServiceRegistrationSink sink)
-public static void RegisterServices( IEnumerable<Assembly> assemblies, IDotBoxDServiceRegistrationSink sink)
+public static void RegisterGeneratedServices( IEnumerable<Assembly> assemblies, IRpcGeneratedServiceRegistrationSink sink)
+public static void RegisterServices( IEnumerable<Assembly> assemblies, IRpcServiceRegistrationSink sink)
 public static void RegisterServices(Assembly assembly, IReadOnlyList<GeneratedService> services)
 public static void ValidateOutgoingFrame(ReadOnlySpan<byte> frame, int maxMessageSize = MaxMessageSize)
 public static void WriteFrame(IBufferWriter<byte> writer, int messageId, MessageType type, ReadOnlySpan<byte> payload)

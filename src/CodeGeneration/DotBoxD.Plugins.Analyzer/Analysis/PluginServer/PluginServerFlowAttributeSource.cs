@@ -1,4 +1,5 @@
 using System.Text;
+using DotBoxD.CodeGeneration.Shared.Defaults;
 using Microsoft.CodeAnalysis;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
@@ -10,6 +11,68 @@ internal static class PluginServerFlowAttributeSource
 
     public static EquatableArray<string> PropertyAttributes(IPropertySymbol property)
         => AttributeLines(property.GetAttributes(), targetReturn: false);
+
+    public static string ParameterAttributePrefix(IParameterSymbol parameter)
+    {
+        var builder = new StringBuilder();
+        foreach (var attribute in parameter.GetAttributes())
+        {
+            if (CallerInfoAttributeFormatter.TryAppend(builder, attribute))
+            {
+                continue;
+            }
+
+            switch (attribute.AttributeClass?.ToDisplayString())
+            {
+                case "System.Diagnostics.CodeAnalysis.AllowNullAttribute":
+                    AppendSimpleAttributePrefix(
+                        builder,
+                        "global::System.Diagnostics.CodeAnalysis.AllowNullAttribute");
+                    break;
+
+                case "System.Diagnostics.CodeAnalysis.DisallowNullAttribute":
+                    AppendSimpleAttributePrefix(
+                        builder,
+                        "global::System.Diagnostics.CodeAnalysis.DisallowNullAttribute");
+                    break;
+
+                case "System.Diagnostics.CodeAnalysis.MaybeNullAttribute":
+                    AppendSimpleAttributePrefix(
+                        builder,
+                        "global::System.Diagnostics.CodeAnalysis.MaybeNullAttribute");
+                    break;
+
+                case "System.Diagnostics.CodeAnalysis.NotNullAttribute":
+                    AppendSimpleAttributePrefix(
+                        builder,
+                        "global::System.Diagnostics.CodeAnalysis.NotNullAttribute");
+                    break;
+
+                case "System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute":
+                    AppendBooleanAttributePrefix(
+                        builder,
+                        attribute,
+                        "global::System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute");
+                    break;
+
+                case "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute":
+                    AppendBooleanAttributePrefix(
+                        builder,
+                        attribute,
+                        "global::System.Diagnostics.CodeAnalysis.NotNullWhenAttribute");
+                    break;
+
+                case "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute":
+                    AppendStringAttributePrefix(
+                        builder,
+                        attribute,
+                        "global::System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute");
+                    break;
+            }
+        }
+
+        return builder.ToString();
+    }
 
     public static void Append(StringBuilder builder, string indent, EquatableArray<string> attributes)
     {
@@ -74,5 +137,44 @@ internal static class PluginServerFlowAttributeSource
 
         var prefix = targetReturn ? "[return: " : "[";
         return prefix + attributeType + "(" + LiteralReader.StringLiteral(value) + ")]";
+    }
+
+    private static void AppendSimpleAttributePrefix(StringBuilder builder, string attributeType)
+        => builder.Append('[').Append(attributeType).Append("] ");
+
+    private static void AppendBooleanAttributePrefix(
+        StringBuilder builder,
+        AttributeData attribute,
+        string attributeType)
+    {
+        if (attribute.ConstructorArguments.Length != 1 ||
+            attribute.ConstructorArguments[0].Value is not bool value)
+        {
+            return;
+        }
+
+        builder.Append('[')
+            .Append(attributeType)
+            .Append('(')
+            .Append(value ? "true" : "false")
+            .Append(")] ");
+    }
+
+    private static void AppendStringAttributePrefix(
+        StringBuilder builder,
+        AttributeData attribute,
+        string attributeType)
+    {
+        if (attribute.ConstructorArguments.Length != 1 ||
+            attribute.ConstructorArguments[0].Value is not string value)
+        {
+            return;
+        }
+
+        builder.Append('[')
+            .Append(attributeType)
+            .Append('(')
+            .Append(LiteralReader.StringLiteral(value))
+            .Append(")] ");
     }
 }

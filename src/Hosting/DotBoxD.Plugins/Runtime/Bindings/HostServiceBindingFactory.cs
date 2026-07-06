@@ -13,15 +13,16 @@ internal static partial class HostServiceBindingFactory
         MethodInfo interfaceMethod,
         MethodInfo targetMethod,
         object target,
-        HostCapabilityAttribute capability)
+        HostCapabilityAttribute? capability,
+        HostBindingAttribute? binding)
     {
         var payloadType = UnwrapReturnType(interfaceMethod.ReturnType);
         var parameters = interfaceMethod.GetParameters()
             .Select(parameter => ServerExtensionSandboxTypeOf(parameter.ParameterType))
             .ToArray();
         var returnType = payloadType is null ? SandboxType.Unit : ServerExtensionSandboxTypeOf(payloadType);
-        var effects = DeclaredEffects(interfaceMethod, returnType, capability);
-        var id = HostBindingRoute(interfaceMethod.DeclaringType!, interfaceMethod);
+        var (id, requiredCapability, effects, isAsync) =
+            MethodBindingMetadata(interfaceMethod, returnType, capability, binding);
         var callTarget = new HostServiceCallTarget(targetMethod);
 
         return CreateDescriptor(
@@ -29,50 +30,10 @@ internal static partial class HostServiceBindingFactory
             parameters,
             returnType,
             effects,
-            capability.Capability,
-            IsTaskLike(interfaceMethod.ReturnType),
+            requiredCapability,
+            isAsync || IsTaskLike(interfaceMethod.ReturnType),
             (context, args, cancellationToken) =>
-                InvokeAsync(context, args, cancellationToken, id, capability.Capability, effects, callTarget, target, payloadType));
-    }
-
-    public static BindingDescriptor CreateHandleBinding(
-        MethodInfo factoryInterfaceMethod,
-        MethodInfo factoryTargetMethod,
-        object factoryTarget,
-        MethodInfo handleInterfaceMethod,
-        HostCapabilityAttribute capability)
-    {
-        var payloadType = UnwrapReturnType(handleInterfaceMethod.ReturnType);
-        var parameters = factoryInterfaceMethod.GetParameters()
-            .Concat(handleInterfaceMethod.GetParameters())
-            .Select(parameter => ServerExtensionSandboxTypeOf(parameter.ParameterType))
-            .ToArray();
-        var returnType = payloadType is null ? SandboxType.Unit : ServerExtensionSandboxTypeOf(payloadType);
-        var effects = DeclaredEffects(handleInterfaceMethod, returnType, capability);
-        var id = HostBindingRoute(handleInterfaceMethod.DeclaringType!, handleInterfaceMethod);
-        var factoryCallTarget = new HostServiceCallTarget(factoryTargetMethod);
-        var handleCallTarget = new HostServiceCallTarget(handleInterfaceMethod);
-
-        return CreateDescriptor(
-            id,
-            parameters,
-            returnType,
-            effects,
-            capability.Capability,
-            IsTaskLike(handleInterfaceMethod.ReturnType),
-            (context, args, cancellationToken) =>
-                InvokeHandleAsync(
-                    context,
-                    args,
-                    cancellationToken,
-                    id,
-                    capability.Capability,
-                    effects,
-                    factoryInterfaceMethod,
-                    factoryCallTarget,
-                    factoryTarget,
-                    handleCallTarget,
-                payloadType));
+                InvokeAsync(context, args, cancellationToken, id, requiredCapability, effects, callTarget, target, payloadType));
     }
 
     public static Type? UnwrapReturnType(Type type)
@@ -132,34 +93,6 @@ internal static partial class HostServiceBindingFactory
         var result = callTarget.Invoke(target, values);
         var payload = await callTarget.ReadReturnAsync(result, cancellationToken).ConfigureAwait(false);
         WriteAudit(context, bindingId, capability, effects, startedAt, values.Length > 0 ? values[0] : null);
-        return payloadType is null
-            ? SandboxValue.Unit
-            : KernelRpcMarshaller.ToSandboxValue(payload, payloadType);
-    }
-
-    private static async ValueTask<SandboxValue> InvokeHandleAsync(
-        SandboxContext context,
-        IReadOnlyList<SandboxValue> args,
-        CancellationToken cancellationToken,
-        string bindingId,
-        string capability,
-        SandboxEffect effects,
-        MethodInfo factoryInterfaceMethod,
-        HostServiceCallTarget factoryCallTarget,
-        object factoryTarget,
-        HostServiceCallTarget handleCallTarget,
-        Type? payloadType)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var startedAt = DateTimeOffset.UtcNow;
-        var factoryValues = ConvertArguments(factoryCallTarget.ParameterTypes, args, startIndex: 0);
-        var handle = factoryCallTarget.Invoke(factoryTarget, factoryValues)
-            ?? throw new InvalidOperationException($"Host service factory '{factoryInterfaceMethod.Name}' returned null.");
-        var handleValues = ConvertArguments(handleCallTarget.ParameterTypes, args, factoryCallTarget.ParameterTypes.Length);
-        var result = handleCallTarget.Invoke(handle, handleValues);
-        var payload = await handleCallTarget.ReadReturnAsync(result, cancellationToken).ConfigureAwait(false);
-        var auditValue = factoryValues.Length > 0 ? factoryValues[0] : handleValues.Length > 0 ? handleValues[0] : null;
-        WriteAudit(context, bindingId, capability, effects, startedAt, auditValue);
         return payloadType is null
             ? SandboxValue.Unit
             : KernelRpcMarshaller.ToSandboxValue(payload, payloadType);
@@ -233,6 +166,69 @@ internal static partial class HostServiceBindingFactory
 
     private static long BaseFuel(SandboxType returnType) => ReturnAllocates(returnType) ? 3 : 2;
 
+    private static (string Id, string Capability, SandboxEffect Effects, bool IsAsync) MethodBindingMetadata(
+        MethodInfo method,
+        SandboxType returnType,
+        HostCapabilityAttribute? capability,
+        HostBindingAttribute? binding)
+    {
+        if (binding is not null)
+        {
+            return (
+                HostBindingId(method.DeclaringType!, method, binding),
+                binding.Capability,
+                DeclaredEffects(method, returnType, binding),
+                binding.IsAsync);
+        }
+
+        if (capability is null)
+        {
+            throw new InvalidOperationException(
+                $"Host service method '{method.DeclaringType?.FullName}.{method.Name}' must declare [HostCapability] on its service contract.");
+        }
+
+        return (
+            HostBindingRoute(method.DeclaringType!, method),
+            capability.Capability,
+            DeclaredEffects(method, returnType, capability),
+            IsAsync: false);
+    }
+
+    private static SandboxEffect DeclaredEffects(
+        MethodInfo method,
+        SandboxType returnType,
+        HostBindingAttribute binding)
+    {
+        var effects = binding.Effects;
+        if (!effects.ContainsOnlyKnownBits())
+        {
+            throw new InvalidOperationException(
+                $"Host binding method '{method.DeclaringType?.FullName}.{method.Name}' declares unknown effects.");
+        }
+
+        var access = effects & (SandboxEffect.HostStateRead | SandboxEffect.HostStateWrite);
+        if (access is not SandboxEffect.HostStateRead and not SandboxEffect.HostStateWrite)
+        {
+            throw new InvalidOperationException(
+                $"Host binding method '{method.DeclaringType?.FullName}.{method.Name}' must declare exactly one of HostStateRead or HostStateWrite.");
+        }
+
+        var allocates = (effects & SandboxEffect.Alloc) == SandboxEffect.Alloc;
+        var returnAllocates = ReturnAllocates(returnType);
+        if (allocates != returnAllocates)
+        {
+            throw new InvalidOperationException(
+                returnAllocates
+                    ? $"Host binding method '{method.DeclaringType?.FullName}.{method.Name}' must declare Alloc because its return shape allocates."
+                    : $"Host binding method '{method.DeclaringType?.FullName}.{method.Name}' must not declare Alloc because its return shape does not allocate.");
+        }
+
+        return effects;
+    }
+
     private static string HostBindingRoute(Type type, MethodInfo method)
         => HostBindingMetadataRules.BindingId(type.Namespace, type.Name, method.Name);
+
+    private static string HostBindingId(Type type, MethodInfo method, HostBindingAttribute binding)
+        => binding.IsAutoBinding ? HostBindingRoute(type, method) : binding.BindingId;
 }

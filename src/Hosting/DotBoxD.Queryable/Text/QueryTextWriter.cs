@@ -62,7 +62,8 @@ internal static class QueryTextWriter
 
     private static void WriteLeaf(QueryFilter filter, StringBuilder builder, string op, Action<QueryValue> writeValue)
     {
-        builder.Append(filter.Field).Append(' ');
+        WriteField(filter.Field, builder);
+        builder.Append(' ');
         if (filter.IgnoreCase)
         {
             builder.Append('~');
@@ -74,7 +75,8 @@ internal static class QueryTextWriter
 
     private static void WriteIn(QueryFilter filter, StringBuilder builder)
     {
-        builder.Append(filter.Field).Append(' ');
+        WriteField(filter.Field, builder);
+        builder.Append(' ');
         if (filter.IgnoreCase)
         {
             builder.Append('~');
@@ -94,6 +96,17 @@ internal static class QueryTextWriter
         builder.Append(']');
     }
 
+    private static void WriteField(string field, StringBuilder builder)
+    {
+        if (field == "not")
+        {
+            WriteString(field, builder);
+            return;
+        }
+
+        builder.Append(field);
+    }
+
     private static void Write(QueryValue value, StringBuilder builder)
     {
         switch (value.Kind)
@@ -108,7 +121,7 @@ internal static class QueryTextWriter
                 builder.Append(value.Integer.ToString(CultureInfo.InvariantCulture));
                 break;
             case QueryValueKind.Number:
-                builder.Append(value.Number.ToString("R", CultureInfo.InvariantCulture));
+                WriteNumber(value.Number, builder);
                 break;
             case QueryValueKind.String:
                 WriteString(value.String ?? string.Empty, builder);
@@ -127,6 +140,16 @@ internal static class QueryTextWriter
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(value), value.Kind, "Unknown value kind.");
+        }
+    }
+
+    private static void WriteNumber(double value, StringBuilder builder)
+    {
+        var text = value.ToString("R", CultureInfo.InvariantCulture);
+        builder.Append(text);
+        if (!text.Contains('.') && !text.Contains('E') && !text.Contains('e'))
+        {
+            builder.Append(".0");
         }
     }
 

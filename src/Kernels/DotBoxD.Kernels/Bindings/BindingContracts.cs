@@ -57,6 +57,7 @@ public sealed record BindingSignature(
 
     public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = ModelCopy.List(value); }
     public bool IsAsync { get; init; }
+    public string AuditKind { get; init; } = BindingAuditKinds.BindingCall;
 }
 
 public sealed record BindingDescriptor(
@@ -80,10 +81,12 @@ public sealed record BindingDescriptor(
     public BindingSignature Signature => new(
         Id, Version, CopyParameters(Parameters), ReturnType, Effects, RequiredCapability, CostModel, AuditLevel, Safety, Compiled)
     {
-        IsAsync = IsAsync
+        IsAsync = IsAsync,
+        AuditKind = AuditKind
     };
 
     public bool IsAsync { get; init; }
+    public string AuditKind { get; init; } = BindingAuditKinds.BindingCall;
 
     private static SandboxType[] CopyParameters(IReadOnlyList<SandboxType> parameters)
     {
@@ -117,13 +120,28 @@ public sealed class BindingRegistryBuilder
 
     public BindingRegistryBuilder Add(BindingDescriptor descriptor)
     {
+        ArgumentNullException.ThrowIfNull(descriptor);
+
         _bindings.Add(descriptor);
         return this;
     }
 
     public BindingRegistryBuilder AddRange(IEnumerable<BindingDescriptor> descriptors)
     {
-        _bindings.AddRange(descriptors);
+        ArgumentNullException.ThrowIfNull(descriptors);
+
+        var validated = new List<BindingDescriptor>();
+        foreach (var descriptor in descriptors)
+        {
+            if (descriptor is null)
+            {
+                throw new ArgumentException("Binding descriptor sequences cannot contain null descriptors.", nameof(descriptors));
+            }
+
+            validated.Add(descriptor);
+        }
+
+        _bindings.AddRange(validated);
         return this;
     }
 

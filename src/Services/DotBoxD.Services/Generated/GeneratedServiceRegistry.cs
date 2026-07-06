@@ -88,7 +88,7 @@ public static class GeneratedServiceRegistry
             throw new ArgumentNullException(nameof(assembly));
         }
 
-        return DotBoxDGeneratedAssemblyCatalog.GetServices(assembly);
+        return RpcGeneratedAssemblyCatalog.GetServices(assembly);
     }
 
     /// <summary>
@@ -102,7 +102,7 @@ public static class GeneratedServiceRegistry
         }
 
         var services = new List<GeneratedService>();
-        foreach (var assembly in assemblies)
+        foreach (var assembly in SnapshotAssemblies(assemblies))
         {
             services.AddRange(GetServices(assembly));
         }
@@ -121,7 +121,7 @@ public static class GeneratedServiceRegistry
         if (services is null)
             throw new ArgumentNullException(nameof(services));
 
-        DotBoxDGeneratedAssemblyCatalog.PublishServices(assembly, services);
+        RpcGeneratedAssemblyCatalog.PublishServices(assembly, services);
     }
 
     /// <summary>
@@ -129,7 +129,7 @@ public static class GeneratedServiceRegistry
     /// </summary>
     public static void RegisterServices(
         IEnumerable<Assembly> assemblies,
-        IDotBoxDServiceRegistrationSink sink)
+        IRpcServiceRegistrationSink sink)
     {
         if (assemblies is null)
         {
@@ -141,9 +141,9 @@ public static class GeneratedServiceRegistry
             throw new ArgumentNullException(nameof(sink));
         }
 
-        foreach (var assembly in assemblies)
+        foreach (var assembly in SnapshotAssemblies(assemblies))
         {
-            DotBoxDGeneratedAssemblyCatalog.RegisterServices(assembly, sink);
+            RpcGeneratedAssemblyCatalog.RegisterServices(assembly, sink);
         }
     }
 
@@ -152,7 +152,7 @@ public static class GeneratedServiceRegistry
     /// </summary>
     public static void RegisterGeneratedServices(
         IEnumerable<Assembly> assemblies,
-        IDotBoxDGeneratedServiceRegistrationSink sink)
+        IRpcGeneratedServiceRegistrationSink sink)
     {
         if (assemblies is null)
         {
@@ -164,10 +164,26 @@ public static class GeneratedServiceRegistry
             throw new ArgumentNullException(nameof(sink));
         }
 
+        foreach (var assembly in SnapshotAssemblies(assemblies))
+        {
+            RpcGeneratedAssemblyCatalog.RegisterGeneratedServices(assembly, sink);
+        }
+    }
+
+    private static List<Assembly> SnapshotAssemblies(IEnumerable<Assembly> assemblies)
+    {
+        var snapshot = new List<Assembly>();
         foreach (var assembly in assemblies)
         {
-            DotBoxDGeneratedAssemblyCatalog.RegisterGeneratedServices(assembly, sink);
+            if (assembly is null)
+            {
+                throw new ArgumentException("Assembly collection cannot contain null elements.", nameof(assemblies));
+            }
+
+            snapshot.Add(assembly);
         }
+
+        return snapshot;
     }
 
     /// <summary>
@@ -251,7 +267,7 @@ public static class GeneratedServiceRegistry
             return registration;
         }
 
-        var generatedTypeFound = DotBoxDGeneratedAssemblyCatalog.EnsureRegistered(serviceInterface.Assembly);
+        var generatedTypeFound = RpcGeneratedAssemblyCatalog.EnsureRegistered(serviceInterface.Assembly);
         if (s_services.TryGetValue(serviceInterface, out registration))
         {
             return registration;
@@ -263,7 +279,7 @@ public static class GeneratedServiceRegistry
             : "no DotBoxD generated registry type was found in that assembly";
         throw new InvalidOperationException(
             $"No DotBoxD generated factory is registered for {FormatType(serviceInterface)}: {reason}. " +
-            "Mark the interface with [DotBoxDService] and ensure the assembly that declares it runs the DotBoxD source generator. " +
+            "Mark the interface with [RpcService] and ensure the assembly that declares it runs the DotBoxD source generator. " +
             $"Assembly: {assemblyName}.");
     }
 

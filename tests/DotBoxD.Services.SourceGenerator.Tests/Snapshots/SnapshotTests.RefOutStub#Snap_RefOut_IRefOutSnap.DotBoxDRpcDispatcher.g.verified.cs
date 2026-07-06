@@ -32,7 +32,7 @@ namespace Snap.RefOut
                 throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException("Service 'IRefOutSnap' can only dispatch instance calls.", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Service);
             }
 
-            return DispatchCoreAsync(_service, method, payload, serializer, registry, output, streaming, ct);
+            return DispatchCoreAsync(_service, null, method, payload, serializer, registry, output, streaming, ct);
         }
 
         public global::System.Threading.Tasks.Task DispatchOnInstanceAsync(string instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::System.Threading.CancellationToken ct = default) =>
@@ -45,13 +45,15 @@ namespace Snap.RefOut
                 throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException("Instance '" + instanceId + "' not found for service 'IRefOutSnap'.", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Instance);
             }
 
-            return DispatchCoreAsync(__inst, method, payload, serializer, registry, output, streaming, ct);
+            return DispatchCoreAsync(__inst, instanceId, method, payload, serializer, registry, output, streaming, ct);
         }
 
 #pragma warning disable CS1998
-        private async global::System.Threading.Tasks.Task DispatchCoreAsync(global::Snap.RefOut.IRefOutSnap receiver, string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::DotBoxD.Services.Streaming.Remote.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct)
+        private async global::System.Threading.Tasks.Task DispatchCoreAsync(global::Snap.RefOut.IRefOutSnap receiver, string? instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::DotBoxD.Services.Streaming.Remote.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct)
 #pragma warning restore CS1998
         {
+            ct.ThrowIfCancellationRequested();
+
             switch (method)
             {
                 case "GoodAsync":

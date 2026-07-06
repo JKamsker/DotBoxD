@@ -89,6 +89,37 @@ public sealed class QueryTextTests
         Assert.Equal(Fingerprint(filter), Fingerprint(parsed));
     }
 
+    public static TheoryData<QueryFilter> KeywordFieldNameFilters => new()
+    {
+        QueryFilter.Compare("not", QueryComparisonOperator.Equal, QueryValue.FromInteger(7)),
+        QueryFilter.In("not", [QueryValue.FromInteger(7)]),
+    };
+
+    [Theory]
+    [MemberData(nameof(KeywordFieldNameFilters))]
+    public void Format_round_trips_keyword_field_names(QueryFilter filter)
+    {
+        var text = QueryText.Format(filter);
+        var parsed = QueryText.Parse(text);
+
+        Assert.Equal(Fingerprint(filter), Fingerprint(parsed));
+    }
+
+    [Theory]
+    [InlineData(1.0)]
+    [InlineData(42.0)]
+    [InlineData(1.5)]
+    public void Format_parse_preserves_number_kind(double value)
+    {
+        var filter = QueryFilter.Compare("X", QueryComparisonOperator.Equal, QueryValue.FromNumber(value));
+
+        var parsed = QueryText.Parse(QueryText.Format(filter));
+
+        Assert.NotNull(parsed.Value);
+        Assert.Equal(QueryValueKind.Number, parsed.Value.Kind);
+        Assert.Equal(value, parsed.Value.Number);
+    }
+
     private static string Fingerprint(QueryFilter filter)
         => QueryFingerprint.Compute(EventQueryDocument.Create("E", filter, QueryProjection.Identity));
 }

@@ -31,6 +31,9 @@ public sealed class ModuleValidator
         IReadOnlySet<string> declaredOpaqueIdTypes,
         SandboxPolicy? policy)
     {
+        ArgumentNullException.ThrowIfNull(module);
+        ArgumentNullException.ThrowIfNull(bindings);
+
         var diagnostics = new List<SandboxDiagnostic>();
         StructuralValidator.Validate(module, diagnostics, declaredOpaqueIdTypes);
         if (diagnostics.Count > 0)

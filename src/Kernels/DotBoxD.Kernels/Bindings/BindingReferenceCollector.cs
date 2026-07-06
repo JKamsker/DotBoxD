@@ -29,6 +29,9 @@ public static class BindingReferenceCollector
         SandboxModule module,
         IBindingCatalog bindings)
     {
+        ArgumentNullException.ThrowIfNull(module);
+        ArgumentNullException.ThrowIfNull(bindings);
+
         var collector = new ModuleBindingReferenceCollector(module, bindings);
         return collector.Collect();
     }

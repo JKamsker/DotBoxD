@@ -8,11 +8,11 @@ namespace DotBoxD.Services.Tests.Coverage.Core;
 public sealed partial class DiagnosticsErrorsCoverageTests
 {
     [Fact]
-    public void DotBoxDMethodAttribute_AppliedToMethod_IsDiscoverableViaReflection()
+    public void RpcMethodAttribute_AppliedToMethod_IsDiscoverableViaReflection()
     {
         var method = typeof(IDecoratedService).GetMethod(nameof(IDecoratedService.RenamedAsync))!;
-        var attribute = method.GetCustomAttributes(typeof(DotBoxDMethodAttribute), false)
-            .Cast<DotBoxDMethodAttribute>()
+        var attribute = method.GetCustomAttributes(typeof(RpcMethodAttribute), false)
+            .Cast<RpcMethodAttribute>()
             .Single();
 
         Assert.Equal("WireMethod", attribute.Name);
@@ -44,6 +44,14 @@ public sealed class EventArgsCoverageTests
     }
 
     [Fact]
+    public void RpcDisconnectedEventArgs_RejectsNullRemoteEndpoint()
+    {
+        var ex = Assert.Throws<ArgumentNullException>(() => new RpcDisconnectedEventArgs(null!, error: null));
+
+        Assert.Equal("remoteEndpoint", ex.ParamName);
+    }
+
+    [Fact]
     public void RpcReadErrorEventArgs_ExposesEndpointAndError()
     {
         var error = new InvalidOperationException("read failed");
@@ -51,6 +59,13 @@ public sealed class EventArgsCoverageTests
 
         Assert.Equal("ep", args.RemoteEndpoint);
         Assert.Same(error, args.Error);
+    }
+
+    [Fact]
+    public void RpcReadErrorEventArgs_RejectsNullConstructorArguments()
+    {
+        DiagnosticAssert.ArgumentNull(() => new RpcReadErrorEventArgs(null!, new Exception("read")), "remoteEndpoint");
+        DiagnosticAssert.ArgumentNull(() => new RpcReadErrorEventArgs("ep", null!), "error");
     }
 
     [Fact]
@@ -74,6 +89,17 @@ public sealed class EventArgsCoverageTests
         Assert.Equal(9, args.MessageId);
         Assert.Equal(MessageType.Response, args.MessageType);
         Assert.Same(error, args.Error);
+    }
+
+    [Fact]
+    public void RpcProtocolErrorEventArgs_RejectsNullConstructorArguments()
+    {
+        DiagnosticAssert.ArgumentNull(
+            () => new RpcProtocolErrorEventArgs(null!, 7, MessageType.Request, "bad header"),
+            "remoteEndpoint");
+        DiagnosticAssert.ArgumentNull(
+            () => new RpcProtocolErrorEventArgs("ep", 7, MessageType.Request, null!),
+            "message");
     }
 
     [Fact]
@@ -106,12 +132,41 @@ public sealed class EventArgsCoverageTests
     }
 
     [Fact]
+    public void RpcDispatchErrorEventArgs_RejectsNullConstructorArguments()
+    {
+        DiagnosticAssert.ArgumentNull(
+            () => new RpcDispatchErrorEventArgs(null!, 1, "Game", "Status", null, new Exception("x")),
+            "remoteEndpoint");
+        DiagnosticAssert.ArgumentNull(
+            () => new RpcDispatchErrorEventArgs("ep", 1, null!, "Status", null, new Exception("x")),
+            "serviceName");
+        DiagnosticAssert.ArgumentNull(
+            () => new RpcDispatchErrorEventArgs("ep", 1, "Game", null!, null, new Exception("x")),
+            "methodName");
+        DiagnosticAssert.ArgumentNull(
+            () => new RpcDispatchErrorEventArgs("ep", 1, "Game", "Status", null, null!),
+            "error");
+    }
+
+    [Fact]
     public void RpcHostErrorEventArgs_ExposesError()
     {
         var error = new InvalidOperationException("accept failed");
         var args = new RpcHostErrorEventArgs(error);
 
         Assert.Same(error, args.Error);
+    }
+
+    [Fact]
+    public void RpcHostErrorEventArgs_RejectsNullException()
+    {
+        DiagnosticAssert.ArgumentNull(() => new RpcHostErrorEventArgs(null!), "exception");
+    }
+
+    [Fact]
+    public void RpcPeerEventArgs_RejectsNullPeer()
+    {
+        DiagnosticAssert.ArgumentNull(() => new RpcPeerEventArgs(null!), "peer");
     }
 
 }

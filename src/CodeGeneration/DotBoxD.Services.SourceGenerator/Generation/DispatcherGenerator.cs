@@ -80,7 +80,7 @@ internal static class DispatcherGenerator
             sb.AppendLine($"                throw new {ServicesGeneratorTypeNames.GlobalServiceNotFoundException}(\"Instance '\" + instanceId + \"' not found for service '{service.ServiceName}'.\", {ServicesGeneratorTypeNames.GlobalServiceNotFoundKind}.{ServicesGeneratorMemberNames.NotFoundKind.Instance});");
             sb.AppendLine("            }");
             sb.AppendLine();
-            sb.AppendLine("            return DispatchCoreAsync(__inst, method, payload, serializer, registry, output, streaming, ct);");
+            sb.AppendLine("            return DispatchCoreAsync(__inst, instanceId, method, payload, serializer, registry, output, streaming, ct);");
             sb.AppendLine("        }");
             return;
         }
@@ -95,7 +95,7 @@ internal static class DispatcherGenerator
         sb.AppendLine($"                throw new {ServicesGeneratorTypeNames.GlobalServiceNotFoundException}(\"Service '{service.ServiceName}' can only dispatch instance calls.\", {ServicesGeneratorTypeNames.GlobalServiceNotFoundKind}.{ServicesGeneratorMemberNames.NotFoundKind.Service});");
         sb.AppendLine("            }");
         sb.AppendLine();
-        sb.AppendLine("            return DispatchCoreAsync(_service, method, payload, serializer, registry, output, streaming, ct);");
+        sb.AppendLine("            return DispatchCoreAsync(_service, null, method, payload, serializer, registry, output, streaming, ct);");
         sb.AppendLine("        }");
     }
 
@@ -107,17 +107,18 @@ internal static class DispatcherGenerator
     {
         sb.AppendLine();
         sb.AppendLine("#pragma warning disable CS1998");
-        sb.AppendLine($"        private async {ServicesGeneratorTypeNames.GlobalTask} DispatchCoreAsync({qualifiedInterface} receiver, string method, {ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalReadOnlyMemory, "byte")} payload, {ServicesGeneratorTypeNames.GlobalSerializer} serializer, {ServicesGeneratorTypeNames.GlobalInstanceRegistry} registry, {ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalBufferWriter, "byte")} output, {ServicesGeneratorTypeNames.GlobalRpcStreamingContextInterface} streaming, {ServicesGeneratorTypeNames.GlobalCancellationToken} ct)");
+        sb.AppendLine($"        private async {ServicesGeneratorTypeNames.GlobalTask} DispatchCoreAsync({qualifiedInterface} receiver, string? instanceId, string method, {ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalReadOnlyMemory, "byte")} payload, {ServicesGeneratorTypeNames.GlobalSerializer} serializer, {ServicesGeneratorTypeNames.GlobalInstanceRegistry} registry, {ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalBufferWriter, "byte")} output, {ServicesGeneratorTypeNames.GlobalRpcStreamingContextInterface} streaming, {ServicesGeneratorTypeNames.GlobalCancellationToken} ct)");
         sb.AppendLine("#pragma warning restore CS1998");
         sb.AppendLine("        {");
-
+        sb.AppendLine("            ct.ThrowIfCancellationRequested();");
+        sb.AppendLine();
         sb.AppendLine("            switch (method)");
         sb.AppendLine("            {");
 
         foreach (var m in service.Methods.Array)
         {
             ct.ThrowIfCancellationRequested();
-            DispatcherCaseGenerator.Generate(sb, service, m, "receiver", ct);
+            DispatcherCaseGenerator.Generate(sb, service, m, "receiver", "instanceId", ct);
         }
 
         sb.AppendLine("                default:");

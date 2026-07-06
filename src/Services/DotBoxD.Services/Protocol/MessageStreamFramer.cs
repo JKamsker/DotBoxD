@@ -16,6 +16,8 @@ internal static class MessageStreamFramer
         TimeSpan frameReadIdleTimeout,
         CancellationToken ct)
     {
+        ct.ThrowIfCancellationRequested();
+
         var idleTimeout = FrameReadTimeoutSource.Validate(
             frameReadIdleTimeout,
             nameof(frameReadIdleTimeout));
@@ -72,6 +74,8 @@ internal static class MessageStreamFramer
         ReadOnlyMemory<byte> payload,
         CancellationToken ct)
     {
+        ct.ThrowIfCancellationRequested();
+
         var totalLength = MessageFrameReader.GetOutgoingFrameLength(payload.Length);
         using var writer = PooledBufferWriter.Rent(totalLength);
         MessageFramer.WriteFrame(writer, messageId, type, payload.Span);

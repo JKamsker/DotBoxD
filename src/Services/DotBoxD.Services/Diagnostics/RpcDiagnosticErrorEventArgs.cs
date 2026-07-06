@@ -8,8 +8,8 @@ public sealed class RpcDiagnosticErrorEventArgs : EventArgs
 {
     public RpcDiagnosticErrorEventArgs(string operation, Exception error)
     {
-        Operation = operation;
-        Error = error;
+        Operation = operation ?? throw new ArgumentNullException(nameof(operation));
+        Error = error ?? throw new ArgumentNullException(nameof(error));
     }
 
     /// <summary>The operation that observed the error.</summary>
