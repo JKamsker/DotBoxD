@@ -8,6 +8,15 @@ namespace DotBoxD.Services.Tests.Protocol;
 
 public sealed class RpcRequestEnvelopeValidationTests
 {
+    [Fact]
+    public void RpcRequest_ExplicitDefaultConstructor_InitializesRequiredNamesToEmpty()
+    {
+        var request = new RpcRequest();
+
+        Assert.Equal(string.Empty, request.ServiceName);
+        Assert.Equal(string.Empty, request.MethodName);
+    }
+
     [Theory]
     [MemberData(nameof(RpcRequestsWithNullRequiredNames))]
     public void RpcRequest_NullRequiredNames_ThrowOnSerialize(RpcRequest request, string missingName)

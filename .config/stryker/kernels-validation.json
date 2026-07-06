@@ -7,7 +7,7 @@
     ],
     "configuration": "Release",
     "target-framework": "net10.0",
-    "test-case-filter": "FullyQualifiedName~PolicyGrantValidationRegressionTests|FullyQualifiedName~PathUriLiteralValidationTests|FullyQualifiedName~FileExtensionPolicyTests|FullyQualifiedName~CapabilityPolicySplitTests|FullyQualifiedName~Fix_ALG_0015_Tests|FullyQualifiedName~ModuleValidatorArgumentValidationTests|FullyQualifiedName~ModuleValidatorNestedNullValidationTests|FullyQualifiedName~ProgrammaticIrValidationTests",
+    "test-case-filter": "FullyQualifiedName~PolicyGrantValidationRegressionTests|FullyQualifiedName~PolicyFileGrantMutationTests|FullyQualifiedName~PolicyResolverMutationTests|FullyQualifiedName~PolicyGrantMutationTests|FullyQualifiedName~PolicyBoundaryTests|FullyQualifiedName~PolicyFileGrantValidationTests|FullyQualifiedName~PathUriLiteralValidationTests|FullyQualifiedName~FileExtensionPolicyTests|FullyQualifiedName~CapabilityPolicySplitTests|FullyQualifiedName~Fix_ALG_0015_Tests|FullyQualifiedName~ModuleValidatorArgumentValidationTests|FullyQualifiedName~ModuleValidatorNestedNullValidationTests|FullyQualifiedName~ProgrammaticIrValidationTests",
     "mutation-level": "standard",
     "mutate": [
       "Internal/FilePolicyGrantValidator.cs",
@@ -22,9 +22,9 @@
     ],
     "concurrency": 2,
     "thresholds": {
-      "high": 1,
-      "low": 0,
-      "break": 0
+      "high": 90,
+      "low": 85,
+      "break": 85
     }
   }
 }
