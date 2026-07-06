@@ -66,11 +66,29 @@ internal static class PluginEventAdapterShapeValidator
         }
 
         if (adapter is IPluginEventValueWriter<TEvent> writer &&
-            writer.EventValueCount != parameters.Count)
+            ReadEventValueCount(writer) != parameters.Count)
         {
             throw CreateException("Plugin event value writer count does not match adapter parameters.");
         }
     }
+
+    internal static int ReadEventValueCount<TEvent>(IPluginEventValueWriter<TEvent> writer)
+    {
+        try
+        {
+            return writer.EventValueCount;
+        }
+        catch (Exception ex) when (IsAdapterCallbackFailure(ex))
+        {
+            throw CallbackException(nameof(IPluginEventValueWriter<TEvent>.EventValueCount));
+        }
+    }
+
+    internal static SandboxValidationException CallbackException(string callbackName)
+        => CreateException("Plugin event value writer callback '" + callbackName + "' failed.");
+
+    internal static bool IsAdapterCallbackFailure(Exception ex)
+        => ex is not SandboxValidationException and not OperationCanceledException;
 
     private static SandboxValidationException CreateException(string message) =>
         new([
