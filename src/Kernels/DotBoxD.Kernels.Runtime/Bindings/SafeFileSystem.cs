@@ -28,8 +28,7 @@ public static partial class SafeFileSystem
                 throw Error(SandboxErrorCode.NotFound, "file.readText denied: file was not found");
             }
 
-            var maxBytes = SafeFileGrantReader.Read(resolved.Grant).MaxBytesPerRun
-                ?? context.Budget.Limits.MaxFileBytesRead;
+            var maxBytes = SafeFileGrantReader.Read(resolved.Grant).MaxBytesPerRun;
             if (info.Length > maxBytes)
             {
                 throw Error(SandboxErrorCode.QuotaExceeded, "file.readText denied: file exceeds read limit");
