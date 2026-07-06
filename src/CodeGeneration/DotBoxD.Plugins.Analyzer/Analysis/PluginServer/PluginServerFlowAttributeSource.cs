@@ -116,6 +116,7 @@ internal static class PluginServerFlowAttributeSource
             }
         }
 
+        lines.Sort(StringComparer.Ordinal);
         return new EquatableArray<string>(lines.ToArray());
     }
 
