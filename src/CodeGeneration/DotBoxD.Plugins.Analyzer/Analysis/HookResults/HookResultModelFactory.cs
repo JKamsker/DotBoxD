@@ -29,14 +29,14 @@ internal static partial class HookResultModelFactory
             return null;
         }
 
-        if (ShouldSkipGeneration(type, declaration, context.SemanticModel.Compilation))
-        {
-            return null;
-        }
-
         if (TryGetInvalidDeclarationResult(type, declaration, context.SemanticModel.Compilation) is { } invalid)
         {
             return invalid;
+        }
+
+        if (ShouldSkipGeneration(type, declaration, context.SemanticModel.Compilation))
+        {
+            return null;
         }
 
         if (declaration is not RecordDeclarationSyntax { ParameterList: { } parameters })
