@@ -1,3 +1,4 @@
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins.Runtime;
 using DotBoxD.Plugins.Runtime.Hooks;
@@ -171,6 +172,40 @@ public sealed class ResultHookSlotTests
                 await slot.FireAsync<TestResult>(new DamageCtx(10), context, context, cts.Token);
             });
         Assert.False(invoked);
+    }
+
+    [Fact]
+    public async Task Sandbox_domain_caller_cancellation_stops_dispatch_without_fault()
+    {
+        var faults = new List<ResultHookFault>();
+        var slot = NewSlot(faults.Add);
+        using var cts = new CancellationTokenSource();
+        var fallbackInvoked = false;
+        slot.AddDirect(
+            100,
+            (_, _, _) =>
+            {
+                cts.Cancel();
+                throw new SandboxRuntimeException(
+                    new SandboxError(SandboxErrorCode.Cancelled, "execution cancelled"));
+            });
+        slot.AddDirect(
+            0,
+            (_, _, _) =>
+            {
+                fallbackInvoked = true;
+                return Ok(9);
+            });
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () =>
+            {
+                var context = Context();
+                await slot.FireAsync<TestResult>(new DamageCtx(10), context, context, cts.Token);
+            });
+
+        Assert.Empty(faults);
+        Assert.False(fallbackInvoked);
     }
 
     [Fact]
