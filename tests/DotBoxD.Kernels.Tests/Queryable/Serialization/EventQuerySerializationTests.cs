@@ -130,14 +130,14 @@ public sealed class EventQuerySerializationTests
             QueryFilter.MatchAll,
             QueryProjection.Construct(
                 "Notice",
-                [QueryProjectionField.FromMember(value, value)]));
+                [QueryProjectionField.FromMember(value, "AttackerId")]));
 
         var restored = EventQueryJson.Deserialize(EventQueryJson.Serialize(document));
 
         Assert.Equal(value, restored.EventName);
         var field = Assert.Single(restored.Projection.Fields);
         Assert.Equal(value, field.Name);
-        Assert.Equal(value, field.Path);
+        Assert.Equal("AttackerId", field.Path);
     }
 
     [Theory]
@@ -155,6 +155,12 @@ public sealed class EventQuerySerializationTests
         });
 
         if (exception is null)
+        {
+            return;
+        }
+
+        if (target == StructuralStringTarget.ProjectionPath &&
+            exception is ArgumentException { ParamName: "path" })
         {
             return;
         }

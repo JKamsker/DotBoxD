@@ -36,46 +36,6 @@ internal static partial class HostServiceBindingFactory
                 InvokeAsync(context, args, cancellationToken, id, requiredCapability, effects, callTarget, target, payloadType));
     }
 
-    public static BindingDescriptor CreateHandleBinding(
-        MethodInfo factoryInterfaceMethod,
-        MethodInfo factoryTargetMethod,
-        object factoryTarget,
-        MethodInfo handleInterfaceMethod,
-        HostCapabilityAttribute capability)
-    {
-        var payloadType = UnwrapReturnType(handleInterfaceMethod.ReturnType);
-        var parameters = factoryInterfaceMethod.GetParameters()
-            .Concat(handleInterfaceMethod.GetParameters())
-            .Select(parameter => ServerExtensionSandboxTypeOf(parameter.ParameterType))
-            .ToArray();
-        var returnType = payloadType is null ? SandboxType.Unit : ServerExtensionSandboxTypeOf(payloadType);
-        var effects = DeclaredEffects(handleInterfaceMethod, returnType, capability);
-        var id = HostBindingRoute(handleInterfaceMethod.DeclaringType!, handleInterfaceMethod);
-        var factoryCallTarget = new HostServiceCallTarget(factoryTargetMethod);
-        var handleCallTarget = new HostServiceCallTarget(handleInterfaceMethod);
-
-        return CreateDescriptor(
-            id,
-            parameters,
-            returnType,
-            effects,
-            capability.Capability,
-            IsTaskLike(factoryInterfaceMethod.ReturnType) || IsTaskLike(handleInterfaceMethod.ReturnType),
-            (context, args, cancellationToken) =>
-                InvokeHandleAsync(
-                    context,
-                    args,
-                    cancellationToken,
-                    id,
-                    capability.Capability,
-                    effects,
-                    factoryInterfaceMethod,
-                    factoryCallTarget,
-                    factoryTarget,
-                    handleCallTarget,
-                    payloadType));
-    }
-
     public static Type? UnwrapReturnType(Type type)
         => HostServiceCallTarget.UnwrapReturnType(type);
 
@@ -133,35 +93,6 @@ internal static partial class HostServiceBindingFactory
         var result = callTarget.Invoke(target, values);
         var payload = await callTarget.ReadReturnAsync(result, cancellationToken).ConfigureAwait(false);
         WriteAudit(context, bindingId, capability, effects, startedAt, values.Length > 0 ? values[0] : null);
-        return payloadType is null
-            ? SandboxValue.Unit
-            : KernelRpcMarshaller.ToSandboxValue(payload, payloadType);
-    }
-
-    private static async ValueTask<SandboxValue> InvokeHandleAsync(
-        SandboxContext context,
-        IReadOnlyList<SandboxValue> args,
-        CancellationToken cancellationToken,
-        string bindingId,
-        string capability,
-        SandboxEffect effects,
-        MethodInfo factoryInterfaceMethod,
-        HostServiceCallTarget factoryCallTarget,
-        object factoryTarget,
-        HostServiceCallTarget handleCallTarget,
-        Type? payloadType)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var startedAt = DateTimeOffset.UtcNow;
-        var factoryValues = ConvertArguments(factoryCallTarget.ParameterTypes, args, startIndex: 0);
-        var factoryResult = factoryCallTarget.Invoke(factoryTarget, factoryValues);
-        var handle = await factoryCallTarget.ReadReturnAsync(factoryResult, cancellationToken).ConfigureAwait(false)
-            ?? throw new InvalidOperationException($"Host service factory '{factoryInterfaceMethod.Name}' returned null.");
-        var handleValues = ConvertArguments(handleCallTarget.ParameterTypes, args, factoryCallTarget.ParameterTypes.Length);
-        var result = handleCallTarget.Invoke(handle, handleValues);
-        var payload = await handleCallTarget.ReadReturnAsync(result, cancellationToken).ConfigureAwait(false);
-        var auditValue = factoryValues.Length > 0 ? factoryValues[0] : handleValues.Length > 0 ? handleValues[0] : null;
-        WriteAudit(context, bindingId, capability, effects, startedAt, auditValue);
         return payloadType is null
             ? SandboxValue.Unit
             : KernelRpcMarshaller.ToSandboxValue(payload, payloadType);
@@ -244,7 +175,7 @@ internal static partial class HostServiceBindingFactory
         if (binding is not null)
         {
             return (
-                binding.BindingId,
+                HostBindingId(method.DeclaringType!, method, binding),
                 binding.Capability,
                 DeclaredEffects(method, returnType, binding),
                 binding.IsAsync);
@@ -297,4 +228,7 @@ internal static partial class HostServiceBindingFactory
 
     private static string HostBindingRoute(Type type, MethodInfo method)
         => HostBindingMetadataRules.BindingId(type.Namespace, type.Name, method.Name);
+
+    private static string HostBindingId(Type type, MethodInfo method, HostBindingAttribute binding)
+        => binding.IsAutoBinding ? HostBindingRoute(type, method) : binding.BindingId;
 }

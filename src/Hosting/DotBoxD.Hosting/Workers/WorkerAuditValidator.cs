@@ -5,7 +5,9 @@ namespace DotBoxD.Hosting;
 
 using System.Globalization;
 using DotBoxD.Kernels;
+using DotBoxD.Kernels.Compiler;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Verifier;
 
 internal static class WorkerAuditValidator
 {
@@ -49,7 +51,8 @@ internal static class WorkerAuditValidator
         ExecutionPlan plan,
         string entrypoint,
         SandboxExecutionOptions options,
-        SandboxAuditEvent auditEvent)
+        SandboxAuditEvent auditEvent,
+        DateTimeOffset grantClock)
     {
         if (string.IsNullOrWhiteSpace(auditEvent.Kind) ||
             !TextIsSafe(auditEvent.Kind) ||
@@ -70,9 +73,10 @@ internal static class WorkerAuditValidator
             "ExecutionFallback" => ExecutionFallbackAuditMatches(plan, auditEvent),
             "VerifierFailure" => VerifierFailureAuditMatches(plan, auditEvent),
             "DebugTrace" => options.EnableDebugTrace && ModuleAuditMatches(plan, auditEvent),
-            "CacheInvalidated" => false,
+            "CacheInvalidated" => CacheInvalidatedAuditMatches(plan, entrypoint, auditEvent),
             "PolicyDenied" => false,
-            "BindingCall" or "SandboxLog" or "PluginMessage" => BindingAuditMatches(plan, entrypoint, auditEvent),
+            BindingAuditKinds.BindingCall or BindingAuditKinds.SandboxLog or BindingAuditKinds.PluginMessage =>
+                BindingAuditMatches(plan, entrypoint, auditEvent, grantClock),
             _ => false
         };
     }
@@ -144,10 +148,55 @@ internal static class WorkerAuditValidator
            auditEvent.ErrorCode == SandboxErrorCode.VerifierFailure &&
            ModuleAuditMatches(plan, auditEvent);
 
-    private static bool BindingAuditMatches(
+    private static bool CacheInvalidatedAuditMatches(
         ExecutionPlan plan,
         string entrypoint,
         SandboxAuditEvent auditEvent)
+    {
+        if (auditEvent.Success ||
+            auditEvent.BindingId is not null ||
+            auditEvent.CapabilityId is not null ||
+            auditEvent.Effect != SandboxEffect.None ||
+            auditEvent.ErrorCode != SandboxErrorCode.CacheInvalid ||
+            auditEvent.Fields is not { Count: 4 } fields ||
+            !fields.TryGetValue("cacheKey", out var cacheKey) ||
+            !fields.TryGetValue("moduleHash", out var moduleHash) ||
+            !fields.TryGetValue("planHash", out var planHash) ||
+            !fields.TryGetValue("reason", out var reason) ||
+            !ExpectedCacheKeyMatches(plan, entrypoint, cacheKey) ||
+            !string.Equals(auditEvent.ResourceId, "cache:" + cacheKey, StringComparison.Ordinal) ||
+            !string.Equals(moduleHash, plan.ModuleHash, StringComparison.Ordinal) ||
+            !string.Equals(planHash, plan.PlanHash, StringComparison.Ordinal) ||
+            string.IsNullOrWhiteSpace(reason))
+        {
+            return false;
+        }
+
+        foreach (var field in fields)
+        {
+            if (string.IsNullOrWhiteSpace(field.Key) ||
+                !TextIsSafe(field.Key) ||
+                !TextIsSafe(field.Value))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool ExpectedCacheKeyMatches(ExecutionPlan plan, string entrypoint, string cacheKey)
+    {
+        var policy = VerificationPolicy.BoxedValueDefaults();
+        return string.Equals(cacheKey, CacheKeyBuilder.Build(plan, entrypoint, policy, optimize: false), StringComparison.Ordinal) ||
+               string.Equals(cacheKey, CacheKeyBuilder.Build(plan, entrypoint, policy, optimize: true), StringComparison.Ordinal);
+    }
+
+    private static bool BindingAuditMatches(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxAuditEvent auditEvent,
+        DateTimeOffset grantClock)
     {
         if (string.IsNullOrWhiteSpace(auditEvent.BindingId) ||
             !plan.BindingReferences.TryGetValue(entrypoint, out var entrypointBindings) ||
@@ -155,11 +204,13 @@ internal static class WorkerAuditValidator
             !plan.Bindings.TryGet(auditEvent.BindingId, out var binding) ||
             binding.AuditLevel is AuditLevel.None or AuditLevel.Summary ||
             string.IsNullOrWhiteSpace(auditEvent.ResourceId) ||
+            !AuditKindMatchesBinding(auditEvent.Kind, binding) ||
             !CapabilityMatches(auditEvent, binding) ||
             !EffectMatches(auditEvent, binding) ||
             !ResultMatches(auditEvent) ||
             !LogAuditMatchesPolicy(plan, auditEvent) ||
             !BindingResourceMatchesGrant(plan, auditEvent, binding) ||
+            !WorkerPluginMessageAuditPolicy.Matches(plan, auditEvent, grantClock) ||
             !RequiredBindingFieldsMatch(plan, auditEvent))
         {
             return false;
@@ -167,6 +218,9 @@ internal static class WorkerAuditValidator
 
         return true;
     }
+
+    private static bool AuditKindMatchesBinding(string kind, BindingSignature binding)
+        => string.Equals(kind, binding.AuditKind, StringComparison.Ordinal);
 
     private static bool CapabilityMatches(SandboxAuditEvent auditEvent, BindingSignature binding)
         => binding.RequiredCapability is null ||
@@ -189,7 +243,7 @@ internal static class WorkerAuditValidator
         => auditEvent.Success ? auditEvent.ErrorCode is null : auditEvent.ErrorCode is not null;
 
     private static bool LogAuditMatchesPolicy(ExecutionPlan plan, SandboxAuditEvent auditEvent)
-        => auditEvent.Kind != "SandboxLog" ||
+        => auditEvent.Kind != BindingAuditKinds.SandboxLog ||
            auditEvent.Message is not null &&
            auditEvent.Message.Length <= plan.Budget.MaxLogMessageLength;
 
@@ -198,7 +252,7 @@ internal static class WorkerAuditValidator
         SandboxAuditEvent auditEvent,
         BindingSignature binding)
         => !auditEvent.Success ||
-           auditEvent.Kind != "BindingCall" ||
+           auditEvent.Kind != BindingAuditKinds.BindingCall ||
            !string.Equals(binding.RequiredCapability, WorkerHttpAuditGrantValidator.CapabilityId, StringComparison.Ordinal) ||
            WorkerHttpAuditGrantValidator.Matches(plan, auditEvent);
 

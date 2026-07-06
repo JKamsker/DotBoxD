@@ -45,7 +45,8 @@ internal static partial class ProxyGenerator
             enumerationCt,
             locals,
             ct,
-            "                ");
+            "                ",
+            checkCancellationBeforeStreamReserve: false);
         ProxyInvocationCleanupEmitter.EmitInvocationAssignment(
             sb,
             method.DeclaredReturnType,
