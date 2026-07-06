@@ -1,7 +1,6 @@
 using System.Text;
 using System.Threading;
 using DotBoxD.CodeGeneration.Shared.Defaults;
-using DotBoxD.Services.SourceGenerator.Infrastructure;
 using Microsoft.CodeAnalysis;
 
 namespace DotBoxD.Services.SourceGenerator.Models;
@@ -40,6 +39,11 @@ internal static partial class MethodModelFactory
                 continue;
             }
 
+            if (NullableFlowAttributeFormatter.TryAppendInlineAttribute(attributes, attr))
+            {
+                continue;
+            }
+
             switch (attr.AttributeClass?.ToDisplayString())
             {
                 case "System.Runtime.CompilerServices.DateTimeConstantAttribute":
@@ -65,51 +69,6 @@ internal static partial class MethodModelFactory
                     }
 
                     break;
-
-                case "System.Diagnostics.CodeAnalysis.AllowNullAttribute":
-                    AppendSimpleAttribute(
-                        attributes,
-                        "global::System.Diagnostics.CodeAnalysis.AllowNullAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.DisallowNullAttribute":
-                    AppendSimpleAttribute(
-                        attributes,
-                        "global::System.Diagnostics.CodeAnalysis.DisallowNullAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.MaybeNullAttribute":
-                    AppendSimpleAttribute(
-                        attributes,
-                        "global::System.Diagnostics.CodeAnalysis.MaybeNullAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.NotNullAttribute":
-                    AppendSimpleAttribute(
-                        attributes,
-                        "global::System.Diagnostics.CodeAnalysis.NotNullAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute":
-                    AppendBooleanArgumentAttribute(
-                        attributes,
-                        attr,
-                        "global::System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute":
-                    AppendBooleanArgumentAttribute(
-                        attributes,
-                        attr,
-                        "global::System.Diagnostics.CodeAnalysis.NotNullWhenAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute":
-                    AppendStringArgumentAttribute(
-                        attributes,
-                        attr,
-                        "global::System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute");
-                    break;
             }
         }
 
@@ -122,99 +81,10 @@ internal static partial class MethodModelFactory
         foreach (var attr in method.GetReturnTypeAttributes())
         {
             ct.ThrowIfCancellationRequested();
-
-            switch (attr.AttributeClass?.ToDisplayString())
-            {
-                case "System.Diagnostics.CodeAnalysis.MaybeNullAttribute":
-                    AppendReturnSimpleAttribute(
-                        attributes,
-                        "global::System.Diagnostics.CodeAnalysis.MaybeNullAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.NotNullAttribute":
-                    AppendReturnSimpleAttribute(
-                        attributes,
-                        "global::System.Diagnostics.CodeAnalysis.NotNullAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute":
-                    AppendReturnStringArgumentAttribute(
-                        attributes,
-                        attr,
-                        "global::System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute");
-                    break;
-            }
+            NullableFlowAttributeFormatter.TryAppendReturnAttribute(attributes, attr);
         }
 
         return attributes.ToString();
-    }
-
-    private static void AppendSimpleAttribute(StringBuilder sb, string attributeType)
-    {
-        sb.Append("[")
-            .Append(attributeType)
-            .Append("] ");
-    }
-
-    private static void AppendBooleanArgumentAttribute(
-        StringBuilder sb,
-        AttributeData attr,
-        string attributeType)
-    {
-        if (attr.ConstructorArguments.Length != 1 ||
-            attr.ConstructorArguments[0].Value is not bool value)
-        {
-            return;
-        }
-
-        sb.Append("[")
-            .Append(attributeType)
-            .Append("(")
-            .Append(value ? "true" : "false")
-            .Append(")] ");
-    }
-
-    private static void AppendStringArgumentAttribute(
-        StringBuilder sb,
-        AttributeData attr,
-        string attributeType)
-    {
-        if (attr.ConstructorArguments.Length != 1 ||
-            attr.ConstructorArguments[0].Value is not string value)
-        {
-            return;
-        }
-
-        sb.Append("[")
-            .Append(attributeType)
-            .Append("(\"")
-            .Append(LiteralHelpers.EscapeStringLiteral(value))
-            .Append("\")] ");
-    }
-
-    private static void AppendReturnSimpleAttribute(StringBuilder sb, string attributeType)
-    {
-        sb.Append("[return: ")
-            .Append(attributeType)
-            .AppendLine("]");
-    }
-
-    private static void AppendReturnStringArgumentAttribute(
-        StringBuilder sb,
-        AttributeData attr,
-        string attributeType)
-    {
-        if (attr.ConstructorArguments.Length != 1 ||
-            attr.ConstructorArguments[0].Value is not string value)
-        {
-            return;
-        }
-
-        sb.Append("[return: ")
-            .Append(attributeType)
-            .Append("(\"")
-            .Append(LiteralHelpers.EscapeStringLiteral(value))
-            .AppendLine("\")]");
     }
 
 }
