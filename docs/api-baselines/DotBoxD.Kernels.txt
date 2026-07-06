@@ -144,7 +144,7 @@ public IReadOnlyList<SandboxAuditEvent> Events
 public IReadOnlyList<SandboxDiagnostic> Diagnostics { get; } = ModelCopy.List(diagnostics)
 public IReadOnlyList<SandboxFunction> Functions { get => _functions; init => _functions = ModelCopy.List(value); }
 public IReadOnlyList<SandboxType> Arguments { get => _arguments; init => _arguments = ModelCopy.List(value); }
-public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = ModelCopy.List(value); }
+public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = BindingParameterTypes.Copy(value, nameof(Parameters)); }
 public IReadOnlyList<SandboxValue> Fields { get => _fields; init => _fields = Snapshot(value); }
 public IReadOnlyList<SandboxValue> Values { get => this; init => _values = Snapshot(value); }
 public IReadOnlyList<Statement> Body { get => _body; init => _body = ModelCopy.List(value); }
