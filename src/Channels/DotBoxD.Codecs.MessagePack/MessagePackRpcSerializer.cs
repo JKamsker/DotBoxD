@@ -85,6 +85,7 @@ public sealed class MessagePackRpcSerializer : ISerializer
                     RpcRequestFormatter.Instance,
                     RpcResponseFormatter.Instance,
                     ReadOnlyMemoryByteFormatter.Instance,
+                    RpcObjectFormatter.Instance,
                 },
                 effectiveResolvers))
             .WithSecurity(MessagePackSecurity.UntrustedData);
