@@ -12,6 +12,22 @@ internal sealed class RpcObjectFormatter : IMessagePackFormatter<object?>
         PrimitiveObjectResolver.Instance.GetFormatter<object?>()
         ?? throw new MessagePackSerializationException("No primitive object formatter is registered.");
 
+    private static readonly HashSet<Type> SupportedScalarTypes = new()
+    {
+        typeof(bool),
+        typeof(byte),
+        typeof(sbyte),
+        typeof(short),
+        typeof(ushort),
+        typeof(int),
+        typeof(uint),
+        typeof(long),
+        typeof(ulong),
+        typeof(float),
+        typeof(double),
+        typeof(string),
+    };
+
     private RpcObjectFormatter()
     {
     }
@@ -52,17 +68,5 @@ internal sealed class RpcObjectFormatter : IMessagePackFormatter<object?>
             "Declare enum, collection, tuple, and aggregate payloads with their concrete type.");
     }
 
-    private static bool IsSupportedScalar(Type type)
-        => type == typeof(bool) ||
-           type == typeof(byte) ||
-           type == typeof(sbyte) ||
-           type == typeof(short) ||
-           type == typeof(ushort) ||
-           type == typeof(int) ||
-           type == typeof(uint) ||
-           type == typeof(long) ||
-           type == typeof(ulong) ||
-           type == typeof(float) ||
-           type == typeof(double) ||
-           type == typeof(string);
+    private static bool IsSupportedScalar(Type type) => SupportedScalarTypes.Contains(type);
 }
