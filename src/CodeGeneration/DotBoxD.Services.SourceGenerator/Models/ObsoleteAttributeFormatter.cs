@@ -16,10 +16,13 @@ internal static class ObsoleteAttributeFormatter
             : "[global::System.ObsoleteAttribute(" + message + IsErrorArgument(attr) + ")]";
     }
 
-    private static string IsErrorArgument(AttributeData attr) =>
+    public static bool IsError(AttributeData attr) =>
         attr.ConstructorArguments.Length > 1 &&
-            attr.ConstructorArguments[1].Value is bool constructorIsError &&
-            constructorIsError
-                ? ", true"
-                : string.Empty;
+        attr.ConstructorArguments[1].Value is bool constructorIsError &&
+        constructorIsError;
+
+    private static string IsErrorArgument(AttributeData attr) =>
+        IsError(attr)
+            ? ", true"
+            : string.Empty;
 }

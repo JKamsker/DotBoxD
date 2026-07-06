@@ -48,17 +48,80 @@ public sealed class ServiceTypeObsoleteAttributeTests
 
         using (new AssertionScope())
         {
-            proxy.SourceText.ToString().Should().Contain(
-                """
-                    [global::System.ObsoleteAttribute("Use INew")]
-                    public sealed class LegacyProxy : global::Regress.ServiceTypeObsolete.ILegacy, global::Regress.ServiceTypeObsolete.ILegacyAsync
-                """);
-            asyncSibling.SourceText.ToString().Should().Contain(
-                """
-                    [global::System.ObsoleteAttribute("Use INew")]
-                    public interface ILegacyAsync
-                """);
+            AssertTypeHasObsoleteAttribute(
+                proxy.SourceText.ToString(),
+                "public sealed class LegacyProxy : global::Regress.ServiceTypeObsolete.ILegacy, global::Regress.ServiceTypeObsolete.ILegacyAsync",
+                "Use INew");
+            AssertTypeHasObsoleteAttribute(
+                asyncSibling.SourceText.ToString(),
+                "public interface ILegacyAsync",
+                "Use INew");
             obsoleteDiagnostics.Should().BeEmpty();
         }
     }
+
+    [Fact]
+    public void ObsoleteErrorServiceInterface_IsRejectedBeforeGeneratedReferences()
+    {
+        const string source = """
+            using DotBoxD.Services.Attributes;
+            using System;
+            using System.Threading.Tasks;
+
+            namespace Regress.ServiceTypeObsolete
+            {
+                [RpcService]
+                [Obsolete("Use INew", true)]
+                public interface ILegacy
+                {
+                    Task PingAsync();
+                }
+            }
+            """;
+
+        var compilation = GeneratorTestHelper.CreateCompilation(source);
+        var driver = GeneratorTestHelper.CreateDriver().RunGenerators(compilation);
+        var runResult = driver.GetRunResult();
+
+        var diagnostic = runResult.Diagnostics.Should().ContainSingle(d => d.Id == "DBXS003").Subject;
+        diagnostic.GetMessage().Should().Contain("[Obsolete(..., true)]");
+        runResult.Results.Single().GeneratedSources.Should().BeEmpty();
+    }
+
+    private static void AssertTypeHasObsoleteAttribute(string source, string declaration, string message)
+    {
+        var declarationIndex = source.IndexOf(declaration, StringComparison.Ordinal);
+        declarationIndex.Should().BeGreaterThanOrEqualTo(0);
+
+        var declarationLineStart = FindLineStart(source, declarationIndex);
+        var previousLine = GetPreviousLine(source, declarationLineStart);
+        previousLine.Should().Be($"[global::System.ObsoleteAttribute(\"{message}\")]");
+    }
+
+    private static int FindLineStart(string source, int index)
+    {
+        var previousNewLine = source.LastIndexOf('\n', index);
+        return previousNewLine < 0 ? 0 : previousNewLine + 1;
+    }
+
+    private static string GetPreviousLine(string source, int lineStart)
+    {
+        var previousLineEnd = lineStart;
+        while (previousLineEnd > 0 && IsLineBreak(source[previousLineEnd - 1]))
+        {
+            previousLineEnd--;
+        }
+
+        if (previousLineEnd == 0)
+        {
+            return string.Empty;
+        }
+
+        var previousLineStart = source.LastIndexOf('\n', previousLineEnd - 1);
+        previousLineStart = previousLineStart < 0 ? 0 : previousLineStart + 1;
+        return source.Substring(previousLineStart, previousLineEnd - previousLineStart).Trim();
+    }
+
+    private static bool IsLineBreak(char value) =>
+        value is '\r' or '\n';
 }

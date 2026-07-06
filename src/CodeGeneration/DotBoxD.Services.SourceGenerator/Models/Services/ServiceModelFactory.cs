@@ -56,6 +56,16 @@ internal static partial class ServiceModelFactory
             return rejectedInterface;
         }
 
+        var obsoleteAttribute = BuildObsoleteAttribute(interfaceSymbol, ct);
+        if (obsoleteAttribute.IsError)
+        {
+            return RejectedService(
+                buildContext.DisplayName,
+                "[Obsolete(..., true)] service interfaces are not supported because generated proxy, dispatcher, and registration code must reference the service type",
+                buildContext.ServiceLocation,
+                buildContext.QualifiedInterfaceName);
+        }
+
         if (!TryCollectServiceMembers(interfaceSymbol, buildContext, ct, out var members, out var rejectedMembers))
         {
             return rejectedMembers;
@@ -146,7 +156,7 @@ internal static partial class ServiceModelFactory
                 Methods: methods.ToEquatableArray(),
                 Properties: properties.ToEquatableArray(),
                 RawServiceName: serviceName,
-                ObsoleteAttribute: BuildObsoleteAttribute(interfaceSymbol, ct)),
+                ObsoleteAttribute: obsoleteAttribute.Source),
             Error: null,
             MethodDiagnostics: methodDiagnostics.ToEquatableArray(),
             MethodLocations: methodLocations.ToEquatableArray(),
@@ -187,18 +197,20 @@ internal static partial class ServiceModelFactory
         return null;
     }
 
-    private static string BuildObsoleteAttribute(INamedTypeSymbol interfaceSymbol, CancellationToken ct)
+    private static (string Source, bool IsError) BuildObsoleteAttribute(
+        INamedTypeSymbol interfaceSymbol,
+        CancellationToken ct)
     {
         foreach (var attr in interfaceSymbol.GetAttributes())
         {
             ct.ThrowIfCancellationRequested();
             if (attr.AttributeClass?.ToDisplayString() == "System.ObsoleteAttribute")
             {
-                return ObsoleteAttributeFormatter.Format(attr);
+                return (ObsoleteAttributeFormatter.Format(attr), ObsoleteAttributeFormatter.IsError(attr));
             }
         }
 
-        return string.Empty;
+        return (string.Empty, false);
     }
 
     private static string GetNamespace(INamespaceSymbol namespaceSymbol)
