@@ -1,5 +1,6 @@
 namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
+using DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 using System.Collections.Generic;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -31,6 +32,7 @@ internal static class RpcKernelClientServiceMethodResolver
                 }
 
                 ValidateDuplicateParameterNames(serviceType, existing, method);
+                ValidateDuplicateReturnFlowAttributes(serviceType, existing, method);
                 continue;
             }
 
@@ -85,6 +87,22 @@ internal static class RpcKernelClientServiceMethodResolver
                     $"Server extension interface '{serviceType.ToDisplayString()}' inherits method '{next.Name}' with the same signature but different parameter names; generated clients cannot preserve both named-argument contracts.");
             }
         }
+    }
+
+    private static void ValidateDuplicateReturnFlowAttributes(
+        INamedTypeSymbol serviceType,
+        IMethodSymbol first,
+        IMethodSymbol next)
+    {
+        var firstAttributes = PluginServerFlowAttributeSource.ReturnAttributes(first);
+        var nextAttributes = PluginServerFlowAttributeSource.ReturnAttributes(next);
+        if (firstAttributes.Equals(nextAttributes))
+        {
+            return;
+        }
+
+        throw new NotSupportedException(
+            $"Server extension interface '{serviceType.ToDisplayString()}' has inherited method '{next.Name}' with the same signature but different return-flow attributes; generated clients cannot preserve both return-flow contracts.");
     }
 
     private static void ValidateNonGeneric(IMethodSymbol serviceMethod)
