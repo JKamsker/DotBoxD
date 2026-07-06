@@ -51,49 +51,49 @@ public static class KernelRpcValueConverter
         ArgumentNullException.ThrowIfNull(expectedType);
         if (expectedType.Equals(SandboxType.Unit))
         {
-            value.RequireKind(KernelRpcValueKind.Unit);
+            RequireKind(value, KernelRpcValueKind.Unit);
             return SandboxValue.Unit;
         }
 
         if (expectedType.Equals(SandboxType.Bool))
         {
-            value.RequireKind(KernelRpcValueKind.Bool);
+            RequireKind(value, KernelRpcValueKind.Bool);
             return SandboxValue.FromBool(value.BoolValue);
         }
 
         if (expectedType.Equals(SandboxType.I32))
         {
-            value.RequireKind(KernelRpcValueKind.I32);
+            RequireKind(value, KernelRpcValueKind.I32);
             return SandboxValue.FromInt32(value.Int32Value);
         }
 
         if (expectedType.Equals(SandboxType.I64))
         {
-            value.RequireKind(KernelRpcValueKind.I64);
+            RequireKind(value, KernelRpcValueKind.I64);
             return SandboxValue.FromInt64(value.Int64Value);
         }
 
         if (expectedType.Equals(SandboxType.F64))
         {
-            value.RequireKind(KernelRpcValueKind.F64);
+            RequireKind(value, KernelRpcValueKind.F64);
             return SandboxValue.FromDouble(value.DoubleValue);
         }
 
         if (expectedType.Equals(SandboxType.String))
         {
-            value.RequireKind(KernelRpcValueKind.String);
+            RequireKind(value, KernelRpcValueKind.String);
             return SandboxValue.FromString(value.TextValue);
         }
 
         if (expectedType.Equals(SandboxType.Guid))
         {
-            value.RequireKind(KernelRpcValueKind.Guid);
+            RequireKind(value, KernelRpcValueKind.Guid);
             return SandboxValue.FromGuid(value.GuidValue);
         }
 
         if (expectedType.Name == "List" && expectedType.Arguments.Count == 1)
         {
-            value.RequireKind(KernelRpcValueKind.List);
+            RequireKind(value, KernelRpcValueKind.List);
             var itemType = expectedType.Arguments[0];
             var source = value.ItemSpan;
             var items = source.Length == 0
@@ -109,7 +109,7 @@ public static class KernelRpcValueConverter
 
         if (expectedType.Name == "Map" && expectedType.Arguments.Count == 2)
         {
-            value.RequireKind(KernelRpcValueKind.Map);
+            RequireKind(value, KernelRpcValueKind.Map);
             var keyType = expectedType.Arguments[0];
             var valueType = expectedType.Arguments[1];
             var source = value.ItemSpan;
@@ -129,11 +129,11 @@ public static class KernelRpcValueConverter
 
         if (expectedType.IsRecord)
         {
-            value.RequireKind(KernelRpcValueKind.Record);
+            RequireKind(value, KernelRpcValueKind.Record);
             var source = value.ItemSpan;
             if (source.Length != expectedType.Arguments.Count)
             {
-                throw new NotSupportedException(
+                throw new FormatException(
                     $"Server extension IPC record expected {expectedType.Arguments.Count} field(s) but received {source.Length}.");
             }
 
@@ -149,6 +149,14 @@ public static class KernelRpcValueConverter
         }
 
         throw new NotSupportedException($"Server extension IPC cannot marshal expected sandbox type '{expectedType}'.");
+    }
+
+    private static void RequireKind(KernelRpcValue value, KernelRpcValueKind expected)
+    {
+        if (value.Kind != expected)
+        {
+            throw new FormatException($"Server extension value expected '{expected}' but received '{value.Kind}'.");
+        }
     }
 
     private static KernelRpcValue[] ConvertList(IReadOnlyList<SandboxValue> values)
