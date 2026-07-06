@@ -99,7 +99,6 @@ internal static class GeneratedMethodShapeSignatures
                !calledMember.StartsWith(
                    CompiledRuntimeName + ".ChargeValueArray(" + SandboxContextName,
                    StringComparison.Ordinal) &&
-               !IsLiteralConstructionCall(calledMember) &&
                !IsScalarConversionCall(calledMember) &&
                !calledMember.Contains("(" + SandboxContextName + ",", StringComparison.Ordinal);
     }
@@ -118,15 +117,6 @@ internal static class GeneratedMethodShapeSignatures
            calledMember.StartsWith(CompiledRuntimeName + ".AsI64(", StringComparison.Ordinal) ||
            calledMember.StartsWith(CompiledRuntimeName + ".AsF64(", StringComparison.Ordinal) ||
            calledMember.StartsWith(CompiledRuntimeName + ".AsBool(", StringComparison.Ordinal);
-
-    private static bool IsLiteralConstructionCall(string calledMember)
-        => calledMember.StartsWith(CompiledRuntimeName + ".CreateLiteralValueArray(", StringComparison.Ordinal) ||
-           calledMember.StartsWith(CompiledRuntimeName + ".StringLiteralValue(", StringComparison.Ordinal) ||
-           calledMember.StartsWith(CompiledRuntimeName + ".OpaqueIdLiteralValue(", StringComparison.Ordinal) ||
-           calledMember.StartsWith(CompiledRuntimeName + ".GuidLiteralValue(", StringComparison.Ordinal) ||
-           calledMember.StartsWith(CompiledRuntimeName + ".PathLiteralValue(", StringComparison.Ordinal) ||
-           calledMember.StartsWith(CompiledRuntimeName + ".UriLiteralValue(", StringComparison.Ordinal) ||
-           IsUnchargedLiteralCall(calledMember);
 
     internal static bool IsUnchargedLiteralCall(string? calledMember)
         => calledMember is not null &&
