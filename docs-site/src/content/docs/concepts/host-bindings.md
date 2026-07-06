@@ -26,7 +26,7 @@ using DotBoxD.Services.Attributes;
 
 namespace Example;
 
-[DotBoxDService]
+[RpcService]
 public interface IWeatherApi
 {
     [HostCapability("weather.current.read", HostBindingEffect.HostStateRead)]
@@ -74,7 +74,7 @@ public sealed partial class WeatherScoreKernel
 }
 ```
 
-For auto-bound `[DotBoxDService]` methods, the binding id is derived as
+For auto-bound `[RpcService]` methods, the binding id is derived as
 `host.{namespace}.{type-metadata-name}.{method-name}`. For the example above that is
 `host.Example.IWeatherApi.CurrentCelsius`. The capability and effects come from `[HostCapability]`.
 
@@ -93,7 +93,7 @@ capability with `SandboxPolicyBuilder.AllowRuntimeAsync()`.
 
 Use a hand-written `BindingDescriptor` when you need exact control over binding ids, cost models,
 resource audit ids, custom grant validation, or a shape that is not naturally represented by a
-`[DotBoxDService]` contract.
+`[RpcService]` contract.
 
 ```csharp
 using DotBoxD.Kernels;

@@ -67,13 +67,13 @@ public sealed partial class InstalledKernel
         if (callerCount < 0)
         {
             throw new SandboxRuntimeException(new SandboxError(
-                SandboxErrorCode.ValidationError, "server extension entrypoint declares fewer parameters than live settings"));
+                SandboxErrorCode.ValidationError,
+                "server extension entrypoint declares fewer parameters than live settings"));
         }
 
         if (rpcArguments.Length != callerCount)
         {
-            throw RpcInvalidInput(
-                $"server extension '{Manifest.PluginId}' expects {callerCount} argument(s) but received {rpcArguments.Length}.");
+            throw RpcArgumentCountMismatch(function.Id, callerCount, rpcArguments.Length);
         }
 
         var sandboxArguments = rpcArguments.Length == 0
@@ -116,9 +116,7 @@ public sealed partial class InstalledKernel
 
         if (arguments.Count != callerCount)
         {
-            throw new SandboxRuntimeException(new SandboxError(
-                SandboxErrorCode.InvalidInput,
-                $"server extension entrypoint '{entrypoint}' expects {callerCount} argument(s) but received {arguments.Count}"));
+            throw RpcArgumentCountMismatch(entrypoint, callerCount, arguments.Count);
         }
 
         if (function.Parameters.Count == 0)
@@ -194,4 +192,9 @@ public sealed partial class InstalledKernel
 
     private static SandboxRuntimeException RpcInvalidInput(string message)
         => new(new SandboxError(SandboxErrorCode.InvalidInput, message));
+
+    private static SandboxRuntimeException RpcArgumentCountMismatch(string entrypoint, int expected, int actual)
+        => new(new SandboxError(
+            SandboxErrorCode.InvalidInput,
+            $"server extension entrypoint '{entrypoint}' expects {expected} argument(s) but received {actual}"));
 }

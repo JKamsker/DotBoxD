@@ -164,20 +164,34 @@ jobs:
           _MARKER_RE = re.compile(r"<!--\s*surprise-fix:resolve\s*(\{.*?\})\s*-->", re.DOTALL)
           _RESOLVE_MUTATION = ("mutation($id:ID!){resolveReviewThread(input:{threadId:$id})"
                                "{thread{id isResolved}}}")
+          # The worker reliably starts its summary with a "Mode: FIX|GREEN|POLISH"
+          # line but (gpt-5.5) does NOT reliably emit the hidden HTML markers. So a
+          # trusted summary comment is itself the "polished" signal, and the review
+          # thread node ids the worker lists in prose (PRRT_...) are the resolve
+          # fallback. Both are still cross-checked: has_marker only trusts our own
+          # authors, and resolution only ever touches ids that are ACTUALLY
+          # unresolved CodeRabbit threads on the PR (see polish_graphql).
+          _POLISHED_RE = re.compile(r"(?im)^\s*Mode:\s*(?:FIX|GREEN|POLISH)")
+          _THREAD_ID_RE = re.compile(r"\bPRRT_[A-Za-z0-9_-]{6,}")
 
           def parse_handled_ids(comment_bodies):
               handled = set()
               for body in comment_bodies:
-                  m = _MARKER_RE.search(body or "")
-                  if not m:
-                      continue
-                  try:
-                      payload = json.loads(m.group(1))
-                  except json.JSONDecodeError:
-                      continue
-                  for tid in payload.get("resolve") or []:
-                      if isinstance(tid, str) and tid:
-                          handled.add(tid)
+                  body = body or ""
+                  m = _MARKER_RE.search(body)
+                  if m:
+                      try:
+                          payload = json.loads(m.group(1))
+                      except json.JSONDecodeError:
+                          payload = {}
+                      for tid in payload.get("resolve") or []:
+                          if isinstance(tid, str) and tid:
+                              handled.add(tid)
+                  # Fallback: the worker lists the thread node ids it addressed in
+                  # prose even when it omits the machine block. Safe because the
+                  # caller intersects with unresolved CodeRabbit thread ids.
+                  for tid in _THREAD_ID_RE.findall(body):
+                      handled.add(tid)
               return handled
 
           def resolve_thread(tid):
@@ -307,10 +321,12 @@ jobs:
                   if is_coderabbit(r.get("author")) and any(tok in body for tok in ACTIONABLE):
                       has_actionable = True
                       break
-              # Only markers authored by our own automation are trusted (spoof guard).
+              # Only comments authored by our own automation are trusted (spoof guard).
               trusted_bodies = [c.get("body") or "" for c in comments
                                 if is_trusted_marker_author(c.get("author"))]
-              has_marker = any(SENTINEL in b for b in trusted_bodies)
+              # A polish pass has run if the worker left its summary comment: either
+              # the explicit marker OR its reliably-emitted "Mode:" summary line.
+              has_marker = any(SENTINEL in b or _POLISHED_RE.search(b) for b in trusted_bodies)
               return {"has_marker": has_marker, "unresolved_cr_ids": unresolved_cr_ids,
                       "handled_ids": parse_handled_ids(trusted_bodies),
                       "has_actionable": has_actionable}

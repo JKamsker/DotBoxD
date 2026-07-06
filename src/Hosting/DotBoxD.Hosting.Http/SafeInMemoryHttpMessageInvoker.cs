@@ -59,6 +59,7 @@ public sealed class SafeInMemoryHttpMessageInvoker : HttpMessageInvoker
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (_responseDelay > TimeSpan.Zero)
             {
                 await Task.Delay(_responseDelay, cancellationToken).ConfigureAwait(false);

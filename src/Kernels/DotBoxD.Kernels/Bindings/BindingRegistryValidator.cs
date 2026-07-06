@@ -60,6 +60,11 @@ internal static class BindingRegistryValidator
             diagnostics.Add(new SandboxDiagnostic("E-BINDING-AUDIT", $"binding '{binding.Id}' declares an unknown audit level"));
         }
 
+        if (!IsKnownAuditKind(binding.AuditKind))
+        {
+            diagnostics.Add(new SandboxDiagnostic("E-BINDING-AUDIT", $"binding '{binding.Id}' declares an unknown audit kind"));
+        }
+
         if (!IsKnownBindingSafety(binding.Safety))
         {
             diagnostics.Add(new SandboxDiagnostic("E-BINDING-SAFETY", $"binding '{binding.Id}' declares an unknown safety classification"));
@@ -260,6 +265,9 @@ internal static class BindingRegistryValidator
             AuditLevel.PerCall or
             AuditLevel.PerResource or
             AuditLevel.FullInputOutput;
+
+    private static bool IsKnownAuditKind(string auditKind)
+        => auditKind is BindingAuditKinds.BindingCall or BindingAuditKinds.SandboxLog or BindingAuditKinds.PluginMessage;
 
     private static bool IsKnownBindingSafety(BindingSafety safety)
         => safety is BindingSafety.PureIntrinsic or

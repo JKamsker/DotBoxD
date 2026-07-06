@@ -24,7 +24,10 @@ public static partial class SafeLogBindings
             AuditLevel.PerCall,
             BindingSafety.SideEffectingExternal,
             invoker.Invoke,
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)))
+        {
+            AuditKind = BindingAuditKinds.SandboxLog
+        };
     }
 
     private static void Write(SandboxContext context, string bindingId, string level, string message)
@@ -36,7 +39,7 @@ public static partial class SafeLogBindings
         var timestamp = context.AuditTimestamp();
         context.Audit.Write(new SandboxAuditEvent(
             context.RunId,
-            "SandboxLog",
+            BindingAuditKinds.SandboxLog,
             timestamp,
             true,
             BindingId: bindingId,
