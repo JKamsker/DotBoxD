@@ -18,9 +18,12 @@ internal static class F64ForLoopRunner
         SandboxContext context,
         SandboxExecutionOptions options)
     {
-        if (options.EnableDebugTrace ||
-            start >= end ||
-            !TryCreateBodyPlan(statement, frame, context.Bindings, out var body, out var fuelPerIteration, out var binding))
+        if (!CanUseFastPath(options, start, end))
+        {
+            return false;
+        }
+
+        if (!TryCreateBodyPlan(statement, frame, context.Bindings, out var body, out var fuelPerIteration, out var binding))
         {
             return false;
         }
@@ -54,6 +57,9 @@ internal static class F64ForLoopRunner
 
         return true;
     }
+
+    private static bool CanUseFastPath(SandboxExecutionOptions options, int start, int end)
+        => !options.EnableDebugTrace && start < end;
 
     private static bool TryCreateBodyPlan(
         ForRangeStatement statement,

@@ -14,6 +14,13 @@ internal sealed class RpcPeerFrameProcessor
     private readonly RpcPeerOutboundInvoker _outbound;
     private readonly RpcStreamManager _streams;
     private readonly Action<int, MessageType, string, Exception?> _protocolError;
+    private readonly Dictionary<MessageType, FrameHandler> _handlers;
+
+    private delegate ValueTask<bool> FrameHandler(
+        RpcFrame frame,
+        int messageId,
+        MessageType messageType,
+        CancellationToken ct);
 
     public RpcPeerFrameProcessor(
         RpcPeerInboundDispatcher inbound,
@@ -25,6 +32,18 @@ internal sealed class RpcPeerFrameProcessor
         _outbound = outbound;
         _streams = streams;
         _protocolError = protocolError;
+        _handlers = new Dictionary<MessageType, FrameHandler>
+        {
+            [MessageType.Response] = HandleResponseAsync,
+            [MessageType.Error] = HandleResponseAsync,
+            [MessageType.Request] = HandleRequestAsync,
+            [MessageType.Cancel] = HandleCancelAsync,
+            [MessageType.StreamCancel] = HandleStreamCancelAsync,
+            [MessageType.StreamItem] = HandleStreamItemAsync,
+            [MessageType.StreamComplete] = HandleStreamCompleteAsync,
+            [MessageType.StreamError] = HandleStreamErrorAsync,
+            [MessageType.StreamCredit] = HandleStreamCreditAsync,
+        };
     }
 
     public async ValueTask<bool> ShouldDisposeAsync(RpcFrame frame, CancellationToken ct)
@@ -35,82 +54,131 @@ internal sealed class RpcPeerFrameProcessor
             return true;
         }
 
-        switch (messageType)
+        if (_handlers.TryGetValue(messageType, out var handler))
         {
-            case MessageType.Response:
-            case MessageType.Error:
-                return !_outbound.TryCompleteResponse(messageId, frame);
-            case MessageType.Request:
-                return !await _inbound.AcceptRequestAsync(frame, messageId, ct).ConfigureAwait(false);
-            case MessageType.Cancel:
-                if (messageId == 0 || frame.Length != MessageFramer.HeaderSize)
-                {
-                    _protocolError(messageId, messageType, "Malformed cancel frame.", null);
-                    return true;
-                }
-
-                _inbound.Cancel(messageId);
-                return true;
-            case MessageType.StreamCancel:
-                if (!RpcStreamControlFrameReader.TryRead(
-                        frame.Memory,
-                        MessageType.StreamCancel,
-                        out var streamCancelId))
-                {
-                    _protocolError(messageId, messageType, "Malformed stream cancel frame.", null);
-                    return true;
-                }
-
-                _streams.CancelOutbound(streamCancelId);
-                return true;
-            case MessageType.StreamItem:
-                if (messageId == 0)
-                {
-                    _protocolError(messageId, messageType, "Malformed stream item frame.", null);
-                    return true;
-                }
-
-                var itemFrame = frame.DetachPayload();
-                if (_streams.TryAcceptItem(messageId, itemFrame))
-                {
-                    return false;
-                }
-
-                itemFrame.Dispose();
-                _protocolError(messageId, messageType, "Unknown stream id.", null);
-                return true;
-            case MessageType.StreamComplete:
-                if (!RpcStreamCompleteFrameReader.TryRead(frame.Memory, out var streamId))
-                {
-                    _protocolError(messageId, messageType, "Malformed stream complete frame.", null);
-                    return true;
-                }
-
-                if (!_streams.TryCompleteInbound(streamId))
-                {
-                    _protocolError(messageId, messageType, "Unknown stream id.", null);
-                }
-
-                return true;
-            case MessageType.StreamError:
-                if (!_streams.TryCompleteInboundError(frame.Memory, out var malformed))
-                {
-                    var message = malformed ? "Malformed stream error frame." : "Unknown stream id.";
-                    _protocolError(messageId, messageType, message, null);
-                }
-
-                return true;
-            case MessageType.StreamCredit:
-                if (!_streams.TryAddCredit(frame.Memory))
-                {
-                    _protocolError(messageId, messageType, "Malformed stream credit frame.", null);
-                }
-
-                return true;
-            default:
-                _protocolError(messageId, messageType, "Unknown message type.", null);
-                return true;
+            return await handler(frame, messageId, messageType, ct).ConfigureAwait(false);
         }
+
+        _protocolError(messageId, messageType, "Unknown message type.", null);
+        return true;
+    }
+
+    private ValueTask<bool> HandleResponseAsync(
+        RpcFrame frame,
+        int messageId,
+        MessageType messageType,
+        CancellationToken ct)
+        => new(!_outbound.TryCompleteResponse(messageId, frame));
+
+    private async ValueTask<bool> HandleRequestAsync(
+        RpcFrame frame,
+        int messageId,
+        MessageType messageType,
+        CancellationToken ct)
+        => !await _inbound.AcceptRequestAsync(frame, messageId, ct).ConfigureAwait(false);
+
+    private ValueTask<bool> HandleCancelAsync(
+        RpcFrame frame,
+        int messageId,
+        MessageType messageType,
+        CancellationToken ct)
+    {
+        if (messageId == 0 || frame.Length != MessageFramer.HeaderSize)
+        {
+            _protocolError(messageId, messageType, "Malformed cancel frame.", null);
+            return new ValueTask<bool>(true);
+        }
+
+        _inbound.Cancel(messageId);
+        return new ValueTask<bool>(true);
+    }
+
+    private ValueTask<bool> HandleStreamCancelAsync(
+        RpcFrame frame,
+        int messageId,
+        MessageType messageType,
+        CancellationToken ct)
+    {
+        if (!RpcStreamControlFrameReader.TryRead(frame.Memory, MessageType.StreamCancel, out var streamCancelId))
+        {
+            _protocolError(messageId, messageType, "Malformed stream cancel frame.", null);
+            return new ValueTask<bool>(true);
+        }
+
+        _streams.CancelOutbound(streamCancelId);
+        return new ValueTask<bool>(true);
+    }
+
+    private ValueTask<bool> HandleStreamItemAsync(
+        RpcFrame frame,
+        int messageId,
+        MessageType messageType,
+        CancellationToken ct)
+    {
+        if (messageId == 0)
+        {
+            _protocolError(messageId, messageType, "Malformed stream item frame.", null);
+            return new ValueTask<bool>(true);
+        }
+
+        var itemFrame = frame.DetachPayload();
+        if (_streams.TryAcceptItem(messageId, itemFrame))
+        {
+            return new ValueTask<bool>(false);
+        }
+
+        itemFrame.Dispose();
+        _protocolError(messageId, messageType, "Unknown stream id.", null);
+        return new ValueTask<bool>(true);
+    }
+
+    private ValueTask<bool> HandleStreamCompleteAsync(
+        RpcFrame frame,
+        int messageId,
+        MessageType messageType,
+        CancellationToken ct)
+    {
+        if (!RpcStreamCompleteFrameReader.TryRead(frame.Memory, out var streamId))
+        {
+            _protocolError(messageId, messageType, "Malformed stream complete frame.", null);
+            return new ValueTask<bool>(true);
+        }
+
+        if (!_streams.TryCompleteInbound(streamId))
+        {
+            _protocolError(messageId, messageType, "Unknown stream id.", null);
+        }
+
+        return new ValueTask<bool>(true);
+    }
+
+    private ValueTask<bool> HandleStreamErrorAsync(
+        RpcFrame frame,
+        int messageId,
+        MessageType messageType,
+        CancellationToken ct)
+    {
+        if (!_streams.TryCompleteInboundError(frame.Memory, out var malformed))
+        {
+            var message = malformed ? "Malformed stream error frame." : "Unknown stream id.";
+            _protocolError(messageId, messageType, message, null);
+        }
+
+        return new ValueTask<bool>(true);
+    }
+
+    private ValueTask<bool> HandleStreamCreditAsync(
+        RpcFrame frame,
+        int messageId,
+        MessageType messageType,
+        CancellationToken ct)
+    {
+        if (!_streams.TryAddCredit(frame.Memory))
+        {
+            _protocolError(messageId, messageType, "Malformed stream credit frame.", null);
+        }
+
+        return new ValueTask<bool>(true);
     }
 
     public ValueTask<bool> ShouldDisposeAsync(Payload frame, CancellationToken ct) =>

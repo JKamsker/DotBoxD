@@ -56,12 +56,12 @@ internal static partial class CompiledBindingDispatcher
             return ScalarTypeMatches(value, expected.Name);
         }
 
-        if (expected.Name == "List" && expected.Arguments.Count == 1)
+        if (IsListType(expected))
         {
             return value is ListValue list && list.ItemType.Equals(expected.Arguments[0]);
         }
 
-        if (expected.Name == "Map" && expected.Arguments.Count == 2)
+        if (IsMapType(expected))
         {
             return value is MapValue map &&
                    map.KeyType.Equals(expected.Arguments[0]) &&
@@ -76,21 +76,53 @@ internal static partial class CompiledBindingDispatcher
         return false;
     }
 
+    private static bool IsListType(SandboxType type)
+        => type.Name == "List" && type.Arguments.Count == 1;
+
+    private static bool IsMapType(SandboxType type)
+        => type.Name == "Map" && type.Arguments.Count == 2;
+
     private static bool ScalarTypeMatches(SandboxValue value, string expectedName)
-        => value switch
+    {
+        if (value is OpaqueIdValue opaque)
         {
-            UnitValue => expectedName == SandboxType.Unit.Name,
-            BoolValue => expectedName == SandboxType.Bool.Name,
-            I32Value => expectedName == SandboxType.I32.Name,
-            I64Value => expectedName == SandboxType.I64.Name,
-            F64Value => expectedName == SandboxType.F64.Name,
-            StringValue => expectedName == SandboxType.String.Name,
-            GuidValue => expectedName == SandboxType.Guid.Name,
-            OpaqueIdValue opaque => string.Equals(opaque.TypeName, expectedName, StringComparison.Ordinal),
-            SandboxPathValue => expectedName == SandboxType.SandboxPath.Name,
-            SandboxUriValue => expectedName == SandboxType.SandboxUri.Name,
-            _ => false
+            return string.Equals(opaque.TypeName, expectedName, StringComparison.Ordinal);
+        }
+
+        if (TryPrimitiveScalarName(value, out var scalarName))
+        {
+            return expectedName == scalarName;
+        }
+
+        return TryResourceScalarName(value, out scalarName) && expectedName == scalarName;
+    }
+
+    private static bool TryPrimitiveScalarName(SandboxValue value, out string name)
+    {
+        name = value switch
+        {
+            UnitValue => SandboxType.Unit.Name,
+            BoolValue => SandboxType.Bool.Name,
+            I32Value => SandboxType.I32.Name,
+            I64Value => SandboxType.I64.Name,
+            F64Value => SandboxType.F64.Name,
+            StringValue => SandboxType.String.Name,
+            GuidValue => SandboxType.Guid.Name,
+            _ => string.Empty
         };
+        return name.Length != 0;
+    }
+
+    private static bool TryResourceScalarName(SandboxValue value, out string name)
+    {
+        name = value switch
+        {
+            SandboxPathValue => SandboxType.SandboxPath.Name,
+            SandboxUriValue => SandboxType.SandboxUri.Name,
+            _ => string.Empty
+        };
+        return name.Length != 0;
+    }
 
     private static bool RecordTypeMatches(RecordValue record, SandboxType expected)
     {

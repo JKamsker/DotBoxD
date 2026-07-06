@@ -26,10 +26,10 @@ internal sealed record RpcServerExtensionGraft(
 
     public static void ValidateServerOwnedReceiver(INamedTypeSymbol receiverType, string description)
     {
-        if (receiverType.TypeKind != TypeKind.Interface || !IsDotBoxDService(receiverType))
+        if (receiverType.TypeKind != TypeKind.Interface || !IsRpcService(receiverType))
         {
             throw new NotSupportedException(
-                $"{description} '{receiverType.ToDisplayString()}' must be a server-owned [DotBoxDService] interface.");
+                $"{description} '{receiverType.ToDisplayString()}' must be a server-owned [RpcService] interface.");
         }
     }
 
@@ -40,27 +40,58 @@ internal sealed record RpcServerExtensionGraft(
         {
             foreach (var member in current.GetMembers())
             {
-                if (member is IFieldSymbol { IsStatic: false } field &&
-                    IsVisibleReceiverMember(field, kernelType) &&
-                    CanStoreReceiver(field.Type, receiverType) &&
-                    seen.Add(field.Name))
+                if (TryGetReceiverHandleFieldName(member, kernelType, receiverType, seen, out var fieldName))
                 {
-                    yield return field.Name;
-                }
-                else if (member is IPropertySymbol
-                {
-                    IsStatic: false,
-                    GetMethod: not null,
-                    SetMethod: null
-                } property &&
-                    IsVisibleReceiverMember(property, kernelType) &&
-                    CanStoreReceiver(property.Type, receiverType) &&
-                    seen.Add(property.Name))
-                {
-                    yield return property.Name;
+                    yield return fieldName;
                 }
             }
         }
+    }
+
+    private static bool TryGetReceiverHandleFieldName(
+        ISymbol member,
+        INamedTypeSymbol kernelType,
+        INamedTypeSymbol receiverType,
+        HashSet<string> seen,
+        out string fieldName)
+    {
+        fieldName = string.Empty;
+        if (member is IFieldSymbol { IsStatic: false } field)
+        {
+            return TryGetReceiverHandleMemberName(field, field.Type, kernelType, receiverType, seen, out fieldName);
+        }
+
+        if (member is IPropertySymbol
+            {
+                IsStatic: false,
+                GetMethod: not null,
+                SetMethod: null
+            } property)
+        {
+            return TryGetReceiverHandleMemberName(property, property.Type, kernelType, receiverType, seen, out fieldName);
+        }
+
+        return false;
+    }
+
+    private static bool TryGetReceiverHandleMemberName(
+        ISymbol member,
+        ITypeSymbol memberType,
+        INamedTypeSymbol kernelType,
+        INamedTypeSymbol receiverType,
+        HashSet<string> seen,
+        out string fieldName)
+    {
+        fieldName = string.Empty;
+        if (!IsVisibleReceiverMember(member, kernelType) ||
+            !CanStoreReceiver(memberType, receiverType) ||
+            !seen.Add(member.Name))
+        {
+            return false;
+        }
+
+        fieldName = member.Name;
+        return true;
     }
 
     private static bool IsVisibleReceiverMember(ISymbol member, INamedTypeSymbol kernelType)
@@ -121,14 +152,11 @@ internal sealed record RpcServerExtensionGraft(
         return false;
     }
 
-    private static bool IsDotBoxDService(INamedTypeSymbol type)
+    private static bool IsRpcService(INamedTypeSymbol type)
     {
         foreach (var attribute in type.GetAttributes())
         {
-            if (string.Equals(
-                attribute.AttributeClass?.ToDisplayString(),
-                DotBoxDMetadataNames.DotBoxDServiceAttribute,
-                StringComparison.Ordinal))
+            if (DotBoxDMetadataNames.IsRpcServiceAttribute(attribute.AttributeClass?.ToDisplayString()))
             {
                 return true;
             }

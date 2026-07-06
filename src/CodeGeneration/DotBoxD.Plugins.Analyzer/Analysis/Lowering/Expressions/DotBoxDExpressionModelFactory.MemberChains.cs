@@ -26,8 +26,8 @@ internal static partial class DotBoxDExpressionModelFactory
 
         return context.SemanticModel.GetSymbolInfo(member, context.CancellationToken).Symbol switch
         {
-            IPropertySymbol property when HasLocalAttribute(property) => throw new NotSupportedException(
-                "[Local] context members cannot be used in lowered server-side IR."),
+            IPropertySymbol property when HasNativeOnlyAttribute(property) => throw new NotSupportedException(
+                "[NativeOnly] context members cannot be used in lowered server-side IR."),
             IPropertySymbol property => DotBoxDHostBindingExpressionLowerer.TryLowerProperty(property, context)
                 ?? throw new NotSupportedException(
                     $"Unsupported server context property '{memberName}'. Use generated context surfaces or [KernelMethod] helpers for server-side IR."),
@@ -78,40 +78,69 @@ internal static partial class DotBoxDExpressionModelFactory
             return null;
         }
 
-        if ((string.Equals(memberName, "Count", StringComparison.Ordinal) ||
-             string.Equals(memberName, "Length", StringComparison.Ordinal)) &&
-            IsListShaped(receiverType))
+        if (TryLowerListMemberChain(member, memberName, receiverType, context) is { } listMember)
         {
+            return listMember;
+        }
+
+        return receiverType is INamedTypeSymbol named
+            ? TryLowerRecordMemberChain(member, memberName, named, context)
+            : null;
+    }
+
+    private static DotBoxDExpressionModel? TryLowerListMemberChain(
+        MemberAccessExpressionSyntax member,
+        string memberName,
+        ITypeSymbol receiverType,
+        DotBoxDExpressionLoweringContext context)
+    {
+        if (!IsListCountOrLength(memberName) || !IsListShaped(receiverType))
+        {
+            return null;
+        }
+
+        var receiver = Lower(member.Expression, context);
+        if (!string.Equals(receiver.Type, DotBoxDGenerationNames.ManifestTypes.List, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var source =
+            $"new {DotBoxDGenerationNames.TypeNames.GlobalCallExpression}(" +
+            $"{LiteralReader.StringLiteral("list.count")}, [{receiver.Source}], null, Span)";
+        return new DotBoxDExpressionModel(source, DotBoxDGenerationNames.ManifestTypes.Int, receiver.Allocates);
+    }
+
+    private static bool IsListCountOrLength(string memberName)
+        => string.Equals(memberName, "Count", StringComparison.Ordinal) ||
+           string.Equals(memberName, "Length", StringComparison.Ordinal);
+
+    private static DotBoxDExpressionModel? TryLowerRecordMemberChain(
+        MemberAccessExpressionSyntax member,
+        string memberName,
+        INamedTypeSymbol receiverType,
+        DotBoxDExpressionLoweringContext context)
+    {
+        if (!IsRecordShaped(receiverType))
+        {
+            return null;
+        }
+
+        var fields = DotBoxDRpcTypeMapper.RecordFields(receiverType);
+        for (var i = 0; i < fields.Count; i++)
+        {
+            if (!string.Equals(fields[i].Name, memberName, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             var receiver = Lower(member.Expression, context);
-            if (!string.Equals(receiver.Type, DotBoxDGenerationNames.ManifestTypes.List, StringComparison.Ordinal))
+            if (!string.Equals(receiver.Type, DotBoxDGenerationNames.ManifestTypes.Record, StringComparison.Ordinal))
             {
                 return null;
             }
 
-            var source =
-                $"new {DotBoxDGenerationNames.TypeNames.GlobalCallExpression}(" +
-                $"{LiteralReader.StringLiteral("list.count")}, [{receiver.Source}], null, Span)";
-            return new DotBoxDExpressionModel(source, DotBoxDGenerationNames.ManifestTypes.Int, receiver.Allocates);
-        }
-
-        if (receiverType is INamedTypeSymbol named && IsRecordShaped(named))
-        {
-            var fields = DotBoxDRpcTypeMapper.RecordFields(named);
-            for (var i = 0; i < fields.Count; i++)
-            {
-                if (!string.Equals(fields[i].Name, memberName, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                var receiver = Lower(member.Expression, context);
-                if (!string.Equals(receiver.Type, DotBoxDGenerationNames.ManifestTypes.Record, StringComparison.Ordinal))
-                {
-                    return null;
-                }
-
-                return RecordGet(receiver, i, fields[i].Type, receiver.Allocates);
-            }
+            return RecordGet(receiver, i, fields[i].Type, receiver.Allocates);
         }
 
         return null;
@@ -160,10 +189,10 @@ internal static partial class DotBoxDExpressionModelFactory
         }
     }
 
-    private static bool HasLocalAttribute(IPropertySymbol property)
+    private static bool HasNativeOnlyAttribute(IPropertySymbol property)
         => property.GetAttributes().Any(attribute => string.Equals(
             attribute.AttributeClass?.ToDisplayString(),
-            DotBoxDMetadataNames.LocalAttribute,
+            DotBoxDMetadataNames.NativeOnlyAttribute,
             StringComparison.Ordinal));
 
     /// <summary>

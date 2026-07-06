@@ -6,26 +6,6 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
 internal static partial class HookChainModelFactory
 {
-    private static HookChainInterceptorInstallKind? InstallKind(
-        PipelineStepRole? terminalRole,
-        HookChainReceiverKind? receiverKind,
-        GeneratedRemoteHookChainKind? generatedRemoteKind)
-        => terminalRole switch
-        {
-            PipelineStepRole.Run => HookChainInterceptorInstallKind.GeneratedChain,
-            PipelineStepRole.RunLocal when receiverKind == HookChainReceiverKind.Remote || generatedRemoteKind is not null =>
-                HookChainInterceptorInstallKind.LocalCallback,
-            PipelineStepRole.Register when receiverKind is HookChainReceiverKind.Local or HookChainReceiverKind.Remote =>
-                HookChainInterceptorInstallKind.ResultChain,
-            PipelineStepRole.Register when generatedRemoteKind == GeneratedRemoteHookChainKind.Hook =>
-                HookChainInterceptorInstallKind.ResultChain,
-            PipelineStepRole.RegisterLocal when receiverKind is HookChainReceiverKind.Local or HookChainReceiverKind.Remote =>
-                HookChainInterceptorInstallKind.LocalResultChain,
-            PipelineStepRole.RegisterLocal when generatedRemoteKind == GeneratedRemoteHookChainKind.Hook =>
-                HookChainInterceptorInstallKind.LocalResultChain,
-            _ => null
-        };
-
     // Resolves the pipeline role of a resolved method purely from its [PipelineStep] attribute. The framework
     // marks its own pipeline methods (see [PipelineStep]/[PipelineSurface] on the Runtime pipeline types), so
     // no method-name literal drives recognition once a symbol (or overload candidate) is available.
@@ -71,49 +51,73 @@ internal static partial class HookChainModelFactory
         }
 
         receiver = HookChainAliasResolver.UnwrapTransparentExpression(receiver);
-
         if (HookChainAliasResolver.Initializer(receiver, model, cancellationToken) is { } initializer)
         {
             return WalkToSeed(initializer, stages, model, cancellationToken, depth + 1);
         }
 
         var current = receiver;
-        while (true)
+        while (TryWalkStage(current, stages, model, cancellationToken, out var seed, out var next))
         {
-            current = HookChainAliasResolver.UnwrapTransparentExpression(current);
-            if (HookChainAliasResolver.Initializer(current, model, cancellationToken) is { } currentInitializer)
+            if (seed is not null)
             {
-                current = currentInitializer;
-                continue;
+                return seed;
             }
 
-            if (current is not InvocationExpressionSyntax invocation ||
-                invocation.Expression is not MemberAccessExpressionSyntax access)
-            {
-                return null;
-            }
-
-            var role = RoleOf(invocation, model, cancellationToken);
-            if (role == PipelineStepRole.Seed)
-            {
-                return invocation;
-            }
-
-            if (role is PipelineStepRole.Filter or PipelineStepRole.Projection &&
-                TryLambda(invocation, out var lambda))
-            {
-                if (IsResolvedNonDotBoxDStageMethodInvocation(invocation, model, cancellationToken))
-                {
-                    return null;
-                }
-
-                stages.Add(new HookChainStage(role == PipelineStepRole.Projection, lambda));
-                current = HookChainAliasResolver.UnwrapTransparentExpression(access.Expression);
-                continue;
-            }
-
-            return null;
+            current = next!;
         }
+
+        return null;
+    }
+
+    private static bool TryWalkStage(
+        ExpressionSyntax current,
+        List<HookChainStage> stages,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        out InvocationExpressionSyntax? seed,
+        out ExpressionSyntax? next)
+    {
+        seed = null;
+        next = null;
+        current = HookChainAliasResolver.UnwrapTransparentExpression(current);
+        if (HookChainAliasResolver.Initializer(current, model, cancellationToken) is { } currentInitializer)
+        {
+            next = currentInitializer;
+            return true;
+        }
+
+        if (current is not InvocationExpressionSyntax invocation ||
+            invocation.Expression is not MemberAccessExpressionSyntax access)
+        {
+            return false;
+        }
+
+        var role = RoleOf(invocation, model, cancellationToken);
+        if (role == PipelineStepRole.Seed)
+        {
+            seed = invocation;
+            return true;
+        }
+
+        if (role is not (PipelineStepRole.Filter or PipelineStepRole.Projection))
+        {
+            return false;
+        }
+
+        if (!TryLambda(invocation, out var lambda))
+        {
+            return false;
+        }
+
+        if (IsResolvedNonDotBoxDStageMethodInvocation(invocation, model, cancellationToken))
+        {
+            return false;
+        }
+
+        stages.Add(new HookChainStage(role == PipelineStepRole.Projection, lambda));
+        next = HookChainAliasResolver.UnwrapTransparentExpression(access.Expression);
+        return true;
     }
 
     private static bool IsResolvedNonDotBoxDStageMethodInvocation(
@@ -136,9 +140,6 @@ internal static partial class HookChainModelFactory
         return ReceiverKind(type, model.Compilation);
     }
 
-    // Transport declared by [PipelineSurface] on the receiver type. Every framework pipeline/stage type carries
-    // the attribute (enforced by PipelineStepMarkingContractTests), so a null result means the receiver is not a
-    // pipeline surface at all — an unmarked consumer type or an unrelated type — and the chain is left alone.
     internal static HookChainReceiverKind? ReceiverKind(INamedTypeSymbol type, Compilation compilation)
         => PipelineRoleReader.Transport(type, compilation);
 

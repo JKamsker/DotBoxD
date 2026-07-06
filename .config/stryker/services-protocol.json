@@ -1,0 +1,31 @@
+{
+  "stryker-config": {
+    "solution": "../../../DotBoxD.slnx",
+    "project": "DotBoxD.Services.csproj",
+    "test-projects": [
+      "../../../tests/DotBoxD.Services.Tests/DotBoxD.Services.Tests.csproj"
+    ],
+    "configuration": "Release",
+    "mutation-level": "standard",
+    "mutate": [
+      "Protocol/MessageFrameReader.cs",
+      "Protocol/MessageFramer.cs",
+      "Protocol/MessageStreamFramer.cs",
+      "Protocol/RpcRequest.cs",
+      "Protocol/RpcResponse.cs",
+      "Streaming/Frames/*.cs"
+    ],
+    "reporters": [
+      "progress",
+      "html",
+      "json",
+      "markdown"
+    ],
+    "concurrency": 2,
+    "thresholds": {
+      "high": 90,
+      "low": 85,
+      "break": 85
+    }
+  }
+}

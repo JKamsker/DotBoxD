@@ -11,7 +11,7 @@ public sealed partial class PluginServerContextContractTests
 
             public sealed partial class GameContext
             {
-                [Local]
+                [NativeOnly]
                 public string NativeName => "local";
             }
 

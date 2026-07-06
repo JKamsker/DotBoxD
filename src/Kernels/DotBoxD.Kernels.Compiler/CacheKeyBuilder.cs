@@ -4,6 +4,7 @@ using DotBoxD.Kernels.Verifier.Generated;
 
 namespace DotBoxD.Kernels.Compiler;
 
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using DotBoxD.Kernels;
@@ -23,8 +24,46 @@ public static class CacheKeyBuilder
 
     public static string Build(ExecutionPlan plan, string entrypoint, VerificationPolicy policy, bool optimize)
     {
-        var parts = new[] {
-            "dotboxd-cache-v1",
+        ValidateInputs(plan, entrypoint, policy);
+
+        return BuildCore(plan, entrypoint, policy, optimize);
+    }
+
+    public static VerificationManifestIdentity BuildManifestIdentity(
+        ExecutionPlan plan,
+        string entrypoint,
+        VerificationPolicy policy,
+        bool optimize)
+    {
+        ValidateInputs(plan, entrypoint, policy);
+
+        return new(
+            1,
+            BuildCore(plan, entrypoint, policy, optimize),
+            plan.ModuleHash,
+            plan.PlanHash,
+            plan.PolicyHash,
+            plan.BindingManifestHash,
+            policy.RuntimeFacadeHash,
+            CompilerVersion,
+            TypeSystemVersion,
+            EffectAnalysisVersion,
+            policy.VerifierVersion,
+            LanguageVersion,
+            TargetFramework,
+            [optimize ? "opt" : "boxed-values"]);
+    }
+
+    private static void ValidateInputs(ExecutionPlan plan, string entrypoint, VerificationPolicy policy)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(entrypoint);
+        ArgumentNullException.ThrowIfNull(policy);
+    }
+
+    private static string BuildCore(ExecutionPlan plan, string entrypoint, VerificationPolicy policy, bool optimize)
+        => HashParts(
+            "dotboxd-cache-v2",
             plan.ModuleHash,
             CanonicalizerVersion,
             entrypoint,
@@ -39,30 +78,21 @@ public static class CacheKeyBuilder
             plan.PolicyHash,
             TargetFramework,
             optimize ? "opt" : "boxed-values",
-            plan.Policy.Deterministic ? "deterministic" : "nondeterministic"
-        };
+            plan.Policy.Deterministic ? "deterministic" : "nondeterministic");
 
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('|', parts)))).ToLowerInvariant();
+    private static string HashParts(params string[] parts)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        Span<byte> lengthBuffer = stackalloc byte[sizeof(int)];
+
+        foreach (var part in parts)
+        {
+            var bytes = Encoding.UTF8.GetBytes(part);
+            BinaryPrimitives.WriteInt32LittleEndian(lengthBuffer, bytes.Length);
+            hash.AppendData(lengthBuffer);
+            hash.AppendData(bytes);
+        }
+
+        return Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
     }
-
-    public static VerificationManifestIdentity BuildManifestIdentity(
-        ExecutionPlan plan,
-        string entrypoint,
-        VerificationPolicy policy,
-        bool optimize)
-        => new(
-            1,
-            Build(plan, entrypoint, policy, optimize),
-            plan.ModuleHash,
-            plan.PlanHash,
-            plan.PolicyHash,
-            plan.BindingManifestHash,
-            policy.RuntimeFacadeHash,
-            CompilerVersion,
-            TypeSystemVersion,
-            EffectAnalysisVersion,
-            policy.VerifierVersion,
-            LanguageVersion,
-            TargetFramework,
-            [optimize ? "opt" : "boxed-values"]);
 }

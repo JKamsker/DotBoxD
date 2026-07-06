@@ -37,20 +37,21 @@ internal static partial class PluginServerFacadeModelFactory
         Compilation compilation,
         CancellationToken cancellationToken)
     {
-        ValidateServerTargetShape(type, cancellationToken);
+        PluginServerTargetValidator.Validate(type, cancellationToken);
 
         var worldType = ResolveWorldType(type)
             ?? throw new NotSupportedException(
-                $"Generated plugin server '{type.Name}' must directly implement one [DotBoxDService] world interface.");
-        ValidateWorldType(type, worldType);
+                $"Generated plugin server '{type.Name}' must directly implement one [RpcService] world interface.");
+        ValidateWorldType(type, compilation, worldType);
         var controlServiceType = ResolveControlService(type, compilation, worldType)
             ?? throw new NotSupportedException(
                 $"Generated plugin server '{type.Name}' could not resolve a control-plane contract. Set ControlService = typeof(TControlService), or declare {worldType.ContainingNamespace}.Ipc.IGamePluginControlService.");
+        ValidateControlServiceAccessibility(type, compilation, controlServiceType);
         var liveSettingUpdateType = ResolveLiveSettingUpdateType(controlServiceType, cancellationToken)
             ?? throw new NotSupportedException(
                 $"Generated plugin server '{type.Name}' control-plane contract '{controlServiceType.ToDisplayString()}' must declare UpdateSettingsAsync with a typed array parameter carrying the live-setting updates.");
-        ValidateControlServiceContract(type, compilation, controlServiceType, liveSettingUpdateType);
-        ValidatePublicFacadeSignatureTypes(type, worldType, controlServiceType, liveSettingUpdateType);
+        PluginServerControlContractValidator.Validate(type, compilation, controlServiceType, liveSettingUpdateType);
+        PluginServerPublicSignatureValidator.Validate(type, worldType, controlServiceType, liveSettingUpdateType);
         var controls = ResolveControls(worldType, cancellationToken);
         var worldServiceWrappers = new Dictionary<string, ServiceWrapperBuilder>(StringComparer.Ordinal);
         var worldProperties = ResolveForwardedProperties(
@@ -64,7 +65,7 @@ internal static partial class PluginServerFacadeModelFactory
             cancellationToken);
         var eventCallback = PluginServerEventCallbackResolver.Resolve(compilation, worldType, cancellationToken);
         var worldServiceWrapperModels = BuildServiceWrappers(worldServiceWrappers);
-        ValidateGeneratedSurfaceCollisions(
+        PluginServerSurfaceCollisionValidator.Validate(
             type,
             worldType,
             worldProperties,
@@ -129,6 +130,24 @@ internal static partial class PluginServerFacadeModelFactory
         PopulateServiceWrapper(serviceType, wrapper, serviceWrappers, cancellationToken);
         return wrapper.WrapperName;
     }
+
+    private static void RejectErrorObsoleteForwarder(ISymbol member)
+    {
+        if (PluginServerFlowAttributeSource.HasErrorObsoleteAttribute(member.GetAttributes()) ||
+            HasErrorObsoleteAccessorAttribute(member))
+        {
+            throw new NotSupportedException(
+                $"Generated plugin server member '{member.ToDisplayString()}' is marked [Obsolete(..., error: true)]; generated plugin server facades cannot forward compiler-error obsolete members.");
+        }
+    }
+
+    private static bool HasErrorObsoleteAccessorAttribute(ISymbol member)
+        => member is IPropertySymbol property &&
+           ((property.GetMethod is not null &&
+             PluginServerFlowAttributeSource.HasErrorObsoleteAttribute(property.GetMethod.GetAttributes())) ||
+            (property.SetMethod is not null &&
+             PluginServerFlowAttributeSource.HasErrorObsoleteAttribute(property.SetMethod.GetAttributes())));
+
     private static (string? Name, PluginServerReturnWrapperKind Kind) ResolveReturnWrapper(
         ITypeSymbol returnType,
         Dictionary<string, ServiceWrapperBuilder> serviceWrappers,
@@ -144,7 +163,7 @@ internal static partial class PluginServerFacadeModelFactory
                 : PluginServerReturnWrapperKind.ValueTask;
         }
         if (serviceType is not INamedTypeSymbol namedServiceType ||
-            !HasAttribute(namedServiceType, DotBoxDMetadataNames.DotBoxDServiceAttribute))
+            !HasAttribute(namedServiceType, DotBoxDMetadataNames.RpcServiceAttribute))
         {
             return (null, PluginServerReturnWrapperKind.None);
         }
@@ -247,7 +266,7 @@ internal static partial class PluginServerFacadeModelFactory
         return string.Equals(name, ServiceControlType, StringComparison.Ordinal) ||
                string.Equals(name, ExtensibleControlType, StringComparison.Ordinal);
     }
-    private static IEnumerable<ISymbol> MembersIncludingInherited(INamedTypeSymbol type)
+    internal static IEnumerable<ISymbol> MembersIncludingInherited(INamedTypeSymbol type)
     {
         foreach (var inherited in type.AllInterfaces.Reverse())
         {

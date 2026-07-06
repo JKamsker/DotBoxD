@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using DotBoxD.Kernels.Model;
-using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins.Kernel;
 using DotBoxD.Plugins.Runtime;
 
@@ -63,7 +62,7 @@ public sealed partial class EventIndexRegistry
         ArgumentNullException.ThrowIfNull(predicates);
 
         _ = predicates;
-        var trustedPredicates = TrustedIndexPredicateExtractor.Extract(kernel.Package, adapter.Parameters);
+        var trustedPredicates = TrustedIndexPredicateExtractor.Extract<TEvent>(kernel.Package, adapter.Parameters);
         var matcher = EventIndexMatcher<TEvent>.Create(trustedPredicates);
         if (!matcher.HasIndex)
         {
@@ -134,6 +133,8 @@ public sealed partial class EventIndexRegistry
                 couldMatch = true;
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (!couldMatch)
             {
                 Interlocked.Increment(ref _prefiltered);
@@ -141,7 +142,7 @@ public sealed partial class EventIndexRegistry
             }
 
             Interlocked.Increment(ref _dispatched);
-            Track(Task.Run(() => DispatchAsync(channel.Adapter, entry, value, cancellationToken, _onFault)));
+            Track(Task.Run(() => EventIndexDispatch.DispatchAsync(channel.Adapter, entry, value, cancellationToken, _onFault)));
         }
     }
 
@@ -175,82 +176,6 @@ public sealed partial class EventIndexRegistry
             }
 
             await Task.WhenAll(pending).ConfigureAwait(false);
-        }
-    }
-
-    private static async Task DispatchAsync<TEvent>(
-        IPluginEventAdapter<TEvent> adapter,
-        EventIndexEntry<TEvent> entry,
-        TEvent value,
-        CancellationToken cancellationToken,
-        Action<SubscriptionDeliveryFault>? onFault)
-    {
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return;
-        }
-
-        bool shouldHandle;
-        try
-        {
-            // The verified IR predicate remains the authority; manifest coverage claims are not trusted.
-            shouldHandle = entry.FullyCovered ||
-                await entry.Kernel.ShouldHandleAsync(adapter, value, cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            return;
-        }
-        catch (SandboxRuntimeException ex) when (WasCallerCancelled(ex, cancellationToken))
-        {
-            return;
-        }
-        catch (Exception ex)
-        {
-            Report<TEvent>(onFault, ex, SubscriptionDeliveryStage.Filter);
-            return;
-        }
-
-        if (!shouldHandle || cancellationToken.IsCancellationRequested)
-        {
-            return;
-        }
-
-        try
-        {
-            await entry.Kernel.HandleAsync(adapter, value, cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
-        catch (SandboxRuntimeException ex) when (WasCallerCancelled(ex, cancellationToken))
-        {
-        }
-        catch (Exception ex)
-        {
-            Report<TEvent>(onFault, ex, SubscriptionDeliveryStage.Handler);
-        }
-    }
-
-    private static bool WasCallerCancelled(SandboxRuntimeException exception, CancellationToken cancellationToken)
-        => cancellationToken.IsCancellationRequested && exception.Error.Code == SandboxErrorCode.Cancelled;
-
-    private static void Report<TEvent>(
-        Action<SubscriptionDeliveryFault>? onFault,
-        Exception exception,
-        SubscriptionDeliveryStage stage)
-    {
-        if (onFault is null)
-        {
-            return;
-        }
-
-        try
-        {
-            onFault(new SubscriptionDeliveryFault(typeof(TEvent), stage, exception));
-        }
-        catch
-        {
         }
     }
 

@@ -37,16 +37,18 @@ public sealed class QueryProjectionInactiveArmValidationTests
     [Fact]
     public void Document_serialization_rejects_projection_inactive_arms()
     {
-        var document = EventQueryDocument.Create(
-            "AttackEvent",
-            QueryFilter.MatchAll,
-            new QueryProjection
+        var document = new EventQueryDocument
+        {
+            EventName = "AttackEvent",
+            Filter = QueryFilter.MatchAll,
+            Projection = new QueryProjection
             {
                 Kind = QueryProjectionKind.Identity,
                 Path = "Secret.Path",
                 TypeName = "Payload",
                 Fields = [QueryProjectionField.FromMember("leaked", "AttackerId")],
-            });
+            },
+        };
 
         AssertInactiveArmRejection(() => EventQueryJson.Serialize(document));
     }
@@ -54,16 +56,18 @@ public sealed class QueryProjectionInactiveArmValidationTests
     [Fact]
     public void Fingerprint_rejects_projection_inactive_arms()
     {
-        var document = EventQueryDocument.Create(
-            "AttackEvent",
-            QueryFilter.MatchAll,
-            new QueryProjection
+        var document = new EventQueryDocument
+        {
+            EventName = "AttackEvent",
+            Filter = QueryFilter.MatchAll,
+            Projection = new QueryProjection
             {
                 Kind = QueryProjectionKind.Member,
                 Path = "AttackerId",
                 TypeName = "Payload",
                 Fields = [QueryProjectionField.FromConstant("constant", QueryValue.FromString("hidden"))],
-            });
+            },
+        };
 
         AssertInactiveArmRejection(() => QueryFingerprint.Compute(document));
     }

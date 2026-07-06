@@ -5,76 +5,71 @@ namespace DotBoxD.Hosting;
 
 using System.Globalization;
 using DotBoxD.Kernels;
-using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Runtime.Bindings;
 
 internal static class WorkerAuditValidator
 {
     private static readonly DateTimeOffset EarliestAcceptedTimestamp = DateTimeOffset.UnixEpoch;
-    private static readonly HashSet<string> CommonRunSummaryFields = [
-        "mode",
-        "executionMode",
-        "executionDispatched",
-        "cacheStatus",
-        "moduleHash",
-        "planHash",
-        "policyId",
-        "policyHash",
-        "bindingManifestHash",
-        "fuelUsed",
-        "maxFuel",
-        "loopIterations",
-        "maxLoopIterations",
-        "allocatedBytes",
-        "allocationCharged",
-        "maxAllocatedBytes",
-        "hostCalls",
-        "maxHostCalls",
-        "fileBytesRead",
-        "maxFileBytesRead",
-        "fileBytesWritten",
-        "maxFileBytesWritten",
-        "networkBytesRead",
-        "maxNetworkBytesRead",
-        "networkBytesWritten",
-        "maxNetworkBytesWritten",
-        "logEvents",
-        "maxLogEvents",
-        "collectionElements",
-        "maxCollectionElements",
-        "stringBytes",
-        "maxStringBytes"
-    ];
+    private static readonly Dictionary<string, AuditKindValidator> AuditKindValidators = new(StringComparer.Ordinal)
+    {
+        ["RunSummary"] = static (plan, _, _, auditEvent, _) => WorkerRunSummaryAuditValidator.Matches(plan, auditEvent),
+        ["WorkerExecution"] = static (plan, _, _, auditEvent, _) => ModuleAuditMatches(plan, auditEvent),
+        ["ExecutionFallback"] = static (plan, _, _, auditEvent, _) => ExecutionFallbackAuditMatches(plan, auditEvent),
+        ["VerifierFailure"] = static (plan, _, _, auditEvent, _) => VerifierFailureAuditMatches(plan, auditEvent),
+        ["DebugTrace"] = static (plan, _, options, auditEvent, _) =>
+            options.EnableDebugTrace && ModuleAuditMatches(plan, auditEvent),
+        ["CacheInvalidated"] = static (plan, entrypoint, _, auditEvent, _) =>
+            WorkerCacheInvalidationAuditValidator.Matches(plan, entrypoint, auditEvent),
+        ["PolicyDenied"] = static (_, _, _, _, _) => false,
+        [BindingAuditKinds.BindingCall] = static (plan, entrypoint, _, auditEvent, grantClock) =>
+            BindingAuditMatches(plan, entrypoint, auditEvent, grantClock),
+        [BindingAuditKinds.SandboxLog] = static (plan, entrypoint, _, auditEvent, grantClock) =>
+            BindingAuditMatches(plan, entrypoint, auditEvent, grantClock),
+        [BindingAuditKinds.PluginMessage] = static (plan, entrypoint, _, auditEvent, grantClock) =>
+            BindingAuditMatches(plan, entrypoint, auditEvent, grantClock),
+    };
+
+    private delegate bool AuditKindValidator(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxExecutionOptions options,
+        SandboxAuditEvent auditEvent,
+        DateTimeOffset grantClock);
 
     public static bool Matches(
         ExecutionPlan plan,
         string entrypoint,
         SandboxExecutionOptions options,
-        SandboxAuditEvent auditEvent)
+        SandboxAuditEvent auditEvent,
+        DateTimeOffset grantClock)
     {
-        if (string.IsNullOrWhiteSpace(auditEvent.Kind) ||
-            !TextIsSafe(auditEvent.Kind) ||
-            !TextIsSafe(auditEvent.ResourceId) ||
-            !TextIsSafe(auditEvent.Message) ||
-            auditEvent.Bytes is < 0 ||
-            (auditEvent.ErrorCode is { } code && !Enum.IsDefined(code)) ||
-            !ResultShapeMatches(auditEvent) ||
-            !TimestampMatches(plan, auditEvent.Timestamp))
+        if (!CommonEnvelopeMatches(plan, auditEvent))
         {
             return false;
         }
 
-        return auditEvent.Kind switch
+        return AuditKindValidators.TryGetValue(auditEvent.Kind, out var validate) &&
+            validate(plan, entrypoint, options, auditEvent, grantClock);
+    }
+
+    private static bool CommonEnvelopeMatches(ExecutionPlan plan, SandboxAuditEvent auditEvent)
+    {
+        if (string.IsNullOrWhiteSpace(auditEvent.Kind) ||
+            !WorkerAuditTextSafety.TextIsSafe(auditEvent.Kind) ||
+            !WorkerAuditTextSafety.TextIsSafe(auditEvent.ResourceId) ||
+            !WorkerAuditTextSafety.TextIsSafe(auditEvent.Message) ||
+            auditEvent.Bytes is < 0)
         {
-            "RunSummary" => RunSummarySchemaMatches(plan, auditEvent),
-            "WorkerExecution" => ModuleAuditMatches(plan, auditEvent),
-            "ExecutionFallback" => ExecutionFallbackAuditMatches(plan, auditEvent),
-            "VerifierFailure" => VerifierFailureAuditMatches(plan, auditEvent),
-            "DebugTrace" => options.EnableDebugTrace && ModuleAuditMatches(plan, auditEvent),
-            "CacheInvalidated" => false,
-            "PolicyDenied" => false,
-            "BindingCall" or "SandboxLog" or "PluginMessage" => BindingAuditMatches(plan, entrypoint, auditEvent),
-            _ => false
-        };
+            return false;
+        }
+
+        if (auditEvent.ErrorCode is { } code && !Enum.IsDefined(code))
+        {
+            return false;
+        }
+
+        return ResultShapeMatches(auditEvent) &&
+            TimestampMatches(plan, auditEvent.Timestamp);
     }
 
     private static bool ResultShapeMatches(SandboxAuditEvent auditEvent)
@@ -89,43 +84,13 @@ internal static class WorkerAuditValidator
             return false;
         }
 
-        if (plan.Policy.Deterministic && plan.Policy.LogicalNow is { } logicalNow)
+        if (plan.Policy.Deterministic)
         {
-            return timestamp == logicalNow;
+            return timestamp == (plan.Policy.LogicalNow ?? DateTimeOffset.UnixEpoch);
         }
 
         return timestamp <= DateTimeOffset.UtcNow.AddMinutes(5);
     }
-
-    private static bool RunSummarySchemaMatches(ExecutionPlan plan, SandboxAuditEvent auditEvent)
-    {
-        if (auditEvent.BindingId is not null ||
-            auditEvent.CapabilityId is not null ||
-            auditEvent.Effect != SandboxEffect.None ||
-            auditEvent.Fields is null ||
-            !string.Equals(auditEvent.ResourceId, $"module:{plan.ModuleHash}", StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        foreach (var field in auditEvent.Fields)
-        {
-            if (!FieldNameAllowed(plan, field.Key) ||
-                string.IsNullOrWhiteSpace(field.Key) ||
-                !TextIsSafe(field.Key) ||
-                !TextIsSafe(field.Value))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static bool FieldNameAllowed(ExecutionPlan plan, string key)
-        => CommonRunSummaryFields.Contains(key) ||
-           (plan.Policy.Deterministic && key == "logicalNow") ||
-           key is "runtimeForm" or "cacheKey" or "artifactHash" or "materializationStatus";
 
     private static bool ModuleAuditMatches(ExecutionPlan plan, SandboxAuditEvent auditEvent)
         => auditEvent.BindingId is null &&
@@ -147,25 +112,46 @@ internal static class WorkerAuditValidator
     private static bool BindingAuditMatches(
         ExecutionPlan plan,
         string entrypoint,
-        SandboxAuditEvent auditEvent)
+        SandboxAuditEvent auditEvent,
+        DateTimeOffset grantClock)
     {
-        if (string.IsNullOrWhiteSpace(auditEvent.BindingId) ||
-            !plan.BindingReferences.TryGetValue(entrypoint, out var entrypointBindings) ||
-            !entrypointBindings.Contains(auditEvent.BindingId) ||
-            !plan.Bindings.TryGet(auditEvent.BindingId, out var binding) ||
-            binding.AuditLevel is AuditLevel.None or AuditLevel.Summary ||
-            string.IsNullOrWhiteSpace(auditEvent.ResourceId) ||
-            !CapabilityMatches(auditEvent, binding) ||
-            !EffectMatches(auditEvent, binding) ||
-            !ResultMatches(auditEvent) ||
-            !LogAuditMatchesPolicy(plan, auditEvent) ||
-            !RequiredBindingFieldsMatch(plan, auditEvent))
+        if (!TryGetAuditedBinding(plan, entrypoint, auditEvent, out var binding))
         {
             return false;
         }
 
-        return true;
+        return !string.IsNullOrWhiteSpace(auditEvent.ResourceId) &&
+            AuditKindMatchesBinding(auditEvent.Kind, binding) &&
+            CapabilityMatches(auditEvent, binding) &&
+            EffectMatches(auditEvent, binding) &&
+            ResultMatches(auditEvent) &&
+            LogAuditMatchesPolicy(plan, auditEvent) &&
+            WorkerBindingAuditResourceValidator.Matches(plan, auditEvent, binding, grantClock) &&
+            WorkerPluginMessageAuditPolicy.Matches(plan, auditEvent, grantClock) &&
+            RequiredBindingFieldsMatch(plan, auditEvent);
     }
+
+    private static bool TryGetAuditedBinding(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxAuditEvent auditEvent,
+        out BindingSignature binding)
+    {
+        binding = null!;
+        if (string.IsNullOrWhiteSpace(auditEvent.BindingId) ||
+            !plan.BindingReferences.TryGetValue(entrypoint, out var entrypointBindings) ||
+            !entrypointBindings.Contains(auditEvent.BindingId) ||
+            !plan.Bindings.TryGet(auditEvent.BindingId, out var resolved))
+        {
+            return false;
+        }
+
+        binding = resolved;
+        return binding.AuditLevel is not (AuditLevel.None or AuditLevel.Summary);
+    }
+
+    private static bool AuditKindMatchesBinding(string kind, BindingSignature binding)
+        => string.Equals(kind, binding.AuditKind, StringComparison.Ordinal);
 
     private static bool CapabilityMatches(SandboxAuditEvent auditEvent, BindingSignature binding)
         => binding.RequiredCapability is null ||
@@ -188,43 +174,94 @@ internal static class WorkerAuditValidator
         => auditEvent.Success ? auditEvent.ErrorCode is null : auditEvent.ErrorCode is not null;
 
     private static bool LogAuditMatchesPolicy(ExecutionPlan plan, SandboxAuditEvent auditEvent)
-        => auditEvent.Kind != "SandboxLog" ||
+        => auditEvent.Kind != BindingAuditKinds.SandboxLog ||
            auditEvent.Message is not null &&
            auditEvent.Message.Length <= plan.Budget.MaxLogMessageLength;
 
     private static bool RequiredBindingFieldsMatch(ExecutionPlan plan, SandboxAuditEvent auditEvent)
     {
-        if (auditEvent.Fields is null ||
-            !auditEvent.Fields.TryGetValue("resourceKind", out var resourceKind) ||
-            string.IsNullOrWhiteSpace(resourceKind) ||
-            !auditEvent.Fields.TryGetValue("durationMs", out var durationMs) ||
-            !auditEvent.Fields.TryGetValue("moduleHash", out var moduleHash) ||
-            !string.Equals(moduleHash, plan.ModuleHash, StringComparison.Ordinal) ||
-            !auditEvent.Fields.TryGetValue("policyHash", out var policyHash) ||
-            !string.Equals(policyHash, plan.PolicyHash, StringComparison.Ordinal))
+        if (!RequiredBindingFieldValuesMatch(plan, auditEvent, out var durationMs))
         {
             return false;
         }
 
-        foreach (var field in auditEvent.Fields)
+        return DeterministicTimeBindingFieldsMatch(plan, auditEvent) &&
+            FieldsAreSafe(auditEvent.Fields!) &&
+            NonNegativeDuration(durationMs);
+    }
+
+    private static bool RequiredBindingFieldValuesMatch(
+        ExecutionPlan plan,
+        SandboxAuditEvent auditEvent,
+        out string durationMs)
+    {
+        durationMs = string.Empty;
+        if (auditEvent.Fields is not { } fields ||
+            !RequiredTextField(fields, "resourceKind", out _) ||
+            !RequiredTextField(fields, "durationMs", out var parsedDuration) ||
+            !RequiredFieldEquals(fields, "moduleHash", plan.ModuleHash) ||
+            !RequiredFieldEquals(fields, "policyHash", plan.PolicyHash))
+        {
+            return false;
+        }
+
+        durationMs = parsedDuration;
+        return true;
+    }
+
+    private static bool RequiredTextField(
+        IReadOnlyDictionary<string, string> fields,
+        string key,
+        out string value)
+    {
+        if (!fields.TryGetValue(key, out var candidate) || string.IsNullOrWhiteSpace(candidate))
+        {
+            value = string.Empty;
+            return false;
+        }
+
+        value = candidate;
+        return true;
+    }
+
+    private static bool RequiredFieldEquals(IReadOnlyDictionary<string, string> fields, string key, string expected)
+        => fields.TryGetValue(key, out var value) &&
+           string.Equals(value, expected, StringComparison.Ordinal);
+
+    private static bool FieldsAreSafe(IReadOnlyDictionary<string, string> fields)
+    {
+        foreach (var field in fields)
         {
             if (string.IsNullOrWhiteSpace(field.Key) ||
-                !TextIsSafe(field.Key) ||
-                !TextIsSafe(field.Value))
+                !WorkerAuditTextSafety.TextIsSafe(field.Key) ||
+                !WorkerAuditTextSafety.TextIsSafe(field.Value))
             {
                 return false;
             }
         }
 
-        return double.TryParse(
-                durationMs,
-                NumberStyles.Float,
-                CultureInfo.InvariantCulture,
-                out var parsedDuration) &&
-            parsedDuration >= 0;
+        return true;
     }
 
-    private static bool TextIsSafe(string? value)
-        => value is null ||
-           string.Equals(AuditTextSanitizer.SanitizeAndRedact(value), value, StringComparison.Ordinal);
+    private static bool DeterministicTimeBindingFieldsMatch(ExecutionPlan plan, SandboxAuditEvent auditEvent)
+    {
+        if (!plan.Policy.Deterministic ||
+            auditEvent.BindingId != SafeTimeBindingNames.NowUnixMillisId)
+        {
+            return true;
+        }
+
+        return plan.Policy.LogicalNow is { } logicalNow &&
+               auditEvent.Fields!.TryGetValue(SafeTimeBindingNames.NowUnixMillisAuditField, out var unixMillis) &&
+               long.TryParse(unixMillis, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) &&
+               value == logicalNow.ToUnixTimeMilliseconds();
+    }
+
+    private static bool NonNegativeDuration(string durationMs)
+        => double.TryParse(
+            durationMs,
+            NumberStyles.Float,
+            CultureInfo.InvariantCulture,
+            out var parsedDuration) &&
+            parsedDuration >= 0;
 }

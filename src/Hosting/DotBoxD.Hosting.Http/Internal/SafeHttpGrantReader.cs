@@ -19,16 +19,25 @@ internal static class SafeHttpGrantReader
             ReadSet(grant, "allowedSchemes", ["https"]),
             ReadSet(grant, "allowedHosts", []),
             ReadOptionalLong(grant, "maxRequestBytes"),
-            ReadOptionalLong(grant, "maxResponseBytes"),
+            ReadRequiredLong(grant, "maxResponseBytes"),
             ReadTimeout(grant),
             ReadBool(grant, "allowIpLiterals"),
             ReadBool(grant, "allowPrivateNetwork"));
 
     private static HashSet<string> ReadSet(CapabilityGrant grant, string key, string[] fallback)
     {
-        var text = grant.Parameters.TryGetValue(key, out var value) ? value : string.Join(',', fallback);
-        return text.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!grant.Parameters.TryGetValue(key, out var text))
+        {
+            return fallback.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var values = text.Split(',', StringSplitOptions.TrimEntries);
+        if (values.Any(string.IsNullOrWhiteSpace))
+        {
+            throw Error($"parameter '{key}' is invalid");
+        }
+
+        return values.ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     private static bool ReadBool(CapabilityGrant grant, string key)
@@ -61,6 +70,9 @@ internal static class SafeHttpGrantReader
         return parsed;
     }
 
+    private static long ReadRequiredLong(CapabilityGrant grant, string key)
+        => ReadOptionalLong(grant, key) ?? throw Error($"parameter '{key}' is required");
+
     private static TimeSpan ReadTimeout(CapabilityGrant grant)
     {
         var milliseconds = ReadOptionalLong(grant, "timeoutMs") ?? 2_000;
@@ -80,7 +92,7 @@ internal sealed record SafeHttpGrantOptions(
     IReadOnlySet<string> AllowedSchemes,
     IReadOnlySet<string> AllowedHosts,
     long? MaxRequestBytes,
-    long? MaxResponseBytes,
+    long MaxResponseBytes,
     TimeSpan Timeout,
     bool AllowIpLiterals,
     bool AllowPrivateNetwork);

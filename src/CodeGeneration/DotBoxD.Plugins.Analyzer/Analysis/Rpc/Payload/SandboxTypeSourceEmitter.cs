@@ -15,6 +15,28 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 internal static class SandboxTypeSourceEmitter
 {
     private const string SandboxType = TypeNames.GlobalSandboxType;
+    private static readonly ManifestTagResolver[] ManifestTagResolvers =
+    [
+        TrySpecialManifestTag,
+        SandboxFrameworkTypeSource.ManifestTag,
+        TryEnumManifestTag,
+        TryCollectionManifestTag,
+    ];
+
+    private static readonly SandboxSourceResolver[] SandboxSourceResolvers =
+    [
+        TrySpecialSandboxSource,
+        TryFrameworkSandboxSource,
+        TryNullableSandboxSource,
+        TryEnumSandboxSource,
+        TryListSandboxSource,
+        TryMapSandboxSource,
+        TryRecordSandboxSource,
+    ];
+
+    private delegate string? ManifestTagResolver(ITypeSymbol type);
+
+    private delegate string? SandboxSourceResolver(SandboxSourceContext context);
 
     // A record field whose type leads back to an enclosing record (directly or through a list/map/record) would
     // recurse forever, so the depth of a record/list/map nesting chain is bounded. The bound is kept at or below
@@ -48,76 +70,12 @@ internal static class SandboxTypeSourceEmitter
             return ManifestTypes.Unsupported;
         }
 
-        switch (type.SpecialType)
+        foreach (var resolver in ManifestTagResolvers)
         {
-            case SpecialType.System_Boolean:
-                return ManifestTypes.Bool;
-            case SpecialType.System_Int32:
-                return ManifestTypes.Int;
-            case SpecialType.System_Int64:
-                return ManifestTypes.Long;
-            case SpecialType.System_Double:
-                return ManifestTypes.Double;
-            case SpecialType.System_Single:
-                return ManifestTypes.Double;
-            case SpecialType.System_String:
-                return ManifestTypes.String;
-        }
-
-        if (DotBoxDRpcTypeMapper.IsGuid(type))
-        {
-            return ManifestTypes.Guid;
-        }
-
-        if (DotBoxDRpcTypeMapper.IsDateTimeWireType(type))
-        {
-            return ManifestTypes.Record;
-        }
-
-        if (DotBoxDRpcTypeMapper.IsDecimalWireType(type))
-        {
-            return ManifestTypes.Record;
-        }
-
-        if (DotBoxDRpcTypeMapper.IsDateOnlyWireType(type))
-        {
-            return ManifestTypes.Int;
-        }
-
-        if (DotBoxDRpcTypeMapper.IsTimeOnlyWireType(type))
-        {
-            return ManifestTypes.Long;
-        }
-
-        if (DotBoxDRpcTypeMapper.IsTimeSpanWireType(type))
-        {
-            return ManifestTypes.Long;
-        }
-
-        if (DotBoxDRpcTypeMapper.IsCancellationTokenWireType(type))
-        {
-            return ManifestTypes.Bool;
-        }
-
-        if (DotBoxDRpcTypeMapper.IsIndexWireType(type) ||
-            DotBoxDRpcTypeMapper.IsRangeWireType(type))
-        {
-            return ManifestTypes.Record;
-        }
-
-        if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
-        {
-            return DotBoxDRpcTypeMapper.EnumUsesI64(enumType) ? ManifestTypes.Long : ManifestTypes.Int;
-        }
-
-        if (DotBoxDRpcTypeMapper.ListElementType(type) is not null)
-        {
-            return ManifestTypes.List;
-        }
-
-        if (DotBoxDRpcTypeMapper.MapTypes(type) is not null)
-        {
-            return ManifestTypes.Map;
+            if (resolver(type) is { } tag)
+            {
+                return tag;
+            }
         }
 
         return ManifestTypes.Record;
@@ -125,130 +83,135 @@ internal static class SandboxTypeSourceEmitter
 
     private static string Emit(ITypeSymbol type, int depth)
     {
-        switch (type.SpecialType)
+        var context = new SandboxSourceContext(type, depth);
+        foreach (var resolver in SandboxSourceResolvers)
         {
-            case SpecialType.System_Boolean:
-                return SandboxType + ".Bool";
-            case SpecialType.System_Int32:
-                return SandboxType + ".I32";
-            case SpecialType.System_Int64:
-                return SandboxType + ".I64";
-            case SpecialType.System_Double:
-                return SandboxType + ".F64";
-            case SpecialType.System_Single:
-                return SandboxType + ".F64";
-            case SpecialType.System_String:
-                return SandboxType + ".String";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsGuid(type))
-        {
-            return SandboxType + ".Guid";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsDateTimeWireType(type))
-        {
-            RejectNestedRecordAtDepth(depth);
-            return $"{SandboxType}.Record(new {SandboxType}[] {{ {SandboxType}.I64, {SandboxType}.I64 }})";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsDecimalWireType(type))
-        {
-            RejectNestedRecordAtDepth(depth);
-            return $"{SandboxType}.Record(new {SandboxType}[] {{ {SandboxType}.I32, {SandboxType}.I32, {SandboxType}.I32, {SandboxType}.I32 }})";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsDateOnlyWireType(type))
-        {
-            return SandboxType + ".I32";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsTimeOnlyWireType(type))
-        {
-            return SandboxType + ".I64";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsTimeSpanWireType(type))
-        {
-            return SandboxType + ".I64";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsCancellationTokenWireType(type))
-        {
-            return SandboxType + ".Bool";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsIndexWireType(type))
-        {
-            RejectNestedRecordAtDepth(depth);
-            return $"{SandboxType}.Record(new {SandboxType}[] {{ {SandboxType}.I32, {SandboxType}.Bool }})";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsRangeWireType(type))
-        {
-            RejectRangeRecordAtDepth(depth);
-            var indexType = $"{SandboxType}.Record(new {SandboxType}[] {{ {SandboxType}.I32, {SandboxType}.Bool }})";
-            return $"{SandboxType}.Record(new {SandboxType}[] {{ {indexType}, {indexType} }})";
-        }
-
-
-        if (DotBoxDNullableScalarType.TryGetSupportedUnderlying(type, out var nullableUnderlying))
-        {
-            if (depth >= MaxDepth)
+            if (resolver(context) is { } source)
             {
-                throw new NotSupportedException();
+                return source;
             }
-
-            return $"{SandboxType}.Record(new {SandboxType}[] {{ {SandboxType}.Bool, {Emit(nullableUnderlying, depth + 1)} }})";
-        }
-
-        if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
-        {
-            return DotBoxDRpcTypeMapper.EnumUsesI64(enumType) ? SandboxType + ".I64" : SandboxType + ".I32";
-        }
-
-        // Past this point the type nests (list/map/record); a self-referential DTO would otherwise recurse
-        // without bound. Reject once the nesting chain grows past the limit — the caller fails the chain safe.
-        if (depth >= MaxDepth)
-        {
-            throw new NotSupportedException();
-        }
-
-        if (DotBoxDRpcTypeMapper.ListElementType(type) is { } elementType)
-        {
-            return $"{SandboxType}.List({Emit(elementType, depth + 1)})";
-        }
-
-        if (DotBoxDRpcTypeMapper.MapTypes(type) is { } map)
-        {
-            if (!DotBoxDRpcTypeMapper.IsSupportedMapKey(map.Key))
-            {
-                throw new NotSupportedException();
-            }
-
-            return $"{SandboxType}.Map({Emit(map.Key, depth + 1)}, {Emit(map.Value, depth + 1)})";
-        }
-
-        if (type is INamedTypeSymbol named && DotBoxDRpcTypeMapper.IsRecordDto(named))
-        {
-            // A DTO that inherits public instance data members would silently drop them: RecordFields (and the
-            // runtime marshaller's GetRecordShape) see only declared members. Fail safe instead of emitting a
-            // partial record shape -- same rule the server-extension JsonType path enforces.
-            DotBoxDRpcTypeMapper.RejectInheritedDtoProperties(named);
-            var fields = DotBoxDRpcTypeMapper.RecordFields(named);
-            var fieldTypes = new string[fields.Count];
-            for (var i = 0; i < fields.Count; i++)
-            {
-                fieldTypes[i] = Emit(fields[i].Type, depth + 1);
-            }
-
-            return $"{SandboxType}.Record(new {SandboxType}[] {{ {string.Join(", ", fieldTypes)} }})";
         }
 
         throw new NotSupportedException();
     }
 
-    private static void RejectNestedRecordAtDepth(int depth)
+    private static string? TrySpecialManifestTag(ITypeSymbol type)
+        => type.SpecialType switch
+        {
+            SpecialType.System_Boolean => ManifestTypes.Bool,
+            SpecialType.System_Int32 => ManifestTypes.Int,
+            SpecialType.System_Int64 => ManifestTypes.Long,
+            SpecialType.System_Double => ManifestTypes.Double,
+            SpecialType.System_Single => ManifestTypes.Double,
+            SpecialType.System_String => ManifestTypes.String,
+            _ => null,
+        };
+
+    private static string? TryEnumManifestTag(ITypeSymbol type)
+        => type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType
+            ? DotBoxDRpcTypeMapper.EnumUsesI64(enumType) ? ManifestTypes.Long : ManifestTypes.Int
+            : null;
+
+    private static string? TryCollectionManifestTag(ITypeSymbol type)
+    {
+        if (DotBoxDRpcTypeMapper.ListElementType(type) is not null)
+        {
+            return ManifestTypes.List;
+        }
+
+        return DotBoxDRpcTypeMapper.MapTypes(type) is not null ? ManifestTypes.Map : null;
+    }
+
+    private static string? TrySpecialSandboxSource(SandboxSourceContext context)
+        => context.Type.SpecialType switch
+        {
+            SpecialType.System_Boolean => SandboxType + ".Bool",
+            SpecialType.System_Int32 => SandboxType + ".I32",
+            SpecialType.System_Int64 => SandboxType + ".I64",
+            SpecialType.System_Double => SandboxType + ".F64",
+            SpecialType.System_Single => SandboxType + ".F64",
+            SpecialType.System_String => SandboxType + ".String",
+            _ => null,
+        };
+
+    private static string? TryFrameworkSandboxSource(SandboxSourceContext context)
+        => SandboxFrameworkTypeSource.SandboxSource(context.Type, context.Depth);
+
+    private static string? TryNullableSandboxSource(SandboxSourceContext context)
+    {
+        if (!DotBoxDNullableScalarType.TryGetSupportedUnderlying(context.Type, out var nullableUnderlying))
+        {
+            return null;
+        }
+
+        RejectNestedShapeAtDepth(context.Depth);
+        return $"{SandboxType}.Record(new {SandboxType}[] {{ {SandboxType}.Bool, {Emit(nullableUnderlying, context.Depth + 1)} }})";
+    }
+
+    private static string? TryEnumSandboxSource(SandboxSourceContext context)
+        => context.Type.TypeKind == TypeKind.Enum && context.Type is INamedTypeSymbol enumType
+            ? DotBoxDRpcTypeMapper.EnumUsesI64(enumType) ? SandboxType + ".I64" : SandboxType + ".I32"
+            : null;
+
+    private static string? TryListSandboxSource(SandboxSourceContext context)
+    {
+        if (DotBoxDRpcTypeMapper.ListElementType(context.Type) is not { } elementType)
+        {
+            return null;
+        }
+
+        RejectNestedShapeAtDepth(context.Depth);
+        return $"{SandboxType}.List({Emit(elementType, context.Depth + 1)})";
+    }
+
+    private static string? TryMapSandboxSource(SandboxSourceContext context)
+    {
+        if (DotBoxDRpcTypeMapper.MapTypes(context.Type) is not { } map)
+        {
+            return null;
+        }
+
+        RejectNestedShapeAtDepth(context.Depth);
+        RejectUnsupportedMapKey(map.Key);
+        return $"{SandboxType}.Map({Emit(map.Key, context.Depth + 1)}, {Emit(map.Value, context.Depth + 1)})";
+    }
+
+    private static string? TryRecordSandboxSource(SandboxSourceContext context)
+    {
+        if (context.Type is not INamedTypeSymbol named || !DotBoxDRpcTypeMapper.IsRecordDto(named))
+        {
+            return null;
+        }
+
+        RejectNestedShapeAtDepth(context.Depth);
+        return RecordSandboxSource(named, context.Depth);
+    }
+
+    private static string RecordSandboxSource(INamedTypeSymbol named, int depth)
+    {
+        // A DTO that inherits public instance data members would silently drop them: RecordFields (and the
+        // runtime marshaller's GetRecordShape) see only declared members. Fail safe instead of emitting a
+        // partial record shape -- same rule the server-extension JsonType path enforces.
+        DotBoxDRpcTypeMapper.RejectInheritedDtoProperties(named);
+        var fields = DotBoxDRpcTypeMapper.RecordFields(named);
+        var fieldTypes = new string[fields.Count];
+        for (var i = 0; i < fields.Count; i++)
+        {
+            fieldTypes[i] = Emit(fields[i].Type, depth + 1);
+        }
+
+        return $"{SandboxType}.Record(new {SandboxType}[] {{ {string.Join(", ", fieldTypes)} }})";
+    }
+
+    private static void RejectUnsupportedMapKey(ITypeSymbol key)
+    {
+        if (!DotBoxDRpcTypeMapper.IsSupportedMapKey(key))
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    private static void RejectNestedShapeAtDepth(int depth)
     {
         if (depth >= MaxDepth)
         {
@@ -256,11 +219,5 @@ internal static class SandboxTypeSourceEmitter
         }
     }
 
-    private static void RejectRangeRecordAtDepth(int depth)
-    {
-        if (depth + 1 >= MaxDepth)
-        {
-            throw new NotSupportedException();
-        }
-    }
+    private readonly record struct SandboxSourceContext(ITypeSymbol Type, int Depth);
 }

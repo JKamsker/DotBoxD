@@ -2,6 +2,15 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 
 internal static partial class KernelMethodDescriptorPayloadParser
 {
+    private static readonly Dictionary<char, char> StringEscapes = new()
+    {
+        ['"'] = '"',
+        ['\\'] = '\\',
+        ['n'] = '\n',
+        ['r'] = '\r',
+        ['t'] = '\t'
+    };
+
     private static bool SkipValue(string json, ref int index)
         => index < json.Length && json[index] switch
         {
@@ -88,16 +97,7 @@ internal static partial class KernelMethodDescriptorPayloadParser
                 return false;
             }
 
-            var escaped = json[index++] switch
-            {
-                '"' => '"',
-                '\\' => '\\',
-                'n' => '\n',
-                'r' => '\r',
-                't' => '\t',
-                _ => '\0'
-            };
-            if (escaped == '\0')
+            if (!TryReadEscapedChar(json, ref index, out var escaped))
             {
                 return false;
             }
@@ -106,6 +106,17 @@ internal static partial class KernelMethodDescriptorPayloadParser
         }
 
         return false;
+    }
+
+    private static bool TryReadEscapedChar(string json, ref int index, out char escaped)
+    {
+        escaped = '\0';
+        if (index >= json.Length)
+        {
+            return false;
+        }
+
+        return StringEscapes.TryGetValue(json[index++], out escaped);
     }
 
     private static int SkipWhitespace(string value, int index)

@@ -38,7 +38,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return Call(binding.BindingId, null, args);
     }
 
-    private bool TryLowerServiceHandleLocal(string localName, ExpressionSyntax value, List<string> output)
+    internal bool TryLowerServiceHandleLocal(string localName, ExpressionSyntax value, List<string> output)
     {
         if (value is not InvocationExpressionSyntax invocation ||
             !TryGetServiceHandleAccessor(invocation, out var handleId, output))
@@ -56,14 +56,14 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return true;
     }
 
-    private void LowerServiceHandleScopedBlock(BlockSyntax block, List<string> output)
+    internal void LowerServiceHandleScopedBlock(BlockSyntax block, List<string> output)
     {
         var previous = new Dictionary<string, string>(_serviceHandleLocals, StringComparer.Ordinal);
         try
         {
             foreach (var inner in block.Statements)
             {
-                LowerStatement(inner, output);
+                RpcJsonStatementLowerer.LowerStatement(this, inner, output);
             }
         }
         finally
@@ -126,7 +126,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
     /// <summary>
     /// Recognizes a scoped-handle accessor call — <c>control.Get(key)</c> whose return type is a
-    /// <c>[DotBoxDService]</c> handle — and lowers the captured key (its first argument). Shared by the local
+    /// <c>[RpcService]</c> handle — and lowers the captured key (its first argument). Shared by the local
     /// declaration path (<see cref="TryLowerServiceHandleLocal"/>) and the inline receiver path so both capture
     /// the scope key identically.
     /// </summary>
@@ -136,7 +136,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         List<string>? output = null)
     {
         if (_model.GetSymbolInfo(invocation, _cancellationToken).Symbol is not IMethodSymbol method ||
-            !HasDotBoxDServiceAttribute(method.ReturnType) ||
+            !HasRpcServiceAttribute(method.ReturnType) ||
             IsHookContextHostMarker(method))
         {
             handleId = string.Empty;

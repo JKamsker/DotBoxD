@@ -11,6 +11,23 @@ namespace DotBoxD.Queryable.Text;
 /// </summary>
 public static class QueryText
 {
+    private static readonly IReadOnlyDictionary<QueryComparisonOperator, string> OperatorTokens =
+        new Dictionary<QueryComparisonOperator, string>
+        {
+            [QueryComparisonOperator.Equal] = "==",
+            [QueryComparisonOperator.NotEqual] = "!=",
+            [QueryComparisonOperator.GreaterThan] = ">",
+            [QueryComparisonOperator.GreaterThanOrEqual] = ">=",
+            [QueryComparisonOperator.LessThan] = "<",
+            [QueryComparisonOperator.LessThanOrEqual] = "<=",
+            [QueryComparisonOperator.StringContains] = "contains",
+            [QueryComparisonOperator.StringStartsWith] = "startswith",
+            [QueryComparisonOperator.StringEndsWith] = "endswith"
+        };
+
+    private static readonly IReadOnlyDictionary<string, QueryComparisonOperator> OperatorsByToken =
+        OperatorTokens.ToDictionary(static pair => pair.Value, static pair => pair.Key, StringComparer.Ordinal);
+
     /// <summary>Formats a filter as DSL text.</summary>
     public static string Format(QueryFilter filter)
     {
@@ -25,36 +42,11 @@ public static class QueryText
         return QueryTextParser.Parse(text);
     }
 
-    internal static string OperatorToken(QueryComparisonOperator op) => op switch
-    {
-        QueryComparisonOperator.Equal => "==",
-        QueryComparisonOperator.NotEqual => "!=",
-        QueryComparisonOperator.GreaterThan => ">",
-        QueryComparisonOperator.GreaterThanOrEqual => ">=",
-        QueryComparisonOperator.LessThan => "<",
-        QueryComparisonOperator.LessThanOrEqual => "<=",
-        QueryComparisonOperator.StringContains => "contains",
-        QueryComparisonOperator.StringStartsWith => "startswith",
-        QueryComparisonOperator.StringEndsWith => "endswith",
-        _ => throw new ArgumentOutOfRangeException(nameof(op), op, "Unknown operator."),
-    };
+    internal static string OperatorToken(QueryComparisonOperator op)
+        => OperatorTokens.TryGetValue(op, out var token)
+            ? token
+            : throw new ArgumentOutOfRangeException(nameof(op), op, "Unknown operator.");
 
     internal static bool TryParseOperator(string token, out QueryComparisonOperator op)
-    {
-        op = token switch
-        {
-            "==" => QueryComparisonOperator.Equal,
-            "!=" => QueryComparisonOperator.NotEqual,
-            ">" => QueryComparisonOperator.GreaterThan,
-            ">=" => QueryComparisonOperator.GreaterThanOrEqual,
-            "<" => QueryComparisonOperator.LessThan,
-            "<=" => QueryComparisonOperator.LessThanOrEqual,
-            "contains" => QueryComparisonOperator.StringContains,
-            "startswith" => QueryComparisonOperator.StringStartsWith,
-            "endswith" => QueryComparisonOperator.StringEndsWith,
-            _ => (QueryComparisonOperator)(-1),
-        };
-
-        return (int)op >= 0;
-    }
+        => OperatorsByToken.TryGetValue(token, out op);
 }

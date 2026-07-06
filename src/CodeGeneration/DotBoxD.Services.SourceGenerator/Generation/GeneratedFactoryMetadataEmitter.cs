@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
@@ -7,6 +8,28 @@ namespace DotBoxD.Services.SourceGenerator.Generation;
 
 internal static class GeneratedFactoryMetadataEmitter
 {
+    private static readonly Dictionary<MethodReturnKind, string> ReturnKindNames = new()
+    {
+        [MethodReturnKind.Void] = ServicesGeneratorMemberNames.GeneratedReturnKind.Void,
+        [MethodReturnKind.Sync] = ServicesGeneratorMemberNames.GeneratedReturnKind.Sync,
+        [MethodReturnKind.SyncSubService] = ServicesGeneratorMemberNames.GeneratedReturnKind.SyncNestedService,
+        [MethodReturnKind.Task] = ServicesGeneratorMemberNames.GeneratedReturnKind.Task,
+        [MethodReturnKind.TaskOf] = ServicesGeneratorMemberNames.GeneratedReturnKind.TaskOfT,
+        [MethodReturnKind.ValueTask] = ServicesGeneratorMemberNames.GeneratedReturnKind.ValueTask,
+        [MethodReturnKind.ValueTaskOf] = ServicesGeneratorMemberNames.GeneratedReturnKind.ValueTaskOfT,
+        [MethodReturnKind.TaskOfSubService] = ServicesGeneratorMemberNames.GeneratedReturnKind.TaskOfNestedService,
+        [MethodReturnKind.ValueTaskOfSubService] = ServicesGeneratorMemberNames.GeneratedReturnKind.ValueTaskOfNestedService,
+        [MethodReturnKind.AsyncEnumerable] = ServicesGeneratorMemberNames.GeneratedReturnKind.AsyncEnumerable,
+        [MethodReturnKind.TaskOfAsyncEnumerable] = ServicesGeneratorMemberNames.GeneratedReturnKind.TaskOfAsyncEnumerable,
+        [MethodReturnKind.ValueTaskOfAsyncEnumerable] = ServicesGeneratorMemberNames.GeneratedReturnKind.ValueTaskOfAsyncEnumerable,
+        [MethodReturnKind.Stream] = ServicesGeneratorMemberNames.GeneratedReturnKind.Stream,
+        [MethodReturnKind.TaskOfStream] = ServicesGeneratorMemberNames.GeneratedReturnKind.TaskOfStream,
+        [MethodReturnKind.ValueTaskOfStream] = ServicesGeneratorMemberNames.GeneratedReturnKind.ValueTaskOfStream,
+        [MethodReturnKind.Pipe] = ServicesGeneratorMemberNames.GeneratedReturnKind.Pipe,
+        [MethodReturnKind.TaskOfPipe] = ServicesGeneratorMemberNames.GeneratedReturnKind.TaskOfPipe,
+        [MethodReturnKind.ValueTaskOfPipe] = ServicesGeneratorMemberNames.GeneratedReturnKind.ValueTaskOfPipe,
+    };
+
     public static string MethodArrayName(int serviceIndex) =>
         "s_service" + serviceIndex.ToString(System.Globalization.CultureInfo.InvariantCulture) + "Methods";
 
@@ -159,28 +182,13 @@ internal static class GeneratedFactoryMetadataEmitter
     private static string ReturnKindExpression(MethodReturnKind returnKind) =>
         ServicesGeneratorTypeNames.GlobalGeneratedReturnKind + "." + ReturnKindName(returnKind);
 
-    private static string ReturnKindName(MethodReturnKind returnKind) => returnKind switch
-    {
-        MethodReturnKind.Void => ServicesGeneratorMemberNames.GeneratedReturnKind.Void,
-        MethodReturnKind.Sync => ServicesGeneratorMemberNames.GeneratedReturnKind.Sync,
-        MethodReturnKind.SyncSubService => ServicesGeneratorMemberNames.GeneratedReturnKind.SyncNestedService,
-        MethodReturnKind.Task => ServicesGeneratorMemberNames.GeneratedReturnKind.Task,
-        MethodReturnKind.TaskOf => ServicesGeneratorMemberNames.GeneratedReturnKind.TaskOfT,
-        MethodReturnKind.ValueTask => ServicesGeneratorMemberNames.GeneratedReturnKind.ValueTask,
-        MethodReturnKind.ValueTaskOf => ServicesGeneratorMemberNames.GeneratedReturnKind.ValueTaskOfT,
-        MethodReturnKind.TaskOfSubService => ServicesGeneratorMemberNames.GeneratedReturnKind.TaskOfNestedService,
-        MethodReturnKind.ValueTaskOfSubService => ServicesGeneratorMemberNames.GeneratedReturnKind.ValueTaskOfNestedService,
-        MethodReturnKind.AsyncEnumerable => ServicesGeneratorMemberNames.GeneratedReturnKind.AsyncEnumerable,
-        MethodReturnKind.TaskOfAsyncEnumerable => ServicesGeneratorMemberNames.GeneratedReturnKind.TaskOfAsyncEnumerable,
-        MethodReturnKind.ValueTaskOfAsyncEnumerable => ServicesGeneratorMemberNames.GeneratedReturnKind.ValueTaskOfAsyncEnumerable,
-        MethodReturnKind.Stream => ServicesGeneratorMemberNames.GeneratedReturnKind.Stream,
-        MethodReturnKind.TaskOfStream => ServicesGeneratorMemberNames.GeneratedReturnKind.TaskOfStream,
-        MethodReturnKind.ValueTaskOfStream => ServicesGeneratorMemberNames.GeneratedReturnKind.ValueTaskOfStream,
-        MethodReturnKind.Pipe => ServicesGeneratorMemberNames.GeneratedReturnKind.Pipe,
-        MethodReturnKind.TaskOfPipe => ServicesGeneratorMemberNames.GeneratedReturnKind.TaskOfPipe,
-        MethodReturnKind.ValueTaskOfPipe => ServicesGeneratorMemberNames.GeneratedReturnKind.ValueTaskOfPipe,
-        _ => ServicesGeneratorMemberNames.GeneratedReturnKind.Void,
-    };
+    private static string ReturnKindName(MethodReturnKind returnKind)
+        => ReturnKindNames.TryGetValue(returnKind, out var name)
+            ? name
+            : throw new System.ArgumentOutOfRangeException(
+                nameof(returnKind),
+                returnKind,
+                "Unmapped MethodReturnKind.");
 
     private static string BoolLiteral(bool value) => value ? "true" : "false";
 }

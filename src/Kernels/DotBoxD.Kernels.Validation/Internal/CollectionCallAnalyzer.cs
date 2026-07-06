@@ -31,6 +31,24 @@ internal sealed partial class CollectionCallAnalyzer
             type = SandboxType.Unit;
             return false;
         }
+        if (TryAnalyzeListCall(call, scope, ref effects, ref canReorder, out type) ||
+            TryAnalyzeMapCall(call, scope, ref effects, ref canReorder, out type) ||
+            TryAnalyzeRecordCall(call, scope, ref effects, ref canReorder, out type))
+        {
+            return true;
+        }
+
+        type = SandboxType.Unit;
+        return true;
+    }
+
+    private bool TryAnalyzeListCall(
+        CallExpression call,
+        FunctionScope scope,
+        ref SandboxEffect effects,
+        ref bool canReorder,
+        out SandboxType type)
+    {
         type = call.Name switch
         {
             "list.empty" => AnalyzeListEmpty(call, ref effects),
@@ -38,16 +56,44 @@ internal sealed partial class CollectionCallAnalyzer
             "list.count" => AnalyzeListCount(call, scope, ref effects, ref canReorder),
             "list.get" => AnalyzeListGet(call, scope, ref effects, ref canReorder),
             "list.add" => AnalyzeListAdd(call, scope, ref effects, ref canReorder),
+            _ => null!
+        };
+        return type is not null;
+    }
+
+    private bool TryAnalyzeMapCall(
+        CallExpression call,
+        FunctionScope scope,
+        ref SandboxEffect effects,
+        ref bool canReorder,
+        out SandboxType type)
+    {
+        type = call.Name switch
+        {
             "map.empty" => AnalyzeMapEmpty(call, ref effects),
             "map.containsKey" => AnalyzeMapContainsKey(call, scope, ref effects, ref canReorder),
             "map.get" => AnalyzeMapGet(call, scope, ref effects, ref canReorder),
             "map.set" => AnalyzeMapSet(call, scope, ref effects, ref canReorder),
             "map.remove" => AnalyzeMapRemove(call, scope, ref effects, ref canReorder),
+            _ => null!
+        };
+        return type is not null;
+    }
+
+    private bool TryAnalyzeRecordCall(
+        CallExpression call,
+        FunctionScope scope,
+        ref SandboxEffect effects,
+        ref bool canReorder,
+        out SandboxType type)
+    {
+        type = call.Name switch
+        {
             "record.new" => AnalyzeRecordNew(call, scope, ref effects, ref canReorder),
             "record.get" => AnalyzeRecordGet(call, scope, ref effects, ref canReorder),
-            _ => SandboxType.Unit
+            _ => null!
         };
-        return true;
+        return type is not null;
     }
     private SandboxType AnalyzeListEmpty(CallExpression call, ref SandboxEffect effects)
     {

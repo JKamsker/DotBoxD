@@ -1,6 +1,4 @@
 using System.Globalization;
-using System.Reflection;
-using Expr = System.Linq.Expressions.Expression;
 
 namespace DotBoxD.Plugins.Indexing;
 
@@ -58,6 +56,11 @@ public sealed class EventIndexMatcher<TEvent>
         var honored = new List<IndexedPredicate>();
         foreach (var predicate in predicates)
         {
+            if (predicate is null)
+            {
+                throw new ArgumentException("The predicates list cannot contain null entries.", nameof(predicates));
+            }
+
             if (IndexKeys.TryGetValue(predicate.Path, out var key) &&
                 TryReconcile(predicate.Value, key.Type, out var value))
             {
@@ -90,28 +93,12 @@ public sealed class EventIndexMatcher<TEvent>
     private static IReadOnlyDictionary<string, IndexKey> BuildIndexKeys()
     {
         var keys = new Dictionary<string, IndexKey>(StringComparer.Ordinal);
-        foreach (var property in typeof(TEvent).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        foreach (var path in EventIndexPathResolver.IndexKeyPaths<TEvent>())
         {
-            if (property.CanRead && property.GetCustomAttribute<EventIndexKeyAttribute>() is not null)
-            {
-                var type = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
-                keys[property.Name] = new IndexKey(CompileGetter(property), type);
-            }
+            keys[path.Path] = new IndexKey(path.Getter, path.Type);
         }
 
         return keys;
-    }
-
-    // Builds value => (object?)value.Property once, so reading an indexed field is a delegate call rather
-    // than reflection on every event.
-    private static Func<TEvent, object?> CompileGetter(PropertyInfo property)
-    {
-        var parameter = Expr.Parameter(typeof(TEvent), "value");
-        Expr instance = property.DeclaringType is { } declaring && !declaring.IsAssignableFrom(typeof(TEvent))
-            ? Expr.Convert(parameter, declaring)
-            : parameter;
-        var boxed = Expr.Convert(Expr.Property(instance, property), typeof(object));
-        return Expr.Lambda<Func<TEvent, object?>>(boxed, parameter).Compile();
     }
 
     // Coerces a manifest value to the indexed property's CLR type so every check compares like-typed boxed
@@ -157,18 +144,31 @@ public sealed class EventIndexMatcher<TEvent>
         public bool Evaluate(TEvent target)
         {
             var actual = getter(target);
-            return op switch
+            if (op == IndexPredicateOperator.Equals)
             {
-                IndexPredicateOperator.Equals => Equals(actual, value),
-                IndexPredicateOperator.NotEquals => !Equals(actual, value),
-                IndexPredicateOperator.GreaterThan => TryCompare(actual, value, out var c) ? c > 0 : true,
-                IndexPredicateOperator.GreaterThanOrEqual => TryCompare(actual, value, out var c) ? c >= 0 : true,
-                IndexPredicateOperator.LessThan => TryCompare(actual, value, out var c) ? c < 0 : true,
-                IndexPredicateOperator.LessThanOrEqual => TryCompare(actual, value, out var c) ? c <= 0 : true,
-                // Unknown operator: cannot decide, so do not reject — leave it to the verified IR.
+                return Equals(actual, value);
+            }
+
+            if (op == IndexPredicateOperator.NotEquals)
+            {
+                return !Equals(actual, value);
+            }
+
+            return TryCompare(actual, value, out var comparison)
+                ? CompareMatches(op, comparison)
+                : true;
+        }
+
+        private static bool CompareMatches(IndexPredicateOperator op, int comparison)
+            => op switch
+            {
+                IndexPredicateOperator.GreaterThan => comparison > 0,
+                IndexPredicateOperator.GreaterThanOrEqual => comparison >= 0,
+                IndexPredicateOperator.LessThan => comparison < 0,
+                IndexPredicateOperator.LessThanOrEqual => comparison <= 0,
+                // Unknown operator: cannot decide, so do not reject; leave it to the verified IR.
                 _ => true,
             };
-        }
 
         // Decidable only when both operands are non-null and the same CLR type (guaranteed by Create's
         // reconciliation for honored predicates). Anything else is left undecided so CouldMatch passes it

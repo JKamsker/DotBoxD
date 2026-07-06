@@ -132,20 +132,35 @@ internal static class ConjunctionContradictions
                     continue;
                 }
 
-                var lowerComparison = _lower is { } lo ? value.CompareTo(lo) : null;
-                if (lowerComparison is < 0 || (lowerComparison is 0 && _lowerStrict))
-                {
-                    return true;
-                }
-
-                var upperComparison = _upper is { } hi ? value.CompareTo(hi) : null;
-                if (upperComparison is > 0 || (upperComparison is 0 && _upperStrict))
+                if (IsOutsideLowerBound(value) || IsOutsideUpperBound(value))
                 {
                     return true;
                 }
             }
 
             return false;
+        }
+
+        private bool IsOutsideLowerBound(NumericLiteral value)
+        {
+            if (_lower is not { } lo)
+            {
+                return false;
+            }
+
+            var comparison = value.CompareTo(lo);
+            return comparison is < 0 || (comparison is 0 && _lowerStrict);
+        }
+
+        private bool IsOutsideUpperBound(NumericLiteral value)
+        {
+            if (_upper is not { } hi)
+            {
+                return false;
+            }
+
+            var comparison = value.CompareTo(hi);
+            return comparison is > 0 || (comparison is 0 && _upperStrict);
         }
 
         private static void Tighten(ref NumericLiteral? bound, ref bool strict, QueryValue value, bool isStrict, bool takeMax)

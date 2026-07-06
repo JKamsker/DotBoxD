@@ -12,41 +12,60 @@ internal static partial class HookChainModelFactory
         CancellationToken cancellationToken)
     {
         var parameters = LambdaParameterNames(lambda);
-        if (parameters.Count == 0 || parameters.Count > 3)
+        if (!HasSupportedResultLocalParameterCount(parameters))
         {
             return default;
         }
 
         if (ResultLocalDelegateShape(invocation, model, cancellationToken) is { } shape)
         {
-            if (shape.ContextParam is not null && parameters.Count < 2)
-            {
-                return default;
-            }
-
-            return shape with
-            {
-                ElementParam = parameters[0],
-                ContextParam = shape.ContextParam is null ? null : parameters[1]
-            };
+            return ShapeWithLambdaParameterNames(shape, parameters);
         }
 
+        return InferResultLocalLambdaShape(lambda, parameters, model, cancellationToken);
+    }
+
+    private static bool HasSupportedResultLocalParameterCount(IReadOnlyList<string> parameters)
+    {
+        if (parameters.Count == 0)
+        {
+            return false;
+        }
+
+        return parameters.Count <= 3;
+    }
+
+    private static ResultLocalTerminalShape ShapeWithLambdaParameterNames(
+        ResultLocalTerminalShape shape,
+        IReadOnlyList<string> parameters)
+    {
+        if (shape.ContextParam is not null && parameters.Count < 2)
+        {
+            return default;
+        }
+
+        return shape with
+        {
+            ElementParam = parameters[0],
+            ContextParam = shape.ContextParam is null ? null : parameters[1]
+        };
+    }
+
+    private static ResultLocalTerminalShape InferResultLocalLambdaShape(
+        LambdaExpressionSyntax lambda,
+        IReadOnlyList<string> parameters,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
         var asyncLocal = lambda.AsyncKeyword.RawKind != 0 || LambdaReturnsValueTask(lambda, model, cancellationToken);
         if (parameters.Count == 3)
         {
-            return LooksLikeCancellationToken(lambda, index: 2, model, cancellationToken, allowNameFallback: asyncLocal)
-                ? new ResultLocalTerminalShape(parameters[0], parameters[1], true, true)
-                : default;
+            return ThreeParameterResultLocalShape(lambda, parameters, model, cancellationToken, asyncLocal);
         }
 
         // With two untyped parameters, "ct" is commonly used for either context or cancellation.
         // Preserve the context shape unless Roslyn or an explicit parameter type proves it is a token.
-        if (parameters.Count == 2 && LooksLikeCancellationToken(
-                lambda,
-                index: 1,
-                model,
-                cancellationToken,
-                allowNameFallback: false))
+        if (HasSecondParameterCancellationToken(lambda, parameters, model, cancellationToken))
         {
             return new ResultLocalTerminalShape(parameters[0], null, true, true);
         }
@@ -58,31 +77,81 @@ internal static partial class HookChainModelFactory
             false);
     }
 
+    private static ResultLocalTerminalShape ThreeParameterResultLocalShape(
+        LambdaExpressionSyntax lambda,
+        IReadOnlyList<string> parameters,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        bool asyncLocal)
+        => LooksLikeCancellationToken(lambda, index: 2, model, cancellationToken, allowNameFallback: asyncLocal)
+            ? new ResultLocalTerminalShape(parameters[0], parameters[1], true, true)
+            : default;
+
+    private static bool HasSecondParameterCancellationToken(
+        LambdaExpressionSyntax lambda,
+        IReadOnlyList<string> parameters,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (parameters.Count != 2)
+        {
+            return false;
+        }
+
+        return LooksLikeCancellationToken(
+            lambda,
+            index: 1,
+            model,
+            cancellationToken,
+            allowNameFallback: false);
+    }
+
     private static ResultLocalTerminalShape? ResultLocalDelegateShape(
         InvocationExpressionSyntax invocation,
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method ||
-            method.Parameters.Length == 0 ||
-            method.Parameters[0].Type is not INamedTypeSymbol delegateType ||
-            delegateType.DelegateInvokeMethod is not { } invoke)
+        if (ResultLocalDelegateInvoke(invocation, model, cancellationToken) is not { } invoke)
         {
             return null;
         }
 
         var asyncLocal = IsValueTask(invoke.ReturnType);
-        var parameters = invoke.Parameters;
-        return parameters.Length switch
+        return invoke.Parameters.Length switch
         {
             1 => new ResultLocalTerminalShape(null, null, asyncLocal, false),
-            2 when IsCancellationToken(parameters[1].Type) =>
+            2 when IsCancellationToken(invoke.Parameters[1].Type) =>
                 new ResultLocalTerminalShape(null, null, true, true),
             2 => new ResultLocalTerminalShape(null, string.Empty, asyncLocal, false),
-            3 when IsCancellationToken(parameters[2].Type) =>
+            3 when IsCancellationToken(invoke.Parameters[2].Type) =>
                 new ResultLocalTerminalShape(null, string.Empty, true, true),
             _ => default(ResultLocalTerminalShape?)
         };
+    }
+
+    private static IMethodSymbol? ResultLocalDelegateInvoke(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method)
+        {
+            return null;
+        }
+
+        return FirstParameterDelegateInvoke(method);
+    }
+
+    private static IMethodSymbol? FirstParameterDelegateInvoke(IMethodSymbol method)
+    {
+        if (method.Parameters.Length == 0)
+        {
+            return null;
+        }
+
+        return method.Parameters[0].Type is INamedTypeSymbol delegateType
+            ? delegateType.DelegateInvokeMethod
+            : null;
     }
 
     private static IReadOnlyList<string> LambdaParameterNames(LambdaExpressionSyntax lambda)

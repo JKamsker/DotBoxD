@@ -6,7 +6,9 @@ namespace DotBoxD.Plugins.Runtime;
 
 public sealed class PluginEventAdapterRegistry
 {
+    private readonly object _gate = new();
     private readonly Dictionary<Type, RegisteredPluginEventAdapter> _adapters = [];
+    private volatile KeyValuePair<Type, RegisteredPluginEventAdapter>[] _adapterSnapshot = [];
 
     public void Register<TEvent>(IPluginEventAdapter<TEvent> adapter)
     {
@@ -15,18 +17,25 @@ public sealed class PluginEventAdapterRegistry
         var parameters = adapter.Parameters;
         PluginEventAdapterShapeValidator.Validate(adapter, eventName, parameters);
         var shape = new PluginEventShape(eventName, parameters);
-        ValidateEventNameShape(typeof(TEvent), shape);
-        // Capture the type-erased wire closure here — the single store site both the explicit Register path and
-        // the lazy Resolve auto-register path flow through — so the router can wire by event name with no
-        // reflection, over the SAME adapter instance Resolve returns (preserving pipeline adapter identity).
-        _adapters[typeof(TEvent)] = new(adapter, shape, new ErasedPluginEventAdapter<TEvent>(adapter));
+        lock (_gate)
+        {
+            ValidateEventNameShape(typeof(TEvent), shape);
+            // Capture the type-erased wire closure here — the single store site both the explicit Register path and
+            // the lazy Resolve auto-register path flow through — so the router can wire by event name with no
+            // reflection, over the SAME adapter instance Resolve returns (preserving pipeline adapter identity).
+            _adapters[typeof(TEvent)] = new(adapter, shape, new ErasedPluginEventAdapter<TEvent>(adapter));
+            _adapterSnapshot = _adapters.ToArray();
+        }
     }
 
     public IPluginEventAdapter<TEvent> Resolve<TEvent>()
     {
-        if (_adapters.TryGetValue(typeof(TEvent), out var registered))
+        lock (_gate)
         {
-            return (IPluginEventAdapter<TEvent>)registered.Adapter;
+            if (_adapters.TryGetValue(typeof(TEvent), out var registered))
+            {
+                return (IPluginEventAdapter<TEvent>)registered.Adapter;
+            }
         }
 
         var discovered = TryDiscoverAdapter<TEvent>() ?? ConventionEventAdapter<TEvent>.Create();
@@ -40,7 +49,7 @@ public sealed class PluginEventAdapterRegistry
         // EventName with DIFFERENT parameter shapes, so every same-name match yields the same shape — returning it
         // keeps install-time DBXK033 parameter validation running instead of silently skipping it (which would let
         // a malformed kernel install and only fail later at wiring/invocation).
-        if (TryResolveRegistered(eventName, rejectAmbiguous: false, out var registered))
+        if (TryResolveRegistered(_adapterSnapshot, eventName, rejectAmbiguous: false, out var registered))
         {
             shape = registered.Shape;
             return true;
@@ -62,7 +71,7 @@ public sealed class PluginEventAdapterRegistry
     /// </summary>
     public bool TryResolveErased(string eventName, out IErasedPluginEventAdapter adapter)
     {
-        if (TryResolveRegistered(eventName, rejectAmbiguous: true, out var registered))
+        if (TryResolveRegistered(_adapterSnapshot, eventName, rejectAmbiguous: true, out var registered))
         {
             adapter = registered.Erased;
             return true;
@@ -88,70 +97,110 @@ public sealed class PluginEventAdapterRegistry
     /// for both callers: DBXK034 does not constrain adapters whose exact names merely share a simple-name tail, so
     /// their shapes may differ and there is no well-defined shape to validate against.
     /// </summary>
-    private bool TryResolveRegistered(string eventName, bool rejectAmbiguous, out RegisteredPluginEventAdapter resolved)
+    private static bool TryResolveRegistered(
+        KeyValuePair<Type, RegisteredPluginEventAdapter>[] adapters,
+        string eventName,
+        bool rejectAmbiguous,
+        out RegisteredPluginEventAdapter resolved)
     {
-        RegisteredPluginEventAdapter exactMatch = default;
-        var exactCount = 0;
-        RegisteredPluginEventAdapter typeNameMatch = default;
-        var hasTypeNameMatch = false;
-        RegisteredPluginEventAdapter suffixMatch = default;
-        var suffixCount = 0;
+        var resolution = new RegisteredPluginEventResolution(eventName);
 
-        foreach (var entry in _adapters)
+        foreach (var entry in adapters)
         {
-            var registered = entry.Value;
-            if (string.Equals(registered.Shape.EventName, eventName, StringComparison.Ordinal))
-            {
-                if (exactCount == 0)
-                {
-                    exactMatch = registered;
-                }
+            resolution.Add(entry.Key, entry.Value);
+        }
 
-                exactCount++;
-                continue;
+        return resolution.TryResolve(rejectAmbiguous, out resolved);
+    }
+
+    private struct RegisteredPluginEventResolution
+    {
+        private readonly string _eventName;
+        private RegisteredPluginEventAdapter _exactMatch;
+        private int _exactCount;
+        private RegisteredPluginEventAdapter _typeNameMatch;
+        private bool _hasTypeNameMatch;
+        private RegisteredPluginEventAdapter _suffixMatch;
+        private int _suffixCount;
+
+        public RegisteredPluginEventResolution(string eventName)
+        {
+            _eventName = eventName;
+            _exactMatch = default;
+            _exactCount = 0;
+            _typeNameMatch = default;
+            _hasTypeNameMatch = false;
+            _suffixMatch = default;
+            _suffixCount = 0;
+        }
+
+        public void Add(Type eventType, RegisteredPluginEventAdapter registered)
+        {
+            if (string.Equals(registered.Shape.EventName, _eventName, StringComparison.Ordinal))
+            {
+                AddExactMatch(registered);
+                return;
             }
 
-            if (!hasTypeNameMatch && string.Equals(entry.Key.FullName, eventName, StringComparison.Ordinal))
+            if (!_hasTypeNameMatch && string.Equals(eventType.FullName, _eventName, StringComparison.Ordinal))
             {
-                typeNameMatch = registered;
-                hasTypeNameMatch = true;
+                _typeNameMatch = registered;
+                _hasTypeNameMatch = true;
             }
 
-            if (EventNameMatch.Matches(registered.Shape.EventName, eventName))
+            if (EventNameMatch.Matches(registered.Shape.EventName, _eventName))
             {
-                if (suffixCount == 0)
-                {
-                    suffixMatch = registered;
-                }
-
-                suffixCount++;
+                AddSuffixMatch(registered);
             }
         }
 
-        if (exactCount == 1 || (exactCount > 1 && !rejectAmbiguous))
+        private void AddExactMatch(RegisteredPluginEventAdapter registered)
         {
-            resolved = exactMatch;
-            return true;
+            if (_exactCount == 0)
+            {
+                _exactMatch = registered;
+            }
+
+            _exactCount++;
         }
 
-        if (exactCount == 0 && hasTypeNameMatch)
+        private void AddSuffixMatch(RegisteredPluginEventAdapter registered)
         {
-            resolved = typeNameMatch;
-            return true;
+            if (_suffixCount == 0)
+            {
+                _suffixMatch = registered;
+            }
+
+            _suffixCount++;
         }
 
-        // Suffix matches require uniqueness for BOTH callers: adapters that merely share a simple-name tail can
-        // have different shapes (DBXK034 only compares exact names), so there is no well-defined shape to validate
-        // against and no unambiguous adapter to wire — picking by registration order would be wrong either way.
-        if (exactCount == 0 && !hasTypeNameMatch && suffixCount == 1)
+        public readonly bool TryResolve(bool rejectAmbiguous, out RegisteredPluginEventAdapter resolved)
         {
-            resolved = suffixMatch;
-            return true;
-        }
+            if (_exactCount == 1 || (_exactCount > 1 && !rejectAmbiguous))
+            {
+                resolved = _exactMatch;
+                return true;
+            }
 
-        // No match, or an ambiguous tier we refuse to resolve by registration order.
-        resolved = default;
-        return false;
+            if (_exactCount == 0 && _hasTypeNameMatch)
+            {
+                resolved = _typeNameMatch;
+                return true;
+            }
+
+            // Suffix matches require uniqueness for BOTH callers: adapters that merely share a simple-name tail can
+            // have different shapes (DBXK034 only compares exact names), so there is no well-defined shape to validate
+            // against and no unambiguous adapter to wire — picking by registration order would be wrong either way.
+            if (_exactCount == 0 && !_hasTypeNameMatch && _suffixCount == 1)
+            {
+                resolved = _suffixMatch;
+                return true;
+            }
+
+            // No match, or an ambiguous tier we refuse to resolve by registration order.
+            resolved = default;
+            return false;
+        }
     }
 
     private static IPluginEventAdapter<TEvent>? TryDiscoverAdapter<TEvent>()

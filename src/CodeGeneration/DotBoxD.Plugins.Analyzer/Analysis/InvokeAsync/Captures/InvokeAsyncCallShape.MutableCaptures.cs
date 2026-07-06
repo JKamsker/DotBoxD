@@ -101,33 +101,56 @@ internal sealed partial class InvokeAsyncCallShape
         while (changed)
         {
             changed = false;
-            foreach (var declarator in block.DescendantNodes().OfType<VariableDeclaratorSyntax>())
-            {
-                if (declarator.Initializer?.Value is not { } initializer ||
-                    MutableCaptureName(initializer, model, capturedName, aliases) is not { } name ||
-                    model.GetDeclaredSymbol(declarator) is not ILocalSymbol local)
-                {
-                    continue;
-                }
-
-                changed |= AddAlias(aliases, local, name);
-            }
-
-            foreach (var assignment in block.DescendantNodes().OfType<AssignmentExpressionSyntax>())
-            {
-                if (assignment.Kind() != SyntaxKind.SimpleAssignmentExpression ||
-                    assignment.Left is not IdentifierNameSyntax left ||
-                    MutableCaptureName(assignment.Right, model, capturedName, aliases) is not { } name ||
-                    model.GetSymbolInfo(left).Symbol is not ILocalSymbol local)
-                {
-                    continue;
-                }
-
-                changed |= AddAlias(aliases, local, name);
-            }
+            changed |= AddMutableCaptureDeclaratorAliases(block, model, capturedName, aliases);
+            changed |= AddMutableCaptureAssignmentAliases(block, model, capturedName, aliases);
         }
 
         return aliases;
+    }
+
+    private static bool AddMutableCaptureDeclaratorAliases(
+        BlockSyntax block,
+        SemanticModel model,
+        Func<ExpressionSyntax, string?> capturedName,
+        Dictionary<ISymbol, string> aliases)
+    {
+        var changed = false;
+        foreach (var declarator in block.DescendantNodes().OfType<VariableDeclaratorSyntax>())
+        {
+            if (declarator.Initializer?.Value is not { } initializer ||
+                MutableCaptureName(initializer, model, capturedName, aliases) is not { } name ||
+                model.GetDeclaredSymbol(declarator) is not ILocalSymbol local)
+            {
+                continue;
+            }
+
+            changed |= AddAlias(aliases, local, name);
+        }
+
+        return changed;
+    }
+
+    private static bool AddMutableCaptureAssignmentAliases(
+        BlockSyntax block,
+        SemanticModel model,
+        Func<ExpressionSyntax, string?> capturedName,
+        Dictionary<ISymbol, string> aliases)
+    {
+        var changed = false;
+        foreach (var assignment in block.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+        {
+            if (assignment.Kind() != SyntaxKind.SimpleAssignmentExpression ||
+                assignment.Left is not IdentifierNameSyntax left ||
+                MutableCaptureName(assignment.Right, model, capturedName, aliases) is not { } name ||
+                model.GetSymbolInfo(left).Symbol is not ILocalSymbol local)
+            {
+                continue;
+            }
+
+            changed |= AddAlias(aliases, local, name);
+        }
+
+        return changed;
     }
 
     private static bool AddAlias(Dictionary<ISymbol, string> aliases, ISymbol local, string name)

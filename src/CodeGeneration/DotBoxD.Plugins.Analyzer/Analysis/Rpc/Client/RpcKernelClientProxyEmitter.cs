@@ -112,6 +112,7 @@ internal static partial class RpcKernelClientProxyEmitter
             var result = locals.Next("__result");
             var payloadParameterCount = RpcKernelClientParameters.PayloadParameterCount(_serviceMethod);
 
+            RpcMethodMetadataAttributeSource.Append(builder, _serviceMethod, "    ");
             RpcReturnFlowAttributeSource.Append(builder, _serviceMethod, "    ");
             builder.Append("    public ");
             if (_returnShape != ReturnShape.Direct)
@@ -123,6 +124,13 @@ internal static partial class RpcKernelClientProxyEmitter
                 .Append(Identifier(_serviceMethod.Name)).Append('(')
                 .Append(RpcKernelClientParameterSource.ParameterList(_serviceMethod)).AppendLine(")");
             builder.AppendLine("    {");
+            if (RpcKernelClientParameters.TryGetCancellationToken(_serviceMethod, out var cancellationToken))
+            {
+                builder.Append("        ")
+                    .Append(Identifier(cancellationToken.Name))
+                    .AppendLine(".ThrowIfCancellationRequested();");
+            }
+
             builder.Append("        var ").Append(arguments).Append($" = new {DotBoxDRpcValueNames.GlobalKernelRpcValue}[")
                 .Append(payloadParameterCount).AppendLine("];");
             for (var i = 0; i < payloadParameterCount; i++)

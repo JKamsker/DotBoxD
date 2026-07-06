@@ -6,7 +6,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 internal sealed partial class DotBoxDRpcJsonLowerer
 {
-    private string LowerExpressionWithPrelude(ExpressionSyntax expression, List<string> output)
+    internal string LowerExpressionWithPrelude(ExpressionSyntax expression, List<string> output)
     {
         var previous = _expressionPrelude;
         var prelude = new List<string>();
@@ -48,7 +48,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return name;
     }
 
-    private string NextDiscardLocal()
+    internal string NextDiscardLocal()
     {
         while (true)
         {
@@ -74,7 +74,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return hash.ToString("x16", System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    private void ReserveUserNames(SyntaxNode node)
+    internal void ReserveUserNames(SyntaxNode node)
     {
         foreach (var token in node.DescendantTokens())
         {
@@ -85,7 +85,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         }
     }
 
-    private int NextLoopTempSuffix()
+    internal int NextLoopTempSuffix()
     {
         while (true)
         {

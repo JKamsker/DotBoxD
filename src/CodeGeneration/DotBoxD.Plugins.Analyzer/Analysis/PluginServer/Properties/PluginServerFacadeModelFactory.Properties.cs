@@ -24,6 +24,7 @@ internal static partial class PluginServerFacadeModelFactory
             }
 
             ValidateForwardedProperty(property);
+            RejectErrorObsoleteForwarder(property);
             var returnWrapperName = ReturnPropertyWrapper(property.Type, serviceWrappers, skipServiceProperties, cancellationToken);
             if (returnWrapperName.IsSkipped)
             {
@@ -101,7 +102,7 @@ internal static partial class PluginServerFacadeModelFactory
         CancellationToken cancellationToken)
     {
         if (returnType is not INamedTypeSymbol namedReturnType ||
-            !HasAttribute(namedReturnType, DotBoxDMetadataNames.DotBoxDServiceAttribute))
+            !HasAttribute(namedReturnType, DotBoxDMetadataNames.RpcServiceAttribute))
         {
             return new ServicePropertyWrapper(null);
         }

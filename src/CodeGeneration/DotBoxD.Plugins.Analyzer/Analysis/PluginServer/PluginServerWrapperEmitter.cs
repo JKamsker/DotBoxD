@@ -114,6 +114,7 @@ internal static class PluginServerWrapperEmitter
         string innerFieldName)
     {
         PluginServerXmlDocumentation.Append(builder, indent, method.Documentation);
+        PluginServerFlowAttributeSource.Append(builder, indent, method.Attributes);
         PluginServerFlowAttributeSource.Append(builder, indent, method.ReturnAttributes);
         builder.Append(indent).Append("public ");
         if (method.ReturnWrapperKind is PluginServerReturnWrapperKind.Task or PluginServerReturnWrapperKind.ValueTask)

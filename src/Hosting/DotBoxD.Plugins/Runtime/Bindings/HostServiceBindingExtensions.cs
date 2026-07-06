@@ -37,6 +37,16 @@ public static class HostServiceBindingExtensions
             return;
         }
 
+        AddServiceMethodBindings(builder, serviceType, implementation, registeredBindings);
+        AddNestedServiceBindings(builder, serviceType, implementation, visited, registeredBindings);
+    }
+
+    private static void AddServiceMethodBindings(
+        SandboxHostBuilder builder,
+        Type serviceType,
+        object implementation,
+        Dictionary<string, HostServiceBindingRegistration> registeredBindings)
+    {
         foreach (var method in HostServiceBindingMemberDiscovery.ServiceMethods(serviceType))
         {
             HostServiceBindingMemberDiscovery.RejectUnsupportedGenericHostBindingMethod(method);
@@ -73,7 +83,15 @@ public static class HostServiceBindingExtensions
                     HostServiceBindingRouteSignature.ForMethod(method));
             }
         }
+    }
 
+    private static void AddNestedServiceBindings(
+        SandboxHostBuilder builder,
+        Type serviceType,
+        object implementation,
+        HashSet<Type> visited,
+        Dictionary<string, HostServiceBindingRegistration> registeredBindings)
+    {
         foreach (var property in HostServiceBindingMemberDiscovery.ServiceProperties(serviceType))
         {
             HostServiceBindingMemberDiscovery.RejectUnsupportedExplicitPropertyBinding(property);
@@ -88,7 +106,7 @@ public static class HostServiceBindingExtensions
                 continue;
             }
 
-            if (!HostServiceBindingMemberDiscovery.HasDotBoxDServiceAttribute(property.PropertyType))
+            if (!HostServiceBindingMemberDiscovery.HasRpcServiceAttribute(property.PropertyType))
             {
                 continue;
             }
@@ -112,7 +130,7 @@ public static class HostServiceBindingExtensions
         Dictionary<string, HostServiceBindingRegistration> registeredBindings)
     {
         if (HostServiceBindingFactory.UnwrapReturnType(factoryMethod.ReturnType) is not { } handleServiceType ||
-            !HostServiceBindingMemberDiscovery.HasDotBoxDServiceAttribute(handleServiceType))
+            !HostServiceBindingMemberDiscovery.HasRpcServiceAttribute(handleServiceType))
         {
             return false;
         }
@@ -133,11 +151,31 @@ public static class HostServiceBindingExtensions
                 continue;
             }
 
+            var binding = handleMethod.GetCustomAttribute<HostBindingAttribute>();
             var capability = handleMethod.GetCustomAttribute<HostCapabilityAttribute>();
-            if (capability is null)
+            if (binding is null && capability is null)
             {
                 throw new InvalidOperationException(
-                    $"Host service handle method '{handleServiceType.FullName}.{handleMethod.Name}' must declare [HostCapability].");
+                    $"Host service handle method '{handleServiceType.FullName}.{handleMethod.Name}' must declare [HostBinding] or [HostCapability].");
+            }
+
+            if (binding is not null)
+            {
+                AddBinding(
+                    builder,
+                    registeredBindings,
+                    HostServiceBindingFactory.CreateHandleBinding(
+                        factoryMethod,
+                        targetFactory,
+                        parentImplementation,
+                        handleMethod,
+                        binding),
+                    HostServiceBindingRouteSignature.ForHandle(factoryMethod, handleMethod));
+            }
+
+            if (capability is null)
+            {
+                continue;
             }
 
             AddBinding(
@@ -166,6 +204,12 @@ public static class HostServiceBindingExtensions
         if (binding is null)
         {
             return false;
+        }
+
+        if (binding.IsAutoBinding)
+        {
+            throw new InvalidOperationException(
+                $"Host service property '{serviceType.FullName}.{property.Name}' must declare an explicit binding id.");
         }
 
         var getter = property.GetMethod

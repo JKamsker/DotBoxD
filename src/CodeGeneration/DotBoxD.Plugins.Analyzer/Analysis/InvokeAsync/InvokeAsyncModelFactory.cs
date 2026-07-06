@@ -2,15 +2,12 @@ using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
 
 internal static partial class InvokeAsyncModelFactory
 {
-    private const string InvokeAsyncMethod = "InvokeAsync";
-
     public static InvokeAsyncResult? Create(GeneratorSyntaxContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -39,105 +36,123 @@ internal static partial class InvokeAsyncModelFactory
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        string receiverType;
-        string? serverAccessType;
-        INamedTypeSymbol worldType;
-        var method = model.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
-        var markedMethod = MarkedMethod(method, model.Compilation);
-        var pluginServerType = model.Compilation.GetTypeByMetadataName(PluginServerInterfaceMetadataName);
         if (IsUnqualifiedInvocationExpression(invocation.Expression))
         {
-            if (markedMethod is null && !IsInvokeAsyncName(invocation.Expression))
-            {
-                return null;
-            }
-
-            if (BindsToUnmarkedUserInvocation(method, model.Compilation, pluginServerType))
-            {
-                return null;
-            }
-
-            if (TryImplicitGeneratedFacadeSurface(
-                    model,
-                    invocation,
-                    cancellationToken,
-                    out receiverType,
-                    out serverAccessType,
-                    out worldType))
-            {
-                return CreateForSurface(
-                    invocation,
-                    method,
-                    model,
-                    cancellationToken,
-                    receiverType,
-                    serverAccessType,
-                    worldType);
-            }
-
-            if (IsDotBoxDLoweredInvocation(method, model.Compilation, pluginServerType))
-            {
-                throw new NotSupportedException(
-                    "implicit InvokeAsync calls are not supported; call InvokeAsync on the generated plugin server receiver.");
-            }
-
-            return null;
+            return TryCreateUnqualified(invocation, model, cancellationToken);
         }
 
         if (IsConditionalInvocationExpression(invocation.Expression))
         {
-            if (markedMethod is null && !IsInvokeAsyncName(invocation.Expression))
-            {
-                return null;
-            }
+            return TryCreateConditional(invocation, model, cancellationToken);
+        }
 
-            if (BindsToUnmarkedUserInvocation(method, model.Compilation, pluginServerType))
-            {
-                return null;
-            }
+        return TryCreateMemberAccess(invocation, model, cancellationToken);
+    }
 
-            if (invocation.Parent is ConditionalAccessExpressionSyntax conditionalAccess &&
-                TryServerInvocationSurface(
-                    model,
-                    conditionalAccess.Expression,
-                    cancellationToken,
-                    out _,
-                    out _,
-                    out _))
-            {
-                throw new NotSupportedException(
-                    "conditional access InvokeAsync calls are not supported; check the generated plugin server receiver for null before calling InvokeAsync.");
-            }
-
-            if (IsDotBoxDLoweredInvocation(method, model.Compilation, pluginServerType))
-            {
-                throw new NotSupportedException(
-                    "conditional access InvokeAsync calls are not supported; check the generated plugin server receiver for null before calling InvokeAsync.");
-            }
-
+    private static InvokeAsyncResult? TryCreateUnqualified(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (!InvokeAsyncServerSurface.IsLoweringCandidate(model, invocation, cancellationToken))
+        {
             return null;
         }
 
+        if (InvokeAsyncServerSurface.BindsToUserInvokeAsync(model, invocation, cancellationToken))
+        {
+            return null;
+        }
+
+        if (InvokeAsyncServerSurface.TryResolveImplicitGeneratedFacade(
+                model,
+                invocation,
+                cancellationToken,
+                out var receiverType,
+                out var serverAccessType,
+                out var worldType))
+        {
+            return CreateForSurface(
+                invocation,
+                model,
+                cancellationToken,
+                receiverType,
+                serverAccessType,
+                worldType);
+        }
+
+        if (InvokeAsyncServerSurface.IsDotBoxDInvokeAsync(model, invocation, cancellationToken))
+        {
+            throw new NotSupportedException(
+                "implicit InvokeAsync calls are not supported; call InvokeAsync on the generated plugin server receiver.");
+        }
+
+        return null;
+    }
+
+    private static InvokeAsyncResult? TryCreateConditional(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (!InvokeAsyncServerSurface.IsLoweringCandidate(model, invocation, cancellationToken))
+        {
+            return null;
+        }
+
+        if (InvokeAsyncServerSurface.BindsToUserInvokeAsync(model, invocation, cancellationToken))
+        {
+            return null;
+        }
+
+        if (IsGeneratedServerConditionalAccess(invocation, model, cancellationToken) ||
+            InvokeAsyncServerSurface.IsDotBoxDInvokeAsync(model, invocation, cancellationToken))
+        {
+            throw new NotSupportedException(
+                "conditional access InvokeAsync calls are not supported; check the generated plugin server receiver for null before calling InvokeAsync.");
+        }
+
+        return null;
+    }
+
+    private static bool IsGeneratedServerConditionalAccess(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+        => invocation.Parent is ConditionalAccessExpressionSyntax conditionalAccess &&
+           InvokeAsyncServerSurface.TryResolve(
+               model,
+               conditionalAccess.Expression,
+               cancellationToken,
+               out _,
+               out _,
+               out _);
+
+    private static InvokeAsyncResult? TryCreateMemberAccess(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
         if (invocation.Expression is not MemberAccessExpressionSyntax access ||
-            markedMethod is null && !IsInvokeAsyncName(access.Name))
+            !InvokeAsyncServerSurface.IsLoweringCandidate(model, invocation, cancellationToken))
         {
             return null;
         }
 
-        if (BindsToUnmarkedUserInvocation(method, model.Compilation, pluginServerType))
+        if (InvokeAsyncServerSurface.BindsToUserInvokeAsync(model, invocation, cancellationToken))
         {
             return null;
         }
 
-        if (!TryServerInvocationSurface(
+        if (!InvokeAsyncServerSurface.TryResolve(
                 model,
                 access.Expression,
                 cancellationToken,
-                out receiverType,
-                out serverAccessType,
-                out worldType))
+                out var receiverType,
+                out var serverAccessType,
+                out var worldType))
         {
-            if (IsDotBoxDLoweredInvocation(method, model.Compilation, pluginServerType))
+            if (InvokeAsyncServerSurface.IsDotBoxDInvokeAsync(model, invocation, cancellationToken))
             {
                 throw new NotSupportedException(
                     "receiver must be a generated plugin server facade or generated server interface, not the erased IPluginServer<TWorld> surface.");
@@ -148,7 +163,6 @@ internal static partial class InvokeAsyncModelFactory
 
         return CreateForSurface(
             invocation,
-            method,
             model,
             cancellationToken,
             receiverType,
@@ -158,14 +172,13 @@ internal static partial class InvokeAsyncModelFactory
 
     private static InvokeAsyncResult CreateForSurface(
         InvocationExpressionSyntax invocation,
-        IMethodSymbol? method,
         SemanticModel model,
         CancellationToken cancellationToken,
         string receiverType,
         string? serverAccessType,
         INamedTypeSymbol worldType)
     {
-        var shape = method is not null
+        var shape = InvokeAsyncServerSurface.ResolvedMethod(model, invocation, cancellationToken) is { } method
             ? InvokeAsyncCallShape.Create(invocation, method, model, cancellationToken)
             : null;
         shape ??= InvokeAsyncCallShape.Create(invocation, worldType, model, cancellationToken);
@@ -215,40 +228,5 @@ internal static partial class InvokeAsyncModelFactory
         var package = EmitPackage(ns, packageName, pluginId, shape, bodyJson, effects, capabilities);
         return new InvokeAsyncResult(package, interception, null);
     }
-
-    private static bool TryImplicitGeneratedFacadeSurface(
-        SemanticModel model,
-        InvocationExpressionSyntax invocation,
-        CancellationToken cancellationToken,
-        out string receiverType,
-        out string? serverAccessType,
-        out INamedTypeSymbol worldType)
-    {
-        receiverType = string.Empty;
-        serverAccessType = null;
-        worldType = null!;
-        var containingType = model.GetEnclosingSymbol(invocation.SpanStart, cancellationToken)?.ContainingType;
-        return containingType is not null &&
-               InvokeAsyncReceiverResolver.TryResolveGeneratedFacadeType(
-                   containingType,
-                   out receiverType,
-                   out serverAccessType,
-                   out worldType);
-    }
-
-    private static bool TryServerInvocationSurface(
-        SemanticModel model,
-        ExpressionSyntax receiver,
-        CancellationToken cancellationToken,
-        out string receiverType,
-        out string? serverAccessType,
-        out INamedTypeSymbol worldType)
-        => InvokeAsyncReceiverResolver.TryResolve(
-            model,
-            receiver,
-            cancellationToken,
-            out receiverType,
-            out serverAccessType,
-            out worldType);
 
 }

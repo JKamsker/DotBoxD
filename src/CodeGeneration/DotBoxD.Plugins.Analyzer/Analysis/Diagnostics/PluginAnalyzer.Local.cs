@@ -31,7 +31,7 @@ public sealed partial class PluginAnalyzer
             context.ReportDiagnostic(Diagnostic.Create(
                 PluginAnalyzerDiagnostics.LocalContextMemberRule,
                 member.Locations.FirstOrDefault(),
-                "[Local] is valid only on instance members of the declared generated plugin server context."));
+                "[NativeOnly] is valid only on instance members of the declared generated plugin server context."));
         }
     }
 
@@ -81,7 +81,7 @@ public sealed partial class PluginAnalyzer
     private static void ReportLocalUseIfInvalid(OperationAnalysisContext context, ISymbol target)
     {
         var model = context.Operation.SemanticModel;
-        if (!HasAttribute(target, DotBoxDMetadataNames.LocalAttribute) ||
+        if (!HasAttribute(target, DotBoxDMetadataNames.NativeOnlyAttribute) ||
             model is null ||
             !IsLocalUseForbidden(context.Operation.Syntax, context.ContainingSymbol, model, context.CancellationToken))
         {
@@ -91,7 +91,7 @@ public sealed partial class PluginAnalyzer
         context.ReportDiagnostic(Diagnostic.Create(
             PluginAnalyzerDiagnostics.LocalContextMemberRule,
             context.Operation.Syntax.GetLocation(),
-            "[Local] context members run natively and cannot be used in lowered hook chains or server-extension bodies."));
+            "[NativeOnly] context members run natively and cannot be used in lowered hook chains or server-extension bodies."));
     }
 
     private static bool IsLocalUseForbidden(
@@ -100,24 +100,40 @@ public sealed partial class PluginAnalyzer
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        if (containingSymbol is IMethodSymbol method &&
-            HasAttribute(method, DotBoxDMetadataNames.ServerExtensionMethodAttribute))
+        if (IsServerExtensionMethod(containingSymbol))
         {
             return true;
         }
 
         foreach (var lambda in syntax.AncestorsAndSelf().OfType<LambdaExpressionSyntax>())
         {
-            if (lambda.Parent is ArgumentSyntax argument &&
-                argument.Parent is ArgumentListSyntax argumentList &&
-                argumentList.Parent is InvocationExpressionSyntax invocation &&
-                invocation.Expression is MemberAccessExpressionSyntax member)
+            if (IsForbiddenHookChainLambda(lambda, model, cancellationToken))
             {
-                return IsLoweredPipelineStep(invocation, member.Expression, model, cancellationToken);
+                return true;
             }
         }
 
         return false;
+    }
+
+    private static bool IsServerExtensionMethod(ISymbol? symbol)
+        => symbol is IMethodSymbol method &&
+           HasAttribute(method, DotBoxDMetadataNames.ServerExtensionMethodAttribute);
+
+    private static bool IsForbiddenHookChainLambda(
+        LambdaExpressionSyntax lambda,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (lambda.Parent is not ArgumentSyntax argument ||
+            argument.Parent is not ArgumentListSyntax argumentList ||
+            argumentList.Parent is not InvocationExpressionSyntax invocation ||
+            invocation.Expression is not MemberAccessExpressionSyntax member)
+        {
+            return false;
+        }
+
+        return IsLoweredPipelineStep(invocation, member.Expression, model, cancellationToken);
     }
 
     private static bool IsHookChainReceiver(

@@ -10,10 +10,10 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
 
         namespace ChainSample.Game
         {
-            [DotBoxDService]
+            [RpcService]
             public interface IAlphaWorld;
 
-            [DotBoxDService]
+            [RpcService]
             public interface IBetaWorld;
         }
 
@@ -203,7 +203,7 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
 
         namespace ChainSample.Game
         {
-            [DotBoxDService]
+            [RpcService]
             public interface IAlphaWorld;
         }
 

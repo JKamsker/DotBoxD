@@ -9,5 +9,9 @@ public static class SandboxLanguage
     public static string CurrentVersionText => CurrentVersion.ToString();
 
     public static bool Supports(SemVersion target)
-        => target.Major == CurrentVersion.Major && target.CompareTo(CurrentVersion) <= 0;
+    {
+        ArgumentNullException.ThrowIfNull(target);
+
+        return target.Major == CurrentVersion.Major && target.CompareTo(CurrentVersion) <= 0;
+    }
 }

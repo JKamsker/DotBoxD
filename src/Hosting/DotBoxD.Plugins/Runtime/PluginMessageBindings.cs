@@ -17,12 +17,16 @@ public static class PluginMessageBindings
         this SandboxHostBuilder builder,
         IPluginMessageSink sink)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+
         builder.AddBinding(CreateSend(sink));
         return builder;
     }
 
     public static BindingDescriptor CreateSend(IPluginMessageSink sink)
     {
+        ArgumentNullException.ThrowIfNull(sink);
+
         var invoker = new PluginMessageSendInvoker(sink);
         return new BindingDescriptor(
             SendBindingId,
@@ -38,7 +42,8 @@ public static class PluginMessageBindings
             CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)),
             PluginMessageGrantPolicy.Validate)
         {
-            IsAsync = true
+            IsAsync = true,
+            AuditKind = BindingAuditKinds.PluginMessage
         };
     }
 
@@ -90,7 +95,7 @@ public static class PluginMessageBindings
         fields["messageLength"] = message.Length.ToString(CultureInfo.InvariantCulture);
         context.Audit.Write(new SandboxAuditEvent(
             context.RunId,
-            "PluginMessage",
+            BindingAuditKinds.PluginMessage,
             timestamp,
             true,
             BindingId: SendBindingId,

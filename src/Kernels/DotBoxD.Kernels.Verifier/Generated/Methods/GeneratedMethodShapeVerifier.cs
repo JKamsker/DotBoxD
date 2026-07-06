@@ -73,7 +73,7 @@ internal static class GeneratedMethodShapeVerifier
 
         VerifyMeterOrder(methodName, analysis, diagnostics);
         VerifyPositiveMeterAmounts(methodName, analysis, diagnostics);
-        GeneratedAccumulateLinearMeterVerifier.Verify(methodName, analysis, diagnostics);
+        GeneratedClosedFormMeterVerifier.Verify(methodName, analysis, diagnostics);
         VerifyWorkHasMeterDensity(methodName, analysis, diagnostics);
         VerifyInstructionMeterDensity(methodName, analysis, diagnostics);
         VerifyRuntimeCallOrder(methodName, analysis, diagnostics);

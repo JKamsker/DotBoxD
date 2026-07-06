@@ -2,6 +2,8 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 using System.Collections.Generic;
 using System.Text;
+using DotBoxD.CodeGeneration.Shared.Defaults;
+using DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 using Microsoft.CodeAnalysis;
 
 internal static class RpcKernelClientServiceMethodResolver
@@ -17,16 +19,22 @@ internal static class RpcKernelClientServiceMethodResolver
         }
 
         var methods = new List<IMethodSymbol>();
-        var methodKeys = new HashSet<string>(StringComparer.Ordinal);
+        var methodsByKey = new Dictionary<string, IMethodSymbol>(StringComparer.Ordinal);
         foreach (var member in ServiceMembers(serviceType))
         {
             if (member is IMethodSymbol { MethodKind: MethodKind.Ordinary, IsStatic: false } method)
             {
-                if (methodKeys.Add(MethodKey(method)))
+                var key = MethodKey(method);
+                if (!methodsByKey.TryGetValue(key, out var existing))
                 {
+                    methodsByKey.Add(key, method);
                     methods.Add(method);
+                    continue;
                 }
 
+                ValidateDuplicateParameterNames(serviceType, existing, method);
+                ValidateDuplicateReturnFlowAttributes(serviceType, existing, method);
+                ValidateDuplicateDefaultValues(serviceType, existing, method);
                 continue;
             }
 
@@ -61,6 +69,65 @@ internal static class RpcKernelClientServiceMethodResolver
         }
 
         return key.ToString();
+    }
+
+    private static void ValidateDuplicateParameterNames(
+        INamedTypeSymbol serviceType,
+        IMethodSymbol first,
+        IMethodSymbol next)
+    {
+        if (first.Parameters.Length != next.Parameters.Length)
+        {
+            throw UnsupportedServiceShape(serviceType);
+        }
+
+        for (var i = 0; i < first.Parameters.Length; i++)
+        {
+            if (!string.Equals(first.Parameters[i].Name, next.Parameters[i].Name, StringComparison.Ordinal))
+            {
+                throw new NotSupportedException(
+                    $"Server extension interface '{serviceType.ToDisplayString()}' inherits method '{next.Name}' with the same signature but different parameter names; generated clients cannot preserve both named-argument contracts.");
+            }
+        }
+    }
+
+    private static void ValidateDuplicateReturnFlowAttributes(
+        INamedTypeSymbol serviceType,
+        IMethodSymbol first,
+        IMethodSymbol next)
+    {
+        var firstAttributes = PluginServerFlowAttributeSource.ReturnAttributes(first);
+        var nextAttributes = PluginServerFlowAttributeSource.ReturnAttributes(next);
+        if (firstAttributes.Equals(nextAttributes))
+        {
+            return;
+        }
+
+        throw new NotSupportedException(
+            $"Server extension interface '{serviceType.ToDisplayString()}' has inherited method '{next.Name}' with the same signature but different return-flow attributes; generated clients cannot preserve both return-flow contracts.");
+    }
+
+    private static void ValidateDuplicateDefaultValues(
+        INamedTypeSymbol serviceType,
+        IMethodSymbol first,
+        IMethodSymbol next)
+    {
+        if (first.Parameters.Length != next.Parameters.Length)
+        {
+            throw UnsupportedServiceShape(serviceType);
+        }
+
+        for (var i = 0; i < first.Parameters.Length; i++)
+        {
+            if (!ParameterDefaultValueComparer.HasSameContract(
+                first.Parameters[i],
+                next.Parameters[i],
+                DefaultLiteralOptions.Analyzer))
+            {
+                throw new NotSupportedException(
+                    $"Server extension interface '{serviceType.ToDisplayString()}' has inherited method '{next.Name}' with the same signature but different optional/default values; generated clients cannot preserve both default-value contracts.");
+            }
+        }
     }
 
     private static void ValidateNonGeneric(IMethodSymbol serviceMethod)

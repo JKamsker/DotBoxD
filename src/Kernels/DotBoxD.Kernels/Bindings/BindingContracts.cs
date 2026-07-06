@@ -12,6 +12,10 @@ public delegate void CapabilityGrantValidator(
     CapabilityGrant grant,
     ICollection<SandboxDiagnostic> diagnostics);
 
+public delegate bool BindingAuditResourceValidator(
+    CapabilityGrant grant,
+    SandboxAuditEvent auditEvent);
+
 public enum BindingSafety
 {
     PureIntrinsic,
@@ -57,6 +61,7 @@ public sealed record BindingSignature(
 
     public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = ModelCopy.List(value); }
     public bool IsAsync { get; init; }
+    public string AuditKind { get; init; } = BindingAuditKinds.BindingCall;
 }
 
 public sealed record BindingDescriptor(
@@ -71,7 +76,8 @@ public sealed record BindingDescriptor(
     BindingSafety Safety,
     BindingInvoker Invoke,
     CompiledBinding Compiled,
-    CapabilityGrantValidator? GrantValidator = null)
+    CapabilityGrantValidator? GrantValidator = null,
+    BindingAuditResourceValidator? AuditResourceValidator = null)
 {
     private IReadOnlyList<SandboxType> _parameters = ModelCopy.List(Parameters);
 
@@ -80,10 +86,12 @@ public sealed record BindingDescriptor(
     public BindingSignature Signature => new(
         Id, Version, CopyParameters(Parameters), ReturnType, Effects, RequiredCapability, CostModel, AuditLevel, Safety, Compiled)
     {
-        IsAsync = IsAsync
+        IsAsync = IsAsync,
+        AuditKind = AuditKind
     };
 
     public bool IsAsync { get; init; }
+    public string AuditKind { get; init; } = BindingAuditKinds.BindingCall;
 
     private static SandboxType[] CopyParameters(IReadOnlyList<SandboxType> parameters)
     {
