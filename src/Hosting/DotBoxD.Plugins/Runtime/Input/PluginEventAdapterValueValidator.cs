@@ -9,10 +9,10 @@ internal static class PluginEventAdapterValueValidator
         IReadOnlyList<Parameter> parameters,
         IReadOnlyList<SandboxValue> values)
     {
-        EnsureValueCountMatches(values.Count, parameters.Count);
+        EnsureValueCountMatches(ReadValueCount(values), parameters.Count);
         for (var i = 0; i < parameters.Count; i++)
         {
-            RequireType(values[i], parameters[i], i);
+            RequireType(ReadValue(values, i), parameters[i], i);
         }
     }
 
@@ -58,6 +58,33 @@ internal static class PluginEventAdapterValueValidator
         if (valueCount != parameterCount)
         {
             throw CreateException("Plugin event adapter value count does not match adapter parameters.");
+        }
+    }
+
+    private static int ReadValueCount(IReadOnlyList<SandboxValue> values)
+    {
+        try
+        {
+            return values.Count;
+        }
+        catch (Exception)
+        {
+            throw CreateException("Plugin event adapter output count could not be read.");
+        }
+    }
+
+    private static SandboxValue ReadValue(IReadOnlyList<SandboxValue> values, int index)
+    {
+        try
+        {
+            return values[index];
+        }
+        catch (Exception)
+        {
+            throw CreateException(
+                "Plugin event adapter output at index " +
+                index.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                " could not be read.");
         }
     }
 

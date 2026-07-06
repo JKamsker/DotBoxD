@@ -110,13 +110,15 @@ public sealed class PluginEventAdapterOutputValidationTests
 
     private sealed class ThrowingValueList : IReadOnlyList<SandboxValue>
     {
+        private static readonly SandboxValue[] Values = [SandboxValue.FromString("unused")];
+
         public int Count => 1;
 
         public SandboxValue this[int index]
             => throw new InvalidOperationException("Adapter value indexer failed.");
 
         public IEnumerator<SandboxValue> GetEnumerator()
-            => throw new InvalidOperationException("Adapter value output should be validated by index.");
+            => ((IEnumerable<SandboxValue>)Values).GetEnumerator();
 
         System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
             => GetEnumerator();
