@@ -44,16 +44,14 @@ internal static class StructuralValidator
             CheckText(item.Value, "metadata value", diagnostics);
         }
 
-        CheckDuplicateFunctionIds(module.Functions, diagnostics);
-
-        if (!HasEntrypoint(module.Functions))
-        {
-            diagnostics.Add(new SandboxDiagnostic("E-STRUCT-ENTRY", "module must declare at least one entry function"));
-        }
+        FunctionCollectionValidator.Validate(module.Functions, diagnostics);
 
         foreach (var function in module.Functions)
         {
-            ValidateFunction(function, diagnostics, declaredOpaqueIdTypes);
+            if (function is not null)
+            {
+                ValidateFunction(function, diagnostics, declaredOpaqueIdTypes);
+            }
         }
     }
 
@@ -142,33 +140,6 @@ internal static class StructuralValidator
         }
     }
 
-    private static void CheckDuplicateFunctionIds(
-        IReadOnlyList<SandboxFunction> functions,
-        List<SandboxDiagnostic> diagnostics)
-    {
-        if (functions.Count < 2)
-        {
-            return;
-        }
-
-        var counts = new Dictionary<string, int>(functions.Count, StringComparer.Ordinal);
-        var nullCount = 0;
-        for (var i = 0; i < functions.Count; i++)
-        {
-            IncrementCount(counts, functions[i].Id, ref nullCount);
-        }
-
-        var reportedNull = false;
-        for (var i = 0; i < functions.Count; i++)
-        {
-            var id = functions[i].Id;
-            if (ShouldReportDuplicate(counts, id, nullCount, ref reportedNull))
-            {
-                diagnostics.Add(new SandboxDiagnostic("E-STRUCT-DUP-FN", $"duplicate function id '{id}'"));
-            }
-        }
-    }
-
     private static void CheckDuplicateParameters(
         SandboxFunction function,
         List<SandboxDiagnostic> diagnostics)
@@ -234,19 +205,6 @@ internal static class StructuralValidator
 
         counts[value] = 0;
         return true;
-    }
-
-    private static bool HasEntrypoint(IReadOnlyList<SandboxFunction> functions)
-    {
-        for (var i = 0; i < functions.Count; i++)
-        {
-            if (functions[i].IsEntrypoint)
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private static void CheckType(
