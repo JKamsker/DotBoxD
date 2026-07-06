@@ -165,7 +165,9 @@ public sealed partial class MessageFramerCoverageTests
     {
         // Arrange
         var serializer = NewSerializer();
-        var response = new RpcResponse { MessageId = 99, IsSuccess = type == MessageType.Response };
+        var response = type == MessageType.Response
+            ? new RpcResponse { MessageId = 99, IsSuccess = true }
+            : new RpcResponse { MessageId = 99, IsSuccess = false, ErrorMessage = "boom", ErrorType = "Remote" };
         var payload = new byte[] { 0xAA, 0xBB, 0xCC, 0xDD };
         using var frame = MessageFramer.FrameMessage(serializer, 99, type, response, payload);
 

@@ -7,6 +7,7 @@ using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Serialization;
 using DotBoxD.Services.Tests.Support;
 using DotBoxD.Services.Transport;
+using MessagePack;
 using Xunit;
 
 namespace DotBoxD.Services.Tests.Coverage.Peer;
@@ -234,24 +235,19 @@ public sealed partial class PeerOutboundCoverageTests
     }
 
     [Fact]
-    public async Task InvokeAsync_UnsuccessfulResponseWithNullErrorFields_ThrowsWithDefaults()
+    public async Task InvokeAsync_UnsuccessfulResponseWithMissingErrorFields_FaultsWithProtocolException()
     {
         var serializer = NewSerializer();
         await using var channel = new ScriptedConnection();
         await using var peer = RpcPeer.Over(channel, serializer, Options()).Start();
 
         var call = peer.InvokeAsync<int, string>(Service, Method, request: 1);
-        // IsSuccess=false but no ErrorMessage/ErrorType -> the invoker fills in the "Unknown" defaults.
-        channel.Enqueue(MessageFramer.FrameMessage(
-            serializer,
+        channel.Enqueue(MessageFramerTestExtensions.FrameToPayloadWithGarbageEnvelope(
             messageId: 1,
-            MessageType.Response,
-            new RpcResponse { MessageId = 1, IsSuccess = false },
-            ReadOnlySpan<byte>.Empty));
+            WriteFailedResponseWithoutErrorDetails()));
 
-        var ex = await Assert.ThrowsAsync<RemoteServiceException>(() => call.WaitAsync(Timeout));
-        Assert.Equal("Unknown error", ex.Message);
-        Assert.Equal("Unknown", ex.RemoteExceptionType);
+        var ex = await Assert.ThrowsAsync<ServiceProtocolException>(() => call.WaitAsync(Timeout));
+        Assert.Contains("Malformed response envelope", ex.Message);
     }
 
     [Fact]
@@ -272,6 +268,19 @@ public sealed partial class PeerOutboundCoverageTests
 
         var ex = await Assert.ThrowsAsync<ServiceProtocolException>(() => call.WaitAsync(Timeout));
         Assert.Contains("Malformed response envelope", ex.Message);
+    }
+
+    private static byte[] WriteFailedResponseWithoutErrorDetails()
+    {
+        var writer = new ArrayBufferWriter<byte>();
+        var message = new MessagePackWriter(writer);
+        message.WriteMapHeader(2);
+        message.Write("MessageId");
+        message.Write(1);
+        message.Write("IsSuccess");
+        message.Write(false);
+        message.Flush();
+        return writer.WrittenMemory.ToArray();
     }
 
 }
