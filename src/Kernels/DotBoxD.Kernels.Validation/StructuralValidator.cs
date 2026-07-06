@@ -61,7 +61,7 @@ internal static class StructuralValidator
         IReadOnlySet<string> declaredOpaqueIdTypes)
     {
         CheckIdentifier(function.Id, "function id", diagnostics);
-        CheckType(function.ReturnType, diagnostics, declaredOpaqueIdTypes);
+        CheckType(function.ReturnType, $"function '{function.Id}' return type", diagnostics, declaredOpaqueIdTypes);
         var hasNullParameters = CheckNullEntries(function.Parameters, "parameters", function.Id, diagnostics);
         CheckNullEntries(function.Body, "body", function.Id, diagnostics);
 
@@ -71,7 +71,11 @@ internal static class StructuralValidator
             foreach (var parameter in function.Parameters)
             {
                 CheckIdentifier(parameter.Name, "parameter name", diagnostics);
-                CheckType(parameter.Type, diagnostics, declaredOpaqueIdTypes);
+                CheckType(
+                    parameter.Type,
+                    $"function '{function.Id}' parameter '{parameter.Name}' type",
+                    diagnostics,
+                    declaredOpaqueIdTypes);
             }
         }
 
@@ -208,10 +212,17 @@ internal static class StructuralValidator
     }
 
     private static void CheckType(
-        SandboxType type,
+        SandboxType? type,
+        string description,
         List<SandboxDiagnostic> diagnostics,
         IReadOnlySet<string> declaredOpaqueIdTypes)
     {
+        if (type is null)
+        {
+            diagnostics.Add(new SandboxDiagnostic("E-STRUCT-NULL", $"{description} must not be null"));
+            return;
+        }
+
         if (type.Name == "Map" && type.Arguments.Count == 2 && !type.Arguments[0].IsValidMapKey(declaredOpaqueIdTypes))
         {
             diagnostics.Add(new SandboxDiagnostic("E-TYPE-MAP-KEY", $"map key type '{type.Arguments[0]}' is not supported"));
