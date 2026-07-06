@@ -41,19 +41,7 @@ public sealed class ResourceMeter
     public long StringBytes { get; private set; }
 
     public SandboxResourceUsage Snapshot()
-        => new(
-            FuelUsed,
-            Limits.MaxFuel,
-            LoopIterations,
-            AllocatedBytes,
-            HostCalls,
-            FileBytesRead,
-            FileBytesWritten,
-            NetworkBytesRead,
-            NetworkBytesWritten,
-            LogEvents,
-            CollectionElements,
-            StringBytes);
+        => ResourceMeterSnapshot.Create(this);
 
     internal void ResetForReuse()
     {
@@ -144,12 +132,17 @@ public sealed class ResourceMeter
     public void ChargeCollection(SandboxValue value) => ChargeCollection(value, CancellationToken.None);
 
     public void ChargeCollection(SandboxValue value, CancellationToken cancellationToken)
-        => ChargeMeasuredShape(SandboxValueShapeMeter.Measure(value, Limits, cancellationToken, this));
+    {
+        ArgumentNullException.ThrowIfNull(value);
 
+        ChargeMeasuredShape(SandboxValueShapeMeter.Measure(value, Limits, cancellationToken, this));
+    }
     public void ChargeValue(SandboxValue value) => ChargeValue(value, CancellationToken.None);
 
     public void ChargeValue(SandboxValue value, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(value);
+
         if (value is RecordValue && ValueShapeCache.TryGet(value, out var cachedRecordShape))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -170,6 +163,8 @@ public sealed class ResourceMeter
 
     public void ChargeString(string value)
     {
+        ArgumentNullException.ThrowIfNull(value);
+
         var bytes = SandboxLiteralConstraints.StringByteCount(value.Length);
         ChargeStringShape(new ValueShape(0, 0, 0, 0, value.Length, bytes));
     }
@@ -232,6 +227,8 @@ public sealed class ResourceMeter
 
     public void ChargeLogEvent(string message)
     {
+        ArgumentNullException.ThrowIfNull(message);
+
         LogEvents = ResourceMeterUsageCharges.AddLogEvent(LogEvents, message, Limits);
         if (LogEvents > Limits.MaxLogEvents)
         {

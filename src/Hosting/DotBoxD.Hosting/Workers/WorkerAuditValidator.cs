@@ -5,6 +5,7 @@ namespace DotBoxD.Hosting;
 
 using System.Globalization;
 using DotBoxD.Kernels;
+using DotBoxD.Kernels.Runtime.Bindings;
 
 internal static class WorkerAuditValidator
 {
@@ -83,9 +84,9 @@ internal static class WorkerAuditValidator
             return false;
         }
 
-        if (plan.Policy.Deterministic && plan.Policy.LogicalNow is { } logicalNow)
+        if (plan.Policy.Deterministic)
         {
-            return timestamp == logicalNow;
+            return timestamp == (plan.Policy.LogicalNow ?? DateTimeOffset.UnixEpoch);
         }
 
         return timestamp <= DateTimeOffset.UtcNow.AddMinutes(5);
@@ -125,6 +126,7 @@ internal static class WorkerAuditValidator
             EffectMatches(auditEvent, binding) &&
             ResultMatches(auditEvent) &&
             LogAuditMatchesPolicy(plan, auditEvent) &&
+            WorkerBindingAuditResourceValidator.Matches(plan, auditEvent, binding, grantClock) &&
             WorkerPluginMessageAuditPolicy.Matches(plan, auditEvent, grantClock) &&
             RequiredBindingFieldsMatch(plan, auditEvent);
     }
@@ -183,7 +185,8 @@ internal static class WorkerAuditValidator
             return false;
         }
 
-        return FieldsAreSafe(auditEvent.Fields!) &&
+        return DeterministicTimeBindingFieldsMatch(plan, auditEvent) &&
+            FieldsAreSafe(auditEvent.Fields!) &&
             NonNegativeDuration(durationMs);
     }
 
@@ -240,6 +243,20 @@ internal static class WorkerAuditValidator
         return true;
     }
 
+    private static bool DeterministicTimeBindingFieldsMatch(ExecutionPlan plan, SandboxAuditEvent auditEvent)
+    {
+        if (!plan.Policy.Deterministic ||
+            auditEvent.BindingId != SafeTimeBindingNames.NowUnixMillisId)
+        {
+            return true;
+        }
+
+        return plan.Policy.LogicalNow is { } logicalNow &&
+               auditEvent.Fields!.TryGetValue(SafeTimeBindingNames.NowUnixMillisAuditField, out var unixMillis) &&
+               long.TryParse(unixMillis, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) &&
+               value == logicalNow.ToUnixTimeMilliseconds();
+    }
+
     private static bool NonNegativeDuration(string durationMs)
         => double.TryParse(
             durationMs,
@@ -247,5 +264,4 @@ internal static class WorkerAuditValidator
             CultureInfo.InvariantCulture,
             out var parsedDuration) &&
             parsedDuration >= 0;
-
 }

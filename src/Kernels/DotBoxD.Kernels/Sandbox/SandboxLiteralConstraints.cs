@@ -1,5 +1,5 @@
-using DotBoxD.Kernels.Model;
 using System.Diagnostics.CodeAnalysis;
+using DotBoxD.Kernels.Model;
 
 namespace DotBoxD.Kernels.Sandbox;
 

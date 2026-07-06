@@ -28,8 +28,7 @@ public static class SafeFileSystem
                 throw Error(SandboxErrorCode.NotFound, "file.readText denied: file was not found");
             }
 
-            var maxBytes = SafeFileGrantReader.Read(resolved.Grant).MaxBytesPerRun
-                ?? context.Budget.Limits.MaxFileBytesRead;
+            var maxBytes = SafeFileGrantReader.Read(resolved.Grant).MaxBytesPerRun;
             if (info.Length > maxBytes)
             {
                 throw Error(SandboxErrorCode.QuotaExceeded, "file.readText denied: file exceeds read limit");
@@ -50,7 +49,8 @@ public static class SafeFileSystem
             SafeFileAudit.Read(context, startedAt, false, SafeFilePathResolver.FailureResource(path, "file.read"), ObservedReadBytes(context, fileBytesReadBefore), ex.Error.Code);
             throw;
         }
-        catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested &&
+                                                !cancellationToken.IsCancellationRequested)
         {
             var error = new SandboxError(SandboxErrorCode.Timeout, "file.readText denied: request timed out");
             SafeFileAudit.Read(context, startedAt, false, SafeFilePathResolver.FailureResource(path, "file.read"), ObservedReadBytes(context, fileBytesReadBefore), error.Code);

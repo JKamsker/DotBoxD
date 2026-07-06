@@ -30,10 +30,12 @@ public sealed class QueryProjectionPathValidationTests
     [MemberData(nameof(InvalidMemberPaths))]
     public void Document_serialization_rejects_invalid_projection_member_paths(string path)
     {
-        var document = EventQueryDocument.Create(
-            "AttackEvent",
-            QueryFilter.MatchAll,
-            new QueryProjection { Kind = QueryProjectionKind.Member, Path = path });
+        var document = new EventQueryDocument
+        {
+            EventName = "AttackEvent",
+            Filter = QueryFilter.MatchAll,
+            Projection = new QueryProjection { Kind = QueryProjectionKind.Member, Path = path },
+        };
 
         AssertProjectionPathRejection(() => EventQueryJson.Serialize(document));
     }
@@ -42,15 +44,17 @@ public sealed class QueryProjectionPathValidationTests
     [MemberData(nameof(InvalidMemberPaths))]
     public void Document_serialization_rejects_invalid_construct_field_paths(string path)
     {
-        var document = EventQueryDocument.Create(
-            "AttackEvent",
-            QueryFilter.MatchAll,
-            new QueryProjection
+        var document = new EventQueryDocument
+        {
+            EventName = "AttackEvent",
+            Filter = QueryFilter.MatchAll,
+            Projection = new QueryProjection
             {
                 Kind = QueryProjectionKind.Construct,
                 TypeName = "AttackNotice",
                 Fields = [new QueryProjectionField { Name = "damage", Path = path }],
-            });
+            },
+        };
 
         AssertProjectionPathRejection(() => EventQueryJson.Serialize(document));
     }

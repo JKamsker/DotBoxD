@@ -61,6 +61,7 @@ public sealed class EventQuerySerializationTests
     [Theory]
     [InlineData(null)]
     [InlineData("")]
+    [InlineData(" ")]
     public void Serialization_rejects_event_names_that_deserialization_rejects(string? eventName)
     {
         var document = new EventQueryDocument
@@ -73,7 +74,7 @@ public sealed class EventQuerySerializationTests
         var exception = Record.Exception(() => EventQueryJson.Serialize(document));
 
         Assert.NotNull(exception);
-        Assert.True(exception is JsonException or InvalidOperationException or ArgumentException);
+        Assert.IsType<JsonException>(exception);
         Assert.Contains("event", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 

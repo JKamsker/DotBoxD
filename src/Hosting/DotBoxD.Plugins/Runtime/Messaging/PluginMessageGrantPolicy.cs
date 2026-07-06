@@ -40,22 +40,9 @@ internal static class PluginMessageGrantPolicy
             return;
         }
 
-        if (value is null)
+        if (!TryReadTargetValues(value, out _, out var error))
         {
-            Add(diagnostics, grant, $"parameter '{key}' must not be null");
-            return;
-        }
-
-        var values = value.Split(',', StringSplitOptions.TrimEntries);
-        if (values.Length == 0 || values.Any(string.IsNullOrEmpty))
-        {
-            Add(diagnostics, grant, $"parameter '{key}' must not contain empty values");
-            return;
-        }
-
-        if (values.Any(item => !SandboxLiteralConstraints.IsOpaqueId(item)))
-        {
-            Add(diagnostics, grant, $"parameter '{key}' must contain only opaque target IDs");
+            Add(diagnostics, grant, TargetListErrorMessage(key, error));
         }
     }
 
@@ -83,14 +70,20 @@ internal static class PluginMessageGrantPolicy
 
     private static IReadOnlySet<string>? ReadTargetSet(CapabilityGrant grant, string key)
         => grant.Parameters.TryGetValue(key, out var value)
-            ? value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-                .ToHashSet(StringComparer.Ordinal)
+            ? ReadTargetValues(value, key).ToHashSet(StringComparer.Ordinal)
             : null;
 
     private static IReadOnlyList<string>? ReadTargetList(CapabilityGrant grant, string key)
         => grant.Parameters.TryGetValue(key, out var value)
-            ? value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            ? ReadTargetValues(value, key)
             : null;
+
+    private static string[] ReadTargetValues(string? value, string key)
+    {
+        return TryReadTargetValues(value, out var values, out _)
+            ? values
+            : throw InvalidGrant(key);
+    }
 
     private static int? ReadMaxMessageLength(CapabilityGrant grant)
     {
@@ -101,12 +94,61 @@ internal static class PluginMessageGrantPolicy
 
         if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) || parsed < 0)
         {
-            throw new SandboxRuntimeException(new SandboxError(
-                SandboxErrorCode.PermissionDenied,
-                "host.message.send denied: maxMessageLength grant is invalid"));
+            throw InvalidGrant("maxMessageLength");
         }
 
         return parsed;
+    }
+
+    private static bool TryReadTargetValues(
+        string? value,
+        out string[] values,
+        out TargetValuesValidationError error)
+    {
+        if (value is null)
+        {
+            values = [];
+            error = TargetValuesValidationError.Null;
+            return false;
+        }
+
+        values = value.Split(',', StringSplitOptions.TrimEntries);
+        if (values.Length == 0 || values.Any(string.IsNullOrEmpty))
+        {
+            error = TargetValuesValidationError.EmptyValue;
+            return false;
+        }
+
+        if (values.Any(item => !SandboxLiteralConstraints.IsOpaqueId(item)))
+        {
+            error = TargetValuesValidationError.InvalidOpaqueId;
+            return false;
+        }
+
+        error = TargetValuesValidationError.None;
+        return true;
+    }
+
+    private static string TargetListErrorMessage(string key, TargetValuesValidationError error)
+        => error switch
+        {
+            TargetValuesValidationError.Null => $"parameter '{key}' must not be null",
+            TargetValuesValidationError.EmptyValue => $"parameter '{key}' must not contain empty values",
+            TargetValuesValidationError.InvalidOpaqueId => $"parameter '{key}' must contain only opaque target IDs",
+            _ => $"parameter '{key}' is invalid"
+        };
+
+    private static SandboxRuntimeException InvalidGrant(string key)
+        => new(new SandboxError(
+            SandboxErrorCode.PermissionDenied,
+            $"host.message.send denied: {key} grant is invalid"));
+
+    private enum TargetValuesValidationError
+    {
+        None,
+        Null,
+        EmptyValue,
+        InvalidOpaqueId
     }
 }
 

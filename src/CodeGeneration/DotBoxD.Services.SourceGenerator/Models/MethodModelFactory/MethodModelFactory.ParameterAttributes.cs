@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using DotBoxD.CodeGeneration.Shared.Defaults;
-using DotBoxD.Services.SourceGenerator.Infrastructure;
 using Microsoft.CodeAnalysis;
 
 namespace DotBoxD.Services.SourceGenerator.Models;
@@ -18,27 +17,6 @@ internal static partial class MethodModelFactory
             static (attributes, parameter, _, preserve) => AppendDecimalConstantAttribute(attributes, parameter, preserve),
         ["System.Runtime.InteropServices.DefaultParameterValueAttribute"] =
             static (attributes, parameter, _, preserve) => AppendDefaultParameterValueAttribute(attributes, parameter, preserve),
-        ["System.Diagnostics.CodeAnalysis.AllowNullAttribute"] =
-            static (attributes, _, _, _) =>
-                AppendSimpleAttribute(attributes, "global::System.Diagnostics.CodeAnalysis.AllowNullAttribute"),
-        ["System.Diagnostics.CodeAnalysis.DisallowNullAttribute"] =
-            static (attributes, _, _, _) =>
-                AppendSimpleAttribute(attributes, "global::System.Diagnostics.CodeAnalysis.DisallowNullAttribute"),
-        ["System.Diagnostics.CodeAnalysis.MaybeNullAttribute"] =
-            static (attributes, _, _, _) =>
-                AppendSimpleAttribute(attributes, "global::System.Diagnostics.CodeAnalysis.MaybeNullAttribute"),
-        ["System.Diagnostics.CodeAnalysis.NotNullAttribute"] =
-            static (attributes, _, _, _) =>
-                AppendSimpleAttribute(attributes, "global::System.Diagnostics.CodeAnalysis.NotNullAttribute"),
-        ["System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute"] =
-            static (attributes, _, attr, _) =>
-                AppendBooleanArgumentAttribute(attributes, attr, "global::System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute"),
-        ["System.Diagnostics.CodeAnalysis.NotNullWhenAttribute"] =
-            static (attributes, _, attr, _) =>
-                AppendBooleanArgumentAttribute(attributes, attr, "global::System.Diagnostics.CodeAnalysis.NotNullWhenAttribute"),
-        ["System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute"] =
-            static (attributes, _, attr, _) =>
-                AppendStringArgumentAttribute(attributes, attr, "global::System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute"),
     };
 
     private delegate void CallerInfoAttributeAppender(
@@ -90,6 +68,11 @@ internal static partial class MethodModelFactory
             return;
         }
 
+        if (NullableFlowAttributeFormatter.TryAppendInlineAttribute(attributes, attr))
+        {
+            return;
+        }
+
         var name = attr.AttributeClass?.ToDisplayString();
         if (name is not null && CallerInfoAttributeAppenders.TryGetValue(name, out var append))
         {
@@ -127,99 +110,10 @@ internal static partial class MethodModelFactory
         foreach (var attr in method.GetReturnTypeAttributes())
         {
             ct.ThrowIfCancellationRequested();
-
-            switch (attr.AttributeClass?.ToDisplayString())
-            {
-                case "System.Diagnostics.CodeAnalysis.MaybeNullAttribute":
-                    AppendReturnSimpleAttribute(
-                        attributes,
-                        "global::System.Diagnostics.CodeAnalysis.MaybeNullAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.NotNullAttribute":
-                    AppendReturnSimpleAttribute(
-                        attributes,
-                        "global::System.Diagnostics.CodeAnalysis.NotNullAttribute");
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute":
-                    AppendReturnStringArgumentAttribute(
-                        attributes,
-                        attr,
-                        "global::System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute");
-                    break;
-            }
+            NullableFlowAttributeFormatter.TryAppendReturnAttribute(attributes, attr);
         }
 
         return attributes.ToString();
-    }
-
-    private static void AppendSimpleAttribute(StringBuilder sb, string attributeType)
-    {
-        sb.Append("[")
-            .Append(attributeType)
-            .Append("] ");
-    }
-
-    private static void AppendBooleanArgumentAttribute(
-        StringBuilder sb,
-        AttributeData attr,
-        string attributeType)
-    {
-        if (attr.ConstructorArguments.Length != 1 ||
-            attr.ConstructorArguments[0].Value is not bool value)
-        {
-            return;
-        }
-
-        sb.Append("[")
-            .Append(attributeType)
-            .Append("(")
-            .Append(value ? "true" : "false")
-            .Append(")] ");
-    }
-
-    private static void AppendStringArgumentAttribute(
-        StringBuilder sb,
-        AttributeData attr,
-        string attributeType)
-    {
-        if (attr.ConstructorArguments.Length != 1 ||
-            attr.ConstructorArguments[0].Value is not string value)
-        {
-            return;
-        }
-
-        sb.Append("[")
-            .Append(attributeType)
-            .Append("(\"")
-            .Append(LiteralHelpers.EscapeStringLiteral(value))
-            .Append("\")] ");
-    }
-
-    private static void AppendReturnSimpleAttribute(StringBuilder sb, string attributeType)
-    {
-        sb.Append("[return: ")
-            .Append(attributeType)
-            .AppendLine("]");
-    }
-
-    private static void AppendReturnStringArgumentAttribute(
-        StringBuilder sb,
-        AttributeData attr,
-        string attributeType)
-    {
-        if (attr.ConstructorArguments.Length != 1 ||
-            attr.ConstructorArguments[0].Value is not string value)
-        {
-            return;
-        }
-
-        sb.Append("[return: ")
-            .Append(attributeType)
-            .Append("(\"")
-            .Append(LiteralHelpers.EscapeStringLiteral(value))
-            .AppendLine("\")]");
     }
 
 }
