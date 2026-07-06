@@ -65,7 +65,7 @@ public sealed class MessagePackRpcSerializer : ISerializer
         }
 
         var extraCount = resolvers.Length;
-        var effectiveResolvers = new IFormatterResolver[extraCount + 3];
+        var effectiveResolvers = new IFormatterResolver[extraCount + 4];
         for (var i = 0; i < extraCount; i++)
         {
             // Reject null elements eagerly: a null slipped into CompositeResolver.Create otherwise
@@ -75,8 +75,9 @@ public sealed class MessagePackRpcSerializer : ISerializer
         }
 
         effectiveResolvers[extraCount] = WellFormedStringResolver.Instance;
-        effectiveResolvers[extraCount + 1] = StandardResolver.Instance;
-        effectiveResolvers[extraCount + 2] = ContractlessStandardResolver.Instance;
+        effectiveResolvers[extraCount + 1] = NativeDateTimeResolver.Instance;
+        effectiveResolvers[extraCount + 2] = StandardResolver.Instance;
+        effectiveResolvers[extraCount + 3] = ContractlessStandardResolver.Instance;
 
         return MessagePackSerializerOptions.Standard
             .WithResolver(CompositeResolver.Create(
@@ -97,14 +98,38 @@ public sealed class MessagePackRpcSerializer : ISerializer
 
     public void Serialize<T>(System.Buffers.IBufferWriter<byte> writer, T value)
     {
-        MessagePackSerializer.Serialize(writer, value, _options);
+        try
+        {
+            MessagePackSerializer.Serialize(writer, value, _options);
+        }
+        catch (MessagePackSerializationException ex)
+        {
+            if (TryGetRpcEnvelopeValidationMessage(ex, out var message))
+            {
+                throw new MessagePackSerializationException(message, ex);
+            }
+
+            throw;
+        }
     }
 
     public T Deserialize<T>(ReadOnlyMemory<byte> data)
     {
-        var value = MessagePackSerializer.Deserialize<T>(data, _options, out var bytesRead, CancellationToken.None);
-        ThrowIfTrailingBytes(data.Length, bytesRead);
-        return value;
+        try
+        {
+            var value = MessagePackSerializer.Deserialize<T>(data, _options, out var bytesRead, CancellationToken.None);
+            ThrowIfTrailingBytes(data.Length, bytesRead);
+            return value;
+        }
+        catch (MessagePackSerializationException ex)
+        {
+            if (TryGetRpcEnvelopeValidationMessage(ex, out var message))
+            {
+                throw new MessagePackSerializationException(message, ex);
+            }
+
+            throw;
+        }
     }
 
     public object? Deserialize(ReadOnlyMemory<byte> data, Type type)
@@ -114,10 +139,22 @@ public sealed class MessagePackRpcSerializer : ISerializer
             throw new ArgumentNullException(nameof(type));
         }
 
-        var reader = new MessagePackReader(data);
-        var value = MessagePackSerializer.Deserialize(type, ref reader, _options);
-        ThrowIfTrailingBytes(data.Length, checked((int)reader.Consumed));
-        return value;
+        try
+        {
+            var reader = new MessagePackReader(data);
+            var value = MessagePackSerializer.Deserialize(type, ref reader, _options);
+            ThrowIfTrailingBytes(data.Length, checked((int)reader.Consumed));
+            return value;
+        }
+        catch (MessagePackSerializationException ex)
+        {
+            if (TryGetRpcEnvelopeValidationMessage(ex, out var message))
+            {
+                throw new MessagePackSerializationException(message, ex);
+            }
+
+            throw;
+        }
     }
 
     private static void ThrowIfTrailingBytes(int totalLength, int bytesRead)
@@ -128,64 +165,21 @@ public sealed class MessagePackRpcSerializer : ISerializer
         }
     }
 
-    private sealed class WellFormedStringResolver : IFormatterResolver
+    private static bool TryGetRpcEnvelopeValidationMessage(
+        MessagePackSerializationException exception,
+        out string message)
     {
-        public static readonly WellFormedStringResolver Instance = new();
-
-        public IMessagePackFormatter<T>? GetFormatter<T>() =>
-            typeof(T) == typeof(string)
-                ? (IMessagePackFormatter<T>)(object)WellFormedStringFormatter.Instance
-                : null;
-    }
-
-    internal sealed class WellFormedStringFormatter : IMessagePackFormatter<string?>
-    {
-        public static readonly WellFormedStringFormatter Instance = new();
-
-        public void Serialize(
-            ref MessagePackWriter writer,
-            string? value,
-            MessagePackSerializerOptions options)
+        for (Exception? current = exception; current is not null; current = current.InnerException)
         {
-            RequireWellFormedUtf16(value);
-            writer.Write(value);
-        }
-
-        public string? Deserialize(
-            ref MessagePackReader reader,
-            MessagePackSerializerOptions options) =>
-            reader.ReadString();
-
-        private static void RequireWellFormedUtf16(string? value)
-        {
-            if (value is null)
+            if (current is RpcEnvelopeValidationException validationException)
             {
-                return;
-            }
-
-            for (var i = 0; i < value.Length; i++)
-            {
-                var current = value[i];
-                if (char.IsHighSurrogate(current))
-                {
-                    if (i + 1 < value.Length && char.IsLowSurrogate(value[i + 1]))
-                    {
-                        i++;
-                        continue;
-                    }
-
-                    throw MalformedUtf16();
-                }
-
-                if (char.IsLowSurrogate(current))
-                {
-                    throw MalformedUtf16();
-                }
+                message = validationException.Message;
+                return true;
             }
         }
 
-        private static MessagePackSerializationException MalformedUtf16() =>
-            new("String payload contains malformed UTF-16 text with an unpaired surrogate.");
+        message = string.Empty;
+        return false;
     }
 
     internal sealed class ReadOnlyMemoryByteFormatter : IMessagePackFormatter<ReadOnlyMemory<byte>>
@@ -213,4 +207,43 @@ public sealed class MessagePackRpcSerializer : ISerializer
                 : ReadOnlyMemory<byte>.Empty;
         }
     }
+}
+
+internal static class RpcEnvelopeStringValidation
+{
+    public static void ThrowIfMalformedUtf16(string? value, string envelopeName, string fieldName)
+    {
+        if (value is null)
+        {
+            return;
+        }
+
+        for (var i = 0; i < value.Length; i++)
+        {
+            var current = value[i];
+            if (char.IsHighSurrogate(current))
+            {
+                if (i + 1 < value.Length && char.IsLowSurrogate(value[i + 1]))
+                {
+                    i++;
+                    continue;
+                }
+
+                throw MalformedUtf16(envelopeName, fieldName);
+            }
+
+            if (char.IsLowSurrogate(current))
+            {
+                throw MalformedUtf16(envelopeName, fieldName);
+            }
+        }
+    }
+
+    private static RpcEnvelopeValidationException MalformedUtf16(string envelopeName, string fieldName)
+        => new(
+            $"RPC {envelopeName} {fieldName} contains malformed UTF-16 text with an unpaired surrogate.");
+}
+
+internal sealed class RpcEnvelopeValidationException(string message) : MessagePackSerializationException(message)
+{
 }

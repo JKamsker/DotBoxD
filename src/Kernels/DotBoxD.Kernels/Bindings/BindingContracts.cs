@@ -57,6 +57,7 @@ public sealed record BindingSignature(
 
     public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = ModelCopy.List(value); }
     public bool IsAsync { get; init; }
+    public string AuditKind { get; init; } = BindingAuditKinds.BindingCall;
 }
 
 public sealed record BindingDescriptor(
@@ -80,10 +81,12 @@ public sealed record BindingDescriptor(
     public BindingSignature Signature => new(
         Id, Version, CopyParameters(Parameters), ReturnType, Effects, RequiredCapability, CostModel, AuditLevel, Safety, Compiled)
     {
-        IsAsync = IsAsync
+        IsAsync = IsAsync,
+        AuditKind = AuditKind
     };
 
     public bool IsAsync { get; init; }
+    public string AuditKind { get; init; } = BindingAuditKinds.BindingCall;
 
     private static SandboxType[] CopyParameters(IReadOnlyList<SandboxType> parameters)
     {

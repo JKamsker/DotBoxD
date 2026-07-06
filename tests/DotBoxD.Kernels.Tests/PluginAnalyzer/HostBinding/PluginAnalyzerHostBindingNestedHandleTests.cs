@@ -14,6 +14,7 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.HostBinding
 
         private const string NestedHandleSource = """
         using DotBoxD.Abstractions;
+        using DotBoxD.Kernels.Sandbox;
         using DotBoxD.Kernels;
         using DotBoxD.Plugins;
         using DotBoxD.Plugins.Runtime;
@@ -21,17 +22,17 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.HostBinding
 
         namespace Sample;
 
-        [DotBoxDService]
+        [RpcService]
         public interface IMonsterHandle
         {
-            [HostCapability("probe.read.monster.threat", HostBindingEffect.HostStateRead)]
+            [HostBinding("probe.read.monster.threat", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
             int GetThreat();
         }
 
-        [DotBoxDService]
+        [RpcService]
         public interface IProbeWorld
         {
-            [HostCapability("probe.read.monster", HostBindingEffect.HostStateRead)]
+            [HostBinding("probe.read.monster", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
             IMonsterHandle GetMonster(string id);
         }
 
@@ -174,17 +175,17 @@ namespace Sample
 {
     using DotBoxD.Abstractions;
 
-    [DotBoxDService]
+    [RpcService]
     public interface IMonsterHandle
     {
-        [HostCapability("probe.read.monster.threat", HostBindingEffect.HostStateRead)]
+        [HostBinding("probe.read.monster.threat", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
         int GetThreat();
     }
 
-    [DotBoxDService]
+    [RpcService]
     public interface IProbeWorld
     {
-        [HostCapability("probe.read.monster", HostBindingEffect.HostStateRead)]
+        [HostBinding("probe.read.monster", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
         IMonsterHandle GetMonster(string id);
     }
 
@@ -198,14 +199,14 @@ namespace Sample
         public IMonsterHandle GetMonster(string id) => new MonsterHandle(id);
     }
 
-    [DotBoxDService]
+    [RpcService]
     public interface IAsyncProbeHandle
     {
         [HostCapability("probe.read.handle.value", HostBindingEffect.HostStateRead)]
         int GetValue();
     }
 
-    [DotBoxDService]
+    [RpcService]
     public interface IAsyncProbeWorld
     {
         [HostCapability("probe.read.handle", HostBindingEffect.HostStateRead)]
