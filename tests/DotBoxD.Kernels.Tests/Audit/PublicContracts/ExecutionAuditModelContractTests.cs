@@ -39,6 +39,25 @@ public sealed class ExecutionAuditModelContractTests
     }
 
     [Theory]
+    [InlineData("SuccessWithError", "Error")]
+    [InlineData("FailureWithValue", "Value")]
+    [InlineData("FailureWithoutError", "Error")]
+    public void Execution_result_rejects_contradictory_terminal_state(string terminalState, string memberName)
+    {
+        AssertPublicArgumentException(memberName, () => _ = terminalState switch
+        {
+            "SuccessWithError" => ValidExecutionResult() with { Error = ValidError() },
+            "FailureWithValue" => ValidExecutionResult() with
+            {
+                Error = ValidError(),
+                Succeeded = false
+            },
+            "FailureWithoutError" => ValidFailedExecutionResult() with { Error = null },
+            _ => throw new ArgumentOutOfRangeException(nameof(terminalState))
+        });
+    }
+
+    [Theory]
     [InlineData("RunId")]
     [InlineData("Kind")]
     public void Audit_event_rejects_null_required_contract_members(string memberName)
@@ -84,6 +103,17 @@ public sealed class ExecutionAuditModelContractTests
             PlanHash = "plan",
             PolicyHash = "policy"
         };
+
+    private static SandboxExecutionResult ValidFailedExecutionResult()
+        => ValidExecutionResult() with
+        {
+            Succeeded = false,
+            Value = null,
+            Error = ValidError()
+        };
+
+    private static SandboxError ValidError()
+        => new(SandboxErrorCode.InvalidInput, "invalid input");
 
     private static SandboxAuditEvent ValidAuditEvent()
         => new(
