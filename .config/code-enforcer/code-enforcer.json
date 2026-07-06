@@ -6,5 +6,5 @@
   "maxLinesHard": 500,
   "maxSoftLimitViolations": 25,
   "maxPartFileCount": 0,
-  "maxSourceMultiFilePartialTypeCount": 68
+  "maxSourceMultiFilePartialTypeCount": 67
 }

@@ -3,20 +3,24 @@ using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Kernels.Bindings;
 
-internal static partial class BindingRegistryValidator
+internal static class BindingValidationPhases
 {
-    private static void ValidateBindingIdentity(
+    public static void ValidateBindingIdentity(
         BindingDescriptor binding,
         List<SandboxDiagnostic> diagnostics)
     {
-        ValidateIdentifier(binding.Id, "binding id", "E-BINDING-ID", diagnostics);
+        BindingRegistryValidator.ValidateIdentifier(binding.Id, "binding id", "E-BINDING-ID", diagnostics);
         if (binding.RequiredCapability is not null)
         {
-            ValidateIdentifier(binding.RequiredCapability, "required capability", "E-BINDING-CAP", diagnostics);
+            BindingRegistryValidator.ValidateIdentifier(
+                binding.RequiredCapability,
+                "required capability",
+                "E-BINDING-CAP",
+                diagnostics);
         }
     }
 
-    private static void ValidateBindingEffectBits(
+    public static void ValidateBindingEffectBits(
         BindingDescriptor binding,
         List<SandboxDiagnostic> diagnostics)
     {
@@ -31,27 +35,27 @@ internal static partial class BindingRegistryValidator
         }
     }
 
-    private static void ValidateBindingClassifications(
+    public static void ValidateBindingClassifications(
         BindingDescriptor binding,
         List<SandboxDiagnostic> diagnostics)
     {
-        if (!IsKnownAuditLevel(binding.AuditLevel))
+        if (!BindingRegistryValidator.IsKnownAuditLevel(binding.AuditLevel))
         {
             diagnostics.Add(new SandboxDiagnostic("E-BINDING-AUDIT", $"binding '{binding.Id}' declares an unknown audit level"));
         }
 
-        if (!IsKnownAuditKind(binding.AuditKind))
+        if (!BindingRegistryValidator.IsKnownAuditKind(binding.AuditKind))
         {
             diagnostics.Add(new SandboxDiagnostic("E-BINDING-AUDIT", $"binding '{binding.Id}' declares an unknown audit kind"));
         }
 
-        if (!IsKnownBindingSafety(binding.Safety))
+        if (!BindingRegistryValidator.IsKnownBindingSafety(binding.Safety))
         {
             diagnostics.Add(new SandboxDiagnostic("E-BINDING-SAFETY", $"binding '{binding.Id}' declares an unknown safety classification"));
         }
     }
 
-    private static void ValidateCapabilityRequirements(
+    public static void ValidateCapabilityRequirements(
         BindingDescriptor binding,
         List<SandboxDiagnostic> diagnostics)
     {
@@ -69,11 +73,11 @@ internal static partial class BindingRegistryValidator
         }
     }
 
-    private static void ValidateSandboxReach(
+    public static void ValidateSandboxReach(
         BindingDescriptor binding,
         List<SandboxDiagnostic> diagnostics)
     {
-        if (!ReachesOutsideSandbox(binding))
+        if (!BindingRegistryValidator.ReachesOutsideSandbox(binding))
         {
             return;
         }
@@ -89,12 +93,12 @@ internal static partial class BindingRegistryValidator
         }
     }
 
-    private static void ValidateCustomCapabilityGrant(
+    public static void ValidateCustomCapabilityGrant(
         BindingDescriptor binding,
         List<SandboxDiagnostic> diagnostics)
     {
         if (!string.IsNullOrWhiteSpace(binding.RequiredCapability) &&
-            !BuiltInCapabilities.Contains(binding.RequiredCapability) &&
+            !BindingRegistryValidator.BuiltInCapabilities.Contains(binding.RequiredCapability) &&
             binding.GrantValidator is null)
         {
             diagnostics.Add(new SandboxDiagnostic(
@@ -103,7 +107,7 @@ internal static partial class BindingRegistryValidator
         }
     }
 
-    private static void ValidateDangerousBinding(
+    public static void ValidateDangerousBinding(
         BindingDescriptor binding,
         List<SandboxDiagnostic> diagnostics)
     {
@@ -113,15 +117,15 @@ internal static partial class BindingRegistryValidator
         }
     }
 
-    private static void ValidateBindingTypes(
+    public static void ValidateBindingTypes(
         BindingDescriptor binding,
         List<SandboxDiagnostic> diagnostics)
     {
         foreach (var type in binding.Parameters)
         {
-            ValidateType(binding, type, diagnostics);
+            BindingRegistryValidator.ValidateType(binding, type, diagnostics);
         }
 
-        ValidateType(binding, binding.ReturnType, diagnostics);
+        BindingRegistryValidator.ValidateType(binding, binding.ReturnType, diagnostics);
     }
 }
