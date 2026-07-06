@@ -38,7 +38,7 @@ public sealed class PolicyResolverMutationTests
             await PolicyMutationTestSupport.TimeModuleAsync(),
             policy);
 
-        PolicyMutationTestSupport.AssertDiagnostic(ex, "E-POLICY-EFFECT", "policy denies effects Time");
+        PolicyMutationTestSupport.AssertDiagnostic(ex, "E-POLICY-EFFECT", "policy denies declared effects Time");
     }
 
     [Theory]

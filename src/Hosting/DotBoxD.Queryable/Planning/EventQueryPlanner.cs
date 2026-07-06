@@ -17,6 +17,7 @@ public static class EventQueryPlanner
     public static EventQueryPlan Plan(EventQueryDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
+        EventQueryDocumentInvariants.RequireValidShape(document);
         return Plan(document.Filter);
     }
 

@@ -15,6 +15,7 @@ public static class EventQueryCanonicalizer
     public static EventQueryDocument Canonicalize(EventQueryDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
+        EventQueryDocumentInvariants.RequireValidShape(document);
         return document with { Filter = Canonicalize(document.Filter) };
     }
 

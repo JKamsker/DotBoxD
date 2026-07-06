@@ -87,7 +87,7 @@ internal sealed partial class FunctionAnalyzer
         }
 
         _analyzing.Remove(functionId);
-        var finalEffects = effects | SandboxEffect.Cpu;
+        var finalEffects = effects | function.DeclaredEffects.GetValueOrDefault() | SandboxEffect.Cpu;
         var result = new FunctionAnalysis(function.ReturnType, finalEffects, canReorder && IsPure(finalEffects));
         _analyzed[functionId] = result;
         return result;

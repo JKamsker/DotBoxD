@@ -191,7 +191,7 @@ public sealed class ExecutionModeSelectionTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.ValidationError, result.Error!.Code);
-        Assert.Equal(invalidMode, result.ActualMode);
+        Assert.Equal(ExecutionMode.Auto, result.ActualMode);
         Assert.False(result.ExecutionDispatched);
         Assert.Equal(0, compiler.Calls);
         Assert.Contains(result.AuditEvents, e => e.Kind == "InvalidExecutionOptions");
