@@ -7,6 +7,7 @@ public IReadOnlyDictionary<string, IReadOnlySet<string>> BindingReferences { get
 public IReadOnlyList<SandboxDiagnostic> Diagnostics { get; init; }
 public IReadOnlySet<string> RequiredCapabilities { get; init; }
 public ModuleValidationResult Validate(SandboxModule module, IBindingCatalog bindings, SandboxPolicy? policy = null)
+public SandboxEffect ModuleEffects { get; init; }
 public sealed class ModuleValidator
 public sealed record ModuleValidationResult( bool Succeeded, IReadOnlyList<SandboxDiagnostic> Diagnostics, IReadOnlyDictionary<string, FunctionAnalysis> Functions, SandboxEffect ModuleEffects, IReadOnlySet<string> RequiredCapabilities, IReadOnlyDictionary<string, IReadOnlySet<string>> BindingReferences)
 public static ModuleValidationResult Failure(IReadOnlyList<SandboxDiagnostic> diagnostics)
