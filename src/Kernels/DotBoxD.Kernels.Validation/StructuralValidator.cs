@@ -1,4 +1,5 @@
 using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Kernels.Validation;
@@ -34,7 +35,7 @@ internal static class StructuralValidator
                 continue;
             }
 
-            CheckIdentifier(request.Id, "capability id", diagnostics);
+            CheckCapabilityRequest(request, diagnostics);
             CheckOptionalText(request.Reason, "capability reason", diagnostics);
         }
 
@@ -222,6 +223,18 @@ internal static class StructuralValidator
 
         counts[value] = 0;
         return true;
+    }
+
+    private static void CheckCapabilityRequest(CapabilityRequest request, List<SandboxDiagnostic> diagnostics)
+    {
+        CheckIdentifier(request.Id, "capability id", diagnostics);
+        if (request.Id is not null &&
+            (CapabilityPattern.IsWildcard(request.Id) || request.Id.EndsWith(".", StringComparison.Ordinal)))
+        {
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-IR-CAPABILITY",
+                $"capability request '{request.Id}' must be concrete"));
+        }
     }
 
     private static void CheckType(
