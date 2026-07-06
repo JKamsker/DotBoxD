@@ -46,6 +46,14 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
             return true;
         }
 
+        return ContainsNullableArrayElement(type, visited) ||
+               ContainsNullableListElement(type, visited) ||
+               ContainsNullableMapType(type, visited) ||
+               ContainsNullableRecordField(type, visited);
+    }
+
+    private static bool ContainsNullableArrayElement(ITypeSymbol type, HashSet<ITypeSymbol> visited)
+    {
         if (type is IArrayTypeSymbol array)
         {
             if (array.Rank != 1)
@@ -58,12 +66,22 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
             return ContainsNullableValueType(array.ElementType, visited);
         }
 
+        return false;
+    }
+
+    private static bool ContainsNullableListElement(ITypeSymbol type, HashSet<ITypeSymbol> visited)
+    {
         if (DotBoxDRpcTypeMapper.ListElementType(type) is { } elementType &&
             ContainsNullableValueType(elementType, visited))
         {
             return true;
         }
 
+        return false;
+    }
+
+    private static bool ContainsNullableMapType(ITypeSymbol type, HashSet<ITypeSymbol> visited)
+    {
         if (DotBoxDRpcTypeMapper.MapTypes(type) is { } map &&
             (ContainsNullableValueType(map.Key, visited) ||
              ContainsNullableValueType(map.Value, visited)))
@@ -71,6 +89,11 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
             return true;
         }
 
+        return false;
+    }
+
+    private static bool ContainsNullableRecordField(ITypeSymbol type, HashSet<ITypeSymbol> visited)
+    {
         if (type is INamedTypeSymbol named && DotBoxDRpcTypeMapper.IsRecordDto(named))
         {
             foreach (var field in DotBoxDRpcTypeMapper.RecordFields(named))

@@ -59,6 +59,17 @@ internal static partial class SandboxValidatedValueShapeMeter
             throw Error(failure);
         }
 
+        return MeasureKnownValue(value, expectedType, failure, limits, cancellationToken, meter);
+    }
+
+    private static ValueShape MeasureKnownValue(
+        SandboxValue value,
+        SandboxType expectedType,
+        ValidationFailure failure,
+        ResourceLimits? limits,
+        CancellationToken cancellationToken,
+        ResourceMeter? meter)
+    {
         var state = SandboxTraversalState<Frame>.Rent();
         var active = state.Active;
         var stack = state.Stack;
@@ -85,33 +96,7 @@ internal static partial class SandboxValidatedValueShapeMeter
 
                 ValidateKnownType(frame.Value, frame.ExpectedType, failure);
                 RequireScalarInvariants(frame.Value, failure);
-                switch (frame.Value)
-                {
-                    case StringValue text:
-                        shape = AddText(shape, SandboxLiteralConstraints.TextShape(text.Value), limits);
-                        break;
-                    case OpaqueIdValue id:
-                        RequireOpaqueId(id, failure);
-                        shape = AddText(shape, SandboxLiteralConstraints.TextShape(id.Value), limits);
-                        break;
-                    case SandboxPathValue path:
-                        shape = AddText(shape, SandboxLiteralConstraints.TextShape(path.Value.RelativePath), limits);
-                        break;
-                    case SandboxUriValue uri:
-                        shape = AddText(shape, SandboxLiteralConstraints.TextShape(uri.Value.Value), limits);
-                        break;
-                    case ListValue list:
-                        shape = AddList(shape, list, frame.ExpectedType, frame.Depth, active, stack, limits, failure);
-                        break;
-                    case MapValue map:
-                        shape = AddMap(shape, map, frame.ExpectedType, frame.Depth, active, stack, limits, failure);
-                        break;
-                    case RecordValue record:
-                        shape = AddRecord(shape, record, frame.ExpectedType, frame.Depth, active, stack, limits, failure);
-                        break;
-                    case UnitValue or BoolValue or I32Value or I64Value or F64Value:
-                        break;
-                }
+                shape = MeasureFrame(shape, frame, active, stack, limits, failure);
             }
 
             return shape;
@@ -121,6 +106,82 @@ internal static partial class SandboxValidatedValueShapeMeter
             SandboxTraversalState<Frame>.Return(state);
         }
     }
+
+    private static ValueShape MeasureFrame(
+        ValueShape shape,
+        Frame frame,
+        HashSet<object> active,
+        Stack<Frame> stack,
+        ResourceLimits? limits,
+        ValidationFailure failure)
+    {
+        if (TryMeasureTextFrame(shape, frame.Value, limits, failure, out var textShape))
+        {
+            return textShape;
+        }
+
+        if (TryMeasureCollectionFrame(shape, frame, active, stack, limits, failure, out var collectionShape))
+        {
+            return collectionShape;
+        }
+
+        return shape;
+    }
+
+    private static bool TryMeasureTextFrame(
+        ValueShape shape,
+        SandboxValue value,
+        ResourceLimits? limits,
+        ValidationFailure failure,
+        out ValueShape result)
+    {
+        switch (value)
+        {
+            case StringValue text:
+                result = AddText(shape, SandboxLiteralConstraints.TextShape(text.Value), limits);
+                return true;
+            case OpaqueIdValue id:
+                RequireOpaqueId(id, failure);
+                result = AddText(shape, SandboxLiteralConstraints.TextShape(id.Value), limits);
+                return true;
+            case SandboxPathValue path:
+                result = AddText(shape, SandboxLiteralConstraints.TextShape(path.Value.RelativePath), limits);
+                return true;
+            case SandboxUriValue uri:
+                result = AddText(shape, SandboxLiteralConstraints.TextShape(uri.Value.Value), limits);
+                return true;
+            default:
+                result = shape;
+                return false;
+        }
+    }
+
+    private static bool TryMeasureCollectionFrame(
+        ValueShape shape,
+        Frame frame,
+        HashSet<object> active,
+        Stack<Frame> stack,
+        ResourceLimits? limits,
+        ValidationFailure failure,
+        out ValueShape result)
+    {
+        switch (frame.Value)
+        {
+            case ListValue list:
+                result = AddList(shape, list, frame.ExpectedType, frame.Depth, active, stack, limits, failure);
+                return true;
+            case MapValue map:
+                result = AddMap(shape, map, frame.ExpectedType, frame.Depth, active, stack, limits, failure);
+                return true;
+            case RecordValue record:
+                result = AddRecord(shape, record, frame.ExpectedType, frame.Depth, active, stack, limits, failure);
+                return true;
+            default:
+                result = shape;
+                return false;
+        }
+    }
+
     private static void Enter(
         object value,
         HashSet<object> active,

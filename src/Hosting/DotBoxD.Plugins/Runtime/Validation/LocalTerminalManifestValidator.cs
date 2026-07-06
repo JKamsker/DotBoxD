@@ -7,6 +7,19 @@ namespace DotBoxD.Plugins.Runtime;
 
 internal static class LocalTerminalManifestValidator
 {
+    private static readonly Dictionary<string, Func<Type, bool>> ProjectedTypePredicates = new(StringComparer.Ordinal)
+    {
+        ["bool"] = static expected => expected == typeof(bool),
+        ["int"] = static expected => expected == typeof(int) || IsEnum(expected),
+        ["long"] = static expected => expected == typeof(long) || IsEnum(expected),
+        ["double"] = static expected => expected == typeof(double) || expected == typeof(float),
+        ["string"] = static expected => expected == typeof(string),
+        ["guid"] = static expected => expected == typeof(Guid),
+        ["list"] = static expected => IsListProjection(expected),
+        ["map"] = static expected => IsMap(expected),
+        ["record"] = static expected => IsAnonymousType(expected) || IsFrameworkRecordType(expected),
+    };
+
     public static void ValidateRunLocal<TProjected>(PluginPackage package)
     {
         var subscription = package.Manifest.Subscriptions.Count > 0 ? package.Manifest.Subscriptions[0] : null;
@@ -51,21 +64,14 @@ internal static class LocalTerminalManifestValidator
     }
 
     private static bool ProjectedTypeMatches(string declared, Type expected)
-        => declared switch
-        {
-            "bool" => expected == typeof(bool),
-            "int" => expected == typeof(int) || IsEnum(expected),
-            "long" => expected == typeof(long) || IsEnum(expected),
-            "double" => expected == typeof(double) || expected == typeof(float),
-            "string" => expected == typeof(string),
-            "guid" => expected == typeof(Guid),
-            "list" => expected != typeof(string) &&
-                !IsMap(expected) &&
-                typeof(System.Collections.IEnumerable).IsAssignableFrom(expected),
-            "map" => IsMap(expected),
-            "record" => IsAnonymousType(expected) || IsFrameworkRecordType(expected),
-            _ => TypeNameMatches(declared, expected)
-        };
+        => ProjectedTypePredicates.TryGetValue(declared, out var predicate)
+            ? predicate(expected)
+            : TypeNameMatches(declared, expected);
+
+    private static bool IsListProjection(Type expected)
+        => expected != typeof(string) &&
+           !IsMap(expected) &&
+           typeof(System.Collections.IEnumerable).IsAssignableFrom(expected);
 
     private static bool IsEnum(Type type)
         => type.IsEnum;

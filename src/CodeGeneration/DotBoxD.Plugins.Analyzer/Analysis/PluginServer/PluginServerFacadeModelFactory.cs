@@ -37,7 +37,7 @@ internal static partial class PluginServerFacadeModelFactory
         Compilation compilation,
         CancellationToken cancellationToken)
     {
-        ValidateServerTargetShape(type, cancellationToken);
+        PluginServerTargetValidator.Validate(type, cancellationToken);
 
         var worldType = ResolveWorldType(type)
             ?? throw new NotSupportedException(
@@ -50,8 +50,8 @@ internal static partial class PluginServerFacadeModelFactory
         var liveSettingUpdateType = ResolveLiveSettingUpdateType(controlServiceType, cancellationToken)
             ?? throw new NotSupportedException(
                 $"Generated plugin server '{type.Name}' control-plane contract '{controlServiceType.ToDisplayString()}' must declare UpdateSettingsAsync with a typed array parameter carrying the live-setting updates.");
-        ValidateControlServiceContract(type, compilation, controlServiceType, liveSettingUpdateType);
-        ValidatePublicFacadeSignatureTypes(type, worldType, controlServiceType, liveSettingUpdateType);
+        PluginServerControlContractValidator.Validate(type, compilation, controlServiceType, liveSettingUpdateType);
+        PluginServerPublicSignatureValidator.Validate(type, worldType, controlServiceType, liveSettingUpdateType);
         var controls = ResolveControls(worldType, cancellationToken);
         var worldServiceWrappers = new Dictionary<string, ServiceWrapperBuilder>(StringComparer.Ordinal);
         var worldProperties = ResolveForwardedProperties(
@@ -65,7 +65,7 @@ internal static partial class PluginServerFacadeModelFactory
             cancellationToken);
         var eventCallback = PluginServerEventCallbackResolver.Resolve(compilation, worldType, cancellationToken);
         var worldServiceWrapperModels = BuildServiceWrappers(worldServiceWrappers);
-        ValidateGeneratedSurfaceCollisions(
+        PluginServerSurfaceCollisionValidator.Validate(
             type,
             worldType,
             worldProperties,
@@ -248,7 +248,7 @@ internal static partial class PluginServerFacadeModelFactory
         return string.Equals(name, ServiceControlType, StringComparison.Ordinal) ||
                string.Equals(name, ExtensibleControlType, StringComparison.Ordinal);
     }
-    private static IEnumerable<ISymbol> MembersIncludingInherited(INamedTypeSymbol type)
+    internal static IEnumerable<ISymbol> MembersIncludingInherited(INamedTypeSymbol type)
     {
         foreach (var inherited in type.AllInterfaces.Reverse())
         {

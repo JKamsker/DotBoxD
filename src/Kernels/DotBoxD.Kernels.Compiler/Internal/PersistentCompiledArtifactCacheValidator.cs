@@ -68,23 +68,53 @@ internal static class PersistentCompiledArtifactCacheValidator
             throw CacheInvalid("cached artifact assembly hash is missing");
         }
 
-        if (manifest.ArtifactVersion != 1 ||
-            manifest.CacheKey != cacheKey ||
-            manifest.ModuleHash != plan.ModuleHash ||
-            manifest.PlanHash != plan.PlanHash ||
-            manifest.PolicyHash != plan.PolicyHash ||
-            manifest.BindingManifestHash != plan.BindingManifestHash ||
-            manifest.CompilerVersion != CacheKeyBuilder.CompilerVersion ||
-            manifest.TypeSystemVersion != CacheKeyBuilder.TypeSystemVersion ||
-            manifest.EffectAnalysisVersion != CacheKeyBuilder.EffectAnalysisVersion ||
-            manifest.VerifierVersion != policy.VerifierVersion ||
-            manifest.RuntimeFacadeHash != policy.RuntimeFacadeHash ||
-            manifest.LanguageVersion != CacheKeyBuilder.LanguageVersion ||
-            manifest.TargetFramework != CacheKeyBuilder.TargetFramework)
+        if (!ManifestIdentityMatches(cacheKey, plan, manifest, policy))
         {
             throw CacheInvalid("cached artifact manifest does not match current plan");
         }
     }
+
+    private static bool ManifestIdentityMatches(
+        string cacheKey,
+        ExecutionPlan plan,
+        ArtifactManifest manifest,
+        VerificationPolicy policy)
+    {
+        if (manifest.ArtifactVersion != 1)
+        {
+            return false;
+        }
+
+        foreach (var field in ManifestIdentityFields(cacheKey, plan, manifest, policy))
+        {
+            if (!string.Equals(field.Actual, field.Expected, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static ManifestIdentityField[] ManifestIdentityFields(
+        string cacheKey,
+        ExecutionPlan plan,
+        ArtifactManifest manifest,
+        VerificationPolicy policy) =>
+        [
+            new(manifest.CacheKey, cacheKey),
+            new(manifest.ModuleHash, plan.ModuleHash),
+            new(manifest.PlanHash, plan.PlanHash),
+            new(manifest.PolicyHash, plan.PolicyHash),
+            new(manifest.BindingManifestHash, plan.BindingManifestHash),
+            new(manifest.CompilerVersion, CacheKeyBuilder.CompilerVersion),
+            new(manifest.TypeSystemVersion, CacheKeyBuilder.TypeSystemVersion),
+            new(manifest.EffectAnalysisVersion, CacheKeyBuilder.EffectAnalysisVersion),
+            new(manifest.VerifierVersion, policy.VerifierVersion),
+            new(manifest.RuntimeFacadeHash, policy.RuntimeFacadeHash),
+            new(manifest.LanguageVersion, CacheKeyBuilder.LanguageVersion),
+            new(manifest.TargetFramework, CacheKeyBuilder.TargetFramework)
+        ];
 
     private static string[] ExpectedOptimizationFlags(
         string cacheKey,
@@ -107,4 +137,6 @@ internal static class PersistentCompiledArtifactCacheValidator
 
     private static SandboxRuntimeException CacheInvalid(string message)
         => new(new SandboxError(SandboxErrorCode.CacheInvalid, message));
+
+    private readonly record struct ManifestIdentityField(string? Actual, string? Expected);
 }

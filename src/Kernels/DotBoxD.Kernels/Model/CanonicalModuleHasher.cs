@@ -172,6 +172,12 @@ public static class CanonicalModuleHasher
     };
 
     private static string Value(SandboxValue value)
+        => PrimitiveValue(value) ??
+           FrameworkValue(value) ??
+           CompositeValue(value) ??
+           throw new NotSupportedException(value.GetType().Name);
+
+    private static string? PrimitiveValue(SandboxValue value)
         => value switch
         {
             UnitValue => Node("unit"),
@@ -180,14 +186,26 @@ public static class CanonicalModuleHasher
             I64Value number => Node("i64", number.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)),
             F64Value number => Node("f64", number.Value.ToString("R", System.Globalization.CultureInfo.InvariantCulture)),
             StringValue text => Node("string", text.Value),
+            _ => null
+        };
+
+    private static string? FrameworkValue(SandboxValue value)
+        => value switch
+        {
             GuidValue guid => Node("guid", guid.Value.ToString("N", System.Globalization.CultureInfo.InvariantCulture)),
             OpaqueIdValue id => Node("opaque-id", id.TypeName, id.Value),
             SandboxPathValue path => Node("path", path.Value.RelativePath),
             SandboxUriValue uri => Node("uri", uri.Value.Value),
+            _ => null
+        };
+
+    private static string? CompositeValue(SandboxValue value)
+        => value switch
+        {
             ListValue list => ListLiteral(list),
             MapValue map => MapLiteral(map),
             RecordValue record => RecordLiteral(record),
-            _ => throw new NotSupportedException(value.GetType().Name)
+            _ => null
         };
 
     private static string Type(SandboxType type)

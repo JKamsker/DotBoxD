@@ -49,13 +49,16 @@ internal static class PluginManifestTextValidator
             return true;
         }
 
-        if (value.Length > 128 ||
-            !IsAsciiLetterOrDigit(value[0]) ||
-            !IsAsciiLetterOrDigit(value[value.Length - 1]))
-        {
-            return false;
-        }
+        return HasStablePluginIdBoundary(value) && HasStablePluginIdBody(value);
+    }
 
+    private static bool HasStablePluginIdBoundary(string value)
+        => value.Length <= 128 &&
+           IsAsciiLetterOrDigit(value[0]) &&
+           IsAsciiLetterOrDigit(value[value.Length - 1]);
+
+    private static bool HasStablePluginIdBody(string value)
+    {
         var previousWasDot = false;
         foreach (var ch in value)
         {

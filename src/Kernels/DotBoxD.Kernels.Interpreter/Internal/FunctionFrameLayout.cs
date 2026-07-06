@@ -14,6 +14,11 @@ using DotBoxD.Kernels;
 /// </summary>
 internal sealed class FunctionFrameLayout
 {
+    private static readonly HashSet<string> BoolBinaryOperators = new(StringComparer.Ordinal)
+    {
+        "&&", "||", "==", "!=", "<", "<=", ">", ">="
+    };
+
     private readonly Dictionary<string, int> _slots;
     private readonly SlotKind[] _slotKinds;
 
@@ -178,20 +183,41 @@ internal sealed class FunctionFrameLayout
         IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis,
         IBindingCatalog bindings,
         IReadOnlyDictionary<string, SlotKind> candidates)
-        => expression switch
+    {
+        if (expression is LiteralExpression literal)
         {
-            LiteralExpression literal => literal.Value.Type,
-            VariableExpression variable => candidates.TryGetValue(variable.Name, out var kind) && TypeOf(kind) is { } type
-                ? type
-                : ParameterType(function, variable.Name),
-            UnaryExpression { Operator: "!" } => SandboxType.Bool,
-            UnaryExpression unary => InferType(unary.Operand, function, functionAnalysis, bindings, candidates),
-            BinaryExpression binary => binary.Operator is "&&" or "||" or "==" or "!=" or "<" or "<=" or ">" or ">="
+            return literal.Value.Type;
+        }
+
+        if (expression is VariableExpression variable)
+        {
+            return InferVariableType(variable, function, candidates);
+        }
+
+        if (expression is UnaryExpression unary)
+        {
+            return string.Equals(unary.Operator, "!", StringComparison.Ordinal)
                 ? SandboxType.Bool
-                : InferType(binary.Left, function, functionAnalysis, bindings, candidates),
-            CallExpression call => InferCallType(call, functionAnalysis, bindings),
-            _ => null
-        };
+                : InferType(unary.Operand, function, functionAnalysis, bindings, candidates);
+        }
+
+        if (expression is BinaryExpression binary)
+        {
+            return BoolBinaryOperators.Contains(binary.Operator)
+                ? SandboxType.Bool
+                : InferType(binary.Left, function, functionAnalysis, bindings, candidates);
+        }
+
+        return expression is CallExpression call ? InferCallType(call, functionAnalysis, bindings) : null;
+    }
+
+    private static SandboxType? InferVariableType(
+        VariableExpression variable,
+        SandboxFunction function,
+        IReadOnlyDictionary<string, SlotKind> candidates)
+        => candidates.TryGetValue(variable.Name, out var kind) && TypeOf(kind) is { } type
+            ? type
+            : ParameterType(function, variable.Name);
 
     private static SandboxType? InferCallType(
         CallExpression call,

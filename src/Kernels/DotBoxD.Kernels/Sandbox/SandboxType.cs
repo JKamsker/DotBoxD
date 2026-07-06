@@ -75,12 +75,7 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
 
     public static bool IsWellFormedOpaqueIdName(string name)
     {
-        if (string.IsNullOrEmpty(name) ||
-            name.Length > MaxOpaqueIdNameLength ||
-            AllowedScalars.Contains(name) ||
-            name is "List" or "Map" or RecordName ||
-            IsForbiddenName(name) ||
-            !char.IsAsciiLetterUpper(name[0]))
+        if (HasInvalidOpaqueIdNamePrefix(name))
         {
             return false;
         }
@@ -95,6 +90,26 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
         }
 
         return true;
+    }
+
+    private static bool HasInvalidOpaqueIdNamePrefix(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            return true;
+        }
+
+        if (name.Length > MaxOpaqueIdNameLength || AllowedScalars.Contains(name))
+        {
+            return true;
+        }
+
+        if (name is "List" or "Map" or RecordName)
+        {
+            return true;
+        }
+
+        return IsForbiddenName(name) || !char.IsAsciiLetterUpper(name[0]);
     }
 
     // Open structural check: any well-formed opaque-id brand is accepted. Used by runtime value
@@ -191,37 +206,65 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
 
         if (type.Arguments.Count == 0)
         {
-            return AllowedScalars.Contains(type.Name) ||
-                   IsAcceptedOpaqueIdBrand(type.Name, declaredOpaqueIdTypes);
+            return IsKnownScalar(type, declaredOpaqueIdTypes);
         }
 
-        if (type.Name == "List")
-        {
-            return type.Arguments.Count == 1 &&
-                   IsKnown(type.Arguments[0], depth + 1, maxDepth, declaredOpaqueIdTypes);
-        }
-
-        if (type.Name == RecordName)
-        {
-            // A record is a positional tuple of known field types (≥ 1). Field types may nest, so each
-            // recurses with an incremented depth against the same bound.
-            for (var i = 0; i < type.Arguments.Count; i++)
-            {
-                if (!IsKnown(type.Arguments[i], depth + 1, maxDepth, declaredOpaqueIdTypes))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        return type.Name == "Map" &&
-               type.Arguments.Count == 2 &&
-               type.Arguments[0].IsValidMapKey(declaredOpaqueIdTypes) &&
-               IsKnown(type.Arguments[0], depth + 1, maxDepth, declaredOpaqueIdTypes) &&
-               IsKnown(type.Arguments[1], depth + 1, maxDepth, declaredOpaqueIdTypes);
+        return IsKnownComposite(type, depth, maxDepth, declaredOpaqueIdTypes);
     }
+
+    private static bool IsKnownScalar(SandboxType type, IReadOnlySet<string>? declaredOpaqueIdTypes)
+        => AllowedScalars.Contains(type.Name) ||
+           IsAcceptedOpaqueIdBrand(type.Name, declaredOpaqueIdTypes);
+
+    private static bool IsKnownComposite(
+        SandboxType type,
+        int depth,
+        int maxDepth,
+        IReadOnlySet<string>? declaredOpaqueIdTypes)
+        => type.Name switch
+        {
+            "List" => IsKnownList(type, depth, maxDepth, declaredOpaqueIdTypes),
+            RecordName => IsKnownRecord(type, depth, maxDepth, declaredOpaqueIdTypes),
+            "Map" => IsKnownMap(type, depth, maxDepth, declaredOpaqueIdTypes),
+            _ => false
+        };
+
+    private static bool IsKnownList(
+        SandboxType type,
+        int depth,
+        int maxDepth,
+        IReadOnlySet<string>? declaredOpaqueIdTypes)
+        => type.Arguments.Count == 1 &&
+           IsKnown(type.Arguments[0], depth + 1, maxDepth, declaredOpaqueIdTypes);
+
+    private static bool IsKnownRecord(
+        SandboxType type,
+        int depth,
+        int maxDepth,
+        IReadOnlySet<string>? declaredOpaqueIdTypes)
+    {
+        // A record is a positional tuple of known field types (>= 1). Field types may nest, so each
+        // recurses with an incremented depth against the same bound.
+        for (var i = 0; i < type.Arguments.Count; i++)
+        {
+            if (!IsKnown(type.Arguments[i], depth + 1, maxDepth, declaredOpaqueIdTypes))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsKnownMap(
+        SandboxType type,
+        int depth,
+        int maxDepth,
+        IReadOnlySet<string>? declaredOpaqueIdTypes)
+        => type.Arguments.Count == 2 &&
+           type.Arguments[0].IsValidMapKey(declaredOpaqueIdTypes) &&
+           IsKnown(type.Arguments[0], depth + 1, maxDepth, declaredOpaqueIdTypes) &&
+           IsKnown(type.Arguments[1], depth + 1, maxDepth, declaredOpaqueIdTypes);
 
     private static bool IsForbidden(SandboxType type)
     {

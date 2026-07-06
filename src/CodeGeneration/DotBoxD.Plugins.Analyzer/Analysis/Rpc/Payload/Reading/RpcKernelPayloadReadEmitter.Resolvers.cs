@@ -1,0 +1,203 @@
+namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
+
+using Microsoft.CodeAnalysis;
+
+internal sealed partial class RpcKernelPayloadReadEmitter
+{
+    private static readonly ComplexReadResolver[] ComplexReadResolvers =
+    [
+        TryReadNullable,
+        TryReadGuid,
+        TryReadDateTime,
+        TryReadDecimal,
+        TryReadDateOnly,
+        TryReadTimeOnly,
+        TryReadTimeSpan,
+        TryReadCancellationToken,
+        TryReadIndex,
+        TryReadRange,
+        TryReadEnum,
+        TryReadList,
+        TryReadMap,
+        TryReadDto,
+    ];
+
+    private delegate bool ComplexReadResolver(
+        RpcKernelPayloadReadEmitter emitter,
+        ITypeSymbol type,
+        string reader,
+        out string result);
+
+    private static bool TryReadNullable(
+        RpcKernelPayloadReadEmitter emitter,
+        ITypeSymbol type,
+        string reader,
+        out string result)
+    {
+        if (DotBoxDNullableScalarType.TryGetSupportedUnderlying(type, out var nullableUnderlying))
+        {
+            result = $"{emitter.EnsureNullablePayloadReader(type, nullableUnderlying)}(ref {reader})";
+            return true;
+        }
+
+        result = string.Empty;
+        return false;
+    }
+
+    private static bool TryReadGuid(
+        RpcKernelPayloadReadEmitter emitter,
+        ITypeSymbol type,
+        string reader,
+        out string result)
+        => TryReadWhen(DotBoxDRpcTypeMapper.IsGuid(type), $"{reader}.ReadGuid()", out result);
+
+    private static bool TryReadDateTime(
+        RpcKernelPayloadReadEmitter emitter,
+        ITypeSymbol type,
+        string reader,
+        out string result)
+        => TryReadWhen(
+            DotBoxDRpcTypeMapper.IsDateTimeWireType(type),
+            $"{emitter.EnsureDateTimePayloadReader(type)}(ref {reader})",
+            out result);
+
+    private static bool TryReadDecimal(
+        RpcKernelPayloadReadEmitter emitter,
+        ITypeSymbol type,
+        string reader,
+        out string result)
+        => TryReadWhen(
+            DotBoxDRpcTypeMapper.IsDecimalWireType(type),
+            $"{emitter.EnsureDecimalPayloadReader()}(ref {reader})",
+            out result);
+
+    private static bool TryReadDateOnly(
+        RpcKernelPayloadReadEmitter emitter,
+        ITypeSymbol type,
+        string reader,
+        out string result)
+        => TryReadWhen(
+            DotBoxDRpcTypeMapper.IsDateOnlyWireType(type),
+            $"{emitter.EnsureDateOnlyPayloadReader()}({reader}.ReadInt32())",
+            out result);
+
+    private static bool TryReadTimeOnly(
+        RpcKernelPayloadReadEmitter emitter,
+        ITypeSymbol type,
+        string reader,
+        out string result)
+        => TryReadWhen(
+            DotBoxDRpcTypeMapper.IsTimeOnlyWireType(type),
+            $"{emitter.EnsureTimeOnlyPayloadReader()}({reader}.ReadInt64())",
+            out result);
+
+    private static bool TryReadTimeSpan(
+        RpcKernelPayloadReadEmitter emitter,
+        ITypeSymbol type,
+        string reader,
+        out string result)
+        => TryReadWhen(
+            DotBoxDRpcTypeMapper.IsTimeSpanWireType(type),
+            $"new global::System.TimeSpan({reader}.ReadInt64())",
+            out result);
+
+    private static bool TryReadCancellationToken(
+        RpcKernelPayloadReadEmitter emitter,
+        ITypeSymbol type,
+        string reader,
+        out string result)
+        => TryReadWhen(
+            DotBoxDRpcTypeMapper.IsCancellationTokenWireType(type),
+            $"new global::System.Threading.CancellationToken({reader}.ReadBool())",
+            out result);
+
+    private static bool TryReadIndex(
+        RpcKernelPayloadReadEmitter emitter,
+        ITypeSymbol type,
+        string reader,
+        out string result)
+        => TryReadWhen(
+            DotBoxDRpcTypeMapper.IsIndexWireType(type),
+            $"{emitter.EnsureIndexPayloadReader()}(ref {reader})",
+            out result);
+
+    private static bool TryReadRange(
+        RpcKernelPayloadReadEmitter emitter,
+        ITypeSymbol type,
+        string reader,
+        out string result)
+        => TryReadWhen(
+            DotBoxDRpcTypeMapper.IsRangeWireType(type),
+            $"{emitter.EnsureRangePayloadReader()}(ref {reader})",
+            out result);
+
+    private static bool TryReadEnum(
+        RpcKernelPayloadReadEmitter emitter,
+        ITypeSymbol type,
+        string reader,
+        out string result)
+    {
+        if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
+        {
+            result = $"{emitter.EnsureEnumReader(enumType)}(ref {reader})";
+            return true;
+        }
+
+        result = string.Empty;
+        return false;
+    }
+
+    private static bool TryReadList(
+        RpcKernelPayloadReadEmitter emitter,
+        ITypeSymbol type,
+        string reader,
+        out string result)
+    {
+        if (DotBoxDRpcTypeMapper.ListElementType(type) is null)
+        {
+            result = string.Empty;
+            return false;
+        }
+
+        result = $"{emitter.EnsureListReader(type)}(ref {reader})";
+        return true;
+    }
+
+    private static bool TryReadMap(
+        RpcKernelPayloadReadEmitter emitter,
+        ITypeSymbol type,
+        string reader,
+        out string result)
+    {
+        if (DotBoxDRpcTypeMapper.MapTypes(type) is { } map)
+        {
+            result = $"{emitter.EnsureMapReader(type, map.Key, map.Value)}(ref {reader})";
+            return true;
+        }
+
+        result = string.Empty;
+        return false;
+    }
+
+    private static bool TryReadDto(
+        RpcKernelPayloadReadEmitter emitter,
+        ITypeSymbol type,
+        string reader,
+        out string result)
+    {
+        if (type is INamedTypeSymbol named && DotBoxDRpcTypeMapper.IsRecordDto(named))
+        {
+            result = $"{emitter.EnsureDtoReader(named)}(ref {reader})";
+            return true;
+        }
+
+        result = string.Empty;
+        return false;
+    }
+
+    private static bool TryReadWhen(bool condition, string value, out string result)
+    {
+        result = condition ? value : string.Empty;
+        return condition;
+    }
+}

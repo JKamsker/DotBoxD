@@ -45,20 +45,7 @@ public static class SafeHttpClient
             var response = pinnedResponse.Message;
             var metadataBytes = SafeHttpResponseAccounting.ChargeMetadata(context, response, request.MaxResponseBytes);
             responseBytes = metadataBytes;
-            if (response.RequestMessage?.RequestUri is { } finalUri && !SafeHttpUriAudit.SameUri(finalUri, request.Uri))
-            {
-                throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: redirects are not allowed");
-            }
-
-            if (IsRedirect(response.StatusCode))
-            {
-                throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: redirects are not allowed");
-            }
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw Error(SandboxErrorCode.HostFailure, "net.http.get failed: response status was not successful");
-            }
+            RequireSuccessfulFinalResponse(response, request.Uri);
 
             var body = await SafeHttpBodyReader.ReadLimitedTextAsync(
                     context,
@@ -181,6 +168,24 @@ public static class SafeHttpClient
         if (!grant.AllowPrivateNetwork && SafeIpAddressClassifier.IsNonGlobal(address))
         {
             throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: private network targets are not allowed");
+        }
+    }
+
+    private static void RequireSuccessfulFinalResponse(HttpResponseMessage response, Uri requestedUri)
+    {
+        if (response.RequestMessage?.RequestUri is { } finalUri && !SafeHttpUriAudit.SameUri(finalUri, requestedUri))
+        {
+            throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: redirects are not allowed");
+        }
+
+        if (IsRedirect(response.StatusCode))
+        {
+            throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: redirects are not allowed");
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw Error(SandboxErrorCode.HostFailure, "net.http.get failed: response status was not successful");
         }
     }
 

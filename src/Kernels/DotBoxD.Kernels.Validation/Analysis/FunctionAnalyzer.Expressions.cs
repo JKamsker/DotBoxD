@@ -59,31 +59,79 @@ internal sealed partial class FunctionAnalyzer
     {
         var left = AnalyzeExpression(binary.Left, scope, ref effects, ref canReorder);
         var right = AnalyzeExpression(binary.Right, scope, ref effects, ref canReorder);
+        if (TryAnalyzeEqualityBinary(binary, left, right, out var equality))
+        {
+            return equality;
+        }
+
+        if (TryAnalyzeComparisonBinary(binary, left, right, out var comparison))
+        {
+            return comparison;
+        }
+
+        if (TryAnalyzeBooleanBinary(binary, left, right, out var boolean))
+        {
+            return boolean;
+        }
+
+        if (binary.Operator is "+" or "-" or "*" or "/" or "%")
+        {
+            return AnalyzeNumericBinary(binary, left, right, comparison: false);
+        }
+
+        _diagnostics.Add(new SandboxDiagnostic("E-OP-UNKNOWN", $"unknown binary operator '{binary.Operator}'", Span: binary.Span));
+        return SandboxType.Unit;
+    }
+
+    private bool TryAnalyzeEqualityBinary(
+        BinaryExpression binary,
+        SandboxType left,
+        SandboxType right,
+        out SandboxType type)
+    {
         if (binary.Operator is "==" or "!=")
         {
             Require(left, right, binary.Span);
-            return SandboxType.Bool;
+            type = SandboxType.Bool;
+            return true;
         }
 
+        type = SandboxType.Unit;
+        return false;
+    }
+
+    private bool TryAnalyzeComparisonBinary(
+        BinaryExpression binary,
+        SandboxType left,
+        SandboxType right,
+        out SandboxType type)
+    {
         if (binary.Operator is "<" or "<=" or ">" or ">=")
         {
-            return AnalyzeNumericBinary(binary, left, right, comparison: true);
+            type = AnalyzeNumericBinary(binary, left, right, comparison: true);
+            return true;
         }
 
+        type = SandboxType.Unit;
+        return false;
+    }
+
+    private bool TryAnalyzeBooleanBinary(
+        BinaryExpression binary,
+        SandboxType left,
+        SandboxType right,
+        out SandboxType type)
+    {
         if (binary.Operator is "&&" or "||")
         {
             Require(left, SandboxType.Bool, binary.Span);
             Require(right, SandboxType.Bool, binary.Span);
-            return SandboxType.Bool;
+            type = SandboxType.Bool;
+            return true;
         }
 
-        if (binary.Operator is not ("+" or "-" or "*" or "/" or "%"))
-        {
-            _diagnostics.Add(new SandboxDiagnostic("E-OP-UNKNOWN", $"unknown binary operator '{binary.Operator}'", Span: binary.Span));
-            return SandboxType.Unit;
-        }
-
-        return AnalyzeNumericBinary(binary, left, right, comparison: false);
+        type = SandboxType.Unit;
+        return false;
     }
 
     private SandboxType AnalyzeNumericUnary(UnaryExpression unary, SandboxType operand)

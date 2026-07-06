@@ -16,16 +16,12 @@ internal sealed record PolymorphicHandleMetadata(
     {
         foreach (var attribute in HandleType.GetAttributes())
         {
-            if (!IsAttribute(attribute, DotBoxDMetadataNames.HandleSubtypeAttribute) ||
-                attribute.ConstructorArguments.Length != 4 ||
-                attribute.ConstructorArguments[0].Value is not INamedTypeSymbol declaredSubtype ||
-                attribute.ConstructorArguments[1].Value is not string discriminator ||
-                attribute.ConstructorArguments[2].Value is not string bindingPrefix ||
-                attribute.ConstructorArguments[3].Value is not string capability ||
-                string.IsNullOrWhiteSpace(discriminator) ||
-                string.IsNullOrWhiteSpace(bindingPrefix) ||
-                string.IsNullOrWhiteSpace(capability) ||
-                !SymbolEqualityComparer.Default.Equals(declaredSubtype, subtype))
+            if (!TryReadSubtype(attribute, out var declaredSubtype, out var discriminator, out var bindingPrefix, out var capability))
+            {
+                continue;
+            }
+
+            if (!SymbolEqualityComparer.Default.Equals(declaredSubtype, subtype))
             {
                 continue;
             }
@@ -36,6 +32,91 @@ internal sealed record PolymorphicHandleMetadata(
 
         metadata = null!;
         return false;
+    }
+
+    private static bool TryReadSubtype(
+        AttributeData attribute,
+        out INamedTypeSymbol declaredSubtype,
+        out string discriminator,
+        out string bindingPrefix,
+        out string capability)
+    {
+        declaredSubtype = null!;
+        discriminator = string.Empty;
+        bindingPrefix = string.Empty;
+        capability = string.Empty;
+        if (!IsAttribute(attribute, DotBoxDMetadataNames.HandleSubtypeAttribute))
+        {
+            return false;
+        }
+
+        if (attribute.ConstructorArguments.Length != 4)
+        {
+            return false;
+        }
+
+        if (attribute.ConstructorArguments[0].Value is not INamedTypeSymbol subtype)
+        {
+            return false;
+        }
+
+        if (!TryReadSubtypeMetadata(attribute, out discriminator, out bindingPrefix, out capability))
+        {
+            return false;
+        }
+
+        declaredSubtype = subtype;
+        return true;
+    }
+
+    private static bool TryReadSubtypeMetadata(
+        AttributeData attribute,
+        out string discriminator,
+        out string bindingPrefix,
+        out string capability)
+    {
+        discriminator = string.Empty;
+        bindingPrefix = string.Empty;
+        capability = string.Empty;
+        if (attribute.ConstructorArguments[1].Value is not string discriminatorValue)
+        {
+            return false;
+        }
+
+        if (attribute.ConstructorArguments[2].Value is not string bindingPrefixValue)
+        {
+            return false;
+        }
+
+        if (attribute.ConstructorArguments[3].Value is not string capabilityValue)
+        {
+            return false;
+        }
+
+        if (!IsValidSubtypeMetadata(discriminatorValue, bindingPrefixValue, capabilityValue))
+        {
+            return false;
+        }
+
+        discriminator = discriminatorValue;
+        bindingPrefix = bindingPrefixValue;
+        capability = capabilityValue;
+        return true;
+    }
+
+    private static bool IsValidSubtypeMetadata(string discriminator, string bindingPrefix, string capability)
+    {
+        if (string.IsNullOrWhiteSpace(discriminator))
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(bindingPrefix))
+        {
+            return false;
+        }
+
+        return !string.IsNullOrWhiteSpace(capability);
     }
 
     internal static bool IsAttribute(AttributeData attribute, string metadataName)

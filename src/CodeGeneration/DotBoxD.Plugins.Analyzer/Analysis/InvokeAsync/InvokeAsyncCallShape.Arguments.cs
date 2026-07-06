@@ -62,61 +62,70 @@ internal sealed partial class InvokeAsyncCallShape
             return false;
         }
 
-        var assignedCaptures = false;
-        var assignedLambda = false;
-        var assignedCancellation = false;
+        var state = new CaptureArgumentState();
         for (var i = 0; i < arguments.Count; i++)
         {
             var argument = arguments[i];
-            var name = argument.NameColon?.Name.Identifier.ValueText;
-            if (name is null)
+            if (!state.TryAssign(CaptureArgumentName(argument, i), argument.Expression))
             {
-                name = i switch
-                {
-                    0 => "captures",
-                    1 => "lambda",
-                    _ => "cancellationToken"
-                };
+                return false;
             }
-
-            if (string.Equals(name, "captures", StringComparison.Ordinal))
-            {
-                if (assignedCaptures)
-                {
-                    return false;
-                }
-
-                captures = argument.Expression;
-                assignedCaptures = true;
-                continue;
-            }
-
-            if (string.Equals(name, "lambda", StringComparison.Ordinal))
-            {
-                if (assignedLambda)
-                {
-                    return false;
-                }
-
-                lambda = argument.Expression;
-                assignedLambda = true;
-                continue;
-            }
-
-            if (string.Equals(name, "cancellationToken", StringComparison.Ordinal))
-            {
-                if (assignedCancellation)
-                {
-                    return false;
-                }
-
-                assignedCancellation = true;
-                continue;
-            }
-
-            return false;
         }
 
-        return assignedCaptures && assignedLambda;
+        return state.TryGet(out captures, out lambda);
+    }
+
+    private static string CaptureArgumentName(ArgumentSyntax argument, int index)
+        => argument.NameColon?.Name.Identifier.ValueText ??
+           index switch
+           {
+               0 => "captures",
+               1 => "lambda",
+               _ => "cancellationToken"
+           };
+
+    private sealed class CaptureArgumentState
+    {
+        private ExpressionSyntax? _captures;
+        private ExpressionSyntax? _lambda;
+        private bool _assignedCancellation;
+
+        public bool TryAssign(string name, ExpressionSyntax expression)
+            => name switch
+            {
+                "captures" => TryAssignOnce(ref _captures, expression),
+                "lambda" => TryAssignOnce(ref _lambda, expression),
+                "cancellationToken" => TryAssignCancellation(),
+                _ => false
+            };
+
+        public bool TryGet(out ExpressionSyntax captures, out ExpressionSyntax lambda)
+        {
+            captures = _captures!;
+            lambda = _lambda!;
+            return _captures is not null && _lambda is not null;
+        }
+
+        private static bool TryAssignOnce(ref ExpressionSyntax? target, ExpressionSyntax expression)
+        {
+            if (target is not null)
+            {
+                return false;
+            }
+
+            target = expression;
+            return true;
+        }
+
+        private bool TryAssignCancellation()
+        {
+            if (_assignedCancellation)
+            {
+                return false;
+            }
+
+            _assignedCancellation = true;
+            return true;
+        }
     }
 }

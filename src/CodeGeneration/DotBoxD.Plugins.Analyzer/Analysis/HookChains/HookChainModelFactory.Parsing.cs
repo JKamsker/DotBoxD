@@ -6,25 +6,24 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
 internal static partial class HookChainModelFactory
 {
-    private static HookChainInterceptorInstallKind? InstallKind(
-        string terminalMethod,
-        HookChainReceiverKind? receiverKind,
-        GeneratedRemoteHookChainKind? generatedRemoteKind)
-        => terminalMethod switch
-        {
-            RunMethod => HookChainInterceptorInstallKind.GeneratedChain,
-            RunLocalMethod when receiverKind == HookChainReceiverKind.Remote || generatedRemoteKind is not null =>
-                HookChainInterceptorInstallKind.LocalCallback,
-            RegisterMethod when receiverKind is HookChainReceiverKind.Local or HookChainReceiverKind.Remote =>
-                HookChainInterceptorInstallKind.ResultChain,
-            RegisterMethod when generatedRemoteKind == GeneratedRemoteHookChainKind.Hook =>
-                HookChainInterceptorInstallKind.ResultChain,
-            RegisterLocalMethod when receiverKind is HookChainReceiverKind.Local or HookChainReceiverKind.Remote =>
-                HookChainInterceptorInstallKind.LocalResultChain,
-            RegisterLocalMethod when generatedRemoteKind == GeneratedRemoteHookChainKind.Hook =>
-                HookChainInterceptorInstallKind.LocalResultChain,
-            _ => null
-        };
+    private static readonly string[] RemoteReceiverOriginals =
+    [
+        DotBoxDGenerationNames.TypeNames.RemoteHookPipelineOriginal,
+        DotBoxDGenerationNames.TypeNames.RemoteHookPipelineWithContextOriginal,
+        DotBoxDGenerationNames.TypeNames.RemoteHookStageOriginal,
+        DotBoxDGenerationNames.TypeNames.RemoteHookStageWithContextOriginal,
+        DotBoxDGenerationNames.TypeNames.RemoteSubscriptionPipelineOriginal,
+        DotBoxDGenerationNames.TypeNames.RemoteSubscriptionPipelineWithContextOriginal,
+        DotBoxDGenerationNames.TypeNames.RemoteSubscriptionStageOriginal,
+        DotBoxDGenerationNames.TypeNames.RemoteSubscriptionStageWithContextOriginal
+    ];
+    private static readonly string[] LocalReceiverOriginals =
+    [
+        DotBoxDGenerationNames.TypeNames.HookPipelineWithContextOriginal,
+        DotBoxDGenerationNames.TypeNames.HookStageWithContextOriginal,
+        DotBoxDGenerationNames.TypeNames.SubscriptionPipelineWithContextOriginal,
+        DotBoxDGenerationNames.TypeNames.SubscriptionStageWithContextOriginal
+    ];
 
     private static InvocationExpressionSyntax? WalkToSeed(
         ExpressionSyntax receiver,
@@ -46,50 +45,84 @@ internal static partial class HookChainModelFactory
         }
 
         receiver = HookChainAliasResolver.UnwrapTransparentExpression(receiver);
-
         if (HookChainAliasResolver.Initializer(receiver, model, cancellationToken) is { } initializer)
         {
             return WalkToSeed(initializer, stages, model, cancellationToken, depth + 1);
         }
 
         var current = receiver;
-        while (true)
+        while (TryWalkStage(current, stages, model, cancellationToken, out var seed, out var next))
         {
-            current = HookChainAliasResolver.UnwrapTransparentExpression(current);
-            if (HookChainAliasResolver.Initializer(current, model, cancellationToken) is { } currentInitializer)
+            if (seed is not null)
             {
-                current = currentInitializer;
-                continue;
+                return seed;
             }
 
-            if (current is not InvocationExpressionSyntax invocation ||
-                invocation.Expression is not MemberAccessExpressionSyntax access)
-            {
-                return null;
-            }
-
-            var name = access.Name.Identifier.ValueText;
-            if (string.Equals(name, OnMethod, StringComparison.Ordinal))
-            {
-                return invocation;
-            }
-
-            var isSelect = string.Equals(name, SelectMethod, StringComparison.Ordinal);
-            if ((isSelect || string.Equals(name, WhereMethod, StringComparison.Ordinal)) &&
-                TryLambda(invocation, out var lambda))
-            {
-                if (IsResolvedNonDotBoxDStageMethodInvocation(invocation, model, cancellationToken))
-                {
-                    return null;
-                }
-
-                stages.Add(new HookChainStage(isSelect, lambda));
-                current = HookChainAliasResolver.UnwrapTransparentExpression(access.Expression);
-                continue;
-            }
-
-            return null;
+            current = next!;
         }
+
+        return null;
+    }
+
+    private static bool TryWalkStage(
+        ExpressionSyntax current,
+        List<HookChainStage> stages,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        out InvocationExpressionSyntax? seed,
+        out ExpressionSyntax? next)
+    {
+        seed = null;
+        next = null;
+        current = HookChainAliasResolver.UnwrapTransparentExpression(current);
+        if (HookChainAliasResolver.Initializer(current, model, cancellationToken) is { } currentInitializer)
+        {
+            next = currentInitializer;
+            return true;
+        }
+
+        if (current is not InvocationExpressionSyntax invocation ||
+            invocation.Expression is not MemberAccessExpressionSyntax access)
+        {
+            return false;
+        }
+
+        var name = access.Name.Identifier.ValueText;
+        if (string.Equals(name, OnMethod, StringComparison.Ordinal))
+        {
+            seed = invocation;
+            return true;
+        }
+
+        if (!TryStageKind(name, out var isSelect))
+        {
+            return false;
+        }
+
+        if (!TryLambda(invocation, out var lambda))
+        {
+            return false;
+        }
+
+        if (IsResolvedNonDotBoxDStageMethodInvocation(invocation, model, cancellationToken))
+        {
+            return false;
+        }
+
+        stages.Add(new HookChainStage(isSelect, lambda));
+        next = HookChainAliasResolver.UnwrapTransparentExpression(access.Expression);
+        return true;
+    }
+
+    private static bool TryStageKind(string name, out bool isSelect)
+    {
+        isSelect = string.Equals(name, SelectMethod, StringComparison.Ordinal);
+        if (isSelect)
+        {
+            return true;
+        }
+
+        return string.Equals(name, WhereMethod, StringComparison.Ordinal);
     }
 
     private static bool IsResolvedNonDotBoxDStageMethodInvocation(
@@ -115,27 +148,30 @@ internal static partial class HookChainModelFactory
     internal static HookChainReceiverKind? ReceiverKind(INamedTypeSymbol type)
     {
         var original = type.OriginalDefinition.ToDisplayString();
-        if (string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteHookPipelineOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteHookPipelineWithContextOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteHookStageOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteHookStageWithContextOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteSubscriptionPipelineOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteSubscriptionPipelineWithContextOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteSubscriptionStageOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteSubscriptionStageWithContextOriginal, StringComparison.Ordinal))
+        if (ContainsOriginal(RemoteReceiverOriginals, original))
         {
             return HookChainReceiverKind.Remote;
         }
 
-        if (string.Equals(original, DotBoxDGenerationNames.TypeNames.HookPipelineWithContextOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.HookStageWithContextOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.SubscriptionPipelineWithContextOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.SubscriptionStageWithContextOriginal, StringComparison.Ordinal))
+        if (ContainsOriginal(LocalReceiverOriginals, original))
         {
             return HookChainReceiverKind.Local;
         }
 
         return null;
+    }
+
+    private static bool ContainsOriginal(string[] candidates, string original)
+    {
+        foreach (var candidate in candidates)
+        {
+            if (string.Equals(candidate, original, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // Accepts both lambda forms a fluent stage can take: a parenthesized lambda (e), (e, ctx) or (),

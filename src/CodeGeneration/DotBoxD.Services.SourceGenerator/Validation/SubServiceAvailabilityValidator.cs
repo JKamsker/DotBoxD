@@ -90,88 +90,170 @@ internal static class SubServiceAvailabilityValidator
         RejectedServiceIndex rejectedServices,
         CancellationToken ct)
     {
-        if (result.Model is null)
+        var model = result.Model;
+        if (model is null)
         {
             return result;
         }
 
-        for (var i = 0; i < result.Model.Properties.Count; i++)
+        if (TryRejectUnavailableProperty(result, model, generatedServices, rejectedServices, ct, out var rejectedResult))
         {
-            ct.ThrowIfCancellationRequested();
-
-            var property = result.Model.Properties[i];
-            if (property.SubService is not null &&
-                IsUnavailable(property.SubService, generatedServices, rejectedServices, ct))
-            {
-                var reason =
-                    $"sub-service property '{IdentifierHelpers.UnescapeIdentifier(property.Name)}' cannot be proxied because that service was not generated";
-                return result with
-                {
-                    Model = null,
-                    MethodDiagnostics = EquatableArray<MethodDiagnostic>.Empty,
-                    MethodLocations = EquatableArray<DiagnosticLocation>.Empty,
-                    PropertyLocations = EquatableArray<DiagnosticLocation>.Empty,
-                    ServiceDiagnostic = new ServiceDiagnostic(
-                        GetDisplayName(result.Model),
-                        reason,
-                        GetLocation(result.PropertyLocations, i)),
-                };
-            }
+            return rejectedResult;
         }
 
-        var methods = new List<MethodModel>();
-        var diagnostics = new List<MethodDiagnostic>(result.MethodDiagnostics.Array);
-        var changed = false;
-        for (var i = 0; i < result.Model.Methods.Count; i++)
-        {
-            ct.ThrowIfCancellationRequested();
-
-            var method = result.Model.Methods[i];
-            if (method.UnsupportedReason is null &&
-                method.SubService is not null &&
-                IsUnavailable(method.SubService, generatedServices, rejectedServices, ct))
-            {
-                var reason =
-                    $"sub-service return type '{method.SubService.QualifiedInterfaceName}' cannot be proxied because that service was not generated";
-                method = method with { UnsupportedReason = reason };
-                diagnostics.Add(new MethodDiagnostic(
-                    GetDisplayName(result.Model),
-                    method.Name,
-                    reason,
-                    GetLocation(result.MethodLocations, i)));
-                changed = true;
-            }
-            else if (method.UnsupportedReason is null &&
-                method.SubService is not null &&
-                generatedServices.TryGetInstanceScopedSubServiceProperty(
-                    method.SubService.QualifiedInterfaceName,
-                    ct,
-                    out var propertyName))
-            {
-                var reason =
-                    $"sub-service return type '{method.SubService.QualifiedInterfaceName}' exposes sub-service property '{IdentifierHelpers.UnescapeIdentifier(propertyName)}' whose proxy would not be instance-scoped";
-                method = method with { UnsupportedReason = reason };
-                diagnostics.Add(new MethodDiagnostic(
-                    GetDisplayName(result.Model),
-                    method.Name,
-                    reason,
-                    GetLocation(result.MethodLocations, i)));
-                changed = true;
-            }
-
-            methods.Add(method);
-        }
-
-        if (!changed)
+        var methodUpdate = ApplyMethodAvailability(model, result.MethodLocations, result.MethodDiagnostics, generatedServices, rejectedServices, ct);
+        if (!methodUpdate.Changed)
         {
             return result;
         }
 
         return result with
         {
-            Model = result.Model with { Methods = methods.ToEquatableArray() },
-            MethodDiagnostics = diagnostics.ToEquatableArray(),
+            Model = model with { Methods = methodUpdate.Methods.ToEquatableArray() },
+            MethodDiagnostics = methodUpdate.Diagnostics.ToEquatableArray(),
         };
+    }
+
+    private static bool TryRejectUnavailableProperty(
+        ServiceResult result,
+        ServiceModel model,
+        GeneratedServiceIndex generatedServices,
+        RejectedServiceIndex rejectedServices,
+        CancellationToken ct,
+        out ServiceResult rejectedResult)
+    {
+        rejectedResult = default;
+        for (var i = 0; i < model.Properties.Count; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var property = model.Properties[i];
+            if (property.SubService is null)
+            {
+                continue;
+            }
+
+            if (IsUnavailable(property.SubService, generatedServices, rejectedServices, ct))
+            {
+                rejectedResult = RejectUnavailableProperty(result, model, property, i);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static ServiceResult RejectUnavailableProperty(
+        ServiceResult result,
+        ServiceModel model,
+        ServicePropertyModel property,
+        int propertyIndex)
+    {
+        var reason =
+            $"sub-service property '{IdentifierHelpers.UnescapeIdentifier(property.Name)}' cannot be proxied because that service was not generated";
+        return result with
+        {
+            Model = null,
+            MethodDiagnostics = EquatableArray<MethodDiagnostic>.Empty,
+            MethodLocations = EquatableArray<DiagnosticLocation>.Empty,
+            PropertyLocations = EquatableArray<DiagnosticLocation>.Empty,
+            ServiceDiagnostic = new ServiceDiagnostic(
+                GetDisplayName(model),
+                reason,
+                GetLocation(result.PropertyLocations, propertyIndex)),
+        };
+    }
+
+    private static (List<MethodModel> Methods, List<MethodDiagnostic> Diagnostics, bool Changed) ApplyMethodAvailability(
+        ServiceModel model,
+        EquatableArray<DiagnosticLocation> methodLocations,
+        EquatableArray<MethodDiagnostic> methodDiagnostics,
+        GeneratedServiceIndex generatedServices,
+        RejectedServiceIndex rejectedServices,
+        CancellationToken ct)
+    {
+        var methods = new List<MethodModel>();
+        var diagnostics = new List<MethodDiagnostic>(methodDiagnostics.Array);
+        var changed = false;
+        for (var i = 0; i < model.Methods.Count; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            var method = ApplyMethodAvailability(
+                model,
+                model.Methods[i],
+                methodLocations,
+                i,
+                generatedServices,
+                rejectedServices,
+                ct,
+                out var diagnostic);
+            if (diagnostic is { } methodDiagnostic)
+            {
+                diagnostics.Add(methodDiagnostic);
+                changed = true;
+            }
+
+            methods.Add(method);
+        }
+
+        return (methods, diagnostics, changed);
+    }
+
+    private static MethodModel ApplyMethodAvailability(
+        ServiceModel model,
+        MethodModel method,
+        EquatableArray<DiagnosticLocation> methodLocations,
+        int methodIndex,
+        GeneratedServiceIndex generatedServices,
+        RejectedServiceIndex rejectedServices,
+        CancellationToken ct,
+        out MethodDiagnostic? diagnostic)
+    {
+        diagnostic = null;
+        if (method.UnsupportedReason is not null)
+        {
+            return method;
+        }
+
+        if (method.SubService is null)
+        {
+            return method;
+        }
+
+        if (IsUnavailable(method.SubService, generatedServices, rejectedServices, ct))
+        {
+            var reason =
+                $"sub-service return type '{method.SubService.QualifiedInterfaceName}' cannot be proxied because that service was not generated";
+            return RejectMethod(model, method, methodLocations, methodIndex, reason, out diagnostic);
+        }
+
+        if (generatedServices.TryGetInstanceScopedSubServiceProperty(
+                method.SubService.QualifiedInterfaceName,
+                ct,
+                out var propertyName))
+        {
+            var reason =
+                $"sub-service return type '{method.SubService.QualifiedInterfaceName}' exposes sub-service property '{IdentifierHelpers.UnescapeIdentifier(propertyName)}' whose proxy would not be instance-scoped";
+            return RejectMethod(model, method, methodLocations, methodIndex, reason, out diagnostic);
+        }
+
+        return method;
+    }
+
+    private static MethodModel RejectMethod(
+        ServiceModel model,
+        MethodModel method,
+        EquatableArray<DiagnosticLocation> methodLocations,
+        int methodIndex,
+        string reason,
+        out MethodDiagnostic? diagnostic)
+    {
+        diagnostic = new MethodDiagnostic(
+            GetDisplayName(model),
+            method.Name,
+            reason,
+            GetLocation(methodLocations, methodIndex));
+        return method with { UnsupportedReason = reason };
     }
 
     private static DiagnosticLocation GetLocation(

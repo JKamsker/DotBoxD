@@ -38,7 +38,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return Call(binding.BindingId, null, args);
     }
 
-    private bool TryLowerServiceHandleLocal(string localName, ExpressionSyntax value, List<string> output)
+    internal bool TryLowerServiceHandleLocal(string localName, ExpressionSyntax value, List<string> output)
     {
         if (value is not InvocationExpressionSyntax invocation ||
             !TryGetServiceHandleAccessor(invocation, out var handleId, output))
@@ -56,14 +56,14 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return true;
     }
 
-    private void LowerServiceHandleScopedBlock(BlockSyntax block, List<string> output)
+    internal void LowerServiceHandleScopedBlock(BlockSyntax block, List<string> output)
     {
         var previous = new Dictionary<string, string>(_serviceHandleLocals, StringComparer.Ordinal);
         try
         {
             foreach (var inner in block.Statements)
             {
-                LowerStatement(inner, output);
+                RpcJsonStatementLowerer.LowerStatement(this, inner, output);
             }
         }
         finally

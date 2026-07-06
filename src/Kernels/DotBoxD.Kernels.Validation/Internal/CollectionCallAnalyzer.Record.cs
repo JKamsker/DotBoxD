@@ -105,7 +105,6 @@ internal sealed partial class CollectionCallAnalyzer
     }
 
     private static bool IsCollectionCall(string name)
-        => name is "list.empty" or "list.of" or "list.count" or "list.get" or "list.add"
-            or "map.empty" or "map.containsKey" or "map.get" or "map.set" or "map.remove"
-            or "record.new" or "record.get";
+        => SandboxCollectionFuel.IsCollectionIntrinsic(name) ||
+           name is "record.new" or "record.get";
 }
