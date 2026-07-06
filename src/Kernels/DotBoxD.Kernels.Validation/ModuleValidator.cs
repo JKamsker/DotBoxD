@@ -36,6 +36,7 @@ public sealed class ModuleValidator
 
         var diagnostics = new List<SandboxDiagnostic>();
         StructuralValidator.Validate(module, diagnostics, declaredOpaqueIdTypes);
+        ValidateCatalogBindingClassifications(bindings, diagnostics);
         if (diagnostics.Count > 0)
         {
             return ModuleValidationResult.Failure(diagnostics);
@@ -127,6 +128,46 @@ public sealed class ModuleValidator
 
     private static bool RequiresRuntimeAsync(BindingSignature binding)
         => binding.IsAsync || (binding.Effects & SandboxEffect.Concurrency) != 0;
+
+    private static void ValidateCatalogBindingClassifications(
+        IBindingCatalog bindings,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        foreach (var binding in bindings.Signatures)
+        {
+            if (!IsKnownAuditLevel(binding.AuditLevel))
+            {
+                diagnostics.Add(new SandboxDiagnostic("E-BINDING-AUDIT", $"binding '{binding.Id}' declares an unknown audit level"));
+            }
+
+            if (!IsKnownAuditKind(binding.AuditKind))
+            {
+                diagnostics.Add(new SandboxDiagnostic("E-BINDING-AUDIT", $"binding '{binding.Id}' declares an unknown audit kind"));
+            }
+
+            if (!IsKnownBindingSafety(binding.Safety))
+            {
+                diagnostics.Add(new SandboxDiagnostic("E-BINDING-SAFETY", $"binding '{binding.Id}' declares an unknown safety classification"));
+            }
+        }
+    }
+
+    private static bool IsKnownAuditLevel(AuditLevel auditLevel)
+        => auditLevel is AuditLevel.None or
+            AuditLevel.Summary or
+            AuditLevel.PerCall or
+            AuditLevel.PerResource or
+            AuditLevel.FullInputOutput;
+
+    private static bool IsKnownAuditKind(string? auditKind)
+        => auditKind is BindingAuditKinds.BindingCall or BindingAuditKinds.SandboxLog or BindingAuditKinds.PluginMessage;
+
+    private static bool IsKnownBindingSafety(BindingSafety safety)
+        => safety is BindingSafety.PureIntrinsic or
+            BindingSafety.PureHostFacade or
+            BindingSafety.ReadOnlyExternal or
+            BindingSafety.SideEffectingExternal or
+            BindingSafety.DangerousRequiresReview;
 
     private static bool HasNoErrors(IReadOnlyList<SandboxDiagnostic> diagnostics)
     {
