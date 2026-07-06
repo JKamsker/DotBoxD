@@ -34,22 +34,12 @@ internal static partial class BindingRegistryValidator
     private static void ValidateBindingClassifications(
         BindingDescriptor binding,
         List<SandboxDiagnostic> diagnostics)
-    {
-        if (!IsKnownAuditLevel(binding.AuditLevel))
-        {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-AUDIT", $"binding '{binding.Id}' declares an unknown audit level"));
-        }
-
-        if (!IsKnownAuditKind(binding.AuditKind))
-        {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-AUDIT", $"binding '{binding.Id}' declares an unknown audit kind"));
-        }
-
-        if (!IsKnownBindingSafety(binding.Safety))
-        {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-SAFETY", $"binding '{binding.Id}' declares an unknown safety classification"));
-        }
-    }
+        => BindingClassificationValidator.Validate(
+            binding.Id,
+            binding.AuditLevel,
+            binding.AuditKind,
+            binding.Safety,
+            diagnostics);
 
     private static void ValidateCapabilityRequirements(
         BindingDescriptor binding,

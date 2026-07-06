@@ -135,39 +135,14 @@ public sealed class ModuleValidator
     {
         foreach (var binding in bindings.Signatures)
         {
-            if (!IsKnownAuditLevel(binding.AuditLevel))
-            {
-                diagnostics.Add(new SandboxDiagnostic("E-BINDING-AUDIT", $"binding '{binding.Id}' declares an unknown audit level"));
-            }
-
-            if (!IsKnownAuditKind(binding.AuditKind))
-            {
-                diagnostics.Add(new SandboxDiagnostic("E-BINDING-AUDIT", $"binding '{binding.Id}' declares an unknown audit kind"));
-            }
-
-            if (!IsKnownBindingSafety(binding.Safety))
-            {
-                diagnostics.Add(new SandboxDiagnostic("E-BINDING-SAFETY", $"binding '{binding.Id}' declares an unknown safety classification"));
-            }
+            BindingClassificationValidator.Validate(
+                binding.Id,
+                binding.AuditLevel,
+                binding.AuditKind,
+                binding.Safety,
+                diagnostics);
         }
     }
-
-    private static bool IsKnownAuditLevel(AuditLevel auditLevel)
-        => auditLevel is AuditLevel.None or
-            AuditLevel.Summary or
-            AuditLevel.PerCall or
-            AuditLevel.PerResource or
-            AuditLevel.FullInputOutput;
-
-    private static bool IsKnownAuditKind(string? auditKind)
-        => auditKind is BindingAuditKinds.BindingCall or BindingAuditKinds.SandboxLog or BindingAuditKinds.PluginMessage;
-
-    private static bool IsKnownBindingSafety(BindingSafety safety)
-        => safety is BindingSafety.PureIntrinsic or
-            BindingSafety.PureHostFacade or
-            BindingSafety.ReadOnlyExternal or
-            BindingSafety.SideEffectingExternal or
-            BindingSafety.DangerousRequiresReview;
 
     private static bool HasNoErrors(IReadOnlyList<SandboxDiagnostic> diagnostics)
     {
