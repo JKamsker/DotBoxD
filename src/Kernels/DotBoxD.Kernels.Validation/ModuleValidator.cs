@@ -52,6 +52,7 @@ public sealed class ModuleValidator
             requiredEffects = RequiredEffects(module, functions);
             bindingReferences = BindingReferenceCollector.CollectByFunction(module, bindings);
             requiredCapabilities = RequiredCapabilities(module, bindings, bindingReferences);
+            ValidateCustomCapabilityGrantValidators(module, bindings, bindingReferences, diagnostics);
             PolicyResolver.Validate(module, bindings, policy, requiredEffects, requiredCapabilities, diagnostics);
         }
         catch (SandboxValidationException ex)
@@ -124,6 +125,42 @@ public sealed class ModuleValidator
 
         return required;
     }
+
+    private static void ValidateCustomCapabilityGrantValidators(
+        SandboxModule module,
+        IBindingCatalog bindings,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> bindingReferences,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        var checkedBindings = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var function in module.Functions)
+        {
+            if (!function.IsEntrypoint ||
+                !bindingReferences.TryGetValue(function.Id, out var references))
+            {
+                continue;
+            }
+
+            foreach (var bindingId in references)
+            {
+                if (!checkedBindings.Add(bindingId) ||
+                    !bindings.TryGet(bindingId, out var binding) ||
+                    binding.RequiredCapability is null ||
+                    IsBuiltInCapability(binding.RequiredCapability) ||
+                    bindings.TryGetCapabilityGrantValidator(binding.RequiredCapability, out _))
+                {
+                    continue;
+                }
+
+                diagnostics.Add(new SandboxDiagnostic(
+                    "E-BINDING-GRANT",
+                    $"binding '{binding.Id}' uses custom capability '{binding.RequiredCapability}' without a grant validator"));
+            }
+        }
+    }
+
+    private static bool IsBuiltInCapability(string capabilityId)
+        => capabilityId is "file.read" or "file.write" or "time.now" or "random" or "log.write";
 
     private static bool RequiresRuntimeAsync(BindingSignature binding)
         => binding.IsAsync || (binding.Effects & SandboxEffect.Concurrency) != 0;

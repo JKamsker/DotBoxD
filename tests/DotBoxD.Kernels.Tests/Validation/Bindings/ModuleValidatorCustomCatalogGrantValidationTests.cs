@@ -35,6 +35,18 @@ public sealed class ModuleValidatorCustomCatalogGrantValidationTests
         Assert.Contains(ex.Diagnostics, diagnostic => diagnostic.Code == "E-BINDING-GRANT");
     }
 
+    [Fact]
+    public void ModuleValidator_accepts_custom_catalog_capability_with_grant_validator()
+    {
+        var binding = CustomBindingSignature();
+        var catalog = new CustomCatalog(binding, static (_, _) => { });
+        var policy = CustomGrantPolicy();
+
+        var result = new ModuleValidator().Validate(ModuleCallingCustomBinding(), catalog, policy);
+
+        Assert.True(result.Succeeded, string.Join(", ", result.Diagnostics.Select(d => $"{d.Code}: {d.Message}")));
+    }
+
     private static BindingSignature CustomBindingSignature()
         => new(
             BindingId,
@@ -97,7 +109,9 @@ public sealed class ModuleValidatorCustomCatalogGrantValidationTests
             ],
             new Dictionary<string, string>());
 
-    private sealed class CustomCatalog(BindingSignature binding) : IBindingCatalog
+    private sealed class CustomCatalog(
+        BindingSignature binding,
+        CapabilityGrantValidator? grantValidator = null) : IBindingCatalog
     {
         private readonly BindingSignature[] _signatures = [binding];
 
@@ -121,6 +135,13 @@ public sealed class ModuleValidatorCustomCatalogGrantValidationTests
 
         public bool TryGetCapabilityGrantValidator(string capabilityId, out CapabilityGrantValidator validator)
         {
+            if (string.Equals(capabilityId, CapabilityId, StringComparison.Ordinal) &&
+                grantValidator is not null)
+            {
+                validator = grantValidator;
+                return true;
+            }
+
             validator = default!;
             return false;
         }
