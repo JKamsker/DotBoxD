@@ -37,6 +37,7 @@ internal static class AsyncInterfaceGenerator
         sb.AppendLine($"    /// Auto-generated async sibling of <see cref=\"{service.InterfaceName}\"/>. Use this");
         sb.AppendLine($"    /// interface from callers that must not block on RPC calls.");
         sb.AppendLine("    /// </summary>");
+        AppendTypeObsoleteAttribute(sb, service);
         sb.AppendLine($"    public interface {IdentifierHelpers.EscapeIdentifier(siblingName)}");
         sb.AppendLine("    {");
 
@@ -65,6 +66,14 @@ internal static class AsyncInterfaceGenerator
         }
 
         return sb.ToString();
+    }
+
+    private static void AppendTypeObsoleteAttribute(StringBuilder sb, ServiceModel service)
+    {
+        if (service.ObsoleteAttribute.Length > 0)
+        {
+            sb.Append("    ").AppendLine(service.ObsoleteAttribute);
+        }
     }
 
     private static void EmitSignature(

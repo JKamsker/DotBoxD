@@ -145,7 +145,8 @@ internal static partial class ServiceModelFactory
                 ServiceName: LiteralHelpers.EscapeStringLiteral(serviceName),
                 Methods: methods.ToEquatableArray(),
                 Properties: properties.ToEquatableArray(),
-                RawServiceName: serviceName),
+                RawServiceName: serviceName,
+                ObsoleteAttribute: BuildObsoleteAttribute(interfaceSymbol, ct)),
             Error: null,
             MethodDiagnostics: methodDiagnostics.ToEquatableArray(),
             MethodLocations: methodLocations.ToEquatableArray(),
@@ -184,6 +185,20 @@ internal static partial class ServiceModelFactory
         }
 
         return null;
+    }
+
+    private static string BuildObsoleteAttribute(INamedTypeSymbol interfaceSymbol, CancellationToken ct)
+    {
+        foreach (var attr in interfaceSymbol.GetAttributes())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (attr.AttributeClass?.ToDisplayString() == "System.ObsoleteAttribute")
+            {
+                return ObsoleteAttributeFormatter.Format(attr);
+            }
+        }
+
+        return string.Empty;
     }
 
     private static string GetNamespace(INamespaceSymbol namespaceSymbol)
