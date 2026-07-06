@@ -8,11 +8,11 @@ namespace DotBoxD.Services.Tests.Coverage.Core;
 public sealed partial class DiagnosticsErrorsCoverageTests
 {
     [Fact]
-    public void DotBoxDMethodAttribute_AppliedToMethod_IsDiscoverableViaReflection()
+    public void RpcMethodAttribute_AppliedToMethod_IsDiscoverableViaReflection()
     {
         var method = typeof(IDecoratedService).GetMethod(nameof(IDecoratedService.RenamedAsync))!;
-        var attribute = method.GetCustomAttributes(typeof(DotBoxDMethodAttribute), false)
-            .Cast<DotBoxDMethodAttribute>()
+        var attribute = method.GetCustomAttributes(typeof(RpcMethodAttribute), false)
+            .Cast<RpcMethodAttribute>()
             .Single();
 
         Assert.Equal("WireMethod", attribute.Name);

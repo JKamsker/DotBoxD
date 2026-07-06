@@ -14,13 +14,13 @@ public sealed class DispatcherSubServiceReleaseFailureTests
 
         namespace Coverage.SubServiceReleaseFailure
         {
-            [DotBoxDService]
+            [RpcService]
             public interface ISubService
             {
                 Task<int> CountAsync();
             }
 
-            [DotBoxDService]
+            [RpcService]
             public interface IRootService
             {
                 Task<ISubService> GetSubAsync(string label);

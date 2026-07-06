@@ -24,10 +24,19 @@ public static class ResourceLimitValidation
         ThrowIfNegative(limits.MaxLogMessageLength, nameof(ResourceLimits.MaxLogMessageLength));
         ThrowIfNegative(limits.MaxStringLength, nameof(ResourceLimits.MaxStringLength));
         ThrowIfNegative(limits.MaxTotalStringBytes, nameof(ResourceLimits.MaxTotalStringBytes));
-        if (limits.MaxWallTime is not null &&
-            (limits.MaxWallTime.Value < TimeSpan.Zero || limits.MaxWallTime.Value > MaxSupportedWallTime))
+        if (limits.MaxWallTime is { } wallTime)
         {
-            throw new ArgumentOutOfRangeException(nameof(ResourceLimits.MaxWallTime));
+            if (wallTime < TimeSpan.Zero)
+            {
+                throw ResourceLimitValidationReasons.NonNegative(nameof(ResourceLimits.MaxWallTime));
+            }
+
+            if (wallTime > MaxSupportedWallTime)
+            {
+                throw ResourceLimitValidationReasons.OutOfRange(
+                    nameof(ResourceLimits.MaxWallTime),
+                    $"must be within the supported range from {TimeSpan.Zero:c} through {MaxSupportedWallTime:c}");
+            }
         }
     }
 
@@ -35,7 +44,25 @@ public static class ResourceLimitValidation
     {
         if (value < 0)
         {
-            throw new ArgumentOutOfRangeException(paramName);
+            throw ResourceLimitValidationReasons.NonNegative(paramName);
         }
+    }
+}
+
+internal static class ResourceLimitValidationReasons
+{
+    private const string ReasonKey = "DotBoxD.Kernels.Model.ResourceLimitValidationReason";
+
+    public static string? GetReason(ArgumentOutOfRangeException exception)
+        => exception.Data[ReasonKey] as string;
+
+    public static ArgumentOutOfRangeException NonNegative(string paramName)
+        => OutOfRange(paramName, "must be non-negative");
+
+    public static ArgumentOutOfRangeException OutOfRange(string paramName, string reason)
+    {
+        var exception = new ArgumentOutOfRangeException(paramName, reason);
+        exception.Data[ReasonKey] = reason;
+        return exception;
     }
 }

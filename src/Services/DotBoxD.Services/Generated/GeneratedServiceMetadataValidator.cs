@@ -46,6 +46,12 @@ internal static class GeneratedServiceMetadataValidator
         {
             throw new ArgumentException("Generated service metadata must include a dispatcher type.", paramName);
         }
+        if (!service.ServiceType.IsInterface)
+        {
+            throw new ArgumentException(
+                $"Generated service metadata service type must be an interface. Received {FormatType(service.ServiceType)}.",
+                paramName);
+        }
         if (string.IsNullOrEmpty(service.ServiceName))
         {
             throw new ArgumentException("Generated service metadata must include a service name.", paramName);

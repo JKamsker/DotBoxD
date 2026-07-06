@@ -64,10 +64,16 @@ public sealed partial class InstalledKernel
         cancellationToken.ThrowIfCancellationRequested();
         var rpcArguments = KernelRpcBinaryCodec.DecodeArguments(arguments);
         var callerCount = _rpcCallerArgumentCount;
-        if (callerCount < 0 || rpcArguments.Length != callerCount)
+        if (callerCount < 0)
         {
-            throw new InvalidOperationException(
-                $"Server extension '{Manifest.PluginId}' expects {callerCount} argument(s) but received {rpcArguments.Length}.");
+            throw new SandboxRuntimeException(new SandboxError(
+                SandboxErrorCode.ValidationError,
+                "server extension entrypoint declares fewer parameters than live settings"));
+        }
+
+        if (rpcArguments.Length != callerCount)
+        {
+            throw RpcArgumentCountMismatch(function.Id, callerCount, rpcArguments.Length);
         }
 
         var sandboxArguments = rpcArguments.Length == 0
@@ -110,9 +116,7 @@ public sealed partial class InstalledKernel
 
         if (arguments.Count != callerCount)
         {
-            throw new SandboxRuntimeException(new SandboxError(
-                SandboxErrorCode.InvalidInput,
-                $"server extension entrypoint '{entrypoint}' expects {callerCount} argument(s) but received {arguments.Count}"));
+            throw RpcArgumentCountMismatch(entrypoint, callerCount, arguments.Count);
         }
 
         if (function.Parameters.Count == 0)
@@ -161,4 +165,9 @@ public sealed partial class InstalledKernel
         => new(new SandboxError(
             SandboxErrorCode.ValidationError,
             $"server extension entrypoint '{entrypoint}' was not found"));
+
+    private static SandboxRuntimeException RpcArgumentCountMismatch(string entrypoint, int expected, int actual)
+        => new(new SandboxError(
+            SandboxErrorCode.InvalidInput,
+            $"server extension entrypoint '{entrypoint}' expects {expected} argument(s) but received {actual}"));
 }

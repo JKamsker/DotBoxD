@@ -1,4 +1,63 @@
 {
   "minimumLineCoverage": 80,
-  "_comment": "Minimum line coverage (percent) over DotBoxD shipping assemblies (src/), enforced by eng/scripts/check-coverage.ps1 across the Kernels and Services test suites. Measured baseline at adoption: ~84.4%. Raise toward the current value to ratchet coverage up."
+  "minimumBranchCoverage": 70,
+  "areas": [
+    {
+      "name": "Kernels",
+      "packagePatterns": [ "DotBoxD.Kernels*" ],
+      "minimumLineCoverage": 82,
+      "minimumBranchCoverage": 74
+    },
+    {
+      "name": "Services",
+      "packagePatterns": [ "DotBoxD.Services" ],
+      "minimumLineCoverage": 80,
+      "minimumBranchCoverage": 78
+    },
+    {
+      "name": "Channels and transports",
+      "packagePatterns": [ "DotBoxD.Codecs.MessagePack", "DotBoxD.Transports.*" ],
+      "minimumLineCoverage": 85,
+      "minimumBranchCoverage": 78
+    },
+    {
+      "name": "Code generation",
+      "packagePatterns": [ "DotBoxD.Plugins.Analyzer", "DotBoxD.Services.SourceGenerator", "DotBoxD.Plugins.Fody" ],
+      "minimumLineCoverage": 80,
+      "minimumBranchCoverage": 70
+    },
+    {
+      "name": "Hosting and pushdown",
+      "packagePatterns": [ "DotBoxD.Abstractions", "DotBoxD.Hosting*", "DotBoxD.Plugins", "DotBoxD.Queryable", "DotBoxD.Pushdown.Services" ],
+      "minimumLineCoverage": 75,
+      "minimumBranchCoverage": 72
+    }
+  ],
+  "criticalAreas": [
+    {
+      "name": "Critical verifier",
+      "packagePatterns": [ "DotBoxD.Kernels.Verifier" ],
+      "minimumLineCoverage": 88,
+      "minimumBranchCoverage": 80
+    },
+    {
+      "name": "Critical runtime",
+      "packagePatterns": [ "DotBoxD.Kernels.Runtime" ],
+      "minimumLineCoverage": 75,
+      "minimumBranchCoverage": 62
+    },
+    {
+      "name": "Critical validation",
+      "packagePatterns": [ "DotBoxD.Kernels.Validation" ],
+      "minimumLineCoverage": 85,
+      "minimumBranchCoverage": 82
+    },
+    {
+      "name": "Critical services",
+      "packagePatterns": [ "DotBoxD.Services" ],
+      "minimumLineCoverage": 82,
+      "minimumBranchCoverage": 80
+    }
+  ],
+  "_comment": "Coverage thresholds are conservative ratchets over shipping DotBoxD assemblies (src/) using merged Cobertura reports from the Kernels and Services coverage suites. Measured local baseline on 2026-07-05: global line 85.15%, global branch 77.80%; area baselines are intentionally rounded down so normal noise does not fail unrelated PRs. Raise thresholds toward the current values as tests improve."
 }

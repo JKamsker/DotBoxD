@@ -22,7 +22,7 @@ public sealed class InheritedDefaultValueConflictTests
                     int Count(int value = 2);
                 }
 
-                [DotBoxDService]
+                [RpcService]
                 public interface ICombined : ILeft, IRight
                 {
                 }
