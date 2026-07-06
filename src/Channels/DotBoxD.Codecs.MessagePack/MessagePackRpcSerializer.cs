@@ -100,6 +100,11 @@ public sealed class MessagePackRpcSerializer : ISerializer
     {
         try
         {
+            if (ConstructorReplayGuard.TrySerialize(writer, value, _options))
+            {
+                return;
+            }
+
             MessagePackSerializer.Serialize(writer, value, _options);
         }
         catch (MessagePackSerializationException ex)
