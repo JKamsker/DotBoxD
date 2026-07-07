@@ -36,6 +36,7 @@ public sealed class ModuleValidator
 
         var diagnostics = new List<SandboxDiagnostic>();
         StructuralValidator.Validate(module, diagnostics, declaredOpaqueIdTypes);
+        ValidateBindingCatalog(bindings, diagnostics);
         if (diagnostics.Count > 0)
         {
             return ModuleValidationResult.Failure(diagnostics);
@@ -127,6 +128,24 @@ public sealed class ModuleValidator
 
     private static bool RequiresRuntimeAsync(BindingSignature binding)
         => binding.IsAsync || (binding.Effects & SandboxEffect.Concurrency) != 0;
+
+    private static void ValidateBindingCatalog(IBindingCatalog bindings, List<SandboxDiagnostic> diagnostics)
+    {
+        var signatures = bindings.Signatures;
+        for (var i = 0; i < signatures.Count; i++)
+        {
+            ValidateCostModel(signatures[i], diagnostics);
+        }
+    }
+
+    private static void ValidateCostModel(BindingSignature binding, List<SandboxDiagnostic> diagnostics)
+    {
+        var cost = binding.CostModel;
+        if (cost.BaseFuel < 0 || cost.PerByteFuel < 0 || cost.MaxCallsPerRun is < 0)
+        {
+            diagnostics.Add(new SandboxDiagnostic("E-BINDING-COST", $"binding '{binding.Id}' declares a negative resource cost or call limit"));
+        }
+    }
 
     private static bool HasNoErrors(IReadOnlyList<SandboxDiagnostic> diagnostics)
     {

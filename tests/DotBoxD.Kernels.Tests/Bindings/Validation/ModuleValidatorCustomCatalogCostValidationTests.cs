@@ -68,20 +68,21 @@ public sealed class ModuleValidatorCustomCatalogCostValidationTests
                 nameof(CompiledRuntime.CallBinding)));
 
     private static BindingDescriptor Descriptor(BindingCostModel costModel)
-        => new(
-            BindingId,
-            SemVersion.One,
-            [],
-            SandboxType.Unit,
-            SandboxEffect.Cpu,
-            null,
-            costModel,
-            AuditLevel.None,
-            BindingSafety.PureHostFacade,
+    {
+        var signature = Signature(costModel);
+        return new BindingDescriptor(
+            signature.Id,
+            signature.Version,
+            signature.Parameters,
+            signature.ReturnType,
+            signature.Effects,
+            signature.RequiredCapability,
+            signature.CostModel,
+            signature.AuditLevel,
+            signature.Safety,
             (_, _, _) => ValueTask.FromResult(SandboxValue.Unit),
-            CompiledBinding.RuntimeStub(
-                typeof(CompiledRuntime).FullName!,
-                nameof(CompiledRuntime.CallBinding)));
+            signature.Compiled);
+    }
 
     private sealed class CustomCatalog(BindingSignature signature) : IBindingCatalog
     {
