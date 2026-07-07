@@ -90,6 +90,53 @@ public sealed class ServiceTypeObsoleteAttributeTests
         runResult.Results.Single().GeneratedSources.Should().BeEmpty();
     }
 
+    [Fact]
+    public void ObsoleteServiceInterface_PreservesDiagnosticMetadataOnGeneratedPublicTypes()
+    {
+        const string source = """
+            using DotBoxD.Services.Attributes;
+            using System;
+            using System.Threading.Tasks;
+
+            namespace Regress.ServiceTypeObsolete
+            {
+                [RpcService]
+                [Obsolete("Use INew", DiagnosticId = "DBXS999", UrlFormat = "https://example.test/obsolete")]
+                public interface ILegacy
+                {
+                    Task PingAsync();
+                }
+            }
+            """;
+
+        var compilation = GeneratorTestHelper.CreateCompilation(source);
+        var driver = GeneratorTestHelper.CreateDriver().RunGenerators(compilation);
+        var generated = driver.GetRunResult().Results.Single().GeneratedSources;
+
+        var proxy = generated.Single(g => g.HintName == GeneratorTestHelper.HintName(
+            "Regress.ServiceTypeObsolete",
+            "ILegacy",
+            GeneratorTestHelper.GeneratedKind.Proxy));
+        var asyncSibling = generated.Single(g => g.HintName == GeneratorTestHelper.HintName(
+            "Regress.ServiceTypeObsolete",
+            "ILegacy",
+            GeneratorTestHelper.GeneratedKind.Async));
+        const string expected =
+            "[global::System.ObsoleteAttribute(\"Use INew\", DiagnosticId = \"DBXS999\", UrlFormat = \"https://example.test/obsolete\")]";
+
+        using (new AssertionScope())
+        {
+            AssertTypeHasAttribute(
+                proxy.SourceText.ToString(),
+                "public sealed class LegacyProxy : global::Regress.ServiceTypeObsolete.ILegacy, global::Regress.ServiceTypeObsolete.ILegacyAsync",
+                expected);
+            AssertTypeHasAttribute(
+                asyncSibling.SourceText.ToString(),
+                "public interface ILegacyAsync",
+                expected);
+        }
+    }
+
     private static void AssertTypeHasObsoleteAttribute(string source, string declaration, string message)
     {
         var declarationIndex = source.IndexOf(declaration, StringComparison.Ordinal);
@@ -98,6 +145,16 @@ public sealed class ServiceTypeObsoleteAttributeTests
         var declarationLineStart = FindLineStart(source, declarationIndex);
         var previousLine = GetPreviousLine(source, declarationLineStart);
         previousLine.Should().Be($"[global::System.ObsoleteAttribute(\"{message}\")]");
+    }
+
+    private static void AssertTypeHasAttribute(string source, string declaration, string expected)
+    {
+        var declarationIndex = source.IndexOf(declaration, StringComparison.Ordinal);
+        declarationIndex.Should().BeGreaterThanOrEqualTo(0);
+
+        var declarationLineStart = FindLineStart(source, declarationIndex);
+        var previousLine = GetPreviousLine(source, declarationLineStart);
+        previousLine.Should().Be(expected);
     }
 
     private static int FindLineStart(string source, int index)
