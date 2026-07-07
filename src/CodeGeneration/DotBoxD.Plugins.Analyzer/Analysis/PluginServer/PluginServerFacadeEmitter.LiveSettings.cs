@@ -36,6 +36,8 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("            {");
         builder.AppendLine("                _owner.RecordLiveSettingValue(_pluginId, value.Name, value.Value);");
         builder.AppendLine("            }");
+        builder.AppendLine("            _updates.Clear();");
+        builder.AppendLine("            _pendingValues.Clear();");
         builder.AppendLine("        }");
         builder.AppendLine("        public async global::System.Threading.Tasks.ValueTask SetValuesAsync(global::System.Action<TKernel> set, bool atomic = false)");
         builder.AppendLine("        {");
@@ -49,7 +51,7 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("            {");
         builder.AppendLine("                if (currentValues.TryGetValue(property.Name, out var currentValue))");
         builder.AppendLine("                {");
-        builder.AppendLine("                    property.SetValue(draft, currentValue);");
+        builder.AppendLine("                    property.SetValue(draft, CoerceLiveSettingValue(property, currentValue));");
         builder.AppendLine("                }");
         builder.AppendLine("            }");
         builder.AppendLine("            var nonLiveValues = properties");
@@ -78,7 +80,7 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("            var changedValues = properties");
         builder.AppendLine("                .Where(static p => IsLiveSetting(p))");
         builder.AppendLine("                .Select(p => new { Property = p, Value = p.GetValue(draft) })");
-        builder.AppendLine("                .Where(entry => !currentValues.TryGetValue(entry.Property.Name, out var currentValue) || !global::System.Object.Equals(currentValue, entry.Value))");
+        builder.AppendLine("                .Where(entry => !currentValues.TryGetValue(entry.Property.Name, out var currentValue) || !global::System.Object.Equals(CoerceLiveSettingValue(entry.Property, currentValue), entry.Value))");
         builder.AppendLine("                .ToArray();");
         builder.AppendLine("            var updates = changedValues");
         builder.AppendLine("                .Select(entry => new " + model.LiveSettingUpdateType + "(entry.Property.Name, global::System.Convert.ToString(entry.Value, global::System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty))");
@@ -95,6 +97,17 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("            => property.GetCustomAttributes(inherit: true).Any(static attribute => string.Equals(attribute.GetType().FullName, \"System.Runtime.CompilerServices.RequiredMemberAttribute\", global::System.StringComparison.Ordinal));");
         builder.AppendLine("        private static bool CanObserveMissingRequiredValue(global::System.Reflection.PropertyInfo property)");
         builder.AppendLine("            => !property.PropertyType.IsValueType || global::System.Nullable.GetUnderlyingType(property.PropertyType) is not null;");
+        builder.AppendLine("        private static object? CoerceLiveSettingValue(global::System.Reflection.PropertyInfo property, object? value)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            if (value is null)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return null;");
+        builder.AppendLine("            }");
+        builder.AppendLine("            var targetType = global::System.Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;");
+        builder.AppendLine("            return targetType.IsInstanceOfType(value)");
+        builder.AppendLine("                ? value");
+        builder.AppendLine("                : global::System.Convert.ChangeType(value, targetType, global::System.Globalization.CultureInfo.InvariantCulture);");
+        builder.AppendLine("        }");
         builder.AppendLine("    }");
     }
 }

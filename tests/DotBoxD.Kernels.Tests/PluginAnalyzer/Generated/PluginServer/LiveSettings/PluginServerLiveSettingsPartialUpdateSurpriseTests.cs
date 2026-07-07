@@ -8,17 +8,30 @@ public sealed class PluginServerLiveSettingsPartialUpdateSurpriseTests
     [Fact]
     public async Task Generated_SetValuesAsync_sends_only_live_settings_written_by_callback()
     {
+        var secondBatch = await RunProbeAsync("RunAsync");
+
+        Assert.Equal(["AggroRange=6"], secondBatch);
+    }
+
+    [Fact]
+    public async Task Generated_live_settings_handle_reuse_sends_only_current_batch()
+    {
+        var secondBatch = await RunProbeAsync("RunReusedHandleAsync");
+
+        Assert.Equal(["AggroRange=7"], secondBatch);
+    }
+
+    private static async Task<string[]> RunProbeAsync(string methodName)
+    {
         var (_, outputCompilation) = PluginServerGenerationTestDriver.Run(Source);
         PluginServerGenerationTestDriver.AssertNoCompilationErrors(outputCompilation);
 
         var assembly = Load(outputCompilation);
         var probe = assembly.GetType("Sample.Plugin.LiveSettingsPartialUpdateProbe", throwOnError: true)!;
-        var runAsync = probe.GetMethod("RunAsync", BindingFlags.Public | BindingFlags.Static)!;
+        var runAsync = probe.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static)!;
 
         var task = Assert.IsAssignableFrom<Task<string[]>>(runAsync.Invoke(null, null));
-        var secondBatch = await task;
-
-        Assert.Equal(["AggroRange=6"], secondBatch);
+        return await task;
     }
 
     private static Assembly Load(Compilation compilation)
@@ -150,6 +163,24 @@ public sealed class PluginServerLiveSettingsPartialUpdateSurpriseTests
                     await server.StartAsync();
                     await server.Get<GuardianKernel>().Set(kernel => kernel.CalmStrength, 35).ApplyAsync();
                     await server.Get<GuardianKernel>().SetValuesAsync(kernel => kernel.AggroRange = 6);
+
+                    return control.Batches[1]
+                        .Select(static update => update.Name + "=" + update.Value)
+                        .ToArray();
+                }
+
+                public static async Task<string[]> RunReusedHandleAsync()
+                {
+                    var control = new RecordingControl();
+                    var server = new RemotePluginServer(
+                        control,
+                        null,
+                        setup => setup.Replace<IEventKernel<DamageEvent>, GuardianKernel>());
+
+                    await server.StartAsync();
+                    var handle = server.Get<GuardianKernel>();
+                    await handle.Set(kernel => kernel.CalmStrength, 35).ApplyAsync();
+                    await handle.Set(kernel => kernel.AggroRange, 7).ApplyAsync();
 
                     return control.Batches[1]
                         .Select(static update => update.Name + "=" + update.Value)
