@@ -136,6 +136,11 @@ internal sealed partial class FunctionAnalyzer
 
         if (_bindings.TryGet(call.Name, out var binding))
         {
+            if (!BindingSignatureIdentityValidator.ValidateResolved(call.Name, binding, _diagnostics, call.Span))
+            {
+                return SandboxType.Unit;
+            }
+
             CheckArguments(call, binding.Parameters, scope, ref effects, ref canReorder);
             effects |= binding.Effects;
             if (binding.IsAsync)
