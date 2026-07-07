@@ -238,18 +238,15 @@ public static partial class KernelRpcMarshaller
         }
     }
 
-    // A member marked [IgnoreDataMember] (System.Runtime.Serialization) is non-wire — a lazily-resolved or
-    // computed member, not serialized data — so it is excluded from the marshalled record shape, matching the
-    // analyzer (DotBoxDRpcTypeMapper.IsIgnoredDataMember) and the convention event adapter so all three readers
-    // agree on the wire field set. Matched by name via GetCustomAttributesData so the attribute need not load.
+    // A member marked with a known serializer ignore attribute is non-wire: lazily-resolved or computed
+    // state, not serialized data. Exclude it from the marshalled record shape so the analyzer, convention
+    // event adapter, and record decoder agree on the wire field set. Matched by name via
+    // GetCustomAttributesData so the attribute need not load.
     internal static bool IsIgnoredMember(MemberInfo member)
     {
         foreach (var attribute in member.GetCustomAttributesData())
         {
-            if (string.Equals(
-                    attribute.AttributeType.FullName,
-                    "System.Runtime.Serialization.IgnoreDataMemberAttribute",
-                    StringComparison.Ordinal))
+            if (IsIgnoreAttribute(attribute.AttributeType.FullName))
             {
                 return true;
             }
@@ -257,6 +254,12 @@ public static partial class KernelRpcMarshaller
 
         return false;
     }
+
+    private static bool IsIgnoreAttribute(string? typeName) =>
+        typeName is "System.Runtime.Serialization.IgnoreDataMemberAttribute"
+            or "System.Text.Json.Serialization.JsonIgnoreAttribute"
+            or "MessagePack.IgnoreMemberAttribute";
+
     private readonly record struct OptionalType(Type? Value);
 
     private readonly record struct OptionalMapTypes((Type Key, Type Value)? Value);

@@ -89,7 +89,7 @@ internal sealed class ConventionEventAdapter<TEvent> : IPluginEventAdapter<TEven
             Array.Sort(properties, static (left, right) => left.MetadataToken.CompareTo(right.MetadataToken));
             foreach (var property in properties)
             {
-                // Skip [IgnoreDataMember] non-wire members (e.g. a lazily-resolved context snapshot): they are
+                // Skip serializer-ignored non-wire members (e.g. a lazily-resolved context snapshot): they are
                 // not serialized data, so excluding them here keeps the pushed whole-event record's fields in
                 // lockstep with the analyzer's kernel parameters and the decode-side GetRecordShape.
                 if (property.GetMethod?.IsPublic == true && property.GetIndexParameters().Length == 0 &&

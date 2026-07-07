@@ -11,6 +11,13 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 /// </summary>
 internal static partial class DotBoxDRpcTypeMapper
 {
+    private const string IgnoreDataMemberAttribute =
+        "System.Runtime.Serialization.IgnoreDataMemberAttribute";
+    private const string JsonIgnoreAttribute =
+        "System.Text.Json.Serialization.JsonIgnoreAttribute";
+    private const string MessagePackIgnoreMemberAttribute =
+        "MessagePack.IgnoreMemberAttribute";
+
     public static string JsonType(ITypeSymbol type, Compilation compilation)
         => RpcJsonTypeResolver.Resolve(type, compilation);
 
@@ -134,18 +141,14 @@ internal static partial class DotBoxDRpcTypeMapper
         return members;
     }
 
-    /// <summary>True when <paramref name="member"/> is marked <c>[IgnoreDataMember]</c>.
+    /// <summary>True when <paramref name="member"/> is marked with a known serializer ignore attribute.
     /// Such a member is non-wire, so the analyzer, convention adapter, and record decoder all exclude it from
     /// the marshalled field set.</summary>
     public static bool IsIgnoredDataMember(ISymbol member)
     {
         foreach (var attribute in member.GetAttributes())
         {
-            if (attribute.AttributeClass is { } attributeClass &&
-                string.Equals(
-                    attributeClass.ToDisplayString(),
-                    "System.Runtime.Serialization.IgnoreDataMemberAttribute",
-                    StringComparison.Ordinal))
+            if (IsIgnoreAttribute(attribute.AttributeClass?.ToDisplayString()))
             {
                 return true;
             }
@@ -153,4 +156,9 @@ internal static partial class DotBoxDRpcTypeMapper
 
         return false;
     }
+
+    private static bool IsIgnoreAttribute(string? typeName) =>
+        typeName is IgnoreDataMemberAttribute
+            or JsonIgnoreAttribute
+            or MessagePackIgnoreMemberAttribute;
 }
