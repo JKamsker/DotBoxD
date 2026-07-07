@@ -36,6 +36,7 @@ public sealed class ModuleValidator
 
         var diagnostics = new List<SandboxDiagnostic>();
         StructuralValidator.Validate(module, diagnostics, declaredOpaqueIdTypes);
+        ValidateCatalogBindingClassifications(bindings, diagnostics);
         if (diagnostics.Count > 0)
         {
             return ModuleValidationResult.Failure(diagnostics);
@@ -227,6 +228,21 @@ public sealed class ModuleValidator
 
     private static bool RequiresRuntimeAsync(BindingSignature binding)
         => binding.IsAsync || (binding.Effects & SandboxEffect.Concurrency) != 0;
+
+    private static void ValidateCatalogBindingClassifications(
+        IBindingCatalog bindings,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        foreach (var binding in bindings.Signatures)
+        {
+            BindingClassificationValidator.Validate(
+                binding.Id,
+                binding.AuditLevel,
+                binding.AuditKind,
+                binding.Safety,
+                diagnostics);
+        }
+    }
 
     private static bool HasNoErrors(IReadOnlyList<SandboxDiagnostic> diagnostics)
     {

@@ -194,23 +194,6 @@ internal static class BindingRegistryValidator
     private static bool IsExternal(BindingSafety safety)
         => safety is BindingSafety.ReadOnlyExternal or BindingSafety.SideEffectingExternal;
 
-    internal static bool IsKnownAuditLevel(AuditLevel auditLevel)
-        => auditLevel is AuditLevel.None or
-            AuditLevel.Summary or
-            AuditLevel.PerCall or
-            AuditLevel.PerResource or
-            AuditLevel.FullInputOutput;
-
-    internal static bool IsKnownAuditKind(string auditKind)
-        => auditKind is BindingAuditKinds.BindingCall or BindingAuditKinds.SandboxLog or BindingAuditKinds.PluginMessage;
-
-    internal static bool IsKnownBindingSafety(BindingSafety safety)
-        => safety is BindingSafety.PureIntrinsic or
-            BindingSafety.PureHostFacade or
-            BindingSafety.ReadOnlyExternal or
-            BindingSafety.SideEffectingExternal or
-            BindingSafety.DangerousRequiresReview;
-
     private static void ValidateBuiltInCapabilityEffect(
         BindingDescriptor binding,
         List<SandboxDiagnostic> diagnostics)
