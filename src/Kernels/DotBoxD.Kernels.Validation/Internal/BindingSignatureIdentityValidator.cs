@@ -5,11 +5,6 @@ namespace DotBoxD.Kernels.Validation.Internal;
 
 internal static class BindingSignatureIdentityValidator
 {
-    private static readonly string[] ForbiddenReferenceFragments = [
-        "System.", "Microsoft.", "Assembly.", "Type.", "Reflection.", "Process.",
-        "Environment.", "Thread.", "Task.", "DllImport", "IServiceProvider"
-    ];
-
     public static bool ValidateResolved(
         string lookupId,
         BindingSignature? binding,
@@ -55,47 +50,12 @@ internal static class BindingSignatureIdentityValidator
         List<SandboxDiagnostic> diagnostics,
         SourceSpan span)
     {
-        if (string.IsNullOrWhiteSpace(value) || ContainsControlCharacter(value))
-        {
-            diagnostics.Add(new SandboxDiagnostic(
-                code,
-                $"{description} must be non-empty and must not contain control characters",
-                Span: span));
-            return false;
-        }
-
-        if (!ContainsForbiddenReferenceFragment(value))
+        if (BindingIdentifierValidator.TryValidate(value, out var message))
         {
             return true;
         }
 
-        diagnostics.Add(new SandboxDiagnostic(code, $"{description} '{value}' looks like a forbidden CLR reference", Span: span));
-        return false;
-    }
-
-    private static bool ContainsControlCharacter(string value)
-    {
-        for (var i = 0; i < value.Length; i++)
-        {
-            if (char.IsControl(value[i]))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool ContainsForbiddenReferenceFragment(string value)
-    {
-        for (var i = 0; i < ForbiddenReferenceFragments.Length; i++)
-        {
-            if (value.Contains(ForbiddenReferenceFragments[i], StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-        }
-
+        diagnostics.Add(new SandboxDiagnostic(code, $"{description} {message}", Span: span));
         return false;
     }
 }

@@ -10,6 +10,7 @@ public sealed class ModuleValidatorCustomCatalogIdentityValidationTests
 {
     private const string LookupBindingId = "safe.call";
     private const string InvalidBindingId = "System.IO.File.ReadAllText";
+    private const string HostBindingId = "host.Regression.Game.InventoryService.ReadAllText";
     private static readonly SourceSpan Span = new(0, 0);
 
     [Fact]
@@ -32,9 +33,33 @@ public sealed class ModuleValidatorCustomCatalogIdentityValidationTests
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-ID");
     }
 
+    [Fact]
+    public void ModuleValidator_accepts_host_catalog_binding_with_clr_shaped_segments()
+    {
+        var result = new ModuleValidator().Validate(ModuleCallingHostBinding(), HostCatalog());
+
+        Assert.True(result.Succeeded, string.Join(Environment.NewLine, result.Diagnostics.Select(d => d.Message)));
+    }
+
+    [Fact]
+    public void BindingRegistry_accepts_host_descriptor_with_clr_shaped_segments()
+    {
+        var registry = new BindingRegistryBuilder()
+            .Add(HostIdentityDescriptor())
+            .Build();
+
+        Assert.True(registry.TryGet(HostBindingId, out _));
+    }
+
     private static SandboxModule ModuleCallingLookupBinding()
+        => ModuleCalling(LookupBindingId, "custom-catalog-invalid-identity");
+
+    private static SandboxModule ModuleCallingHostBinding()
+        => ModuleCalling(HostBindingId, "custom-catalog-host-identity");
+
+    private static SandboxModule ModuleCalling(string bindingId, string moduleId)
         => new(
-            "custom-catalog-invalid-identity",
+            moduleId,
             SemVersion.One,
             SandboxLanguage.CurrentVersion,
             [],
@@ -46,7 +71,7 @@ public sealed class ModuleValidatorCustomCatalogIdentityValidationTests
                     SandboxType.Unit,
                     [
                         new ReturnStatement(
-                            new CallExpression(LookupBindingId, [], null, Span),
+                            new CallExpression(bindingId, [], null, Span),
                             Span)
                     ])
             ],
@@ -55,9 +80,57 @@ public sealed class ModuleValidatorCustomCatalogIdentityValidationTests
     private static IBindingCatalog CustomCatalog()
         => new SingleBindingCatalog(LookupBindingId, InvalidIdentitySignature());
 
+    private static IBindingCatalog HostCatalog()
+        => new SingleBindingCatalog(HostBindingId, HostIdentitySignature());
+
     private static BindingSignature InvalidIdentitySignature()
+    {
+        var metadata = InvalidIdentityMetadata();
+        return new(
+            metadata.Id,
+            metadata.Version,
+            metadata.Parameters,
+            metadata.ReturnType,
+            metadata.Effects,
+            metadata.RequiredCapability,
+            metadata.CostModel,
+            metadata.AuditLevel,
+            metadata.Safety,
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+    }
+
+    private static BindingDescriptor InvalidIdentityDescriptor()
+    {
+        var metadata = InvalidIdentityMetadata();
+        return new(
+            metadata.Id,
+            metadata.Version,
+            metadata.Parameters,
+            metadata.ReturnType,
+            metadata.Effects,
+            metadata.RequiredCapability,
+            metadata.CostModel,
+            metadata.AuditLevel,
+            metadata.Safety,
+            (_, _, _) => ValueTask.FromResult(SandboxValue.Unit),
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+    }
+
+    private static BindingIdentityMetadata InvalidIdentityMetadata()
         => new(
             InvalidBindingId,
+            SemVersion.One,
+            [],
+            SandboxType.Unit,
+            SandboxEffect.Cpu,
+            RequiredCapability: null,
+            BindingCostModel.Fixed(1),
+            AuditLevel.None,
+            BindingSafety.PureHostFacade);
+
+    private static BindingSignature HostIdentitySignature()
+        => new(
+            HostBindingId,
             SemVersion.One,
             [],
             SandboxType.Unit,
@@ -68,9 +141,9 @@ public sealed class ModuleValidatorCustomCatalogIdentityValidationTests
             BindingSafety.PureHostFacade,
             CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
 
-    private static BindingDescriptor InvalidIdentityDescriptor()
+    private static BindingDescriptor HostIdentityDescriptor()
         => new(
-            InvalidBindingId,
+            HostBindingId,
             SemVersion.One,
             [],
             SandboxType.Unit,
@@ -81,6 +154,17 @@ public sealed class ModuleValidatorCustomCatalogIdentityValidationTests
             BindingSafety.PureHostFacade,
             (_, _, _) => ValueTask.FromResult(SandboxValue.Unit),
             CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+
+    private readonly record struct BindingIdentityMetadata(
+        string Id,
+        SemVersion Version,
+        IReadOnlyList<SandboxType> Parameters,
+        SandboxType ReturnType,
+        SandboxEffect Effects,
+        string? RequiredCapability,
+        BindingCostModel CostModel,
+        AuditLevel AuditLevel,
+        BindingSafety Safety);
 
     private sealed class SingleBindingCatalog(string lookupId, BindingSignature binding) : IBindingCatalog
     {
