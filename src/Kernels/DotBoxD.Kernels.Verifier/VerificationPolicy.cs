@@ -288,12 +288,7 @@ public sealed record VerificationPolicy(
 
     private static string RequireVersion(string? value, string parameterName)
     {
-        ArgumentNullException.ThrowIfNull(value, parameterName);
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            throw new ArgumentException("Verifier version must not be empty or whitespace.", parameterName);
-        }
-
+        ArgumentException.ThrowIfNullOrWhiteSpace(value, parameterName);
         return value;
     }
 
