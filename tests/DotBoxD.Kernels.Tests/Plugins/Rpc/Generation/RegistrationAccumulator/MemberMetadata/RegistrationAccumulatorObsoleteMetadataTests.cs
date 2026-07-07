@@ -74,6 +74,45 @@ public sealed class RegistrationAccumulatorObsoleteMetadataTests
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Generated_accumulators_do_not_emit_malformed_obsolete_attributes_for_unresolved_arguments()
+    {
+        var result = RunGeneratorWithWarningsAsErrors("""
+            using System;
+            using System.Threading.Tasks;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [Obsolete("Use CurrentControl", MissingFlag)]
+            [GeneratePluginRegistrationAccumulator("LegacyRegistrationAccumulator", "RegisterAsync")]
+            internal sealed class LegacyControl
+            {
+                public ValueTask<string> RegisterAsync<TService, TKernel>()
+                    where TService : class
+                    where TKernel : class, TService
+                    => ValueTask.FromResult("registered");
+            }
+            """);
+
+        var generated = string.Join("\n", result.GeneratedSources);
+        Assert.DoesNotContain(
+            "[global::System.ObsoleteAttribute(\"Use CurrentControl\"]",
+            generated,
+            StringComparison.Ordinal);
+
+        var generatedSyntaxDiagnostics = result.OutputCompilation.GetDiagnostics()
+            .Where(d => result.IsGeneratedTree(d.Location.SourceTree))
+            .Where(d => d.Id is "CS1026" or "CS1001" or "CS1003")
+            .Select(d => d.ToString())
+            .ToArray();
+
+        Assert.True(
+            generatedSyntaxDiagnostics.Length == 0,
+            "Generated syntax diagnostics leaked:" + Environment.NewLine +
+            string.Join(Environment.NewLine, generatedSyntaxDiagnostics));
+    }
+
     private static GeneratedCompilationResult RunGeneratorWithWarningsAsErrors(string source)
     {
         var inputTree = CSharpSyntaxTree.ParseText(source, ParseOptions);

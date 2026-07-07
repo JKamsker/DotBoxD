@@ -35,7 +35,7 @@ internal static class RegistrationObsoleteAttributeSource
 
     private static void AppendArguments(StringBuilder builder, AttributeData attribute)
     {
-        var needsSeparator = false;
+        var arguments = new List<string>(attribute.ConstructorArguments.Length + attribute.NamedArguments.Length);
         for (var i = 0; i < attribute.ConstructorArguments.Length; i++)
         {
             if (ConstantSource(attribute.ConstructorArguments[i]) is not { } value)
@@ -43,8 +43,7 @@ internal static class RegistrationObsoleteAttributeSource
                 return;
             }
 
-            builder.Append(needsSeparator ? ", " : "(").Append(value);
-            needsSeparator = true;
+            arguments.Add(value);
         }
 
         foreach (var argument in attribute.NamedArguments)
@@ -54,16 +53,14 @@ internal static class RegistrationObsoleteAttributeSource
                 continue;
             }
 
-            builder.Append(needsSeparator ? ", " : "(")
-                .Append(argument.Key)
-                .Append(" = ")
-                .Append(value);
-            needsSeparator = true;
+            arguments.Add(argument.Key + " = " + value);
         }
 
-        if (needsSeparator)
+        if (arguments.Count > 0)
         {
-            builder.Append(')');
+            builder.Append('(')
+                .Append(string.Join(", ", arguments))
+                .Append(')');
         }
     }
 
