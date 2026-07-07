@@ -1,6 +1,7 @@
 using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
+using DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -174,6 +175,7 @@ internal static class PluginKernelModelFactory
             ContextParameterName: contextParameterName,
             HandleEventParameterName: handleEventParameterName,
             HandleContextParameterName: handleContextParameterName,
+            PackageAttributes: PluginServerFlowAttributeSource.TypeAttributes(type),
             EventProperties: eventProperties,
             LiveSettings: liveSettings,
             ShouldHandle: shouldHandleBody,

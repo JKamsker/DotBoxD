@@ -118,6 +118,7 @@ internal static partial class ResultHookChain
             ContextParameterName: terminalContextParam ?? DotBoxDGenerationNames.DefaultContextParameterName,
             HandleEventParameterName: terminalElementParam,
             HandleContextParameterName: terminalContextParam ?? DotBoxDGenerationNames.DefaultContextParameterName,
+            PackageAttributes: default,
             EventProperties: eventProperties,
             LiveSettings: default,
             ShouldHandle: shouldHandle,
