@@ -41,7 +41,6 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("        }");
         builder.AppendLine("        public async global::System.Threading.Tasks.ValueTask SetValuesAsync(global::System.Action<TKernel> set, bool atomic = false)");
         builder.AppendLine("        {");
-        builder.AppendLine("            _owner.RequireInstalledKernel<TKernel>(_pluginId);");
         builder.AppendLine("            var currentValues = _owner.SnapshotLiveSettingValues(_pluginId);");
         builder.AppendLine("            var draft = new TKernel();");
         builder.AppendLine("            var properties = typeof(TKernel).GetProperties(global::System.Reflection.BindingFlags.Public | global::System.Reflection.BindingFlags.Instance)");
@@ -85,6 +84,7 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("            var updates = changedValues");
         builder.AppendLine("                .Select(entry => new " + model.LiveSettingUpdateType + "(entry.Property.Name, global::System.Convert.ToString(entry.Value, global::System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty))");
         builder.AppendLine("                .ToArray();");
+        builder.AppendLine("            _owner.RequireInstalledKernel<TKernel>(_pluginId);");
         builder.AppendLine("            await _owner.RequireControl().UpdateSettingsAsync(_pluginId, updates, atomic, default).ConfigureAwait(false);");
         builder.AppendLine("            foreach (var entry in changedValues)");
         builder.AppendLine("            {");
