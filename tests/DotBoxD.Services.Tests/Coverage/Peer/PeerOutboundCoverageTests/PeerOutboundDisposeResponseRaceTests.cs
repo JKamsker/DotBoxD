@@ -21,7 +21,7 @@ public sealed class PeerOutboundDisposeResponseRaceTests
         var call = peer.InvokeAsync<int, string>(Service, Method, request: 1);
         await channel.WaitForRequestAsync(PeerOutboundTimeout);
 
-        await peer.DisposeAsync();
+        await peer.DisposeAsync().AsTask().WaitAsync(PeerOutboundTimeout);
 
         var ex = await Assert.ThrowsAsync<ServiceConnectionException>(
             () => call.WaitAsync(PeerOutboundTimeout));
