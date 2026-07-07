@@ -4,7 +4,7 @@ using DotBoxD.Plugins.Runtime.Validation;
 
 namespace DotBoxD.Plugins.Runtime;
 
-internal static class PluginPackageValidator
+internal static partial class PluginPackageValidator
 {
     public static void Validate(PluginPackage package)
     {
