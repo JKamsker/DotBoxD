@@ -1,7 +1,7 @@
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins;
 
-namespace DotBoxD.Kernels.Tests.Plugins;
+namespace DotBoxD.Kernels.Tests.Plugins.Server.Reentrancy;
 
 public sealed class PluginServerReentrantAdapterRegistrationTests
 {

@@ -124,7 +124,7 @@ public sealed partial class PluginServer : IDisposable
         ThrowIfDisposed();
         Hooks.EnsureCanRegister(adapter);
         Subscriptions.EnsureCanRegister(adapter);
-        Events.Register(adapter);
+        Events.Register(adapter, ThrowIfDisposed);
         return this;
     }
 
