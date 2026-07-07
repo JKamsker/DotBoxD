@@ -39,6 +39,11 @@ internal static class BindingRegistryValidator
 
     private static void ValidateBinding(BindingDescriptor binding, List<SandboxDiagnostic> diagnostics)
     {
+        if (!BindingDescriptorRequiredFieldValidator.Validate(binding, diagnostics))
+        {
+            return;
+        }
+
         BindingValidationPhases.ValidateBindingIdentity(binding, diagnostics);
         BindingValidationPhases.ValidateBindingEffectBits(binding, diagnostics);
         BindingValidationPhases.ValidateBindingClassifications(binding, diagnostics);
