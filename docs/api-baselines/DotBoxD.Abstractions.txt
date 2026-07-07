@@ -66,7 +66,7 @@ public sealed class ServerExtensionClientAttribute(Type receiverType, string? na
 public sealed class ServerExtensionMethodAttribute(Type? receiverType = null, string? name = null) : Attribute
 public sealed record PluginMessage(string TargetId, string Message)
 public ServerExtensionAttribute(string id, Type serviceType)
-public ServerExtensionAttribute(string id) => Id = id
+public ServerExtensionAttribute(string id) => Id = id ?? throw new ArgumentNullException(nameof(id))
 public ServerExtensionAttribute(Type grafts, string? id = null)
 public string AccumulatorName { get; } = accumulatorName
 public string BindingId { get; }
