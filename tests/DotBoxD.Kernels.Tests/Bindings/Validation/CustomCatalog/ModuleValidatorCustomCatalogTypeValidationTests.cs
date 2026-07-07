@@ -4,7 +4,7 @@ using DotBoxD.Kernels.Runtime;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Validation;
 
-namespace DotBoxD.Kernels.Tests.Bindings.Validation;
+namespace DotBoxD.Kernels.Tests.Bindings.Validation.CustomCatalog;
 
 public sealed class ModuleValidatorCustomCatalogTypeValidationTests
 {

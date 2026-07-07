@@ -146,25 +146,12 @@ public sealed class ModuleValidator
                     continue;
                 }
 
-                ValidateBindingType(binding.Id, binding.ReturnType, diagnostics);
+                BindingTypeChecks.Validate(binding.Id, binding.ReturnType, diagnostics);
                 for (var i = 0; i < binding.Parameters.Count; i++)
                 {
-                    ValidateBindingType(binding.Id, binding.Parameters[i], diagnostics);
+                    BindingTypeChecks.Validate(binding.Id, binding.Parameters[i], diagnostics);
                 }
             }
-        }
-    }
-
-    private static void ValidateBindingType(
-        string bindingId,
-        SandboxType type,
-        List<SandboxDiagnostic> diagnostics)
-    {
-        if (!type.IsKnownBuiltIn())
-        {
-            diagnostics.Add(new SandboxDiagnostic(
-                "E-BINDING-TYPE",
-                $"binding '{bindingId}' exposes forbidden or unknown type '{type}'"));
         }
     }
 
