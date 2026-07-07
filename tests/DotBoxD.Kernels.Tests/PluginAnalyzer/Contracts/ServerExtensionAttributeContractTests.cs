@@ -2,21 +2,22 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Contracts;
 
 public sealed class ServerExtensionAttributeContractTests
 {
-    [Theory]
-    [InlineData("id")]
-    [InlineData("serviceType")]
-    public void Service_backed_constructor_rejects_null_required_metadata(string parameterName)
+    [Fact]
+    public void Service_backed_constructor_rejects_null_id()
     {
-        var exception = parameterName switch
-        {
-            "id" => Assert.Throws<ArgumentNullException>(
-                () => new ServerExtensionAttribute(null!, typeof(IEchoService))),
-            "serviceType" => Assert.Throws<ArgumentNullException>(
-                () => new ServerExtensionAttribute("echo", null!)),
-            _ => throw new ArgumentOutOfRangeException(nameof(parameterName), parameterName, null),
-        };
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => new ServerExtensionAttribute(null!, typeof(IEchoService)));
 
-        Assert.Equal(parameterName, exception.ParamName);
+        Assert.Equal("id", exception.ParamName);
+    }
+
+    [Fact]
+    public void Service_backed_constructor_rejects_null_service_type()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => new ServerExtensionAttribute("echo", null!));
+
+        Assert.Equal("serviceType", exception.ParamName);
     }
 
     [Fact]

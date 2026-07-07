@@ -141,17 +141,17 @@ public sealed class KernelMethodAttribute : Attribute;
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class ServerExtensionAttribute : Attribute
 {
-    public ServerExtensionAttribute(string id) => Id = id;
+    public ServerExtensionAttribute(string id) => Id = id ?? throw new ArgumentNullException(nameof(id));
 
     public ServerExtensionAttribute(string id, Type serviceType)
     {
-        Id = id;
-        ServiceType = serviceType;
+        Id = id ?? throw new ArgumentNullException(nameof(id));
+        ServiceType = serviceType ?? throw new ArgumentNullException(nameof(serviceType));
     }
 
     public ServerExtensionAttribute(Type grafts, string? id = null)
     {
-        Grafts = grafts;
+        Grafts = grafts ?? throw new ArgumentNullException(nameof(grafts));
         Id = id;
     }
 
