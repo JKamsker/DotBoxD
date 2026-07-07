@@ -116,4 +116,17 @@ internal static partial class MethodModelFactory
         return attributes.ToString();
     }
 
+    private static string BuildMemberAttributePrefix(IMethodSymbol method, CancellationToken ct)
+    {
+        var attributes = new StringBuilder();
+        foreach (var attr in method.GetAttributes())
+        {
+            ct.ThrowIfCancellationRequested();
+
+            NullableFlowAttributeFormatter.TryAppendMemberAttribute(attributes, attr);
+        }
+
+        return attributes.ToString();
+    }
+
 }

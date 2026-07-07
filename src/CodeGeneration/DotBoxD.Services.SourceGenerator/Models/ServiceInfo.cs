@@ -99,6 +99,7 @@ internal sealed record MethodModel(
     string DeclaredReturnType,
     string? UnwrappedReturnType,
     string ReturnRefKindKeyword,
+    string MemberAttributePrefix,
     string ReturnAttributePrefix,
     bool HasCancellationToken,
     EquatableArray<ParameterModel> Parameters,

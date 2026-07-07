@@ -88,6 +88,21 @@ internal static class AsyncInterfaceGenerator
                 isLast: i == s.Parameters.Count - 1);
         }
 
+        AppendAttributes(sb, s.Source.MemberAttributePrefix);
         sb.AppendLine($"        {returnText} {s.Name}({paramList});");
+    }
+
+    private static void AppendAttributes(StringBuilder sb, string attributes)
+    {
+        if (attributes.Length == 0)
+        {
+            return;
+        }
+
+        var lines = attributes.Split(['\n'], System.StringSplitOptions.RemoveEmptyEntries);
+        foreach (var line in lines)
+        {
+            sb.Append("        ").AppendLine(line.TrimEnd('\r'));
+        }
     }
 }
