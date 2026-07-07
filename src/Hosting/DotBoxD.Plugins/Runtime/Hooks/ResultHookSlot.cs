@@ -139,20 +139,13 @@ internal sealed class ResultHookSlot<TEvent, TContext>
         IHookResult? result;
         try
         {
-            if (entry.Filter is not null)
+            if (!await PassesFilterAsync(entry, e, rawContext, context, cancellationToken).ConfigureAwait(false))
             {
-                var matches = await entry.Filter(e, rawContext, context, cancellationToken).ConfigureAwait(false);
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!matches)
-                {
-                    return null;
-                }
+                return null;
             }
 
-            result = entry.Remote
-                ? await _invoker.InvokeRemoteAsync(entry, e, rawContext, context, options, cancellationToken)
-                    .ConfigureAwait(false)
-                : await entry.Invoke(e, rawContext, context, cancellationToken).ConfigureAwait(false);
+            result = await InvokeEntryAsync(entry, e, rawContext, context, options, cancellationToken)
+                .ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -185,6 +178,35 @@ internal sealed class ResultHookSlot<TEvent, TContext>
             $"but '{typeof(TResult).FullName}' was requested."));
         return null;
     }
+
+    private static async ValueTask<bool> PassesFilterAsync(
+        Entry entry,
+        TEvent e,
+        HookContext rawContext,
+        TContext context,
+        CancellationToken cancellationToken)
+    {
+        if (entry.Filter is null)
+        {
+            return true;
+        }
+
+        var matches = await entry.Filter(e, rawContext, context, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return matches;
+    }
+
+    private ValueTask<IHookResult?> InvokeEntryAsync<TResult>(
+        Entry entry,
+        TEvent e,
+        HookContext rawContext,
+        TContext context,
+        ResultHookDispatchOptions<TResult> options,
+        CancellationToken cancellationToken)
+        where TResult : struct, IHookResult
+        => entry.Remote
+            ? _invoker.InvokeRemoteAsync(entry, e, rawContext, context, options, cancellationToken)
+            : entry.Invoke(e, rawContext, context, cancellationToken);
 
     public void RemoveKernel(InstalledKernel kernel)
     {
