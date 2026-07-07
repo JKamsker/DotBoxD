@@ -31,6 +31,11 @@ public sealed class Payload : IMemoryOwner<byte>
     /// </summary>
     public static Payload Rent(int length)
     {
+        if (length < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(length), length, "Payload length must be non-negative.");
+        }
+
         if (length == 0)
         {
             return Empty;

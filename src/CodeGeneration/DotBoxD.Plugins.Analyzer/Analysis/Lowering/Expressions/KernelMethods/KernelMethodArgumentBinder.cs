@@ -1,5 +1,5 @@
-using DotBoxD.CodeGeneration.Shared.Defaults;
 using System.Collections.Immutable;
+using DotBoxD.CodeGeneration.Shared.Defaults;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;

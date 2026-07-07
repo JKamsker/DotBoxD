@@ -1,6 +1,6 @@
-using DotBoxD.Services.SourceGenerator.Infrastructure;
 using System;
 using System.Collections.Generic;
+using DotBoxD.Services.SourceGenerator.Infrastructure;
 
 namespace DotBoxD.Services.SourceGenerator.Models;
 
