@@ -21,6 +21,10 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("            {");
         builder.AppendLine("                throw new global::System.ArgumentException(\"Live setting expression must select a property.\", nameof(member));");
         builder.AppendLine("            }");
+        builder.AppendLine("            if (!IsKernelProperty(property))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                throw new global::System.ArgumentException($\"Live setting expression must select a public instance property on '{typeof(TKernel).FullName}'.\", nameof(member));");
+        builder.AppendLine("            }");
         builder.AppendLine("            if (!IsLiveSetting(property))");
         builder.AppendLine("            {");
         builder.AppendLine("                throw new global::System.ArgumentException($\"Property '{property.Name}' is not a live setting.\", nameof(member));");
@@ -93,6 +97,12 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("                _owner.RecordLiveSettingValue(_pluginId, entry.Property.Name, entry.Value);");
         builder.AppendLine("            }");
         builder.AppendLine("        }");
+        builder.AppendLine("        private static bool IsKernelProperty(global::System.Reflection.PropertyInfo property)");
+        builder.AppendLine("            => property.DeclaringType is { } declaringType &&");
+        builder.AppendLine("                declaringType.IsAssignableFrom(typeof(TKernel)) &&");
+        builder.AppendLine("                property.GetMethod is { IsPublic: true, IsStatic: false } &&");
+        builder.AppendLine("                property.SetMethod is { IsPublic: true, IsStatic: false } &&");
+        builder.AppendLine("                property.GetIndexParameters().Length == 0;");
         builder.AppendLine("        private static bool IsLiveSetting(global::System.Reflection.PropertyInfo property)");
         builder.AppendLine("            => property.GetCustomAttributes(typeof(global::DotBoxD.Abstractions.LiveSettingAttribute), inherit: true).Length != 0;");
         builder.AppendLine("        private static bool IsRequired(global::System.Reflection.PropertyInfo property)");
