@@ -2,7 +2,7 @@ namespace DotBoxD.Kernels.Bindings;
 
 internal static class BindingIdentifierValidator
 {
-    private static readonly HashSet<string> ForbiddenClrRoots = new(StringComparer.Ordinal) {
+    private static readonly HashSet<string> ForbiddenClrRoots = new(StringComparer.OrdinalIgnoreCase) {
         "System", "Microsoft", "Assembly", "Type", "Reflection", "Process",
         "Environment", "Thread", "Task", "DllImport", "IServiceProvider"
     };
@@ -21,7 +21,7 @@ internal static class BindingIdentifierValidator
             return false;
         }
 
-        if (!IsHostRoutedIdentifier(value) && LooksLikeRawClrReference(value))
+        if (LooksLikeRawClrReference(value))
         {
             message = $"'{value}' looks like a forbidden CLR reference";
             return false;
@@ -72,11 +72,17 @@ internal static class BindingIdentifierValidator
     {
         var dot = value.IndexOf('.');
         var firstSegment = dot < 0 ? value : value[..dot];
-        return ForbiddenClrRoots.Contains(firstSegment);
+        var rootSegment = string.Equals(firstSegment, "host", StringComparison.OrdinalIgnoreCase) && dot >= 0
+            ? NextSegment(value, dot + 1)
+            : firstSegment;
+        return ForbiddenClrRoots.Contains(rootSegment);
     }
 
-    private static bool IsHostRoutedIdentifier(string value)
-        => value.StartsWith("host.", StringComparison.Ordinal);
+    private static string NextSegment(string value, int start)
+    {
+        var dot = value.IndexOf('.', start);
+        return dot < 0 ? value[start..] : value[start..dot];
+    }
 
     private static bool ContainsControlCharacter(string value)
     {

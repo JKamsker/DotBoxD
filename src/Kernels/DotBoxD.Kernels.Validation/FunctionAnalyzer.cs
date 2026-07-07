@@ -138,6 +138,7 @@ internal sealed partial class FunctionAnalyzer
         {
             if (!ValidateResolvedBindingSignature(call.Name, binding, call.Span))
             {
+                canReorder = false;
                 return SandboxType.Unit;
             }
 

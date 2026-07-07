@@ -10,24 +10,32 @@ public sealed class ModuleValidatorCustomCatalogIdentityValidationTests
 {
     private const string LookupBindingId = "safe.call";
     private const string InvalidBindingId = "System.IO.File.ReadAllText";
+    private const string InvalidLowercaseBindingId = "system.IO.File.ReadAllText";
+    private const string InvalidHostClrBindingId = "Host.System.IO.File.ReadAllText";
     private const string HostBindingId = "host.Regression.Game.InventoryService.ReadAllText";
     private static readonly SourceSpan Span = new(0, 0);
 
-    [Fact]
-    public void ModuleValidator_rejects_custom_catalog_binding_with_invalid_identity()
+    [Theory]
+    [InlineData(InvalidBindingId)]
+    [InlineData(InvalidLowercaseBindingId)]
+    [InlineData(InvalidHostClrBindingId)]
+    public void ModuleValidator_rejects_custom_catalog_binding_with_invalid_identity(string invalidBindingId)
     {
-        var result = new ModuleValidator().Validate(ModuleCallingLookupBinding(), CustomCatalog());
+        var result = new ModuleValidator().Validate(ModuleCallingLookupBinding(), CustomCatalog(invalidBindingId));
 
         Assert.False(result.Succeeded);
         Assert.Contains(result.Diagnostics, d => d.Code == "E-BINDING-ID");
     }
 
-    [Fact]
-    public void BindingRegistry_rejects_equivalent_binding_descriptor_with_invalid_identity()
+    [Theory]
+    [InlineData(InvalidBindingId)]
+    [InlineData(InvalidLowercaseBindingId)]
+    [InlineData(InvalidHostClrBindingId)]
+    public void BindingRegistry_rejects_equivalent_binding_descriptor_with_invalid_identity(string invalidBindingId)
     {
         var ex = Assert.Throws<SandboxValidationException>(() =>
             new BindingRegistryBuilder()
-                .Add(InvalidIdentityDescriptor())
+                .Add(InvalidIdentityDescriptor(invalidBindingId))
                 .Build());
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-ID");
@@ -77,15 +85,15 @@ public sealed class ModuleValidatorCustomCatalogIdentityValidationTests
             ],
             new Dictionary<string, string>());
 
-    private static IBindingCatalog CustomCatalog()
-        => new SingleBindingCatalog(LookupBindingId, InvalidIdentitySignature());
+    private static IBindingCatalog CustomCatalog(string invalidBindingId)
+        => new SingleBindingCatalog(LookupBindingId, InvalidIdentitySignature(invalidBindingId));
 
     private static IBindingCatalog HostCatalog()
         => new SingleBindingCatalog(HostBindingId, HostIdentitySignature());
 
-    private static BindingSignature InvalidIdentitySignature()
+    private static BindingSignature InvalidIdentitySignature(string invalidBindingId)
     {
-        var metadata = InvalidIdentityMetadata();
+        var metadata = InvalidIdentityMetadata(invalidBindingId);
         return new(
             metadata.Id,
             metadata.Version,
@@ -99,9 +107,9 @@ public sealed class ModuleValidatorCustomCatalogIdentityValidationTests
             CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
     }
 
-    private static BindingDescriptor InvalidIdentityDescriptor()
+    private static BindingDescriptor InvalidIdentityDescriptor(string invalidBindingId)
     {
-        var metadata = InvalidIdentityMetadata();
+        var metadata = InvalidIdentityMetadata(invalidBindingId);
         return new(
             metadata.Id,
             metadata.Version,
@@ -116,9 +124,9 @@ public sealed class ModuleValidatorCustomCatalogIdentityValidationTests
             CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
     }
 
-    private static BindingIdentityMetadata InvalidIdentityMetadata()
+    private static BindingIdentityMetadata InvalidIdentityMetadata(string invalidBindingId)
         => new(
-            InvalidBindingId,
+            invalidBindingId,
             SemVersion.One,
             [],
             SandboxType.Unit,
