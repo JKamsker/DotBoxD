@@ -89,6 +89,7 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("    private readonly global::System.Collections.Concurrent.ConcurrentDictionary<string, global::System.Lazy<global::System.Threading.Tasks.Task<string>>> _anonymousKernels = new();");
         builder.AppendLine("    private readonly global::System.Collections.Generic.HashSet<string> _installedPluginIds = new(global::System.StringComparer.Ordinal);");
         builder.AppendLine("    private readonly global::System.Collections.Generic.Dictionary<global::System.Type, string> _serverExtensions = new();");
+        builder.AppendLine("    private readonly global::System.Collections.Generic.Dictionary<string, global::System.Collections.Generic.Dictionary<string, object?>> _liveSettingValues = new(global::System.StringComparer.Ordinal);");
         builder.AppendLine("    private readonly global::System.Collections.Generic.List<RecordedInstall> _setupInstalls;");
         builder.Append("    private ").Append(model.ControlServiceType).AppendLine("? _control;");
         builder.Append("    private ").Append(model.WorldType).AppendLine("? _world;");
