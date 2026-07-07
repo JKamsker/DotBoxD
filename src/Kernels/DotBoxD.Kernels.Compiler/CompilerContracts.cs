@@ -9,13 +9,24 @@ public delegate SandboxValue SandboxCompiledEntrypoint(SandboxContext context, S
 
 public sealed record CompileOptions(string Entrypoint, bool Optimize = false)
 {
-    private string _entrypoint =
-        Entrypoint ?? throw new ArgumentNullException(nameof(Entrypoint));
+    private string _entrypoint = RequireEntrypoint(Entrypoint);
 
     public string Entrypoint
     {
         get => _entrypoint;
-        init => _entrypoint = value ?? throw new ArgumentNullException(nameof(Entrypoint));
+        init => _entrypoint = RequireEntrypoint(value);
+    }
+
+    private static string RequireEntrypoint(string? entrypoint)
+    {
+        ArgumentNullException.ThrowIfNull(entrypoint, nameof(Entrypoint));
+
+        if (string.IsNullOrWhiteSpace(entrypoint))
+        {
+            throw new ArgumentException("Entrypoint must not be blank.", nameof(Entrypoint));
+        }
+
+        return entrypoint;
     }
 }
 

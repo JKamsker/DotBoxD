@@ -46,6 +46,41 @@ public sealed class ReflectionEmitSandboxCompilerArgumentValidationTests
         Assert.Equal("Entrypoint", ex.ParamName);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void CompileOptions_rejects_blank_entrypoint_with_public_parameter_name(string entrypoint)
+    {
+        var ex = Assert.Throws<ArgumentException>(
+            () => new CompileOptions(entrypoint));
+
+        Assert.Equal("Entrypoint", ex.ParamName);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void CompileOptions_rejects_blank_entrypoint_with_init_parameter_name(string entrypoint)
+    {
+        var ex = Assert.Throws<ArgumentException>(
+            () => new CompileOptions("main") { Entrypoint = entrypoint });
+
+        Assert.Equal("Entrypoint", ex.ParamName);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void CompileOptions_rejects_blank_entrypoint_with_expression_parameter_name(string entrypoint)
+    {
+        var options = new CompileOptions("main");
+
+        var ex = Assert.Throws<ArgumentException>(
+            () => options with { Entrypoint = entrypoint });
+
+        Assert.Equal("Entrypoint", ex.ParamName);
+    }
+
     [Fact]
     public async Task CompileAsync_rejects_null_plan_with_public_parameter_name()
     {
@@ -77,8 +112,37 @@ public sealed class ReflectionEmitSandboxCompilerArgumentValidationTests
         Assert.Equal("options", ex.ParamName);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task CompileAsync_rejects_blank_entrypoint_before_runtime_resolution(string entrypoint)
+    {
+        var plan = await PreparePlanAsync();
+        var compiler = CreateCompiler();
+        var options = CreateOptionsBypassingInit(entrypoint);
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(
+            async () => await compiler.CompileAsync(
+                    plan,
+                    options,
+                    CancellationToken.None)
+                .AsTask());
+
+        Assert.Equal("Entrypoint", ex.ParamName);
+    }
+
     private static ReflectionEmitSandboxCompiler CreateCompiler()
         => new(new GeneratedAssemblyVerifier());
+
+    private static CompileOptions CreateOptionsBypassingInit(string entrypoint)
+    {
+        var options = new CompileOptions("main");
+        typeof(CompileOptions)
+            .GetField("_entrypoint", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .SetValue(options, entrypoint);
+
+        return options;
+    }
 
     private static async Task<ExecutionPlan> PreparePlanAsync()
     {

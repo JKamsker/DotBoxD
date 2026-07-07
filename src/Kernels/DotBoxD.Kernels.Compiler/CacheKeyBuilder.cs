@@ -59,6 +59,11 @@ public static class CacheKeyBuilder
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentNullException.ThrowIfNull(entrypoint);
         ArgumentNullException.ThrowIfNull(policy);
+
+        if (string.IsNullOrWhiteSpace(entrypoint))
+        {
+            throw new ArgumentException("Entrypoint must not be blank.", nameof(entrypoint));
+        }
     }
 
     private static string BuildCore(ExecutionPlan plan, string entrypoint, VerificationPolicy policy, bool optimize)
