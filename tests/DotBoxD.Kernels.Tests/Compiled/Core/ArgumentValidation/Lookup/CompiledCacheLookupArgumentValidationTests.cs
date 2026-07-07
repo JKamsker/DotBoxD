@@ -45,6 +45,7 @@ public sealed class CompiledCacheLookupArgumentValidationTests
     [Theory]
     [InlineData(null)]
     [InlineData("")]
+    [InlineData("   ")]
     public void Invalid_rejects_missing_invalid_reason(string? invalidReason)
     {
         var ex = Assert.Throws<ArgumentException>(
