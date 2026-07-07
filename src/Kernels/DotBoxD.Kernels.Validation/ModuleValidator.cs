@@ -1,6 +1,7 @@
 using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Validation.Bindings;
 using DotBoxD.Kernels.Validation.Model;
 
 namespace DotBoxD.Kernels.Validation;
@@ -36,7 +37,7 @@ public sealed class ModuleValidator
 
         var diagnostics = new List<SandboxDiagnostic>();
         StructuralValidator.Validate(module, diagnostics, declaredOpaqueIdTypes);
-        ValidateBindingCatalog(bindings, diagnostics);
+        CatalogBindingSignatureValidator.ValidateCatalog(bindings, diagnostics);
         if (diagnostics.Count > 0)
         {
             return ModuleValidationResult.Failure(diagnostics);
@@ -49,7 +50,7 @@ public sealed class ModuleValidator
         try
         {
             bindingReferences = BindingReferenceCollector.CollectByFunction(module, bindings);
-            ValidateReferencedBindingTypes(bindings, bindingReferences, diagnostics);
+            CatalogBindingSignatureValidator.ValidateReferenced(module, bindingReferences, bindings, diagnostics);
             if (diagnostics.Count > 0)
             {
                 return ModuleValidationResult.Failure(diagnostics);
@@ -58,10 +59,7 @@ public sealed class ModuleValidator
             var analyzer = new FunctionAnalyzer(module, bindings, diagnostics, declaredOpaqueIdTypes);
             functions = analyzer.AnalyzeAll();
             requiredEffects = RequiredEffects(module, functions);
-            ValidateReferencedBindingSignatures(module, bindings, bindingReferences, diagnostics);
-            ValidateReferencedCompiledTargets(bindings, bindingReferences, diagnostics);
             requiredCapabilities = RequiredCapabilities(module, bindings, bindingReferences);
-            ValidateCustomCapabilityGrantValidators(module, bindings, bindingReferences, diagnostics);
             PolicyResolver.Validate(module, bindings, policy, requiredEffects, requiredCapabilities, diagnostics);
         }
         catch (SandboxValidationException ex)
@@ -94,68 +92,6 @@ public sealed class ModuleValidator
 
         return effects;
     }
-
-    private static void ValidateReferencedBindingSignatures(
-        SandboxModule module,
-        IBindingCatalog bindings,
-        IReadOnlyDictionary<string, IReadOnlySet<string>> bindingReferences,
-        List<SandboxDiagnostic> diagnostics)
-    {
-        var checkedBindings = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var function in module.Functions)
-        {
-            if (!function.IsEntrypoint ||
-                !bindingReferences.TryGetValue(function.Id, out var references))
-            {
-                continue;
-            }
-
-            foreach (var bindingId in references)
-            {
-                if (checkedBindings.Add(bindingId) &&
-                    bindings.TryGet(bindingId, out var binding))
-                {
-                    ValidateReferencedBindingSignature(binding, diagnostics);
-                }
-            }
-        }
-    }
-
-    private static void ValidateReferencedBindingSignature(
-        BindingSignature binding,
-        List<SandboxDiagnostic> diagnostics)
-    {
-        if (!binding.Effects.ContainsOnlyKnownBits())
-        {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-EFFECT", $"binding '{binding.Id}' declares an unknown effect"));
-        }
-
-        if (binding.Effects == SandboxEffect.None)
-        {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-EFFECT", $"binding '{binding.Id}' declares no effects"));
-        }
-
-        if (binding.Effects.RequiresCapability() && string.IsNullOrWhiteSpace(binding.RequiredCapability))
-        {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-CAP", $"binding '{binding.Id}' has side effects but no capability"));
-        }
-
-        if (!string.IsNullOrWhiteSpace(binding.RequiredCapability) &&
-            (binding.Effects & ~SandboxEffects.Pure) == SandboxEffect.None)
-        {
-            diagnostics.Add(new SandboxDiagnostic(
-                "E-BINDING-EFFECT",
-                $"binding '{binding.Id}' requires a capability but declares only pure effects"));
-        }
-
-        if (IsExternal(binding.Safety) && string.IsNullOrWhiteSpace(binding.RequiredCapability))
-        {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-CAP", $"binding '{binding.Id}' reaches outside the sandbox but has no capability"));
-        }
-    }
-
-    private static bool IsExternal(BindingSafety safety)
-        => safety is BindingSafety.ReadOnlyExternal or BindingSafety.SideEffectingExternal;
 
     private static IReadOnlySet<string> RequiredCapabilities(
         SandboxModule module,
@@ -197,113 +133,8 @@ public sealed class ModuleValidator
         return required;
     }
 
-    private static void ValidateReferencedCompiledTargets(
-        IBindingCatalog bindings,
-        IReadOnlyDictionary<string, IReadOnlySet<string>> bindingReferences,
-        List<SandboxDiagnostic> diagnostics)
-    {
-        var validated = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var references in bindingReferences.Values)
-        {
-            foreach (var bindingId in references)
-            {
-                if (!validated.Add(bindingId) || !bindings.TryGet(bindingId, out var binding))
-                {
-                    continue;
-                }
-
-                BindingCompiledTargetValidator.Validate(binding, diagnostics);
-            }
-        }
-    }
-
-    private static void ValidateReferencedBindingTypes(
-        IBindingCatalog bindings,
-        IReadOnlyDictionary<string, IReadOnlySet<string>> bindingReferences,
-        List<SandboxDiagnostic> diagnostics)
-    {
-        var validated = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var references in bindingReferences.Values)
-        {
-            foreach (var bindingId in references)
-            {
-                if (!validated.Add(bindingId) || !bindings.TryGet(bindingId, out var binding))
-                {
-                    continue;
-                }
-
-                BindingTypeChecks.Validate(binding.Id, binding.ReturnType, diagnostics);
-                for (var i = 0; i < binding.Parameters.Count; i++)
-                {
-                    BindingTypeChecks.Validate(binding.Id, binding.Parameters[i], diagnostics);
-                }
-            }
-        }
-    }
-
-    private static void ValidateCustomCapabilityGrantValidators(
-        SandboxModule module,
-        IBindingCatalog bindings,
-        IReadOnlyDictionary<string, IReadOnlySet<string>> bindingReferences,
-        List<SandboxDiagnostic> diagnostics)
-    {
-        var checkedBindings = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var function in module.Functions)
-        {
-            if (!function.IsEntrypoint ||
-                !bindingReferences.TryGetValue(function.Id, out var references))
-            {
-                continue;
-            }
-
-            foreach (var bindingId in references)
-            {
-                if (!checkedBindings.Add(bindingId) ||
-                    !bindings.TryGet(bindingId, out var binding) ||
-                    binding.RequiredCapability is null ||
-                    IsBuiltInCapability(binding.RequiredCapability) ||
-                    bindings.TryGetCapabilityGrantValidator(binding.RequiredCapability, out _))
-                {
-                    continue;
-                }
-
-                diagnostics.Add(new SandboxDiagnostic(
-                    "E-BINDING-GRANT",
-                    $"binding '{binding.Id}' uses custom capability '{binding.RequiredCapability}' without a grant validator"));
-            }
-        }
-    }
-
-    private static bool IsBuiltInCapability(string capabilityId)
-        => capabilityId is "file.read" or "file.write" or "time.now" or "random" or "log.write";
-
     private static bool RequiresRuntimeAsync(BindingSignature binding)
         => binding.IsAsync || (binding.Effects & SandboxEffect.Concurrency) != 0;
-
-    private static void ValidateBindingCatalog(IBindingCatalog bindings, List<SandboxDiagnostic> diagnostics)
-    {
-        var signatures = bindings.Signatures;
-        for (var i = 0; i < signatures.Count; i++)
-        {
-            var binding = signatures[i];
-            BindingClassificationValidator.Validate(
-                binding.Id,
-                binding.AuditLevel,
-                binding.AuditKind,
-                binding.Safety,
-                diagnostics);
-            ValidateCostModel(binding, diagnostics);
-        }
-    }
-
-    private static void ValidateCostModel(BindingSignature binding, List<SandboxDiagnostic> diagnostics)
-    {
-        var cost = binding.CostModel;
-        if (cost.BaseFuel < 0 || cost.PerByteFuel < 0 || cost.MaxCallsPerRun is < 0)
-        {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-COST", $"binding '{binding.Id}' declares a negative resource cost or call limit"));
-        }
-    }
 
     private static bool HasNoErrors(IReadOnlyList<SandboxDiagnostic> diagnostics)
     {
