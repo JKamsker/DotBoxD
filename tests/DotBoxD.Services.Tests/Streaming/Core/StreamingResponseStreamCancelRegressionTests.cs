@@ -14,6 +14,7 @@ namespace DotBoxD.Services.Tests.Streaming.Core;
 public sealed class StreamingResponseStreamCancelRegressionTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan ResponseStreamStartGracePeriod = TimeSpan.FromMilliseconds(500);
 
     [Fact]
     public async Task EarlyStreamCancelBeforeResponseSenderRegistration_ReleasesRequest()
@@ -149,7 +150,7 @@ public sealed class StreamingResponseStreamCancelRegressionTests
     {
         var completed = await Task.WhenAny(
             readStarted,
-            Task.Delay(TimeSpan.FromMilliseconds(500))).ConfigureAwait(false);
+            Task.Delay(ResponseStreamStartGracePeriod)).ConfigureAwait(false);
         return completed == readStarted;
     }
 

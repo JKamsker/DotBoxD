@@ -80,6 +80,7 @@ internal sealed partial class RpcStreamManager
         try
         {
             RpcStreamValidation.ValidateOutboundAttachments(attachments);
+            ct.ThrowIfCancellationRequested();
             for (var i = 0; i < attachments.Length; i++)
             {
                 var state = new RpcStreamSendState(attachments[i].Handle.StreamId, ct);
@@ -118,6 +119,7 @@ internal sealed partial class RpcStreamManager
     public RpcOutboundStreamSet RegisterOutbound(RpcStreamAttachment attachment, CancellationToken ct)
     {
         RpcStreamValidation.ValidateOutboundAttachment(attachment);
+        ct.ThrowIfCancellationRequested();
         var rows = new (RpcStreamAttachment Attachment, RpcStreamSendState State)[1];
         var state = new RpcStreamSendState(attachment.Handle.StreamId, ct);
         var added = false;
