@@ -48,10 +48,16 @@ public sealed class ModuleValidator
         SandboxEffect requiredEffects;
         try
         {
+            bindingReferences = BindingReferenceCollector.CollectByFunction(module, bindings);
+            ValidateReferencedBindingTypes(bindings, bindingReferences, diagnostics);
+            if (diagnostics.Count > 0)
+            {
+                return ModuleValidationResult.Failure(diagnostics);
+            }
+
             var analyzer = new FunctionAnalyzer(module, bindings, diagnostics, declaredOpaqueIdTypes);
             functions = analyzer.AnalyzeAll();
             requiredEffects = RequiredEffects(module, functions);
-            bindingReferences = BindingReferenceCollector.CollectByFunction(module, bindings);
             ValidateReferencedBindingSignatures(module, bindings, bindingReferences, diagnostics);
             ValidateReferencedCompiledTargets(bindings, bindingReferences, diagnostics);
             requiredCapabilities = RequiredCapabilities(module, bindings, bindingReferences);
@@ -207,6 +213,30 @@ public sealed class ModuleValidator
                 }
 
                 BindingCompiledTargetValidator.Validate(binding, diagnostics);
+            }
+        }
+    }
+
+    private static void ValidateReferencedBindingTypes(
+        IBindingCatalog bindings,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> bindingReferences,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        var validated = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var references in bindingReferences.Values)
+        {
+            foreach (var bindingId in references)
+            {
+                if (!validated.Add(bindingId) || !bindings.TryGet(bindingId, out var binding))
+                {
+                    continue;
+                }
+
+                BindingTypeChecks.Validate(binding.Id, binding.ReturnType, diagnostics);
+                for (var i = 0; i < binding.Parameters.Count; i++)
+                {
+                    BindingTypeChecks.Validate(binding.Id, binding.Parameters[i], diagnostics);
+                }
             }
         }
     }
