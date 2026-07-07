@@ -24,8 +24,7 @@ internal static class SafeFileWritePublisher
             throw Error(SandboxErrorCode.PermissionDenied, "file.writeText denied: create is not allowed");
         }
 
-        var maxBytes = options.MaxBytesPerRun ?? long.MaxValue;
-        if (byteCount > maxBytes)
+        if (byteCount > options.MaxBytesPerRun)
         {
             throw Error(SandboxErrorCode.QuotaExceeded, "file.writeText denied: content exceeds write limit");
         }

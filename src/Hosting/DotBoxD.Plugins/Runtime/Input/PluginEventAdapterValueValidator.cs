@@ -9,11 +9,38 @@ internal static class PluginEventAdapterValueValidator
         IReadOnlyList<Parameter> parameters,
         IReadOnlyList<SandboxValue> values)
     {
-        EnsureValueCountMatches(values.Count, parameters.Count);
+        if (values is null)
+        {
+            throw CreateException("Plugin event adapter values must be non-null.");
+        }
+
+        EnsureValueCountMatches(ReadValueCount(values), parameters.Count);
         for (var i = 0; i < parameters.Count; i++)
         {
-            RequireType(values[i], parameters[i], i);
+            RequireType(ReadValue(values, i), parameters[i], i);
         }
+    }
+
+    public static SandboxValue[] CopyValidatedValues(
+        IReadOnlyList<Parameter> parameters,
+        IReadOnlyList<SandboxValue> values)
+    {
+        if (values is null)
+        {
+            throw CreateException("Plugin event adapter values must be non-null.");
+        }
+
+        var valueCount = ReadValueCount(values);
+        EnsureValueCountMatches(valueCount, parameters.Count);
+        var copy = new SandboxValue[valueCount];
+        for (var i = 0; i < valueCount; i++)
+        {
+            var value = ReadValue(values, i);
+            RequireType(value, parameters[i], i);
+            copy[i] = value;
+        }
+
+        return copy;
     }
 
     public static void ValidateValue(
@@ -22,7 +49,7 @@ internal static class PluginEventAdapterValueValidator
         int index,
         SandboxValue value)
     {
-        EnsureValueCountMatches(eventValueCount, parameters.Count);
+        ValidateValueCount(parameters, eventValueCount);
         if ((uint)index >= (uint)parameters.Count)
         {
             throw CreateException("Plugin event adapter value index is outside adapter parameters.");
@@ -46,18 +73,48 @@ internal static class PluginEventAdapterValueValidator
         SandboxValue[] values,
         int destinationIndex)
     {
-        EnsureValueCountMatches(eventValueCount, parameters.Count);
+        ValidateValueCount(parameters, eventValueCount);
         for (var i = 0; i < parameters.Count; i++)
         {
             RequireType(values[destinationIndex + i], parameters[i], i);
         }
     }
 
+    public static void ValidateValueCount(IReadOnlyList<Parameter> parameters, int eventValueCount)
+        => EnsureValueCountMatches(eventValueCount, parameters.Count);
+
     private static void EnsureValueCountMatches(int valueCount, int parameterCount)
     {
         if (valueCount != parameterCount)
         {
             throw CreateException("Plugin event adapter value count does not match adapter parameters.");
+        }
+    }
+
+    private static int ReadValueCount(IReadOnlyList<SandboxValue> values)
+    {
+        try
+        {
+            return values.Count;
+        }
+        catch (Exception ex) when (PluginEventAdapterShapeValidator.IsAdapterCallbackFailure(ex))
+        {
+            throw CreateException("Plugin event adapter output count could not be read.");
+        }
+    }
+
+    private static SandboxValue ReadValue(IReadOnlyList<SandboxValue> values, int index)
+    {
+        try
+        {
+            return values[index];
+        }
+        catch (Exception ex) when (PluginEventAdapterShapeValidator.IsAdapterCallbackFailure(ex))
+        {
+            throw CreateException(
+                "Plugin event adapter output at index " +
+                index.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                " could not be read.");
         }
     }
 

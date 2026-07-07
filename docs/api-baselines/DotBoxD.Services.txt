@@ -106,16 +106,16 @@ public InstanceRegistry() : this(DefaultMaxInstances) { }
 public InstanceRegistry(int maxInstances)
 public int Length => _length
 public int Length => Memory.Length
-public int MaxConcurrentInboundDispatch
-public int MaxInboundStreamsPerPeer
-public int MaxInboundStreamsPerRequest
-public int MaxPendingRequests
+public int MaxConcurrentInboundDispatch { get; init; }
+public int MaxInboundStreamsPerPeer { get; init; }
+public int MaxInboundStreamsPerRequest { get; init; }
+public int MaxPendingRequests { get; init; }
 public int MessageId { get; }
 public int MessageId { get; set; }
 public int StreamId { get; set; }
-public int WrittenCount
-public int? InboundQueueCapacity
-public int? MaxAcceptedPeers
+public int WrittenCount { get; }
+public int? InboundQueueCapacity { get; init; }
+public int? MaxAcceptedPeers { get; init; }
 public interface IInstanceRegistry
 public interface INonStreamingServiceDispatcher
 public interface IRpcChannel : IAsyncDisposable
@@ -131,7 +131,7 @@ public interface ITransport : IAsyncDisposable
 public IReadOnlyList<GeneratedMethod> Methods { get; init; } = Array.Empty<GeneratedMethod>()
 public IRpcChannel? Connection => Volatile.Read(ref _disposed) == 0 ? _connection : null
 public IServiceProvider? ServiceProvider { get; init; }
-public long? MaxInboundBytes
+public long? MaxInboundBytes { get; init; }
 public Memory<byte> GetMemory(int sizeHint = 0)
 public Memory<byte> Memory =>
 public MessageType MessageType { get; }
@@ -140,13 +140,13 @@ public partial interface IRpcInvoker
 public Payload DetachPayload()
 public Pipe GetPipe(RpcStreamHandle handle)
 public PooledBufferWriter(int initialCapacity = 256)
-public QueueFullMode QueueFullMode
+public QueueFullMode QueueFullMode { get; init; }
 public readonly record struct FramedMessage(int MessageId, MessageType Type, Payload Body)
 public readonly record struct GeneratedMethod( string Name, string WireName, Type ReturnType, Type? ResultType, GeneratedReturnKind ReturnKind, bool ReturnsNestedService, IReadOnlyList<GeneratedParameter> Parameters)
 public readonly record struct GeneratedParameter( string Name, Type Type, int Position, bool IsCancellationToken, bool HasDefaultValue, object? DefaultValue)
 public readonly record struct GeneratedService( Type ServiceType, Type ProxyType, Type DispatcherType, string ServiceName)
 public readonly record struct RpcErrorInfo(string Message, string Type)
-public ReadOnlyMemory<byte> Memory
+public ReadOnlyMemory<byte> Memory { get; }
 public ReadOnlyMemory<byte> WrittenMemory =>
 public ReadOnlySpan<byte> Span =>
 public RemoteServiceException(string message, string remoteExceptionType)
@@ -314,7 +314,7 @@ public Task<TResponse> InvokeOnInstanceAsync<TRequest, TResponse>( string servic
 public Task<TResponse> InvokeOnInstanceAsync<TRequest, TResponse>(string service, string instanceId, string method, TRequest request, CancellationToken ct = default) =>
 public Task<TResponse> InvokeOnInstanceAsync<TRequest, TResponse>(string service, string instanceId, string method, TRequest request, RpcStreamAttachment[] streams, CancellationToken ct = default) =>
 public Task<TResponse> InvokeOnInstanceAsync<TResponse>(string service, string instanceId, string method, CancellationToken ct = default) =>
-public TimeSpan RequestTimeout
+public TimeSpan RequestTimeout { get; init; }
 public TService Get<TService>() where TService : class
 public ValueTask DisposeAsync()
 public ValueTask DisposeAsync() => new(CloseAsync())

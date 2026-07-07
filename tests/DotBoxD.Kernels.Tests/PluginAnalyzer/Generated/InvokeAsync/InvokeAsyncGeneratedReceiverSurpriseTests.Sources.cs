@@ -1,8 +1,8 @@
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
-public sealed partial class InvokeAsyncGeneratedReceiverSurpriseTests
+internal static class InvokeAsyncGeneratedReceiverTestSources
 {
-    private static string GeneratedFacadeBodySource(string serverMembers, string worldMembers = "")
+    internal static string GeneratedFacadeBodySource(string serverMembers, string worldMembers = "")
         => """
         using System;
         using System.Threading;

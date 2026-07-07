@@ -39,7 +39,7 @@ public interface IServerExtensionClientRegistry : IServerExtensionWireClient
 public interface IServerExtensionWireClient
 public interface IServiceControl : IExtensibleControl
 public IPluginMessageSink Messages { get; }
-public IReadOnlyList<PluginMessage> Messages
+public IReadOnlyList<PluginMessage> Messages { get; }
 public PluginAttribute(string? id = null) => Id = id
 public PolymorphicHandleAttribute(string keyMember)
 public SandboxEffect Effects { get; }
@@ -78,10 +78,12 @@ public string DescriptorPayload { get; } = descriptorPayload
 public string Discriminator { get; }
 public string Id { get; } = id
 public string KeyMember { get; }
+public string Message { get; init; }
 public string MethodMetadataName { get; } = methodMetadataName
 public string MethodName { get; } = methodName
 public string Name { get; }
 public string NormalizedSignature { get; } = normalizedSignature
+public string TargetId { get; init; }
 public string? ContextFactory { get; set; }
 public string? Id { get; }
 public string? Name { get; } = name

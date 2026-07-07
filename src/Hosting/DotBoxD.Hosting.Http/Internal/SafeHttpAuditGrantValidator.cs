@@ -1,0 +1,39 @@
+using System.Net;
+using DotBoxD.Kernels;
+using DotBoxD.Kernels.Bindings;
+
+namespace DotBoxD.Hosting.Http.Internal;
+
+internal static class SafeHttpAuditGrantValidator
+{
+    public static bool Matches(CapabilityGrant grant, SandboxAuditEvent auditEvent)
+    {
+        if (auditEvent.ResourceId is not { } resource ||
+            !Uri.TryCreate(resource, UriKind.Absolute, out var uri) ||
+            !string.IsNullOrEmpty(uri.UserInfo))
+        {
+            return false;
+        }
+
+        var options = SafeHttpGrantReader.Read(grant);
+        return options.AllowedSchemes.Contains(uri.Scheme) &&
+               SafeHttpUriAudit.MatchesAllowedAuthority(options.AllowedHosts, uri) &&
+               IpLiteralMatches(options, uri);
+    }
+
+    private static bool IpLiteralMatches(SafeHttpGrantOptions options, Uri uri)
+    {
+        if (!IPAddress.TryParse(UnbracketHost(uri.Host), out var address))
+        {
+            return true;
+        }
+
+        return options.AllowIpLiterals &&
+               (options.AllowPrivateNetwork || !SafeIpAddressClassifier.IsNonGlobal(address));
+    }
+
+    private static string UnbracketHost(string host)
+        => host.Length >= 2 && host[0] == '[' && host[^1] == ']'
+            ? host[1..^1]
+            : host;
+}

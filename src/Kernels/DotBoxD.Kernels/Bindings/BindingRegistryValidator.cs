@@ -3,14 +3,14 @@ using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Kernels.Bindings;
 
-internal static partial class BindingRegistryValidator
+internal static class BindingRegistryValidator
 {
     private static readonly string[] ForbiddenReferenceFragments = [
         "System.", "Microsoft.", "Assembly.", "Type.", "Reflection.", "Process.",
         "Environment.", "Thread.", "Task.", "DllImport", "IServiceProvider"
     ];
 
-    private static readonly HashSet<string> BuiltInCapabilities = new(StringComparer.Ordinal) {
+    internal static readonly HashSet<string> BuiltInCapabilities = new(StringComparer.Ordinal) {
         "file.read", "file.write", "time.now", "random", "log.write"
     };
 
@@ -39,17 +39,17 @@ internal static partial class BindingRegistryValidator
 
     private static void ValidateBinding(BindingDescriptor binding, List<SandboxDiagnostic> diagnostics)
     {
-        ValidateBindingIdentity(binding, diagnostics);
-        ValidateBindingEffectBits(binding, diagnostics);
-        ValidateBindingClassifications(binding, diagnostics);
-        ValidateCapabilityRequirements(binding, diagnostics);
-        ValidateSandboxReach(binding, diagnostics);
-        ValidateCustomCapabilityGrant(binding, diagnostics);
+        BindingValidationPhases.ValidateBindingIdentity(binding, diagnostics);
+        BindingValidationPhases.ValidateBindingEffectBits(binding, diagnostics);
+        BindingValidationPhases.ValidateBindingClassifications(binding, diagnostics);
+        BindingValidationPhases.ValidateCapabilityRequirements(binding, diagnostics);
+        BindingValidationPhases.ValidateSandboxReach(binding, diagnostics);
+        BindingValidationPhases.ValidateCustomCapabilityGrant(binding, diagnostics);
         ValidateBuiltInCapabilityEffect(binding, diagnostics);
-        ValidateDangerousBinding(binding, diagnostics);
+        BindingValidationPhases.ValidateDangerousBinding(binding, diagnostics);
         ValidateCostModel(binding, diagnostics);
         BindingCompiledTargetValidator.Validate(binding, diagnostics);
-        ValidateBindingTypes(binding, diagnostics);
+        BindingValidationPhases.ValidateBindingTypes(binding, diagnostics);
     }
 
     private static void CheckDuplicateBindingIds(
@@ -117,7 +117,7 @@ internal static partial class BindingRegistryValidator
         return true;
     }
 
-    private static void ValidateType(
+    internal static void ValidateType(
         BindingDescriptor binding,
         SandboxType type,
         List<SandboxDiagnostic> diagnostics)
@@ -137,7 +137,7 @@ internal static partial class BindingRegistryValidator
         }
     }
 
-    private static void ValidateIdentifier(
+    internal static void ValidateIdentifier(
         string value,
         string description,
         string code,
@@ -183,23 +183,23 @@ internal static partial class BindingRegistryValidator
         return false;
     }
 
-    private static bool ReachesOutsideSandbox(BindingDescriptor binding)
+    internal static bool ReachesOutsideSandbox(BindingDescriptor binding)
         => IsExternal(binding.Safety) || binding.Effects.RequiresCapability();
 
     private static bool IsExternal(BindingSafety safety)
         => safety is BindingSafety.ReadOnlyExternal or BindingSafety.SideEffectingExternal;
 
-    private static bool IsKnownAuditLevel(AuditLevel auditLevel)
+    internal static bool IsKnownAuditLevel(AuditLevel auditLevel)
         => auditLevel is AuditLevel.None or
             AuditLevel.Summary or
             AuditLevel.PerCall or
             AuditLevel.PerResource or
             AuditLevel.FullInputOutput;
 
-    private static bool IsKnownAuditKind(string auditKind)
+    internal static bool IsKnownAuditKind(string auditKind)
         => auditKind is BindingAuditKinds.BindingCall or BindingAuditKinds.SandboxLog or BindingAuditKinds.PluginMessage;
 
-    private static bool IsKnownBindingSafety(BindingSafety safety)
+    internal static bool IsKnownBindingSafety(BindingSafety safety)
         => safety is BindingSafety.PureIntrinsic or
             BindingSafety.PureHostFacade or
             BindingSafety.ReadOnlyExternal or
