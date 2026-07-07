@@ -24,6 +24,7 @@ public sealed record VerificationPolicy(
     private IReadOnlySet<string> _allowedMembers = Freeze(AllowedMembers, nameof(AllowedMembers));
     private IReadOnlySet<string> _forbiddenTypePrefixes = Freeze(ForbiddenTypePrefixes, nameof(ForbiddenTypePrefixes));
     private IReadOnlySet<string> _runtimeFacadeIdentities = Freeze(RuntimeFacadeIdentities, nameof(RuntimeFacadeIdentities));
+    private string _verifierVersion = RequireVersion(VerifierVersion, nameof(VerifierVersion));
     private string? _allowlistHash;
     private string? _runtimeFacadeHash;
 
@@ -33,6 +34,7 @@ public sealed record VerificationPolicy(
     public IReadOnlySet<string> AllowedMembers { get => _allowedMembers; init { _allowedMembers = Freeze(value, nameof(AllowedMembers)); InvalidateHashes(); } }
     public IReadOnlySet<string> ForbiddenTypePrefixes { get => _forbiddenTypePrefixes; init { _forbiddenTypePrefixes = Freeze(value, nameof(ForbiddenTypePrefixes)); InvalidateHashes(); } }
     public IReadOnlySet<string> RuntimeFacadeIdentities { get => _runtimeFacadeIdentities; init { _runtimeFacadeIdentities = Freeze(value, nameof(RuntimeFacadeIdentities)); InvalidateHashes(); } }
+    public string VerifierVersion { get => _verifierVersion; init => _verifierVersion = RequireVersion(value, nameof(VerifierVersion)); }
 
     public static VerificationPolicy BoxedValueDefaults()
         => new(
@@ -282,6 +284,17 @@ public sealed record VerificationPolicy(
         }
 
         return values.ToFrozenSet(StringComparer.Ordinal);
+    }
+
+    private static string RequireVersion(string? value, string parameterName)
+    {
+        ArgumentNullException.ThrowIfNull(value, parameterName);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new ArgumentException("Verifier version must not be empty or whitespace.", parameterName);
+        }
+
+        return value;
     }
 
 }
