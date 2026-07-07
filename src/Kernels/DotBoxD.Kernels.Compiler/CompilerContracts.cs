@@ -34,6 +34,88 @@ public enum CompiledCacheStatus
     Recompiled
 }
 
+public sealed record CompiledCacheLookup(
+    CompiledCacheStatus Status,
+    CompiledArtifact? Artifact,
+    string? InvalidReason = null)
+{
+    private CompiledCacheStatus _status = ValidateStatus(Status);
+    private CompiledArtifact? _artifact = ValidateArtifact(Status, Artifact, InvalidReason);
+    private string? _invalidReason = ValidateInvalidReason(Status, Artifact, InvalidReason);
+
+    public CompiledCacheStatus Status
+    {
+        get => _status;
+        init
+        {
+            Validate(value, _artifact, _invalidReason);
+            _status = value;
+        }
+    }
+
+    public CompiledArtifact? Artifact
+    {
+        get => _artifact;
+        init
+        {
+            Validate(_status, value, _invalidReason);
+            _artifact = value;
+        }
+    }
+
+    public string? InvalidReason
+    {
+        get => _invalidReason;
+        init
+        {
+            Validate(_status, _artifact, value);
+            _invalidReason = value;
+        }
+    }
+
+    private static void Validate(CompiledCacheStatus status, CompiledArtifact? artifact, string? invalidReason)
+    {
+        _ = ValidateStatus(status);
+        _ = ValidateArtifact(status, artifact, invalidReason);
+        _ = ValidateInvalidReason(status, artifact, invalidReason);
+    }
+
+    private static CompiledCacheStatus ValidateStatus(CompiledCacheStatus status)
+        => status is CompiledCacheStatus.Hit or CompiledCacheStatus.Miss or CompiledCacheStatus.Invalid
+            ? status
+            : throw new ArgumentOutOfRangeException(nameof(Status), status, "Compiled cache lookup status is not supported.");
+
+    private static CompiledArtifact? ValidateArtifact(
+        CompiledCacheStatus status,
+        CompiledArtifact? artifact,
+        string? invalidReason)
+        => (status, artifact, invalidReason) switch
+        {
+            (CompiledCacheStatus.Hit, null, _) => throw new ArgumentException(
+                "Cache hits must include the cached artifact.",
+                nameof(Artifact)),
+            (CompiledCacheStatus.Miss or CompiledCacheStatus.Invalid, not null, _) => throw new ArgumentException(
+                "Cache misses and invalid entries cannot include an artifact.",
+                nameof(Artifact)),
+            _ => artifact
+        };
+
+    private static string? ValidateInvalidReason(
+        CompiledCacheStatus status,
+        CompiledArtifact? artifact,
+        string? invalidReason)
+        => (status, artifact, invalidReason) switch
+        {
+            (CompiledCacheStatus.Invalid, _, null or "") => throw new ArgumentException(
+                "Invalid cache entries must include the invalid reason.",
+                nameof(InvalidReason)),
+            (CompiledCacheStatus.Hit or CompiledCacheStatus.Miss, _, not null) => throw new ArgumentException(
+                "Only invalid cache entries can include an invalid reason.",
+                nameof(InvalidReason)),
+            _ => invalidReason
+        };
+}
+
 public sealed record CompiledArtifact
 {
     private byte[] _assemblyBytes = [];
