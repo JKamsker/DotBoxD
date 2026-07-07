@@ -48,7 +48,7 @@ public sealed class MessagePackRpcSerializer : ISerializer
     /// Creates a serializer using the supplied resolver plus DotBoxD's binary payload formatters.
     /// </summary>
     public static MessagePackRpcSerializer CreateWithResolver(IFormatterResolver resolver) =>
-        new(CreateOptions(resolver));
+        new(CreateOptions(resolver ?? throw new ArgumentNullException(nameof(resolver))));
 
     /// <summary>
     /// Creates MessagePack options that include DotBoxD's payload formatters before user resolvers.
@@ -99,6 +99,11 @@ public sealed class MessagePackRpcSerializer : ISerializer
 
     public void Serialize<T>(System.Buffers.IBufferWriter<byte> writer, T value)
     {
+        if (writer is null)
+        {
+            throw new ArgumentNullException(nameof(writer));
+        }
+
         ThrowIfUnsupportedObjectDeclaredScalar(typeof(T), value);
 
         try
