@@ -51,6 +51,7 @@ public sealed class ModuleValidator
             functions = analyzer.AnalyzeAll();
             requiredEffects = RequiredEffects(module, functions);
             bindingReferences = BindingReferenceCollector.CollectByFunction(module, bindings);
+            ValidateReferencedBindingSignatures(module, bindings, bindingReferences, diagnostics);
             requiredCapabilities = RequiredCapabilities(module, bindings, bindingReferences);
             ValidateCustomCapabilityGrantValidators(module, bindings, bindingReferences, diagnostics);
             PolicyResolver.Validate(module, bindings, policy, requiredEffects, requiredCapabilities, diagnostics);
@@ -85,6 +86,68 @@ public sealed class ModuleValidator
 
         return effects;
     }
+
+    private static void ValidateReferencedBindingSignatures(
+        SandboxModule module,
+        IBindingCatalog bindings,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> bindingReferences,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        var checkedBindings = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var function in module.Functions)
+        {
+            if (!function.IsEntrypoint ||
+                !bindingReferences.TryGetValue(function.Id, out var references))
+            {
+                continue;
+            }
+
+            foreach (var bindingId in references)
+            {
+                if (checkedBindings.Add(bindingId) &&
+                    bindings.TryGet(bindingId, out var binding))
+                {
+                    ValidateReferencedBindingSignature(binding, diagnostics);
+                }
+            }
+        }
+    }
+
+    private static void ValidateReferencedBindingSignature(
+        BindingSignature binding,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        if (!binding.Effects.ContainsOnlyKnownBits())
+        {
+            diagnostics.Add(new SandboxDiagnostic("E-BINDING-EFFECT", $"binding '{binding.Id}' declares an unknown effect"));
+        }
+
+        if (binding.Effects == SandboxEffect.None)
+        {
+            diagnostics.Add(new SandboxDiagnostic("E-BINDING-EFFECT", $"binding '{binding.Id}' declares no effects"));
+        }
+
+        if (binding.Effects.RequiresCapability() && string.IsNullOrWhiteSpace(binding.RequiredCapability))
+        {
+            diagnostics.Add(new SandboxDiagnostic("E-BINDING-CAP", $"binding '{binding.Id}' has side effects but no capability"));
+        }
+
+        if (!string.IsNullOrWhiteSpace(binding.RequiredCapability) &&
+            (binding.Effects & ~SandboxEffects.Pure) == SandboxEffect.None)
+        {
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-BINDING-EFFECT",
+                $"binding '{binding.Id}' requires a capability but declares only pure effects"));
+        }
+
+        if (IsExternal(binding.Safety) && string.IsNullOrWhiteSpace(binding.RequiredCapability))
+        {
+            diagnostics.Add(new SandboxDiagnostic("E-BINDING-CAP", $"binding '{binding.Id}' reaches outside the sandbox but has no capability"));
+        }
+    }
+
+    private static bool IsExternal(BindingSafety safety)
+        => safety is BindingSafety.ReadOnlyExternal or BindingSafety.SideEffectingExternal;
 
     private static IReadOnlySet<string> RequiredCapabilities(
         SandboxModule module,
