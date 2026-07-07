@@ -2,7 +2,7 @@ using DotBoxD.Kernels.Model;
 
 namespace DotBoxD.Kernels.Sandbox.Values;
 
-internal static partial class SandboxValidatedValueShapeMeter
+internal static class SandboxValidatedValueShapeMeter
 {
     public static ValueShape MeasureBindingReturn(
         SandboxValue value,
@@ -44,19 +44,24 @@ internal static partial class SandboxValidatedValueShapeMeter
         ResourceMeter? meter)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (TryMeasureScalar(value, expectedType, failure, limits, out var scalarShape))
+        if (SandboxValidatedScalarShapeMeter.TryMeasureScalar(value, expectedType, failure, limits, out var scalarShape))
         {
             return scalarShape;
         }
 
-        if (TryMeasureEmptyCollection(value, expectedType, failure, limits, out var emptyShape))
+        if (SandboxValidatedCollectionShapeMeter.TryMeasureEmptyCollection(
+                value,
+                expectedType,
+                failure,
+                limits,
+                out var emptyShape))
         {
             return emptyShape;
         }
 
         if (!expectedType.IsKnown())
         {
-            throw Error(failure);
+            throw SandboxValidatedValueShapeErrors.Error(failure);
         }
 
         return MeasureKnownValue(value, expectedType, failure, limits, cancellationToken, meter);
@@ -95,7 +100,7 @@ internal static partial class SandboxValidatedValueShapeMeter
                 }
 
                 ValidateKnownType(frame.Value, frame.ExpectedType, failure);
-                RequireScalarInvariants(frame.Value, failure);
+                SandboxValidatedScalarShapeMeter.RequireScalarInvariants(frame.Value, failure);
                 shape = MeasureFrame(shape, frame, active, stack, limits, failure);
             }
 
@@ -138,17 +143,29 @@ internal static partial class SandboxValidatedValueShapeMeter
         switch (value)
         {
             case StringValue text:
-                result = AddText(shape, SandboxLiteralConstraints.TextShape(text.Value), limits);
+                result = SandboxValidatedValueShapeLimits.AddText(
+                    shape,
+                    SandboxLiteralConstraints.TextShape(text.Value),
+                    limits);
                 return true;
             case OpaqueIdValue id:
-                RequireOpaqueId(id, failure);
-                result = AddText(shape, SandboxLiteralConstraints.TextShape(id.Value), limits);
+                SandboxValidatedScalarShapeMeter.RequireOpaqueId(id, failure);
+                result = SandboxValidatedValueShapeLimits.AddText(
+                    shape,
+                    SandboxLiteralConstraints.TextShape(id.Value),
+                    limits);
                 return true;
             case SandboxPathValue path:
-                result = AddText(shape, SandboxLiteralConstraints.TextShape(path.Value.RelativePath), limits);
+                result = SandboxValidatedValueShapeLimits.AddText(
+                    shape,
+                    SandboxLiteralConstraints.TextShape(path.Value.RelativePath),
+                    limits);
                 return true;
             case SandboxUriValue uri:
-                result = AddText(shape, SandboxLiteralConstraints.TextShape(uri.Value.Value), limits);
+                result = SandboxValidatedValueShapeLimits.AddText(
+                    shape,
+                    SandboxLiteralConstraints.TextShape(uri.Value.Value),
+                    limits);
                 return true;
             default:
                 result = shape;
@@ -168,13 +185,37 @@ internal static partial class SandboxValidatedValueShapeMeter
         switch (frame.Value)
         {
             case ListValue list:
-                result = AddList(shape, list, frame.ExpectedType, frame.Depth, active, stack, limits, failure);
+                result = SandboxValidatedCollectionShapeMeter.AddList(
+                    shape,
+                    list,
+                    frame.ExpectedType,
+                    frame.Depth,
+                    active,
+                    stack,
+                    limits,
+                    failure);
                 return true;
             case MapValue map:
-                result = AddMap(shape, map, frame.ExpectedType, frame.Depth, active, stack, limits, failure);
+                result = SandboxValidatedCollectionShapeMeter.AddMap(
+                    shape,
+                    map,
+                    frame.ExpectedType,
+                    frame.Depth,
+                    active,
+                    stack,
+                    limits,
+                    failure);
                 return true;
             case RecordValue record:
-                result = AddRecord(shape, record, frame.ExpectedType, frame.Depth, active, stack, limits, failure);
+                result = SandboxValidatedCollectionShapeMeter.AddRecord(
+                    shape,
+                    record,
+                    frame.ExpectedType,
+                    frame.Depth,
+                    active,
+                    stack,
+                    limits,
+                    failure);
                 return true;
             default:
                 result = shape;
@@ -189,7 +230,7 @@ internal static partial class SandboxValidatedValueShapeMeter
     {
         if (!active.Add(value))
         {
-            throw Error(failure);
+            throw SandboxValidatedValueShapeErrors.Error(failure);
         }
     }
 
@@ -200,42 +241,7 @@ internal static partial class SandboxValidatedValueShapeMeter
     {
         if (!SandboxValueTypeMatcher.MatchesValidationFrame(value, expectedType))
         {
-            throw Error(failure);
+            throw SandboxValidatedValueShapeErrors.Error(failure);
         }
     }
-
-    private static long AddLong(long current, long amount, string quotaMessage)
-    {
-        try
-        {
-            return checked(current + amount);
-        }
-        catch (OverflowException)
-        {
-            throw Quota(quotaMessage);
-        }
-    }
-
-    private static SandboxRuntimeException Quota(string message)
-        => new(new SandboxError(SandboxErrorCode.QuotaExceeded, message));
-
-    private static SandboxRuntimeException Error(ValidationFailure failure)
-        => new(new SandboxError(failure.Code, failure.Message));
-
-    private readonly record struct ValidationFailure(
-        SandboxErrorCode Code,
-        string? StaticMessage,
-        string? BindingId)
-    {
-        public static ValidationFailure Fixed(SandboxErrorCode code, string message)
-            => new(code, message, null);
-
-        public static ValidationFailure BindingReturn(string bindingId)
-            => new(SandboxErrorCode.BindingFailure, null, bindingId);
-
-        public string Message
-            => StaticMessage ?? $"binding '{BindingId}' returned an unexpected value type";
-    }
-
-    private readonly record struct Frame(SandboxValue Value, SandboxType ExpectedType, int Depth, bool Exit);
 }
