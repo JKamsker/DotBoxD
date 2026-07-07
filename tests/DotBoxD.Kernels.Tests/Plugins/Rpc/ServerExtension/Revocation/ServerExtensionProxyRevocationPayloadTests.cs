@@ -4,7 +4,7 @@ using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 using DotBoxD.Plugins.Runtime.Rpc;
 
-namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
+namespace DotBoxD.Kernels.Tests.Plugins.Rpc.ServerExtension.Revocation;
 
 public sealed class ServerExtensionProxyRevocationPayloadTests
 {
