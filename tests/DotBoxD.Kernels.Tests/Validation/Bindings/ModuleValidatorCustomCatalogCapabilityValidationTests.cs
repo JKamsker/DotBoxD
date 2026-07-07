@@ -33,11 +33,11 @@ public sealed class ModuleValidatorCustomCatalogCapabilityValidationTests
     }
 
     [Fact]
-    public void ModuleValidator_rejects_custom_catalog_pure_alloc_binding_with_capability()
+    public void ModuleValidator_rejects_custom_catalog_pure_binding_with_capability()
     {
         var result = new ModuleValidator().Validate(
             ModuleCallingCustomWrite(),
-            new CustomCatalog(CustomPureAllocCapabilitySignature()),
+            new CustomCatalog(CustomPureCapabilitySignature()),
             PurePolicyWithTimeGrant());
 
         Assert.False(result.Succeeded);
@@ -90,7 +90,7 @@ public sealed class ModuleValidatorCustomCatalogCapabilityValidationTests
             BindingSafety.SideEffectingExternal,
             CompiledBinding.RuntimeStub("Probe", "Write"));
 
-    private static BindingSignature CustomPureAllocCapabilitySignature()
+    private static BindingSignature CustomPureCapabilitySignature()
         => new(
             "custom.write",
             SemVersion.One,
