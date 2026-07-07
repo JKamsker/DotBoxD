@@ -28,6 +28,7 @@ internal static partial class ProxyGenerator
         sb.AppendLine("    /// <summary>");
         sb.AppendLine($"    /// Client proxy for {service.InterfaceName}.");
         sb.AppendLine("    /// </summary>");
+        ObsoleteAttributeEmitter.AppendIfPresent(sb, service.ObsoleteAttribute, "    ");
         sb.AppendLine($"    public sealed class {proxyName} : {baseList}");
         sb.AppendLine("    {");
         sb.AppendLine($"        private readonly {ServicesGeneratorTypeNames.GlobalRpcInvoker} _invoker;");
@@ -212,4 +213,5 @@ internal static partial class ProxyGenerator
             sb.AppendLine("}");
         }
     }
+
 }

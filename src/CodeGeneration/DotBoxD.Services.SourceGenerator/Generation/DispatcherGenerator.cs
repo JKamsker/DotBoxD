@@ -29,6 +29,7 @@ internal static class DispatcherGenerator
         var dispatcherInterfaces = DispatcherGeneratorHelpers.CanDispatchWithoutStreaming(service)
             ? $"{ServicesGeneratorTypeNames.GlobalServiceDispatcher}, {ServicesGeneratorTypeNames.GlobalNonStreamingServiceDispatcher}"
             : ServicesGeneratorTypeNames.GlobalServiceDispatcher;
+        ObsoleteAttributeEmitter.AppendIfPresent(sb, service.ObsoleteAttribute, "    ");
         sb.AppendLine($"    public sealed class {dispatcherName} : {dispatcherInterfaces}");
         sb.AppendLine("    {");
         sb.AppendLine($"        private readonly {qualifiedInterface}? _service;");
