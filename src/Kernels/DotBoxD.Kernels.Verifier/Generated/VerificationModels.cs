@@ -168,19 +168,19 @@ public sealed record VerificationManifestIdentity(
 
 public sealed record VerificationDiagnostic(string Code, string Message)
 {
-    private string _code = VerificationModelCopy.Required(Code, nameof(Code));
-    private string _message = VerificationModelCopy.Required(Message, nameof(Message));
+    private string _code = VerificationModelCopy.RequiredText(Code, nameof(Code));
+    private string _message = VerificationModelCopy.RequiredText(Message, nameof(Message));
 
     public string Code
     {
         get => _code;
-        init => _code = VerificationModelCopy.Required(value, nameof(Code));
+        init => _code = VerificationModelCopy.RequiredText(value, nameof(Code));
     }
 
     public string Message
     {
         get => _message;
-        init => _message = VerificationModelCopy.Required(value, nameof(Message));
+        init => _message = VerificationModelCopy.RequiredText(value, nameof(Message));
     }
 }
 
@@ -221,6 +221,12 @@ internal static class VerificationModelCopy
     internal static T Required<T>(T? value, string paramName)
         where T : class
         => value ?? throw new ArgumentNullException(paramName);
+
+    internal static string RequiredText(string? value, string paramName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value, paramName);
+        return value;
+    }
 
     internal static IReadOnlyList<T> List<T>(IEnumerable<T> values, string paramName)
     {
