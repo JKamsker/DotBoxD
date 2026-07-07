@@ -77,6 +77,23 @@ public sealed class InvokeAsyncGenerationTests
     }
 
     [Fact]
+    public void Method_group_InvokeAsync_reports_InvokeAsync_diagnostic()
+    {
+        var result = RunGenerator(UsageSource("""
+            public static ValueTask<int> Run(RemotePluginServer kernels)
+                => kernels.InvokeAsync(Handle);
+
+            private static ValueTask<int> Handle(IGameWorldAccess world)
+                => new ValueTask<int>(world.GetHealth("monster-1"));
+            """));
+
+        Assert.Contains(
+            result.Diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                          diagnostic.GetMessage().Contains("InvokeAsync", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void KernelMethod_helper_inside_InvokeAsync_generates_anonymous_package()
     {
         var result = RunGenerator(UsageSource("""

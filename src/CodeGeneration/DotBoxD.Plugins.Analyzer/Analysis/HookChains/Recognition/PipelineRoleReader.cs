@@ -61,8 +61,12 @@ internal static class PipelineRoleReader
                     attribute.ConstructorArguments.Length == 1 &&
                     attribute.ConstructorArguments[0].Value is int value)
                 {
-                    // PipelineTransport.Remote == 1, Local == 0.
-                    return value == 1 ? HookChainReceiverKind.Remote : HookChainReceiverKind.Local;
+                    return value switch
+                    {
+                        0 => HookChainReceiverKind.Local,
+                        1 => HookChainReceiverKind.Remote,
+                        _ => null,
+                    };
                 }
             }
         }

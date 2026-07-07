@@ -81,6 +81,48 @@ public sealed partial class PluginAnalyzerHookChainTests
             tree => tree.ToString().Contains("HookChain_", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Does_not_lower_a_pipeline_surface_with_an_unknown_transport()
+    {
+        var source = ConsumerSurfaceSource
+            .Replace("{0}", "[PipelineSurface((PipelineTransport)42)]", StringComparison.Ordinal)
+            .Replace("{1}", "[PipelineStep(PipelineStepRole.Filter)]", StringComparison.Ordinal)
+            .Replace("{2}", "[PipelineStep(PipelineStepRole.Seed)]", StringComparison.Ordinal);
+
+        var result = RunGenerator(source);
+
+        Assert.DoesNotContain(
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("HookChain_", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Method_group_Run_terminal_reports_not_lowered_diagnostic()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Abstractions;
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+
+            namespace Sample;
+
+            public sealed record HitEvent(string TargetId);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<HitEvent>().Run(Handle);
+
+                private static void Handle(HitEvent e, HookContext ctx) { }
+            }
+            """);
+
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK114");
+        Assert.DoesNotContain(
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("HookChain_", StringComparison.Ordinal));
+    }
+
     // A consumer surface that uses the framework's STANDARD stage names (On/Where) on [PipelineSurface] types.
     // The type opt-in alone must not be enough: each stage still needs its own [PipelineStep], otherwise an
     // ordinary same-named method on a surface type would be lowered by name behind the consumer's back.

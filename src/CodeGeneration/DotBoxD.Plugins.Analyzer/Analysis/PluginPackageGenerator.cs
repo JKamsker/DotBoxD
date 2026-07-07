@@ -124,7 +124,7 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
 
         var invokeAsyncResults = GeneratorGuard.SyntaxValues(
             context,
-            static (node, _) => node is InvocationExpressionSyntax invocation && HasLambdaArgument(invocation),
+            static (node, _) => node is InvocationExpressionSyntax,
             "InvokeAsync package model",
             static (syntaxContext, ct) => InvokeAsyncModelFactory.Create(syntaxContext, ct));
         GeneratorGuard.RegisterOutput(
@@ -242,9 +242,5 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
     }
 
     private static bool IsHookChainTerminal(SyntaxNode node)
-        => node is InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax } invocation &&
-           HasLambdaArgument(invocation);
-
-    private static bool HasLambdaArgument(InvocationExpressionSyntax invocation)
-        => invocation.ArgumentList.Arguments.Any(static argument => argument.Expression is LambdaExpressionSyntax);
+        => node is InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax };
 }

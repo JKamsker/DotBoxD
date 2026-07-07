@@ -103,6 +103,19 @@ public sealed class LoweredPipelineComposerTests
     }
 
     [Fact]
+    public void Filter_only_composition_accepts_structurally_equal_result_type_instances()
+    {
+        var inputType = SandboxType.Record([SandboxType.List(SandboxType.I32)]);
+        var resultType = SandboxType.Record([SandboxType.List(SandboxType.I32)]);
+        var filter = Step(LoweredPipelineStepKind.Filter, "record", "bool", inputType);
+
+        var module = LoweredPipelineComposer.Compose(
+            new LoweredPipelineComposition("filter-only", [filter], resultType));
+
+        Assert.Contains(module.Functions, function => function.Id == "Handle" && function.ReturnType == resultType);
+    }
+
+    [Fact]
     public void Rejects_an_unknown_step_kind()
     {
         var bogus = new LoweredPipelineStep(

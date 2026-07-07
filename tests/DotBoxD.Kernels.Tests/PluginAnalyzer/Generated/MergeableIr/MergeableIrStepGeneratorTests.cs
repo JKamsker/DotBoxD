@@ -73,6 +73,54 @@ public sealed class MergeableIrStepGeneratorTests
     }
 
     [Fact]
+    public void Generator_requires_only_capabilities_for_properties_read_by_the_lowered_expression()
+    {
+        var result = RunGeneratorAndAssertCompiles("""
+            using System;
+            using System.Collections.Generic;
+            using DotBoxD.Abstractions;
+            using DotBoxD.Kernels;
+
+            namespace Sample;
+
+            public sealed record ProbeEvent(
+                [property: Capability("probe.read.secret")] int Secret,
+                [property: Capability("probe.read.id")] string Id);
+
+            public sealed class StepPipeline<T>
+            {
+                private readonly List<LoweredPipelineStep> _steps;
+
+                public StepPipeline() : this(new List<LoweredPipelineStep>()) { }
+
+                private StepPipeline(List<LoweredPipelineStep> steps) => _steps = steps;
+
+                public IReadOnlyList<LoweredPipelineStep> Steps => _steps;
+
+                public StepPipeline<T> Where([LowerToIr(LoweredPipelineStepKind.Filter)] Func<T, bool> predicate)
+                    => throw new InvalidOperationException("not lowered");
+
+                public StepPipeline<T> Where(LoweredPipelineStep step)
+                {
+                    _steps.Add(step);
+                    return this;
+                }
+            }
+
+            public static class Usage
+            {
+                public static StepPipeline<ProbeEvent> Configure(StepPipeline<ProbeEvent> pipeline)
+                    => pipeline.Where(e => e.Id == "target-1");
+            }
+            """);
+
+        var generated = GeneratedSource(result);
+
+        Assert.Contains("\"probe.read.id\"", generated, StringComparison.Ordinal);
+        Assert.DoesNotContain("probe.read.secret", generated, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Generator_reports_marked_receiver_without_lowered_step_overload()
     {
         var result = RunGenerator("""

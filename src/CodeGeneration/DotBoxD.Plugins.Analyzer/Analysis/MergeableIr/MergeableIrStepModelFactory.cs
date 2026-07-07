@@ -75,7 +75,6 @@ internal static class MergeableIrStepModelFactory
         var outputTag = OutputTag(call.Kind, call.OutputType);
         var capabilities = new SortedSet<string>(StringComparer.Ordinal);
         var effects = new SortedSet<string>(StringComparer.Ordinal);
-        AddInputPropertyCapabilities(inputType, capabilities);
 
         var current = new DotBoxDExpressionModel(
             $"{DotBoxDGenerationNames.Helpers.Var}({LiteralReader.StringLiteral(CurrentValueName)})",
@@ -223,31 +222,6 @@ internal static class MergeableIrStepModelFactory
 
         return "<" + string.Join(", ", method.TypeArguments.Select(static type =>
             type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))) + ">";
-    }
-
-    private static void AddInputPropertyCapabilities(ITypeSymbol inputType, ISet<string> capabilities)
-    {
-        if (inputType is not INamedTypeSymbol named)
-        {
-            return;
-        }
-
-        foreach (var property in named.GetMembers().OfType<IPropertySymbol>())
-        {
-            foreach (var attribute in property.GetAttributes())
-            {
-                if (string.Equals(
-                        attribute.AttributeClass?.ToDisplayString(),
-                        DotBoxDMetadataNames.CapabilityAttribute,
-                        StringComparison.Ordinal) &&
-                    attribute.ConstructorArguments.Length == 1 &&
-                    attribute.ConstructorArguments[0].Value is string capability &&
-                    !string.IsNullOrEmpty(capability))
-                {
-                    capabilities.Add(capability);
-                }
-            }
-        }
     }
 
     private static string HintName(string ns, string className)
