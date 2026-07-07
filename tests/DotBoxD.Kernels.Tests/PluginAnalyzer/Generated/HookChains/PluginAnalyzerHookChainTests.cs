@@ -1,5 +1,7 @@
 using Microsoft.CodeAnalysis.CSharp;
 
+using static DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.HookChainGeneratorTestSupport;
+
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
 /// <summary>

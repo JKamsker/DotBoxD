@@ -5,7 +5,7 @@ using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Kernels.Runtime.Bindings;
 
-public static partial class SafeFileSystem
+public static class SafeFileSystem
 {
     public static async ValueTask<string> ReadTextAsync(
         SandboxContext context,
@@ -21,7 +21,7 @@ public static partial class SafeFileSystem
         var fileBytesReadBefore = context.Budget.FileBytesRead;
         try
         {
-            var resolved = ResolvePath(context, path, "file.read", "file.readText");
+            var resolved = SafeFilePathResolver.Resolve(context, path, "file.read", "file.readText");
             var info = new FileInfo(resolved.FullPath);
             if (!info.Exists)
             {
@@ -46,26 +46,26 @@ public static partial class SafeFileSystem
         }
         catch (SandboxRuntimeException ex)
         {
-            SafeFileAudit.Read(context, startedAt, false, FailureResource(path, "file.read"), ObservedReadBytes(context, fileBytesReadBefore), ex.Error.Code);
+            SafeFileAudit.Read(context, startedAt, false, SafeFilePathResolver.FailureResource(path, "file.read"), ObservedReadBytes(context, fileBytesReadBefore), ex.Error.Code);
             throw;
         }
         catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested &&
                                                 !cancellationToken.IsCancellationRequested)
         {
             var error = new SandboxError(SandboxErrorCode.Timeout, "file.readText denied: request timed out");
-            SafeFileAudit.Read(context, startedAt, false, FailureResource(path, "file.read"), ObservedReadBytes(context, fileBytesReadBefore), error.Code);
+            SafeFileAudit.Read(context, startedAt, false, SafeFilePathResolver.FailureResource(path, "file.read"), ObservedReadBytes(context, fileBytesReadBefore), error.Code);
             throw new SandboxRuntimeException(error);
         }
         catch (OperationCanceledException)
         {
             var error = new SandboxError(SandboxErrorCode.Cancelled, "file.readText cancelled");
-            SafeFileAudit.Read(context, startedAt, false, FailureResource(path, "file.read"), ObservedReadBytes(context, fileBytesReadBefore), error.Code);
+            SafeFileAudit.Read(context, startedAt, false, SafeFilePathResolver.FailureResource(path, "file.read"), ObservedReadBytes(context, fileBytesReadBefore), error.Code);
             throw new SandboxRuntimeException(error);
         }
         catch (Exception)
         {
             var error = new SandboxError(SandboxErrorCode.HostFailure, "file.readText failed");
-            SafeFileAudit.Read(context, startedAt, false, FailureResource(path, "file.read"), ObservedReadBytes(context, fileBytesReadBefore), error.Code);
+            SafeFileAudit.Read(context, startedAt, false, SafeFilePathResolver.FailureResource(path, "file.read"), ObservedReadBytes(context, fileBytesReadBefore), error.Code);
             throw new SandboxRuntimeException(error);
         }
     }
@@ -85,7 +85,7 @@ public static partial class SafeFileSystem
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var resolved = ResolvePath(context, path, "file.write", "file.writeText");
+            var resolved = SafeFilePathResolver.Resolve(context, path, "file.write", "file.writeText");
             var byteCount = Encoding.UTF8.GetByteCount(text);
             var permission = SafeFileWritePublisher.EnsureAllowed(resolved.Grant, resolved.FullPath, byteCount);
             context.Budget.ChargeFileWrite(byteCount);
@@ -125,26 +125,26 @@ public static partial class SafeFileSystem
         }
         catch (SandboxRuntimeException ex)
         {
-            SafeFileAudit.Write(context, startedAt, false, FailureResource(path, "file.write"), null, ex.Error.Code);
+            SafeFileAudit.Write(context, startedAt, false, SafeFilePathResolver.FailureResource(path, "file.write"), null, ex.Error.Code);
             throw;
         }
         catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested &&
                                                 !cancellationToken.IsCancellationRequested)
         {
             var error = new SandboxError(SandboxErrorCode.Timeout, "file.writeText denied: request timed out");
-            SafeFileAudit.Write(context, startedAt, false, FailureResource(path, "file.write"), null, error.Code);
+            SafeFileAudit.Write(context, startedAt, false, SafeFilePathResolver.FailureResource(path, "file.write"), null, error.Code);
             throw new SandboxRuntimeException(error);
         }
         catch (OperationCanceledException)
         {
             var error = new SandboxError(SandboxErrorCode.Cancelled, "file.writeText cancelled");
-            SafeFileAudit.Write(context, startedAt, false, FailureResource(path, "file.write"), null, error.Code);
+            SafeFileAudit.Write(context, startedAt, false, SafeFilePathResolver.FailureResource(path, "file.write"), null, error.Code);
             throw new SandboxRuntimeException(error);
         }
         catch (Exception)
         {
             var error = new SandboxError(SandboxErrorCode.HostFailure, "file.writeText failed");
-            SafeFileAudit.Write(context, startedAt, false, FailureResource(path, "file.write"), null, error.Code);
+            SafeFileAudit.Write(context, startedAt, false, SafeFilePathResolver.FailureResource(path, "file.write"), null, error.Code);
             throw new SandboxRuntimeException(error);
         }
     }
@@ -157,7 +157,7 @@ public static partial class SafeFileSystem
 
     private static async ValueTask<MemoryStream> ReadLimitedBytesAsync(
         SandboxContext context,
-        ResolvedPath resolved,
+        SafeFileResolvedPath resolved,
         long maxBytes,
         CancellationToken cancellationToken)
     {
@@ -209,4 +209,10 @@ public static partial class SafeFileSystem
     }
 
     internal static SandboxRuntimeException Error(SandboxErrorCode code, string message) => new(new SandboxError(code, message));
+
+    internal static void EnsureNoReparsePoint(string rootFull, string fullPath) =>
+        SafeFilePathGuard.EnsureNoReparsePoint(rootFull, fullPath);
+
+    internal static bool IsRootEscapeRelativePath(string relative) =>
+        SafeFilePathGuard.IsRootEscapeRelativePath(relative);
 }
