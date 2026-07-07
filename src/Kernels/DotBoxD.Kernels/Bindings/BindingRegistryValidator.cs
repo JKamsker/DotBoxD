@@ -5,11 +5,6 @@ namespace DotBoxD.Kernels.Bindings;
 
 internal static class BindingRegistryValidator
 {
-    private static readonly string[] ForbiddenReferenceFragments = [
-        "System.", "Microsoft.", "Assembly.", "Type.", "Reflection.", "Process.",
-        "Environment.", "Thread.", "Task.", "DllImport", "IServiceProvider"
-    ];
-
     internal static readonly HashSet<string> BuiltInCapabilities = new(StringComparer.Ordinal) {
         "file.read", "file.write", "time.now", "random", "log.write"
     };
@@ -148,44 +143,12 @@ internal static class BindingRegistryValidator
         string code,
         List<SandboxDiagnostic> diagnostics)
     {
-        if (string.IsNullOrWhiteSpace(value) || ContainsControlCharacter(value))
+        if (BindingIdentifierValidator.TryValidate(value, out var message))
         {
-            diagnostics.Add(new SandboxDiagnostic(
-                code,
-                $"{description} must be non-empty and must not contain control characters"));
             return;
         }
 
-        if (ContainsForbiddenReferenceFragment(value))
-        {
-            diagnostics.Add(new SandboxDiagnostic(code, $"{description} '{value}' looks like a forbidden CLR reference"));
-        }
-    }
-
-    private static bool ContainsControlCharacter(string value)
-    {
-        for (var i = 0; i < value.Length; i++)
-        {
-            if (char.IsControl(value[i]))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool ContainsForbiddenReferenceFragment(string value)
-    {
-        for (var i = 0; i < ForbiddenReferenceFragments.Length; i++)
-        {
-            if (value.Contains(ForbiddenReferenceFragments[i], StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        diagnostics.Add(new SandboxDiagnostic(code, $"{description} {message}"));
     }
 
     internal static bool ReachesOutsideSandbox(BindingDescriptor binding)

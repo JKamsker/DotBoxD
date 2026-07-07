@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("DotBoxD.Kernels.Runtime")]
 [assembly: InternalsVisibleTo("DotBoxD.Kernels.Validation")]
 [assembly: InternalsVisibleTo("DotBoxD.Kernels.Interpreter")]
+[assembly: InternalsVisibleTo("DotBoxD.Kernels.Validation")]
 [assembly: InternalsVisibleTo("DotBoxD.Kernels.Serialization.Json")]
 [assembly: InternalsVisibleTo("DotBoxD.Kernels.Validation")]
 [assembly: InternalsVisibleTo("DotBoxD.Hosting")]
