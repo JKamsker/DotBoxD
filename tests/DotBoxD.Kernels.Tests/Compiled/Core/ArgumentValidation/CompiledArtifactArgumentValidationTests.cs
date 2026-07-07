@@ -44,4 +44,42 @@ public sealed class CompiledArtifactArgumentValidationTests
         Assert.Equal(nameof(CompiledArtifact.Entrypoint), ex.ParamName);
     }
 
+    [Fact]
+    public void Compiled_artifact_constructor_rejects_unknown_cache_status()
+    {
+        var artifact = CompiledArtifactArgumentValidationFixtures.ValidDynamicArtifact();
+
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => new CompiledArtifact(
+            artifact.AssemblyBytes,
+            artifact.AssemblyHash,
+            artifact.Manifest,
+            artifact.Verification,
+            artifact.Entrypoint,
+            artifact.RuntimeForm,
+            (CompiledCacheStatus)99));
+
+        Assert.Equal("cacheStatus", ex.ParamName);
+    }
+
+    [Fact]
+    public void Compiled_artifact_init_rejects_unknown_runtime_form()
+    {
+        var artifact = CompiledArtifactArgumentValidationFixtures.ValidDynamicArtifact();
+
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(
+            () => artifact with { RuntimeForm = (CompiledRuntimeFormKind)99 });
+
+        Assert.Equal(nameof(CompiledArtifact.RuntimeForm), ex.ParamName);
+    }
+
+    [Fact]
+    public void Compiled_artifact_init_rejects_unknown_cache_status()
+    {
+        var artifact = CompiledArtifactArgumentValidationFixtures.ValidDynamicArtifact();
+
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(
+            () => artifact with { CacheStatus = (CompiledCacheStatus)99 });
+
+        Assert.Equal(nameof(CompiledArtifact.CacheStatus), ex.ParamName);
+    }
 }
