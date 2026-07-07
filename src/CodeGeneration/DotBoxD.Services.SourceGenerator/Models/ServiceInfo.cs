@@ -83,7 +83,8 @@ internal sealed record ServicePropertyModel(
     string? ProxyType,
     string PropertyAttributePrefix,
     bool IsInstanceId,
-    SubServiceInfo? SubService);
+    SubServiceInfo? SubService,
+    string MemberAttributePrefix = "");
 
 /// <summary>
 /// Immutable, value-equatable representation of a service method. When
@@ -98,6 +99,7 @@ internal sealed record MethodModel(
     MethodReturnKind ReturnKind,
     string DeclaredReturnType,
     string? UnwrappedReturnType,
+    string MemberAttributePrefix,
     string ReturnRefKindKeyword,
     string ReturnAttributePrefix,
     bool HasCancellationToken,

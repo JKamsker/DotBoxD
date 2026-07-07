@@ -131,6 +131,7 @@ internal static partial class ProxyGenerator
     private static void AppendProxyProperty(StringBuilder sb, ServicePropertyModel property)
     {
         AppendAttributes(sb, property.PropertyAttributePrefix);
+        AppendAttributes(sb, property.MemberAttributePrefix);
         if (property.IsInstanceId)
         {
             sb.AppendLine($"        public {property.Type} {property.Name} => this._instanceId ?? string.Empty;");
