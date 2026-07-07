@@ -77,6 +77,7 @@ internal static partial class RpcKernelClientProxyEmitter
         {
             var builder = new StringBuilder();
             var clientName = _kernelType.Name + "ServerExtensionClient";
+            RpcObsoleteAttributeSource.Append(builder, _serviceType, string.Empty);
             builder.Append(AccessibilityKeyword(_serviceType)).Append(" sealed class ")
                 .Append(clientName).Append(" : ").AppendLine(TypeName(_serviceType));
             builder.AppendLine("{");
