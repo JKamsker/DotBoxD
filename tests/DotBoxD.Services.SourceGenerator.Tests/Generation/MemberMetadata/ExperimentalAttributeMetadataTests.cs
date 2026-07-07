@@ -16,7 +16,8 @@ public sealed class ExperimentalAttributeMetadataTests
         var proxy = generated
             .Single(g => g.HintName == GeneratorTestHelper.HintName(
                 "Regress.ExperimentalSurface", "IRoot", GeneratorTestHelper.GeneratedKind.Proxy))
-            .SourceText.ToString();
+            .SourceText.ToString()
+            .Replace("\r\n", "\n");
         proxy.Should().Contain(
             "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBXEXP001\")]\n" +
             "        public global::System.Threading.Tasks.Task ExperimentalAsync()");
@@ -26,7 +27,8 @@ public sealed class ExperimentalAttributeMetadataTests
 
         var asyncSibling = generated
             .Single(g => g.HintName.EndsWith("IRoot.DotBoxDRpcAsync.g.cs", StringComparison.Ordinal))
-            .SourceText.ToString();
+            .SourceText.ToString()
+            .Replace("\r\n", "\n");
         asyncSibling.Should().Contain(
             "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBXEXP001\")]\n" +
             "        global::System.Threading.Tasks.Task ExperimentalAsync(");
