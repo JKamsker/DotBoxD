@@ -136,7 +136,7 @@ internal sealed partial class FunctionAnalyzer
 
         if (_bindings.TryGet(call.Name, out var binding))
         {
-            if (!BindingSignatureIdentityValidator.ValidateResolved(call.Name, binding, _diagnostics, call.Span))
+            if (!ValidateResolvedBindingSignature(call.Name, binding, call.Span))
             {
                 return SandboxType.Unit;
             }
@@ -223,6 +223,37 @@ internal sealed partial class FunctionAnalyzer
         => binding.Safety == BindingSafety.PureIntrinsic && IsPure(binding.Effects);
 
     private static bool IsPure(SandboxEffect effects) => (effects & ~SandboxEffects.Pure) == SandboxEffect.None;
+
+    private bool ValidateResolvedBindingSignature(string lookupId, BindingSignature binding, SourceSpan span)
+    {
+        var valid = ValidateBindingIdentifier(binding.Id, "binding id", "E-BINDING-ID", span);
+        if (binding.RequiredCapability is not null)
+        {
+            valid &= ValidateBindingIdentifier(binding.RequiredCapability, "required capability", "E-BINDING-CAP", span);
+        }
+
+        if (!string.Equals(lookupId, binding.Id, StringComparison.Ordinal))
+        {
+            _diagnostics.Add(new SandboxDiagnostic(
+                "E-BINDING-ID",
+                $"binding catalog returned binding id '{binding.Id}' for lookup '{lookupId}'",
+                Span: span));
+            valid = false;
+        }
+
+        return valid;
+    }
+
+    private bool ValidateBindingIdentifier(string value, string description, string code, SourceSpan span)
+    {
+        if (BindingIdentifierValidator.TryValidate(value, out var message))
+        {
+            return true;
+        }
+
+        _diagnostics.Add(new SandboxDiagnostic(code, $"{description} {message}", Span: span));
+        return false;
+    }
 
     private static bool IsNumeric(SandboxType type)
         => type == SandboxType.I32 || type == SandboxType.I64 || type == SandboxType.F64;

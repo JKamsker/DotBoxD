@@ -21,7 +21,7 @@ internal static class BindingIdentifierValidator
             return false;
         }
 
-        if (LooksLikeRawClrReference(value))
+        if (!IsHostRoutedIdentifier(value) && LooksLikeRawClrReference(value))
         {
             message = $"'{value}' looks like a forbidden CLR reference";
             return false;
@@ -72,17 +72,11 @@ internal static class BindingIdentifierValidator
     {
         var dot = value.IndexOf('.');
         var firstSegment = dot < 0 ? value : value[..dot];
-        var rootSegment = string.Equals(firstSegment, "host", StringComparison.Ordinal) && dot >= 0
-            ? NextSegment(value, dot + 1)
-            : firstSegment;
-        return ForbiddenClrRoots.Contains(rootSegment);
+        return ForbiddenClrRoots.Contains(firstSegment);
     }
 
-    private static string NextSegment(string value, int start)
-    {
-        var dot = value.IndexOf('.', start);
-        return dot < 0 ? value[start..] : value[start..dot];
-    }
+    private static bool IsHostRoutedIdentifier(string value)
+        => value.StartsWith("host.", StringComparison.Ordinal);
 
     private static bool ContainsControlCharacter(string value)
     {
