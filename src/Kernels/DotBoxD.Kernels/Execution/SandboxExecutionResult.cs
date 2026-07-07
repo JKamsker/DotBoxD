@@ -12,10 +12,43 @@ public sealed record SandboxExecutionResult
     private string _planHash = null!;
     private string _policyHash = null!;
     private ExecutionMode _actualMode;
+    private bool _succeeded;
+    private bool _succeededAssigned;
+    private bool _errorAssigned;
+    private SandboxValue? _value;
+    private SandboxError? _error;
 
-    public bool Succeeded { get; init; }
-    public SandboxValue? Value { get; init; }
-    public SandboxError? Error { get; init; }
+    public bool Succeeded
+    {
+        get => _succeeded;
+        init
+        {
+            _succeeded = value;
+            _succeededAssigned = true;
+            ValidateTerminalState();
+        }
+    }
+
+    public SandboxValue? Value
+    {
+        get => _value;
+        init
+        {
+            _value = value;
+            ValidateTerminalState();
+        }
+    }
+
+    public SandboxError? Error
+    {
+        get => _error;
+        init
+        {
+            _error = value;
+            _errorAssigned = true;
+            ValidateTerminalState();
+        }
+    }
     public required SandboxResourceUsage ResourceUsage
     {
         get => _resourceUsage;
@@ -80,4 +113,27 @@ public sealed record SandboxExecutionResult
         => Enum.IsDefined(mode)
             ? mode
             : throw new ArgumentException("Execution result mode must be defined.", paramName);
+
+    private void ValidateTerminalState()
+    {
+        if (!_succeededAssigned)
+        {
+            return;
+        }
+
+        if (_succeeded && _error is not null)
+        {
+            throw new ArgumentException("Successful execution results cannot carry an error.", nameof(Error));
+        }
+
+        if (!_succeeded && _value is not null)
+        {
+            throw new ArgumentException("Failed execution results cannot carry a value.", nameof(Value));
+        }
+
+        if (!_succeeded && _errorAssigned && _error is null)
+        {
+            throw new ArgumentException("Failed execution results must carry an error.", nameof(Error));
+        }
+    }
 }
