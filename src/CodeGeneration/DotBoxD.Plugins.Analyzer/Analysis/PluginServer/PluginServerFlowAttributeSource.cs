@@ -140,6 +140,15 @@ internal static class PluginServerFlowAttributeSource
                     }
 
                     break;
+
+                case "System.Diagnostics.CodeAnalysis.ExperimentalAttribute":
+                    if (!targetReturn &&
+                        ExperimentalAttribute(attribute) is { } experimentalSource)
+                    {
+                        lines.Add(experimentalSource);
+                    }
+
+                    break;
             }
         }
 
@@ -198,6 +207,30 @@ internal static class PluginServerFlowAttributeSource
         return arguments.Count == 0
             ? "[global::System.ObsoleteAttribute]"
             : "[global::System.ObsoleteAttribute(" + string.Join(", ", arguments) + ")]";
+    }
+
+    private static string? ExperimentalAttribute(AttributeData attribute)
+    {
+        if (attribute.ConstructorArguments.Length != 1 ||
+            attribute.ConstructorArguments[0].Value is not string diagnosticId)
+        {
+            return null;
+        }
+
+        var arguments = new List<string> { LiteralReader.StringLiteral(diagnosticId) };
+        foreach (var argument in attribute.NamedArguments)
+        {
+            if (argument.Key != "UrlFormat" ||
+                argument.Value.Value is not (null or string))
+            {
+                return null;
+            }
+
+            arguments.Add(argument.Key + " = " + LiteralReader.ObjectLiteral(argument.Value.Value));
+        }
+
+        return "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(" +
+            string.Join(", ", arguments) + ")]";
     }
 
     private static void AppendSimpleAttributePrefix(StringBuilder builder, string attributeType)
