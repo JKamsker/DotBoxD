@@ -14,6 +14,7 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("        public LiveSettingsHandle(" + PluginServerIdentifier.Escape(model.ClassName) + " owner, string pluginId) { _owner = owner; _pluginId = pluginId; }");
         builder.AppendLine("        public global::DotBoxD.Abstractions.ILiveSettingsHandle<TKernel> Set<TValue>(global::System.Linq.Expressions.Expression<global::System.Func<TKernel, TValue>> member, TValue value)");
         builder.AppendLine("        {");
+        builder.AppendLine("            if (member is null) throw new global::System.ArgumentNullException(nameof(member));");
         builder.AppendLine("            var body = member.Body is global::System.Linq.Expressions.UnaryExpression unary ? unary.Operand : member.Body;");
         builder.AppendLine("            if (body is not global::System.Linq.Expressions.MemberExpression { Member: global::System.Reflection.PropertyInfo property })");
         builder.AppendLine("            {");
@@ -33,6 +34,7 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("        }");
         builder.AppendLine("        public async global::System.Threading.Tasks.ValueTask SetValuesAsync(global::System.Action<TKernel> set, bool atomic = false)");
         builder.AppendLine("        {");
+        builder.AppendLine("            if (set is null) throw new global::System.ArgumentNullException(nameof(set));");
         builder.AppendLine("            var draft = new TKernel();");
         builder.AppendLine("            var properties = typeof(TKernel).GetProperties(global::System.Reflection.BindingFlags.Public | global::System.Reflection.BindingFlags.Instance)");
         builder.AppendLine("                .Where(static p => p.GetMethod is not null && p.GetIndexParameters().Length == 0)");
