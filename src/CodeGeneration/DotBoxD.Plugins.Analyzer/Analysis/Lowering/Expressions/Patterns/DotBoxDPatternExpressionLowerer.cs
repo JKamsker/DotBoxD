@@ -229,16 +229,16 @@ internal static partial class DotBoxDPatternExpressionLowerer
         {
             SyntaxKind.GreaterThanEqualsToken => (
                 DotBoxDGenerationNames.Helpers.Ge,
-                DotBoxDGenerationNames.Operators.GreaterThanOrEqual),
+                DotBoxDOperatorNames.GreaterThanOrEqual),
             SyntaxKind.GreaterThanToken => (
                 DotBoxDGenerationNames.Helpers.Gt,
-                DotBoxDGenerationNames.Operators.GreaterThan),
+                DotBoxDOperatorNames.GreaterThan),
             SyntaxKind.LessThanEqualsToken => (
                 DotBoxDGenerationNames.Helpers.Le,
-                DotBoxDGenerationNames.Operators.LessThanOrEqual),
+                DotBoxDOperatorNames.LessThanOrEqual),
             SyntaxKind.LessThanToken => (
                 DotBoxDGenerationNames.Helpers.Lt,
-                DotBoxDGenerationNames.Operators.LessThan),
+                DotBoxDOperatorNames.LessThan),
             _ => throw new NotSupportedException(
                 $"Unsupported relational pattern operator '{pattern.OperatorToken.ValueText}'.")
         };

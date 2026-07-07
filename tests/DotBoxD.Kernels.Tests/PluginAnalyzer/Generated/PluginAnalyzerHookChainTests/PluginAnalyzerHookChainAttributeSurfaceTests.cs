@@ -1,6 +1,8 @@
+using static DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.HookChainGeneratorTestSupport;
+
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
-public sealed partial class PluginAnalyzerHookChainTests
+public sealed class PluginAnalyzerHookChainAttributeSurfaceTests
 {
     // A consumer defines its OWN fluent surface: a custom-named pipeline type with custom-named seed and
     // filter methods, and opts into lowering purely by applying the public [PipelineSurface]/[PipelineStep]

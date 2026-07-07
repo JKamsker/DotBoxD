@@ -68,21 +68,21 @@ internal static class MergeableIrExpressionHelperEmitter
             DotBoxDGenerationNames.Helpers.Bool,
             Parameter(DotBoxDGenerationNames.CSharpTypes.Bool, "value"),
             $"new {TypeNames.GlobalLiteralExpression}({TypeNames.GlobalSandboxValue}.FromBool(value), Span)");
-        EmitUnaryHelper(builder, DotBoxDGenerationNames.Helpers.Not, DotBoxDGenerationNames.Operators.LogicalNot);
-        EmitUnaryHelper(builder, DotBoxDGenerationNames.Helpers.Neg, DotBoxDGenerationNames.Operators.Minus);
-        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Eq, DotBoxDGenerationNames.Operators.EqualTo);
-        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Ne, DotBoxDGenerationNames.Operators.NotEqualTo);
-        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Ge, DotBoxDGenerationNames.Operators.GreaterThanOrEqual);
-        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Gt, DotBoxDGenerationNames.Operators.GreaterThan);
-        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Le, DotBoxDGenerationNames.Operators.LessThanOrEqual);
-        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Lt, DotBoxDGenerationNames.Operators.LessThan);
-        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.And, DotBoxDGenerationNames.Operators.LogicalAnd);
-        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Or, DotBoxDGenerationNames.Operators.LogicalOr);
-        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Add, DotBoxDGenerationNames.Operators.Add);
-        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Sub, DotBoxDGenerationNames.Operators.Minus);
-        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Mul, DotBoxDGenerationNames.Operators.Multiply);
-        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Div, DotBoxDGenerationNames.Operators.Divide);
-        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Mod, DotBoxDGenerationNames.Operators.Modulo);
+        EmitUnaryHelper(builder, DotBoxDGenerationNames.Helpers.Not, DotBoxDOperatorNames.LogicalNot);
+        EmitUnaryHelper(builder, DotBoxDGenerationNames.Helpers.Neg, DotBoxDOperatorNames.Minus);
+        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Eq, DotBoxDOperatorNames.EqualTo);
+        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Ne, DotBoxDOperatorNames.NotEqualTo);
+        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Ge, DotBoxDOperatorNames.GreaterThanOrEqual);
+        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Gt, DotBoxDOperatorNames.GreaterThan);
+        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Le, DotBoxDOperatorNames.LessThanOrEqual);
+        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Lt, DotBoxDOperatorNames.LessThan);
+        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.And, DotBoxDOperatorNames.LogicalAnd);
+        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Or, DotBoxDOperatorNames.LogicalOr);
+        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Add, DotBoxDOperatorNames.Add);
+        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Sub, DotBoxDOperatorNames.Minus);
+        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Mul, DotBoxDOperatorNames.Multiply);
+        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Div, DotBoxDOperatorNames.Divide);
+        EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Mod, DotBoxDOperatorNames.Modulo);
     }
 
     private static void EmitHelper(StringBuilder builder, string name, string parameters, string expression)
