@@ -31,6 +31,20 @@ public sealed class VerifierEvidenceModelContractTests
     }
 
     [Fact]
+    public void VerificationResult_rejects_success_with_diagnostics()
+    {
+        var exception = Assert.ThrowsAny<ArgumentException>(
+            () => new VerificationResult(
+                true,
+                [new VerificationDiagnostic("V-TEST", "failure")],
+                "assembly-hash",
+                "verifier-version",
+                DateTimeOffset.UtcNow));
+
+        Assert.Contains("Diagnostics", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ArtifactManifest_rejects_null_optimization_flag_entries()
     {
         var exception = Assert.ThrowsAny<ArgumentException>(
