@@ -36,8 +36,8 @@ public sealed partial class Fix_CMP_0012_Tests
     private const string ExpressionReaderRelative =
         "src/Kernels/DotBoxD.Kernels.Serialization.Json/Internal/JsonExpressionReader.cs";
 
-    private const string SerializerRelative =
-        "src/Hosting/DotBoxD.Plugins/Json/PluginPackageJsonSerializer.cs";
+    private const string PluginPackageReaderRelative =
+        "src/Hosting/DotBoxD.Plugins/Json/PluginPackageJsonReader.cs";
 
     [Fact]
     public void Versioned_schema_artifacts_are_checked_in_under_a_version_segment()
@@ -111,12 +111,12 @@ public sealed partial class Fix_CMP_0012_Tests
     [InlineData(ModuleSchemaRelative, ExpressionReaderRelative, "unary expression", new[] { "unary", "operand" })]
     [InlineData(ModuleSchemaRelative, ExpressionReaderRelative, "binary expression", new[] { "op", "left", "right" })]
     // Plugin package envelope objects.
-    [InlineData(PackageSchemaRelative, SerializerRelative, "plugin package", new[] { "manifest", "module", "entrypoints" })]
-    [InlineData(PackageSchemaRelative, SerializerRelative, "plugin manifest", new[] { "pluginId", "contract", "mode", "effects", "liveSettings", "subscriptions", "requiredCapabilities", "rpcEntrypoint" })]
-    [InlineData(PackageSchemaRelative, SerializerRelative, "live setting", new[] { "name", "type", "defaultValue", "min", "max" })]
-    [InlineData(PackageSchemaRelative, SerializerRelative, "hook subscription", new[] { "event", "kernel", "indexedPredicates", "indexCoversPredicate", "localTerminal", "projectedType", "priority", "resultType", "resultLocalTerminal" })]
-    [InlineData(PackageSchemaRelative, SerializerRelative, "indexed predicate", new[] { "path", "operator", "value", "valueType" })]
-    [InlineData(PackageSchemaRelative, SerializerRelative, "kernel entrypoints", new[] { "shouldHandle", "handle" })]
+    [InlineData(PackageSchemaRelative, PluginPackageReaderRelative, "plugin package", new[] { "manifest", "module", "entrypoints" })]
+    [InlineData(PackageSchemaRelative, PluginPackageReaderRelative, "plugin manifest", new[] { "pluginId", "contract", "mode", "effects", "liveSettings", "subscriptions", "requiredCapabilities", "rpcEntrypoint" })]
+    [InlineData(PackageSchemaRelative, PluginPackageReaderRelative, "live setting", new[] { "name", "type", "defaultValue", "min", "max" })]
+    [InlineData(PackageSchemaRelative, PluginPackageReaderRelative, "hook subscription", new[] { "event", "kernel", "indexedPredicates", "indexCoversPredicate", "localTerminal", "projectedType", "priority", "resultType", "resultLocalTerminal" })]
+    [InlineData(PackageSchemaRelative, PluginPackageReaderRelative, "indexed predicate", new[] { "path", "operator", "value", "valueType" })]
+    [InlineData(PackageSchemaRelative, PluginPackageReaderRelative, "kernel entrypoints", new[] { "shouldHandle", "handle" })]
     public void Schema_allowed_properties_stay_synchronized_with_importer_strict_shape(
         string schemaRelative,
         string sourceRelative,

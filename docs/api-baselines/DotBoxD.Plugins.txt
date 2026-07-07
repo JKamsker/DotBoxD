@@ -532,6 +532,7 @@ public static class KernelRpcValueConverter
 public static class PluginDiagnosticCodes
 public static class PluginMessageBindings
 public static class PluginPackageJsonSchemas
+public static class PluginPackageJsonSerializer
 public static class PluginServerJsonExtensions
 public static EventIndexMatcher<TEvent> Create(IReadOnlyList<IndexedPredicate> predicates)
 public static IReadOnlyCollection<string> IndexKeyNames => (IReadOnlyCollection<string>)IndexKeys.Keys
@@ -552,7 +553,6 @@ public static KernelRpcValue[] DecodeArguments(ReadOnlyMemory<byte> payload)
 public static object? FromSandboxValue(SandboxValue value, Type type)
 public static partial class KernelRpcBinaryCodec
 public static partial class KernelRpcMarshaller
-public static partial class PluginPackageJsonSerializer
 public static PluginPackage Create( PluginManifest manifest, SandboxModule module, KernelEntrypoints? entrypoints = null)
 public static PluginPackage Import(string json)
 public static PluginPackage Resolve(Type kernelType)
