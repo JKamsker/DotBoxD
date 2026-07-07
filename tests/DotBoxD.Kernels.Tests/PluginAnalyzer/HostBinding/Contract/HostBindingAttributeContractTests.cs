@@ -1,6 +1,6 @@
 using DotBoxD.Kernels.Sandbox;
 
-namespace DotBoxD.Kernels.Tests.PluginAnalyzer.HostBinding;
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.HostBinding.Contract;
 
 public sealed class HostBindingAttributeContractTests
 {
