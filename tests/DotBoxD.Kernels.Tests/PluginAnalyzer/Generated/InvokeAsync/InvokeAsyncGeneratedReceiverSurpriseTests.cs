@@ -1,3 +1,4 @@
+using static DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.InvokeAsyncGeneratedReceiverTestSources;
 using static DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.InvokeAsyncGenerationTestSources;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;

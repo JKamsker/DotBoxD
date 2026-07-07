@@ -158,24 +158,24 @@ public IReadOnlyList<Statement> Else { get => _else; init => _else = ModelCopy.L
 public IReadOnlyList<Statement> Then { get => _then; init => _then = ModelCopy.List(value); }
 public IReadOnlySet<string> DeclaredOpaqueIdTypes { get; init; }
 public long AllocatedBytes { get => _allocatedBytes; init => _allocatedBytes = RequireNonNegative(value, nameof(AllocatedBytes)); }
-public long AllocatedBytes { get; private set; }
+public long AllocatedBytes => _allocatedBytes
 public long AuditCheckpoint() => Audit.EventsWritten
 public long CollectionElements { get => _collectionElements; init => _collectionElements = RequireNonNegative(value, nameof(CollectionElements)); }
 public long CollectionElements { get; private set; }
 public long EventsWritten { get; }
 public long FileBytesRead { get => _fileBytesRead; init => _fileBytesRead = RequireNonNegative(value, nameof(FileBytesRead)); }
-public long FileBytesRead { get; private set; }
+public long FileBytesRead => _fileBytesRead
 public long FileBytesWritten { get => _fileBytesWritten; init => _fileBytesWritten = RequireNonNegative(value, nameof(FileBytesWritten)); }
-public long FileBytesWritten { get; private set; }
+public long FileBytesWritten => _fileBytesWritten
 public long FuelUsed { get => _fuelUsed; init => _fuelUsed = RequireNonNegative(value, nameof(FuelUsed)); }
 public long FuelUsed { get; private set; }
 public long LoopIterations { get => _loopIterations; init => _loopIterations = RequireNonNegative(value, nameof(LoopIterations)); }
 public long LoopIterations { get; private set; }
 public long MaxFuel { get => _maxFuel; init => _maxFuel = RequireNonNegative(value, nameof(MaxFuel)); }
 public long NetworkBytesRead { get => _networkBytesRead; init => _networkBytesRead = RequireNonNegative(value, nameof(NetworkBytesRead)); }
-public long NetworkBytesRead { get; private set; }
+public long NetworkBytesRead => _networkBytesRead
 public long NetworkBytesWritten { get => _networkBytesWritten; init => _networkBytesWritten = RequireNonNegative(value, nameof(NetworkBytesWritten)); }
-public long NetworkBytesWritten { get; private set; }
+public long NetworkBytesWritten => _networkBytesWritten
 public long StringBytes { get => _stringBytes; init => _stringBytes = RequireNonNegative(value, nameof(StringBytes)); }
 public long StringBytes { get; private set; }
 public long? Bytes { get => _bytes; init => _bytes = RequireNonNegative(value, nameof(Bytes)); }
@@ -268,10 +268,10 @@ public sealed class BindingRegistryBuilder
 public sealed class ExecutionPlan
 public sealed class ExecutionPlanSeal : IEquatable<ExecutionPlanSeal>
 public sealed class InMemoryAuditSink : IAuditSink
+public sealed class ResourceMeter
 public sealed class SandboxPolicyBuilder
 public sealed class SandboxRuntimeException : Exception
 public sealed class SandboxValidationException : Exception
-public sealed partial class ResourceMeter
 public sealed partial class SandboxContext
 public sealed record AssignmentStatement(string Name, Expression Value, SourceSpan Span) : Statement(Span)
 public sealed record BinaryExpression(Expression Left, string Operator, Expression Right, SourceSpan Span) : Expression(Span)

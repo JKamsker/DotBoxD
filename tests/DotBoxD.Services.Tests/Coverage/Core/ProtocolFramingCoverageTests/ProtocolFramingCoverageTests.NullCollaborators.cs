@@ -1,6 +1,7 @@
 using DotBoxD.Codecs.MessagePack;
 using DotBoxD.Services.Protocol;
 using Xunit;
+using static DotBoxD.Services.Tests.Coverage.Core.ProtocolFramingTestSupport;
 
 namespace DotBoxD.Services.Tests.Coverage.Core;
 
@@ -51,7 +52,7 @@ public sealed partial class MessageFramerCoverageTests
     public async Task ReadMessageAsync_NullStream_ThrowsArgumentNullException()
     {
         var ex = await Assert.ThrowsAsync<ArgumentNullException>(
-            () => MessageFramer.ReadMessageAsync(null!).AsTaskWithTimeout(Timeout));
+            () => MessageFramer.ReadMessageAsync(null!).AsTaskWithTimeout(FramingTimeout));
 
         Assert.Equal("stream", ex.ParamName);
     }
@@ -64,7 +65,7 @@ public sealed partial class MessageFramerCoverageTests
                 null!,
                 1,
                 MessageType.Request,
-                ReadOnlyMemory<byte>.Empty).AsTaskWithTimeout(Timeout));
+                ReadOnlyMemory<byte>.Empty).AsTaskWithTimeout(FramingTimeout));
 
         Assert.Equal("stream", ex.ParamName);
     }
