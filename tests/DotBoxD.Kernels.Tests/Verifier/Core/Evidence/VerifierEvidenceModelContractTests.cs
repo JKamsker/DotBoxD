@@ -40,6 +40,15 @@ public sealed class VerifierEvidenceModelContractTests
     }
 
     [Fact]
+    public void VerificationManifestIdentity_rejects_null_manifest_factory_argument()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => VerificationManifestIdentity.FromManifest(null!));
+
+        Assert.Equal("manifest", exception.ParamName);
+    }
+
+    [Fact]
     public void ArtifactManifest_rejects_null_identity_fields()
     {
         var exception = Assert.Throws<ArgumentNullException>(

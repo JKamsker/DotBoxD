@@ -149,7 +149,10 @@ public sealed record VerificationManifestIdentity(
     }
 
     public static VerificationManifestIdentity FromManifest(ArtifactManifest manifest)
-        => new(
+    {
+        ArgumentNullException.ThrowIfNull(manifest);
+
+        return new(
             manifest.ArtifactVersion,
             manifest.CacheKey,
             manifest.ModuleHash,
@@ -164,6 +167,7 @@ public sealed record VerificationManifestIdentity(
             manifest.LanguageVersion,
             manifest.TargetFramework,
             manifest.OptimizationFlags);
+    }
 }
 
 public sealed record VerificationDiagnostic(string Code, string Message)
