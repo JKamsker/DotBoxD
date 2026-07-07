@@ -102,7 +102,7 @@ public sealed partial class PluginServer : IDisposable
     {
         ArgumentNullException.ThrowIfNull(package);
         ThrowIfDisposed();
-        PluginPackageValidator.ValidateRootContract(package);
+        PluginPackageRootValidator.Validate(package);
         var required = _host.GetRequiredCapabilities(package.Module)
             .ToHashSet(StringComparer.Ordinal);
         if (package.Manifest.RpcEntrypoint is null)

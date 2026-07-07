@@ -1,8 +1,8 @@
 namespace DotBoxD.Plugins.Runtime;
 
-internal static partial class PluginPackageValidator
+internal static class PluginPackageRootValidator
 {
-    internal static void ValidateRootContract(PluginPackage package)
+    internal static void Validate(PluginPackage package)
     {
         ArgumentNullException.ThrowIfNull(package);
         ArgumentNullException.ThrowIfNull(package.Manifest, nameof(PluginPackage.Manifest));

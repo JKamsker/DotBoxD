@@ -18,7 +18,7 @@ internal static class RpcKernelPackageValidator
 {
     public static void Validate(PluginPackage package)
     {
-        PluginPackageValidator.ValidateRootContract(package);
+        PluginPackageRootValidator.Validate(package);
         var diagnostics = new List<SandboxDiagnostic>();
         PluginManifestTextValidator.ValidatePluginId(package.Manifest.PluginId, diagnostics);
         PluginManifestTextValidator.ValidateText(package.Manifest.Contract, "plugin contract", diagnostics);

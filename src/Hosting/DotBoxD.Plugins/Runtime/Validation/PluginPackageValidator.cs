@@ -4,11 +4,11 @@ using DotBoxD.Plugins.Runtime.Validation;
 
 namespace DotBoxD.Plugins.Runtime;
 
-internal static partial class PluginPackageValidator
+internal static class PluginPackageValidator
 {
     public static void Validate(PluginPackage package)
     {
-        ValidateRootContract(package);
+        PluginPackageRootValidator.Validate(package);
         var diagnostics = new List<SandboxDiagnostic>();
         PluginPackageValidationPhases.ValidateManifestIdentity(package, diagnostics);
         var metadataKernel = ValidateModuleKernelMetadata(package, diagnostics);
