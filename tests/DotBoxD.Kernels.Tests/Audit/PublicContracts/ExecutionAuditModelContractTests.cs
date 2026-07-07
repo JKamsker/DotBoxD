@@ -39,6 +39,58 @@ public sealed class ExecutionAuditModelContractTests
     }
 
     [Theory]
+    [InlineData("SuccessValueBeforeSucceeded", true)]
+    [InlineData("FailureErrorBeforeSucceeded", false)]
+    [InlineData("FailureSucceededBeforeError", false)]
+    public void Execution_result_accepts_valid_terminal_state_initialization_orders(
+        string terminalOrder,
+        bool expectedSucceeded)
+    {
+        var result = terminalOrder switch
+        {
+            "SuccessValueBeforeSucceeded" => new SandboxExecutionResult
+            {
+                Value = SandboxValue.Unit,
+                Succeeded = true,
+                ResourceUsage = ValidUsage(),
+                AuditEvents = [ValidAuditEvent()],
+                ActualMode = ExecutionMode.Interpreted,
+                ExecutionDispatched = true,
+                ModuleHash = "module",
+                PlanHash = "plan",
+                PolicyHash = "policy"
+            },
+            "FailureErrorBeforeSucceeded" => new SandboxExecutionResult
+            {
+                Error = ValidError(),
+                Succeeded = false,
+                ResourceUsage = ValidUsage(),
+                AuditEvents = [ValidAuditEvent()],
+                ActualMode = ExecutionMode.Interpreted,
+                ExecutionDispatched = true,
+                ModuleHash = "module",
+                PlanHash = "plan",
+                PolicyHash = "policy"
+            },
+            "FailureSucceededBeforeError" => new SandboxExecutionResult
+            {
+                Succeeded = false,
+                Error = ValidError(),
+                ResourceUsage = ValidUsage(),
+                AuditEvents = [ValidAuditEvent()],
+                ActualMode = ExecutionMode.Interpreted,
+                ExecutionDispatched = true,
+                ModuleHash = "module",
+                PlanHash = "plan",
+                PolicyHash = "policy"
+            },
+            _ => throw new ArgumentOutOfRangeException(nameof(terminalOrder))
+        };
+
+        Assert.Equal(expectedSucceeded, result.Succeeded);
+    }
+
+    [Theory]
     [InlineData("SuccessWithError", "Error")]
     [InlineData("FailureWithValue", "Value")]
     [InlineData("FailureWithoutError", "Error")]
@@ -103,6 +155,9 @@ public sealed class ExecutionAuditModelContractTests
             PlanHash = "plan",
             PolicyHash = "policy"
         };
+
+    private static SandboxResourceUsage ValidUsage()
+        => new ResourceMeter(new ResourceLimits(MaxFuel: 1_000)).Snapshot();
 
     private static SandboxExecutionResult ValidFailedExecutionResult()
         => ValidExecutionResult() with

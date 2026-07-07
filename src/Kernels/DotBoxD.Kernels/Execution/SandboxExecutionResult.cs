@@ -13,6 +13,8 @@ public sealed record SandboxExecutionResult
     private string _policyHash = null!;
     private ExecutionMode _actualMode;
     private bool _succeeded;
+    private bool _succeededAssigned;
+    private bool _errorAssigned;
     private SandboxValue? _value;
     private SandboxError? _error;
 
@@ -21,17 +23,9 @@ public sealed record SandboxExecutionResult
         get => _succeeded;
         init
         {
-            if (value && _error is not null)
-            {
-                throw new ArgumentException("Successful execution results cannot carry an error.", nameof(Error));
-            }
-
-            if (!value && _value is not null)
-            {
-                throw new ArgumentException("Failed execution results cannot carry a value.", nameof(Value));
-            }
-
             _succeeded = value;
+            _succeededAssigned = true;
+            ValidateTerminalState();
         }
     }
 
@@ -40,12 +34,8 @@ public sealed record SandboxExecutionResult
         get => _value;
         init
         {
-            if (!_succeeded && value is not null)
-            {
-                throw new ArgumentException("Failed execution results cannot carry a value.", nameof(Value));
-            }
-
             _value = value;
+            ValidateTerminalState();
         }
     }
 
@@ -54,17 +44,9 @@ public sealed record SandboxExecutionResult
         get => _error;
         init
         {
-            if (_succeeded && value is not null)
-            {
-                throw new ArgumentException("Successful execution results cannot carry an error.", nameof(Error));
-            }
-
-            if (!_succeeded && value is null)
-            {
-                throw new ArgumentException("Failed execution results must carry an error.", nameof(Error));
-            }
-
             _error = value;
+            _errorAssigned = true;
+            ValidateTerminalState();
         }
     }
     public required SandboxResourceUsage ResourceUsage
@@ -131,4 +113,27 @@ public sealed record SandboxExecutionResult
         => Enum.IsDefined(mode)
             ? mode
             : throw new ArgumentException("Execution result mode must be defined.", paramName);
+
+    private void ValidateTerminalState()
+    {
+        if (!_succeededAssigned)
+        {
+            return;
+        }
+
+        if (_succeeded && _error is not null)
+        {
+            throw new ArgumentException("Successful execution results cannot carry an error.", nameof(Error));
+        }
+
+        if (!_succeeded && _value is not null)
+        {
+            throw new ArgumentException("Failed execution results cannot carry a value.", nameof(Value));
+        }
+
+        if (!_succeeded && _errorAssigned && _error is null)
+        {
+            throw new ArgumentException("Failed execution results must carry an error.", nameof(Error));
+        }
+    }
 }
