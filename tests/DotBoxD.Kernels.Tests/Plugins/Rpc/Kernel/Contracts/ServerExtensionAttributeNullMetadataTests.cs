@@ -51,6 +51,54 @@ public sealed class ServerExtensionAttributeNullMetadataTests
         AssertServerExtensionDiagnostic(diagnostics, "serviceType");
     }
 
+    [Fact]
+    public void Graft_server_extension_with_explicit_null_id_does_not_report_diagnostic()
+    {
+        var diagnostics = Diagnostics("""
+            using DotBoxD.Abstractions;
+            using DotBoxD.Kernels;
+            using DotBoxD.Kernels.Sandbox;
+
+            namespace Sample;
+
+            public sealed class EchoGraft
+            {
+                public int Echo(int value, HookContext ctx) => value;
+            }
+
+            [ServerExtension(typeof(EchoGraft), null)]
+            public sealed partial class EchoKernel
+            {
+            }
+            """);
+
+        AssertNoServerExtensionDiagnostic(diagnostics);
+    }
+
+    [Fact]
+    public void Graft_server_extension_with_named_null_id_does_not_report_diagnostic()
+    {
+        var diagnostics = Diagnostics("""
+            using DotBoxD.Abstractions;
+            using DotBoxD.Kernels;
+            using DotBoxD.Kernels.Sandbox;
+
+            namespace Sample;
+
+            public sealed class EchoGraft
+            {
+                public int Echo(int value, HookContext ctx) => value;
+            }
+
+            [ServerExtension(typeof(EchoGraft), id: null)]
+            public sealed partial class EchoKernel
+            {
+            }
+            """);
+
+        AssertNoServerExtensionDiagnostic(diagnostics);
+    }
+
     private static IReadOnlyList<Diagnostic> Diagnostics(string source)
         => PluginAnalyzerGeneratedPackageFactory.Diagnostics(source);
 
@@ -63,6 +111,16 @@ public sealed class ServerExtensionAttributeNullMetadataTests
             d => d.Id == "DBXK100" &&
                  d.GetMessage().Contains("ServerExtension", StringComparison.Ordinal) &&
                  d.GetMessage().Contains(parameterName, StringComparison.Ordinal));
+
+        Assert.DoesNotContain(diagnostics, d => d.Id.StartsWith("CS", StringComparison.Ordinal));
+    }
+
+    private static void AssertNoServerExtensionDiagnostic(IReadOnlyList<Diagnostic> diagnostics)
+    {
+        Assert.DoesNotContain(
+            diagnostics,
+            d => d.Id == "DBXK100" &&
+                 d.GetMessage().Contains("ServerExtension", StringComparison.Ordinal));
 
         Assert.DoesNotContain(diagnostics, d => d.Id.StartsWith("CS", StringComparison.Ordinal));
     }

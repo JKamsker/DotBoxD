@@ -57,13 +57,28 @@ internal static class ServerExtensionAttributeNullDiagnosticFactory
         IMethodSymbol constructor,
         int ordinal)
     {
+        var parameter = ResolveParameter(argument, constructor, ordinal);
+        return parameter is { IsOptional: false } ? parameter.Name : null;
+    }
+
+    private static IParameterSymbol? ResolveParameter(
+        AttributeArgumentSyntax argument,
+        IMethodSymbol constructor,
+        int ordinal)
+    {
         if (argument.NameColon is { Name.Identifier.ValueText: { Length: > 0 } name })
         {
-            return name;
+            foreach (var parameter in constructor.Parameters)
+            {
+                if (parameter.Name == name)
+                {
+                    return parameter;
+                }
+            }
+
+            return null;
         }
 
-        return ordinal < constructor.Parameters.Length
-            ? constructor.Parameters[ordinal].Name
-            : null;
+        return ordinal < constructor.Parameters.Length ? constructor.Parameters[ordinal] : null;
     }
 }
