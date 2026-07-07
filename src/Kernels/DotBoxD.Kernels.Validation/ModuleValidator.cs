@@ -47,10 +47,16 @@ public sealed class ModuleValidator
         SandboxEffect requiredEffects;
         try
         {
+            bindingReferences = BindingReferenceCollector.CollectByFunction(module, bindings);
+            ValidateReferencedBindingTypes(bindings, bindingReferences, diagnostics);
+            if (diagnostics.Count > 0)
+            {
+                return ModuleValidationResult.Failure(diagnostics);
+            }
+
             var analyzer = new FunctionAnalyzer(module, bindings, diagnostics, declaredOpaqueIdTypes);
             functions = analyzer.AnalyzeAll();
             requiredEffects = RequiredEffects(module, functions);
-            bindingReferences = BindingReferenceCollector.CollectByFunction(module, bindings);
             requiredCapabilities = RequiredCapabilities(module, bindings, bindingReferences);
             PolicyResolver.Validate(module, bindings, policy, requiredEffects, requiredCapabilities, diagnostics);
         }
@@ -123,6 +129,43 @@ public sealed class ModuleValidator
         }
 
         return required;
+    }
+
+    private static void ValidateReferencedBindingTypes(
+        IBindingCatalog bindings,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> bindingReferences,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        var validated = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var references in bindingReferences.Values)
+        {
+            foreach (var bindingId in references)
+            {
+                if (!validated.Add(bindingId) || !bindings.TryGet(bindingId, out var binding))
+                {
+                    continue;
+                }
+
+                ValidateBindingType(binding.Id, binding.ReturnType, diagnostics);
+                for (var i = 0; i < binding.Parameters.Count; i++)
+                {
+                    ValidateBindingType(binding.Id, binding.Parameters[i], diagnostics);
+                }
+            }
+        }
+    }
+
+    private static void ValidateBindingType(
+        string bindingId,
+        SandboxType type,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        if (!type.IsKnownBuiltIn())
+        {
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-BINDING-TYPE",
+                $"binding '{bindingId}' exposes forbidden or unknown type '{type}'"));
+        }
     }
 
     private static bool RequiresRuntimeAsync(BindingSignature binding)
