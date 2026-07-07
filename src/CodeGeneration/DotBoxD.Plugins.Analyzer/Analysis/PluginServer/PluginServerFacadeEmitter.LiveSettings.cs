@@ -23,6 +23,10 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("            {");
         builder.AppendLine("                throw new global::System.ArgumentException($\"Property '{property.Name}' is not a live setting.\", nameof(member));");
         builder.AppendLine("            }");
+        builder.AppendLine("            if (value is null && IsRequired(property) && CanObserveMissingRequiredValue(property))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                throw new global::System.ArgumentException($\"Required live setting '{property.Name}' must be assigned a non-null value.\", nameof(value));");
+        builder.AppendLine("            }");
         builder.AppendLine("            _updates.Add(new " + model.LiveSettingUpdateType + "(property.Name, global::System.Convert.ToString(value, global::System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty));");
         builder.AppendLine("            return this;");
         builder.AppendLine("        }");
