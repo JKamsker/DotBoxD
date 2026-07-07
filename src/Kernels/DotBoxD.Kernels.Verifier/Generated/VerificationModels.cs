@@ -191,16 +191,16 @@ public sealed record VerificationResult(
     string VerifierVersion,
     DateTimeOffset VerifiedAt)
 {
-    private IReadOnlyList<VerificationDiagnostic> _diagnostics = VerificationModelCopy.List(
+    private IReadOnlyList<VerificationDiagnostic> _diagnostics = VerificationModelCopy.Diagnostics(
         Diagnostics,
-        nameof(Diagnostics));
+        Succeeded);
     private string _assemblyHash = VerificationModelCopy.Required(AssemblyHash, nameof(AssemblyHash));
     private string _verifierVersion = VerificationModelCopy.Required(VerifierVersion, nameof(VerifierVersion));
 
     public IReadOnlyList<VerificationDiagnostic> Diagnostics
     {
         get => _diagnostics;
-        init => _diagnostics = VerificationModelCopy.List(value, nameof(Diagnostics));
+        init => _diagnostics = VerificationModelCopy.Diagnostics(value, Succeeded);
     }
 
     public string AssemblyHash
@@ -237,6 +237,25 @@ internal static class VerificationModelCopy
 
     internal static IReadOnlyList<T>? NullableList<T>(IEnumerable<T>? values, string paramName)
         => values is null ? null : List(values, paramName);
+
+    internal static IReadOnlyList<VerificationDiagnostic> Diagnostics(
+        IEnumerable<VerificationDiagnostic> values,
+        bool succeeded)
+        => RequireNoSuccessDiagnostics(List(values, nameof(VerificationResult.Diagnostics)), succeeded);
+
+    private static IReadOnlyList<VerificationDiagnostic> RequireNoSuccessDiagnostics(
+        IReadOnlyList<VerificationDiagnostic> diagnostics,
+        bool succeeded)
+    {
+        if (succeeded && diagnostics.Count > 0)
+        {
+            throw new ArgumentException(
+                "Succeeded verification results cannot include Diagnostics.",
+                nameof(VerificationResult.Diagnostics));
+        }
+
+        return diagnostics;
+    }
 }
 
 public interface IGeneratedAssemblyVerifier
