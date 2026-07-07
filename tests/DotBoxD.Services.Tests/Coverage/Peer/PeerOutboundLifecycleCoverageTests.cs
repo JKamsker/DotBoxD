@@ -13,7 +13,7 @@ using Xunit;
 namespace DotBoxD.Services.Tests.Coverage.Peer;
 
 /// <summary>
-/// Lifecycle/teardown coverage that complements <see cref="PeerOutboundCoverageTests"/>: faulting many
+/// Lifecycle/teardown coverage that complements <see cref="PeerOutboundInvocationCoverageTests"/>: faulting many
 /// in-flight requests at once on dispose (the <c>PendingRequests.FailAll</c> snapshot path), the
 /// <c>ReceivedResponse.DisposeWhenAvailable</c> deferred-disposal path for an unconsumed response, and
 /// the inbound byte-gate wait that drives <c>RpcTaskWaiter</c> being cancelled by peer shutdown.
