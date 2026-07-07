@@ -53,6 +53,7 @@ public sealed class ModuleValidator
             requiredEffects = RequiredEffects(module, functions);
             bindingReferences = BindingReferenceCollector.CollectByFunction(module, bindings);
             ValidateReferencedBindingSignatures(module, bindings, bindingReferences, diagnostics);
+            ValidateReferencedCompiledTargets(bindings, bindingReferences, diagnostics);
             requiredCapabilities = RequiredCapabilities(module, bindings, bindingReferences);
             ValidateCustomCapabilityGrantValidators(module, bindings, bindingReferences, diagnostics);
             PolicyResolver.Validate(module, bindings, policy, requiredEffects, requiredCapabilities, diagnostics);
@@ -188,6 +189,26 @@ public sealed class ModuleValidator
         }
 
         return required;
+    }
+
+    private static void ValidateReferencedCompiledTargets(
+        IBindingCatalog bindings,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> bindingReferences,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        var validated = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var references in bindingReferences.Values)
+        {
+            foreach (var bindingId in references)
+            {
+                if (!validated.Add(bindingId) || !bindings.TryGet(bindingId, out var binding))
+                {
+                    continue;
+                }
+
+                BindingCompiledTargetValidator.Validate(binding, diagnostics);
+            }
+        }
     }
 
     private static void ValidateCustomCapabilityGrantValidators(
