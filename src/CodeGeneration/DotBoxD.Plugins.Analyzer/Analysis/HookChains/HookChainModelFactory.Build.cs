@@ -161,6 +161,7 @@ internal static partial class HookChainModelFactory
             ContextParameterName: prepared.TerminalContextParam ?? DotBoxDGenerationNames.DefaultContextParameterName,
             HandleEventParameterName: prepared.TerminalElementParam,
             HandleContextParameterName: prepared.TerminalContextParam ?? DotBoxDGenerationNames.DefaultContextParameterName,
+            PackageAttributes: default,
             EventProperties: eventShape.EventProperties,
             LiveSettings: default,
             ShouldHandle: lowered.ShouldHandle,

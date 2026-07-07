@@ -18,6 +18,11 @@ internal static class DotBoxDPackageSourceEmitter
             builder.AppendLine();
         }
 
+        foreach (var attribute in model.PackageAttributes)
+        {
+            builder.AppendLine(attribute);
+        }
+
         builder.Append("public static class ").Append(model.PackageName).AppendLine();
         builder.AppendLine("{");
         EmitBody(builder, model);

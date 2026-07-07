@@ -12,6 +12,7 @@ internal sealed record PluginKernelModel(
     string ContextParameterName,
     string HandleEventParameterName,
     string HandleContextParameterName,
+    EquatableArray<string> PackageAttributes,
     EquatableArray<EventPropertyModel> EventProperties,
     EquatableArray<LiveSettingModel> LiveSettings,
     DotBoxDStatementBodyModel ShouldHandle,

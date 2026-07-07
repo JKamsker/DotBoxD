@@ -70,7 +70,7 @@ public sealed class PluginPackageObsoleteAttributeSurpriseTests
 
         Assert.Contains(
             consumerDiagnostics,
-            diagnostic => diagnostic.Id == "CS0618" &&
+            diagnostic => diagnostic.Id == "CS0619" &&
                           diagnostic.Severity == DiagnosticSeverity.Error &&
                           diagnostic.GetMessage().Contains("Use NewDamageKernel", StringComparison.Ordinal));
     }
