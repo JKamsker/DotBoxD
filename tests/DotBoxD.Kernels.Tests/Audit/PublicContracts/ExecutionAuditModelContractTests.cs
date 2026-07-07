@@ -49,8 +49,8 @@ public sealed class ExecutionAuditModelContractTests
             "SuccessWithError" => ValidExecutionResult() with { Error = ValidError() },
             "FailureWithValue" => ValidExecutionResult() with
             {
-                Error = ValidError(),
-                Succeeded = false
+                Succeeded = false,
+                Error = ValidError()
             },
             "FailureWithoutError" => ValidFailedExecutionResult() with { Error = null },
             _ => throw new ArgumentOutOfRangeException(nameof(terminalState))
@@ -107,8 +107,8 @@ public sealed class ExecutionAuditModelContractTests
     private static SandboxExecutionResult ValidFailedExecutionResult()
         => ValidExecutionResult() with
         {
-            Succeeded = false,
             Value = null,
+            Succeeded = false,
             Error = ValidError()
         };
 
