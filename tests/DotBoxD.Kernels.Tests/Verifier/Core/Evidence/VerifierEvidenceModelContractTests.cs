@@ -16,6 +16,22 @@ public sealed class VerifierEvidenceModelContractTests
         Assert.Equal("Message", message.ParamName);
     }
 
+    [Theory]
+    [InlineData("", "message", "Code")]
+    [InlineData("   ", "message", "Code")]
+    [InlineData("V-TEST", "", "Message")]
+    [InlineData("V-TEST", "   ", "Message")]
+    public void VerificationDiagnostic_rejects_blank_contract_fields(
+        string code,
+        string message,
+        string parameterName)
+    {
+        var exception = Assert.ThrowsAny<ArgumentException>(
+            () => new VerificationDiagnostic(code, message));
+
+        Assert.Equal(parameterName, exception.ParamName);
+    }
+
     [Fact]
     public void VerificationResult_rejects_null_diagnostic_entries()
     {
