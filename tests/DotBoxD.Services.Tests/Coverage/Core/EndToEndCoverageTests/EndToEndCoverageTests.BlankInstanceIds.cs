@@ -7,10 +7,11 @@ using DotBoxD.Services.Tests.GeneratedFixtures;
 using DotBoxD.Services.Tests.Support;
 using Shared;
 using Xunit;
+using static DotBoxD.Services.Tests.Coverage.Core.EndToEndCoverageTestSupport;
 
 namespace DotBoxD.Services.Tests.Coverage.Core;
 
-public sealed partial class EndToEndCoverageTests
+public sealed class EndToEndBlankInstanceIdTests
 {
     [Theory]
     [InlineData("")]
@@ -25,7 +26,7 @@ public sealed partial class EndToEndCoverageTests
                 () => client.InvokeOnInstanceAsync<ServerStatus>(
                     "IGameService",
                     instanceId,
-                    "GetServerStatusAsync").WaitAsync(Timeout));
+                    "GetServerStatusAsync").WaitAsync(EndToEndTimeout));
 
             Assert.Equal("instanceId", ex.ParamName);
         }
@@ -43,19 +44,19 @@ public sealed partial class EndToEndCoverageTests
     {
         var (clientConnection, serverConnection) = InMemoryPipe.CreateConnectionPair();
         await using var server = RpcPeer
-            .Over(serverConnection, NewSerializer(), new RpcPeerOptions { RequestTimeout = Timeout })
+            .Over(serverConnection, NewSerializer(), new RpcPeerOptions { RequestTimeout = EndToEndTimeout })
             .Provide((IServiceDispatcher)new BlankHandleRootDispatcher(instanceId))
             .ProvideSubServiceLifecycleChild(new LifecycleChildService())
             .Start();
         await using var client = RpcPeer
-            .Over(clientConnection, NewSerializer(), new RpcPeerOptions { RequestTimeout = Timeout })
+            .Over(clientConnection, NewSerializer(), new RpcPeerOptions { RequestTimeout = EndToEndTimeout })
             .Start();
 
         var root = client.Get<ISubServiceLifecycleRoot>();
-        var child = await root.CreateAsync().WaitAsync(Timeout);
+        var child = await root.CreateAsync().WaitAsync(EndToEndTimeout);
 
         var ex = await Assert.ThrowsAsync<ArgumentException>(
-            () => child.PingAsync().WaitAsync(Timeout));
+            () => child.PingAsync().WaitAsync(EndToEndTimeout));
 
         Assert.Equal("instanceId", ex.ParamName);
     }
