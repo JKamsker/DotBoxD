@@ -1,19 +1,19 @@
 using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Plugins;
 
-namespace DotBoxD.Kernels.Tests.Plugins;
+namespace DotBoxD.Kernels.Tests.Plugins.Server.PackageContracts;
 
 public sealed class PluginPackageRootContractTests
 {
     public static TheoryData<string, Func<PluginPackage, PluginPackage>> InvalidRootPackages()
         => new()
         {
-            { "Manifest", package => new PluginPackage(null!, package.Module, package.Entrypoints) },
-            { "Manifest", package => package with { Manifest = null! } },
-            { "Module", package => new PluginPackage(package.Manifest, null!, package.Entrypoints) },
-            { "Module", package => package with { Module = null! } },
-            { "Entrypoints", package => new PluginPackage(package.Manifest, package.Module, null!) },
-            { "Entrypoints", package => package with { Entrypoints = null! } },
+            { nameof(PluginPackage.Manifest), package => new PluginPackage(null!, package.Module, package.Entrypoints) },
+            { nameof(PluginPackage.Manifest), package => package with { Manifest = null! } },
+            { nameof(PluginPackage.Module), package => new PluginPackage(package.Manifest, null!, package.Entrypoints) },
+            { nameof(PluginPackage.Module), package => package with { Module = null! } },
+            { nameof(PluginPackage.Entrypoints), package => new PluginPackage(package.Manifest, package.Module, null!) },
+            { nameof(PluginPackage.Entrypoints), package => package with { Entrypoints = null! } },
         };
 
     [Theory]

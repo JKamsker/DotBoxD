@@ -8,6 +8,7 @@ internal static partial class PluginPackageValidator
 {
     public static void Validate(PluginPackage package)
     {
+        ValidateRootContract(package);
         var diagnostics = new List<SandboxDiagnostic>();
         ValidateManifestIdentity(package, diagnostics);
         var metadataKernel = ValidateModuleKernelMetadata(package, diagnostics);
