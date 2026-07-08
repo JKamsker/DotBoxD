@@ -69,13 +69,20 @@ public sealed class HostBindingAttribute : Attribute
 
 /// <summary>
 /// Gates an event property behind a capability. Reading the property from kernel IR contributes
-/// <paramref name="id"/> to the manifest's required capabilities, so a kernel that touches the property
+/// <see cref="Id"/> to the manifest's required capabilities, so a kernel that touches the property
 /// only installs under a policy granting it. Unannotated properties stay ungated (default-allow).
 /// </summary>
 [AttributeUsage(AttributeTargets.Property)]
-public sealed class CapabilityAttribute(string id) : Attribute
+public sealed class CapabilityAttribute : Attribute
 {
-    public string Id { get; } = id;
+    public CapabilityAttribute(string id)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+
+        Id = id;
+    }
+
+    public string Id { get; }
 }
 
 /// <summary>
