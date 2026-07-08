@@ -33,7 +33,7 @@ public enum PipelineStepRole.Seed = 0
 public enum PipelineTransport
 public enum PipelineTransport.Local = 0
 public enum PipelineTransport.Remote = 1
-public GeneratedPluginServerRegistryKind Kind { get; } = kind
+public GeneratedPluginServerRegistryKind Kind { get; } = Enum.IsDefined(kind)
 public HandleSubtypeAttribute( Type subtype, string discriminator, string bindingPrefix, string capability)
 public HookAttribute(string name, Type resultType)
 public HookContext(IPluginMessageSink messages, CancellationToken cancellationToken)
@@ -106,7 +106,7 @@ public sealed record PluginMessage(string TargetId, string Message)
 public SemVersion TargetSandboxVersion { get; init; } = new(1, 0, 0)
 public SemVersion Version { get; init; } = new(1, 0, 0)
 public ServerExtensionAttribute(string id, Type serviceType)
-public ServerExtensionAttribute(string id) => Id = id
+public ServerExtensionAttribute(string id) => Id = id ?? throw new ArgumentNullException(nameof(id))
 public ServerExtensionAttribute(Type grafts, string? id = null)
 public static class LoweredPipelineComposer
 public static IRFunc<TInput, TOutput> FromStep(LoweredPipelineStep step) => new(step)
@@ -116,17 +116,17 @@ public string BindingId { get; }
 public string BindingPrefix { get; }
 public string Capability { get; }
 public string Capability { get; } = capability
-public string DescriptorHash { get; } = descriptorHash
-public string DescriptorPayload { get; } = descriptorPayload
+public string DescriptorHash { get; } = RequireMetadata(descriptorHash, nameof(descriptorHash))
+public string DescriptorPayload { get; } = RequireMetadata(descriptorPayload, nameof(descriptorPayload))
 public string Discriminator { get; }
 public string HandleFunctionId { get; init; } = "Handle"
 public string Id { get; } = id
 public string KeyMember { get; }
 public string Message { get; init; }
-public string MethodMetadataName { get; } = methodMetadataName
+public string MethodMetadataName { get; } = RequireMetadata(methodMetadataName, nameof(methodMetadataName))
 public string MethodName { get; } = methodName
 public string Name { get; }
-public string NormalizedSignature { get; } = normalizedSignature
+public string NormalizedSignature { get; } = RequireMetadata(normalizedSignature, nameof(normalizedSignature))
 public string ParameterName { get; }
 public string ShouldHandleFunctionId { get; init; } = "ShouldHandle"
 public string TargetId { get; init; }
@@ -134,10 +134,10 @@ public string? ContextFactory { get; set; }
 public string? Id { get; }
 public string? Name { get; } = name
 public THost Host<THost>() where THost : class
-public Type ContextType { get; } = contextType
+public Type ContextType { get; } = contextType ?? throw new ArgumentNullException(nameof(contextType))
 public Type ReceiverType { get; } = receiverType
 public Type ResultType { get; }
-public Type ServerType { get; } = serverType
+public Type ServerType { get; } = serverType ?? throw new ArgumentNullException(nameof(serverType))
 public Type Subtype { get; }
 public Type? Context { get; set; }
 public Type? ControlService { get; set; }

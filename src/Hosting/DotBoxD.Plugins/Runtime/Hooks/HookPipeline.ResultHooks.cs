@@ -179,7 +179,14 @@ public partial class HookPipeline<TEvent, TContext>
             typeof(TEvent),
             typeof(DotBoxD.Abstractions.HookAttribute),
             inherit: false);
-        if (hook is null || hook.ResultType == resultType)
+        if (hook is null)
+        {
+            throw ResultValidationError(
+                $"Hook context '{typeof(TEvent).FullName}' must declare [Hook] with a result type " +
+                $"before installing result hook '{resultType.FullName}'.");
+        }
+
+        if (hook.ResultType == resultType)
         {
             return;
         }

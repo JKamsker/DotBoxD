@@ -27,7 +27,8 @@ public sealed class HostBindingAttribute : Attribute
 {
     public HostBindingAttribute(string bindingId, string capability, SandboxEffect effects)
     {
-        ArgumentNullException.ThrowIfNull(bindingId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(bindingId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(capability);
 
         BindingId = bindingId;
         Capability = capability;
@@ -36,6 +37,8 @@ public sealed class HostBindingAttribute : Attribute
 
     public HostBindingAttribute(string capability, SandboxEffect effects)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(capability);
+
         BindingId = string.Empty;
         Capability = capability;
         Effects = effects;
@@ -141,17 +144,17 @@ public sealed class KernelMethodAttribute : Attribute;
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class ServerExtensionAttribute : Attribute
 {
-    public ServerExtensionAttribute(string id) => Id = id;
+    public ServerExtensionAttribute(string id) => Id = id ?? throw new ArgumentNullException(nameof(id));
 
     public ServerExtensionAttribute(string id, Type serviceType)
     {
-        Id = id;
-        ServiceType = serviceType;
+        Id = id ?? throw new ArgumentNullException(nameof(id));
+        ServiceType = serviceType ?? throw new ArgumentNullException(nameof(serviceType));
     }
 
     public ServerExtensionAttribute(Type grafts, string? id = null)
     {
-        Grafts = grafts;
+        Grafts = grafts ?? throw new ArgumentNullException(nameof(grafts));
         Id = id;
     }
 

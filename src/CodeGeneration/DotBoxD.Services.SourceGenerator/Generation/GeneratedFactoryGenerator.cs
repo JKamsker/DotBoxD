@@ -36,6 +36,7 @@ internal static class GeneratedFactoryGenerator
             var fullProxyName = IdentifierHelpers.QualifyTypeName(service.Namespace, serviceName + "Proxy");
             var fullDispatcherName = IdentifierHelpers.QualifyTypeName(service.Namespace, serviceName + "Dispatcher");
 
+            AppendObsoletePragmaStart(sb, service);
             sb.AppendLine($"            new {ServicesGeneratorTypeNames.GlobalGeneratedService}(");
             sb.AppendLine($"                typeof({fullInterfaceName}),");
             sb.AppendLine($"                typeof({fullProxyName}),");
@@ -45,6 +46,7 @@ internal static class GeneratedFactoryGenerator
             // double-escaping names that contain backslashes, quotes, or control characters.
             sb.AppendLine($"                \"{service.ServiceName}\",");
             sb.AppendLine($"                {GeneratedFactoryMetadataEmitter.MethodArrayName(i)}),");
+            AppendObsoletePragmaEnd(sb, service);
         }
 
         sb.AppendLine("        });");
@@ -64,10 +66,12 @@ internal static class GeneratedFactoryGenerator
             var fullProxyName = IdentifierHelpers.QualifyTypeName(service.Namespace, serviceName + "Proxy");
             var fullDispatcherName = IdentifierHelpers.QualifyTypeName(service.Namespace, serviceName + "Dispatcher");
 
+            AppendObsoletePragmaStart(sb, service);
             sb.AppendLine($"            {ServicesGeneratorTypeNames.GlobalGeneratedServiceRegistry}.{ServicesGeneratorMemberNames.GeneratedServiceRegistry.Register}<{fullInterfaceName}>(");
             sb.AppendLine($"                static client => new {fullProxyName}(client),");
             sb.AppendLine($"                static implementation => new {fullDispatcherName}(({fullInterfaceName})implementation),");
             sb.AppendLine($"                s_services[{i.ToString(System.Globalization.CultureInfo.InvariantCulture)}]);");
+            AppendObsoletePragmaEnd(sb, service);
         }
 
         sb.AppendLine("        }");
@@ -96,7 +100,9 @@ internal static class GeneratedFactoryGenerator
             var fullInterfaceName = IdentifierHelpers.QualifyTypeName(service.Namespace, service.InterfaceName);
             var fullProxyName = IdentifierHelpers.QualifyTypeName(service.Namespace, serviceName + "Proxy");
 
+            AppendObsoletePragmaStart(sb, service);
             sb.AppendLine($"            sink.{ServicesGeneratorMemberNames.ServiceRegistrationSink.AddService}<{fullInterfaceName}, {fullProxyName}>();");
+            AppendObsoletePragmaEnd(sb, service);
         }
 
         sb.AppendLine("        }");
@@ -120,7 +126,9 @@ internal static class GeneratedFactoryGenerator
             var fullProxyName = IdentifierHelpers.QualifyTypeName(service.Namespace, serviceName + "Proxy");
             var fullDispatcherName = IdentifierHelpers.QualifyTypeName(service.Namespace, serviceName + "Dispatcher");
 
+            AppendObsoletePragmaStart(sb, service);
             sb.AppendLine($"            sink.{ServicesGeneratorMemberNames.ServiceRegistrationSink.AddService}<{fullInterfaceName}, {fullProxyName}, {fullDispatcherName}>();");
+            AppendObsoletePragmaEnd(sb, service);
         }
 
         sb.AppendLine("        }");
@@ -154,5 +162,21 @@ internal static class GeneratedFactoryGenerator
         sb.AppendLine("}");
 
         return sb.ToString();
+    }
+
+    private static void AppendObsoletePragmaStart(StringBuilder sb, ServiceModel service)
+    {
+        if (service.ObsoleteAttribute.Length > 0)
+        {
+            sb.AppendLine("#pragma warning disable CS0618, CS0619");
+        }
+    }
+
+    private static void AppendObsoletePragmaEnd(StringBuilder sb, ServiceModel service)
+    {
+        if (service.ObsoleteAttribute.Length > 0)
+        {
+            sb.AppendLine("#pragma warning restore CS0618, CS0619");
+        }
     }
 }

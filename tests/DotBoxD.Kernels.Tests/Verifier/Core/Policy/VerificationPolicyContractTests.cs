@@ -36,4 +36,46 @@ public sealed class VerificationPolicyContractTests
 
         Assert.Equal("ForbiddenTypePrefixes", exception.ParamName);
     }
+
+    [Fact]
+    public void VerifierVersion_rejects_null_at_public_property_boundary()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => _ = VerificationPolicy.BoxedValueDefaults() with
+            {
+                VerifierVersion = null!
+            });
+
+        Assert.Equal("VerifierVersion", exception.ParamName);
+    }
+
+    [Fact]
+    public void VerifierVersion_constructor_rejects_null_at_public_boundary()
+    {
+        var policy = VerificationPolicy.BoxedValueDefaults();
+
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => _ = new VerificationPolicy(
+                policy.AllowedAssemblies,
+                policy.AllowedAssemblyIdentities,
+                policy.AllowedTypes,
+                policy.AllowedMembers,
+                policy.ForbiddenTypePrefixes,
+                policy.RuntimeFacadeIdentities,
+                VerifierVersion: null!));
+
+        Assert.Equal("VerifierVersion", exception.ParamName);
+    }
+
+    [Fact]
+    public void VerifierVersion_rejects_whitespace_at_public_property_boundary()
+    {
+        var exception = Assert.Throws<ArgumentException>(
+            () => _ = VerificationPolicy.BoxedValueDefaults() with
+            {
+                VerifierVersion = "   "
+            });
+
+        Assert.Equal("VerifierVersion", exception.ParamName);
+    }
 }

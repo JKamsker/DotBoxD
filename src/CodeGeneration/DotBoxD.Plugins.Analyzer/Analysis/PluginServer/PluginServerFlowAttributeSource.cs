@@ -15,6 +15,9 @@ internal static class PluginServerFlowAttributeSource
     public static EquatableArray<string> PropertyAttributes(IPropertySymbol property)
         => AttributeLines(property.GetAttributes(), targetReturn: false);
 
+    public static EquatableArray<string> TypeAttributes(INamedTypeSymbol type)
+        => AttributeLines(type.GetAttributes(), targetReturn: false);
+
     public static string ParameterAttributePrefix(IParameterSymbol parameter)
     {
         var builder = new StringBuilder();

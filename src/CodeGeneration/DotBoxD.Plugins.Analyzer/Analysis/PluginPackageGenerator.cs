@@ -98,11 +98,21 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
             static (node, _) => node is ClassDeclarationSyntax,
             "server extension package model",
             static (ctx, ct) => RpcKernelModelFactory.Create(ctx, ct));
+        var rpcNullMetadataDiagnostics = GeneratorGuard.SyntaxValues(
+            context,
+            static (node, _) => ServerExtensionAttributeNullDiagnosticFactory.IsCandidate(node),
+            "server extension attribute null diagnostic",
+            static (ctx, ct) => ServerExtensionAttributeNullDiagnosticFactory.Create(ctx, ct));
 
         GeneratorGuard.RegisterOutput(
             context,
             rpcResults.Where(static result => result.Diagnostic is not null).Select(static (result, _) => result.Diagnostic!),
             "server extension diagnostic output",
+            static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
+        GeneratorGuard.RegisterOutput(
+            context,
+            rpcNullMetadataDiagnostics,
+            "server extension attribute null diagnostic output",
             static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
 
         var serverExtensionMethodDiagnostics = GeneratorGuard.AttributeValues(
