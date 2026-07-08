@@ -12,6 +12,9 @@ public static class SafeFileSystem
         SandboxPath path,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(path);
+
         if (context.CancellationToken.IsCancellationRequested)
         {
             throw Error(SandboxErrorCode.Cancelled, "file.readText cancelled");
@@ -76,6 +79,10 @@ public static class SafeFileSystem
         string text,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(path);
+        ArgumentNullException.ThrowIfNull(text);
+
         if (context.CancellationToken.IsCancellationRequested)
         {
             throw Error(SandboxErrorCode.Cancelled, "file.writeText cancelled");
