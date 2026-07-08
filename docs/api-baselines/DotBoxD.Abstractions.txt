@@ -3,11 +3,35 @@
 # Update intentionally with scripts/check-api-compat-baseline.ps1 -Update when approving public API changes.
 
 protected static NotSupportedException ControlPlaneOnly()
+public BinaryExpression Add(Expression left, Expression right)
+public BinaryExpression And(Expression left, Expression right)
+public BinaryExpression Binary(Expression left, string @operator, Expression right)
+public BinaryExpression Divide(Expression left, Expression right)
+public BinaryExpression Equal(Expression left, Expression right)
+public BinaryExpression GreaterThan(Expression left, Expression right)
+public BinaryExpression GreaterThanOrEqual(Expression left, Expression right)
+public BinaryExpression LessThan(Expression left, Expression right)
+public BinaryExpression LessThanOrEqual(Expression left, Expression right)
+public BinaryExpression Multiply(Expression left, Expression right)
+public BinaryExpression NotEqual(Expression left, Expression right)
+public BinaryExpression Or(Expression left, Expression right)
+public BinaryExpression Remainder(Expression left, Expression right)
+public BinaryExpression Subtract(Expression left, Expression right)
 public bool HasExplicitStepKind { get; }
 public bool IsAsync { get; set; }
 public bool IsAutoBinding => BindingId.Length == 0
 public bool Success { get; }
+public CallExpression Call(string name, IReadOnlyList<Expression> arguments, SandboxType? genericType = null)
+public CallExpression Call(string name, params Expression[] arguments)
+public CallExpression Field(int index)
+public CallExpression ListCount(Expression list)
+public CallExpression ListGet(Expression list, Expression index)
+public CallExpression MapGet(Expression map, Expression key)
+public CallExpression Record(params Expression[] fields)
+public CallExpression RecordGet(Expression record, int index)
+public CallExpression StringLength(Expression text)
 public CancellationToken CancellationToken { get; }
+public const string CurrentParameterName = "$dotboxd.current"
 public delegate ValueTask<TReturn> RemoteServerInvocation<TWorld, TCaptures, TReturn>( TWorld world, TCaptures captures)
 public enum GeneratedPluginServerRegistryKind
 public enum GeneratedPluginServerRegistryKind.Hook
@@ -61,6 +85,15 @@ public IReadOnlyList<PluginMessage> Messages { get; }
 public IReadOnlyList<Statement> Prefix { get; init; }
 public IReadOnlyList<string> Effects { get; init; }
 public IReadOnlyList<string> RequiredCapabilities { get; init; }
+public IRExpressionBuilder()
+public IRExpressionBuilder(SourceSpan span)
+public LiteralExpression Bool(bool value)
+public LiteralExpression Double(double value)
+public LiteralExpression Guid(Guid value)
+public LiteralExpression Int32(int value)
+public LiteralExpression Int64(long value)
+public LiteralExpression Literal(SandboxValue value)
+public LiteralExpression String(string value)
 public LoweredIrMethodKind Kind { get; } = kind
 public LoweredPipelineStep Step { get; }
 public LoweredPipelineStepKind Kind { get; } = kind
@@ -83,6 +116,7 @@ public sealed class HostBindingAttribute : Attribute
 public sealed class HostCapabilityAttribute(string capability, HostBindingEffect effects) : Attribute
 public sealed class InMemoryPluginMessageSink : IPluginMessageSink
 public sealed class IRBodyOfAttribute : Attribute
+public sealed class IRExpressionBuilder
 public sealed class IRFunc<TInput, TContext, TOutput>
 public sealed class IRFunc<TInput, TOutput>
 public sealed class IRInvocation<TCaptures, TDelegate, TReturn> where TCaptures : class where TDelegate : Delegate
@@ -106,6 +140,7 @@ public SemVersion Version { get; init; } = new(1, 0, 0)
 public ServerExtensionAttribute(string id, Type serviceType)
 public ServerExtensionAttribute(string id) => Id = id ?? throw new ArgumentNullException(nameof(id))
 public ServerExtensionAttribute(Type grafts, string? id = null)
+public SourceSpan Span { get; }
 public static class LoweredPipelineComposer
 public static IRFunc<TInput, TContext, TOutput> FromStep(LoweredPipelineStep step) => new(step)
 public static IRFunc<TInput, TOutput> FromStep(LoweredPipelineStep step) => new(step)
@@ -146,5 +181,10 @@ public Type? ControlService { get; set; }
 public Type? Grafts { get; }
 public Type? ReceiverType { get; } = receiverType
 public Type? ServiceType { get; }
+public UnaryExpression Negate(Expression value)
+public UnaryExpression Not(Expression value)
+public UnaryExpression Unary(string @operator, Expression value)
 public ValueTask SendAsync(string targetId, string message, CancellationToken cancellationToken = default)
+public VariableExpression Current()
+public VariableExpression Variable(string name)
 public void Send(string targetId, string message)

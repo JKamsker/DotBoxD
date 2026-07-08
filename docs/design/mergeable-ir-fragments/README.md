@@ -80,6 +80,43 @@ capabilities and effects is surfaced in module metadata. The composed module ver
 host validator and runs on the interpreter, so a consumer that collected steps from a custom pipeline surface
 can hand-assemble exactly what the build-time hook-chain fusion would have produced.
 
+## Runtime Builder (implemented)
+
+For dynamic or advanced scenarios, use the public runtime builder instead of copying the generator's raw
+`LoweredPipelineStep` construction:
+
+```csharp
+using DotBoxD.Plugins;
+
+var maxDistance = 4;
+var ir = IRBuilder.For<MonsterAggroEvent>();
+var steps = new[]
+{
+    ir.FilterStep(e => e.LessThanOrEqual(e.Field(2), e.Int32(maxDistance))),
+    ir.ProjectionStep<string>(e => e.Field(0))
+};
+
+var filter = ir.Filter(e => e.LessThanOrEqual(e.Field(2), e.Int32(maxDistance)));
+pipeline.Where(e => e.Distance <= maxDistance, filter);
+```
+
+`IRBuilder.For<TInput>()` validates `TInput` through the same RPC marshaller used by plugin runtime
+adapters, emits generator-compatible manifest shape tags, and creates the single `$dotboxd.current`
+placeholder parameter required by `LoweredPipelineComposer`. `IRExpressionBuilder.Field(index)` reads the
+marshalled record order: public readable properties first, then public fields.
+
+Step metadata is still explicit at the call site:
+
+```csharp
+var filter = ir.FilterStep(
+    e => e.LessThanOrEqual(e.Field(2), e.Int32(maxDistance)),
+    requiredCapabilities: ["world.monsters.read"],
+    effects: ["Cpu"]);
+```
+
+The lower-level `Expression` and `LoweredPipelineStep` records remain public for importers and tooling that
+already have a complete IR tree, but ordinary runtime-authored hook fragments should prefer the builder.
+
 ## Why Not Per-Step Modules
 
 A per-step `SandboxModule` would be expensive and awkward to merge. It would force each `Where` or `Select`

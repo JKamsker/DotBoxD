@@ -187,6 +187,11 @@ public IReadOnlyList<PluginExecutionObservation> ExecutionObservations => _execu
 public IReadOnlyList<string> Effects { get => _effects; init => _effects = PluginModelCopy.List(value, nameof(Effects)); }
 public IReadOnlyList<string> GetRequiredCapabilities(PluginPackage package)
 public IReadOnlyList<string> RequiredCapabilities { get; init; }
+public IRExpressionBuilder Expression => expression
+public IRFunc<TInput, bool> Filter( Func<IRExpressionBuilder, Expression> build, IEnumerable<string>? requiredCapabilities = null, IEnumerable<string>? effects = null)
+public IRFunc<TInput, TContext, bool> FilterWithContext<TContext>( Func<IRExpressionBuilder, Expression> build, IEnumerable<string>? requiredCapabilities = null, IEnumerable<string>? effects = null)
+public IRFunc<TInput, TContext, TOutput> ProjectionWithContext<TContext, TOutput>( Func<IRExpressionBuilder, Expression> build, IEnumerable<string>? requiredCapabilities = null, IEnumerable<string>? effects = null)
+public IRFunc<TInput, TOutput> Projection<TOutput>( Func<IRExpressionBuilder, Expression> build, IEnumerable<string>? requiredCapabilities = null, IEnumerable<string>? effects = null)
 public KernelRegistry Kernels { get; }
 public KernelRpcPayloadReader(ReadOnlySpan<byte> payload)
 public KernelRpcValue GetItem(int index) => (_items ?? EmptyItems)[index]
@@ -202,6 +207,10 @@ public LiveValue(string name, T value)
 public LiveValue<T> BindValue<T>(string name, T initialValue)
 public long Int64Value { get; }
 public long ReadInt64()
+public LoweredPipelineStep FilterStep( Func<IRExpressionBuilder, Expression> build, IEnumerable<string>? requiredCapabilities = null, IEnumerable<string>? effects = null)
+public LoweredPipelineStep ProjectionStep( Type outputType, Func<IRExpressionBuilder, Expression> build, IEnumerable<string>? requiredCapabilities = null, IEnumerable<string>? effects = null)
+public LoweredPipelineStep ProjectionStep<TOutput>( Func<IRExpressionBuilder, Expression> build, IEnumerable<string>? requiredCapabilities = null, IEnumerable<string>? effects = null)
+public LoweredPipelineStep Step( LoweredPipelineStepKind kind, Type outputType, Expression value, IEnumerable<string>? requiredCapabilities = null, IEnumerable<string>? effects = null)
 public object? CurrentValue => Value
 public object? GetObject(string name)
 public object? OwnerId => _ownerId
@@ -491,6 +500,7 @@ public SandboxValue ToSandboxValue()
 public sealed class EventIndexKeyAttribute : Attribute
 public sealed class EventIndexMatcher<TEvent>
 public sealed class InstalledKernelPool
+public sealed class IRBuilder<TInput>
 public sealed class IRKernel
 public sealed class KernelRegistry : IEnumerable<InstalledKernel>
 public sealed class LiveContext<T> where T : class
@@ -536,6 +546,7 @@ public static byte[] EncodeValue(KernelRpcValue value)
 public static byte[] EncodeValue(SandboxValue value)
 public static class HostMessagePolicyBuilderExtensions
 public static class HostServiceBindingExtensions
+public static class IRBuilder
 public static class KernelPackageRegistry
 public static class KernelRpcValueConverter
 public static class PluginDiagnosticCodes
@@ -544,6 +555,8 @@ public static class PluginPackageJsonSchemas
 public static class PluginPackageJsonSerializer
 public static class PluginServerJsonExtensions
 public static EventIndexMatcher<TEvent> Create(IReadOnlyList<IndexedPredicate> predicates)
+public static IRBuilder<TInput> For<TInput>()
+public static IRBuilder<TInput> For<TInput>(SourceSpan span)
 public static IReadOnlyCollection<string> IndexKeyNames => (IReadOnlyCollection<string>)IndexKeys.Keys
 public static IReadOnlyList<PluginDiagnosticReference> All => References
 public static IRKernel FromPackage(PluginPackage package) => new(package, projectedPayloadDecoder: null)

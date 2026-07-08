@@ -22,8 +22,8 @@ This tutorial shows the public primitives behind that path:
 1. Build or load a `PluginPackage`.
 2. Validate/install it under a `SandboxPolicy`.
 3. Wire the installed kernel to `server.Hooks` or `server.Subscriptions`.
-4. Use `LoweredPipelineComposer` when you want to merge small `Where`/`Select` fragments into one module.
-5. Add pipeline role attributes plus `[IRBodyOf]` optional `IRFunc` parameters when your own fluent API opts into analyzer lowering.
+4. Use `IRBuilder` and `LoweredPipelineComposer` when you want to merge small `Where`/`Select` fragments into one module.
+5. Add `[IRBodyOf]` optional `IRFunc`/`IRKernel` parameters when your own fluent API opts into analyzer lowering.
 
 For the generated version of the same idea, read [event pipelines](/tutorials/event-pipeline-runlocal/).
 
@@ -263,7 +263,36 @@ result terminals because there is no decision value to return.
 ## Step 5 - Build filter/projection IR from fragments
 
 If you are building a hook-like pipeline, do not make every stage emit a complete module. Let each stage emit
-a small `LoweredPipelineStep`, then compose the ordered steps once:
+a small `LoweredPipelineStep`, then compose the ordered steps once. For dynamic server-side filters and
+projections, use `IRBuilder.For<TEvent>()` instead of hand-assembling the `$dotboxd.current` parameter and
+manifest shape tags yourself:
+
+```csharp
+using DotBoxD.Plugins;
+
+var maxDistance = 4;
+var ir = IRBuilder.For<MonsterAggroEvent>();
+var steps = new[]
+{
+    ir.FilterStep(e => e.LessThanOrEqual(e.Field(2), e.Int32(maxDistance))),
+    ir.ProjectionStep<string>(e => e.Field(0))
+};
+```
+
+`Field(index)` reads the event DTO in its marshalled order: public readable properties first, then public
+fields. The builder validates the input/output CLR types through the same RPC marshaller used by the plugin
+runtime, produces generator-compatible manifest tags, and returns the same public `IRFunc` /
+`LoweredPipelineStep` carriers that analyzer-generated calls use.
+
+When a dynamic fragment depends on host-bound operations or audited effects, declare that metadata at the
+same place you build the step:
+
+```csharp
+var filtered = ir.FilterStep(
+    e => e.LessThanOrEqual(e.Field(2), e.Int32(maxDistance)),
+    requiredCapabilities: ["world.monsters.read"],
+    effects: ["Cpu"]);
+```
 
 ```csharp
 var composed = LoweredPipelineComposer.Compose(new LoweredPipelineComposition(
@@ -316,8 +345,8 @@ path as generated IR. The generator saves authoring effort; it does not grant au
 ## Step 7 - Optional: make your own fluent surface lowerable
 
 If you want DotBoxD's analyzer to lower your own fluent API, make the lowered body explicit in the method
-signature. The delegate stays as the ergonomic authoring API, and the optional `IRFunc` parameter is the
-public IR body the analyzer supplies through an interceptor:
+signature. The delegate stays as the ergonomic authoring API. An optional `IRFunc` parameter carries a stage
+fragment, and an optional `IRKernel` parameter carries a generated terminal package:
 
 ```csharp
 using System.Collections.Generic;
@@ -330,38 +359,40 @@ public sealed class MyRemotePipeline<TEvent>
 {
     private readonly List<LoweredPipelineStep> _steps = [];
 
-    [PipelineStep(PipelineStepRole.Filter)]
     public MyRemotePipeline<TEvent> Matching(
         Func<TEvent, bool> predicate,
         [IRBodyOf(nameof(predicate))] IRFunc<TEvent, bool>? irPredicate = null)
     {
-        _steps.Add(RequiredIr(irPredicate, nameof(Matching)).Step);
+        ArgumentNullException.ThrowIfNull(predicate);
+        ArgumentNullException.ThrowIfNull(irPredicate);
+        _steps.Add(irPredicate.Step);
         return this;
     }
 
-    [PipelineStep(PipelineStepRole.Projection)]
     public MyRemoteStage<TEvent, TNext> Map<TNext>(
         Func<TEvent, TNext> selector,
         [IRBodyOf(nameof(selector))] IRFunc<TEvent, TNext>? irSelector = null)
     {
-        _steps.Add(RequiredIr(irSelector, nameof(Map)).Step);
+        ArgumentNullException.ThrowIfNull(selector);
+        ArgumentNullException.ThrowIfNull(irSelector);
+        _steps.Add(irSelector.Step);
         return new(this);
     }
 
-    [PipelineStep(PipelineStepRole.Run)]
-    public MyRemotePipeline<TEvent> Do(Action<TEvent, HookContext> handler)
-        => throw new InvalidOperationException("This method must be lowered by DotBoxD.Plugins.Analyzer.");
+    public MyRemotePipeline<TEvent> Do(
+        Action<TEvent, HookContext> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        ArgumentNullException.ThrowIfNull(irHandler);
+        return UseGeneratedChain(irHandler.Package);
+    }
 
     public MyRemotePipeline<TEvent> UseGeneratedChain(PluginPackage package)
     {
         // Install the generated package through your transport/session.
         return this;
     }
-
-    private static IRFunc<TInput, TOutput> RequiredIr<TInput, TOutput>(
-        IRFunc<TInput, TOutput>? irFunc,
-        string method)
-        => irFunc ?? throw new InvalidOperationException(method + " must be lowered by DotBoxD.Plugins.Analyzer.");
 }
 
 [PipelineSurface(PipelineTransport.Remote)]
@@ -371,9 +402,14 @@ public sealed class MyRemoteStage<TEvent, TCurrent>
 
     private MyRemotePipeline<TEvent> Root { get; }
 
-    [PipelineStep(PipelineStepRole.Run)]
-    public MyRemotePipeline<TEvent> Do(Action<TCurrent, HookContext> handler)
-        => throw new InvalidOperationException("This method must be lowered by DotBoxD.Plugins.Analyzer.");
+    public MyRemotePipeline<TEvent> Do(
+        Action<TCurrent, HookContext> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        ArgumentNullException.ThrowIfNull(irHandler);
+        return Root.UseGeneratedChain(irHandler.Package);
+    }
 }
 ```
 
@@ -393,7 +429,7 @@ you could have called yourself:
 ```csharp
 pipeline.Matching(
     e => e.Distance <= 4,
-    IRFunc<MonsterAggroEvent, bool>.FromStep(myLoweredFilterStep));
+    IRBuilder.For<MonsterAggroEvent>().Filter(e => e.LessThanOrEqual(e.Field(2), e.Int32(4))));
 ```
 
 That is the important boundary: the generator supplies the `IRFunc` automatically, but the API does not depend
