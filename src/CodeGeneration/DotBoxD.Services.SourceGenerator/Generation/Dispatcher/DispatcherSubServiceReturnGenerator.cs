@@ -18,6 +18,8 @@ internal static class DispatcherSubServiceReturnGenerator
             GenerateAwaitedSubService(sb, call);
         }
 
+        GenerateCancellationCleanup(sb);
+
         if (info.AllowsNull)
         {
             sb.AppendLine("                    if (__sub is null)");
@@ -38,6 +40,15 @@ internal static class DispatcherSubServiceReturnGenerator
         sb.AppendLine("                        throw;");
         sb.AppendLine("                    }");
         GenerateSubServiceHandleSerialization(sb, info.ServiceName);
+    }
+
+    private static void GenerateCancellationCleanup(StringBuilder sb)
+    {
+        sb.AppendLine("                    if (ct.IsCancellationRequested)");
+        sb.AppendLine("                    {");
+        GenerateSubServiceCleanup(sb);
+        sb.AppendLine("                        ct.ThrowIfCancellationRequested();");
+        sb.AppendLine("                    }");
     }
 
     private static void GenerateAwaitedSubService(StringBuilder sb, string call)

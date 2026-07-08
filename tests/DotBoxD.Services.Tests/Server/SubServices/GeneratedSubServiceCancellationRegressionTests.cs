@@ -33,19 +33,11 @@ public sealed class GeneratedSubServiceCancellationRegressionTests
 
         var registeredChild = TryGetRegisteredChild(serializer, registry, output, out var handle);
 
-        Assert.True(
-            exception is OperationCanceledException &&
-            service.CallCount == 1 &&
-            !registeredChild &&
-            service.Child.Disposed &&
-            output.WrittenCount == 0,
-            "Expected cancellation after the receiver returned to stop sub-service registration and clean up the child; " +
-            $"actual exception {exception?.GetType().Name ?? "none"}, " +
-            $"receiver calls {service.CallCount}, " +
-            $"output bytes {output.WrittenCount}, " +
-            $"handle {Format(handle)}, " +
-            $"registered child {registeredChild}, " +
-            $"child disposed {service.Child.Disposed}.");
+        Assert.IsType<OperationCanceledException>(exception);
+        Assert.Equal(1, service.CallCount);
+        Assert.False(registeredChild, $"Unexpected registered child handle {Format(handle)}.");
+        Assert.True(service.Child.Disposed);
+        Assert.Equal(0, output.WrittenCount);
     }
 
     private static bool TryGetRegisteredChild(
