@@ -11,8 +11,7 @@ internal static class RpcPayloadReconstructibilityInspector
         ITypeSymbol type,
         string role,
         CancellationToken ct) =>
-        Inspect(
-            type,
+        Inspect(type,
             role,
             ct,
             new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default),
@@ -36,7 +35,6 @@ internal static class RpcPayloadReconstructibilityInspector
         {
             return null;
         }
-
         return InspectNamed(
             named,
             role,
@@ -53,7 +51,7 @@ internal static class RpcPayloadReconstructibilityInspector
         bool requireConstructible)
     {
         return InspectTypeArguments(named, role, ct, visitedOriginalDefinitions) ??
-               InspectConstructibility(named, role, ct, requireConstructible) ??
+               InspectConstructibility(named, role, ct, visitedOriginalDefinitions, requireConstructible) ??
                InspectDtoGraph(named, role, ct, visitedOriginalDefinitions);
     }
 
@@ -65,7 +63,7 @@ internal static class RpcPayloadReconstructibilityInspector
     {
         foreach (var arg in named.TypeArguments)
         {
-            var argumentReason = Inspect(arg, role, ct, visitedOriginalDefinitions, requireConstructible: true);
+            var argumentReason = Inspect(arg, role, ct, visitedOriginalDefinitions, true);
             if (argumentReason is not null)
             {
                 return argumentReason;
@@ -79,9 +77,10 @@ internal static class RpcPayloadReconstructibilityInspector
         INamedTypeSymbol named,
         string role,
         CancellationToken ct,
+        HashSet<INamedTypeSymbol> visitedOriginalDefinitions,
         bool requireConstructible)
         => requireConstructible
-            ? GetNonConstructibleDtoReason(named, role, ct)
+            ? GetNonConstructibleDtoReason(named, role, ct, visitedOriginalDefinitions)
             : null;
 
     private static string? InspectDtoGraph(
@@ -186,14 +185,15 @@ internal static class RpcPayloadReconstructibilityInspector
     private static string? GetNonConstructibleDtoReason(
         INamedTypeSymbol type,
         string role,
-        CancellationToken ct)
+        CancellationToken ct,
+        HashSet<INamedTypeSymbol> visitedOriginalDefinitions)
     {
         if (!IsUserDtoNamespace(type) || HasRpcServiceAttribute(type, ct))
         {
             return null;
         }
 
-        return type.TypeKind switch
+        var defaultReason = type.TypeKind switch
         {
             TypeKind.Interface =>
                 $"{role} uses interface DTO '{type.ToDisplayString()}'; RPC payload DTOs must be concrete so the wire contract can be reconstructed.",
@@ -201,6 +201,19 @@ internal static class RpcPayloadReconstructibilityInspector
                 $"{role} uses abstract DTO '{type.ToDisplayString()}'; RPC payload DTOs must be concrete so the wire contract can be reconstructed.",
             _ => null,
         };
+        if (defaultReason is null)
+        {
+            return null;
+        }
+        return RpcPayloadUnionResolver.TryRead(type, role, ct, out var cases, out var unionReason)
+            ? unionReason ?? RpcPayloadUnionCaseInspector.Inspect(
+                type,
+                cases,
+                role,
+                ct,
+                visitedOriginalDefinitions,
+                Inspect)
+            : defaultReason;
     }
 
     private static bool CanInspectDtoMembers(INamedTypeSymbol type)
@@ -210,7 +223,6 @@ internal static class RpcPayloadReconstructibilityInspector
         {
             return false;
         }
-
         return IsUserDtoNamespace(type);
     }
 
