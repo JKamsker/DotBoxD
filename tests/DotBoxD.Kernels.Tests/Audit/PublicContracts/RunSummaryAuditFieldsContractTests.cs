@@ -3,7 +3,7 @@ using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Serialization.Json.Hosting;
 using DotBoxD.Kernels.Tests._TestSupport;
 
-namespace DotBoxD.Kernels.Tests.Audit;
+namespace DotBoxD.Kernels.Tests.Audit.PublicContracts;
 
 public sealed class RunSummaryAuditFieldsContractTests
 {
@@ -79,7 +79,7 @@ public sealed class RunSummaryAuditFieldsContractTests
 
     private static async Task<ExecutionPlan> ValidPlanAsync()
     {
-        var host = SandboxTestHost.Create();
+        using var host = SandboxTestHost.Create();
         var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         return await host.PrepareAsync(module, SandboxPolicyBuilder.Create()
             .WithPolicyId("summary-policy")
