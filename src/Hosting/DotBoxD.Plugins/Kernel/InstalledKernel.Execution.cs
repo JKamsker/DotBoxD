@@ -36,6 +36,12 @@ public sealed partial class InstalledKernel
 
         if (!terminalResult.Succeeded)
         {
+            if (terminalResult.Error?.Code == SandboxErrorCode.Cancelled &&
+                cancellationToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+
             throw new SandboxRuntimeException(
                 terminalResult.Error ?? new SandboxError(SandboxErrorCode.HostFailure, "kernel execution failed"));
         }
