@@ -38,22 +38,12 @@ internal static class BindingValidationPhases
     public static void ValidateBindingClassifications(
         BindingDescriptor binding,
         List<SandboxDiagnostic> diagnostics)
-    {
-        if (!BindingRegistryValidator.IsKnownAuditLevel(binding.AuditLevel))
-        {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-AUDIT", $"binding '{binding.Id}' declares an unknown audit level"));
-        }
-
-        if (!BindingRegistryValidator.IsKnownAuditKind(binding.AuditKind))
-        {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-AUDIT", $"binding '{binding.Id}' declares an unknown audit kind"));
-        }
-
-        if (!BindingRegistryValidator.IsKnownBindingSafety(binding.Safety))
-        {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-SAFETY", $"binding '{binding.Id}' declares an unknown safety classification"));
-        }
-    }
+        => BindingClassificationValidator.Validate(
+            binding.Id,
+            binding.AuditLevel,
+            binding.AuditKind,
+            binding.Safety,
+            diagnostics);
 
     public static void ValidateCapabilityRequirements(
         BindingDescriptor binding,
@@ -65,11 +55,11 @@ internal static class BindingValidationPhases
         }
 
         if (!string.IsNullOrWhiteSpace(binding.RequiredCapability) &&
-            (binding.Effects & ~SandboxEffect.Cpu) == SandboxEffect.None)
+            (binding.Effects & ~SandboxEffects.Pure) == SandboxEffect.None)
         {
             diagnostics.Add(new SandboxDiagnostic(
                 "E-BINDING-EFFECT",
-                $"binding '{binding.Id}' requires a capability but declares only pure CPU effects"));
+                $"binding '{binding.Id}' requires a capability but declares only pure effects"));
         }
     }
 

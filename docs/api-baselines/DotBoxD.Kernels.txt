@@ -150,7 +150,7 @@ public IReadOnlyList<SandboxAuditEvent> Events { get; }
 public IReadOnlyList<SandboxDiagnostic> Diagnostics { get; }
 public IReadOnlyList<SandboxFunction> Functions { get => _functions; init => _functions = ModelCopy.List(value); }
 public IReadOnlyList<SandboxType> Arguments { get => _arguments; init => _arguments = CopyArguments(value); }
-public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = ModelCopy.List(value); }
+public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = BindingParameterTypes.Copy(value, nameof(Parameters)); }
 public IReadOnlyList<SandboxValue> Fields { get => _fields; init => _fields = Snapshot(value); }
 public IReadOnlyList<SandboxValue> Values { get => this; init => _values = Snapshot(value); }
 public IReadOnlyList<Statement> Body { get => _body; init => _body = ModelCopy.List(value); }
@@ -219,6 +219,7 @@ public SandboxEffect AllowedEffects { get => _allowedEffects; init { _allowedEff
 public SandboxEffect Effect { get => _effect; init => _effect = RequireKnownEffect(value, nameof(Effect)); }
 public SandboxError Error { get; }
 public SandboxError? Error { get; init; }
+public SandboxErrorCode Code { get; init; }
 public SandboxErrorCode? ErrorCode { get => _errorCode; init => _errorCode = RequireKnownErrorCode(value, nameof(ErrorCode)); }
 public SandboxIsolation Isolation { get; init; } = SandboxIsolation.InProcess
 public SandboxModule Module { get; }
@@ -456,6 +457,7 @@ public string PlanHash { get; }
 public string PolicyHash { get; }
 public string PolicyId { get => _policyId; init { _policyId = value; ResetHash(); } }
 public string RelativePath { get => _relativePath; init => _relativePath = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
+public string SafeMessage { get; init; }
 public string TypeName { get => _typeName; init => _typeName = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
 public string Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
 public string Value { get; init; }

@@ -1,0 +1,121 @@
+using DotBoxD.Plugins;
+using DotBoxD.Plugins.Analyzer.Analysis;
+using DotBoxD.Services.Attributes;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+
+namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
+
+public sealed class ServerExtensionClientTypeObsoleteAttributeTests
+{
+    [Fact]
+    public void Service_backed_generated_client_preserves_obsolete_service_attribute()
+    {
+        var (generatedSources, outputCompilation, generatedTrees) = RunGenerator(ServiceBackedSource);
+        var generatedDiagnostics = outputCompilation.GetDiagnostics()
+            .Where(diagnostic => IsGeneratedDiagnostic(diagnostic, generatedTrees))
+            .ToArray();
+
+        Assert.DoesNotContain(generatedDiagnostics, diagnostic => diagnostic.Id == "CS0618");
+        AssertGeneratedSourceContains(
+            generatedSources,
+            "EchoKernelServerExtensionClient",
+            "[global::System.ObsoleteAttribute(\"Use INew\")]");
+        AssertGeneratedSourceContains(
+            generatedSources,
+            "EchoKernelServerExtensionClient",
+            "public sealed class EchoKernelServerExtensionClient : global::Sample.IEchoService");
+    }
+
+    private static bool IsGeneratedDiagnostic(
+        Diagnostic diagnostic,
+        IReadOnlySet<SyntaxTree> generatedTrees)
+        => diagnostic.Location.SourceTree is { } tree && generatedTrees.Contains(tree);
+
+    private static void AssertGeneratedSourceContains(
+        IReadOnlyList<string> generatedSources,
+        string generatedTypeName,
+        string expectedSource)
+        => Assert.Contains(
+            generatedSources,
+            source => source.Contains(generatedTypeName, StringComparison.Ordinal) &&
+                      source.Contains(expectedSource, StringComparison.Ordinal));
+
+    private static (
+        IReadOnlyList<string> GeneratedSources,
+        Compilation OutputCompilation,
+        IReadOnlySet<SyntaxTree> GeneratedTrees) RunGenerator(string source)
+    {
+        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "DotBoxDGeneratedPackageRuntimeTest",
+            [CSharpSyntaxTree.ParseText(source, parseOptions)],
+            TrustedPlatformReferences()
+                .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(RpcServiceAttribute).Assembly.Location)),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            [new PluginPackageGenerator().AsSourceGenerator()],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var outputCompilation,
+            out var generatorDiagnostics);
+
+        Assert.Empty(generatorDiagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+
+        var generatedTrees = driver.GetRunResult().GeneratedTrees.ToHashSet();
+        var generatedSources = generatedTrees
+            .Select(tree => tree.GetText().ToString())
+            .ToArray();
+        return (generatedSources, outputCompilation, generatedTrees);
+    }
+
+    private static IEnumerable<MetadataReference> TrustedPlatformReferences()
+    {
+        var references = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))?
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries) ?? [];
+        return references.Select(reference => MetadataReference.CreateFromFile(reference));
+    }
+
+    private const string ServiceBackedSource = """
+        #pragma warning disable CS0618
+        using System;
+        using System.Threading.Tasks;
+        using DotBoxD.Abstractions;
+        using DotBoxD.Kernels;
+        using DotBoxD.Kernels.Sandbox;
+        using DotBoxD.Plugins;
+        using DotBoxD.Services.Attributes;
+
+        namespace Sample;
+
+        [RpcService]
+        public interface IRemoteControl;
+
+        public sealed class RemoteControl : IRemoteControl, IServerExtensionClientAccessor
+        {
+            public RemoteControl(DotBoxD.Abstractions.IServerExtensionClientRegistry serverExtensions)
+                => ServerExtensions = serverExtensions;
+
+            public DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }
+        }
+
+        [Obsolete("Use INew")]
+        public interface IEchoService
+        {
+            ValueTask<string> EchoAsync(int value);
+        }
+
+        [ServerExtensionClient(typeof(IRemoteControl), "EchoClient")]
+        [ServerExtension("echo", typeof(IEchoService))]
+        public sealed partial class EchoKernel
+        {
+            [ServerExtensionMethod(typeof(IRemoteControl), "EchoValue")]
+            public string Echo(int value, HookContext ctx) => "echo";
+        }
+        """;
+}

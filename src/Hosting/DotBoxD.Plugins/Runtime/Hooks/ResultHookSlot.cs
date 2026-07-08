@@ -1,3 +1,4 @@
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins.Kernel;
 using DotBoxD.Plugins.Runtime.Rpc;
@@ -11,10 +12,7 @@ namespace DotBoxD.Plugins.Runtime.Hooks;
 /// walks that order and returns the first <i>successful</i> result: a handler whose filter did not match, or
 /// that abstained (<c>Success == false</c>), falls through to the next. A handler that throws is isolated —
 /// skipped so one faulty registration cannot break dispatch — and dispatch falls through to the next handler;
-/// cancellation of the dispatch token stops the walk. No registered handler — or none successful — yields
-/// <see langword="null"/>. A swallowed handler fault is reported to the optional <see cref="ResultHookFault"/>
-/// observer before dispatch falls through, so a veto-bearing handler that faults is diagnosable instead of
-/// silently failing open to the host default.
+/// cancellation of the dispatch token stops the walk.
 /// </summary>
 internal sealed class ResultHookSlot<TEvent, TContext>
 {
@@ -141,25 +139,23 @@ internal sealed class ResultHookSlot<TEvent, TContext>
         IHookResult? result;
         try
         {
-            if (entry.Filter is not null)
+            if (!await PassesFilterAsync(entry, e, rawContext, context, cancellationToken).ConfigureAwait(false))
             {
-                var matches = await entry.Filter(e, rawContext, context, cancellationToken).ConfigureAwait(false);
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!matches)
-                {
-                    return null;
-                }
+                return null;
             }
 
-            result = entry.Remote
-                ? await _invoker.InvokeRemoteAsync(entry, e, rawContext, context, options, cancellationToken)
-                    .ConfigureAwait(false)
-                : await entry.Invoke(e, rawContext, context, cancellationToken).ConfigureAwait(false);
+            result = await InvokeEntryAsync(entry, e, rawContext, context, options, cancellationToken)
+                .ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
+        }
+        catch (SandboxRuntimeException ex) when (cancellationToken.IsCancellationRequested &&
+                                                ex.Error.Code == SandboxErrorCode.Cancelled)
+        {
+            throw new OperationCanceledException(null, ex, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -182,6 +178,35 @@ internal sealed class ResultHookSlot<TEvent, TContext>
             $"but '{typeof(TResult).FullName}' was requested."));
         return null;
     }
+
+    private static async ValueTask<bool> PassesFilterAsync(
+        Entry entry,
+        TEvent e,
+        HookContext rawContext,
+        TContext context,
+        CancellationToken cancellationToken)
+    {
+        if (entry.Filter is null)
+        {
+            return true;
+        }
+
+        var matches = await entry.Filter(e, rawContext, context, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return matches;
+    }
+
+    private ValueTask<IHookResult?> InvokeEntryAsync<TResult>(
+        Entry entry,
+        TEvent e,
+        HookContext rawContext,
+        TContext context,
+        ResultHookDispatchOptions<TResult> options,
+        CancellationToken cancellationToken)
+        where TResult : struct, IHookResult
+        => entry.Remote
+            ? _invoker.InvokeRemoteAsync(entry, e, rawContext, context, options, cancellationToken)
+            : entry.Invoke(e, rawContext, context, cancellationToken);
 
     public void RemoveKernel(InstalledKernel kernel)
     {
@@ -224,8 +249,7 @@ internal sealed class ResultHookSlot<TEvent, TContext>
         }
     }
 
-    private static long NextLocalOrder()
-        => Interlocked.Increment(ref LocalOrder) - 1;
+    private static long NextLocalOrder() => Interlocked.Increment(ref LocalOrder) - 1;
 
     private static long LocalOrder;
 

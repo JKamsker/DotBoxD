@@ -494,6 +494,7 @@ jobs:
               "UnsupportedDtoConstructibilityTests",
               "ExplicitDtoUnionSignatureTests",
               "ExplicitDtoUnionRoundTripTests",
+              "DtoPayloadIgnoreAttributeTests",
               "UnsupportedDtoPayloadShapeTests",
               "UnsupportedTransportPayloadShapeTests",
               "SubServiceAvailabilityTests",

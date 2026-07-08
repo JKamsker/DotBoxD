@@ -51,9 +51,9 @@ internal static partial class ServiceModelFactory
             interfaceSymbol.Name);
 
         var buildContext = new ServiceBuildContext(displayName, serviceLocation, serviceNamespace, qualifiedInterfaceName);
-        if (ValidateInterfaceSymbol(interfaceSymbol, buildContext) is { } rejectedInterface)
+        if (ValidateServiceSymbol(interfaceSymbol, buildContext, ct, out var obsoleteAttribute) is { } rejectedService)
         {
-            return rejectedInterface;
+            return rejectedService;
         }
 
         if (!TryCollectServiceMembers(interfaceSymbol, buildContext, ct, out var members, out var rejectedMembers))
@@ -145,7 +145,8 @@ internal static partial class ServiceModelFactory
                 ServiceName: LiteralHelpers.EscapeStringLiteral(serviceName),
                 Methods: methods.ToEquatableArray(),
                 Properties: properties.ToEquatableArray(),
-                RawServiceName: serviceName),
+                RawServiceName: serviceName,
+                ObsoleteAttribute: obsoleteAttribute.Source),
             Error: null,
             MethodDiagnostics: methodDiagnostics.ToEquatableArray(),
             MethodLocations: methodLocations.ToEquatableArray(),
@@ -153,6 +154,31 @@ internal static partial class ServiceModelFactory
             ServiceLocation: buildContext.ServiceLocation,
             QualifiedInterfaceName: buildContext.QualifiedInterfaceName,
             ServiceDiagnostic: null);
+    }
+
+    private static ServiceResult? ValidateServiceSymbol(
+        INamedTypeSymbol interfaceSymbol,
+        ServiceBuildContext buildContext,
+        CancellationToken ct,
+        out (string Source, bool IsError) obsoleteAttribute)
+    {
+        obsoleteAttribute = default;
+        if (ValidateInterfaceSymbol(interfaceSymbol, buildContext) is { } rejectedInterface)
+        {
+            return rejectedInterface;
+        }
+
+        obsoleteAttribute = BuildObsoleteAttribute(interfaceSymbol, ct);
+        if (!obsoleteAttribute.IsError)
+        {
+            return null;
+        }
+
+        return RejectedService(
+            buildContext.DisplayName,
+            "[Obsolete(..., true)] service interfaces are not supported because generated proxy, dispatcher, and registration code must reference the service type",
+            buildContext.ServiceLocation,
+            buildContext.QualifiedInterfaceName);
     }
 
     private static ServiceResult RejectedService(
@@ -184,6 +210,22 @@ internal static partial class ServiceModelFactory
         }
 
         return null;
+    }
+
+    private static (string Source, bool IsError) BuildObsoleteAttribute(
+        INamedTypeSymbol interfaceSymbol,
+        CancellationToken ct)
+    {
+        foreach (var attr in interfaceSymbol.GetAttributes())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (attr.AttributeClass?.ToDisplayString() == "System.ObsoleteAttribute")
+            {
+                return ObsoleteAttributeFormatter.Format(attr);
+            }
+        }
+
+        return (string.Empty, false);
     }
 
     private static string GetNamespace(INamespaceSymbol namespaceSymbol)

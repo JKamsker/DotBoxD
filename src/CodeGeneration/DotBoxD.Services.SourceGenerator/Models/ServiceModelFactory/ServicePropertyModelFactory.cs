@@ -33,7 +33,8 @@ internal static class ServicePropertyModelFactory
                 ProxyType: null,
                 BuildPropertyFlowAttributePrefix(propertySymbol, ct),
                 IsInstanceId: true,
-                SubService: null);
+                SubService: null,
+                MemberAttributePrefix: MemberAttributeFormatter.BuildPrefix(propertySymbol, ct));
             return true;
         }
 
@@ -54,7 +55,8 @@ internal static class ServicePropertyModelFactory
             IdentifierHelpers.QualifyTypeName(propertyNamespace, proxyName),
             BuildPropertyFlowAttributePrefix(propertySymbol, ct),
             IsInstanceId: false,
-            subService);
+            subService,
+            MemberAttributeFormatter.BuildPrefix(propertySymbol, ct));
         return true;
     }
 
