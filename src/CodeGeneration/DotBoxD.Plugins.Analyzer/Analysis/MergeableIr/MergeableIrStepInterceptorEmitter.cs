@@ -44,6 +44,20 @@ internal static class MergeableIrStepInterceptorEmitter
         MergeableIrStepInterception interception,
         int index)
     {
+        if (interception.Kind == MergeableIrInterceptionKind.IRFuncParameter)
+        {
+            AppendIRFuncInterceptor(builder, interception, index);
+            return;
+        }
+
+        AppendStepOverloadInterceptor(builder, interception, index);
+    }
+
+    private static void AppendStepOverloadInterceptor(
+        StringBuilder builder,
+        MergeableIrStepInterception interception,
+        int index)
+    {
         builder.Append("        ").AppendLine(interception.AttributeSyntax);
         builder.Append("        public static ").Append(interception.ReturnType).Append(" Intercept_")
             .Append(index.ToString(CultureInfo.InvariantCulture))
@@ -53,5 +67,40 @@ internal static class MergeableIrStepInterceptorEmitter
         builder.Append("            => receiver.").Append(interception.MethodName).Append(interception.MethodTypeArguments)
             .Append('(').Append(interception.StepFullName).AppendLine(".Create());");
     }
-}
 
+    private static void AppendIRFuncInterceptor(
+        StringBuilder builder,
+        MergeableIrStepInterception interception,
+        int index)
+    {
+        if (interception.IRParameterName is null || interception.IRFuncType is null)
+        {
+            throw new InvalidOperationException("IRFunc interception metadata is incomplete.");
+        }
+
+        builder.Append("        ").AppendLine(interception.AttributeSyntax);
+        builder.Append("        public static ").Append(interception.ReturnType).Append(" Intercept_")
+            .Append(index.ToString(CultureInfo.InvariantCulture))
+            .AppendLine("(");
+        builder.Append("            this ").Append(interception.ReceiverType).AppendLine(" receiver,");
+        builder.Append("            ").Append(interception.DelegateType).Append(' ')
+            .Append(Identifier(interception.SourceParameterName)).AppendLine(",");
+        builder.Append("            ").Append(interception.IRFuncType).Append("? ")
+            .Append(Identifier(interception.IRParameterName)).AppendLine(" = null)");
+
+        builder.Append("            => receiver.").Append(interception.MethodName).Append(interception.MethodTypeArguments)
+            .Append('(')
+            .Append(ArgumentName(interception.SourceParameterName))
+            .Append(": ")
+            .Append(Identifier(interception.SourceParameterName))
+            .Append(", ")
+            .Append(ArgumentName(interception.IRParameterName))
+            .Append(": ")
+            .Append(interception.StepFullName)
+            .AppendLine(".CreateIRFunc());");
+    }
+
+    private static string ArgumentName(string parameterName) => "@" + parameterName;
+
+    private static string Identifier(string parameterName) => "@" + parameterName;
+}

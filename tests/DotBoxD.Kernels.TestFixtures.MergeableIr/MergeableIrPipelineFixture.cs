@@ -17,22 +17,19 @@ public sealed class StepPipeline<T>
 
     public IReadOnlyList<LoweredPipelineStep> Steps => _steps;
 
-    public StepPipeline<T> Where([LowerToIr(LoweredPipelineStepKind.Filter)] Func<T, bool> predicate)
-        => throw new InvalidOperationException("Where(Func<T, bool>) was not source-generated.");
-
-    public StepPipeline<T> Where(LoweredPipelineStep step)
+    public StepPipeline<T> Where(
+        Func<T, bool> predicate,
+        [IRBodyOf(nameof(predicate))] IRFunc<T, bool>? irPredicate = null)
     {
-        _steps.Add(step);
+        _steps.Add(RequiredStep(irPredicate, nameof(Where)));
         return this;
     }
 
     public StepPipeline<TNext> Select<TNext>(
-        [LowerToIr(LoweredPipelineStepKind.Projection)] Func<T, TNext> selector)
-        => throw new InvalidOperationException("Select(Func<T, TNext>) was not source-generated.");
-
-    public StepPipeline<TNext> Select<TNext>(LoweredPipelineStep step)
+        Func<T, TNext> selector,
+        [IRBodyOf(nameof(selector))] IRFunc<T, TNext>? irSelector = null)
     {
-        _steps.Add(step);
+        _steps.Add(RequiredStep(irSelector, nameof(Select)));
         return new StepPipeline<TNext>(_steps);
     }
 
@@ -41,6 +38,12 @@ public sealed class StepPipeline<T>
         var value = MergeableIrStepRuntime.Execute(_steps, input);
         return value is null ? default : (T)value;
     }
+
+    private static LoweredPipelineStep RequiredStep<TInput, TOutput>(
+        IRFunc<TInput, TOutput>? irFunc,
+        string methodName)
+        => irFunc?.Step ??
+           throw new InvalidOperationException(methodName + " must be lowered by DotBoxD.Plugins.Analyzer.");
 }
 
 public static class MergeableIrPipelineFixture

@@ -3,6 +3,7 @@
 # Update intentionally with scripts/check-api-compat-baseline.ps1 -Update when approving public API changes.
 
 protected static NotSupportedException ControlPlaneOnly()
+public bool HasExplicitStepKind { get; }
 public bool IsAsync { get; set; }
 public bool IsAutoBinding => BindingId.Length == 0
 public bool Success { get; }
@@ -55,6 +56,8 @@ public interface IServerExtensionClientRegistry : IServerExtensionWireClient
 public interface IServerExtensionWireClient
 public interface IServiceControl : IExtensibleControl
 public IPluginMessageSink Messages { get; }
+public IRBodyOfAttribute(string parameterName, LoweredPipelineStepKind stepKind)
+public IRBodyOfAttribute(string parameterName)
 public IReadOnlyList<LoweredPipelineStep> Steps { get; init; }
 public IReadOnlyList<Parameter> Parameters { get; init; }
 public IReadOnlyList<PluginMessage> Messages { get; }
@@ -62,7 +65,9 @@ public IReadOnlyList<Statement> Prefix { get; init; }
 public IReadOnlyList<string> Effects { get; init; }
 public IReadOnlyList<string> RequiredCapabilities { get; init; }
 public LoweredIrMethodKind Kind { get; } = kind
+public LoweredPipelineStep Step { get; }
 public LoweredPipelineStepKind Kind { get; } = kind
+public LoweredPipelineStepKind StepKind { get; }
 public PipelineStepRole Role { get; } = role
 public PipelineTransport Transport { get; } = transport
 public PluginAttribute(string? id = null) => Id = id
@@ -81,6 +86,8 @@ public sealed class HookResultAttribute : Attribute
 public sealed class HostBindingAttribute : Attribute
 public sealed class HostCapabilityAttribute(string capability, HostBindingEffect effects) : Attribute
 public sealed class InMemoryPluginMessageSink : IPluginMessageSink
+public sealed class IRBodyOfAttribute : Attribute
+public sealed class IRFunc<TInput, TOutput>
 public sealed class KernelMethodAttribute : Attribute
 public sealed class LiveSettingAttribute : Attribute
 public sealed class LowerToIrAttribute(LoweredPipelineStepKind kind) : Attribute
@@ -102,6 +109,7 @@ public ServerExtensionAttribute(string id, Type serviceType)
 public ServerExtensionAttribute(string id) => Id = id
 public ServerExtensionAttribute(Type grafts, string? id = null)
 public static class LoweredPipelineComposer
+public static IRFunc<TInput, TOutput> FromStep(LoweredPipelineStep step) => new(step)
 public static SandboxModule Compose(LoweredPipelineComposition composition)
 public string AccumulatorName { get; } = accumulatorName
 public string BindingId { get; }
@@ -119,6 +127,7 @@ public string MethodMetadataName { get; } = methodMetadataName
 public string MethodName { get; } = methodName
 public string Name { get; }
 public string NormalizedSignature { get; } = normalizedSignature
+public string ParameterName { get; }
 public string ShouldHandleFunctionId { get; init; } = "ShouldHandle"
 public string TargetId { get; init; }
 public string? ContextFactory { get; set; }

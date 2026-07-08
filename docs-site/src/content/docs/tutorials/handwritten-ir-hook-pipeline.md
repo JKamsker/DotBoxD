@@ -23,7 +23,7 @@ This tutorial shows the public primitives behind that path:
 2. Validate/install it under a `SandboxPolicy`.
 3. Wire the installed kernel to `server.Hooks` or `server.Subscriptions`.
 4. Use `LoweredPipelineComposer` when you want to merge small `Where`/`Select` fragments into one module.
-5. Add `[PipelineSurface]` and `[PipelineStep]` if you want your own fluent API to opt into analyzer lowering.
+5. Add pipeline role attributes plus `[IRBodyOf]` optional `IRFunc` parameters when your own fluent API opts into analyzer lowering.
 
 For the generated version of the same idea, read [event pipelines](/tutorials/event-pipeline-runlocal/).
 
@@ -315,10 +315,12 @@ path as generated IR. The generator saves authoring effort; it does not grant au
 
 ## Step 7 - Optional: make your own fluent surface lowerable
 
-If you want DotBoxD's analyzer to lower your own fluent API, mark the surface and methods with the public
-pipeline attributes. The analyzer recognizes roles, not hardcoded method names:
+If you want DotBoxD's analyzer to lower your own fluent API, make the lowered body explicit in the method
+signature. The delegate stays as the ergonomic authoring API, and the optional `IRFunc` parameter is the
+public IR body the analyzer supplies through an interceptor:
 
 ```csharp
+using System.Collections.Generic;
 using DotBoxD.Abstractions;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Runtime;
@@ -326,12 +328,25 @@ using DotBoxD.Plugins.Runtime;
 [PipelineSurface(PipelineTransport.Remote)]
 public sealed class MyRemotePipeline<TEvent>
 {
+    private readonly List<LoweredPipelineStep> _steps = [];
+
     [PipelineStep(PipelineStepRole.Filter)]
-    public MyRemotePipeline<TEvent> Matching(Func<TEvent, bool> predicate) => this;
+    public MyRemotePipeline<TEvent> Matching(
+        Func<TEvent, bool> predicate,
+        [IRBodyOf(nameof(predicate))] IRFunc<TEvent, bool>? irPredicate = null)
+    {
+        _steps.Add(RequiredIr(irPredicate, nameof(Matching)).Step);
+        return this;
+    }
 
     [PipelineStep(PipelineStepRole.Projection)]
-    public MyRemoteStage<TEvent, TNext> Map<TNext>(Func<TEvent, TNext> selector)
-        => new(this);
+    public MyRemoteStage<TEvent, TNext> Map<TNext>(
+        Func<TEvent, TNext> selector,
+        [IRBodyOf(nameof(selector))] IRFunc<TEvent, TNext>? irSelector = null)
+    {
+        _steps.Add(RequiredIr(irSelector, nameof(Map)).Step);
+        return new(this);
+    }
 
     [PipelineStep(PipelineStepRole.Run)]
     public MyRemotePipeline<TEvent> Do(Action<TEvent, HookContext> handler)
@@ -342,6 +357,11 @@ public sealed class MyRemotePipeline<TEvent>
         // Install the generated package through your transport/session.
         return this;
     }
+
+    private static IRFunc<TInput, TOutput> RequiredIr<TInput, TOutput>(
+        IRFunc<TInput, TOutput>? irFunc,
+        string method)
+        => irFunc ?? throw new InvalidOperationException(method + " must be lowered by DotBoxD.Plugins.Analyzer.");
 }
 
 [PipelineSurface(PipelineTransport.Remote)]
@@ -368,7 +388,18 @@ pipeline
 
 The terminal still needs a public install method such as `UseGeneratedChain(PluginPackage package)` (and the
 local-terminal equivalents if you support `RunLocal`/`RegisterLocal`). The generated output calls public API
-you could have called yourself, which keeps the custom fluent surface opt-in sugar instead of lock-in.
+you could have called yourself:
+
+```csharp
+pipeline.Matching(
+    e => e.Distance <= 4,
+    IRFunc<MonsterAggroEvent, bool>.FromStep(myLoweredFilterStep));
+```
+
+That is the important boundary: the generator supplies the `IRFunc` automatically, but the API does not depend
+on an internal overload. Older `[LowerToIr]` methods with a sibling `LoweredPipelineStep` overload still work
+for compatibility, but new custom fluent surfaces should prefer the explicit `IRBodyOf` shape so the lowering
+contract is visible and hand-writable.
 
 ## Next steps
 

@@ -41,6 +41,13 @@ internal static class MergeableIrStepSourceEmitter
         builder.Append("            ").Append(StringArray(model.RequiredCapabilities)).AppendLine(",");
         builder.Append("            ").Append(StringArray(model.Effects)).AppendLine(");");
         builder.AppendLine();
+        if (model.IRFuncType is not null)
+        {
+            builder.Append("    public static ").Append(model.IRFuncType).AppendLine(" CreateIRFunc()");
+            builder.Append("        => ").Append(model.IRFuncType).AppendLine(".FromStep(Create());");
+            builder.AppendLine();
+        }
+
         MergeableIrExpressionHelperEmitter.Emit(builder);
         builder.AppendLine("}");
         return builder.ToString();

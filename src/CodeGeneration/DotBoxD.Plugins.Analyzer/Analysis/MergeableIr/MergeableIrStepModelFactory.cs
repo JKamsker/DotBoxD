@@ -39,9 +39,9 @@ internal static class MergeableIrStepModelFactory
         catch (NotSupportedException ex)
         {
             return new MergeableIrStepCreateResult(
-                null,
-                new PluginKernelDiagnostic(
-                    "[LowerToIr] step could not be lowered: " + ex.Message,
+                    null,
+                    new PluginKernelDiagnostic(
+                    "mergeable IR step could not be lowered: " + ex.Message,
                     PluginDiagnosticLocation.From(invocation.GetLocation())));
         }
     }
@@ -72,7 +72,15 @@ internal static class MergeableIrStepModelFactory
                 "anonymous-type projections are not supported; project to a named type so the generated interceptor can name it.");
         }
 
+        if (call.InterceptionKind == MergeableIrInterceptionKind.IRFuncParameter &&
+            call.InputType.IsAnonymousType)
+        {
+            throw new NotSupportedException(
+                "anonymous input types are not supported; use a named input type so the generated IRFunc can name it.");
+        }
+
         var outputTag = OutputTag(call.Kind, call.OutputType);
+        var irFuncType = IRFuncType(call);
         var capabilities = new SortedSet<string>(StringComparer.Ordinal);
         var effects = new SortedSet<string>(StringComparer.Ordinal);
 
@@ -109,6 +117,7 @@ internal static class MergeableIrStepModelFactory
             call.Kind.ToString(),
             inputTag,
             outputTag,
+            irFuncType,
             $"new {DotBoxDGenerationNames.TypeNames.GlobalParameter}({LiteralReader.StringLiteral(CurrentValueName)}, {inputTypeSource})",
             value.Source,
             EquatableArray<string>.FromOwned([.. capabilities]),
@@ -128,7 +137,8 @@ internal static class MergeableIrStepModelFactory
         var method = call.Method;
         var receiverType = ReceiverType(invocation, model, cancellationToken)
             ?? throw new NotSupportedException("the marked method must be called on an instance receiver.");
-        if (!HasStepOverload(receiverType, method, model.Compilation))
+        if (call.InterceptionKind == MergeableIrInterceptionKind.LoweredPipelineStepOverload &&
+            !HasStepOverload(receiverType, method, model.Compilation))
         {
             throw new NotSupportedException(
                 $"receiver type '{receiverType.Name}' must expose a '{method.Name}(LoweredPipelineStep)' overload.");
@@ -141,7 +151,26 @@ internal static class MergeableIrStepModelFactory
             method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             method.Name,
             MethodTypeArguments(method),
-            stepFullName);
+            stepFullName,
+            call.InterceptionKind,
+            call.Parameter.Name,
+            call.IRParameter?.Name,
+            IRFuncType(call));
+    }
+
+    private static string? IRFuncType(MergeableIrMarkedLoweringCall call)
+    {
+        if (call.InterceptionKind != MergeableIrInterceptionKind.IRFuncParameter)
+        {
+            return null;
+        }
+
+        return MergeableIrContractNames.GlobalIRFunc +
+               "<" +
+               call.InputType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
+               ", " +
+               call.OutputType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
+               ">";
     }
 
     private static string LambdaParameterName(LambdaExpressionSyntax lambda)

@@ -38,17 +38,16 @@ internal static class MergeableIrStepGenerator
             static (sourceContext, interceptions) => MergeableIrStepInterceptorEmitter.Emit(sourceContext, interceptions));
     }
 
-    // Narrow syntactically before the semantic transform runs (mirrors IsHookChainTerminal): a
-    // [LowerToIr] target is always an instance method invoked on a receiver, so require a
-    // member-access invocation with a single lambda argument. Whether the parameter is marked is only
-    // knowable semantically, and the lambda shape/arity checks stay in the factory so malformed marked
-    // calls still surface a build-time diagnostic rather than being silently skipped here.
+    // Narrow syntactically before the semantic transform runs (mirrors IsHookChainTerminal): mergeable IR
+    // targets are instance methods invoked on a receiver, and the source body must be a lambda argument.
+    // Whether that lambda is marked through [LowerToIr] or paired with [IRBodyOf] is only knowable
+    // semantically, and the lambda shape/arity checks stay in the factory so malformed marked calls still
+    // surface a build-time diagnostic rather than being silently skipped here.
     private static bool IsCandidate(SyntaxNode node)
         => node is InvocationExpressionSyntax
         {
             Expression: MemberAccessExpressionSyntax,
-            ArgumentList.Arguments.Count: 1,
+            ArgumentList.Arguments.Count: > 0 and <= 2,
         } invocation &&
-           invocation.ArgumentList.Arguments[0].Expression is LambdaExpressionSyntax;
+           invocation.ArgumentList.Arguments.Any(static argument => argument.Expression is LambdaExpressionSyntax);
 }
-

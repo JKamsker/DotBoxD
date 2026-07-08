@@ -56,6 +56,7 @@ public sealed class PluginAnalyzerTypeNameContractTests
             [nameof(TypeNames.CapabilityAttribute)] = TypeName(typeof(CapabilityAttribute)),
             [nameof(TypeNames.KernelMethodAttribute)] = TypeName(typeof(KernelMethodAttribute)),
             [nameof(TypeNames.LowerToIrAttribute)] = TypeName(typeof(LowerToIrAttribute)),
+            [nameof(TypeNames.IRBodyOfAttribute)] = TypeName(typeof(IRBodyOfAttribute)),
             [nameof(TypeNames.LowerToIrMethodAttribute)] = TypeName(typeof(LowerToIrMethodAttribute)),
             [nameof(TypeNames.PipelineStepAttribute)] = TypeName(typeof(PipelineStepAttribute)),
             [nameof(TypeNames.PipelineSurfaceAttribute)] = TypeName(typeof(PipelineSurfaceAttribute)),

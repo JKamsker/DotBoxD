@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
-public sealed class MergeableIrStepGeneratorTests
+public sealed partial class MergeableIrStepGeneratorTests
 {
     private static readonly CSharpParseOptions ParseOptions = CSharpParseOptions.Default
         .WithLanguageVersion(LanguageVersion.Preview)

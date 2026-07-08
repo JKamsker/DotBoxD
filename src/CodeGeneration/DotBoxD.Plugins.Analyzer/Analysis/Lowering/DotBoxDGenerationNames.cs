@@ -28,6 +28,7 @@ internal static partial class DotBoxDGenerationNames
         public const string CapabilityAttribute = "DotBoxD.Abstractions.CapabilityAttribute";
         public const string KernelMethodAttribute = "DotBoxD.Abstractions.KernelMethodAttribute";
         public const string LowerToIrAttribute = "DotBoxD.Abstractions.LowerToIrAttribute";
+        public const string IRBodyOfAttribute = "DotBoxD.Abstractions.IRBodyOfAttribute";
         public const string LowerToIrMethodAttribute = "DotBoxD.Abstractions.LowerToIrMethodAttribute";
         public const string PipelineStepAttribute = "DotBoxD.Abstractions.PipelineStepAttribute";
         public const string PipelineSurfaceAttribute = "DotBoxD.Abstractions.PipelineSurfaceAttribute";

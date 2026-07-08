@@ -22,6 +22,46 @@ public sealed class LowerToIrAttribute(LoweredPipelineStepKind kind) : Attribute
 }
 
 /// <summary>
+/// Marks an optional <see cref="IRFunc{TInput,TOutput}"/> parameter as the generated IR body of another
+/// delegate parameter on the same method.
+/// </summary>
+[AttributeUsage(AttributeTargets.Parameter, Inherited = false)]
+public sealed class IRBodyOfAttribute : Attribute
+{
+    public IRBodyOfAttribute(string parameterName)
+    {
+        ParameterName = parameterName;
+        StepKind = LoweredPipelineStepKind.Projection;
+    }
+
+    public IRBodyOfAttribute(string parameterName, LoweredPipelineStepKind stepKind)
+    {
+        ParameterName = parameterName;
+        StepKind = stepKind;
+        HasExplicitStepKind = true;
+    }
+
+    public string ParameterName { get; }
+
+    public LoweredPipelineStepKind StepKind { get; }
+
+    public bool HasExplicitStepKind { get; }
+}
+
+/// <summary>
+/// Typed public carrier for the IR body generated from a delegate argument.
+/// </summary>
+public sealed class IRFunc<TInput, TOutput>
+{
+    private IRFunc(LoweredPipelineStep step)
+        => Step = step ?? throw new ArgumentNullException(nameof(step));
+
+    public LoweredPipelineStep Step { get; }
+
+    public static IRFunc<TInput, TOutput> FromStep(LoweredPipelineStep step) => new(step);
+}
+
+/// <summary>
 /// Describes method-level source-generator lowering into verified IR.
 /// </summary>
 public enum LoweredIrMethodKind

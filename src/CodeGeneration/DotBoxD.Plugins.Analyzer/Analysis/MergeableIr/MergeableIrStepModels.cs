@@ -14,6 +14,7 @@ internal sealed record MergeableIrStepModel(
     string Kind,
     string InputType,
     string OutputType,
+    string? IRFuncType,
     string ParameterSource,
     string ValueSource,
     EquatableArray<string> RequiredCapabilities,
@@ -27,7 +28,11 @@ internal sealed record MergeableIrStepInterception(
     string ReturnType,
     string MethodName,
     string MethodTypeArguments,
-    string StepFullName);
+    string StepFullName,
+    MergeableIrInterceptionKind Kind,
+    string SourceParameterName,
+    string? IRParameterName,
+    string? IRFuncType);
 
 internal sealed record MergeableIrMarkedLoweringCall(
     IMethodSymbol Method,
@@ -35,7 +40,15 @@ internal sealed record MergeableIrMarkedLoweringCall(
     ArgumentSyntax Argument,
     MergeableIrLoweredStepKind Kind,
     ITypeSymbol InputType,
-    ITypeSymbol OutputType);
+    ITypeSymbol OutputType,
+    MergeableIrInterceptionKind InterceptionKind,
+    IParameterSymbol? IRParameter);
+
+internal enum MergeableIrInterceptionKind
+{
+    LoweredPipelineStepOverload,
+    IRFuncParameter,
+}
 
 internal enum MergeableIrLoweredStepKind
 {
