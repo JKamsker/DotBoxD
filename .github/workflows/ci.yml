@@ -482,7 +482,8 @@ jobs:
               "ClientTransportConnectionLifecycleTests",
               "SingleConnectionTransportCoverageTests",
               "SingleConnectionServerTransportLifecycleRegressionTests",
-              "NamedPipeServerTransportCancellationRegressionTests"
+              "NamedPipeServerTransportCancellationRegressionTests",
+              "MessagePackPolymorphicDtoUnionTests"
             )
           ./eng/scripts/run-required-tests.ps1 `
             -Project tests/DotBoxD.Services.SourceGenerator.Tests/DotBoxD.Services.SourceGenerator.Tests.csproj `
@@ -491,6 +492,8 @@ jobs:
             -RequiredFullyQualifiedNameContains @(
               "UnsupportedShapeCoverageTests",
               "UnsupportedDtoConstructibilityTests",
+              "ExplicitDtoUnionSignatureTests",
+              "ExplicitDtoUnionRoundTripTests",
               "DtoPayloadIgnoreAttributeTests",
               "UnsupportedDtoPayloadShapeTests",
               "UnsupportedTransportPayloadShapeTests",
