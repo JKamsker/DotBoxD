@@ -1,4 +1,3 @@
-using DotBoxD.Hosting.Execution.Prepared;
 using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Plugins.Runtime;
@@ -19,9 +18,44 @@ public sealed record PluginExecutionObservation(
     private readonly string _entrypoint = Entrypoint ?? throw new ArgumentNullException(nameof(Entrypoint));
     private readonly ExecutionMode _requestedMode = Defined(RequestedMode, nameof(RequestedMode));
     private readonly ExecutionMode _actualMode = Defined(ActualMode, nameof(ActualMode));
+    private readonly bool _succeeded = Succeeded;
     private readonly SandboxErrorCode? _errorCode = Defined(ErrorCode, nameof(ErrorCode));
     private readonly SandboxErrorCode? _fallbackReason = Defined(FallbackReason, nameof(FallbackReason));
-    private readonly string _cacheStatus = CacheStatus ?? throw new ArgumentNullException(nameof(CacheStatus));
+    private readonly string _cacheStatus = ValidCompiledTelemetry(
+        CacheStatus ?? throw new ArgumentNullException(nameof(CacheStatus)),
+        nameof(CacheStatus),
+        RequestedMode,
+        ActualMode,
+        Succeeded,
+        CacheStatus != "None");
+    private readonly string? _runtimeForm = ValidCompiledTelemetry(
+        RuntimeForm,
+        nameof(RuntimeForm),
+        RequestedMode,
+        ActualMode,
+        Succeeded,
+        RuntimeForm is not null);
+    private readonly string? _cacheKey = ValidCompiledTelemetry(
+        CacheKey,
+        nameof(CacheKey),
+        RequestedMode,
+        ActualMode,
+        Succeeded,
+        CacheKey is not null);
+    private readonly string? _artifactHash = ValidCompiledTelemetry(
+        ArtifactHash,
+        nameof(ArtifactHash),
+        RequestedMode,
+        ActualMode,
+        Succeeded,
+        ArtifactHash is not null);
+    private readonly string? _materializationStatus = ValidCompiledTelemetry(
+        MaterializationStatus,
+        nameof(MaterializationStatus),
+        RequestedMode,
+        ActualMode,
+        Succeeded,
+        MaterializationStatus is not null);
 
     public string Entrypoint
     {
@@ -32,13 +66,19 @@ public sealed record PluginExecutionObservation(
     public ExecutionMode RequestedMode
     {
         get => _requestedMode;
-        init => _requestedMode = Defined(value, nameof(RequestedMode));
+        init => _requestedMode = ValidRequestedMode(Defined(value, nameof(RequestedMode)));
     }
 
     public ExecutionMode ActualMode
     {
         get => _actualMode;
-        init => _actualMode = Defined(value, nameof(ActualMode));
+        init => _actualMode = ValidActualMode(Defined(value, nameof(ActualMode)));
+    }
+
+    public bool Succeeded
+    {
+        get => _succeeded;
+        init => _succeeded = ValidSucceeded(value);
     }
 
     public SandboxErrorCode? ErrorCode
@@ -56,7 +96,61 @@ public sealed record PluginExecutionObservation(
     public string CacheStatus
     {
         get => _cacheStatus;
-        init => _cacheStatus = value ?? throw new ArgumentNullException(nameof(CacheStatus));
+        init => _cacheStatus = ValidCompiledTelemetry(
+            value ?? throw new ArgumentNullException(nameof(CacheStatus)),
+            nameof(CacheStatus),
+            RequestedMode,
+            ActualMode,
+            Succeeded,
+            value != "None");
+    }
+
+    public string? RuntimeForm
+    {
+        get => _runtimeForm;
+        init => _runtimeForm = ValidCompiledTelemetry(
+            value,
+            nameof(RuntimeForm),
+            RequestedMode,
+            ActualMode,
+            Succeeded,
+            value is not null);
+    }
+
+    public string? CacheKey
+    {
+        get => _cacheKey;
+        init => _cacheKey = ValidCompiledTelemetry(
+            value,
+            nameof(CacheKey),
+            RequestedMode,
+            ActualMode,
+            Succeeded,
+            value is not null);
+    }
+
+    public string? ArtifactHash
+    {
+        get => _artifactHash;
+        init => _artifactHash = ValidCompiledTelemetry(
+            value,
+            nameof(ArtifactHash),
+            RequestedMode,
+            ActualMode,
+            Succeeded,
+            value is not null);
+    }
+
+    public string? MaterializationStatus
+    {
+        get => _materializationStatus;
+        init => _materializationStatus = ValidCompiledTelemetry(
+            value,
+            nameof(MaterializationStatus),
+            RequestedMode,
+            ActualMode,
+            Succeeded,
+            value is not null);
     }
 
     private static ExecutionMode Defined(ExecutionMode value, string parameterName)
@@ -64,226 +158,71 @@ public sealed record PluginExecutionObservation(
 
     private static SandboxErrorCode? Defined(SandboxErrorCode? value, string parameterName)
         => value is null || Enum.IsDefined(value.Value) ? value : throw new ArgumentOutOfRangeException(parameterName);
-}
 
-internal sealed class PluginExecutionObserver
-{
-    // Bounded retention window. Long-running hosts can drive millions of executions
-    // through a single installed kernel, so full history is kept in a fixed-size ring
-    // buffer instead of an unbounded list: memory tracks active diagnostics rather than
-    // lifetime event volume, and Snapshot copies only this window. LastExecution stays
-    // the always-on hot-path diagnostic for the most recent run.
-    private const int HistoryCapacity = 128;
-
-    private readonly object _gate = new();
-    private readonly ObservationEntry[] _observations = new ObservationEntry[HistoryCapacity];
-    private int _start;
-    private int _count;
-    private ObservationEntry _last;
-    private bool _hasLast;
-
-    public PluginExecutionObservation? Last
-    {
-        get
-        {
-            lock (_gate)
-            {
-                return _hasLast ? _last.ToObservation() : null;
-            }
-        }
-    }
-
-    public IReadOnlyList<PluginExecutionObservation> Snapshot()
-    {
-        lock (_gate)
-        {
-            var snapshot = new PluginExecutionObservation[_count];
-            for (var i = 0; i < _count; i++)
-            {
-                snapshot[i] = _observations[(_start + i) % HistoryCapacity].ToObservation();
-            }
-
-            return snapshot;
-        }
-    }
-
-    public void Record(string entrypoint, ExecutionMode requestedMode, SandboxExecutionResult result)
-    {
-        if (result is { Succeeded: true, Error: null, AuditEvents.Count: 0 })
-        {
-            RecordNoAuditSuccess(entrypoint, requestedMode, result.ActualMode, result.ArtifactHash);
-            return;
-        }
-
-        ExtractMarkers(requestedMode, result, out var summary, out var fallbackReason);
-        var observation = new ObservationEntry(
-            entrypoint,
-            requestedMode,
-            result.ActualMode,
-            result.Succeeded,
-            result.Error?.Code,
-            fallbackReason,
-            Field(summary, "cacheStatus") ?? "None",
-            Field(summary, "runtimeForm"),
-            Field(summary, "cacheKey"),
-            result.ArtifactHash ?? Field(summary, "artifactHash"),
-            Field(summary, "materializationStatus"));
-        Append(observation);
-    }
-
-    public void Record(string entrypoint, ExecutionMode requestedMode, PreparedExecutionResult result)
-    {
-        if (result.FullResult is { } fullResult)
-        {
-            Record(entrypoint, requestedMode, fullResult);
-            return;
-        }
-
-        if (!result.Succeeded)
-        {
-            RecordNoAuditFailure(
-                entrypoint,
-                requestedMode,
-                result.ActualMode,
-                result.ArtifactHash,
-                result.Error?.Code);
-            return;
-        }
-
-        RecordNoAuditSuccess(entrypoint, requestedMode, result.ActualMode, result.ArtifactHash);
-    }
-
-    private void RecordNoAuditSuccess(
-        string entrypoint,
+    private static T ValidCompiledTelemetry<T>(
+        T value,
+        string parameterName,
         ExecutionMode requestedMode,
         ExecutionMode actualMode,
-        string? artifactHash)
-        => Append(new ObservationEntry(
-            entrypoint,
-            requestedMode,
-            actualMode,
-            Succeeded: true,
-            ErrorCode: null,
-            FallbackReason: null,
-            CacheStatus: "None",
-            RuntimeForm: null,
-            CacheKey: null,
-            artifactHash,
-            MaterializationStatus: null));
+        bool succeeded,
+        bool hasCompiledTelemetry)
+    {
+        if (hasCompiledTelemetry)
+        {
+            ThrowIfInterpretedSuccess(requestedMode, actualMode, succeeded, parameterName);
+        }
 
-    private void RecordNoAuditFailure(
-        string entrypoint,
+        return value;
+    }
+
+    private ExecutionMode ValidRequestedMode(ExecutionMode value)
+    {
+        if (HasCompiledTelemetry())
+        {
+            ThrowIfInterpretedSuccess(value, ActualMode, Succeeded, nameof(RequestedMode));
+        }
+
+        return value;
+    }
+
+    private ExecutionMode ValidActualMode(ExecutionMode value)
+    {
+        if (HasCompiledTelemetry())
+        {
+            ThrowIfInterpretedSuccess(RequestedMode, value, Succeeded, nameof(ActualMode));
+        }
+
+        return value;
+    }
+
+    private bool ValidSucceeded(bool value)
+    {
+        if (HasCompiledTelemetry())
+        {
+            ThrowIfInterpretedSuccess(RequestedMode, ActualMode, value, nameof(Succeeded));
+        }
+
+        return value;
+    }
+
+    private bool HasCompiledTelemetry()
+        => CacheStatus != "None"
+            || RuntimeForm is not null
+            || CacheKey is not null
+            || ArtifactHash is not null
+            || MaterializationStatus is not null;
+
+    private static void ThrowIfInterpretedSuccess(
         ExecutionMode requestedMode,
         ExecutionMode actualMode,
-        string? artifactHash,
-        SandboxErrorCode? errorCode)
-        => Append(new ObservationEntry(
-            entrypoint,
-            requestedMode,
-            actualMode,
-            Succeeded: false,
-            errorCode,
-            FallbackReason: null,
-            CacheStatus: "None",
-            RuntimeForm: null,
-            CacheKey: null,
-            artifactHash,
-            MaterializationStatus: null));
-
-    private void Append(ObservationEntry observation)
+        bool succeeded,
+        string parameterName)
     {
-        lock (_gate)
+        if (succeeded && requestedMode == ExecutionMode.Interpreted && actualMode == ExecutionMode.Interpreted)
         {
-            var slot = (_start + _count) % HistoryCapacity;
-            _observations[slot] = observation;
-            if (_count < HistoryCapacity)
-            {
-                _count++;
-            }
-            else
-            {
-                _start = (_start + 1) % HistoryCapacity;
-            }
-
-            _last = observation;
-            _hasLast = true;
+            throw new ArgumentException(
+                "Successful interpreted execution observations cannot include compiled artifact telemetry.",
+                parameterName);
         }
-    }
-
-    // Walks the audit-event list a single time to recover the two telemetry markers the
-    // observation needs: the last RunSummary's fields and the first ExecutionFallback's
-    // error code. This replaces two independent full-list LINQ scans, so extraction stays
-    // a single pass over the events even as audit volume grows.
-    private static void ExtractMarkers(
-        ExecutionMode requestedMode,
-        SandboxExecutionResult result,
-        out IReadOnlyDictionary<string, string>? summary,
-        out SandboxErrorCode? fallbackReason)
-    {
-        summary = null;
-        fallbackReason = null;
-
-        // A run requested as Interpreted that actually ran Interpreted never attempts compilation,
-        // so it has no fallback (fallbackReason stays null) and no compiled-artifact telemetry —
-        // cacheStatus/runtimeForm/cacheKey/artifactHash/materializationStatus all describe a compiled
-        // artifact that interpreted execution does not produce, so they are correctly None/null.
-        // Skipping the scan here is therefore an equivalence, not a data loss, and it holds whether or
-        // not SuppressSuccessfulRunSummaryAudit dropped the (artifact-free) interpreted RunSummary.
-        // The hot suppressed-success path with zero events is already handled by RecordNoAuditSuccess
-        // before this method runs; compiled and compiled->interpreted fallback runs fall through and are
-        // scanned below so their fallbackReason and artifact markers are still recovered.
-        if (requestedMode == ExecutionMode.Interpreted && result.ActualMode == ExecutionMode.Interpreted)
-        {
-            return;
-        }
-
-        var auditEvents = result.AuditEvents;
-        var fallbackFound = false;
-
-        for (var i = 0; i < auditEvents.Count; i++)
-        {
-            var auditEvent = auditEvents[i];
-            switch (auditEvent.Kind)
-            {
-                case "RunSummary":
-                    summary = auditEvent.Fields;
-                    break;
-                case "ExecutionFallback" when !fallbackFound:
-                    fallbackReason = auditEvent.ErrorCode;
-                    fallbackFound = true;
-                    break;
-            }
-        }
-    }
-
-    private static string? Field(IReadOnlyDictionary<string, string>? fields, string key)
-        => fields is not null && fields.TryGetValue(key, out var value) ? value : null;
-
-    private readonly record struct ObservationEntry(
-        string Entrypoint,
-        ExecutionMode RequestedMode,
-        ExecutionMode ActualMode,
-        bool Succeeded,
-        SandboxErrorCode? ErrorCode,
-        SandboxErrorCode? FallbackReason,
-        string CacheStatus,
-        string? RuntimeForm,
-        string? CacheKey,
-        string? ArtifactHash,
-        string? MaterializationStatus)
-    {
-        public PluginExecutionObservation ToObservation()
-            => new(
-                Entrypoint,
-                RequestedMode,
-                ActualMode,
-                Succeeded,
-                ErrorCode,
-                FallbackReason,
-                CacheStatus,
-                RuntimeForm,
-                CacheKey,
-                ArtifactHash,
-                MaterializationStatus);
     }
 }
