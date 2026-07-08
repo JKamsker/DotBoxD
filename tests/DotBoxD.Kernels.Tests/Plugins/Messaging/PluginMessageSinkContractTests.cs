@@ -2,6 +2,14 @@ namespace DotBoxD.Kernels.Tests.Plugins.Messaging;
 
 public sealed class PluginMessageSinkContractTests
 {
+    public static TheoryData<string> InvalidTargetIds => new()
+    {
+        "",
+        "   ",
+        "player/one",
+        "player\u0001one"
+    };
+
     [Fact]
     public void Plugin_message_rejects_null_target_id()
     {
@@ -21,10 +29,7 @@ public sealed class PluginMessageSinkContractTests
     }
 
     [Theory]
-    [InlineData("")]
-    [InlineData("   ")]
-    [InlineData("player/one")]
-    [InlineData("player\u0001one")]
+    [MemberData(nameof(InvalidTargetIds))]
     public void Plugin_message_rejects_invalid_target_id(string targetId)
     {
         var ex = Assert.Throws<ArgumentException>(
@@ -68,10 +73,7 @@ public sealed class PluginMessageSinkContractTests
     }
 
     [Theory]
-    [InlineData("")]
-    [InlineData("   ")]
-    [InlineData("player/one")]
-    [InlineData("player\u0001one")]
+    [MemberData(nameof(InvalidTargetIds))]
     public void In_memory_sink_send_rejects_invalid_target_id_without_appending(string targetId)
     {
         var sink = new InMemoryPluginMessageSink();
@@ -104,10 +106,7 @@ public sealed class PluginMessageSinkContractTests
     }
 
     [Theory]
-    [InlineData("")]
-    [InlineData("   ")]
-    [InlineData("player/one")]
-    [InlineData("player\u0001one")]
+    [MemberData(nameof(InvalidTargetIds))]
     public async Task In_memory_sink_send_async_rejects_invalid_target_id_without_appending(string targetId)
     {
         var sink = new InMemoryPluginMessageSink();
