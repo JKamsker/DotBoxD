@@ -17,6 +17,7 @@ internal static class RegistrationAccumulatorEmitter
     private static string TargetSource(RegistrationAccumulatorTargetModel model)
     {
         var builder = SourceHeader(model.Namespace);
+        AppendAttributes(builder, string.Empty, model.Attributes);
         builder.Append("internal sealed class ").Append(model.AccumulatorName).AppendLine();
         builder.AppendLine("{");
         builder.Append("    private readonly ").Append(model.ReceiverTypeName).AppendLine(" _target;");
@@ -36,6 +37,7 @@ internal static class RegistrationAccumulatorEmitter
     private static void AppendRegistrationMethod(StringBuilder builder, RegistrationAccumulatorTargetModel model)
     {
         var genericList = GenericParameterList(model.TypeParameters);
+        AppendAttributes(builder, "    ", model.MethodAttributes);
         builder.Append("    public ").Append(model.AccumulatorName).Append(' ')
             .Append(Identifier(model.MethodName)).Append(genericList).AppendLine("()");
         AppendConstraintClauses(builder, model.TypeParameters);
@@ -54,6 +56,7 @@ internal static class RegistrationAccumulatorEmitter
         EquatableArray<RegistrationChildAccumulatorModel> children)
     {
         var builder = SourceHeader(model.Namespace);
+        AppendAttributes(builder, string.Empty, model.Attributes);
         builder.Append("internal sealed class ").Append(model.AccumulatorName).AppendLine();
         builder.AppendLine("{");
         foreach (var child in children)
@@ -109,6 +112,17 @@ internal static class RegistrationAccumulatorEmitter
 
     private static string ChildTargetExpression(RegistrationChildAccumulatorModel child)
         => "((" + child.DeclaringTypeName + ")target)." + Identifier(child.PropertyName);
+
+    private static void AppendAttributes(
+        StringBuilder builder,
+        string indent,
+        EquatableArray<string> attributes)
+    {
+        foreach (var attribute in attributes)
+        {
+            builder.Append(indent).AppendLine(attribute);
+        }
+    }
 
     private static void AppendConstraintClauses(
         StringBuilder builder,

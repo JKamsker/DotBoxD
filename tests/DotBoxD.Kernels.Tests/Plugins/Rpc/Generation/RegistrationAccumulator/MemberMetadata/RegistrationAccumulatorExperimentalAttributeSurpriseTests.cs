@@ -50,7 +50,7 @@ public sealed class RegistrationAccumulatorExperimentalAttributeSurpriseTests
 
         if (HasFailClosedExperimentalDiagnostic(run.Diagnostics))
         {
-            return;
+            Assert.Fail("Registration accumulator generation must preserve ExperimentalAttribute rather than fail closed.");
         }
 
         var source = GeneratedSource(run.Result, "ServiceRegistrationAccumulator");
@@ -100,7 +100,7 @@ public sealed class RegistrationAccumulatorExperimentalAttributeSurpriseTests
 
         if (HasFailClosedExperimentalDiagnostic(run.Diagnostics))
         {
-            return;
+            Assert.Fail("Registration accumulator generation must preserve ExperimentalAttribute rather than fail closed.");
         }
 
         Assert.Contains(ExpectedAttribute, GeneratedSource(run.Result, "ServiceRegistrationAccumulator"), StringComparison.Ordinal);
