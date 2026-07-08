@@ -180,15 +180,14 @@ public sealed class RemoteSubscriptionPipeline<TEvent>
             throw;
         }
     }
-
-    [PipelineStep(PipelineStepRole.Filter)]
-    public RemoteSubscriptionPipeline<TEvent> Where(Func<TEvent, HookContext, bool> filter)
+    public RemoteSubscriptionPipeline<TEvent> Where(
+        Func<TEvent, HookContext, bool> filter,
+        [IRBodyOf(nameof(filter))] IRFunc<TEvent, HookContext, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
+        _ = irFilter?.Step;
         return this;
     }
-
-    [PipelineStep(PipelineStepRole.Filter)]
     public RemoteSubscriptionPipeline<TEvent> Where(
         Func<TEvent, bool> filter,
         [IRBodyOf(nameof(filter))] IRFunc<TEvent, bool>? irFilter = null)
@@ -197,15 +196,14 @@ public sealed class RemoteSubscriptionPipeline<TEvent>
         _ = irFilter?.Step;
         return this;
     }
-
-    [PipelineStep(PipelineStepRole.Projection)]
-    public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>(Func<TEvent, HookContext, TNext> projection)
+    public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>(
+        Func<TEvent, HookContext, TNext> projection,
+        [IRBodyOf(nameof(projection))] IRFunc<TEvent, HookContext, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
+        _ = irProjection?.Step;
         return new RemoteSubscriptionStage<TEvent, TNext>(this);
     }
-
-    [PipelineStep(PipelineStepRole.Projection)]
     public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>(
         Func<TEvent, TNext> projection,
         [IRBodyOf(nameof(projection))] IRFunc<TEvent, TNext>? irProjection = null)
@@ -214,41 +212,94 @@ public sealed class RemoteSubscriptionPipeline<TEvent>
         _ = irProjection?.Step;
         return new RemoteSubscriptionStage<TEvent, TNext>(this);
     }
+    public RemoteSubscriptionPipeline<TEvent> Run(
+        Func<TEvent, HookContext, ValueTask> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedChain(HookLowering.RequiredPackage(irHandler, nameof(irHandler)));
+    }
 
-    [PipelineStep(PipelineStepRole.Run)]
-    public RemoteSubscriptionPipeline<TEvent> Run(Func<TEvent, HookContext, ValueTask> handler)
-        => throw NotLowered();
+    public RemoteSubscriptionPipeline<TEvent> Run(
+        Action<TEvent, HookContext> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return Run((e, ctx) =>
+        {
+            handler(e, ctx);
+            return ValueTask.CompletedTask;
+        }, irHandler);
+    }
 
-    [PipelineStep(PipelineStepRole.Run)]
-    public RemoteSubscriptionPipeline<TEvent> Run(Action<TEvent, HookContext> handler)
-        => throw NotLowered();
+    public RemoteSubscriptionPipeline<TEvent> Run(
+        Func<TEvent, ValueTask> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return Run((e, _) => handler(e), irHandler);
+    }
 
-    [PipelineStep(PipelineStepRole.Run)]
-    public RemoteSubscriptionPipeline<TEvent> Run(Func<TEvent, ValueTask> handler)
-        => throw NotLowered();
+    public RemoteSubscriptionPipeline<TEvent> Run(
+        Action<TEvent> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return Run((e, _) =>
+        {
+            handler(e);
+            return ValueTask.CompletedTask;
+        }, irHandler);
+    }
 
-    [PipelineStep(PipelineStepRole.Run)]
-    public RemoteSubscriptionPipeline<TEvent> Run(Action<TEvent> handler)
-        => throw NotLowered();
+    public RemoteSubscriptionPipeline<TEvent> RunLocal(
+        Func<TEvent, HookContext, ValueTask> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        var kernel = RequiredKernel(irHandler);
+        return kernel.TryGetProjectedPayloadDecoder<TEvent>(out var decoder)
+            ? InstallLocal(kernel.Package, handler, decoder)
+            : InstallLocal(kernel.Package, handler);
+    }
 
-    [PipelineStep(PipelineStepRole.RunLocal)]
-    public RemoteSubscriptionPipeline<TEvent> RunLocal(Func<TEvent, HookContext, ValueTask> handler)
-        => throw LocalHandlersNotSupported();
+    public RemoteSubscriptionPipeline<TEvent> RunLocal(
+        Action<TEvent, HookContext> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return RunLocal((e, ctx) =>
+        {
+            handler(e, ctx);
+            return ValueTask.CompletedTask;
+        }, irHandler);
+    }
 
-    [PipelineStep(PipelineStepRole.RunLocal)]
-    public RemoteSubscriptionPipeline<TEvent> RunLocal(Action<TEvent, HookContext> handler)
-        => throw LocalHandlersNotSupported();
+    public RemoteSubscriptionPipeline<TEvent> RunLocal(
+        Func<TEvent, ValueTask> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return RunLocal((e, _) => handler(e), irHandler);
+    }
 
-    [PipelineStep(PipelineStepRole.RunLocal)]
-    public RemoteSubscriptionPipeline<TEvent> RunLocal(Func<TEvent, ValueTask> handler)
-        => throw LocalHandlersNotSupported();
+    public RemoteSubscriptionPipeline<TEvent> RunLocal(
+        Action<TEvent> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return RunLocal((e, _) =>
+        {
+            handler(e);
+            return ValueTask.CompletedTask;
+        }, irHandler);
+    }
 
-    [PipelineStep(PipelineStepRole.RunLocal)]
-    public RemoteSubscriptionPipeline<TEvent> RunLocal(Action<TEvent> handler)
-        => throw LocalHandlersNotSupported();
-
-    private static InvalidOperationException NotLowered()
-        => new("Remote subscription Run(lambda) calls must be intercepted by the DotBoxD plugin generator.");
+    private static IRKernel RequiredKernel(IRKernel? irHandler)
+    {
+        ArgumentNullException.ThrowIfNull(irHandler);
+        return irHandler;
+    }
 
     private static NotSupportedException LocalHandlersNotSupported()
         => new("Remote subscription RunLocal requires an event callback transport; use PluginServer.Subscriptions for local handlers.");

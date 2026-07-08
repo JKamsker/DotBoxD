@@ -202,10 +202,25 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
             .Where(static result => result.Interception is not null)
             .Select(static (result, _) => result.Interception!)
             .Collect();
+        var stageIrModels = chainResults
+            .SelectMany(static (result, _) => result.StageIrModels);
+        var stageIrInterceptions = stageIrModels
+            .Select(static (model, _) => model.Interception)
+            .Collect();
         var invokeAsyncInterceptions = invokeAsyncResults
             .Where(static result => result.Interception is not null)
             .Select(static (result, _) => result.Interception!)
             .Collect();
+        GeneratorGuard.RegisterOutput(
+            context,
+            stageIrModels.Collect(),
+            "hook chain stage IR source output",
+            static (sourceContext, items) => HookChainStageIrEmitter.EmitSteps(sourceContext, items));
+        GeneratorGuard.RegisterOutput(
+            context,
+            stageIrInterceptions,
+            "hook chain stage IR interceptor output",
+            static (sourceContext, items) => HookChainStageIrEmitter.EmitInterceptors(sourceContext, items));
         GeneratorGuard.RegisterOutput(
             context,
             interceptions,

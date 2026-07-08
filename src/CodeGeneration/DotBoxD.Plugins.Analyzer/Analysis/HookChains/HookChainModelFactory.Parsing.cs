@@ -6,13 +6,12 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
 internal static partial class HookChainModelFactory
 {
-    // Resolves the pipeline role of a resolved method purely from its [PipelineStep] attribute. The framework
-    // marks its own pipeline methods (see [PipelineStep]/[PipelineSurface] on the Runtime pipeline types), so
-    // no method-name literal drives recognition once a symbol (or overload candidate) is available.
-    private static PipelineStepRole? RoleOf(IMethodSymbol? method, Compilation compilation)
+    // Resolves the pipeline role of a resolved method from a [PipelineSurface] receiver and explicit
+    // delegate+IR method shape. Public per-method role markers no longer exist.
+    private static PipelineCallRole? RoleOf(IMethodSymbol? method, Compilation compilation)
         => PipelineRoleReader.RoleOf(method, compilation);
 
-    private static PipelineStepRole? RoleOf(
+    private static PipelineCallRole? RoleOf(
         InvocationExpressionSyntax invocation,
         SemanticModel model,
         CancellationToken cancellationToken)
@@ -94,13 +93,13 @@ internal static partial class HookChainModelFactory
         }
 
         var role = RoleOf(invocation, model, cancellationToken);
-        if (role == PipelineStepRole.Seed)
+        if (role == PipelineCallRole.Seed)
         {
             seed = invocation;
             return true;
         }
 
-        if (role is not (PipelineStepRole.Filter or PipelineStepRole.Projection))
+        if (role is not (PipelineCallRole.Filter or PipelineCallRole.Projection))
         {
             return false;
         }
@@ -115,7 +114,7 @@ internal static partial class HookChainModelFactory
             return false;
         }
 
-        stages.Add(new HookChainStage(role == PipelineStepRole.Projection, lambda));
+        stages.Add(new HookChainStage(role == PipelineCallRole.Projection, invocation, lambda));
         next = HookChainAliasResolver.UnwrapTransparentExpression(access.Expression);
         return true;
     }

@@ -22,17 +22,14 @@ public enum LoweredIrMethodKind.AnonymousInvocation
 public enum LoweredPipelineStepKind
 public enum LoweredPipelineStepKind.Filter
 public enum LoweredPipelineStepKind.Projection
-public enum PipelineStepRole
-public enum PipelineStepRole.Filter = 1
-public enum PipelineStepRole.Projection = 2
-public enum PipelineStepRole.Register = 5
-public enum PipelineStepRole.RegisterLocal = 6
-public enum PipelineStepRole.Run = 3
-public enum PipelineStepRole.RunLocal = 4
-public enum PipelineStepRole.Seed = 0
 public enum PipelineTransport
 public enum PipelineTransport.Local = 0
 public enum PipelineTransport.Remote = 1
+public Func<object> PackageFactory { get; }
+public Func<TCaptures, TDelegate, byte[]> EncodeArguments { get; }
+public Func<TCaptures, TDelegate, ReadOnlyMemory<byte>, TReturn> DecodeResult { get; }
+public Func<TDelegate, byte[]> EncodeArguments { get; }
+public Func<TDelegate, ReadOnlyMemory<byte>, TReturn> DecodeResult { get; }
 public GeneratedPluginServerRegistryKind Kind { get; } = Enum.IsDefined(kind)
 public HandleSubtypeAttribute( Type subtype, string discriminator, string bindingPrefix, string capability)
 public HookAttribute(string name, Type resultType)
@@ -68,7 +65,6 @@ public LoweredIrMethodKind Kind { get; } = kind
 public LoweredPipelineStep Step { get; }
 public LoweredPipelineStepKind Kind { get; } = kind
 public LoweredPipelineStepKind StepKind { get; }
-public PipelineStepRole Role { get; } = role
 public PipelineTransport Transport { get; } = transport
 public PluginAttribute(string? id = null) => Id = id
 public PolymorphicHandleAttribute(string keyMember)
@@ -87,13 +83,15 @@ public sealed class HostBindingAttribute : Attribute
 public sealed class HostCapabilityAttribute(string capability, HostBindingEffect effects) : Attribute
 public sealed class InMemoryPluginMessageSink : IPluginMessageSink
 public sealed class IRBodyOfAttribute : Attribute
+public sealed class IRFunc<TInput, TContext, TOutput>
 public sealed class IRFunc<TInput, TOutput>
+public sealed class IRInvocation<TCaptures, TDelegate, TReturn> where TCaptures : class where TDelegate : Delegate
+public sealed class IRInvocation<TDelegate, TReturn> where TDelegate : Delegate
 public sealed class KernelMethodAttribute : Attribute
 public sealed class LiveSettingAttribute : Attribute
 public sealed class LowerToIrAttribute(LoweredPipelineStepKind kind) : Attribute
 public sealed class LowerToIrMethodAttribute(LoweredIrMethodKind kind) : Attribute
 public sealed class NativeOnlyAttribute : Attribute
-public sealed class PipelineStepAttribute(PipelineStepRole role) : Attribute
 public sealed class PipelineSurfaceAttribute(PipelineTransport transport) : Attribute
 public sealed class PluginAttribute : Attribute
 public sealed class PolymorphicHandleAttribute : Attribute
@@ -109,7 +107,10 @@ public ServerExtensionAttribute(string id, Type serviceType)
 public ServerExtensionAttribute(string id) => Id = id ?? throw new ArgumentNullException(nameof(id))
 public ServerExtensionAttribute(Type grafts, string? id = null)
 public static class LoweredPipelineComposer
+public static IRFunc<TInput, TContext, TOutput> FromStep(LoweredPipelineStep step) => new(step)
 public static IRFunc<TInput, TOutput> FromStep(LoweredPipelineStep step) => new(step)
+public static IRInvocation<TCaptures, TDelegate, TReturn> FromGenerated( string pluginId, Func<object> packageFactory, Func<TCaptures, TDelegate, byte[]> encodeArguments, Func<TCaptures, TDelegate, ReadOnlyMemory<byte>, TReturn> decodeResult)
+public static IRInvocation<TDelegate, TReturn> FromGenerated( string pluginId, Func<object> packageFactory, Func<TDelegate, byte[]> encodeArguments, Func<TDelegate, ReadOnlyMemory<byte>, TReturn> decodeResult)
 public static SandboxModule Compose(LoweredPipelineComposition composition)
 public string AccumulatorName { get; } = accumulatorName
 public string BindingId { get; }
@@ -128,6 +129,7 @@ public string MethodName { get; } = methodName
 public string Name { get; }
 public string NormalizedSignature { get; } = RequireMetadata(normalizedSignature, nameof(normalizedSignature))
 public string ParameterName { get; }
+public string PluginId { get; }
 public string ShouldHandleFunctionId { get; init; } = "ShouldHandle"
 public string TargetId { get; init; }
 public string? ContextFactory { get; set; }

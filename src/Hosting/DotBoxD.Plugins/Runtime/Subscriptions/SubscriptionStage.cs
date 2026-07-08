@@ -19,11 +19,12 @@ public class SubscriptionStage<TEvent, TCurrent, TContext>
         _root = root;
         _project = project;
     }
-
-    [PipelineStep(PipelineStepRole.Filter)]
-    public SubscriptionStage<TEvent, TCurrent, TContext> Where(Func<TCurrent, TContext, bool> filter)
+    public SubscriptionStage<TEvent, TCurrent, TContext> Where(
+        Func<TCurrent, TContext, bool> filter,
+        [IRBodyOf(nameof(filter))] IRFunc<TCurrent, TContext, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
+        _ = irFilter?.Step;
         var project = _project;
         return new SubscriptionStage<TEvent, TCurrent, TContext>(_root, async (e, ctx) =>
         {
@@ -31,8 +32,6 @@ public class SubscriptionStage<TEvent, TCurrent, TContext>
             return (ok && filter(value, ctx), value);
         });
     }
-
-    [PipelineStep(PipelineStepRole.Filter)]
     public SubscriptionStage<TEvent, TCurrent, TContext> Where(
         Func<TCurrent, bool> filter,
         [IRBodyOf(nameof(filter))] IRFunc<TCurrent, bool>? irFilter = null)
@@ -41,11 +40,12 @@ public class SubscriptionStage<TEvent, TCurrent, TContext>
         _ = irFilter?.Step;
         return Where((value, _) => filter(value));
     }
-
-    [PipelineStep(PipelineStepRole.Projection)]
-    public SubscriptionStage<TEvent, TNext, TContext> Select<TNext>(Func<TCurrent, TContext, TNext> projection)
+    public SubscriptionStage<TEvent, TNext, TContext> Select<TNext>(
+        Func<TCurrent, TContext, TNext> projection,
+        [IRBodyOf(nameof(projection))] IRFunc<TCurrent, TContext, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
+        _ = irProjection?.Step;
         var project = _project;
         return new SubscriptionStage<TEvent, TNext, TContext>(_root, async (e, ctx) =>
         {
@@ -53,8 +53,6 @@ public class SubscriptionStage<TEvent, TCurrent, TContext>
             return ok ? (true, projection(value, ctx)) : (false, default!);
         });
     }
-
-    [PipelineStep(PipelineStepRole.Projection)]
     public SubscriptionStage<TEvent, TNext, TContext> Select<TNext>(
         Func<TCurrent, TNext> projection,
         [IRBodyOf(nameof(projection))] IRFunc<TCurrent, TNext>? irProjection = null)
@@ -63,8 +61,6 @@ public class SubscriptionStage<TEvent, TCurrent, TContext>
         _ = irProjection?.Step;
         return Select((value, _) => projection(value));
     }
-
-    [PipelineStep(PipelineStepRole.RunLocal)]
     public SubscriptionPipeline<TEvent, TContext> RunLocal(Func<TCurrent, TContext, ValueTask> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
@@ -78,8 +74,6 @@ public class SubscriptionStage<TEvent, TCurrent, TContext>
             }
         });
     }
-
-    [PipelineStep(PipelineStepRole.RunLocal)]
     public SubscriptionPipeline<TEvent, TContext> RunLocal(Action<TCurrent, TContext> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
@@ -89,15 +83,11 @@ public class SubscriptionStage<TEvent, TCurrent, TContext>
             return ValueTask.CompletedTask;
         });
     }
-
-    [PipelineStep(PipelineStepRole.RunLocal)]
     public SubscriptionPipeline<TEvent, TContext> RunLocal(Func<TCurrent, ValueTask> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
         return RunLocal((value, _) => handler(value));
     }
-
-    [PipelineStep(PipelineStepRole.RunLocal)]
     public SubscriptionPipeline<TEvent, TContext> RunLocal(Action<TCurrent> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
@@ -121,20 +111,43 @@ public class SubscriptionStage<TEvent, TCurrent, TContext>
         ArgumentNullException.ThrowIfNull(package);
         return _root.UseGeneratedChain(package);
     }
+    public SubscriptionPipeline<TEvent, TContext> Run(
+        Func<TCurrent, TContext, ValueTask> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedChainFromInterceptor(HookLowering.RequiredPackage(irHandler, nameof(irHandler)));
+    }
 
-    [PipelineStep(PipelineStepRole.Run)]
-    public SubscriptionPipeline<TEvent, TContext> Run(Func<TCurrent, TContext, ValueTask> handler)
-        => throw HookLowering.NotLowered();
+    public SubscriptionPipeline<TEvent, TContext> Run(
+        Action<TCurrent, TContext> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return Run((value, ctx) =>
+        {
+            handler(value, ctx);
+            return ValueTask.CompletedTask;
+        }, irHandler);
+    }
 
-    [PipelineStep(PipelineStepRole.Run)]
-    public SubscriptionPipeline<TEvent, TContext> Run(Action<TCurrent, TContext> handler)
-        => throw HookLowering.NotLowered();
+    public SubscriptionPipeline<TEvent, TContext> Run(
+        Func<TCurrent, ValueTask> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return Run((value, _) => handler(value), irHandler);
+    }
 
-    [PipelineStep(PipelineStepRole.Run)]
-    public SubscriptionPipeline<TEvent, TContext> Run(Func<TCurrent, ValueTask> handler)
-        => throw HookLowering.NotLowered();
-
-    [PipelineStep(PipelineStepRole.Run)]
-    public SubscriptionPipeline<TEvent, TContext> Run(Action<TCurrent> handler)
-        => throw HookLowering.NotLowered();
+    public SubscriptionPipeline<TEvent, TContext> Run(
+        Action<TCurrent> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return Run((value, _) =>
+        {
+            handler(value);
+            return ValueTask.CompletedTask;
+        }, irHandler);
+    }
 }

@@ -20,11 +20,7 @@ public sealed class RemoteHookRegistry
         _install = install ?? throw new ArgumentNullException(nameof(install));
         _localHandlers = localHandlers;
     }
-
-    [PipelineStep(PipelineStepRole.Seed)]
     public RemoteHookPipeline<TEvent> On<TEvent>() => new(_install, _localHandlers);
-
-    [PipelineStep(PipelineStepRole.Seed)]
     public RemoteHookPipeline<TEvent, TContext> On<TEvent, TContext>(Func<HookContext, TContext> createContext)
     {
         ArgumentNullException.ThrowIfNull(createContext);

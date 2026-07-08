@@ -62,6 +62,19 @@ public sealed class IRFunc<TInput, TOutput>
 }
 
 /// <summary>
+/// Typed public carrier for an IR body generated from a delegate that receives an element and context.
+/// </summary>
+public sealed class IRFunc<TInput, TContext, TOutput>
+{
+    private IRFunc(LoweredPipelineStep step)
+        => Step = step ?? throw new ArgumentNullException(nameof(step));
+
+    public LoweredPipelineStep Step { get; }
+
+    public static IRFunc<TInput, TContext, TOutput> FromStep(LoweredPipelineStep step) => new(step);
+}
+
+/// <summary>
 /// Describes method-level source-generator lowering into verified IR.
 /// </summary>
 public enum LoweredIrMethodKind

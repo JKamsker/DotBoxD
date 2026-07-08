@@ -211,12 +211,12 @@ public sealed partial class RemoteRunLocalValidationTests
             type.Name.EndsWith("PluginPackage", StringComparison.Ordinal));
 
         // The .RunLocal call site was not intercepted (the chain did not lower), so invoking Configure hits the
-        // runtime RunLocal stub, which throws — the un-lowered RunLocal never runs unsandboxed.
+        // explicit IR terminal without an IR package. It fails closed and never runs unsandboxed.
         var usage = assembly.GetType("ChainSample.UnmarshallableUsage")!;
         var registry = new RemoteHookRegistry(_ => ValueTask.FromResult("unused"), new RemoteLocalHandlerRegistry());
         var ex = Assert.Throws<TargetInvocationException>(() =>
             usage.GetMethod("Configure", BindingFlags.Public | BindingFlags.Static)!.Invoke(null, [registry]));
-        Assert.IsType<NotSupportedException>(ex.InnerException);
+        Assert.IsType<ArgumentNullException>(ex.InnerException);
     }
 
     private static SandboxPolicy Policy()

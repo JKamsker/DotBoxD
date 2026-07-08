@@ -29,8 +29,13 @@ internal static partial class DotBoxDGenerationNames
         public const string KernelMethodAttribute = "DotBoxD.Abstractions.KernelMethodAttribute";
         public const string LowerToIrAttribute = "DotBoxD.Abstractions.LowerToIrAttribute";
         public const string IRBodyOfAttribute = "DotBoxD.Abstractions.IRBodyOfAttribute";
+        public const string IRFunc2Original = "DotBoxD.Abstractions.IRFunc<TInput, TOutput>";
+        public const string IRFunc3Original = "DotBoxD.Abstractions.IRFunc<TInput, TContext, TOutput>";
+        public const string IRInvocation2Original = "DotBoxD.Abstractions.IRInvocation<TDelegate, TReturn>";
+        public const string IRInvocation3Original =
+            "DotBoxD.Abstractions.IRInvocation<TCaptures, TDelegate, TReturn>";
+        public const string IRKernel = "DotBoxD.Plugins.IRKernel";
         public const string LowerToIrMethodAttribute = "DotBoxD.Abstractions.LowerToIrMethodAttribute";
-        public const string PipelineStepAttribute = "DotBoxD.Abstractions.PipelineStepAttribute";
         public const string PipelineSurfaceAttribute = "DotBoxD.Abstractions.PipelineSurfaceAttribute";
         public const string NativeOnlyAttribute = "DotBoxD.Abstractions.NativeOnlyAttribute";
         public const string ServerExtensionAttribute = "DotBoxD.Abstractions.ServerExtensionAttribute";

@@ -16,7 +16,7 @@ public sealed partial class PluginAnalyzerPolymorphicHandleTests
                                       ctx.Victim is MonsterCombatant victim &&
                                       attacker.HasEquippedItem(9001L) &&
                                       victim.IsBoss())
-                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, priority: 0);
             }
             """));
         var generated = string.Join(
@@ -37,7 +37,7 @@ public sealed partial class PluginAnalyzerPolymorphicHandleTests
                     => hooks.On<DamageCtx>()
                         .Where(ctx => ctx.Attacker is PlayerCombatant(> 100L) attacker &&
                                       attacker.HasEquippedItem(9001L))
-                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, priority: 0);
             }
             """));
 
@@ -78,7 +78,7 @@ public sealed partial class PluginAnalyzerPolymorphicHandleTests
                     => hooks.On<DamageCtx>()
                         .Where(ctx => ctx.Attacker is PlayerCombatant { Id: > 100L } attacker &&
                                       attacker.HasEquippedItem(9001L))
-                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, priority: 0);
             }
             """);
 

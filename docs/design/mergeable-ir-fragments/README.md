@@ -109,5 +109,5 @@ Those are separate design steps because each changes the trust boundary or overl
 composition is now provided by `LoweredPipelineComposer` (see [Composition](#composition-implemented) above).
 
 For the runtime-dynamic counterpart to this compile-time model — `EventQuery<TEvent>`, which uses runtime
-expression trees rather than source-lambda lowering and is deliberately not part of the `[PipelineStep]`
-vocabulary — see [event-query-vs-pipeline](../event-query-vs-pipeline/README.md).
+expression trees rather than source-lambda lowering and is deliberately not part of the explicit
+`IRBodyOf` companion vocabulary — see [event-query-vs-pipeline](../event-query-vs-pipeline/README.md).

@@ -26,7 +26,7 @@ public sealed class PluginAnalyzerHookChainResultRegistrationTests
                 public static void Configure(RemoteHookRegistry hooks)
                     => hooks.On<DamageCtx>()
                         .Where(ctx => ctx.Damage > 0)
-                        .RegisterLocal((ctx, hookContext) => new DamageResult { Success = true, Damage = ctx.Damage }, 25);
+                        .RegisterLocal((ctx, hookContext) => new DamageResult { Success = true, Damage = ctx.Damage }, priority: 25);
             }
             """);
 
@@ -35,7 +35,7 @@ public sealed class PluginAnalyzerHookChainResultRegistrationTests
             result.GeneratedTrees.Select(tree => tree.GetText().ToString()));
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
-        Assert.Contains("UseGeneratedLocalResultChain<global::Sample.DamageResult>", generated, StringComparison.Ordinal);
+        Assert.Contains("IRKernel.FromPackage", generated, StringComparison.Ordinal);
         Assert.Contains("ResultType = \"global::Sample.DamageResult\"", generated, StringComparison.Ordinal);
         Assert.Contains("ResultLocalTerminal = true", generated, StringComparison.Ordinal);
         Assert.DoesNotContain("                LocalTerminal = true", generated, StringComparison.Ordinal);
@@ -62,7 +62,7 @@ public sealed class PluginAnalyzerHookChainResultRegistrationTests
                 public static void Configure(RemoteHookRegistry hooks)
                     => hooks.On<DamageCtx>()
                         .Select(ctx => ctx.Damage)
-                        .RegisterLocal((damage, hookContext) => DamageResult.Ok().WithDamage(damage), 25);
+                        .RegisterLocal((damage, hookContext) => DamageResult.Ok().WithDamage(damage), priority: 25);
             }
             """);
 
@@ -90,7 +90,7 @@ public sealed class PluginAnalyzerHookChainResultRegistrationTests
                 public static void Configure(RemoteHookRegistry hooks)
                     => hooks.On<DamageCtx>()
                         .Where(ctx => ctx.Damage > 0)
-                        .Register(ctx => DamageResult.Ok().WithDamage(ctx.Damage), 25);
+                        .Register(ctx => DamageResult.Ok().WithDamage(ctx.Damage), priority: 25);
             }
             """);
 
@@ -123,14 +123,14 @@ public sealed class PluginAnalyzerHookChainResultRegistrationTests
             {
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<DamageCtx>()
-                        .Register(ctx => DamageResult.Ok().WithDamage(ctx.Damage * 2), 100);
+                        .Register(ctx => DamageResult.Ok().WithDamage(ctx.Damage * 2), priority: 100);
             }
             """);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
         Assert.Contains(
             result.GeneratedTrees,
-            tree => tree.ToString().Contains("UseGeneratedResultChain", StringComparison.Ordinal));
+            tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -160,7 +160,7 @@ public sealed class PluginAnalyzerHookChainResultRegistrationTests
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
         Assert.Contains(
             result.GeneratedTrees,
-            tree => tree.ToString().Contains("UseGeneratedResultChain", StringComparison.Ordinal));
+            tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -192,7 +192,7 @@ public sealed class PluginAnalyzerHookChainResultRegistrationTests
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
         Assert.Contains(
             result.GeneratedTrees,
-            tree => tree.ToString().Contains("UseGeneratedLocalResultChain", StringComparison.Ordinal));
+            tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -215,7 +215,7 @@ public sealed class PluginAnalyzerHookChainResultRegistrationTests
             {
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<DamageCtx>()
-                        .RegisterLocal((ctx, ct) => DamageResult.Ok().WithDamage(ctx.Damage), 100);
+                        .RegisterLocal((ctx, ct) => DamageResult.Ok().WithDamage(ctx.Damage), priority: 100);
             }
             """);
         var generated = string.Join(
@@ -223,7 +223,7 @@ public sealed class PluginAnalyzerHookChainResultRegistrationTests
             result.GeneratedTrees.Select(tree => tree.GetText().ToString()));
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
-        Assert.Contains("UseGeneratedLocalResultChain", generated, StringComparison.Ordinal);
+        Assert.Contains("IRKernel.FromPackage", generated, StringComparison.Ordinal);
         Assert.DoesNotContain(
             "global::System.Func<global::Sample.DamageCtx, global::System.Threading.CancellationToken",
             generated,
@@ -255,7 +255,7 @@ public sealed class PluginAnalyzerHookChainResultRegistrationTests
                         {
                             await Task.Yield();
                             return DamageResult.Ok().WithDamage(ctx.Damage);
-                        }, 100);
+                        }, priority: 100);
             }
             """);
         var generated = string.Join(
@@ -263,7 +263,7 @@ public sealed class PluginAnalyzerHookChainResultRegistrationTests
             result.GeneratedTrees.Select(tree => tree.GetText().ToString()));
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
-        Assert.Contains("UseGeneratedLocalResultChain", generated, StringComparison.Ordinal);
+        Assert.Contains("IRKernel.FromPackage", generated, StringComparison.Ordinal);
         Assert.DoesNotContain(
             "global::System.Func<global::Sample.DamageCtx, global::System.Threading.CancellationToken",
             generated,
@@ -296,7 +296,7 @@ public sealed class PluginAnalyzerHookChainResultRegistrationTests
                         {
                             await Task.Yield();
                             return DamageResult.Ok().WithDamage(ctx.Damage);
-                        }, 100);
+                        }, priority: 100);
             }
             """);
         var generated = string.Join(
@@ -304,7 +304,7 @@ public sealed class PluginAnalyzerHookChainResultRegistrationTests
             result.GeneratedTrees.Select(tree => tree.GetText().ToString()));
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
-        Assert.Contains("UseGeneratedLocalResultChain", generated, StringComparison.Ordinal);
+        Assert.Contains("IRKernel.FromPackage", generated, StringComparison.Ordinal);
         Assert.Contains(
             "global::System.Func<global::Sample.DamageCtx, global::System.Threading.CancellationToken",
             generated,
@@ -334,14 +334,14 @@ public sealed class PluginAnalyzerHookChainResultRegistrationTests
                         .RegisterLocal((ctx, hookContext) =>
                         {
                             return DamageResult.Ok().WithDamage(ctx.Damage);
-                        }, 100);
+                        }, priority: 100);
             }
             """);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
         Assert.Contains(
             result.GeneratedTrees,
-            tree => tree.ToString().Contains("UseGeneratedLocalResultChain", StringComparison.Ordinal));
+            tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
 }

@@ -3,7 +3,7 @@
 ## Status
 
 Reference. Explains why `DotBoxD.Queryable`'s `EventQuery<TEvent>` is deliberately **not** folded into the
-`[PipelineStep]` / `[PipelineSurface]` attribute vocabulary that drives the hook-chain and mergeable-IR
+`[PipelineSurface]` plus explicit `IRBodyOf` companion vocabulary that drives the hook-chain and mergeable-IR
 source generator, and when to reach for each.
 
 ## Two event models, on purpose
@@ -16,20 +16,20 @@ authoring surface would break one of them.
 |---|---|---|
 | Namespace | `DotBoxD.Plugins.Runtime` (hooks/subscriptions) + `[IRBodyOf]` mergeable-IR | `DotBoxD.Queryable.Authoring` |
 | Operator input | **source lambdas** — `Func<T, bool>` / `Func<T, U>` whose body the analyzer reads at compile time | **runtime expression trees** — `Expression<Func<T, bool>>` / `Expression<Func<T, U>>` |
-| Recognition | analyzer, by `[PipelineStep]` role on the method (or `[IRBodyOf]` on an `IRFunc` companion; `[LowerToIr]` remains legacy) | none — the analyzer never sees it |
+| Recognition | analyzer, by `[PipelineSurface]` on the fluent type plus standard method names whose delegate is paired with an explicit `[IRBodyOf]` `IRFunc`/`IRKernel` companion (`[LowerToIr]` remains legacy for mergeable-IR) | none — the analyzer never sees it |
 | Lowering | compile time, into verified sandbox IR (`SandboxModule` / `LoweredPipelineStep`) | runtime, into a portable `QueryFilter` / `QueryProjection` AST |
 | Execution | inside the sandbox (interpreter or compiled kernel), fuel- and capability-gated | in-process tree-walking interpreter with a JIT-compile promotion step |
 | Terminal | `Run` / `RunLocal` / `Register` / `RegisterLocal`, lowered into the module | `SubscribeAsync`, dispatching to a native in-process delegate |
 | Trust | designed for **untrusted plugin code** — the server re-verifies the IR | **host-trusted** code building its own subscriptions |
 
-## Why `[PipelineStep]` does not apply to `EventQuery`
+## Why source-generated pipeline contracts do not apply to `EventQuery`
 
-The attribute vocabulary is a contract with the **source generator**, and the generator only lowers
+The explicit companion vocabulary is a contract with the **source generator**, and the generator only lowers
 source-level lambda syntax at a call site. `EventQuery.Where`/`Select` take `Expression<Func<…>>`: the C#
 compiler materializes those as runtime expression-tree objects, which is exactly what `EventQuery` wants —
 it needs the tree at runtime to conjoin predicates, decide indexing, and JIT-promote hot queries. There is
-no `Func<>` delegate parameter to intercept and no sibling `(LoweredPipelineStep)` overload to redirect to,
-so marking the methods would be inert. More importantly, lowering those expressions to a static module at
+no `Func<>` delegate parameter paired with an `IRFunc`/`IRKernel` companion for the generator to fill, so
+marking the type as a pipeline surface would be inert. More importantly, lowering those expressions to a static module at
 compile time would **remove** the runtime dynamism (captured locals, runtime-varying predicates) that is the
 entire reason `EventQuery` exists.
 
@@ -39,9 +39,9 @@ So this is a category difference, not a missing annotation. The shared *vocabula
 ## When to use which
 
 - **Authoring plugin logic that runs in the sandbox** (untrusted, verified, portable): use the fluent hook /
-  subscription pipeline, or a custom `[PipelineSurface]` type with `[PipelineStep]` stages. Combine collected
-  `LoweredPipelineStep` fragments with `LoweredPipelineComposer` when you need the runtime counterpart to the
-  generator's build-time fusion.
+  subscription pipeline, or a custom `[PipelineSurface]` type whose standard `Where`/`Select`/terminal methods
+  expose explicit `IRBodyOf` companion parameters. Combine collected `LoweredPipelineStep` fragments with
+  `LoweredPipelineComposer` when you need the runtime counterpart to the generator's build-time fusion.
 - **Building a dynamic, host-side subscription** whose predicate is only known at runtime (built from user
   input, config, or captured state): use `EventQuery<TEvent>`.
 

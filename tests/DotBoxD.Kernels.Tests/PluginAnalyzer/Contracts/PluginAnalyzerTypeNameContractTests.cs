@@ -57,8 +57,15 @@ public sealed class PluginAnalyzerTypeNameContractTests
             [nameof(TypeNames.KernelMethodAttribute)] = TypeName(typeof(KernelMethodAttribute)),
             [nameof(TypeNames.LowerToIrAttribute)] = TypeName(typeof(LowerToIrAttribute)),
             [nameof(TypeNames.IRBodyOfAttribute)] = TypeName(typeof(IRBodyOfAttribute)),
+            [nameof(TypeNames.IRFunc2Original)] = OriginalTypeName(typeof(IRFunc<,>), "TInput", "TOutput"),
+            [nameof(TypeNames.IRFunc3Original)] =
+                OriginalTypeName(typeof(IRFunc<,,>), "TInput", "TContext", "TOutput"),
+            [nameof(TypeNames.IRInvocation2Original)] =
+                OriginalTypeName(typeof(IRInvocation<,>), "TDelegate", "TReturn"),
+            [nameof(TypeNames.IRInvocation3Original)] =
+                OriginalTypeName(typeof(IRInvocation<,,>), "TCaptures", "TDelegate", "TReturn"),
+            [nameof(TypeNames.IRKernel)] = TypeName(typeof(IRKernel)),
             [nameof(TypeNames.LowerToIrMethodAttribute)] = TypeName(typeof(LowerToIrMethodAttribute)),
-            [nameof(TypeNames.PipelineStepAttribute)] = TypeName(typeof(PipelineStepAttribute)),
             [nameof(TypeNames.PipelineSurfaceAttribute)] = TypeName(typeof(PipelineSurfaceAttribute)),
             [nameof(TypeNames.NativeOnlyAttribute)] = TypeName(typeof(NativeOnlyAttribute)),
             [nameof(TypeNames.ServerExtensionAttribute)] = TypeName(typeof(ServerExtensionAttribute)),

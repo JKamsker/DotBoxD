@@ -84,7 +84,7 @@ internal static partial class HookChainModelFactory
         }
 
         if (RoleOf(invocation, model, cancellationToken) is not
-            (PipelineStepRole.Filter or PipelineStepRole.Projection))
+            (PipelineCallRole.Filter or PipelineCallRole.Projection))
         {
             return false;
         }

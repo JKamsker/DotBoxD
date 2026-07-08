@@ -55,7 +55,7 @@ public sealed class HookPipelineResultHooksTests
         using var server = PluginServer.Create();
         var pipeline = server.Hooks.On<DamageCtx>(new StubAdapter());
 
-        Assert.Throws<SandboxValidationException>(() => pipeline.Register<DamageResult>(c => default, priority: 0));
+        Assert.Throws<ArgumentNullException>(() => pipeline.Register<DamageResult>(c => default, priority: 0));
     }
 
     [Fact]
@@ -64,11 +64,11 @@ public sealed class HookPipelineResultHooksTests
         using var server = PluginServer.Create();
         var pipeline = server.Hooks.On<DamageCtx>(new StubAdapter());
 
-        Assert.Throws<SandboxValidationException>(
+        Assert.Throws<ArgumentNullException>(
             () => pipeline.RegisterLocal<DamageResult>(
                 (DamageCtx c, HookContext ctx) => default(DamageResult),
                 priority: 0));
-        Assert.Throws<SandboxValidationException>(
+        Assert.Throws<ArgumentNullException>(
             () => pipeline.RegisterLocal<DamageResult>(
                 (DamageCtx c, CancellationToken ct) => new ValueTask<DamageResult>(default(DamageResult)),
                 priority: 0));
@@ -82,13 +82,13 @@ public sealed class HookPipelineResultHooksTests
             new StubAdapter(),
             ctx => new DamageServerContext(ctx));
 
-        Assert.Throws<SandboxValidationException>(
+        Assert.Throws<ArgumentNullException>(
             () => pipeline.Register<DamageResult>((c, ctx) => default, priority: 0));
-        Assert.Throws<SandboxValidationException>(
+        Assert.Throws<ArgumentNullException>(
             () => pipeline.RegisterLocal<DamageResult>(
                 (DamageCtx c, DamageServerContext ctx) => default(DamageResult),
                 priority: 0));
-        Assert.Throws<SandboxValidationException>(
+        Assert.Throws<ArgumentNullException>(
             () => pipeline.RegisterLocal<DamageResult>(
                 (DamageCtx c, DamageServerContext ctx, CancellationToken ct) =>
                     new ValueTask<DamageResult>(default(DamageResult)),
@@ -102,11 +102,11 @@ public sealed class HookPipelineResultHooksTests
         var stage = hooks.On<DamageCtx, DamageServerContext>(ctx => new DamageServerContext(ctx))
             .Select((c, _) => c.Damage);
 
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<ArgumentNullException>(() =>
         {
             stage.Register<DamageResult>(damage => default, priority: 0);
         });
-        Assert.Throws<NotSupportedException>(() =>
+        Assert.Throws<ArgumentNullException>(() =>
         {
             stage.RegisterLocal<DamageResult>(
                 (int damage, DamageServerContext ctx) => default(DamageResult),

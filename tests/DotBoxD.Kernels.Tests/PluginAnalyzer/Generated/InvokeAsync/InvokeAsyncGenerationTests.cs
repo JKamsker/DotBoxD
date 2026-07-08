@@ -19,13 +19,14 @@ public sealed class InvokeAsyncGenerationTests
     }
 
     [Fact]
-    public void Generated_InvokeAsync_methods_are_marked_for_ir_lowering()
+    public void Generated_InvokeAsync_methods_expose_explicit_ir_invocation_companions()
     {
         var result = RunGenerator(NoCaptureSource);
         var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
 
-        Assert.Contains("LowerToIrMethod", source, StringComparison.Ordinal);
-        Assert.Contains("LoweredIrMethodKind.AnonymousInvocation", source, StringComparison.Ordinal);
+        Assert.Contains("IRBodyOf(nameof(lambda))", source, StringComparison.Ordinal);
+        Assert.Contains("IRInvocation<global::System.Func<", source, StringComparison.Ordinal);
+        Assert.Contains("IRInvocation<TCaptures,", source, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -2,6 +2,7 @@ using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
@@ -64,6 +65,11 @@ internal static partial class InvokeAsyncModelFactory
             return null;
         }
 
+        if (HasExplicitInvocationIrArgument(invocation))
+        {
+            return null;
+        }
+
         if (InvokeAsyncServerSurface.TryResolveImplicitGeneratedFacade(
                 model,
                 invocation,
@@ -105,6 +111,11 @@ internal static partial class InvokeAsyncModelFactory
             return null;
         }
 
+        if (HasExplicitInvocationIrArgument(invocation))
+        {
+            return null;
+        }
+
         if (IsGeneratedServerConditionalAccess(invocation, model, cancellationToken) ||
             InvokeAsyncServerSurface.IsDotBoxDInvokeAsync(model, invocation, cancellationToken))
         {
@@ -140,6 +151,11 @@ internal static partial class InvokeAsyncModelFactory
         }
 
         if (InvokeAsyncServerSurface.BindsToUserInvokeAsync(model, invocation, cancellationToken))
+        {
+            return null;
+        }
+
+        if (HasExplicitInvocationIrArgument(invocation))
         {
             return null;
         }
@@ -228,5 +244,40 @@ internal static partial class InvokeAsyncModelFactory
         var package = EmitPackage(ns, packageName, pluginId, shape, bodyJson, effects, capabilities);
         return new InvokeAsyncResult(package, interception, null);
     }
+
+    private static bool HasExplicitInvocationIrArgument(InvocationExpressionSyntax invocation)
+    {
+        var positionalIndex = 0;
+        var irPositionalIndex = FirstPositionalArgumentIsLambda(invocation) ? 1 : 2;
+        foreach (var argument in invocation.ArgumentList.Arguments)
+        {
+            if (argument.NameColon is { Name.Identifier.ValueText: "irInvocation" })
+            {
+                return !IsNullLike(argument.Expression);
+            }
+
+            if (argument.NameColon is null &&
+                positionalIndex == irPositionalIndex)
+            {
+                return !IsNullLike(argument.Expression);
+            }
+
+            if (argument.NameColon is null)
+            {
+                positionalIndex++;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool FirstPositionalArgumentIsLambda(InvocationExpressionSyntax invocation)
+        => invocation.ArgumentList.Arguments.FirstOrDefault(argument => argument.NameColon is null)?.Expression
+            is LambdaExpressionSyntax;
+
+    private static bool IsNullLike(ExpressionSyntax expression)
+        => expression.IsKind(SyntaxKind.NullLiteralExpression) ||
+            expression.IsKind(SyntaxKind.DefaultLiteralExpression) ||
+            expression.IsKind(SyntaxKind.DefaultExpression);
 
 }

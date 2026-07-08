@@ -105,18 +105,26 @@ public sealed class PipelineValidationTests
         string sourceParameterName,
         string irParameterName)
     {
-        var method = Assert.Single(
-            declaringType.GetMethods(BindingFlags.Public | BindingFlags.Instance),
+        var methods = declaringType.GetMethods(BindingFlags.Public | BindingFlags.Instance)
+            .Where(
             candidate => candidate.Name == methodName &&
-                candidate.GetParameters().Any(parameter => parameter.Name == irParameterName));
-        var irParameter = Assert.Single(method.GetParameters(), parameter => parameter.Name == irParameterName);
-        var attribute = Assert.Single(irParameter.GetCustomAttributes<IRBodyOfAttribute>());
+                candidate.GetParameters().Any(parameter => parameter.Name == irParameterName))
+            .ToArray();
 
-        Assert.Equal(sourceParameterName, attribute.ParameterName);
-        Assert.True(irParameter.HasDefaultValue);
-        Assert.Null(irParameter.DefaultValue);
-        Assert.True(irParameter.ParameterType.IsGenericType);
-        Assert.Equal(typeof(IRFunc<,>), irParameter.ParameterType.GetGenericTypeDefinition());
+        Assert.NotEmpty(methods);
+        foreach (var method in methods)
+        {
+            var irParameter = Assert.Single(method.GetParameters(), parameter => parameter.Name == irParameterName);
+            var attribute = Assert.Single(irParameter.GetCustomAttributes<IRBodyOfAttribute>());
+
+            Assert.Equal(sourceParameterName, attribute.ParameterName);
+            Assert.True(irParameter.HasDefaultValue);
+            Assert.Null(irParameter.DefaultValue);
+            Assert.True(irParameter.ParameterType.IsGenericType);
+            Assert.Contains(
+                irParameter.ParameterType.GetGenericTypeDefinition(),
+                new[] { typeof(IRFunc<,>), typeof(IRFunc<,,>) });
+        }
     }
 
     private static PluginPackage PackageWithProjection(string projectedType)

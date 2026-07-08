@@ -113,7 +113,7 @@ public sealed class PluginAnalyzerHookChainRemoteAliasTests
         var result = RunGenerator(source);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK114");
-        Assert.Contains(result.GeneratedTrees, tree => tree.ToString().Contains("UseGeneratedChain", StringComparison.Ordinal));
+        Assert.Contains(result.GeneratedTrees, tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -140,7 +140,7 @@ public sealed class PluginAnalyzerHookChainRemoteAliasTests
             """);
 
         Assert.Contains(result.Diagnostics, d => d.Id == "DBXK114");
-        Assert.DoesNotContain(result.GeneratedTrees, tree => tree.ToString().Contains("UseGeneratedChain", StringComparison.Ordinal));
+        Assert.DoesNotContain(result.GeneratedTrees, tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -288,6 +288,6 @@ public sealed class PluginAnalyzerHookChainRemoteAliasTests
             """);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id is "DBXK100" or "DBXK114");
-        Assert.Contains(result.GeneratedTrees, tree => tree.ToString().Contains("UseGeneratedChain", StringComparison.Ordinal));
+        Assert.Contains(result.GeneratedTrees, tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 }

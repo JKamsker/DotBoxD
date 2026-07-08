@@ -10,15 +10,16 @@ public interface IPluginServer<TWorld>
 
     ValueTask RunAsync(CancellationToken cancellationToken = default);
 
-    [LowerToIrMethod(LoweredIrMethodKind.AnonymousInvocation)]
     ValueTask<TReturn> InvokeAsync<TReturn>(
         Func<TWorld, ValueTask<TReturn>> lambda,
+        [IRBodyOf(nameof(lambda))] IRInvocation<Func<TWorld, ValueTask<TReturn>>, TReturn>? irInvocation = null,
         CancellationToken cancellationToken = default);
 
-    [LowerToIrMethod(LoweredIrMethodKind.AnonymousInvocation)]
     ValueTask<TReturn> InvokeAsync<TCaptures, TReturn>(
         TCaptures captures,
         RemoteServerInvocation<TWorld, TCaptures, TReturn> lambda,
+        [IRBodyOf(nameof(lambda))]
+        IRInvocation<TCaptures, RemoteServerInvocation<TWorld, TCaptures, TReturn>, TReturn>? irInvocation = null,
         CancellationToken cancellationToken = default)
         where TCaptures : class;
 

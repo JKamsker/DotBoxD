@@ -151,14 +151,14 @@ public sealed class PluginAnalyzerHookChainTerminalTests
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<DamageCtx>()
                         .Where(ctx => ctx.Relation == Relation.Pve)
-                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage * 2 }, 100);
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage * 2 }, priority: 100);
             }
             """);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
         Assert.Contains(
             result.GeneratedTrees,
-            tree => tree.ToString().Contains("UseGeneratedResultChain", StringComparison.Ordinal));
+            tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -181,7 +181,7 @@ public sealed class PluginAnalyzerHookChainTerminalTests
             {
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<DamageCtx>()
-                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, priority: 0);
             }
             """);
 
@@ -248,14 +248,14 @@ public sealed class PluginAnalyzerHookChainTerminalTests
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<DeathCtx>()
                         .Where(ctx => ctx.FatalDamage > 0)
-                        .RegisterLocal((ctx, hookContext) => new DeathResult { Success = true }, 5);
+                        .RegisterLocal((ctx, hookContext) => new DeathResult { Success = true }, priority: 5);
             }
             """);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
         Assert.Contains(
             result.GeneratedTrees,
-            tree => tree.ToString().Contains("UseGeneratedLocalResultChain", StringComparison.Ordinal));
+            tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -279,7 +279,7 @@ public sealed class PluginAnalyzerHookChainTerminalTests
                 public static void Configure(RemoteHookRegistry hooks)
                     => hooks.On<DamageCtx>()
                         .Where(ctx => ctx.Damage > 0)
-                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 25);
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, priority: 25);
             }
             """);
 
@@ -288,7 +288,7 @@ public sealed class PluginAnalyzerHookChainTerminalTests
             result.GeneratedTrees.Select(tree => tree.GetText().ToString()));
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
-        Assert.Contains("UseGeneratedResultChain<global::Sample.DamageResult>", generated, StringComparison.Ordinal);
+        Assert.Contains("IRKernel.FromPackage", generated, StringComparison.Ordinal);
         Assert.Contains("ResultType = \"global::Sample.DamageResult\"", generated, StringComparison.Ordinal);
         Assert.DoesNotContain("                LocalTerminal = true", generated, StringComparison.Ordinal);
     }

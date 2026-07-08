@@ -122,15 +122,14 @@ public sealed partial class RemoteHookPipeline<TEvent>
             return ValueTask.CompletedTask;
         }, decoder);
     }
-
-    [PipelineStep(PipelineStepRole.Filter)]
-    public RemoteHookPipeline<TEvent> Where(Func<TEvent, HookContext, bool> filter)
+    public RemoteHookPipeline<TEvent> Where(
+        Func<TEvent, HookContext, bool> filter,
+        [IRBodyOf(nameof(filter))] IRFunc<TEvent, HookContext, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
+        _ = irFilter?.Step;
         return this;
     }
-
-    [PipelineStep(PipelineStepRole.Filter)]
     public RemoteHookPipeline<TEvent> Where(
         Func<TEvent, bool> filter,
         [IRBodyOf(nameof(filter))] IRFunc<TEvent, bool>? irFilter = null)
@@ -139,15 +138,14 @@ public sealed partial class RemoteHookPipeline<TEvent>
         _ = irFilter?.Step;
         return this;
     }
-
-    [PipelineStep(PipelineStepRole.Projection)]
-    public RemoteHookStage<TEvent, TNext> Select<TNext>(Func<TEvent, HookContext, TNext> projection)
+    public RemoteHookStage<TEvent, TNext> Select<TNext>(
+        Func<TEvent, HookContext, TNext> projection,
+        [IRBodyOf(nameof(projection))] IRFunc<TEvent, HookContext, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
+        _ = irProjection?.Step;
         return new RemoteHookStage<TEvent, TNext>(this);
     }
-
-    [PipelineStep(PipelineStepRole.Projection)]
     public RemoteHookStage<TEvent, TNext> Select<TNext>(
         Func<TEvent, TNext> projection,
         [IRBodyOf(nameof(projection))] IRFunc<TEvent, TNext>? irProjection = null)
@@ -156,42 +154,6 @@ public sealed partial class RemoteHookPipeline<TEvent>
         _ = irProjection?.Step;
         return new RemoteHookStage<TEvent, TNext>(this);
     }
-
-    [PipelineStep(PipelineStepRole.Run)]
-    public RemoteHookPipeline<TEvent> Run(Func<TEvent, HookContext, ValueTask> handler)
-        => throw NotLowered();
-
-    [PipelineStep(PipelineStepRole.Run)]
-    public RemoteHookPipeline<TEvent> Run(Action<TEvent, HookContext> handler)
-        => throw NotLowered();
-
-    [PipelineStep(PipelineStepRole.Run)]
-    public RemoteHookPipeline<TEvent> Run(Func<TEvent, ValueTask> handler)
-        => throw NotLowered();
-
-    [PipelineStep(PipelineStepRole.Run)]
-    public RemoteHookPipeline<TEvent> Run(Action<TEvent> handler)
-        => throw NotLowered();
-
-    [PipelineStep(PipelineStepRole.RunLocal)]
-    public RemoteHookPipeline<TEvent> RunLocal(Func<TEvent, HookContext, ValueTask> handler)
-        => throw LocalHandlersNotSupported();
-
-    [PipelineStep(PipelineStepRole.RunLocal)]
-    public RemoteHookPipeline<TEvent> RunLocal(Action<TEvent, HookContext> handler)
-        => throw LocalHandlersNotSupported();
-
-    [PipelineStep(PipelineStepRole.RunLocal)]
-    public RemoteHookPipeline<TEvent> RunLocal(Func<TEvent, ValueTask> handler)
-        => throw LocalHandlersNotSupported();
-
-    [PipelineStep(PipelineStepRole.RunLocal)]
-    public RemoteHookPipeline<TEvent> RunLocal(Action<TEvent> handler)
-        => throw LocalHandlersNotSupported();
-
-    private static InvalidOperationException NotLowered()
-        => new("Remote hook Run(lambda) calls must be intercepted by the DotBoxD plugin generator.");
-
     private static NotSupportedException LocalHandlersNotSupported()
         => new("Remote hook RunLocal requires an event callback transport; use PluginServer.Hooks for local handlers.");
 

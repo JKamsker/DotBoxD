@@ -5,7 +5,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
 internal static partial class GeneratedRemoteHookChainFallback
 {
-    public static PipelineStepRole? RoleOfUnresolvedGeneratedSurface(
+    public static PipelineCallRole? RoleOfUnresolvedGeneratedSurface(
         InvocationExpressionSyntax invocation,
         SemanticModel model,
         CancellationToken cancellationToken,
@@ -22,11 +22,11 @@ internal static partial class GeneratedRemoteHookChainFallback
             return null;
         }
 
-        if (role == PipelineStepRole.Seed)
+        if (role == PipelineCallRole.Seed)
         {
             return Candidate(invocation, model, cancellationToken) is null
                 ? null
-                : PipelineStepRole.Seed;
+                : PipelineCallRole.Seed;
         }
 
         return HasGeneratedRemoteSeed(access.Expression, model, cancellationToken, depth: 0)
@@ -34,16 +34,16 @@ internal static partial class GeneratedRemoteHookChainFallback
             : null;
     }
 
-    private static PipelineStepRole? GeneratedRemoteRole(string methodName)
+    private static PipelineCallRole? GeneratedRemoteRole(string methodName)
         => methodName switch
         {
-            "On" => PipelineStepRole.Seed,
-            "Where" => PipelineStepRole.Filter,
-            "Select" => PipelineStepRole.Projection,
-            "Run" => PipelineStepRole.Run,
-            "RunLocal" => PipelineStepRole.RunLocal,
-            "Register" => PipelineStepRole.Register,
-            "RegisterLocal" => PipelineStepRole.RegisterLocal,
+            "On" => PipelineCallRole.Seed,
+            "Where" => PipelineCallRole.Filter,
+            "Select" => PipelineCallRole.Projection,
+            "Run" => PipelineCallRole.Run,
+            "RunLocal" => PipelineCallRole.RunLocal,
+            "Register" => PipelineCallRole.Register,
+            "RegisterLocal" => PipelineCallRole.RegisterLocal,
             _ => null,
         };
 
@@ -71,7 +71,7 @@ internal static partial class GeneratedRemoteHookChainFallback
             return false;
         }
 
-        return role == PipelineStepRole.Seed
+        return role == PipelineCallRole.Seed
             ? Candidate(invocation, model, cancellationToken) is not null
             : HasGeneratedRemoteSeed(access.Expression, model, cancellationToken, depth + 1);
     }

@@ -7,15 +7,14 @@ public sealed partial class RemoteHookStage<TEvent, TCurrent, TContext>
 
     internal RemoteHookStage(RemoteHookPipeline<TEvent, TContext> root)
         => _root = root;
-
-    [PipelineStep(PipelineStepRole.Filter)]
-    public RemoteHookStage<TEvent, TCurrent, TContext> Where(Func<TCurrent, TContext, bool> filter)
+    public RemoteHookStage<TEvent, TCurrent, TContext> Where(
+        Func<TCurrent, TContext, bool> filter,
+        [IRBodyOf(nameof(filter))] IRFunc<TCurrent, TContext, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
+        _ = irFilter?.Step;
         return this;
     }
-
-    [PipelineStep(PipelineStepRole.Filter)]
     public RemoteHookStage<TEvent, TCurrent, TContext> Where(
         Func<TCurrent, bool> filter,
         [IRBodyOf(nameof(filter))] IRFunc<TCurrent, bool>? irFilter = null)
@@ -24,15 +23,14 @@ public sealed partial class RemoteHookStage<TEvent, TCurrent, TContext>
         _ = irFilter?.Step;
         return this;
     }
-
-    [PipelineStep(PipelineStepRole.Projection)]
-    public RemoteHookStage<TEvent, TNext, TContext> Select<TNext>(Func<TCurrent, TContext, TNext> projection)
+    public RemoteHookStage<TEvent, TNext, TContext> Select<TNext>(
+        Func<TCurrent, TContext, TNext> projection,
+        [IRBodyOf(nameof(projection))] IRFunc<TCurrent, TContext, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
+        _ = irProjection?.Step;
         return new RemoteHookStage<TEvent, TNext, TContext>(_root);
     }
-
-    [PipelineStep(PipelineStepRole.Projection)]
     public RemoteHookStage<TEvent, TNext, TContext> Select<TNext>(
         Func<TCurrent, TNext> projection,
         [IRBodyOf(nameof(projection))] IRFunc<TCurrent, TNext>? irProjection = null)
@@ -161,42 +159,92 @@ public sealed partial class RemoteHookStage<TEvent, TCurrent, TContext>
             return ValueTask.CompletedTask;
         }, decoder);
     }
+    public RemoteHookPipeline<TEvent, TContext> Run(
+        Func<TCurrent, TContext, ValueTask> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedChain(HookLowering.RequiredPackage(irHandler, nameof(irHandler)));
+    }
 
-    [PipelineStep(PipelineStepRole.Run)]
-    public RemoteHookPipeline<TEvent, TContext> Run(Func<TCurrent, TContext, ValueTask> handler)
-        => throw NotLowered();
+    public RemoteHookPipeline<TEvent, TContext> Run(
+        Action<TCurrent, TContext> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return Run((value, context) =>
+        {
+            handler(value, context);
+            return ValueTask.CompletedTask;
+        }, irHandler);
+    }
 
-    [PipelineStep(PipelineStepRole.Run)]
-    public RemoteHookPipeline<TEvent, TContext> Run(Action<TCurrent, TContext> handler)
-        => throw NotLowered();
+    public RemoteHookPipeline<TEvent, TContext> Run(
+        Func<TCurrent, ValueTask> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return Run((value, _) => handler(value), irHandler);
+    }
 
-    [PipelineStep(PipelineStepRole.Run)]
-    public RemoteHookPipeline<TEvent, TContext> Run(Func<TCurrent, ValueTask> handler)
-        => throw NotLowered();
+    public RemoteHookPipeline<TEvent, TContext> Run(
+        Action<TCurrent> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return Run((value, _) =>
+        {
+            handler(value);
+            return ValueTask.CompletedTask;
+        }, irHandler);
+    }
 
-    [PipelineStep(PipelineStepRole.Run)]
-    public RemoteHookPipeline<TEvent, TContext> Run(Action<TCurrent> handler)
-        => throw NotLowered();
+    public RemoteHookPipeline<TEvent, TContext> RunLocal(
+        Func<TCurrent, TContext, ValueTask> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        var kernel = RequiredKernel(irHandler);
+        return kernel.TryGetProjectedPayloadDecoder<TCurrent>(out var decoder)
+            ? _root.InstallLocal(kernel.Package, handler, decoder)
+            : _root.InstallLocal(kernel.Package, handler);
+    }
 
-    [PipelineStep(PipelineStepRole.RunLocal)]
-    public RemoteHookPipeline<TEvent, TContext> RunLocal(Func<TCurrent, TContext, ValueTask> handler)
-        => throw LocalHandlersNotSupported();
+    public RemoteHookPipeline<TEvent, TContext> RunLocal(
+        Action<TCurrent, TContext> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return RunLocal((value, context) =>
+        {
+            handler(value, context);
+            return ValueTask.CompletedTask;
+        }, irHandler);
+    }
 
-    [PipelineStep(PipelineStepRole.RunLocal)]
-    public RemoteHookPipeline<TEvent, TContext> RunLocal(Action<TCurrent, TContext> handler)
-        => throw LocalHandlersNotSupported();
+    public RemoteHookPipeline<TEvent, TContext> RunLocal(
+        Func<TCurrent, ValueTask> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return RunLocal((value, _) => handler(value), irHandler);
+    }
 
-    [PipelineStep(PipelineStepRole.RunLocal)]
-    public RemoteHookPipeline<TEvent, TContext> RunLocal(Func<TCurrent, ValueTask> handler)
-        => throw LocalHandlersNotSupported();
+    public RemoteHookPipeline<TEvent, TContext> RunLocal(
+        Action<TCurrent> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return RunLocal((value, _) =>
+        {
+            handler(value);
+            return ValueTask.CompletedTask;
+        }, irHandler);
+    }
 
-    [PipelineStep(PipelineStepRole.RunLocal)]
-    public RemoteHookPipeline<TEvent, TContext> RunLocal(Action<TCurrent> handler)
-        => throw LocalHandlersNotSupported();
-
-    private static InvalidOperationException NotLowered()
-        => new("Remote hook Run(lambda) calls must be intercepted by the DotBoxD plugin generator.");
-
-    private static NotSupportedException LocalHandlersNotSupported()
-        => new("Remote hook RunLocal requires an event callback transport; use PluginServer.Hooks for local handlers.");
+    private static IRKernel RequiredKernel(IRKernel? irHandler)
+    {
+        ArgumentNullException.ThrowIfNull(irHandler);
+        return irHandler;
+    }
 }

@@ -67,7 +67,7 @@ internal static partial class HookChainModelFactory
         isLocalTerminal = false;
         var terminalRole = RoleOf(invocation, model, cancellationToken);
         if (invocation.Expression is not MemberAccessExpressionSyntax terminalAccess ||
-            terminalRole is not (PipelineStepRole.Register or PipelineStepRole.RegisterLocal))
+            terminalRole is not (PipelineCallRole.Register or PipelineCallRole.RegisterLocal))
         {
             return false;
         }
@@ -85,7 +85,7 @@ internal static partial class HookChainModelFactory
             }
         }
 
-        isLocalTerminal = terminalRole == PipelineStepRole.RegisterLocal;
+        isLocalTerminal = terminalRole == PipelineCallRole.RegisterLocal;
         location = PluginDiagnosticLocation.From(terminalAccess.Name.GetLocation());
         return true;
     }
@@ -101,7 +101,7 @@ internal static partial class HookChainModelFactory
     {
         location = default;
         if (invocation.Expression is not MemberAccessExpressionSyntax terminalAccess ||
-            RoleOf(invocation, model, cancellationToken) != PipelineStepRole.RunLocal)
+            RoleOf(invocation, model, cancellationToken) != PipelineCallRole.RunLocal)
         {
             return false;
         }
@@ -132,7 +132,7 @@ internal static partial class HookChainModelFactory
     {
         location = default;
         if (invocation.Expression is not MemberAccessExpressionSyntax terminalAccess ||
-            RoleOf(invocation, model, cancellationToken) != PipelineStepRole.Run)
+            RoleOf(invocation, model, cancellationToken) != PipelineCallRole.Run)
         {
             return false;
         }

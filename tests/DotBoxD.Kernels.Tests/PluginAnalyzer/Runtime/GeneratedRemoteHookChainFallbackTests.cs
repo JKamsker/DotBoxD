@@ -31,7 +31,7 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
             "RemoteSubscriptionPipeline<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent, " +
             "global::ChainSample.Plugin.BetaPluginContext>",
             StringComparison.Ordinal));
-        Assert.Contains(generatedSources, source => source.Contains("UseGeneratedResultChain", StringComparison.Ordinal));
+        Assert.Contains(generatedSources, source => source.Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -142,7 +142,7 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
         Assert.Contains("GeneratedPluginServerRegistryKind.Subscription", generated, StringComparison.Ordinal);
         Assert.Contains("typeof(global::ChainSample.Plugin.AlphaPluginServer)", generated, StringComparison.Ordinal);
         Assert.Contains("typeof(global::ChainSample.Plugin.AlphaPluginContext)", generated, StringComparison.Ordinal);
-        Assert.Contains("PipelineStepRole.Seed", generated, StringComparison.Ordinal);
+        Assert.DoesNotContain("PipelineStep", generated, StringComparison.Ordinal);
     }
 
     [Fact]

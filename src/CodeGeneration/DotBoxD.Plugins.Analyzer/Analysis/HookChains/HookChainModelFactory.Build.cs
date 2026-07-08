@@ -55,7 +55,13 @@ internal static partial class HookChainModelFactory
             eventShape,
             lowered,
             modelResult);
-        return new HookChainResult(modelResult, interception);
+        var stageIrModels = HookChainStageIrFactory.Create(
+            invocation,
+            prepared.Stages,
+            eventShape.EventType,
+            model,
+            cancellationToken);
+        return new HookChainResult(modelResult, interception, stageIrModels);
     }
 
     private static SendHookLowering LowerSendHookBody(

@@ -3,15 +3,15 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 internal static class HookChainInstallKindResolver
 {
     public static HookChainInterceptorInstallKind? Resolve(
-        PipelineStepRole? terminalRole,
+        PipelineCallRole? terminalRole,
         HookChainReceiverKind? receiverKind,
         GeneratedRemoteHookChainKind? generatedRemoteKind)
         => terminalRole switch
         {
-            PipelineStepRole.Run => HookChainInterceptorInstallKind.GeneratedChain,
-            PipelineStepRole.RunLocal => RunLocalInstallKind(receiverKind, generatedRemoteKind),
-            PipelineStepRole.Register => RegisterInstallKind(receiverKind, generatedRemoteKind),
-            PipelineStepRole.RegisterLocal => RegisterLocalInstallKind(receiverKind, generatedRemoteKind),
+            PipelineCallRole.Run => HookChainInterceptorInstallKind.GeneratedChain,
+            PipelineCallRole.RunLocal => RunLocalInstallKind(receiverKind, generatedRemoteKind),
+            PipelineCallRole.Register => RegisterInstallKind(receiverKind, generatedRemoteKind),
+            PipelineCallRole.RegisterLocal => RegisterLocalInstallKind(receiverKind, generatedRemoteKind),
             _ => null,
         };
 

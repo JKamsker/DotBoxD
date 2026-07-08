@@ -164,10 +164,10 @@ public sealed partial class PluginAnalyzer
             method));
     }
 
-    private static bool IsForbiddenLocalUseRole(PipelineStepRole? role)
+    private static bool IsForbiddenLocalUseRole(PipelineCallRole? role)
         => role is
-            PipelineStepRole.Filter or
-            PipelineStepRole.Projection or
-            PipelineStepRole.Run or
-            PipelineStepRole.Register;
+            PipelineCallRole.Filter or
+            PipelineCallRole.Projection or
+            PipelineCallRole.Run or
+            PipelineCallRole.Register;
 }

@@ -24,14 +24,14 @@ public sealed class PluginAnalyzerNullableResultHookTests
             {
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<DamageCtx>()
-                        .Register(ctx => DamageResult.Ok().WithDamage(ctx.Damage).WithCanDie(null), 100);
+                        .Register(ctx => DamageResult.Ok().WithDamage(ctx.Damage).WithCanDie(null), priority: 100);
             }
             """);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
         Assert.Contains(
             result.GeneratedTrees,
-            tree => tree.ToString().Contains("UseGeneratedResultChain", StringComparison.Ordinal));
+            tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -54,7 +54,7 @@ public sealed class PluginAnalyzerNullableResultHookTests
             {
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<DamageCtx>()
-                        .Register(ctx => new DamageResult { Success = true, Damage = 1, CanDie = false }, 100);
+                        .Register(ctx => new DamageResult { Success = true, Damage = 1, CanDie = false }, priority: 100);
             }
             """);
 
@@ -81,7 +81,7 @@ public sealed class PluginAnalyzerNullableResultHookTests
             {
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<DamageCtx>()
-                        .Register(ctx => DamageResult.Ok().WithAmount(1f), 100);
+                        .Register(ctx => DamageResult.Ok().WithAmount(1f), priority: 100);
             }
             """);
 
@@ -108,7 +108,7 @@ public sealed class PluginAnalyzerNullableResultHookTests
             {
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<DamageCtx>()
-                        .Register(ctx => new DamageResult { Success = true, Amount = 1f }, 100);
+                        .Register(ctx => new DamageResult { Success = true, Amount = 1f }, priority: 100);
             }
             """);
 

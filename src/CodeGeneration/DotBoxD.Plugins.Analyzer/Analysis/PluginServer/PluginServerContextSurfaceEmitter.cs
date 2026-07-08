@@ -59,13 +59,11 @@ internal static class PluginServerContextSurfaceEmitter
         builder.AppendLine();
         AppendRegistryConstructor(builder, model.HookRegistryName, "RemoteHookRegistry");
         builder.AppendLine();
-        AppendPipelineStepAttribute(builder, "Seed");
         builder.Append("    public global::DotBoxD.Plugins.Runtime.RemoteHookPipeline<TEvent, ")
             .Append(model.ContextFullName).AppendLine("> On<TEvent>()");
         builder.Append("        => _inner.On<TEvent, ").Append(model.ContextFullName)
             .Append(">(").Append(model.ContextFullName).AppendLine(".FromHookContext);");
         builder.AppendLine();
-        AppendPipelineStepAttribute(builder, "Seed");
         builder.AppendLine("    public global::DotBoxD.Plugins.Runtime.RemoteHookPipeline<TEvent, TContext> On<TEvent, TContext>(");
         builder.AppendLine("        global::System.Func<global::DotBoxD.Abstractions.HookContext, TContext> createContext)");
         builder.AppendLine("        => _inner.On<TEvent, TContext>(createContext);");
@@ -85,13 +83,11 @@ internal static class PluginServerContextSurfaceEmitter
         builder.AppendLine();
         AppendRegistryConstructor(builder, model.SubscriptionRegistryName, "RemoteSubscriptionRegistry");
         builder.AppendLine();
-        AppendPipelineStepAttribute(builder, "Seed");
         builder.Append("    public global::DotBoxD.Plugins.Runtime.RemoteSubscriptionPipeline<TEvent, ")
             .Append(model.ContextFullName).AppendLine("> On<TEvent>()");
         builder.Append("        => _inner.On<TEvent, ").Append(model.ContextFullName)
             .Append(">(").Append(model.ContextFullName).AppendLine(".FromHookContext);");
         builder.AppendLine();
-        AppendPipelineStepAttribute(builder, "Seed");
         builder.AppendLine("    public global::DotBoxD.Plugins.Runtime.RemoteSubscriptionPipeline<TEvent, TContext> On<TEvent, TContext>(");
         builder.AppendLine("        global::System.Func<global::DotBoxD.Abstractions.HookContext, TContext> createContext)");
         builder.AppendLine("        => _inner.On<TEvent, TContext>(createContext);");
@@ -108,14 +104,6 @@ internal static class PluginServerContextSurfaceEmitter
             .Append("), typeof(")
             .Append(model.ContextFullName)
             .AppendLine("))]");
-    }
-
-    private static void AppendPipelineStepAttribute(StringBuilder builder, string role)
-    {
-        builder.Append("    [global::DotBoxD.Abstractions.PipelineStep(")
-            .Append("global::DotBoxD.Abstractions.PipelineStepRole.")
-            .Append(role)
-            .AppendLine(")]");
     }
 
     private static string TypeReference(PluginServerFacadeModel model, string typeName)

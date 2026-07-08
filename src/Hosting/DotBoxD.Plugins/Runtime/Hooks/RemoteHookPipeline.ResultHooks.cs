@@ -2,45 +2,93 @@ namespace DotBoxD.Plugins.Runtime;
 
 public sealed partial class RemoteHookPipeline<TEvent>
 {
-    [PipelineStep(PipelineStepRole.Register)]
-    public RemoteHookPipeline<TEvent> Register<TResult>(Func<TEvent, TResult> handler, int priority = 0)
-        => throw ResultNotLowered();
+    public RemoteHookPipeline<TEvent> Register<TResult>(
+        Func<TEvent, TResult> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null,
+        int priority = 0)
+        where TResult : struct, IHookResult
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedResultChain<TResult>(Hooks.HookLowering.RequiredPackage(irHandler, nameof(irHandler)), priority);
+    }
 
-    [PipelineStep(PipelineStepRole.RegisterLocal)]
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TEvent, TResult> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null,
         int priority = 0)
-        => throw ResultLocalHandlersNotSupported();
+        where TResult : struct, IHookResult
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedLocalResultChain(
+            Hooks.HookLowering.RequiredPackage(irHandler, nameof(irHandler)),
+            handler,
+            priority);
+    }
 
-    [PipelineStep(PipelineStepRole.RegisterLocal)]
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TEvent, HookContext, TResult> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null,
         int priority = 0)
-        => throw ResultLocalHandlersNotSupported();
+        where TResult : struct, IHookResult
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedLocalResultChain(
+            Hooks.HookLowering.RequiredPackage(irHandler, nameof(irHandler)),
+            handler,
+            priority);
+    }
 
-    [PipelineStep(PipelineStepRole.RegisterLocal)]
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TEvent, ValueTask<TResult>> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null,
         int priority = 0)
-        => throw ResultLocalHandlersNotSupported();
+        where TResult : struct, IHookResult
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedLocalResultChain(
+            Hooks.HookLowering.RequiredPackage(irHandler, nameof(irHandler)),
+            handler,
+            priority);
+    }
 
-    [PipelineStep(PipelineStepRole.RegisterLocal)]
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TEvent, HookContext, ValueTask<TResult>> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null,
         int priority = 0)
-        => throw ResultLocalHandlersNotSupported();
+        where TResult : struct, IHookResult
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedLocalResultChain(
+            Hooks.HookLowering.RequiredPackage(irHandler, nameof(irHandler)),
+            handler,
+            priority);
+    }
 
-    [PipelineStep(PipelineStepRole.RegisterLocal)]
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TEvent, CancellationToken, ValueTask<TResult>> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null,
         int priority = 0)
-        => throw ResultLocalHandlersNotSupported();
+        where TResult : struct, IHookResult
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedLocalResultChain(
+            Hooks.HookLowering.RequiredPackage(irHandler, nameof(irHandler)),
+            handler,
+            priority);
+    }
 
-    [PipelineStep(PipelineStepRole.RegisterLocal)]
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TEvent, HookContext, CancellationToken, ValueTask<TResult>> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null,
         int priority = 0)
-        => throw ResultLocalHandlersNotSupported();
+        where TResult : struct, IHookResult
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedLocalResultChain(
+            Hooks.HookLowering.RequiredPackage(irHandler, nameof(irHandler)),
+            handler,
+            priority);
+    }
 
     public RemoteHookPipeline<TEvent> UseGeneratedResultChain<TResult>(PluginPackage package, int priority = 0)
         where TResult : struct, IHookResult
@@ -175,9 +223,6 @@ public sealed partial class RemoteHookPipeline<TEvent>
                 $"'{resultType}', but '{typeof(TResult).FullName}' was expected.");
         }
     }
-
-    private static InvalidOperationException ResultNotLowered()
-        => new("Remote hook Register(lambda) calls must be intercepted by the DotBoxD plugin generator.");
 
     private static NotSupportedException ResultLocalHandlersNotSupported()
         => new("Remote hook RegisterLocal requires a result callback transport; use PluginServer.Hooks for local result handlers.");

@@ -1,3 +1,4 @@
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -43,13 +44,17 @@ internal static class InvokeAsyncServerSurface
             return false;
         }
 
+        if (!HasExplicitIrInvocationCompanion(method, model.Compilation))
+        {
+            return false;
+        }
+
         if (IsPluginServerType(method.ContainingType, model.Compilation))
         {
             return true;
         }
 
-        return LowerToIrMethodReader.IsAnonymousInvocation(method, model.Compilation) &&
-            IsGeneratedPluginServerFacadeType(method.ContainingType);
+        return IsGeneratedPluginServerFacadeType(method.ContainingType);
     }
 
     public static bool BindsToUserInvokeAsync(
@@ -59,6 +64,13 @@ internal static class InvokeAsyncServerSurface
     {
         if (ResolvedMethod(model, invocation, cancellationToken) is not { } method ||
             method.ContainingType.TypeKind == TypeKind.Error)
+        {
+            return false;
+        }
+
+        if (string.Equals(method.Name, InvokeAsyncMethod, StringComparison.Ordinal) &&
+            IsGeneratedPluginServerFacadeType(method.ContainingType) &&
+            HasExplicitIrInvocationCompanion(method, model.Compilation))
         {
             return false;
         }
@@ -75,7 +87,8 @@ internal static class InvokeAsyncServerSurface
         if (ResolvedMethod(model, invocation, cancellationToken) is { } method)
         {
             return LowerToIrMethodReader.IsAnonymousInvocation(method, model.Compilation) ||
-                string.Equals(method.Name, InvokeAsyncMethod, StringComparison.Ordinal);
+                (string.Equals(method.Name, InvokeAsyncMethod, StringComparison.Ordinal) &&
+                 HasExplicitIrInvocationCompanion(method, model.Compilation));
         }
 
         return InvocationName(invocation) is { } name &&
@@ -117,6 +130,81 @@ internal static class InvokeAsyncServerSurface
 
         return SymbolEqualityComparer.Default.Equals(named.OriginalDefinition, pluginServerType);
     }
+
+    private static bool HasExplicitIrInvocationCompanion(IMethodSymbol method, Compilation compilation)
+    {
+        var lambdaIndex = LambdaParameterIndex(method);
+        if (lambdaIndex < 0)
+        {
+            return false;
+        }
+
+        var irIndex = lambdaIndex + 1;
+        if (method.Parameters.Length <= irIndex ||
+            !IsOptionalNull(method.Parameters[irIndex]) ||
+            !HasIRBodyOf(method.Parameters[irIndex], method.Parameters[lambdaIndex].Name, compilation))
+        {
+            return false;
+        }
+
+        return IsIRInvocation(method.Parameters[irIndex].Type);
+    }
+
+    private static int LambdaParameterIndex(IMethodSymbol method)
+    {
+        for (var i = 0; i < method.Parameters.Length; i++)
+        {
+            if (method.Parameters[i].Type.TypeKind == TypeKind.Delegate)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private static bool IsOptionalNull(IParameterSymbol parameter)
+        => parameter.IsOptional && parameter.HasExplicitDefaultValue && parameter.ExplicitDefaultValue is null;
+
+    private static bool HasIRBodyOf(IParameterSymbol parameter, string sourceParameterName, Compilation compilation)
+    {
+        foreach (var attribute in parameter.GetAttributes())
+        {
+            if (IsDotBoxDAttribute(attribute, compilation, DotBoxDGenerationNames.TypeNames.IRBodyOfAttribute) &&
+                attribute.ConstructorArguments.Length > 0 &&
+                attribute.ConstructorArguments[0].Value is string parameterName &&
+                string.Equals(parameterName, sourceParameterName, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsIRInvocation(ITypeSymbol type)
+    {
+        if (type is not INamedTypeSymbol named)
+        {
+            return false;
+        }
+
+        var definition = named.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        return string.Equals(
+                definition,
+                DotBoxDGenerationNames.TypeNames.GlobalPrefix +
+                DotBoxDGenerationNames.TypeNames.IRInvocation2Original,
+                StringComparison.Ordinal) ||
+            string.Equals(
+                definition,
+                DotBoxDGenerationNames.TypeNames.GlobalPrefix +
+                DotBoxDGenerationNames.TypeNames.IRInvocation3Original,
+                StringComparison.Ordinal);
+    }
+
+    private static bool IsDotBoxDAttribute(AttributeData attribute, Compilation compilation, string metadataName)
+        => compilation.GetTypeByMetadataName(metadataName) is { } expected &&
+           SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected);
 
     private static bool IsGeneratedPluginServerFacadeType(ITypeSymbol? type)
         => type is INamedTypeSymbol named &&
