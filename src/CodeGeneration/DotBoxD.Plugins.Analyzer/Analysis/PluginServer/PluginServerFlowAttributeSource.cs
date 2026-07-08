@@ -107,54 +107,49 @@ internal static class PluginServerFlowAttributeSource
         var lines = new List<string>();
         foreach (var attribute in attributes)
         {
-            switch (attribute.AttributeClass?.ToDisplayString())
+            if (AttributeLine(attribute, targetReturn) is { } line)
             {
-                case "System.Diagnostics.CodeAnalysis.MaybeNullAttribute":
-                    lines.Add(SimpleAttribute(
-                        "global::System.Diagnostics.CodeAnalysis.MaybeNullAttribute",
-                        targetReturn));
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.NotNullAttribute":
-                    lines.Add(SimpleAttribute(
-                        "global::System.Diagnostics.CodeAnalysis.NotNullAttribute",
-                        targetReturn));
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute":
-                    if (StringArgumentAttribute(
-                        attribute,
-                        "global::System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute",
-                        targetReturn) is { } source)
-                    {
-                        lines.Add(source);
-                    }
-
-                    break;
-
-                case "System.ObsoleteAttribute":
-                    if (!targetReturn &&
-                        ObsoleteAttribute(attribute) is { } obsoleteSource)
-                    {
-                        lines.Add(obsoleteSource);
-                    }
-
-                    break;
-
-                case "System.Diagnostics.CodeAnalysis.ExperimentalAttribute":
-                    if (!targetReturn &&
-                        ExperimentalAttribute(attribute) is { } experimentalSource)
-                    {
-                        lines.Add(experimentalSource);
-                    }
-
-                    break;
+                lines.Add(line);
             }
         }
 
         lines.Sort(StringComparer.Ordinal);
         return new EquatableArray<string>(lines.ToArray());
     }
+
+    private static string? AttributeLine(AttributeData attribute, bool targetReturn)
+    {
+        switch (attribute.AttributeClass?.ToDisplayString())
+        {
+            case "System.Diagnostics.CodeAnalysis.MaybeNullAttribute":
+                return SimpleAttribute(
+                    "global::System.Diagnostics.CodeAnalysis.MaybeNullAttribute",
+                    targetReturn);
+
+            case "System.Diagnostics.CodeAnalysis.NotNullAttribute":
+                return SimpleAttribute(
+                    "global::System.Diagnostics.CodeAnalysis.NotNullAttribute",
+                    targetReturn);
+
+            case "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute":
+                return StringArgumentAttribute(
+                    attribute,
+                    "global::System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute",
+                    targetReturn);
+
+            case "System.ObsoleteAttribute":
+                return MemberOnlyAttribute(targetReturn, ObsoleteAttribute(attribute));
+
+            case "System.Diagnostics.CodeAnalysis.ExperimentalAttribute":
+                return MemberOnlyAttribute(targetReturn, ExperimentalAttribute(attribute));
+
+            default:
+                return null;
+        }
+    }
+
+    private static string? MemberOnlyAttribute(bool targetReturn, string? source)
+        => targetReturn ? null : source;
 
     private static string SimpleAttribute(string attributeType, bool targetReturn)
         => targetReturn
