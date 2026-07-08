@@ -134,7 +134,7 @@ internal static class HookFireAsyncModelFactory
     private static string? ExperimentalAttribute(AttributeData attribute)
     {
         if (attribute.AttributeClass?.ToDisplayString() !=
-            "System.Diagnostics.CodeAnalysis.ExperimentalAttribute" ||
+            DotBoxDMetadataNames.ExperimentalAttribute ||
             attribute.ConstructorArguments.Length != 1 ||
             attribute.ConstructorArguments[0].Value is not string diagnosticId)
         {
@@ -144,7 +144,11 @@ internal static class HookFireAsyncModelFactory
         var arguments = new List<string> { LiteralReader.StringLiteral(diagnosticId) };
         foreach (var argument in attribute.NamedArguments)
         {
-            if (argument is { Key: "UrlFormat", Value.Value: string urlFormat })
+            if (argument is { Key: "Message", Value.Value: string message })
+            {
+                arguments.Add("Message = " + LiteralReader.StringLiteral(message));
+            }
+            else if (argument is { Key: "UrlFormat", Value.Value: string urlFormat })
             {
                 arguments.Add("UrlFormat = " + LiteralReader.StringLiteral(urlFormat));
             }

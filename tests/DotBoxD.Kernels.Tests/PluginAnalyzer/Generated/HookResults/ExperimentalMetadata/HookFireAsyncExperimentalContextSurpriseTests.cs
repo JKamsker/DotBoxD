@@ -26,7 +26,9 @@ public sealed class HookFireAsyncExperimentalContextSurpriseTests
         var fireAsyncSource = Assert.Single(result.GeneratedSources, ContainsFireAsyncExtensions);
         Assert.DoesNotContain(result.Diagnostics, result.IsGeneratedFireAsyncExperimentalDiagnostic);
         Assert.Contains(
-            "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBXEXP_FIRE\")]\n" +
+            "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBXEXP_FIRE\", " +
+            "Message = \"Generated FireAsync is experimental.\", " +
+            "UrlFormat = \"https://example.test/diagnostics/{0}\")]\n" +
             "    public static global::System.Threading.Tasks.ValueTask<global::Regression.Game.DamageResult?> FireAsync(",
             NormalizeLineEndings(fireAsyncSource),
             StringComparison.Ordinal);
@@ -102,7 +104,7 @@ public sealed class HookFireAsyncExperimentalContextSurpriseTests
 
         namespace Regression.Game;
 
-        [Experimental("DBXEXP_FIRE")]
+        [Experimental("DBXEXP_FIRE", Message = "Generated FireAsync is experimental.", UrlFormat = "https://example.test/diagnostics/{0}")]
         [Hook("combat.damage", typeof(DamageResult))]
         public sealed record DamageContext(int Amount);
 
