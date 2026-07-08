@@ -3,7 +3,7 @@ using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
 
-namespace DotBoxD.Kernels.Tests.Core;
+namespace DotBoxD.Kernels.Tests.Core.PublicContracts;
 
 public sealed class SandboxContextContractTests
 {

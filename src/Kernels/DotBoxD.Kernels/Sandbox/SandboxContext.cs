@@ -28,10 +28,10 @@ public sealed partial class SandboxContext
         string? policyHash = null)
     {
         RunId = runId;
-        Policy = policy;
-        Budget = budget;
-        Bindings = bindings;
-        Audit = audit;
+        Policy = policy ?? throw new ArgumentNullException(nameof(policy));
+        Budget = budget ?? throw new ArgumentNullException(nameof(budget));
+        Bindings = bindings ?? throw new ArgumentNullException(nameof(bindings));
+        Audit = audit ?? throw new ArgumentNullException(nameof(audit));
         CancellationToken = cancellationToken;
         AllowedBindingIds = allowedBindingIds;
         ModuleHash = moduleHash ?? "";
