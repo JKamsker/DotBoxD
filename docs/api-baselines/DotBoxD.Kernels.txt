@@ -37,6 +37,7 @@ public bool IsValidMapKey() => IsValidMapKey(declaredOpaqueIdTypes: null)
 public bool IsValidMapKey(IReadOnlySet<string>? declaredOpaqueIdTypes)
 public bool RequireDeterministic { get; init; }
 public bool Succeeded { get; init; }
+public bool Success { get; init; }
 public bool TryGet(string id, out BindingSignature binding)
 public bool TryGetCapabilityGrantValidator(string capabilityId, out CapabilityGrantValidator validator)
 public bool TryGetGrant(string capabilityId, out CapabilityGrant grant)
@@ -220,7 +221,7 @@ public SandboxEffect Effect { get => _effect; init => _effect = RequireKnownEffe
 public SandboxError Error { get; }
 public SandboxError? Error { get; init; }
 public SandboxErrorCode Code { get; init; }
-public SandboxErrorCode? ErrorCode { get => _errorCode; init => _errorCode = RequireKnownErrorCode(value, nameof(ErrorCode)); }
+public SandboxErrorCode? ErrorCode { get; init; }
 public SandboxIsolation Isolation { get; init; } = SandboxIsolation.InProcess
 public SandboxModule Module { get; }
 public SandboxPath Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
