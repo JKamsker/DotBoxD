@@ -43,7 +43,8 @@ the source of truth — including the full `DBXK###` set, which is not reproduce
 - Services (`DBXS###`): [`AnalyzerReleases.Shipped.md`](https://github.com/JKamsker/DotBoxD/blob/main/src/CodeGeneration/DotBoxD.Services.SourceGenerator/AnalyzerReleases.Shipped.md)
   and its [`AnalyzerReleases.Unshipped.md`](https://github.com/JKamsker/DotBoxD/blob/main/src/CodeGeneration/DotBoxD.Services.SourceGenerator/AnalyzerReleases.Unshipped.md) sibling.
 - Kernels/plugins (`DBXK###`): [`AnalyzerReleases.Shipped.md`](https://github.com/JKamsker/DotBoxD/blob/main/src/CodeGeneration/DotBoxD.Plugins.Analyzer/AnalyzerReleases.Shipped.md)
-  (and the kernel runtime diagnostic-code source).
+  and its [`AnalyzerReleases.Unshipped.md`](https://github.com/JKamsker/DotBoxD/blob/main/src/CodeGeneration/DotBoxD.Plugins.Analyzer/AnalyzerReleases.Unshipped.md) sibling
+  (plus the kernel runtime diagnostic-code source).
 
 > Migration note: these were renamed during the merge — ShaRPC's `SHARPC###` → `DBXS###` and Safe-IR's
 > `SGP###` → `DBXK###`. If you previously suppressed any old IDs, update your `.editorconfig` /
