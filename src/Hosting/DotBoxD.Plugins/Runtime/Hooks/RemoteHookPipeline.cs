@@ -131,9 +131,12 @@ public sealed partial class RemoteHookPipeline<TEvent>
     }
 
     [PipelineStep(PipelineStepRole.Filter)]
-    public RemoteHookPipeline<TEvent> Where(Func<TEvent, bool> filter)
+    public RemoteHookPipeline<TEvent> Where(
+        Func<TEvent, bool> filter,
+        [IRBodyOf(nameof(filter))] IRFunc<TEvent, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
+        _ = irFilter?.Step;
         return this;
     }
 
@@ -145,9 +148,12 @@ public sealed partial class RemoteHookPipeline<TEvent>
     }
 
     [PipelineStep(PipelineStepRole.Projection)]
-    public RemoteHookStage<TEvent, TNext> Select<TNext>(Func<TEvent, TNext> projection)
+    public RemoteHookStage<TEvent, TNext> Select<TNext>(
+        Func<TEvent, TNext> projection,
+        [IRBodyOf(nameof(projection))] IRFunc<TEvent, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
+        _ = irProjection?.Step;
         return new RemoteHookStage<TEvent, TNext>(this);
     }
 

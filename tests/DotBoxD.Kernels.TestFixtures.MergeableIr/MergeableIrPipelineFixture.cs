@@ -21,7 +21,7 @@ public sealed class StepPipeline<T>
         Func<T, bool> predicate,
         [IRBodyOf(nameof(predicate))] IRFunc<T, bool>? irPredicate = null)
     {
-        _steps.Add(RequiredStep(irPredicate, nameof(Where)));
+        _steps.Add(RequiredStep(irPredicate, nameof(irPredicate)));
         return this;
     }
 
@@ -29,7 +29,7 @@ public sealed class StepPipeline<T>
         Func<T, TNext> selector,
         [IRBodyOf(nameof(selector))] IRFunc<T, TNext>? irSelector = null)
     {
-        _steps.Add(RequiredStep(irSelector, nameof(Select)));
+        _steps.Add(RequiredStep(irSelector, nameof(irSelector)));
         return new StepPipeline<TNext>(_steps);
     }
 
@@ -41,9 +41,11 @@ public sealed class StepPipeline<T>
 
     private static LoweredPipelineStep RequiredStep<TInput, TOutput>(
         IRFunc<TInput, TOutput>? irFunc,
-        string methodName)
-        => irFunc?.Step ??
-           throw new InvalidOperationException(methodName + " must be lowered by DotBoxD.Plugins.Analyzer.");
+        string parameterName)
+    {
+        ArgumentNullException.ThrowIfNull(irFunc, parameterName);
+        return irFunc.Step;
+    }
 }
 
 public static class MergeableIrPipelineFixture

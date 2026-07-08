@@ -144,20 +144,21 @@ internal static partial class HookChainModelFactory
         => PipelineRoleReader.Transport(type, compilation);
 
     // Accepts both lambda forms a fluent stage can take: a parenthesized lambda (e), (e, ctx) or (),
-    // and the simple form e => .... Arity is resolved later by LambdaParameters, so every stage
-    // independently chooses element-only or element+context regardless of what neighbouring stages used.
+    // and the simple form e => .... A stage may also spell its optional IRFunc companion argument explicitly;
+    // the lambda's arity is resolved later by LambdaParameters.
     private static bool TryLambda(InvocationExpressionSyntax invocation, out LambdaExpressionSyntax lambda)
     {
         lambda = null!;
-        var arguments = invocation.ArgumentList.Arguments;
-        if (arguments.Count != 1 ||
-            arguments[0].Expression is not LambdaExpressionSyntax lambdaExpression)
+        foreach (var argument in invocation.ArgumentList.Arguments)
         {
-            return false;
+            if (argument.Expression is LambdaExpressionSyntax lambdaExpression)
+            {
+                lambda = lambdaExpression;
+                return true;
+            }
         }
 
-        lambda = lambdaExpression;
-        return true;
+        return false;
     }
 
     // The handler lambda of a result terminal - Register(lambda, priority) / RegisterLocal(lambda, priority) -

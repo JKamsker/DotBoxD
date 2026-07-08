@@ -191,10 +191,14 @@ current event/value first and the server context second. The same rule applies t
 ```csharp
 public sealed class HookPipeline<TEvent, TServerContext>
 {
-    public HookPipeline<TEvent, TServerContext> Where(Func<TEvent, bool> filter);
+    public HookPipeline<TEvent, TServerContext> Where(
+        Func<TEvent, bool> filter,
+        [IRBodyOf(nameof(filter))] IRFunc<TEvent, bool>? irFilter = null);
     public HookPipeline<TEvent, TServerContext> Where(Func<TEvent, TServerContext, bool> filter);
 
-    public HookStage<TEvent, TNext, TServerContext> Select<TNext>(Func<TEvent, TNext> projection);
+    public HookStage<TEvent, TNext, TServerContext> Select<TNext>(
+        Func<TEvent, TNext> projection,
+        [IRBodyOf(nameof(projection))] IRFunc<TEvent, TNext>? irProjection = null);
     public HookStage<TEvent, TNext, TServerContext> Select<TNext>(
         Func<TEvent, TServerContext, TNext> projection);
 

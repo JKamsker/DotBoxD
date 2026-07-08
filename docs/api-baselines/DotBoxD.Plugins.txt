@@ -142,17 +142,17 @@ public HookPipeline<TEvent, TContext> UseProjecting(InstalledKernel kernel, stri
 public HookPipeline<TEvent, TContext> UseProjectingResult( InstalledKernel filterKernel, string subscriptionId, Type resultType, RemoteLocalResultRequest request, int priority = 0)
 public HookPipeline<TEvent, TContext> UseProjectingResult<TResult>( InstalledKernel filterKernel, string subscriptionId, RemoteLocalResultRequest request, int priority = 0) where TResult : struct, IHookResult
 public HookPipeline<TEvent, TContext> UseResult(InstalledKernel kernel, Type resultType, int priority = 0)
-public HookPipeline<TEvent, TContext> Where(Func<TEvent, bool> filter)
+public HookPipeline<TEvent, TContext> Where( Func<TEvent, bool> filter,
 public HookPipeline<TEvent, TContext> Where(Func<TEvent, TContext, bool> filter)
 public HookPipeline<TEvent, TContext> Where(Func<TEvent, TContext, ValueTask<bool>> filter)
 public HookPipeline<TEvent, TContext> Where(Func<TEvent, ValueTask<bool>> filter)
 public HookRegistry Hooks { get; }
-public HookStage<TEvent, TCurrent, TContext> Where(Func<TCurrent, bool> filter)
+public HookStage<TEvent, TCurrent, TContext> Where( Func<TCurrent, bool> filter,
 public HookStage<TEvent, TCurrent, TContext> Where(Func<TCurrent, TContext, bool> filter)
+public HookStage<TEvent, TNext, TContext> Select<TNext>( Func<TCurrent, TNext> projection,
+public HookStage<TEvent, TNext, TContext> Select<TNext>( Func<TEvent, TNext> projection,
 public HookStage<TEvent, TNext, TContext> Select<TNext>(Func<TCurrent, TContext, TNext> projection)
-public HookStage<TEvent, TNext, TContext> Select<TNext>(Func<TCurrent, TNext> projection)
 public HookStage<TEvent, TNext, TContext> Select<TNext>(Func<TEvent, TContext, TNext> projection)
-public HookStage<TEvent, TNext, TContext> Select<TNext>(Func<TEvent, TNext> projection)
 public IDisposable Register<TProjected>( string subscriptionId, Func<TProjected, HookContext, ValueTask> handler, Func<KernelRpcValue, TProjected> decoder)
 public IDisposable Register<TProjected>( string subscriptionId, Func<TProjected, HookContext, ValueTask> handler, Func<ReadOnlyMemory<byte>, TProjected> decoder)
 public IDisposable Register<TProjected>( string subscriptionId, Func<TProjected, HookContext, ValueTask> handler)
@@ -291,7 +291,7 @@ public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalResultChain<TResult
 public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalResultChain<TResult>( PluginPackage package, Func<TEvent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
 public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalResultChain<TResult>( PluginPackage package, Func<TEvent, ValueTask<TResult>> handler, int priority = 0) where TResult : struct, IHookResult
 public RemoteHookPipeline<TEvent, TContext> UseGeneratedResultChain<TResult>( PluginPackage package, int priority = 0) where TResult : struct, IHookResult
-public RemoteHookPipeline<TEvent, TContext> Where(Func<TEvent, bool> filter)
+public RemoteHookPipeline<TEvent, TContext> Where( Func<TEvent, bool> filter,
 public RemoteHookPipeline<TEvent, TContext> Where(Func<TEvent, TContext, bool> filter)
 public RemoteHookPipeline<TEvent> On<TEvent>() => new(_install, _localHandlers)
 public RemoteHookPipeline<TEvent> Register<TResult>(Func<TCurrent, TResult> handler, int priority = 0)
@@ -357,21 +357,21 @@ public RemoteHookPipeline<TEvent> UseGeneratedLocalResultChain<TResult>( PluginP
 public RemoteHookPipeline<TEvent> UseGeneratedLocalResultChain<TResult>( PluginPackage package, Func<TEvent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
 public RemoteHookPipeline<TEvent> UseGeneratedLocalResultChain<TResult>( PluginPackage package, Func<TEvent, ValueTask<TResult>> handler, int priority = 0) where TResult : struct, IHookResult
 public RemoteHookPipeline<TEvent> UseGeneratedResultChain<TResult>(PluginPackage package, int priority = 0) where TResult : struct, IHookResult
-public RemoteHookPipeline<TEvent> Where(Func<TEvent, bool> filter)
+public RemoteHookPipeline<TEvent> Where( Func<TEvent, bool> filter,
 public RemoteHookPipeline<TEvent> Where(Func<TEvent, HookContext, bool> filter)
 public RemoteHookRegistry( Func<PluginPackage, ValueTask<string>> install, RemoteLocalHandlerRegistry? localHandlers = null)
-public RemoteHookStage<TEvent, TCurrent, TContext> Where(Func<TCurrent, bool> filter)
+public RemoteHookStage<TEvent, TCurrent, TContext> Where( Func<TCurrent, bool> filter,
 public RemoteHookStage<TEvent, TCurrent, TContext> Where(Func<TCurrent, TContext, bool> filter)
-public RemoteHookStage<TEvent, TCurrent> Where(Func<TCurrent, bool> filter)
+public RemoteHookStage<TEvent, TCurrent> Where( Func<TCurrent, bool> filter,
 public RemoteHookStage<TEvent, TCurrent> Where(Func<TCurrent, HookContext, bool> filter)
+public RemoteHookStage<TEvent, TNext, TContext> Select<TNext>( Func<TCurrent, TNext> projection,
+public RemoteHookStage<TEvent, TNext, TContext> Select<TNext>( Func<TEvent, TNext> projection,
 public RemoteHookStage<TEvent, TNext, TContext> Select<TNext>(Func<TCurrent, TContext, TNext> projection)
-public RemoteHookStage<TEvent, TNext, TContext> Select<TNext>(Func<TCurrent, TNext> projection)
 public RemoteHookStage<TEvent, TNext, TContext> Select<TNext>(Func<TEvent, TContext, TNext> projection)
-public RemoteHookStage<TEvent, TNext, TContext> Select<TNext>(Func<TEvent, TNext> projection)
+public RemoteHookStage<TEvent, TNext> Select<TNext>( Func<TCurrent, TNext> projection,
+public RemoteHookStage<TEvent, TNext> Select<TNext>( Func<TEvent, TNext> projection,
 public RemoteHookStage<TEvent, TNext> Select<TNext>(Func<TCurrent, HookContext, TNext> projection)
-public RemoteHookStage<TEvent, TNext> Select<TNext>(Func<TCurrent, TNext> projection)
 public RemoteHookStage<TEvent, TNext> Select<TNext>(Func<TEvent, HookContext, TNext> projection)
-public RemoteHookStage<TEvent, TNext> Select<TNext>(Func<TEvent, TNext> projection)
 public RemoteLocalPush? LocalPush { get; init; }
 public RemoteLocalResultRequest? LocalResult { get; init; }
 public RemoteSubscriptionPipeline<TEvent, TContext> On<TEvent, TContext>( Func<HookContext, TContext> createContext)
@@ -417,7 +417,7 @@ public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( Plug
 public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TEvent, ValueTask> handler, Func<KernelRpcValue, TEvent> decoder)
 public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TEvent, ValueTask> handler, Func<ReadOnlyMemory<byte>, TEvent> decoder)
 public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TEvent, ValueTask> handler)
-public RemoteSubscriptionPipeline<TEvent, TContext> Where(Func<TEvent, bool> filter)
+public RemoteSubscriptionPipeline<TEvent, TContext> Where( Func<TEvent, bool> filter,
 public RemoteSubscriptionPipeline<TEvent, TContext> Where(Func<TEvent, TContext, bool> filter)
 public RemoteSubscriptionPipeline<TEvent> On<TEvent>() => new(_install, _localHandlers)
 public RemoteSubscriptionPipeline<TEvent> Run(Action<TCurrent, HookContext> handler)
@@ -462,21 +462,21 @@ public RemoteSubscriptionPipeline<TEvent> UseGeneratedLocalChain(PluginPackage p
 public RemoteSubscriptionPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, Func<TEvent, ValueTask> handler, Func<KernelRpcValue, TEvent> decoder)
 public RemoteSubscriptionPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, Func<TEvent, ValueTask> handler, Func<ReadOnlyMemory<byte>, TEvent> decoder)
 public RemoteSubscriptionPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, Func<TEvent, ValueTask> handler)
-public RemoteSubscriptionPipeline<TEvent> Where(Func<TEvent, bool> filter)
+public RemoteSubscriptionPipeline<TEvent> Where( Func<TEvent, bool> filter,
 public RemoteSubscriptionPipeline<TEvent> Where(Func<TEvent, HookContext, bool> filter)
 public RemoteSubscriptionRegistry( Func<PluginPackage, ValueTask<string>> install, RemoteLocalHandlerRegistry? localHandlers = null)
-public RemoteSubscriptionStage<TEvent, TCurrent, TContext> Where(Func<TCurrent, bool> filter)
+public RemoteSubscriptionStage<TEvent, TCurrent, TContext> Where( Func<TCurrent, bool> filter,
 public RemoteSubscriptionStage<TEvent, TCurrent, TContext> Where(Func<TCurrent, TContext, bool> filter)
-public RemoteSubscriptionStage<TEvent, TCurrent> Where(Func<TCurrent, bool> filter)
+public RemoteSubscriptionStage<TEvent, TCurrent> Where( Func<TCurrent, bool> filter,
 public RemoteSubscriptionStage<TEvent, TCurrent> Where(Func<TCurrent, HookContext, bool> filter)
 public RemoteSubscriptionStage<TEvent, TNext, TContext> Select<TNext>( Func<TCurrent, TContext, TNext> projection)
+public RemoteSubscriptionStage<TEvent, TNext, TContext> Select<TNext>( Func<TCurrent, TNext> projection,
 public RemoteSubscriptionStage<TEvent, TNext, TContext> Select<TNext>( Func<TEvent, TContext, TNext> projection)
-public RemoteSubscriptionStage<TEvent, TNext, TContext> Select<TNext>(Func<TCurrent, TNext> projection)
-public RemoteSubscriptionStage<TEvent, TNext, TContext> Select<TNext>(Func<TEvent, TNext> projection)
+public RemoteSubscriptionStage<TEvent, TNext, TContext> Select<TNext>( Func<TEvent, TNext> projection,
+public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>( Func<TCurrent, TNext> projection,
+public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>( Func<TEvent, TNext> projection,
 public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>(Func<TCurrent, HookContext, TNext> projection)
-public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>(Func<TCurrent, TNext> projection)
 public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>(Func<TEvent, HookContext, TNext> projection)
-public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>(Func<TEvent, TNext> projection)
 public SandboxErrorCode? ErrorCode { get; init; }
 public SandboxErrorCode? FallbackReason { get; init; }
 public SandboxValue ToSandboxValue()
@@ -626,17 +626,17 @@ public SubscriptionPipeline<TEvent, TContext> Use<TKernel>() where TKernel : cla
 public SubscriptionPipeline<TEvent, TContext> UseGeneratedChain(PluginPackage package)
 public SubscriptionPipeline<TEvent, TContext> UseGeneratedChainFromInterceptor(PluginPackage package)
 public SubscriptionPipeline<TEvent, TContext> UseProjecting( InstalledKernel kernel, string subscriptionId, Hooks.RemoteLocalPush push)
-public SubscriptionPipeline<TEvent, TContext> Where(Func<TEvent, bool> filter)
+public SubscriptionPipeline<TEvent, TContext> Where( Func<TEvent, bool> filter,
 public SubscriptionPipeline<TEvent, TContext> Where(Func<TEvent, TContext, bool> filter)
 public SubscriptionPipeline<TEvent, TContext> Where(Func<TEvent, TContext, ValueTask<bool>> filter)
 public SubscriptionPipeline<TEvent, TContext> Where(Func<TEvent, ValueTask<bool>> filter)
 public SubscriptionRegistry Subscriptions { get; }
-public SubscriptionStage<TEvent, TCurrent, TContext> Where(Func<TCurrent, bool> filter)
+public SubscriptionStage<TEvent, TCurrent, TContext> Where( Func<TCurrent, bool> filter,
 public SubscriptionStage<TEvent, TCurrent, TContext> Where(Func<TCurrent, TContext, bool> filter)
+public SubscriptionStage<TEvent, TNext, TContext> Select<TNext>( Func<TCurrent, TNext> projection,
+public SubscriptionStage<TEvent, TNext, TContext> Select<TNext>( Func<TEvent, TNext> projection,
 public SubscriptionStage<TEvent, TNext, TContext> Select<TNext>(Func<TCurrent, TContext, TNext> projection)
-public SubscriptionStage<TEvent, TNext, TContext> Select<TNext>(Func<TCurrent, TNext> projection)
 public SubscriptionStage<TEvent, TNext, TContext> Select<TNext>(Func<TEvent, TContext, TNext> projection)
-public SubscriptionStage<TEvent, TNext, TContext> Select<TNext>(Func<TEvent, TNext> projection)
 public System.Guid GuidValue { get; }
 public T As<T>() where T : class => LiveContextProxy<T>.Create(this)
 public T Get<T>(string name)

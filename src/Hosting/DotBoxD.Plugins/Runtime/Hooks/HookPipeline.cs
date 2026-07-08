@@ -61,9 +61,12 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
     /// <summary>Element-only filter — the same as the (element, context) overload with the context
     /// discarded. Both arities are always available so a stage need not take the context it doesn't use.</summary>
     [PipelineStep(PipelineStepRole.Filter)]
-    public HookPipeline<TEvent, TContext> Where(Func<TEvent, bool> filter)
+    public HookPipeline<TEvent, TContext> Where(
+        Func<TEvent, bool> filter,
+        [IRBodyOf(nameof(filter))] IRFunc<TEvent, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
+        _ = irFilter?.Step;
         return Where((e, _) => filter(e));
     }
 
@@ -131,9 +134,12 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
     }
 
     [PipelineStep(PipelineStepRole.Projection)]
-    public HookStage<TEvent, TNext, TContext> Select<TNext>(Func<TEvent, TNext> projection)
+    public HookStage<TEvent, TNext, TContext> Select<TNext>(
+        Func<TEvent, TNext> projection,
+        [IRBodyOf(nameof(projection))] IRFunc<TEvent, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
+        _ = irProjection?.Step;
         return Select((e, _) => projection(e));
     }
 

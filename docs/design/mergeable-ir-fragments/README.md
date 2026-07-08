@@ -17,18 +17,19 @@ that exact method name and semantics.
 
 ## Model
 
-Custom stages should lower one marked delegate argument into a mergeable IR step:
+Custom stages should expose a delegate plus an optional generated IR companion:
 
 ```csharp
 public Pipeline<T> Where(
-    [LowerToIr(LoweredPipelineStepKind.Filter)] Func<T, bool> predicate)
-    => throw new NotSupportedException();
-
-public Pipeline<T> Where(LoweredPipelineStep step)
-    => Append(step);
+    Func<T, bool> predicate,
+    [IRBodyOf(nameof(predicate))] IRFunc<T, bool>? irPredicate = null)
+{
+    ArgumentNullException.ThrowIfNull(irPredicate);
+    return Append(irPredicate.Step);
+}
 ```
 
-The generator intercepts the `Func` overload at the call site and redirects to the step overload:
+The generator intercepts the call site and supplies the companion argument:
 
 ```csharp
 pipeline.Where(e => e.Distance <= 4);
@@ -37,7 +38,7 @@ pipeline.Where(e => e.Distance <= 4);
 becomes:
 
 ```csharp
-pipeline.Where(GeneratedStep.Create());
+pipeline.Where(e => e.Distance <= 4, GeneratedStep.CreateIRFunc());
 ```
 
 Each generated step contains:
@@ -89,13 +90,13 @@ the public primitive small: one expression plus metadata.
 
 The experimental generator recognizes calls where:
 
-- exactly one method parameter is marked with `[LowerToIr(...)]`;
-- the marked parameter is `Func<TInput, bool>` for filters or `Func<TInput, TOutput>` for projections;
+- exactly one method parameter is marked with `[IRBodyOf(nameof(sourceParameter))]`;
+- the marked parameter is an optional-null `IRFunc<TInput, TOutput>` companion;
+- the source parameter is `Func<TInput, bool>` for filters or `Func<TInput, TOutput>` for projections;
 - the argument is an expression-bodied lambda with one parameter;
-- the receiver type has an overload with the same method name that accepts `LoweredPipelineStep`.
 
-It emits generated step factory classes plus interceptors. It intentionally does not annotate or alter the
-existing DotBoxD hook pipeline methods.
+It emits generated step factory classes plus interceptors. The older `[LowerToIr(...)]` parameter plus
+`LoweredPipelineStep` overload shape remains supported as legacy generator plumbing during migration.
 
 Unsupported in this first slice:
 
@@ -110,4 +111,3 @@ composition is now provided by `LoweredPipelineComposer` (see [Composition](#com
 For the runtime-dynamic counterpart to this compile-time model — `EventQuery<TEvent>`, which uses runtime
 expression trees rather than source-lambda lowering and is deliberately not part of the `[PipelineStep]`
 vocabulary — see [event-query-vs-pipeline](../event-query-vs-pipeline/README.md).
-

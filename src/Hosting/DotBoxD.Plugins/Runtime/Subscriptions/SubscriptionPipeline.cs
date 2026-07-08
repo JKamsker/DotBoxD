@@ -100,9 +100,12 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
     }
 
     [PipelineStep(PipelineStepRole.Filter)]
-    public SubscriptionPipeline<TEvent, TContext> Where(Func<TEvent, bool> filter)
+    public SubscriptionPipeline<TEvent, TContext> Where(
+        Func<TEvent, bool> filter,
+        [IRBodyOf(nameof(filter))] IRFunc<TEvent, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
+        _ = irFilter?.Step;
         return Where((e, _) => filter(e));
     }
 
@@ -168,9 +171,12 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
     }
 
     [PipelineStep(PipelineStepRole.Projection)]
-    public SubscriptionStage<TEvent, TNext, TContext> Select<TNext>(Func<TEvent, TNext> projection)
+    public SubscriptionStage<TEvent, TNext, TContext> Select<TNext>(
+        Func<TEvent, TNext> projection,
+        [IRBodyOf(nameof(projection))] IRFunc<TEvent, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
+        _ = irProjection?.Step;
         return Select((e, _) => projection(e));
     }
 

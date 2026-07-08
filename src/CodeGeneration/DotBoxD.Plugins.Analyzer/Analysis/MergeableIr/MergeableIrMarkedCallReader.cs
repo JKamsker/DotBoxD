@@ -1,3 +1,4 @@
+using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -15,6 +16,11 @@ internal static class MergeableIrMarkedCallReader
         if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method ||
             method.IsStatic ||
             method.IsExtensionMethod)
+        {
+            return null;
+        }
+
+        if (PipelineRoleReader.RoleOf(method, model.Compilation) is not null)
         {
             return null;
         }

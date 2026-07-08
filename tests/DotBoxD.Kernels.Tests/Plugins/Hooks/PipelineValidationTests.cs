@@ -1,6 +1,9 @@
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Kernel;
 using DotBoxD.Plugins.Runtime;
+using DotBoxD.Plugins.Runtime.Hooks;
+using DotBoxD.Plugins.Runtime.Subscriptions;
+using System.Reflection;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Hooks;
 
@@ -45,6 +48,32 @@ public sealed class PipelineValidationTests
     }
 
     [Fact]
+    public void Element_only_filter_and_projection_surfaces_expose_ir_body_companions()
+    {
+        Type[] pipelineTypes =
+        [
+            typeof(HookPipeline<GuardEvent, GuardContext>),
+            typeof(HookStage<GuardEvent, int, GuardContext>),
+            typeof(SubscriptionPipeline<GuardEvent, GuardContext>),
+            typeof(SubscriptionStage<GuardEvent, int, GuardContext>),
+            typeof(RemoteHookPipeline<GuardEvent>),
+            typeof(RemoteHookPipeline<GuardEvent, GuardContext>),
+            typeof(RemoteHookStage<GuardEvent, int>),
+            typeof(RemoteHookStage<GuardEvent, int, GuardContext>),
+            typeof(RemoteSubscriptionPipeline<GuardEvent>),
+            typeof(RemoteSubscriptionPipeline<GuardEvent, GuardContext>),
+            typeof(RemoteSubscriptionStage<GuardEvent, int>),
+            typeof(RemoteSubscriptionStage<GuardEvent, int, GuardContext>),
+        ];
+
+        foreach (var pipelineType in pipelineTypes)
+        {
+            AssertIrBodyCompanion(pipelineType, "Where", "filter", "irFilter");
+            AssertIrBodyCompanion(pipelineType, "Select", "projection", "irProjection");
+        }
+    }
+
+    [Fact]
     public void Local_terminal_validation_distinguishes_map_interfaces_from_lists()
     {
         var map = PackageWithProjection("map");
@@ -69,6 +98,26 @@ public sealed class PipelineValidationTests
     }
 
     private static GuardContext CreateContext(HookContext context) => new(context);
+
+    private static void AssertIrBodyCompanion(
+        Type declaringType,
+        string methodName,
+        string sourceParameterName,
+        string irParameterName)
+    {
+        var method = Assert.Single(
+            declaringType.GetMethods(BindingFlags.Public | BindingFlags.Instance),
+            candidate => candidate.Name == methodName &&
+                candidate.GetParameters().Any(parameter => parameter.Name == irParameterName));
+        var irParameter = Assert.Single(method.GetParameters(), parameter => parameter.Name == irParameterName);
+        var attribute = Assert.Single(irParameter.GetCustomAttributes<IRBodyOfAttribute>());
+
+        Assert.Equal(sourceParameterName, attribute.ParameterName);
+        Assert.True(irParameter.HasDefaultValue);
+        Assert.Null(irParameter.DefaultValue);
+        Assert.True(irParameter.ParameterType.IsGenericType);
+        Assert.Equal(typeof(IRFunc<,>), irParameter.ParameterType.GetGenericTypeDefinition());
+    }
 
     private static PluginPackage PackageWithProjection(string projectedType)
     {

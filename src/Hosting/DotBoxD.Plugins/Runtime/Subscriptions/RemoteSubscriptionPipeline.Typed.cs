@@ -36,9 +36,12 @@ public sealed class RemoteSubscriptionPipeline<TEvent, TContext>
     }
 
     [PipelineStep(PipelineStepRole.Filter)]
-    public RemoteSubscriptionPipeline<TEvent, TContext> Where(Func<TEvent, bool> filter)
+    public RemoteSubscriptionPipeline<TEvent, TContext> Where(
+        Func<TEvent, bool> filter,
+        [IRBodyOf(nameof(filter))] IRFunc<TEvent, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
+        _ = irFilter?.Step;
         return this;
     }
 
@@ -51,9 +54,12 @@ public sealed class RemoteSubscriptionPipeline<TEvent, TContext>
     }
 
     [PipelineStep(PipelineStepRole.Projection)]
-    public RemoteSubscriptionStage<TEvent, TNext, TContext> Select<TNext>(Func<TEvent, TNext> projection)
+    public RemoteSubscriptionStage<TEvent, TNext, TContext> Select<TNext>(
+        Func<TEvent, TNext> projection,
+        [IRBodyOf(nameof(projection))] IRFunc<TEvent, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
+        _ = irProjection?.Step;
         return new RemoteSubscriptionStage<TEvent, TNext, TContext>(this);
     }
 

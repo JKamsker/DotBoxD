@@ -41,9 +41,12 @@ public class HookStage<TEvent, TCurrent, TContext>
     /// <summary>Element-only filter over the projected element — the (element, context) overload with
     /// the context discarded, so a stage need not take the context it doesn't use.</summary>
     [PipelineStep(PipelineStepRole.Filter)]
-    public HookStage<TEvent, TCurrent, TContext> Where(Func<TCurrent, bool> filter)
+    public HookStage<TEvent, TCurrent, TContext> Where(
+        Func<TCurrent, bool> filter,
+        [IRBodyOf(nameof(filter))] IRFunc<TCurrent, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
+        _ = irFilter?.Step;
         return Where((value, _) => filter(value));
     }
 
@@ -60,9 +63,12 @@ public class HookStage<TEvent, TCurrent, TContext>
     }
 
     [PipelineStep(PipelineStepRole.Projection)]
-    public HookStage<TEvent, TNext, TContext> Select<TNext>(Func<TCurrent, TNext> projection)
+    public HookStage<TEvent, TNext, TContext> Select<TNext>(
+        Func<TCurrent, TNext> projection,
+        [IRBodyOf(nameof(projection))] IRFunc<TCurrent, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
+        _ = irProjection?.Step;
         return Select((value, _) => projection(value));
     }
 

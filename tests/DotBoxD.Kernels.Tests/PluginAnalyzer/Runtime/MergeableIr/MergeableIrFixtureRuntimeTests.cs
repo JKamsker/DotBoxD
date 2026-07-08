@@ -29,4 +29,28 @@ public sealed class MergeableIrFixtureRuntimeTests
                 Assert.Equal("string", step.OutputType);
             });
     }
+
+    [Fact]
+    public void Fixture_Where_rejects_a_runtime_null_ir_body()
+    {
+        var pipeline = new StepPipeline<ProbeEvent>();
+        IRFunc<ProbeEvent, bool>? irPredicate = null;
+
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => pipeline.Where(e => e.Distance >= 4, irPredicate));
+
+        Assert.Equal(nameof(irPredicate), exception.ParamName);
+    }
+
+    [Fact]
+    public void Fixture_Select_rejects_a_runtime_null_ir_body()
+    {
+        var pipeline = new StepPipeline<ProbeEvent>();
+        IRFunc<ProbeEvent, string>? irSelector = null;
+
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => pipeline.Select(e => e.TargetId, irSelector));
+
+        Assert.Equal(nameof(irSelector), exception.ParamName);
+    }
 }

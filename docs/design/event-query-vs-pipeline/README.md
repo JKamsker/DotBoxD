@@ -14,9 +14,9 @@ authoring surface would break one of them.
 
 | | Source-generated pipeline | `EventQuery<TEvent>` |
 |---|---|---|
-| Namespace | `DotBoxD.Plugins.Runtime` (hooks/subscriptions) + `[LowerToIr]` mergeable-IR | `DotBoxD.Queryable.Authoring` |
+| Namespace | `DotBoxD.Plugins.Runtime` (hooks/subscriptions) + `[IRBodyOf]` mergeable-IR | `DotBoxD.Queryable.Authoring` |
 | Operator input | **source lambdas** — `Func<T, bool>` / `Func<T, U>` whose body the analyzer reads at compile time | **runtime expression trees** — `Expression<Func<T, bool>>` / `Expression<Func<T, U>>` |
-| Recognition | analyzer, by `[PipelineStep]` role on the method (or `[LowerToIr]` on the parameter) | none — the analyzer never sees it |
+| Recognition | analyzer, by `[PipelineStep]` role on the method (or `[IRBodyOf]` on an `IRFunc` companion; `[LowerToIr]` remains legacy) | none — the analyzer never sees it |
 | Lowering | compile time, into verified sandbox IR (`SandboxModule` / `LoweredPipelineStep`) | runtime, into a portable `QueryFilter` / `QueryProjection` AST |
 | Execution | inside the sandbox (interpreter or compiled kernel), fuel- and capability-gated | in-process tree-walking interpreter with a JIT-compile promotion step |
 | Terminal | `Run` / `RunLocal` / `Register` / `RegisterLocal`, lowered into the module | `SubscribeAsync`, dispatching to a native in-process delegate |
