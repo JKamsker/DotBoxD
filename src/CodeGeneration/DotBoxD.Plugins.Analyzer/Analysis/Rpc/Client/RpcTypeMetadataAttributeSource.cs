@@ -3,24 +3,54 @@ using Microsoft.CodeAnalysis;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
-internal static class RpcObsoleteAttributeSource
+internal static class RpcTypeMetadataAttributeSource
 {
+    private const string ExperimentalAttribute = "System.Diagnostics.CodeAnalysis.ExperimentalAttribute";
+    private const string ObsoleteAttribute = "System.ObsoleteAttribute";
+
     public static void Append(StringBuilder builder, INamedTypeSymbol sourceType, string indent)
     {
         foreach (var attribute in sourceType.GetAttributes())
         {
-            if (attribute.AttributeClass?.ToDisplayString() == "System.ObsoleteAttribute")
+            switch (attribute.AttributeClass?.ToDisplayString())
             {
-                AppendAttribute(builder, attribute, indent);
-                return;
+                case ExperimentalAttribute:
+                    AppendAttribute(
+                        builder,
+                        attribute,
+                        indent,
+                        "global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute");
+                    break;
+
+                case ObsoleteAttribute:
+                    AppendAttribute(builder, attribute, indent, "global::System.ObsoleteAttribute");
+                    break;
             }
         }
     }
 
-    private static void AppendAttribute(StringBuilder builder, AttributeData attribute, string indent)
+    public static IEnumerable<string> ExperimentalDiagnosticIds(INamedTypeSymbol sourceType)
+    {
+        foreach (var attribute in sourceType.GetAttributes())
+        {
+            if (attribute.AttributeClass?.ToDisplayString() == ExperimentalAttribute &&
+                attribute.ConstructorArguments.Length == 1 &&
+                attribute.ConstructorArguments[0].Value is string diagnosticId &&
+                IsPragmaWarningIdentifier(diagnosticId))
+            {
+                yield return diagnosticId;
+            }
+        }
+    }
+
+    private static void AppendAttribute(
+        StringBuilder builder,
+        AttributeData attribute,
+        string indent,
+        string attributeType)
     {
         var source = new StringBuilder();
-        source.Append(indent).Append("[global::System.ObsoleteAttribute");
+        source.Append(indent).Append('[').Append(attributeType);
         if (attribute.ConstructorArguments.Length == 0 &&
             !HasSupportedNamedArguments(attribute))
         {
@@ -109,4 +139,11 @@ internal static class RpcObsoleteAttributeSource
             needsSeparator = true;
         }
     }
+
+    private static bool IsPragmaWarningIdentifier(string value)
+        => value.Length > 0 &&
+           value.All(static ch => IsAsciiLetterOrDigit(ch) || ch == '_');
+
+    private static bool IsAsciiLetterOrDigit(char value)
+        => value is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9';
 }
