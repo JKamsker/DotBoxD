@@ -4,8 +4,8 @@ description: >-
   Same C# contract, three delivery strategies — Services (RPC), sandboxed Kernels, and Pushdown.
   How to choose a mode, and a map of the whole documentation.
 ---
-DotBoxD is a source-generated, contract-first .NET extension runtime. One C# contract can be used in
-three ways:
+DotBoxD is a source-generated, contract-first plugin runtime for .NET hosts. One C# contract can be
+used in three ways:
 
 New here? Install via [Getting started](/getting-started/), then work through the three
 [Tutorials](/tutorials/) — the mode links below go straight to the deep-dive concepts.

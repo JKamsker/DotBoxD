@@ -10,7 +10,7 @@ link for the full treatment.
 ## Sandbox and kernels
 
 - **Kernel** — Client/plugin-supplied logic the host runs safely under policy, as
-  [validated, capability-gated, fuel-metered IR](/concepts/kernels/) — never C#, IL, or reflection.
+  [validated, capability-gated, fuel-metered restricted IR](/concepts/kernels/) — never C#, IL, or reflection.
 - **IR (intermediate representation)** — The restricted, JSON-authored instruction format a
   [kernel](/concepts/kernels/) is expressed in; the host rejects anything outside the allowed shape
   before it runs.

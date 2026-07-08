@@ -5,10 +5,10 @@ description: 'The GameServer sample is the maintained, runnable example that tie
 The GameServer sample is the maintained, runnable example that ties **Services**, **Kernels**, and **Pushdown** together in one program. It is the canonical reference because it exercises all three modes end to end in a single process pair:
 
 - **Services (RPC)** — typed interop from one C# contract.
-- **Query/event pipeline (RunLocal)** — server-side filtering and projection so the host receives only the data it needs.
+- **Query (RunLocal)** — the event pipeline: server-side filtering and projection so the host receives only the data it needs.
 - **Pushdown** — server extensions that batch work next to the data instead of round-tripping.
 
-So the patterns you see here map straight onto your own host and plugins. A parent *server* process runs a small deterministic simulation; a child *plugin* process ships untrusted, sandboxed kernels to the server over a bidirectional named-pipe control plane. This page walks the sample feature by feature and maps each one to the concrete file that implements it, so you can jump straight into the real code.
+The patterns you see here map straight onto your own host and plugins. A parent *server* process runs a small deterministic simulation; a child *plugin* process ships untrusted, sandboxed kernels to the server over a bidirectional named-pipe control plane. This page walks the sample feature by feature and maps each one to the concrete file that implements it, so you can jump straight into the real code.
 
 The sample lives under [`samples/GameServer`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer) and is the example the root [`README.md`](https://github.com/JKamsker/DotBoxD/blob/main/README.md) points at for "service IPC, event kernels, live settings, host bindings, policies, and server extensions."
 
@@ -51,7 +51,7 @@ The phase structure is driven by `BaselineTicks` / `PluginTicks` and the `world.
 | `Examples.GameServer.Plugin` | The untrusted plugin/child process: authored-in-C# kernels, server extensions, and the one-line generated plugin server. | `Program.cs`, `GamePluginServer.cs`, `Kernels/` |
 | `Examples.GameServer.Plugin.Tests` | xUnit coverage that exercises the plugin surface, IPC round-trips, and server-extension RPC without spawning processes. | `Regression/`, `RunLocal/`, `Routing/` |
 
-Both `Server` and `Plugin` reference the `Server.Abstractions` project (see the two `.csproj` files); the plugin additionally references the analyzer as an `Analyzer` output so its C# kernels are lowered to verified IR at build time ([`Examples.GameServer.Plugin.csproj`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Examples.GameServer.Plugin.csproj)).
+Both `Server` and `Plugin` reference the `Server.Abstractions` project (see the two `.csproj` files); the plugin additionally references the analyzer as an `Analyzer` output so its C# kernels are lowered to verified, restricted IR (intermediate representation) at build time ([`Examples.GameServer.Plugin.csproj`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Examples.GameServer.Plugin.csproj)).
 
 ## The shared contract (Server.Abstractions)
 
