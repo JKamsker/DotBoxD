@@ -62,7 +62,7 @@ public sealed class BindingAuditFieldsContractTests
                 moduleHash: "module",
                 policyHash: null!,
                 deterministic: true),
-            _ => throw new ArgumentOutOfRangeException(nameof(parameterName), parameterName, null)
+            _ => UnexpectedParameterName(parameterName)
         };
 
     private static IReadOnlyDictionary<string, string> CreateWithNegativeBytes(string parameterName)
@@ -78,6 +78,9 @@ public sealed class BindingAuditFieldsContractTests
                 StartedAt,
                 deterministic: true,
                 bytesWritten: -1),
-            _ => throw new ArgumentOutOfRangeException(nameof(parameterName), parameterName, null)
+            _ => UnexpectedParameterName(parameterName)
         };
+
+    private static IReadOnlyDictionary<string, string> UnexpectedParameterName(string parameterName)
+        => throw new ArgumentOutOfRangeException(nameof(parameterName), parameterName, null);
 }
