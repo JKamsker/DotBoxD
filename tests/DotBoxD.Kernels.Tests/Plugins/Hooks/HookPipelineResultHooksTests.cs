@@ -100,7 +100,9 @@ public sealed class HookPipelineResultHooksTests
     {
         var hooks = new RemoteHookRegistry(_ => ValueTask.FromResult("unused"));
         var stage = hooks.On<DamageCtx, DamageServerContext>(ctx => new DamageServerContext(ctx))
-            .Select((c, _) => c.Damage);
+            .Select(
+                (c, _) => c.Damage,
+                RemoteIrTestSteps.Ir<DamageCtx, DamageServerContext, int>(LoweredPipelineStepKind.Projection));
 
         Assert.Throws<ArgumentNullException>(() =>
         {

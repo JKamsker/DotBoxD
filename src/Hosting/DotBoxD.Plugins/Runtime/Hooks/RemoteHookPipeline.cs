@@ -8,13 +8,23 @@ public sealed partial class RemoteHookPipeline<TEvent>
 {
     private readonly Func<PluginPackage, ValueTask<string>> _install;
     private readonly RemoteLocalHandlerRegistry? _localHandlers;
+    private readonly RemotePipelineIr _pipelineIr;
 
     internal RemoteHookPipeline(
         Func<PluginPackage, ValueTask<string>> install,
         RemoteLocalHandlerRegistry? localHandlers = null)
+        : this(install, localHandlers, RemotePipelineIr.Empty)
+    {
+    }
+
+    private RemoteHookPipeline(
+        Func<PluginPackage, ValueTask<string>> install,
+        RemoteLocalHandlerRegistry? localHandlers,
+        RemotePipelineIr pipelineIr)
     {
         _install = install;
         _localHandlers = localHandlers;
+        _pipelineIr = pipelineIr;
     }
 
     public RemoteHookPipeline<TEvent> Use<TKernel>() where TKernel : class
@@ -127,33 +137,47 @@ public sealed partial class RemoteHookPipeline<TEvent>
         [IRBodyOf(nameof(filter))] IRFunc<TEvent, HookContext, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
-        _ = irFilter?.Step;
-        return this;
+        return AppendStep(irFilter, nameof(irFilter));
     }
     public RemoteHookPipeline<TEvent> Where(
         Func<TEvent, bool> filter,
         [IRBodyOf(nameof(filter))] IRFunc<TEvent, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
-        _ = irFilter?.Step;
-        return this;
+        return AppendStep(irFilter, nameof(irFilter));
     }
     public RemoteHookStage<TEvent, TNext> Select<TNext>(
         Func<TEvent, HookContext, TNext> projection,
         [IRBodyOf(nameof(projection))] IRFunc<TEvent, HookContext, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
-        _ = irProjection?.Step;
-        return new RemoteHookStage<TEvent, TNext>(this);
+        return new RemoteHookStage<TEvent, TNext>(
+            AppendStep(irProjection, nameof(irProjection)));
     }
     public RemoteHookStage<TEvent, TNext> Select<TNext>(
         Func<TEvent, TNext> projection,
         [IRBodyOf(nameof(projection))] IRFunc<TEvent, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
-        _ = irProjection?.Step;
-        return new RemoteHookStage<TEvent, TNext>(this);
+        return new RemoteHookStage<TEvent, TNext>(
+            AppendStep(irProjection, nameof(irProjection)));
     }
+
+    internal RemoteHookPipeline<TEvent> AppendStep<TInput, TOutput>(
+        IRFunc<TInput, TOutput>? irFunc,
+        string parameterName)
+        => WithPipelineIr(_pipelineIr.Append(irFunc, parameterName));
+
+    internal RemoteHookPipeline<TEvent> AppendStep<TInput, TContext, TOutput>(
+        IRFunc<TInput, TContext, TOutput>? irFunc,
+        string parameterName)
+        => WithPipelineIr(_pipelineIr.Append(irFunc, parameterName));
+
+    private RemoteHookPipeline<TEvent> WithPipelineIr(RemotePipelineIr pipelineIr)
+        => new(_install, _localHandlers, pipelineIr);
+
+    internal PluginPackage LocalTerminalPackage(IRKernel kernel)
+        => _pipelineIr.ComposeLocalTerminalPackage(kernel);
     private static NotSupportedException LocalHandlersNotSupported()
         => new("Remote hook RunLocal requires an event callback transport; use PluginServer.Hooks for local handlers.");
 

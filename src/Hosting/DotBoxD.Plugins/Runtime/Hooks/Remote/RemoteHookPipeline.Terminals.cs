@@ -50,9 +50,10 @@ public sealed partial class RemoteHookPipeline<TEvent>
     {
         ArgumentNullException.ThrowIfNull(handler);
         var kernel = RequiredKernel(irHandler);
+        var package = LocalTerminalPackage(kernel);
         return kernel.TryGetProjectedPayloadDecoder<TEvent>(out var decoder)
-            ? InstallLocal(kernel.Package, handler, decoder)
-            : InstallLocal(kernel.Package, handler);
+            ? InstallLocal(package, handler, decoder)
+            : InstallLocal(package, handler);
     }
 
     public RemoteHookPipeline<TEvent> RunLocal(

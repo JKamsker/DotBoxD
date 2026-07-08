@@ -9,13 +9,23 @@ public sealed class RemoteSubscriptionPipeline<TEvent>
 {
     private readonly Func<PluginPackage, ValueTask<string>> _install;
     private readonly RemoteLocalHandlerRegistry? _localHandlers;
+    private readonly RemotePipelineIr _pipelineIr;
 
     internal RemoteSubscriptionPipeline(
         Func<PluginPackage, ValueTask<string>> install,
         RemoteLocalHandlerRegistry? localHandlers = null)
+        : this(install, localHandlers, RemotePipelineIr.Empty)
+    {
+    }
+
+    private RemoteSubscriptionPipeline(
+        Func<PluginPackage, ValueTask<string>> install,
+        RemoteLocalHandlerRegistry? localHandlers,
+        RemotePipelineIr pipelineIr)
     {
         _install = install;
         _localHandlers = localHandlers;
+        _pipelineIr = pipelineIr;
     }
 
     public RemoteSubscriptionPipeline<TEvent> Use<TKernel>() where TKernel : class
@@ -185,32 +195,30 @@ public sealed class RemoteSubscriptionPipeline<TEvent>
         [IRBodyOf(nameof(filter))] IRFunc<TEvent, HookContext, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
-        _ = irFilter?.Step;
-        return this;
+        return AppendStep(irFilter, nameof(irFilter));
     }
     public RemoteSubscriptionPipeline<TEvent> Where(
         Func<TEvent, bool> filter,
         [IRBodyOf(nameof(filter))] IRFunc<TEvent, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
-        _ = irFilter?.Step;
-        return this;
+        return AppendStep(irFilter, nameof(irFilter));
     }
     public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>(
         Func<TEvent, HookContext, TNext> projection,
         [IRBodyOf(nameof(projection))] IRFunc<TEvent, HookContext, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
-        _ = irProjection?.Step;
-        return new RemoteSubscriptionStage<TEvent, TNext>(this);
+        return new RemoteSubscriptionStage<TEvent, TNext>(
+            AppendStep(irProjection, nameof(irProjection)));
     }
     public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>(
         Func<TEvent, TNext> projection,
         [IRBodyOf(nameof(projection))] IRFunc<TEvent, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
-        _ = irProjection?.Step;
-        return new RemoteSubscriptionStage<TEvent, TNext>(this);
+        return new RemoteSubscriptionStage<TEvent, TNext>(
+            AppendStep(irProjection, nameof(irProjection)));
     }
     public RemoteSubscriptionPipeline<TEvent> Run(
         Func<TEvent, HookContext, ValueTask> handler,
@@ -258,9 +266,10 @@ public sealed class RemoteSubscriptionPipeline<TEvent>
     {
         ArgumentNullException.ThrowIfNull(handler);
         var kernel = RequiredKernel(irHandler);
+        var package = LocalTerminalPackage(kernel);
         return kernel.TryGetProjectedPayloadDecoder<TEvent>(out var decoder)
-            ? InstallLocal(kernel.Package, handler, decoder)
-            : InstallLocal(kernel.Package, handler);
+            ? InstallLocal(package, handler, decoder)
+            : InstallLocal(package, handler);
     }
 
     public RemoteSubscriptionPipeline<TEvent> RunLocal(
@@ -296,10 +305,19 @@ public sealed class RemoteSubscriptionPipeline<TEvent>
     }
 
     private static IRKernel RequiredKernel(IRKernel? irHandler)
-    {
-        ArgumentNullException.ThrowIfNull(irHandler);
-        return irHandler;
-    }
+        => irHandler ?? throw new ArgumentNullException(nameof(irHandler));
+
+    internal RemoteSubscriptionPipeline<TEvent> AppendStep<TInput, TOutput>(IRFunc<TInput, TOutput>? irFunc, string parameterName)
+        => WithPipelineIr(_pipelineIr.Append(irFunc, parameterName));
+
+    internal RemoteSubscriptionPipeline<TEvent> AppendStep<TInput, TContext, TOutput>(IRFunc<TInput, TContext, TOutput>? irFunc, string parameterName)
+        => WithPipelineIr(_pipelineIr.Append(irFunc, parameterName));
+
+    internal PluginPackage LocalTerminalPackage(IRKernel kernel)
+        => _pipelineIr.ComposeLocalTerminalPackage(kernel);
+
+    private RemoteSubscriptionPipeline<TEvent> WithPipelineIr(RemotePipelineIr pipelineIr)
+        => new(_install, _localHandlers, pipelineIr);
 
     private static NotSupportedException LocalHandlersNotSupported()
         => new("Remote subscription RunLocal requires an event callback transport; use PluginServer.Subscriptions for local handlers.");

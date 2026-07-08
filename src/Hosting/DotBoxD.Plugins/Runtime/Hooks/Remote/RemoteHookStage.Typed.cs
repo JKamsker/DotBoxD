@@ -12,32 +12,32 @@ public sealed partial class RemoteHookStage<TEvent, TCurrent, TContext>
         [IRBodyOf(nameof(filter))] IRFunc<TCurrent, TContext, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
-        _ = irFilter?.Step;
-        return this;
+        return new RemoteHookStage<TEvent, TCurrent, TContext>(
+            _root.AppendStep(irFilter, nameof(irFilter)));
     }
     public RemoteHookStage<TEvent, TCurrent, TContext> Where(
         Func<TCurrent, bool> filter,
         [IRBodyOf(nameof(filter))] IRFunc<TCurrent, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
-        _ = irFilter?.Step;
-        return this;
+        return new RemoteHookStage<TEvent, TCurrent, TContext>(
+            _root.AppendStep(irFilter, nameof(irFilter)));
     }
     public RemoteHookStage<TEvent, TNext, TContext> Select<TNext>(
         Func<TCurrent, TContext, TNext> projection,
         [IRBodyOf(nameof(projection))] IRFunc<TCurrent, TContext, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
-        _ = irProjection?.Step;
-        return new RemoteHookStage<TEvent, TNext, TContext>(_root);
+        return new RemoteHookStage<TEvent, TNext, TContext>(
+            _root.AppendStep(irProjection, nameof(irProjection)));
     }
     public RemoteHookStage<TEvent, TNext, TContext> Select<TNext>(
         Func<TCurrent, TNext> projection,
         [IRBodyOf(nameof(projection))] IRFunc<TCurrent, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
-        _ = irProjection?.Step;
-        return new RemoteHookStage<TEvent, TNext, TContext>(_root);
+        return new RemoteHookStage<TEvent, TNext, TContext>(
+            _root.AppendStep(irProjection, nameof(irProjection)));
     }
 
     public RemoteHookPipeline<TEvent, TContext> UseGeneratedChain(PluginPackage package)
@@ -205,9 +205,10 @@ public sealed partial class RemoteHookStage<TEvent, TCurrent, TContext>
     {
         ArgumentNullException.ThrowIfNull(handler);
         var kernel = RequiredKernel(irHandler);
+        var package = _root.LocalTerminalPackage(kernel);
         return kernel.TryGetProjectedPayloadDecoder<TCurrent>(out var decoder)
-            ? _root.InstallLocal(kernel.Package, handler, decoder)
-            : _root.InstallLocal(kernel.Package, handler);
+            ? _root.InstallLocal(package, handler, decoder)
+            : _root.InstallLocal(package, handler);
     }
 
     public RemoteHookPipeline<TEvent, TContext> RunLocal(
