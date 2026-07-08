@@ -56,6 +56,28 @@ public sealed class PluginRuntimeTelemetryContractTests
             },
         };
 
+    public static TheoryData<Func<PluginExecutionObservation>> InterpretedSuccessCompiledTelemetryEnvelopes()
+        => new()
+        {
+            () => new PluginExecutionObservation(
+                "Handle",
+                ExecutionMode.Interpreted,
+                ExecutionMode.Interpreted,
+                Succeeded: true,
+                ErrorCode: null,
+                FallbackReason: null,
+                CacheStatus: "Hit",
+                RuntimeForm: "LoadedAssembly",
+                CacheKey: "cache-key",
+                ArtifactHash: "artifact-hash",
+                MaterializationStatus: "Miss"),
+            () => ValidObservation() with { CacheStatus = "Hit" },
+            () => ValidObservation() with { RuntimeForm = "LoadedAssembly" },
+            () => ValidObservation() with { CacheKey = "cache-key" },
+            () => ValidObservation() with { ArtifactHash = "artifact-hash" },
+            () => ValidObservation() with { MaterializationStatus = "Miss" },
+        };
+
     public static TheoryData<string, Func<ResultHookFault>> InvalidResultHookFaults()
         => new()
         {
@@ -98,6 +120,25 @@ public sealed class PluginRuntimeTelemetryContractTests
         var exception = Assert.ThrowsAny<ArgumentException>(() => _ = create());
 
         Assert.Equal(memberName, exception.ParamName);
+    }
+
+    [Theory]
+    [MemberData(nameof(InterpretedSuccessCompiledTelemetryEnvelopes))]
+    public void Plugin_execution_observation_rejects_interpreted_success_compiled_telemetry(
+        Func<PluginExecutionObservation> create)
+    {
+        var exception = Assert.ThrowsAny<ArgumentException>(() => _ = create());
+
+        Assert.Contains(
+            exception.ParamName,
+            new[]
+            {
+                nameof(PluginExecutionObservation.CacheStatus),
+                nameof(PluginExecutionObservation.RuntimeForm),
+                nameof(PluginExecutionObservation.CacheKey),
+                nameof(PluginExecutionObservation.ArtifactHash),
+                nameof(PluginExecutionObservation.MaterializationStatus),
+            });
     }
 
     [Theory]
