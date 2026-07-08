@@ -47,6 +47,14 @@ public sealed class HookPipelineResultHooksTests
             () => new HandleSubtypeAttribute(typeof(DamageCtx), "player", "", "combatant.player.read"));
         Assert.Throws<ArgumentException>(
             () => new HandleSubtypeAttribute(typeof(DamageCtx), "player", "combatant.player", ""));
+        Assert.Throws<ArgumentException>(
+            () => new HandleSubtypeAttribute(typeof(DamageCtx), "player", "combatant..player", "combatant.player.read"));
+        Assert.Throws<ArgumentException>(
+            () => new HandleSubtypeAttribute(
+                typeof(DamageCtx),
+                "player",
+                "combatant.player",
+                "combatant.player.bad\u0001id"));
     }
 
     [Fact]
