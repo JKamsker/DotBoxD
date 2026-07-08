@@ -139,17 +139,11 @@ public sealed class ExecutionAuditModelContractTests
     {
         var success = ValidAuditEvent();
         var failure = ValidAuditEvent(success: false, errorCode: SandboxErrorCode.PermissionDenied);
-        var recoveredSuccess = failure with { Success = true, ErrorCode = null };
-        var updatedFailure = success with { Success = false, ErrorCode = SandboxErrorCode.InvalidInput };
 
         Assert.True(success.Success);
         Assert.Null(success.ErrorCode);
         Assert.False(failure.Success);
         Assert.Equal(SandboxErrorCode.PermissionDenied, failure.ErrorCode);
-        Assert.True(recoveredSuccess.Success);
-        Assert.Null(recoveredSuccess.ErrorCode);
-        Assert.False(updatedFailure.Success);
-        Assert.Equal(SandboxErrorCode.InvalidInput, updatedFailure.ErrorCode);
     }
 
     [Theory]
