@@ -135,6 +135,60 @@ public sealed class ExecutionAuditModelContractTests
     }
 
     [Fact]
+    public void Audit_event_accepts_valid_terminal_states()
+    {
+        var success = ValidAuditEvent();
+        var failure = ValidAuditEvent(success: false, errorCode: SandboxErrorCode.PermissionDenied);
+        var recoveredSuccess = failure with { Success = true, ErrorCode = null };
+        var updatedFailure = success with { Success = false, ErrorCode = SandboxErrorCode.InvalidInput };
+
+        Assert.True(success.Success);
+        Assert.Null(success.ErrorCode);
+        Assert.False(failure.Success);
+        Assert.Equal(SandboxErrorCode.PermissionDenied, failure.ErrorCode);
+        Assert.True(recoveredSuccess.Success);
+        Assert.Null(recoveredSuccess.ErrorCode);
+        Assert.False(updatedFailure.Success);
+        Assert.Equal(SandboxErrorCode.InvalidInput, updatedFailure.ErrorCode);
+    }
+
+    [Theory]
+    [InlineData("SuccessWithError")]
+    [InlineData("FailureWithoutError")]
+    public void Audit_event_rejects_contradictory_terminal_state_on_construction(string terminalState)
+    {
+        AssertPublicTerminalArgumentException(() => _ = terminalState switch
+        {
+            "SuccessWithError" => ValidAuditEvent(errorCode: SandboxErrorCode.PermissionDenied),
+            "FailureWithoutError" => ValidAuditEvent(success: false),
+            _ => throw new ArgumentOutOfRangeException(nameof(terminalState))
+        });
+    }
+
+    [Theory]
+    [InlineData("SuccessWithError")]
+    [InlineData("SuccessByChangingFailure")]
+    [InlineData("FailureWithoutError")]
+    [InlineData("FailureByClearingError")]
+    public void Audit_event_rejects_contradictory_terminal_state_with_init(string terminalState)
+    {
+        AssertPublicTerminalArgumentException(() => _ = terminalState switch
+        {
+            "SuccessWithError" => ValidAuditEvent() with { ErrorCode = SandboxErrorCode.PermissionDenied },
+            "SuccessByChangingFailure" => ValidAuditEvent(success: false, errorCode: SandboxErrorCode.PermissionDenied) with
+            {
+                Success = true
+            },
+            "FailureWithoutError" => ValidAuditEvent() with { Success = false },
+            "FailureByClearingError" => ValidAuditEvent(success: false, errorCode: SandboxErrorCode.PermissionDenied) with
+            {
+                ErrorCode = null
+            },
+            _ => throw new ArgumentOutOfRangeException(nameof(terminalState))
+        });
+    }
+
+    [Fact]
     public void In_memory_audit_sink_rejects_null_events()
     {
         var sink = new InMemoryAuditSink();
@@ -170,12 +224,15 @@ public sealed class ExecutionAuditModelContractTests
     private static SandboxError ValidError()
         => new(SandboxErrorCode.InvalidInput, "invalid input");
 
-    private static SandboxAuditEvent ValidAuditEvent()
+    private static SandboxAuditEvent ValidAuditEvent(
+        bool success = true,
+        SandboxErrorCode? errorCode = null)
         => new(
             SandboxRunId.New(),
             BindingAuditKinds.BindingCall,
             DateTimeOffset.UtcNow,
-            true,
+            success,
+            ErrorCode: errorCode,
             Fields: new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["resourceKind"] = "test",
@@ -190,5 +247,13 @@ public sealed class ExecutionAuditModelContractTests
         var argumentException = Assert.IsAssignableFrom<ArgumentException>(exception);
 
         Assert.Equal(expectedParamName, argumentException.ParamName);
+    }
+
+    private static void AssertPublicTerminalArgumentException(Action action)
+    {
+        var exception = Record.Exception(action);
+        var argumentException = Assert.IsAssignableFrom<ArgumentException>(exception);
+
+        Assert.Contains(argumentException.ParamName, new[] { "ErrorCode", "Success" });
     }
 }
