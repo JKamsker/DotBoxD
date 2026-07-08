@@ -187,6 +187,15 @@ public sealed class ServiceExceptionCoverageTests
         Assert.Equal(kind, ex.Kind);
         Assert.Equal("missing", ex.Message);
     }
+
+    [Fact]
+    public void ServiceNotFoundException_WithUndefinedKind_ThrowsArgumentOutOfRangeException()
+    {
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new ServiceNotFoundException("missing", (ServiceNotFoundException.NotFoundKind)99));
+
+        Assert.Equal("kind", ex.ParamName);
+    }
 }
 
 /// <summary>
