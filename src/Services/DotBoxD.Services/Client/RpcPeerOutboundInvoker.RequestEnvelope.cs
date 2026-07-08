@@ -32,6 +32,11 @@ internal sealed partial class RpcPeerOutboundInvoker
             throw new ArgumentNullException(nameof(instanceId));
         }
 
+        if (string.IsNullOrWhiteSpace(instanceId))
+        {
+            throw new ArgumentException("Instance id must not be null, empty, or whitespace.", nameof(instanceId));
+        }
+
         return instanceId;
     }
 
@@ -60,8 +65,14 @@ internal sealed partial class RpcPeerOutboundInvoker
         string service,
         string method,
         string? instanceId,
-        RpcStreamAttachmentSet streams) =>
-        new()
+        RpcStreamAttachmentSet streams)
+    {
+        if (instanceId is not null)
+        {
+            instanceId = ValidateInstanceId(instanceId);
+        }
+
+        return new()
         {
             MessageId = messageId,
             ServiceName = service,
@@ -69,6 +80,7 @@ internal sealed partial class RpcPeerOutboundInvoker
             InstanceId = instanceId,
             Streams = CreateHandles(streams),
         };
+    }
 
     private static RpcStreamHandle[]? CreateHandles(RpcStreamAttachmentSet streams)
     {

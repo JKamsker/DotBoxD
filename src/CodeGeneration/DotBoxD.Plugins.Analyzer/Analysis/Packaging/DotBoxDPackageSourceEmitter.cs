@@ -18,6 +18,8 @@ internal static class DotBoxDPackageSourceEmitter
             builder.AppendLine();
         }
 
+        EmitPackageAttributes(builder, model.PackageAttributes);
+        EmitPackageAttributes(builder, model.GeneratedPackageAttributes);
         builder.Append("public static class ").Append(model.PackageName).AppendLine();
         builder.AppendLine("{");
         EmitBody(builder, model);
@@ -36,6 +38,14 @@ internal static class DotBoxDPackageSourceEmitter
 
     private static string HintNamePart(string value)
         => value.Replace(DotBoxDGenerationNames.CSharpIdentifiers.EscapePrefix, string.Empty);
+
+    private static void EmitPackageAttributes(StringBuilder builder, EquatableArray<string> attributes)
+    {
+        foreach (var attribute in attributes)
+        {
+            builder.AppendLine(attribute);
+        }
+    }
 
     private static void EmitBody(StringBuilder builder, PluginKernelModel model)
     {

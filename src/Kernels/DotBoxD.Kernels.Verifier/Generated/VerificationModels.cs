@@ -149,7 +149,10 @@ public sealed record VerificationManifestIdentity(
     }
 
     public static VerificationManifestIdentity FromManifest(ArtifactManifest manifest)
-        => new(
+    {
+        ArgumentNullException.ThrowIfNull(manifest);
+
+        return new(
             manifest.ArtifactVersion,
             manifest.CacheKey,
             manifest.ModuleHash,
@@ -164,23 +167,24 @@ public sealed record VerificationManifestIdentity(
             manifest.LanguageVersion,
             manifest.TargetFramework,
             manifest.OptimizationFlags);
+    }
 }
 
 public sealed record VerificationDiagnostic(string Code, string Message)
 {
-    private string _code = VerificationModelCopy.Required(Code, nameof(Code));
-    private string _message = VerificationModelCopy.Required(Message, nameof(Message));
+    private string _code = VerificationModelCopy.RequiredText(Code, nameof(Code));
+    private string _message = VerificationModelCopy.RequiredText(Message, nameof(Message));
 
     public string Code
     {
         get => _code;
-        init => _code = VerificationModelCopy.Required(value, nameof(Code));
+        init => _code = VerificationModelCopy.RequiredText(value, nameof(Code));
     }
 
     public string Message
     {
         get => _message;
-        init => _message = VerificationModelCopy.Required(value, nameof(Message));
+        init => _message = VerificationModelCopy.RequiredText(value, nameof(Message));
     }
 }
 
@@ -191,16 +195,16 @@ public sealed record VerificationResult(
     string VerifierVersion,
     DateTimeOffset VerifiedAt)
 {
-    private IReadOnlyList<VerificationDiagnostic> _diagnostics = VerificationModelCopy.List(
+    private IReadOnlyList<VerificationDiagnostic> _diagnostics = VerificationModelCopy.Diagnostics(
         Diagnostics,
-        nameof(Diagnostics));
+        Succeeded);
     private string _assemblyHash = VerificationModelCopy.Required(AssemblyHash, nameof(AssemblyHash));
     private string _verifierVersion = VerificationModelCopy.Required(VerifierVersion, nameof(VerifierVersion));
 
     public IReadOnlyList<VerificationDiagnostic> Diagnostics
     {
         get => _diagnostics;
-        init => _diagnostics = VerificationModelCopy.List(value, nameof(Diagnostics));
+        init => _diagnostics = VerificationModelCopy.Diagnostics(value, Succeeded);
     }
 
     public string AssemblyHash
@@ -222,6 +226,12 @@ internal static class VerificationModelCopy
         where T : class
         => value ?? throw new ArgumentNullException(paramName);
 
+    internal static string RequiredText(string? value, string paramName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value, paramName);
+        return value;
+    }
+
     internal static IReadOnlyList<T> List<T>(IEnumerable<T> values, string paramName)
     {
         ArgumentNullException.ThrowIfNull(values, paramName);
@@ -237,6 +247,25 @@ internal static class VerificationModelCopy
 
     internal static IReadOnlyList<T>? NullableList<T>(IEnumerable<T>? values, string paramName)
         => values is null ? null : List(values, paramName);
+
+    internal static IReadOnlyList<VerificationDiagnostic> Diagnostics(
+        IEnumerable<VerificationDiagnostic> values,
+        bool succeeded)
+        => RequireNoSuccessDiagnostics(List(values, nameof(VerificationResult.Diagnostics)), succeeded);
+
+    private static IReadOnlyList<VerificationDiagnostic> RequireNoSuccessDiagnostics(
+        IReadOnlyList<VerificationDiagnostic> diagnostics,
+        bool succeeded)
+    {
+        if (succeeded && diagnostics.Count > 0)
+        {
+            throw new ArgumentException(
+                "Succeeded verification results cannot include Diagnostics.",
+                nameof(VerificationResult.Diagnostics));
+        }
+
+        return diagnostics;
+    }
 }
 
 public interface IGeneratedAssemblyVerifier

@@ -141,6 +141,13 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
                 "Successful RPC response must not contain error fields.");
         }
 
+        if (!response.IsSuccess &&
+            (response.ErrorMessage is null || response.ErrorType is null))
+        {
+            throw new RpcEnvelopeValidationException(
+                "Error RPC response must contain error message and error type.");
+        }
+
         if (!response.IsSuccess && response.Stream is not null)
         {
             throw new RpcEnvelopeValidationException(

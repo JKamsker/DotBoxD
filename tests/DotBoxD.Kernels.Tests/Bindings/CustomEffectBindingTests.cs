@@ -150,7 +150,7 @@ public sealed class CustomEffectBindingTests
             SemVersion.One,
             [],
             SandboxType.I32,
-            SandboxEffect.Cpu,
+            SandboxEffects.Pure,
             "game.write",
             BindingCostModel.Fixed(1),
             AuditLevel.None,

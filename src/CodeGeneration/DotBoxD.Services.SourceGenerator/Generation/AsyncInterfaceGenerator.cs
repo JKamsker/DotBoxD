@@ -37,6 +37,7 @@ internal static class AsyncInterfaceGenerator
         sb.AppendLine($"    /// Auto-generated async sibling of <see cref=\"{service.InterfaceName}\"/>. Use this");
         sb.AppendLine($"    /// interface from callers that must not block on RPC calls.");
         sb.AppendLine("    /// </summary>");
+        ObsoleteAttributeEmitter.AppendIfPresent(sb, service.ObsoleteAttribute, "    ");
         sb.AppendLine($"    public interface {IdentifierHelpers.EscapeIdentifier(siblingName)}");
         sb.AppendLine("    {");
 
@@ -88,6 +89,7 @@ internal static class AsyncInterfaceGenerator
                 isLast: i == s.Parameters.Count - 1);
         }
 
+        ProxyGenerationHelpers.AppendAttributeLines(sb, s.Source.MemberAttributePrefix);
         sb.AppendLine($"        {returnText} {s.Name}({paramList});");
     }
 }
