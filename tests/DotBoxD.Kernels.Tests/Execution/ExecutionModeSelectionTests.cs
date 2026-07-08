@@ -197,7 +197,7 @@ public sealed class ExecutionModeSelectionTests
         Assert.Contains(result.AuditEvents, e => e.Kind == "InvalidExecutionOptions");
         Assert.DoesNotContain(result.AuditEvents, e => e.Kind == "CompilerUnavailable");
         var summary = Assert.Single(result.AuditEvents, e => e.Kind == "RunSummary");
-        Assert.Equal("123", summary.Fields!["mode"]);
+        Assert.Equal("Auto", summary.Fields!["mode"]);
         Assert.Equal("False", summary.Fields["executionDispatched"]);
     }
 

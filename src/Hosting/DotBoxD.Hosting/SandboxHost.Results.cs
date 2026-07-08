@@ -65,7 +65,7 @@ public sealed partial class SandboxHost
             ResourceId: $"module:{plan.ModuleHash}",
             ErrorCode: error.Code,
             Message: error.SafeMessage));
-        WriteFailedRunSummary(audit, runId, startedAt, plan, budget, options.Mode, error, false);
+        WriteFailedRunSummary(audit, runId, startedAt, plan, budget, ExecutionMode.Auto, error, false);
         return new SandboxExecutionResult
         {
             Succeeded = false,
