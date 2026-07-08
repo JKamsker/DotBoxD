@@ -10,7 +10,7 @@ public sealed class ExperimentalAttributeMetadataTests
     [Fact]
     public void ExperimentalAttributes_ArePreservedOnGeneratedServiceSurface()
     {
-        var (_, runResult) = Run(ExperimentalServiceSource);
+        var (_, runResult) = RunWithPreviewByRefLikeGenerics(ExperimentalServiceSource);
 
         var generated = runResult.Results.Single().GeneratedSources;
         var proxy = generated
@@ -19,7 +19,7 @@ public sealed class ExperimentalAttributeMetadataTests
             .SourceText.ToString()
             .Replace("\r\n", "\n");
         proxy.Should().Contain(
-            "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBXEXP001\")]\n" +
+            "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBXEXP001\", UrlFormat = \"https://example.test/{0}\", Message = \"Method is still settling\")]\n" +
             "        public global::System.Threading.Tasks.Task ExperimentalAsync()");
         proxy.Should().Contain(
             "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBXEXP002\")]\n" +
@@ -30,14 +30,14 @@ public sealed class ExperimentalAttributeMetadataTests
             .SourceText.ToString()
             .Replace("\r\n", "\n");
         asyncSibling.Should().Contain(
-            "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBXEXP001\")]\n" +
+            "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBXEXP001\", UrlFormat = \"https://example.test/{0}\", Message = \"Method is still settling\")]\n" +
             "        global::System.Threading.Tasks.Task ExperimentalAsync(");
     }
 
     [Fact]
     public void DirectCallsToGeneratedExperimentalSurface_ReportConfiguredDiagnostics()
     {
-        var (final, _) = Run(ExperimentalServiceSource);
+        var (final, _) = RunWithPreviewByRefLikeGenerics(ExperimentalServiceSource);
 
         var callSite = CSharpSyntaxTree.ParseText(
             """
@@ -54,7 +54,7 @@ public sealed class ExperimentalAttributeMetadataTests
                 }
             }
             """,
-            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Latest),
+            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview),
             path: "GeneratedSurfaceCallSite.cs");
 
         var diagnostics = final.AddSyntaxTrees(callSite).GetDiagnostics()
@@ -83,7 +83,7 @@ public sealed class ExperimentalAttributeMetadataTests
             [RpcService]
             public interface IRoot
             {
-                [Experimental("DBXEXP001")]
+                [Experimental("DBXEXP001", UrlFormat = "https://example.test/{0}", Message = "Method is still settling")]
                 Task ExperimentalAsync();
 
                 [Experimental("DBXEXP002")]

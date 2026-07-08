@@ -227,10 +227,16 @@ internal static class NullableFlowAttributeFormatter
 
         foreach (var namedArg in attr.NamedArguments)
         {
-            if (namedArg.Key == "UrlFormat" && namedArg.Value.Value is string urlFormat)
+            if (namedArg is { Key: "UrlFormat", Value.Value: string urlFormat })
             {
                 sb.Append(", UrlFormat = \"")
                     .Append(LiteralHelpers.EscapeStringLiteral(urlFormat))
+                    .Append('"');
+            }
+            else if (namedArg is { Key: "Message", Value.Value: string message })
+            {
+                sb.Append(", Message = \"")
+                    .Append(LiteralHelpers.EscapeStringLiteral(message))
                     .Append('"');
             }
         }
