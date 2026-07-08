@@ -9,16 +9,30 @@ internal static class RpcMethodMetadataAttributeSource
     {
         foreach (var attribute in method.GetAttributes())
         {
-            if (attribute.AttributeClass?.ToDisplayString() == "System.ObsoleteAttribute")
+            switch (attribute.AttributeClass?.ToDisplayString())
             {
-                AppendObsolete(builder, attribute, indent);
+                case "System.Diagnostics.CodeAnalysis.ExperimentalAttribute":
+                    AppendAttribute(
+                        builder,
+                        attribute,
+                        indent,
+                        "global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute");
+                    break;
+
+                case "System.ObsoleteAttribute":
+                    AppendAttribute(builder, attribute, indent, "global::System.ObsoleteAttribute");
+                    break;
             }
         }
     }
 
-    private static void AppendObsolete(StringBuilder builder, AttributeData attribute, string indent)
+    private static void AppendAttribute(
+        StringBuilder builder,
+        AttributeData attribute,
+        string indent,
+        string attributeType)
     {
-        builder.Append(indent).Append("[global::System.ObsoleteAttribute");
+        builder.Append(indent).Append('[').Append(attributeType);
         if (attribute.ConstructorArguments.Length > 0 || attribute.NamedArguments.Length > 0)
         {
             builder.Append('(');
@@ -75,7 +89,7 @@ internal static class RpcMethodMetadataAttributeSource
                 break;
 
             default:
-                throw new NotSupportedException("ObsoleteAttribute arguments must be null, string, or bool values.");
+                throw new NotSupportedException("Method metadata attribute arguments must be null, string, or bool values.");
         }
     }
 }
