@@ -12,6 +12,9 @@ public sealed class PluginServerExperimentalAttributeSurpriseTests
                     [Experimental("DBXEXP001")]
                     ValueTask<int> ExperimentalPingAsync();
 
+                    [Experimental("DBXEXP002", Message = "Use StablePingAsync.")]
+                    ValueTask<int> ExperimentalPingWithMessageAsync();
+
                     [Experimental("DBXEXP001")]
                     IMonsterControl ExperimentalMonsters { get; }
             """, """
@@ -38,6 +41,11 @@ public sealed class PluginServerExperimentalAttributeSurpriseTests
         Assert.Contains(
             "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBXEXP001\")]\n" +
             "    public global::System.Threading.Tasks.ValueTask<int> ExperimentalPingAsync(",
+            normalized,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBXEXP002\", Message = \"Use StablePingAsync.\")]\n" +
+            "    public global::System.Threading.Tasks.ValueTask<int> ExperimentalPingWithMessageAsync(",
             normalized,
             StringComparison.Ordinal);
         Assert.Contains(

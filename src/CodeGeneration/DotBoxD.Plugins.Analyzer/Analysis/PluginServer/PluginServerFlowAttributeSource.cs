@@ -206,16 +206,26 @@ internal static class PluginServerFlowAttributeSource
 
     private static string? ExperimentalAttribute(AttributeData attribute)
     {
-        if (attribute.ConstructorArguments.Length != 1 ||
+        if (attribute.ConstructorArguments is { Length: not (1 or 2) } ||
             attribute.ConstructorArguments[0].Value is not string diagnosticId)
         {
             return null;
         }
 
         var arguments = new List<string> { LiteralReader.StringLiteral(diagnosticId) };
+        if (attribute.ConstructorArguments.Length == 2)
+        {
+            if (attribute.ConstructorArguments[1].Value is not (null or string))
+            {
+                return null;
+            }
+
+            arguments.Add(LiteralReader.ObjectLiteral(attribute.ConstructorArguments[1].Value));
+        }
+
         foreach (var argument in attribute.NamedArguments)
         {
-            if (argument.Key != "UrlFormat" ||
+            if (argument.Key is not ("Message" or "UrlFormat") ||
                 argument.Value.Value is not (null or string))
             {
                 return null;
