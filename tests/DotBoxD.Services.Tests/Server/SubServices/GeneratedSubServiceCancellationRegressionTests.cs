@@ -35,7 +35,38 @@ public sealed class GeneratedSubServiceCancellationRegressionTests
 
         Assert.IsType<OperationCanceledException>(exception);
         Assert.Equal(1, service.CallCount);
-        Assert.False(registeredChild, $"Unexpected registered child handle {Format(handle)}.");
+        Assert.False(registeredChild);
+        Assert.Null(handle);
+        Assert.True(service.Child.Disposed);
+        Assert.Equal(0, output.WrittenCount);
+    }
+
+    [Fact]
+    public async Task Generated_dispatcher_releases_sub_service_when_registration_cancels_token()
+    {
+        using var cts = new CancellationTokenSource();
+        var service = new RegisterCancellationRootService();
+        var dispatcher = GeneratedServiceRegistry.CreateDispatcher<ISubServiceLifecycleRoot>(service);
+        var method = Assert.Single(
+            GeneratedServiceRegistry.GetService<ISubServiceLifecycleRoot>().Methods,
+            static candidate => candidate.Name == nameof(ISubServiceLifecycleRoot.CreateAsync));
+        var serializer = new MessagePackRpcSerializer();
+        var registry = new CancellingInstanceRegistry(cts);
+        var output = new ArrayBufferWriter<byte>();
+
+        var exception = await Record.ExceptionAsync(() =>
+            dispatcher.DispatchAsync(
+                method.WireName,
+                ReadOnlyMemory<byte>.Empty,
+                serializer,
+                registry,
+                output,
+                cts.Token));
+
+        Assert.IsType<OperationCanceledException>(exception);
+        Assert.Equal(1, service.CallCount);
+        Assert.Equal(1, registry.RegisterCount);
+        Assert.Equal(1, registry.ReleaseAsyncCount);
         Assert.True(service.Child.Disposed);
         Assert.Equal(0, output.WrittenCount);
     }
@@ -58,11 +89,6 @@ public sealed class GeneratedSubServiceCancellationRegressionTests
             instance is TrackingLifecycleChild;
     }
 
-    private static string Format(ServiceHandle? handle) =>
-        handle.HasValue
-            ? $"{handle.Value.ServiceName}/{handle.Value.InstanceId}"
-            : "<none>";
-
     private sealed class CancelBeforeReturnRootService(CancellationTokenSource cts) : ISubServiceLifecycleRoot
     {
         public TrackingLifecycleChild Child { get; } = new();
@@ -75,6 +101,50 @@ public sealed class GeneratedSubServiceCancellationRegressionTests
             cts.Cancel();
             return Task.FromResult<ISubServiceLifecycleChild>(Child);
         }
+    }
+
+    private sealed class RegisterCancellationRootService : ISubServiceLifecycleRoot
+    {
+        public TrackingLifecycleChild Child { get; } = new();
+
+        public int CallCount { get; private set; }
+
+        public Task<ISubServiceLifecycleChild> CreateAsync(CancellationToken ct = default)
+        {
+            CallCount++;
+            return Task.FromResult<ISubServiceLifecycleChild>(Child);
+        }
+    }
+
+    private sealed class CancellingInstanceRegistry(CancellationTokenSource cts) : IInstanceRegistry
+    {
+        private readonly InstanceRegistry _inner = new();
+
+        public int RegisterCount { get; private set; }
+
+        public int ReleaseAsyncCount { get; private set; }
+
+        public string Register(string serviceName, object instance)
+        {
+            RegisterCount++;
+            var id = _inner.Register(serviceName, instance);
+            cts.Cancel();
+            return id;
+        }
+
+        public bool TryGet(string serviceName, string instanceId, out object instance) =>
+            _inner.TryGet(serviceName, instanceId, out instance);
+
+        public void Release(string serviceName, string instanceId) =>
+            _inner.Release(serviceName, instanceId);
+
+        public async ValueTask ReleaseAsync(string serviceName, string instanceId)
+        {
+            ReleaseAsyncCount++;
+            await _inner.ReleaseAsync(serviceName, instanceId);
+        }
+
+        public void ReleaseAll() => _inner.ReleaseAll();
     }
 
     private sealed class TrackingLifecycleChild : ISubServiceLifecycleChild
