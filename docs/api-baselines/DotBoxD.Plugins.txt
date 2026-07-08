@@ -29,6 +29,7 @@ public bool Owns(string pluginId)
 public bool ReadBool()
 public bool Register<TEvent>( IPluginEventAdapter<TEvent> adapter, InstalledKernel kernel, IReadOnlyList<IndexedPredicate> predicates, bool indexCoversPredicate)
 public bool ResultLocalTerminal { get; init; }
+public bool Succeeded { get; init; }
 public bool TryGet(string pluginId, [MaybeNullWhen(false)] out InstalledKernel kernel)
 public bool TryGetOwned(string pluginId, [MaybeNullWhen(false)] out InstalledKernel kernel)
 public bool TryResolveErased(string eventName, out IErasedPluginEventAdapter adapter)
