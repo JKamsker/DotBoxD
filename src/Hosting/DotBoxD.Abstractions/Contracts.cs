@@ -243,6 +243,8 @@ public sealed class HookContext
 {
     public HookContext(IPluginMessageSink messages, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(messages);
+
         Messages = messages;
         CancellationToken = cancellationToken;
     }
