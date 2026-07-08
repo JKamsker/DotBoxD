@@ -125,68 +125,36 @@ public sealed class RemoteSubscriptionPipeline<TEvent>
 
     internal RemoteSubscriptionPipeline<TEvent> InstallLocal<TProjected>(PluginPackage package, Func<TProjected, HookContext, ValueTask> handler)
     {
-        ArgumentNullException.ThrowIfNull(package);
-        ArgumentNullException.ThrowIfNull(handler);
-        ValidateSubscription(package);
-        LocalTerminalManifestValidator.ValidateRunLocal<TProjected>(package);
-        if (_localHandlers is null)
-        {
-            throw LocalHandlersNotSupported();
-        }
-
-        var subscriptionId = LocalTerminalIdentity.CreateCallbackSubscriptionId();
-        var registration = _localHandlers.Register(subscriptionId, handler);
-        try
-        {
-            _install(LocalTerminalIdentity.WithCallbackSubscriptionId(package, subscriptionId))
-                .AsTask()
-                .GetAwaiter()
-                .GetResult();
-        }
-        catch
-        {
-            registration.Dispose();
-            throw;
-        }
-
+        var (subscriptionId, handlers) = PrepareLocalInstall(package, handler);
+        var registration = handlers.Register(subscriptionId, handler);
+        InstallWithRegistration(package, subscriptionId, registration);
         return this;
     }
 
     internal RemoteSubscriptionPipeline<TEvent> InstallLocal<TProjected>(PluginPackage package, Func<TProjected, HookContext, ValueTask> handler, Func<KernelRpcValue, TProjected> decoder)
     {
-        ArgumentNullException.ThrowIfNull(package);
-        ArgumentNullException.ThrowIfNull(handler);
         ArgumentNullException.ThrowIfNull(decoder);
-        ValidateSubscription(package);
-        LocalTerminalManifestValidator.ValidateRunLocal<TProjected>(package);
-        if (_localHandlers is null)
-        {
-            throw LocalHandlersNotSupported();
-        }
-
-        var subscriptionId = LocalTerminalIdentity.CreateCallbackSubscriptionId();
-        var registration = _localHandlers.Register(subscriptionId, handler, decoder);
-        try
-        {
-            _install(LocalTerminalIdentity.WithCallbackSubscriptionId(package, subscriptionId))
-                .AsTask()
-                .GetAwaiter()
-                .GetResult();
-        }
-        catch
-        {
-            registration.Dispose();
-            throw;
-        }
-
+        var (subscriptionId, handlers) = PrepareLocalInstall(package, handler);
+        var registration = handlers.Register(subscriptionId, handler, decoder);
+        InstallWithRegistration(package, subscriptionId, registration);
         return this;
     }
 
     internal RemoteSubscriptionPipeline<TEvent> InstallLocal<TProjected>(PluginPackage package, Func<TProjected, HookContext, ValueTask> handler, Func<ReadOnlyMemory<byte>, TProjected> decoder)
     {
+        ArgumentNullException.ThrowIfNull(decoder);
+        var (subscriptionId, handlers) = PrepareLocalInstall(package, handler);
+        var registration = handlers.Register(subscriptionId, handler, decoder);
+        InstallWithRegistration(package, subscriptionId, registration);
+        return this;
+    }
+
+    private (string SubscriptionId, RemoteLocalHandlerRegistry Handlers) PrepareLocalInstall<TProjected>(
+        PluginPackage package,
+        Func<TProjected, HookContext, ValueTask> handler)
+    {
         ArgumentNullException.ThrowIfNull(package);
         ArgumentNullException.ThrowIfNull(handler);
-        ArgumentNullException.ThrowIfNull(decoder);
         ValidateSubscription(package);
         LocalTerminalManifestValidator.ValidateRunLocal<TProjected>(package);
         if (_localHandlers is null)
@@ -194,8 +162,11 @@ public sealed class RemoteSubscriptionPipeline<TEvent>
             throw LocalHandlersNotSupported();
         }
 
-        var subscriptionId = LocalTerminalIdentity.CreateCallbackSubscriptionId();
-        var registration = _localHandlers.Register(subscriptionId, handler, decoder);
+        return (LocalTerminalIdentity.CreateCallbackSubscriptionId(), _localHandlers);
+    }
+
+    private void InstallWithRegistration(PluginPackage package, string subscriptionId, IDisposable registration)
+    {
         try
         {
             _install(LocalTerminalIdentity.WithCallbackSubscriptionId(package, subscriptionId))
@@ -208,8 +179,6 @@ public sealed class RemoteSubscriptionPipeline<TEvent>
             registration.Dispose();
             throw;
         }
-
-        return this;
     }
 
     [PipelineStep(PipelineStepRole.Filter)]
