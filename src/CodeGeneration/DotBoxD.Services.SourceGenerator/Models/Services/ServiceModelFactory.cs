@@ -137,6 +137,7 @@ internal static partial class ServiceModelFactory
         }
 
         WireNameValidator.MarkDuplicateWireNames(displayName, methods, methodLocations, methodDiagnostics, ct);
+        var experimentalAttribute = ExperimentalAttributeFormatter.From(interfaceSymbol);
 
         return new ServiceResult(
             Model: new ServiceModel(
@@ -145,7 +146,9 @@ internal static partial class ServiceModelFactory
                 ServiceName: LiteralHelpers.EscapeStringLiteral(serviceName),
                 Methods: methods.ToEquatableArray(),
                 Properties: properties.ToEquatableArray(),
-                RawServiceName: serviceName),
+                RawServiceName: serviceName,
+                TypeAttributePrefix: experimentalAttribute.AttributePrefix,
+                ExperimentalDiagnosticId: experimentalAttribute.DiagnosticId),
             Error: null,
             MethodDiagnostics: methodDiagnostics.ToEquatableArray(),
             MethodLocations: methodLocations.ToEquatableArray(),
