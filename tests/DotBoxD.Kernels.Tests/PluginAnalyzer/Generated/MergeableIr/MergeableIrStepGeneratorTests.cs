@@ -83,9 +83,11 @@ public sealed class MergeableIrStepGeneratorTests
 
             namespace Sample;
 
+            public sealed record SecretBox([property: Capability("probe.read.secret")] int Secret);
+
             public sealed record ProbeEvent(
-                [property: Capability("probe.read.secret")] int Secret,
-                [property: Capability("probe.read.id")] string Id);
+                [property: Capability("probe.read.unused")] int Unused,
+                SecretBox Box);
 
             public sealed class StepPipeline<T>
             {
@@ -110,14 +112,14 @@ public sealed class MergeableIrStepGeneratorTests
             public static class Usage
             {
                 public static StepPipeline<ProbeEvent> Configure(StepPipeline<ProbeEvent> pipeline)
-                    => pipeline.Where(e => e.Id == "target-1");
+                    => pipeline.Where(e => e.Box.Secret == 7);
             }
             """);
 
         var generated = GeneratedSource(result);
 
-        Assert.Contains("\"probe.read.id\"", generated, StringComparison.Ordinal);
-        Assert.DoesNotContain("probe.read.secret", generated, StringComparison.Ordinal);
+        Assert.Contains("\"probe.read.secret\"", generated, StringComparison.Ordinal);
+        Assert.DoesNotContain("probe.read.unused", generated, StringComparison.Ordinal);
     }
 
     [Fact]

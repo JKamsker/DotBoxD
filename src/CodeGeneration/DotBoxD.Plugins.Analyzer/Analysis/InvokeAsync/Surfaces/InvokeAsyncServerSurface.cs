@@ -38,9 +38,18 @@ internal static class InvokeAsyncServerSurface
             return false;
         }
 
-        return LowerToIrMethodReader.IsAnonymousInvocation(method, model.Compilation) ||
-            (string.Equals(method.Name, InvokeAsyncMethod, StringComparison.Ordinal) &&
-             IsPluginServerType(method.ContainingType, model.Compilation));
+        if (!string.Equals(method.Name, InvokeAsyncMethod, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (IsPluginServerType(method.ContainingType, model.Compilation))
+        {
+            return true;
+        }
+
+        return LowerToIrMethodReader.IsAnonymousInvocation(method, model.Compilation) &&
+            IsGeneratedPluginServerFacadeType(method.ContainingType);
     }
 
     public static bool BindsToUserInvokeAsync(
@@ -108,6 +117,10 @@ internal static class InvokeAsyncServerSurface
 
         return SymbolEqualityComparer.Default.Equals(named.OriginalDefinition, pluginServerType);
     }
+
+    private static bool IsGeneratedPluginServerFacadeType(ITypeSymbol? type)
+        => type is INamedTypeSymbol named &&
+           InvokeAsyncReceiverResolver.TryResolveGeneratedFacadeType(named, out _, out _, out _);
 
     private static SimpleNameSyntax? InvocationName(InvocationExpressionSyntax invocation)
         => invocation.Expression switch

@@ -44,6 +44,7 @@ export default defineConfig({
             { label: '1 · First service (RPC)', slug: 'tutorials/first-service' },
             { label: '2 · Event pipelines (RunLocal)', slug: 'tutorials/event-pipeline-runlocal' },
             { label: '3 · Pushdown server extension', slug: 'tutorials/pushdown-server-extension' },
+            { label: '4 · Hand-written IR hook pipeline', slug: 'tutorials/handwritten-ir-hook-pipeline' },
           ],
         },
         {

@@ -51,6 +51,38 @@ public sealed class InvokeAsyncGenerationTests
     }
 
     [Fact]
+    public void Marked_anonymous_invocation_on_non_server_receiver_is_not_classified_as_InvokeAsync()
+    {
+        var result = RunGenerator("""
+            using System;
+            using System.Threading.Tasks;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public sealed class CustomPipeline
+            {
+                [LowerToIrMethod(LoweredIrMethodKind.AnonymousInvocation)]
+                public ValueTask<int> Evaluate(Func<ValueTask<int>> lambda)
+                    => throw new InvalidOperationException("not lowered");
+            }
+
+            public static class Usage
+            {
+                public static ValueTask<int> Run(CustomPipeline pipeline)
+                    => pipeline.Evaluate(() => new ValueTask<int>(42));
+            }
+            """);
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.DoesNotContain(
+            result.Diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                          diagnostic.GetMessage().Contains("InvokeAsync", StringComparison.Ordinal));
+        Assert.DoesNotContain("AnonymousInvokeAsync", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Object_snapshot_member_access_generates_record_get_package()
     {
         var result = RunGenerator(ObjectSurfaceSource);

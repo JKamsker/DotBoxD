@@ -141,6 +141,7 @@ internal static partial class DotBoxDExpressionModelFactory
                 return null;
             }
 
+            CollectRecordMemberCapability(fields[i], context);
             return RecordGet(receiver, i, fields[i].Type, receiver.Allocates);
         }
 
