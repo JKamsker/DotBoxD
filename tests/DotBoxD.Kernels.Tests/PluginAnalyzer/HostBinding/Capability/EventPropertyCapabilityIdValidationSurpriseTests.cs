@@ -1,6 +1,6 @@
 using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 
-namespace DotBoxD.Kernels.Tests.PluginAnalyzer.HostBinding;
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.HostBinding.Capability;
 
 public sealed class EventPropertyCapabilityIdValidationSurpriseTests
 {

@@ -120,10 +120,30 @@ internal static class PluginSymbolReader
                     $"Capability on event property '{property.Name}' must not be empty or whitespace.");
             }
 
+            if (ContainsControlCharacter(id))
+            {
+                throw new NotSupportedException(
+                    $"Capability on event property '{property.Name}' has invalid capability id; " +
+                    "capability id must not contain control characters.");
+            }
+
             return id;
         }
 
         return null;
+    }
+
+    private static bool ContainsControlCharacter(string value)
+    {
+        for (var i = 0; i < value.Length; i++)
+        {
+            if (char.IsControl(value[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static EquatableArray<LiveSettingModel> LiveSettings(
