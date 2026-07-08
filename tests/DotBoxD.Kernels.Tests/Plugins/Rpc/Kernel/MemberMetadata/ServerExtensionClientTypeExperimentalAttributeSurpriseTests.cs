@@ -1,20 +1,14 @@
-using DotBoxD.Plugins;
-using DotBoxD.Plugins.Analyzer.Analysis;
-using DotBoxD.Services.Attributes;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
-namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
+namespace DotBoxD.Kernels.Tests.Plugins.Rpc.Kernel.MemberMetadata;
 
 public sealed class ServerExtensionClientTypeExperimentalAttributeSurpriseTests
 {
-    private static readonly CSharpParseOptions ParseOptions =
-        CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
-
     [Fact]
     public void Service_backed_generated_client_preserves_experimental_service_attribute()
     {
-        var result = RunGenerator(ServiceBackedSource);
+        var result = RpcMemberMetadataGeneratorHarness.RunGenerator(ServiceBackedSource);
         if (AssertFocusedFailClosedDiagnostic(result.GeneratorDiagnostics))
         {
             return;
@@ -26,6 +20,20 @@ public sealed class ServerExtensionClientTypeExperimentalAttributeSurpriseTests
             "EchoKernelServerExtensionClient",
             "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBXEXP_TYPE\")]");
         AssertDirectGeneratedClientUseReportsExperimentalDiagnostic(result.GeneratedTrees);
+    }
+
+    [Fact]
+    public void Service_backed_generated_client_skips_experimental_service_attribute_with_unsuppressible_id()
+    {
+        var result = RpcMemberMetadataGeneratorHarness.RunGenerator(
+            ServiceBackedSource.Replace("\"DBXEXP_TYPE\"", "\"DBX-EXP\"", StringComparison.Ordinal));
+
+        Assert.DoesNotContain(
+            result.GeneratedSources,
+            source => source.Contains("EchoKernelServerExtensionClient", StringComparison.Ordinal) &&
+                      source.Contains(
+                          "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBX-EXP\")]",
+                          StringComparison.Ordinal));
     }
 
     private static bool AssertFocusedFailClosedDiagnostic(IReadOnlyList<Diagnostic> diagnostics)
@@ -74,14 +82,14 @@ public sealed class ServerExtensionClientTypeExperimentalAttributeSurpriseTests
     {
         var syntaxTrees = new[]
             {
-                CSharpSyntaxTree.ParseText(ServiceBackedSource, ParseOptions),
-                CSharpSyntaxTree.ParseText(ConsumerSource, ParseOptions),
+                CSharpSyntaxTree.ParseText(ServiceBackedSource, RpcMemberMetadataGeneratorHarness.ParseOptions),
+                CSharpSyntaxTree.ParseText(ConsumerSource, RpcMemberMetadataGeneratorHarness.ParseOptions),
             }
             .Concat(generatedTrees);
         var compilation = CSharpCompilation.Create(
             "DotBoxDGeneratedPackageExperimentalTypeConsumerTest",
             syntaxTrees,
-            References(),
+            RpcMemberMetadataGeneratorHarness.References(),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var diagnostics = compilation.GetDiagnostics();
 
@@ -111,53 +119,6 @@ public sealed class ServerExtensionClientTypeExperimentalAttributeSurpriseTests
         var span = diagnostic.Location.GetLineSpan();
         var text = diagnostic.Location.SourceTree!.GetText();
         return text.Lines[span.StartLinePosition.Line].ToString();
-    }
-
-    private static (
-        IReadOnlyList<string> GeneratedSources,
-        Compilation OutputCompilation,
-        IReadOnlySet<SyntaxTree> GeneratedTrees,
-        IReadOnlyList<Diagnostic> GeneratorDiagnostics) RunGenerator(string source)
-    {
-        var compilation = CSharpCompilation.Create(
-            "DotBoxDGeneratedPackageExperimentalTypeTest",
-            [CSharpSyntaxTree.ParseText(source, ParseOptions)],
-            References(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            [new PluginPackageGenerator().AsSourceGenerator()],
-            parseOptions: ParseOptions);
-
-        driver = driver.RunGeneratorsAndUpdateCompilation(
-            compilation,
-            out var outputCompilation,
-            out var generatorDiagnostics);
-
-        var generatedTrees = driver.GetRunResult().GeneratedTrees.ToHashSet();
-        var generatedSources = generatedTrees
-            .Select(tree => tree.GetText().ToString())
-            .ToArray();
-        return (generatedSources, outputCompilation, generatedTrees, generatorDiagnostics);
-    }
-
-    private static IEnumerable<MetadataReference> References()
-    {
-        foreach (var reference in TrustedPlatformReferences())
-        {
-            yield return reference;
-        }
-
-        yield return MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location);
-        yield return MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location);
-        yield return MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location);
-        yield return MetadataReference.CreateFromFile(typeof(RpcServiceAttribute).Assembly.Location);
-    }
-
-    private static IEnumerable<MetadataReference> TrustedPlatformReferences()
-    {
-        var references = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))?
-            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries) ?? [];
-        return references.Select(reference => MetadataReference.CreateFromFile(reference));
     }
 
     private const string ConsumerSource = """

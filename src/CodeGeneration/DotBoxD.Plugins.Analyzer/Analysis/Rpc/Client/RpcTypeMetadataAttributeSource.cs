@@ -15,11 +15,15 @@ internal static class RpcTypeMetadataAttributeSource
             switch (attribute.AttributeClass?.ToDisplayString())
             {
                 case ExperimentalAttribute:
-                    AppendAttribute(
-                        builder,
-                        attribute,
-                        indent,
-                        "global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute");
+                    if (TryGetPragmaSafeExperimentalDiagnosticId(attribute, out _))
+                    {
+                        AppendAttribute(
+                            builder,
+                            attribute,
+                            indent,
+                            "global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute");
+                    }
+
                     break;
 
                 case ObsoleteAttribute:
@@ -34,13 +38,25 @@ internal static class RpcTypeMetadataAttributeSource
         foreach (var attribute in sourceType.GetAttributes())
         {
             if (attribute.AttributeClass?.ToDisplayString() == ExperimentalAttribute &&
-                attribute.ConstructorArguments.Length == 1 &&
-                attribute.ConstructorArguments[0].Value is string diagnosticId &&
-                IsPragmaWarningIdentifier(diagnosticId))
+                TryGetPragmaSafeExperimentalDiagnosticId(attribute, out var diagnosticId))
             {
                 yield return diagnosticId;
             }
         }
+    }
+
+    private static bool TryGetPragmaSafeExperimentalDiagnosticId(AttributeData attribute, out string diagnosticId)
+    {
+        if (attribute.ConstructorArguments.Length == 1 &&
+            attribute.ConstructorArguments[0].Value is string value &&
+            IsPragmaWarningIdentifier(value))
+        {
+            diagnosticId = value;
+            return true;
+        }
+
+        diagnosticId = "";
+        return false;
     }
 
     private static void AppendAttribute(

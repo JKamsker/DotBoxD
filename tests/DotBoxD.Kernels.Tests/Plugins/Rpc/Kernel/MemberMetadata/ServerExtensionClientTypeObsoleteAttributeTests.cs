@@ -1,30 +1,30 @@
-using DotBoxD.Plugins;
-using DotBoxD.Plugins.Analyzer.Analysis;
-using DotBoxD.Services.Attributes;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 
-namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
+namespace DotBoxD.Kernels.Tests.Plugins.Rpc.Kernel.MemberMetadata;
 
 public sealed class ServerExtensionClientTypeObsoleteAttributeTests
 {
     [Fact]
     public void Service_backed_generated_client_preserves_obsolete_service_attribute()
     {
-        var (generatedSources, outputCompilation, generatedTrees) = RunGenerator(ServiceBackedSource);
-        var generatedDiagnostics = outputCompilation.GetDiagnostics()
-            .Where(diagnostic => IsGeneratedDiagnostic(diagnostic, generatedTrees))
+        var result = RpcMemberMetadataGeneratorHarness.RunGenerator(ServiceBackedSource);
+        var generatedDiagnostics = result.OutputCompilation.GetDiagnostics()
+            .Where(diagnostic => IsGeneratedDiagnostic(diagnostic, result.GeneratedTrees))
             .ToArray();
 
+        Assert.DoesNotContain(
+            result.GeneratorDiagnostics,
+            diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
         Assert.DoesNotContain(generatedDiagnostics, diagnostic => diagnostic.Id == "CS0618");
         AssertGeneratedSourceContains(
-            generatedSources,
+            result.GeneratedSources,
             "EchoKernelServerExtensionClient",
             "[global::System.ObsoleteAttribute(\"Use INew\")]");
         AssertGeneratedSourceContains(
-            generatedSources,
+            result.GeneratedSources,
             "EchoKernelServerExtensionClient",
             "public sealed class EchoKernelServerExtensionClient : global::Sample.IEchoService");
+
     }
 
     private static bool IsGeneratedDiagnostic(
@@ -40,46 +40,6 @@ public sealed class ServerExtensionClientTypeObsoleteAttributeTests
             generatedSources,
             source => source.Contains(generatedTypeName, StringComparison.Ordinal) &&
                       source.Contains(expectedSource, StringComparison.Ordinal));
-
-    private static (
-        IReadOnlyList<string> GeneratedSources,
-        Compilation OutputCompilation,
-        IReadOnlySet<SyntaxTree> GeneratedTrees) RunGenerator(string source)
-    {
-        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
-        var compilation = CSharpCompilation.Create(
-            "DotBoxDGeneratedPackageRuntimeTest",
-            [CSharpSyntaxTree.ParseText(source, parseOptions)],
-            TrustedPlatformReferences()
-                .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
-                .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
-                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
-                .Append(MetadataReference.CreateFromFile(typeof(RpcServiceAttribute).Assembly.Location)),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            [new PluginPackageGenerator().AsSourceGenerator()],
-            parseOptions: parseOptions);
-
-        driver = driver.RunGeneratorsAndUpdateCompilation(
-            compilation,
-            out var outputCompilation,
-            out var generatorDiagnostics);
-
-        Assert.Empty(generatorDiagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
-
-        var generatedTrees = driver.GetRunResult().GeneratedTrees.ToHashSet();
-        var generatedSources = generatedTrees
-            .Select(tree => tree.GetText().ToString())
-            .ToArray();
-        return (generatedSources, outputCompilation, generatedTrees);
-    }
-
-    private static IEnumerable<MetadataReference> TrustedPlatformReferences()
-    {
-        var references = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))?
-            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries) ?? [];
-        return references.Select(reference => MetadataReference.CreateFromFile(reference));
-    }
 
     private const string ServiceBackedSource = """
         #pragma warning disable CS0618
