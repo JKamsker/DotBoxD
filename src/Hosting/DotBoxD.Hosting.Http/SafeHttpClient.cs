@@ -16,6 +16,8 @@ public static class SafeHttpClient
         SafeDnsResolver? dnsResolver,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(uri);
         if (cancellationToken.IsCancellationRequested || context.CancellationToken.IsCancellationRequested)
         {
             throw Error(SandboxErrorCode.Cancelled, "net.http.get cancelled");
