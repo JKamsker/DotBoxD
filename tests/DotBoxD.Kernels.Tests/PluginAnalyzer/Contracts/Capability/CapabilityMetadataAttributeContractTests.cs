@@ -1,4 +1,4 @@
-namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Contracts;
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Contracts.Capability;
 
 public sealed class CapabilityMetadataAttributeContractTests
 {
