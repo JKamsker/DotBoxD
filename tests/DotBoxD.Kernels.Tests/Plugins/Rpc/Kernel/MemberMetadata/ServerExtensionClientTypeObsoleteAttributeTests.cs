@@ -9,37 +9,24 @@ public sealed class ServerExtensionClientTypeObsoleteAttributeTests
     {
         var result = RpcMemberMetadataGeneratorHarness.RunGenerator(ServiceBackedSource);
         var generatedDiagnostics = result.OutputCompilation.GetDiagnostics()
-            .Where(diagnostic => IsGeneratedDiagnostic(diagnostic, result.GeneratedTrees))
+            .Where(diagnostic => RpcMemberMetadataGeneratorHarness.IsGeneratedDiagnostic(
+                diagnostic,
+                result.GeneratedTrees))
             .ToArray();
 
         Assert.DoesNotContain(
             result.GeneratorDiagnostics,
             diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
         Assert.DoesNotContain(generatedDiagnostics, diagnostic => diagnostic.Id == "CS0618");
-        AssertGeneratedSourceContains(
+        RpcMemberMetadataGeneratorHarness.AssertGeneratedSourceContains(
             result.GeneratedSources,
             "EchoKernelServerExtensionClient",
             "[global::System.ObsoleteAttribute(\"Use INew\")]");
-        AssertGeneratedSourceContains(
+        RpcMemberMetadataGeneratorHarness.AssertGeneratedSourceContains(
             result.GeneratedSources,
             "EchoKernelServerExtensionClient",
             "public sealed class EchoKernelServerExtensionClient : global::Sample.IEchoService");
-
     }
-
-    private static bool IsGeneratedDiagnostic(
-        Diagnostic diagnostic,
-        IReadOnlySet<SyntaxTree> generatedTrees)
-        => diagnostic.Location.SourceTree is { } tree && generatedTrees.Contains(tree);
-
-    private static void AssertGeneratedSourceContains(
-        IReadOnlyList<string> generatedSources,
-        string generatedTypeName,
-        string expectedSource)
-        => Assert.Contains(
-            generatedSources,
-            source => source.Contains(generatedTypeName, StringComparison.Ordinal) &&
-                      source.Contains(expectedSource, StringComparison.Ordinal));
 
     private const string ServiceBackedSource = """
         #pragma warning disable CS0618

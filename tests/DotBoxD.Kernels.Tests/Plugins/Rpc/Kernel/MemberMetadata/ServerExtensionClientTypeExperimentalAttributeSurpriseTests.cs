@@ -9,13 +9,10 @@ public sealed class ServerExtensionClientTypeExperimentalAttributeSurpriseTests
     public void Service_backed_generated_client_preserves_experimental_service_attribute()
     {
         var result = RpcMemberMetadataGeneratorHarness.RunGenerator(ServiceBackedSource);
-        if (AssertFocusedFailClosedDiagnostic(result.GeneratorDiagnostics))
-        {
-            return;
-        }
 
+        AssertNoGeneratorErrors(result.GeneratorDiagnostics);
         AssertNoGeneratedExperimentalDiagnostics(result.OutputCompilation, result.GeneratedTrees);
-        AssertGeneratedSourceContains(
+        RpcMemberMetadataGeneratorHarness.AssertGeneratedSourceContains(
             result.GeneratedSources,
             "EchoKernelServerExtensionClient",
             "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBXEXP_TYPE\")]");
@@ -34,26 +31,16 @@ public sealed class ServerExtensionClientTypeExperimentalAttributeSurpriseTests
                       source.Contains(
                           "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBX-EXP\")]",
                           StringComparison.Ordinal));
+        RpcMemberMetadataGeneratorHarness.AssertGeneratedSourceContains(
+            result.GeneratedSources,
+            "EchoKernelServerExtensionClient",
+            "public sealed class EchoKernelServerExtensionClient");
     }
 
-    private static bool AssertFocusedFailClosedDiagnostic(IReadOnlyList<Diagnostic> diagnostics)
-    {
-        var failClosedDiagnostics = diagnostics
-            .Where(diagnostic => diagnostic.Id.StartsWith("DBXK", StringComparison.Ordinal))
-            .ToArray();
-        if (failClosedDiagnostics.Length == 0)
-        {
-            Assert.DoesNotContain(
-                diagnostics,
-                diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
-            return false;
-        }
-
-        Assert.All(
-            failClosedDiagnostics,
-            diagnostic => Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity));
-        return true;
-    }
+    private static void AssertNoGeneratorErrors(IReadOnlyList<Diagnostic> diagnostics)
+        => Assert.DoesNotContain(
+            diagnostics,
+            diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
 
     private static void AssertNoGeneratedExperimentalDiagnostics(
         Compilation compilation,
@@ -61,21 +48,13 @@ public sealed class ServerExtensionClientTypeExperimentalAttributeSurpriseTests
     {
         var generatedDiagnostics = compilation.GetDiagnostics()
             .Where(diagnostic => diagnostic.Id == "DBXEXP_TYPE" &&
-                                 diagnostic.Location.SourceTree is { } tree &&
-                                 generatedTrees.Contains(tree))
+                                 RpcMemberMetadataGeneratorHarness.IsGeneratedDiagnostic(
+                                     diagnostic,
+                                     generatedTrees))
             .ToArray();
 
         Assert.Empty(generatedDiagnostics);
     }
-
-    private static void AssertGeneratedSourceContains(
-        IReadOnlyList<string> generatedSources,
-        string generatedTypeName,
-        string expectedSource)
-        => Assert.Contains(
-            generatedSources,
-            source => source.Contains(generatedTypeName, StringComparison.Ordinal) &&
-                      source.Contains(expectedSource, StringComparison.Ordinal));
 
     private static void AssertDirectGeneratedClientUseReportsExperimentalDiagnostic(
         IReadOnlySet<SyntaxTree> generatedTrees)

@@ -57,6 +57,20 @@ internal static class RpcMemberMetadataGeneratorHarness
         yield return MetadataReference.CreateFromFile(typeof(RpcServiceAttribute).Assembly.Location);
     }
 
+    public static bool IsGeneratedDiagnostic(
+        Diagnostic diagnostic,
+        IReadOnlySet<SyntaxTree> generatedTrees)
+        => diagnostic.Location.SourceTree is { } tree && generatedTrees.Contains(tree);
+
+    public static void AssertGeneratedSourceContains(
+        IReadOnlyList<string> generatedSources,
+        string generatedTypeName,
+        string expectedSource)
+        => Assert.Contains(
+            generatedSources,
+            source => source.Contains(generatedTypeName, StringComparison.Ordinal) &&
+                      source.Contains(expectedSource, StringComparison.Ordinal));
+
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()
     {
         var references = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))?
