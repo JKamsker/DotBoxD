@@ -24,6 +24,7 @@ public sealed partial class PluginServer
     {
         var opts = options ?? DefaultWireOptions;
         var (erased, terminal, callbacks) = Prepare(kernel, opts);
+        ThrowIfDisposed();
         erased.WireHook(Hooks, kernel, terminal, callbacks);
         return new WireResult(erased.EventType, erased.EventName, terminal);
     }
@@ -41,6 +42,7 @@ public sealed partial class PluginServer
     {
         var opts = options ?? DefaultWireOptions;
         var (erased, terminal, callbacks) = Prepare(kernel, opts);
+        ThrowIfDisposed();
         var indexRegistry = opts.UseIndex ? opts.IndexRegistry : null;
         erased.WireSubscription(Subscriptions, kernel, terminal, callbacks, indexRegistry);
         return new WireResult(erased.EventType, erased.EventName, terminal);
