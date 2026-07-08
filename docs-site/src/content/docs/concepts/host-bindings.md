@@ -6,15 +6,15 @@ Host bindings are how a kernel calls host-owned APIs without giving sandboxed co
 access. The host chooses the callable surface, registers descriptors for it, grants capabilities in a
 policy, and the kernel can only call those registered binding ids.
 
-This already supports arbitrary external APIs. "Arbitrary" means any host API can be wrapped by the
+This already supports arbitrary external APIs, in the sense that any host API can be wrapped by the
 host. It does not mean a plugin can name and invoke arbitrary .NET methods from sandboxed code.
 
 ## Recommended route: host services
 
 For normal host APIs, define a service contract and register its implementation with
 `SandboxHostBuilder.AddBindingsFrom<TService>()`. The analyzer lowers calls to the service into
-verified kernel IR, while the host registration creates matching runtime bindings from the same
-contract metadata.
+verified kernel IR (intermediate representation), while the host registration creates matching runtime
+bindings from the same contract metadata.
 
 ```csharp
 using DotBoxD.Abstractions;

@@ -5,7 +5,7 @@ description: 'An event pipeline lets a plugin react to a host event without rece
 An **event pipeline** lets a plugin react to a host event *without receiving every event over the wire*. You
 author one fluent chain — `server.Hooks.On<TEvent>().Where(...).Select(...).<terminal>(...)` — and the
 [`DotBoxD.Plugins.Analyzer`](https://github.com/JKamsker/DotBoxD/tree/main/src/CodeGeneration/DotBoxD.Plugins.Analyzer)
-lowers the `Where` filter and `Select` projection to verified server-side [kernel IR](/concepts/kernels/). The host
+lowers the `Where` filter and `Select` projection to verified server-side [kernel IR](/concepts/kernels/) — a restricted intermediate representation. The host
 does the matching and shaping first, so only the values you actually asked for cross the pipe — and only for
 events that pass the filter. It is the event-push counterpart to [Pushdown](/concepts/pushdown/): both move author
 logic next to the host's data instead of round-tripping.

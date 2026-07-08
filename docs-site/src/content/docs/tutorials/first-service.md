@@ -355,7 +355,7 @@ generated `[RpcService]` proxy, dispatcher, and `Provide`/`Get` extensions are i
 - [**Event pipelines (RunLocal)**](/tutorials/event-pipeline-runlocal/) — the next tutorial: subscribe to a
   server event, push the `Where`/`Select` filter server-side, and react locally.
 - [Services concepts](/concepts/services/) — the dispatch model, peers/hosts, and streaming.
-- [Kernels concept](/concepts/kernels/) — run *validated client logic* inside a metered
+- [Kernels concept](/concepts/kernels/) — run *validated client logic* inside a fuel-metered
   sandbox (the second of the three modes).
 - [Project README](https://github.com/JKamsker/DotBoxD/blob/main/README.md) — the three modes side by side, the full package matrix, and the
   security/trust boundary.

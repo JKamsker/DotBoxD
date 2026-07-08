@@ -26,8 +26,8 @@ Or reference individual packages — see the table in the root [README](https://
 Host↔plugin communication usually forces a choice between hand-written marshaling (request envelopes and
 matching each response back to its call — repetitive, easy to get subtly wrong) and a chatty stream the
 client has to filter after the fact. DotBoxD starts from **one C# contract** and lowers it (compiles it
-down to a restricted lower-level form) at compile time — no runtime reflection on the hot path — into
-whichever of **three delivery strategies** fits the call shape:
+down to a restricted IR, an intermediate representation) at compile time — no runtime reflection on the
+hot path — into whichever of **three delivery strategies** fits the call shape:
 
 - **Services (RPC):** typed request→response.
 - **Query (RunLocal):** server-side filter + projection, one-way push to the plugin.
