@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Runtime.Rpc;
@@ -129,6 +130,20 @@ public sealed partial class KernelRpcMarshallerSurpriseTests
     }
 
     [Fact]
+    public void Runtime_marshaller_excludes_serializer_ignored_computed_getters_from_record_shape()
+    {
+        var jsonIgnored = KernelRpcMarshaller.ToSandboxValue(
+            new JsonIgnoredComputedDto(0),
+            typeof(JsonIgnoredComputedDto));
+        var messagePackIgnored = KernelRpcMarshaller.ToSandboxValue(
+            new MessagePackIgnoredComputedDto(0),
+            typeof(MessagePackIgnoredComputedDto));
+
+        Assert.Equal(SandboxValue.FromRecord([SandboxValue.FromInt32(0)]), jsonIgnored);
+        Assert.Equal(SandboxValue.FromRecord([SandboxValue.FromInt32(0)]), messagePackIgnored);
+    }
+
+    [Fact]
     public void ToSandboxValue_accepts_reconstructible_defensive_copy_read_only_array()
     {
         var sandbox = KernelRpcMarshaller.ToSandboxValue(
@@ -203,6 +218,22 @@ public sealed partial class KernelRpcMarshallerSurpriseTests
         public int Y { get; } = y;
 
         public int Sum => X + Y;
+    }
+
+    private sealed class JsonIgnoredComputedDto(int value)
+    {
+        public int Value { get; } = value;
+
+        [JsonIgnore]
+        public bool IsEmpty => Value == 0;
+    }
+
+    private sealed class MessagePackIgnoredComputedDto(int value)
+    {
+        public int Value { get; } = value;
+
+        [MessagePack.IgnoreMember]
+        public bool IsEmpty => Value == 0;
     }
 
     private sealed class DefensiveCopyReadOnlyArrayDto(int[] values)
