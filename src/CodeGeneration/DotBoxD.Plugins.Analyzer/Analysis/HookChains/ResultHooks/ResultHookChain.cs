@@ -113,6 +113,7 @@ internal static partial class ResultHookChain
             Namespace: HookChainIdentity.Namespace(invocation),
             KernelName: kernelName,
             PackageName: kernelName + DotBoxDGenerationNames.PluginPackageSuffix,
+            GeneratedAttributeSource: ExperimentalAttributeSource.FromTypes(contextType, resultType),
             EventName: hookName,
             EventParameterName: DotBoxDGenerationNames.DefaultEventParameterName,
             ContextParameterName: terminalContextParam ?? DotBoxDGenerationNames.DefaultContextParameterName,

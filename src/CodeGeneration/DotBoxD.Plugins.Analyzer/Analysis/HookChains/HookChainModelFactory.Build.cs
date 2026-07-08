@@ -156,6 +156,9 @@ internal static partial class HookChainModelFactory
             Namespace: HookChainIdentity.Namespace(invocation),
             KernelName: kernelName,
             PackageName: kernelName + "PluginPackage",
+            GeneratedAttributeSource: ExperimentalAttributeSource.FromTypes(
+                eventShape.EventType,
+                lowered.ProjectedTypeSymbol),
             EventName: EventTypeName.HookOrQualified(eventShape.EventType),
             EventParameterName: DotBoxDGenerationNames.DefaultEventParameterName,
             ContextParameterName: prepared.TerminalContextParam ?? DotBoxDGenerationNames.DefaultContextParameterName,

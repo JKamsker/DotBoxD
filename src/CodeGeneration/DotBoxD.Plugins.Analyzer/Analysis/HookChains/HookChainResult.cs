@@ -110,6 +110,7 @@ internal enum HookChainInterceptorInstallKind
 /// </summary>
 internal sealed record HookChainInterception(
     string AttributeSyntax,
+    string GeneratedAttributeSource,
     string ReceiverTypeFullName,
     string HandlerTypeFullName,
     string ReturnTypeFullName,

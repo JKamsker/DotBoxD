@@ -169,6 +169,7 @@ internal static class PluginKernelModelFactory
             Namespace: type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString(),
             KernelName: type.Name,
             PackageName: PackageName(type.Name),
+            GeneratedAttributeSource: string.Empty,
             EventName: EventTypeName.HookOrQualified(eventType),
             EventParameterName: eventParameterName,
             ContextParameterName: contextParameterName,
