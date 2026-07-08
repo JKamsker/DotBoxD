@@ -26,6 +26,38 @@ internal static class BindingDescriptorRequiredFieldValidator
         return diagnostics.Count == count;
     }
 
+    public static bool Validate(BindingSignature binding, ICollection<SandboxDiagnostic> diagnostics)
+    {
+        var count = diagnostics.Count;
+        var parameters = binding.Parameters;
+
+        AddDiagnosticIfNull(binding.Id, nameof(BindingSignature.Id), diagnostics);
+        AddDiagnosticIfNull(binding.Version, nameof(BindingSignature.Version), diagnostics);
+        AddDiagnosticIfNull(parameters, nameof(BindingSignature.Parameters), diagnostics);
+        AddDiagnosticIfNull(binding.ReturnType, nameof(BindingSignature.ReturnType), diagnostics);
+        AddDiagnosticIfNull(binding.CostModel, nameof(BindingSignature.CostModel), diagnostics);
+        AddDiagnosticIfNull(binding.Compiled, nameof(BindingSignature.Compiled), diagnostics);
+
+        if (parameters is not null)
+        {
+            ValidateParameters(parameters, diagnostics);
+        }
+
+        return diagnostics.Count == count;
+    }
+
+    public static bool HasRequiredFields(BindingSignature binding)
+    {
+        var parameters = binding.Parameters;
+        return binding.Id is not null &&
+            binding.Version is not null &&
+            parameters is not null &&
+            binding.ReturnType is not null &&
+            binding.CostModel is not null &&
+            binding.Compiled is not null &&
+            ParametersAreNonNull(parameters);
+    }
+
     private static void ValidateParameters(
         IReadOnlyList<SandboxType> parameters,
         ICollection<SandboxDiagnostic> diagnostics)
@@ -38,6 +70,19 @@ internal static class BindingDescriptorRequiredFieldValidator
                 return;
             }
         }
+    }
+
+    private static bool ParametersAreNonNull(IReadOnlyList<SandboxType> parameters)
+    {
+        for (var i = 0; i < parameters.Count; i++)
+        {
+            if (parameters[i] is null)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static void AddDiagnosticIfNull(

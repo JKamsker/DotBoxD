@@ -18,6 +18,7 @@ public sealed class ModuleValidatorCustomCatalogRequiredFieldTests
     [InlineData("CostModel", "CostModel")]
     [InlineData("Compiled", "Compiled")]
     [InlineData("ParameterElement", "Parameters")]
+    [InlineData("Id", "Id")]
     public void ModuleValidator_reports_required_field_diagnostic_for_malformed_custom_catalog_binding(
         string malformedField,
         string expectedField)
@@ -34,7 +35,7 @@ public sealed class ModuleValidatorCustomCatalogRequiredFieldTests
         Assert.False(result.Succeeded);
         Assert.Contains(result.Diagnostics, diagnostic =>
             diagnostic.Code == "E-BINDING-REQUIRED" &&
-            diagnostic.Message.Contains("binding signature", StringComparison.OrdinalIgnoreCase) &&
+            diagnostic.Message.Contains("binding descriptor", StringComparison.OrdinalIgnoreCase) &&
             diagnostic.Message.Contains(expectedField, StringComparison.Ordinal));
     }
 
@@ -62,6 +63,7 @@ public sealed class ModuleValidatorCustomCatalogRequiredFieldTests
         var signature = ValidSignature();
         return field switch
         {
+            "Id" => signature with { Id = null! },
             "Version" => signature with { Version = null! },
             "ReturnType" => signature with { ReturnType = null! },
             "CostModel" => signature with { CostModel = null! },
