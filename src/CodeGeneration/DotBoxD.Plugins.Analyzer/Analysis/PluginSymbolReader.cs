@@ -220,12 +220,17 @@ internal static class PluginSymbolReader
     {
         var syntax = DeclaringPropertySyntax(property, cancellationToken);
         var type = DotBoxDTypeNameReader.LiveSettingTypeName(property.Type);
-        var range = PluginLiveSettingRangeReader.Read(property, type);
+        var defaultValue = LiteralReader.DefaultObjectValue(
+            property.Type,
+            syntax?.Initializer?.Value,
+            semanticModel,
+            cancellationToken);
+        var range = PluginLiveSettingRangeReader.Read(property, type, defaultValue);
         return new LiveSettingModel(
             property.Name,
             type,
             LiveSettingSymbolKey(property),
-            LiteralReader.DefaultValue(property.Type, syntax?.Initializer?.Value, semanticModel, cancellationToken),
+            LiteralReader.ObjectLiteral(defaultValue),
             range.Min,
             range.Max);
     }
