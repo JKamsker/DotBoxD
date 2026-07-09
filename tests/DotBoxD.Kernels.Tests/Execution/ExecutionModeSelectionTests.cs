@@ -291,8 +291,7 @@ public sealed class ExecutionModeSelectionTests
         Assert.Contains(result.AuditEvents, e =>
             e.Kind == "RunSummary" && !e.Success && e.ErrorCode == SandboxErrorCode.HostFailure);
     }
-    private static SandboxHost HostWithCompiler(ISandboxCompiler compiler)
-        => SandboxHost.Create(builder =>
+    private static SandboxHost HostWithCompiler(ISandboxCompiler compiler) => SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();

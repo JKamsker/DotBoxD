@@ -45,9 +45,7 @@ public enum CompiledCacheStatus
     Recompiled
 }
 
-/// <summary>
-/// Describes the result of reading a compiled artifact from the persistent cache.
-/// </summary>
+/// <summary>Describes the result of reading a compiled artifact from the persistent cache.</summary>
 /// <remarks>
 /// A <see cref="CompiledCacheStatus.Hit"/> result must include an artifact and cannot include an invalid reason.
 /// <see cref="CompiledCacheStatus.Miss"/> and <see cref="CompiledCacheStatus.Invalid"/> results cannot include
@@ -62,9 +60,7 @@ public sealed record CompiledCacheLookup(
     private CompiledArtifact? _artifact = ValidateArtifact(Status, Artifact, InvalidReason);
     private string? _invalidReason = ValidateInvalidReason(Status, Artifact, InvalidReason);
 
-    /// <summary>
-    /// Gets the cache lookup state. Only hit, miss, and invalid are valid lookup states.
-    /// </summary>
+    /// <summary>Gets the cache lookup state. Only hit, miss, and invalid are valid lookup states.</summary>
     public CompiledCacheStatus Status
     {
         get => _status;
@@ -75,9 +71,7 @@ public sealed record CompiledCacheLookup(
         }
     }
 
-    /// <summary>
-    /// Gets the cached artifact. Cache hits require an artifact; misses and invalid entries cannot include one.
-    /// </summary>
+    /// <summary>Gets the cached artifact. Cache hits require an artifact; misses and invalid entries cannot include one.</summary>
     public CompiledArtifact? Artifact
     {
         get => _artifact;
@@ -88,9 +82,7 @@ public sealed record CompiledCacheLookup(
         }
     }
 
-    /// <summary>
-    /// Gets the invalid-cache diagnostic. Only invalid entries can include this value, and they must include it.
-    /// </summary>
+    /// <summary>Gets the invalid-cache diagnostic. Only invalid entries can include this value, and they must include it.</summary>
     public string? InvalidReason
     {
         get => _invalidReason;

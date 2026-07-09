@@ -1,8 +1,7 @@
+using DotBoxD.Kernels;
 using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Abstractions;
-
-using DotBoxD.Kernels;
 
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class PluginAttribute : Attribute
@@ -86,8 +85,8 @@ public sealed class CapabilityAttribute : Attribute
 }
 
 /// <summary>
-/// Marks a reusable helper method whose body the DotBoxD.Kernels generator <b>inlines</b> into the kernel/hook IR
-/// at every call site, so plugin authors can factor shared gate/handler logic out of a
+/// Marks a reusable helper method whose body the DotBoxD.Kernels generator <b>inlines</b> into the kernel/hook IR at
+/// every call site, so plugin authors can factor shared gate/handler logic out of a
 /// <c>Where</c>/<c>Select</c>/<c>Run</c> lambda (or a kernel-class <c>ShouldHandle</c>/<c>Handle</c>)
 /// without leaving the sandbox. The helper can be a static method, or an instance method called on the generated
 /// server-context parameter. For example:
@@ -107,21 +106,20 @@ public sealed class CapabilityAttribute : Attribute
 /// named arguments plus supported optional parameter defaults are bound before lowering.
 /// </para>
 /// <para>
-/// Constraints (verified at generation time; a violation fails the chain/kernel safely rather than
-/// miscompiling): the method must be static or called on the server-context parameter, have an expression body
-/// or a single <c>return</c> statement, and use types the kernel marshaller can represent in the current
-/// lowering surface (scalars, supported nullable scalars, enums, GUIDs, records/DTOs, lists, and maps where
-/// that surface supports them). Recursion, generic helpers, <c>ref</c>/<c>out</c>/<c>in</c> parameters, and
-/// <c>params</c> arrays are not allowed.
+/// Constraints (verified at generation time; a violation fails the chain/kernel safely rather than miscompiling):
+/// the method must be static or called on the server-context parameter, have an expression body or a single
+/// <c>return</c> statement, and use types the kernel marshaller can represent in the current lowering surface
+/// (scalars, supported nullable scalars, enums, GUIDs, records/DTOs, lists, and maps where that surface supports them).
+/// Recursion, generic helpers, <c>ref</c>/<c>out</c>/<c>in</c> parameters, and <c>params</c> arrays are not allowed.
 /// </para>
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, Inherited = false)]
 public sealed class KernelMethodAttribute : Attribute;
 
 /// <summary>
-/// Marks a class as a <b>server extension</b>: a batch operation the plugin ships as verified IR and
-/// the server runs request/response in a single roundtrip, so a loop over many entities executes
-/// server-side (calling the host's existing bindings) instead of one network call per entity. The
+/// Marks a class as a <b>server extension</b>: a batch operation the plugin ships as verified IR and the server runs
+/// request/response in a single roundtrip, so a loop over many entities executes server-side (calling the host's
+/// existing bindings) instead of one network call per entity. The
 /// generator lowers the class's single public batch method — its body may use locals, a <c>foreach</c>
 /// over a list parameter, host bindings via <c>ctx.Host&lt;T&gt;()</c> or constructor-injected service
 /// fields, and may build and return complex objects (records/DTOs) and lists of them. For example:
@@ -142,11 +140,10 @@ public sealed class KernelMethodAttribute : Attribute;
 /// }
 /// public readonly record struct KillResult(int MonsterId, bool Success);
 /// </code>
-/// The trailing <see cref="HookContext"/> parameter is the lowering marker for host bindings (as in a
-/// kernel's <c>Handle</c>) and is not part of the wire signature. Parameters, return type, and DTO
-/// fields must use the supported scalar types, lists, or nested DTOs. Supplying the optional service
-/// interface type lets the analyzer emit a source-generated plugin-side client that marshals directly to
-/// compact server-extension value bytes instead of using a reflection proxy.
+/// The trailing <see cref="HookContext"/> parameter is the lowering marker for host bindings (as in a kernel's
+/// <c>Handle</c>) and is not part of the wire signature. Parameters, return type, and DTO fields must use supported
+/// scalar types, lists, or nested DTOs. Supplying the optional service interface type lets the analyzer emit a
+/// source-generated plugin-side client that marshals directly to compact server-extension value bytes instead of using a reflection proxy.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class ServerExtensionAttribute : Attribute
@@ -292,9 +289,8 @@ public sealed class HookContext
     public CancellationToken CancellationToken { get; }
 
     /// <summary>
-    /// Identifies a host service the kernel calls into. In verified kernel IR the call is replaced by a
-    /// sandbox binding (see <see cref="HostBindingAttribute"/>), so this marker is never invoked
-    /// directly; calling it at runtime throws.
+    /// Identifies a host service the kernel calls into. In verified kernel IR the call is replaced by a sandbox binding
+    /// (see <see cref="HostBindingAttribute"/>), so this marker is never invoked directly; calling it at runtime throws.
     /// </summary>
     public THost Host<THost>()
         where THost : class
