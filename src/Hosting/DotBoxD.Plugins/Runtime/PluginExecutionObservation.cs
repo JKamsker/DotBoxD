@@ -15,14 +15,14 @@ public sealed record PluginExecutionObservation(
     string? ArtifactHash,
     string? MaterializationStatus)
 {
-    private readonly string _entrypoint = Entrypoint ?? throw new ArgumentNullException(nameof(Entrypoint));
+    private readonly string _entrypoint = RequiredText(Entrypoint, nameof(Entrypoint));
     private readonly ExecutionMode _requestedMode = Defined(RequestedMode, nameof(RequestedMode));
     private readonly ExecutionMode _actualMode = Defined(ActualMode, nameof(ActualMode));
     private readonly bool _succeeded = ValidSucceeded(Succeeded, ErrorCode);
     private readonly SandboxErrorCode? _errorCode = ValidErrorCode(ErrorCode, Succeeded);
     private readonly SandboxErrorCode? _fallbackReason = Defined(FallbackReason, nameof(FallbackReason));
     private readonly string _cacheStatus = ValidCompiledTelemetry(
-        CacheStatus ?? throw new ArgumentNullException(nameof(CacheStatus)),
+        RequiredText(CacheStatus, nameof(CacheStatus)),
         nameof(CacheStatus),
         RequestedMode,
         ActualMode,
@@ -60,7 +60,7 @@ public sealed record PluginExecutionObservation(
     public string Entrypoint
     {
         get => _entrypoint;
-        init => _entrypoint = value ?? throw new ArgumentNullException(nameof(Entrypoint));
+        init => _entrypoint = RequiredText(value, nameof(Entrypoint));
     }
 
     public ExecutionMode RequestedMode
@@ -97,7 +97,7 @@ public sealed record PluginExecutionObservation(
     {
         get => _cacheStatus;
         init => _cacheStatus = ValidCompiledTelemetry(
-            value ?? throw new ArgumentNullException(nameof(CacheStatus)),
+            RequiredText(value, nameof(CacheStatus)),
             nameof(CacheStatus),
             RequestedMode,
             ActualMode,
@@ -151,6 +151,14 @@ public sealed record PluginExecutionObservation(
             ActualMode,
             Succeeded,
             value is not null);
+    }
+
+    private static string RequiredText(string value, string parameterName)
+    {
+        ArgumentNullException.ThrowIfNull(value, parameterName);
+        return string.IsNullOrWhiteSpace(value)
+            ? throw new ArgumentException("Value must not be empty or whitespace.", parameterName)
+            : value;
     }
 
     private static ExecutionMode Defined(ExecutionMode value, string parameterName)

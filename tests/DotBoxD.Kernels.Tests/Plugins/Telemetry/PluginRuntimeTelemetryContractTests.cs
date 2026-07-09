@@ -24,6 +24,25 @@ public sealed class PluginRuntimeTelemetryContractTests
                     MaterializationStatus: null)
             },
             {
+                "Entrypoint",
+                () => new PluginExecutionObservation(
+                    "   ",
+                    ExecutionMode.Interpreted,
+                    ExecutionMode.Interpreted,
+                    Succeeded: true,
+                    ErrorCode: null,
+                    FallbackReason: null,
+                    CacheStatus: "None",
+                    RuntimeForm: null,
+                    CacheKey: null,
+                    ArtifactHash: null,
+                    MaterializationStatus: null)
+            },
+            {
+                "Entrypoint",
+                () => ValidObservation() with { Entrypoint = "\t" }
+            },
+            {
                 "RequestedMode",
                 () => ValidObservation() with { RequestedMode = (ExecutionMode)999 }
             },
@@ -53,6 +72,25 @@ public sealed class PluginRuntimeTelemetryContractTests
                     CacheKey: null,
                     ArtifactHash: null,
                     MaterializationStatus: null)
+            },
+            {
+                "CacheStatus",
+                () => new PluginExecutionObservation(
+                    "Handle",
+                    ExecutionMode.Interpreted,
+                    ExecutionMode.Interpreted,
+                    Succeeded: true,
+                    ErrorCode: null,
+                    FallbackReason: null,
+                    CacheStatus: " ",
+                    RuntimeForm: null,
+                    CacheKey: null,
+                    ArtifactHash: null,
+                    MaterializationStatus: null)
+            },
+            {
+                "CacheStatus",
+                () => ValidObservation() with { CacheStatus = "\n" }
             },
         };
 
@@ -213,6 +251,15 @@ public sealed class PluginRuntimeTelemetryContractTests
         SubscriptionDeliveryFault fault = default!;
 
         Assert.Null(fault);
+    }
+
+    [Fact]
+    public void Plugin_execution_observation_accepts_valid_required_text()
+    {
+        var observation = ValidObservation();
+
+        Assert.Equal("Handle", observation.Entrypoint);
+        Assert.Equal("None", observation.CacheStatus);
     }
 
     private static PluginExecutionObservation ValidObservation()
