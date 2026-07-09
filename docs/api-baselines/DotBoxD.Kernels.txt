@@ -444,13 +444,13 @@ public static void Validate(ResourceLimits limits)
 public static void ValidateInputShape(SandboxValue input, int parameterCount)
 public string AuditKind { get; init; } = BindingAuditKinds.BindingCall
 public string BindingManifestHash { get; }
-public string Code { get => _code; init => _code = ValidateNotNull(value, nameof(Code)); }
+public string Code { get => _code; init => _code = ValidateText(value, nameof(Code)); }
 public string CreateChargedStringConcat(string left, string right)
 public string CreateChargedSubstring(string value, int startIndex, int length)
 public string Hash => (_hash ??= CreateHashCache()).Value
 public string Kind { get => _kind; init => _kind = value ?? throw new ArgumentNullException(nameof(Kind)); }
 public string ManifestHash { get; }
-public string Message { get => _message; init => _message = ValidateNotNull(value, nameof(Message)); }
+public string Message { get => _message; init => _message = ValidateText(value, nameof(Message)); }
 public string ModuleHash { get; }
 public string Name { get; init; } = Name ?? throw new ArgumentNullException(nameof(Name))
 public string PlanHash { get; }

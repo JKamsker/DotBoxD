@@ -31,6 +31,32 @@ public sealed class SandboxDiagnosticContractTests
     }
 
     [Fact]
+    public void Sandbox_diagnostic_rejects_blank_code_and_message()
+    {
+        var code = Assert.ThrowsAny<ArgumentException>(
+            () => new SandboxDiagnostic("", "message"));
+        var message = Assert.ThrowsAny<ArgumentException>(
+            () => new SandboxDiagnostic("E-TEST", " "));
+
+        Assert.Equal("Code", code.ParamName);
+        Assert.Equal("Message", message.ParamName);
+    }
+
+    [Fact]
+    public void Sandbox_diagnostic_rejects_blank_code_and_message_updates()
+    {
+        var diagnostic = new SandboxDiagnostic("E-TEST", "message");
+
+        var code = Assert.ThrowsAny<ArgumentException>(
+            () => diagnostic with { Code = "" });
+        var message = Assert.ThrowsAny<ArgumentException>(
+            () => diagnostic with { Message = " " });
+
+        Assert.Equal("Code", code.ParamName);
+        Assert.Equal("Message", message.ParamName);
+    }
+
+    [Fact]
     public void Sandbox_diagnostic_rejects_undefined_severity()
     {
         var exception = Assert.ThrowsAny<ArgumentException>(
