@@ -67,25 +67,52 @@ internal sealed class ErasedPluginEventAdapter<TEvent> : IErasedPluginEventAdapt
 
     public void WireHook(HookRegistry hooks, InstalledKernel kernel, KernelWireTerminal terminal, WireCallbacks callbacks)
     {
+        if (!IsHookTerminal(terminal.Kind))
+        {
+            throw UnknownKind(terminal.Kind);
+        }
+
+        var pipeline = hooks.OnForWire<TEvent>(_adapter, out var created);
+        try
+        {
+            WireHook(pipeline, kernel, terminal, callbacks);
+        }
+        catch
+        {
+            if (created)
+            {
+                hooks.RemoveWirePipeline(_adapter, pipeline);
+            }
+
+            throw;
+        }
+    }
+
+    private static void WireHook(
+        HookPipeline<TEvent, HookContext> pipeline,
+        InstalledKernel kernel,
+        KernelWireTerminal terminal,
+        WireCallbacks callbacks)
+    {
         switch (terminal.Kind)
         {
             case KernelWireKind.Plain:
-                hooks.On<TEvent>(_adapter).Use(kernel);
+                pipeline.Use(kernel);
                 break;
             case KernelWireKind.Projecting:
                 var projectingCallbackId = RequireCallbackId(terminal, kernel);
                 var push = RequirePush(callbacks);
-                hooks.On<TEvent>(_adapter).UseProjecting(kernel, projectingCallbackId, push);
+                pipeline.UseProjecting(kernel, projectingCallbackId, push);
                 break;
             case KernelWireKind.Result:
                 var resultType = RequireResultType(terminal, kernel);
-                hooks.On<TEvent>(_adapter).UseResult(kernel, resultType, terminal.Priority);
+                pipeline.UseResult(kernel, resultType, terminal.Priority);
                 break;
             case KernelWireKind.ProjectingResult:
                 var projectingResultCallbackId = RequireCallbackId(terminal, kernel);
                 var projectingResultType = RequireResultType(terminal, kernel);
                 var result = RequireResult(callbacks);
-                hooks.On<TEvent>(_adapter).UseProjectingResult(
+                pipeline.UseProjectingResult(
                     kernel,
                     projectingResultCallbackId,
                     projectingResultType,
@@ -159,6 +186,12 @@ internal sealed class ErasedPluginEventAdapter<TEvent> : IErasedPluginEventAdapt
     private static RemoteLocalResultRequest RequireResult(WireCallbacks callbacks)
         => callbacks.LocalResult ?? throw new InvalidOperationException(
             "the connected plugin did not provide an IPluginEventCallback; a remote RegisterLocal chain requires it.");
+
+    private static bool IsHookTerminal(KernelWireKind kind)
+        => kind is KernelWireKind.Plain or
+            KernelWireKind.Projecting or
+            KernelWireKind.Result or
+            KernelWireKind.ProjectingResult;
 
     private static InvalidOperationException UnknownKind(KernelWireKind kind)
         => new($"Unknown kernel wire kind '{kind}'.");
