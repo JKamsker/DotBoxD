@@ -9,35 +9,40 @@ public sealed class PluginSessionInstallAndWirePolicyReentryTests
     public async Task Install_and_wire_policy_reentry_completes_instead_of_deadlocking()
     {
         var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
-        var session = server.CreateSession();
+        try
+        {
+            var session = server.CreateSession();
 
-        var install = Task.Run(async () => await session.InstallAndWireAsync(
-            FireDamagePluginPackage.Create(),
-            _ => { },
-            _package =>
+            var install = Task.Run(async () => await session.InstallAndWireAsync(
+                FireDamagePluginPackage.Create(),
+                _ => { },
+                _package =>
+                {
+                    var ownsKernel = session.Owns("fire-damage");
+                    Assert.False(ownsKernel);
+                    return LongWallPluginPolicy();
+                }).AsTask());
+
+            var completed = await Task.WhenAny(install, Task.Delay(TimeSpan.FromSeconds(2))) == install;
+
+            Assert.True(
+                completed,
+                "InstallAndWireAsync did not complete when its policy callback re-entered session ownership state.");
+
+            if (install.IsCompletedSuccessfully)
             {
-                var ownsKernel = session.Owns("fire-damage");
-                Assert.False(ownsKernel);
-                return LongWallPluginPolicy();
-            }).AsTask());
-
-        var completed = await Task.WhenAny(install, Task.Delay(TimeSpan.FromSeconds(2))) == install;
-
-        Assert.True(
-            completed,
-            "InstallAndWireAsync did not complete when its policy callback re-entered session ownership state.");
-
-        if (install.IsCompletedSuccessfully)
-        {
-            Assert.NotNull(await install);
+                Assert.NotNull(await install);
+            }
+            else
+            {
+                var exception = await Record.ExceptionAsync(async () => await install);
+                Assert.NotNull(exception);
+            }
         }
-        else
+        finally
         {
-            var exception = await Record.ExceptionAsync(async () => await install);
-            Assert.NotNull(exception);
+            server.Dispose();
         }
-
-        server.Dispose();
     }
 
     private static SandboxPolicy LongWallPluginPolicy()
