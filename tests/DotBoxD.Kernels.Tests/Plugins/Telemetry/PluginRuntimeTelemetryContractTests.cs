@@ -56,6 +56,37 @@ public sealed class PluginRuntimeTelemetryContractTests
             },
         };
 
+    public static TheoryData<Func<PluginExecutionObservation>> TerminalStateContradictions()
+        => new()
+        {
+            () => new PluginExecutionObservation(
+                "Handle",
+                ExecutionMode.Interpreted,
+                ExecutionMode.Interpreted,
+                Succeeded: true,
+                ErrorCode: SandboxErrorCode.PolicyDenied,
+                FallbackReason: null,
+                CacheStatus: "None",
+                RuntimeForm: null,
+                CacheKey: null,
+                ArtifactHash: null,
+                MaterializationStatus: null),
+            () => ValidObservation() with { ErrorCode = SandboxErrorCode.PolicyDenied },
+            () => new PluginExecutionObservation(
+                "Handle",
+                ExecutionMode.Interpreted,
+                ExecutionMode.Interpreted,
+                Succeeded: false,
+                ErrorCode: null,
+                FallbackReason: null,
+                CacheStatus: "None",
+                RuntimeForm: null,
+                CacheKey: null,
+                ArtifactHash: null,
+                MaterializationStatus: null),
+            () => ValidObservation() with { Succeeded = false },
+        };
+
     public static TheoryData<string, Func<ResultHookFault>> InvalidResultHookFaults()
         => new()
         {
@@ -98,6 +129,16 @@ public sealed class PluginRuntimeTelemetryContractTests
         var exception = Assert.ThrowsAny<ArgumentException>(() => _ = create());
 
         Assert.Equal(memberName, exception.ParamName);
+    }
+
+    [Theory]
+    [MemberData(nameof(TerminalStateContradictions))]
+    public void Plugin_execution_observation_rejects_terminal_state_contradictions(
+        Func<PluginExecutionObservation> create)
+    {
+        var exception = Assert.ThrowsAny<ArgumentException>(() => _ = create());
+
+        Assert.Contains(exception.ParamName, new[] { nameof(PluginExecutionObservation.ErrorCode), nameof(PluginExecutionObservation.Succeeded) });
     }
 
     [Theory]
