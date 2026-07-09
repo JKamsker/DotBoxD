@@ -12,6 +12,7 @@ public sealed class InMemoryChannelSoakTests
         var iterations = int.TryParse(Environment.GetEnvironmentVariable("DOTBOXD_SOAK_ITERATIONS"), out var configured)
             ? configured
             : 2_000;
+        Assert.True(iterations > 0, "DOTBOXD_SOAK_ITERATIONS must be greater than zero.");
 
         for (var i = 0; i < iterations; i++)
         {
