@@ -26,6 +26,7 @@ internal static class DotBoxDMetadataNames
     public const string ServerInvocationDelegateOriginal = DotBoxDGenerationNames.TypeNames.ServerInvocationDelegateOriginal;
     public const string GameWorldAccessType = DotBoxDGenerationNames.TypeNames.GameWorldAccessType;
     public const string GameWorldMonsterSnapshotType = DotBoxDGenerationNames.TypeNames.GameWorldMonsterSnapshotType;
+    public const string ExperimentalAttribute = "System.Diagnostics.CodeAnalysis.ExperimentalAttribute";
 
     public static bool IsRpcServiceAttribute(string? typeName) =>
         typeName is RpcServiceAttribute;

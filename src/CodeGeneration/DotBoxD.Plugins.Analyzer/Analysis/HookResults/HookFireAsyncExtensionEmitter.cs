@@ -53,6 +53,11 @@ internal static class HookFireAsyncExtensionEmitter
 
     private static void EmitDefaultOverload(StringBuilder builder, HookFireAsyncModel model)
     {
+        foreach (var attribute in model.Attributes)
+        {
+            builder.Append("    ").AppendLine(attribute);
+        }
+
         builder.Append("    ").Append(model.Accessibility).Append(" static global::System.Threading.Tasks.ValueTask<")
             .Append(model.ResultTypeFullName).AppendLine("?> FireAsync(");
         builder.AppendLine("        this global::DotBoxD.Plugins.Runtime.HookRegistry hooks,");
