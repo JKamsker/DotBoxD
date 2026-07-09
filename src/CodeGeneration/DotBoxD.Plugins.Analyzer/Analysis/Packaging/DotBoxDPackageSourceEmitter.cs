@@ -20,6 +20,7 @@ internal static class DotBoxDPackageSourceEmitter
 
         EmitPackageAttributes(builder, model.PackageAttributes);
         EmitPackageAttributes(builder, model.GeneratedPackageAttributes);
+        builder.Append(model.GeneratedAttributeSource);
         builder.Append("public static class ").Append(model.PackageName).AppendLine();
         builder.AppendLine("{");
         EmitBody(builder, model);

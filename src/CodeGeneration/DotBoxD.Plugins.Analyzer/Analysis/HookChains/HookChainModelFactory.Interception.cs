@@ -70,6 +70,7 @@ internal static partial class HookChainModelFactory
 
         return GeneratedRemoteHookChainFallback.CreateInterception(
             location.GetInterceptsLocationAttributeSyntax(),
+            ExperimentalAttributeSource.FromTypes(eventType, projectedTypeSymbol),
             eventType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             stages.Any(stage => stage.IsSelect),
             terminalElementTypeFullName,
@@ -156,6 +157,7 @@ internal static partial class HookChainModelFactory
         var substitution = TypeParameterSubstitution(receiverType, typeParameters);
         return new HookChainInterception(
             attributeSyntax,
+            ExperimentalAttributeSource.FromTypes(receiverType, handlerType, returnType),
             RewriteWithTypeParameters(receiverType, substitution),
             RewriteWithTypeParameters(handlerType, substitution),
             RewriteWithTypeParameters(returnType, substitution),
@@ -190,6 +192,10 @@ internal static partial class HookChainModelFactory
         bool hasLocalDecoder)
         => new(
             attributeSyntax,
+            ExperimentalAttributeSource.FromTypes(
+                context.ReceiverType,
+                context.Method.Parameters[0].Type,
+                context.Method.ReturnType),
             context.ReceiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             context.Method.Parameters[0].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             context.Method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
