@@ -51,7 +51,7 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
         writer.WriteString(InstanceIdKey);
         WriteNullableString(ref writer, value.InstanceId);
         writer.WriteString(StreamsKey);
-        GetStreamsFormatter(options).Serialize(ref writer, value.Streams!, options);
+        WriteStreams(ref writer, value.Streams, options);
     }
 
     public RpcRequest Deserialize(ref MessagePackReader reader, MessagePackSerializerOptions options)
@@ -106,7 +106,7 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
                 case RpcRequestField.Streams:
                     ThrowIfDuplicate(_seenStreams, nameof(RpcRequest.Streams));
                     _seenStreams = true;
-                    _request.Streams = GetStreamsFormatter(options).Deserialize(ref reader, options);
+                    _request.Streams = ReadStreams(ref reader, options);
                     break;
                 default:
                     MessagePackEnvelopeSkipper.SkipUnknownField(ref reader, "RPC request");
@@ -131,12 +131,41 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
         }
     }
 
-    private static IMessagePackFormatter<RpcStreamHandle[]> GetStreamsFormatter(
+    private static void WriteStreams(
+        ref MessagePackWriter writer,
+        RpcStreamHandle[]? streams,
         MessagePackSerializerOptions options)
     {
-        return options.Resolver.GetFormatter<RpcStreamHandle[]>()
-            ?? throw new MessagePackSerializationException(
-            "No MessagePack formatter is registered for RPC stream handles.");
+        if (streams is null)
+        {
+            writer.WriteNil();
+            return;
+        }
+
+        writer.WriteArrayHeader(streams.Length);
+        foreach (var stream in streams)
+        {
+            RpcStreamHandleFormatter.Instance.Serialize(ref writer, stream, options);
+        }
+    }
+
+    private static RpcStreamHandle[]? ReadStreams(
+        ref MessagePackReader reader,
+        MessagePackSerializerOptions options)
+    {
+        if (reader.TryReadNil())
+        {
+            return null;
+        }
+
+        var count = reader.ReadArrayHeader();
+        var streams = new RpcStreamHandle[count];
+        for (var i = 0; i < count; i++)
+        {
+            streams[i] = RpcStreamHandleFormatter.Instance.Deserialize(ref reader, options);
+        }
+
+        return streams;
     }
 
     private static void ThrowIfDuplicate(bool alreadySeen, string fieldName)
