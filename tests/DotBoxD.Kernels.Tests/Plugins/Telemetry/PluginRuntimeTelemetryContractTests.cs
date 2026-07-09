@@ -87,6 +87,31 @@ public sealed class PluginRuntimeTelemetryContractTests
             () => ValidObservation() with { Succeeded = false },
         };
 
+    public static TheoryData<string, Func<PluginExecutionObservation>> InterpretedSuccessCompiledTelemetryEnvelopes()
+        => new()
+        {
+            {
+                "CacheStatus",
+                () => new PluginExecutionObservation(
+                    "Handle",
+                    ExecutionMode.Interpreted,
+                    ExecutionMode.Interpreted,
+                    Succeeded: true,
+                    ErrorCode: null,
+                    FallbackReason: null,
+                    CacheStatus: "Hit",
+                    RuntimeForm: "LoadedAssembly",
+                    CacheKey: "cache-key",
+                    ArtifactHash: "artifact-hash",
+                    MaterializationStatus: "Miss")
+            },
+            { "CacheStatus", () => ValidObservation() with { CacheStatus = "Hit" } },
+            { "RuntimeForm", () => ValidObservation() with { RuntimeForm = "LoadedAssembly" } },
+            { "CacheKey", () => ValidObservation() with { CacheKey = "cache-key" } },
+            { "ArtifactHash", () => ValidObservation() with { ArtifactHash = "artifact-hash" } },
+            { "MaterializationStatus", () => ValidObservation() with { MaterializationStatus = "Miss" } },
+        };
+
     public static TheoryData<string, Func<ResultHookFault>> InvalidResultHookFaults()
         => new()
         {
@@ -139,6 +164,17 @@ public sealed class PluginRuntimeTelemetryContractTests
         var exception = Assert.ThrowsAny<ArgumentException>(() => _ = create());
 
         Assert.Contains(exception.ParamName, new[] { nameof(PluginExecutionObservation.ErrorCode), nameof(PluginExecutionObservation.Succeeded) });
+    }
+
+    [Theory]
+    [MemberData(nameof(InterpretedSuccessCompiledTelemetryEnvelopes))]
+    public void Plugin_execution_observation_rejects_interpreted_success_compiled_telemetry(
+        string memberName,
+        Func<PluginExecutionObservation> create)
+    {
+        var exception = Assert.ThrowsAny<ArgumentException>(() => _ = create());
+
+        Assert.Equal(memberName, exception.ParamName);
     }
 
     [Theory]
