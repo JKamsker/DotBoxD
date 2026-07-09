@@ -7,16 +7,16 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 internal static class PluginServerFlowAttributeSource
 {
     public static EquatableArray<string> MemberAttributes(IMethodSymbol method)
-        => AttributeLines(method.GetAttributes(), targetReturn: false);
+        => AttributeLines(method.GetAttributes(), targetReturn: false, includeExperimental: true);
 
     public static EquatableArray<string> ReturnAttributes(IMethodSymbol method)
-        => AttributeLines(method.GetReturnTypeAttributes(), targetReturn: true);
+        => AttributeLines(method.GetReturnTypeAttributes(), targetReturn: true, includeExperimental: true);
 
     public static EquatableArray<string> PropertyAttributes(IPropertySymbol property)
-        => AttributeLines(property.GetAttributes(), targetReturn: false);
+        => AttributeLines(property.GetAttributes(), targetReturn: false, includeExperimental: true);
 
     public static EquatableArray<string> TypeAttributes(INamedTypeSymbol type)
-        => AttributeLines(type.GetAttributes(), targetReturn: false);
+        => AttributeLines(type.GetAttributes(), targetReturn: false, includeExperimental: false);
 
     public static string ParameterAttributePrefix(IParameterSymbol parameter)
     {
@@ -105,12 +105,13 @@ internal static class PluginServerFlowAttributeSource
 
     private static EquatableArray<string> AttributeLines(
         IEnumerable<AttributeData> attributes,
-        bool targetReturn)
+        bool targetReturn,
+        bool includeExperimental)
     {
         var lines = new List<string>();
         foreach (var attribute in attributes)
         {
-            if (AttributeLine(attribute, targetReturn) is { } line)
+            if (AttributeLine(attribute, targetReturn, includeExperimental) is { } line)
             {
                 lines.Add(line);
             }
@@ -120,7 +121,7 @@ internal static class PluginServerFlowAttributeSource
         return new EquatableArray<string>(lines.ToArray());
     }
 
-    private static string? AttributeLine(AttributeData attribute, bool targetReturn)
+    private static string? AttributeLine(AttributeData attribute, bool targetReturn, bool includeExperimental)
     {
         switch (attribute.AttributeClass?.ToDisplayString())
         {
@@ -144,6 +145,11 @@ internal static class PluginServerFlowAttributeSource
                 return MemberOnlyAttribute(targetReturn, ObsoleteAttribute(attribute));
 
             case "System.Diagnostics.CodeAnalysis.ExperimentalAttribute":
+                if (!includeExperimental)
+                {
+                    return null;
+                }
+
                 return MemberOnlyAttribute(targetReturn, PluginServerExperimentalAttributeFormatter.Format(attribute));
 
             default:
