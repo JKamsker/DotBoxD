@@ -1,4 +1,3 @@
-using DotBoxD.CodeGeneration.Shared.Defaults;
 using Microsoft.CodeAnalysis;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
