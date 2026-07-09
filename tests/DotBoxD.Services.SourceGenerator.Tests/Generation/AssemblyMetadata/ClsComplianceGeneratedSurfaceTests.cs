@@ -1,6 +1,5 @@
 using FluentAssertions;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 
 namespace DotBoxD.Services.SourceGenerator.Tests.Generation.AssemblyMetadata;
 
@@ -29,7 +28,9 @@ public sealed class ClsComplianceGeneratedSurfaceTests
         var compilation = GeneratorTestHelper.CreateCompilation(source);
         var driver = GeneratorTestHelper.CreateDriver().RunGenerators(compilation);
         var runResult = driver.GetRunResult();
-        var finalCompilation = ((CSharpCompilation)compilation).AddSyntaxTrees(runResult.GeneratedTrees);
+        runResult.GeneratedTrees.Should().NotBeEmpty(
+            "the generator should have produced output for [RpcService] interfaces");
+        var finalCompilation = compilation.AddSyntaxTrees(runResult.GeneratedTrees);
 
         using var output = new MemoryStream();
         var emitResult = finalCompilation.Emit(output);

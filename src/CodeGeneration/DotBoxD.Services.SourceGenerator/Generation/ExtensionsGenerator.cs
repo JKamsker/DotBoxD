@@ -9,7 +9,10 @@ namespace DotBoxD.Services.SourceGenerator.Generation;
 
 internal static class ExtensionsGenerator
 {
-    public static string Generate(EquatableArray<ServiceExtensionModel> services, CancellationToken ct = default)
+    public static string Generate(
+        EquatableArray<ServiceExtensionModel> services,
+        bool emitClsNonCompliantAttribute,
+        CancellationToken ct = default)
     {
         var sb = new StringBuilder();
         var extensionSuffixes = BuildExtensionSuffixes(services, ct);
@@ -23,6 +26,11 @@ internal static class ExtensionsGenerator
         sb.AppendLine("    /// <summary>");
         sb.AppendLine("    /// Extension methods for registering generated DotBoxD services.");
         sb.AppendLine("    /// </summary>");
+        if (emitClsNonCompliantAttribute)
+        {
+            sb.AppendLine("    [global::System.CLSCompliant(false)]");
+        }
+
         sb.AppendLine("    public static class DotBoxDGeneratedExtensions");
         sb.AppendLine("    {");
 

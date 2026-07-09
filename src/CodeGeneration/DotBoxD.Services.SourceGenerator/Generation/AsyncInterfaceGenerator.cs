@@ -18,6 +18,7 @@ internal static class AsyncInterfaceGenerator
     public static string Generate(
         ServiceModel service,
         EquatableArray<AsyncSiblingMethod> siblingMethods,
+        bool emitClsNonCompliantAttribute,
         CancellationToken ct = default)
     {
         var siblingName = NamingHelpers.AsyncSiblingInterfaceName(service.InterfaceName);
@@ -38,6 +39,11 @@ internal static class AsyncInterfaceGenerator
         sb.AppendLine($"    /// interface from callers that must not block on RPC calls.");
         sb.AppendLine("    /// </summary>");
         ObsoleteAttributeEmitter.AppendIfPresent(sb, service.ObsoleteAttribute, "    ");
+        if (emitClsNonCompliantAttribute)
+        {
+            sb.AppendLine("    [global::System.CLSCompliant(false)]");
+        }
+
         sb.AppendLine($"    public interface {IdentifierHelpers.EscapeIdentifier(siblingName)}");
         sb.AppendLine("    {");
 

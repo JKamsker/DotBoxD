@@ -17,6 +17,7 @@ internal static partial class ProxyGenerator
     public static string Generate(
         ServiceModel service,
         EquatableArray<AsyncSiblingMethod> siblingMethods,
+        bool emitClsNonCompliantAttribute,
         CancellationToken ct = default)
     {
         var sb = new StringBuilder();
@@ -26,7 +27,7 @@ internal static partial class ProxyGenerator
             service,
             NamingHelpers.AsyncSiblingInterfaceName(service.InterfaceName));
         var baseList = ProxyBaseList(qualifiedInterface, qualifiedAsyncSibling, siblingMethods);
-        AppendProxyHeader(sb, service, proxyName, baseList);
+        AppendProxyHeader(sb, service, proxyName, baseList, emitClsNonCompliantAttribute);
         AppendProxyFields(sb, service, ct);
         AppendProxyConstructors(sb, service, proxyName, ct);
         AppendProxyProperties(sb, service, ct);

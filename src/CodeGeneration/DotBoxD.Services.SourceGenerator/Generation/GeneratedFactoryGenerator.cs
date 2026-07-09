@@ -7,7 +7,10 @@ namespace DotBoxD.Services.SourceGenerator.Generation;
 
 internal static class GeneratedFactoryGenerator
 {
-    public static string Generate(EquatableArray<ServiceModel> services, CancellationToken ct = default)
+    public static string Generate(
+        EquatableArray<ServiceModel> services,
+        bool emitClsNonCompliantAttribute,
+        CancellationToken ct = default)
     {
         var sb = new StringBuilder();
 
@@ -19,6 +22,11 @@ internal static class GeneratedFactoryGenerator
         sb.AppendLine("    /// <summary>");
         sb.AppendLine("    /// Factory methods for DotBoxD-generated proxies and dispatchers.");
         sb.AppendLine("    /// </summary>");
+        if (emitClsNonCompliantAttribute)
+        {
+            sb.AppendLine("    [global::System.CLSCompliant(false)]");
+        }
+
         sb.AppendLine("    public static class DotBoxDGenerated");
         sb.AppendLine("    {");
         GeneratedFactoryMetadataEmitter.AppendMethodArrays(sb, services, ct);
