@@ -169,6 +169,17 @@ public sealed class DiagnosticsErrorReportingCoverageTests
         DiagnosticAssert.ArgumentNull(() => new RpcDiagnosticErrorEventArgs("teardown", null!), "error");
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\t")]
+    public void RpcDiagnosticErrorEventArgs_RejectsBlankOperation(string operation)
+    {
+        DiagnosticAssert.Argument(
+            () => new RpcDiagnosticErrorEventArgs(operation, new InvalidOperationException("kaboom")),
+            "operation");
+    }
+
     // --- InstanceRegistry observable behavior gaps ---
 
     [Fact]
@@ -229,6 +240,13 @@ public sealed class DiagnosticsErrorReportingCoverageTests
 
 internal static class DiagnosticAssert
 {
+    public static void Argument(Action action, string paramName)
+    {
+        var ex = Assert.Throws<ArgumentException>(action);
+
+        Assert.Equal(paramName, ex.ParamName);
+    }
+
     public static void ArgumentNull(Action action, string paramName)
     {
         var ex = Assert.Throws<ArgumentNullException>(action);
