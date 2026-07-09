@@ -1,6 +1,7 @@
 using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Validation.Bindings;
 using DotBoxD.Kernels.Validation.Model;
 
 namespace DotBoxD.Kernels.Validation;
@@ -36,6 +37,7 @@ public sealed class ModuleValidator
 
         var diagnostics = new List<SandboxDiagnostic>();
         StructuralValidator.Validate(module, diagnostics, declaredOpaqueIdTypes);
+        CatalogBindingSignatureValidator.ValidateCatalog(bindings, diagnostics);
         if (diagnostics.Count > 0)
         {
             return ModuleValidationResult.Failure(diagnostics);
@@ -47,10 +49,16 @@ public sealed class ModuleValidator
         SandboxEffect requiredEffects;
         try
         {
+            bindingReferences = BindingReferenceCollector.CollectByFunction(module, bindings);
+            CatalogBindingSignatureValidator.ValidateReferenced(module, bindingReferences, bindings, diagnostics);
+            if (diagnostics.Count > 0)
+            {
+                return ModuleValidationResult.Failure(diagnostics);
+            }
+
             var analyzer = new FunctionAnalyzer(module, bindings, diagnostics, declaredOpaqueIdTypes);
             functions = analyzer.AnalyzeAll();
             requiredEffects = RequiredEffects(module, functions);
-            bindingReferences = BindingReferenceCollector.CollectByFunction(module, bindings);
             requiredCapabilities = RequiredCapabilities(module, bindings, bindingReferences);
             PolicyResolver.Validate(module, bindings, policy, requiredEffects, requiredCapabilities, diagnostics);
         }

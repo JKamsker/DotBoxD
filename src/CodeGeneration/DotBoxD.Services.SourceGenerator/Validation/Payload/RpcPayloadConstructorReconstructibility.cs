@@ -47,7 +47,8 @@ internal static class RpcPayloadConstructorReconstructibility
     {
         if (property.IsStatic ||
             property.Parameters.Length != 0 ||
-            property.DeclaredAccessibility != Accessibility.Public)
+            property.DeclaredAccessibility != Accessibility.Public ||
+            RpcPayloadIgnoredMember.IsIgnored(property))
         {
             return null;
         }
@@ -82,7 +83,8 @@ internal static class RpcPayloadConstructorReconstructibility
         if (field.IsStatic ||
             field.IsImplicitlyDeclared ||
             field.DeclaredAccessibility != Accessibility.Public ||
-            !field.IsReadOnly)
+            !field.IsReadOnly ||
+            RpcPayloadIgnoredMember.IsIgnored(field))
         {
             return null;
         }

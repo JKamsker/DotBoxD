@@ -12,9 +12,9 @@ you need before you click in:
 2. **[Event pipelines (RunLocal)](/tutorials/event-pipeline-runlocal/)** — subscribe to a server event, push the
    `Where`/`Select` filter server-side, and react locally with `RunLocal` so only matching, projected
    data crosses the pipe. *Why this mode:* efficient server-side filtering + projection — `Where`/`Select`
-   lower to verified IR, so only matching, projected values cross the pipe (fewer bytes, fewer wake-ups,
-   one-way push, no round-trips), and that filter logic is safe to accept from untrusted plugins because
-   it runs as validated, fuel-metered IR.
+   lower to verified restricted IR (intermediate representation), so only matching, projected values
+   cross the pipe (fewer bytes, fewer wake-ups, one-way push, no round-trips), and that filter logic is
+   safe to accept from untrusted plugins because it runs as validated, fuel-metered IR.
 3. **[Pushdown server extension](/tutorials/pushdown-server-extension/)** — ship a plugin-supplied, server-side
    batch operation that collapses N remote calls into one. *Why this mode:* reduce round-trips — move the
    loop/aggregation next to the data (N calls → 1 server-side batch); the host stays frozen/minimal while

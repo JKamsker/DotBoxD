@@ -57,9 +57,9 @@ public sealed record BindingSignature(
     BindingSafety Safety,
     CompiledBinding Compiled)
 {
-    private IReadOnlyList<SandboxType> _parameters = ModelCopy.List(Parameters);
+    private IReadOnlyList<SandboxType> _parameters = BindingParameterTypes.Copy(Parameters, nameof(Parameters));
 
-    public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = ModelCopy.List(value); }
+    public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = BindingParameterTypes.Copy(value, nameof(Parameters)); }
     public bool IsAsync { get; init; }
     public string AuditKind { get; init; } = BindingAuditKinds.BindingCall;
 }
@@ -79,9 +79,9 @@ public sealed record BindingDescriptor(
     CapabilityGrantValidator? GrantValidator = null,
     BindingAuditResourceValidator? AuditResourceValidator = null)
 {
-    private IReadOnlyList<SandboxType> _parameters = ModelCopy.List(Parameters);
+    private IReadOnlyList<SandboxType> _parameters = BindingParameterTypes.Copy(Parameters, nameof(Parameters));
 
-    public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = ModelCopy.List(value); }
+    public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = BindingParameterTypes.Copy(value, nameof(Parameters)); }
 
     public BindingSignature Signature => new(
         Id, Version, CopyParameters(Parameters), ReturnType, Effects, RequiredCapability, CostModel, AuditLevel, Safety, Compiled)
@@ -107,6 +107,15 @@ public sealed record BindingDescriptor(
         }
 
         return copy;
+    }
+}
+
+internal static class BindingParameterTypes
+{
+    public static IReadOnlyList<SandboxType> Copy(IReadOnlyList<SandboxType>? parameters, string paramName)
+    {
+        ArgumentNullException.ThrowIfNull(parameters, paramName);
+        return ModelCopy.List(parameters);
     }
 }
 

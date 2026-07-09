@@ -6,6 +6,9 @@ internal static class ServicesGeneratorTypeNames
 
     public const string RpcServiceAttribute = "DotBoxD.Services.Attributes.RpcServiceAttribute";
     public const string RpcMethodAttribute = "DotBoxD.Services.Attributes.RpcMethodAttribute";
+    public const string MessagePackUnionAttribute = "MessagePack.UnionAttribute";
+    public const string JsonPolymorphicAttribute = "System.Text.Json.Serialization.JsonPolymorphicAttribute";
+    public const string JsonDerivedTypeAttribute = "System.Text.Json.Serialization.JsonDerivedTypeAttribute";
     public const string CancellationTokenMetadata = "System.Threading.CancellationToken";
 
     public const string GeneratedNamespace = "DotBoxD.Services.Generated";

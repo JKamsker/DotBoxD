@@ -18,6 +18,20 @@ public sealed class CacheKeyBuilderArgumentValidationTests
             (plan, entrypoint, policy) => () => CacheKeyBuilder.Build(plan!, entrypoint!, policy!, optimize: false));
 
     [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Build_rejects_blank_entrypoint(string entrypoint)
+    {
+        var plan = await CreatePlanAsync();
+        var policy = VerificationPolicy.BoxedValueDefaults();
+
+        var ex = Assert.Throws<ArgumentException>(
+            () => CacheKeyBuilder.Build(plan, entrypoint, policy, optimize: false));
+
+        Assert.Equal("entrypoint", ex.ParamName);
+    }
+
+    [Theory]
     [InlineData("plan")]
     [InlineData("entrypoint")]
     [InlineData("policy")]
@@ -25,6 +39,20 @@ public sealed class CacheKeyBuilderArgumentValidationTests
         => await AssertBuilderRejectsNullAsync(
             parameterName,
             (plan, entrypoint, policy) => () => CacheKeyBuilder.BuildManifestIdentity(plan!, entrypoint!, policy!, optimize: false));
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task BuildManifestIdentity_rejects_blank_entrypoint(string entrypoint)
+    {
+        var plan = await CreatePlanAsync();
+        var policy = VerificationPolicy.BoxedValueDefaults();
+
+        var ex = Assert.Throws<ArgumentException>(
+            () => CacheKeyBuilder.BuildManifestIdentity(plan, entrypoint, policy, optimize: false));
+
+        Assert.Equal("entrypoint", ex.ParamName);
+    }
 
     private static async Task AssertBuilderRejectsNullAsync(
         string parameterName,

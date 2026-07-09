@@ -9,13 +9,24 @@ public delegate SandboxValue SandboxCompiledEntrypoint(SandboxContext context, S
 
 public sealed record CompileOptions(string Entrypoint, bool Optimize = false)
 {
-    private string _entrypoint =
-        Entrypoint ?? throw new ArgumentNullException(nameof(Entrypoint));
+    private string _entrypoint = RequireEntrypoint(Entrypoint);
 
     public string Entrypoint
     {
         get => _entrypoint;
-        init => _entrypoint = value ?? throw new ArgumentNullException(nameof(Entrypoint));
+        init => _entrypoint = RequireEntrypoint(value);
+    }
+
+    private static string RequireEntrypoint(string? entrypoint)
+    {
+        ArgumentNullException.ThrowIfNull(entrypoint, nameof(Entrypoint));
+
+        if (string.IsNullOrWhiteSpace(entrypoint))
+        {
+            throw new ArgumentException("Entrypoint must not be blank.", nameof(Entrypoint));
+        }
+
+        return entrypoint;
     }
 }
 
@@ -41,6 +52,8 @@ public sealed record CompiledArtifact
     private ArtifactManifest _manifest = null!;
     private VerificationResult _verification = null!;
     private SandboxCompiledEntrypoint _entrypoint = null!;
+    private CompiledRuntimeFormKind _runtimeForm;
+    private CompiledCacheStatus _cacheStatus;
 
     public CompiledArtifact(
         byte[] assemblyBytes,
@@ -81,10 +94,8 @@ public sealed record CompiledArtifact
         ArgumentNullException.ThrowIfNull(verification);
         ArgumentNullException.ThrowIfNull(entrypoint);
 
-        if (!Enum.IsDefined(runtimeForm))
-        {
-            throw new ArgumentOutOfRangeException(nameof(runtimeForm), runtimeForm, "Compiled runtime form is not supported.");
-        }
+        RequireDefined(runtimeForm, nameof(runtimeForm), "Compiled runtime form is not supported.");
+        RequireDefined(cacheStatus, nameof(cacheStatus), "Compiled cache status is not supported.");
 
         if (!verification.Succeeded)
         {
@@ -116,8 +127,8 @@ public sealed record CompiledArtifact
         _manifest = manifest;
         _verification = verification;
         _entrypoint = entrypoint;
-        RuntimeForm = runtimeForm;
-        CacheStatus = cacheStatus;
+        _runtimeForm = runtimeForm;
+        _cacheStatus = cacheStatus;
         CacheInvalidReason = cacheInvalidReason;
     }
 
@@ -148,8 +159,22 @@ public sealed record CompiledArtifact
         get => _entrypoint;
         init => _entrypoint = RequireNonNull(value, nameof(Entrypoint));
     }
-    public CompiledRuntimeFormKind RuntimeForm { get; init; }
-    public CompiledCacheStatus CacheStatus { get; init; }
+    public CompiledRuntimeFormKind RuntimeForm
+    {
+        get => _runtimeForm;
+        init => _runtimeForm = RequireDefined(
+            value,
+            nameof(RuntimeForm),
+            "Compiled runtime form is not supported.");
+    }
+    public CompiledCacheStatus CacheStatus
+    {
+        get => _cacheStatus;
+        init => _cacheStatus = RequireDefined(
+            value,
+            nameof(CacheStatus),
+            "Compiled cache status is not supported.");
+    }
     public string? CacheInvalidReason { get; init; }
     public string ArtifactHash => AssemblyHash;
 
@@ -157,6 +182,17 @@ public sealed record CompiledArtifact
         where T : class
     {
         ArgumentNullException.ThrowIfNull(value, paramName);
+        return value;
+    }
+
+    private static TEnum RequireDefined<TEnum>(TEnum value, string paramName, string message)
+        where TEnum : struct, Enum
+    {
+        if (!Enum.IsDefined(value))
+        {
+            throw new ArgumentOutOfRangeException(paramName, value, message);
+        }
+
         return value;
     }
 }

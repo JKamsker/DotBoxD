@@ -50,7 +50,7 @@ internal static class InterpreterBindingCaller
             var pending = descriptor.Invoke(context, args, timeout.Token);
             var value = pending.IsCompleted
                 ? pending.GetAwaiter().GetResult()
-                : await AwaitPendingAsync(context, pending).ConfigureAwait(false);
+                : await AwaitPendingAsync(context, pending, timeout.Token).ConfigureAwait(false);
             context.Checkpoint();
             value = context.ChargeBindingReturn(descriptor, value);
             context.EnsureRequiredBindingSuccessAudit(descriptor, auditCheckpoint);
@@ -104,7 +104,8 @@ internal static class InterpreterBindingCaller
 
     private static async ValueTask<SandboxValue> AwaitPendingAsync(
         SandboxContext context,
-        ValueTask<SandboxValue> pending)
+        ValueTask<SandboxValue> pending,
+        CancellationToken timeoutToken)
     {
         if (!context.AsyncEnabled)
         {
@@ -113,6 +114,6 @@ internal static class InterpreterBindingCaller
                 "binding returned a pending result; async capability is not granted"));
         }
 
-        return await pending.ConfigureAwait(false);
+        return await pending.AsTask().WaitAsync(timeoutToken).ConfigureAwait(false);
     }
 }

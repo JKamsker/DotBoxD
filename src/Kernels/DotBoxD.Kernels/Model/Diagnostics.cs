@@ -85,7 +85,7 @@ public sealed class SandboxValidationException : Exception
 public sealed class SandboxRuntimeException : Exception
 {
     public SandboxRuntimeException(SandboxError error)
-        : base(error.SafeMessage)
+        : base((error ?? throw new ArgumentNullException(nameof(error))).SafeMessage)
     {
         Error = error;
     }

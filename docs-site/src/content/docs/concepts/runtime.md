@@ -2,7 +2,7 @@
 title: 'Kernel runtime'
 description: 'The kernel runtime executes validated IR under hard budgets. Key pieces:'
 ---
-The kernel runtime executes validated IR under hard budgets. Key pieces:
+The kernel runtime executes validated IR (intermediate representation) under hard budgets. Key pieces:
 
 ## Why two backends, and why everything is metered
 

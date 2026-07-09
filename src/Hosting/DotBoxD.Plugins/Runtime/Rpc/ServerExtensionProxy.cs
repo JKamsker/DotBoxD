@@ -43,6 +43,7 @@ public class ServerExtensionProxy : DispatchProxy
         var method = MethodCache.GetOrAdd(targetMethod, static target => new ServerExtensionMethod(target));
         var cancellationToken = method.CancellationToken(args);
         cancellationToken.ThrowIfCancellationRequested();
+        PluginKernelRevocation.ThrowIfRevoked(_kernel.IsRevoked);
         var arguments = ConvertPayloadArguments(args, method.PayloadParameterTypes);
 
         return method.Materialize(_kernel.InvokeServerExtensionAsync(arguments, cancellationToken));

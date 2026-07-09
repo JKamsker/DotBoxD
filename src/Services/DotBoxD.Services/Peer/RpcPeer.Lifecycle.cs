@@ -79,6 +79,8 @@ public sealed partial class RpcPeer
 
     private async Task DisposeCoreAsync(Task? readLoop, CancellationTokenSource? cts)
     {
+        _outbound.FailPending(new ServiceConnectionException("Connection closed."));
+
         try
         {
             await _channel.DisposeAsync().ConfigureAwait(false);
@@ -101,7 +103,6 @@ public sealed partial class RpcPeer
         }
 
         await _outbound.StopCancelFramesAsync().ConfigureAwait(false);
-        _outbound.FailPending(new ServiceConnectionException("Connection closed."));
         _streams.Stop();
         await _inbound.StopAsync().ConfigureAwait(false);
 

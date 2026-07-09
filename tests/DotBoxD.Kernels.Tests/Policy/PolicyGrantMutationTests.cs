@@ -227,12 +227,12 @@ public sealed class PolicyGrantMutationTests
         var host = PolicyMutationTestSupport.CustomCapabilityHost();
         var unusedRegisteredPolicy = new SandboxPolicy(
             "unused-custom-grant",
-            SandboxEffects.Pure,
+            SandboxEffects.Pure | SandboxEffect.HostStateRead | SandboxEffect.Audit,
             [new CapabilityGrant("probe.read", new Dictionary<string, string> { ["scope"] = "inventory" })],
             new ResourceLimits(MaxFuel: 1_000));
         var malformedPolicy = new SandboxPolicy(
             "malformed-custom-grant",
-            SandboxEffects.Pure,
+            SandboxEffects.Pure | SandboxEffect.HostStateRead | SandboxEffect.Audit,
             [new CapabilityGrant("probe.read", new Dictionary<string, string> { ["scope"] = "" })],
             new ResourceLimits(MaxFuel: 1_000));
 

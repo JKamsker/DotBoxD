@@ -73,7 +73,8 @@ internal sealed record ServiceModel(
     string ServiceName,
     EquatableArray<MethodModel> Methods,
     EquatableArray<ServicePropertyModel> Properties,
-    string RawServiceName = "");
+    string RawServiceName = "",
+    string ObsoleteAttribute = "");
 
 /// <summary>Immutable, value-equatable representation of a get-only sub-service property.</summary>
 internal sealed record ServicePropertyModel(
@@ -83,7 +84,8 @@ internal sealed record ServicePropertyModel(
     string? ProxyType,
     string PropertyAttributePrefix,
     bool IsInstanceId,
-    SubServiceInfo? SubService);
+    SubServiceInfo? SubService,
+    string MemberAttributePrefix = "");
 
 /// <summary>
 /// Immutable, value-equatable representation of a service method. When
@@ -98,6 +100,7 @@ internal sealed record MethodModel(
     MethodReturnKind ReturnKind,
     string DeclaredReturnType,
     string? UnwrappedReturnType,
+    string MemberAttributePrefix,
     string ReturnRefKindKeyword,
     string ReturnAttributePrefix,
     bool HasCancellationToken,

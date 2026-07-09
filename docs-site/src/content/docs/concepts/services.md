@@ -1,6 +1,6 @@
 ---
 title: 'Services (RPC)'
-description: 'A Service is a handwritten host capability behind a shared C# contract. Annotate an interface with'
+description: 'A Service is a handwritten host capability behind a shared C# contract: annotate an interface with [RpcService] and the source generator emits a typed proxy and dispatcher at compile time.'
 ---
 A **Service** is a handwritten host capability behind a shared C# contract. Annotate an interface with
 `[RpcService]` and the `DotBoxD.Services.SourceGenerator` emits, at compile time:
@@ -55,7 +55,7 @@ reach (Services is the most-mature netstandard2.1 surface).
 
 **When to prefer another mode:** to react to a high-frequency server event but only need a filtered
 subset, prefer the [event pipeline (RunLocal)](/tutorials/event-pipeline-runlocal/) — `Where` /
-`Select` lower to server-side IR so only matching, projected values cross the pipe (one-way push, no
+`Select` lower to server-side restricted IR (intermediate representation) so only matching, projected values cross the pipe (one-way push, no
 round-trips). To collapse a chatty N-call loop over the host's fine-grained bindings into one
 server-side batch, prefer [Pushdown](/concepts/pushdown/) — the batch runs as verified, capability-gated,
 fuel-metered IR.

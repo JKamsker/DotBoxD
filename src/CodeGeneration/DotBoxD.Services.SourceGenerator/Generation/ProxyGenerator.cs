@@ -62,6 +62,7 @@ internal static partial class ProxyGenerator
         var access = explicitInterface ? string.Empty : "public ";
         var target = explicitInterface ? method.ExplicitImplementationType + "." + method.Name : method.Name;
 
+        AppendAttributes(sb, method.MemberAttributePrefix);
         AppendAttributes(sb, method.ReturnAttributePrefix);
         sb.AppendLine($"        {access}{unsafeKeyword}{asyncKeyword}{method.ReturnRefKindKeyword}{declaredReturn} {target}{method.TypeParameterList}({paramList}){method.ConstraintClauses}");
         sb.AppendLine("        {");
@@ -117,6 +118,7 @@ internal static partial class ProxyGenerator
         var target = explicitInterface ? qualifiedAsyncSibling + "." + s.Name : s.Name;
 
         var asyncKeyword = RequiresAsyncStateMachine(s.SiblingReturnKind) ? "async " : string.Empty;
+        ProxyGenerationHelpers.AppendAttributeLines(sb, s.Source.MemberAttributePrefix);
         sb.AppendLine($"        {access}{asyncKeyword}{declaredReturn} {target}({paramList})");
         sb.AppendLine("        {");
 

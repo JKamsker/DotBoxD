@@ -37,6 +37,17 @@ internal static class HookFireAsyncModelFactory
                         + "HookRegistry.FireAsync<TContext, TResult>(...) from the same file"));
             }
 
+            if (IsErrorObsoleteOrNestedInErrorObsolete(contextType))
+            {
+                return new HookFireAsyncModelResult(
+                    null,
+                    PluginKernelDiagnostic.Create(
+                        declaration.Identifier,
+                        $"hook context '{contextType.Name}' is marked [Obsolete(..., error: true)] or nested in a "
+                        + "type marked that way; generated HookRegistry.FireAsync(context) extensions cannot "
+                        + "reference compiler-error obsolete context types"));
+            }
+
             return new HookFireAsyncModelResult(
                 new HookFireAsyncModel(
                     contextType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
@@ -96,6 +107,34 @@ internal static class HookFireAsyncModelFactory
                 {
                     return true;
                 }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsErrorObsoleteOrNestedInErrorObsolete(INamedTypeSymbol type)
+    {
+        for (var current = type; current is not null; current = current.ContainingType)
+        {
+            if (HasErrorObsoleteAttribute(current.GetAttributes()))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasErrorObsoleteAttribute(IEnumerable<AttributeData> attributes)
+    {
+        foreach (var attribute in attributes)
+        {
+            if (attribute.AttributeClass?.ToDisplayString() == "System.ObsoleteAttribute" &&
+                attribute.ConstructorArguments.Length >= 2 &&
+                attribute.ConstructorArguments[1].Value is true)
+            {
+                return true;
             }
         }
 
