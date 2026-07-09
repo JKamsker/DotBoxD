@@ -56,6 +56,7 @@ internal static partial class DotBoxDExpressionModelFactory
                     continue;
                 }
 
+                CollectRecordMemberCapability(fields[i], context);
                 return RecordGet(projected, i, fields[i].Type, allocates: false);
             }
         }
@@ -140,6 +141,7 @@ internal static partial class DotBoxDExpressionModelFactory
                 return null;
             }
 
+            CollectRecordMemberCapability(fields[i], context);
             return RecordGet(receiver, i, fields[i].Type, receiver.Allocates);
         }
 
@@ -211,6 +213,18 @@ internal static partial class DotBoxDExpressionModelFactory
         }
 
         if (PluginSymbolReader.Capability(property) is { } capability)
+        {
+            context.Capabilities.Add(capability);
+        }
+    }
+
+    private static void CollectRecordMemberCapability(
+        RecordMember member,
+        DotBoxDExpressionLoweringContext context)
+    {
+        if (context.Capabilities is not null &&
+            member.Symbol is IPropertySymbol property &&
+            PluginSymbolReader.Capability(property) is { } capability)
         {
             context.Capabilities.Add(capability);
         }

@@ -40,7 +40,7 @@ public sealed class PluginAnalyzerHookChainCustomStageTests
         Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
         Assert.DoesNotContain(
             result.GeneratedTrees,
-            tree => tree.ToString().Contains("UseGeneratedChain", StringComparison.Ordinal));
+            tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -77,6 +77,6 @@ public sealed class PluginAnalyzerHookChainCustomStageTests
         Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
         Assert.DoesNotContain(
             result.GeneratedTrees,
-            tree => tree.ToString().Contains("UseGeneratedChain", StringComparison.Ordinal));
+            tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 }

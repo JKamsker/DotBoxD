@@ -278,7 +278,7 @@ public sealed class PluginAnalyzerCompletenessTests
             compilation,
             out var outputCompilation,
             out var diagnostics);
-        return (driver.GetRunResult(), outputCompilation, diagnostics);
+        return (PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()), outputCompilation, diagnostics);
     }
 
     private static CSharpCompilation CreateCompilation(string source)

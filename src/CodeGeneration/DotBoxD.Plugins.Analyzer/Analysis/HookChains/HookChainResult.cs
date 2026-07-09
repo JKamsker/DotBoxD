@@ -8,7 +8,10 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 /// <c>UseGeneratedChain</c>. Interception is null when the call site has no interceptable location —
 /// the package still generates.
 /// </summary>
-internal sealed record HookChainResult(PluginKernelModel Model, HookChainInterception? Interception);
+internal sealed record HookChainResult(
+    PluginKernelModel Model,
+    HookChainInterception? Interception,
+    EquatableArray<HookChainStageIrModel> StageIrModels);
 
 /// <summary>
 /// The outcome of one hook-chain call site: either a lowered <see cref="HookChainResult"/>, or — for a recognized

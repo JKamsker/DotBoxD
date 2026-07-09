@@ -86,7 +86,7 @@ public sealed class DtoProjectionTests
     {
         using var h = new RunLocalHarness<EncounterEvent>();
 
-        Assert.Throws<NotSupportedException>(() =>
+        Assert.Throws<ArgumentNullException>(() =>
         {
             h.Hooks.On<EncounterEvent>()
                 .Where(e => e.Distance <= 4)

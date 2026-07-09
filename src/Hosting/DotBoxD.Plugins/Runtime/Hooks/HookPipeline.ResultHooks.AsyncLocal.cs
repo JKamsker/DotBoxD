@@ -4,23 +4,55 @@ public partial class HookPipeline<TEvent, TContext>
 {
     public HookPipeline<TEvent, TContext> RegisterLocal<TResult>(
         Func<TEvent, ValueTask<TResult>> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null,
         int priority = 0)
-        => throw Hooks.HookLowering.ResultNotLowered();
+        where TResult : struct, IHookResult
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedLocalResultChain<TResult>(
+            Hooks.HookLowering.RequiredPackage(irHandler, nameof(irHandler)),
+            handler,
+            priority);
+    }
 
     public HookPipeline<TEvent, TContext> RegisterLocal<TResult>(
         Func<TEvent, TContext, ValueTask<TResult>> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null,
         int priority = 0)
-        => throw Hooks.HookLowering.ResultNotLowered();
+        where TResult : struct, IHookResult
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedLocalResultChain<TResult>(
+            Hooks.HookLowering.RequiredPackage(irHandler, nameof(irHandler)),
+            handler,
+            priority);
+    }
 
     public HookPipeline<TEvent, TContext> RegisterLocal<TResult>(
         Func<TEvent, CancellationToken, ValueTask<TResult>> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null,
         int priority = 0)
-        => throw Hooks.HookLowering.ResultNotLowered();
+        where TResult : struct, IHookResult
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedLocalResultChain<TResult>(
+            Hooks.HookLowering.RequiredPackage(irHandler, nameof(irHandler)),
+            handler,
+            priority);
+    }
 
     public HookPipeline<TEvent, TContext> RegisterLocal<TResult>(
         Func<TEvent, TContext, CancellationToken, ValueTask<TResult>> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null,
         int priority = 0)
-        => throw Hooks.HookLowering.ResultNotLowered();
+        where TResult : struct, IHookResult
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedLocalResultChain<TResult>(
+            Hooks.HookLowering.RequiredPackage(irHandler, nameof(irHandler)),
+            handler,
+            priority);
+    }
 
     public HookPipeline<TEvent, TContext> UseGeneratedLocalResultChain<TResult>(
         PluginPackage package,

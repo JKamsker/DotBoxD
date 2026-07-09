@@ -38,7 +38,7 @@ internal static class PluginServerGenerationTestDriver
             parseOptions: ParseOptions);
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var diagnostics);
 
-        var generated = string.Join("\n", driver.GetRunResult().GeneratedTrees.Select(tree => tree.ToString()));
+        var generated = string.Join("\n", PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()).GeneratedTrees.Select(tree => tree.ToString()));
         return (generated, outputCompilation, diagnostics);
     }
 
@@ -61,7 +61,7 @@ internal static class PluginServerGenerationTestDriver
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var diagnostics);
 
         Assert.Empty(diagnostics.Where(IsError));
-        var generated = string.Join("\n", driver.GetRunResult().GeneratedTrees.Select(tree => tree.ToString()));
+        var generated = string.Join("\n", PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()).GeneratedTrees.Select(tree => tree.ToString()));
         return (generated, outputCompilation);
     }
 
@@ -80,7 +80,7 @@ internal static class PluginServerGenerationTestDriver
             [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: ParseOptions);
 
-        return driver.RunGenerators(compilation).GetRunResult().Diagnostics;
+        return PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.RunGenerators(compilation).GetRunResult()).Diagnostics;
     }
 
     public static IReadOnlyList<Diagnostic> InputDiagnostics(

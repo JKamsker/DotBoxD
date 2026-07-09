@@ -58,7 +58,7 @@ public sealed class PluginAnalyzerHookChainDiagnosticTests
             {
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<NoHookCtx>()
-                        .RegisterLocal((ctx, hookContext) => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
+                        .RegisterLocal((ctx, hookContext) => new DamageResult { Success = true, Damage = ctx.Damage }, priority: 0);
             }
             """);
 

@@ -53,6 +53,11 @@ internal static partial class ResultHookChain
             throw new NotSupportedException("Result hook context types must declare [Hook(name, typeof(TResult))].");
         }
 
+        if (IsFileLocal(resultType))
+        {
+            throw new NotSupportedException("Result hook result types must be source-nameable.");
+        }
+
         if (!HookResultModelFactory.CanSatisfyHookResult(resultType, model.Compilation, cancellationToken))
         {
             throw new NotSupportedException("Result hook result types must be constructible from the generated hook result builder.");
@@ -151,12 +156,16 @@ internal static partial class ResultHookChain
             generatedRemoteServerContextTypeFullName,
             cancellationToken) ?? throw new NotSupportedException("the call site is not interceptable");
 
-        return new HookChainResult(kernelModel, interception);
+        var stageIrModels = HookChainStageIrFactory.Create(
+            invocation,
+            stages,
+            contextType,
+            generatedRemoteKind,
+            generatedRemoteServerContextTypeFullName,
+            model,
+            cancellationToken);
+        return new HookChainResult(kernelModel, interception, stageIrModels);
     }
-
-    public static bool IsResultTerminal(string terminalMethod)
-        => string.Equals(terminalMethod, "Register", StringComparison.Ordinal)
-            || string.Equals(terminalMethod, "RegisterLocal", StringComparison.Ordinal);
 
     private static DotBoxDStatementBodyModel LowerResultHandle(
         LambdaExpressionSyntax terminalLambda,
@@ -233,6 +242,19 @@ internal static partial class ResultHookChain
             hookName = declaredName;
             resultType = declaredResult;
             return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsFileLocal(INamedTypeSymbol type)
+    {
+        for (INamedTypeSymbol? current = type; current is not null; current = current.ContainingType)
+        {
+            if (current.IsFileLocal)
+            {
+                return true;
+            }
         }
 
         return false;

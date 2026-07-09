@@ -1,7 +1,9 @@
+using DotBoxD.Kernels.Model;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Json;
 using DotBoxD.Plugins.Runtime;
 using DotBoxD.Plugins.Runtime.Hooks;
+using DotBoxD.Plugins.Runtime.Rpc;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime;
 
@@ -25,7 +27,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
             registry.On<ChainAggroEvent>()
-                .Select(e => e.MonsterId)
+                .Select(e => e.MonsterId, Ir<ChainAggroEvent, string>())
                 .UseGeneratedLocalChain(package, (string _, HookContext _) => ValueTask.CompletedTask));
 
         Assert.False(installed);
@@ -48,7 +50,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
             registry.On<ChainAggroEvent>()
-                .Select(e => e.MonsterId)
+                .Select(e => e.MonsterId, Ir<ChainAggroEvent, string>())
                 .UseGeneratedLocalChain(package, (string _, HookContext _) => ValueTask.CompletedTask));
 
         Assert.False(installed);
@@ -68,7 +70,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
             registry.On<ScoreEvent>()
-                .Select(_ => new List<string>())
+                .Select(_ => new List<string>(), Ir<ScoreEvent, List<string>>())
                 .UseGeneratedLocalChain(package, (List<string> _, HookContext _) => ValueTask.CompletedTask));
 
         Assert.False(installed);
@@ -110,7 +112,9 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
             registry.On<ChainAggroEvent>()
-                .Select(e => new SameShapeAggroProjection(e.MonsterId, e.Distance))
+                .Select(
+                    e => new SameShapeAggroProjection(e.MonsterId, e.Distance),
+                    Ir<ChainAggroEvent, SameShapeAggroProjection>())
                 .UseGeneratedLocalChain(
                     package,
                     (SameShapeAggroProjection _, HookContext _) => ValueTask.CompletedTask));
@@ -123,6 +127,21 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
     private static PluginPackage JsonRoundTrip(PluginPackage package)
         => PluginPackageJsonSerializer.Import(PluginPackageJsonSerializer.Export(package));
 
+    private static IRFunc<TInput, TOutput> Ir<TInput, TOutput>()
+    {
+        var span = new SourceSpan(1, 1);
+        var step = new LoweredPipelineStep(
+            LoweredPipelineStepKind.Projection,
+            TypeName(typeof(TInput)),
+            TypeName(typeof(TOutput)),
+            [new Parameter("$dotboxd.current", KernelRpcMarshaller.SandboxTypeOf(typeof(TInput)))],
+            [],
+            new VariableExpression("$dotboxd.current", span),
+            [],
+            []);
+        return IRFunc<TInput, TOutput>.FromStep(step);
+    }
+
     private static PluginPackage WithSubscription(
         PluginPackage package,
         Func<HookSubscriptionManifest, HookSubscriptionManifest> mutate)
@@ -133,4 +152,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
             Manifest = package.Manifest with { Subscriptions = subscriptions }
         };
     }
+
+    private static string TypeName(Type type)
+        => type.FullName ?? type.Name;
 }

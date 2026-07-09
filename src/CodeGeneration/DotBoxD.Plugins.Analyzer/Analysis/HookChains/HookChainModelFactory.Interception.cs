@@ -128,7 +128,7 @@ internal static partial class HookChainModelFactory
         }
 
         var receiverType = ResolvedReceiverType(method, expressionReceiverType);
-        if (receiverType is null || ReceiverKind(receiverType) is null)
+        if (receiverType is null || ReceiverKind(receiverType, model.Compilation) is null)
         {
             return false;
         }

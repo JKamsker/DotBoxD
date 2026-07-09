@@ -76,7 +76,7 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
 
                     hooks.On<ChainDamageContext>()
                         .Where(e => e.Damage > 10)
-                        .Register(e => new ChainDamageResult { Success = true, Damage = e.Damage }, 5);
+                        .Register(e => new ChainDamageResult { Success = true, Damage = e.Damage }, priority: 5);
 
                     var subscriptions = beta.Subscriptions;
                     subscriptions.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent>()

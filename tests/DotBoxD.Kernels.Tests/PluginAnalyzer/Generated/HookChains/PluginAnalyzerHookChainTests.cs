@@ -235,6 +235,35 @@ public sealed partial class PluginAnalyzerHookChainTests
     }
 
     [Fact]
+    public void Lowers_one_parameter_stages_with_explicit_null_ir_companions()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public sealed record MonsterAggroEvent(string MonsterId, int Distance, int MonsterLevel, int PlayerLevel);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<MonsterAggroEvent>()
+                        .Where(e => e.Distance <= 5, irFilter: null)
+                        .Select(e => e.MonsterLevel - e.PlayerLevel, irProjection: null)
+                        .Where(gap => gap >= 3, irFilter: null)
+                        .Run((gap, ctx) => ctx.Messages.Send("monster", "calm"));
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK100");
+        Assert.Contains(
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("HookChain_", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Lowers_a_chain_mixing_one_and_two_parameter_stages_independently()
     {
         // Each stage independently chooses its arity: 1-param Where, 2-param Where, 1-param Select.

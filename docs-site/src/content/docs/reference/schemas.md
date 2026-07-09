@@ -22,5 +22,6 @@ with the code that consumes it, so a schema change that diverges from the import
 ## See also
 
 - [Kernels](/concepts/kernels/)
+- [Hand-written IR hook pipeline](/tutorials/handwritten-ir-hook-pipeline/)
 - [Pushdown Step 6 — hand-authoring the payload](/tutorials/pushdown-server-extension/#step-6--diagnostics-and-the-no-lock-in-principle)
 - [Glossary](/reference/glossary/)

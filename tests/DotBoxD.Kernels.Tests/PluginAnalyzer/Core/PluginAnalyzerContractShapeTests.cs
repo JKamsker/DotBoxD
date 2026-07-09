@@ -55,7 +55,7 @@ public sealed class PluginAnalyzerContractShapeTests
             [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: ParseOptions);
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out _, out _);
-        return driver.GetRunResult();
+        return PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult());
     }
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()

@@ -132,6 +132,6 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: parseOptions);
-        return driver.RunGenerators(compilation).GetRunResult().Diagnostics;
+        return PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.RunGenerators(compilation).GetRunResult()).Diagnostics;
     }
 }

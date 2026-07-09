@@ -22,15 +22,12 @@ internal static class Program
 
     public static async Task<int> Main(string[] args)
     {
-        if (args.Length > 1 || (args.Length == 1 && args[0] != "--use-builder"))
+        if (!GameServerLaunchOptions.TryParse(args, out var options, out var parseError))
         {
-            await Console.Error
-                .WriteLineAsync("Usage: Examples.GameServer.Server [--use-builder]")
-                .ConfigureAwait(false);
+            await Console.Error.WriteLineAsync(parseError).ConfigureAwait(false);
+            await Console.Error.WriteLineAsync(GameServerLaunchOptions.Usage).ConfigureAwait(false);
             return 1;
         }
-
-        var useBuilder = args.Length == 1;
 
         // (a) Build the world and plugin server. The command sink is the example-defined capability that turns
         // plugin messages into game-state changes; the world host backs the gated ctx.Host<IGameWorldAccess>()
@@ -80,13 +77,14 @@ internal static class Program
         // (c) Start the IPC control plane. GamePluginHost owns the pipe, the per-peer ownership session, and
         // provisioning both services; when the connection drops it disposes the session and unloads the
         // kernels it owned.
-        await using var host = await GamePluginHost.StartAsync(server, sink, world).ConfigureAwait(false);
+        await using var host = await GamePluginHost
+            .StartAsync(server, sink, world, options.ExternalPluginPipeName)
+            .ConfigureAwait(false);
         Console.WriteLine($"[server] listening for plugin on pipe '{host.PipeName}'.");
 
-        // (d) Launch the plugin child process.
-        Console.WriteLine("[server] launching plugin child process...");
-        var pluginProcess = PluginLauncher.Launch(host.PipeName, useBuilder);
-        var pluginExit = pluginProcess.WaitForExitAsync();
+        // (d) Launch the plugin child process unless the server was started in external-plugin debug mode.
+        var pluginProcess = LaunchPluginIfRequested(options, host.PipeName);
+        var pluginExit = pluginProcess?.WaitForExitAsync() ?? Task.Delay(Timeout.InfiniteTimeSpan);
         var readinessTimeout = PluginReadinessGate.ReadTimeout();
 
         // (e) Wait until the plugin has connected and installed its kernels (it then holds the connection).
@@ -96,12 +94,12 @@ internal static class Program
             .ConfigureAwait(false);
         if (connectionWait == PluginReadinessWaitResult.PluginExited)
         {
-            return await FailPluginAsync(host, pluginProcess, $"plugin exited before connecting (code {pluginProcess.ExitCode}).").ConfigureAwait(false);
+            return await FailExitedPluginAsync(host, pluginProcess, "connecting").ConfigureAwait(false);
         }
 
         if (connectionWait == PluginReadinessWaitResult.TimedOut)
         {
-            return await FailPluginAsync(host, pluginProcess, "plugin did not connect before the readiness timeout.").ConfigureAwait(false);
+            return await FailPluginOrExternalAsync(host, pluginProcess, "plugin did not connect before the readiness timeout.").ConfigureAwait(false);
         }
 
         var control = await host.Connected.ConfigureAwait(false);
@@ -110,12 +108,12 @@ internal static class Program
             .ConfigureAwait(false);
         if (readyWait == PluginReadinessWaitResult.PluginExited)
         {
-            return await FailPluginAsync(host, pluginProcess, $"plugin exited before installing kernels (code {pluginProcess.ExitCode}).").ConfigureAwait(false);
+            return await FailExitedPluginAsync(host, pluginProcess, "installing kernels").ConfigureAwait(false);
         }
 
         if (readyWait == PluginReadinessWaitResult.TimedOut)
         {
-            return await FailPluginAsync(host, pluginProcess, "plugin did not install kernels before the readiness timeout.").ConfigureAwait(false);
+            return await FailPluginOrExternalAsync(host, pluginProcess, "plugin did not install kernels before the readiness timeout.").ConfigureAwait(false);
         }
 
         Console.WriteLine("[server] plugin connected; event kernels and server extension are installed and live.");
@@ -139,16 +137,23 @@ internal static class Program
 
         // (g) Release the plugin; it disconnects, and ownership unloads its kernels.
         control.SignalShutdown();
-        if (await Task.WhenAny(pluginExit, Task.Delay(readinessTimeout)).ConfigureAwait(false) != pluginExit)
+        if (pluginProcess is not null)
         {
-            return await FailPluginAsync(host, pluginProcess, "plugin did not shut down before the readiness timeout.").ConfigureAwait(false);
-        }
+            var shutdown = Task.WhenAll(pluginExit, host.Disconnected);
+            if (await Task.WhenAny(shutdown, Task.Delay(readinessTimeout)).ConfigureAwait(false) != shutdown)
+            {
+                return await FailPluginAsync(host, pluginProcess, "plugin did not shut down before the readiness timeout.").ConfigureAwait(false);
+            }
 
-        await pluginExit.ConfigureAwait(false);
-        await host.Disconnected.ConfigureAwait(false);
-        if (pluginProcess.ExitCode != 0)
+            await shutdown.ConfigureAwait(false);
+            if (pluginProcess.ExitCode != 0)
+            {
+                return await FailPluginAsync(host, pluginProcess, $"plugin exited with code {pluginProcess.ExitCode}.").ConfigureAwait(false);
+            }
+        }
+        else if (await Task.WhenAny(host.Disconnected, Task.Delay(readinessTimeout)).ConfigureAwait(false) != host.Disconnected)
         {
-            return await FailPluginAsync(host, pluginProcess, $"plugin exited with code {pluginProcess.ExitCode}.").ConfigureAwait(false);
+            return await FailAsync(host, "external plugin did not disconnect before the readiness timeout.").ConfigureAwait(false);
         }
 
         // (h) Summary, plus proof that disconnect unloaded the plugin's kernels.
@@ -166,12 +171,38 @@ internal static class Program
         return 0;
     }
 
+    private static Process? LaunchPluginIfRequested(GameServerLaunchOptions options, string pipeName)
+    {
+        if (!options.LaunchPlugin)
+        {
+            Console.WriteLine("[server] waiting for externally launched plugin process...");
+            return null;
+        }
+
+        Console.WriteLine("[server] launching plugin child process...");
+        return PluginLauncher.Launch(pipeName, options.UseBuilder);
+    }
+
     private static async Task<int> FailAsync(PluginConnectionHost<GamePluginControlService> host, string message)
     {
         await Console.Error.WriteLineAsync($"[server] {message}").ConfigureAwait(false);
         await host.StopAsync().ConfigureAwait(false);
         return 1;
     }
+
+    private static Task<int> FailPluginOrExternalAsync(
+        PluginConnectionHost<GamePluginControlService> host,
+        Process? pluginProcess,
+        string message)
+        => pluginProcess is null ? FailAsync(host, message) : FailPluginAsync(host, pluginProcess, message);
+
+    private static Task<int> FailExitedPluginAsync(
+        PluginConnectionHost<GamePluginControlService> host,
+        Process? pluginProcess,
+        string phase)
+        => pluginProcess is null
+            ? FailAsync(host, $"external plugin wait completed unexpectedly while {phase}.")
+            : FailPluginAsync(host, pluginProcess, $"plugin exited before {phase} (code {pluginProcess.ExitCode}).");
 
     private static async Task<int> FailPluginAsync(PluginConnectionHost<GamePluginControlService> host, Process pluginProcess, string message)
     {

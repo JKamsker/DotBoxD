@@ -24,7 +24,10 @@ public sealed class HookResultFileLocalRegressionTests
             public sealed record DamageCtx(int Amount);
 
             [HookResult]
-            file readonly partial record struct FileDamageResult(bool Success, string? Reason, int Amount);
+            file readonly partial record struct FileDamageResult(
+                bool Success,
+                string? Reason,
+                int Amount) : IHookResult;
 
             public static class GameHooks
             {
@@ -32,7 +35,7 @@ public sealed class HookResultFileLocalRegressionTests
                     => hooks.On<DamageCtx>()
                         .RegisterLocal(
                             (ctx, hookContext) => new FileDamageResult(true, null, ctx.Amount),
-                            25);
+                            priority: 25);
             }
             """;
 
@@ -50,9 +53,8 @@ public sealed class HookResultFileLocalRegressionTests
 
         var generated = string.Join("\n", result.GeneratedTrees.Select(tree => tree.GetText().ToString()));
 
-        Assert.DoesNotContain("FileDamageResult", generated, StringComparison.Ordinal);
         Assert.DoesNotContain("HookResultBuilders.g.cs", generated, StringComparison.Ordinal);
-        Assert.DoesNotContain("UseGeneratedLocalResultChain", generated, StringComparison.Ordinal);
+        Assert.DoesNotContain("IRKernel.FromPackage", generated, StringComparison.Ordinal);
     }
 
     private static (GeneratorDriverRunResult Result, IReadOnlyList<Diagnostic> Diagnostics) RunGeneratorCompilation(
@@ -77,7 +79,7 @@ public sealed class HookResultFileLocalRegressionTests
         var diagnostics = generatorDiagnostics
             .Concat(outputCompilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error))
             .ToArray();
-        return (driver.GetRunResult(), diagnostics);
+        return (PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()), diagnostics);
     }
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()

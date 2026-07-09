@@ -124,6 +124,8 @@ the `Where`/`Select` lower and the terminal delegate stays native.
 - [Event-pipeline tutorial](/tutorials/event-pipeline-runlocal/) — build a pipeline end to end against
   the maintained sample, with the runnable chains from
   [`LocalReactions.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Authoring/LocalReactions.cs).
+- [Hand-written IR hook pipeline](/tutorials/handwritten-ir-hook-pipeline/) — install and wire the same
+  hook shape yourself with public `PluginPackage`, `PluginSession`, and `PluginServer` primitives.
 - [Kernels](/concepts/kernels/) — the validated, fuel-metered sandbox the `Where`/`Select` IR runs inside, and what
   `Use<TKernel>` installs.
 - [Pushdown](/concepts/pushdown/) — the sibling server-side mode: aggregate N round-trips into one instead of

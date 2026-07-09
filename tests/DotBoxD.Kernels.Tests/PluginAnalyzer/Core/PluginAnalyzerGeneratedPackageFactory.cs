@@ -84,7 +84,7 @@ internal static class PluginAnalyzerGeneratedPackageFactory
         Assert.Empty(diagnostics.Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
         Assert.Empty(outputCompilation.GetDiagnostics().Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
 
-        return driver.GetRunResult().GeneratedTrees
+        return PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()).GeneratedTrees
             .Select(tree => tree.GetText().ToString())
             .ToArray();
     }
@@ -98,7 +98,7 @@ internal static class PluginAnalyzerGeneratedPackageFactory
             [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: ParseOptions);
         driver = driver.RunGenerators(compilation);
-        return driver.GetRunResult();
+        return PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult());
     }
 
     public static GeneratorDriverRunResult RunGeneratorWithReferences(
@@ -110,7 +110,7 @@ internal static class PluginAnalyzerGeneratedPackageFactory
             [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: ParseOptions);
         driver = driver.RunGenerators(compilation);
-        return driver.GetRunResult();
+        return PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult());
     }
 
     public static IReadOnlyList<Diagnostic> Diagnostics(string source, params Type[] additionalReferenceTypes)
@@ -130,6 +130,7 @@ internal static class PluginAnalyzerGeneratedPackageFactory
             compilation,
             out var outputCompilation,
             out var generatorDiagnostics);
+        PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(generatorDiagnostics);
 
         return generatorDiagnostics
             .Concat(outputCompilation.GetDiagnostics().Where(

@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
@@ -13,6 +14,11 @@ internal static partial class HookChainModelFactory
     {
         prepared = default;
         if (invocation.Expression is not MemberAccessExpressionSyntax terminalAccess)
+        {
+            return false;
+        }
+
+        if (HasExplicitTerminalIrArgument(invocation, model, cancellationToken))
         {
             return false;
         }
@@ -49,7 +55,7 @@ internal static partial class HookChainModelFactory
         out PreparedHookChain prepared)
     {
         prepared = default;
-        var resolution = ResolveChainInstall(terminalAccess, seed, model, cancellationToken);
+        var resolution = ResolveChainInstall(invocation, terminalAccess, seed, model, cancellationToken);
         if (resolution.InstallKind is null)
         {
             return false;
@@ -88,6 +94,7 @@ internal static partial class HookChainModelFactory
     }
 
     private static HookChainResolution ResolveChainInstall(
+        InvocationExpressionSyntax terminal,
         MemberAccessExpressionSyntax terminalAccess,
         InvocationExpressionSyntax seed,
         SemanticModel model,
@@ -104,7 +111,7 @@ internal static partial class HookChainModelFactory
         var installKind = generatedRemoteTarget is null && receiverKind is null
             ? null
             : HookChainInstallKindResolver.Resolve(
-                terminalAccess.Name.Identifier.ValueText,
+                RoleOf(terminal, model, cancellationToken),
                 receiverKind,
                 generatedRemoteKind);
 
@@ -142,6 +149,62 @@ internal static partial class HookChainModelFactory
         => IsResultTerminal(installKind)
             ? TryLeadingLambda(invocation, out terminalLambda)
             : TryLambda(invocation, out terminalLambda);
+
+    private static bool HasExplicitTerminalIrArgument(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        var irParameter = TerminalIrParameter(invocation, model, cancellationToken);
+        if (irParameter is null)
+        {
+            return false;
+        }
+
+        var positionalIndex = -1;
+        foreach (var argument in invocation.ArgumentList.Arguments)
+        {
+            if (argument.NameColon is { } namedArgument)
+            {
+                if (string.Equals(namedArgument.Name.Identifier.ValueText, irParameter.Name, StringComparison.Ordinal))
+                {
+                    return !IsNullLike(argument.Expression);
+                }
+
+                continue;
+            }
+
+            positionalIndex++;
+            if (positionalIndex == irParameter.Ordinal)
+            {
+                return !IsNullLike(argument.Expression);
+            }
+        }
+
+        return false;
+    }
+
+    private static IParameterSymbol? TerminalIrParameter(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        var info = model.GetSymbolInfo(invocation, cancellationToken);
+        var method = info.Symbol as IMethodSymbol ??
+            (info.CandidateSymbols.Length > 0 ? info.CandidateSymbols[0] as IMethodSymbol : null);
+        if (method is null || RoleOf(method, model.Compilation) is not
+            (PipelineCallRole.Run or PipelineCallRole.RunLocal or PipelineCallRole.Register or PipelineCallRole.RegisterLocal))
+        {
+            return null;
+        }
+
+        return method.Parameters.Length > 1 ? method.Parameters[1] : null;
+    }
+
+    private static bool IsNullLike(ExpressionSyntax expression)
+        => expression.IsKind(SyntaxKind.NullLiteralExpression) ||
+            expression.IsKind(SyntaxKind.DefaultLiteralExpression) ||
+            expression.IsKind(SyntaxKind.DefaultExpression);
 
     private static bool TryEventShape(
         InvocationExpressionSyntax seed,

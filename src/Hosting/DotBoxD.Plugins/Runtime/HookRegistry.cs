@@ -52,21 +52,18 @@ public sealed partial class HookRegistry
         _onFault = onFault;
         _throwIfDisposed = throwIfDisposed;
     }
-
     public HookPipeline<TEvent, HookContext> On<TEvent>()
     {
         ThrowIfDisposed();
         var adapter = _events.Resolve<TEvent>();
         return On(adapter);
     }
-
     public HookPipeline<TEvent, HookContext> On<TEvent>(IPluginEventAdapter<TEvent> adapter)
     {
         ArgumentNullException.ThrowIfNull(adapter);
         ThrowIfDisposed();
         return OnHookContext(adapter, ServerContextFactory<HookContext>.Identity);
     }
-
     public HookPipeline<TEvent, TContext> On<TEvent, TContext>(Func<HookContext, TContext> createContext)
     {
         ArgumentNullException.ThrowIfNull(createContext);
@@ -74,7 +71,6 @@ public sealed partial class HookRegistry
         var adapter = _events.Resolve<TEvent>();
         return On(adapter, createContext);
     }
-
     public HookPipeline<TEvent, TContext> On<TEvent, TContext>(
         IPluginEventAdapter<TEvent> adapter,
         Func<HookContext, TContext> createContext)

@@ -7,7 +7,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
 /// <summary>
 /// Emits the C# interceptors that replace each lowered chain's <c>Run(lambda)</c> call site
-/// with <c>UseGeneratedChain(&lt;ChainPackage&gt;.Create())</c>, plus the
+/// with <c>Run(lambda, IRKernel.FromPackage(&lt;ChainPackage&gt;.Create()))</c>, plus the
 /// <c>InterceptsLocationAttribute</c> definition. Consuming projects opt in by adding the interceptor
 /// namespace to <c>&lt;InterceptorsNamespaces&gt;</c> (<c>DotBoxD.Plugins.Generated</c>).
 /// </summary>
@@ -56,24 +56,27 @@ internal static class DotBoxDHookChainInterceptorEmitter
             if (IsResultChain(interception.InstallKind))
             {
                 builder.Append("            ").Append(interception.HandlerTypeFullName).AppendLine(" handler,");
+                builder.AppendLine("            global::DotBoxD.Plugins.IRKernel? irHandler = null,");
                 builder.AppendLine("            int priority = 0)");
                 builder.Append("            => pipeline.")
                     .Append(interception.InstallKind == HookChainInterceptorInstallKind.ResultChain
-                        ? "UseGeneratedResultChain"
-                        : "UseGeneratedLocalResultChain")
+                        ? "Register"
+                        : "RegisterLocal")
                     .Append('<').Append(interception.ResultTypeFullName).Append(">(")
-                    .Append(interception.PackageFullName)
-                    .Append(ResultInstallArguments(interception))
+                    .Append("handler, ")
+                    .Append(IrKernelExpression(interception))
+                    .Append(", priority")
                     .AppendLine(");");
                 continue;
             }
 
-            builder.Append("            ").Append(interception.HandlerTypeFullName).AppendLine(" handler)");
+            builder.Append("            ").Append(interception.HandlerTypeFullName).AppendLine(" handler,");
+            builder.AppendLine("            global::DotBoxD.Plugins.IRKernel? irHandler = null)");
             builder.Append("            => pipeline.")
-                .Append(InstallMethod(interception))
+                .Append(TerminalMethod(interception))
                 .Append('(')
-                .Append(interception.PackageFullName)
-                .Append(InstallArguments(interception))
+                .Append("handler, ")
+                .Append(IrKernelExpression(interception))
                 .AppendLine(");");
         }
 
@@ -98,46 +101,28 @@ internal static class DotBoxDHookChainInterceptorEmitter
         }
     }
 
-    private static string InstallMethod(HookChainInterception interception)
+    private static string TerminalMethod(HookChainInterception interception)
+        => interception.InstallKind == HookChainInterceptorInstallKind.LocalCallback ? "RunLocal" : "Run";
+
+    private static string IrKernelExpression(HookChainInterception interception)
     {
-        if (interception.InstallKind == HookChainInterceptorInstallKind.LocalCallback)
-        {
-            return "UseGeneratedLocalChain";
-        }
-
-        return interception.BypassReceiverStage
-            ? "UseGeneratedChainFromInterceptor"
-            : "UseGeneratedChain";
-    }
-
-    // A non-local chain takes only the package; a local chain also takes the native handler, and — when the
-    // projected type is wire-eligible — the generated reflection-free decoder as the 3rd argument so decode
-    // skips the SandboxValue graph. A local chain without a decoder keeps the 2-arg reflective form.
-    private static string InstallArguments(HookChainInterception interception)
-    {
-        if (interception.InstallKind != HookChainInterceptorInstallKind.LocalCallback)
-        {
-            return ".Create()";
-        }
-
         if (!interception.HasLocalDecoder)
         {
-            return ".Create(), handler";
+            return "global::DotBoxD.Plugins.IRKernel.FromPackage(" +
+                interception.PackageFullName +
+                ".Create())";
         }
 
         var decoder = interception.LocalDecoderTypeArgument is { Length: > 0 } typeArgument
             ? interception.PackageFullName + ".ReadProjectedPayload<" + typeArgument + ">"
             : interception.PackageFullName + ".ReadProjectedPayload";
-        return ".Create(), handler, " + decoder;
+        return "global::DotBoxD.Plugins.IRKernel.FromPackage(" +
+            interception.PackageFullName +
+            ".Create(), " +
+            decoder +
+            ")";
     }
 
     private static bool IsResultChain(HookChainInterceptorInstallKind kind)
         => kind is HookChainInterceptorInstallKind.ResultChain or HookChainInterceptorInstallKind.LocalResultChain;
-
-    // A sandbox Register chain installs only the package (its handler body lowered to IR); a RegisterLocal chain
-    // also passes the native handler that produces the result. Both pass the install-time priority.
-    private static string ResultInstallArguments(HookChainInterception interception)
-        => interception.InstallKind == HookChainInterceptorInstallKind.ResultChain
-            ? ".Create(), priority"
-            : ".Create(), handler, priority";
 }

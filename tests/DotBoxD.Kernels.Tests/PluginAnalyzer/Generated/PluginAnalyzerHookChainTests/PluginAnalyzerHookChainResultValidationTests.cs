@@ -28,16 +28,16 @@ public sealed class PluginAnalyzerHookChainResultValidationTests
                     => hooks.On<DamageCtx>()
                         .RegisterLocal((ctx, hookContext) =>
                         {
-                            var capped = Math.Min(ctx.Damage, 10);
+                            var capped = Math.Min(ctx.Damage, priority: 10);
                             return DamageResult.Ok().WithDamage(capped);
-                        }, 100);
+                        }, priority: 100);
             }
             """);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
         Assert.Contains(
             result.GeneratedTrees,
-            tree => tree.ToString().Contains("UseGeneratedLocalResultChain", StringComparison.Ordinal));
+            tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public sealed class PluginAnalyzerHookChainResultValidationTests
             {
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<DamageCtx>()
-                        .Register(ctx => DamageResult.Ok().WithDamage(1), 100);
+                        .Register(ctx => DamageResult.Ok().WithDamage(1), priority: 100);
             }
             """);
 
@@ -92,7 +92,7 @@ public sealed class PluginAnalyzerHookChainResultValidationTests
             {
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<DamageCtx>()
-                        .Register(ctx => DamageResult.Ok().WithDamage(ctx.Damage), 100);
+                        .Register(ctx => DamageResult.Ok().WithDamage(ctx.Damage), priority: 100);
             }
             """);
 
@@ -122,7 +122,7 @@ public sealed class PluginAnalyzerHookChainResultValidationTests
             {
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<DamageCtx>()
-                        .Register(ctx => DamageResult.Ok().WithDamage(ctx.Damage), 100);
+                        .Register(ctx => DamageResult.Ok().WithDamage(ctx.Damage), priority: 100);
             }
             """);
 
@@ -152,7 +152,7 @@ public sealed class PluginAnalyzerHookChainResultValidationTests
             {
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<DamageCtx>()
-                        .Register(ctx => DamageResult.Ok().WithDamage(ctx.Damage), 100);
+                        .Register(ctx => DamageResult.Ok().WithDamage(ctx.Damage), priority: 100);
             }
             """);
 
@@ -182,14 +182,14 @@ public sealed class PluginAnalyzerHookChainResultValidationTests
             {
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<DamageCtx>()
-                        .Register(ctx => DamageResult.Ok().WithDamage(ctx.Damage), 100);
+                        .Register(ctx => DamageResult.Ok().WithDamage(ctx.Damage), priority: 100);
             }
             """);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
         Assert.Contains(
             result.GeneratedTrees,
-            tree => tree.ToString().Contains("UseGeneratedResultChain", StringComparison.Ordinal));
+            tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -215,7 +215,7 @@ public sealed class PluginAnalyzerHookChainResultValidationTests
             {
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<DamageCtx>()
-                        .RegisterLocal((ctx, hookContext) => new OtherResult { Success = true }, 0);
+                        .RegisterLocal((ctx, hookContext) => new OtherResult { Success = true }, priority: 0);
             }
             """);
 
@@ -241,7 +241,7 @@ public sealed class PluginAnalyzerHookChainResultValidationTests
             {
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<NoHookCtx>()
-                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, priority: 0);
             }
             """);
 
@@ -269,7 +269,7 @@ public sealed class PluginAnalyzerHookChainResultValidationTests
             {
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<NoHookCtx>()
-                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, priority: 0);
             }
             """);
 

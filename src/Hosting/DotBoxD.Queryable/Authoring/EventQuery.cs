@@ -9,6 +9,13 @@ namespace DotBoxD.Queryable.Authoring;
 /// translate the captured expressions into the portable AST and register the subscription. Only the
 /// expression shapes the model supports are accepted — unsupported shapes throw at subscribe time.
 /// </summary>
+/// <remarks>
+/// This is the runtime-dynamic sibling of the source-generated hook/subscription pipeline. It takes runtime
+/// <see cref="Expression"/> trees rather than source lambdas, translates them to a portable AST at subscribe
+/// time, and dispatches in-process — so it is deliberately not part of the <c>[PipelineSurface]</c> /
+/// <c>[IRBodyOf]</c> source-generator vocabulary. See <c>docs/design/event-query-vs-pipeline</c> for
+/// when to use each.
+/// </remarks>
 public sealed class EventQuery<TEvent>
 {
     private readonly EventQueryHost _host;

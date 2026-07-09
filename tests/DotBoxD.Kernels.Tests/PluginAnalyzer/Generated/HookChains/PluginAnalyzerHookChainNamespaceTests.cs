@@ -57,7 +57,7 @@ public sealed class PluginAnalyzerHookChainNamespaceTests
             [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: ParseOptions);
         driver = driver.RunGenerators(compilation);
-        return driver.GetRunResult();
+        return PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult());
     }
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()

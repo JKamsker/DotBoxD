@@ -39,6 +39,6 @@ public sealed partial class PluginAnalyzerTests
             generatorDiagnostics,
             d => d.Id == "DBXK100" &&
                  d.GetMessage().Contains("generic", StringComparison.OrdinalIgnoreCase));
-        Assert.Empty(driver.GetRunResult().GeneratedTrees);
+        Assert.Empty(PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()).GeneratedTrees);
     }
 }

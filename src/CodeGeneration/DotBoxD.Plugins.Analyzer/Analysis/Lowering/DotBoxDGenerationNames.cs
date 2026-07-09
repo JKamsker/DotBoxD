@@ -1,6 +1,6 @@
 namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 
-internal static class DotBoxDGenerationNames
+internal static partial class DotBoxDGenerationNames
 {
     public const int GeneratedSpanLine = 1;
     public const int GeneratedSpanColumn = 1;
@@ -27,6 +27,16 @@ internal static class DotBoxDGenerationNames
         public const string HostBindingAttribute = "DotBoxD.Abstractions.HostBindingAttribute";
         public const string CapabilityAttribute = "DotBoxD.Abstractions.CapabilityAttribute";
         public const string KernelMethodAttribute = "DotBoxD.Abstractions.KernelMethodAttribute";
+        public const string LowerToIrAttribute = "DotBoxD.Abstractions.LowerToIrAttribute";
+        public const string IRBodyOfAttribute = "DotBoxD.Abstractions.IRBodyOfAttribute";
+        public const string IRFunc2Original = "DotBoxD.Abstractions.IRFunc<TInput, TOutput>";
+        public const string IRFunc3Original = "DotBoxD.Abstractions.IRFunc<TInput, TContext, TOutput>";
+        public const string IRInvocation2Original = "DotBoxD.Abstractions.IRInvocation<TDelegate, TReturn>";
+        public const string IRInvocation3Original =
+            "DotBoxD.Abstractions.IRInvocation<TCaptures, TDelegate, TReturn>";
+        public const string IRKernel = "DotBoxD.Plugins.IRKernel";
+        public const string LowerToIrMethodAttribute = "DotBoxD.Abstractions.LowerToIrMethodAttribute";
+        public const string PipelineSurfaceAttribute = "DotBoxD.Abstractions.PipelineSurfaceAttribute";
         public const string NativeOnlyAttribute = "DotBoxD.Abstractions.NativeOnlyAttribute";
         public const string ServerExtensionAttribute = "DotBoxD.Abstractions.ServerExtensionAttribute";
         public const string ServerExtensionClientAttribute = "DotBoxD.Abstractions.ServerExtensionClientAttribute";
@@ -278,21 +288,4 @@ internal static class DotBoxDGenerationNames
         public const string RequiredCapabilities = "requiredCapabilities";
     }
 
-    public static class Operators
-    {
-        public const string LogicalNot = "!";
-        public const string Minus = "-";
-        public const string EqualTo = "==";
-        public const string NotEqualTo = "!=";
-        public const string GreaterThanOrEqual = ">=";
-        public const string GreaterThan = ">";
-        public const string LessThanOrEqual = "<=";
-        public const string LessThan = "<";
-        public const string LogicalAnd = "&&";
-        public const string LogicalOr = "||";
-        public const string Add = "+";
-        public const string Multiply = "*";
-        public const string Divide = "/";
-        public const string Modulo = "%";
-    }
 }

@@ -39,7 +39,7 @@ public sealed class PluginAnalyzerHookChainRemoteRefAliasTests
         Assert.Contains("Where/Select", diagnostic.GetMessage(), StringComparison.Ordinal);
         Assert.DoesNotContain(
             result.GeneratedTrees,
-            tree => tree.ToString().Contains("UseGeneratedChain", StringComparison.Ordinal));
+            tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -75,6 +75,6 @@ public sealed class PluginAnalyzerHookChainRemoteRefAliasTests
         Assert.Contains("Where/Select", diagnostic.GetMessage(), StringComparison.Ordinal);
         Assert.DoesNotContain(
             result.GeneratedTrees,
-            tree => tree.ToString().Contains("UseGeneratedLocalChain", StringComparison.Ordinal));
+            tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 }

@@ -2,14 +2,13 @@ using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
 
 internal static partial class InvokeAsyncModelFactory
 {
-    private const string InvokeAsyncMethod = "InvokeAsync";
-
     public static InvokeAsyncResult? Create(GeneratorSyntaxContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -38,12 +37,12 @@ internal static partial class InvokeAsyncModelFactory
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        if (IsUnqualifiedInvokeAsyncExpression(invocation.Expression))
+        if (IsUnqualifiedInvocationExpression(invocation.Expression))
         {
             return TryCreateUnqualified(invocation, model, cancellationToken);
         }
 
-        if (IsConditionalInvokeAsyncExpression(invocation.Expression))
+        if (IsConditionalInvocationExpression(invocation.Expression))
         {
             return TryCreateConditional(invocation, model, cancellationToken);
         }
@@ -56,7 +55,17 @@ internal static partial class InvokeAsyncModelFactory
         SemanticModel model,
         CancellationToken cancellationToken)
     {
+        if (!InvokeAsyncServerSurface.IsLoweringCandidate(model, invocation, cancellationToken))
+        {
+            return null;
+        }
+
         if (InvokeAsyncServerSurface.BindsToUserInvokeAsync(model, invocation, cancellationToken))
+        {
+            return null;
+        }
+
+        if (HasExplicitInvocationIrArgument(invocation))
         {
             return null;
         }
@@ -92,7 +101,17 @@ internal static partial class InvokeAsyncModelFactory
         SemanticModel model,
         CancellationToken cancellationToken)
     {
+        if (!InvokeAsyncServerSurface.IsLoweringCandidate(model, invocation, cancellationToken))
+        {
+            return null;
+        }
+
         if (InvokeAsyncServerSurface.BindsToUserInvokeAsync(model, invocation, cancellationToken))
+        {
+            return null;
+        }
+
+        if (HasExplicitInvocationIrArgument(invocation))
         {
             return null;
         }
@@ -126,12 +145,17 @@ internal static partial class InvokeAsyncModelFactory
         CancellationToken cancellationToken)
     {
         if (invocation.Expression is not MemberAccessExpressionSyntax access ||
-            !string.Equals(access.Name.Identifier.ValueText, InvokeAsyncMethod, StringComparison.Ordinal))
+            !InvokeAsyncServerSurface.IsLoweringCandidate(model, invocation, cancellationToken))
         {
             return null;
         }
 
         if (InvokeAsyncServerSurface.BindsToUserInvokeAsync(model, invocation, cancellationToken))
+        {
+            return null;
+        }
+
+        if (HasExplicitInvocationIrArgument(invocation))
         {
             return null;
         }
@@ -170,7 +194,7 @@ internal static partial class InvokeAsyncModelFactory
         string? serverAccessType,
         INamedTypeSymbol worldType)
     {
-        var shape = model.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol method
+        var shape = InvokeAsyncServerSurface.ResolvedMethod(model, invocation, cancellationToken) is { } method
             ? InvokeAsyncCallShape.Create(invocation, method, model, cancellationToken)
             : null;
         shape ??= InvokeAsyncCallShape.Create(invocation, worldType, model, cancellationToken);
@@ -221,15 +245,39 @@ internal static partial class InvokeAsyncModelFactory
         return new InvokeAsyncResult(package, interception, null);
     }
 
-    private static bool IsUnqualifiedInvokeAsyncExpression(ExpressionSyntax expression)
-        => expression is IdentifierNameSyntax { Identifier.ValueText: InvokeAsyncMethod } or
-            GenericNameSyntax { Identifier.ValueText: InvokeAsyncMethod };
-
-    private static bool IsConditionalInvokeAsyncExpression(ExpressionSyntax expression)
-        => expression is MemberBindingExpressionSyntax
+    private static bool HasExplicitInvocationIrArgument(InvocationExpressionSyntax invocation)
+    {
+        var positionalIndex = 0;
+        var irPositionalIndex = FirstPositionalArgumentIsLambda(invocation) ? 1 : 2;
+        foreach (var argument in invocation.ArgumentList.Arguments)
         {
-            Name: IdentifierNameSyntax { Identifier.ValueText: InvokeAsyncMethod }
-                or GenericNameSyntax { Identifier.ValueText: InvokeAsyncMethod }
-        };
+            if (argument.NameColon is { Name.Identifier.ValueText: "irInvocation" })
+            {
+                return !IsNullLike(argument.Expression);
+            }
+
+            if (argument.NameColon is null &&
+                positionalIndex == irPositionalIndex)
+            {
+                return !IsNullLike(argument.Expression);
+            }
+
+            if (argument.NameColon is null)
+            {
+                positionalIndex++;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool FirstPositionalArgumentIsLambda(InvocationExpressionSyntax invocation)
+        => invocation.ArgumentList.Arguments.FirstOrDefault(argument => argument.NameColon is null)?.Expression
+            is LambdaExpressionSyntax;
+
+    private static bool IsNullLike(ExpressionSyntax expression)
+        => expression.IsKind(SyntaxKind.NullLiteralExpression) ||
+            expression.IsKind(SyntaxKind.DefaultLiteralExpression) ||
+            expression.IsKind(SyntaxKind.DefaultExpression);
 
 }
