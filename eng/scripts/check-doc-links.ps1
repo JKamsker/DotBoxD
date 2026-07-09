@@ -23,7 +23,7 @@ function Resolve-SiteTarget([string] $Target) {
     return $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 }
 
-function Get-DocumentAnchors([string] $Path) {
+function Get-DocumentAnchorSet([string] $Path) {
     if ($anchorCache.ContainsKey($Path)) { return ,$anchorCache[$Path] }
     $anchors = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     $slugCounts = @{}
@@ -93,7 +93,7 @@ foreach ($document in $documents) {
             if (-not [string]::IsNullOrWhiteSpace($fragment) -and
                 (Test-Path -LiteralPath $targetFile -PathType Leaf) -and
                 [System.IO.Path]::GetExtension($targetFile) -in @('.md', '.mdx') -and
-                -not (Get-DocumentAnchors $targetFile).Contains($fragment)) {
+                -not (Get-DocumentAnchorSet $targetFile).Contains($fragment)) {
                 $relative = [System.IO.Path]::GetRelativePath($root, $document.FullName)
                 $failures.Add("${relative}:$lineNumber -> $target (missing fragment)")
             }
