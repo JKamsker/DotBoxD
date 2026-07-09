@@ -48,7 +48,7 @@ internal static class HookChainStageIrFactory
 
             if (stage.IsSelect)
             {
-                if (!TryOutputType(stage, model, cancellationToken, out currentType))
+                if (!HookChainStageIrOutputFactory.TryOutputType(stage, model, cancellationToken, out currentType))
                 {
                     break;
                 }
@@ -106,7 +106,7 @@ internal static class HookChainStageIrFactory
             throw new NotSupportedException();
         }
 
-        var (elementParam, contextParam) = LambdaParameters(stage.Lambda);
+        var (elementParam, contextParam) = HookChainStageIrOutputFactory.LambdaParameters(stage.Lambda);
         if (elementParam is null)
         {
             throw new NotSupportedException();
@@ -131,11 +131,13 @@ internal static class HookChainStageIrFactory
             projectedElement: current,
             projectedElementType: inputType,
             serverContextParameterName: contextParam,
-            serverContextType: contextParam is null ? null : LambdaParameterType(stage.Lambda, contextParam, model, cancellationToken),
+            serverContextType: contextParam is null
+                ? null
+                : HookChainStageIrOutputFactory.LambdaParameterType(stage.Lambda, contextParam, model, cancellationToken),
             capabilities: capabilities,
             effects: effects);
         var value = DotBoxDExpressionModelFactory.Create(body, context);
-        var outputShape = OutputShape(stage, value, model, cancellationToken);
+        var outputShape = HookChainStageIrOutputFactory.OutputShape(stage, value, model, cancellationToken);
         Validate(stage, value, outputShape.Tag);
 
         var ns = HookChainIdentity.Namespace(terminalInvocation);
@@ -208,116 +210,8 @@ internal static class HookChainStageIrFactory
             signature.IRFuncType);
     }
 
-    private static ITypeSymbol OutputType(
-        HookChainStage stage,
-        SemanticModel model,
-        CancellationToken cancellationToken)
-    {
-        if (stage.Lambda.ExpressionBody is not { } body)
-        {
-            throw new NotSupportedException();
-        }
-
-        var typeInfo = model.GetTypeInfo(body, cancellationToken);
-        var type = typeInfo.ConvertedType ?? typeInfo.Type;
-        return type is { TypeKind: not TypeKind.Error }
-            ? type
-            : throw new NotSupportedException("the projection output type could not be resolved.");
-    }
-
-    private static bool TryOutputType(
-        HookChainStage stage,
-        SemanticModel model,
-        CancellationToken cancellationToken,
-        out ITypeSymbol outputType)
-    {
-        outputType = null!;
-        try
-        {
-            outputType = OutputType(stage, model, cancellationToken);
-            return true;
-        }
-        catch (NotSupportedException)
-        {
-            return false;
-        }
-    }
-
-    private static HookChainStageOutputShape OutputShape(
-        HookChainStage stage,
-        DotBoxDExpressionModel value,
-        SemanticModel model,
-        CancellationToken cancellationToken)
-    {
-        if (!stage.IsSelect)
-        {
-            var boolType = model.Compilation.GetSpecialType(SpecialType.System_Boolean);
-            return new HookChainStageOutputShape(
-                DotBoxDGenerationNames.ManifestTypes.Bool,
-                boolType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
-        }
-
-        if (TryOutputType(stage, model, cancellationToken, out var outputType))
-        {
-            return new HookChainStageOutputShape(
-                SandboxTypeSourceEmitter.ManifestTag(outputType),
-                outputType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
-        }
-
-        if (stage.Lambda.ExpressionBody is not { } body)
-        {
-            throw new NotSupportedException();
-        }
-
-        return new HookChainStageOutputShape(
-            value.Type,
-            GeneratedRemoteHookChainFallback.TypeFullName(body, model, cancellationToken, value.Type));
-    }
-
-    private static (string? ElementParam, string? ContextParam) LambdaParameters(LambdaExpressionSyntax lambda)
-        => lambda switch
-        {
-            SimpleLambdaExpressionSyntax simple => (simple.Parameter.Identifier.ValueText, null),
-            ParenthesizedLambdaExpressionSyntax { ParameterList.Parameters: var parameters } => parameters.Count switch
-            {
-                1 => (parameters[0].Identifier.ValueText, null),
-                2 => (parameters[0].Identifier.ValueText, parameters[1].Identifier.ValueText),
-                _ => (null, null),
-            },
-            _ => (null, null)
-        };
-
-    private static ITypeSymbol? LambdaParameterType(
-        LambdaExpressionSyntax lambda,
-        string parameterName,
-        SemanticModel model,
-        CancellationToken cancellationToken)
-    {
-        if (lambda is ParenthesizedLambdaExpressionSyntax { ParameterList.Parameters: var parameters })
-        {
-            foreach (var parameter in parameters)
-            {
-                if (!string.Equals(parameter.Identifier.ValueText, parameterName, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                var type = (model.GetDeclaredSymbol(parameter, cancellationToken) as IParameterSymbol)?.Type;
-                return type is { TypeKind: not TypeKind.Error }
-                    ? type
-                    : GeneratedRemoteHookChainFallback.ServerContextTypeForLambda(lambda, model, cancellationToken);
-            }
-        }
-
-        return GeneratedRemoteHookChainFallback.ServerContextTypeForLambda(lambda, model, cancellationToken);
-    }
-
     private static string HintName(string ns, string className)
         => string.IsNullOrEmpty(ns)
             ? className + ".g.cs"
             : ns.Replace(DotBoxDGenerationNames.CSharpIdentifiers.EscapePrefix, string.Empty) + "." + className + ".g.cs";
-
-    private readonly record struct HookChainStageOutputShape(
-        string Tag,
-        string FullName);
 }
