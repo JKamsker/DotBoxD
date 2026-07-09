@@ -63,6 +63,7 @@ namespace Snap.Nested
                     var __sub = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result
                         : await __dotboxd_task;
+                    ct.ThrowIfCancellationRequested();
                     string __subId;
                     try
                     {
@@ -90,6 +91,7 @@ namespace Snap.Nested
                     }
                     try
                     {
+                    ct.ThrowIfCancellationRequested();
                         serializer.Serialize(output, new global::DotBoxD.Services.Protocol.ServiceHandle { ServiceName = "ISubSnap", InstanceId = __subId });
                     }
                     catch
