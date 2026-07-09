@@ -37,7 +37,8 @@ internal sealed class ConventionEventAdapter<TEvent> : IPluginEventAdapter<TEven
     public int EventValueCount => _properties.Length;
 
     private static string EventNameFor(Type eventType)
-        => eventType.GetCustomAttribute<HookAttribute>(inherit: false)?.Name ?? eventType.Name;
+        => eventType.GetCustomAttribute<HookAttribute>(inherit: false)?.Name ??
+           EventNameMatch.CanonicalTypeName(eventType);
 
     public static ConventionEventAdapter<TEvent> Create()
     {
