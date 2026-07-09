@@ -62,6 +62,8 @@ public sealed record VerifierDiagnosticReference(
     string Remediation,
     bool ExpectedFromCompilerOutput)
 {
+    // Field-backed property initializers set the backing field directly; keep validation here
+    // and in the init accessors so construction and with-expression updates both reject blanks.
     public string Code { get; init => field = RequireText(value, nameof(Code)); } = RequireText(Code, nameof(Code));
 
     public string Meaning { get; init => field = RequireText(value, nameof(Meaning)); } = RequireText(Meaning, nameof(Meaning));
