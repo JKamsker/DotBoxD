@@ -32,27 +32,35 @@ internal sealed class RpcStreamHandleFormatter : IMessagePackFormatter<RpcStream
         ref MessagePackReader reader,
         MessagePackSerializerOptions options)
     {
-        var count = reader.ReadMapHeader();
-        var streamId = 0;
-        var kind = default(RpcStreamKind);
-
-        for (var i = 0; i < count; i++)
+        options.Security.DepthStep(ref reader);
+        try
         {
-            var name = reader.ReadString();
-            switch (name)
-            {
-                case "StreamId":
-                    streamId = reader.ReadInt32();
-                    break;
-                case "Kind":
-                    kind = (RpcStreamKind)reader.ReadByte();
-                    break;
-                default:
-                    reader.Skip();
-                    break;
-            }
-        }
+            var count = reader.ReadMapHeader();
+            var streamId = 0;
+            var kind = default(RpcStreamKind);
 
-        return new RpcStreamHandle(streamId, kind);
+            for (var i = 0; i < count; i++)
+            {
+                var name = reader.ReadString();
+                switch (name)
+                {
+                    case "StreamId":
+                        streamId = reader.ReadInt32();
+                        break;
+                    case "Kind":
+                        kind = (RpcStreamKind)reader.ReadByte();
+                        break;
+                    default:
+                        reader.Skip();
+                        break;
+                }
+            }
+
+            return new RpcStreamHandle(streamId, kind);
+        }
+        finally
+        {
+            reader.Depth--;
+        }
     }
 }
