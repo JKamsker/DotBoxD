@@ -29,7 +29,9 @@ public sealed class CompiledCacheMetadataTests
 
     [Fact]
     public async Task Cached_manifest_missing_assembly_hash_is_quarantined_and_recompiled()
-        => await CorruptAndRecoverManifestAsync(m => m with { AssemblyHash = "" });
+        // AssemblyHash can no longer be blanked through the typed model, so corrupt
+        // the persisted manifest to keep covering cache recovery from stale data.
+        => await CorruptAndRecoverManifestJsonAsync(node => node["assemblyHash"] = "");
 
     [Fact]
     public async Task Cached_verification_missing_assembly_hash_is_quarantined_and_recompiled()
