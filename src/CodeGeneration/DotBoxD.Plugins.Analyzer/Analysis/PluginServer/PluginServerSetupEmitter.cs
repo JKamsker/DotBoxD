@@ -29,6 +29,7 @@ internal static class PluginServerSetupEmitter
             builder,
             string.Empty,
             "Builder for the generated plugin server. Use Setup to record installs without I/O, then Build to create the runtime facade.");
+        PluginServerClsComplianceAttributeSource.AppendFalse(builder, model);
         builder.Append(model.Accessibility).Append(" sealed class ").Append(model.ClassName).AppendLine("Builder");
         builder.AppendLine("{");
         builder.AppendLine("    private readonly global::System.Func<global::System.Action<global::DotBoxD.Services.Peer.RpcPeer>?, global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>>? _connectionFactory;");
@@ -78,6 +79,7 @@ internal static class PluginServerSetupEmitter
             builder,
             string.Empty,
             "Setup-time registration surface. Actions recorded here are replayed when the generated plugin server starts.");
+        PluginServerClsComplianceAttributeSource.AppendFalse(builder, model);
         builder.Append(model.Accessibility).Append(" interface ").Append(model.SetupInterfaceName).AppendLine();
         builder.AppendLine("{");
         PluginServerXmlDocumentation.AppendSummary(
@@ -110,6 +112,7 @@ internal static class PluginServerSetupEmitter
                 builder,
                 string.Empty,
                 "Setup-time server-extension accumulator for the " + control.Name + " domain control.");
+            PluginServerClsComplianceAttributeSource.AppendFalse(builder, model);
             builder.Append(model.Accessibility).Append(" interface ").Append(control.AccumulatorInterfaceName).AppendLine();
             builder.AppendLine("{");
             PluginServerXmlDocumentation.AppendSummary(

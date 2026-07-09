@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 
 internal sealed record PluginServerFacadeModel(
@@ -20,6 +22,7 @@ internal sealed record PluginServerFacadeModel(
     string ControlServiceType,
     string LiveSettingUpdateType,
     bool EmitPipeBuilder,
+    bool EmitClsNonComplianceAttributes,
     bool UserDefinesPublicInvokeAsync,
     EquatableArray<PluginServerForwardedProperty> WorldProperties,
     EquatableArray<PluginServerForwardedMethod> WorldMethods,
@@ -96,4 +99,15 @@ internal enum PluginServerReturnWrapperKind
     Sync,
     Task,
     ValueTask,
+}
+
+internal static class PluginServerClsComplianceAttributeSource
+{
+    public static void AppendFalse(StringBuilder builder, PluginServerFacadeModel model, string indent = "")
+    {
+        if (model.EmitClsNonComplianceAttributes)
+        {
+            builder.Append(indent).AppendLine("[global::System.CLSCompliant(false)]");
+        }
+    }
 }

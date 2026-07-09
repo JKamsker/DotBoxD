@@ -10,6 +10,7 @@ internal static class PluginServerContextSurfaceEmitter
             builder,
             string.Empty,
             "Generated server hook context. Extend this partial type with helper members; [KernelMethod] instance members can be consumed by lowered hook chains.");
+        PluginServerClsComplianceAttributeSource.AppendFalse(builder, model);
         builder.Append(model.ContextAccessibility).Append(" partial class ")
             .Append(PluginServerIdentifier.Escape(model.ContextName)).AppendLine();
         builder.AppendLine("{");
@@ -53,6 +54,7 @@ internal static class PluginServerContextSurfaceEmitter
             string.Empty,
             "Generated hook registry whose parameterless On<TEvent>() uses the generated server context by default.");
         AppendRegistryAttribute(builder, model, "Hook");
+        PluginServerClsComplianceAttributeSource.AppendFalse(builder, model);
         builder.Append(model.Accessibility).Append(" sealed class ").Append(model.HookRegistryName).AppendLine();
         builder.AppendLine("{");
         builder.AppendLine("    private readonly global::DotBoxD.Plugins.Runtime.RemoteHookRegistry _inner;");
@@ -77,6 +79,7 @@ internal static class PluginServerContextSurfaceEmitter
             string.Empty,
             "Generated subscription registry whose parameterless On<TEvent>() uses the generated server context by default.");
         AppendRegistryAttribute(builder, model, "Subscription");
+        PluginServerClsComplianceAttributeSource.AppendFalse(builder, model);
         builder.Append(model.Accessibility).Append(" sealed class ").Append(model.SubscriptionRegistryName).AppendLine();
         builder.AppendLine("{");
         builder.AppendLine("    private readonly global::DotBoxD.Plugins.Runtime.RemoteSubscriptionRegistry _inner;");

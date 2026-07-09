@@ -11,6 +11,7 @@ internal static class PluginServerWrapperEmitter
     {
         var fields = ResolveBackingFields(control.Properties, control.Methods);
         PluginServerXmlDocumentation.Append(builder, "    ", control.Documentation);
+        PluginServerClsComplianceAttributeSource.AppendFalse(builder, model, "    ");
         builder.AppendLine("    public sealed class " + control.WrapperName + " : " + control.Type + ", global::DotBoxD.Abstractions.IServerExtensionClientAccessor");
         builder.AppendLine("    {");
         builder.AppendLine("        private readonly " + PluginServerIdentifier.Escape(model.ClassName) + " " + fields.Owner + ";");
