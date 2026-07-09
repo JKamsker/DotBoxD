@@ -216,16 +216,23 @@ internal static class ServerExtensionAttributeValidation
 
 /// <summary>
 /// Requests a generated client-side registration accumulator for a control type. The generated accumulator
-/// queues calls to <paramref name="methodName"/> and flushes them in order when the plugin builder starts.
+/// queues calls to <see cref="MethodName"/> and flushes them in order when the plugin builder starts.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-public sealed class GeneratePluginRegistrationAccumulatorAttribute(
-    string accumulatorName,
-    string methodName) : Attribute
+public sealed class GeneratePluginRegistrationAccumulatorAttribute : Attribute
 {
-    public string AccumulatorName { get; } = accumulatorName;
+    public GeneratePluginRegistrationAccumulatorAttribute(string accumulatorName, string methodName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accumulatorName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(methodName);
 
-    public string MethodName { get; } = methodName;
+        AccumulatorName = accumulatorName;
+        MethodName = methodName;
+    }
+
+    public string AccumulatorName { get; }
+
+    public string MethodName { get; }
 }
 
 /// <summary>
@@ -233,9 +240,16 @@ public sealed class GeneratePluginRegistrationAccumulatorAttribute(
 /// control properties.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-public sealed class GeneratePluginRegistrationRootAccumulatorAttribute(string accumulatorName) : Attribute
+public sealed class GeneratePluginRegistrationRootAccumulatorAttribute : Attribute
 {
-    public string AccumulatorName { get; } = accumulatorName;
+    public GeneratePluginRegistrationRootAccumulatorAttribute(string accumulatorName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accumulatorName);
+
+        AccumulatorName = accumulatorName;
+    }
+
+    public string AccumulatorName { get; }
 }
 
 public interface IEventKernel<TEvent>
