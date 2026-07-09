@@ -91,7 +91,8 @@ public sealed class SubscriptionRegistry
                 new ServerContextFactory<TContext>(createContext),
                 _kernels,
                 _installer,
-                _onFault);
+                _onFault,
+                _throwIfDisposed);
             _pipelines[key] = created;
             RegisterEventTypeLocked<TEvent>();
             return created;
@@ -119,7 +120,8 @@ public sealed class SubscriptionRegistry
                 new ServerContextFactory<HookContext>(createContext),
                 _kernels,
                 _installer,
-                _onFault);
+                _onFault,
+                _throwIfDisposed);
             _pipelines[key] = created;
             RegisterEventTypeLocked<TEvent>();
             return created;
