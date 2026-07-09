@@ -1,0 +1,20 @@
+{
+  "stryker-config": {
+    "solution": "../../../DotBoxD.slnx",
+    "project": "DotBoxD.Codecs.MessagePack.csproj",
+    "test-projects": [
+      "../../../tests/DotBoxD.Services.Tests/DotBoxD.Services.Tests.csproj"
+    ],
+    "configuration": "Release",
+    "mutation-level": "standard",
+    "mutate": [
+      "MessagePackRpcSerializer.cs",
+      "RpcRequestFormatter.cs",
+      "RpcResponseFormatter.cs",
+      "Formatters/WellFormedStringFormatter.cs"
+    ],
+    "reporters": ["progress", "html", "json", "markdown"],
+    "concurrency": 2,
+    "thresholds": { "high": 80, "low": 70, "break": 0 }
+  }
+}
