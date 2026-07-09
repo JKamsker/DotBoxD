@@ -5,6 +5,7 @@ internal static class HostBindingMetadataRules
     public const long HostStateRead = 1;
     public const long HostStateWrite = 2;
     public const long Allocates = 4;
+    private const long AllKnownEffects = HostStateRead | HostStateWrite | Allocates;
 
     public const string CpuEffect = "Cpu";
     public const string HostStateReadEffect = "HostStateRead";
@@ -20,6 +21,11 @@ internal static class HostBindingMetadataRules
 
     public static long ValidateDeclaredEffects(long declaredEffects, bool returnAllocates, string description)
     {
+        if ((declaredEffects & ~AllKnownEffects) != 0)
+        {
+            throw new InvalidOperationException($"{description} declares unknown effects.");
+        }
+
         var access = declaredEffects & (HostStateRead | HostStateWrite);
         if (access is not HostStateRead and not HostStateWrite)
         {
