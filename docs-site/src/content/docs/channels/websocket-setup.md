@@ -99,6 +99,7 @@ public sealed class WebSocketConnection : IRpcChannel
         }
 
         // Read the complete WebSocket message
+        const int maxMessageBytes = 16 * 1024 * 1024;
         var buffer = ArrayPool<byte>.Shared.Rent(16 * 1024); // 16KB initial buffer
         var totalReceived = 0;
 
@@ -107,17 +108,23 @@ public sealed class WebSocketConnection : IRpcChannel
             WebSocketReceiveResult result;
             do
             {
+                if (totalReceived >= maxMessageBytes)
+                {
+                    throw new InvalidOperationException("Message exceeds the 16 MiB limit");
+                }
+
                 // Expand buffer if needed
                 if (totalReceived >= buffer.Length - 4096)
                 {
-                    var newBuffer = ArrayPool<byte>.Shared.Rent(buffer.Length * 2);
+                    var newBuffer = ArrayPool<byte>.Shared.Rent(
+                        Math.Min(buffer.Length * 2, maxMessageBytes));
                     Buffer.BlockCopy(buffer, 0, newBuffer, 0, totalReceived);
                     ArrayPool<byte>.Shared.Return(buffer);
                     buffer = newBuffer;
                 }
 
                 result = await _socket.ReceiveAsync(
-                    buffer.AsMemory(totalReceived),
+                    buffer.AsMemory(totalReceived, maxMessageBytes - totalReceived),
                     ct);
 
                 if (result.MessageType == WebSocketMessageType.Close)
@@ -141,7 +148,7 @@ public sealed class WebSocketConnection : IRpcChannel
             }
 
             var messageLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(0, 4));
-            if (messageLength != totalReceived || messageLength > 16 * 1024 * 1024)
+            if (messageLength != totalReceived || messageLength > maxMessageBytes)
             {
                 throw new InvalidOperationException($"Invalid message length: {messageLength}");
             }
