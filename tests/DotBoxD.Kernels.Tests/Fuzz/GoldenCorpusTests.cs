@@ -89,6 +89,10 @@ public sealed class GoldenCorpusTests
             var compiled = await ExecuteAsync(host, plan, value, ExecutionMode.Compiled);
             var expected = input > 0 ? 1 : -1;
 
+            Assert.True(interpreted.Succeeded, interpreted.Error?.SafeMessage);
+            Assert.True(compiled.Succeeded, compiled.Error?.SafeMessage);
+            Assert.Equal(ExecutionMode.Interpreted, interpreted.ActualMode);
+            Assert.Equal(ExecutionMode.Compiled, compiled.ActualMode);
             Assert.Equal(expected, Assert.IsType<I32Value>(interpreted.Value).Value);
             Assert.Equal(expected, Assert.IsType<I32Value>(compiled.Value).Value);
         }
