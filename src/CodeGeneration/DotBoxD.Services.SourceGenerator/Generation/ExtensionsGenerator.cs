@@ -43,58 +43,7 @@ internal static class ExtensionsGenerator
             var fullInterfaceName = IdentifierHelpers.QualifyTypeName(service.Namespace, service.InterfaceName);
             var fullDispatcherName = IdentifierHelpers.QualifyTypeName(service.Namespace, dispatcherName);
 
-            sb.AppendLine();
-            sb.AppendLine("        /// <summary>");
-            sb.AppendLine($"        /// Provides a {service.InterfaceName} implementation for the other peer to call.");
-            sb.AppendLine("        /// </summary>");
-            ObsoleteAttributeEmitter.AppendIfPresent(sb, service.ObsoleteAttribute, "        ");
-            sb.AppendLine($"        public static {ServicesGeneratorTypeNames.GlobalRpcPeer} Provide{extensionSuffix}(this {ServicesGeneratorTypeNames.GlobalRpcPeer} peer, {fullInterfaceName} implementation)");
-            if (!HasSubServiceProperties(service, ct) && service.MethodSubServices.Array.Length == 0)
-            {
-                sb.AppendLine($"            => peer.{ServicesGeneratorMemberNames.RpcPeer.Provide}(({ServicesGeneratorTypeNames.GlobalServiceDispatcher})new {fullDispatcherName}(implementation));");
-            }
-            else
-            {
-                sb.AppendLine("        {");
-                sb.AppendLine($"            peer.{ServicesGeneratorMemberNames.RpcPeer.Provide}(({ServicesGeneratorTypeNames.GlobalServiceDispatcher})new {fullDispatcherName}(implementation));");
-                foreach (var property in service.Properties.Array)
-                {
-                    ct.ThrowIfCancellationRequested();
-                    if (property.IsInstanceId)
-                    {
-                        continue;
-                    }
-
-                    var propertyAccess = $"(({property.ImplementationType})implementation).{property.Name}";
-                    if (servicesByType.TryGetValue(property.Type, out var propertyService))
-                    {
-                        sb.AppendLine($"            peer.Provide{extensionSuffixes[ServiceKey(propertyService)]}({propertyAccess});");
-                    }
-                    else
-                    {
-                        var proxyType = property.ProxyType!;
-                        var propertyDispatcher = proxyType.EndsWith("Proxy", StringComparison.Ordinal)
-                            ? proxyType.Substring(0, proxyType.Length - "Proxy".Length) + "Dispatcher"
-                            : proxyType + "Dispatcher";
-                        sb.AppendLine($"            peer.{ServicesGeneratorMemberNames.RpcPeer.Provide}(({ServicesGeneratorTypeNames.GlobalServiceDispatcher})new {propertyDispatcher}({propertyAccess}));");
-                    }
-                }
-
-                foreach (var subService in service.MethodSubServices.Array)
-                {
-                    ct.ThrowIfCancellationRequested();
-                    if (!servicesByType.TryGetValue(subService.QualifiedInterfaceName, out var methodService))
-                    {
-                        continue;
-                    }
-
-                    var methodDispatcherName = NamingHelpers.StripInterfacePrefix(methodService.InterfaceName) + "Dispatcher";
-                    var fullMethodDispatcherName = IdentifierHelpers.QualifyTypeName(methodService.Namespace, methodDispatcherName);
-                    sb.AppendLine($"            peer.{ServicesGeneratorMemberNames.RpcPeer.Provide}(({ServicesGeneratorTypeNames.GlobalServiceDispatcher})new {fullMethodDispatcherName}());");
-                }
-                sb.AppendLine("            return peer;");
-                sb.AppendLine("        }");
-            }
+            AppendProvideMethod(sb, service, extensionSuffix, fullInterfaceName, fullDispatcherName, extensionSuffixes, servicesByType, ct);
 
             sb.AppendLine();
             sb.AppendLine("        /// <summary>");
@@ -109,6 +58,87 @@ internal static class ExtensionsGenerator
         sb.AppendLine("}");
 
         return sb.ToString();
+    }
+
+    private static void AppendProvideMethod(
+        StringBuilder sb,
+        ServiceExtensionModel service,
+        string extensionSuffix,
+        string fullInterfaceName,
+        string fullDispatcherName,
+        Dictionary<string, string> extensionSuffixes,
+        Dictionary<string, ServiceExtensionModel> servicesByType,
+        CancellationToken ct)
+    {
+        sb.AppendLine();
+        sb.AppendLine("        /// <summary>");
+        sb.AppendLine($"        /// Provides a {service.InterfaceName} implementation for the other peer to call.");
+        sb.AppendLine("        /// </summary>");
+        ObsoleteAttributeEmitter.AppendIfPresent(sb, service.ObsoleteAttribute, "        ");
+        sb.AppendLine($"        public static {ServicesGeneratorTypeNames.GlobalRpcPeer} Provide{extensionSuffix}(this {ServicesGeneratorTypeNames.GlobalRpcPeer} peer, {fullInterfaceName} implementation)");
+        if (!HasSubServiceProperties(service, ct) && service.MethodSubServices.Array.Length == 0)
+        {
+            sb.AppendLine($"            => peer.{ServicesGeneratorMemberNames.RpcPeer.Provide}(({ServicesGeneratorTypeNames.GlobalServiceDispatcher})new {fullDispatcherName}(implementation));");
+            return;
+        }
+
+        sb.AppendLine("        {");
+        sb.AppendLine($"            peer.{ServicesGeneratorMemberNames.RpcPeer.Provide}(({ServicesGeneratorTypeNames.GlobalServiceDispatcher})new {fullDispatcherName}(implementation));");
+        AppendPropertySubServices(sb, service, extensionSuffixes, servicesByType, ct);
+        AppendMethodSubServices(sb, service, servicesByType, ct);
+        sb.AppendLine("            return peer;");
+        sb.AppendLine("        }");
+    }
+
+    private static void AppendPropertySubServices(
+        StringBuilder sb,
+        ServiceExtensionModel service,
+        Dictionary<string, string> extensionSuffixes,
+        Dictionary<string, ServiceExtensionModel> servicesByType,
+        CancellationToken ct)
+    {
+        foreach (var property in service.Properties.Array)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (property.IsInstanceId)
+            {
+                continue;
+            }
+
+            var propertyAccess = $"(({property.ImplementationType})implementation).{property.Name}";
+            if (servicesByType.TryGetValue(property.Type, out var propertyService))
+            {
+                sb.AppendLine($"            peer.Provide{extensionSuffixes[ServiceKey(propertyService)]}({propertyAccess});");
+            }
+            else
+            {
+                var proxyType = property.ProxyType!;
+                var propertyDispatcher = proxyType.EndsWith("Proxy", StringComparison.Ordinal)
+                    ? proxyType.Substring(0, proxyType.Length - "Proxy".Length) + "Dispatcher"
+                    : proxyType + "Dispatcher";
+                sb.AppendLine($"            peer.{ServicesGeneratorMemberNames.RpcPeer.Provide}(({ServicesGeneratorTypeNames.GlobalServiceDispatcher})new {propertyDispatcher}({propertyAccess}));");
+            }
+        }
+    }
+
+    private static void AppendMethodSubServices(
+        StringBuilder sb,
+        ServiceExtensionModel service,
+        Dictionary<string, ServiceExtensionModel> servicesByType,
+        CancellationToken ct)
+    {
+        foreach (var subService in service.MethodSubServices.Array)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!servicesByType.TryGetValue(subService.QualifiedInterfaceName, out var methodService))
+            {
+                continue;
+            }
+
+            var methodDispatcherName = NamingHelpers.StripInterfacePrefix(methodService.InterfaceName) + "Dispatcher";
+            var fullMethodDispatcherName = IdentifierHelpers.QualifyTypeName(methodService.Namespace, methodDispatcherName);
+            sb.AppendLine($"            peer.{ServicesGeneratorMemberNames.RpcPeer.Provide}(({ServicesGeneratorTypeNames.GlobalServiceDispatcher})new {fullMethodDispatcherName}());");
+        }
     }
 
     private static bool HasSubServiceProperties(ServiceExtensionModel service, CancellationToken ct)
