@@ -12,16 +12,11 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.KernelMethod;
 
-/// <summary>An event a generated kernel-method hook chain subscribes to (referenced from chain source).</summary>
 public sealed record KernelMethodAggroEvent(string MonsterId, int Distance, int MonsterLevel, int PlayerLevel);
 
 /// <summary>
-/// Coverage of <c>[KernelMethod]</c> inlining (Followup #1): a static helper carrying
-/// <c>[KernelMethod]</c> is inlined into the calling kernel/hook IR exactly as if its body were written
-/// at the call site — its parameters are replaced by the already-lowered argument IR. Proven for a
-/// kernel-class <c>ShouldHandle</c>, for an inline <c>Where</c> hook chain, for multi-argument helpers,
-/// and for capability collection when an argument is a <c>[HostBinding]</c> call. Unsupported shapes
-/// (multi-statement body, non-static) fail safe (no package; the runtime terminal throws DBXK062).
+/// Covers <c>[KernelMethod]</c> inlining and capability discovery; unsupported shapes fail closed
+/// with no generated package and the runtime terminal throws DBXK062 after explicit suppression.
 /// </summary>
 public sealed class PluginAnalyzerKernelMethodTests
 {
@@ -190,10 +185,7 @@ public sealed class PluginAnalyzerKernelMethodTests
     [Fact]
     public void A_KernelMethod_with_a_multi_statement_body_fails_safe_with_no_generated_chain_package()
     {
-        var assembly = Compile(
-            PluginAnalyzerKernelMethodTestSources.MultiStatement,
-            enableInterceptors: true,
-            suppressFailClosedDiagnostic: true);
+        var assembly = Compile(PluginAnalyzerKernelMethodTestSources.MultiStatement, enableInterceptors: true);
 
         var hasChainPackage = assembly.GetTypes().Any(type =>
             type.Name.StartsWith("HookChain_", StringComparison.Ordinal) &&
@@ -212,23 +204,13 @@ public sealed class PluginAnalyzerKernelMethodTests
             .Invoke(null, null)!;
     }
 
-    private static Assembly Compile(
-        string source,
-        bool enableInterceptors,
-        bool suppressFailClosedDiagnostic = false)
+    private static Assembly Compile(string source, bool enableInterceptors)
     {
         var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
         if (enableInterceptors)
         {
             parseOptions = parseOptions.WithFeatures(
                 [new KeyValuePair<string, string>("InterceptorsNamespaces", "DotBoxD.Plugins.Generated")]);
-        }
-
-        var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary);
-        if (suppressFailClosedDiagnostic)
-        {
-            compilationOptions = compilationOptions.WithSpecificDiagnosticOptions(
-                new Dictionary<string, ReportDiagnostic> { ["DBXK114"] = ReportDiagnostic.Suppress });
         }
 
         var compilation = CSharpCompilation.Create(
@@ -239,7 +221,12 @@ public sealed class PluginAnalyzerKernelMethodTests
                 .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(KernelMethodAggroEvent).Assembly.Location)),
-            compilationOptions);
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                specificDiagnosticOptions: new Dictionary<string, ReportDiagnostic>
+                {
+                    ["DBXK114"] = ReportDiagnostic.Suppress
+                }));
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: parseOptions);
