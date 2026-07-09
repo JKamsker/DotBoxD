@@ -62,18 +62,15 @@ public sealed record VerifierDiagnosticReference(
     string Remediation,
     bool ExpectedFromCompilerOutput)
 {
-    private string _code = RequireText(Code, nameof(Code));
-    private string _meaning = RequireText(Meaning, nameof(Meaning));
-    private string _likelyCause = RequireText(LikelyCause, nameof(LikelyCause));
-    private string _remediation = RequireText(Remediation, nameof(Remediation));
+    public string Code { get; init => field = RequireText(value, nameof(Code)); } = RequireText(Code, nameof(Code));
 
-    public string Code { get => _code; init => _code = RequireText(value, nameof(Code)); }
+    public string Meaning { get; init => field = RequireText(value, nameof(Meaning)); } = RequireText(Meaning, nameof(Meaning));
 
-    public string Meaning { get => _meaning; init => _meaning = RequireText(value, nameof(Meaning)); }
+    public string LikelyCause { get; init => field = RequireText(value, nameof(LikelyCause)); } =
+        RequireText(LikelyCause, nameof(LikelyCause));
 
-    public string LikelyCause { get => _likelyCause; init => _likelyCause = RequireText(value, nameof(LikelyCause)); }
-
-    public string Remediation { get => _remediation; init => _remediation = RequireText(value, nameof(Remediation)); }
+    public string Remediation { get; init => field = RequireText(value, nameof(Remediation)); } =
+        RequireText(Remediation, nameof(Remediation));
 
     private static string RequireText(string value, string paramName)
     {
