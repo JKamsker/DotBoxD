@@ -1,6 +1,5 @@
 using System.Buffers;
 using DotBoxD.Codecs.MessagePack;
-using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Server;
 using DotBoxD.Services.Tests.GeneratedFixtures;
 using Xunit;
@@ -19,7 +18,7 @@ public sealed class GeneratedSubServiceCancellationRegressionTests
             GeneratedServiceRegistry.GetService<ISubServiceLifecycleRoot>().Methods,
             static candidate => candidate.Name == nameof(ISubServiceLifecycleRoot.CreateAsync));
         var serializer = new MessagePackRpcSerializer();
-        var registry = new InstanceRegistry();
+        var registry = new TrackingInstanceRegistry();
         var output = new ArrayBufferWriter<byte>();
 
         var exception = await Record.ExceptionAsync(() =>
@@ -31,12 +30,9 @@ public sealed class GeneratedSubServiceCancellationRegressionTests
                 output,
                 cts.Token));
 
-        var registeredChild = TryGetRegisteredChild(serializer, registry, output, out var handle);
-
         Assert.IsType<OperationCanceledException>(exception);
         Assert.Equal(1, service.CallCount);
-        Assert.False(registeredChild);
-        Assert.Null(handle);
+        Assert.Equal(0, registry.RegisterCount);
         Assert.True(service.Child.Disposed);
         Assert.Equal(0, output.WrittenCount);
     }
@@ -71,24 +67,6 @@ public sealed class GeneratedSubServiceCancellationRegressionTests
         Assert.Equal(0, output.WrittenCount);
     }
 
-    private static bool TryGetRegisteredChild(
-        MessagePackRpcSerializer serializer,
-        InstanceRegistry registry,
-        ArrayBufferWriter<byte> output,
-        out ServiceHandle? handle)
-    {
-        handle = null;
-        if (output.WrittenCount == 0)
-        {
-            return false;
-        }
-
-        var decoded = serializer.Deserialize<ServiceHandle>(output.WrittenMemory);
-        handle = decoded;
-        return registry.TryGet(decoded.ServiceName, decoded.InstanceId, out var instance) &&
-            instance is TrackingLifecycleChild;
-    }
-
     private sealed class CancelBeforeReturnRootService(CancellationTokenSource cts) : ISubServiceLifecycleRoot
     {
         public TrackingLifecycleChild Child { get; } = new();
@@ -114,6 +92,30 @@ public sealed class GeneratedSubServiceCancellationRegressionTests
             CallCount++;
             return Task.FromResult<ISubServiceLifecycleChild>(Child);
         }
+    }
+
+    private sealed class TrackingInstanceRegistry : IInstanceRegistry
+    {
+        private readonly InstanceRegistry _inner = new();
+
+        public int RegisterCount { get; private set; }
+
+        public string Register(string serviceName, object instance)
+        {
+            RegisterCount++;
+            return _inner.Register(serviceName, instance);
+        }
+
+        public bool TryGet(string serviceName, string instanceId, out object instance) =>
+            _inner.TryGet(serviceName, instanceId, out instance);
+
+        public void Release(string serviceName, string instanceId) =>
+            _inner.Release(serviceName, instanceId);
+
+        public ValueTask ReleaseAsync(string serviceName, string instanceId) =>
+            _inner.ReleaseAsync(serviceName, instanceId);
+
+        public void ReleaseAll() => _inner.ReleaseAll();
     }
 
     private sealed class CancellingInstanceRegistry(CancellationTokenSource cts) : IInstanceRegistry
