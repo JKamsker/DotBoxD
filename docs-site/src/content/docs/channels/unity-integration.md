@@ -72,7 +72,7 @@ AOT path; Unity projects must keep an IL2CPP batch build in their own supported 
 - API Compatibility Level: .NET Standard 2.1
 
 ### Server Requirements
-- .NET 6.0 or newer (recommended: .NET 8.0+)
+- .NET 10.0 or newer for the server and Pushdown convenience host used in this guide
 
 ### NuGet Packages
 - `MessagePack` 3.1.7 (the repository-tested version)
@@ -968,17 +968,19 @@ public static class MessagePackAOTSetup
         // Directly root the generated RPC registry so IL2CPP cannot strip it.
         _ = DotBoxD.Services.Generated.DotBoxDGenerated.Services;
 
-        // GeneratedResolver must contain formatters for this application's DTO set.
+        // Replace YourGameGeneratedResolver with the resolver produced by this
+        // application's MessagePack source-generator configuration.
         // Pass it to DotBoxD directly; changing MessagePack's global defaults is insufficient.
-        Serializer = MessagePackRpcSerializer.CreateWithResolver(GeneratedResolver.Instance);
+        Serializer = MessagePackRpcSerializer.CreateWithResolver(YourGameGeneratedResolver.Instance);
     }
 }
 ```
 
 ### Generate MessagePack Formatters
 
-Annotate transported DTOs for MessagePack's source generator and generate the resolver as part of the
-shared project's build. Inspect the IL2CPP output to confirm
+`YourGameGeneratedResolver` is a placeholder, not a DotBoxD type. Annotate transported DTOs for
+MessagePack's source generator and replace it with the resolver produced by the shared project's build.
+Inspect the IL2CPP output to confirm
 that every transported DTO has a static formatter. Do not fall back to
 `ContractlessStandardResolver`; it is reflection-capable and does not establish AOT compatibility.
 
@@ -1313,7 +1315,7 @@ public class NotificationPoller : MonoBehaviour
 
 | DotBoxD Version | Unity Version | .NET Server | MessagePack |
 |----------------|---------------|-------------|-------------|
-| Current preview | 2021.3+      | 8.0+        | 3.1.7       |
+| Current preview | 2021.3+      | 10.0+       | 3.1.7       |
 
 ---
 
