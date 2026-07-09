@@ -50,7 +50,7 @@ public sealed class PluginPackageExperimentalAttributeSurpriseTests
         Assert.Empty(generatorErrors);
         Assert.Empty(outputCompilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
 
-        var generated = Assert.Single(driver.GetRunResult().GeneratedTrees).GetText().ToString();
+        var generated = Assert.Single(PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()).GeneratedTrees).GetText().ToString();
         Assert.Contains(
             "global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBXEXP_PACKAGE\")",
             generated,

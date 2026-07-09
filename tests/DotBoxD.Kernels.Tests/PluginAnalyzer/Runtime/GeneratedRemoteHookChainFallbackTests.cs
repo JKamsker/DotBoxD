@@ -234,7 +234,7 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
 
         Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
         Assert.Empty(output.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
-        return driver.GetRunResult();
+        return PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult());
     }
 
     private static CSharpCompilation CreateCompilation(

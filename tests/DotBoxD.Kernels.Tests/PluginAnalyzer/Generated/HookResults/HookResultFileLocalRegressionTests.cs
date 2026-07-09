@@ -79,7 +79,7 @@ public sealed class HookResultFileLocalRegressionTests
         var diagnostics = generatorDiagnostics
             .Concat(outputCompilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error))
             .ToArray();
-        return (driver.GetRunResult(), diagnostics);
+        return (PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()), diagnostics);
     }
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()

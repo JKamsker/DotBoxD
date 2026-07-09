@@ -41,7 +41,7 @@ public sealed class PluginPackageObsoleteAttributeSurpriseTests
             out var outputCompilation,
             out var generatorDiagnostics);
 
-        if (TryAssertFailClosed(generatorDiagnostics, driver.GetRunResult()))
+        if (TryAssertFailClosed(generatorDiagnostics, PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult())))
         {
             return;
         }
@@ -49,7 +49,7 @@ public sealed class PluginPackageObsoleteAttributeSurpriseTests
         Assert.Empty(generatorDiagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
         Assert.Empty(outputCompilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
 
-        var generated = Assert.Single(driver.GetRunResult().GeneratedTrees).GetText().ToString();
+        var generated = Assert.Single(PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()).GeneratedTrees).GetText().ToString();
         Assert.Contains("public static class LegacyDamagePluginPackage", generated, StringComparison.Ordinal);
         Assert.Contains(
             "[global::System.ObsoleteAttribute(\"Use NewDamageKernel\"",

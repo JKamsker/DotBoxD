@@ -253,7 +253,7 @@ public sealed partial class MergeableIrStepGeneratorTests
             [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: ParseOptions);
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out outputCompilation, out diagnostics);
-        return driver.GetRunResult();
+        return PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult());
     }
 
     private static string GeneratedSource(GeneratorDriverRunResult result)

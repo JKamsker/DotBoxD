@@ -38,7 +38,7 @@ internal static class HookChainGeneratorTestSupport
             [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: ParseOptions);
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out _);
-        return (output, driver.GetRunResult());
+        return (output, PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()));
     }
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()

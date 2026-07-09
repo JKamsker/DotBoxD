@@ -290,7 +290,7 @@ public sealed class PluginServerRemoteLocalWiringTests
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var diagnostics);
 
         Assert.Empty(diagnostics.Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
-        return (driver.GetRunResult(), outputCompilation);
+        return (PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()), outputCompilation);
     }
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()

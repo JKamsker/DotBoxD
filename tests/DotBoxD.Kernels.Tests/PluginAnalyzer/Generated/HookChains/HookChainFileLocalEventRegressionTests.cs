@@ -59,6 +59,7 @@ public sealed class HookChainFileLocalEventRegressionTests
             compilation,
             out var outputCompilation,
             out var generatorDiagnostics);
+        PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(generatorDiagnostics);
 
         return generatorDiagnostics
             .Concat(outputCompilation.GetDiagnostics())
