@@ -6,6 +6,8 @@ public sealed partial class EventIndexRegistry
 {
     private interface IEventIndexChannel
     {
+        bool IsEmpty { get; }
+
         void Remove(InstalledKernel kernel);
     }
 
@@ -17,6 +19,8 @@ public sealed partial class EventIndexRegistry
         private volatile EventIndexEntry<TEvent>[] _entries = [];
 
         public IPluginEventAdapter<TEvent> Adapter { get; } = adapter;
+
+        public bool IsEmpty => _entries.Length == 0;
 
         public void Add(EventIndexEntry<TEvent> entry)
         {

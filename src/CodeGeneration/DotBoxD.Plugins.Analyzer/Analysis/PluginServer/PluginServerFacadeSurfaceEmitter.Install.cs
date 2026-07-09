@@ -189,6 +189,7 @@ internal static class PluginServerFacadeInstallSurfaceEmitter
         builder.AppendLine("    {");
         builder.AppendLine("        var pluginId = await RequireControl().InstallPluginAsync(global::DotBoxD.Plugins.Json.PluginPackageJsonSerializer.Export(package), cancellationToken).ConfigureAwait(false);");
         builder.AppendLine("        RequireInstalledPackageId(package, pluginId);");
+        builder.AppendLine("        cancellationToken.ThrowIfCancellationRequested();");
         builder.AppendLine("        MarkInstalled(package);");
         builder.AppendLine("        return pluginId;");
         builder.AppendLine("    }");
@@ -196,6 +197,7 @@ internal static class PluginServerFacadeInstallSurfaceEmitter
         builder.AppendLine("    {");
         builder.AppendLine("        var pluginId = await RequireControl().InstallSubscriptionAsync(global::DotBoxD.Plugins.Json.PluginPackageJsonSerializer.Export(package), cancellationToken).ConfigureAwait(false);");
         builder.AppendLine("        RequireInstalledPackageId(package, pluginId);");
+        builder.AppendLine("        cancellationToken.ThrowIfCancellationRequested();");
         builder.AppendLine("        MarkInstalled(package);");
         builder.AppendLine("        return pluginId;");
         builder.AppendLine("    }");
@@ -203,6 +205,7 @@ internal static class PluginServerFacadeInstallSurfaceEmitter
         builder.AppendLine("    {");
         builder.AppendLine("        var pluginId = await RequireControl().InstallServerExtensionAsync(global::DotBoxD.Plugins.Json.PluginPackageJsonSerializer.Export(package), cancellationToken).ConfigureAwait(false);");
         builder.AppendLine("        RequireInstalledPackageId(package, pluginId);");
+        builder.AppendLine("        cancellationToken.ThrowIfCancellationRequested();");
         builder.AppendLine("        MarkInstalled(package);");
         builder.AppendLine("        return pluginId;");
         builder.AppendLine("    }");

@@ -1,3 +1,6 @@
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+
 namespace DotBoxD.Plugins.Runtime;
 
 internal static class SubscriptionDelivery
@@ -54,6 +57,10 @@ internal static class SubscriptionDelivery
         {
             return false;
         }
+        catch (SandboxRuntimeException ex) when (WasCallerCancelled(ex, rawContext.CancellationToken))
+        {
+            return false;
+        }
         catch (Exception ex)
         {
             Report<TEvent>(onFault, ex, SubscriptionDeliveryStage.Filter);
@@ -85,12 +92,19 @@ internal static class SubscriptionDelivery
             {
                 return;
             }
+            catch (SandboxRuntimeException ex) when (WasCallerCancelled(ex, rawContext.CancellationToken))
+            {
+                return;
+            }
             catch (Exception ex)
             {
                 Report<TEvent>(onFault, ex, SubscriptionDeliveryStage.Handler);
             }
         }
     }
+
+    private static bool WasCallerCancelled(SandboxRuntimeException exception, CancellationToken cancellationToken)
+        => cancellationToken.IsCancellationRequested && exception.Error.Code == SandboxErrorCode.Cancelled;
 
     private static void Report<TEvent>(
         Action<SubscriptionDeliveryFault>? onFault,

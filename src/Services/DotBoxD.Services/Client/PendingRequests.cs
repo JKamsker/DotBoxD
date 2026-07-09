@@ -20,14 +20,15 @@ internal sealed class PendingRequests : IDisposable
         int messageId,
         bool captureCallerCancellation,
         bool captureTimeoutTarget,
+        CancellationToken callerToken,
         string service,
         string method,
         out PendingUnaryResponse<TResponse> pending)
     {
         var candidate = captureTimeoutTarget
-            ? new PendingUnaryResponseWithTimeout<TResponse>(this, messageId, service, method)
+            ? new PendingUnaryResponseWithTimeout<TResponse>(this, messageId, service, method, callerToken)
             : captureCallerCancellation
-                ? new CancellablePendingUnaryResponse<TResponse>(this, messageId)
+                ? new CancellablePendingUnaryResponse<TResponse>(this, messageId, callerToken)
                 : new PendingUnaryResponse<TResponse>(messageId);
 
         return TryAddCore(messageId, candidate, out pending);

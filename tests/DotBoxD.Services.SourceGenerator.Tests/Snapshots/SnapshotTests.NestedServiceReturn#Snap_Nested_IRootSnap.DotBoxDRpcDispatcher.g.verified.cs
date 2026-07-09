@@ -63,6 +63,26 @@ namespace Snap.Nested
                     var __sub = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result
                         : await __dotboxd_task;
+                    if (ct.IsCancellationRequested)
+                    {
+                        try
+                        {
+                            if (__sub is global::System.IAsyncDisposable __ad)
+                            {
+                                await __ad.DisposeAsync().ConfigureAwait(false);
+                            }
+                            else if (__sub is global::System.IDisposable __d)
+                            {
+                                __d.Dispose();
+                            }
+                        }
+                        catch
+                        {
+                            // Best-effort cleanup of the orphaned sub-service: a faulting disposer must
+                            // not replace the original registration failure that is about to be rethrown.
+                        }
+                        ct.ThrowIfCancellationRequested();
+                    }
                     string __subId;
                     try
                     {
@@ -88,8 +108,22 @@ namespace Snap.Nested
                         }
                         throw;
                     }
+                    if (ct.IsCancellationRequested)
+                    {
+                        try
+                        {
+                            await registry.ReleaseAsync("ISubSnap", __subId).ConfigureAwait(false);
+                        }
+                        catch
+                        {
+                            // Best-effort release: a faulting release must not replace
+                            // the cancellation that is about to be thrown.
+                        }
+                        ct.ThrowIfCancellationRequested();
+                    }
                     try
                     {
+                        ct.ThrowIfCancellationRequested();
                         serializer.Serialize(output, new global::DotBoxD.Services.Protocol.ServiceHandle { ServiceName = "ISubSnap", InstanceId = __subId });
                     }
                     catch

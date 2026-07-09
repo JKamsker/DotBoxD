@@ -29,9 +29,9 @@ internal static partial class RpcKernelModelFactory
         IReadOnlyList<AttributeData> attributes)
     {
         var pluginId = PluginId(attributes, type.Name);
-        if (string.IsNullOrWhiteSpace(pluginId))
+        if (PluginIdValidation.ErrorMessage(pluginId) is { } pluginIdError)
         {
-            return Fail(declaration, "Server extension id must be a non-empty string.");
+            return Fail(declaration, pluginIdError);
         }
 
         if (type.IsGenericType || type.TypeParameters.Length > 0)

@@ -8,6 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
     <!-- Opt the generated interceptors namespace into C# interceptors, exactly as a real plugin project does. -->
     <DotBoxDGeneratedInterceptorsNamespace>DotBoxD.Plugins.Generated</DotBoxDGeneratedInterceptorsNamespace>
     <InterceptorsNamespaces>$(InterceptorsNamespaces);$(DotBoxDGeneratedInterceptorsNamespace)</InterceptorsNamespaces>

@@ -79,6 +79,52 @@ public sealed class RpcStreamAttachmentMutationTests
     }
 
     [Fact]
+    public async Task PipeAttachment_PumpCoreAsync_StopsWhenPendingReadIsCanceled()
+    {
+        var sentItems = 0;
+        var serializer = new MessagePackRpcSerializer();
+        var handle = new RpcStreamHandle(11, RpcStreamKind.Binary);
+        var streams = new RpcStreamManager(serializer, SendAsync, exceptionTransformer: null);
+        var pipe = new Pipe();
+        var attachment = RpcStreamAttachment.FromPipe(handle, pipe, completeReader: true);
+        streams.ReserveOutbound(handle.StreamId);
+        await using var outbound = streams.RegisterOutbound(attachment, CancellationToken.None);
+        using var credit = RpcRawFrame.FrameInt32(handle.StreamId, MessageType.StreamCredit, 1);
+        Assert.True(streams.TryAddCredit(credit));
+
+        var pumpTask = attachment.PumpCoreAsync(streams, serializer, CancellationToken.None);
+        pipe.Reader.CancelPendingRead();
+
+        try
+        {
+            await pumpTask.WaitAsync(Timeout);
+        }
+        catch
+        {
+            await pipe.Writer.CompleteAsync();
+            await pumpTask.WaitAsync(Timeout);
+            throw;
+        }
+
+        Assert.Equal(0, Volatile.Read(ref sentItems));
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => pipe.Reader.ReadAsync().AsTask().WaitAsync(Timeout));
+        await pipe.Writer.CompleteAsync();
+
+        Task SendAsync(ReadOnlyMemory<byte> frame, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (MessageFramer.TryReadFrameHeader(frame, out _, out var type) &&
+                type == MessageType.StreamItem)
+            {
+                Interlocked.Increment(ref sentItems);
+            }
+
+            return Task.CompletedTask;
+        }
+    }
+
+    [Fact]
     public async Task PipeAttachment_DisposeSourceOnce_LeavesReaderOpenWhenNotOwned()
     {
         var pipe = new Pipe();

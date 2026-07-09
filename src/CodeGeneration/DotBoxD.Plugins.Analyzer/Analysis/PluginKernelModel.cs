@@ -8,6 +8,7 @@ internal sealed record PluginKernelModel(
     string KernelName,
     string PackageName,
     EquatableArray<string> GeneratedPackageAttributes,
+    string GeneratedAttributeSource,
     string EventName,
     string EventParameterName,
     string ContextParameterName,

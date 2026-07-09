@@ -52,6 +52,7 @@ internal static class HookFireAsyncModelFactory
                 new HookFireAsyncModel(
                     contextType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
                     resultType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                    ContextAttributes(contextType),
                     IsEffectivelyPublic(contextType) && IsEffectivelyPublic(resultType) ? "public" : "internal"),
                 null);
         }
@@ -152,5 +153,47 @@ internal static class HookFireAsyncModelFactory
         }
 
         return true;
+    }
+
+    private static EquatableArray<string> ContextAttributes(INamedTypeSymbol contextType)
+    {
+        var attributes = new List<string>();
+        foreach (var attribute in contextType.GetAttributes())
+        {
+            if (ExperimentalAttribute(attribute) is { } experimentalAttribute)
+            {
+                attributes.Add(experimentalAttribute);
+            }
+        }
+
+        attributes.Sort(StringComparer.Ordinal);
+        return new EquatableArray<string>(attributes);
+    }
+
+    private static string? ExperimentalAttribute(AttributeData attribute)
+    {
+        if (attribute.AttributeClass?.ToDisplayString() !=
+            DotBoxDMetadataNames.ExperimentalAttribute ||
+            attribute.ConstructorArguments.Length != 1 ||
+            attribute.ConstructorArguments[0].Value is not string diagnosticId)
+        {
+            return null;
+        }
+
+        var arguments = new List<string> { LiteralReader.StringLiteral(diagnosticId) };
+        foreach (var argument in attribute.NamedArguments)
+        {
+            if (argument is { Key: "Message", Value.Value: string message })
+            {
+                arguments.Add("Message = " + LiteralReader.StringLiteral(message));
+            }
+            else if (argument is { Key: "UrlFormat", Value.Value: string urlFormat })
+            {
+                arguments.Add("UrlFormat = " + LiteralReader.StringLiteral(urlFormat));
+            }
+        }
+
+        return "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(" +
+            string.Join(", ", arguments) + ")]";
     }
 }

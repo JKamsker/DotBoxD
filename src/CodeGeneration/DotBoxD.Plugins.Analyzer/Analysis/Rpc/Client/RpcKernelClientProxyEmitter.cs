@@ -77,7 +77,7 @@ internal static partial class RpcKernelClientProxyEmitter
         {
             var builder = new StringBuilder();
             var clientName = _kernelType.Name + "ServerExtensionClient";
-            RpcObsoleteAttributeSource.Append(builder, _serviceType, string.Empty);
+            RpcTypeMetadataAttributeSource.Append(builder, _serviceType, string.Empty);
             builder.Append(AccessibilityKeyword(_serviceType)).Append(" sealed class ")
                 .Append(clientName).Append(" : ").AppendLine(TypeName(_serviceType));
             builder.AppendLine("{");
@@ -159,6 +159,13 @@ internal static partial class RpcKernelClientProxyEmitter
                     .Append(request).Append(", ")
                     .Append(RpcKernelClientParameters.CancellationTokenArgument(_serviceMethod))
                     .AppendLine(").ConfigureAwait(false);");
+            }
+
+            if (RpcKernelClientParameters.TryGetCancellationToken(_serviceMethod, out cancellationToken))
+            {
+                builder.Append("        ")
+                    .Append(Identifier(cancellationToken.Name))
+                    .AppendLine(".ThrowIfCancellationRequested();");
             }
 
             if (_payloadReturnType is null)

@@ -121,6 +121,9 @@ internal static class HookChainStageIrFactory
             $"{DotBoxDGenerationNames.Helpers.Var}({LiteralReader.StringLiteral(CurrentValueName)})",
             inputTag,
             false);
+        var serverContextType = contextParam is null
+            ? null
+            : HookChainStageIrOutputFactory.LambdaParameterType(stage.Lambda, contextParam, model, cancellationToken);
         var context = new DotBoxDExpressionLoweringContext(
             eventParameterName: string.Empty,
             eventProperties: default,
@@ -131,14 +134,14 @@ internal static class HookChainStageIrFactory
             projectedElement: current,
             projectedElementType: inputType,
             serverContextParameterName: contextParam,
-            serverContextType: contextParam is null
-                ? null
-                : HookChainStageIrOutputFactory.LambdaParameterType(stage.Lambda, contextParam, model, cancellationToken),
+            serverContextType: serverContextType,
             capabilities: capabilities,
             effects: effects);
         var value = DotBoxDExpressionModelFactory.Create(body, context);
         var outputShape = HookChainStageIrOutputFactory.OutputShape(stage, value, model, cancellationToken);
         Validate(stage, value, outputShape.Tag);
+        HookChainStageIrOutputFactory.TryOutputType(stage, model, cancellationToken, out var outputType);
+        var generatedAttributeSource = ExperimentalAttributeSource.FromTypes(inputType, outputType, serverContextType);
 
         var ns = HookChainIdentity.Namespace(terminalInvocation);
         var className = "HookChainStageStep_" + MergeableIrStepIdentity.Compute(stage.Invocation);
@@ -165,11 +168,12 @@ internal static class HookChainStageIrFactory
             outputShape.Tag,
             signature.IRFuncType,
             signature.TypeParameters,
+            generatedAttributeSource,
             $"new {DotBoxDGenerationNames.TypeNames.GlobalParameter}({LiteralReader.StringLiteral(CurrentValueName)}, {inputTypeSource})",
             value.Source,
             EquatableArray<string>.FromOwned([.. capabilities]),
             EquatableArray<string>.FromOwned([.. effects]),
-            Interception(stage, model, fullName, signature, cancellationToken));
+            Interception(stage, model, fullName, signature, generatedAttributeSource, cancellationToken));
     }
 
     private static void Validate(HookChainStage stage, DotBoxDExpressionModel value, string outputTag)
@@ -191,12 +195,14 @@ internal static class HookChainStageIrFactory
         SemanticModel model,
         string stepFullName,
         HookChainStageIrSignature signature,
+        string generatedAttributeSource,
         CancellationToken cancellationToken)
     {
         var location = model.GetInterceptableLocation(stage.Invocation, cancellationToken)
             ?? throw new NotSupportedException("the stage call site is not interceptable.");
         return new HookChainStageIrInterception(
             location.GetInterceptsLocationAttributeSyntax(),
+            generatedAttributeSource,
             signature.ReceiverType,
             signature.DelegateType,
             signature.ReturnType,

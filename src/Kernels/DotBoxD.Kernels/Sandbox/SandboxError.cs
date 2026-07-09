@@ -38,7 +38,7 @@ public sealed record SandboxError(
 
     private static string ValidateSafeMessage(string value)
     {
-        ArgumentException.ThrowIfNullOrEmpty(value, nameof(SafeMessage));
+        ArgumentException.ThrowIfNullOrWhiteSpace(value, nameof(SafeMessage));
         return value;
     }
 }

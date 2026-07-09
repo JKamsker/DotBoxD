@@ -44,6 +44,18 @@ public sealed class ExecutionPlanContractTests
     }
 
     [Fact]
+    public void Constructor_rejects_function_analysis_with_undefined_effect_bits()
+    {
+        var functionAnalysis = ValidFunctionAnalysis();
+        functionAnalysis["main"] = new FunctionAnalysis(SandboxType.I32, UndefinedEffect(), CanReorder: true);
+
+        var exception = Assert.ThrowsAny<ArgumentException>(() =>
+            CreatePlan(functionAnalysis: functionAnalysis));
+
+        Assert.Equal("functionAnalysis", exception.ParamName);
+    }
+
+    [Fact]
     public void Constructor_rejects_null_binding_reference_sets_at_public_boundary()
     {
         var bindingReferences = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
@@ -107,6 +119,9 @@ public sealed class ExecutionPlanContractTests
         {
             ["main"] = new(SandboxType.I32, SandboxEffect.Cpu, CanReorder: true)
         };
+
+    private static SandboxEffect UndefinedEffect()
+        => (SandboxEffect)(1 << 20);
 
     private static SandboxModule EmptyModule()
         => new("module", SemVersion.One, SemVersion.One, [], [EmptyFunction()], new Dictionary<string, string>());

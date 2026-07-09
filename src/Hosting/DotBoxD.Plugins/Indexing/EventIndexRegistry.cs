@@ -152,9 +152,13 @@ public sealed partial class EventIndexRegistry
         ArgumentNullException.ThrowIfNull(kernel);
         lock (_gate)
         {
-            foreach (var channel in _channels.Values)
+            foreach (var pair in _channels)
             {
-                channel.Remove(kernel);
+                pair.Value.Remove(kernel);
+                if (pair.Value.IsEmpty)
+                {
+                    _channels.TryRemove(pair.Key, out _);
+                }
             }
         }
     }

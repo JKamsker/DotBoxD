@@ -176,6 +176,12 @@ public sealed class ExecutionPlan
             {
                 throw new ArgumentException("Function analysis entries must declare a return type.", nameof(functionAnalysis));
             }
+            if (!item.Value.Effects.ContainsOnlyKnownBits())
+            {
+                throw new ArgumentException(
+                    "Function analysis entries must contain only known effect bits.",
+                    nameof(functionAnalysis));
+            }
             copy.Add(item.Key, item.Value);
         }
 

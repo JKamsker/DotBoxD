@@ -102,6 +102,20 @@ public sealed class EventArgsCoverageTests
             "message");
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\t")]
+    public void RpcProtocolErrorEventArgs_RejectsBlankMessage(string message)
+    {
+        DiagnosticAssert.Argument(
+            () => new RpcProtocolErrorEventArgs("ep", 7, MessageType.Request, message),
+            "message");
+        DiagnosticAssert.Argument(
+            () => new RpcProtocolErrorEventArgs("ep", 7, MessageType.Request, message, new Exception("decode")),
+            "message");
+    }
+
     [Fact]
     public void RpcDispatchErrorEventArgs_ExposesAllRequestCoordinates()
     {
@@ -146,6 +160,23 @@ public sealed class EventArgsCoverageTests
         DiagnosticAssert.ArgumentNull(
             () => new RpcDispatchErrorEventArgs("ep", 1, "Game", "Status", null, null!),
             "error");
+    }
+
+    [Theory]
+    [InlineData("", "Move", "serviceName")]
+    [InlineData("   ", "Move", "serviceName")]
+    [InlineData("\t", "Move", "serviceName")]
+    [InlineData("Game", "", "methodName")]
+    [InlineData("Game", "   ", "methodName")]
+    [InlineData("Game", "\t", "methodName")]
+    public void RpcDispatchErrorEventArgs_RejectsBlankRequestNames(
+        string serviceName,
+        string methodName,
+        string paramName)
+    {
+        DiagnosticAssert.Argument(
+            () => new RpcDispatchErrorEventArgs("ep", 1, serviceName, methodName, null, new Exception("x")),
+            paramName);
     }
 
     [Fact]

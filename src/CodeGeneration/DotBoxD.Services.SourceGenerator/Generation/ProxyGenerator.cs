@@ -17,6 +17,7 @@ internal static partial class ProxyGenerator
     public static string Generate(
         ServiceModel service,
         EquatableArray<AsyncSiblingMethod> siblingMethods,
+        bool emitClsNonCompliantAttribute,
         CancellationToken ct = default)
     {
         var sb = new StringBuilder();
@@ -26,7 +27,7 @@ internal static partial class ProxyGenerator
             service,
             NamingHelpers.AsyncSiblingInterfaceName(service.InterfaceName));
         var baseList = ProxyBaseList(qualifiedInterface, qualifiedAsyncSibling, siblingMethods);
-        AppendProxyHeader(sb, service, proxyName, baseList);
+        AppendProxyHeader(sb, service, proxyName, baseList, emitClsNonCompliantAttribute);
         AppendProxyFields(sb, service, ct);
         AppendProxyConstructors(sb, service, proxyName, ct);
         AppendProxyProperties(sb, service, ct);
@@ -62,8 +63,8 @@ internal static partial class ProxyGenerator
         var access = explicitInterface ? string.Empty : "public ";
         var target = explicitInterface ? method.ExplicitImplementationType + "." + method.Name : method.Name;
 
-        AppendAttributes(sb, method.MemberAttributePrefix);
-        AppendAttributes(sb, method.ReturnAttributePrefix);
+        ProxyGenerationHelpers.AppendAttributes(sb, method.MemberAttributePrefix);
+        ProxyGenerationHelpers.AppendAttributes(sb, method.ReturnAttributePrefix);
         sb.AppendLine($"        {access}{unsafeKeyword}{asyncKeyword}{method.ReturnRefKindKeyword}{declaredReturn} {target}{method.TypeParameterList}({paramList}){method.ConstraintClauses}");
         sb.AppendLine("        {");
 
@@ -118,7 +119,7 @@ internal static partial class ProxyGenerator
         var target = explicitInterface ? qualifiedAsyncSibling + "." + s.Name : s.Name;
 
         var asyncKeyword = RequiresAsyncStateMachine(s.SiblingReturnKind) ? "async " : string.Empty;
-        ProxyGenerationHelpers.AppendAttributeLines(sb, s.Source.MemberAttributePrefix);
+        ProxyGenerationHelpers.AppendAttributes(sb, s.Source.MemberAttributePrefix);
         sb.AppendLine($"        {access}{asyncKeyword}{declaredReturn} {target}({paramList})");
         sb.AppendLine("        {");
 
@@ -155,17 +156,4 @@ internal static partial class ProxyGenerator
     private static bool RequiresAsyncStateMachine(MethodReturnKind returnKind) =>
         returnKind is MethodReturnKind.TaskOfSubService or MethodReturnKind.ValueTaskOfSubService;
 
-    private static void AppendAttributes(StringBuilder sb, string attributes)
-    {
-        if (attributes.Length == 0)
-        {
-            return;
-        }
-
-        var lines = attributes.Split(['\n'], System.StringSplitOptions.RemoveEmptyEntries);
-        foreach (var line in lines)
-        {
-            sb.Append("        ").AppendLine(line.TrimEnd('\r'));
-        }
-    }
 }

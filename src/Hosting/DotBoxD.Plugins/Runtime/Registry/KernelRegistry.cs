@@ -70,7 +70,7 @@ public sealed class KernelRegistry : IEnumerable<InstalledKernel>
 
     internal InstalledKernel GetByKernelType<TKernel>() where TKernel : class
     {
-        var pluginId = KernelTypeMetadata.PluginId(typeof(TKernel));
+        var pluginId = KernelTypeMetadata.PluginId(typeof(TKernel), KernelPackageRegistry.Resolve);
         return Get(pluginId);
     }
 

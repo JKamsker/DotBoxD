@@ -15,18 +15,24 @@ public sealed record SandboxDiagnostic(
     DiagnosticSeverity Severity = DiagnosticSeverity.Error,
     SourceSpan? Span = null)
 {
-    private string _code = ValidateNotNull(Code, nameof(Code));
-    private string _message = ValidateNotNull(Message, nameof(Message));
+    private string _code = ValidateText(Code, nameof(Code));
+    private string _message = ValidateText(Message, nameof(Message));
     private DiagnosticSeverity _severity = ValidateSeverity(Severity);
 
-    public string Code { get => _code; init => _code = ValidateNotNull(value, nameof(Code)); }
+    public string Code { get => _code; init => _code = ValidateText(value, nameof(Code)); }
 
-    public string Message { get => _message; init => _message = ValidateNotNull(value, nameof(Message)); }
+    public string Message { get => _message; init => _message = ValidateText(value, nameof(Message)); }
 
     public DiagnosticSeverity Severity { get => _severity; init => _severity = ValidateSeverity(value); }
 
-    private static string ValidateNotNull(string? value, string paramName)
-        => value ?? throw new ArgumentNullException(paramName);
+    private static string ValidateText(string? value, string paramName)
+    {
+        ArgumentNullException.ThrowIfNull(value, paramName);
+
+        return string.IsNullOrWhiteSpace(value)
+            ? throw new ArgumentException("Diagnostic text must not be blank.", paramName)
+            : value;
+    }
 
     private static DiagnosticSeverity ValidateSeverity(DiagnosticSeverity severity)
         => Enum.IsDefined(severity)

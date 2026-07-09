@@ -59,7 +59,26 @@ internal sealed class PendingReceivedResponse :
 
     public void TrySetCanceled(PendingCancellationKind kind)
     {
-        Volatile.Write(ref _cancellationKind, (int)kind);
-        TrySetCanceled();
+        if (!TrySetCancellationKind(kind))
+        {
+            return;
+        }
+
+        if (!TrySetCanceled())
+        {
+            ResetCancellationKind(kind);
+        }
     }
+
+    private bool TrySetCancellationKind(PendingCancellationKind kind) =>
+        Interlocked.CompareExchange(
+            ref _cancellationKind,
+            (int)kind,
+            (int)PendingCancellationKind.None) == (int)PendingCancellationKind.None;
+
+    private void ResetCancellationKind(PendingCancellationKind kind) =>
+        Interlocked.CompareExchange(
+            ref _cancellationKind,
+            (int)PendingCancellationKind.None,
+            (int)kind);
 }

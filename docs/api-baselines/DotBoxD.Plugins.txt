@@ -29,6 +29,7 @@ public bool Owns(string pluginId)
 public bool ReadBool()
 public bool Register<TEvent>( IPluginEventAdapter<TEvent> adapter, InstalledKernel kernel, IReadOnlyList<IndexedPredicate> predicates, bool indexCoversPredicate)
 public bool ResultLocalTerminal { get; init; }
+public bool Succeeded { get; init; }
 public bool TryGet(string pluginId, [MaybeNullWhen(false)] out InstalledKernel kernel)
 public bool TryGetOwned(string pluginId, [MaybeNullWhen(false)] out InstalledKernel kernel)
 public bool TryGetProjectedPayloadDecoder<TProjected>( out Func<ReadOnlyMemory<byte>, TProjected>? decoder)
@@ -614,11 +615,15 @@ public string PluginId { get; }
 public string ReadString()
 public string Remediation { get; init; }
 public string TextValue { get; }
+public string? ArtifactHash { get; init; }
+public string? CacheKey { get; init; }
 public string? CallbackSubscriptionId => LocalTerminalIdentity.CallbackSubscriptionId(this)
 public string? CallbackSubscriptionId => Package.CallbackSubscriptionId
+public string? MaterializationStatus { get; init; }
 public string? ProjectedType { get; init; }
 public string? ResultType { get; init; }
 public string? RpcEntrypoint { get; init; }
+public string? RuntimeForm { get; init; }
 public SubscriptionDeliveryStage Stage { get; init; }
 public SubscriptionPipeline<TEvent, HookContext> On<TEvent>()
 public SubscriptionPipeline<TEvent, HookContext> On<TEvent>(IPluginEventAdapter<TEvent> adapter)

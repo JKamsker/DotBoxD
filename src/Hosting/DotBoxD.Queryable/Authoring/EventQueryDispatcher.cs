@@ -1,11 +1,11 @@
 using System.Text;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Queryable.Ast;
 using DotBoxD.Queryable.Execution;
 using DotBoxD.Queryable.Planning;
 using DotBoxD.Queryable.Serialization;
-
 namespace DotBoxD.Queryable.Authoring;
-
 /// <summary>
 /// Routes events of one type to matching query subscriptions. Subscriptions with equality predicates are
 /// indexed by a <em>composite</em> key over all their equality members, so an event becomes a candidate
@@ -19,7 +19,6 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
     private readonly object _gate = new();
     private long _eventsObserved;
     private volatile Snapshot _snapshot = Snapshot.Empty;
-
     public long EventsObserved => Interlocked.Read(ref _eventsObserved);
     public bool HasSubscriptions => !_snapshot.IsEmpty;
     public EventQuerySubscriptionHandle Register(
@@ -102,6 +101,11 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
         catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
         {
             throw;
+        }
+        catch (SandboxRuntimeException ex) when (context.CancellationToken.IsCancellationRequested &&
+                                                ex.Error.Code == SandboxErrorCode.Cancelled)
+        {
+            throw new OperationCanceledException(null, ex, context.CancellationToken);
         }
         catch
         {
@@ -208,14 +212,10 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
         public bool IsEmpty => _all.Length == 0;
 
         public EventQuerySubscriptionEntry<TEvent>[] Broad => _broad;
-
         public RoutingGroup[] Groups => _groups;
-
         public Snapshot With(EventQuerySubscriptionEntry<TEvent> entry) => new([.. _all, entry]);
-
         public Snapshot Without(EventQuerySubscriptionEntry<TEvent> entry)
             => new(_all.Where(e => !ReferenceEquals(e, entry)).ToArray());
-
         // Reused on the hot TryEventKey path; nested same-thread calls allocate their own builder.
         [ThreadStatic] private static StringBuilder? _eventKeyBuilder;
         [ThreadStatic] private static bool _eventKeyBuilderInUse;

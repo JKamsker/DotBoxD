@@ -43,6 +43,11 @@ public static class RunSummaryAuditFields
         string? materializationStatus = null,
         bool executionDispatched = true)
     {
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(budget);
+        RequireDefinedMode(mode);
+        ArgumentException.ThrowIfNullOrWhiteSpace(cacheStatus);
+
         var fields = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["mode"] = mode.ToString(),
@@ -84,6 +89,14 @@ public static class RunSummaryAuditFields
         AddIfPresent(fields, "artifactHash", artifactHash);
         AddIfPresent(fields, "materializationStatus", materializationStatus);
         return fields;
+    }
+
+    private static void RequireDefinedMode(ExecutionMode mode)
+    {
+        if (!Enum.IsDefined(mode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(mode), mode, "Run summary execution mode must be defined.");
+        }
     }
 
     private static void AddIfPresent(IDictionary<string, string> fields, string key, string? value)

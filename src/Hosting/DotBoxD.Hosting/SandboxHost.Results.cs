@@ -11,7 +11,7 @@ public sealed partial class SandboxHost
             runId,
             "ExecutionFallback",
             AuditTime(plan),
-            true,
+            false,
             ResourceId: $"module:{plan.ModuleHash}",
             ErrorCode: reason.Code,
             Message: $"compiled execution fell back to interpreted mode: {reason.SafeMessage}");

@@ -158,6 +158,10 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
             .Select(static (projection, _) => projection.Bundle)
             .WithTrackingName("ServiceBundles");
 
+        var emitClsNonCompliantAttributes = context.CompilationProvider
+            .Select(static (compilation, _) => AssemblyClsCompliance.IsEnabled(compilation))
+            .WithTrackingName("EmitClsNonCompliantAttributes");
+
         var siblingCollisions = projections
             .SelectMany(static (projection, _) => projection.SiblingCollisions.Array)
             .WithTrackingName("SiblingCollisions");
@@ -170,25 +174,27 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
                 d.MethodName,
                 d.Reason)));
 
-        context.RegisterSourceOutput(bundles, static (spc, bundle) =>
+        context.RegisterSourceOutput(bundles.Combine(emitClsNonCompliantAttributes), static (spc, pair) =>
         {
+            var bundle = pair.Left;
+            var emitClsNonCompliantAttribute = pair.Right;
             try
             {
                 var hintPrefix = HintNameBuilder.Prefix(bundle.Model);
                 var ct = spc.CancellationToken;
-                var proxySource = ProxyGenerator.Generate(bundle.Model, bundle.SiblingMethods, ct);
+                var proxySource = ProxyGenerator.Generate(bundle.Model, bundle.SiblingMethods, emitClsNonCompliantAttribute, ct);
                 spc.AddSource(
                     $"{hintPrefix}.DotBoxDRpcProxy.g.cs",
                     SourceText.From(proxySource, Encoding.UTF8));
 
-                var dispatcherSource = DispatcherGenerator.Generate(bundle.Model, ct);
+                var dispatcherSource = DispatcherGenerator.Generate(bundle.Model, emitClsNonCompliantAttribute, ct);
                 spc.AddSource(
                     $"{hintPrefix}.DotBoxDRpcDispatcher.g.cs",
                     SourceText.From(dispatcherSource, Encoding.UTF8));
 
                 if (!bundle.SiblingMethods.IsEmpty)
                 {
-                    var asyncSource = AsyncInterfaceGenerator.Generate(bundle.Model, bundle.SiblingMethods, ct);
+                    var asyncSource = AsyncInterfaceGenerator.Generate(bundle.Model, bundle.SiblingMethods, emitClsNonCompliantAttribute, ct);
                     spc.AddSource(
                         $"{hintPrefix}.DotBoxDRpcAsync.g.cs",
                         SourceText.From(asyncSource, Encoding.UTF8));
@@ -222,8 +228,9 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
             .Select(static (arr, ct) => ServiceModelOrdering.Sort(arr, ct))
             .WithTrackingName("AllServiceMetadata");
 
-        context.RegisterSourceOutput(allServices, static (spc, services) =>
+        context.RegisterSourceOutput(allServices.Combine(emitClsNonCompliantAttributes), static (spc, pair) =>
         {
+            var services = pair.Left;
             if (services.IsEmpty)
             {
                 return;
@@ -231,7 +238,7 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
 
             try
             {
-                var extensionsSource = ExtensionsGenerator.Generate(services, spc.CancellationToken);
+                var extensionsSource = ExtensionsGenerator.Generate(services, pair.Right, spc.CancellationToken);
                 spc.AddSource(
                     "DotBoxDRpcExtensions.g.cs",
                     SourceText.From(extensionsSource, Encoding.UTF8));
@@ -250,8 +257,9 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
             }
         });
 
-        context.RegisterSourceOutput(allServiceMetadata, static (spc, services) =>
+        context.RegisterSourceOutput(allServiceMetadata.Combine(emitClsNonCompliantAttributes), static (spc, pair) =>
         {
+            var services = pair.Left;
             if (services.IsEmpty)
             {
                 return;
@@ -259,7 +267,7 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
 
             try
             {
-                var factorySource = GeneratedFactoryGenerator.Generate(services, spc.CancellationToken);
+                var factorySource = GeneratedFactoryGenerator.Generate(services, pair.Right, spc.CancellationToken);
                 spc.AddSource(
                     "DotBoxDGenerated.g.cs",
                     SourceText.From(factorySource, Encoding.UTF8));

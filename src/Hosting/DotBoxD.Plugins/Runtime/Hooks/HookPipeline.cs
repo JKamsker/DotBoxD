@@ -20,6 +20,7 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
     private readonly ServerContextFactory<TContext> _contextFactory;
     private readonly KernelRegistry _kernels;
     private readonly Func<PluginPackage, InstalledKernel>? _installer;
+    private readonly Action? _throwIfDisposed;
 
     internal HookPipeline(
         IPluginEventAdapter<TEvent> adapter,
@@ -28,7 +29,8 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
         KernelRegistry kernels,
         Func<PluginPackage, InstalledKernel>? installer = null,
         Action<ResultHookFault>? onFault = null,
-        Func<long>? nextResultOrder = null)
+        Func<long>? nextResultOrder = null,
+        Action? throwIfDisposed = null)
     {
         _adapter = adapter;
         _messages = messages;
@@ -36,6 +38,7 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
         _contextFactory = contextFactory;
         _kernels = kernels;
         _installer = installer;
+        _throwIfDisposed = throwIfDisposed;
         _resultHooks = new ResultHookSlot<TEvent, TContext>(adapter, onFault, nextResultOrder);
     }
     public HookPipeline<TEvent, TContext> Where(
@@ -125,7 +128,9 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
     public HookPipeline<TEvent, TContext> Use(InstalledKernel kernel)
     {
         ArgumentNullException.ThrowIfNull(kernel);
+        ThrowIfDisposed();
         kernel.ValidateFor(_adapter);
+        ThrowIfDisposed();
         _handlerSet.Add(kernel, (e, rawContext, _) => kernel.InvokeAsync(_adapter, e, rawContext.CancellationToken));
         return this;
     }
@@ -133,7 +138,9 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
     public HookPipeline<TEvent, TContext> Use(InstalledKernelPool pool)
     {
         ArgumentNullException.ThrowIfNull(pool);
+        ThrowIfDisposed();
         pool.ValidateFor(_adapter);
+        ThrowIfDisposed();
         _handlerSet.Add(pool, (e, rawContext, _) => pool.InvokeAsync(_adapter, e, rawContext.CancellationToken));
         return this;
     }
@@ -201,6 +208,9 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
 
     ValueTask IHookPipeline<TEvent>.PublishAsync(TEvent e, CancellationToken cancellationToken)
         => PublishAsync(e, cancellationToken);
+
+    private void ThrowIfDisposed()
+        => _throwIfDisposed?.Invoke();
 
     private static async ValueTask PublishAfterFilterAwaitAsync(
         ValueTask<bool> pending,

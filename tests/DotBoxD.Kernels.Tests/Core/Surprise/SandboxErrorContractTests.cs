@@ -71,13 +71,15 @@ public sealed class SandboxErrorContractTests
         {
             { (SandboxErrorCode)999, "safe message", typeof(ArgumentOutOfRangeException), "Code" },
             { SandboxErrorCode.InvalidInput, null, typeof(ArgumentNullException), "SafeMessage" },
-            { SandboxErrorCode.InvalidInput, string.Empty, typeof(ArgumentException), "SafeMessage" }
+            { SandboxErrorCode.InvalidInput, string.Empty, typeof(ArgumentException), "SafeMessage" },
+            { SandboxErrorCode.InvalidInput, "   ", typeof(ArgumentException), "SafeMessage" }
         };
 
     public static TheoryData<string?, Type> MalformedSafeMessages()
         => new()
         {
             { null, typeof(ArgumentNullException) },
-            { string.Empty, typeof(ArgumentException) }
+            { string.Empty, typeof(ArgumentException) },
+            { "\t", typeof(ArgumentException) }
         };
 }

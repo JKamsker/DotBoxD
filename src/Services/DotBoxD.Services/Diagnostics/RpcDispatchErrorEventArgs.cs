@@ -15,8 +15,8 @@ public sealed class RpcDispatchErrorEventArgs : EventArgs
     {
         RemoteEndpoint = remoteEndpoint ?? throw new ArgumentNullException(nameof(remoteEndpoint));
         MessageId = messageId;
-        ServiceName = serviceName ?? throw new ArgumentNullException(nameof(serviceName));
-        MethodName = methodName ?? throw new ArgumentNullException(nameof(methodName));
+        ServiceName = RequireNonBlank(serviceName, nameof(serviceName), "Service name");
+        MethodName = RequireNonBlank(methodName, nameof(methodName), "Method name");
         InstanceId = instanceId;
         Error = error ?? throw new ArgumentNullException(nameof(error));
     }
@@ -38,4 +38,19 @@ public sealed class RpcDispatchErrorEventArgs : EventArgs
 
     /// <summary>The dispatch or response-send failure.</summary>
     public Exception Error { get; }
+
+    private static string RequireNonBlank(string value, string paramName, string label)
+    {
+        if (value is null)
+        {
+            throw new ArgumentNullException(paramName);
+        }
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new ArgumentException(label + " must not be empty or whitespace.", paramName);
+        }
+
+        return value;
+    }
 }

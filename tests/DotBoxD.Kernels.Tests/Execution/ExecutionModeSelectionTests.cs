@@ -199,6 +199,7 @@ public sealed class ExecutionModeSelectionTests
         var summary = Assert.Single(result.AuditEvents, e => e.Kind == "RunSummary");
         Assert.Equal("Auto", summary.Fields!["mode"]);
         Assert.Equal("Auto", summary.Fields["executionMode"]);
+        Assert.Equal("False", summary.Fields["executionDispatched"]);
     }
 
     [Fact]
@@ -290,8 +291,7 @@ public sealed class ExecutionModeSelectionTests
         Assert.Contains(result.AuditEvents, e =>
             e.Kind == "RunSummary" && !e.Success && e.ErrorCode == SandboxErrorCode.HostFailure);
     }
-    private static SandboxHost HostWithCompiler(ISandboxCompiler compiler)
-        => SandboxHost.Create(builder =>
+    private static SandboxHost HostWithCompiler(ISandboxCompiler compiler) => SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();

@@ -177,11 +177,19 @@ public enum HostBindingEffect
 /// Declares the capability and host-state effects required by an analyzer-visible host binding contract.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, Inherited = false)]
-public sealed class HostCapabilityAttribute(string capability, HostBindingEffect effects) : Attribute
+public sealed class HostCapabilityAttribute : Attribute
 {
-    public string Capability { get; } = capability;
+    public HostCapabilityAttribute(string capability, HostBindingEffect effects)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(capability);
 
-    public HostBindingEffect Effects { get; } = effects;
+        Capability = capability;
+        Effects = effects;
+    }
+
+    public string Capability { get; }
+
+    public HostBindingEffect Effects { get; }
 }
 
 /// <summary>Wire client used by generated server-extension proxies.</summary>
