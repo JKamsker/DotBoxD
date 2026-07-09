@@ -22,8 +22,10 @@ function Assert-ExistingPath([string] $Document, [int] $LineNumber, [string] $Pa
 
 function Test-IsRepoPath([string] $Path) {
     $normalized = $Path.Replace('\', '/')
+    if ($normalized.StartsWith('./')) {
+        $normalized = $normalized.Substring(2)
+    }
     return $normalized -in @('DotBoxD.slnx', 'DotBoxD.Packages.slnx') -or
-        $normalized.StartsWith('./eng/') -or
         $normalized.StartsWith('eng/') -or
         $normalized.StartsWith('samples/') -or
         $normalized.StartsWith('tests/') -or
