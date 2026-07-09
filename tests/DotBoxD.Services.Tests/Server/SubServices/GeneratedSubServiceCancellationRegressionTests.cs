@@ -94,59 +94,54 @@ public sealed class GeneratedSubServiceCancellationRegressionTests
         }
     }
 
-    private sealed class TrackingInstanceRegistry : IInstanceRegistry
+    private abstract class DelegatingInstanceRegistry : IInstanceRegistry
     {
-        private readonly InstanceRegistry _inner = new();
+        protected InstanceRegistry Inner { get; } = new();
 
-        public int RegisterCount { get; private set; }
-
-        public string Register(string serviceName, object instance)
-        {
-            RegisterCount++;
-            return _inner.Register(serviceName, instance);
-        }
+        public abstract string Register(string serviceName, object instance);
 
         public bool TryGet(string serviceName, string instanceId, out object instance) =>
-            _inner.TryGet(serviceName, instanceId, out instance);
+            Inner.TryGet(serviceName, instanceId, out instance);
 
         public void Release(string serviceName, string instanceId) =>
-            _inner.Release(serviceName, instanceId);
+            Inner.Release(serviceName, instanceId);
 
-        public ValueTask ReleaseAsync(string serviceName, string instanceId) =>
-            _inner.ReleaseAsync(serviceName, instanceId);
+        public virtual ValueTask ReleaseAsync(string serviceName, string instanceId) =>
+            Inner.ReleaseAsync(serviceName, instanceId);
 
-        public void ReleaseAll() => _inner.ReleaseAll();
+        public void ReleaseAll() => Inner.ReleaseAll();
     }
 
-    private sealed class CancellingInstanceRegistry(CancellationTokenSource cts) : IInstanceRegistry
+    private sealed class TrackingInstanceRegistry : DelegatingInstanceRegistry
     {
-        private readonly InstanceRegistry _inner = new();
+        public int RegisterCount { get; private set; }
 
+        public override string Register(string serviceName, object instance)
+        {
+            RegisterCount++;
+            return Inner.Register(serviceName, instance);
+        }
+    }
+
+    private sealed class CancellingInstanceRegistry(CancellationTokenSource cts) : DelegatingInstanceRegistry
+    {
         public int RegisterCount { get; private set; }
 
         public int ReleaseAsyncCount { get; private set; }
 
-        public string Register(string serviceName, object instance)
+        public override string Register(string serviceName, object instance)
         {
             RegisterCount++;
-            var id = _inner.Register(serviceName, instance);
+            var id = Inner.Register(serviceName, instance);
             cts.Cancel();
             return id;
         }
 
-        public bool TryGet(string serviceName, string instanceId, out object instance) =>
-            _inner.TryGet(serviceName, instanceId, out instance);
-
-        public void Release(string serviceName, string instanceId) =>
-            _inner.Release(serviceName, instanceId);
-
-        public async ValueTask ReleaseAsync(string serviceName, string instanceId)
+        public override async ValueTask ReleaseAsync(string serviceName, string instanceId)
         {
             ReleaseAsyncCount++;
-            await _inner.ReleaseAsync(serviceName, instanceId);
+            await Inner.ReleaseAsync(serviceName, instanceId);
         }
-
-        public void ReleaseAll() => _inner.ReleaseAll();
     }
 
     private sealed class TrackingLifecycleChild : ISubServiceLifecycleChild
