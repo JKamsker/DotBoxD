@@ -139,13 +139,13 @@ internal static class Program
         control.SignalShutdown();
         if (pluginProcess is not null)
         {
-            if (await Task.WhenAny(pluginExit, Task.Delay(readinessTimeout)).ConfigureAwait(false) != pluginExit)
+            var shutdown = Task.WhenAll(pluginExit, host.Disconnected);
+            if (await Task.WhenAny(shutdown, Task.Delay(readinessTimeout)).ConfigureAwait(false) != shutdown)
             {
                 return await FailPluginAsync(host, pluginProcess, "plugin did not shut down before the readiness timeout.").ConfigureAwait(false);
             }
 
-            await pluginExit.ConfigureAwait(false);
-            await host.Disconnected.ConfigureAwait(false);
+            await shutdown.ConfigureAwait(false);
             if (pluginProcess.ExitCode != 0)
             {
                 return await FailPluginAsync(host, pluginProcess, $"plugin exited with code {pluginProcess.ExitCode}.").ConfigureAwait(false);

@@ -55,6 +55,21 @@ public sealed class LoweredPipelineComposerTests
     }
 
     [Fact]
+    public void Emits_multiple_step_capabilities_with_the_validator_delimiter()
+    {
+        var steps = MergeableIrPipelineFixture.ConfigureSteps().ToArray();
+        steps[0] = steps[0] with
+        {
+            RequiredCapabilities = ["probe.read.distance", "probe.read.health"]
+        };
+
+        var module = LoweredPipelineComposer.Compose(
+            new LoweredPipelineComposition("mergeable-pipeline", steps, SandboxType.String));
+
+        Assert.Equal("probe.read.distance;probe.read.health", module.Metadata["dotboxd.requiredCapabilities"]);
+    }
+
+    [Fact]
     public void Rejects_an_empty_composition()
         => Assert.Throws<ArgumentException>(() => LoweredPipelineComposer.Compose(
             new LoweredPipelineComposition("empty", [], SandboxType.I32)));

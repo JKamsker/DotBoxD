@@ -272,7 +272,7 @@ public static class LoweredPipelineComposer
         var metadata = new Dictionary<string, string>(StringComparer.Ordinal);
         if (capabilities.Count != 0)
         {
-            metadata[RequiredCapabilitiesMetadataKey] = string.Join(",", capabilities);
+            metadata[RequiredCapabilitiesMetadataKey] = string.Join(";", capabilities);
         }
 
         if (effects.Count != 0)

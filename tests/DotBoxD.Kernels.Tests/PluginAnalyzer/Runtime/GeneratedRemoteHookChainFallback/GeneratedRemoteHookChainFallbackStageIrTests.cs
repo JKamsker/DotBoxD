@@ -23,7 +23,9 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
 
         Assert.Contains("HookChainStageIrInterceptors", generated, StringComparison.Ordinal);
         Assert.Contains("@irFilter:", generated, StringComparison.Ordinal);
+        Assert.Contains("@irFilter ??", generated, StringComparison.Ordinal);
         Assert.Contains("@irProjection:", generated, StringComparison.Ordinal);
+        Assert.Contains("@irProjection ??", generated, StringComparison.Ordinal);
         Assert.Contains(
             "IRFunc<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent, bool>",
             generated,

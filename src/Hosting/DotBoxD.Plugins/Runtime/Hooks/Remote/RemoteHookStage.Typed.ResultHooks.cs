@@ -15,10 +15,7 @@ public sealed partial class RemoteHookStage<TEvent, TCurrent, TContext>
         where TResult : struct, IHookResult
     {
         ArgumentNullException.ThrowIfNull(handler);
-        return _root.UseGeneratedLocalResultChain<TResult>(
-            package,
-            e => handler((TCurrent)(object)e!),
-            priority);
+        return ProjectedLocalResultTerminal(package, priority);
     }
 
     public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalResultChain<TResult>(
@@ -28,10 +25,7 @@ public sealed partial class RemoteHookStage<TEvent, TCurrent, TContext>
         where TResult : struct, IHookResult
     {
         ArgumentNullException.ThrowIfNull(handler);
-        return _root.UseGeneratedLocalResultChain<TResult>(
-            package,
-            (e, context) => handler((TCurrent)(object)e!, context),
-            priority);
+        return ProjectedLocalResultTerminal(package, priority);
     }
 
     public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalResultChain<TResult>(
@@ -41,10 +35,7 @@ public sealed partial class RemoteHookStage<TEvent, TCurrent, TContext>
         where TResult : struct, IHookResult
     {
         ArgumentNullException.ThrowIfNull(handler);
-        return _root.UseGeneratedLocalResultChain<TResult>(
-            package,
-            e => handler((TCurrent)(object)e!),
-            priority);
+        return ProjectedLocalResultTerminal(package, priority);
     }
 
     public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalResultChain<TResult>(
@@ -54,10 +45,7 @@ public sealed partial class RemoteHookStage<TEvent, TCurrent, TContext>
         where TResult : struct, IHookResult
     {
         ArgumentNullException.ThrowIfNull(handler);
-        return _root.UseGeneratedLocalResultChain<TResult>(
-            package,
-            (e, context) => handler((TCurrent)(object)e!, context),
-            priority);
+        return ProjectedLocalResultTerminal(package, priority);
     }
 
     public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalResultChain<TResult>(
@@ -67,10 +55,7 @@ public sealed partial class RemoteHookStage<TEvent, TCurrent, TContext>
         where TResult : struct, IHookResult
     {
         ArgumentNullException.ThrowIfNull(handler);
-        return _root.UseGeneratedLocalResultChain<TResult>(
-            package,
-            (e, ct) => handler((TCurrent)(object)e!, ct),
-            priority);
+        return ProjectedLocalResultTerminal(package, priority);
     }
 
     public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalResultChain<TResult>(
@@ -80,10 +65,7 @@ public sealed partial class RemoteHookStage<TEvent, TCurrent, TContext>
         where TResult : struct, IHookResult
     {
         ArgumentNullException.ThrowIfNull(handler);
-        return _root.UseGeneratedLocalResultChain<TResult>(
-            package,
-            (e, context, ct) => handler((TCurrent)(object)e!, context, ct),
-            priority);
+        return ProjectedLocalResultTerminal(package, priority);
     }
     public RemoteHookPipeline<TEvent, TContext> Register<TResult>(
         Func<TCurrent, TResult> handler,
@@ -181,5 +163,15 @@ public sealed partial class RemoteHookStage<TEvent, TCurrent, TContext>
             HookLowering.RequiredPackage(irHandler, nameof(irHandler)),
             handler,
             priority);
+    }
+
+    private static RemoteHookPipeline<TEvent, TContext> ProjectedLocalResultTerminal(PluginPackage package, int priority)
+    {
+        ArgumentNullException.ThrowIfNull(package);
+        _ = priority;
+        throw new NotSupportedException(
+            "Remote hook RegisterLocal result handlers are not supported after Select because result " +
+            "callbacks receive the root event payload. Use Register for sandboxed result hooks or register " +
+            "local result handlers on the root remote hook pipeline.");
     }
 }

@@ -126,6 +126,8 @@ internal static class HookChainStageIrEmitter
             .Append(", ")
             .Append(ArgumentName(interception.IRParameterName))
             .Append(": ")
+            .Append(Identifier(interception.IRParameterName))
+            .Append(" ?? ")
             .Append(interception.StepFullName)
             .Append(".CreateIRFunc")
             .Append(interception.CreateIRFuncTypeArguments)

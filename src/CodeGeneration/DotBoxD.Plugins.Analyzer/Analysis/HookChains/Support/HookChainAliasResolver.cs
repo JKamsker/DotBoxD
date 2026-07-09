@@ -30,7 +30,7 @@ internal static class HookChainAliasResolver
         CancellationToken cancellationToken)
     {
         expression = UnwrapTransparentExpression(expression);
-        var expressionModel = SemanticModelFor(expression, model);
+        var expressionModel = HookChainSemanticModelResolver.For(expression, model);
         if (expressionModel is null)
         {
             return null;
@@ -87,7 +87,7 @@ internal static class HookChainAliasResolver
                 continue;
             }
 
-            var nodeModel = SemanticModelFor(node, model);
+            var nodeModel = HookChainSemanticModelResolver.For(node, model);
             if (nodeModel is not null && IsMutationOfLocal(node, local, nodeModel, cancellationToken))
             {
                 return true;
@@ -154,7 +154,7 @@ internal static class HookChainAliasResolver
         CancellationToken cancellationToken)
     {
         expression = UnwrapTransparentExpression(expression);
-        var expressionModel = SemanticModelFor(expression, model);
+        var expressionModel = HookChainSemanticModelResolver.For(expression, model);
         if (expressionModel is null)
         {
             return false;
@@ -183,21 +183,4 @@ internal static class HookChainAliasResolver
         return false;
     }
 
-    private static SemanticModel? SemanticModelFor(SyntaxNode node, SemanticModel model)
-    {
-        if (ReferenceEquals(node.SyntaxTree, model.SyntaxTree))
-        {
-            return model;
-        }
-
-        foreach (var tree in model.Compilation.SyntaxTrees)
-        {
-            if (ReferenceEquals(tree, node.SyntaxTree))
-            {
-                return model.Compilation.GetSemanticModel(tree);
-            }
-        }
-
-        return null;
-    }
 }

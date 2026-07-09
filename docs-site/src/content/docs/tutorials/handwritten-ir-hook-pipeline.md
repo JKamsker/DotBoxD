@@ -342,11 +342,13 @@ Treat generated and hand-written packages the same:
 The important design point is that hand-written IR goes through the same `SandboxHost` validation and execution
 path as generated IR. The generator saves authoring effort; it does not grant authority.
 
-## Step 7 - Optional: make your own fluent surface lowerable
+## Step 7 - Optional: expose a lowerable fluent surface
 
-If you want DotBoxD's analyzer to lower your own fluent API, make the lowered body explicit in the method
-signature. The delegate stays as the ergonomic authoring API. An optional `IRFunc` parameter carries a stage
-fragment, and an optional `IRKernel` parameter carries a generated terminal package:
+DotBoxD's analyzer recognizes the built-in pipeline role names (`Where`, `Select`, `Run`, `RunLocal`,
+`Register`, and `RegisterLocal`). If you want a custom surface to be lowered automatically, keep those names
+and make the lowered body explicit in the method signature. The delegate stays as the ergonomic authoring API.
+An optional `IRFunc` parameter carries a stage fragment, and an optional `IRKernel` parameter carries a
+generated terminal package:
 
 ```csharp
 using System.Collections.Generic;
@@ -359,9 +361,10 @@ public sealed class MyRemotePipeline<TEvent>
 {
     private readonly List<LoweredPipelineStep> _steps = [];
 
-    public MyRemotePipeline<TEvent> Matching(
+    public MyRemotePipeline<TEvent> Where(
         Func<TEvent, bool> predicate,
-        [IRBodyOf(nameof(predicate))] IRFunc<TEvent, bool>? irPredicate = null)
+        [IRBodyOf(nameof(predicate), LoweredPipelineStepKind.Filter)]
+        IRFunc<TEvent, bool>? irPredicate = null)
     {
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentNullException.ThrowIfNull(irPredicate);
@@ -369,7 +372,7 @@ public sealed class MyRemotePipeline<TEvent>
         return this;
     }
 
-    public MyRemoteStage<TEvent, TNext> Map<TNext>(
+    public MyRemoteStage<TEvent, TNext> Select<TNext>(
         Func<TEvent, TNext> selector,
         [IRBodyOf(nameof(selector))] IRFunc<TEvent, TNext>? irSelector = null)
     {
@@ -379,7 +382,7 @@ public sealed class MyRemotePipeline<TEvent>
         return new(this);
     }
 
-    public MyRemotePipeline<TEvent> Do(
+    public MyRemotePipeline<TEvent> Run(
         Action<TEvent, HookContext> handler,
         [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
     {
@@ -402,7 +405,7 @@ public sealed class MyRemoteStage<TEvent, TCurrent>
 
     private MyRemotePipeline<TEvent> Root { get; }
 
-    public MyRemotePipeline<TEvent> Do(
+    public MyRemotePipeline<TEvent> Run(
         Action<TCurrent, HookContext> handler,
         [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
     {
@@ -413,13 +416,13 @@ public sealed class MyRemoteStage<TEvent, TCurrent>
 }
 ```
 
-A user can now write a chain with your names:
+A user can now write a chain on your surface:
 
 ```csharp
 pipeline
-    .Matching(e => e.Distance <= 4)
-    .Map(e => e.MonsterId)
-    .Do((monsterId, ctx) => ctx.Messages.Send(monsterId, "calm"));
+    .Where(e => e.Distance <= 4)
+    .Select(e => e.MonsterId)
+    .Run((monsterId, ctx) => ctx.Messages.Send(monsterId, "calm"));
 ```
 
 The terminal still needs a public install method such as `UseGeneratedChain(PluginPackage package)` (and the
@@ -427,15 +430,17 @@ local-terminal equivalents if you support `RunLocal`/`RegisterLocal`). The gener
 you could have called yourself:
 
 ```csharp
-pipeline.Matching(
+pipeline.Where(
     e => e.Distance <= 4,
     IRBuilder.For<MonsterAggroEvent>().Filter(e => e.LessThanOrEqual(e.Field(2), e.Int32(4))));
 ```
 
 That is the important boundary: the generator supplies the `IRFunc` automatically, but the API does not depend
-on an internal overload. Older `[LowerToIr]` methods with a sibling `LoweredPipelineStep` overload still work
-for compatibility, but new custom fluent surfaces should prefer the explicit `IRBodyOf` shape so the lowering
-contract is visible and hand-writable.
+on an internal overload. If you prefer domain-specific method names, keep them as a hand-written layer that
+builds `IRFunc` values with `IRBuilder` and calls the same public primitive methods; those names are not
+automatically lowered by the analyzer. Older `[LowerToIr]` methods with a sibling `LoweredPipelineStep`
+overload still work for compatibility, but new custom fluent surfaces should prefer the explicit `IRBodyOf`
+shape so the lowering contract is visible and hand-writable.
 
 ## Next steps
 

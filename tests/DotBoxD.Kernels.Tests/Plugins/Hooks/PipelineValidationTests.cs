@@ -1,3 +1,4 @@
+using System.Reflection;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins;
@@ -5,7 +6,6 @@ using DotBoxD.Plugins.Kernel;
 using DotBoxD.Plugins.Runtime;
 using DotBoxD.Plugins.Runtime.Hooks;
 using DotBoxD.Plugins.Runtime.Subscriptions;
-using System.Reflection;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Hooks;
 

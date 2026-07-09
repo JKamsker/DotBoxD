@@ -29,6 +29,39 @@ public sealed class ApiBaselineScriptTests
         Assert.Equal("True|internal protected virtual void OnHook()", output);
     }
 
+    [Fact]
+    public async Task Normalize_api_declaration_preserves_parameter_text_after_attributes()
+    {
+        var output = await RunProbeAsync(
+            """
+            $declaration = @'
+            public bool TryGet<T>(
+                [NotNullWhen(true)] out Func<ReadOnlyMemory<byte>, T>? decoder)
+            '@
+            [Console]::Out.Write((Normalize-ApiDeclaration $declaration))
+            """);
+
+        Assert.Equal("public bool TryGet<T>( out Func<ReadOnlyMemory<byte>, T>? decoder)", output);
+    }
+
+    [Fact]
+    public async Task Normalize_api_declaration_keeps_collection_expression_brackets()
+    {
+        var output = await RunProbeAsync(
+            """
+            $declaration = @'
+            public static object Value { get; } = new(
+                "id",
+                [SandboxType.I32],
+                new Dictionary<string, string> { ["value"] = "x" });
+            '@
+            [Console]::Out.Write((Normalize-ApiDeclaration $declaration))
+            """);
+
+        Assert.Contains("[SandboxType.I32]", output, StringComparison.Ordinal);
+        Assert.Contains("[\"value\"] = \"x\"", output, StringComparison.Ordinal);
+    }
+
     private static async Task<string> RunProbeAsync(string body)
     {
         var scriptPath = Path.Combine(

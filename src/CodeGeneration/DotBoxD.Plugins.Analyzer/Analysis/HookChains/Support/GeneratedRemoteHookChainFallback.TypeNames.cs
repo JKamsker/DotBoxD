@@ -26,7 +26,7 @@ internal static partial class GeneratedRemoteHookChainFallback
             return false;
         }
 
-        var semanticModel = SemanticModelFor(identifier, model);
+        var semanticModel = HookChainSemanticModelResolver.For(identifier, model);
         if (semanticModel is null)
         {
             return false;

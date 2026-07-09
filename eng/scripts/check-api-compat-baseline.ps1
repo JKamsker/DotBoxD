@@ -41,6 +41,7 @@ $publicSurfaceAccessibilityPattern = "^(public|protected\s+internal|internal\s+p
 function Normalize-ApiLine([string] $Line) {
     $trimmed = Remove-LineComment $Line
     $trimmed = $trimmed.Trim()
+    $trimmed = Remove-LeadingAttributeLists $trimmed
     if ([string]::IsNullOrWhiteSpace($trimmed) -or
         $trimmed.StartsWith("//", [StringComparison]::Ordinal) -or
         $trimmed.StartsWith("[", [StringComparison]::Ordinal)) {
@@ -62,6 +63,38 @@ function Normalize-ApiLine([string] $Line) {
     }
 
     return $normalized
+}
+
+function Remove-LeadingAttributeLists([string] $Line) {
+    $text = $Line.Trim()
+    while ($text.StartsWith("[", [StringComparison]::Ordinal)) {
+        $depth = 0
+        $closedIndex = -1
+        for ($index = 0; $index -lt $text.Length; $index++) {
+            if ($text[$index] -eq "[") {
+                $depth++
+            } elseif ($text[$index] -eq "]") {
+                $depth--
+                if ($depth -eq 0) {
+                    $closedIndex = $index
+                    break
+                }
+            }
+        }
+
+        if ($closedIndex -lt 0) {
+            return $text
+        }
+
+        $remaining = $text.Substring($closedIndex + 1).TrimStart()
+        if ($remaining.Length -gt 0 -and ",)]};=".Contains($remaining[0], [StringComparison]::Ordinal)) {
+            return $text
+        }
+
+        $text = $remaining
+    }
+
+    return $text
 }
 
 function Remove-LineComment([string] $Line) {
@@ -294,8 +327,8 @@ function Normalize-ApiDeclaration([string] $Declaration) {
     $lines = New-Object "System.Collections.Generic.List[string]"
     foreach ($line in ($Declaration -split "\r?\n")) {
         $trimmed = (Remove-LineComment $line).Trim()
-        if (-not [string]::IsNullOrWhiteSpace($trimmed) -and
-            -not $trimmed.StartsWith("[", [StringComparison]::Ordinal)) {
+        $trimmed = Remove-LeadingAttributeLists $trimmed
+        if (-not [string]::IsNullOrWhiteSpace($trimmed)) {
             $lines.Add($trimmed)
         }
     }
