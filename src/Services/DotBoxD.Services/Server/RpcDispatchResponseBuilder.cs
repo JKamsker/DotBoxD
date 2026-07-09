@@ -80,7 +80,9 @@ internal sealed class RpcDispatchResponseBuilder
         // reported as ServiceNotFound instead of escaping as an internal lookup error.
         if (dispatcher is null)
         {
-            return new RpcDispatchResult(BuildErrorFrame(messageId, RpcErrors.ServiceNotFound()), stream: null);
+            var error = RpcErrors.ServiceNotFound();
+            telemetry.MarkFailed(new ServiceNotFoundException(error.Message));
+            return new RpcDispatchResult(BuildErrorFrame(messageId, error), stream: null);
         }
 
         var writer = MessageFramer.RentFrameWriter();
