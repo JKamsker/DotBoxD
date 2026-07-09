@@ -87,6 +87,64 @@ public sealed class VerifierEvidenceModelContractTests
         Assert.Equal("CacheKey", exception.ParamName);
     }
 
+    [Fact]
+    public void ArtifactManifest_constructs_with_valid_identity_fields()
+    {
+        var manifest = Manifest();
+
+        Assert.Equal("cache-key", manifest.CacheKey);
+        Assert.Equal("assembly-hash", manifest.AssemblyHash);
+    }
+
+    [Fact]
+    public void ArtifactManifest_rejects_blank_constructor_identity_fields()
+    {
+        var exception = Assert.ThrowsAny<ArgumentException>(
+            () => new ArtifactManifest(
+                1,
+                "   ",
+                "module-hash",
+                "plan-hash",
+                "policy-hash",
+                "binding-hash",
+                "runtime-hash",
+                "compiler-version",
+                "type-system-version",
+                "effect-analysis-version",
+                "verifier-version",
+                "1.0.0",
+                "net10.0",
+                ["boxed-values"],
+                "assembly-hash",
+                DateTimeOffset.UtcNow));
+
+        Assert.Equal("CacheKey", exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData("CacheKey", "   ")]
+    [InlineData("ModuleHash", "")]
+    [InlineData("PlanHash", "   ")]
+    [InlineData("PolicyHash", "\t")]
+    [InlineData("BindingManifestHash", "")]
+    [InlineData("RuntimeFacadeHash", "   ")]
+    [InlineData("CompilerVersion", "")]
+    [InlineData("TypeSystemVersion", "   ")]
+    [InlineData("EffectAnalysisVersion", "\t")]
+    [InlineData("VerifierVersion", "\t")]
+    [InlineData("LanguageVersion", "")]
+    [InlineData("TargetFramework", "   ")]
+    [InlineData("AssemblyHash", "")]
+    public void ArtifactManifest_rejects_blank_init_identity_fields(
+        string fieldName,
+        string value)
+    {
+        var exception = Assert.ThrowsAny<ArgumentException>(
+            () => WithIdentityField(fieldName, value));
+
+        Assert.Equal(fieldName, exception.ParamName);
+    }
+
     private static ArtifactManifest Manifest()
         => new(
             1,
@@ -105,4 +163,23 @@ public sealed class VerifierEvidenceModelContractTests
             ["boxed-values"],
             "assembly-hash",
             DateTimeOffset.UtcNow);
+
+    private static ArtifactManifest WithIdentityField(string fieldName, string value)
+        => fieldName switch
+        {
+            "CacheKey" => Manifest() with { CacheKey = value },
+            "ModuleHash" => Manifest() with { ModuleHash = value },
+            "PlanHash" => Manifest() with { PlanHash = value },
+            "PolicyHash" => Manifest() with { PolicyHash = value },
+            "BindingManifestHash" => Manifest() with { BindingManifestHash = value },
+            "RuntimeFacadeHash" => Manifest() with { RuntimeFacadeHash = value },
+            "CompilerVersion" => Manifest() with { CompilerVersion = value },
+            "TypeSystemVersion" => Manifest() with { TypeSystemVersion = value },
+            "EffectAnalysisVersion" => Manifest() with { EffectAnalysisVersion = value },
+            "VerifierVersion" => Manifest() with { VerifierVersion = value },
+            "LanguageVersion" => Manifest() with { LanguageVersion = value },
+            "TargetFramework" => Manifest() with { TargetFramework = value },
+            "AssemblyHash" => Manifest() with { AssemblyHash = value },
+            _ => throw new ArgumentOutOfRangeException(nameof(fieldName), fieldName, null)
+        };
 }
