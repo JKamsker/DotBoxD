@@ -71,6 +71,7 @@ foreach ($document in $documents) {
             $path = $targetParts[0].Split('?', 2)[0]
             $fragment = if ($targetParts.Count -eq 2) { $targetParts[1] } else { '' }
             if ($path -match '^(https?|mailto|tel):' -or
+                $path.StartsWith('//') -or
                 $path.StartsWith('/api/') -or
                 $path.Contains('{')) {
                 continue
