@@ -49,6 +49,30 @@ public sealed class RpcKernelPackageValidationTests
     }
 
     [Fact]
+    public async Task Install_rejects_rpc_package_with_null_manifest_required_capability_entry()
+    {
+        using var server = PluginServer.Create(
+            configureHost: RpcKernelTestPackages.AddKillBinding,
+            defaultPolicy: RpcKernelTestPackages.KillPolicy());
+        var package = RpcKernelTestPackages.MonsterKiller();
+        var invalid = package with
+        {
+            Manifest = package.Manifest with
+            {
+                RequiredCapabilities = [.. package.Manifest.RequiredCapabilities, null!]
+            }
+        };
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
+            async () => await server.InstallServerExtensionAsync(invalid).AsTask());
+
+        Assert.Contains(ex.Diagnostics, d =>
+            d.Code == "DBXK045" &&
+            d.Message.Contains("requiredCapabilities", StringComparison.Ordinal) &&
+            d.Message.Contains("null", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void Server_required_capability_analysis_excludes_rpc_event_property_manifest_capabilities()
     {
         using var server = PluginServer.Create(

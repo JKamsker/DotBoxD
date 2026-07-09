@@ -64,6 +64,7 @@ internal static class HookChainStageIrEmitter
         builder.Append("            ").Append(StringArray(model.RequiredCapabilities)).AppendLine(",");
         builder.Append("            ").Append(StringArray(model.Effects)).AppendLine(");");
         builder.AppendLine();
+        AppendGeneratedAttributes(builder, model.GeneratedAttributeSource, "    ");
         builder.Append("    public static ").Append(model.IRFuncType).Append(" CreateIRFunc");
         if (model.IRFuncTypeParameters is { Length: > 0 } typeParameters)
         {
@@ -104,6 +105,7 @@ internal static class HookChainStageIrEmitter
         int index)
     {
         builder.Append("        ").AppendLine(interception.AttributeSyntax);
+        AppendGeneratedAttributes(builder, interception.GeneratedAttributeSource, "        ");
         builder.Append("        public static ").Append(interception.ReturnType).Append(" Intercept_")
             .Append(index.ToString(CultureInfo.InvariantCulture));
         if (interception.InterceptorTypeParameters is { Length: > 0 } typeParameters)
@@ -196,6 +198,22 @@ internal static class HookChainStageIrEmitter
 
         builder.Append(" }");
         return builder.ToString();
+    }
+
+    private static void AppendGeneratedAttributes(StringBuilder builder, string attributeSource, string indent)
+    {
+        if (attributeSource.Length == 0)
+        {
+            return;
+        }
+
+        foreach (var line in attributeSource.Split('\n'))
+        {
+            if (line.Length > 0)
+            {
+                builder.Append(indent).AppendLine(line);
+            }
+        }
     }
 
     private static string ArgumentName(string parameterName) => "@" + parameterName;

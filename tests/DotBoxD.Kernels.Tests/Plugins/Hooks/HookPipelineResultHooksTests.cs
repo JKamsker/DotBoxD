@@ -17,13 +17,9 @@ public sealed class HookPipelineResultHooksTests
 {
     [Hook("test.damage", typeof(DamageResult))]
     private sealed record DamageCtx(int Damage);
-
     private readonly record struct DamageResult(bool Success, string? Reason, int Damage) : IHookResult;
-
     private readonly record struct OtherDamageResult(bool Success, string? Reason) : IHookResult;
-
     private sealed record ReferenceDamageResult(bool Success, string? Reason) : IHookResult;
-
     private sealed record DamageServerContext(HookContext Raw);
 
     [Fact]
@@ -47,6 +43,14 @@ public sealed class HookPipelineResultHooksTests
             () => new HandleSubtypeAttribute(typeof(DamageCtx), "player", "", "combatant.player.read"));
         Assert.Throws<ArgumentException>(
             () => new HandleSubtypeAttribute(typeof(DamageCtx), "player", "combatant.player", ""));
+        Assert.Throws<ArgumentException>(
+            () => new HandleSubtypeAttribute(typeof(DamageCtx), "player", "combatant..player", "combatant.player.read"));
+        Assert.Throws<ArgumentException>(
+            () => new HandleSubtypeAttribute(
+                typeof(DamageCtx),
+                "player",
+                "combatant.player",
+                "combatant.player.bad\u0001id"));
     }
 
     [Fact]

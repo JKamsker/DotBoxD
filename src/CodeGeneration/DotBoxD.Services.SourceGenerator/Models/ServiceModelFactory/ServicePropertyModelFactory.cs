@@ -31,7 +31,7 @@ internal static class ServicePropertyModelFactory
                 GetImplementationType(propertySymbol),
                 propertySymbol.Type.ToDisplayString(s_qualifiedFormat),
                 ProxyType: null,
-                BuildPropertyFlowAttributePrefix(propertySymbol, ct),
+                BuildPropertyAttributePrefix(propertySymbol, ct),
                 IsInstanceId: true,
                 SubService: null,
                 MemberAttributePrefix: MemberAttributeFormatter.BuildPrefix(propertySymbol, ct));
@@ -53,14 +53,14 @@ internal static class ServicePropertyModelFactory
             GetImplementationType(propertySymbol),
             propertyType.ToDisplayString(s_qualifiedFormat),
             IdentifierHelpers.QualifyTypeName(propertyNamespace, proxyName),
-            BuildPropertyFlowAttributePrefix(propertySymbol, ct),
+            BuildPropertyAttributePrefix(propertySymbol, ct),
             IsInstanceId: false,
             subService,
             MemberAttributeFormatter.BuildPrefix(propertySymbol, ct));
         return true;
     }
 
-    private static string BuildPropertyFlowAttributePrefix(IPropertySymbol property, CancellationToken ct)
+    private static string BuildPropertyAttributePrefix(IPropertySymbol property, CancellationToken ct)
     {
         var attributes = new StringBuilder();
         foreach (var attr in property.GetAttributes())

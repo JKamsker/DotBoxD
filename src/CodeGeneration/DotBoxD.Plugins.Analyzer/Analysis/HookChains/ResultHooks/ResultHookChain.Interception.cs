@@ -68,6 +68,7 @@ internal static partial class ResultHookChain
         {
             return CreateGeneratedResultInterception(
                 location,
+                ExperimentalAttributeSource.FromTypes(contextType, resultType),
                 contextFullName,
                 receiverIsStage,
                 resultFullName,
@@ -83,6 +84,7 @@ internal static partial class ResultHookChain
         var receiverFullName = receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         return new HookChainInterception(
             location.GetInterceptsLocationAttributeSyntax(),
+            ExperimentalAttributeSource.FromTypes(receiverType, contextType, resultType),
             receiverFullName,
             handlerFullName,
             receiverFullName,
@@ -126,6 +128,7 @@ internal static partial class ResultHookChain
 
         interception = new HookChainInterception(
             location.GetInterceptsLocationAttributeSyntax(),
+            ExperimentalAttributeSource.FromTypes(resolvedReceiver, handlerType, method.ReturnType),
             resolvedReceiver.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             handlerType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
@@ -150,6 +153,7 @@ internal static partial class ResultHookChain
 
     private static HookChainInterception? CreateGeneratedResultInterception(
         InterceptableLocation location,
+        string generatedAttributeSource,
         string contextFullName,
         bool receiverIsStage,
         string resultFullName,
@@ -168,6 +172,7 @@ internal static partial class ResultHookChain
 
         return GeneratedRemoteHookChainFallback.CreateResultInterception(
             location.GetInterceptsLocationAttributeSyntax(),
+            generatedAttributeSource,
             contextFullName,
             receiverIsStage,
             resultFullName,

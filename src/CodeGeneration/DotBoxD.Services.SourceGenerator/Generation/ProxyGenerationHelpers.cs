@@ -37,7 +37,7 @@ internal static class ProxyGenerationHelpers
         AppendDefaultValue(sb, p);
     }
 
-    public static void AppendAttributeLines(StringBuilder sb, string attributes)
+    public static void AppendAttributes(StringBuilder sb, string attributes)
     {
         if (attributes.Length == 0)
         {

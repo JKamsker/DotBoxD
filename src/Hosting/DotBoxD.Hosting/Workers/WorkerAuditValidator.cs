@@ -73,9 +73,9 @@ internal static class WorkerAuditValidator
     }
 
     private static bool ResultShapeMatches(SandboxAuditEvent auditEvent)
-        => !auditEvent.Success ||
-           auditEvent.ErrorCode is null ||
-           auditEvent.Kind == "ExecutionFallback";
+        => auditEvent.Success
+            ? auditEvent.ErrorCode is null
+            : auditEvent.ErrorCode is not null;
 
     private static bool TimestampMatches(ExecutionPlan plan, DateTimeOffset timestamp)
     {
@@ -100,7 +100,7 @@ internal static class WorkerAuditValidator
            string.Equals(auditEvent.ResourceId, $"module:{plan.ModuleHash}", StringComparison.Ordinal);
 
     private static bool ExecutionFallbackAuditMatches(ExecutionPlan plan, SandboxAuditEvent auditEvent)
-        => auditEvent.Success &&
+        => !auditEvent.Success &&
            auditEvent.ErrorCode is SandboxErrorCode.ValidationError or SandboxErrorCode.VerifierFailure &&
            ModuleAuditMatches(plan, auditEvent);
 

@@ -15,7 +15,7 @@ public sealed record ModuleValidationResult(
 {
     private SandboxEffect _moduleEffects = ValidateModuleEffects(ModuleEffects, nameof(ModuleEffects));
     private IReadOnlyList<SandboxDiagnostic> _diagnostics = CopyList(Diagnostics, nameof(Diagnostics));
-    private IReadOnlyDictionary<string, FunctionAnalysis> _functions = CopyDictionary(Functions, nameof(Functions));
+    private IReadOnlyDictionary<string, FunctionAnalysis> _functions = CopyFunctionAnalysis(Functions, nameof(Functions));
     private IReadOnlySet<string> _requiredCapabilities = CopySet(RequiredCapabilities, nameof(RequiredCapabilities));
     private IReadOnlyDictionary<string, IReadOnlySet<string>> _bindingReferences =
         CopyBindingReferences(BindingReferences, nameof(BindingReferences));
@@ -35,7 +35,7 @@ public sealed record ModuleValidationResult(
     public IReadOnlyDictionary<string, FunctionAnalysis> Functions
     {
         get => _functions;
-        init => _functions = CopyDictionary(value, nameof(Functions));
+        init => _functions = CopyFunctionAnalysis(value, nameof(Functions));
     }
 
     public IReadOnlySet<string> RequiredCapabilities
@@ -72,22 +72,21 @@ public sealed record ModuleValidationResult(
         return new ReadOnlyCollection<T>(copy);
     }
 
-    private static IReadOnlyDictionary<string, TValue> CopyDictionary<TValue>(
-        IReadOnlyDictionary<string, TValue> values,
+    private static IReadOnlyDictionary<string, FunctionAnalysis> CopyFunctionAnalysis(
+        IReadOnlyDictionary<string, FunctionAnalysis> values,
         string paramName)
     {
         ArgumentNullException.ThrowIfNull(values, paramName);
 
-        var copy = new Dictionary<string, TValue>(values.Count, StringComparer.Ordinal);
+        var copy = new Dictionary<string, FunctionAnalysis>(values.Count, StringComparer.Ordinal);
         foreach (var item in values)
         {
             copy.Add(
                 RequireNonNull(item.Key, paramName, "Dictionary keys cannot be null."),
-                RequireNonNull(item.Value, paramName, "Dictionary values cannot be null."));
+                RequireFunctionAnalysis(item.Value, paramName));
         }
 
-        return new ReadOnlyDictionary<string, TValue>(
-            copy);
+        return new ReadOnlyDictionary<string, FunctionAnalysis>(copy);
     }
 
     private static IReadOnlySet<string> CopySet(IReadOnlySet<string> values, string paramName)
@@ -128,6 +127,19 @@ public sealed record ModuleValidationResult(
         }
 
         return effects;
+    }
+
+    private static FunctionAnalysis RequireFunctionAnalysis(FunctionAnalysis value, string paramName)
+    {
+        RequireNonNull(value, paramName, "Dictionary values cannot be null.");
+        RequireNonNull(value.ReturnType, paramName, "Function analysis return types cannot be null.");
+
+        if (!value.Effects.ContainsOnlyKnownBits())
+        {
+            throw new ArgumentException("Function analysis effects must contain only known effect bits.", paramName);
+        }
+
+        return value;
     }
 
     private static T RequireNonNull<T>(T value, string paramName, string message)

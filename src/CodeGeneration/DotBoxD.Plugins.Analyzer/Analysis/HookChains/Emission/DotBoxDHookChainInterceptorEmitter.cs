@@ -40,6 +40,7 @@ internal static class DotBoxDHookChainInterceptorEmitter
         {
             var interception = interceptions[i];
             builder.Append("        ").AppendLine(interception.AttributeSyntax);
+            AppendGeneratedAttributes(builder, interception.GeneratedAttributeSource);
             builder.Append("        public static ").Append(interception.ReturnTypeFullName).Append(" Intercept_")
                 .Append(i.ToString(System.Globalization.CultureInfo.InvariantCulture));
             // An un-nameable (anonymous) terminal projection makes the interceptor generic; Roslyn infers the type
@@ -82,6 +83,22 @@ internal static class DotBoxDHookChainInterceptorEmitter
         builder.AppendLine("    }");
         builder.AppendLine("}");
         return builder.ToString();
+    }
+
+    private static void AppendGeneratedAttributes(StringBuilder builder, string attributeSource)
+    {
+        if (attributeSource.Length == 0)
+        {
+            return;
+        }
+
+        foreach (var line in attributeSource.Split('\n'))
+        {
+            if (line.Length > 0)
+            {
+                builder.Append("        ").AppendLine(line);
+            }
+        }
     }
 
     private static string TerminalMethod(HookChainInterception interception)

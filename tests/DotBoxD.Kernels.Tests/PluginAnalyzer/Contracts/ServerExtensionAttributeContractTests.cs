@@ -38,5 +38,36 @@ public sealed class ServerExtensionAttributeContractTests
         Assert.Equal("grafts", exception.ParamName);
     }
 
+    [Fact]
+    public void Receiver_client_constructor_rejects_null_receiver_type()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => new ServerExtensionClientAttribute(null!, "Echo"));
+
+        Assert.Equal("receiverType", exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Receiver_client_constructor_rejects_blank_name(string name)
+    {
+        var exception = Assert.Throws<ArgumentException>(
+            () => new ServerExtensionClientAttribute(typeof(IEchoService), name));
+
+        Assert.Equal("name", exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Receiver_method_constructor_rejects_blank_name(string name)
+    {
+        var exception = Assert.Throws<ArgumentException>(
+            () => new ServerExtensionMethodAttribute(typeof(IEchoService), name));
+
+        Assert.Equal("name", exception.ParamName);
+    }
+
     private interface IEchoService;
 }

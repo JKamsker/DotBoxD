@@ -12,6 +12,11 @@ internal static class CatalogBindingSignatureValidator
         for (var i = 0; i < signatures.Count; i++)
         {
             var binding = signatures[i];
+            if (!BindingDescriptorRequiredFieldValidator.Validate(binding, diagnostics))
+            {
+                continue;
+            }
+
             BindingClassificationValidator.Validate(
                 binding.Id,
                 binding.AuditLevel,
@@ -46,7 +51,9 @@ internal static class CatalogBindingSignatureValidator
         {
             foreach (var bindingId in references)
             {
-                if (visited.Add(bindingId) && bindings.TryGet(bindingId, out var binding))
+                if (visited.Add(bindingId) &&
+                    bindings.TryGet(bindingId, out var binding) &&
+                    BindingDescriptorRequiredFieldValidator.HasRequiredFields(binding))
                 {
                     validate(binding, diagnostics);
                 }
@@ -72,7 +79,9 @@ internal static class CatalogBindingSignatureValidator
 
             foreach (var bindingId in references)
             {
-                if (visited.Add(bindingId) && bindings.TryGet(bindingId, out var binding))
+                if (visited.Add(bindingId) &&
+                    bindings.TryGet(bindingId, out var binding) &&
+                    BindingDescriptorRequiredFieldValidator.HasRequiredFields(binding))
                 {
                     validate(binding, diagnostics);
                 }
@@ -98,7 +107,9 @@ internal static class CatalogBindingSignatureValidator
 
             foreach (var bindingId in references)
             {
-                if (visited.Add(bindingId) && bindings.TryGet(bindingId, out var binding))
+                if (visited.Add(bindingId) &&
+                    bindings.TryGet(bindingId, out var binding) &&
+                    BindingDescriptorRequiredFieldValidator.HasRequiredFields(binding))
                 {
                     validate(binding, bindings, diagnostics);
                 }

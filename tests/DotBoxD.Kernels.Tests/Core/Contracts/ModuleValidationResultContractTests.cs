@@ -173,9 +173,27 @@ public sealed class ModuleValidationResultContractTests
     public void Init_rejects_undefined_module_effects()
     {
         var exception = Assert.Throws<ArgumentOutOfRangeException>(
-            () => _ = ValidResult() with { ModuleEffects = (SandboxEffect)(1 << 20) });
+            () => _ = ValidResult() with { ModuleEffects = UndefinedEffect() });
 
         Assert.Equal("ModuleEffects", exception.ParamName);
+    }
+
+    [Fact]
+    public void Constructor_rejects_function_analysis_with_undefined_effect_bits()
+    {
+        var exception = Assert.ThrowsAny<ArgumentException>(
+            () => Create(functions: FunctionsWithUndefinedEffects()));
+
+        Assert.Equal("Functions", exception.ParamName);
+    }
+
+    [Fact]
+    public void Init_rejects_function_analysis_with_undefined_effect_bits()
+    {
+        var exception = Assert.ThrowsAny<ArgumentException>(
+            () => _ = ValidResult() with { Functions = FunctionsWithUndefinedEffects() });
+
+        Assert.Equal("Functions", exception.ParamName);
     }
 
     private static ModuleValidationResult ValidResult()
@@ -234,6 +252,15 @@ public sealed class ModuleValidationResultContractTests
 
     private static FunctionAnalysis Analysis()
         => new(SandboxType.I32, SandboxEffect.Audit, true);
+
+    private static IReadOnlyDictionary<string, FunctionAnalysis> FunctionsWithUndefinedEffects()
+        => new Dictionary<string, FunctionAnalysis>(StringComparer.Ordinal)
+        {
+            ["main"] = new(SandboxType.I32, UndefinedEffect(), true)
+        };
+
+    private static SandboxEffect UndefinedEffect()
+        => (SandboxEffect)(1 << 20);
 
     private static IReadOnlySet<string> References()
         => new HashSet<string>(StringComparer.Ordinal) { "log.write" };

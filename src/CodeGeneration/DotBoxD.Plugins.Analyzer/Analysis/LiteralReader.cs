@@ -15,7 +15,7 @@ internal static class LiteralReader
         => CSharpLiteralFormatter.FormatValue(value, type, DefaultLiteralOptions.Analyzer) ??
            ObjectLiteral(value);
 
-    public static string DefaultValue(
+    public static object? DefaultObjectValue(
         ITypeSymbol type,
         ExpressionSyntax? expression,
         SemanticModel semanticModel,
@@ -29,17 +29,17 @@ internal static class LiteralReader
                 throw new NotSupportedException("Live setting defaults must be compile-time constants.");
             }
 
-            return ObjectLiteral(constant.Value);
+            return constant.Value;
         }
 
         return type.SpecialType switch
         {
-            SpecialType.System_Boolean => DotBoxDGenerationNames.CSharpLiterals.False,
-            SpecialType.System_Int32 => DotBoxDGenerationNames.CSharpLiterals.Int32Default,
-            SpecialType.System_Int64 => DotBoxDGenerationNames.CSharpLiterals.Int64Default,
-            SpecialType.System_Double => DotBoxDGenerationNames.CSharpLiterals.DoubleDefault,
-            SpecialType.System_String => DotBoxDGenerationNames.CSharpLiterals.StringDefault,
-            _ => DotBoxDGenerationNames.CSharpLiterals.Null
+            SpecialType.System_Boolean => false,
+            SpecialType.System_Int32 => 0,
+            SpecialType.System_Int64 => 0L,
+            SpecialType.System_Double => 0D,
+            SpecialType.System_String => string.Empty,
+            _ => null
         };
     }
 

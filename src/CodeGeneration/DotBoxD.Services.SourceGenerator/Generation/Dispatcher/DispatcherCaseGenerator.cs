@@ -18,6 +18,7 @@ internal static class DispatcherCaseGenerator
         [MethodReturnKind.Sync] = static (sb, _, _, call) =>
         {
             sb.AppendLine($"                    var result = {call};");
+            AppendCancellationCheckpoint(sb);
             sb.AppendLine($"                    serializer.{ServicesGeneratorMemberNames.Serializer.Serialize}(output, result);");
             sb.AppendLine("                    return;");
         },
@@ -219,6 +220,7 @@ internal static class DispatcherCaseGenerator
     private static void GenerateSerializedAwaitedResult(StringBuilder sb, string call)
     {
         GenerateAwaitedResult(sb, call);
+        AppendCancellationCheckpoint(sb);
         sb.AppendLine($"                    serializer.{ServicesGeneratorMemberNames.Serializer.Serialize}(output, __dotboxd_result);");
         sb.AppendLine("                    return;");
     }
@@ -226,6 +228,7 @@ internal static class DispatcherCaseGenerator
     private static void GenerateStreamingReturn(StringBuilder sb, string call)
     {
         sb.AppendLine($"                    var result = {call};");
+        AppendCancellationCheckpoint(sb);
         sb.AppendLine($"                    streaming.{ServicesGeneratorMemberNames.RpcStreamingContext.SetResponse}(result);");
         sb.AppendLine("                    return;");
     }
@@ -233,6 +236,7 @@ internal static class DispatcherCaseGenerator
     private static void GenerateAwaitedStreamingReturn(StringBuilder sb, string call)
     {
         GenerateAwaitedResult(sb, call);
+        AppendCancellationCheckpoint(sb);
         sb.AppendLine($"                    streaming.{ServicesGeneratorMemberNames.RpcStreamingContext.SetResponse}(__dotboxd_result);");
         sb.AppendLine("                    return;");
     }
@@ -243,5 +247,10 @@ internal static class DispatcherCaseGenerator
         sb.AppendLine("                    var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully");
         sb.AppendLine("                        ? __dotboxd_task.Result");
         sb.AppendLine("                        : await __dotboxd_task;");
+    }
+
+    private static void AppendCancellationCheckpoint(StringBuilder sb)
+    {
+        sb.AppendLine("                    ct.ThrowIfCancellationRequested();");
     }
 }

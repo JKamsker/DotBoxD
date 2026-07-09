@@ -105,6 +105,10 @@ internal static class NullableFlowAttributeFormatter
                     inline: false);
                 return true;
 
+            case "System.Diagnostics.CodeAnalysis.ExperimentalAttribute":
+                AppendExperimentalAttribute(sb, attr);
+                return true;
+
             default:
                 return false;
         }
@@ -207,6 +211,37 @@ internal static class NullableFlowAttributeFormatter
             .Append("(\"")
             .Append(LiteralHelpers.EscapeStringLiteral(value))
             .AppendLine("\")]");
+    }
+
+    private static void AppendExperimentalAttribute(StringBuilder sb, AttributeData attr)
+    {
+        if (attr.ConstructorArguments.Length != 1 ||
+            attr.ConstructorArguments[0].Value is not string diagnosticId)
+        {
+            return;
+        }
+
+        sb.Append("[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"")
+            .Append(LiteralHelpers.EscapeStringLiteral(diagnosticId))
+            .Append('"');
+
+        foreach (var namedArg in attr.NamedArguments)
+        {
+            if (namedArg is { Key: "UrlFormat", Value.Value: string urlFormat })
+            {
+                sb.Append(", UrlFormat = \"")
+                    .Append(LiteralHelpers.EscapeStringLiteral(urlFormat))
+                    .Append('"');
+            }
+            else if (namedArg is { Key: "Message", Value.Value: string message })
+            {
+                sb.Append(", Message = \"")
+                    .Append(LiteralHelpers.EscapeStringLiteral(message))
+                    .Append('"');
+            }
+        }
+
+        sb.AppendLine(")]");
     }
 
     private static void AppendSeparator(StringBuilder sb, bool inline)

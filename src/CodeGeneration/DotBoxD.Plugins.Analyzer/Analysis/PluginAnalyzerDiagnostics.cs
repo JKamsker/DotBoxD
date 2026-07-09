@@ -118,3 +118,74 @@ internal static class PluginAnalyzerDiagnostics
             + "stage. The generator skipped that item instead of failing the whole generation pass.",
         helpLinkUri: UnshippedRulesHelpLinkBase + "DBXK117");
 }
+
+internal static class PluginIdValidation
+{
+    public static string? ErrorMessage(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Any(char.IsControl))
+        {
+            return "Plugin id must be a non-empty stable identifier and must not contain control characters.";
+        }
+
+        return IsStablePluginId(value!)
+            ? null
+            : "Plugin id must be a stable identifier: use ASCII letters, digits, '.', '_' or '-', " +
+              "start and end with a letter or digit, and do not use empty dot segments.";
+    }
+
+    private static bool IsStablePluginId(string value)
+        => IsGeneratedAnonymousPluginId(value) ||
+           value.Length <= 128 &&
+           IsAsciiLetterOrDigit(value[0]) &&
+           IsAsciiLetterOrDigit(value[value.Length - 1]) &&
+           HasStablePluginIdBody(value);
+
+    private static bool HasStablePluginIdBody(string value)
+    {
+        var previousWasDot = false;
+        foreach (var ch in value)
+        {
+            if (ch == '.')
+            {
+                if (previousWasDot)
+                {
+                    return false;
+                }
+
+                previousWasDot = true;
+                continue;
+            }
+
+            previousWasDot = false;
+            if (!IsAsciiLetterOrDigit(ch) && ch is not '-' and not '_')
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsGeneratedAnonymousPluginId(string value)
+    {
+        const string prefix = "$anon:";
+        if (!value.StartsWith(prefix, StringComparison.Ordinal) || value.Length == prefix.Length)
+        {
+            return false;
+        }
+
+        for (var i = prefix.Length; i < value.Length; i++)
+        {
+            if (!IsAsciiLetterOrDigit(value[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsAsciiLetterOrDigit(char ch)
+        => ch is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9';
+}

@@ -245,8 +245,3 @@ public sealed partial class PersistentCompiledArtifactCache
         };
 
 }
-
-public sealed record CompiledCacheLookup(
-    CompiledCacheStatus Status,
-    CompiledArtifact? Artifact,
-    string? InvalidReason = null);

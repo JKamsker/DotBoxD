@@ -18,6 +18,28 @@ namespace DotBoxD.Plugins.Runtime;
 /// </remarks>
 internal static class EventNameMatch
 {
+    public static string CanonicalTypeName(Type type)
+    {
+        if (type.IsArray)
+        {
+            return CanonicalTypeName(type.GetElementType()!) + "[]";
+        }
+
+        var name = UnqualifiedTypeName(type);
+        if (type.DeclaringType is not null)
+        {
+            name = CanonicalTypeName(type.DeclaringType) + "." + name;
+        }
+        else if (!string.IsNullOrEmpty(type.Namespace) && !IsSystemNamespace(type.Namespace))
+        {
+            name = type.Namespace + "." + name;
+        }
+
+        return type.IsGenericType
+            ? name + "<" + string.Join(", ", type.GetGenericArguments().Select(CanonicalTypeName)) + ">"
+            : name;
+    }
+
     public static bool Matches(string? left, string? right)
     {
         if (string.Equals(left, right, StringComparison.Ordinal))
@@ -30,19 +52,215 @@ internal static class EventNameMatch
             return false;
         }
 
-        var leftQualified = IsQualified(left);
-        var rightQualified = IsQualified(right);
-        return leftQualified != rightQualified &&
-            string.Equals(SimpleName(left!), SimpleName(right!), StringComparison.Ordinal);
+        var normalizedLeft = Normalize(left);
+        var normalizedRight = Normalize(right);
+        if (string.Equals(normalizedLeft, normalizedRight, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        var leftSimpleName = SimpleName(normalizedLeft);
+        var rightSimpleName = SimpleName(normalizedRight);
+        if (!string.Equals(leftSimpleName, rightSimpleName, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return IsQualified(normalizedLeft) != IsQualified(normalizedRight);
     }
 
-    private static bool IsQualified(string name) => name.Contains('.', StringComparison.Ordinal);
+    public static bool HasTopLevelQualifier(string? name)
+        => !string.IsNullOrEmpty(name) && IsQualified(Normalize(name));
+
+    private static string Normalize(string name)
+    {
+        const string globalPrefix = "global::";
+        var normalized = name.StartsWith(globalPrefix, StringComparison.Ordinal)
+            ? name[globalPrefix.Length..]
+            : name;
+
+        return NormalizeSystemTypeName(NormalizeReflectionGenericName(normalized.Replace('+', '.')));
+    }
+
+    private static string NormalizeReflectionGenericName(string name)
+    {
+        var tick = name.IndexOf('`', StringComparison.Ordinal);
+        if (tick < 0)
+        {
+            return name;
+        }
+
+        var argumentsStart = name.IndexOf('[', tick);
+        if (argumentsStart < 0)
+        {
+            return name;
+        }
+
+        var arguments = ReflectionGenericArguments(name, argumentsStart);
+        return arguments.Count == 0
+            ? name
+            : NormalizeSystemTypeName(name[..tick]) + "<" + string.Join(", ", arguments.Select(NormalizeReflectionArgument)) + ">";
+    }
+
+    private static List<string> ReflectionGenericArguments(string name, int argumentsStart)
+    {
+        if (argumentsStart >= name.Length - 1 || name[argumentsStart] != '[' || name[^1] != ']')
+        {
+            return [];
+        }
+
+        var inner = name[(argumentsStart + 1)..^1];
+        var arguments = new List<string>();
+        for (var i = 0; i < inner.Length;)
+        {
+            if (!TryReadReflectionGenericArgument(inner, i, out var argument, out var next))
+            {
+                return [];
+            }
+
+            arguments.Add(argument);
+            i = next;
+        }
+
+        return arguments;
+    }
+
+    private static bool TryReadReflectionGenericArgument(
+        string inner,
+        int start,
+        out string argument,
+        out int next)
+    {
+        if (inner[start] != '[')
+        {
+            var end = TopLevelComma(inner, start);
+            argument = inner[start..end];
+            next = NextArgumentIndex(inner, end);
+            return true;
+        }
+
+        return TryReadBracketedReflectionGenericArgument(inner, start, out argument, out next);
+    }
+
+    private static bool TryReadBracketedReflectionGenericArgument(
+        string inner,
+        int start,
+        out string argument,
+        out int next)
+    {
+        var current = start + 1;
+        var argumentStart = current;
+        var depth = 0;
+        while (current < inner.Length)
+        {
+            if (inner[current] == '[')
+            {
+                depth++;
+            }
+            else if (inner[current] == ']')
+            {
+                if (depth == 0)
+                {
+                    argument = inner[argumentStart..current];
+                    next = NextArgumentIndex(inner, current + 1);
+                    return true;
+                }
+
+                depth--;
+            }
+
+            current++;
+        }
+
+        argument = string.Empty;
+        next = inner.Length;
+        return false;
+    }
+
+    private static int NextArgumentIndex(string inner, int current)
+        => current < inner.Length && inner[current] == ',' ? current + 1 : current;
+
+    private static string NormalizeReflectionArgument(string argument)
+    {
+        var end = TopLevelComma(argument, 0);
+        return Normalize(argument[..end]);
+    }
+
+    private static string NormalizeSystemTypeName(string name)
+        => name.StartsWith("System.", StringComparison.Ordinal)
+            ? SimpleName(name)
+            : name;
+
+    private static string UnqualifiedTypeName(Type type)
+    {
+        var tick = type.Name.IndexOf('`');
+        return tick < 0 ? type.Name : type.Name[..tick];
+    }
+
+    private static bool IsSystemNamespace(string @namespace)
+        => string.Equals(@namespace, "System", StringComparison.Ordinal) ||
+           @namespace.StartsWith("System.", StringComparison.Ordinal);
+
+    private static int TopLevelComma(string value, int start)
+    {
+        var bracketDepth = 0;
+        for (var i = start; i < value.Length; i++)
+        {
+            if (value[i] == '[')
+            {
+                bracketDepth++;
+            }
+            else if (value[i] == ']')
+            {
+                bracketDepth--;
+            }
+            else if (value[i] == ',' && bracketDepth == 0)
+            {
+                return i;
+            }
+        }
+
+        return value.Length;
+    }
+
+    private static bool IsQualified(string name) => TopLevelLastDot(name) >= 0;
 
     private static string SimpleName(string name)
     {
-        var lastDot = name.LastIndexOf('.');
+        var lastDot = TopLevelLastDot(name);
         return lastDot >= 0 && lastDot < name.Length - 1
             ? name[(lastDot + 1)..]
             : name;
+    }
+
+    private static int TopLevelLastDot(string name)
+    {
+        var angleDepth = 0;
+        var bracketDepth = 0;
+        for (var i = name.Length - 1; i >= 0; i--)
+        {
+            if (name[i] == '>')
+            {
+                angleDepth++;
+            }
+            else if (name[i] == '<')
+            {
+                angleDepth--;
+            }
+            else if (name[i] == ']')
+            {
+                bracketDepth++;
+            }
+            else if (name[i] == '[')
+            {
+                bracketDepth--;
+            }
+            else if (name[i] == '.' && angleDepth == 0 && bracketDepth == 0)
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 }

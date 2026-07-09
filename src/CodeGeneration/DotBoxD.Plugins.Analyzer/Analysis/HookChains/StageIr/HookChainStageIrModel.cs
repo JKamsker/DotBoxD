@@ -9,6 +9,7 @@ internal sealed record HookChainStageIrModel(
     string OutputType,
     string IRFuncType,
     string? IRFuncTypeParameters,
+    string GeneratedAttributeSource,
     string ParameterSource,
     string ValueSource,
     EquatableArray<string> RequiredCapabilities,
@@ -17,6 +18,7 @@ internal sealed record HookChainStageIrModel(
 
 internal sealed record HookChainStageIrInterception(
     string AttributeSyntax,
+    string GeneratedAttributeSource,
     string ReceiverType,
     string DelegateType,
     string ReturnType,

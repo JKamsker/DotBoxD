@@ -124,4 +124,3 @@ internal static class MergeableIrExpressionHelperEmitter
 
     private static string Parameter(string type, string name) => type + " " + name;
 }
-

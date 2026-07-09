@@ -74,7 +74,9 @@ internal sealed record ServiceModel(
     EquatableArray<MethodModel> Methods,
     EquatableArray<ServicePropertyModel> Properties,
     string RawServiceName = "",
-    string ObsoleteAttribute = "");
+    string ObsoleteAttribute = "",
+    string TypeAttributePrefix = "",
+    string ExperimentalDiagnosticId = "");
 
 /// <summary>Immutable, value-equatable representation of a get-only sub-service property.</summary>
 internal sealed record ServicePropertyModel(

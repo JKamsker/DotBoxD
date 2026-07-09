@@ -74,7 +74,13 @@ internal class PendingUnaryResponse<TResponse> :
                     "Response opened a stream for a non-streaming invocation.");
             }
 
-            CompleteAndSetResult(serializer.Deserialize<TResponse>(payload));
+            var result = serializer.Deserialize<TResponse>(payload);
+            if (TryCancelIfCallerCanceledAfterMaterialization())
+            {
+                return true;
+            }
+
+            CompleteAndSetResult(result);
         }
         catch (Exception ex)
         {
@@ -90,25 +96,29 @@ internal class PendingUnaryResponse<TResponse> :
     }
 
     public virtual void TrySetCanceled(PendingCancellationKind kind)
+        => TryCompleteCanceled(kind);
+
+    protected bool TryCompleteCanceled(PendingCancellationKind kind)
     {
         if (!IsDirectCompletion)
         {
-            TrySetCanceled();
-            return;
+            return TrySetCanceled();
         }
 
         CompleteDirect(sendCancel: true);
         if (kind == PendingCancellationKind.Timeout)
         {
-            TrySetException(CreateTimeoutException());
-            return;
+            return TrySetException(CreateTimeoutException());
         }
 
-        TrySetCanceled();
+        return TrySetCanceled();
     }
 
     protected virtual Exception CreateTimeoutException() =>
         new ServiceTimeoutException("Request timed out.");
+
+    protected virtual bool TryCancelIfCallerCanceledAfterMaterialization() =>
+        false;
 
     private bool IsDirectCompletion =>
         Volatile.Read(ref _directOwner) is not null;
@@ -148,25 +158,57 @@ internal class CancellablePendingUnaryResponse<TResponse> :
     PendingUnaryResponse<TResponse>
 {
     private readonly PendingRequests _owner;
+    private readonly CancellationToken _callerToken;
     private int _cancellationKind;
 
-    public CancellablePendingUnaryResponse(PendingRequests owner, int messageId)
+    public CancellablePendingUnaryResponse(PendingRequests owner, int messageId, CancellationToken callerToken)
         : base(messageId)
     {
         _owner = owner;
+        _callerToken = callerToken;
     }
 
     public override PendingCancellationKind CancellationKind =>
         (PendingCancellationKind)Volatile.Read(ref _cancellationKind);
 
-    public override void CancelByCaller() =>
-        _owner.TryCancel(MessageId, this, PendingCancellationKind.Caller);
+    public override void CancelByCaller()
+        => _owner.TryCancel(MessageId, this, PendingCancellationKind.Caller);
 
     public override void TrySetCanceled(PendingCancellationKind kind)
     {
-        Volatile.Write(ref _cancellationKind, (int)kind);
-        base.TrySetCanceled(kind);
+        if (!TrySetCancellationKind(kind))
+        {
+            return;
+        }
+
+        if (!TryCompleteCanceled(kind))
+        {
+            ResetCancellationKind(kind);
+        }
     }
+
+    protected override bool TryCancelIfCallerCanceledAfterMaterialization()
+    {
+        if (!_callerToken.IsCancellationRequested)
+        {
+            return false;
+        }
+
+        TrySetCanceled(PendingCancellationKind.Caller);
+        return true;
+    }
+
+    private bool TrySetCancellationKind(PendingCancellationKind kind) =>
+        Interlocked.CompareExchange(
+            ref _cancellationKind,
+            (int)kind,
+            (int)PendingCancellationKind.None) == (int)PendingCancellationKind.None;
+
+    private void ResetCancellationKind(PendingCancellationKind kind) =>
+        Interlocked.CompareExchange(
+            ref _cancellationKind,
+            (int)PendingCancellationKind.None,
+            (int)kind);
 }
 
 internal sealed class PendingUnaryResponseWithTimeout<TResponse> :
@@ -180,8 +222,9 @@ internal sealed class PendingUnaryResponseWithTimeout<TResponse> :
         PendingRequests owner,
         int messageId,
         string service,
-        string method)
-        : base(owner, messageId)
+        string method,
+        CancellationToken callerToken)
+        : base(owner, messageId, callerToken)
     {
         _service = service;
         _method = method;

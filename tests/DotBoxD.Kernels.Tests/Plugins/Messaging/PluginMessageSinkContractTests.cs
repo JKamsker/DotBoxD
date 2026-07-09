@@ -2,6 +2,14 @@ namespace DotBoxD.Kernels.Tests.Plugins.Messaging;
 
 public sealed class PluginMessageSinkContractTests
 {
+    public static TheoryData<string> InvalidTargetIds => new()
+    {
+        "",
+        "   ",
+        "player/one",
+        "player\u0001one"
+    };
+
     [Fact]
     public void Plugin_message_rejects_null_target_id()
     {
@@ -18,6 +26,16 @@ public sealed class PluginMessageSinkContractTests
             () => new PluginMessage("target-1", null!));
 
         Assert.Equal("message", ex.ParamName);
+    }
+
+    [Theory]
+    [MemberData(nameof(InvalidTargetIds))]
+    public void Plugin_message_rejects_invalid_target_id(string targetId)
+    {
+        var ex = Assert.Throws<ArgumentException>(
+            () => new PluginMessage(targetId, "message"));
+
+        Assert.Equal("targetId", ex.ParamName);
     }
 
     [Fact]
@@ -54,6 +72,19 @@ public sealed class PluginMessageSinkContractTests
         Assert.Empty(nullMessageSink.Messages);
     }
 
+    [Theory]
+    [MemberData(nameof(InvalidTargetIds))]
+    public void In_memory_sink_send_rejects_invalid_target_id_without_appending(string targetId)
+    {
+        var sink = new InMemoryPluginMessageSink();
+
+        var ex = Assert.Throws<ArgumentException>(
+            () => sink.Send(targetId, "message"));
+
+        Assert.Equal("targetId", ex.ParamName);
+        Assert.Empty(sink.Messages);
+    }
+
     [Fact]
     public async Task In_memory_sink_send_async_rejects_null_inputs_without_appending()
     {
@@ -72,5 +103,18 @@ public sealed class PluginMessageSinkContractTests
 
         Assert.Equal("message", messageEx.ParamName);
         Assert.Empty(nullMessageSink.Messages);
+    }
+
+    [Theory]
+    [MemberData(nameof(InvalidTargetIds))]
+    public async Task In_memory_sink_send_async_rejects_invalid_target_id_without_appending(string targetId)
+    {
+        var sink = new InMemoryPluginMessageSink();
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(
+            async () => await sink.SendAsync(targetId, "message").AsTask());
+
+        Assert.Equal("targetId", ex.ParamName);
+        Assert.Empty(sink.Messages);
     }
 }
