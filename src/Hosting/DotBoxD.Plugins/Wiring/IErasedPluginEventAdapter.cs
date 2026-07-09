@@ -67,24 +67,29 @@ internal sealed class ErasedPluginEventAdapter<TEvent> : IErasedPluginEventAdapt
 
     public void WireHook(HookRegistry hooks, InstalledKernel kernel, KernelWireTerminal terminal, WireCallbacks callbacks)
     {
-        var pipeline = hooks.On<TEvent>(_adapter);
         switch (terminal.Kind)
         {
             case KernelWireKind.Plain:
-                pipeline.Use(kernel);
+                hooks.On<TEvent>(_adapter).Use(kernel);
                 break;
             case KernelWireKind.Projecting:
-                pipeline.UseProjecting(kernel, RequireCallbackId(terminal, kernel), RequirePush(callbacks));
+                var projectingCallbackId = RequireCallbackId(terminal, kernel);
+                var push = RequirePush(callbacks);
+                hooks.On<TEvent>(_adapter).UseProjecting(kernel, projectingCallbackId, push);
                 break;
             case KernelWireKind.Result:
-                pipeline.UseResult(kernel, RequireResultType(terminal, kernel), terminal.Priority);
+                var resultType = RequireResultType(terminal, kernel);
+                hooks.On<TEvent>(_adapter).UseResult(kernel, resultType, terminal.Priority);
                 break;
             case KernelWireKind.ProjectingResult:
-                pipeline.UseProjectingResult(
+                var projectingResultCallbackId = RequireCallbackId(terminal, kernel);
+                var projectingResultType = RequireResultType(terminal, kernel);
+                var result = RequireResult(callbacks);
+                hooks.On<TEvent>(_adapter).UseProjectingResult(
                     kernel,
-                    RequireCallbackId(terminal, kernel),
-                    RequireResultType(terminal, kernel),
-                    RequireResult(callbacks),
+                    projectingResultCallbackId,
+                    projectingResultType,
+                    result,
                     terminal.Priority);
                 break;
             default:
@@ -112,8 +117,10 @@ internal sealed class ErasedPluginEventAdapter<TEvent> : IErasedPluginEventAdapt
                 subscriptions.On<TEvent>(_adapter).Use(kernel);
                 break;
             case KernelWireKind.Projecting:
+                var callbackId = RequireCallbackId(terminal, kernel);
+                var push = RequirePush(callbacks);
                 subscriptions.On<TEvent>(_adapter)
-                    .UseProjecting(kernel, RequireCallbackId(terminal, kernel), RequirePush(callbacks));
+                    .UseProjecting(kernel, callbackId, push);
                 break;
             default:
                 throw new InvalidOperationException(
