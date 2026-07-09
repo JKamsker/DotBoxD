@@ -56,6 +56,7 @@ export default defineConfig({
             { label: 'Event pipelines', slug: 'concepts/event-pipelines' },
             { label: 'Host bindings', slug: 'concepts/host-bindings' },
             { label: 'Kernel runtime', slug: 'concepts/runtime' },
+            { label: 'Determinism contract', slug: 'concepts/determinism' },
             { label: 'Channels & transports', slug: 'concepts/channels-transports' },
           ],
         },

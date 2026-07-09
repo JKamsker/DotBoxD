@@ -75,6 +75,25 @@ public sealed class GoldenCorpusTests
         Assert.Equal("15", audit.Fields!["bytesRead"]);
     }
 
+    [Fact]
+    public async Task Golden_branching_result_is_stable_across_backends()
+    {
+        using var host = SandboxTestHost.Create(compiler: true);
+        var module = await host.ImportJsonAsync(GoldenJson("branching"));
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(10_000).Build());
+
+        foreach (var input in new[] { -1, 0, 7 })
+        {
+            var value = SandboxValue.FromInt32(input);
+            var interpreted = await ExecuteAsync(host, plan, value, ExecutionMode.Interpreted);
+            var compiled = await ExecuteAsync(host, plan, value, ExecutionMode.Compiled);
+            var expected = input > 0 ? 1 : -1;
+
+            Assert.Equal(expected, Assert.IsType<I32Value>(interpreted.Value).Value);
+            Assert.Equal(expected, Assert.IsType<I32Value>(compiled.Value).Value);
+        }
+    }
+
     private static ValueTask<SandboxExecutionResult> ExecuteAsync(
         SandboxHost host,
         ExecutionPlan plan,
@@ -133,6 +152,28 @@ public sealed class GoldenCorpusTests
                     {
                       "op": "return",
                       "value": { "call": "file.readText", "args": [{ "path": "settings.json" }] }
+                    }
+                  ]
+                }
+              ]
+            }
+            """,
+            "branching" => """
+            {
+              "id": "golden-branching",
+              "version": "1.0.0",
+              "functions": [
+                {
+                  "id": "main",
+                  "visibility": "entrypoint",
+                  "parameters": [{ "name": "value", "type": "I32" }],
+                  "returnType": "I32",
+                  "body": [
+                    {
+                      "op": "if",
+                      "condition": { "op": "gt", "left": { "var": "value" }, "right": { "i32": 0 } },
+                      "then": [{ "op": "return", "value": { "i32": 1 } }],
+                      "else": [{ "op": "return", "value": { "i32": -1 } }]
                     }
                   ]
                 }
