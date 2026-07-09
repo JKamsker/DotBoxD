@@ -1,3 +1,5 @@
+#pragma warning disable DBXK111 // Deliberately exercise the native fallback after suppressing the fail-closed diagnostic.
+
 namespace DotBoxD.Plugins.Generated.Tests;
 
 /// <summary>A projected DTO whose <c>ZoneLength</c> field is derived in the constructor body rather than passed as a

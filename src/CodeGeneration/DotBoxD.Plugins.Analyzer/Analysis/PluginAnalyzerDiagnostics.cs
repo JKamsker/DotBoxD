@@ -31,7 +31,7 @@ internal static class PluginAnalyzerDiagnostics
             + "predicate{0}), so the generator does not intercept it and the runtime terminal throws "
             + "NotSupportedException; use a supported projection/predicate shape",
         "DotBoxD.Kernels.Generation",
-        DiagnosticSeverity.Info,
+        DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "A recognized remote RunLocal hook chain whose Where/Select stages cannot be lowered is skipped "
             + "by the generator; without interception its native terminal throws at runtime.",
@@ -47,7 +47,7 @@ internal static class PluginAnalyzerDiagnostics
             + "or terminal body), so the generator does not intercept it and the runtime terminal throws DBXK062; "
             + "use a supported hook-chain shape or bind a kernel class with Use/Register{0}",
         "DotBoxD.Kernels.Generation",
-        DiagnosticSeverity.Warning,
+        DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "A recognized Run hook chain that cannot be lowered is skipped by the generator; without "
             + "interception its native terminal throws DBXK062 when the chain is configured.",
@@ -100,7 +100,7 @@ internal static class PluginAnalyzerDiagnostics
         "Result hook chain is not lowered and will throw at runtime",
         "{0}",
         "DotBoxD.Kernels.Generation",
-        DiagnosticSeverity.Info,
+        DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "A recognized result-returning hook chain whose context lacks [Hook], whose handler returns the "
             + "wrong result type, or whose filter/handler cannot be lowered is skipped by the generator; without "

@@ -70,7 +70,7 @@ internal sealed record HookChainNotLoweredDiagnostic(
             : Diagnostic.Create(
                 PluginAnalyzerDiagnostics.ResultHookNotLoweredRule,
                 location,
-                DiagnosticSeverity.Warning,
+                DiagnosticSeverity.Error,
                 additionalLocations: null,
                 properties: null,
                 ResultMessage);
