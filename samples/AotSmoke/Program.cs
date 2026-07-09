@@ -1,14 +1,14 @@
+using DotBoxD.AotSmoke;
 using DotBoxD.Codecs.MessagePack;
-using DotBoxD.Services.Peer;
-using DotBoxD.Services.Testing;
-using DotBoxD.Transports.Tcp;
 using DotBoxD.Hosting.Execution;
 using DotBoxD.Kernels;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Services.Peer;
+using DotBoxD.Services.Testing;
+using DotBoxD.Transports.Tcp;
 using MessagePack.Resolvers;
-using DotBoxD.AotSmoke;
 
 // Directly root the source-generated registry. NativeAOT cannot discover a generated
 // type by its reflection-only name after trimming, so AOT hosts bootstrap it explicitly.
