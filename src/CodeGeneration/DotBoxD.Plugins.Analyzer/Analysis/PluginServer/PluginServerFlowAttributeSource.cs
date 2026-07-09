@@ -144,7 +144,7 @@ internal static class PluginServerFlowAttributeSource
                 return MemberOnlyAttribute(targetReturn, ObsoleteAttribute(attribute));
 
             case "System.Diagnostics.CodeAnalysis.ExperimentalAttribute":
-                return MemberOnlyAttribute(targetReturn, ExperimentalAttribute(attribute));
+                return MemberOnlyAttribute(targetReturn, PluginServerExperimentalAttributeFormatter.Format(attribute));
 
             default:
                 return null;
@@ -206,61 +206,6 @@ internal static class PluginServerFlowAttributeSource
             : "[global::System.ObsoleteAttribute(" + string.Join(", ", arguments) + ")]";
     }
 
-    private static string? ExperimentalAttribute(AttributeData attribute)
-    {
-        if (!TryExperimentalConstructorArguments(attribute, out var arguments) ||
-            !TryAddExperimentalNamedArguments(attribute, arguments))
-        {
-            return null;
-        }
-
-        return "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(" + string.Join(", ", arguments) + ")]";
-    }
-
-    private static bool TryExperimentalConstructorArguments(AttributeData attribute, out List<string> arguments)
-    {
-        arguments = [];
-        if (attribute.ConstructorArguments is { Length: not (1 or 2) } ||
-            attribute.ConstructorArguments[0].Value is not string diagnosticId)
-        {
-            return false;
-        }
-
-        arguments.Add(LiteralReader.StringLiteral(diagnosticId));
-        if (attribute.ConstructorArguments.Length == 2)
-        {
-            return TryAddOptionalStringArgument(attribute.ConstructorArguments[1], arguments);
-        }
-
-        return true;
-    }
-
-    private static bool TryAddExperimentalNamedArguments(AttributeData attribute, List<string> arguments)
-    {
-        foreach (var argument in attribute.NamedArguments)
-        {
-            if (argument.Key is not ("Message" or "UrlFormat") ||
-                argument.Value.Value is not (null or string))
-            {
-                return false;
-            }
-
-            arguments.Add(argument.Key + " = " + LiteralReader.ObjectLiteral(argument.Value.Value));
-        }
-
-        return true;
-    }
-
-    private static bool TryAddOptionalStringArgument(TypedConstant argument, List<string> arguments)
-    {
-        if (argument.Value is not (null or string))
-        {
-            return false;
-        }
-
-        arguments.Add(LiteralReader.ObjectLiteral(argument.Value));
-        return true;
-    }
     private static void AppendSimpleAttributePrefix(StringBuilder builder, string attributeType)
         => builder.Append('[').Append(attributeType).Append("] ");
 
