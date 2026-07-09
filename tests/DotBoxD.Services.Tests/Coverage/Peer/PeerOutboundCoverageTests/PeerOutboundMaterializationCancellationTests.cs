@@ -19,7 +19,6 @@ public sealed class PeerOutboundMaterializationCancellationTests
         var call = peer.InvokeAsync<int, string>(Service, Method, request: 1, cts.Token);
         var messageIds = await channel.WaitForSentFrameIdsAsync(1, PeerOutboundTimeout);
 
-        await Task.Delay(25);
         channel.Enqueue(ResponseFrame(serializer, messageIds[0], result: "decoded"));
 
         await Assert.ThrowsAsync<OperationCanceledException>(() => call.WaitAsync(PeerOutboundTimeout));
