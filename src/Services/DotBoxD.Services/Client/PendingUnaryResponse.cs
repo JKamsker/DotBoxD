@@ -96,21 +96,22 @@ internal class PendingUnaryResponse<TResponse> :
     }
 
     public virtual void TrySetCanceled(PendingCancellationKind kind)
+        => TryCompleteCanceled(kind);
+
+    protected bool TryCompleteCanceled(PendingCancellationKind kind)
     {
         if (!IsDirectCompletion)
         {
-            TrySetCanceled();
-            return;
+            return TrySetCanceled();
         }
 
         CompleteDirect(sendCancel: true);
         if (kind == PendingCancellationKind.Timeout)
         {
-            TrySetException(CreateTimeoutException());
-            return;
+            return TrySetException(CreateTimeoutException());
         }
 
-        TrySetCanceled();
+        return TrySetCanceled();
     }
 
     protected virtual Exception CreateTimeoutException() =>
@@ -171,15 +172,19 @@ internal class CancellablePendingUnaryResponse<TResponse> :
         (PendingCancellationKind)Volatile.Read(ref _cancellationKind);
 
     public override void CancelByCaller()
-    {
-        Volatile.Write(ref _cancellationKind, (int)PendingCancellationKind.Caller);
-        _owner.TryCancel(MessageId, this, PendingCancellationKind.Caller);
-    }
+        => _owner.TryCancel(MessageId, this, PendingCancellationKind.Caller);
 
     public override void TrySetCanceled(PendingCancellationKind kind)
     {
-        Volatile.Write(ref _cancellationKind, (int)kind);
-        base.TrySetCanceled(kind);
+        if (!TrySetCancellationKind(kind))
+        {
+            return;
+        }
+
+        if (!TryCompleteCanceled(kind))
+        {
+            ResetCancellationKind(kind);
+        }
     }
 
     protected override bool TryCancelIfCallerCanceledAfterMaterialization()
@@ -192,6 +197,18 @@ internal class CancellablePendingUnaryResponse<TResponse> :
         TrySetCanceled(PendingCancellationKind.Caller);
         return true;
     }
+
+    private bool TrySetCancellationKind(PendingCancellationKind kind) =>
+        Interlocked.CompareExchange(
+            ref _cancellationKind,
+            (int)kind,
+            (int)PendingCancellationKind.None) == (int)PendingCancellationKind.None;
+
+    private void ResetCancellationKind(PendingCancellationKind kind) =>
+        Interlocked.CompareExchange(
+            ref _cancellationKind,
+            (int)PendingCancellationKind.None,
+            (int)kind);
 }
 
 internal sealed class PendingUnaryResponseWithTimeout<TResponse> :

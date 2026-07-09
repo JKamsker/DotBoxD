@@ -32,7 +32,8 @@ internal static class RegistrationAccumulatorMetadataAttributeSource
     {
         if (attribute.AttributeClass?.ToDisplayString() != "System.Diagnostics.CodeAnalysis.ExperimentalAttribute" ||
             attribute.ConstructorArguments.Length != 1 ||
-            attribute.ConstructorArguments[0].Value is not string diagnosticId)
+            attribute.ConstructorArguments[0].Value is not string diagnosticId ||
+            string.IsNullOrWhiteSpace(diagnosticId))
         {
             return null;
         }

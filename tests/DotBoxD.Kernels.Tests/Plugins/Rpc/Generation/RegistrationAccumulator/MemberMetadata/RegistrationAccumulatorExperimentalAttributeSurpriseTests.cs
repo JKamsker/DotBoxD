@@ -108,7 +108,35 @@ public sealed class RegistrationAccumulatorExperimentalAttributeSurpriseTests
         Assert.Empty(GeneratedExperimentalDiagnostics(run));
     }
 
-    private static GeneratorRun RunGenerator(string source)
+    [Fact]
+    public void Generated_accumulators_skip_experimental_attribute_with_blank_diagnostic_id()
+    {
+        var run = RunGenerator("""
+            using System.Diagnostics.CodeAnalysis;
+            using System.Threading.Tasks;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [GeneratePluginRegistrationAccumulator("ServiceRegistrationAccumulator", "Replace")]
+            internal sealed class RemoteServiceControl
+            {
+                [Experimental("   ")]
+                public ValueTask<string> Replace<TService, TKernel>()
+                    where TService : class
+                    where TKernel : class, TService
+                    => ValueTask.FromResult("service");
+            }
+            """, allowCompilationErrors: true);
+
+        var source = GeneratedSource(run.Result, "ServiceRegistrationAccumulator");
+
+        Assert.Contains(run.Diagnostics, diagnostic => diagnostic.Id == "CS9211");
+        Assert.DoesNotContain("ExperimentalAttribute", source, StringComparison.Ordinal);
+        Assert.Contains("Replace<TService, TKernel>", source, StringComparison.Ordinal);
+    }
+
+    private static GeneratorRun RunGenerator(string source, bool allowCompilationErrors = false)
     {
         var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
         var sourceTree = CSharpSyntaxTree.ParseText(source, parseOptions);
@@ -132,10 +160,13 @@ public sealed class RegistrationAccumulatorExperimentalAttributeSurpriseTests
         var result = driver.GetRunResult();
         var diagnostics = generatorDiagnostics.Concat(outputCompilation.GetDiagnostics()).ToArray();
 
-        Assert.DoesNotContain(
-            diagnostics,
-            diagnostic => diagnostic.Id.StartsWith("CS", StringComparison.Ordinal) &&
-                          diagnostic.Severity == DiagnosticSeverity.Error);
+        if (!allowCompilationErrors)
+        {
+            Assert.DoesNotContain(
+                diagnostics,
+                diagnostic => diagnostic.Id.StartsWith("CS", StringComparison.Ordinal) &&
+                              diagnostic.Severity == DiagnosticSeverity.Error);
+        }
 
         return new GeneratorRun(result, outputCompilation, sourceTree, diagnostics);
     }

@@ -15,7 +15,7 @@ internal static class RpcTypeMetadataAttributeSource
             switch (attribute.AttributeClass?.ToDisplayString())
             {
                 case ExperimentalAttribute:
-                    if (TryGetPragmaSafeExperimentalDiagnosticId(attribute, out _))
+                    if (HasStringDiagnosticId(attribute))
                     {
                         AppendAttribute(
                             builder,
@@ -44,6 +44,10 @@ internal static class RpcTypeMetadataAttributeSource
             }
         }
     }
+
+    private static bool HasStringDiagnosticId(AttributeData attribute) =>
+        attribute.ConstructorArguments.Length == 1 &&
+        attribute.ConstructorArguments[0].Value is string;
 
     private static bool TryGetPragmaSafeExperimentalDiagnosticId(AttributeData attribute, out string diagnosticId)
     {

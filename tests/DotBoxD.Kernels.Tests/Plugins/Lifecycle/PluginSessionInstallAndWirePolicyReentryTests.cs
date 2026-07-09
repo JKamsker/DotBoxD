@@ -29,15 +29,10 @@ public sealed class PluginSessionInstallAndWirePolicyReentryTests
                 completed,
                 "InstallAndWireAsync did not complete when its policy callback re-entered session ownership state.");
 
-            if (install.IsCompletedSuccessfully)
-            {
-                Assert.NotNull(await install);
-            }
-            else
-            {
-                var exception = await Record.ExceptionAsync(async () => await install);
-                Assert.NotNull(exception);
-            }
+            var exception = await Record.ExceptionAsync(async () => Assert.NotNull(await install));
+            Assert.True(
+                exception is null or InvalidOperationException,
+                "Unexpected install completion exception: " + exception);
         }
         finally
         {

@@ -20,21 +20,19 @@ public sealed class ServerExtensionClientTypeExperimentalAttributeSurpriseTests
     }
 
     [Fact]
-    public void Service_backed_generated_client_skips_experimental_service_attribute_with_unsuppressible_id()
+    public void Service_backed_generated_client_preserves_experimental_service_attribute_with_unsuppressible_id()
     {
         var result = RpcMemberMetadataGeneratorHarness.RunGenerator(
             ServiceBackedSource.Replace("\"DBXEXP_TYPE\"", "\"DBX-EXP\"", StringComparison.Ordinal));
 
-        Assert.DoesNotContain(
-            result.GeneratedSources,
-            source => source.Contains("EchoKernelServerExtensionClient", StringComparison.Ordinal) &&
-                      source.Contains(
-                          "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBX-EXP\")]",
-                          StringComparison.Ordinal));
+        AssertNoGeneratorErrors(result.GeneratorDiagnostics);
         RpcMemberMetadataGeneratorHarness.AssertGeneratedSourceContains(
             result.GeneratedSources,
             "EchoKernelServerExtensionClient",
-            "public sealed class EchoKernelServerExtensionClient");
+            "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBX-EXP\")]");
+        Assert.DoesNotContain(
+            result.GeneratedSources,
+            source => source.Contains("#pragma warning disable DBX-EXP", StringComparison.Ordinal));
     }
 
     private static void AssertNoGeneratorErrors(IReadOnlyList<Diagnostic> diagnostics)

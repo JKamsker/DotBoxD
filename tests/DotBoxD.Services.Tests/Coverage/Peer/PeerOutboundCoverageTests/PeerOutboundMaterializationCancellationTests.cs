@@ -58,6 +58,40 @@ public sealed class PeerOutboundMaterializationCancellationTests
         Assert.True(pending.Task.IsCanceled);
     }
 
+    [Fact]
+    public void PendingUnaryResponse_LateCancellationDoesNotOverwriteWinningKind()
+    {
+        using var owner = new PendingRequests();
+        using var cts = new CancellationTokenSource();
+        Assert.True(owner.TryAddUnary<string>(
+            messageId: 43,
+            captureCallerCancellation: true,
+            captureTimeoutTarget: false,
+            cts.Token,
+            Service,
+            Method,
+            out var pending));
+
+        Assert.True(owner.TryCancel(43, pending, PendingCancellationKind.Timeout));
+
+        pending.TrySetCanceled(PendingCancellationKind.Caller);
+
+        Assert.Equal(PendingCancellationKind.Timeout, pending.CancellationKind);
+    }
+
+    [Fact]
+    public void PendingReceivedResponse_LateCancellationDoesNotOverwriteWinningKind()
+    {
+        using var owner = new PendingRequests();
+        Assert.True(owner.TryAdd(messageId: 44, out var pending));
+
+        Assert.True(owner.TryCancel(44, pending, PendingCancellationKind.Timeout));
+
+        pending.TrySetCanceled(PendingCancellationKind.Caller);
+
+        Assert.Equal(PendingCancellationKind.Timeout, pending.CancellationKind);
+    }
+
     private sealed class ResponseCancellingSerializer : ISerializer
     {
         private readonly ISerializer _inner;
