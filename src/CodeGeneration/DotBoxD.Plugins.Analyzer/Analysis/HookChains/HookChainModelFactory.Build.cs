@@ -59,6 +59,8 @@ internal static partial class HookChainModelFactory
             invocation,
             prepared.Stages,
             eventShape.EventType,
+            prepared.GeneratedRemoteKind,
+            prepared.GeneratedRemoteServerContextTypeFullName,
             model,
             cancellationToken);
         return new HookChainResult(modelResult, interception, stageIrModels);

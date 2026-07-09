@@ -85,13 +85,13 @@ internal static class Program
         ArgumentNullException.ThrowIfNull(server);
 
         server.Hooks.On<MonsterAggroEvent>()
-            .Where(e => e.Distance <= 4, ExplicitRemoteIr.MonsterAggroDistanceAtMost(4))
-            .Select(e => e.MonsterId, ExplicitRemoteIr.MonsterAggroMonsterId())
+            .Where(e => e.Distance <= 4)
+            .Select(e => e.MonsterId)
             .Run((monsterId, ctx) => ctx.Messages.Send(monsterId, "calm:inline"));
 
         server.Subscriptions.On<AttackEvent>()
-            .Where(e => e.Damage >= 5, ExplicitRemoteIr.AttackDamageAtLeast(5))
-            .Select(e => e.AttackerId, ExplicitRemoteIr.AttackAttackerId())
+            .Where(e => e.Damage >= 5)
+            .Select(e => e.AttackerId)
             .Run((attackerId, ctx) => ctx.Messages.Send(attackerId, "taunt:inline"));
 
         // Indexed subscription: both .Where leaves compare an [EventIndexKey] property to a constant, so the
@@ -100,8 +100,8 @@ internal static class Program
         // see the "[server] registered indexed ..." diagnostics. The verified predicate still executes as the
         // correctness fallback for events the index lets through.
         server.Subscriptions.On<AttackEvent>()
-            .Where(e => e.AttackerId == "player-1" && e.Damage >= 5, ExplicitRemoteIr.AttackPlayerDamageAtLeast("player-1", 5))
-            .Select(e => e.TargetId, ExplicitRemoteIr.AttackTargetId())
+            .Where(e => e.AttackerId == "player-1" && e.Damage >= 5)
+            .Select(e => e.TargetId)
             .Run((targetId, ctx) => ctx.Messages.Send(targetId, "indexed-taunt:inline"));
     }
 }

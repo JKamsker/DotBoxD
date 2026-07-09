@@ -16,6 +16,8 @@ internal static class HookChainStageIrFactory
         InvocationExpressionSyntax terminalInvocation,
         IReadOnlyList<HookChainStage> stages,
         INamedTypeSymbol eventType,
+        GeneratedRemoteHookChainKind? generatedRemoteKind,
+        string? generatedRemoteServerContextTypeFullName,
         SemanticModel model,
         CancellationToken cancellationToken)
     {
@@ -26,10 +28,20 @@ internal static class HookChainStageIrFactory
 
         var results = new List<HookChainStageIrModel>(stages.Count);
         ITypeSymbol currentType = eventType;
+        var receiverIsStage = false;
         for (var i = 0; i < stages.Count; i++)
         {
             var stage = stages[i];
-            if (TryCreate(terminalInvocation, stage, currentType, model, cancellationToken) is { } lowered)
+            if (TryCreate(
+                    terminalInvocation,
+                    stage,
+                    currentType,
+                    eventType,
+                    generatedRemoteKind,
+                    generatedRemoteServerContextTypeFullName,
+                    receiverIsStage,
+                    model,
+                    cancellationToken) is { } lowered)
             {
                 results.Add(lowered);
             }
@@ -40,6 +52,8 @@ internal static class HookChainStageIrFactory
                 {
                     break;
                 }
+
+                receiverIsStage = true;
             }
         }
 
@@ -50,12 +64,25 @@ internal static class HookChainStageIrFactory
         InvocationExpressionSyntax terminalInvocation,
         HookChainStage stage,
         ITypeSymbol inputType,
+        INamedTypeSymbol eventType,
+        GeneratedRemoteHookChainKind? generatedRemoteKind,
+        string? generatedRemoteServerContextTypeFullName,
+        bool receiverIsStage,
         SemanticModel model,
         CancellationToken cancellationToken)
     {
         try
         {
-            return Create(terminalInvocation, stage, inputType, model, cancellationToken);
+            return Create(
+                terminalInvocation,
+                stage,
+                inputType,
+                eventType,
+                generatedRemoteKind,
+                generatedRemoteServerContextTypeFullName,
+                receiverIsStage,
+                model,
+                cancellationToken);
         }
         catch (NotSupportedException)
         {
@@ -67,6 +94,10 @@ internal static class HookChainStageIrFactory
         InvocationExpressionSyntax terminalInvocation,
         HookChainStage stage,
         ITypeSymbol inputType,
+        INamedTypeSymbol eventType,
+        GeneratedRemoteHookChainKind? generatedRemoteKind,
+        string? generatedRemoteServerContextTypeFullName,
+        bool receiverIsStage,
         SemanticModel model,
         CancellationToken cancellationToken)
     {
@@ -104,16 +135,24 @@ internal static class HookChainStageIrFactory
             capabilities: capabilities,
             effects: effects);
         var value = DotBoxDExpressionModelFactory.Create(body, context);
-        var outputType = stage.IsSelect ? OutputType(stage, model, cancellationToken) : model.Compilation.GetSpecialType(SpecialType.System_Boolean);
-        var outputTag = stage.IsSelect ? SandboxTypeSourceEmitter.ManifestTag(outputType) : DotBoxDGenerationNames.ManifestTypes.Bool;
-        Validate(stage, value, outputTag);
+        var outputShape = OutputShape(stage, value, model, cancellationToken);
+        Validate(stage, value, outputShape.Tag);
 
         var ns = HookChainIdentity.Namespace(terminalInvocation);
         var className = "HookChainStageStep_" + MergeableIrStepIdentity.Compute(stage.Invocation);
         var fullName = string.IsNullOrEmpty(ns)
             ? DotBoxDGenerationNames.TypeNames.GlobalPrefix + className
             : DotBoxDGenerationNames.TypeNames.GlobalPrefix + ns + "." + className;
-        var signature = HookChainStageIrSignatureFactory.Create(stage, model, cancellationToken);
+        var signature = HookChainStageIrSignatureFactory.Create(
+            stage,
+            inputType,
+            outputShape.FullName,
+            eventType,
+            generatedRemoteKind,
+            generatedRemoteServerContextTypeFullName,
+            receiverIsStage,
+            model,
+            cancellationToken);
 
         return new HookChainStageIrModel(
             HintName(ns, className),
@@ -121,7 +160,7 @@ internal static class HookChainStageIrFactory
             className,
             stage.IsSelect ? "Projection" : "Filter",
             inputTag,
-            outputTag,
+            outputShape.Tag,
             signature.IRFuncType,
             signature.TypeParameters,
             $"new {DotBoxDGenerationNames.TypeNames.GlobalParameter}({LiteralReader.StringLiteral(CurrentValueName)}, {inputTypeSource})",
@@ -154,21 +193,18 @@ internal static class HookChainStageIrFactory
     {
         var location = model.GetInterceptableLocation(stage.Invocation, cancellationToken)
             ?? throw new NotSupportedException("the stage call site is not interceptable.");
-        var method = model.GetSymbolInfo(stage.Invocation, cancellationToken).Symbol as IMethodSymbol
-            ?? throw new NotSupportedException("the stage method could not be resolved.");
-        var irParameter = method.Parameters[1];
         return new HookChainStageIrInterception(
             location.GetInterceptsLocationAttributeSyntax(),
             signature.ReceiverType,
             signature.DelegateType,
             signature.ReturnType,
-            method.Name,
+            signature.MethodName,
             signature.MethodTypeArguments,
             stepFullName,
             signature.TypeParameters,
             signature.TypeArguments,
-            method.Parameters[0].Name,
-            irParameter.Name,
+            signature.SourceParameterName,
+            signature.IRParameterName,
             signature.IRFuncType);
     }
 
@@ -205,6 +241,37 @@ internal static class HookChainStageIrFactory
         {
             return false;
         }
+    }
+
+    private static HookChainStageOutputShape OutputShape(
+        HookChainStage stage,
+        DotBoxDExpressionModel value,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (!stage.IsSelect)
+        {
+            var boolType = model.Compilation.GetSpecialType(SpecialType.System_Boolean);
+            return new HookChainStageOutputShape(
+                DotBoxDGenerationNames.ManifestTypes.Bool,
+                boolType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+        }
+
+        if (TryOutputType(stage, model, cancellationToken, out var outputType))
+        {
+            return new HookChainStageOutputShape(
+                SandboxTypeSourceEmitter.ManifestTag(outputType),
+                outputType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+        }
+
+        if (stage.Lambda.ExpressionBody is not { } body)
+        {
+            throw new NotSupportedException();
+        }
+
+        return new HookChainStageOutputShape(
+            value.Type,
+            GeneratedRemoteHookChainFallback.TypeFullName(body, model, cancellationToken, value.Type));
     }
 
     private static (string? ElementParam, string? ContextParam) LambdaParameters(LambdaExpressionSyntax lambda)
@@ -250,4 +317,7 @@ internal static class HookChainStageIrFactory
             ? className + ".g.cs"
             : ns.Replace(DotBoxDGenerationNames.CSharpIdentifiers.EscapePrefix, string.Empty) + "." + className + ".g.cs";
 
+    private readonly record struct HookChainStageOutputShape(
+        string Tag,
+        string FullName);
 }

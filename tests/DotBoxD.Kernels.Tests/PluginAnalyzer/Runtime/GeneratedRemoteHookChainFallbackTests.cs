@@ -123,6 +123,43 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
     }
 
     [Fact]
+    public void Same_compilation_generated_remote_stages_emit_ir_companion_interceptors()
+    {
+        var result = RunGenerator(GeneratedServerSource + """
+
+            namespace ChainSample.Plugin
+            {
+            public static class StageCompanionUsage
+            {
+                public static void Configure(AlphaPluginServer server)
+                    => server.Hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent>()
+                        .Where(e => e.Distance <= 5)
+                        .Select(e => e.MonsterId)
+                        .Run((monsterId, ctx) => ctx.Messages.Send(monsterId, "stage-ir"));
+            }
+            }
+            """);
+        var generated = string.Join("\n", GeneratedSources(result));
+
+        Assert.Contains("HookChainStageIrInterceptors", generated, StringComparison.Ordinal);
+        Assert.Contains("@irFilter:", generated, StringComparison.Ordinal);
+        Assert.Contains("@irProjection:", generated, StringComparison.Ordinal);
+        Assert.Contains(
+            "IRFunc<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent, bool>",
+            generated,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "IRFunc<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent, global::System.String>",
+            generated,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "RemoteHookStage<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent, global::System.String, " +
+            "global::ChainSample.Plugin.AlphaPluginContext>",
+            generated,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Same_simple_name_foreign_registry_alias_is_not_intercepted()
     {
         var result = RunGenerator(SameSimpleNameForeignRegistrySource);
@@ -136,13 +173,16 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
     public void Generated_plugin_server_registries_emit_marker_metadata()
     {
         var result = RunGenerator(GeneratedServerSource);
-        var generated = string.Join("\n", GeneratedSources(result));
+        var generatedSources = GeneratedSources(result);
+        var generated = string.Join("\n", generatedSources);
 
         Assert.Contains("GeneratedPluginServerRegistryKind.Hook", generated, StringComparison.Ordinal);
         Assert.Contains("GeneratedPluginServerRegistryKind.Subscription", generated, StringComparison.Ordinal);
         Assert.Contains("typeof(global::ChainSample.Plugin.AlphaPluginServer)", generated, StringComparison.Ordinal);
         Assert.Contains("typeof(global::ChainSample.Plugin.AlphaPluginContext)", generated, StringComparison.Ordinal);
-        Assert.DoesNotContain("PipelineStep", generated, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            generatedSources.Where(static source => source.Contains("GeneratedPluginServerRegistry", StringComparison.Ordinal)),
+            static source => source.Contains("PipelineStep", StringComparison.Ordinal));
     }
 
     [Fact]

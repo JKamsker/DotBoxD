@@ -159,6 +159,8 @@ internal static partial class ResultHookChain
             invocation,
             stages,
             contextType,
+            generatedRemoteKind,
+            generatedRemoteServerContextTypeFullName,
             model,
             cancellationToken);
         return new HookChainResult(kernelModel, interception, stageIrModels);
