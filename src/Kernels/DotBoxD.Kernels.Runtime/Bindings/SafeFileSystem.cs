@@ -128,30 +128,65 @@ public static class SafeFileSystem
                 SafeFileWritePublisher.TryDelete(tempPath);
             }
 
-            SafeFileAudit.Write(context, startedAt, true, resolved.SanitizedPath, byteCount, null);
+            SafeFileAudit.Write(
+                context,
+                startedAt,
+                true,
+                resolved.SanitizedPath,
+                byteCount,
+                permission.TargetExisted,
+                null);
         }
         catch (SandboxRuntimeException ex)
         {
-            SafeFileAudit.Write(context, startedAt, false, SafeFilePathResolver.FailureResource(path, "file.write"), null, ex.Error.Code);
+            SafeFileAudit.Write(
+                context,
+                startedAt,
+                false,
+                SafeFilePathResolver.FailureResource(path, "file.write"),
+                null,
+                false,
+                ex.Error.Code);
             throw;
         }
         catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested &&
                                                 !cancellationToken.IsCancellationRequested)
         {
             var error = new SandboxError(SandboxErrorCode.Timeout, "file.writeText denied: request timed out");
-            SafeFileAudit.Write(context, startedAt, false, SafeFilePathResolver.FailureResource(path, "file.write"), null, error.Code);
+            SafeFileAudit.Write(
+                context,
+                startedAt,
+                false,
+                SafeFilePathResolver.FailureResource(path, "file.write"),
+                null,
+                false,
+                error.Code);
             throw new SandboxRuntimeException(error);
         }
         catch (OperationCanceledException)
         {
             var error = new SandboxError(SandboxErrorCode.Cancelled, "file.writeText cancelled");
-            SafeFileAudit.Write(context, startedAt, false, SafeFilePathResolver.FailureResource(path, "file.write"), null, error.Code);
+            SafeFileAudit.Write(
+                context,
+                startedAt,
+                false,
+                SafeFilePathResolver.FailureResource(path, "file.write"),
+                null,
+                false,
+                error.Code);
             throw new SandboxRuntimeException(error);
         }
         catch (Exception)
         {
             var error = new SandboxError(SandboxErrorCode.HostFailure, "file.writeText failed");
-            SafeFileAudit.Write(context, startedAt, false, SafeFilePathResolver.FailureResource(path, "file.write"), null, error.Code);
+            SafeFileAudit.Write(
+                context,
+                startedAt,
+                false,
+                SafeFilePathResolver.FailureResource(path, "file.write"),
+                null,
+                false,
+                error.Code);
             throw new SandboxRuntimeException(error);
         }
     }

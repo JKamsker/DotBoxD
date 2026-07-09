@@ -29,7 +29,7 @@ internal static class SafeFileWritePublisher
             throw Error(SandboxErrorCode.QuotaExceeded, "file.writeText denied: content exceeds write limit");
         }
 
-        return new SafeFileWritePermission(options.AllowCreate, options.AllowOverwrite);
+        return new SafeFileWritePermission(options.AllowCreate, options.AllowOverwrite, exists);
     }
 
     public static void EnsureParentDirectory(
@@ -185,4 +185,4 @@ internal static class SafeFileWritePublisher
     }
 }
 
-internal sealed record SafeFileWritePermission(bool AllowCreate, bool AllowOverwrite);
+internal sealed record SafeFileWritePermission(bool AllowCreate, bool AllowOverwrite, bool TargetExisted = false);

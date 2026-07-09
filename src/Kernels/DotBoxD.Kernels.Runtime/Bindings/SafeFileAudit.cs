@@ -6,6 +6,7 @@ namespace DotBoxD.Kernels.Runtime.Bindings;
 internal static class SafeFileAudit
 {
     private const string PathExtensionField = "pathExtension";
+    private const string WriteDispositionField = "writeDisposition";
 
     public static void Read(
         SandboxContext context,
@@ -14,7 +15,17 @@ internal static class SafeFileAudit
         string resource,
         long? bytes,
         SandboxErrorCode? error)
-        => WriteEvent(context, startedAt, success, "file.readText", "file.read", SandboxEffect.FileRead, resource, bytes, error);
+        => WriteEvent(
+            context,
+            startedAt,
+            success,
+            "file.readText",
+            "file.read",
+            SandboxEffect.FileRead,
+            resource,
+            bytes,
+            false,
+            error);
 
     public static void Write(
         SandboxContext context,
@@ -22,8 +33,19 @@ internal static class SafeFileAudit
         bool success,
         string resource,
         long? bytes,
+        bool targetExisted,
         SandboxErrorCode? error)
-        => WriteEvent(context, startedAt, success, "file.writeText", "file.write", SandboxEffect.FileWrite, resource, bytes, error);
+        => WriteEvent(
+            context,
+            startedAt,
+            success,
+            "file.writeText",
+            "file.write",
+            SandboxEffect.FileWrite,
+            resource,
+            bytes,
+            targetExisted,
+            error);
 
     private static void WriteEvent(
         SandboxContext context,
@@ -34,6 +56,7 @@ internal static class SafeFileAudit
         SandboxEffect effect,
         string resource,
         long? bytes,
+        bool targetExisted,
         SandboxErrorCode? error)
     {
         var fields = BindingAuditFields.CreateMutable(
@@ -42,12 +65,13 @@ internal static class SafeFileAudit
             context.ModuleHash,
             context.PolicyHash,
             context.Policy.Deterministic,
-            extraCapacity: success ? 1 : 0,
+            extraCapacity: success ? 2 : 0,
             bytesRead: bindingId == "file.readText" ? bytes : null,
             bytesWritten: bindingId == "file.writeText" ? bytes : null);
         if (success)
         {
             AddPathExtension(fields, resource);
+            AddWriteDisposition(fields, bindingId, targetExisted);
         }
 
         context.Audit.Write(new SandboxAuditEvent(
@@ -73,6 +97,14 @@ internal static class SafeFileAudit
         if (!string.IsNullOrEmpty(extension))
         {
             fields[PathExtensionField] = extension;
+        }
+    }
+
+    private static void AddWriteDisposition(IDictionary<string, string> fields, string bindingId, bool targetExisted)
+    {
+        if (bindingId == "file.writeText")
+        {
+            fields[WriteDispositionField] = targetExisted ? "overwrite" : "create";
         }
     }
 }
