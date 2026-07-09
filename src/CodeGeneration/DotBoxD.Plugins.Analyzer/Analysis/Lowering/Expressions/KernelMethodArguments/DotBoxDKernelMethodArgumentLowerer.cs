@@ -114,18 +114,9 @@ internal static class DotBoxDKernelMethodArgumentLowerer
 
         foreach (var property in recordType.GetMembers(propertyName).OfType<IPropertySymbol>())
         {
-            foreach (var attribute in property.GetAttributes())
+            if (PluginSymbolReader.Capability(property) is { } capability)
             {
-                if (string.Equals(
-                        attribute.AttributeClass?.ToDisplayString(),
-                        DotBoxDMetadataNames.CapabilityAttribute,
-                        StringComparison.Ordinal) &&
-                    attribute.ConstructorArguments.Length == 1 &&
-                    attribute.ConstructorArguments[0].Value is string id &&
-                    !string.IsNullOrEmpty(id))
-                {
-                    context.Capabilities.Add(id);
-                }
+                context.Capabilities.Add(capability);
             }
         }
     }
