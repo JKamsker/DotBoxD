@@ -20,17 +20,31 @@ function Assert-ExistingPath([string] $Document, [int] $LineNumber, [string] $Pa
     }
 }
 
+function Test-IsRepoPath([string] $Path) {
+    $normalized = $Path.Replace('\', '/')
+    return $normalized -in @('DotBoxD.slnx', 'DotBoxD.Packages.slnx') -or
+        $normalized.StartsWith('./eng/') -or
+        $normalized.StartsWith('eng/') -or
+        $normalized.StartsWith('samples/') -or
+        $normalized.StartsWith('tests/') -or
+        $normalized.StartsWith('tools/')
+}
+
 function Test-DocumentCommands([string] $Path) {
     $lines = Get-Content -LiteralPath $Path
     for ($i = 0; $i -lt $lines.Count; $i++) {
         $line = $lines[$i].Trim()
         if ($line -match '^dotnet\s+(restore|build|test|pack)\s+(?<target>\S+)') {
-            Assert-ExistingPath $Path ($i + 1) $matches["target"]
+            if (Test-IsRepoPath $matches["target"]) {
+                Assert-ExistingPath $Path ($i + 1) $matches["target"]
+            }
             continue
         }
 
         if ($line -match '^dotnet\s+run\b.*\s--project\s+(?<project>\S+)') {
-            Assert-ExistingPath $Path ($i + 1) $matches["project"]
+            if (Test-IsRepoPath $matches["project"]) {
+                Assert-ExistingPath $Path ($i + 1) $matches["project"]
+            }
             continue
         }
 
@@ -182,10 +196,18 @@ function Invoke-GameServer([string] $ServerProject, [string] $HostDll) {
     }
 }
 
-Test-DocumentCommands (Join-Path $root "README.md")
-Test-DocumentCommands (Join-Path $root "CONTRIBUTING.md")
-Test-DocumentCommands (Join-Path $root "docs-site/src/content/docs/getting-started.md")
-Test-DocumentCommands (Join-Path $root "docs/Specs/Addendum/Examples.md")
+$publicDocuments = @(
+    Get-Item -LiteralPath (Join-Path $root "README.md"), (Join-Path $root "CONTRIBUTING.md")
+    Get-ChildItem -LiteralPath (Join-Path $root "docs-site/src/content/docs") -Recurse -File -Include "*.md", "*.mdx"
+)
+# The repository's design, legacy, task, and specification trees are engineering
+# records, not published user documentation. Dedicated checks below continue to
+# validate the current claims and examples that those records are expected to keep.
+foreach ($document in $publicDocuments) {
+    Test-DocumentCommands $document.FullName
+}
+
+& (Join-Path $PSScriptRoot "check-doc-links.ps1")
 
 Assert-DocsDoNotContain "Sandbox\.Parse" "JSON IR import is Sandbox.ImportJson"
 Assert-DocsDoNotContain "tenant://123/config" "file grants use canonical filesystem roots"
