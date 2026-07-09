@@ -181,9 +181,9 @@ public sealed class ServerExtensionAttribute : Attribute
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class ServerExtensionClientAttribute(Type receiverType, string? name = null) : Attribute
 {
-    public Type ReceiverType { get; } = receiverType;
+    public Type ReceiverType { get; } = receiverType ?? throw new ArgumentNullException(nameof(receiverType));
 
-    public string? Name { get; } = name;
+    public string? Name { get; } = ServerExtensionAttributeValidation.ValidateName(name);
 }
 
 /// <summary>
@@ -196,7 +196,22 @@ public sealed class ServerExtensionMethodAttribute(Type? receiverType = null, st
 {
     public Type? ReceiverType { get; } = receiverType;
 
-    public string? Name { get; } = name;
+    public string? Name { get; } = ServerExtensionAttributeValidation.ValidateName(name);
+}
+
+internal static class ServerExtensionAttributeValidation
+{
+    public static string? ValidateName(string? name)
+    {
+        if (name is null)
+        {
+            return null;
+        }
+
+        return string.IsNullOrWhiteSpace(name)
+            ? throw new ArgumentException("Name cannot be empty or whitespace.", nameof(name))
+            : name;
+    }
 }
 
 /// <summary>

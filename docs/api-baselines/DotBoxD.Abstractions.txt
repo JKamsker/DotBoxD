@@ -87,10 +87,10 @@ public string NormalizedSignature { get; } = RequireMetadata(normalizedSignature
 public string TargetId { get; init; }
 public string? ContextFactory { get; set; }
 public string? Id { get; }
-public string? Name { get; } = name
+public string? Name { get; } = ServerExtensionAttributeValidation.ValidateName(name)
 public THost Host<THost>() where THost : class
 public Type ContextType { get; } = contextType ?? throw new ArgumentNullException(nameof(contextType))
-public Type ReceiverType { get; } = receiverType
+public Type ReceiverType { get; } = receiverType ?? throw new ArgumentNullException(nameof(receiverType))
 public Type ResultType { get; }
 public Type ServerType { get; } = serverType ?? throw new ArgumentNullException(nameof(serverType))
 public Type Subtype { get; }
