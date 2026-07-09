@@ -1,7 +1,7 @@
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Plugins.Policies;
 
-namespace DotBoxD.Kernels.Tests.Core.Regression;
+namespace DotBoxD.Kernels.Tests.Core.Regression.HostMessage;
 
 public sealed class HostMessagePolicyBuilderValidationSurpriseTests
 {

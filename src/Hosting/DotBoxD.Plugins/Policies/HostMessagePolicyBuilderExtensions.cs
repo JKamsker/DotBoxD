@@ -44,11 +44,18 @@ public static class HostMessagePolicyBuilderExtensions
         if (values is null)
             return;
 
-        var normalized = values
-            .Select(value => (value ?? "").Trim())
-            .Where(value => value.Length > 0)
-            .ToArray();
-        if (normalized.Length == 0)
+        var normalized = new List<string>();
+        foreach (var value in values)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new ArgumentException($"{key} values must not be null or empty", key);
+            }
+
+            normalized.Add(value.Trim());
+        }
+
+        if (normalized.Count == 0)
         {
             throw new ArgumentException($"{key} must contain at least one non-empty value", key);
         }
