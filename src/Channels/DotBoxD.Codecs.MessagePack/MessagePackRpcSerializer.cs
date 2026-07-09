@@ -34,8 +34,9 @@ public sealed class MessagePackRpcSerializer : ISerializer
     }
 
     /// <summary>
-    /// Creates a MessagePack serializer optimized for Unity compatibility.
-    /// Uses ContractlessStandardResolver which doesn't require attributes.
+    /// Creates the legacy contractless serializer preset used by some Unity projects.
+    /// ContractlessStandardResolver may use reflection and is not an IL2CPP/AOT guarantee;
+    /// AOT applications should call <see cref="CreateWithResolver"/> with generated formatters.
     /// </summary>
     public static MessagePackRpcSerializer CreateUnityCompatible()
     {

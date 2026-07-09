@@ -8,7 +8,8 @@ reason — pick by what you need before you click in:
 1. **[First Service (RPC)](/tutorials/first-service/)** — define a `[RpcService]` contract, host it, and
    call it from a client over a typed proxy. *Why this mode:* easy interop — one C# contract compiles
    to a typed proxy + dispatcher, so there is no hand-written marshaling and no runtime reflection on
-   the hot path (AOTs, runs on Unity/IL2CPP); the interface is the single source of truth.
+   the hot path; the interface is the single source of truth. Unity/IL2CPP additionally requires
+   generated codec formatters and validation in the consumer's own build.
 2. **[Event pipelines (RunLocal)](/tutorials/event-pipeline-runlocal/)** — subscribe to a server event, push the
    `Where`/`Select` filter server-side, and react locally with `RunLocal` so only matching, projected
    data crosses the pipe. *Why this mode:* efficient server-side filtering + projection — `Where`/`Select`

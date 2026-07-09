@@ -4,6 +4,10 @@ description: 'This guide covers implementing and using WebSocket transport with 
 ---
 This guide covers implementing and using WebSocket transport with DotBoxD. WebSocket transport is ideal for browser clients, Unity WebGL builds, and scenarios requiring HTTP-based connectivity.
 
+> This is an illustrative custom-transport walkthrough, not a shipped or CI-compiled
+> `DotBoxD.Transports.WebSocket` package. Copy it into an application-owned project, pin resource limits,
+> and maintain it against the current `IRpcChannel` API before production use.
+
 ## Overview
 
 DotBoxD is transport-agnostic. This guide shows how to create a WebSocket transport by implementing the core transport interfaces:
@@ -41,6 +45,7 @@ using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
 using DotBoxD.Services.Transport;
+using DotBoxD.Services.Buffers;
 
 namespace DotBoxD.Transports.WebSocket;
 
@@ -86,7 +91,7 @@ public sealed class WebSocketConnection : IRpcChannel
         }
     }
 
-    public async Task<Memory<byte>> ReceiveAsync(CancellationToken ct = default)
+    public async Task<Payload> ReceiveAsync(CancellationToken ct = default)
     {
         if (_disposed)
         {
@@ -117,7 +122,7 @@ public sealed class WebSocketConnection : IRpcChannel
 
                 if (result.MessageType == WebSocketMessageType.Close)
                 {
-                    return Memory<byte>.Empty;
+                    return Payload.Empty;
                 }
 
                 totalReceived += result.Count;
@@ -126,7 +131,7 @@ public sealed class WebSocketConnection : IRpcChannel
 
             if (totalReceived == 0)
             {
-                return Memory<byte>.Empty;
+                return Payload.Empty;
             }
 
             // Validate message length
@@ -141,9 +146,8 @@ public sealed class WebSocketConnection : IRpcChannel
                 throw new InvalidOperationException($"Invalid message length: {messageLength}");
             }
 
-            // Copy to exact-sized array
-            var message = new byte[totalReceived];
-            Buffer.BlockCopy(buffer, 0, message, 0, totalReceived);
+            var message = Payload.Rent(totalReceived);
+            buffer.AsSpan(0, totalReceived).CopyTo(message.Memory.Span);
             return message;
         }
         finally
@@ -546,7 +550,8 @@ public class NetworkManager : MonoBehaviour
     public async Task ConnectAsync()
     {
         _transport = new WebSocketTransport(serverUrl);
-        var serializer = MessagePackRpcSerializer.CreateUnityCompatible();
+        // GeneratedResolver is application code produced for this DTO set.
+        var serializer = MessagePackRpcSerializer.CreateWithResolver(GeneratedResolver.Instance);
 
         await _transport.ConnectAsync();
 
