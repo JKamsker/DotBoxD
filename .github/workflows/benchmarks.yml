@@ -15,7 +15,7 @@ on:
     - cron: '17 4 * * 1'
   workflow_dispatch:
   pull_request:
-    types: [labeled]
+    types: [labeled, synchronize, reopened]
 
 permissions:
   contents: read
@@ -27,8 +27,8 @@ concurrency:
 jobs:
   benchmark:
     name: Run BenchmarkDotNet suites
-    # PR runs: only when the just-applied label is 'benchmark'. Schedule/dispatch: always.
-    if: github.event_name != 'pull_request' || github.event.label.name == 'benchmark'
+    # PR runs continue on subsequent pushes while the benchmark label remains attached.
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'benchmark')
     runs-on: ubuntu-latest
     permissions:
       # Auto-push of results to gh-pages and PR alert comments need write; only exercised on
@@ -39,6 +39,7 @@ jobs:
     env:
       # Only the scheduled run on main may gate on regressions and push history.
       IS_TRACKING_RUN: ${{ github.event_name == 'schedule' && github.ref == 'refs/heads/main' }}
+      IS_GATING_RUN: ${{ github.event_name == 'pull_request' || (github.event_name == 'schedule' && github.ref == 'refs/heads/main') }}
 
     steps:
       - name: Checkout
@@ -110,7 +111,7 @@ jobs:
           alert-threshold: '150%'
           comment-on-alert: true
           # Only the scheduled main run gates and rewrites the gh-pages history.
-          fail-on-alert: ${{ env.IS_TRACKING_RUN == 'true' }}
+          fail-on-alert: ${{ env.IS_GATING_RUN == 'true' }}
           auto-push: ${{ env.IS_TRACKING_RUN == 'true' }}
 
       - name: Track / alert on Kernels benchmarks
@@ -123,5 +124,5 @@ jobs:
           benchmark-data-dir-path: dev/bench/kernels
           alert-threshold: '150%'
           comment-on-alert: true
-          fail-on-alert: ${{ env.IS_TRACKING_RUN == 'true' }}
+          fail-on-alert: ${{ env.IS_GATING_RUN == 'true' }}
           auto-push: ${{ env.IS_TRACKING_RUN == 'true' }}
