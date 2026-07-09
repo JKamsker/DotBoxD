@@ -79,8 +79,8 @@
     },
     {
       "path": "spec/02-threat-model.md",
-      "sha256": "c8c7f66a161539060f5d1bab9afc4983dc42a304ae4986d41f19ec5ce86f69f1",
-      "bytes": 6709
+      "sha256": "ac13089fa1a5677095e334e369c009e0deb53eb7be97f3942d6102cfa3003926",
+      "bytes": 8366
     },
     {
       "path": "spec/03-architecture.md",

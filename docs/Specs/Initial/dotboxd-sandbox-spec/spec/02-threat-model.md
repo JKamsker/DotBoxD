@@ -219,3 +219,20 @@ The following are not solved by the IR sandbox alone:
 | Cache confusion | Cache key includes policy/bindings/runtime/verifier | Reverify cached DLL |
 | Interpreter/compiler mismatch | Differential tests | Prefer interpreter for critical small scripts |
 | Unsafe binding | Binding signature validation | Manual security review checklist |
+
+## Requirement-to-test traceability
+
+These identifiers are stable review anchors. Renaming a test requires updating this table and the spec
+manifest in the same change.
+
+| Requirement | Boundary proof |
+|---|---|
+| TM-I1: untrusted IR cannot introduce arbitrary CLR references | `FuzzBreadthTests.Json_importer_fuzz_rejects_malformed_expression_shapes_with_diagnostics`; `ProgrammaticIrValidationTests` |
+| TM-I2: only host policy grants capabilities | `CapabilityPolicySplitTests.Install_denies_ungranted_plugin_requests_even_when_host_requirements_are_granted` |
+| TM-I3: unsafe host objects cannot cross bindings | `HostCapabilityEffectValidationContractTests`; `ModuleValidatorArgumentValidationTests` |
+| TM-I4: generated assemblies are verified before execution | `GeneratedAssemblyVerifierTests`; `Verifier_fuzz_reports_diagnostics_for_malformed_bytes` |
+| TM-I5: cache entries are content-, policy-, runtime-, and verifier-bound | `PersistentCacheIntegrityTests`; `Fix_CMP_0021_Tests` |
+| TM-I6: declared effects cover observed binding effects | `EffectSoundnessPropertyTests.Declared_effects_cover_observed_capability_effects` |
+| TM-I7: calls, allocations, I/O, and collections consume bounded resources | `CollectionQuotaTests`; `CompilerTests.Compiled_call_depth_is_enforced`; `RuntimeFuzzCoverageTests` |
+| TM-I8: non-cooperative work has a worker-process containment path | `WorkerTimeoutResultHardeningTests.Worker_wall_time_timeout_does_not_require_worker_cooperation` |
+| TM-DIFF: interpreter and compiler remain semantically aligned | `DifferentialFuzzTests.Pure_i32_json_fuzz_cases_match_interpreter_and_compiler`; `GoldenCorpusTests` |
