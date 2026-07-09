@@ -123,6 +123,7 @@ namespace Snap.Nested
                     }
                     try
                     {
+                        ct.ThrowIfCancellationRequested();
                         serializer.Serialize(output, new global::DotBoxD.Services.Protocol.ServiceHandle { ServiceName = "ISubSnap", InstanceId = __subId });
                     }
                     catch

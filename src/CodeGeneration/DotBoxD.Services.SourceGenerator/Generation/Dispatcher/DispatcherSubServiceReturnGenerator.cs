@@ -24,6 +24,7 @@ internal static class DispatcherSubServiceReturnGenerator
         {
             sb.AppendLine("                    if (__sub is null)");
             sb.AppendLine("                    {");
+            AppendCancellationCheckpoint(sb, "                        ");
             sb.AppendLine($"                        serializer.{ServicesGeneratorMemberNames.Serializer.Serialize}<{ServicesGeneratorTypeNames.NullableOf(ServicesGeneratorTypeNames.GlobalServiceHandle)}>(output, null);");
             sb.AppendLine("                        return;");
             sb.AppendLine("                    }");
@@ -101,6 +102,7 @@ internal static class DispatcherSubServiceReturnGenerator
     {
         sb.AppendLine("                    try");
         sb.AppendLine("                    {");
+        AppendCancellationCheckpoint(sb, "                        ");
         sb.AppendLine($"                        serializer.{ServicesGeneratorMemberNames.Serializer.Serialize}(output, new {ServicesGeneratorTypeNames.GlobalServiceHandle} {{ {ServicesGeneratorMemberNames.ServiceHandle.ServiceName} = \"{serviceName}\", {ServicesGeneratorMemberNames.ServiceHandle.InstanceId} = __subId }});");
         sb.AppendLine("                    }");
         sb.AppendLine("                    catch");
@@ -117,5 +119,10 @@ internal static class DispatcherSubServiceReturnGenerator
         sb.AppendLine("                        throw;");
         sb.AppendLine("                    }");
         sb.AppendLine("                    return;");
+    }
+
+    private static void AppendCancellationCheckpoint(StringBuilder sb, string indent = "                    ")
+    {
+        sb.Append(indent).AppendLine("ct.ThrowIfCancellationRequested();");
     }
 }
