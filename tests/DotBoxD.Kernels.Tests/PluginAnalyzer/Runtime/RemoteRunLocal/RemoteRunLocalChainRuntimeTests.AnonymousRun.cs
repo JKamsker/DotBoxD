@@ -29,7 +29,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         var generated = GeneratedSource(AnonymousRemoteRunTerminalSource);
 
         Assert.Contains("Intercept_0<TEvent, TCurrent>", generated, StringComparison.Ordinal);
-        Assert.Contains(".UseGeneratedChain(", generated, StringComparison.Ordinal);
+        Assert.Contains("IRKernel.FromPackage", generated, StringComparison.Ordinal);
         Assert.DoesNotContain("<anonymous type", generated, StringComparison.Ordinal);
     }
 
@@ -40,7 +40,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         var generated = GeneratedSource(AnonymousRemoteSubscriptionRunTerminalSource);
 
         Assert.Contains("Intercept_0<TEvent, TCurrent>", generated, StringComparison.Ordinal);
-        Assert.Contains(".UseGeneratedChain(", generated, StringComparison.Ordinal);
+        Assert.Contains("IRKernel.FromPackage", generated, StringComparison.Ordinal);
         Assert.DoesNotContain("<anonymous type", generated, StringComparison.Ordinal);
     }
 }

@@ -11,24 +11,6 @@ public partial class HookPipeline<TEvent, TContext>
     private readonly Hooks.ResultHookSlot<TEvent, TContext> _resultHooks;
     private readonly Dictionary<Type, object> _resultDispatchOptions = [];
 
-    public HookPipeline<TEvent, TContext> Register<TResult>(Func<TEvent, TResult> handler, int priority = 0)
-        => throw Hooks.HookLowering.ResultNotLowered();
-
-    public HookPipeline<TEvent, TContext> Register<TResult>(
-        Func<TEvent, TContext, TResult> handler,
-        int priority = 0)
-        => throw Hooks.HookLowering.ResultNotLowered();
-
-    public HookPipeline<TEvent, TContext> RegisterLocal<TResult>(
-        Func<TEvent, TResult> handler,
-        int priority = 0)
-        => throw Hooks.HookLowering.ResultNotLowered();
-
-    public HookPipeline<TEvent, TContext> RegisterLocal<TResult>(
-        Func<TEvent, TContext, TResult> handler,
-        int priority = 0)
-        => throw Hooks.HookLowering.ResultNotLowered();
-
     public HookPipeline<TEvent, TContext> UseGeneratedResultChain<TResult>(PluginPackage package, int priority = 0)
         where TResult : struct, IHookResult
     {

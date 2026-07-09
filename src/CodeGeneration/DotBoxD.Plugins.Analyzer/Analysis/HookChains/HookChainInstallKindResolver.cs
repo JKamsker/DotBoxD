@@ -2,26 +2,18 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
 internal static class HookChainInstallKindResolver
 {
-    private static readonly Dictionary<string, InstallKindResolver> InstallKindResolvers =
-        new(StringComparer.Ordinal)
-        {
-            [HookChainModelFactory.RunMethod] = static (_, _) => HookChainInterceptorInstallKind.GeneratedChain,
-            [HookChainModelFactory.RunLocalMethod] = RunLocalInstallKind,
-            [HookChainModelFactory.RegisterMethod] = RegisterInstallKind,
-            [HookChainModelFactory.RegisterLocalMethod] = RegisterLocalInstallKind,
-        };
-
-    private delegate HookChainInterceptorInstallKind? InstallKindResolver(
-        HookChainReceiverKind? receiverKind,
-        GeneratedRemoteHookChainKind? generatedRemoteKind);
-
     public static HookChainInterceptorInstallKind? Resolve(
-        string terminalMethod,
+        PipelineCallRole? terminalRole,
         HookChainReceiverKind? receiverKind,
         GeneratedRemoteHookChainKind? generatedRemoteKind)
-        => InstallKindResolvers.TryGetValue(terminalMethod, out var resolver)
-            ? resolver(receiverKind, generatedRemoteKind)
-            : null;
+        => terminalRole switch
+        {
+            PipelineCallRole.Run => HookChainInterceptorInstallKind.GeneratedChain,
+            PipelineCallRole.RunLocal => RunLocalInstallKind(receiverKind, generatedRemoteKind),
+            PipelineCallRole.Register => RegisterInstallKind(receiverKind, generatedRemoteKind),
+            PipelineCallRole.RegisterLocal => RegisterLocalInstallKind(receiverKind, generatedRemoteKind),
+            _ => null,
+        };
 
     private static HookChainInterceptorInstallKind? RunLocalInstallKind(
         HookChainReceiverKind? receiverKind,

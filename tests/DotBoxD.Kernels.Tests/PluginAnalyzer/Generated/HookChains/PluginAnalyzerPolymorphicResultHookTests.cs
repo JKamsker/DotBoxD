@@ -15,7 +15,7 @@ public sealed partial class PluginAnalyzerPolymorphicHandleTests
                         .Where(ctx => ctx.Attacker is PlayerCombatant attacker &&
                                       (attacker).HasEquippedItem(9001L))
                         .Where(ctx => ctx.Victim is MonsterCombatant)
-                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage * 2 }, 100);
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage * 2 }, priority: 100);
             }
             """);
         var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator(source);
@@ -40,7 +40,7 @@ public sealed partial class PluginAnalyzerPolymorphicHandleTests
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<DamageCtx>()
                         .Where(ctx => ctx.Victim is MonsterCombatant)
-                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, priority: 0);
             }
             """, includeMonsterSubtype: false));
 
@@ -55,7 +55,7 @@ public sealed partial class PluginAnalyzerPolymorphicHandleTests
                         .Where(ctx => (ctx.Attacker is PlayerCombatant attacker &&
                                        attacker.HasEquippedItem(9001L)) ||
                                       ctx.Damage > 0)
-                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, priority: 0);
             }
             """);
         var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator(source);
@@ -79,7 +79,7 @@ public sealed partial class PluginAnalyzerPolymorphicHandleTests
                         .Where(ctx => ctx.Attacker is PlayerCombatant attacker
                             ? attacker.HasEquippedItem(9001L)
                             : false)
-                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, priority: 0);
             }
             """);
         var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator(source);
@@ -127,7 +127,7 @@ public sealed partial class PluginAnalyzerPolymorphicHandleTests
                     => hooks.On<DamageCtx>()
                         .Register(ctx => DamageResult.Ok().WithIsEquipped(
                             ctx.Attacker is PlayerCombatant attacker &&
-                            attacker.HasEquippedItem(9001L)), 0);
+                            attacker.HasEquippedItem(9001L)), priority: 0);
             }
             """);
 
@@ -141,7 +141,7 @@ public sealed partial class PluginAnalyzerPolymorphicHandleTests
                     => hooks.On<DamageCtx>()
                         .Where(ctx => ctx.Attacker is PlayerCombatant { Id: > 100L } attacker &&
                                       attacker.HasEquippedItem(9001L))
-                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, priority: 0);
             }
             """);
         var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator(source);
@@ -163,7 +163,7 @@ public sealed partial class PluginAnalyzerPolymorphicHandleTests
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<DamageCtx>()
                         .Where(ctx => !(ctx.Attacker is PlayerCombatant { Id: > 100L } attacker))
-                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, priority: 0);
             }
             """));
 
@@ -177,7 +177,7 @@ public sealed partial class PluginAnalyzerPolymorphicHandleTests
                     => hooks.On<DamageCtx>()
                         .Where(ctx => ctx.Attacker is PlayerCombatant attacker &&
                                       attacker.HasEquippedItem(9001L))
-                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, priority: 0);
             }
             """, playerHostBindingSuffix: ", IsAsync = true");
         var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator(source);

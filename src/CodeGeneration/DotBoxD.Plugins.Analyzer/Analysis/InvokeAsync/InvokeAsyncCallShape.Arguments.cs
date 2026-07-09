@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
@@ -10,45 +11,32 @@ internal sealed partial class InvokeAsyncCallShape
         out ExpressionSyntax lambda)
     {
         lambda = null!;
-        if (arguments.Count is < 1 or > 2)
+        if (arguments.Count is < 1 or > 3)
         {
             return false;
         }
 
-        var assignedLambda = false;
-        var assignedCancellation = false;
+        var state = new LambdaArgumentState();
         for (var i = 0; i < arguments.Count; i++)
         {
             var argument = arguments[i];
-            var name = argument.NameColon?.Name.Identifier.ValueText ?? (i == 0 ? "lambda" : "cancellationToken");
-            if (string.Equals(name, "lambda", StringComparison.Ordinal))
+            if (!state.TryAssign(LambdaArgumentName(argument, i), argument.Expression))
             {
-                if (assignedLambda)
-                {
-                    return false;
-                }
-
-                lambda = argument.Expression;
-                assignedLambda = true;
-                continue;
+                return false;
             }
-
-            if (string.Equals(name, "cancellationToken", StringComparison.Ordinal))
-            {
-                if (assignedCancellation)
-                {
-                    return false;
-                }
-
-                assignedCancellation = true;
-                continue;
-            }
-
-            return false;
         }
 
-        return assignedLambda;
+        return state.TryGet(out lambda);
     }
+
+    private static string LambdaArgumentName(ArgumentSyntax argument, int index)
+        => argument.NameColon?.Name.Identifier.ValueText ??
+           index switch
+           {
+               0 => "lambda",
+               1 => "irInvocation",
+               _ => "cancellationToken"
+           };
 
     private static bool TryCaptureArguments(
         SeparatedSyntaxList<ArgumentSyntax> arguments,
@@ -57,7 +45,7 @@ internal sealed partial class InvokeAsyncCallShape
     {
         captures = null!;
         lambda = null!;
-        if (arguments.Count is < 2 or > 3)
+        if (arguments.Count is < 2 or > 4)
         {
             return false;
         }
@@ -81,6 +69,7 @@ internal sealed partial class InvokeAsyncCallShape
            {
                0 => "captures",
                1 => "lambda",
+               2 => "irInvocation",
                _ => "cancellationToken"
            };
 
@@ -88,13 +77,15 @@ internal sealed partial class InvokeAsyncCallShape
     {
         private ExpressionSyntax? _captures;
         private ExpressionSyntax? _lambda;
+        private bool _assignedIr;
         private bool _assignedCancellation;
 
         public bool TryAssign(string name, ExpressionSyntax expression)
             => name switch
             {
-                "captures" => TryAssignOnce(ref _captures, expression),
-                "lambda" => TryAssignOnce(ref _lambda, expression),
+                "captures" => AssignOnce(ref _captures, expression),
+                "lambda" => AssignOnce(ref _lambda, expression),
+                "irInvocation" => TryAssignIr(expression),
                 "cancellationToken" => TryAssignCancellation(),
                 _ => false
             };
@@ -104,17 +95,6 @@ internal sealed partial class InvokeAsyncCallShape
             captures = _captures!;
             lambda = _lambda!;
             return _captures is not null && _lambda is not null;
-        }
-
-        private static bool TryAssignOnce(ref ExpressionSyntax? target, ExpressionSyntax expression)
-        {
-            if (target is not null)
-            {
-                return false;
-            }
-
-            target = expression;
-            return true;
         }
 
         private bool TryAssignCancellation()
@@ -127,5 +107,76 @@ internal sealed partial class InvokeAsyncCallShape
             _assignedCancellation = true;
             return true;
         }
+
+        private bool TryAssignIr(ExpressionSyntax expression)
+        {
+            if (_assignedIr || !IsNullLike(expression))
+            {
+                return false;
+            }
+
+            _assignedIr = true;
+            return true;
+        }
     }
+
+    private sealed class LambdaArgumentState
+    {
+        private ExpressionSyntax? _lambda;
+        private bool _assignedIr;
+        private bool _assignedCancellation;
+
+        public bool TryAssign(string name, ExpressionSyntax expression)
+            => name switch
+            {
+                "lambda" => AssignOnce(ref _lambda, expression),
+                "irInvocation" => TryAssignIr(expression),
+                "cancellationToken" => TryAssignCancellation(),
+                _ => false
+            };
+
+        public bool TryGet(out ExpressionSyntax lambda)
+        {
+            lambda = _lambda!;
+            return _lambda is not null;
+        }
+
+        private bool TryAssignCancellation()
+        {
+            if (_assignedCancellation)
+            {
+                return false;
+            }
+
+            _assignedCancellation = true;
+            return true;
+        }
+
+        private bool TryAssignIr(ExpressionSyntax expression)
+        {
+            if (_assignedIr || !IsNullLike(expression))
+            {
+                return false;
+            }
+
+            _assignedIr = true;
+            return true;
+        }
+    }
+
+    private static bool AssignOnce(ref ExpressionSyntax? target, ExpressionSyntax expression)
+    {
+        if (target is not null)
+        {
+            return false;
+        }
+
+        target = expression;
+        return true;
+    }
+
+    private static bool IsNullLike(ExpressionSyntax expression)
+        => expression.IsKind(SyntaxKind.NullLiteralExpression) ||
+            expression.IsKind(SyntaxKind.DefaultLiteralExpression) ||
+            expression.IsKind(SyntaxKind.DefaultExpression);
 }

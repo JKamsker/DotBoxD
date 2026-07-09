@@ -2,6 +2,7 @@ using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using DotBoxD.Plugins.Analyzer.Analysis.HookResults;
 using DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
+using DotBoxD.Plugins.Analyzer.Analysis.MergeableIr;
 using DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 using DotBoxD.Plugins.Analyzer.Analysis.Registration;
 using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
@@ -133,8 +134,7 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
 
         var invokeAsyncResults = GeneratorGuard.SyntaxValues(
             context,
-            static (node, _) => node is InvocationExpressionSyntax invocation &&
-                IsInvokeAsyncCandidate(invocation.Expression),
+            static (node, _) => node is InvocationExpressionSyntax,
             "InvokeAsync package model",
             static (syntaxContext, ct) => InvokeAsyncModelFactory.Create(syntaxContext, ct));
         GeneratorGuard.RegisterOutput(
@@ -202,10 +202,25 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
             .Where(static result => result.Interception is not null)
             .Select(static (result, _) => result.Interception!)
             .Collect();
+        var stageIrModels = chainResults
+            .SelectMany(static (result, _) => result.StageIrModels);
+        var stageIrInterceptions = stageIrModels
+            .Select(static (model, _) => model.Interception)
+            .Collect();
         var invokeAsyncInterceptions = invokeAsyncResults
             .Where(static result => result.Interception is not null)
             .Select(static (result, _) => result.Interception!)
             .Collect();
+        GeneratorGuard.RegisterOutput(
+            context,
+            stageIrModels.Collect(),
+            "hook chain stage IR source output",
+            static (sourceContext, items) => HookChainStageIrEmitter.EmitSteps(sourceContext, items));
+        GeneratorGuard.RegisterOutput(
+            context,
+            stageIrInterceptions,
+            "hook chain stage IR interceptor output",
+            static (sourceContext, items) => HookChainStageIrEmitter.EmitInterceptors(sourceContext, items));
         GeneratorGuard.RegisterOutput(
             context,
             interceptions,
@@ -218,6 +233,7 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
             static (sourceContext, items) => InvokeAsyncInterceptorEmitter.Emit(sourceContext, items));
 
         RegistrationAccumulatorGenerator.Register(context);
+        MergeableIrStepGenerator.Register(context);
 
         // [HookResult] builder surface: Ok()/Reject()/With<Field>() for each annotated result record, plus the
         // DBXK112 diagnostic when the Success/Reason contract is missing.
@@ -251,25 +267,5 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
     }
 
     private static bool IsHookChainTerminal(SyntaxNode node)
-        => node is InvocationExpressionSyntax
-        {
-            Expression: MemberAccessExpressionSyntax
-            {
-                Name.Identifier.ValueText: "Run" or "RunLocal" or "Register" or "RegisterLocal"
-            }
-        };
-
-    private static bool IsInvokeAsyncCandidate(ExpressionSyntax expression)
-        => expression switch
-        {
-            MemberAccessExpressionSyntax { Name.Identifier.ValueText: "InvokeAsync" } => true,
-            MemberBindingExpressionSyntax
-            {
-                Name: IdentifierNameSyntax { Identifier.ValueText: "InvokeAsync" }
-                    or GenericNameSyntax { Identifier.ValueText: "InvokeAsync" }
-            } => true,
-            IdentifierNameSyntax { Identifier.ValueText: "InvokeAsync" } => true,
-            GenericNameSyntax { Identifier.ValueText: "InvokeAsync" } => true,
-            _ => false
-        };
+        => node is InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax };
 }

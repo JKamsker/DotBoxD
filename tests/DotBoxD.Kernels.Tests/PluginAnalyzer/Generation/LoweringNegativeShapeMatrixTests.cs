@@ -125,7 +125,7 @@ public sealed class LoweringNegativeShapeMatrixTests
             {
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<DamageCtx>()
-                        .RegisterLocal((ctx, hookContext) => new OtherResult { Success = true }, 0);
+                        .RegisterLocal((ctx, hookContext) => new OtherResult { Success = true }, priority: 0);
             }
             """
         ];

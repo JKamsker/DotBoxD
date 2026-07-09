@@ -58,7 +58,7 @@ public sealed class RemoteSubscriptionStageTests
     private static RemoteSubscriptionStage<StageEvent, string> Stage()
         => new RemoteSubscriptionRegistry(_ => throw new InvalidOperationException(), new RemoteLocalHandlerRegistry())
             .On<StageEvent>()
-            .Select(e => e.Id);
+            .Select(e => e.Id, RemoteIrTestSteps.Ir<StageEvent, string>(LoweredPipelineStepKind.Projection));
 
     private static PluginPackage Package()
     {

@@ -30,6 +30,35 @@ internal static class RemoteStagedUseFlowAnalyzer
             return false;
         }
 
+        return LocalFlowsIntoSupportedTerminal(block, invocation, local, model, cancellationToken) ||
+            LocalFlowsIntoReturnedExpression(block, invocation, local, model, cancellationToken);
+    }
+
+    public static bool ContainsStageInvocation(ExpressionSyntax expression)
+    {
+        expression = HookChainAliasResolver.UnwrapTransparentExpression(expression);
+
+        if (expression is InvocationExpressionSyntax
+            {
+                Expression: MemberAccessExpressionSyntax stageAccess
+            })
+        {
+            var stageName = stageAccess.Name.Identifier.ValueText;
+            return stageName is "Where" or "Select" ||
+                ContainsStageInvocation(stageAccess.Expression);
+        }
+
+        return expression is MemberAccessExpressionSyntax access &&
+            ContainsStageInvocation(access.Expression);
+    }
+
+    private static bool LocalFlowsIntoSupportedTerminal(
+        BlockSyntax block,
+        InvocationExpressionSyntax invocation,
+        ILocalSymbol local,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
         foreach (var terminal in block.DescendantNodes(static node =>
                 node is not LambdaExpressionSyntax and not LocalFunctionStatementSyntax)
             .OfType<InvocationExpressionSyntax>())
@@ -59,22 +88,31 @@ internal static class RemoteStagedUseFlowAnalyzer
         return false;
     }
 
-    public static bool ContainsStageInvocation(ExpressionSyntax expression)
+    private static bool LocalFlowsIntoReturnedExpression(
+        BlockSyntax block,
+        InvocationExpressionSyntax invocation,
+        ILocalSymbol local,
+        SemanticModel model,
+        CancellationToken cancellationToken)
     {
-        expression = HookChainAliasResolver.UnwrapTransparentExpression(expression);
-
-        if (expression is InvocationExpressionSyntax
-            {
-                Expression: MemberAccessExpressionSyntax stageAccess
-            })
+        foreach (var returned in block.DescendantNodes(static node =>
+                node is not LambdaExpressionSyntax and not LocalFunctionStatementSyntax)
+            .OfType<ReturnStatementSyntax>())
         {
-            var stageName = stageAccess.Name.Identifier.ValueText;
-            return stageName is "Where" or "Select" ||
-                ContainsStageInvocation(stageAccess.Expression);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (returned.SpanStart <= invocation.SpanStart || returned.Expression is null)
+            {
+                continue;
+            }
+
+            if (!HasMutationBeforeReturn(local, invocation, returned, model, cancellationToken) &&
+                ExpressionReferencesLocal(returned.Expression, local, model, cancellationToken, depth: 0))
+            {
+                return true;
+            }
         }
 
-        return expression is MemberAccessExpressionSyntax access &&
-            ContainsStageInvocation(access.Expression);
+        return false;
     }
 
     private static bool IsPriorOrCurrentInvocation(
@@ -132,6 +170,19 @@ internal static class RemoteStagedUseFlowAnalyzer
             local,
             invocation.SpanStart,
             terminal.SpanStart,
+            model,
+            cancellationToken);
+
+    private static bool HasMutationBeforeReturn(
+        ILocalSymbol local,
+        InvocationExpressionSyntax invocation,
+        ReturnStatementSyntax returned,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+        => HookChainAliasResolver.HasMutationBetween(
+            local,
+            invocation.SpanStart,
+            returned.SpanStart,
             model,
             cancellationToken);
 

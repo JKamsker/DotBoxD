@@ -20,6 +20,7 @@ internal sealed record PluginServerFacadeModel(
     string ControlServiceType,
     string LiveSettingUpdateType,
     bool EmitPipeBuilder,
+    bool UserDefinesPublicInvokeAsync,
     EquatableArray<PluginServerForwardedProperty> WorldProperties,
     EquatableArray<PluginServerForwardedMethod> WorldMethods,
     EquatableArray<PluginServerServiceWrapper> WorldServiceWrappers,

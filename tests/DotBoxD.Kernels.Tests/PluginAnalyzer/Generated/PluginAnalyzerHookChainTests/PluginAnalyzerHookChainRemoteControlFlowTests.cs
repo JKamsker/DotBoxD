@@ -145,7 +145,7 @@ public sealed class PluginAnalyzerHookChainRemoteControlFlowTests
         var diagnostic = Assert.Single(result.Diagnostics.Where(d => d.Id == "DBXK100"));
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Contains("Where/Select", diagnostic.GetMessage(), StringComparison.Ordinal);
-        Assert.DoesNotContain(result.GeneratedTrees, tree => tree.ToString().Contains("UseGeneratedChain", StringComparison.Ordinal));
+        Assert.DoesNotContain(result.GeneratedTrees, tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -198,7 +198,7 @@ public sealed class PluginAnalyzerHookChainRemoteControlFlowTests
             """);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id is "DBXK100" or "DBXK114");
-        Assert.Contains(result.GeneratedTrees, tree => tree.ToString().Contains("UseGeneratedChain", StringComparison.Ordinal));
+        Assert.Contains(result.GeneratedTrees, tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -224,7 +224,7 @@ public sealed class PluginAnalyzerHookChainRemoteControlFlowTests
             """);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id is "DBXK100" or "DBXK114");
-        Assert.Contains(result.GeneratedTrees, tree => tree.ToString().Contains("UseGeneratedChain", StringComparison.Ordinal));
+        Assert.Contains(result.GeneratedTrees, tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -251,7 +251,7 @@ public sealed class PluginAnalyzerHookChainRemoteControlFlowTests
             """);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id is "DBXK100" or "DBXK114");
-        Assert.Contains(result.GeneratedTrees, tree => tree.ToString().Contains("UseGeneratedChain", StringComparison.Ordinal));
+        Assert.Contains(result.GeneratedTrees, tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     [Fact]

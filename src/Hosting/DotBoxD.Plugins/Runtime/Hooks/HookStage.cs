@@ -12,6 +12,7 @@ namespace DotBoxD.Plugins.Runtime.Hooks;
 /// Every fluent method offers both the (element, context) and element-only lambda arities, chosen
 /// independently per stage.
 /// </summary>
+[PipelineSurface(PipelineTransport.Local)]
 public class HookStage<TEvent, TCurrent, TContext>
 {
     private readonly HookPipeline<TEvent, TContext> _root;
@@ -24,10 +25,12 @@ public class HookStage<TEvent, TCurrent, TContext>
         _root = root;
         _project = project;
     }
-
-    public HookStage<TEvent, TCurrent, TContext> Where(Func<TCurrent, TContext, bool> filter)
+    public HookStage<TEvent, TCurrent, TContext> Where(
+        Func<TCurrent, TContext, bool> filter,
+        [IRBodyOf(nameof(filter))] IRFunc<TCurrent, TContext, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
+        _ = irFilter?.Step;
         var project = _project;
         return new HookStage<TEvent, TCurrent, TContext>(_root, async (e, ctx) =>
         {
@@ -38,15 +41,20 @@ public class HookStage<TEvent, TCurrent, TContext>
 
     /// <summary>Element-only filter over the projected element — the (element, context) overload with
     /// the context discarded, so a stage need not take the context it doesn't use.</summary>
-    public HookStage<TEvent, TCurrent, TContext> Where(Func<TCurrent, bool> filter)
+    public HookStage<TEvent, TCurrent, TContext> Where(
+        Func<TCurrent, bool> filter,
+        [IRBodyOf(nameof(filter))] IRFunc<TCurrent, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
+        _ = irFilter?.Step;
         return Where((value, _) => filter(value));
     }
-
-    public HookStage<TEvent, TNext, TContext> Select<TNext>(Func<TCurrent, TContext, TNext> projection)
+    public HookStage<TEvent, TNext, TContext> Select<TNext>(
+        Func<TCurrent, TContext, TNext> projection,
+        [IRBodyOf(nameof(projection))] IRFunc<TCurrent, TContext, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
+        _ = irProjection?.Step;
         var project = _project;
         return new HookStage<TEvent, TNext, TContext>(_root, async (e, ctx) =>
         {
@@ -54,10 +62,12 @@ public class HookStage<TEvent, TCurrent, TContext>
             return ok ? (true, projection(value, ctx)) : (false, default!);
         });
     }
-
-    public HookStage<TEvent, TNext, TContext> Select<TNext>(Func<TCurrent, TNext> projection)
+    public HookStage<TEvent, TNext, TContext> Select<TNext>(
+        Func<TCurrent, TNext> projection,
+        [IRBodyOf(nameof(projection))] IRFunc<TCurrent, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
+        _ = irProjection?.Step;
         return Select((value, _) => projection(value));
     }
 
@@ -75,7 +85,6 @@ public class HookStage<TEvent, TCurrent, TContext>
             }
         });
     }
-
     public HookPipeline<TEvent, TContext> RunLocal(Action<TCurrent, TContext> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
@@ -85,13 +94,11 @@ public class HookStage<TEvent, TCurrent, TContext>
             return ValueTask.CompletedTask;
         });
     }
-
     public HookPipeline<TEvent, TContext> RunLocal(Func<TCurrent, ValueTask> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
         return RunLocal((value, _) => handler(value));
     }
-
     public HookPipeline<TEvent, TContext> RunLocal(Action<TCurrent> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
@@ -117,21 +124,55 @@ public class HookStage<TEvent, TCurrent, TContext>
     }
 
     /// <summary>The terminal the analyzer lowers to verified IR; un-lowered it throws (never native).</summary>
-    public HookPipeline<TEvent, TContext> Run(Func<TCurrent, TContext, ValueTask> handler)
-        => throw HookLowering.NotLowered();
+    public HookPipeline<TEvent, TContext> Run(
+        Func<TCurrent, TContext, ValueTask> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedChainFromInterceptor(HookLowering.RequiredPackage(irHandler, nameof(irHandler)));
+    }
 
-    public HookPipeline<TEvent, TContext> Run(Action<TCurrent, TContext> handler)
-        => throw HookLowering.NotLowered();
+    public HookPipeline<TEvent, TContext> Run(
+        Action<TCurrent, TContext> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return Run((value, ctx) =>
+        {
+            handler(value, ctx);
+            return ValueTask.CompletedTask;
+        }, irHandler);
+    }
 
-    public HookPipeline<TEvent, TContext> Run(Func<TCurrent, ValueTask> handler)
-        => throw HookLowering.NotLowered();
+    public HookPipeline<TEvent, TContext> Run(
+        Func<TCurrent, ValueTask> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return Run((value, _) => handler(value), irHandler);
+    }
 
-    public HookPipeline<TEvent, TContext> Run(Action<TCurrent> handler)
-        => throw HookLowering.NotLowered();
+    public HookPipeline<TEvent, TContext> Run(
+        Action<TCurrent> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return Run((value, _) =>
+        {
+            handler(value);
+            return ValueTask.CompletedTask;
+        }, irHandler);
+    }
 }
 
 internal static class HookLowering
 {
+    public static PluginPackage RequiredPackage(IRKernel? kernel, string parameterName)
+    {
+        ArgumentNullException.ThrowIfNull(kernel, parameterName);
+        return kernel.Package;
+    }
+
     public static SandboxValidationException NotLowered()
         => new([
             new SandboxDiagnostic(

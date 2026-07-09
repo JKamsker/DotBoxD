@@ -75,8 +75,8 @@ internal static partial class DotBoxDPatternExpressionLowerer
 
     private static DotBoxDExpressionModel And(DotBoxDExpressionModel left, DotBoxDExpressionModel right)
     {
-        RequireBool(left, DotBoxDGenerationNames.Operators.LogicalAnd);
-        RequireBool(right, DotBoxDGenerationNames.Operators.LogicalAnd);
+        RequireBool(left, DotBoxDOperatorNames.LogicalAnd);
+        RequireBool(right, DotBoxDOperatorNames.LogicalAnd);
         return new DotBoxDExpressionModel(
             $"{DotBoxDGenerationNames.Helpers.And}({left.Source}, {right.Source})",
             DotBoxDGenerationNames.ManifestTypes.Bool,

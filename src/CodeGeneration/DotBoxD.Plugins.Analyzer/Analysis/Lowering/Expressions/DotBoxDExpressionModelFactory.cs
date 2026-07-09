@@ -12,26 +12,26 @@ internal static partial class DotBoxDExpressionModelFactory
         [SyntaxKind.NotEqualsExpression] = static (binary, context, left, right, allocates) =>
             LowerEqualityBinary(binary, context, left, right, negate: true, allocates),
         [SyntaxKind.GreaterThanOrEqualExpression] = static (_, _, left, right, allocates) =>
-            NumericBinary(DotBoxDGenerationNames.Helpers.Ge, DotBoxDGenerationNames.Operators.GreaterThanOrEqual, left, right, comparison: true, allocates),
+            NumericBinary(DotBoxDGenerationNames.Helpers.Ge, DotBoxDOperatorNames.GreaterThanOrEqual, left, right, comparison: true, allocates),
         [SyntaxKind.GreaterThanExpression] = static (_, _, left, right, allocates) =>
-            NumericBinary(DotBoxDGenerationNames.Helpers.Gt, DotBoxDGenerationNames.Operators.GreaterThan, left, right, comparison: true, allocates),
+            NumericBinary(DotBoxDGenerationNames.Helpers.Gt, DotBoxDOperatorNames.GreaterThan, left, right, comparison: true, allocates),
         [SyntaxKind.LessThanOrEqualExpression] = static (_, _, left, right, allocates) =>
-            NumericBinary(DotBoxDGenerationNames.Helpers.Le, DotBoxDGenerationNames.Operators.LessThanOrEqual, left, right, comparison: true, allocates),
+            NumericBinary(DotBoxDGenerationNames.Helpers.Le, DotBoxDOperatorNames.LessThanOrEqual, left, right, comparison: true, allocates),
         [SyntaxKind.LessThanExpression] = static (_, _, left, right, allocates) =>
-            NumericBinary(DotBoxDGenerationNames.Helpers.Lt, DotBoxDGenerationNames.Operators.LessThan, left, right, comparison: true, allocates),
+            NumericBinary(DotBoxDGenerationNames.Helpers.Lt, DotBoxDOperatorNames.LessThan, left, right, comparison: true, allocates),
         [SyntaxKind.LogicalAndExpression] = static (_, _, left, right, allocates) =>
-            BoolBinary(DotBoxDGenerationNames.Helpers.And, DotBoxDGenerationNames.Operators.LogicalAnd, left, right, allocates),
+            BoolBinary(DotBoxDGenerationNames.Helpers.And, DotBoxDOperatorNames.LogicalAnd, left, right, allocates),
         [SyntaxKind.LogicalOrExpression] = static (_, _, left, right, allocates) =>
-            BoolBinary(DotBoxDGenerationNames.Helpers.Or, DotBoxDGenerationNames.Operators.LogicalOr, left, right, allocates),
+            BoolBinary(DotBoxDGenerationNames.Helpers.Or, DotBoxDOperatorNames.LogicalOr, left, right, allocates),
         [SyntaxKind.AddExpression] = static (_, _, left, right, allocates) => AddBinary(left, right, allocates),
         [SyntaxKind.SubtractExpression] = static (_, _, left, right, allocates) =>
-            NumericBinary(DotBoxDGenerationNames.Helpers.Sub, DotBoxDGenerationNames.Operators.Minus, left, right, comparison: false, allocates),
+            NumericBinary(DotBoxDGenerationNames.Helpers.Sub, DotBoxDOperatorNames.Minus, left, right, comparison: false, allocates),
         [SyntaxKind.MultiplyExpression] = static (_, _, left, right, allocates) =>
-            NumericBinary(DotBoxDGenerationNames.Helpers.Mul, DotBoxDGenerationNames.Operators.Multiply, left, right, comparison: false, allocates),
+            NumericBinary(DotBoxDGenerationNames.Helpers.Mul, DotBoxDOperatorNames.Multiply, left, right, comparison: false, allocates),
         [SyntaxKind.DivideExpression] = static (_, _, left, right, allocates) =>
-            NumericBinary(DotBoxDGenerationNames.Helpers.Div, DotBoxDGenerationNames.Operators.Divide, left, right, comparison: false, allocates),
+            NumericBinary(DotBoxDGenerationNames.Helpers.Div, DotBoxDOperatorNames.Divide, left, right, comparison: false, allocates),
         [SyntaxKind.ModuloExpression] = static (_, _, left, right, allocates) =>
-            NumericBinary(DotBoxDGenerationNames.Helpers.Mod, DotBoxDGenerationNames.Operators.Modulo, left, right, comparison: false, allocates),
+            NumericBinary(DotBoxDGenerationNames.Helpers.Mod, DotBoxDOperatorNames.Modulo, left, right, comparison: false, allocates),
     };
 
     private delegate DotBoxDExpressionModel BinaryLowerer(
@@ -77,13 +77,13 @@ internal static partial class DotBoxDExpressionModelFactory
         {
             SyntaxKind.LogicalNotExpression => Unary(
                 DotBoxDGenerationNames.Helpers.Not,
-                DotBoxDGenerationNames.Operators.LogicalNot,
+                DotBoxDOperatorNames.LogicalNot,
                 operand,
                 DotBoxDGenerationNames.ManifestTypes.Bool,
                 DotBoxDGenerationNames.ManifestTypes.Bool),
             SyntaxKind.UnaryMinusExpression => DotBoxDNumericExpressionLowerer.Unary(
                 DotBoxDGenerationNames.Helpers.Neg,
-                DotBoxDGenerationNames.Operators.Minus,
+                DotBoxDOperatorNames.Minus,
                 operand),
             _ => Unsupported(unary)
         };
@@ -150,7 +150,7 @@ internal static partial class DotBoxDExpressionModelFactory
 
         return NumericBinary(
             DotBoxDGenerationNames.Helpers.Add,
-            DotBoxDGenerationNames.Operators.Add,
+            DotBoxDOperatorNames.Add,
             left,
             right,
             comparison: false,

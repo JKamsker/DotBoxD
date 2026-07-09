@@ -14,8 +14,8 @@ internal static class DotBoxDEqualityExpressionLowerer
         ITypeSymbol? rightType)
     {
         var symbol = negate
-            ? DotBoxDGenerationNames.Operators.NotEqualTo
-            : DotBoxDGenerationNames.Operators.EqualTo;
+            ? DotBoxDOperatorNames.NotEqualTo
+            : DotBoxDOperatorNames.EqualTo;
         if (!string.Equals(left.Type, right.Type, StringComparison.Ordinal))
         {
             throw new NotSupportedException(

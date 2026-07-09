@@ -40,14 +40,14 @@ public sealed class PluginAnalyzerResultLocalHandlerValidatorTests
                             {
                                 return DamageResult.Ok().WithDamage(ctx.Damage);
                             }
-                        }, 100);
+                        }, priority: 100);
             }
             """);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
         Assert.Contains(
             result.GeneratedTrees,
-            tree => tree.ToString().Contains("UseGeneratedLocalResultChain", StringComparison.Ordinal));
+            tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public sealed class PluginAnalyzerResultLocalHandlerValidatorTests
                             }
 
                             return DamageResult.Ok().WithDamage(ctx.Damage);
-                        }, 100);
+                        }, priority: 100);
             }
             """);
 
@@ -121,14 +121,14 @@ public sealed class PluginAnalyzerResultLocalHandlerValidatorTests
 
                             _ = ignored;
                             return DamageResult.Ok().WithDamage(ctx.Damage);
-                        }, 100);
+                        }, priority: 100);
             }
             """);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
         Assert.Contains(
             result.GeneratedTrees,
-            tree => tree.ToString().Contains("UseGeneratedLocalResultChain", StringComparison.Ordinal));
+            tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     private static GeneratorDriverRunResult RunGenerator(string source)
@@ -145,7 +145,7 @@ public sealed class PluginAnalyzerResultLocalHandlerValidatorTests
             [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: ParseOptions);
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out _, out _);
-        return driver.GetRunResult();
+        return PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult());
     }
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()

@@ -31,7 +31,7 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
             "RemoteSubscriptionPipeline<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent, " +
             "global::ChainSample.Plugin.BetaPluginContext>",
             StringComparison.Ordinal));
-        Assert.Contains(generatedSources, source => source.Contains("UseGeneratedResultChain", StringComparison.Ordinal));
+        Assert.Contains(generatedSources, source => source.Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -136,12 +136,16 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
     public void Generated_plugin_server_registries_emit_marker_metadata()
     {
         var result = RunGenerator(GeneratedServerSource);
-        var generated = string.Join("\n", GeneratedSources(result));
+        var generatedSources = GeneratedSources(result);
+        var generated = string.Join("\n", generatedSources);
 
         Assert.Contains("GeneratedPluginServerRegistryKind.Hook", generated, StringComparison.Ordinal);
         Assert.Contains("GeneratedPluginServerRegistryKind.Subscription", generated, StringComparison.Ordinal);
         Assert.Contains("typeof(global::ChainSample.Plugin.AlphaPluginServer)", generated, StringComparison.Ordinal);
         Assert.Contains("typeof(global::ChainSample.Plugin.AlphaPluginContext)", generated, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            generatedSources.Where(static source => source.Contains("GeneratedPluginServerRegistry", StringComparison.Ordinal)),
+            static source => source.Contains("PipelineStep", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -233,7 +237,7 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
 
         Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
         Assert.Empty(output.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
-        return driver.GetRunResult();
+        return PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult());
     }
 
     private static CSharpCompilation CreateCompilation(

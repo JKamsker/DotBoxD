@@ -60,7 +60,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
             parseOptions: parseOptions);
         return string.Join(
             "\n",
-            driver.RunGenerators(compilation).GetRunResult().GeneratedTrees.Select(tree => tree.ToString()));
+            PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.RunGenerators(compilation).GetRunResult()).GeneratedTrees.Select(tree => tree.ToString()));
     }
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()

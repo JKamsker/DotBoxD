@@ -44,6 +44,12 @@ internal static class LoweringDiagnosticCatalog
             "NotSupportedException is caught by the accumulator factory and reported as PluginKernelDiagnostic.",
             "registration accumulator target/root declarations and generated member names"),
         new(
+            "mergeable IR [LowerToIr] step",
+            "MergeableIrStepModelFactory",
+            PluginAnalyzerDiagnostics.UnsupportedKernelShapeRule,
+            "NotSupportedException is caught by the mergeable-IR step factory and reported as PluginKernelDiagnostic.",
+            "[LowerToIr] delegate shape, step overload, interceptable call site, and lowered fragment expression"),
+        new(
             "remote RunLocal hook chain",
             "HookChainModelFactory",
             PluginAnalyzerDiagnostics.RunLocalNotLoweredRule,

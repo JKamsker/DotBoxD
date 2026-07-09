@@ -189,15 +189,16 @@ public sealed partial class RemotePluginServerBuilderTests
     }
 
     [Fact]
-    public void InvokeAsync_stub_throws_when_call_site_is_not_intercepted()
+    public async Task InvokeAsync_stub_throws_when_call_site_is_not_intercepted()
     {
         var control = new RecordingGamePluginControlService();
         using var server = new GamePluginServer(control, new FakeWorld());
 
-        var ex = Assert.Throws<InvalidOperationException>(
-            () => server.InvokeAsync(async world => await world.Entities.Get("monster-1").GetHealthAsync()));
+        var ex = await Assert.ThrowsAsync<ArgumentNullException>(
+            async () => await server.InvokeAsync(
+                async world => await world.Entities.Get("monster-1").GetHealthAsync()));
 
-        Assert.Contains("must be intercepted", ex.Message, StringComparison.Ordinal);
+        Assert.Equal("irInvocation", ex.ParamName);
     }
 
     [Fact]

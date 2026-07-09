@@ -87,7 +87,7 @@ public string RuntimeFacadeHash
 public string RuntimeFacadeHash { get; init; }
 public string TargetFramework { get; init; }
 public string TypeSystemVersion { get; init; }
-public string VerifierVersion { get; init; }
 public string VerifierVersion { get => _verifierVersion; init => _verifierVersion = RequireVersion(value, nameof(VerifierVersion)); }
+public string VerifierVersion { get; init; }
 public ValueTask<VerificationResult> VerifyAsync( ReadOnlyMemory<byte> assemblyBytes, ArtifactManifest manifest, VerificationPolicy policy, CancellationToken cancellationToken)
 public VerificationPolicy WithExpectedManifest(VerificationManifestIdentity identity)

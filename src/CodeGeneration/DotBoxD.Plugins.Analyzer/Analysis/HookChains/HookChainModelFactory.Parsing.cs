@@ -6,24 +6,29 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
 internal static partial class HookChainModelFactory
 {
-    private static readonly string[] RemoteReceiverOriginals =
-    [
-        DotBoxDGenerationNames.TypeNames.RemoteHookPipelineOriginal,
-        DotBoxDGenerationNames.TypeNames.RemoteHookPipelineWithContextOriginal,
-        DotBoxDGenerationNames.TypeNames.RemoteHookStageOriginal,
-        DotBoxDGenerationNames.TypeNames.RemoteHookStageWithContextOriginal,
-        DotBoxDGenerationNames.TypeNames.RemoteSubscriptionPipelineOriginal,
-        DotBoxDGenerationNames.TypeNames.RemoteSubscriptionPipelineWithContextOriginal,
-        DotBoxDGenerationNames.TypeNames.RemoteSubscriptionStageOriginal,
-        DotBoxDGenerationNames.TypeNames.RemoteSubscriptionStageWithContextOriginal
-    ];
-    private static readonly string[] LocalReceiverOriginals =
-    [
-        DotBoxDGenerationNames.TypeNames.HookPipelineWithContextOriginal,
-        DotBoxDGenerationNames.TypeNames.HookStageWithContextOriginal,
-        DotBoxDGenerationNames.TypeNames.SubscriptionPipelineWithContextOriginal,
-        DotBoxDGenerationNames.TypeNames.SubscriptionStageWithContextOriginal
-    ];
+    // Resolves the pipeline role of a resolved method from a [PipelineSurface] receiver and explicit
+    // delegate+IR method shape. Public per-method role markers no longer exist.
+    private static PipelineCallRole? RoleOf(IMethodSymbol? method, Compilation compilation)
+        => PipelineRoleReader.RoleOf(method, compilation);
+
+    private static PipelineCallRole? RoleOf(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        var info = model.GetSymbolInfo(invocation, cancellationToken);
+        var symbol = info.Symbol ?? (info.CandidateSymbols.Length > 0 ? info.CandidateSymbols[0] : null);
+        if (RoleOf(symbol as IMethodSymbol, model.Compilation) is { } role)
+        {
+            return role;
+        }
+
+        return GeneratedRemoteHookChainFallback.RoleOfUnresolvedGeneratedSurface(
+            invocation,
+            model,
+            cancellationToken,
+            symbol as IMethodSymbol);
+    }
 
     private static InvocationExpressionSyntax? WalkToSeed(
         ExpressionSyntax receiver,
@@ -87,14 +92,14 @@ internal static partial class HookChainModelFactory
             return false;
         }
 
-        var name = access.Name.Identifier.ValueText;
-        if (string.Equals(name, OnMethod, StringComparison.Ordinal))
+        var role = RoleOf(invocation, model, cancellationToken);
+        if (role == PipelineCallRole.Seed)
         {
             seed = invocation;
             return true;
         }
 
-        if (!TryStageKind(name, out var isSelect))
+        if (role is not (PipelineCallRole.Filter or PipelineCallRole.Projection))
         {
             return false;
         }
@@ -109,20 +114,9 @@ internal static partial class HookChainModelFactory
             return false;
         }
 
-        stages.Add(new HookChainStage(isSelect, lambda));
+        stages.Add(new HookChainStage(role == PipelineCallRole.Projection, invocation, lambda));
         next = HookChainAliasResolver.UnwrapTransparentExpression(access.Expression);
         return true;
-    }
-
-    private static bool TryStageKind(string name, out bool isSelect)
-    {
-        isSelect = string.Equals(name, SelectMethod, StringComparison.Ordinal);
-        if (isSelect)
-        {
-            return true;
-        }
-
-        return string.Equals(name, WhereMethod, StringComparison.Ordinal);
     }
 
     private static bool IsResolvedNonDotBoxDStageMethodInvocation(
@@ -130,7 +124,7 @@ internal static partial class HookChainModelFactory
         SemanticModel model,
         CancellationToken cancellationToken)
         => model.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol method &&
-           (method.ContainingType is null || ReceiverKind(method.ContainingType) is null);
+           (method.ContainingType is null || ReceiverKind(method.ContainingType, model.Compilation) is null);
 
     internal static HookChainReceiverKind? ReceiverKind(
         SemanticModel model,
@@ -142,53 +136,28 @@ internal static partial class HookChainModelFactory
             return null;
         }
 
-        return ReceiverKind(type);
+        return ReceiverKind(type, model.Compilation);
     }
 
-    internal static HookChainReceiverKind? ReceiverKind(INamedTypeSymbol type)
+    internal static HookChainReceiverKind? ReceiverKind(INamedTypeSymbol type, Compilation compilation)
+        => PipelineRoleReader.Transport(type, compilation);
+
+    // Accepts both lambda forms a fluent stage can take: a parenthesized lambda (e), (e, ctx) or (),
+    // and the simple form e => .... A stage may also spell its optional IRFunc companion argument explicitly;
+    // the lambda's arity is resolved later by LambdaParameters.
+    private static bool TryLambda(InvocationExpressionSyntax invocation, out LambdaExpressionSyntax lambda)
     {
-        var original = type.OriginalDefinition.ToDisplayString();
-        if (ContainsOriginal(RemoteReceiverOriginals, original))
+        lambda = null!;
+        foreach (var argument in invocation.ArgumentList.Arguments)
         {
-            return HookChainReceiverKind.Remote;
-        }
-
-        if (ContainsOriginal(LocalReceiverOriginals, original))
-        {
-            return HookChainReceiverKind.Local;
-        }
-
-        return null;
-    }
-
-    private static bool ContainsOriginal(string[] candidates, string original)
-    {
-        foreach (var candidate in candidates)
-        {
-            if (string.Equals(candidate, original, StringComparison.Ordinal))
+            if (argument.Expression is LambdaExpressionSyntax lambdaExpression)
             {
+                lambda = lambdaExpression;
                 return true;
             }
         }
 
         return false;
-    }
-
-    // Accepts both lambda forms a fluent stage can take: a parenthesized lambda (e), (e, ctx) or (),
-    // and the simple form e => .... Arity is resolved later by LambdaParameters, so every stage
-    // independently chooses element-only or element+context regardless of what neighbouring stages used.
-    private static bool TryLambda(InvocationExpressionSyntax invocation, out LambdaExpressionSyntax lambda)
-    {
-        lambda = null!;
-        var arguments = invocation.ArgumentList.Arguments;
-        if (arguments.Count != 1 ||
-            arguments[0].Expression is not LambdaExpressionSyntax lambdaExpression)
-        {
-            return false;
-        }
-
-        lambda = lambdaExpression;
-        return true;
     }
 
     // The handler lambda of a result terminal - Register(lambda, priority) / RegisterLocal(lambda, priority) -

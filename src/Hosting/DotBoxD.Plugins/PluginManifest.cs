@@ -161,3 +161,34 @@ public sealed record PluginPackage(
                 PluginManifestNames.Entrypoints.ShouldHandle,
                 PluginManifestNames.Entrypoints.Handle)));
 }
+
+/// <summary>
+/// Public carrier for a generated hook or subscription kernel package supplied by the source generator to a
+/// fluent terminal such as <c>Run</c>, <c>RunLocal</c>, <c>Register</c>, or <c>RegisterLocal</c>.
+/// </summary>
+public sealed class IRKernel
+{
+    private IRKernel(PluginPackage package, Delegate? projectedPayloadDecoder)
+    {
+        Package = package ?? throw new ArgumentNullException(nameof(package));
+        ProjectedPayloadDecoder = projectedPayloadDecoder;
+    }
+
+    public PluginPackage Package { get; }
+
+    public Delegate? ProjectedPayloadDecoder { get; }
+
+    public static IRKernel FromPackage(PluginPackage package) => new(package, projectedPayloadDecoder: null);
+
+    public static IRKernel FromPackage<TProjected>(
+        PluginPackage package,
+        Func<ReadOnlyMemory<byte>, TProjected> projectedPayloadDecoder)
+        => new(package, projectedPayloadDecoder ?? throw new ArgumentNullException(nameof(projectedPayloadDecoder)));
+
+    public bool TryGetProjectedPayloadDecoder<TProjected>(
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Func<ReadOnlyMemory<byte>, TProjected>? decoder)
+    {
+        decoder = ProjectedPayloadDecoder as Func<ReadOnlyMemory<byte>, TProjected>;
+        return decoder is not null;
+    }
+}

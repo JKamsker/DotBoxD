@@ -99,6 +99,7 @@ internal static partial class PluginServerFacadeModelFactory
             TypeName(controlServiceType),
             TypeName(liveSettingUpdateType),
             compilation.GetTypeByMetadataName("DotBoxD.Pushdown.Services.RpcMessagePackIpc") is not null,
+            UserDefinesPublicInvokeAsync(type),
             new EquatableArray<PluginServerForwardedProperty>(worldProperties),
             new EquatableArray<PluginServerForwardedMethod>(worldMethods),
             new EquatableArray<PluginServerServiceWrapper>(worldServiceWrapperModels),

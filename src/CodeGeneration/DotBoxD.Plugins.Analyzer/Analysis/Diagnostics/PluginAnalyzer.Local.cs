@@ -1,3 +1,4 @@
+using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -132,34 +133,41 @@ public sealed partial class PluginAnalyzer
             return false;
         }
 
-        if (!IsForbiddenHookChainMethod(member.Name.Identifier.ValueText))
-        {
-            return false;
-        }
-
-        return IsHookChainReceiver(member.Expression, model, cancellationToken);
+        return IsLoweredPipelineStep(invocation, member.Expression, model, cancellationToken);
     }
-
-    private static bool IsForbiddenHookChainMethod(string name)
-        => name is "Where" or "Select" or "Run" or "Register";
 
     private static bool IsHookChainReceiver(
         ExpressionSyntax receiver,
         SemanticModel model,
         CancellationToken cancellationToken)
         => model.GetTypeInfo(receiver, cancellationToken).Type is INamedTypeSymbol receiverType &&
-           IsHookChainType(receiverType);
+           PipelineRoleReader.Transport(receiverType, model.Compilation) is not null;
 
-    private static bool IsHookChainType(INamedTypeSymbol type)
-        => type.ContainingNamespace.ToDisplayString() switch
+    private static bool IsLoweredPipelineStep(
+        InvocationExpressionSyntax invocation,
+        ExpressionSyntax receiver,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        var info = model.GetSymbolInfo(invocation, cancellationToken);
+        var method = info.Symbol as IMethodSymbol ??
+            (info.CandidateSymbols.Length > 0 ? info.CandidateSymbols[0] as IMethodSymbol : null);
+        if (IsForbiddenLocalUseRole(PipelineRoleReader.RoleOf(method, model.Compilation)))
         {
-            "DotBoxD.Plugins.Runtime" => type.Name is
-                "HookPipeline" or
-                "SubscriptionPipeline" or
-                "RemoteHookPipeline" or
-                "RemoteSubscriptionPipeline",
-            "DotBoxD.Plugins.Runtime.Hooks" => type.Name is "HookStage" or "RemoteHookStage",
-            "DotBoxD.Plugins.Runtime.Subscriptions" => type.Name is "SubscriptionStage" or "RemoteSubscriptionStage",
-            _ => false,
-        };
+            return IsHookChainReceiver(receiver, model, cancellationToken);
+        }
+
+        return IsForbiddenLocalUseRole(GeneratedRemoteHookChainFallback.RoleOfUnresolvedGeneratedSurface(
+            invocation,
+            model,
+            cancellationToken,
+            method));
+    }
+
+    private static bool IsForbiddenLocalUseRole(PipelineCallRole? role)
+        => role is
+            PipelineCallRole.Filter or
+            PipelineCallRole.Projection or
+            PipelineCallRole.Run or
+            PipelineCallRole.Register;
 }

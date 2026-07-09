@@ -83,7 +83,8 @@ internal static partial class HookChainModelFactory
             return false;
         }
 
-        if (!IsStageMethodName(access.Name.Identifier.ValueText))
+        if (RoleOf(invocation, model, cancellationToken) is not
+            (PipelineCallRole.Filter or PipelineCallRole.Projection))
         {
             return false;
         }
@@ -95,9 +96,6 @@ internal static partial class HookChainModelFactory
 
         return ExpressionReferencesLocal(access.Expression, receiverLocal, model, cancellationToken, depth: 0);
     }
-
-    private static bool IsStageMethodName(string name)
-        => name is WhereMethod or SelectMethod;
 
     private static bool StageMutatesReceiver(
         InvocationExpressionSyntax invocation,
@@ -121,7 +119,7 @@ internal static partial class HookChainModelFactory
         SemanticModel model,
         CancellationToken cancellationToken)
         => model.GetTypeInfo(invocation, cancellationToken).Type is INamedTypeSymbol type &&
-           ReceiverKind(type) is not null;
+           ReceiverKind(type, model.Compilation) is not null;
 
     private static bool IsAssignedBackToReceiver(
         InvocationExpressionSyntax invocation,

@@ -74,8 +74,8 @@ public sealed class PluginAnalyzerIncrementalityTests
             driverOptions: options);
 
         driver = driver.RunGenerators(compilation);
-        var first = driver.GetRunResult();
-        var second = driver.RunGenerators(compilation.Clone()).GetRunResult();
+        var first = PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult());
+        var second = PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.RunGenerators(compilation.Clone()).GetRunResult());
         return (first, second);
     }
 

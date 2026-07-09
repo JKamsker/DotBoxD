@@ -183,7 +183,7 @@ public sealed class PluginServerRemoteLocalProvideShapeTests
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var diagnostics);
 
         Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-        return (driver.GetRunResult(), outputCompilation);
+        return (PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()), outputCompilation);
     }
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()

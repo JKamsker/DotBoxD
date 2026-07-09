@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "GameServer + Plugin Debug",
+    "Projects": [
+      {
+        "Path": "samples\\GameServer\\Examples.GameServer.Server\\Examples.GameServer.Server.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "samples\\GameServer\\Examples.GameServer.Plugin\\Examples.GameServer.Plugin.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

@@ -1,34 +1,43 @@
 namespace DotBoxD.Plugins.Runtime.Subscriptions;
 
+[PipelineSurface(PipelineTransport.Remote)]
 public sealed class RemoteSubscriptionStage<TEvent, TCurrent>
 {
     private readonly RemoteSubscriptionPipeline<TEvent> _root;
 
     internal RemoteSubscriptionStage(RemoteSubscriptionPipeline<TEvent> root)
         => _root = root;
-
-    public RemoteSubscriptionStage<TEvent, TCurrent> Where(Func<TCurrent, HookContext, bool> filter)
+    public RemoteSubscriptionStage<TEvent, TCurrent> Where(
+        Func<TCurrent, HookContext, bool> filter,
+        [IRBodyOf(nameof(filter))] IRFunc<TCurrent, HookContext, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
-        return this;
+        return new RemoteSubscriptionStage<TEvent, TCurrent>(
+            _root.AppendStep(irFilter, nameof(irFilter)));
     }
-
-    public RemoteSubscriptionStage<TEvent, TCurrent> Where(Func<TCurrent, bool> filter)
+    public RemoteSubscriptionStage<TEvent, TCurrent> Where(
+        Func<TCurrent, bool> filter,
+        [IRBodyOf(nameof(filter))] IRFunc<TCurrent, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
-        return this;
+        return new RemoteSubscriptionStage<TEvent, TCurrent>(
+            _root.AppendStep(irFilter, nameof(irFilter)));
     }
-
-    public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>(Func<TCurrent, HookContext, TNext> projection)
+    public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>(
+        Func<TCurrent, HookContext, TNext> projection,
+        [IRBodyOf(nameof(projection))] IRFunc<TCurrent, HookContext, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
-        return new RemoteSubscriptionStage<TEvent, TNext>(_root);
+        return new RemoteSubscriptionStage<TEvent, TNext>(
+            _root.AppendStep(irProjection, nameof(irProjection)));
     }
-
-    public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>(Func<TCurrent, TNext> projection)
+    public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>(
+        Func<TCurrent, TNext> projection,
+        [IRBodyOf(nameof(projection))] IRFunc<TCurrent, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
-        return new RemoteSubscriptionStage<TEvent, TNext>(_root);
+        return new RemoteSubscriptionStage<TEvent, TNext>(
+            _root.AppendStep(irProjection, nameof(irProjection)));
     }
 
     public RemoteSubscriptionPipeline<TEvent> UseGeneratedChain(PluginPackage package)
@@ -139,34 +148,93 @@ public sealed class RemoteSubscriptionStage<TEvent, TCurrent>
             return ValueTask.CompletedTask;
         }, decoder);
     }
+    public RemoteSubscriptionPipeline<TEvent> Run(
+        Func<TCurrent, HookContext, ValueTask> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedChain(Hooks.HookLowering.RequiredPackage(irHandler, nameof(irHandler)));
+    }
 
-    public RemoteSubscriptionPipeline<TEvent> Run(Func<TCurrent, HookContext, ValueTask> handler)
-        => throw NotLowered();
+    public RemoteSubscriptionPipeline<TEvent> Run(
+        Action<TCurrent, HookContext> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return Run((value, ctx) =>
+        {
+            handler(value, ctx);
+            return ValueTask.CompletedTask;
+        }, irHandler);
+    }
 
-    public RemoteSubscriptionPipeline<TEvent> Run(Action<TCurrent, HookContext> handler)
-        => throw NotLowered();
+    public RemoteSubscriptionPipeline<TEvent> Run(
+        Func<TCurrent, ValueTask> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return Run((value, _) => handler(value), irHandler);
+    }
 
-    public RemoteSubscriptionPipeline<TEvent> Run(Func<TCurrent, ValueTask> handler)
-        => throw NotLowered();
+    public RemoteSubscriptionPipeline<TEvent> Run(
+        Action<TCurrent> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return Run((value, _) =>
+        {
+            handler(value);
+            return ValueTask.CompletedTask;
+        }, irHandler);
+    }
 
-    public RemoteSubscriptionPipeline<TEvent> Run(Action<TCurrent> handler)
-        => throw NotLowered();
+    public RemoteSubscriptionPipeline<TEvent> RunLocal(
+        Func<TCurrent, HookContext, ValueTask> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        var kernel = RequiredKernel(irHandler);
+        var package = _root.LocalTerminalPackage(kernel);
+        return kernel.TryGetProjectedPayloadDecoder<TCurrent>(out var decoder)
+            ? _root.InstallLocal(package, handler, decoder)
+            : _root.InstallLocal(package, handler);
+    }
 
-    public RemoteSubscriptionPipeline<TEvent> RunLocal(Func<TCurrent, HookContext, ValueTask> handler)
-        => throw LocalHandlersNotSupported();
+    public RemoteSubscriptionPipeline<TEvent> RunLocal(
+        Action<TCurrent, HookContext> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return RunLocal((value, ctx) =>
+        {
+            handler(value, ctx);
+            return ValueTask.CompletedTask;
+        }, irHandler);
+    }
 
-    public RemoteSubscriptionPipeline<TEvent> RunLocal(Action<TCurrent, HookContext> handler)
-        => throw LocalHandlersNotSupported();
+    public RemoteSubscriptionPipeline<TEvent> RunLocal(
+        Func<TCurrent, ValueTask> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return RunLocal((value, _) => handler(value), irHandler);
+    }
 
-    public RemoteSubscriptionPipeline<TEvent> RunLocal(Func<TCurrent, ValueTask> handler)
-        => throw LocalHandlersNotSupported();
+    public RemoteSubscriptionPipeline<TEvent> RunLocal(
+        Action<TCurrent> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return RunLocal((value, _) =>
+        {
+            handler(value);
+            return ValueTask.CompletedTask;
+        }, irHandler);
+    }
 
-    public RemoteSubscriptionPipeline<TEvent> RunLocal(Action<TCurrent> handler)
-        => throw LocalHandlersNotSupported();
-
-    private static InvalidOperationException NotLowered()
-        => new("Remote subscription Run(lambda) calls must be intercepted by the DotBoxD plugin generator.");
-
-    private static NotSupportedException LocalHandlersNotSupported()
-        => new("Remote subscription RunLocal requires an event callback transport; use PluginServer.Subscriptions for local handlers.");
+    private static IRKernel RequiredKernel(IRKernel? irHandler)
+    {
+        ArgumentNullException.ThrowIfNull(irHandler);
+        return irHandler;
+    }
 }
