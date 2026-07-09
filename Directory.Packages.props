@@ -42,6 +42,7 @@
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="CsCheck" Version="4.7.0" />
+    <PackageVersion Include="SharpFuzz" Version="2.3.0" />
 
     <!-- Source-generator snapshot/verification stack -->
     <PackageVersion Include="Verify.Xunit" Version="26.6.0" />
