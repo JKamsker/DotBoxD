@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
-using DotBoxD.Services.Protocol;
 
 namespace DotBoxD.Services.Diagnostics;
 
@@ -28,8 +27,8 @@ public static class RpcTelemetry
         "dotboxd.rpc.peers.active",
         description: "Currently active RPC peers.");
 
-    internal static RpcServerRequestScope StartServerRequest(RpcRequest request)
-        => new(request, s_serverDuration);
+    internal static RpcServerRequestScope StartServerRequest()
+        => new(s_serverDuration);
 
     internal static void ReportDiagnosticError(string operation, Exception error)
     {
@@ -56,19 +55,27 @@ internal sealed class RpcServerRequestScope : IDisposable
     private readonly Activity? _activity;
     private readonly Histogram<double> _duration;
     private readonly long _startedTimestamp = Stopwatch.GetTimestamp();
-    private readonly string _method;
-    private readonly string _service;
+    private string _method;
+    private string _service;
     private bool _failed;
 
-    public RpcServerRequestScope(RpcRequest request, Histogram<double> duration)
+    public RpcServerRequestScope(Histogram<double> duration)
     {
         _duration = duration;
-        _service = request.ServiceName ?? string.Empty;
-        _method = request.MethodName ?? string.Empty;
+        _service = "unknown";
+        _method = "unknown";
         _activity = RpcTelemetry.Activities.StartActivity("dotboxd.rpc.server", ActivityKind.Server);
         _activity?.SetTag("rpc.system", "dotboxd");
         _activity?.SetTag("rpc.service", _service);
         _activity?.SetTag("rpc.method", _method);
+    }
+
+    public void SetResolvedOperation(string service, string method)
+    {
+        _service = service;
+        _method = method;
+        _activity?.SetTag("rpc.service", service);
+        _activity?.SetTag("rpc.method", method);
     }
 
     public void MarkFailed(Exception error)
