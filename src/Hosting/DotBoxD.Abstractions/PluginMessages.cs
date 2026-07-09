@@ -1,20 +1,34 @@
+using DotBoxD.Kernels.Sandbox;
+
 namespace DotBoxD.Abstractions;
 
 public sealed record PluginMessage(string TargetId, string Message)
 {
-    private readonly string _targetId = TargetId ?? throw new ArgumentNullException("targetId");
+    private readonly string _targetId = ValidateTargetId(TargetId, "targetId");
     private readonly string _message = Message ?? throw new ArgumentNullException("message");
 
     public string TargetId
     {
         get => _targetId;
-        init => _targetId = value ?? throw new ArgumentNullException(nameof(value));
+        init => _targetId = ValidateTargetId(value, nameof(value));
     }
 
     public string Message
     {
         get => _message;
         init => _message = value ?? throw new ArgumentNullException(nameof(value));
+    }
+
+    private static string ValidateTargetId(string targetId, string paramName)
+    {
+        ArgumentNullException.ThrowIfNull(targetId, paramName);
+
+        if (!SandboxLiteralConstraints.IsOpaqueId(targetId))
+        {
+            throw new ArgumentException("Plugin message target ID must be a non-empty opaque ID.", paramName);
+        }
+
+        return targetId;
     }
 }
 
@@ -72,8 +86,8 @@ public sealed class InMemoryPluginMessageSink : IPluginMessageSink
 
     private void AddMessage(string targetId, string message)
     {
-        ArgumentNullException.ThrowIfNull(targetId);
         ArgumentNullException.ThrowIfNull(message);
+        var pluginMessage = new PluginMessage(targetId, message);
 
         lock (_gate)
         {
@@ -82,7 +96,7 @@ public sealed class InMemoryPluginMessageSink : IPluginMessageSink
                 throw new InvalidOperationException("The plugin message sink has reached its configured capacity.");
             }
 
-            _messages.Add(new PluginMessage(targetId, message));
+            _messages.Add(pluginMessage);
         }
     }
 }
