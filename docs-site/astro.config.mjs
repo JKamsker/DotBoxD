@@ -66,6 +66,10 @@ export default defineConfig({
             { label: 'Overview', slug: 'examples' },
             { label: 'GameServer walkthrough', slug: 'examples/gameserver-walkthrough' },
             { label: 'Coverage gaps', slug: 'examples/coverage-gaps' },
+            {
+              label: 'Project templates',
+              link: 'https://github.com/JKamsker/DotBoxD/tree/main/templates',
+            },
           ],
         },
         {

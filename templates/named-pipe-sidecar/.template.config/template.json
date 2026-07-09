@@ -1,0 +1,10 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "DotBoxD",
+  "classifications": ["DotBoxD", "RPC", "Named Pipes"],
+  "identity": "DotBoxD.Templates.NamedPipeSidecar",
+  "name": "DotBoxD named-pipe sidecar",
+  "shortName": "dotboxd-sidecar",
+  "sourceName": "DotBoxDSidecarTemplate",
+  "preferNameDirectory": true
+}

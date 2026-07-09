@@ -1,0 +1,10 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "DotBoxD",
+  "classifications": ["DotBoxD", "RPC", "Testing"],
+  "identity": "DotBoxD.Templates.ServiceOnly",
+  "name": "DotBoxD service-only host/client",
+  "shortName": "dotboxd-service",
+  "sourceName": "DotBoxDServiceTemplate",
+  "preferNameDirectory": true
+}
