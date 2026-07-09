@@ -112,8 +112,17 @@ internal static class PluginManifestCapabilityValidator
         List<SandboxDiagnostic> diagnostics,
         bool includeModuleNonBindingCapabilities = true)
     {
+        PluginPackageValidator.ValidateRequiredCapabilities(manifest, diagnostics);
         var now = installPolicy.GrantClock;
-        var required = new HashSet<string>(manifest.RequiredCapabilities, StringComparer.Ordinal);
+        var required = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var capability in manifest.RequiredCapabilities)
+        {
+            if (capability is not null)
+            {
+                required.Add(capability);
+            }
+        }
+
         AddModuleNonBindingRequiredCapabilities(module, required, includeModuleNonBindingCapabilities);
         foreach (var capability in required)
         {
