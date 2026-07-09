@@ -69,6 +69,9 @@ internal static class EventNameMatch
         return IsQualified(normalizedLeft) != IsQualified(normalizedRight);
     }
 
+    public static bool HasTopLevelQualifier(string? name)
+        => !string.IsNullOrEmpty(name) && IsQualified(Normalize(name));
+
     private static string Normalize(string name)
     {
         const string globalPrefix = "global::";
@@ -110,50 +113,72 @@ internal static class EventNameMatch
         var arguments = new List<string>();
         for (var i = 0; i < inner.Length;)
         {
-            if (inner[i] != '[')
-            {
-                var end = TopLevelComma(inner, i);
-                arguments.Add(inner[i..end]);
-                i = end < inner.Length ? end + 1 : end;
-                continue;
-            }
-
-            var start = ++i;
-            var depth = 0;
-            while (i < inner.Length)
-            {
-                if (inner[i] == '[')
-                {
-                    depth++;
-                }
-                else if (inner[i] == ']')
-                {
-                    if (depth == 0)
-                    {
-                        break;
-                    }
-
-                    depth--;
-                }
-
-                i++;
-            }
-
-            if (i >= inner.Length)
+            if (!TryReadReflectionGenericArgument(inner, i, out var argument, out var next))
             {
                 return [];
             }
 
-            arguments.Add(inner[start..i]);
-            i++;
-            if (i < inner.Length && inner[i] == ',')
-            {
-                i++;
-            }
+            arguments.Add(argument);
+            i = next;
         }
 
         return arguments;
     }
+
+    private static bool TryReadReflectionGenericArgument(
+        string inner,
+        int start,
+        out string argument,
+        out int next)
+    {
+        if (inner[start] != '[')
+        {
+            var end = TopLevelComma(inner, start);
+            argument = inner[start..end];
+            next = NextArgumentIndex(inner, end);
+            return true;
+        }
+
+        return TryReadBracketedReflectionGenericArgument(inner, start, out argument, out next);
+    }
+
+    private static bool TryReadBracketedReflectionGenericArgument(
+        string inner,
+        int start,
+        out string argument,
+        out int next)
+    {
+        var current = start + 1;
+        var argumentStart = current;
+        var depth = 0;
+        while (current < inner.Length)
+        {
+            if (inner[current] == '[')
+            {
+                depth++;
+            }
+            else if (inner[current] == ']')
+            {
+                if (depth == 0)
+                {
+                    argument = inner[argumentStart..current];
+                    next = NextArgumentIndex(inner, current + 1);
+                    return true;
+                }
+
+                depth--;
+            }
+
+            current++;
+        }
+
+        argument = string.Empty;
+        next = inner.Length;
+        return false;
+    }
+
+    private static int NextArgumentIndex(string inner, int current)
+        => current < inner.Length && inner[current] == ',' ? current + 1 : current;
 
     private static string NormalizeReflectionArgument(string argument)
     {
