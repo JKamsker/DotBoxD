@@ -1,4 +1,4 @@
-namespace DotBoxD.Kernels.Tests.PluginAnalyzer.HostBinding;
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.HostBinding.Contract.Effects;
 
 public sealed class HostCapabilityEffectValidationContractTests
 {
