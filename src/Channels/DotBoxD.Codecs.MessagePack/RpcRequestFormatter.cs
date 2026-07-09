@@ -158,14 +158,22 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
             return null;
         }
 
-        var count = reader.ReadArrayHeader();
-        var streams = new RpcStreamHandle[count];
-        for (var i = 0; i < count; i++)
+        options.Security.DepthStep(ref reader);
+        try
         {
-            streams[i] = RpcStreamHandleFormatter.Instance.Deserialize(ref reader, options);
-        }
+            var count = reader.ReadArrayHeader();
+            var streams = new RpcStreamHandle[count];
+            for (var i = 0; i < count; i++)
+            {
+                streams[i] = RpcStreamHandleFormatter.Instance.Deserialize(ref reader, options);
+            }
 
-        return streams;
+            return streams;
+        }
+        finally
+        {
+            reader.Depth--;
+        }
     }
 
     private static void ThrowIfDuplicate(bool alreadySeen, string fieldName)
