@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using CsCheck;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
@@ -17,32 +18,32 @@ public sealed class FuzzBreadthTests
     [Fact]
     public void Json_importer_fuzz_rejects_malformed_expression_shapes_with_diagnostics()
     {
-        var random = new Random(0x51AFE001);
-
-        for (var i = 0; i < 60; i++)
+        Gen.Int.Sample(seed =>
         {
+            var random = new Random(seed);
+            var i = seed;
             var json = ModuleJson(i, InvalidExpression(random).ToJsonString(JsonOptions));
 
             var ex = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import(json));
 
             Assert.NotEmpty(ex.Diagnostics);
             Assert.All(ex.Diagnostics, d => Assert.StartsWith("E-JSON-", d.Code, StringComparison.Ordinal));
-        }
+        }, seed: "0N0XIzNsQ0O2", iter: 60, threads: 1);
     }
 
     [Fact]
     public void Canonical_hash_fuzz_is_stable_across_json_property_order()
     {
-        var random = new Random(0x51AFE002);
-
-        for (var i = 0; i < 40; i++)
+        Gen.Int.Sample(seed =>
         {
+            var random = new Random(seed);
+            var i = seed;
             var expression = ValidExpression(random, depth: 4).ToJsonString(JsonOptions);
             var first = JsonImporter.Import(ModuleJson(i, expression, shuffled: false));
             var second = JsonImporter.Import(ModuleJson(i, expression, shuffled: true));
 
             Assert.Equal(CanonicalModuleHasher.Hash(first), CanonicalModuleHasher.Hash(second));
-        }
+        }, seed: "0N0XIzNsQ0O2", iter: 40, threads: 1);
     }
 
     [Fact]
@@ -81,21 +82,18 @@ public sealed class FuzzBreadthTests
     }
 
     [Fact]
-    public async Task Verifier_fuzz_reports_diagnostics_for_malformed_bytes()
+    public void Verifier_fuzz_reports_diagnostics_for_malformed_bytes()
     {
-        var random = new Random(0x51AFE004);
         var verifier = new GeneratedAssemblyVerifier();
         var policy = VerificationPolicy.BoxedValueDefaults();
-
-        for (var i = 0; i < 30; i++)
+        Gen.Byte.Array[1, 255].Sample(bytes =>
         {
-            var bytes = new byte[random.Next(1, 256)];
-            random.NextBytes(bytes);
-            var result = await verifier.VerifyAsync(bytes, Manifest(bytes), policy, CancellationToken.None);
+            var result = verifier.VerifyAsync(bytes, Manifest(bytes), policy, CancellationToken.None)
+                .AsTask().GetAwaiter().GetResult();
 
             Assert.False(result.Succeeded);
             Assert.NotEmpty(result.Diagnostics);
-        }
+        }, seed: "0N0XIzNsQ0O2", iter: 30, threads: 1);
     }
 
     private static JsonObject InvalidExpression(Random random)
