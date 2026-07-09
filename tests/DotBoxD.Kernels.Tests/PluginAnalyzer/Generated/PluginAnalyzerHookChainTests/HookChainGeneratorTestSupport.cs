@@ -13,14 +13,20 @@ internal static class HookChainGeneratorTestSupport
     internal static GeneratorDriverRunResult RunGenerator(string source)
         => RunGeneratorCore(source).Result;
 
+    internal static GeneratorDriverRunResult RunGenerator(params SyntaxTree[] syntaxTrees)
+        => RunGeneratorCore(syntaxTrees).Result;
+
     internal static Compilation RunGeneratorCompilation(string source)
         => RunGeneratorCore(source).Output;
 
     internal static (Compilation Output, GeneratorDriverRunResult Result) RunGeneratorCore(string source)
+        => RunGeneratorCore([CSharpSyntaxTree.ParseText(source, ParseOptions)]);
+
+    private static (Compilation Output, GeneratorDriverRunResult Result) RunGeneratorCore(SyntaxTree[] syntaxTrees)
     {
         var compilation = CSharpCompilation.Create(
             "DotBoxDHookChainGeneratorTest",
-            [CSharpSyntaxTree.ParseText(source, ParseOptions)],
+            syntaxTrees,
             TrustedPlatformReferences()
                 .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))

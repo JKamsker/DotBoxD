@@ -56,6 +56,23 @@ internal static class RemoteStagedUseFlowAnalyzer
             }
         }
 
+        foreach (var returned in block.DescendantNodes(static node =>
+                node is not LambdaExpressionSyntax and not LocalFunctionStatementSyntax)
+            .OfType<ReturnStatementSyntax>())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (returned.SpanStart <= invocation.SpanStart || returned.Expression is null)
+            {
+                continue;
+            }
+
+            if (!HasMutationBeforeReturn(local, invocation, returned, model, cancellationToken) &&
+                ExpressionReferencesLocal(returned.Expression, local, model, cancellationToken, depth: 0))
+            {
+                return true;
+            }
+        }
+
         return false;
     }
 
@@ -132,6 +149,19 @@ internal static class RemoteStagedUseFlowAnalyzer
             local,
             invocation.SpanStart,
             terminal.SpanStart,
+            model,
+            cancellationToken);
+
+    private static bool HasMutationBeforeReturn(
+        ILocalSymbol local,
+        InvocationExpressionSyntax invocation,
+        ReturnStatementSyntax returned,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+        => HookChainAliasResolver.HasMutationBetween(
+            local,
+            invocation.SpanStart,
+            returned.SpanStart,
             model,
             cancellationToken);
 

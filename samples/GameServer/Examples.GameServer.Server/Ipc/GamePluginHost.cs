@@ -16,10 +16,11 @@ internal static class GamePluginHost
     public static Task<PluginConnectionHost<GamePluginControlService>> StartAsync(
         PluginServer server,
         GameCommandSink sink,
-        GameWorld world)
+        GameWorld world,
+        string? pipeName = null)
         => PluginConnectionHost<GamePluginControlService>.StartAsync(
             server,
-            "dotboxd-game-" + Guid.NewGuid().ToString("N"),
+            string.IsNullOrWhiteSpace(pipeName) ? "dotboxd-game-" + Guid.NewGuid().ToString("N") : pipeName,
             (peer, session) =>
             {
                 // Reverse-direction proxy: the plugin PROVIDES IPluginEventCallback, the server GETS it to push

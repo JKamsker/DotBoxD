@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using static DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.HookChainGeneratorTestSupport;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
@@ -296,5 +297,80 @@ public sealed class PluginAnalyzerHookChainRemoteStagedUseTests
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK114");
         Assert.Contains(result.GeneratedTrees, tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Generated_server_remote_staged_Use_from_cross_tree_helper_reports_DBXK100_without_DBXK117()
+    {
+        var helperTree = CSharpSyntaxTree.ParseText("""
+            using System.Threading;
+            using System.Threading.Tasks;
+            using DotBoxD.Abstractions;
+            using DotBoxD.Services.Attributes;
+
+            namespace Sample.Game
+            {
+                [RpcService]
+                public interface IGameWorld;
+            }
+
+            namespace Sample.Game.Ipc
+            {
+                public readonly record struct LiveSettingUpdate(string Name, string Value);
+
+                public interface IGamePluginControlService : DotBoxD.Plugins.IServerExtensionWireClient
+                {
+                    ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask<string> InstallSubscriptionAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask UpdateSettingsAsync(
+                        string pluginId,
+                        LiveSettingUpdate[] updates,
+                        bool atomic = false,
+                        CancellationToken ct = default);
+                    ValueTask HoldUntilShutdownAsync(CancellationToken ct = default);
+                }
+            }
+
+            namespace Sample.Plugin
+            {
+                [GeneratePluginServer(Context = typeof(RemotePluginContext))]
+                public partial class RemotePluginServer : Sample.Game.IGameWorld;
+
+                public sealed partial class RemotePluginContext;
+                public sealed record DamageEvent(string TargetId);
+                public sealed class DamageKernel;
+
+                public static class HookStages
+                {
+                    public static DotBoxD.Plugins.Runtime.Hooks.RemoteHookStage<DamageEvent, RemotePluginContext> Damage(RemotePluginServer server)
+                    {
+                        var staged = server.Hooks.On<DamageEvent>()
+                            .Where(e => e.TargetId == "monster-1");
+                        return staged;
+                    }
+                }
+            }
+            """, HookChainGeneratorTestSupport.ParseOptions);
+        var usageTree = CSharpSyntaxTree.ParseText("""
+            namespace Sample.Plugin
+            {
+                public sealed class Usage
+                {
+                    public RemotePluginServer Server { get; init; } = null!;
+
+                    public void Configure()
+                        => HookStages.Damage(Server).Use<DamageKernel>();
+                }
+            }
+            """, HookChainGeneratorTestSupport.ParseOptions);
+
+        var result = RunGenerator(helperTree, usageTree);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK117");
+        var diagnostic = Assert.Single(result.Diagnostics.Where(d => d.Id == "DBXK100"));
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Contains("Where/Select", diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains("Use", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 }
