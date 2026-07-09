@@ -63,6 +63,15 @@ public sealed class Fix_PAL_0027_Tests
     }
 
     [Fact]
+    public void SanitizeAndRedact_rejects_null_message()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => AuditTextSanitizer.SanitizeAndRedact(null!));
+
+        Assert.Equal("message", exception.ParamName);
+    }
+
+    [Fact]
     public void RedactPathSegments_returns_same_instance_for_clean_path()
     {
         var clean = new string("/v1/config/public/status".ToCharArray());
@@ -71,6 +80,15 @@ public sealed class Fix_PAL_0027_Tests
 
         Assert.Equal(clean, result);
         Assert.Same(clean, result);
+    }
+
+    [Fact]
+    public void RedactPathSegments_rejects_null_path()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => AuditTextSanitizer.RedactPathSegments(null!));
+
+        Assert.Equal("path", exception.ParamName);
     }
 
     [Fact]
