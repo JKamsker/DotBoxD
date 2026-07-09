@@ -22,8 +22,8 @@ public class PluginPackageGeneratorScaleBenchmarks
             "GeneratorScale",
             [CSharpSyntaxTree.ParseText(Source(KernelCount), parseOptions)],
             TrustedPlatformReferences()
-                .Append(MetadataReference.CreateFromFile(typeof(global::DotBoxD.Plugins.PluginAttribute).Assembly.Location))
-                .Append(MetadataReference.CreateFromFile(typeof(global::DotBoxD.Kernels.Model.SandboxModule).Assembly.Location)),
+                .Append(MetadataReference.CreateFromFile(typeof(global::DotBoxD.Abstractions.PluginAttribute).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(global::DotBoxD.Kernels.SandboxModule).Assembly.Location)),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         _driver = CSharpGeneratorDriver.Create(
             [new DotBoxD.Plugins.Analyzer.Analysis.PluginPackageGenerator().AsSourceGenerator()],
