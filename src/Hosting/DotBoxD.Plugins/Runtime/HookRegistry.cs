@@ -105,7 +105,8 @@ public sealed partial class HookRegistry
                 _kernels,
                 _installer,
                 _onFault,
-                NextResultOrder);
+                NextResultOrder,
+                _throwIfDisposed);
             _pipelines[key] = created;
             RegisterEventTypeLocked<TEvent>();
             return created;
@@ -134,7 +135,8 @@ public sealed partial class HookRegistry
                 _kernels,
                 _installer,
                 _onFault,
-                NextResultOrder);
+                NextResultOrder,
+                _throwIfDisposed);
             _pipelines[key] = created;
             RegisterEventTypeLocked<TEvent>();
             return created;
