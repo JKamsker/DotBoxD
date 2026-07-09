@@ -18,6 +18,8 @@ internal static class DispatcherSubServiceReturnGenerator
             GenerateAwaitedSubService(sb, call);
         }
 
+        GenerateCancellationCleanup(sb);
+
         if (info.AllowsNull)
         {
             sb.AppendLine("                    if (__sub is null)");
@@ -37,7 +39,17 @@ internal static class DispatcherSubServiceReturnGenerator
         GenerateSubServiceCleanup(sb);
         sb.AppendLine("                        throw;");
         sb.AppendLine("                    }");
+        GenerateRegisteredCancellationCleanup(sb, info.ServiceName);
         GenerateSubServiceHandleSerialization(sb, info.ServiceName);
+    }
+
+    private static void GenerateCancellationCleanup(StringBuilder sb)
+    {
+        sb.AppendLine("                    if (ct.IsCancellationRequested)");
+        sb.AppendLine("                    {");
+        GenerateSubServiceCleanup(sb);
+        sb.AppendLine("                        ct.ThrowIfCancellationRequested();");
+        sb.AppendLine("                    }");
     }
 
     private static void GenerateAwaitedSubService(StringBuilder sb, string call)
@@ -46,6 +58,23 @@ internal static class DispatcherSubServiceReturnGenerator
         sb.AppendLine("                    var __sub = __dotboxd_task.IsCompletedSuccessfully");
         sb.AppendLine("                        ? __dotboxd_task.Result");
         sb.AppendLine("                        : await __dotboxd_task;");
+    }
+
+    private static void GenerateRegisteredCancellationCleanup(StringBuilder sb, string serviceName)
+    {
+        sb.AppendLine("                    if (ct.IsCancellationRequested)");
+        sb.AppendLine("                    {");
+        sb.AppendLine("                        try");
+        sb.AppendLine("                        {");
+        sb.AppendLine($"                            await registry.{ServicesGeneratorMemberNames.InstanceRegistry.ReleaseAsync}(\"{serviceName}\", __subId).ConfigureAwait(false);");
+        sb.AppendLine("                        }");
+        sb.AppendLine("                        catch");
+        sb.AppendLine("                        {");
+        sb.AppendLine("                            // Best-effort release: a faulting release must not replace");
+        sb.AppendLine("                            // the cancellation that is about to be thrown.");
+        sb.AppendLine("                        }");
+        sb.AppendLine("                        ct.ThrowIfCancellationRequested();");
+        sb.AppendLine("                    }");
     }
 
     private static void GenerateSubServiceCleanup(StringBuilder sb)
