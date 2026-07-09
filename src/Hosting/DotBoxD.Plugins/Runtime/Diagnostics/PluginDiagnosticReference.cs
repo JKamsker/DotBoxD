@@ -69,8 +69,11 @@ public sealed record PluginDiagnosticReference(
         init => _remediation = ValidateRequired(value, nameof(Remediation));
     }
 
-    private static string ValidateRequired(string? value, string paramName) =>
-        value ?? throw new ArgumentNullException(paramName);
+    private static string ValidateRequired(string? value, string paramName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value, paramName);
+        return value;
+    }
 
     private static PluginDiagnosticPhase ValidatePhase(PluginDiagnosticPhase value) =>
         Enum.IsDefined(value)
