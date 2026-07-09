@@ -199,6 +199,7 @@ public sealed class ExecutionModeSelectionTests
         var summary = Assert.Single(result.AuditEvents, e => e.Kind == "RunSummary");
         Assert.Equal("Auto", summary.Fields!["mode"]);
         Assert.Equal("Auto", summary.Fields["executionMode"]);
+        Assert.Equal("False", summary.Fields["executionDispatched"]);
     }
 
     [Fact]
