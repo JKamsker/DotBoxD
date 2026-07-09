@@ -28,8 +28,8 @@ public sealed record ModuleHotnessStats(
     int CompileFailures,
     string? LastCompiledArtifactHash)
 {
-    private string _planHash = PlanHash ?? throw new ArgumentNullException(nameof(PlanHash));
-    private string _entrypoint = Entrypoint ?? throw new ArgumentNullException(nameof(Entrypoint));
+    private string _planHash = RequireNotNull(PlanHash, nameof(PlanHash));
+    private string _entrypoint = RequireNotNull(Entrypoint, nameof(Entrypoint));
     private int _runCount = RequireNonNegative(RunCount, nameof(RunCount));
     private int _completedRunCount = RequireNonNegative(CompletedRunCount, nameof(CompletedRunCount));
     private int _compileFailures = RequireNonNegative(CompileFailures, nameof(CompileFailures));
@@ -37,13 +37,13 @@ public sealed record ModuleHotnessStats(
     public string PlanHash
     {
         get => _planHash;
-        init => _planHash = value ?? throw new ArgumentNullException(nameof(PlanHash));
+        init => _planHash = RequireNotNull(value, nameof(PlanHash));
     }
 
     public string Entrypoint
     {
         get => _entrypoint;
-        init => _entrypoint = value ?? throw new ArgumentNullException(nameof(Entrypoint));
+        init => _entrypoint = RequireNotNull(value, nameof(Entrypoint));
     }
 
     public int RunCount
@@ -80,6 +80,9 @@ public sealed record ModuleHotnessStats(
 
     private static int RequireNonNegative(int value, string paramName)
         => value >= 0 ? value : throw new ArgumentOutOfRangeException(paramName);
+
+    private static string RequireNotNull(string? value, string paramName)
+        => value ?? throw new ArgumentNullException(paramName);
 }
 
 public sealed class HotnessExecutionModeSelector : IExecutionModeSelector
