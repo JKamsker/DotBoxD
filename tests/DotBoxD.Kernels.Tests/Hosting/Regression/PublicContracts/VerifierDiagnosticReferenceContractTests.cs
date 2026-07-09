@@ -1,6 +1,6 @@
 using DotBoxD.Kernels.Verifier.Diagnostics;
 
-namespace DotBoxD.Kernels.Tests.Hosting.Regression;
+namespace DotBoxD.Kernels.Tests.Hosting.Regression.PublicContracts;
 
 public sealed class VerifierDiagnosticReferenceContractTests
 {

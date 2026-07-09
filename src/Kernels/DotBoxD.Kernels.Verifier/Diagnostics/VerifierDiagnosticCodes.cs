@@ -60,7 +60,27 @@ public sealed record VerifierDiagnosticReference(
     string Meaning,
     string LikelyCause,
     string Remediation,
-    bool ExpectedFromCompilerOutput);
+    bool ExpectedFromCompilerOutput)
+{
+    private string _code = RequireText(Code, nameof(Code));
+    private string _meaning = RequireText(Meaning, nameof(Meaning));
+    private string _likelyCause = RequireText(LikelyCause, nameof(LikelyCause));
+    private string _remediation = RequireText(Remediation, nameof(Remediation));
+
+    public string Code { get => _code; init => _code = RequireText(value, nameof(Code)); }
+
+    public string Meaning { get => _meaning; init => _meaning = RequireText(value, nameof(Meaning)); }
+
+    public string LikelyCause { get => _likelyCause; init => _likelyCause = RequireText(value, nameof(LikelyCause)); }
+
+    public string Remediation { get => _remediation; init => _remediation = RequireText(value, nameof(Remediation)); }
+
+    private static string RequireText(string value, string paramName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value, paramName);
+        return value;
+    }
+}
 
 /// <summary>
 /// Public, maintained reference for the <c>V-*</c> diagnostic codes emitted by
