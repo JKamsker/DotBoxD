@@ -89,7 +89,7 @@ internal static class AsyncInterfaceGenerator
                 isLast: i == s.Parameters.Count - 1);
         }
 
-        ProxyGenerationHelpers.AppendAttributeLines(sb, s.Source.MemberAttributePrefix);
+        ProxyGenerationHelpers.AppendAttributes(sb, s.Source.MemberAttributePrefix);
         sb.AppendLine($"        {returnText} {s.Name}({paramList});");
     }
 }

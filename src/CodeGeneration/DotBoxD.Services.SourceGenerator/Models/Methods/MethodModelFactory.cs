@@ -93,7 +93,8 @@ internal static partial class MethodModelFactory
             ReturnKind: returnKind,
             DeclaredReturnType: declaredReturnType,
             UnwrappedReturnType: unwrappedReturnType,
-            MemberAttributePrefix: MemberAttributeFormatter.BuildPrefix(methodSymbol, ct),
+            MemberAttributePrefix: MemberAttributeFormatter.BuildPrefix(methodSymbol, ct) +
+                BuildMemberAttributePrefix(methodSymbol, ct),
             ReturnRefKindKeyword: ReturnRefKindKeyword(methodSymbol.RefKind),
             ReturnAttributePrefix: BuildReturnFlowAttributePrefix(methodSymbol, ct),
             HasCancellationToken: hasCancellationToken,
