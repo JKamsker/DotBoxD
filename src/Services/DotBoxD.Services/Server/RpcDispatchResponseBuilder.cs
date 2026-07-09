@@ -73,6 +73,8 @@ internal sealed class RpcDispatchResponseBuilder
         IServiceDispatcher? dispatcher,
         CancellationToken ct)
     {
+        using var telemetry = RpcTelemetry.StartServerRequest(request);
+
         // request.ServiceName is remote-supplied and can deserialize to null from a hostile/malformed
         // envelope (MessagePack nil). Guard before the dictionary lookup so that malformed input is
         // reported as ServiceNotFound instead of escaping as an internal lookup error.
@@ -101,12 +103,14 @@ internal sealed class RpcDispatchResponseBuilder
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
+            telemetry.MarkFailed(new OperationCanceledException("RPC dispatch was cancelled."));
             writer?.Dispose();
             await streaming.AbandonResponseAsync().ConfigureAwait(false);
             throw;
         }
         catch (ServiceProtocolException ex)
         {
+            telemetry.MarkFailed(ex);
             writer?.Dispose();
             await streaming.AbandonResponseAsync().ConfigureAwait(false);
             return new RpcDispatchResult(
@@ -115,6 +119,7 @@ internal sealed class RpcDispatchResponseBuilder
         }
         catch (Exception ex)
         {
+            telemetry.MarkFailed(ex);
             writer?.Dispose();
             await streaming.AbandonResponseAsync().ConfigureAwait(false);
             return new RpcDispatchResult(

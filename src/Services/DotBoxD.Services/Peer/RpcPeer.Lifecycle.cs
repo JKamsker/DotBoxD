@@ -38,6 +38,7 @@ public sealed partial class RpcPeer
             _cts = new CancellationTokenSource();
             _inbound.Start(_cts.Token);
             _readLoop = Task.Run(() => _readLoopRunner.RunAsync(_cts.Token));
+            RpcTelemetry.PeerStarted();
         }
     }
 
@@ -108,6 +109,10 @@ public sealed partial class RpcPeer
 
         _sender.Dispose();
         cts?.Dispose();
+        if (readLoop is not null)
+        {
+            RpcTelemetry.PeerStopped();
+        }
     }
 
     private void RaiseProtocolError(
