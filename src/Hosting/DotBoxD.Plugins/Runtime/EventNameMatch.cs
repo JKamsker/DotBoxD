@@ -66,9 +66,7 @@ internal static class EventNameMatch
             return false;
         }
 
-        var leftQualified = IsQualified(normalizedLeft);
-        var rightQualified = IsQualified(normalizedRight);
-        return leftQualified != rightQualified || IsClosedGenericName(leftSimpleName);
+        return IsQualified(normalizedLeft) != IsQualified(normalizedRight);
     }
 
     private static string Normalize(string name)
@@ -78,7 +76,7 @@ internal static class EventNameMatch
             ? name[globalPrefix.Length..]
             : name;
 
-        return NormalizeSystemTypeName(NormalizeReflectionGenericName(normalized));
+        return NormalizeSystemTypeName(NormalizeReflectionGenericName(normalized.Replace('+', '.')));
     }
 
     private static string NormalizeReflectionGenericName(string name)
@@ -201,8 +199,6 @@ internal static class EventNameMatch
     }
 
     private static bool IsQualified(string name) => TopLevelLastDot(name) >= 0;
-
-    private static bool IsClosedGenericName(string name) => name.Contains('<', StringComparison.Ordinal);
 
     private static string SimpleName(string name)
     {
