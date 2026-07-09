@@ -40,6 +40,11 @@ internal static class HookFireAsyncExtensionEmitter
         var classAccessibility = models.Any(static model => string.Equals(model.Accessibility, "public", StringComparison.Ordinal))
             ? "public"
             : "internal";
+        if (models.Any(static model => model.IsAssemblyClsCompliant))
+        {
+            builder.AppendLine("[global::System.CLSCompliant(false)]");
+        }
+
         builder.Append(classAccessibility).AppendLine(" static class HookRegistryFireAsyncExtensions");
         builder.AppendLine("{");
         foreach (var model in models)
