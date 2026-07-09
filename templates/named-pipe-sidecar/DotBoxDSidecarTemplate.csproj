@@ -4,6 +4,6 @@
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="DotBoxD.Pushdown.Services" Version="0.1.0" />
+    <PackageReference Include="DotBoxD.Pushdown.Services" Version="0.1.0-*" />
   </ItemGroup>
 </Project>

@@ -13,5 +13,5 @@ The templates intentionally stay small enough to act as debugging oracles:
 - `dotboxd-sidecar`: named-pipe sidecar host with an unguessable local pipe name.
 - `dotboxd-kernel-host`: hand-written public IR prepared and executed by `SandboxHost`.
 
-Package version `0.1.0` follows `Directory.Build.props`; update template package references whenever the
-repository version changes.
+Package version range `0.1.0-*` follows the current preview line in `Directory.Build.props`; update
+template package references whenever the repository version line changes.

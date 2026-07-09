@@ -4,6 +4,6 @@
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="DotBoxD.Hosting" Version="0.1.0" />
+    <PackageReference Include="DotBoxD.Hosting" Version="0.1.0-*" />
   </ItemGroup>
 </Project>
