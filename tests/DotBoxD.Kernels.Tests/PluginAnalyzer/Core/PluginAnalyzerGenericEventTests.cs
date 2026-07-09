@@ -1,4 +1,3 @@
-using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Tests._TestSupport;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
@@ -40,15 +39,14 @@ public sealed class PluginAnalyzerGenericEventTests
     }
 
     [Fact]
-    public void Hook_registry_rejects_ambiguous_generic_event_adapter_shapes()
+    public void Hook_registry_allows_distinct_closed_generic_event_adapter_shapes()
     {
         var server = PluginAddendumTestPolicies.CreateServer();
         _ = server.Hooks.On<GenericDamageEvent<int>>();
 
-        var ex = Assert.Throws<SandboxValidationException>(
-            () => server.Hooks.On<GenericDamageEvent<string>>());
+        var pipeline = server.Hooks.On<GenericDamageEvent<string>>();
 
-        Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK034");
+        Assert.NotNull(pipeline);
     }
 
     private sealed record GenericDamageEvent<T>(T Payload, string TargetId, string Message);

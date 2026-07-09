@@ -27,7 +27,7 @@ public sealed class PluginAnalyzerClosedGenericEventIdentitySurpriseTests
 
         var package = PluginAnalyzerGeneratedPackageFactory.Create(
             ClosedGenericEventKernelSource,
-            "Probe.GenericKernelPackage");
+            "Probe.GenericPluginPackage");
 
         Assert.DoesNotContain("Probe.GenericEvent`1", package.Manifest.Contract);
         Assert.DoesNotContain(

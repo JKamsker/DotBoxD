@@ -153,7 +153,9 @@ public sealed class PluginEventAdapterRegistry
                 return;
             }
 
-            if (!_hasTypeNameMatch && string.Equals(eventType.FullName, _eventName, StringComparison.Ordinal))
+            if (!_hasTypeNameMatch &&
+                eventType.FullName is { } fullName &&
+                EventNameMatch.Matches(fullName, _eventName))
             {
                 _typeNameMatch = registered;
                 _hasTypeNameMatch = true;

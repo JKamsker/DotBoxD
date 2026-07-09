@@ -18,9 +18,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 internal static class EventTypeName
 {
     public static string Qualified(INamedTypeSymbol eventType)
-        => eventType.ContainingNamespace.IsGlobalNamespace
-            ? eventType.MetadataName
-            : eventType.ContainingNamespace.ToDisplayString() + "." + eventType.MetadataName;
+        => TypeName(eventType);
 
     public static string HookOrQualified(INamedTypeSymbol eventType)
     {
@@ -56,4 +54,42 @@ internal static class EventTypeName
         hookName = declaredName;
         return true;
     }
+
+    private static string TypeName(ITypeSymbol type)
+        => type switch
+        {
+            IArrayTypeSymbol array => TypeName(array.ElementType) + "[]",
+            INamedTypeSymbol named => NamedTypeName(named),
+            _ => type.Name
+        };
+
+    private static string NamedTypeName(INamedTypeSymbol type)
+    {
+        var name = UnqualifiedName(type);
+        if (type.ContainingType is not null)
+        {
+            name = NamedTypeName(type.ContainingType) + "." + name;
+        }
+        else if (!type.ContainingNamespace.IsGlobalNamespace && !IsSystemNamespace(type.ContainingNamespace))
+        {
+            name = type.ContainingNamespace.ToDisplayString() + "." + name;
+        }
+
+        if (type.TypeArguments.Length == 0)
+        {
+            return name;
+        }
+
+        return name + "<" + string.Join(", ", type.TypeArguments.Select(TypeName)) + ">";
+    }
+
+    private static string UnqualifiedName(INamedTypeSymbol type)
+    {
+        var tick = type.MetadataName.IndexOf('`');
+        return tick < 0 ? type.MetadataName : type.MetadataName.Substring(0, tick);
+    }
+
+    private static bool IsSystemNamespace(INamespaceSymbol @namespace)
+        => string.Equals(@namespace.ToDisplayString(), "System", StringComparison.Ordinal) ||
+           @namespace.ToDisplayString().StartsWith("System.", StringComparison.Ordinal);
 }
