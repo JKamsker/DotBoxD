@@ -74,10 +74,15 @@ function Get-FailedTrxTests([string] $TrxPath) {
         return @()
     }
 
-    [xml] $trx = Get-Content -Raw -LiteralPath $TrxPath
-    return @($trx.SelectNodes("//*[local-name()='UnitTestResult']") | Where-Object {
-        [string] $_.outcome -eq "Failed"
-    } | ForEach-Object { [string] $_.testName } | Sort-Object -Unique)
+    try {
+        [xml] $trx = Get-Content -Raw -LiteralPath $TrxPath
+        return @($trx.SelectNodes("//*[local-name()='UnitTestResult']") | Where-Object {
+            [string] $_.outcome -eq "Failed"
+        } | ForEach-Object { [string] $_.testName } | Sort-Object -Unique)
+    } catch {
+        Write-Warning "Could not read failed test names from '$TrxPath': $($_.Exception.Message)"
+        return @()
+    }
 }
 
 $projectPaths = @($Projects | ForEach-Object { Resolve-ProjectPath $_ } | Where-Object {
