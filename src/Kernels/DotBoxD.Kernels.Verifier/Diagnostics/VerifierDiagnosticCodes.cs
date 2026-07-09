@@ -60,7 +60,26 @@ public sealed record VerifierDiagnosticReference(
     string Meaning,
     string LikelyCause,
     string Remediation,
-    bool ExpectedFromCompilerOutput);
+    bool ExpectedFromCompilerOutput)
+{
+    // Field-backed property initializers set the backing field directly; keep validation here
+    // and in the init accessors so construction and with-expression updates both reject blanks.
+    public string Code { get; init => field = RequireText(value, nameof(Code)); } = RequireText(Code, nameof(Code));
+
+    public string Meaning { get; init => field = RequireText(value, nameof(Meaning)); } = RequireText(Meaning, nameof(Meaning));
+
+    public string LikelyCause { get; init => field = RequireText(value, nameof(LikelyCause)); } =
+        RequireText(LikelyCause, nameof(LikelyCause));
+
+    public string Remediation { get; init => field = RequireText(value, nameof(Remediation)); } =
+        RequireText(Remediation, nameof(Remediation));
+
+    private static string RequireText(string value, string paramName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value, paramName);
+        return value;
+    }
+}
 
 /// <summary>
 /// Public, maintained reference for the <c>V-*</c> diagnostic codes emitted by
