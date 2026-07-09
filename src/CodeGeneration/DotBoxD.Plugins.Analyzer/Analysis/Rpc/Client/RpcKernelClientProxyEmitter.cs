@@ -161,6 +161,13 @@ internal static partial class RpcKernelClientProxyEmitter
                     .AppendLine(").ConfigureAwait(false);");
             }
 
+            if (RpcKernelClientParameters.TryGetCancellationToken(_serviceMethod, out cancellationToken))
+            {
+                builder.Append("        ")
+                    .Append(Identifier(cancellationToken.Name))
+                    .AppendLine(".ThrowIfCancellationRequested();");
+            }
+
             if (_payloadReturnType is null)
             {
                 builder.Append($"        {DotBoxDRpcValueNames.GlobalKernelRpcBinaryCodec}.DecodeValue(")
