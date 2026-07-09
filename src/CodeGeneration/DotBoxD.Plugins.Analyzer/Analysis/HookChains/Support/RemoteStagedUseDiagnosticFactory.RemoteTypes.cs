@@ -142,55 +142,92 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        expression = HookChainAliasResolver.UnwrapTransparentExpression(expression);
-        var expressionModel = SemanticModelFor(expression, model);
-        if (expressionModel is null)
-        {
-            return null;
-        }
-
-        if (HookChainAliasResolver.Initializer(expression, expressionModel, cancellationToken) is { } initializer)
-        {
-            return WalkToSeed(initializer, expressionModel, cancellationToken);
-        }
-
         var current = expression;
-        var currentModel = expressionModel;
+        var currentModel = model;
         while (true)
         {
-            current = HookChainAliasResolver.UnwrapTransparentExpression(current);
-            currentModel = SemanticModelFor(current, currentModel);
-            if (currentModel is null)
+            if (!TryResolveSeedExpression(current, currentModel, cancellationToken, out current, out currentModel))
             {
                 return null;
             }
 
-            if (HookChainAliasResolver.Initializer(current, currentModel, cancellationToken) is { } currentInitializer)
+            if (TrySeedInvocation(current, out var seed))
             {
-                current = currentInitializer;
-                continue;
+                return seed;
             }
 
-            if (current is not InvocationExpressionSyntax invocation ||
-                invocation.Expression is not MemberAccessExpressionSyntax access)
+            if (!TryStageReceiver(current, out current))
             {
                 return null;
             }
+        }
+    }
 
+    private static bool TryResolveSeedExpression(
+        ExpressionSyntax expression,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        out ExpressionSyntax resolved,
+        out SemanticModel resolvedModel)
+    {
+        resolved = HookChainAliasResolver.UnwrapTransparentExpression(expression);
+        var semanticModel = SemanticModelFor(resolved, model);
+        if (semanticModel is null)
+        {
+            resolvedModel = null!;
+            return false;
+        }
+
+        resolvedModel = semanticModel;
+        while (HookChainAliasResolver.Initializer(resolved, resolvedModel, cancellationToken) is { } initializer)
+        {
+            resolved = HookChainAliasResolver.UnwrapTransparentExpression(initializer);
+            semanticModel = SemanticModelFor(resolved, resolvedModel);
+            if (semanticModel is null)
+            {
+                resolvedModel = null!;
+                return false;
+            }
+
+            resolvedModel = semanticModel;
+        }
+
+        return true;
+    }
+
+    private static bool TrySeedInvocation(ExpressionSyntax expression, out InvocationExpressionSyntax invocation)
+    {
+        if (expression is InvocationExpressionSyntax
+            {
+                Expression: MemberAccessExpressionSyntax access
+            } candidate &&
+            string.Equals(access.Name.Identifier.ValueText, "On", StringComparison.Ordinal))
+        {
+            invocation = candidate;
+            return true;
+        }
+
+        invocation = null!;
+        return false;
+    }
+
+    private static bool TryStageReceiver(ExpressionSyntax expression, out ExpressionSyntax receiver)
+    {
+        if (expression is InvocationExpressionSyntax
+            {
+                Expression: MemberAccessExpressionSyntax access
+            })
+        {
             var name = access.Name.Identifier.ValueText;
-            if (string.Equals(name, "On", StringComparison.Ordinal))
-            {
-                return invocation;
-            }
-
             if (name is "Where" or "Select")
             {
-                current = access.Expression;
-                continue;
+                receiver = access.Expression;
+                return true;
             }
-
-            return null;
         }
+
+        receiver = null!;
+        return false;
     }
 
     private static SemanticModel? SemanticModelFor(SyntaxNode node, SemanticModel model)

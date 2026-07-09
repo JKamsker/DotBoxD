@@ -19,6 +19,64 @@ internal static class HookChainGeneratorTestSupport
     internal static Compilation RunGeneratorCompilation(string source)
         => RunGeneratorCore(source).Output;
 
+    internal static string RemotePluginServerUsageSource(string configureBody)
+        => RemotePluginServerSource($$"""
+            public sealed record DamageEvent(string TargetId);
+            public sealed class DamageKernel;
+
+            public sealed class Usage
+            {
+                public RemotePluginServer Server { get; init; } = null!;
+
+                public void Configure()
+                {
+                    {{configureBody}}
+                }
+            }
+            """);
+
+    internal static string RemotePluginServerSource(string pluginMembers)
+        => $$"""
+            using System.Threading;
+            using System.Threading.Tasks;
+            using DotBoxD.Abstractions;
+            using DotBoxD.Services.Attributes;
+
+            namespace Sample.Game
+            {
+                [RpcService]
+                public interface IGameWorld;
+            }
+
+            namespace Sample.Game.Ipc
+            {
+                public readonly record struct LiveSettingUpdate(string Name, string Value);
+
+                public interface IGamePluginControlService : DotBoxD.Plugins.IServerExtensionWireClient
+                {
+                    ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask<string> InstallSubscriptionAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask UpdateSettingsAsync(
+                        string pluginId,
+                        LiveSettingUpdate[] updates,
+                        bool atomic = false,
+                        CancellationToken ct = default);
+                    ValueTask HoldUntilShutdownAsync(CancellationToken ct = default);
+                }
+            }
+
+            namespace Sample.Plugin
+            {
+                [GeneratePluginServer(Context = typeof(RemotePluginContext))]
+                public partial class RemotePluginServer : Sample.Game.IGameWorld;
+
+                public sealed partial class RemotePluginContext;
+
+            {{pluginMembers}}
+            }
+            """;
+
     internal static (Compilation Output, GeneratorDriverRunResult Result) RunGeneratorCore(string source)
         => RunGeneratorCore([CSharpSyntaxTree.ParseText(source, ParseOptions)]);
 

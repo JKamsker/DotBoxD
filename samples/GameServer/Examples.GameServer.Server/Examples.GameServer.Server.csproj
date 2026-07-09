@@ -1,8 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <!-- Build the child process when the server is launched directly; runtime loading still happens by path. -->
-    <ProjectReference Include="..\Examples.GameServer.Plugin\Examples.GameServer.Plugin.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
     <ProjectReference Include="..\..\..\src\Hosting\DotBoxD.Plugins\DotBoxD.Plugins.csproj" />
     <ProjectReference Include="..\..\..\src\Hosting\DotBoxD.Queryable\DotBoxD.Queryable.csproj" />
     <ProjectReference Include="..\..\..\src\Kernels\DotBoxD.Kernels.Serialization.Json\DotBoxD.Kernels.Serialization.Json.csproj" />

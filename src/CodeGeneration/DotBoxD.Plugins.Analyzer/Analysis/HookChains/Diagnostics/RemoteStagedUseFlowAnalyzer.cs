@@ -30,6 +30,35 @@ internal static class RemoteStagedUseFlowAnalyzer
             return false;
         }
 
+        return LocalFlowsIntoSupportedTerminal(block, invocation, local, model, cancellationToken) ||
+            LocalFlowsIntoReturnedExpression(block, invocation, local, model, cancellationToken);
+    }
+
+    public static bool ContainsStageInvocation(ExpressionSyntax expression)
+    {
+        expression = HookChainAliasResolver.UnwrapTransparentExpression(expression);
+
+        if (expression is InvocationExpressionSyntax
+            {
+                Expression: MemberAccessExpressionSyntax stageAccess
+            })
+        {
+            var stageName = stageAccess.Name.Identifier.ValueText;
+            return stageName is "Where" or "Select" ||
+                ContainsStageInvocation(stageAccess.Expression);
+        }
+
+        return expression is MemberAccessExpressionSyntax access &&
+            ContainsStageInvocation(access.Expression);
+    }
+
+    private static bool LocalFlowsIntoSupportedTerminal(
+        BlockSyntax block,
+        InvocationExpressionSyntax invocation,
+        ILocalSymbol local,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
         foreach (var terminal in block.DescendantNodes(static node =>
                 node is not LambdaExpressionSyntax and not LocalFunctionStatementSyntax)
             .OfType<InvocationExpressionSyntax>())
@@ -56,6 +85,16 @@ internal static class RemoteStagedUseFlowAnalyzer
             }
         }
 
+        return false;
+    }
+
+    private static bool LocalFlowsIntoReturnedExpression(
+        BlockSyntax block,
+        InvocationExpressionSyntax invocation,
+        ILocalSymbol local,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
         foreach (var returned in block.DescendantNodes(static node =>
                 node is not LambdaExpressionSyntax and not LocalFunctionStatementSyntax)
             .OfType<ReturnStatementSyntax>())
@@ -74,24 +113,6 @@ internal static class RemoteStagedUseFlowAnalyzer
         }
 
         return false;
-    }
-
-    public static bool ContainsStageInvocation(ExpressionSyntax expression)
-    {
-        expression = HookChainAliasResolver.UnwrapTransparentExpression(expression);
-
-        if (expression is InvocationExpressionSyntax
-            {
-                Expression: MemberAccessExpressionSyntax stageAccess
-            })
-        {
-            var stageName = stageAccess.Name.Identifier.ValueText;
-            return stageName is "Where" or "Select" ||
-                ContainsStageInvocation(stageAccess.Expression);
-        }
-
-        return expression is MemberAccessExpressionSyntax access &&
-            ContainsStageInvocation(access.Expression);
     }
 
     private static bool IsPriorOrCurrentInvocation(
