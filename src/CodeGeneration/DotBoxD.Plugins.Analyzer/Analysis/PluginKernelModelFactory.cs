@@ -60,9 +60,9 @@ internal static class PluginKernelModelFactory
         string? pluginId,
         IReadOnlyList<INamedTypeSymbol> eventTypes)
     {
-        if (string.IsNullOrWhiteSpace(pluginId))
+        if (PluginIdValidation.ErrorMessage(pluginId) is { } pluginIdError)
         {
-            return Fail(declaration, "Plugin id must be a non-empty string.");
+            return Fail(declaration, pluginIdError);
         }
 
         if (type.IsGenericType || type.TypeParameters.Length > 0)
