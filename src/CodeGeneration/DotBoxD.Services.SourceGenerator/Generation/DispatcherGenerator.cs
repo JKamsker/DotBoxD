@@ -7,7 +7,10 @@ namespace DotBoxD.Services.SourceGenerator.Generation;
 
 internal static class DispatcherGenerator
 {
-    public static string Generate(ServiceModel service, CancellationToken ct = default)
+    public static string Generate(
+        ServiceModel service,
+        bool emitClsNonCompliantAttribute,
+        CancellationToken ct = default)
     {
         var sb = new StringBuilder();
         var dispatcherName = NamingHelpers.StripInterfacePrefix(service.InterfaceName) + "Dispatcher";
@@ -32,6 +35,11 @@ internal static class DispatcherGenerator
             ? $"{ServicesGeneratorTypeNames.GlobalServiceDispatcher}, {ServicesGeneratorTypeNames.GlobalNonStreamingServiceDispatcher}"
             : ServicesGeneratorTypeNames.GlobalServiceDispatcher;
         ObsoleteAttributeEmitter.AppendIfPresent(sb, service.ObsoleteAttribute, "    ");
+        if (emitClsNonCompliantAttribute)
+        {
+            sb.AppendLine("    [global::System.CLSCompliant(false)]");
+        }
+
         sb.AppendLine($"    public sealed class {dispatcherName} : {dispatcherInterfaces}");
         sb.AppendLine("    {");
         sb.AppendLine($"        private readonly {qualifiedInterface}? _service;");
