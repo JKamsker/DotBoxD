@@ -27,13 +27,23 @@ function Get-DocumentAnchorSet([string] $Path) {
     if ($anchorCache.ContainsKey($Path)) { return ,$anchorCache[$Path] }
     $anchors = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     $slugCounts = @{}
-    $inFence = $false
+    $fenceCharacter = $null
+    $fenceLength = 0
     foreach ($line in Get-Content -LiteralPath $Path) {
-        if ($line.TrimStart() -match '^(`{3,}|~{3,})') {
-            $inFence = -not $inFence
+        $trimmed = $line.TrimStart()
+        if ($null -ne $fenceCharacter) {
+            $closingPattern = '^' + [regex]::Escape([string] $fenceCharacter) + '{' + $fenceLength + ',}\s*$'
+            if ($trimmed -match $closingPattern) {
+                $fenceCharacter = $null
+                $fenceLength = 0
+            }
             continue
         }
-        if ($inFence) { continue }
+        if ($trimmed -match '^(?<fence>`{3,}|~{3,})') {
+            $fenceCharacter = $matches['fence'][0]
+            $fenceLength = $matches['fence'].Length
+            continue
+        }
 
         foreach ($match in [regex]::Matches($line, '(?:id|name)=["''](?<id>[^"'']+)["'']')) {
             [void] $anchors.Add($match.Groups['id'].Value)
@@ -56,14 +66,24 @@ function Get-DocumentAnchorSet([string] $Path) {
 $failures = [System.Collections.Generic.List[string]]::new()
 foreach ($document in $documents) {
     $lineNumber = 0
-    $inFence = $false
+    $fenceCharacter = $null
+    $fenceLength = 0
     foreach ($line in Get-Content -LiteralPath $document.FullName) {
         $lineNumber++
-        if ($line.TrimStart() -match '^(`{3,}|~{3,})') {
-            $inFence = -not $inFence
+        $trimmed = $line.TrimStart()
+        if ($null -ne $fenceCharacter) {
+            $closingPattern = '^' + [regex]::Escape([string] $fenceCharacter) + '{' + $fenceLength + ',}\s*$'
+            if ($trimmed -match $closingPattern) {
+                $fenceCharacter = $null
+                $fenceLength = 0
+            }
             continue
         }
-        if ($inFence) { continue }
+        if ($trimmed -match '^(?<fence>`{3,}|~{3,})') {
+            $fenceCharacter = $matches['fence'][0]
+            $fenceLength = $matches['fence'].Length
+            continue
+        }
 
         foreach ($match in [regex]::Matches($line, '!?(?<!\!)\[[^\]]*\]\((?<target>[^\s\)]+)')) {
             $target = [uri]::UnescapeDataString($match.Groups["target"].Value.Trim('<', '>'))
