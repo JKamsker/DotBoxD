@@ -53,6 +53,7 @@ internal sealed partial class RpcPeerOutboundInvoker
                         messageId,
                         ct.CanBeCanceled,
                         _timeout != Timeout.InfiniteTimeSpan,
+                        ct,
                         service,
                         method,
                         out var pending))
