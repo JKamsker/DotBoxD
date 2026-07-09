@@ -75,7 +75,11 @@ internal class PendingUnaryResponse<TResponse> :
             }
 
             var result = serializer.Deserialize<TResponse>(payload);
-            ThrowIfCallerCanceledAfterMaterialization();
+            if (TryCancelIfCallerCanceledAfterMaterialization())
+            {
+                return true;
+            }
+
             CompleteAndSetResult(result);
         }
         catch (Exception ex)
@@ -112,9 +116,8 @@ internal class PendingUnaryResponse<TResponse> :
     protected virtual Exception CreateTimeoutException() =>
         new ServiceTimeoutException("Request timed out.");
 
-    protected virtual void ThrowIfCallerCanceledAfterMaterialization()
-    {
-    }
+    protected virtual bool TryCancelIfCallerCanceledAfterMaterialization() =>
+        false;
 
     private bool IsDirectCompletion =>
         Volatile.Read(ref _directOwner) is not null;
@@ -179,15 +182,15 @@ internal class CancellablePendingUnaryResponse<TResponse> :
         base.TrySetCanceled(kind);
     }
 
-    protected override void ThrowIfCallerCanceledAfterMaterialization()
+    protected override bool TryCancelIfCallerCanceledAfterMaterialization()
     {
         if (!_callerToken.IsCancellationRequested)
         {
-            return;
+            return false;
         }
 
-        Volatile.Write(ref _cancellationKind, (int)PendingCancellationKind.Caller);
-        throw new OperationCanceledException(_callerToken);
+        TrySetCanceled(PendingCancellationKind.Caller);
+        return true;
     }
 }
 

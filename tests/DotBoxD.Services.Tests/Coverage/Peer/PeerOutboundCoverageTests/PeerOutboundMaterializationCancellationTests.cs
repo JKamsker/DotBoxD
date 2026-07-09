@@ -1,6 +1,9 @@
 using System.Buffers;
+using DotBoxD.Services.Client;
 using DotBoxD.Services.Peer;
+using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Serialization;
+using DotBoxD.Services.Transport;
 using Xunit;
 using static DotBoxD.Services.Tests.Coverage.Peer.PeerOutboundTestSupport;
 
@@ -23,6 +26,36 @@ public sealed class PeerOutboundMaterializationCancellationTests
 
         await Assert.ThrowsAsync<OperationCanceledException>(() => call.WaitAsync(PeerOutboundTimeout));
         Assert.True(cts.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task PendingUnaryResponse_WhenResponseDeserializerCancelsCallerToken_CompletesTaskAsCanceled()
+    {
+        using var owner = new PendingRequests();
+        using var cts = new CancellationTokenSource();
+        var serializer = new ResponseCancellingSerializer(NewSerializer(), cts);
+        Assert.True(owner.TryAddUnary<string>(
+            messageId: 42,
+            captureCallerCancellation: true,
+            captureTimeoutTarget: false,
+            cts.Token,
+            Service,
+            Method,
+            out var pending));
+
+        using var framePayload = ResponseFrame(serializer, messageId: 42, result: "decoded");
+        Assert.True(MessageFramer.TryReadFrame(
+            framePayload.Memory,
+            out _,
+            out _,
+            out var envelope,
+            out var payload));
+        var response = serializer.Deserialize<RpcResponse>(envelope);
+
+        Assert.True(pending.TrySetResponse(response, payload, new RpcFrame(framePayload), stream: null, serializer));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending.Task.WaitAsync(PeerOutboundTimeout));
+        Assert.True(pending.Task.IsCanceled);
     }
 
     private sealed class ResponseCancellingSerializer : ISerializer
