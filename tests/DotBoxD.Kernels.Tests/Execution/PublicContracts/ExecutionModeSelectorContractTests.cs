@@ -4,7 +4,7 @@ using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
 
-namespace DotBoxD.Kernels.Tests.Execution;
+namespace DotBoxD.Kernels.Tests.Execution.PublicContracts;
 
 public sealed class ExecutionModeSelectorContractTests
 {

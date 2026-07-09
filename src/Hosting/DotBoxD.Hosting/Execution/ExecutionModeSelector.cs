@@ -28,6 +28,42 @@ public sealed record ModuleHotnessStats(
     int CompileFailures,
     string? LastCompiledArtifactHash)
 {
+    private string _planHash = PlanHash ?? throw new ArgumentNullException(nameof(PlanHash));
+    private string _entrypoint = Entrypoint ?? throw new ArgumentNullException(nameof(Entrypoint));
+    private int _runCount = RequireNonNegative(RunCount, nameof(RunCount));
+    private int _completedRunCount = RequireNonNegative(CompletedRunCount, nameof(CompletedRunCount));
+    private int _compileFailures = RequireNonNegative(CompileFailures, nameof(CompileFailures));
+
+    public string PlanHash
+    {
+        get => _planHash;
+        init => _planHash = value ?? throw new ArgumentNullException(nameof(PlanHash));
+    }
+
+    public string Entrypoint
+    {
+        get => _entrypoint;
+        init => _entrypoint = value ?? throw new ArgumentNullException(nameof(Entrypoint));
+    }
+
+    public int RunCount
+    {
+        get => _runCount;
+        init => _runCount = RequireNonNegative(value, nameof(RunCount));
+    }
+
+    public int CompletedRunCount
+    {
+        get => _completedRunCount;
+        init => _completedRunCount = RequireNonNegative(value, nameof(CompletedRunCount));
+    }
+
+    public int CompileFailures
+    {
+        get => _compileFailures;
+        init => _compileFailures = RequireNonNegative(value, nameof(CompileFailures));
+    }
+
     public ModuleHotnessStats(int runCount)
         : this(
             string.Empty,
@@ -41,6 +77,9 @@ public sealed record ModuleHotnessStats(
             null)
     {
     }
+
+    private static int RequireNonNegative(int value, string paramName)
+        => value >= 0 ? value : throw new ArgumentOutOfRangeException(paramName);
 }
 
 public sealed class HotnessExecutionModeSelector : IExecutionModeSelector
@@ -51,6 +90,10 @@ public sealed class HotnessExecutionModeSelector : IExecutionModeSelector
         ModuleHotnessStats hotness,
         CompiledCacheStatus cacheStatus)
     {
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(hotness);
+
         var threshold = Math.Max(2, options.AutoCompileThreshold);
         return hotness.RunCount < threshold
             ? ExecutionModeDecision.Interpreted
