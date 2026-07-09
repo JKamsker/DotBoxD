@@ -16,17 +16,17 @@ public sealed record PluginExecutionObservation(
     string? ArtifactHash,
     string? MaterializationStatus)
 {
-    private readonly string _entrypoint = Entrypoint ?? throw new ArgumentNullException(nameof(Entrypoint));
+    private readonly string _entrypoint = RequiredText(Entrypoint, nameof(Entrypoint));
     private readonly ExecutionMode _requestedMode = Defined(RequestedMode, nameof(RequestedMode));
     private readonly ExecutionMode _actualMode = Defined(ActualMode, nameof(ActualMode));
     private readonly SandboxErrorCode? _errorCode = Defined(ErrorCode, nameof(ErrorCode));
     private readonly SandboxErrorCode? _fallbackReason = Defined(FallbackReason, nameof(FallbackReason));
-    private readonly string _cacheStatus = CacheStatus ?? throw new ArgumentNullException(nameof(CacheStatus));
+    private readonly string _cacheStatus = RequiredText(CacheStatus, nameof(CacheStatus));
 
     public string Entrypoint
     {
         get => _entrypoint;
-        init => _entrypoint = value ?? throw new ArgumentNullException(nameof(Entrypoint));
+        init => _entrypoint = RequiredText(value, nameof(Entrypoint));
     }
 
     public ExecutionMode RequestedMode
@@ -56,7 +56,15 @@ public sealed record PluginExecutionObservation(
     public string CacheStatus
     {
         get => _cacheStatus;
-        init => _cacheStatus = value ?? throw new ArgumentNullException(nameof(CacheStatus));
+        init => _cacheStatus = RequiredText(value, nameof(CacheStatus));
+    }
+
+    private static string RequiredText(string value, string parameterName)
+    {
+        ArgumentNullException.ThrowIfNull(value, parameterName);
+        return string.IsNullOrWhiteSpace(value)
+            ? throw new ArgumentException("Value must not be empty or whitespace.", parameterName)
+            : value;
     }
 
     private static ExecutionMode Defined(ExecutionMode value, string parameterName)
