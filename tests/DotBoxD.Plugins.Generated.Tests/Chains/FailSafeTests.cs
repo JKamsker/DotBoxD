@@ -1,5 +1,3 @@
-#pragma warning disable DBXK111 // Deliberately exercise the native fallback after suppressing the fail-closed diagnostic.
-
 namespace DotBoxD.Plugins.Generated.Tests;
 
 /// <summary>A projected DTO whose <c>ZoneLength</c> field is derived in the constructor body rather than passed as a
@@ -53,10 +51,12 @@ public sealed class FailSafeTests
 
         Assert.Throws<ArgumentNullException>(() =>
         {
+#pragma warning disable DBXK111 // Exercise the native fallback after explicit suppression.
             h.Hooks.On<EncounterEvent>()
                 .Where(e => e.Distance <= 4)
                 .Select(e => new DerivedInfo(e.Zone))
                 .RunLocal((info, ctx) => { });
+#pragma warning restore DBXK111
         });
     }
 
@@ -67,10 +67,12 @@ public sealed class FailSafeTests
 
         Assert.Throws<ArgumentNullException>(() =>
         {
+#pragma warning disable DBXK111 // Exercise the native fallback after explicit suppression.
             h.Hooks.On<EncounterEvent>()
                 .Where(e => e.Distance <= 4)
                 .Select(e => new DerivedShape(e.Zone, e.Distance))
                 .RunLocal((shape, ctx) => { });
+#pragma warning restore DBXK111
         });
     }
 
@@ -81,10 +83,12 @@ public sealed class FailSafeTests
 
         Assert.Throws<ArgumentNullException>(() =>
         {
+#pragma warning disable DBXK111 // Exercise the native fallback after explicit suppression.
             h.Hooks.On<EncounterEvent>()
                 .Where(e => e.Distance <= 4)
                 .Select(e => new ConvertingInfo(e.Distance))
                 .RunLocal((info, ctx) => { });
+#pragma warning restore DBXK111
         });
     }
 
@@ -95,10 +99,12 @@ public sealed class FailSafeTests
 
         Assert.Throws<ArgumentNullException>(() =>
         {
+#pragma warning disable DBXK111 // Exercise the native fallback after explicit suppression.
             h.Hooks.On<TwoListEvent>()
                 .Where(e => e.Left == e.Right)
                 .Select(e => e.Distance)
                 .RunLocal((distance, ctx) => { });
+#pragma warning restore DBXK111
         });
     }
 }
