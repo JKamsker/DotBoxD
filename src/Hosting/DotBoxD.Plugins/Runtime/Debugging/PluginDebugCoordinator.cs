@@ -85,29 +85,21 @@ internal sealed class PluginDebugCoordinator : IDisposable
         SandboxDebugCheckpoint checkpoint,
         CancellationToken cancellationToken)
     {
-        PluginDebugSession? candidate;
-        Task? wait;
-        lock (_gate)
-        {
-            wait = _pause is not null && Applies(_pause, kernel, checkpoint.RunId)
-                ? _pause.Resume.Task
-                : null;
-            candidate = wait is null && OwnsKernel(_attached, kernel) ? _attached : null;
-        }
+        var target = FindCheckpointTarget(kernel, checkpoint.RunId);
 
-        if (wait is not null)
+        if (target.Wait is not null)
         {
-            await wait.WaitAsync(cancellationToken).ConfigureAwait(false);
+            await target.Wait.WaitAsync(cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        if (candidate is null)
+        if (target.Session is null)
         {
             return;
         }
 
         var reason = await PluginDebugBreakpointEvaluator.StopReasonAsync(
-                candidate,
+                target.Session,
                 kernel.Manifest.PluginId,
                 checkpoint,
                 cancellationToken)
@@ -117,52 +109,55 @@ internal sealed class PluginDebugCoordinator : IDisposable
             return;
         }
 
-        var created = false;
-        lock (_gate)
-        {
-            if (_pause is not null)
-            {
-                wait = Applies(_pause, kernel, checkpoint.RunId) ? _pause.Resume.Task : null;
-            }
-            else if (ReferenceEquals(_attached, candidate))
-            {
-                var pause = new DebugPause(candidate, checkpoint.RunId, candidate.PauseScope);
-                _pause = pause;
-                wait = pause.Resume.Task;
-                created = true;
-            }
-        }
-
-        if (wait is null)
+        var pause = AcquirePause(target.Session, kernel, checkpoint.RunId);
+        if (pause.Wait is null)
         {
             return;
         }
 
-        if (created)
+        if (pause.Created)
         {
-            candidate.ExecutionState.RecordStopped(kernel.Manifest.PluginId, checkpoint, reason);
-            await candidate.PublishEventAsync(
-                    "stopped",
-                    new
-                    {
-                        runId = checkpoint.RunId.ToString(),
-                        pluginId = kernel.Manifest.PluginId,
-                        nodeId = checkpoint.Node.Id.Value,
-                        checkpointKind = checkpoint.Kind.ToString(),
-                        reason,
-                        error = checkpoint.Error is null
-                            ? null
-                            : new
-                            {
-                                code = checkpoint.Error.Code.ToString(),
-                                message = checkpoint.Error.SafeMessage
-                            }
-                    },
-                    cancellationToken)
+            await PluginDebugStopPublisher.PublishAsync(target.Session, kernel, checkpoint, reason, cancellationToken)
                 .ConfigureAwait(false);
         }
 
-        await wait.WaitAsync(cancellationToken).ConfigureAwait(false);
+        await pause.Wait.WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private CheckpointTarget FindCheckpointTarget(InstalledKernel kernel, SandboxRunId runId)
+    {
+        lock (_gate)
+        {
+            var wait = _pause is not null && Applies(_pause, kernel, runId)
+                ? _pause.Resume.Task
+                : null;
+            var session = wait is null && OwnsKernel(_attached, kernel) ? _attached : null;
+            return new CheckpointTarget(session, wait);
+        }
+    }
+
+    private PauseAcquisition AcquirePause(
+        PluginDebugSession candidate,
+        InstalledKernel kernel,
+        SandboxRunId runId)
+    {
+        lock (_gate)
+        {
+            if (_pause is not null)
+            {
+                var wait = Applies(_pause, kernel, runId) ? _pause.Resume.Task : null;
+                return new PauseAcquisition(wait, Created: false);
+            }
+
+            if (!ReferenceEquals(_attached, candidate))
+            {
+                return default;
+            }
+
+            var pause = new DebugPause(candidate, runId, candidate.PauseScope);
+            _pause = pause;
+            return new PauseAcquisition(pause.Resume.Task, Created: true);
+        }
     }
 
     public bool Resume(PluginDebugSession session, string runId)
@@ -280,6 +275,10 @@ internal sealed class PluginDebugCoordinator : IDisposable
             _kernels.Remove(kernel);
         }
     }
+
+    private readonly record struct CheckpointTarget(PluginDebugSession? Session, Task? Wait);
+
+    private readonly record struct PauseAcquisition(Task? Wait, bool Created);
 
     private sealed record DebugPause(
         PluginDebugSession Session,

@@ -311,6 +311,7 @@ and `DBXK###` (kernels/plugins). See [the docs overview](https://dotboxd.kamsker
 | [`DotBoxD.Kernels.Compiler`](https://www.nuget.org/packages/DotBoxD.Kernels.Compiler) | Generated-runtime backend + persistent artifact cache | net10.0 | Preview |
 | [`DotBoxD.Kernels.Verifier`](https://www.nuget.org/packages/DotBoxD.Kernels.Verifier) | Generated-assembly verifier | net10.0 | Preview |
 | [`DotBoxD.Kernels.Serialization.Json`](https://www.nuget.org/packages/DotBoxD.Kernels.Serialization.Json) | JSON IR importer/exporter + schema | net10.0 | Preview |
+| `DotBoxD.Kernels.Debugging.Clr` | Opt-in trusted Roslyn debug evaluators | net10.0 | Preview · unsafe by design |
 | [`DotBoxD.Hosting`](https://www.nuget.org/packages/DotBoxD.Hosting) | Host-facing orchestration API (`SandboxHost`) | net10.0 | Preview |
 | [`DotBoxD.Hosting.Http`](https://www.nuget.org/packages/DotBoxD.Hosting.Http) | HTTP GET binding, grant helpers, pinned transport | net10.0 | Preview |
 | [`DotBoxD.Plugins`](https://www.nuget.org/packages/DotBoxD.Plugins) | Host runtime that loads/validates/dispatches plugins | net10.0 | Preview |

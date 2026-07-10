@@ -130,6 +130,12 @@ internal static class PluginDebugBreakpointEvaluator
             I64Value scalar => scalar.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
             F64Value scalar => scalar.Value.ToString("R", System.Globalization.CultureInfo.InvariantCulture),
             StringValue scalar => scalar.Value,
+            _ => DisplayConstrained(value)
+        };
+
+    private static string DisplayConstrained(SandboxValue value)
+        => value switch
+        {
             GuidValue scalar => scalar.Value.ToString("D"),
             OpaqueIdValue scalar => scalar.Value,
             SandboxPathValue scalar => scalar.Value.RelativePath,

@@ -21,6 +21,7 @@
          consumer SDKs. Test/host projects that need newer APIs use VersionOverride
          (DotBoxD.Plugins.Analyzer + DotBoxD.Kernels.Tests -> 4.14.0, DotBoxD.Services.SourceGenerator.Tests -> 4.11.0). -->
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.14.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0" />
 
     <!-- Static-analysis layer (analyzer-only, wired in Directory.Build.props with

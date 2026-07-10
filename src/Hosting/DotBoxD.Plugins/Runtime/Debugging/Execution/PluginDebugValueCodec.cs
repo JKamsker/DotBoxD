@@ -16,6 +16,12 @@ internal static class PluginDebugValueCodec
             I64Value scalar => new(value.Type.ToString(), scalar.Value),
             F64Value scalar => new(value.Type.ToString(), scalar.Value),
             StringValue scalar => new(value.Type.ToString(), scalar.Value),
+            _ => SnapshotStructured(value)
+        };
+
+    private static PluginDebugValueSnapshot SnapshotStructured(SandboxValue value)
+        => value switch
+        {
             GuidValue scalar => new(value.Type.ToString(), scalar.Value.ToString("D")),
             OpaqueIdValue scalar => new(value.Type.ToString(), scalar.Value),
             SandboxPathValue scalar => new(value.Type.ToString(), scalar.Value.RelativePath),
@@ -72,7 +78,13 @@ internal static class PluginDebugValueCodec
     private static SandboxValue Parse(JsonElement element, SandboxType type)
     {
         RequireObject(element);
-        return type.Name switch
+        return type.Name is "List" or SandboxType.RecordName or "Map"
+            ? ParseStructured(element, type)
+            : ParseScalar(element, type);
+    }
+
+    private static SandboxValue ParseScalar(JsonElement element, SandboxType type)
+        => type.Name switch
         {
             "Unit" => SandboxValue.Unit,
             "Bool" => SandboxValue.FromBool(RequiredValue(element).GetBoolean()),
@@ -80,18 +92,29 @@ internal static class PluginDebugValueCodec
             "I64" => SandboxValue.FromInt64(RequiredValue(element).GetInt64()),
             "F64" => SandboxValue.FromDouble(RequiredValue(element).GetDouble()),
             "String" => SandboxValue.FromString(RequiredValue(element).GetString() ?? throw Invalid("String value is null.")),
+            _ => ParseConstrainedScalar(element, type)
+        };
+
+    private static SandboxValue ParseConstrainedScalar(JsonElement element, SandboxType type)
+        => type.Name switch
+        {
             "Guid" => SandboxValue.FromGuid(Guid.Parse(RequiredValue(element).GetString() ?? string.Empty)),
             "SandboxPath" => SandboxValue.FromPath(RequiredValue(element).GetString() ?? string.Empty),
             "SandboxUri" => SandboxValue.FromUri(RequiredValue(element).GetString() ?? string.Empty),
-            "List" => ParseList(element, type),
-            SandboxType.RecordName => ParseRecord(element, type),
-            "Map" => ParseMap(element, type),
             _ when type.Arguments.Count == 0 => SandboxValue.FromOpaqueId(
                 type.Name,
                 RequiredValue(element).GetString() ?? string.Empty),
             _ => throw Invalid($"Unsupported sandbox type '{type}'.")
         };
-    }
+
+    private static SandboxValue ParseStructured(JsonElement element, SandboxType type)
+        => type.Name switch
+        {
+            "List" => ParseList(element, type),
+            SandboxType.RecordName => ParseRecord(element, type),
+            "Map" => ParseMap(element, type),
+            _ => throw Invalid($"Unsupported sandbox type '{type}'.")
+        };
 
     private static SandboxValue ParseList(JsonElement element, SandboxType type)
     {

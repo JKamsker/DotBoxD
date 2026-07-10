@@ -15,19 +15,10 @@ internal sealed class SandboxDebugExpressionTokenizer(string expression)
         }
 
         var character = expression[_position];
-        if (char.IsAsciiLetter(character) || character == '_')
+        var literal = ReadLiteral(character);
+        if (literal is not null)
         {
-            return Identifier();
-        }
-
-        if (char.IsAsciiDigit(character))
-        {
-            return Number();
-        }
-
-        if (character == '"')
-        {
-            return String();
+            return literal.Value;
         }
 
         foreach (var candidate in TwoCharacterOperators)
@@ -39,15 +30,38 @@ internal sealed class SandboxDebugExpressionTokenizer(string expression)
             }
         }
 
-        _position++;
-        return character switch
+        return SingleCharacterToken(character);
+    }
+
+    private SandboxDebugToken? ReadLiteral(char character)
+    {
+        if (char.IsAsciiLetter(character) || character == '_')
         {
-            '(' => new SandboxDebugToken(SandboxDebugTokenKind.LeftParenthesis, "("),
-            ')' => new SandboxDebugToken(SandboxDebugTokenKind.RightParenthesis, ")"),
-            '+' or '-' or '*' or '/' or '%' or '!' or '<' or '>'
-                => new SandboxDebugToken(SandboxDebugTokenKind.Operator, character.ToString()),
-            _ => throw Invalid($"Unsupported character '{character}' at position {_position}.")
-        };
+            return Identifier();
+        }
+
+        if (char.IsAsciiDigit(character))
+        {
+            return Number();
+        }
+
+        return character == '"' ? String() : null;
+    }
+
+    private SandboxDebugToken SingleCharacterToken(char character)
+    {
+        _position++;
+        if (character is '(' or ')')
+        {
+            var kind = character == '('
+                ? SandboxDebugTokenKind.LeftParenthesis
+                : SandboxDebugTokenKind.RightParenthesis;
+            return new SandboxDebugToken(kind, character.ToString());
+        }
+
+        return "+-*/%!<>".Contains(character)
+            ? new SandboxDebugToken(SandboxDebugTokenKind.Operator, character.ToString())
+            : throw Invalid($"Unsupported character '{character}' at position {_position}.");
     }
 
     private SandboxDebugToken Identifier()
@@ -116,19 +130,21 @@ internal sealed class SandboxDebugExpressionTokenizer(string expression)
                 throw Invalid("The string literal ends with an escape character.");
             }
 
-            builder.Append(expression[_position++] switch
-            {
-                '"' => '"',
-                '\\' => '\\',
-                'n' => '\n',
-                'r' => '\r',
-                't' => '\t',
-                _ => throw Invalid("The string literal contains an unsupported escape sequence.")
-            });
+            builder.Append(Unescape(expression[_position++]));
         }
 
         throw Invalid("The string literal is not terminated.");
     }
+
+    private static char Unescape(char character) => character switch
+    {
+        '"' => '"',
+        '\\' => '\\',
+        'n' => '\n',
+        'r' => '\r',
+        't' => '\t',
+        _ => throw Invalid("The string literal contains an unsupported escape sequence.")
+    };
 
     private void SkipWhiteSpace()
     {

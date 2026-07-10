@@ -11,29 +11,33 @@ internal sealed class PluginDebugExecutionRequestHandler(PluginDebugSession sess
         PluginDebugEnvelope request,
         CancellationToken cancellationToken)
     {
+        if (_evaluation.Handles(request.Kind))
+        {
+            return await _evaluation.HandleAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+
         var result = request.Kind switch
         {
             PluginDebugCommands.SetBreakpoints => SetBreakpoints(request.Payload),
             PluginDebugCommands.Pause => Pause(),
-            PluginDebugCommands.Continue => Resume(request.Payload, PluginDebugStepKind.Continue),
-            PluginDebugCommands.StepIn => Resume(request.Payload, PluginDebugStepKind.StepIn),
-            PluginDebugCommands.StepOver => Resume(request.Payload, PluginDebugStepKind.StepOver),
-            PluginDebugCommands.StepOut => Resume(request.Payload, PluginDebugStepKind.StepOut),
             PluginDebugCommands.Threads => Threads(),
             PluginDebugCommands.StackTrace => StackTrace(request.Payload),
             PluginDebugCommands.Variables => Variables(request.Payload),
             PluginDebugCommands.SetVariable => SetVariable(request.Payload),
+            _ => ResumeCommand(request)
+        };
+        return result;
+    }
+
+    private PluginDebugHandlerResult? ResumeCommand(PluginDebugEnvelope request)
+        => request.Kind switch
+        {
+            PluginDebugCommands.Continue => Resume(request.Payload, PluginDebugStepKind.Continue),
+            PluginDebugCommands.StepIn => Resume(request.Payload, PluginDebugStepKind.StepIn),
+            PluginDebugCommands.StepOver => Resume(request.Payload, PluginDebugStepKind.StepOver),
+            PluginDebugCommands.StepOut => Resume(request.Payload, PluginDebugStepKind.StepOut),
             _ => null
         };
-        if (result is not null)
-        {
-            return result;
-        }
-
-        return _evaluation.Handles(request.Kind)
-            ? await _evaluation.HandleAsync(request, cancellationToken).ConfigureAwait(false)
-            : null;
-    }
 
     private PluginDebugHandlerResult SetBreakpoints(JsonElement payload)
     {
