@@ -68,7 +68,16 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
     /// not part of the structural type — the analyzer and the host marshaling layer map fields to a C#
     /// DTO's declared member order. Records can nest (a field may itself be a record, list, or map).
     /// </summary>
-    public static SandboxType Record(IReadOnlyList<SandboxType> fields) => new(RecordName, fields);
+    public static SandboxType Record(IReadOnlyList<SandboxType> fields)
+    {
+        ArgumentNullException.ThrowIfNull(fields);
+        if (fields.Count == 0)
+        {
+            throw new ArgumentException("Record types must declare at least one field.", nameof(fields));
+        }
+
+        return new(RecordName, fields);
+    }
 
     public bool IsRecord => Arguments.Count > 0 && StringComparer.Ordinal.Equals(Name, RecordName);
 

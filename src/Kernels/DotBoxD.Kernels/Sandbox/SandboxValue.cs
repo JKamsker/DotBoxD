@@ -190,6 +190,12 @@ public sealed record RecordValue : SandboxValue
 
     private static IReadOnlyList<SandboxValue> Snapshot(IReadOnlyList<SandboxValue> fields)
     {
+        ArgumentNullException.ThrowIfNull(fields);
+        if (fields.Count == 0)
+        {
+            throw new ArgumentException("Record values must contain at least one field.", nameof(fields));
+        }
+
         if (fields is OwnedSnapshot owned)
         {
             return owned;
