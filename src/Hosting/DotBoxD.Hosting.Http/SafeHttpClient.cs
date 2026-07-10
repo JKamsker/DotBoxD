@@ -140,7 +140,6 @@ public static class SafeHttpClient
         {
             throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: URI must be absolute");
         }
-
         if (!string.IsNullOrEmpty(uri.UserInfo))
         {
             throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: user info is not allowed");

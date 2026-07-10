@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using CsCheck;
@@ -110,7 +111,7 @@ public sealed class DifferentialFuzzTests
     private static string ModuleJson(int index, JsonObject expression)
         => new JsonObject
         {
-            ["id"] = $"differential-fuzz-{index}",
+            ["id"] = ModuleId(index),
             ["version"] = "1.0.0",
             ["functions"] = new JsonArray {
                 new JsonObject {
@@ -131,6 +132,9 @@ public sealed class DifferentialFuzzTests
                 }
             }
         }.ToJsonString(JsonOptions);
+
+    private static string ModuleId(int index)
+        => $"differential-fuzz-{string.Join('x', index.ToString(CultureInfo.InvariantCulture))}";
 
     private static JsonObject Parameter(string name)
         => new()
