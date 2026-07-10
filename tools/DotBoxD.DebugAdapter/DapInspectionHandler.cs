@@ -1,5 +1,6 @@
 using System.Text.Json;
 using DotBoxD.Plugins.Debugging;
+using static DotBoxD.DebugAdapter.DapInspectionJson;
 
 namespace DotBoxD.DebugAdapter;
 
@@ -273,41 +274,5 @@ internal sealed class DapInspectionHandler(
         => _frames.TryGetValue(frameId, out var frame)
             ? frame
             : throw new DebugAdapterException("staleFrame", "The selected stack frame is no longer stopped.");
-
-    private static JsonElement Arguments(JsonElement request) => request.GetProperty("arguments");
-
-    private static string DapStopReason(string? reason) => reason switch
-    {
-        "step" => "step",
-        "pause" => "pause",
-        "exception" or "breakpointConditionError" => "exception",
-        _ => "breakpoint"
-    };
-
-    private static JsonElement Property(JsonElement value, string first, string second)
-        => value.TryGetProperty(first, out var property) ? property : value.GetProperty(second);
-
-    private static int? OptionalInt(JsonElement value, string first, string second)
-    {
-        if (!value.TryGetProperty(first, out var property) && !value.TryGetProperty(second, out property))
-        {
-            return null;
-        }
-
-        return property.ValueKind == JsonValueKind.Number ? property.GetInt32() : null;
-    }
-
-    private static bool IsDebugConsole(JsonElement arguments)
-        => arguments.TryGetProperty("context", out var context) &&
-           context.ValueKind == JsonValueKind.String &&
-           string.Equals(context.GetString(), "repl", StringComparison.Ordinal);
-
-    private static void EnsureBridgeSuccess(JsonElement response)
-    {
-        if (!response.GetProperty("success").GetBoolean())
-        {
-            throw new DebugAdapterException("bridgeError", "The plugin bridge could not serve the requested source.");
-        }
-    }
 
 }

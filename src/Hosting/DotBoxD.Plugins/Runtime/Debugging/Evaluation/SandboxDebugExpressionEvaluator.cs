@@ -116,19 +116,34 @@ internal static class SandboxDebugExpressionEvaluator
         }
 
         private static bool? NumericEqual(SandboxValue left, SandboxValue right)
-            => (left, right) switch
+        {
+            if (!TryNumeric(left, out var leftInteger, out var leftFloat, out var leftIsFloat) ||
+                !TryNumeric(right, out var rightInteger, out var rightFloat, out var rightIsFloat))
             {
-                (I32Value l, I32Value r) => l.Value == r.Value,
-                (I32Value l, I64Value r) => l.Value == r.Value,
-                (I64Value l, I32Value r) => l.Value == r.Value,
-                (I64Value l, I64Value r) => l.Value == r.Value,
-                (F64Value l, I32Value r) => l.Value == r.Value,
-                (F64Value l, I64Value r) => l.Value == r.Value,
-                (I32Value l, F64Value r) => l.Value == r.Value,
-                (I64Value l, F64Value r) => l.Value == r.Value,
-                (F64Value l, F64Value r) => l.Value == r.Value,
-                _ => null
+                return null;
+            }
+
+            return leftIsFloat || rightIsFloat
+                ? leftFloat == rightFloat
+                : leftInteger == rightInteger;
+        }
+
+        private static bool TryNumeric(
+            SandboxValue value,
+            out long integer,
+            out double floating,
+            out bool isFloat)
+        {
+            integer = value switch
+            {
+                I32Value int32 => int32.Value,
+                I64Value int64 => int64.Value,
+                _ => 0
             };
+            floating = value is F64Value float64 ? float64.Value : integer;
+            isFloat = value is F64Value;
+            return value is I32Value or I64Value or F64Value;
+        }
 
         private SandboxValue ParseComparison()
         {
