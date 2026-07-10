@@ -40,6 +40,12 @@ public sealed class DebuggerIntegrationAssetTests
         Assert.Contains(
             project.Descendants().Where(item => item.Name.LocalName == "Target"),
             item => item.Attribute("Name")?.Value == "PublishDotBoxDDebugAdapter");
+        Assert.Equal(
+            "$(VsixIntermediateOutputPath)",
+            project.Descendants().Single(item => item.Name.LocalName == "TemplateOutputDirectory").Value);
+        Assert.Contains(
+            project.Descendants().Where(item => item.Name.LocalName == "Target"),
+            item => item.Attribute("Name")?.Value == "PrepareVsixIntermediateOutput");
         Assert.Contains(
             manifest.Descendants().Where(item => item.Name.LocalName == "Asset"),
             item => item.Attribute("Path")?.Value == "AdapterRegistration.pkgdef");
