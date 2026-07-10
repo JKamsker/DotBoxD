@@ -23,6 +23,28 @@ function Resolve-SiteTarget([string] $Target) {
     return $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 }
 
+function Test-FencedCodeLine(
+    [string] $Line,
+    [ref] $FenceCharacter,
+    [ref] $FenceLength
+) {
+    $trimmed = $Line.TrimStart()
+    if ($null -ne $FenceCharacter.Value) {
+        $closingPattern = '^' + [regex]::Escape([string] $FenceCharacter.Value) + '{' + $FenceLength.Value + ',}\s*$'
+        if ($trimmed -match $closingPattern) {
+            $FenceCharacter.Value = $null
+            $FenceLength.Value = 0
+        }
+        return $true
+    }
+    if ($trimmed -match '^(?<fence>`{3,}|~{3,})') {
+        $FenceCharacter.Value = $matches['fence'][0]
+        $FenceLength.Value = $matches['fence'].Length
+        return $true
+    }
+    return $false
+}
+
 function Get-DocumentAnchorSet([string] $Path) {
     if ($anchorCache.ContainsKey($Path)) { return ,$anchorCache[$Path] }
     $anchors = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
@@ -30,20 +52,7 @@ function Get-DocumentAnchorSet([string] $Path) {
     $fenceCharacter = $null
     $fenceLength = 0
     foreach ($line in Get-Content -LiteralPath $Path) {
-        $trimmed = $line.TrimStart()
-        if ($null -ne $fenceCharacter) {
-            $closingPattern = '^' + [regex]::Escape([string] $fenceCharacter) + '{' + $fenceLength + ',}\s*$'
-            if ($trimmed -match $closingPattern) {
-                $fenceCharacter = $null
-                $fenceLength = 0
-            }
-            continue
-        }
-        if ($trimmed -match '^(?<fence>`{3,}|~{3,})') {
-            $fenceCharacter = $matches['fence'][0]
-            $fenceLength = $matches['fence'].Length
-            continue
-        }
+        if (Test-FencedCodeLine $line ([ref] $fenceCharacter) ([ref] $fenceLength)) { continue }
 
         foreach ($match in [regex]::Matches($line, '(?:id|name)=["''](?<id>[^"'']+)["'']')) {
             [void] $anchors.Add($match.Groups['id'].Value)
@@ -70,20 +79,7 @@ foreach ($document in $documents) {
     $fenceLength = 0
     foreach ($line in Get-Content -LiteralPath $document.FullName) {
         $lineNumber++
-        $trimmed = $line.TrimStart()
-        if ($null -ne $fenceCharacter) {
-            $closingPattern = '^' + [regex]::Escape([string] $fenceCharacter) + '{' + $fenceLength + ',}\s*$'
-            if ($trimmed -match $closingPattern) {
-                $fenceCharacter = $null
-                $fenceLength = 0
-            }
-            continue
-        }
-        if ($trimmed -match '^(?<fence>`{3,}|~{3,})') {
-            $fenceCharacter = $matches['fence'][0]
-            $fenceLength = $matches['fence'].Length
-            continue
-        }
+        if (Test-FencedCodeLine $line ([ref] $fenceCharacter) ([ref] $fenceLength)) { continue }
 
         foreach ($match in [regex]::Matches($line, '!?(?<!\!)\[[^\]]*\]\((?<target>[^\s\)]+)')) {
             $target = [uri]::UnescapeDataString($match.Groups["target"].Value.Trim('<', '>'))
