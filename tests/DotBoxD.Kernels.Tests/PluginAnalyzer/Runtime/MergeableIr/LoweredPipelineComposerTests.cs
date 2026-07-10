@@ -70,6 +70,27 @@ public sealed class LoweredPipelineComposerTests
     }
 
     [Fact]
+    public async Task Composed_step_capabilities_are_enforced_by_policy()
+    {
+        var steps = MergeableIrPipelineFixture.ConfigureSteps().ToArray();
+        steps[0] = steps[0] with
+        {
+            RequiredCapabilities = ["probe.read.secret"],
+            Effects = [nameof(SandboxEffect.HostStateRead)]
+        };
+        var module = LoweredPipelineComposer.Compose(
+            new LoweredPipelineComposition("metadata-policy", steps, SandboxType.String));
+        var host = SandboxTestHost.Create();
+
+        var exception = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
+            await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000_000).Build()));
+
+        Assert.Contains(exception.Diagnostics, d =>
+            d.Code == "E-POLICY-CAP" &&
+            d.Message.Contains("probe.read.secret", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Rejects_an_empty_composition()
         => Assert.Throws<ArgumentException>(() => LoweredPipelineComposer.Compose(
             new LoweredPipelineComposition("empty", [], SandboxType.I32)));
