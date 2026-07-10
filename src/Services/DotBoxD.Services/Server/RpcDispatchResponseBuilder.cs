@@ -73,12 +73,16 @@ internal sealed class RpcDispatchResponseBuilder
         IServiceDispatcher? dispatcher,
         CancellationToken ct)
     {
+        using var telemetry = RpcTelemetry.StartServerRequest();
+
         // request.ServiceName is remote-supplied and can deserialize to null from a hostile/malformed
         // envelope (MessagePack nil). Guard before the dictionary lookup so that malformed input is
         // reported as ServiceNotFound instead of escaping as an internal lookup error.
         if (dispatcher is null)
         {
-            return new RpcDispatchResult(BuildErrorFrame(messageId, RpcErrors.ServiceNotFound()), stream: null);
+            var error = RpcErrors.ServiceNotFound();
+            telemetry.MarkFailed(new ServiceNotFoundException(error.Message));
+            return new RpcDispatchResult(BuildErrorFrame(messageId, error), stream: null);
         }
 
         var writer = MessageFramer.RentFrameWriter();
@@ -97,16 +101,19 @@ internal sealed class RpcDispatchResponseBuilder
                 writer,
                 streaming,
                 ct).ConfigureAwait(false);
+            telemetry.SetResolvedOperation(dispatcher.ServiceName, request.MethodName);
             streaming.EnsureAllDeclaredInboundStreamsClaimed();
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
+            telemetry.MarkFailed(new OperationCanceledException("RPC dispatch was cancelled."));
             writer?.Dispose();
             await streaming.AbandonResponseAsync().ConfigureAwait(false);
             throw;
         }
         catch (ServiceProtocolException ex)
         {
+            telemetry.MarkFailed(ex);
             writer?.Dispose();
             await streaming.AbandonResponseAsync().ConfigureAwait(false);
             return new RpcDispatchResult(
@@ -115,6 +122,7 @@ internal sealed class RpcDispatchResponseBuilder
         }
         catch (Exception ex)
         {
+            telemetry.MarkFailed(ex);
             writer?.Dispose();
             await streaming.AbandonResponseAsync().ConfigureAwait(false);
             return new RpcDispatchResult(
@@ -140,8 +148,9 @@ internal sealed class RpcDispatchResponseBuilder
                 MessageFramer.CompleteFrame(writer, responseEnvelopeLength);
                 return new RpcDispatchResult(writer, stream);
             }
-            catch
+            catch (Exception ex)
             {
+                telemetry.MarkFailed(ex);
                 writer.Dispose();
                 await streaming.AbandonResponseAsync().ConfigureAwait(false);
                 throw;

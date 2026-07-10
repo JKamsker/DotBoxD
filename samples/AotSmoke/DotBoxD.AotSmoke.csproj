@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <PublishAot>true</PublishAot>
+    <IsAotCompatible>true</IsAotCompatible>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <IsPackable>false</IsPackable>
+    <!-- The smoke deliberately references reflection-capable fallback implementations, then proves
+         at runtime that NativeAOT selects generated RPC paths and interpreted kernel execution. Keep
+         the linker diagnostics visible, but do not promote these known fallback warnings to errors. -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);IL2026;IL2059;IL2070;IL2075;IL2104;IL3050;IL3053</WarningsNotAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Services\DotBoxD.Services\DotBoxD.Services.csproj" />
+    <ProjectReference Include="..\..\src\Channels\DotBoxD.Codecs.MessagePack\DotBoxD.Codecs.MessagePack.csproj" />
+    <ProjectReference Include="..\..\src\Channels\DotBoxD.Transports.Tcp\DotBoxD.Transports.Tcp.csproj" />
+    <ProjectReference Include="..\..\src\Hosting\DotBoxD.Hosting\DotBoxD.Hosting.csproj" />
+    <ProjectReference Include="..\..\src\CodeGeneration\DotBoxD.Services.SourceGenerator\DotBoxD.Services.SourceGenerator.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+</Project>

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using DotBoxD.Kernels.Compiler;
 using DotBoxD.Kernels.Compiler.Emitters;
 
@@ -9,7 +10,8 @@ internal sealed class CompiledExecutionProvider(ISandboxCompiler? compiler) : ID
     private readonly CompiledExecutableExecutionCache _executables = new();
     private readonly CompiledExecutableCache _materialized = new();
 
-    public bool IsAvailable => compiler is not null;
+    public bool IsAvailable => compiler is not null &&
+        (compiler is not ReflectionEmitSandboxCompiler || RuntimeFeature.IsDynamicCodeSupported);
 
     public ValueTask<CompiledExecutable> GetAsync(
         ExecutionPlan plan,

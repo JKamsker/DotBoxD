@@ -57,17 +57,19 @@ public sealed class PluginLiveUpdateOrderingTests
             var livePropertyReads = 0;
             kernel.Value.OnGetLiveProperty = _ => Interlocked.Increment(ref livePropertyReads);
 
-            var buildInputStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var buildInput = Task.Run(() =>
+            var shouldHandleStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var shouldHandle = Task.Run(async () =>
             {
-                buildInputStarted.SetResult();
-                _ = BuildInput(kernel.Kernel, new DamageEvent("fire", 120, "player-1"));
+                shouldHandleStarted.SetResult();
+                _ = await kernel.Kernel.ShouldHandleAsync(
+                    DamageEventAdapter.Instance,
+                    new DamageEvent("fire", 120, "player-1"));
             });
-            await buildInputStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await shouldHandleStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
             await WaitForLivePropertyReadsAsync(() => Volatile.Read(ref livePropertyReads));
             setting.Release();
 
-            await Task.WhenAll(modify, buildInput).WaitAsync(TimeSpan.FromSeconds(5));
+            await Task.WhenAll(modify, shouldHandle).WaitAsync(TimeSpan.FromSeconds(5));
         }
         finally
         {
@@ -81,33 +83,6 @@ public sealed class PluginLiveUpdateOrderingTests
         Assert.Equal(250, kernel.Value.MinDamage);
     }
 
-    private static SandboxValue BuildInput(InstalledKernel kernel, DamageEvent e)
-    {
-        var adapter = DamageEventAdapter.Instance;
-        var validateMethod = typeof(InstalledKernel).GetMethod(
-            "ValidateFor",
-            BindingFlags.Instance | BindingFlags.NonPublic);
-        var method = typeof(InstalledKernel).GetMethod(
-            "BuildInput",
-            BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(validateMethod);
-        Assert.NotNull(method);
-        try
-        {
-            var parameters = validateMethod
-                .MakeGenericMethod(typeof(DamageEvent))
-                .Invoke(kernel, [adapter])!;
-
-            return (SandboxValue)method
-                .MakeGenericMethod(typeof(DamageEvent))
-                .Invoke(kernel, [adapter, e, kernel.Package.Entrypoints.ShouldHandle, parameters])!;
-        }
-        catch (TargetInvocationException ex) when (ex.InnerException is not null)
-        {
-            throw ex.InnerException;
-        }
-    }
-
     private static async Task WaitForLivePropertyReadsAsync(Func<int> readCount)
     {
         for (var i = 0; i < 20 && readCount() < 2; i++)
@@ -116,6 +91,8 @@ public sealed class PluginLiveUpdateOrderingTests
         }
     }
 
+    // This test intentionally reaches the queue because it verifies ordering between an already
+    // running stale update and FlushUpdatesAsync; no public API can pause a queued update precisely.
     private static PendingLiveUpdateQueue PendingQueue(InstalledKernel kernel)
     {
         var field = typeof(InstalledKernel).GetField(

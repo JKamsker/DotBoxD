@@ -6,7 +6,7 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 public sealed class PluginAnalyzerHookChainDiagnosticTests
 {
     [Fact]
-    public void Unlowered_Run_reports_DBXK114_as_warning()
+    public void Unlowered_Run_reports_DBXK114_as_error()
     {
         var result = RunGenerator("""
             using System.Threading.Tasks;
@@ -31,17 +31,17 @@ public sealed class PluginAnalyzerHookChainDiagnosticTests
             """);
 
         var diagnostic = Assert.Single(result.Diagnostics.Where(d => d.Id == "DBXK114"));
-        Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.DoesNotContain(
             result.GeneratedTrees,
             tree => tree.ToString().Contains("HookChain_", StringComparison.Ordinal));
     }
 
     [Fact]
-    public void Unlowered_RegisterLocal_reports_DBXK113_as_info()
+    public void Unlowered_RegisterLocal_reports_DBXK113_as_error()
     {
-        // RegisterLocal is an escape hatch whose body need not lower; a not-lowered case stays Info, consistent
-        // with the remote RunLocal (DBXK111) not-lowered diagnostic.
+        // RegisterLocal is an explicit local escape hatch, but a call that looks like a lowerable
+        // generated chain must still fail closed when the generator cannot prove its shape.
         var result = RunGenerator("""
             using DotBoxD.Plugins;
             using DotBoxD.Plugins.Runtime;
@@ -63,7 +63,7 @@ public sealed class PluginAnalyzerHookChainDiagnosticTests
             """);
 
         var diagnostic = Assert.Single(result.Diagnostics.Where(d => d.Id == "DBXK113"));
-        Assert.Equal(DiagnosticSeverity.Info, diagnostic.Severity);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
     }
 
     [Fact]

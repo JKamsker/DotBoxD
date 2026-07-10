@@ -10,8 +10,9 @@
 [![Docs](https://img.shields.io/badge/docs-online-2ea44f.svg)](https://dotboxd.kamsker.at/)
 
 **For .NET hosts — game servers, desktop apps, backend services — that must run untrusted
-third-party plugins safely.** The Services stack targets `netstandard2.1` (runs on .NET 8/9/10 and
-Unity/IL2CPP); the Kernels and Pushdown stack targets `net10.0`.
+third-party plugins safely.** The Services stack targets `netstandard2.1`; Unity/IL2CPP deployments
+must use generated MessagePack DTO formatters and validate their own IL2CPP build. The Kernels and
+Pushdown stack targets `net10.0`.
 
 ## The problem
 
@@ -46,8 +47,8 @@ Full guide, tutorials, examples, and the generated API reference live at <https:
 **How:** one C# contract, delivered three ways.
 
 - **Services** — the host implements a contract; clients call it remotely over RPC. A typed proxy and
-  dispatcher are generated from the same interface, so they cannot drift; it compiles AOT, so it runs
-  on **Unity / IL2CPP**.
+  dispatcher are generated from the same interface, so they cannot drift; AOT deployments also need a
+  generated/static codec resolver.
 - **Kernels** — a client supplies validated logic the host runs safely inside a fuel-metered sandbox.
   Downstream, this event-pipeline flavor is called *Query (RunLocal)*.
 - **Pushdown** — a plugin ships its *own* sandboxed batch operation that runs *server-side*, looping
@@ -297,11 +298,11 @@ and `DBXK###` (kernels/plugins). See [the docs overview](https://dotboxd.kamsker
 | Package | Purpose | TFM | Stability |
 |---------|---------|-----|-----------|
 | [`DotBoxD`](https://www.nuget.org/packages/DotBoxD) | Meta-package: the full net10.0 stack (Services + Kernels + Pushdown) | net10.0 | Preview |
-| [`DotBoxD.Services.All`](https://www.nuget.org/packages/DotBoxD.Services.All) | Meta-package: service + Unity bundle | netstandard2.1 | Stable · **Unity/IL2CPP** |
-| [`DotBoxD.Services`](https://www.nuget.org/packages/DotBoxD.Services) | Contract attributes, `RpcPeer`/`RpcHost`, dispatch, and bundled source generator | netstandard2.1 | Stable · **Unity/IL2CPP** |
-| [`DotBoxD.Codecs.MessagePack`](https://www.nuget.org/packages/DotBoxD.Codecs.MessagePack) | MessagePack serializer for the wire format | netstandard2.1 | Stable · **Unity/IL2CPP** |
-| [`DotBoxD.Transports.Tcp`](https://www.nuget.org/packages/DotBoxD.Transports.Tcp) | TCP transport | netstandard2.1 | Stable · **Unity/IL2CPP** |
-| [`DotBoxD.Transports.NamedPipes`](https://www.nuget.org/packages/DotBoxD.Transports.NamedPipes) | Named-pipe transport (local IPC) | netstandard2.1 | Stable · **Unity/IL2CPP** |
+| [`DotBoxD.Services.All`](https://www.nuget.org/packages/DotBoxD.Services.All) | Meta-package: service + channel bundle | netstandard2.1 | Stable API · AOT configuration required |
+| [`DotBoxD.Services`](https://www.nuget.org/packages/DotBoxD.Services) | Contract attributes, `RpcPeer`/`RpcHost`, dispatch, and bundled source generator | netstandard2.1 | Stable API |
+| [`DotBoxD.Codecs.MessagePack`](https://www.nuget.org/packages/DotBoxD.Codecs.MessagePack) | MessagePack serializer for the wire format | netstandard2.1 | Stable API · generated resolver required for AOT |
+| [`DotBoxD.Transports.Tcp`](https://www.nuget.org/packages/DotBoxD.Transports.Tcp) | TCP transport | netstandard2.1 | Stable API |
+| [`DotBoxD.Transports.NamedPipes`](https://www.nuget.org/packages/DotBoxD.Transports.NamedPipes) | Named-pipe transport (local IPC) | netstandard2.1 | Stable API |
 | [`DotBoxD.Abstractions`](https://www.nuget.org/packages/DotBoxD.Abstractions) | Plugin-to-host authoring contracts (`[Plugin]`, `IEventKernel<TEvent>`) | net10.0 | Preview |
 | [`DotBoxD.Kernels`](https://www.nuget.org/packages/DotBoxD.Kernels) | IR model, policy model, resource metering, canonical hashing | net10.0 | Preview |
 | [`DotBoxD.Kernels.Validation`](https://www.nuget.org/packages/DotBoxD.Kernels.Validation) | Structural, type, effect, policy, binding validation | net10.0 | Preview |

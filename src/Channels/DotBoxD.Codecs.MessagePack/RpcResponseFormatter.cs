@@ -155,14 +155,6 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
         }
     }
 
-    private static IMessagePackFormatter<RpcStreamHandle> GetStreamFormatter(
-        MessagePackSerializerOptions options)
-    {
-        return options.Resolver.GetFormatter<RpcStreamHandle>()
-            ?? throw new MessagePackSerializationException(
-                "No MessagePack formatter is registered for RPC stream handles.");
-    }
-
     private static void ThrowIfDuplicate(bool alreadySeen, string fieldName)
     {
         if (alreadySeen)
@@ -194,7 +186,10 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
             return;
         }
 
-        GetStreamFormatter(options).Serialize(ref writer, value.GetValueOrDefault(), options);
+        RpcStreamHandleFormatter.Instance.Serialize(
+            ref writer,
+            value.GetValueOrDefault(),
+            options);
     }
 
     private static RpcStreamHandle? ReadNullableStream(
@@ -206,7 +201,7 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
             return null;
         }
 
-        return GetStreamFormatter(options).Deserialize(ref reader, options);
+        return RpcStreamHandleFormatter.Instance.Deserialize(ref reader, options);
     }
 
     private static RpcResponseField ReadField(ref MessagePackReader reader)
