@@ -107,7 +107,7 @@ $expectedPackageMetadata = @{
         Tfm = "net10.0"
     }
     "DotBoxD.Services.All" = @{
-        Description = "DotBoxD service/channels bundle: the source-generated RPC core (DotBoxD.Services) together with the MessagePack codec and the TCP and named-pipe transports. Targets netstandard2.1 and is Unity/IL2CPP compatible for service-only consumers that do not need the Kernels or Pushdown stack."
+        Description = "DotBoxD service/channels bundle: the source-generated RPC core together with the MessagePack codec and TCP/named-pipe transports. Targets netstandard2.1; AOT deployments must supply generated MessagePack DTO formatters."
         Tags = @("dotboxd", "rpc", "services", "channels", "transport", "messagepack", "unity", "il2cpp", "meta")
         Tfm = "netstandard2.1"
     }

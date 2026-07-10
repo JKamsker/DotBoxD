@@ -249,7 +249,7 @@ public sealed class PluginAnalyzerHookChainResultValidationTests
     }
 
     [Fact]
-    public void Unlowered_Register_reports_DBXK113_as_a_warning()
+    public void Unlowered_Register_reports_DBXK113_as_an_error()
     {
         // A sandbox Register that fails to lower has no in-process fallback (it always throws at first dispatch),
         // so it is raised to Warning so the author sees it rather than the default-suppressed Info.
@@ -274,7 +274,7 @@ public sealed class PluginAnalyzerHookChainResultValidationTests
             """);
 
         var diagnostic = Assert.Single(result.Diagnostics.Where(d => d.Id == "DBXK113"));
-        Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
     }
 
 }

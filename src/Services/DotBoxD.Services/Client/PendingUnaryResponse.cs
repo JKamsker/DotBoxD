@@ -1,3 +1,4 @@
+using DotBoxD.Services.Diagnostics;
 using DotBoxD.Services.Exceptions;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Serialization;
@@ -114,8 +115,11 @@ internal class PendingUnaryResponse<TResponse> :
         return TrySetCanceled();
     }
 
-    protected virtual Exception CreateTimeoutException() =>
-        new ServiceTimeoutException("Request timed out.");
+    protected virtual Exception CreateTimeoutException()
+    {
+        RpcTelemetry.RequestTimedOut();
+        return new ServiceTimeoutException("Request timed out.");
+    }
 
     protected virtual bool TryCancelIfCallerCanceledAfterMaterialization() =>
         false;
@@ -235,6 +239,9 @@ internal sealed class PendingUnaryResponseWithTimeout<TResponse> :
     public override void SetTimeoutDeadline(long deadline) =>
         Volatile.Write(ref _timeoutDeadline, deadline);
 
-    protected override Exception CreateTimeoutException() =>
-        new ServiceTimeoutException($"Request to {_service}.{_method} timed out.");
+    protected override Exception CreateTimeoutException()
+    {
+        RpcTelemetry.RequestTimedOut();
+        return new ServiceTimeoutException($"Request to {_service}.{_method} timed out.");
+    }
 }

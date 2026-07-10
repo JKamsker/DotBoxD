@@ -76,11 +76,14 @@
     <Project Path="benchmarks/DotBoxD.Services.Benchmarks/DotBoxD.Services.Benchmarks.csproj" />
   </Folder>
 
-  <Folder Name="/samples/" />
+  <Folder Name="/samples/">
+    <Project Path="samples/AotSmoke/DotBoxD.AotSmoke.csproj" />
+  </Folder>
 
   <Folder Name="/tools/">
     <Project Path="tools/AgentQueue/src/AgentQueue/AgentQueue.csproj" />
     <Project Path="tools/AgentQueue/tests/AgentQueue.Tests/AgentQueue.Tests.csproj" />
+    <Project Path="tools/Fuzzing/DotBoxD.Fuzzing/DotBoxD.Fuzzing.csproj" />
   </Folder>
 
   <Properties Name="Visual Studio">

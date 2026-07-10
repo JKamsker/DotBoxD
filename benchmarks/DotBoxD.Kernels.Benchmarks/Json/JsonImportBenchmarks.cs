@@ -10,7 +10,7 @@ public class JsonImportBenchmarks
 {
     private string _json = string.Empty;
 
-    [Params(100, 1_000, 10_000)]
+    [Params(100, 1_000, 5_000)]
     public int StatementCount { get; set; }
 
     [Params(false, true)]

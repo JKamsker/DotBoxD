@@ -56,6 +56,7 @@ export default defineConfig({
             { label: 'Event pipelines', slug: 'concepts/event-pipelines' },
             { label: 'Host bindings', slug: 'concepts/host-bindings' },
             { label: 'Kernel runtime', slug: 'concepts/runtime' },
+            { label: 'Determinism contract', slug: 'concepts/determinism' },
             { label: 'Channels & transports', slug: 'concepts/channels-transports' },
           ],
         },
@@ -65,6 +66,10 @@ export default defineConfig({
             { label: 'Overview', slug: 'examples' },
             { label: 'GameServer walkthrough', slug: 'examples/gameserver-walkthrough' },
             { label: 'Coverage gaps', slug: 'examples/coverage-gaps' },
+            {
+              label: 'Project templates',
+              link: 'https://github.com/JKamsker/DotBoxD/tree/main/templates',
+            },
           ],
         },
         {
@@ -81,6 +86,7 @@ export default defineConfig({
           label: 'Reference',
           items: [
             { label: 'Diagnostics (DBXS / DBXK)', slug: 'reference/diagnostics' },
+            { label: 'Consumer testing kit', slug: 'reference/testing' },
             { label: 'Schemas', slug: 'reference/schemas' },
             { label: 'Glossary', slug: 'reference/glossary' },
             {

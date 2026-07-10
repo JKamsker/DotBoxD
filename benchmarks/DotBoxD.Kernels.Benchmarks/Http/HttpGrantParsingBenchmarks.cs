@@ -29,15 +29,25 @@ public class HttpGrantParsingBenchmarks
     [GlobalSetup]
     public void Setup()
     {
+        var responseBytesPerIteration = checked((long)ResponseBytes * RequestCount);
         _invoker = new SafeInMemoryHttpMessageInvoker(new byte[ResponseBytes]);
         _bindings = new BindingRegistryBuilder()
             .AddNetworkBindings(_invoker, StaticDns)
             .Build();
-        _policy = SandboxPolicyBuilder.Create()
+        var policy = SandboxPolicyBuilder.Create()
             .GrantHttpGet(["api.example.com"], maxResponseBytes: 1_000_000)
-            .WithFuel(10_000_000)
-            .WithMaxAllocatedBytes(10_000_000)
+            .WithFuel(checked(responseBytesPerIteration + 10_000_000))
+            .WithMaxAllocatedBytes(checked((responseBytesPerIteration * 3) + 10_000_000))
+            .WithMaxTotalStringBytes(checked((responseBytesPerIteration * 2) + 1_048_576))
+            .WithWallTime(TimeSpan.FromSeconds(30))
             .Build();
+        _policy = policy with
+        {
+            ResourceLimits = policy.ResourceLimits with
+            {
+                MaxNetworkBytesRead = checked(responseBytesPerIteration + 1_048_576)
+            }
+        };
     }
 
     [IterationSetup]
@@ -60,5 +70,5 @@ public class HttpGrantParsingBenchmarks
     }
 
     private static ValueTask<IReadOnlyList<IPAddress>> StaticDns(string host, CancellationToken cancellationToken)
-        => ValueTask.FromResult<IReadOnlyList<IPAddress>>([IPAddress.Parse("203.0.113.10")]);
+        => ValueTask.FromResult<IReadOnlyList<IPAddress>>([IPAddress.Parse("93.184.216.34")]);
 }

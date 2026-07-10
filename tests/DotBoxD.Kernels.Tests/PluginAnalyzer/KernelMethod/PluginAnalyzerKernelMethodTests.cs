@@ -5,23 +5,17 @@ using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 using DotBoxD.Plugins;
-using DotBoxD.Plugins.Analyzer.Analysis;
 using DotBoxD.Plugins.Policies;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
+
+using static DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.HookChainRuntimeTestCompiler;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.KernelMethod;
 
-/// <summary>An event a generated kernel-method hook chain subscribes to (referenced from chain source).</summary>
 public sealed record KernelMethodAggroEvent(string MonsterId, int Distance, int MonsterLevel, int PlayerLevel);
 
 /// <summary>
-/// Coverage of <c>[KernelMethod]</c> inlining (Followup #1): a static helper carrying
-/// <c>[KernelMethod]</c> is inlined into the calling kernel/hook IR exactly as if its body were written
-/// at the call site — its parameters are replaced by the already-lowered argument IR. Proven for a
-/// kernel-class <c>ShouldHandle</c>, for an inline <c>Where</c> hook chain, for multi-argument helpers,
-/// and for capability collection when an argument is a <c>[HostBinding]</c> call. Unsupported shapes
-/// (multi-statement body, non-static) fail safe (no package; the runtime terminal throws DBXK062).
+/// Covers <c>[KernelMethod]</c> inlining and capability discovery; unsupported shapes fail closed
+/// with no generated package and the runtime terminal throws DBXK062 after explicit suppression.
 /// </summary>
 public sealed class PluginAnalyzerKernelMethodTests
 {
@@ -190,7 +184,10 @@ public sealed class PluginAnalyzerKernelMethodTests
     [Fact]
     public void A_KernelMethod_with_a_multi_statement_body_fails_safe_with_no_generated_chain_package()
     {
-        var assembly = Compile(PluginAnalyzerKernelMethodTestSources.MultiStatement, enableInterceptors: true);
+        var assembly = Compile(
+            PluginAnalyzerKernelMethodTestSources.MultiStatement,
+            enableInterceptors: true,
+            suppressedDiagnosticId: "DBXK114");
 
         var hasChainPackage = assembly.GetTypes().Any(type =>
             type.Name.StartsWith("HookChain_", StringComparison.Ordinal) &&
@@ -207,38 +204,6 @@ public sealed class PluginAnalyzerKernelMethodTests
         return (PluginPackage)packageType
             .GetMethod("Create", BindingFlags.Public | BindingFlags.Static)!
             .Invoke(null, null)!;
-    }
-
-    private static Assembly Compile(string source, bool enableInterceptors)
-    {
-        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
-        if (enableInterceptors)
-        {
-            parseOptions = parseOptions.WithFeatures(
-                [new KeyValuePair<string, string>("InterceptorsNamespaces", "DotBoxD.Plugins.Generated")]);
-        }
-
-        var compilation = CSharpCompilation.Create(
-            "DotBoxDKernelMethodTest",
-            [CSharpSyntaxTree.ParseText(source, parseOptions)],
-            TrustedPlatformReferences()
-                .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
-                .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
-                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
-                .Append(MetadataReference.CreateFromFile(typeof(KernelMethodAggroEvent).Assembly.Location)),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            [new PluginPackageGenerator().AsSourceGenerator()],
-            parseOptions: parseOptions);
-        driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out var diagnostics);
-
-        Assert.Empty(diagnostics.Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
-        Assert.Empty(output.GetDiagnostics().Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
-
-        using var stream = new MemoryStream();
-        var emit = output.Emit(stream);
-        Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics.Select(d => d.ToString())));
-        return Assembly.Load(stream.ToArray());
     }
 
     private static SandboxPolicy SandboxedPolicy()
@@ -289,12 +254,5 @@ public sealed class PluginAnalyzerKernelMethodTests
             },
             CompiledBinding.RuntimeStub("DotBoxD.Kernels.Runtime.CompiledRuntime", "CallBinding"),
             GrantValidator: static (_, _) => { }));
-
-    private static IEnumerable<MetadataReference> TrustedPlatformReferences()
-    {
-        var references = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))?
-            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries) ?? [];
-        return references.Select(reference => MetadataReference.CreateFromFile(reference));
-    }
 
 }
