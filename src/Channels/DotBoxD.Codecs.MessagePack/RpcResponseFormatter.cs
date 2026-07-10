@@ -163,7 +163,7 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
         if (value is null)
         {
             throw new RpcEnvelopeValidationException(
-                "Error RPC response must contain error message and error type.");
+                $"Error RPC response is missing required {fieldName}.");
         }
 
         if (string.IsNullOrWhiteSpace(value))

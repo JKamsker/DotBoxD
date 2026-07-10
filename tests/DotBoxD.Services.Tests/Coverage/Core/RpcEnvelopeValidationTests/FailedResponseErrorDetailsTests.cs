@@ -9,12 +9,13 @@ namespace DotBoxD.Services.Tests.Coverage.Core;
 public sealed class FailedResponseErrorDetailsTests
 {
     [Theory]
-    [InlineData(null, "RemoteServiceException")]
-    [InlineData("boom", null)]
-    [InlineData(null, null)]
+    [InlineData(null, "RemoteServiceException", "ErrorMessage")]
+    [InlineData("boom", null, "ErrorType")]
+    [InlineData(null, null, "ErrorMessage")]
     public void RpcResponse_failed_encode_requires_error_details(
         string? errorMessage,
-        string? errorType)
+        string? errorType,
+        string fieldName)
     {
         var serializer = new MessagePackRpcSerializer();
         var writer = new ArrayBufferWriter<byte>();
@@ -26,8 +27,9 @@ public sealed class FailedResponseErrorDetailsTests
             ErrorType = errorType,
         };
 
-        Assert.Throws<MessagePackSerializationException>(
-            () => serializer.Serialize(writer, response));
+        AssertInvalidErrorDetails(
+            () => serializer.Serialize(writer, response),
+            fieldName);
     }
 
     [Theory]
@@ -56,16 +58,17 @@ public sealed class FailedResponseErrorDetailsTests
     }
 
     [Theory]
-    [InlineData(false, null, true, "RemoteServiceException")]
-    [InlineData(true, "boom", false, null)]
-    [InlineData(true, null, true, "RemoteServiceException")]
-    [InlineData(true, "boom", true, null)]
-    [InlineData(true, null, true, null)]
+    [InlineData(false, null, true, "RemoteServiceException", "ErrorMessage")]
+    [InlineData(true, "boom", false, null, "ErrorType")]
+    [InlineData(true, null, true, "RemoteServiceException", "ErrorMessage")]
+    [InlineData(true, "boom", true, null, "ErrorType")]
+    [InlineData(true, null, true, null, "ErrorMessage")]
     public void RpcResponse_failed_decode_requires_error_details(
         bool includeErrorMessage,
         string? errorMessage,
         bool includeErrorType,
-        string? errorType)
+        string? errorType,
+        string fieldName)
     {
         var serializer = new MessagePackRpcSerializer();
         var payload = WriteFailedResponse(
@@ -74,8 +77,9 @@ public sealed class FailedResponseErrorDetailsTests
             includeErrorType,
             errorType);
 
-        Assert.Throws<MessagePackSerializationException>(
-            () => serializer.Deserialize<RpcResponse>(payload));
+        AssertInvalidErrorDetails(
+            () => serializer.Deserialize<RpcResponse>(payload),
+            fieldName);
     }
 
     [Theory]
