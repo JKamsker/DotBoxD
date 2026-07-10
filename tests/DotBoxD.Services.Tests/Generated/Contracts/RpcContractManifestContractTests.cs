@@ -52,6 +52,33 @@ public sealed class RpcContractManifestContractTests
         Assert.Contains(changes, change => change.Contract == "game/add" && !change.IsBreaking);
     }
 
+    [Fact]
+    public void Create_rejects_null_assembly_sequence()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => RpcContractManifest.Create((IEnumerable<System.Reflection.Assembly>)null!));
+
+        Assert.Equal("assemblies", exception.ParamName);
+    }
+
+    [Fact]
+    public void Diff_rejects_null_previous_manifest()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => ValidManifest().Diff(null!));
+
+        Assert.Equal("previous", exception.ParamName);
+    }
+
+    [Fact]
+    public void EnsureCompatibleWith_allows_identical_manifest()
+    {
+        var current = ValidManifest();
+        var previous = ValidManifest();
+
+        current.EnsureCompatibleWith(previous);
+    }
+
     private static RpcContractManifest ValidManifest()
         => new([ValidService()]);
 
