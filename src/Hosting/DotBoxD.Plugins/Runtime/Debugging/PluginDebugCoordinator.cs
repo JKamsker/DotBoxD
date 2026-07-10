@@ -101,8 +101,18 @@ internal sealed class PluginDebugCoordinator : IDisposable
             return;
         }
 
-        if (candidate is null ||
-            !candidate.ExecutionState.ShouldStop(kernel.Manifest.PluginId, checkpoint, out var reason))
+        if (candidate is null)
+        {
+            return;
+        }
+
+        var reason = await PluginDebugBreakpointEvaluator.StopReasonAsync(
+                candidate,
+                kernel.Manifest.PluginId,
+                checkpoint,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (reason is null)
         {
             return;
         }

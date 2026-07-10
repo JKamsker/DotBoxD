@@ -29,6 +29,9 @@ public sealed record PluginRemoteDebugOptions
     /// <summary>Maximum encoded request, response, or event envelope size.</summary>
     public int MaxMessageBytes { get; init; } = 1024 * 1024;
 
+    /// <summary>Host-selected expression evaluator. Defaults to the sandbox-only provider.</summary>
+    public IPluginDebugEvaluatorProvider EvaluatorProvider { get; init; } = SandboxOnlyPluginDebugEvaluator.Instance;
+
     /// <summary>Validates host configuration and throws for unsafe or contradictory limits.</summary>
     public void Validate()
     {
@@ -79,6 +82,7 @@ public sealed record PluginRemoteDebugOptions
         EnsurePositive(MaxExpressionLength, nameof(MaxExpressionLength));
         EnsurePositive(MaxAssemblyUploadBytes, nameof(MaxAssemblyUploadBytes));
         EnsurePositive(MaxMessageBytes, nameof(MaxMessageBytes));
+        ArgumentNullException.ThrowIfNull(EvaluatorProvider);
     }
 
     internal IReadOnlySet<KernelDebugPauseScope> SnapshotAllowedPauseScopes()

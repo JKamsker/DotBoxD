@@ -6,7 +6,7 @@ internal sealed class PluginDebugRequestHandler(PluginDebugSession session)
 {
     private readonly PluginDebugExecutionRequestHandler _execution = new(session);
 
-    public ValueTask<byte[]> ExchangeAsync(byte[] message, CancellationToken cancellationToken)
+    public async ValueTask<byte[]> ExchangeAsync(byte[] message, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
         cancellationToken.ThrowIfCancellationRequested();
@@ -14,10 +14,10 @@ internal sealed class PluginDebugRequestHandler(PluginDebugSession session)
         session.Authenticate(request.SessionToken);
         if (request.Version != PluginDebugProtocol.Version)
         {
-            return ValueTask.FromResult(Error(
+            return Error(
                 request,
                 "unsupportedVersion",
-                $"Debug protocol version {request.Version} is not supported."));
+                $"Debug protocol version {request.Version} is not supported.");
         }
 
         session.RenewLease();
@@ -27,9 +27,14 @@ internal sealed class PluginDebugRequestHandler(PluginDebugSession session)
             PluginDebugCommands.Attach => Attach(request),
             PluginDebugCommands.Heartbeat => Success(request, new { }),
             PluginDebugCommands.Disconnect => Disconnect(request),
-            _ => Execute(request)
+            _ => null
         };
-        return ValueTask.FromResult(response);
+        if (response is not null)
+        {
+            return response;
+        }
+
+        return await ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
     }
 
     private byte[] Initialize(PluginDebugEnvelope request)
@@ -54,12 +59,20 @@ internal sealed class PluginDebugRequestHandler(PluginDebugSession session)
                     PluginDebugCommands.StackTrace,
                     PluginDebugCommands.Variables,
                     PluginDebugCommands.SetVariable,
+                    PluginDebugCommands.Evaluate,
+                    PluginDebugCommands.SetExpression,
                     PluginDebugCommands.Heartbeat,
                     PluginDebugCommands.Disconnect
                 },
                 defaultPauseScope = ScopeName(session.Options.DefaultPauseScope),
                 allowedPauseScopes = session.AllowedPauseScopes.Select(ScopeName).Order().ToArray(),
                 stopLeaseMilliseconds = checked((long)session.Options.StopLease.TotalMilliseconds),
+                evaluator = new
+                {
+                    id = session.Options.EvaluatorProvider.Id,
+                    trustProfile = session.Options.EvaluatorProvider.TrustProfile.ToString(),
+                    supportsAwait = session.Options.EvaluatorProvider.SupportsAwait
+                },
                 limits = new
                 {
                     snapshotBytes = session.Options.MaxSnapshotBytes,
@@ -100,9 +113,12 @@ internal sealed class PluginDebugRequestHandler(PluginDebugSession session)
         return Success(request, new { });
     }
 
-    private byte[] Execute(PluginDebugEnvelope request)
+    private async ValueTask<byte[]> ExecuteAsync(
+        PluginDebugEnvelope request,
+        CancellationToken cancellationToken)
     {
-        if (!_execution.TryHandle(request, out var result))
+        var result = await _execution.HandleAsync(request, cancellationToken).ConfigureAwait(false);
+        if (result is null)
         {
             return Error(request, "unsupportedCommand", $"Debug command '{request.Kind}' is not supported.");
         }

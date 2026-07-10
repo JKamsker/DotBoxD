@@ -15,6 +15,8 @@ public static class PluginDebugCommands
     public const string StackTrace = "stackTrace";
     public const string Variables = "variables";
     public const string SetVariable = "setVariable";
+    public const string Evaluate = "evaluate";
+    public const string SetExpression = "setExpression";
     public const string Heartbeat = "heartbeat";
     public const string Disconnect = "disconnect";
 }

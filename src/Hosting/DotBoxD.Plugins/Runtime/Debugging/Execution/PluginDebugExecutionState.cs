@@ -5,7 +5,7 @@ namespace DotBoxD.Plugins.Debugging;
 internal sealed class PluginDebugExecutionState
 {
     private readonly object _gate = new();
-    private readonly Dictionary<string, HashSet<SandboxNodeId>> _breakpoints = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Dictionary<SandboxNodeId, PluginDebugBreakpointState>> _breakpoints = new(StringComparer.Ordinal);
     private readonly Dictionary<string, PluginDebugStoppedExecution> _stopped = new(StringComparer.Ordinal);
     private readonly Dictionary<string, StepPlan> _steps = new(StringComparer.Ordinal);
     private bool _pauseRequested;
@@ -14,13 +14,23 @@ internal sealed class PluginDebugExecutionState
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(pluginId);
         ArgumentNullException.ThrowIfNull(nodeIds);
-        var parsed = nodeIds.Select(value => new SandboxNodeId(value)).Distinct().ToArray();
+        var parsed = nodeIds.Select(value => new PluginDebugBreakpointSpec(new SandboxNodeId(value)))
+            .DistinctBy(spec => spec.NodeId)
+            .ToArray();
+        SetBreakpoints(pluginId, parsed);
+        return parsed.Select(spec => spec.NodeId).ToArray();
+    }
+
+    public void SetBreakpoints(string pluginId, IReadOnlyList<PluginDebugBreakpointSpec> breakpoints)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(pluginId);
+        ArgumentNullException.ThrowIfNull(breakpoints);
         lock (_gate)
         {
-            _breakpoints[pluginId] = parsed.ToHashSet();
+            _breakpoints[pluginId] = breakpoints.ToDictionary(
+                breakpoint => breakpoint.NodeId,
+                breakpoint => new PluginDebugBreakpointState(breakpoint));
         }
-
-        return parsed;
     }
 
     public void RequestPause()
@@ -31,7 +41,7 @@ internal sealed class PluginDebugExecutionState
         }
     }
 
-    public bool ShouldStop(string pluginId, SandboxDebugCheckpoint checkpoint, out string reason)
+    public PluginDebugCheckpointDecision Decide(string pluginId, SandboxDebugCheckpoint checkpoint)
     {
         lock (_gate)
         {
@@ -39,35 +49,35 @@ internal sealed class PluginDebugExecutionState
             {
                 _pauseRequested = false;
                 _steps.Remove(checkpoint.RunId.ToString());
-                reason = "pause";
-                return true;
+                return PluginDebugCheckpointDecision.Stop("pause");
             }
 
             if (checkpoint.Kind == SandboxDebugCheckpointKind.Exception)
             {
                 _steps.Remove(checkpoint.RunId.ToString());
-                reason = "exception";
-                return true;
+                return PluginDebugCheckpointDecision.Stop("exception");
             }
 
-            if (_breakpoints.TryGetValue(pluginId, out var nodes) && nodes.Contains(checkpoint.Node.Id))
+            if (_breakpoints.TryGetValue(pluginId, out var nodes) &&
+                nodes.TryGetValue(checkpoint.Node.Id, out var breakpoint))
             {
-                _steps.Remove(checkpoint.RunId.ToString());
-                reason = "breakpoint";
-                return true;
+                breakpoint.Hits++;
+                if (breakpoint.Spec.HitCount is null || breakpoint.Hits == breakpoint.Spec.HitCount)
+                {
+                    _steps.Remove(checkpoint.RunId.ToString());
+                    return PluginDebugCheckpointDecision.ForBreakpoint(breakpoint.Spec);
+                }
             }
 
             var runId = checkpoint.RunId.ToString();
             if (_steps.TryGetValue(runId, out var step) && step.ShouldStop(checkpoint.Frame.Depth))
             {
                 _steps.Remove(runId);
-                reason = "step";
-                return true;
+                return PluginDebugCheckpointDecision.Stop("step");
             }
         }
 
-        reason = string.Empty;
-        return false;
+        return PluginDebugCheckpointDecision.None;
     }
 
     public void RecordStopped(string pluginId, SandboxDebugCheckpoint checkpoint, string reason)
@@ -200,3 +210,29 @@ internal sealed record PluginDebugStoppedExecution(
     string PluginId,
     SandboxDebugCheckpoint Checkpoint,
     string Reason);
+
+internal sealed record PluginDebugBreakpointSpec(
+    SandboxNodeId NodeId,
+    string? Condition = null,
+    int? HitCount = null,
+    string? LogMessage = null);
+
+internal sealed class PluginDebugBreakpointState(PluginDebugBreakpointSpec spec)
+{
+    public PluginDebugBreakpointSpec Spec { get; } = spec;
+
+    public long Hits { get; set; }
+}
+
+internal sealed record PluginDebugCheckpointDecision(
+    bool ShouldStop,
+    string? Reason,
+    PluginDebugBreakpointSpec? Breakpoint)
+{
+    public static PluginDebugCheckpointDecision None { get; } = new(false, null, null);
+
+    public static PluginDebugCheckpointDecision Stop(string reason) => new(true, reason, null);
+
+    public static PluginDebugCheckpointDecision ForBreakpoint(PluginDebugBreakpointSpec breakpoint)
+        => new(false, null, breakpoint);
+}
