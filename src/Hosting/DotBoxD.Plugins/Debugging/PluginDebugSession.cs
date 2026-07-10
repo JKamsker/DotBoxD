@@ -34,6 +34,7 @@ public sealed class PluginDebugSession : IPluginDebugControlEndpoint, IDisposabl
         _leaseTimer = new Timer(static state => ((PluginDebugSession)state!).OnLeaseExpired(), this, -1, -1);
         _requests = new PluginDebugRequestHandler(this);
         ExecutionState = new PluginDebugExecutionState();
+        Assemblies = new PluginDebugAssemblyStore(Options.MaxAssemblyUploadBytes);
     }
 
     /// <summary>Authentication token that the plugin-side bridge must put in every envelope.</summary>
@@ -56,6 +57,8 @@ public sealed class PluginDebugSession : IPluginDebugControlEndpoint, IDisposabl
     internal PluginRemoteDebugOptions Options => _coordinator.Options;
 
     internal PluginDebugExecutionState ExecutionState { get; }
+
+    internal PluginDebugAssemblyStore Assemblies { get; }
 
     internal IReadOnlySet<KernelDebugPauseScope> AllowedPauseScopes => _coordinator.AllowedPauseScopes;
 
@@ -92,6 +95,7 @@ public sealed class PluginDebugSession : IPluginDebugControlEndpoint, IDisposabl
         }
 
         attachmentCancellation.Cancel();
+        Assemblies.Clear();
         if (detach)
         {
             _coordinator.Detach(this);
@@ -266,6 +270,7 @@ public sealed class PluginDebugSession : IPluginDebugControlEndpoint, IDisposabl
         }
 
         attachmentCancellation?.Cancel();
+        Assemblies.Clear();
         if (detach)
         {
             _coordinator.Detach(this);

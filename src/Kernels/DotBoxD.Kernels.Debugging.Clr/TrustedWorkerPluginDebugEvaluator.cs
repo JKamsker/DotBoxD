@@ -71,7 +71,11 @@ internal sealed class TrustedWorkerPluginDebugEvaluator : IPluginDebugEvaluatorP
                 item => ClrDebugValue.FromSandbox(item.Value),
                 StringComparer.Ordinal),
             ReferencePaths = _options.ReferencePaths.ToArray(),
-            Imports = _options.Imports.ToArray()
+            Imports = _options.Imports.ToArray(),
+            Assemblies = request.Assemblies.ToDictionary(
+                item => item.Key,
+                item => item.Value.ToArray(),
+                StringComparer.Ordinal)
         };
 
         try
@@ -115,6 +119,8 @@ internal sealed record ClrDebugWorkerRequest
     public required string[] ReferencePaths { get; init; }
 
     public required string[] Imports { get; init; }
+
+    public required IReadOnlyDictionary<string, byte[]> Assemblies { get; init; }
 }
 
 internal sealed record ClrDebugWorkerResponse(ClrDebugValue? Value, string? Error);
@@ -225,6 +231,7 @@ internal static class ClrDebugWorkerProgram
                     context,
                     references,
                     request.Imports,
+                    request.Assemblies.Values.Select(image => (ReadOnlyMemory<byte>)image).ToArray(),
                     CancellationToken.None)
                 .ConfigureAwait(false);
             await WriteResponseAsync(new ClrDebugWorkerResponse(value, null)).ConfigureAwait(false);

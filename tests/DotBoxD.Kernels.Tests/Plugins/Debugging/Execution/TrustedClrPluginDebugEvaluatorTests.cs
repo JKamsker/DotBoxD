@@ -42,6 +42,25 @@ public sealed class TrustedClrPluginDebugEvaluatorTests
     }
 
     [Fact]
+    public async Task Trusted_provider_compiles_against_lazily_supplied_assembly_image()
+    {
+        var evaluator = ClrPluginDebugEvaluators.CreateTrustedInProcess(
+            new TrustedInProcessDebugEvaluatorOptions());
+        var image = await File.ReadAllBytesAsync(typeof(TrustedClrPluginDebugEvaluatorTests).Assembly.Location);
+        var result = await evaluator.EvaluateAsync(
+            new PluginDebugEvaluationRequest(
+                new TestFrame(SandboxValue.FromInt32(1)),
+                "typeof(DotBoxD.Kernels.Tests.Plugins.Debugging.Execution.TrustedClrPluginDebugEvaluatorTests).Name",
+                assemblies: new Dictionary<string, ReadOnlyMemory<byte>>
+                {
+                    ["DotBoxD.Kernels.Tests.dll"] = image
+                }));
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Equal(SandboxValue.FromString(nameof(TrustedClrPluginDebugEvaluatorTests)), result.Value);
+    }
+
+    [Fact]
     public async Task Worker_provider_evaluates_serialized_frame_in_disposable_process()
     {
         var evaluator = ClrPluginDebugEvaluators.CreateTrustedWorker(

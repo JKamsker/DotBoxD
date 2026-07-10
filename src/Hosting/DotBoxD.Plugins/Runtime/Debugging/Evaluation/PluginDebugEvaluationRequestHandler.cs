@@ -61,7 +61,7 @@ internal sealed class PluginDebugEvaluationRequestHandler(PluginDebugSession ses
         {
             return PluginDebugHandlerResult.Error(
                 "invalidExpression",
-                "SandboxOnly setExpression targets must name an existing sandbox variable.");
+                "setExpression targets must name an existing sandbox variable.");
         }
 
         var result = await EvaluateCoreAsync(frame, valueExpression!, allowAwait: false, cancellationToken)
@@ -96,7 +96,11 @@ internal sealed class PluginDebugEvaluationRequestHandler(PluginDebugSession ses
         }
 
         return await evaluator.EvaluateAsync(
-                new PluginDebugEvaluationRequest(frame, expression, allowAwait),
+                new PluginDebugEvaluationRequest(
+                    frame,
+                    expression,
+                    allowAwait,
+                    session.Assemblies.Snapshot()),
                 cancellationToken)
             .ConfigureAwait(false);
     }

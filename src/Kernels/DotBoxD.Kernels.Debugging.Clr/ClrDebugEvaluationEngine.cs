@@ -1,6 +1,8 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Text;
 using DotBoxD.Kernels.Sandbox;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -18,6 +20,7 @@ internal static class ClrDebugEvaluationEngine
         IReadOnlyDictionary<string, object?> context,
         IReadOnlyCollection<Assembly> references,
         IReadOnlyCollection<string> imports,
+        IReadOnlyCollection<ReadOnlyMemory<byte>> assemblyImages,
         CancellationToken cancellationToken)
     {
         EnsureAwaitAllowed(expression, allowAwait);
@@ -25,7 +28,8 @@ internal static class ClrDebugEvaluationEngine
             Convert(arguments),
             Convert(locals),
             context);
-        var options = CreateOptions(references, imports);
+        LoadAssemblyImages(assemblyImages);
+        var options = CreateOptions(references, imports, assemblyImages);
         var source = BuildSource(expression, arguments.Keys.Concat(locals.Keys));
         var result = await CSharpScript.EvaluateAsync<object?>(
                 source,
@@ -57,19 +61,22 @@ internal static class ClrDebugEvaluationEngine
 
     private static ScriptOptions CreateOptions(
         IReadOnlyCollection<Assembly> references,
-        IReadOnlyCollection<string> imports)
+        IReadOnlyCollection<string> imports,
+        IReadOnlyCollection<ReadOnlyMemory<byte>> assemblyImages)
     {
-        Assembly[] defaults =
-        [
-            typeof(object).Assembly,
-            typeof(Enumerable).Assembly,
-            typeof(Task).Assembly,
-            typeof(Microsoft.CSharp.RuntimeBinder.Binder).Assembly,
-            typeof(SandboxValue).Assembly,
-            typeof(ClrDebugEvaluationEngine).Assembly
-        ];
+        var trustedPlatformAssemblies = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))?
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+            ?? throw new InvalidOperationException("Trusted platform assembly metadata is unavailable.");
+        Assembly[] packageAssemblies = [typeof(SandboxValue).Assembly, typeof(ClrDebugEvaluationEngine).Assembly];
+        var metadata = trustedPlatformAssemblies
+            .Concat(packageAssemblies.Concat(references).Select(assembly => assembly.Location))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(path => MetadataReference.CreateFromFile(path))
+            .Concat(assemblyImages.Select(image =>
+                MetadataReference.CreateFromImage(ImmutableArray.Create(image.ToArray()))))
+            .ToArray();
         return ScriptOptions.Default
-            .WithReferences(defaults.Concat(references).Distinct())
+            .WithReferences(metadata)
             .WithImports(
                 new[]
                 {
@@ -78,6 +85,14 @@ internal static class ClrDebugEvaluationEngine
                     "System.Linq",
                     "System.Threading.Tasks"
                 }.Concat(imports).Distinct(StringComparer.Ordinal));
+    }
+
+    private static void LoadAssemblyImages(IReadOnlyCollection<ReadOnlyMemory<byte>> assemblyImages)
+    {
+        foreach (var image in assemblyImages)
+        {
+            Assembly.Load(image.ToArray());
+        }
     }
 
     private static string BuildSource(string expression, IEnumerable<string> variableNames)

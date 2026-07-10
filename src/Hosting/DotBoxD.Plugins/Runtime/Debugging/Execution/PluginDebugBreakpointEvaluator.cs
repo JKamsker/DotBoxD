@@ -104,7 +104,10 @@ internal static class PluginDebugBreakpointEvaluator
         string expression,
         CancellationToken cancellationToken)
         => session.Options.EvaluatorProvider.EvaluateAsync(
-            new PluginDebugEvaluationRequest(frame, expression),
+            new PluginDebugEvaluationRequest(
+                frame,
+                expression,
+                assemblies: session.Assemblies.Snapshot()),
             cancellationToken);
 
     private static async ValueTask PublishEvaluationErrorAsync(

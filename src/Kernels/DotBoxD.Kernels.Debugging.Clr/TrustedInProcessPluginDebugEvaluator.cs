@@ -79,6 +79,7 @@ internal sealed class TrustedInProcessPluginDebugEvaluator : IPluginDebugEvaluat
                     _context,
                     _references,
                     _imports,
+                    request.Assemblies.Values.ToArray(),
                     cancellationToken)
                 .ConfigureAwait(false);
             return PluginDebugEvaluationResult.Success(value.ToSandbox());

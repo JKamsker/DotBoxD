@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using DotBoxD.Kernels.Debugging;
 using DotBoxD.Kernels.Sandbox;
 
@@ -16,12 +17,14 @@ public sealed record PluginDebugEvaluationRequest
     public PluginDebugEvaluationRequest(
         ISandboxDebugFrame frame,
         string expression,
-        bool allowAwait = false)
+        bool allowAwait = false,
+        IReadOnlyDictionary<string, ReadOnlyMemory<byte>>? assemblies = null)
     {
         Frame = frame ?? throw new ArgumentNullException(nameof(frame));
         ArgumentException.ThrowIfNullOrWhiteSpace(expression);
         Expression = expression;
         AllowAwait = allowAwait;
+        Assemblies = SnapshotAssemblies(assemblies);
     }
 
     public ISandboxDebugFrame Frame { get; }
@@ -29,6 +32,33 @@ public sealed record PluginDebugEvaluationRequest
     public string Expression { get; }
 
     public bool AllowAwait { get; }
+
+    /// <summary>Session-scoped assembly images supplied only after trusted capability negotiation.</summary>
+    public IReadOnlyDictionary<string, ReadOnlyMemory<byte>> Assemblies { get; }
+
+    private static IReadOnlyDictionary<string, ReadOnlyMemory<byte>> SnapshotAssemblies(
+        IReadOnlyDictionary<string, ReadOnlyMemory<byte>>? assemblies)
+    {
+        if (assemblies is null || assemblies.Count == 0)
+        {
+            return new ReadOnlyDictionary<string, ReadOnlyMemory<byte>>(
+                new Dictionary<string, ReadOnlyMemory<byte>>(StringComparer.Ordinal));
+        }
+
+        var snapshot = new Dictionary<string, ReadOnlyMemory<byte>>(assemblies.Count, StringComparer.Ordinal);
+        foreach (var assembly in assemblies)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(assembly.Key);
+            if (assembly.Value.IsEmpty)
+            {
+                throw new ArgumentException("Uploaded debug assemblies cannot be empty.", nameof(assemblies));
+            }
+
+            snapshot.Add(assembly.Key, assembly.Value.ToArray());
+        }
+
+        return new ReadOnlyDictionary<string, ReadOnlyMemory<byte>>(snapshot);
+    }
 }
 
 /// <summary>Sandbox-value-only evaluation result returned across the debug trust boundary.</summary>

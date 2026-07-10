@@ -5,6 +5,7 @@ namespace DotBoxD.Plugins.Debugging;
 internal sealed class PluginDebugRequestHandler(PluginDebugSession session)
 {
     private readonly PluginDebugExecutionRequestHandler _execution = new(session);
+    private readonly PluginDebugAssemblyUploadHandler _assemblyUpload = new(session);
 
     public async ValueTask<byte[]> ExchangeAsync(byte[] message, CancellationToken cancellationToken)
     {
@@ -45,25 +46,7 @@ internal sealed class PluginDebugRequestHandler(PluginDebugSession session)
                 supported = session.Options.Enabled,
                 protocolVersion = PluginDebugProtocol.Version,
                 supportedVersions = new[] { PluginDebugProtocol.Version },
-                commands = new[]
-                {
-                    PluginDebugCommands.Initialize,
-                    PluginDebugCommands.Attach,
-                    PluginDebugCommands.SetBreakpoints,
-                    PluginDebugCommands.Pause,
-                    PluginDebugCommands.Continue,
-                    PluginDebugCommands.StepIn,
-                    PluginDebugCommands.StepOver,
-                    PluginDebugCommands.StepOut,
-                    PluginDebugCommands.Threads,
-                    PluginDebugCommands.StackTrace,
-                    PluginDebugCommands.Variables,
-                    PluginDebugCommands.SetVariable,
-                    PluginDebugCommands.Evaluate,
-                    PluginDebugCommands.SetExpression,
-                    PluginDebugCommands.Heartbeat,
-                    PluginDebugCommands.Disconnect
-                },
+                commands = SupportedCommands(),
                 defaultPauseScope = ScopeName(session.Options.DefaultPauseScope),
                 allowedPauseScopes = session.AllowedPauseScopes.Select(ScopeName).Order().ToArray(),
                 stopLeaseMilliseconds = checked((long)session.Options.StopLease.TotalMilliseconds),
@@ -71,7 +54,8 @@ internal sealed class PluginDebugRequestHandler(PluginDebugSession session)
                 {
                     id = session.Options.EvaluatorProvider.Id,
                     trustProfile = session.Options.EvaluatorProvider.TrustProfile.ToString(),
-                    supportsAwait = session.Options.EvaluatorProvider.SupportsAwait
+                    supportsAwait = session.Options.EvaluatorProvider.SupportsAwait,
+                    supportsAssemblyUpload = SupportsAssemblyUpload()
                 },
                 limits = new
                 {
@@ -117,16 +101,53 @@ internal sealed class PluginDebugRequestHandler(PluginDebugSession session)
         PluginDebugEnvelope request,
         CancellationToken cancellationToken)
     {
+        if (request.Kind == PluginDebugCommands.UploadAssembly)
+        {
+            return EncodeResult(request, _assemblyUpload.Handle(request.Payload));
+        }
+
         var result = await _execution.HandleAsync(request, cancellationToken).ConfigureAwait(false);
         if (result is null)
         {
             return Error(request, "unsupportedCommand", $"Debug command '{request.Kind}' is not supported.");
         }
 
-        return result.Succeeded
+        return EncodeResult(request, result);
+    }
+
+    private byte[] EncodeResult(PluginDebugEnvelope request, PluginDebugHandlerResult result)
+        => result.Succeeded
             ? Success(request, result.Body!)
             : Error(request, result.Code!, result.Message!);
+
+    private string[] SupportedCommands()
+    {
+        string[] commands =
+        [
+            PluginDebugCommands.Initialize,
+            PluginDebugCommands.Attach,
+            PluginDebugCommands.SetBreakpoints,
+            PluginDebugCommands.Pause,
+            PluginDebugCommands.Continue,
+            PluginDebugCommands.StepIn,
+            PluginDebugCommands.StepOver,
+            PluginDebugCommands.StepOut,
+            PluginDebugCommands.Threads,
+            PluginDebugCommands.StackTrace,
+            PluginDebugCommands.Variables,
+            PluginDebugCommands.SetVariable,
+            PluginDebugCommands.Evaluate,
+            PluginDebugCommands.SetExpression,
+            PluginDebugCommands.Heartbeat,
+            PluginDebugCommands.Disconnect
+        ];
+        return SupportsAssemblyUpload()
+            ? [.. commands, PluginDebugCommands.UploadAssembly]
+            : commands;
     }
+
+    private bool SupportsAssemblyUpload()
+        => session.Options.EvaluatorProvider.TrustProfile != PluginDebugEvaluationTrustProfile.SandboxOnly;
 
     private byte[] Success(PluginDebugEnvelope request, object body)
     {

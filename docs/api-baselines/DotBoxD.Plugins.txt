@@ -66,6 +66,7 @@ public const string StepIn = "stepIn"
 public const string StepOut = "stepOut"
 public const string StepOver = "stepOver"
 public const string Threads = "threads"
+public const string UploadAssembly = "uploadAssembly"
 public const string Variables = "variables"
 public delegate ValueTask RemoteLocalPush(string subscriptionId, ReadOnlyMemory<byte> projectedValue, CancellationToken cancellationToken)
 public delegate ValueTask<byte[]> RemoteLocalResultRequest( string subscriptionId, ReadOnlyMemory<byte> contextValue, CancellationToken cancellationToken)
@@ -218,6 +219,7 @@ public interface IServerExtensionWireClient : DotBoxD.Abstractions.IServerExtens
 public IPluginDebugEvaluatorProvider EvaluatorProvider { get; init; } = SandboxOnlyPluginDebugEvaluator.Instance
 public IPluginEventAdapter<TEvent> Resolve<TEvent>()
 public IReadOnlyCollection<KernelDebugPauseScope> AllowedPauseScopes { get; init; } = ServerOnly
+public IReadOnlyDictionary<string, ReadOnlyMemory<byte>> Assemblies { get; }
 public IReadOnlyList<HookSubscriptionManifest> Subscriptions { get => _subscriptions; init => _subscriptions = PluginModelCopy.List(value, nameof(Subscriptions)); }
 public IReadOnlyList<IndexedPredicate> HonoredPredicates { get; }
 public IReadOnlyList<IndexedPredicate> IndexedPredicates { get; init; }
@@ -264,7 +266,7 @@ public object? OwnerId => _ownerId
 public partial class HookPipeline<TEvent, TContext>
 public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
 public PluginDebugEnvelope( int version, string kind, string id, string sessionToken, JsonElement payload)
-public PluginDebugEvaluationRequest( ISandboxDebugFrame frame, string expression, bool allowAwait = false)
+public PluginDebugEvaluationRequest( ISandboxDebugFrame frame, string expression, bool allowAwait = false, IReadOnlyDictionary<string, ReadOnlyMemory<byte>>? assemblies = null)
 public PluginDebugEvaluationTrustProfile TrustProfile => PluginDebugEvaluationTrustProfile.SandboxOnly
 public PluginDebugProtocolException(string code, string message)
 public PluginDebugSession CreateDebugSession(IPluginDebugEventEndpoint eventEndpoint)
