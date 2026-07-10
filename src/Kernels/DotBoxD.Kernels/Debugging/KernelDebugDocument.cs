@@ -45,12 +45,16 @@ public sealed record KernelDebugDocument
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         var normalized = path.Replace('\\', '/');
-        while (normalized.Contains("//", StringComparison.Ordinal))
+        var schemeSeparator = normalized.IndexOf("://", StringComparison.Ordinal);
+        var prefixLength = schemeSeparator < 0 ? 0 : schemeSeparator + 3;
+        var prefix = normalized[..prefixLength];
+        var remainder = normalized[prefixLength..];
+        while (remainder.Contains("//", StringComparison.Ordinal))
         {
-            normalized = normalized.Replace("//", "/", StringComparison.Ordinal);
+            remainder = remainder.Replace("//", "/", StringComparison.Ordinal);
         }
 
-        return normalized;
+        return prefix + remainder;
     }
 
     private static string ValidateChecksum(string checksum)
@@ -64,4 +68,3 @@ public sealed record KernelDebugDocument
         return checksum;
     }
 }
-

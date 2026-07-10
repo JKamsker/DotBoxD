@@ -1,0 +1,205 @@
+using System.Text;
+using System.Text.Json;
+using DotBoxD.DebugAdapter;
+using DotBoxD.Kernels.Debugging;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Plugins.Debugging;
+using DotBoxD.Pushdown.Services;
+
+namespace DotBoxD.Kernels.Tests.Plugins.Debugging.Protocol;
+
+public sealed class DapAdapterTranscriptTests
+{
+    [Fact]
+    public async Task Bridge_rejects_wrong_discovery_token_without_losing_listener()
+    {
+        await using var bridge = PluginDebugBridge.Start(new PluginDebugBridgeOptions
+        {
+            WaitForDebuggerBeforeInstall = false
+        });
+        var control = new RecordingControl();
+        bridge.AttachControl(control);
+        await bridge.PublishAsync(Bootstrap(control.SessionToken));
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => BridgeClient.ConnectAsync(
+            bridge.Descriptor.PipeName,
+            new string('0', bridge.Descriptor.DiscoveryToken.Length),
+            CancellationToken.None));
+        await using var authenticated = await BridgeClient.ConnectAsync(
+            bridge.Descriptor.PipeName,
+            bridge.Descriptor.DiscoveryToken,
+            CancellationToken.None);
+
+        Assert.Equal(control.SessionToken, authenticated.SessionToken);
+    }
+
+    [Fact]
+    public async Task Bridge_leaves_breakpoint_unverified_when_local_source_checksum_is_stale()
+    {
+        await using var bridge = PluginDebugBridge.Start(new PluginDebugBridgeOptions
+        {
+            WaitForDebuggerBeforeInstall = false,
+            SourceReader = _ => Encoding.UTF8.GetBytes("changed")
+        });
+        var control = new RecordingControl();
+        bridge.AttachControl(control);
+        var package = FireDamagePluginPackage.Create();
+        var node = SandboxNodeMap.Create(package.Module).Nodes[0];
+        var document = KernelDebugDocument.FromSource("document", "/source/Plugin.cs", "original");
+        bridge.RegisterPackage(package with
+        {
+            DebugInfo = new KernelDebugInfo(
+                [document],
+                [new KernelSequencePoint(node.Id, new SourceSpan(0, 0, document.Id, 0, 1))])
+        });
+        await bridge.PublishAsync(Bootstrap(control.SessionToken));
+        await using var client = await BridgeClient.ConnectAsync(
+            bridge.Descriptor.PipeName,
+            bridge.Descriptor.DiscoveryToken,
+            CancellationToken.None);
+
+        var response = await client.SendAsync(
+            "resolve",
+            new Dictionary<string, object?>
+            {
+                ["pluginId"] = package.Manifest.PluginId,
+                ["path"] = document.Path,
+                ["lines"] = new[] { 0 }
+            },
+            CancellationToken.None);
+
+        var breakpoint = Assert.Single(
+            response.GetProperty("body").GetProperty("Breakpoints").EnumerateArray().ToArray());
+        Assert.False(breakpoint.GetProperty("Verified").GetBoolean());
+        Assert.Contains("checksum", breakpoint.GetProperty("Message").GetString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Standard_dap_lifecycle_authenticates_bridge_resolves_breakpoint_and_configures_session()
+    {
+        await using var bridge = PluginDebugBridge.Start(new PluginDebugBridgeOptions
+        {
+            WaitForDebuggerBeforeInstall = false
+        });
+        var control = new RecordingControl();
+        bridge.AttachControl(control);
+        var package = FireDamagePluginPackage.Create() with { DebugInfo = null };
+        bridge.RegisterPackage(package);
+        await bridge.PublishAsync(Bootstrap(control.SessionToken));
+        var descriptor = bridge.Descriptor;
+        var virtualPath = $"dotboxd-ir://{package.Manifest.PluginId}/module.ir";
+        await using var input = new MemoryStream(Transcript(
+            Request(1, "initialize", new { adapterID = "dotboxd-test", linesStartAt1 = true, columnsStartAt1 = true }),
+            Request(2, "attach", new
+            {
+                processId = descriptor.ProcessId,
+                pluginId = package.Manifest.PluginId
+            }),
+            Request(3, "setBreakpoints", new
+            {
+                source = new { path = virtualPath },
+                breakpoints = new[] { new { line = 1 } }
+            }),
+            Request(4, "configurationDone", new { }),
+            Request(5, "disconnect", new { })));
+        await using var output = new MemoryStream();
+        var connection = new DapConnection(input, output);
+        await using (var session = new DapSession(connection))
+        {
+            await session.RunAsync(CancellationToken.None);
+        }
+
+        output.Position = 0;
+        var messages = await ReadDapMessagesAsync(output);
+        var expectedCommands = new[]
+        {
+            PluginDebugCommands.Initialize,
+            PluginDebugCommands.Attach,
+            PluginDebugCommands.SetBreakpoints,
+            PluginDebugCommands.Disconnect
+        };
+        Assert.True(
+            expectedCommands.SequenceEqual(control.Commands),
+            JsonSerializer.Serialize(messages));
+        var setBreakpoints = Assert.Single(
+            control.Payloads,
+            item => item.Command == PluginDebugCommands.SetBreakpoints);
+        var remoteBreakpoints = setBreakpoints.Payload.GetProperty("breakpoints").EnumerateArray().ToArray();
+        Assert.True(remoteBreakpoints.Length == 1, JsonSerializer.Serialize(messages));
+        var breakpoint = remoteBreakpoints[0];
+        Assert.StartsWith("v1:", breakpoint.GetProperty("nodeId").GetString(), StringComparison.Ordinal);
+
+        Assert.Contains(messages, item => item.GetProperty("type").GetString() == "event" && item.GetProperty("event").GetString() == "initialized");
+        Assert.Contains(messages, item => item.GetProperty("type").GetString() == "event" && item.GetProperty("event").GetString() == "terminated");
+        Assert.Equal(5, messages.Count(item => item.GetProperty("type").GetString() == "response" && item.GetProperty("success").GetBoolean()));
+    }
+
+    private static byte[] Bootstrap(string token)
+    {
+        var envelope = new PluginDebugEnvelope(
+            PluginDebugProtocol.Version,
+            "session",
+            "bootstrap",
+            token,
+            JsonSerializer.SerializeToElement(new { sessionToken = token }));
+        return PluginDebugProtocol.Encode(envelope, 1024 * 1024);
+    }
+
+    private static byte[] Transcript(params byte[][] messages) => messages.SelectMany(item => item).ToArray();
+
+    private static byte[] Request(int sequence, string command, object arguments)
+    {
+        var payload = JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            seq = sequence,
+            type = "request",
+            command,
+            arguments
+        });
+        return Encoding.ASCII.GetBytes($"Content-Length: {payload.Length}\r\n\r\n").Concat(payload).ToArray();
+    }
+
+    private static async Task<JsonElement[]> ReadDapMessagesAsync(Stream stream)
+    {
+        var connection = new DapConnection(stream, Stream.Null);
+        var messages = new List<JsonElement>();
+        while (await connection.ReadAsync(CancellationToken.None) is { } document)
+        {
+            using (document)
+            {
+                messages.Add(document.RootElement.Clone());
+            }
+        }
+
+        return messages.ToArray();
+    }
+
+    private sealed class RecordingControl : IPluginDebugControlRpcService
+    {
+        public string SessionToken { get; } = Convert.ToHexStringLower(Guid.NewGuid().ToByteArray()) +
+            Convert.ToHexStringLower(Guid.NewGuid().ToByteArray());
+
+        public List<string> Commands { get; } = [];
+
+        public List<(string Command, JsonElement Payload)> Payloads { get; } = [];
+
+        public ValueTask<byte[]> ExchangeAsync(byte[] message, CancellationToken cancellationToken = default)
+        {
+            var request = PluginDebugProtocol.Decode(message, 1024 * 1024);
+            Commands.Add(request.Kind);
+            Payloads.Add((request.Kind, request.Payload.Clone()));
+            object body = request.Kind == PluginDebugCommands.Initialize
+                ? new { supported = true }
+                : request.Kind == PluginDebugCommands.SetBreakpoints
+                    ? new { breakpoints = Array.Empty<object>() }
+                    : new { };
+            var response = new PluginDebugEnvelope(
+                PluginDebugProtocol.Version,
+                request.Kind + "Response",
+                request.Id,
+                SessionToken,
+                JsonSerializer.SerializeToElement(new { success = true, body }));
+            return ValueTask.FromResult(PluginDebugProtocol.Encode(response, 1024 * 1024));
+        }
+    }
+}

@@ -5,25 +5,36 @@
 public async Task DispatchAsync( string method, ReadOnlyMemory<byte> payload, ISerializer serializer, IInstanceRegistry registry, IBufferWriter<byte> output, CancellationToken ct = default)
 public async Task StopAsync()
 public async ValueTask DisposeAsync()
+public async ValueTask PreparePackageAsync( PluginPackage package, CancellationToken cancellationToken = default)
+public async ValueTask<InstalledKernel> InstallAsync( PluginSession session, PluginPackage package, SandboxPolicy? policy = null, CancellationToken cancellationToken = default)
+public async ValueTask<InstalledKernel> InstallServerExtensionAsync( PluginSession session, PluginPackage package, SandboxPolicy? policy = null, CancellationToken cancellationToken = default)
+public bool WaitForDebuggerBeforeInstall { get; init; } = true
+public Func<string, byte[]?>? SourceReader { get; init; }
+public int MaxFrameBytes { get; init; } = 1024 * 1024
 public interface IPluginDebugControlRpcService
 public interface IPluginDebugEventRpcService
+public PluginDebugBridgeDescriptor Descriptor { get; }
 public PluginDebugControlRpcDispatcher(IPluginDebugControlRpcService service) =>
 public PluginDebugControlRpcProxy(IRpcInvoker invoker) =>
 public PluginDebugEventRpcDispatcher(IPluginDebugEventRpcService service) =>
 public PluginDebugEventRpcProxy(IRpcInvoker invoker) =>
 public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
+public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDisposable
 public sealed class PluginDebugControlRpcDispatcher : IServiceDispatcher, INonStreamingServiceDispatcher
 public sealed class PluginDebugControlRpcProxy : IPluginDebugControlRpcService
 public sealed class PluginDebugEventRpcDispatcher : IServiceDispatcher, INonStreamingServiceDispatcher
 public sealed class PluginDebugEventRpcProxy : IPluginDebugEventRpcService
 public sealed record NamedPipeTransportOptions(bool AllowUnsafeLowEntropyName = false)
 public sealed record PluginConnectionDebugOptions(bool Enabled = true)
+public sealed record PluginDebugBridgeDescriptor(int ProcessId, string PipeName, string DiscoveryToken)
+public sealed record PluginDebugBridgeOptions
 public static class PluginDebugRpcPeerExtensions
 public static class RpcMessagePackIpc
 public static IPluginDebugControlRpcService GetPluginDebugControl(this RpcPeer peer) =>
 public static IPluginDebugEventRpcService GetPluginDebugEvents(this RpcPeer peer) =>
 public static NamedPipeTransportOptions Default { get; } = new()
 public static NamedPipeTransportOptions UnsafeDevelopment { get; } = new(AllowUnsafeLowEntropyName: true)
+public static PluginDebugBridge Start(PluginDebugBridgeOptions? options = null)
 public static RpcHost Listen( IServerTransport transport, Action<RpcPeer> configurePeer, RpcPeerOptions? options = null)
 public static RpcHost ListenNamedPipe( string pipeName, Action<RpcPeer> configurePeer, NamedPipeTransportOptions namedPipeOptions, RpcPeerOptions? options = null)
 public static RpcHost ListenNamedPipe( string pipeName, Action<RpcPeer> configurePeer, RpcPeerOptions? options = null)
@@ -43,7 +54,11 @@ public static Task<RpcPeerSession> ConnectNamedPipeAsync( string serverName, str
 public string PipeName { get; }
 public string ServiceName => "DotBoxD.PluginDebug.Control.v1"
 public string ServiceName => "DotBoxD.PluginDebug.Events.v1"
+public string? DiscoveryFile { get; init; }
 public Task Disconnected => _disconnected.Task
 public Task<TConnection> Connected => _connected.Task
+public TimeSpan DebuggerWaitTimeout { get; init; } = TimeSpan.FromSeconds(30)
 public ValueTask PublishAsync(byte[] message, CancellationToken cancellationToken = default)
 public ValueTask<byte[]> ExchangeAsync(byte[] message, CancellationToken cancellationToken = default)
+public void AttachControl(IPluginDebugControlRpcService control)
+public void RegisterPackage(PluginPackage package) => _sources.Register(package)
