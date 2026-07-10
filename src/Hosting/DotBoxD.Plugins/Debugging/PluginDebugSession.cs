@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using DotBoxD.Kernels.Debugging;
 
 namespace DotBoxD.Plugins.Debugging;
 
@@ -31,6 +32,7 @@ public sealed class PluginDebugSession : IPluginDebugControlEndpoint, IDisposabl
         SessionToken = Convert.ToHexString(_tokenBytes).ToLowerInvariant();
         _leaseTimer = new Timer(static state => ((PluginDebugSession)state!).OnLeaseExpired(), this, -1, -1);
         _requests = new PluginDebugRequestHandler(this);
+        ExecutionState = new PluginDebugExecutionState();
     }
 
     /// <summary>Authentication token that the plugin-side bridge must put in every envelope.</summary>
@@ -51,6 +53,8 @@ public sealed class PluginDebugSession : IPluginDebugControlEndpoint, IDisposabl
     internal PluginSession Owner { get; }
 
     internal PluginRemoteDebugOptions Options => _coordinator.Options;
+
+    internal PluginDebugExecutionState ExecutionState { get; }
 
     internal IReadOnlySet<KernelDebugPauseScope> AllowedPauseScopes => _coordinator.AllowedPauseScopes;
 
@@ -105,7 +109,7 @@ public sealed class PluginDebugSession : IPluginDebugControlEndpoint, IDisposabl
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            if (!_coordinator.TryAttach(this))
+            if (!_coordinator.TryAttach(this, pauseScope))
             {
                 return false;
             }
@@ -149,6 +153,11 @@ public sealed class PluginDebugSession : IPluginDebugControlEndpoint, IDisposabl
     }
 
     internal void DetachFromClient() => DetachCore();
+
+    internal bool Resume(string runId) => _coordinator.Resume(this, runId);
+
+    internal bool IsBreakpointVerified(string pluginId, SandboxNodeId nodeId)
+        => _coordinator.IsBreakpointVerified(this, pluginId, nodeId);
 
     internal async ValueTask PublishEventAsync(
         string kind,

@@ -23,6 +23,9 @@ internal sealed class PluginDebugRequestHandler(PluginDebugSession session)
         {
             PluginDebugCommands.Initialize => Initialize(request),
             PluginDebugCommands.Attach => Attach(request),
+            PluginDebugCommands.SetBreakpoints => SetBreakpoints(request),
+            PluginDebugCommands.Pause => Pause(request),
+            PluginDebugCommands.Continue => Continue(request),
             PluginDebugCommands.Heartbeat => Success(request, new { }),
             PluginDebugCommands.Disconnect => Disconnect(request),
             _ => Error(request, "unsupportedCommand", $"Debug command '{request.Kind}' is not supported.")
@@ -42,6 +45,9 @@ internal sealed class PluginDebugRequestHandler(PluginDebugSession session)
                 {
                     PluginDebugCommands.Initialize,
                     PluginDebugCommands.Attach,
+                    PluginDebugCommands.SetBreakpoints,
+                    PluginDebugCommands.Pause,
+                    PluginDebugCommands.Continue,
                     PluginDebugCommands.Heartbeat,
                     PluginDebugCommands.Disconnect
                 },
@@ -88,6 +94,63 @@ internal sealed class PluginDebugRequestHandler(PluginDebugSession session)
         return Success(request, new { });
     }
 
+    private byte[] SetBreakpoints(PluginDebugEnvelope request)
+    {
+        if (!TryReadString(request.Payload, "pluginId", out var pluginId) ||
+            request.Payload.ValueKind != JsonValueKind.Object ||
+            !request.Payload.TryGetProperty("nodeIds", out var values) ||
+            values.ValueKind != JsonValueKind.Array)
+        {
+            return Error(request, "invalidArguments", "setBreakpoints requires pluginId and a nodeIds array.");
+        }
+
+        try
+        {
+            var nodeIds = values.EnumerateArray()
+                .Select(value => value.ValueKind == JsonValueKind.String ? value.GetString()! : string.Empty)
+                .ToArray();
+            var parsed = session.ExecutionState.SetBreakpoints(pluginId!, nodeIds);
+            return Success(
+                request,
+                new
+                {
+                    breakpoints = parsed.Select(node => new
+                    {
+                        nodeId = node.Value,
+                        verified = session.IsBreakpointVerified(pluginId!, node)
+                    }).ToArray()
+                });
+        }
+        catch (ArgumentException exception)
+        {
+            return Error(request, "invalidBreakpoint", exception.Message);
+        }
+    }
+
+    private byte[] Pause(PluginDebugEnvelope request)
+    {
+        if (!session.IsAttached)
+        {
+            return Error(request, "notAttached", "No debugger is attached to this session.");
+        }
+
+        session.ExecutionState.RequestPause();
+        return Success(request, new { });
+    }
+
+    private byte[] Continue(PluginDebugEnvelope request)
+    {
+        if (!TryReadString(request.Payload, "runId", out var runId) ||
+            !session.ExecutionState.ContainsStopped(runId!))
+        {
+            return Error(request, "staleRun", "The requested execution is not stopped in this plugin session.");
+        }
+
+        return session.Resume(runId!)
+            ? Success(request, new { runId })
+            : Error(request, "staleRun", "The requested execution is no longer stopped.");
+    }
+
     private byte[] Success(PluginDebugEnvelope request, object body)
         => Response(request, request.Kind + "Response", new { success = true, body });
 
@@ -120,6 +183,20 @@ internal sealed class PluginDebugRequestHandler(PluginDebugSession session)
         }
 
         return true;
+    }
+
+    private static bool TryReadString(JsonElement payload, string name, out string? value)
+    {
+        value = null;
+        if (payload.ValueKind != JsonValueKind.Object ||
+            !payload.TryGetProperty(name, out var property) ||
+            property.ValueKind != JsonValueKind.String)
+        {
+            return false;
+        }
+
+        value = property.GetString();
+        return !string.IsNullOrWhiteSpace(value);
     }
 
     private static bool TryParseScope(string? value, out KernelDebugPauseScope scope)

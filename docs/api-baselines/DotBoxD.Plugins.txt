@@ -47,10 +47,13 @@ public class SubscriptionStage<TEvent, TCurrent, TContext>
 public const int Version = 1
 public const string Attach = "attach"
 public const string CapabilityId = "host.message.write"
+public const string Continue = "continue"
 public const string Disconnect = "disconnect"
 public const string Heartbeat = "heartbeat"
 public const string Initialize = "initialize"
+public const string Pause = "pause"
 public const string SendBindingId = "host.message.send"
+public const string SetBreakpoints = "setBreakpoints"
 public delegate ValueTask RemoteLocalPush(string subscriptionId, ReadOnlyMemory<byte> projectedValue, CancellationToken cancellationToken)
 public delegate ValueTask<byte[]> RemoteLocalResultRequest( string subscriptionId, ReadOnlyMemory<byte> contextValue, CancellationToken cancellationToken)
 public Delegate? ProjectedPayloadDecoder { get; }
