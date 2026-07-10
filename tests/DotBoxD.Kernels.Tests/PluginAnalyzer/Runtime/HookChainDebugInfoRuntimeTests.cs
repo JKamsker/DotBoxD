@@ -1,0 +1,80 @@
+using DotBoxD.Kernels.Debugging;
+using DotBoxD.Plugins;
+using static DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.HookChainRuntimeTestCompiler;
+
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime;
+
+public sealed class HookChainDebugInfoRuntimeTests
+{
+    private const string SendChainSource = """
+        using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
+
+        namespace ChainSample;
+
+        public static class Usage
+        {
+            public static void Configure(HookRegistry hooks)
+                => hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent>()
+                    .Where((e, ctx) => e.Distance <= 5)
+                    .Run((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
+        }
+        """;
+
+    private const string ResultChainSource = """
+        using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
+        using DotBoxD.Abstractions;
+
+        namespace ChainSample;
+
+        [Hook("chain.damage", typeof(DamageResult))]
+        public sealed record DamageContext(int Damage);
+
+        [HookResult]
+        public readonly partial record struct DamageResult(bool Success, string? Reason, int Damage);
+
+        public static class Usage
+        {
+            public static void Configure(HookRegistry hooks)
+                => hooks.On<DamageContext>()
+                    .Where(e => e.Damage > 10)
+                    .Register(e => new DamageResult { Success = true, Damage = e.Damage }, priority: 5);
+        }
+        """;
+
+    [Fact]
+    public void Send_chain_maps_filter_and_terminal_into_both_execution_functions()
+    {
+        var package = PackageFrom(Compile(SendChainSource, enableInterceptors: true));
+
+        AssertMapped(package, SendChainSource, "e.Distance", "e.MonsterId");
+    }
+
+    [Fact]
+    public void Result_hook_maps_filter_and_result_body_into_both_execution_functions()
+    {
+        var package = PackageFrom(Compile(ResultChainSource, enableInterceptors: true));
+
+        AssertMapped(package, ResultChainSource, "e.Damage");
+    }
+
+    private static void AssertMapped(PluginPackage package, string source, params string[] variableNames)
+    {
+        var debugInfo = Assert.IsType<KernelDebugInfo>(package.DebugInfo);
+        Assert.Equal(2, debugInfo.Documents.Count);
+        Assert.All(debugInfo.Documents, document => Assert.True(document.MatchesSource(source)));
+        var nodes = SandboxNodeMap.Create(package.Module).Nodes.ToDictionary(node => node.Id);
+        var functions = new[] { package.Entrypoints.ShouldHandle, package.Entrypoints.Handle };
+        Assert.All(functions, functionId =>
+        {
+            var locations = debugInfo.SequencePoints
+                .Where(point => nodes[point.NodeId].FunctionId == functionId)
+                .Select(point => (point.Span.Line, point.Span.Column, point.Span.EndLine, point.Span.EndColumn))
+                .Distinct();
+            Assert.True(locations.Count() > 1);
+        });
+        Assert.All(variableNames, sourceName =>
+            Assert.Contains(debugInfo.VariableBindings, binding => binding.SourceName == sourceName));
+    }
+}

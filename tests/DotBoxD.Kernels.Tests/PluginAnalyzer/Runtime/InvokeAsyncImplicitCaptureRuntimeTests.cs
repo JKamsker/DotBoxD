@@ -1,5 +1,6 @@
 using System.Reflection;
 using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Debugging;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins;
@@ -17,6 +18,14 @@ public sealed class InvokeAsyncImplicitCaptureRuntimeTests
     public async Task Generated_interceptor_round_trips_implicit_capture_reflection_sync_out()
     {
         var assembly = Compile(Source);
+        var packageType = assembly.GetTypes().Single(type =>
+            type.Name.StartsWith("InvokeAsync_", StringComparison.Ordinal) &&
+            type.Name.EndsWith("PluginPackage", StringComparison.Ordinal));
+        var mappedPackage = (PluginPackage)packageType.GetMethod("Create")!.Invoke(null, null)!;
+        var debugInfo = Assert.IsType<KernelDebugInfo>(mappedPackage.DebugInfo);
+        Assert.True(Assert.Single(debugInfo.Documents).MatchesSource(Source));
+        Assert.Contains(debugInfo.VariableBindings, binding => binding.SourceName == "monsterId");
+        Assert.Contains(debugInfo.VariableBindings, binding => binding.SourceName == "lastHealth");
         var wire = Activator.CreateInstance(assembly.GetType("Sample.RecordingControlService", throwOnError: true)!)!;
         var controlType = assembly.GetType("DotBoxD.Kernels.Game.Plugin.Client.RemotePluginServer", true)!;
         var control = Activator.CreateInstance(controlType, [wire, null])!;
