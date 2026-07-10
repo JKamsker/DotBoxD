@@ -34,7 +34,7 @@ public sealed class SandboxInterpreter : ISandboxInterpreter
         try
         {
             budget.CheckDeadline();
-            InterpreterNestingGuard.ThrowIfExceeded(plan.Module);
+            InterpreterNestingGuard.ThrowIfExceeded(plan);
             var evaluator = new InterpreterEvaluator(plan, context, options);
             var value = await evaluator.ExecuteEntrypointAsync(entrypoint, input).ConfigureAwait(false);
             if (!options.SuppressSuccessfulRunSummaryAudit)

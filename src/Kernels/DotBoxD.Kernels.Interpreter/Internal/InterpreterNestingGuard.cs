@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 
@@ -6,11 +7,15 @@ namespace DotBoxD.Kernels.Interpreter.Internal;
 internal static class InterpreterNestingGuard
 {
     internal const int MaxDepth = 128;
+    private static readonly ConditionalWeakTable<ExecutionPlan, ValidatedPlan> ValidatedPlans = new();
 
-    public static void ThrowIfExceeded(SandboxModule module)
+    public static void ThrowIfExceeded(ExecutionPlan plan)
+        => _ = ValidatedPlans.GetValue(plan, Validate);
+
+    private static ValidatedPlan Validate(ExecutionPlan plan)
     {
         var pending = new Stack<(object Node, int Depth)>();
-        foreach (var function in module.Functions)
+        foreach (var function in plan.Module.Functions)
         {
             PushStatements(pending, function.Body, depth: 1);
         }
@@ -26,6 +31,8 @@ internal static class InterpreterNestingGuard
 
             PushChildren(pending, current.Node, current.Depth + 1);
         }
+
+        return ValidatedPlan.Instance;
     }
 
     private static void PushChildren(Stack<(object Node, int Depth)> pending, object node, int depth)
@@ -80,5 +87,10 @@ internal static class InterpreterNestingGuard
         {
             pending.Push((statement, depth));
         }
+    }
+
+    private sealed class ValidatedPlan
+    {
+        public static ValidatedPlan Instance { get; } = new();
     }
 }
