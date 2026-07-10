@@ -169,6 +169,33 @@ public sealed class PluginDebugExecutionControlTests
         Assert.True(await next.WaitAsync(TimeSpan.FromSeconds(2)));
     }
 
+    [Fact]
+    public async Task Pause_request_stops_the_next_safe_interpreter_checkpoint()
+    {
+        var events = new RecordingEvents();
+        using var server = DebugServer(KernelDebugPauseScope.Execution, ExecutionMode.Interpreted);
+        using var owner = server.CreateSession();
+        await using var debug = owner.CreateDebugSession(events);
+        var package = FireDamagePluginPackage.Create();
+        _ = await ExchangeAsync(debug, PluginDebugCommands.Attach);
+        var kernel = await owner.InstallAsync(package);
+
+        _ = await ExchangeAsync(debug, PluginDebugCommands.Pause);
+        var execution = kernel.ShouldHandleAsync(
+                DamageEventAdapter.Instance,
+                new DamageEvent("fire", 120, "paused"))
+            .AsTask();
+        var stopped = await events.NextAsync();
+
+        Assert.False(execution.IsCompleted);
+        Assert.Equal("pause", stopped.GetProperty("reason").GetString());
+        _ = await ExchangeAsync(
+            debug,
+            PluginDebugCommands.Continue,
+            new { runId = stopped.GetProperty("runId").GetString() });
+        Assert.True(await execution);
+    }
+
     private static PluginServer DebugServer(KernelDebugPauseScope scope, ExecutionMode executionMode)
         => PluginServer.Create(
             defaultPolicy: PluginAddendumTestPolicies.LongWall(),
