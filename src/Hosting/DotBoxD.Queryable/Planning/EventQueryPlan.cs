@@ -15,6 +15,8 @@ public sealed record EventQueryPlan
     private IReadOnlyList<IndexedPredicate> _routingKeys = null!;
     private QueryFilter? _residualFilter;
     private IndexCoverage _coverage;
+    private bool _residualFilterAssigned;
+    private bool _coverageAssigned;
 
     /// <summary>All index-covered predicates (equality and range).</summary>
     public required IReadOnlyList<IndexedPredicate> IndexedPredicates
@@ -31,17 +33,14 @@ public sealed record EventQueryPlan
     }
 
     /// <summary>The residual filter to evaluate after index prefiltering, or <see langword="null"/> when fully covered.</summary>
-    public QueryFilter? ResidualFilter
+    public required QueryFilter? ResidualFilter
     {
         get => _residualFilter;
         init
         {
-            if (value is not null && _coverage == IndexCoverage.Full)
-            {
-                throw ResidualCoverageMismatch(_coverage);
-            }
-
             _residualFilter = value;
+            _residualFilterAssigned = true;
+            ValidateResidualCoverageWhenComplete();
         }
     }
 
@@ -52,12 +51,9 @@ public sealed record EventQueryPlan
         init
         {
             EnsureKnownCoverage(value);
-            if ((value == IndexCoverage.Full) == (_residualFilter is not null))
-            {
-                throw ResidualCoverageMismatch(value);
-            }
-
             _coverage = value;
+            _coverageAssigned = true;
+            ValidateResidualCoverageWhenComplete();
         }
     }
 
@@ -85,6 +81,19 @@ public sealed record EventQueryPlan
         if (coverage is not (IndexCoverage.None or IndexCoverage.Partial or IndexCoverage.Full))
         {
             throw new ArgumentOutOfRangeException(nameof(Coverage), coverage, "Event query plan coverage is not defined.");
+        }
+    }
+
+    private void ValidateResidualCoverageWhenComplete()
+    {
+        if (!_coverageAssigned || !_residualFilterAssigned)
+        {
+            return;
+        }
+
+        if ((_coverage == IndexCoverage.Full) == (_residualFilter is not null))
+        {
+            throw ResidualCoverageMismatch(_coverage);
         }
     }
 

@@ -28,11 +28,39 @@ public sealed class EventQueryPlanContractTests
         {
             IndexedPredicates = [predicate],
             RoutingKeys = [predicate],
+            ResidualFilter = null,
             Coverage = IndexCoverage.Full,
         };
 
         Assert.True(plan.IsRoutable);
         Assert.Single(EventQueryIndexAdapter.ToIndexedPredicates(plan));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Direct_partial_plan_initializer_accepts_coverage_and_residual_in_either_order(bool coverageFirst)
+    {
+        var predicate = Predicate("AttackerId");
+        var residual = ResidualFilter();
+        var plan = coverageFirst
+            ? new EventQueryPlan
+            {
+                IndexedPredicates = [predicate],
+                RoutingKeys = [predicate],
+                Coverage = IndexCoverage.Partial,
+                ResidualFilter = residual,
+            }
+            : new EventQueryPlan
+            {
+                IndexedPredicates = [predicate],
+                RoutingKeys = [predicate],
+                ResidualFilter = residual,
+                Coverage = IndexCoverage.Partial,
+            };
+
+        Assert.Same(residual, plan.ResidualFilter);
+        Assert.Equal(IndexCoverage.Partial, plan.Coverage);
     }
 
     private static EventQueryPlan CreateMalformedPlan(MalformedPlanShape shape)
@@ -44,30 +72,35 @@ public sealed class EventQueryPlanContractTests
             {
                 IndexedPredicates = null!,
                 RoutingKeys = [predicate],
+                ResidualFilter = null,
                 Coverage = IndexCoverage.Full,
             },
             MalformedPlanShape.NullRoutingKeys => new EventQueryPlan
             {
                 IndexedPredicates = [predicate],
                 RoutingKeys = null!,
+                ResidualFilter = null,
                 Coverage = IndexCoverage.Full,
             },
             MalformedPlanShape.NullIndexedPredicateElement => new EventQueryPlan
             {
                 IndexedPredicates = [predicate, null!],
                 RoutingKeys = [predicate],
+                ResidualFilter = null,
                 Coverage = IndexCoverage.Full,
             },
             MalformedPlanShape.NullRoutingKeyElement => new EventQueryPlan
             {
                 IndexedPredicates = [predicate],
                 RoutingKeys = [predicate, null!],
+                ResidualFilter = null,
                 Coverage = IndexCoverage.Full,
             },
             MalformedPlanShape.UndefinedCoverage => new EventQueryPlan
             {
                 IndexedPredicates = [],
                 RoutingKeys = [],
+                ResidualFilter = null,
                 Coverage = (IndexCoverage)99,
             },
             MalformedPlanShape.FullCoverageWithResidual => new EventQueryPlan
@@ -81,12 +114,14 @@ public sealed class EventQueryPlanContractTests
             {
                 IndexedPredicates = [predicate],
                 RoutingKeys = [predicate],
+                ResidualFilter = null,
                 Coverage = IndexCoverage.Partial,
             },
             MalformedPlanShape.NoCoverageWithoutResidual => new EventQueryPlan
             {
                 IndexedPredicates = [],
                 RoutingKeys = [],
+                ResidualFilter = null,
                 Coverage = IndexCoverage.None,
             },
             _ => throw new ArgumentOutOfRangeException(nameof(shape), shape, null),
