@@ -86,6 +86,11 @@ jobs:
             # Keep the first report's envelope (Title/HostEnvironmentInfo) and concatenate the
             # Benchmarks arrays from every per-class report into it.
             jq -s '.[0] * {Benchmarks: (map(.Benchmarks) | add)}' "${reports[@]}" > "${outFile}"
+            if ! jq -e 'all(.Benchmarks[]; (.Statistics.Mean? != null))' "${outFile}" > /dev/null; then
+              jq -r '.Benchmarks[] | select(.Statistics.Mean? == null) |
+                "Benchmark produced no mean: \(.FullName // .DisplayInfo // "unknown")"' "${outFile}" >&2
+              exit 1
+            fi
             echo "Merged ${#reports[@]} report(s) into ${outFile}"
           }
           merge_suite services

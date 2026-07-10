@@ -31,8 +31,8 @@ public class PluginPackageGeneratorScaleBenchmarks
     }
 
     [Benchmark]
-    public GeneratorDriverRunResult RunGenerators()
-        => _driver.RunGenerators(_compilation).GetRunResult();
+    public int RunGenerators()
+        => _driver.RunGenerators(_compilation).GetRunResult().Diagnostics.Length;
 
     private static string Source(int count)
     {
