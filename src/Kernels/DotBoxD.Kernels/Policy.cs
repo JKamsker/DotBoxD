@@ -4,8 +4,6 @@ using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Kernels;
 
-using System.Collections.ObjectModel;
-
 public sealed record CapabilityGrant(
     string Id,
     IReadOnlyDictionary<string, string> Parameters,
@@ -13,8 +11,16 @@ public sealed record CapabilityGrant(
     string GrantedBy = "host-policy",
     string Reason = "")
 {
-    public IReadOnlyDictionary<string, string> Parameters { get; init; } =
-        new ReadOnlyDictionary<string, string>(new Dictionary<string, string>(Parameters, StringComparer.Ordinal));
+    private readonly IReadOnlyDictionary<string, string>? _parameters = SnapshotParameters(Parameters);
+
+    public IReadOnlyDictionary<string, string> Parameters
+    {
+        get => _parameters!;
+        init => _parameters = value is null ? null : SnapshotParameters(value);
+    }
+
+    private static IReadOnlyDictionary<string, string> SnapshotParameters(IReadOnlyDictionary<string, string> parameters)
+        => ModelCopy.StringDictionary(parameters);
 }
 
 public sealed record SandboxPolicy(
