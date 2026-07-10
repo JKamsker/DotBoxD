@@ -74,7 +74,7 @@ foreach ($document in $documents) {
         $lineNumber++
         if (Test-FencedCodeLine $line ([ref] $fenceCharacter) ([ref] $fenceLength)) { continue }
 
-        foreach ($match in [regex]::Matches($line, '!?(?<!\!)\[[^\]]*\]\((?<target>[^\s\)]+)')) {
+        foreach ($match in [regex]::Matches($line, '!?\[[^\]]*\]\((?<target>[^\s\)]+)')) {
             $target = [uri]::UnescapeDataString($match.Groups["target"].Value.Trim('<', '>'))
             $targetParts = $target.Split('#', 2)
             $path = $targetParts[0].Split('?', 2)[0]
