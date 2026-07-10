@@ -1,4 +1,5 @@
 using DotBoxD.Kernels.Debugging;
+using DotBoxD.Kernels.Model;
 
 namespace DotBoxD.Abstractions;
 
@@ -7,7 +8,8 @@ public sealed class LoweredPipelineDebugInfo
 {
     public LoweredPipelineDebugInfo(
         IReadOnlyList<KernelDebugDocument> documents,
-        string? inputSourceName = null)
+        string? inputSourceName = null,
+        IReadOnlyList<SourceSpan>? sequenceSpans = null)
     {
         ArgumentNullException.ThrowIfNull(documents);
         var copy = documents.ToArray();
@@ -23,10 +25,19 @@ public sealed class LoweredPipelineDebugInfo
 
         Documents = Array.AsReadOnly(copy);
         InputSourceName = inputSourceName;
+        var spanCopy = sequenceSpans?.ToArray() ?? [];
+        if (spanCopy.Any(span => span is null))
+        {
+            throw new ArgumentException("Sequence span collections cannot contain null entries.", nameof(sequenceSpans));
+        }
+
+        SequenceSpans = Array.AsReadOnly(spanCopy);
     }
 
     public IReadOnlyList<KernelDebugDocument> Documents { get; }
 
     public string? InputSourceName { get; }
-}
 
+    /// <summary>Ordered authored locations for the fragment's lowered expression tree.</summary>
+    public IReadOnlyList<SourceSpan> SequenceSpans { get; }
+}

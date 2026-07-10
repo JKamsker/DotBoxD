@@ -53,6 +53,7 @@ internal static partial class HookChainModelFactory
             prepared.Stages,
             prepared.TerminalLambda,
             prepared.InstallKind == HookChainInterceptorInstallKind.LocalCallback,
+            model,
             cancellationToken);
         var interception = BuildSendHookInterception(
             invocation,

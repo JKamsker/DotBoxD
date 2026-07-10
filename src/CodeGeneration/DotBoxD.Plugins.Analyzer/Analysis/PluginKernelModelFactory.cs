@@ -189,7 +189,7 @@ internal static class PluginKernelModelFactory
             IndexPredicates: indexPredicates,
             IndexCoversPredicate: indexCoversPredicate);
         model = KernelSourceLocationModel.ApplyToNamedKernel(
-            model, pluginId, shouldHandle, handle, cancellationToken);
+            model, pluginId, shouldHandle, handle, context.SemanticModel, cancellationToken);
         return new PluginKernelModelResult(model, null);
     }
 

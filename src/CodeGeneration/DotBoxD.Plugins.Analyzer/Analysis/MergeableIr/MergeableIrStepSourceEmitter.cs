@@ -107,12 +107,37 @@ internal static class MergeableIrStepSourceEmitter
         builder.AppendLine("        {");
         builder.Append("            DebugInfo = new ")
             .Append(MergeableIrContractNames.GlobalLoweredPipelineDebugInfo).AppendLine("(");
-        builder.Append("                [new ").Append(TypeNames.GlobalKernelDebugDocument).Append('(')
-            .Append(LiteralReader.StringLiteral(model.Source.DocumentId)).Append(", ")
-            .Append(LiteralReader.StringLiteral(model.Source.Path)).Append(", ")
-            .Append(LiteralReader.StringLiteral(model.Source.Sha256Checksum)).AppendLine(")],");
+        builder.AppendLine("                new global::DotBoxD.Kernels.Debugging.KernelDebugDocument[]");
+        builder.AppendLine("                {");
+        foreach (var document in SequencePoints(model.Source)
+                     .GroupBy(point => point.DocumentId, StringComparer.Ordinal)
+                     .Select(group => group.First()))
+        {
+            builder.Append("                    new ").Append(TypeNames.GlobalKernelDebugDocument).Append('(')
+                .Append(LiteralReader.StringLiteral(document.DocumentId)).Append(", ")
+                .Append(LiteralReader.StringLiteral(document.Path)).Append(", ")
+                .Append(LiteralReader.StringLiteral(document.Sha256Checksum)).AppendLine("),");
+        }
+
+        builder.AppendLine("                },");
         builder.Append("                ").Append(LiteralReader.StringLiteral(model.InputSourceName ?? "value"))
-            .AppendLine(")");
+            .AppendLine(",");
+        builder.AppendLine("                new global::DotBoxD.Kernels.Model.SourceSpan[]");
+        builder.AppendLine("                {");
+        foreach (var point in SequencePoints(model.Source))
+        {
+            builder.Append("                    new ").Append(TypeNames.GlobalSourceSpan).Append('(')
+                .Append(point.StartLine).Append(", ")
+                .Append(point.StartColumn).Append(", ")
+                .Append(LiteralReader.StringLiteral(point.DocumentId)).Append(", ")
+                .Append(point.EndLine).Append(", ")
+                .Append(point.EndColumn).AppendLine("),");
+        }
+
+        builder.AppendLine("                })");
         builder.AppendLine("        };");
     }
+
+    private static IEnumerable<KernelSourceLocationModel> SequencePoints(KernelSourceLocationModel source)
+        => source.SequencePoints.Count == 0 ? [source] : source.SequencePoints;
 }

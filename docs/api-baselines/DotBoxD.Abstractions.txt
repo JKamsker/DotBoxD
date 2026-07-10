@@ -87,6 +87,7 @@ public IReadOnlyList<KernelDebugDocument> Documents { get; }
 public IReadOnlyList<LoweredPipelineStep> Steps { get; init; }
 public IReadOnlyList<Parameter> Parameters { get; init; }
 public IReadOnlyList<PluginMessage> Messages { get; }
+public IReadOnlyList<SourceSpan> SequenceSpans { get; }
 public IReadOnlyList<Statement> Prefix { get; init; }
 public IReadOnlyList<string> Effects { get; init; }
 public IReadOnlyList<string> RequiredCapabilities { get; init; }
@@ -103,7 +104,7 @@ public LiteralExpression String(string value)
 public LoweredIrMethodKind Kind { get; } = kind
 public LoweredPipelineCompositionResult(SandboxModule module, KernelDebugInfo? debugInfo)
 public LoweredPipelineDebugInfo? DebugInfo { get; init; }
-public LoweredPipelineDebugInfo( IReadOnlyList<KernelDebugDocument> documents, string? inputSourceName = null)
+public LoweredPipelineDebugInfo( IReadOnlyList<KernelDebugDocument> documents, string? inputSourceName = null, IReadOnlyList<SourceSpan>? sequenceSpans = null)
 public LoweredPipelineStep Step { get; }
 public LoweredPipelineStepKind Kind { get; } = kind
 public LoweredPipelineStepKind StepKind { get; }

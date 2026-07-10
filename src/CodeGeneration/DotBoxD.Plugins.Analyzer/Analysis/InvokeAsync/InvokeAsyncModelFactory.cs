@@ -242,7 +242,8 @@ internal static partial class InvokeAsyncModelFactory
             throw new NotSupportedException("call site is not interceptable by the C# compiler.");
         }
 
-        var source = KernelSourceLocationModel.Create(pluginId + ":Invoke", shape.Block, cancellationToken);
+        var source = KernelSourceLocationModel.CreateWithKernelMethods(
+            pluginId + ":Invoke", shape.Block, model, cancellationToken);
         var package = EmitPackage(ns, packageName, pluginId, shape, bodyJson, effects, capabilities, source);
         return new InvokeAsyncResult(package, interception, null);
     }

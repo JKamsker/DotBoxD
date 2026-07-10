@@ -145,6 +145,7 @@ internal static partial class ResultHookChain
             stages,
             terminalLambda,
             isLocal,
+            model,
             cancellationToken);
 
         var interception = Interception(

@@ -71,6 +71,7 @@ public sealed partial class MergeableIrStepGeneratorTests
         Assert.Contains("\"probe.read.distance\"", generated);
         Assert.Contains("LoweredPipelineDebugInfo", generated);
         Assert.Contains("KernelDebugDocument", generated);
+        Assert.Contains("SourceSpan[]", generated);
         Assert.Contains("DotBoxDMergeableIrStepInterceptors", GeneratedHintNames(result));
     }
 

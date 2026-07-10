@@ -62,6 +62,13 @@ public sealed class HookChainRuntimeTests
             .ToHashSet(StringComparer.Ordinal);
         Assert.Contains(package.Entrypoints.ShouldHandle, functions);
         Assert.Contains(package.Entrypoints.Handle, functions);
+        Assert.All(
+            new[] { package.Entrypoints.ShouldHandle, package.Entrypoints.Handle },
+            functionId => Assert.True(debugInfo.SequencePoints
+                .Where(point => nodes[point.NodeId].FunctionId == functionId)
+                .Select(point => (point.Span.Line, point.Span.Column, point.Span.EndLine, point.Span.EndColumn))
+                .Distinct()
+                .Count() > 1));
         Assert.Contains(debugInfo.VariableBindings, binding => binding.SourceName == "e.Distance");
         Assert.Contains(debugInfo.VariableBindings, binding => binding.SourceName == "e.MonsterId");
     }

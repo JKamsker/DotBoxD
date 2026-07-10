@@ -20,6 +20,14 @@ public sealed class LoweredPipelineDebugCompositionTests
         Assert.Equal(2, debugInfo.Documents.Count);
         Assert.NotEmpty(debugInfo.SequencePoints);
         Assert.Contains(debugInfo.VariableBindings, binding => binding.SourceName == "e");
+        var nodes = SandboxNodeMap.Create(result.Module).Nodes.ToDictionary(node => node.Id);
+        Assert.All(
+            new[] { "ShouldHandle", "Handle" },
+            functionId => Assert.True(debugInfo.SequencePoints
+                .Where(point => nodes[point.NodeId].FunctionId == functionId)
+                .Select(point => (point.Span.Line, point.Span.Column, point.Span.EndLine, point.Span.EndColumn))
+                .Distinct()
+                .Count() > 1));
     }
 
     [Fact]

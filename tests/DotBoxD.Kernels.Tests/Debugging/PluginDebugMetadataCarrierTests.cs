@@ -25,6 +25,8 @@ public sealed class PluginDebugMetadataCarrierTests
             .ToHashSet(StringComparer.Ordinal);
         Assert.Contains(package.Entrypoints.ShouldHandle, mappedFunctions);
         Assert.Contains(package.Entrypoints.Handle, mappedFunctions);
+        Assert.True(DistinctLocations(debugInfo, nodes, package.Entrypoints.ShouldHandle) > 1);
+        Assert.True(DistinctLocations(debugInfo, nodes, package.Entrypoints.Handle) > 1);
         Assert.Contains(debugInfo.VariableBindings, binding =>
             binding.FunctionId == package.Entrypoints.ShouldHandle &&
             binding.SourceName == "e.Amount");
@@ -71,5 +73,20 @@ public sealed class PluginDebugMetadataCarrierTests
         Assert.Null(imported.DebugInfo);
         Assert.Equal(CanonicalModuleHasher.Hash(package.Module), CanonicalModuleHasher.Hash(imported.Module));
     }
+
+    private static int DistinctLocations(
+        KernelDebugInfo debugInfo,
+        IReadOnlyDictionary<SandboxNodeId, SandboxNodeDescriptor> nodes,
+        string functionId)
+        => debugInfo.SequencePoints
+            .Where(point => nodes[point.NodeId].FunctionId == functionId)
+            .Select(point => (
+                point.Span.DocumentId,
+                point.Span.Line,
+                point.Span.Column,
+                point.Span.EndLine,
+                point.Span.EndColumn))
+            .Distinct()
+            .Count();
 
 }

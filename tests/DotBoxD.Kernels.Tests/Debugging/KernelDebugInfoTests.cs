@@ -56,6 +56,23 @@ public sealed class KernelDebugInfoTests
     }
 
     [Fact]
+    public void Public_sequence_helper_maps_ordered_authored_locations_across_ir_nodes()
+    {
+        var first = new SourceSpan(10, 3, "plugin", 10, 12);
+        var second = new SourceSpan(11, 7, "plugin", 11, 18);
+        var mapped = KernelDebugModuleMapper.ApplyFunctionSequenceSpans(
+            Module(new SourceSpan(1, 1)),
+            new Dictionary<string, IReadOnlyList<SourceSpan>> { ["main"] = [first, second] });
+
+        var nodes = SandboxNodeMap.Create(mapped).Nodes
+            .Where(node => node.FunctionId == "main" && node.SourceSpan is not null)
+            .ToArray();
+
+        Assert.Equal(first, nodes[0].SourceSpan);
+        Assert.Equal(second, nodes[^1].SourceSpan);
+    }
+
+    [Fact]
     public void Source_debug_metadata_does_not_change_canonical_module_hash()
     {
         var plain = Module(new SourceSpan(1, 1));

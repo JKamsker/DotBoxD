@@ -61,7 +61,9 @@ internal static class DotBoxDDebugInfoSourceEmitter
     {
         builder.Append("        var documents = new ").Append(TypeNames.GlobalKernelDebugDocument).AppendLine("[]");
         builder.AppendLine("        {");
-        foreach (var source in sources)
+        foreach (var source in sources.SelectMany(SequencePoints)
+                     .GroupBy(item => item.DocumentId, StringComparer.Ordinal)
+                     .Select(group => group.First()))
         {
             builder.Append("            new ").Append(TypeNames.GlobalKernelDebugDocument).Append('(')
                 .Append(LiteralReader.StringLiteral(source.DocumentId)).Append(", ")
@@ -75,13 +77,14 @@ internal static class DotBoxDDebugInfoSourceEmitter
     private static void EmitFunctionSpans(StringBuilder builder, PluginKernelModel model)
     {
         builder.Append("        var functionSpans = new ")
-            .Append(TypeNames.GlobalDictionary).Append("<string, ").Append(TypeNames.GlobalSourceSpan).AppendLine(">");
+            .Append(TypeNames.GlobalDictionary).Append("<string, global::System.Collections.Generic.IReadOnlyList<")
+            .Append(TypeNames.GlobalSourceSpan).AppendLine(">>");
         builder.AppendLine("        {");
         EmitFunctionSpan(builder, DotBoxDGenerationNames.Entrypoints.ShouldHandle, model.ShouldHandleSource);
         EmitFunctionSpan(builder, DotBoxDGenerationNames.Entrypoints.Handle, model.HandleSource);
         builder.AppendLine("        };");
         builder.Append("        module = ").Append(TypeNames.GlobalKernelDebugModuleMapper)
-            .AppendLine(".ApplyFunctionSpans(module, functionSpans);");
+            .AppendLine(".ApplyFunctionSequenceSpans(module, functionSpans);");
     }
 
     private static void EmitFunctionSpan(
@@ -94,13 +97,19 @@ internal static class DotBoxDDebugInfoSourceEmitter
             return;
         }
 
-        builder.Append("            [").Append(LiteralReader.StringLiteral(functionId)).Append("] = new ")
-            .Append(TypeNames.GlobalSourceSpan).Append('(')
-            .Append(source.StartLine).Append(", ")
-            .Append(source.StartColumn).Append(", ")
-            .Append(LiteralReader.StringLiteral(source.DocumentId)).Append(", ")
-            .Append(source.EndLine).Append(", ")
-            .Append(source.EndColumn).AppendLine("),");
+        builder.Append("            [").Append(LiteralReader.StringLiteral(functionId)).AppendLine("] = new[]");
+        builder.AppendLine("            {");
+        foreach (var point in SequencePoints(source))
+        {
+            builder.Append("                new ").Append(TypeNames.GlobalSourceSpan).Append('(')
+                .Append(point.StartLine).Append(", ")
+                .Append(point.StartColumn).Append(", ")
+                .Append(LiteralReader.StringLiteral(point.DocumentId)).Append(", ")
+                .Append(point.EndLine).Append(", ")
+                .Append(point.EndColumn).AppendLine("),");
+        }
+
+        builder.AppendLine("            },");
     }
 
     private static void EmitVariableBindings(StringBuilder builder, PluginKernelModel model)
@@ -151,4 +160,7 @@ internal static class DotBoxDDebugInfoSourceEmitter
             .Append(LiteralReader.StringLiteral(functionId)).Append(", ")
             .Append(LiteralReader.StringLiteral(slotName)).Append(", ")
             .Append(LiteralReader.StringLiteral(sourceName)).AppendLine("),");
+
+    private static IEnumerable<KernelSourceLocationModel> SequencePoints(KernelSourceLocationModel source)
+        => source.SequencePoints.Count == 0 ? [source] : source.SequencePoints;
 }

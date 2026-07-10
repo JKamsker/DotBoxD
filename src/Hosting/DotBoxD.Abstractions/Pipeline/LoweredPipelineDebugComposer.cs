@@ -1,4 +1,6 @@
+using DotBoxD.Kernels;
 using DotBoxD.Kernels.Debugging;
+using DotBoxD.Kernels.Model;
 
 namespace DotBoxD.Abstractions;
 
@@ -8,7 +10,7 @@ public static class LoweredPipelineDebugComposer
     public static LoweredPipelineCompositionResult Compose(LoweredPipelineComposition composition)
     {
         ArgumentNullException.ThrowIfNull(composition);
-        var module = LoweredPipelineComposer.Compose(composition);
+        var module = ApplySequenceSpans(LoweredPipelineComposer.Compose(composition), composition);
         var documents = Documents(composition.Steps);
         if (documents.Count == 0)
         {
@@ -20,6 +22,47 @@ public static class LoweredPipelineDebugComposer
             module,
             KernelDebugInfo.Create(module, documents, bindings));
     }
+
+    private static SandboxModule ApplySequenceSpans(
+        SandboxModule module,
+        LoweredPipelineComposition composition)
+    {
+        var functionSpans = new Dictionary<string, IReadOnlyList<SourceSpan>>(StringComparer.Ordinal);
+        var shouldHandle = ShouldHandleSpans(composition.Steps);
+        if (shouldHandle.Count > 0)
+        {
+            functionSpans[composition.ShouldHandleFunctionId] = shouldHandle;
+        }
+
+        var handle = composition.Steps
+            .Where(step => step.Kind == LoweredPipelineStepKind.Projection)
+            .SelectMany(SequenceSpans)
+            .ToArray();
+        if (handle.Length > 0)
+        {
+            functionSpans[composition.HandleFunctionId] = handle;
+        }
+
+        return KernelDebugModuleMapper.ApplyFunctionSequenceSpans(module, functionSpans);
+    }
+
+    private static IReadOnlyList<SourceSpan> ShouldHandleSpans(IReadOnlyList<LoweredPipelineStep> steps)
+    {
+        var lastFilter = -1;
+        for (var index = steps.Count - 1; index >= 0; index--)
+        {
+            if (steps[index].Kind == LoweredPipelineStepKind.Filter)
+            {
+                lastFilter = index;
+                break;
+            }
+        }
+
+        return steps.Take(lastFilter + 1).SelectMany(SequenceSpans).ToArray();
+    }
+
+    private static IEnumerable<SourceSpan> SequenceSpans(LoweredPipelineStep step)
+        => step.DebugInfo?.SequenceSpans ?? [];
 
     private static IReadOnlyList<KernelDebugDocument> Documents(IReadOnlyList<LoweredPipelineStep> steps)
     {
@@ -107,4 +150,3 @@ public static class LoweredPipelineDebugComposer
         }
     }
 }
-

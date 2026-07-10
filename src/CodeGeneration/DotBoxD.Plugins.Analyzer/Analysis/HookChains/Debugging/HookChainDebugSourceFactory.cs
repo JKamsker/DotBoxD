@@ -12,19 +12,24 @@ internal static class HookChainDebugSourceFactory
         IReadOnlyList<HookChainStage> stages,
         LambdaExpressionSyntax terminalLambda,
         bool isLocalCallback,
+        SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
         SyntaxNode shouldHandle = FirstFilter(stages) ?? (SyntaxNode)invocation;
         SyntaxNode handle = HandleSource(stages, terminalLambda, isLocalCallback) ?? (SyntaxNode)invocation;
         return kernel with
         {
-            ShouldHandleSource = KernelSourceLocationModel.Create(
+            ShouldHandleSource = KernelSourceLocationModel.CreateCompositeWithKernelMethods(
                 kernel.PluginId + ":ShouldHandle",
                 shouldHandle,
+                stages.Where(stage => !stage.IsSelect).Select(stage => (SyntaxNode)stage.Lambda),
+                semanticModel,
                 cancellationToken),
-            HandleSource = KernelSourceLocationModel.Create(
+            HandleSource = KernelSourceLocationModel.CreateCompositeWithKernelMethods(
                 kernel.PluginId + ":Handle",
                 handle,
+                stages.Select(stage => (SyntaxNode)stage.Lambda).Append(terminalLambda),
+                semanticModel,
                 cancellationToken)
         };
     }
@@ -35,18 +40,23 @@ internal static class HookChainDebugSourceFactory
         IReadOnlyList<HookChainStage> stages,
         LambdaExpressionSyntax terminalLambda,
         bool isLocal,
+        SemanticModel semanticModel,
         CancellationToken cancellationToken)
         => kernel with
         {
-            ShouldHandleSource = KernelSourceLocationModel.Create(
+            ShouldHandleSource = KernelSourceLocationModel.CreateCompositeWithKernelMethods(
                 kernel.PluginId + ":ShouldHandle",
                 FirstFilter(stages) ?? (SyntaxNode)invocation,
+                stages.Where(stage => !stage.IsSelect).Select(stage => (SyntaxNode)stage.Lambda),
+                semanticModel,
                 cancellationToken),
             HandleSource = isLocal
                 ? null
-                : KernelSourceLocationModel.Create(
+                : KernelSourceLocationModel.CreateCompositeWithKernelMethods(
                     kernel.PluginId + ":Handle",
                     terminalLambda,
+                    stages.Select(stage => (SyntaxNode)stage.Lambda).Append(terminalLambda),
+                    semanticModel,
                     cancellationToken)
         };
 

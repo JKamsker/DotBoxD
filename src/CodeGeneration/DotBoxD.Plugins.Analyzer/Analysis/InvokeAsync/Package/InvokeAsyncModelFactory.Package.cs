@@ -80,16 +80,32 @@ internal static partial class InvokeAsyncModelFactory
         InvokeAsyncCallShape shape,
         KernelSourceLocationModel source)
     {
-        builder.Append("        var span = new ").Append(TypeNames.GlobalSourceSpan).Append('(')
-            .Append(source.StartLine).Append(", ").Append(source.StartColumn).Append(", ")
-            .Append(LiteralReader.StringLiteral(source.DocumentId)).Append(", ")
-            .Append(source.EndLine).Append(", ").Append(source.EndColumn).AppendLine(");");
+        var points = SequencePoints(source).ToArray();
+        builder.Append("        var spans = new ").Append(TypeNames.GlobalSourceSpan).AppendLine("[]");
+        builder.AppendLine("        {");
+        foreach (var point in points)
+        {
+            builder.Append("            new ").Append(TypeNames.GlobalSourceSpan).Append('(')
+                .Append(point.StartLine).Append(", ").Append(point.StartColumn).Append(", ")
+                .Append(LiteralReader.StringLiteral(point.DocumentId)).Append(", ")
+                .Append(point.EndLine).Append(", ").Append(point.EndColumn).AppendLine("),");
+        }
+
+        builder.AppendLine("        };");
         builder.Append("        var module = ").Append(TypeNames.GlobalKernelDebugModuleMapper)
-            .AppendLine(".ApplyFunctionSpans(package.Module, new global::System.Collections.Generic.Dictionary<string, global::DotBoxD.Kernels.Model.SourceSpan> { [\"Invoke\"] = span });");
-        builder.Append("        var document = new ").Append(TypeNames.GlobalKernelDebugDocument).Append('(')
-            .Append(LiteralReader.StringLiteral(source.DocumentId)).Append(", ")
-            .Append(LiteralReader.StringLiteral(source.Path)).Append(", ")
-            .Append(LiteralReader.StringLiteral(source.Sha256Checksum)).AppendLine(");");
+            .AppendLine(".ApplyFunctionSequenceSpans(package.Module, new global::System.Collections.Generic.Dictionary<string, global::System.Collections.Generic.IReadOnlyList<global::DotBoxD.Kernels.Model.SourceSpan>> { [\"Invoke\"] = spans });");
+        builder.Append("        var documents = new ").Append(TypeNames.GlobalKernelDebugDocument).AppendLine("[]");
+        builder.AppendLine("        {");
+        foreach (var document in points.GroupBy(point => point.DocumentId, StringComparer.Ordinal)
+                     .Select(group => group.First()))
+        {
+            builder.Append("            new ").Append(TypeNames.GlobalKernelDebugDocument).Append('(')
+                .Append(LiteralReader.StringLiteral(document.DocumentId)).Append(", ")
+                .Append(LiteralReader.StringLiteral(document.Path)).Append(", ")
+                .Append(LiteralReader.StringLiteral(document.Sha256Checksum)).AppendLine("),");
+        }
+
+        builder.AppendLine("        };");
         builder.Append("        var bindings = new ").Append(TypeNames.GlobalKernelDebugVariableBinding).AppendLine("[]");
         builder.AppendLine("        {");
         foreach (var name in shape.DebugParameterNames)
@@ -101,8 +117,11 @@ internal static partial class InvokeAsyncModelFactory
 
         builder.AppendLine("        };");
         builder.Append("        var debugInfo = ").Append(TypeNames.GlobalKernelDebugInfo)
-            .AppendLine(".Create(module, [document], bindings);");
+            .AppendLine(".Create(module, documents, bindings);");
     }
+
+    private static IEnumerable<KernelSourceLocationModel> SequencePoints(KernelSourceLocationModel source)
+        => source.SequencePoints.Count == 0 ? [source] : source.SequencePoints;
 
     private static string HintName(string ns, string packageName)
         => string.IsNullOrWhiteSpace(ns)
