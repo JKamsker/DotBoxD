@@ -52,4 +52,66 @@ public sealed class RpcContractManifestTests
         Assert.True(change.IsBreaking);
         Assert.Throws<InvalidOperationException>(() => current.EnsureCompatibleWith(previous));
     }
+
+    [Fact]
+    public void Manifest_rejects_null_service_graph_entries_at_construction()
+    {
+        var nullServices = Assert.Throws<ArgumentNullException>(() => new RpcContractManifest(null!));
+        Assert.Equal(nameof(RpcContractManifest.Services), nullServices.ParamName);
+
+        var nullService = Assert.Throws<ArgumentNullException>(() =>
+            new RpcContractManifest([null!]));
+        Assert.Equal(nameof(RpcContractManifest.Services), nullService.ParamName);
+    }
+
+    [Fact]
+    public void Services_reject_null_contract_fields_at_construction()
+    {
+        var nullWireName = Assert.Throws<ArgumentNullException>(() =>
+            new RpcContractService(null!, "IGame", []));
+        Assert.Equal(nameof(RpcContractService.WireName), nullWireName.ParamName);
+
+        var nullContractType = Assert.Throws<ArgumentNullException>(() =>
+            new RpcContractService("game", null!, []));
+        Assert.Equal(nameof(RpcContractService.ContractType), nullContractType.ParamName);
+
+        var nullMethods = Assert.Throws<ArgumentNullException>(() =>
+            new RpcContractService("game", "IGame", null!));
+        Assert.Equal(nameof(RpcContractService.Methods), nullMethods.ParamName);
+
+        var nullMethod = Assert.Throws<ArgumentNullException>(() =>
+            new RpcContractService("game", "IGame", [null!]));
+        Assert.Equal(nameof(RpcContractService.Methods), nullMethod.ParamName);
+    }
+
+    [Fact]
+    public void Methods_reject_null_contract_fields_at_construction()
+    {
+        var nullWireName = Assert.Throws<ArgumentNullException>(() =>
+            new RpcContractMethod(null!, "signature"));
+        Assert.Equal(nameof(RpcContractMethod.WireName), nullWireName.ParamName);
+
+        var nullSignature = Assert.Throws<ArgumentNullException>(() =>
+            new RpcContractMethod("get", null!));
+        Assert.Equal(nameof(RpcContractMethod.Signature), nullSignature.ParamName);
+    }
+
+    [Fact]
+    public void Manifest_rejects_duplicate_flattened_wire_contracts_at_construction()
+    {
+        var duplicateMethods = Assert.Throws<ArgumentException>(() =>
+            new RpcContractManifest([
+                new RpcContractService("game", "IGame", [
+                    new RpcContractMethod("get", "one"),
+                    new RpcContractMethod("get", "two")])]));
+        Assert.Equal(nameof(RpcContractManifest.Services), duplicateMethods.ParamName);
+        Assert.Contains("game/get", duplicateMethods.Message, StringComparison.Ordinal);
+
+        var duplicateServices = Assert.Throws<ArgumentException>(() =>
+            new RpcContractManifest([
+                new RpcContractService("game", "IGame", [new RpcContractMethod("get", "one")]),
+                new RpcContractService("game", "IGameV2", [new RpcContractMethod("get", "two")])]));
+        Assert.Equal(nameof(RpcContractManifest.Services), duplicateServices.ParamName);
+        Assert.Contains("game/get", duplicateServices.Message, StringComparison.Ordinal);
+    }
 }
