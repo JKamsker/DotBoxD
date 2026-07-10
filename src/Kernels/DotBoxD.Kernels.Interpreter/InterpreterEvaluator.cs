@@ -1,3 +1,4 @@
+using DotBoxD.Kernels.Interpreter.Debugging;
 using DotBoxD.Kernels.Interpreter.Frame;
 using DotBoxD.Kernels.Interpreter.Internal.Expressions;
 using DotBoxD.Kernels.Model;
@@ -16,6 +17,8 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
     private readonly string _moduleHash;
     private readonly ExpressionEvaluator _expressions;
     private readonly StatementExecutor _statements;
+    private readonly InterpreterDebugState? _debug;
+    private readonly InterpreterDebugFunctionExecutor? _debugFunctions;
     private readonly Dictionary<string, FunctionFrameLayout> _frameLayouts = new(StringComparer.Ordinal);
 
     public InterpreterEvaluator(ExecutionPlan plan, SandboxContext context, SandboxExecutionOptions options)
@@ -25,8 +28,14 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
         _moduleHash = plan.ModuleHash;
         _functions = plan.FunctionLookup;
         _functionAnalysis = plan.FunctionAnalysis;
-        _expressions = new ExpressionEvaluator(_context, this, _functionAnalysis, _options, _moduleHash);
-        _statements = new StatementExecutor(_context, _expressions, this, _options, _moduleHash);
+        _debug = options.DebugHook is null
+            ? null
+            : new InterpreterDebugState(options.DebugHook, plan.DebugNodeMap, context);
+        _expressions = new ExpressionEvaluator(_context, this, _functionAnalysis, _options, _moduleHash, _debug);
+        _statements = new StatementExecutor(_context, _expressions, this, _options, _moduleHash, _debug);
+        _debugFunctions = _debug is null
+            ? null
+            : new InterpreterDebugFunctionExecutor(_context, _statements, _debug, GetFrameLayout);
     }
 
     public ValueTask<SandboxValue> ExecuteEntrypointAsync(string entrypoint, SandboxValue input)
@@ -113,6 +122,11 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
     // helper called inside a loop costs only its indexed frame object per call.
     public ValueTask<SandboxValue> InvokeFunctionAsync(SandboxFunction function, IReadOnlyList<SandboxValue> args)
     {
+        if (_debug is not null)
+        {
+            return _debugFunctions!.InvokeAsync(function, args);
+        }
+
         _context.EnterCall();
         var exited = false;
         try

@@ -167,6 +167,15 @@ public sealed partial class SandboxHost : IDisposable
             return true;
         }
 
+        if (options.DebugHook is not null && options.Isolation == SandboxIsolation.WorkerProcess)
+        {
+            result = InvalidExecutionOptionsResult(
+                plan,
+                options,
+                "worker-process interpreter debugging is not supported by protocol version 1");
+            return true;
+        }
+
         if (TryGetCapabilityDenial(plan, entrypoint, out var denial))
         {
             result = CapabilityDeniedResult(plan, options, denial);

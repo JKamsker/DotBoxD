@@ -200,7 +200,7 @@ public sealed partial class SandboxHost
         SandboxExecutionOptions options)
         => _compiled.IsAvailable &&
            options.Mode == ExecutionMode.Compiled &&
-           !options.EnableDebugTrace &&
+           !options.RequiresInterpreter &&
            options.SuppressSuccessfulRunSummaryAudit &&
            plan.BindingReferences.TryGetValue(entrypoint, out var allowedBindings) &&
            allowedBindings.Count == 0;

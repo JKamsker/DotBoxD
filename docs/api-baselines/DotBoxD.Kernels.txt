@@ -3,6 +3,7 @@
 # Update intentionally with scripts/check-api-compat-baseline.ps1 -Update when approving public API changes.
 
 public abstract record Expression(SourceSpan Span)
+public abstract record SandboxDebugValuePathSegment
 public abstract record SandboxValue
 public abstract record Statement(SourceSpan Span)
 public abstract SandboxType Type { get; }
@@ -27,6 +28,7 @@ public bool ExecutionDispatched { get; init; }
 public bool GrantsCapability(string capabilityId, DateTimeOffset now)
 public bool GrantsCapability(string capabilityId)
 public bool HasBindingAuditSince( BindingDescriptor descriptor, long checkpoint, bool success, SandboxErrorCode? expectedErrorCode, SandboxRunId runId, string moduleHash, string policyHash)
+public bool IsAssigned { get; }
 public bool IsAsync { get; init; }
 public bool IsForbidden() => IsForbidden(this)
 public bool IsKnown(int maxDepth = 8) => IsKnown(this, 0, maxDepth, declaredOpaqueIdTypes: null)
@@ -83,6 +85,17 @@ public enum ExecutionMode
 public enum ExecutionMode.Auto
 public enum ExecutionMode.Compiled
 public enum ExecutionMode.Interpreted
+public enum SandboxDebugCheckpointKind
+public enum SandboxDebugCheckpointKind.Call
+public enum SandboxDebugCheckpointKind.Exception
+public enum SandboxDebugCheckpointKind.Expression
+public enum SandboxDebugCheckpointKind.FunctionEntry
+public enum SandboxDebugCheckpointKind.FunctionExit
+public enum SandboxDebugCheckpointKind.LoopIteration
+public enum SandboxDebugCheckpointKind.Statement
+public enum SandboxDebugVariableKind
+public enum SandboxDebugVariableKind.Argument
+public enum SandboxDebugVariableKind.Local
 public enum SandboxEffect
 public enum SandboxEffect.Alloc = 1 << 1
 public enum SandboxEffect.Audit = 1 << 11
@@ -130,6 +143,7 @@ public int CompareTo(SemVersion? other)
 public int Count => _values.Count
 public int HostCalls { get => _hostCalls; init => _hostCalls = RequireNonNegative(value, nameof(HostCalls)); }
 public int HostCalls { get; private set; }
+public int Index { get; }
 public int Line { get => _line; init => _line = ValidateCoordinate(value, nameof(Line)); }
 public int LogEvents { get => _logEvents; init => _logEvents = RequireNonNegative(value, nameof(LogEvents)); }
 public int LogEvents { get; private set; }
@@ -140,6 +154,8 @@ public int Patch { get => _patch; init => _patch = RequireNonNegative(value, nam
 public int Version { get; }
 public interface IAuditSink
 public interface IBindingCatalog
+public interface ISandboxDebugFrame
+public interface ISandboxExecutionDebugHook
 public IReadOnlyDictionary<SandboxValue, SandboxValue> Values { get => _values; init => _values = Snapshot(value); }
 public IReadOnlyDictionary<string, FunctionAnalysis> FunctionAnalysis { get; }
 public IReadOnlyDictionary<string, IReadOnlySet<string>> BindingReferences { get; }
@@ -165,6 +181,8 @@ public IReadOnlyList<Statement> Body { get => _body; init => _body = ModelCopy.L
 public IReadOnlyList<Statement> Else { get => _else; init => _else = ModelCopy.List(value); }
 public IReadOnlyList<Statement> Then { get => _then; init => _then = ModelCopy.List(value); }
 public IReadOnlySet<string> DeclaredOpaqueIdTypes { get; init; }
+public ISandboxDebugFrame Frame { get; }
+public ISandboxExecutionDebugHook? DebugHook { get; init; }
 public long AllocatedBytes { get => _allocatedBytes; init => _allocatedBytes = RequireNonNegative(value, nameof(AllocatedBytes)); }
 public long AllocatedBytes => _allocatedBytes
 public long AuditCheckpoint() => Audit.EventsWritten
@@ -223,9 +241,17 @@ public ResourceLimits ResourceLimits { get => _resourceLimits; init { _resourceL
 public ResourceMeter Budget { get; }
 public ResourceMeter(ResourceLimits limits)
 public SandboxContext( SandboxRunId runId, SandboxPolicy policy, ResourceMeter budget, BindingRegistry bindings, IAuditSink audit, CancellationToken cancellationToken, IReadOnlySet<string>? allowedBindingIds = null, string? moduleHash = null, string? policyHash = null)
+public SandboxDebugCheckpoint( SandboxRunId runId, SandboxNodeDescriptor node, SandboxDebugCheckpointKind kind, ISandboxDebugFrame frame, SandboxValue? value = null, SandboxError? error = null)
+public SandboxDebugCheckpointKind Kind { get; }
+public SandboxDebugListIndex(int index)
+public SandboxDebugMapValue(SandboxValue key)
+public SandboxDebugRecordField(int index)
+public SandboxDebugVariable( string name, SandboxType type, SandboxDebugVariableKind kind, bool isAssigned, SandboxValue? value)
+public SandboxDebugVariableKind Kind { get; }
 public SandboxEffect AllowedEffects { get => _allowedEffects; init { _allowedEffects = value; ResetHash(); } }
 public SandboxEffect Effect { get => _effect; init => _effect = RequireKnownEffect(value, nameof(Effect)); }
 public SandboxError Error { get; }
+public SandboxError? Error { get; }
 public SandboxError? Error { get; init; }
 public SandboxErrorCode Code { get; init; }
 public SandboxErrorCode? ErrorCode { get; init; }
@@ -234,6 +260,7 @@ public SandboxModule Module { get; }
 public SandboxNodeDescriptor GetDescriptor(Expression expression)
 public SandboxNodeDescriptor GetDescriptor(SandboxFunction function)
 public SandboxNodeDescriptor GetDescriptor(Statement statement)
+public SandboxNodeDescriptor Node { get; }
 public SandboxNodeDescriptor( SandboxNodeId id, string functionId, SandboxNodeKind kind, string structuralPath, SourceSpan? sourceSpan)
 public SandboxNodeId Id { get; }
 public SandboxNodeId(string value)
@@ -274,10 +301,13 @@ public SandboxRunId RunId { get => _runId; init => _runId = value ?? throw new A
 public SandboxRunId RunId { get; }
 public SandboxRunId? RunId { get; init; }
 public SandboxRuntimeException(SandboxError error)
+public SandboxType Type { get; }
 public SandboxUri Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
 public SandboxValidationException(IReadOnlyList<SandboxDiagnostic> diagnostics)
 public SandboxValue ChargeBindingReturn(BindingDescriptor descriptor, SandboxValue value)
+public SandboxValue Key { get; }
 public SandboxValue this[int index] => _values[index]
+public SandboxValue? Value { get; }
 public SandboxValue? Value { get; init; }
 public sealed class BindingRegistry : IBindingCatalog
 public sealed class BindingRegistryBuilder
@@ -319,6 +349,11 @@ public sealed record RecordValue : SandboxValue
 public sealed record ResourceLimits( long MaxFuel = 100_000, long MaxLoopIterations = 100_000, TimeSpan? MaxWallTime = null, long MaxAllocatedBytes = 1_048_576, int MaxCallDepth = 64, int MaxHostCalls = 100, int MaxListLength = 10_000, int MaxMapEntries = 10_000, int MaxCollectionDepth = 32, long MaxTotalCollectionElements = 100_000, long MaxFileBytesRead = 1_048_576, long MaxFileBytesWritten = 0, long MaxNetworkBytesRead = 1_048_576, long MaxNetworkBytesWritten = 1_048_576, int MaxLogEvents = 100, int MaxLogMessageLength = 4_096, int MaxStringLength = 65_536, long MaxTotalStringBytes = 1_048_576)
 public sealed record ReturnStatement(Expression Value, SourceSpan Span) : Statement(Span)
 public sealed record SandboxAuditEvent( SandboxRunId RunId, string Kind, DateTimeOffset Timestamp, bool Success, string? BindingId = null, string? CapabilityId = null, SandboxEffect Effect = SandboxEffect.None, string? ResourceId = null, SandboxErrorCode? ErrorCode = null, string? Message = null, long? Bytes = null, IReadOnlyDictionary<string, string>? Fields = null, long SequenceNumber = 0)
+public sealed record SandboxDebugCheckpoint
+public sealed record SandboxDebugListIndex : SandboxDebugValuePathSegment
+public sealed record SandboxDebugMapValue : SandboxDebugValuePathSegment
+public sealed record SandboxDebugRecordField : SandboxDebugValuePathSegment
+public sealed record SandboxDebugVariable
 public sealed record SandboxDiagnostic( string Code, string Message, DiagnosticSeverity Severity = DiagnosticSeverity.Error, SourceSpan? Span = null)
 public sealed record SandboxError( SandboxErrorCode Code, string SafeMessage, string? DiagnosticId = null)
 public sealed record SandboxExecutionOptions
@@ -473,6 +508,7 @@ public string Kind { get => _kind; init => _kind = value ?? throw new ArgumentNu
 public string ManifestHash { get; }
 public string Message { get => _message; init => _message = ValidateText(value, nameof(Message)); }
 public string ModuleHash { get; }
+public string Name { get; }
 public string Name { get; init; } = Name ?? throw new ArgumentNullException(nameof(Name))
 public string PlanHash { get; }
 public string PolicyHash { get; }

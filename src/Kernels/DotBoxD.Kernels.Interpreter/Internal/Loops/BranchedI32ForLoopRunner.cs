@@ -24,7 +24,7 @@ internal static class BranchedI32ForLoopRunner
         SandboxExecutionOptions options,
         I32CallEvaluator calls)
     {
-        if (options.EnableDebugTrace ||
+        if (options.RequiresInterpreter ||
             start >= end ||
             !TryCreatePlan(statement, frame, calls, out var plan))
         {

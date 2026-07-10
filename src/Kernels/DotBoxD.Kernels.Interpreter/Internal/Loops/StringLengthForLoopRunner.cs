@@ -18,7 +18,7 @@ internal static class StringLengthForLoopRunner
         SandboxContext context,
         SandboxExecutionOptions options)
     {
-        if (options.EnableDebugTrace ||
+        if (options.RequiresInterpreter ||
             start >= end ||
             !TryCreatePlan(statement, frame, context.Bindings, out var plan))
         {

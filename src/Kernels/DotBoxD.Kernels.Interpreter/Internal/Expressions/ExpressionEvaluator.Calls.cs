@@ -1,3 +1,4 @@
+using DotBoxD.Kernels.Debugging;
 using DotBoxD.Kernels.Interpreter.Frame;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
@@ -33,6 +34,22 @@ internal sealed partial class ExpressionEvaluator
     };
 
     private ValueTask<SandboxValue> EvaluateCall(CallExpression call, InterpreterFrame frame)
+    {
+        if (_debug is not null)
+        {
+            return EvaluateDebugCallAsync(call, frame);
+        }
+
+        return EvaluateCallCore(call, frame);
+    }
+
+    private async ValueTask<SandboxValue> EvaluateDebugCallAsync(CallExpression call, InterpreterFrame frame)
+    {
+        await _debug!.CheckpointAsync(SandboxDebugCheckpointKind.Call, call, frame).ConfigureAwait(false);
+        return await EvaluateCallCore(call, frame).ConfigureAwait(false);
+    }
+
+    private ValueTask<SandboxValue> EvaluateCallCore(CallExpression call, InterpreterFrame frame)
     {
         if (UnaryPureIntrinsicDispatcher.IsCandidate(call.Name) &&
             UnaryPureIntrinsicDispatcher.TryEvaluate(

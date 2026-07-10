@@ -19,7 +19,7 @@ internal static class I64ForLoopRunner
         SandboxContext context,
         SandboxExecutionOptions options)
     {
-        if (options.EnableDebugTrace ||
+        if (options.RequiresInterpreter ||
             start >= end ||
             !TryCreateBody(statement, frame, out var body, out var fuelPerIteration))
         {

@@ -17,7 +17,7 @@ internal static class I32ForLoopRunner
         SandboxExecutionOptions options,
         I32CallEvaluator calls)
     {
-        if (options.EnableDebugTrace ||
+        if (options.RequiresInterpreter ||
             start >= end ||
             !TryCreateBodyPlan(statement, frame, calls, out var body, out var fuelPerIteration))
         {

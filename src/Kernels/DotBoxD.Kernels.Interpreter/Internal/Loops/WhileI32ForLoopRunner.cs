@@ -22,7 +22,7 @@ internal static class WhileI32ForLoopRunner
         SandboxExecutionOptions options,
         I32CallEvaluator calls)
     {
-        if (options.EnableDebugTrace ||
+        if (options.RequiresInterpreter ||
             !I32ComparisonPlan.TryCreate(statement.Condition, frame, "", calls, out var condition) ||
             !TryCreateBody(statement.Body, frame, calls, out var body, out var bodyFuel))
         {

@@ -17,7 +17,7 @@ internal static class ListCountForLoopRunner
         SandboxContext context,
         SandboxExecutionOptions options)
     {
-        if (options.EnableDebugTrace ||
+        if (options.RequiresInterpreter ||
             start >= end ||
             !TryCreatePlan(statement, frame, out var plan))
         {

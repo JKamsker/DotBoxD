@@ -14,28 +14,34 @@ using DotBoxD.Kernels;
 /// </summary>
 internal sealed class FunctionFrameLayout
 {
-    private static readonly HashSet<string> BoolBinaryOperators = new(StringComparer.Ordinal)
-    {
-        "&&", "||", "==", "!=", "<", "<=", ">", ">="
-    };
-
     private readonly Dictionary<string, int> _slots;
+    private readonly string[] _slotNames;
+    private readonly SandboxType?[] _slotTypes;
     private readonly SlotKind[] _slotKinds;
 
-    private FunctionFrameLayout(string functionId, Dictionary<string, int> slots, SlotKind[] slotKinds)
+    private FunctionFrameLayout(
+        string functionId,
+        int parameterCount,
+        Dictionary<string, int> slots,
+        SandboxType?[] slotTypes)
     {
         FunctionId = functionId;
+        ParameterCount = parameterCount;
         _slots = slots;
-        _slotKinds = slotKinds;
+        _slotNames = BuildSlotNames(slots);
+        _slotTypes = slotTypes;
+        _slotKinds = slotTypes.Select(KindOf).ToArray();
         SlotCount = slots.Count;
-        HasI32Slots = Array.IndexOf(slotKinds, SlotKind.I32) >= 0;
-        HasI64Slots = Array.IndexOf(slotKinds, SlotKind.I64) >= 0;
-        HasF64Slots = Array.IndexOf(slotKinds, SlotKind.F64) >= 0;
+        HasI32Slots = Array.IndexOf(_slotKinds, SlotKind.I32) >= 0;
+        HasI64Slots = Array.IndexOf(_slotKinds, SlotKind.I64) >= 0;
+        HasF64Slots = Array.IndexOf(_slotKinds, SlotKind.F64) >= 0;
     }
 
     public string FunctionId { get; }
 
     public int SlotCount { get; }
+
+    public int ParameterCount { get; }
 
     public bool HasI32Slots { get; }
 
@@ -60,13 +66,22 @@ internal sealed class FunctionFrameLayout
         }
 
         CollectStatements(function.Body, slots);
-        return new FunctionFrameLayout(function.Id, slots, BuildSlotKinds(function, functionAnalysis, bindings, slots));
+        var slotTypes = FunctionFrameTypeResolver.Resolve(function, functionAnalysis, bindings, slots);
+        return new FunctionFrameLayout(function.Id, function.Parameters.Count, slots, slotTypes);
     }
 
     public int GetSlot(string name)
         => _slots.TryGetValue(name, out var slot)
             ? slot
             : throw Unknown(name);
+
+    public bool TryGetSlot(string name, out int slot) => _slots.TryGetValue(name, out slot);
+
+    public string GetName(int slot) => _slotNames[slot];
+
+    public SandboxType? GetType(int slot) => _slotTypes[slot];
+
+    public bool IsArgument(int slot) => slot < ParameterCount;
 
     public bool IsI32Slot(int slot) => _slotKinds[slot] == SlotKind.I32;
 
@@ -115,137 +130,6 @@ internal sealed class FunctionFrameLayout
         }
     }
 
-    private static SlotKind[] BuildSlotKinds(
-        SandboxFunction function,
-        IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis,
-        IBindingCatalog bindings,
-        Dictionary<string, int> slots)
-    {
-        var candidates = new Dictionary<string, SlotKind>(StringComparer.Ordinal);
-        foreach (var parameter in function.Parameters)
-        {
-            Observe(candidates, parameter.Name, KindOf(parameter.Type));
-        }
-
-        ScanLocalKinds(function.Body, function, functionAnalysis, bindings, candidates);
-        var slotKinds = new SlotKind[slots.Count];
-        foreach (var pair in slots)
-        {
-            slotKinds[pair.Value] = candidates.TryGetValue(pair.Key, out var kind) ? kind : SlotKind.Boxed;
-        }
-
-        return slotKinds;
-    }
-
-    private static void ScanLocalKinds(
-        IReadOnlyList<Statement> statements,
-        SandboxFunction function,
-        IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis,
-        IBindingCatalog bindings,
-        Dictionary<string, SlotKind> candidates)
-    {
-        foreach (var statement in statements)
-        {
-            switch (statement)
-            {
-                case AssignmentStatement assignment:
-                    Observe(candidates, assignment.Name, KindOf(InferType(assignment.Value, function, functionAnalysis, bindings, candidates)));
-                    break;
-                case IfStatement branch:
-                    ScanLocalKinds(branch.Then, function, functionAnalysis, bindings, candidates);
-                    ScanLocalKinds(branch.Else, function, functionAnalysis, bindings, candidates);
-                    break;
-                case ForRangeStatement range:
-                    Observe(candidates, range.LocalName, SlotKind.I32);
-                    ScanLocalKinds(range.Body, function, functionAnalysis, bindings, candidates);
-                    break;
-                case WhileStatement loop:
-                    ScanLocalKinds(loop.Body, function, functionAnalysis, bindings, candidates);
-                    break;
-            }
-        }
-    }
-
-    private static void Observe(Dictionary<string, SlotKind> candidates, string name, SlotKind kind)
-    {
-        if (!candidates.TryGetValue(name, out var existing))
-        {
-            candidates[name] = kind;
-            return;
-        }
-
-        candidates[name] = existing == kind ? existing : SlotKind.Boxed;
-    }
-
-    private static SandboxType? InferType(
-        Expression expression,
-        SandboxFunction function,
-        IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis,
-        IBindingCatalog bindings,
-        IReadOnlyDictionary<string, SlotKind> candidates)
-    {
-        if (expression is LiteralExpression literal)
-        {
-            return literal.Value.Type;
-        }
-
-        if (expression is VariableExpression variable)
-        {
-            return InferVariableType(variable, function, candidates);
-        }
-
-        if (expression is UnaryExpression unary)
-        {
-            return string.Equals(unary.Operator, "!", StringComparison.Ordinal)
-                ? SandboxType.Bool
-                : InferType(unary.Operand, function, functionAnalysis, bindings, candidates);
-        }
-
-        if (expression is BinaryExpression binary)
-        {
-            return BoolBinaryOperators.Contains(binary.Operator)
-                ? SandboxType.Bool
-                : InferType(binary.Left, function, functionAnalysis, bindings, candidates);
-        }
-
-        return expression is CallExpression call ? InferCallType(call, functionAnalysis, bindings) : null;
-    }
-
-    private static SandboxType? InferVariableType(
-        VariableExpression variable,
-        SandboxFunction function,
-        IReadOnlyDictionary<string, SlotKind> candidates)
-        => candidates.TryGetValue(variable.Name, out var kind) && TypeOf(kind) is { } type
-            ? type
-            : ParameterType(function, variable.Name);
-
-    private static SandboxType? InferCallType(
-        CallExpression call,
-        IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis,
-        IBindingCatalog bindings)
-        => call.Name switch
-        {
-            "list.count" => SandboxType.I32,
-            "numeric.toI64" => SandboxType.I64,
-            "numeric.toF64" => SandboxType.F64,
-            _ => functionAnalysis.TryGetValue(call.Name, out var analysis)
-                ? analysis.ReturnType
-                : bindings.TryGet(call.Name, out var binding) ? binding.ReturnType : null
-        };
-
-    private static SandboxType? ParameterType(SandboxFunction function, string name)
-    {
-        foreach (var parameter in function.Parameters)
-        {
-            if (string.Equals(parameter.Name, name, StringComparison.Ordinal))
-            {
-                return parameter.Type;
-            }
-        }
-
-        return null;
-    }
-
     private static SlotKind KindOf(SandboxType? type)
         => type switch
         {
@@ -255,14 +139,16 @@ internal sealed class FunctionFrameLayout
             _ => SlotKind.Boxed
         };
 
-    private static SandboxType? TypeOf(SlotKind kind)
-        => kind switch
+    private static string[] BuildSlotNames(Dictionary<string, int> slots)
+    {
+        var names = new string[slots.Count];
+        foreach (var pair in slots)
         {
-            SlotKind.I32 => SandboxType.I32,
-            SlotKind.I64 => SandboxType.I64,
-            SlotKind.F64 => SandboxType.F64,
-            _ => null
-        };
+            names[pair.Value] = pair.Key;
+        }
+
+        return names;
+    }
 
     private static SandboxRuntimeException Unknown(string name)
         => new(new SandboxError(SandboxErrorCode.ValidationError, $"unknown local '{name}' at runtime"));
