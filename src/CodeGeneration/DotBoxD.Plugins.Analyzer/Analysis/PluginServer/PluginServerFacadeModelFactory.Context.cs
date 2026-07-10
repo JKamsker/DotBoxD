@@ -79,7 +79,8 @@ internal static partial class PluginServerFacadeModelFactory
                 continue;
             }
 
-            if (argument.Value.Value is string { Length: > 0 } factoryName)
+            if (argument.Value.Value is string factoryName &&
+                !string.IsNullOrWhiteSpace(factoryName))
             {
                 return factoryName;
             }
