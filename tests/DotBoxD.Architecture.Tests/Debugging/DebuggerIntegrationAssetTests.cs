@@ -45,7 +45,8 @@ public sealed class DebuggerIntegrationAssetTests
             project.Descendants().Single(item => item.Name.LocalName == "TemplateOutputDirectory").Value);
         Assert.Contains(
             project.Descendants().Where(item => item.Name.LocalName == "Target"),
-            item => item.Attribute("Name")?.Value == "PrepareVsixIntermediateOutput");
+            item => item.Attribute("Name")?.Value == "PrepareVsixIntermediateOutput" &&
+                    item.Attribute("BeforeTargets")?.Value == "GenerateFileManifest");
         Assert.Contains(
             manifest.Descendants().Where(item => item.Name.LocalName == "Asset"),
             item => item.Attribute("Path")?.Value == "AdapterRegistration.pkgdef");

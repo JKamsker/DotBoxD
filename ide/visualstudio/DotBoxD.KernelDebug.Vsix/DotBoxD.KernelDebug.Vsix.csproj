@@ -48,7 +48,7 @@
   </Target>
 
   <Import Project="$(VSToolsPath)\vssdk\Microsoft.VsSDK.targets" />
-  <Target Name="PrepareVsixIntermediateOutput" BeforeTargets="GenerateTemplatesManifest">
+  <Target Name="PrepareVsixIntermediateOutput" BeforeTargets="GenerateFileManifest">
     <MakeDir Directories="$(VsixIntermediateOutputPath)" />
   </Target>
   <Target Name="BuildVsixContainer"
