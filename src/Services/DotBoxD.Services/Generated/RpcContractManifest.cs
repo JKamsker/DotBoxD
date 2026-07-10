@@ -9,6 +9,14 @@ public sealed record RpcContractManifest(IReadOnlyList<RpcContractService> Servi
 {
     public const int CurrentFormatVersion = 1;
 
+    private readonly IReadOnlyList<RpcContractService> _services = ValidateList(Services, nameof(Services));
+
+    public IReadOnlyList<RpcContractService> Services
+    {
+        get => _services;
+        init => _services = ValidateList(value, nameof(Services));
+    }
+
     public int FormatVersion { get; init; } = CurrentFormatVersion;
 
     public static RpcContractManifest Create(params Assembly[] assemblies)
@@ -134,6 +142,24 @@ public sealed record RpcContractManifest(IReadOnlyList<RpcContractService> Servi
                 new KeyValuePair<string, string>($"{service.WireName}/{method.WireName}", method.Signature)))
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
 
+    private static IReadOnlyList<T> ValidateList<T>(IReadOnlyList<T>? values, string paramName)
+    {
+        if (values is null)
+        {
+            throw new ArgumentNullException(paramName);
+        }
+
+        for (var i = 0; i < values.Count; i++)
+        {
+            if (values[i] is null)
+            {
+                throw new ArgumentException("Collection cannot contain null elements.", paramName);
+            }
+        }
+
+        return values;
+    }
+
     private static string TypeName(Type? type) => type?.FullName ?? string.Empty;
 
     private static string Default(object? value) => value is null
@@ -146,9 +172,72 @@ public sealed record RpcContractManifest(IReadOnlyList<RpcContractService> Servi
 public sealed record RpcContractService(
     string WireName,
     string ContractType,
-    IReadOnlyList<RpcContractMethod> Methods);
+    IReadOnlyList<RpcContractMethod> Methods)
+{
+    private readonly string _wireName = ValidateString(WireName, nameof(WireName));
+    private readonly string _contractType = ValidateString(ContractType, nameof(ContractType));
+    private readonly IReadOnlyList<RpcContractMethod> _methods = ValidateList(Methods, nameof(Methods));
 
-public sealed record RpcContractMethod(string WireName, string Signature);
+    public string WireName
+    {
+        get => _wireName;
+        init => _wireName = ValidateString(value, nameof(WireName));
+    }
+
+    public string ContractType
+    {
+        get => _contractType;
+        init => _contractType = ValidateString(value, nameof(ContractType));
+    }
+
+    public IReadOnlyList<RpcContractMethod> Methods
+    {
+        get => _methods;
+        init => _methods = ValidateList(value, nameof(Methods));
+    }
+
+    private static string ValidateString(string? value, string paramName)
+        => value ?? throw new ArgumentNullException(paramName);
+
+    private static IReadOnlyList<T> ValidateList<T>(IReadOnlyList<T>? values, string paramName)
+    {
+        if (values is null)
+        {
+            throw new ArgumentNullException(paramName);
+        }
+
+        for (var i = 0; i < values.Count; i++)
+        {
+            if (values[i] is null)
+            {
+                throw new ArgumentException("Collection cannot contain null elements.", paramName);
+            }
+        }
+
+        return values;
+    }
+}
+
+public sealed record RpcContractMethod(string WireName, string Signature)
+{
+    private readonly string _wireName = ValidateString(WireName, nameof(WireName));
+    private readonly string _signature = ValidateString(Signature, nameof(Signature));
+
+    public string WireName
+    {
+        get => _wireName;
+        init => _wireName = ValidateString(value, nameof(WireName));
+    }
+
+    public string Signature
+    {
+        get => _signature;
+        init => _signature = ValidateString(value, nameof(Signature));
+    }
+
+    private static string ValidateString(string? value, string paramName)
+        => value ?? throw new ArgumentNullException(paramName);
+}
 
 public enum RpcContractChangeKind
 {
