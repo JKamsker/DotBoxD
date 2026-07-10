@@ -15,6 +15,15 @@ public sealed class SandboxRecordContractTests
     }
 
     [Fact]
+    public void Owned_record_factory_rejects_null_array_before_wrapping()
+    {
+        var ex = Assert.Throws<ArgumentNullException>(() =>
+            SandboxValue.FromOwnedRecord(null!));
+
+        Assert.Equal("fields", ex.ParamName);
+    }
+
+    [Fact]
     public void Non_empty_records_report_known_self_type_and_validate()
     {
         var value = SandboxValue.FromRecord([

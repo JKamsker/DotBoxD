@@ -186,7 +186,10 @@ public sealed record RecordValue : SandboxValue
     /// Internal because the owned-array contract cannot be enforced for external callers.
     /// </summary>
     internal static RecordValue FromOwnedFields(SandboxValue[] fields)
-        => new(new OwnedSnapshot(fields));
+    {
+        ArgumentNullException.ThrowIfNull(fields);
+        return new(new OwnedSnapshot(fields));
+    }
 
     private static IReadOnlyList<SandboxValue> Snapshot(IReadOnlyList<SandboxValue> fields)
     {
