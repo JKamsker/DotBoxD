@@ -11,10 +11,10 @@ $sourcePaths = @(
     "src/Hosting/DotBoxD.Plugins/Runtime/Diagnostics/PluginDiagnosticCodes.cs"
 )
 
-$reference = Get-Content -LiteralPath $referencePath -Raw
+$reference = Get-Content -LiteralPath $referencePath -Raw -Encoding utf8
 $codes = @(
     foreach ($relativePath in $sourcePaths) {
-        $source = Get-Content -LiteralPath (Join-Path $root $relativePath) -Raw
+        $source = Get-Content -LiteralPath (Join-Path $root $relativePath) -Raw -Encoding utf8
         foreach ($match in [regex]::Matches($source, '"(?<code>DBX[SK][0-9]{3})"')) {
             $match.Groups["code"].Value
         }
@@ -28,7 +28,7 @@ if ($codes.Count -eq 0) {
 $missing = @()
 foreach ($code in $codes) {
     $anchor = '<a id="' + $code.ToLowerInvariant() + '"></a>`' + $code + '`'
-    if (-not $reference.Contains($anchor, [System.StringComparison]::Ordinal)) {
+    if ($reference.IndexOf($anchor, [System.StringComparison]::Ordinal) -lt 0) {
         $missing += $code
     }
 }
@@ -37,14 +37,15 @@ if ($missing.Count -gt 0) {
     throw "Diagnostics reference is missing stable actionable anchors for: $($missing -join ', ')"
 }
 
+$arrow = [char]0x2192
 $requiredColumns = @(
     "Cause",
-    "Bad example → correction",
+    "Bad example $arrow correction",
     "Alternative or fallback",
     "Suppression policy"
 )
 foreach ($column in $requiredColumns) {
-    if (-not $reference.Contains($column, [System.StringComparison]::Ordinal)) {
+    if ($reference.IndexOf($column, [System.StringComparison]::Ordinal) -lt 0) {
         throw "Diagnostics reference is missing the required '$column' field."
     }
 }
