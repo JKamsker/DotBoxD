@@ -8,8 +8,8 @@ internal sealed class PluginDebugCoordinator : IDisposable
 {
     private readonly object _gate = new();
     private readonly HashSet<InstalledKernel> _kernels = new(ReferenceEqualityComparer.Instance);
+    private readonly List<DebugPause> _pauses = [];
     private PluginDebugSession? _attached;
-    private DebugPause? _pause;
     private bool _disposed;
 
     public PluginDebugCoordinator(PluginRemoteDebugOptions? options)
@@ -72,9 +72,7 @@ internal sealed class PluginDebugCoordinator : IDisposable
         Task? wait;
         lock (_gate)
         {
-            wait = _pause is not null && Applies(_pause, kernel, runId: null)
-                ? _pause.Resume.Task
-                : null;
+            wait = _pauses.FirstOrDefault(pause => Applies(pause, kernel, runId: null))?.Resume.Task;
         }
 
         return wait is null ? default : new ValueTask(wait.WaitAsync(cancellationToken));
@@ -128,9 +126,7 @@ internal sealed class PluginDebugCoordinator : IDisposable
     {
         lock (_gate)
         {
-            var wait = _pause is not null && Applies(_pause, kernel, runId)
-                ? _pause.Resume.Task
-                : null;
+            var wait = _pauses.FirstOrDefault(pause => Applies(pause, kernel, runId))?.Resume.Task;
             var session = wait is null && OwnsKernel(_attached, kernel) ? _attached : null;
             return new CheckpointTarget(session, wait);
         }
@@ -143,10 +139,10 @@ internal sealed class PluginDebugCoordinator : IDisposable
     {
         lock (_gate)
         {
-            if (_pause is not null)
+            var existing = _pauses.FirstOrDefault(pause => Applies(pause, kernel, runId));
+            if (existing is not null)
             {
-                var wait = Applies(_pause, kernel, runId) ? _pause.Resume.Task : null;
-                return new PauseAcquisition(wait, Created: false);
+                return new PauseAcquisition(existing.Resume.Task, Created: false);
             }
 
             if (!ReferenceEquals(_attached, candidate))
@@ -155,7 +151,7 @@ internal sealed class PluginDebugCoordinator : IDisposable
             }
 
             var pause = new DebugPause(candidate, runId, candidate.PauseScope);
-            _pause = pause;
+            _pauses.Add(pause);
             return new PauseAcquisition(pause.Resume.Task, Created: true);
         }
     }
@@ -165,12 +161,13 @@ internal sealed class PluginDebugCoordinator : IDisposable
         TaskCompletionSource? resume = null;
         lock (_gate)
         {
-            if (_pause is not null &&
-                ReferenceEquals(_pause.Session, session) &&
-                string.Equals(_pause.RunId.ToString(), runId, StringComparison.Ordinal))
+            var pause = _pauses.FirstOrDefault(candidate =>
+                ReferenceEquals(candidate.Session, session) &&
+                string.Equals(candidate.RunId.ToString(), runId, StringComparison.Ordinal));
+            if (pause is not null)
             {
-                resume = _pause.Resume;
-                _pause = null;
+                resume = pause.Resume;
+                _pauses.Remove(pause);
             }
         }
 
@@ -203,7 +200,7 @@ internal sealed class PluginDebugCoordinator : IDisposable
     public void Detach(PluginDebugSession session)
     {
         InstalledKernel[] kernels;
-        TaskCompletionSource? resume;
+        TaskCompletionSource[] resumes;
         lock (_gate)
         {
             if (!ReferenceEquals(_attached, session))
@@ -213,8 +210,8 @@ internal sealed class PluginDebugCoordinator : IDisposable
 
             _attached = null;
             kernels = _kernels.ToArray();
-            resume = _pause?.Resume;
-            _pause = null;
+            resumes = _pauses.Select(pause => pause.Resume).ToArray();
+            _pauses.Clear();
         }
 
         session.ExecutionState.ClearStops();
@@ -223,7 +220,10 @@ internal sealed class PluginDebugCoordinator : IDisposable
             kernel.SetDebugHook(null);
         }
 
-        resume?.TrySetResult();
+        foreach (var resume in resumes)
+        {
+            resume.TrySetResult();
+        }
     }
 
     public void Dispose()
