@@ -131,3 +131,5 @@ jobs:
           comment-on-alert: true
           fail-on-alert: ${{ env.IS_GATING_RUN == 'true' }}
           auto-push: ${{ env.IS_TRACKING_RUN == 'true' }}
+          # The Services tracker already fetched and checked out this ref in the same job.
+          skip-fetch-gh-pages: true
