@@ -1,6 +1,6 @@
 ---
 title: Remote kernel debugging
-description: Debug the real server-side DotBoxD interpreter from Visual Studio, VS Code, or another DAP client.
+description: Debug the real server-side DotBoxD interpreter from Rider, Visual Studio, VS Code, or another DAP client.
 ---
 
 Remote kernel debugging pauses the **actual IR interpreter in the host process** while the debugger displays the
@@ -105,6 +105,18 @@ Install or run the extension in `ide/vscode-dotboxd-debug`, build `tools/DotBoxD
 
 `pluginId` is optional. Omitting it binds a source breakpoint to every mapped package in the authenticated plugin
 session. Raw DAP hosts launch `DotBoxD.DebugAdapter` over stdio and send the plugin PID in `attach`.
+
+### JetBrains Rider
+
+Build `ide/rider-dotboxd-debug` with its Gradle wrapper, then install the ZIP from `build/distributions` through
+**Settings > Plugins > Install Plugin from Disk**. Use **Run > Attach to Process > Attach to DotBoxD Kernels** and
+select the plugin PID. The picker enumerates live per-user descriptor filenames without reading their authentication
+tokens; the bundled adapter performs the protected descriptor read and connection after selection.
+
+The Rider integration mirrors enabled C# line breakpoints into the kernel DAP session. Use a compound configuration
+with the normal .NET plugin and server profiles when managed `RunLocal` code and server-executed IR must be debugged
+together. The **DotBoxD Kernel** run-configuration type also supports persistent PID, package-filter, pause-scope,
+and development adapter-path settings.
 
 ### Visual Studio
 

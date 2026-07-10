@@ -67,6 +67,17 @@ jobs:
           cache: true
           cache-dependency-path: '**/*.csproj'
 
+      - name: Setup Java for Rider plugin
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Gradle for Rider plugin
+        if: matrix.os == 'ubuntu-latest'
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+
       - name: Restore
         run: dotnet restore DotBoxD.slnx
 
@@ -76,6 +87,16 @@ jobs:
       - name: Test VS Code debugger contribution
         if: matrix.os == 'ubuntu-latest'
         run: npm test --prefix ide/vscode-dotboxd-debug
+
+      - name: Test and package Rider kernel debugger
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          ide/rider-dotboxd-debug/gradlew -p ide/rider-dotboxd-debug test buildPlugin
+          package=$(find ide/rider-dotboxd-debug/build/distributions -name '*.zip' -print -quit)
+          test -n "$package"
+          unzip -p "$package" '*/lib/dotboxd-kernel-debug-rider-*.jar' > "$RUNNER_TEMP/dotboxd-rider-plugin.jar"
+          jar tf "$RUNNER_TEMP/dotboxd-rider-plugin.jar" | grep -Fx 'META-INF/plugin.xml'
+          jar tf "$RUNNER_TEMP/dotboxd-rider-plugin.jar" | grep -Fx 'adapter/DotBoxD.DebugAdapter.dll'
 
       - name: Build Visual Studio kernel debugger VSIX
         if: matrix.os == 'windows-latest'
