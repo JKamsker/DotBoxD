@@ -1,5 +1,6 @@
 param(
-    [string] $Configuration = "Release"
+    [string] $Configuration = "Release",
+    [switch] $SkipLinkValidation
 )
 
 $ErrorActionPreference = "Stop"
@@ -209,7 +210,9 @@ foreach ($document in $publicDocuments) {
     Test-DocumentCommands $document.FullName
 }
 
-& (Join-Path $PSScriptRoot "check-doc-links.ps1")
+if (-not $SkipLinkValidation) {
+    & (Join-Path $PSScriptRoot "check-doc-links.ps1")
+}
 
 Assert-DocsDoNotContain "Sandbox\.Parse" "JSON IR import is Sandbox.ImportJson"
 Assert-DocsDoNotContain "tenant://123/config" "file grants use canonical filesystem roots"
