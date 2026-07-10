@@ -193,6 +193,8 @@ public IRFunc<TInput, bool> Filter( Func<IRExpressionBuilder, Expression> build,
 public IRFunc<TInput, TContext, bool> FilterWithContext<TContext>( Func<IRExpressionBuilder, Expression> build, IEnumerable<string>? requiredCapabilities = null, IEnumerable<string>? effects = null)
 public IRFunc<TInput, TContext, TOutput> ProjectionWithContext<TContext, TOutput>( Func<IRExpressionBuilder, Expression> build, IEnumerable<string>? requiredCapabilities = null, IEnumerable<string>? effects = null)
 public IRFunc<TInput, TOutput> Projection<TOutput>( Func<IRExpressionBuilder, Expression> build, IEnumerable<string>? requiredCapabilities = null, IEnumerable<string>? effects = null)
+public KernelDebugInfo? DebugInfo { get; init; }
+public KernelDebugInfo? DebugInfo => Package.DebugInfo
 public KernelRegistry Kernels { get; }
 public KernelRpcPayloadReader(ReadOnlySpan<byte> payload)
 public KernelRpcValue GetItem(int index) => (_items ?? EmptyItems)[index]
@@ -578,7 +580,7 @@ public static KernelRpcValue[] DecodeArguments(ReadOnlyMemory<byte> payload)
 public static object? FromSandboxValue(SandboxValue value, Type type)
 public static partial class KernelRpcBinaryCodec
 public static partial class KernelRpcMarshaller
-public static PluginPackage Create( PluginManifest manifest, SandboxModule module, KernelEntrypoints? entrypoints = null)
+public static PluginPackage Create( PluginManifest manifest, SandboxModule module, KernelEntrypoints? entrypoints = null, KernelDebugInfo? debugInfo = null)
 public static PluginPackage Import(string json)
 public static PluginPackage Resolve(Type kernelType)
 public static PluginPackage Resolve<TKernel>() where TKernel : class => Resolve(typeof(TKernel))

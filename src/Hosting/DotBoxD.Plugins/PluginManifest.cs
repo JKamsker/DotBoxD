@@ -1,4 +1,5 @@
 using DotBoxD.Plugins.Runtime;
+using DotBoxD.Kernels.Debugging;
 
 namespace DotBoxD.Plugins;
 
@@ -144,6 +145,9 @@ public sealed record PluginPackage(
     SandboxModule Module,
     KernelEntrypoints Entrypoints)
 {
+    /// <summary>Client-only source mapping. It is excluded from package JSON and canonical hashes.</summary>
+    public KernelDebugInfo? DebugInfo { get; init; }
+
     /// <summary>
     /// Opaque callback route id for lowered <c>RunLocal</c>/<c>RegisterLocal</c> packages, when the
     /// installing client preallocated one. This is distinct from the stable plugin/package id.
@@ -153,13 +157,17 @@ public sealed record PluginPackage(
     public static PluginPackage Create(
         PluginManifest manifest,
         SandboxModule module,
-        KernelEntrypoints? entrypoints = null)
+        KernelEntrypoints? entrypoints = null,
+        KernelDebugInfo? debugInfo = null)
         => new(
             PluginModelCopy.Manifest(manifest),
             PluginModelCopy.Module(module),
             PluginModelCopy.Entrypoints(entrypoints ?? new KernelEntrypoints(
                 PluginManifestNames.Entrypoints.ShouldHandle,
-                PluginManifestNames.Entrypoints.Handle)));
+                PluginManifestNames.Entrypoints.Handle)))
+        {
+            DebugInfo = debugInfo
+        };
 }
 
 /// <summary>
@@ -175,6 +183,8 @@ public sealed class IRKernel
     }
 
     public PluginPackage Package { get; }
+
+    public KernelDebugInfo? DebugInfo => Package.DebugInfo;
 
     public Delegate? ProjectedPayloadDecoder { get; }
 
