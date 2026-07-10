@@ -51,7 +51,6 @@ public static class LoweredPipelineComposer
             BuildMetadata(steps));
     }
 
-    // The running value only changes at a projection, so each step must accept the shape that reached it.
     private static SandboxType ValidateAndInputType(IReadOnlyList<LoweredPipelineStep> steps)
     {
         var first = steps[0] ?? throw new ArgumentNullException(nameof(LoweredPipelineComposition.Steps));
@@ -120,18 +119,20 @@ public static class LoweredPipelineComposer
     }
 
     private static bool ParameterMatchesExactTag(Parameter parameter, string tag)
-        => tag switch
-        {
-            "bool" => parameter.Type == SandboxType.Bool,
-            "int" or "i32" => parameter.Type == SandboxType.I32,
-            "long" or "i64" => parameter.Type == SandboxType.I64,
-            "double" or "f64" => parameter.Type == SandboxType.F64,
-            "string" => parameter.Type == SandboxType.String,
-            "guid" => parameter.Type == SandboxType.Guid,
-            _ => true
-        };
+    {
+        if (tag is "bool")
+            return parameter.Type == SandboxType.Bool;
+        if (tag is "int" or "i32")
+            return parameter.Type == SandboxType.I32;
+        if (tag is "long" or "i64")
+            return parameter.Type == SandboxType.I64;
+        if (tag is "double" or "f64")
+            return parameter.Type == SandboxType.F64;
+        if (tag is "string")
+            return parameter.Type == SandboxType.String;
+        return tag is not "guid" || parameter.Type == SandboxType.Guid;
+    }
 
-    // ResultType is directly checkable only when no projection changes the running value.
     private static void ValidateResultType(
         IReadOnlyList<LoweredPipelineStep> steps,
         SandboxType resultType,
@@ -236,8 +237,7 @@ public static class LoweredPipelineComposer
 
     private static LiteralExpression Bool(bool value) => new(SandboxValue.FromBool(value), Span);
 
-    // Rewrites the fragment's $dotboxd.current placeholder to the scoped variable that currently holds the
-    // flowing value. The lowered fragment expressions are the closed set the generator emits.
+    // Rewrites the fragment's $dotboxd.current placeholder to the scoped running-value variable.
     private static Expression Rewrite(Expression expression, string current)
         => expression switch
         {
