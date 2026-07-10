@@ -105,6 +105,7 @@ public event EventHandler<RpcProtocolErrorEventArgs>? ProtocolError
 public event EventHandler<RpcReadErrorEventArgs>? ReadError
 public Exception Error { get; }
 public Exception? Error { get; }
+public FaultInjectingRpcChannel( IRpcChannel inner, Func<RpcChannelOperation, int, CancellationToken, ValueTask> beforeOperation, Func<ReadOnlyMemory<byte>, int, CancellationToken, ValueTask<ReadOnlyMemory<byte>>> transformSend)
 public FaultInjectingRpcChannel( IRpcChannel inner, Func<RpcChannelOperation, int, CancellationToken, ValueTask> beforeOperation)
 public Func<Exception, RpcErrorInfo?>? ExceptionTransformer { get; init; }
 public GeneratedService( Type serviceType, Type proxyType, Type dispatcherType, string serviceName, IReadOnlyList<GeneratedMethod> methods)

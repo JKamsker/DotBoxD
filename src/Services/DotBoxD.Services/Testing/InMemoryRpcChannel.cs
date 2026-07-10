@@ -16,10 +16,16 @@ public static class InMemoryRpcChannel
 
         var firstInbound = CreateQueue(capacity);
         var secondInbound = CreateQueue(capacity);
+        var state = new PairState();
         return (
-            new Endpoint("memory://second", firstInbound, secondInbound.Writer),
-            new Endpoint("memory://first", secondInbound, firstInbound.Writer));
+            new Endpoint("memory://second", firstInbound, secondInbound.Writer, state),
+            new Endpoint("memory://first", secondInbound, firstInbound.Writer, state));
     }
+
+    internal static long GetOutstandingQueuedPayloadCount(IRpcChannel endpoint)
+        => endpoint is Endpoint memoryEndpoint
+            ? memoryEndpoint.OutstandingQueuedPayloadCount
+            : throw new ArgumentException("Channel is not an in-memory endpoint.", nameof(endpoint));
 
     private static Channel<Payload> CreateQueue(int capacity)
         => Channel.CreateBounded<Payload>(new BoundedChannelOptions(capacity)
@@ -33,13 +39,16 @@ public static class InMemoryRpcChannel
     private sealed class Endpoint(
         string remoteEndpoint,
         Channel<Payload> inbound,
-        ChannelWriter<Payload> outbound) : IRpcChannel
+        ChannelWriter<Payload> outbound,
+        PairState state) : IRpcChannel
     {
         private int _disposed;
 
         public bool IsConnected => Volatile.Read(ref _disposed) == 0;
 
         public string RemoteEndpoint { get; } = remoteEndpoint;
+
+        public long OutstandingQueuedPayloadCount => state.OutstandingPayloads;
 
         public async Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
         {
@@ -49,12 +58,14 @@ public static class InMemoryRpcChannel
             }
             var payload = Payload.Rent(data.Length);
             data.Span.CopyTo(payload.Memory.Span);
+            state.AddPayload();
             try
             {
                 await outbound.WriteAsync(payload, ct).ConfigureAwait(false);
             }
             catch
             {
+                state.RemovePayload();
                 payload.Dispose();
                 throw;
             }
@@ -66,6 +77,7 @@ public static class InMemoryRpcChannel
             {
                 if (inbound.Reader.TryRead(out var payload))
                 {
+                    state.RemovePayload();
                     return payload;
                 }
             }
@@ -81,11 +93,23 @@ public static class InMemoryRpcChannel
                 inbound.Writer.TryComplete();
                 while (inbound.Reader.TryRead(out var payload))
                 {
+                    state.RemovePayload();
                     payload.Dispose();
                 }
             }
 
             return default;
         }
+    }
+
+    private sealed class PairState
+    {
+        private long _outstandingPayloads;
+
+        public long OutstandingPayloads => Interlocked.Read(ref _outstandingPayloads);
+
+        public void AddPayload() => Interlocked.Increment(ref _outstandingPayloads);
+
+        public void RemovePayload() => Interlocked.Decrement(ref _outstandingPayloads);
     }
 }
