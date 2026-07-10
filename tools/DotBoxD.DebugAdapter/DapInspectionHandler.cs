@@ -227,10 +227,10 @@ internal sealed class DapInspectionHandler(
         var source = new { name = Path.GetFileName(path), path, sourceReference = path.StartsWith("dotboxd-ir://", StringComparison.Ordinal) ? 1 : 0 };
         return (
             source,
-            Property(location, "Line", "line").GetInt32() + 1,
-            Property(location, "Column", "column").GetInt32() + 1,
-            OptionalInt(location, "EndLine", "endLine") is { } endLine ? endLine + 1 : null,
-            OptionalInt(location, "EndColumn", "endColumn") is { } endColumn ? endColumn + 1 : null);
+            Property(location, "Line", "line").GetInt32(),
+            Property(location, "Column", "column").GetInt32(),
+            OptionalInt(location, "EndLine", "endLine"),
+            OptionalInt(location, "EndColumn", "endColumn"));
     }
 
     private int ThreadId(string runId)

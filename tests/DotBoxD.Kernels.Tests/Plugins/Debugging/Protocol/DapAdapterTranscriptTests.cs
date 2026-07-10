@@ -50,7 +50,7 @@ public sealed class DapAdapterTranscriptTests
         {
             DebugInfo = new KernelDebugInfo(
                 [document],
-                [new KernelSequencePoint(node.Id, new SourceSpan(0, 0, document.Id, 0, 1))])
+                [new KernelSequencePoint(node.Id, new SourceSpan(1, 1, document.Id, 1, 2))])
         });
         await bridge.PublishAsync(Bootstrap(control.SessionToken));
         await using var client = await BridgeClient.ConnectAsync(
@@ -64,7 +64,7 @@ public sealed class DapAdapterTranscriptTests
             {
                 ["pluginId"] = package.Manifest.PluginId,
                 ["path"] = document.Path,
-                ["lines"] = new[] { 0 }
+                ["lines"] = new[] { 1 }
             },
             CancellationToken.None);
 
@@ -148,7 +148,7 @@ public sealed class DapAdapterTranscriptTests
         var document = KernelDebugDocument.FromSource("shared", "/source/Shared.cs", source);
         var point = new KernelSequencePoint(
             SandboxNodeMap.Create(package.Module).Nodes[0].Id,
-            new SourceSpan(0, 0, document.Id, 0, 1));
+            new SourceSpan(1, 1, document.Id, 1, 2));
         var debugInfo = new KernelDebugInfo([document], [point]);
         bridge.RegisterPackage(package with { Manifest = package.Manifest with { PluginId = "shared-a" }, DebugInfo = debugInfo });
         bridge.RegisterPackage(package with { Manifest = package.Manifest with { PluginId = "shared-b" }, DebugInfo = debugInfo });
@@ -160,7 +160,7 @@ public sealed class DapAdapterTranscriptTests
 
         var response = await client.SendAsync(
             "resolve",
-            new Dictionary<string, object?> { ["pluginId"] = string.Empty, ["path"] = document.Path, ["lines"] = new[] { 0 } },
+            new Dictionary<string, object?> { ["pluginId"] = string.Empty, ["path"] = document.Path, ["lines"] = new[] { 1 } },
             CancellationToken.None);
 
         var breakpoint = Assert.Single(response.GetProperty("body").GetProperty("Breakpoints").EnumerateArray());

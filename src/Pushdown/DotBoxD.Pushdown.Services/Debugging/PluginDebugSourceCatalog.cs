@@ -155,7 +155,7 @@ internal sealed class PluginDebugSourceCatalog(Func<string, byte[]?> sourceReade
                 .Append(' ').Append(node.StructuralPath).Append(" // ").AppendLine(node.Id.Value);
             points[index] = new KernelSequencePoint(
                 node.Id,
-                new SourceSpan(index, 0, "virtual", index, 1));
+                new SourceSpan(index + 1, 1, "virtual", index + 1, 2));
         }
 
         var source = text.ToString();

@@ -19,7 +19,7 @@ internal sealed class DapBreakpointHandler(
         var requested = arguments.TryGetProperty("breakpoints", out var breakpointValues)
             ? breakpointValues.EnumerateArray().Select(item => item.Clone()).ToArray()
             : [];
-        var lines = requested.Select(item => item.GetProperty("line").GetInt32() - 1).ToArray();
+        var lines = requested.Select(item => item.GetProperty("line").GetInt32()).ToArray();
         var resolvedResponse = await bridge.SendAsync(
                 "resolve",
                 new Dictionary<string, object?>
@@ -102,8 +102,8 @@ internal sealed class DapBreakpointHandler(
             id = index + 1,
             verified,
             message = OptionalPropertyString(resolved, "Message", "message"),
-            line = Property(resolved, "Line", "line").GetInt32() + 1,
-            column = Property(resolved, "Column", "column").GetInt32() + 1
+            line = Property(resolved, "Line", "line").GetInt32(),
+            column = Property(resolved, "Column", "column").GetInt32()
         };
     }
 
