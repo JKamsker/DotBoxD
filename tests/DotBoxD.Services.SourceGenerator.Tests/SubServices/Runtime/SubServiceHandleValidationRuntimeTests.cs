@@ -61,12 +61,16 @@ public sealed class SubServiceHandleValidationRuntimeTests
         };
         var rootProxy = CreateRootProxy(assembly, client);
 
-        var sub = await InvokeRootOpenAsync(rootProxy, CancellationToken.None);
+        using var rootCts = new CancellationTokenSource();
+        var sub = await InvokeRootOpenAsync(rootProxy, rootCts.Token);
         using var cts = new CancellationTokenSource();
         var count = sub.GetType().GetMethod("CountAsync", new[] { typeof(int), typeof(CancellationToken) })!;
         var result = await (Task<int>)count.Invoke(sub, new object[] { 7, cts.Token })!;
 
         result.Should().Be(42);
+        client.LastRootService.Should().Be("root-custom");
+        client.LastRootMethod.Should().Be("OpenAsync");
+        client.LastRootCancellationToken.Should().Be(rootCts.Token);
         client.LastInstanceService.Should().Be("sub-custom");
         client.LastInstanceId.Should().Be("sub-1");
         client.LastInstanceMethod.Should().Be("CountAsync");
@@ -101,6 +105,9 @@ public sealed class SubServiceHandleValidationRuntimeTests
     {
         public ServiceHandle HandleResult { get; init; }
         public int CountResult { get; init; }
+        public string? LastRootService { get; private set; }
+        public string? LastRootMethod { get; private set; }
+        public CancellationToken LastRootCancellationToken { get; private set; }
         public string? LastInstanceService { get; private set; }
         public string? LastInstanceId { get; private set; }
         public string? LastInstanceMethod { get; private set; }
@@ -111,7 +118,12 @@ public sealed class SubServiceHandleValidationRuntimeTests
             string service,
             string method,
             CancellationToken ct = default)
-            => Task.FromResult((TResponse)(object)HandleResult);
+        {
+            LastRootService = service;
+            LastRootMethod = method;
+            LastRootCancellationToken = ct;
+            return Task.FromResult((TResponse)(object)HandleResult);
+        }
 
         public Task<TResponse> InvokeAsync<TRequest, TResponse>(
             string service,

@@ -144,10 +144,18 @@ internal static class ProxyInvocationEmitter
         {
             // ServiceHandle is a struct, so the nullable wire type is Nullable<ServiceHandle>;
             // unwrap via .Value before reading InstanceId.
-            sb.AppendLine($"{indent}return {handleName} is null ? null : new {subProxyType}(this._invoker, {handleName}.Value.{ServicesGeneratorMemberNames.ServiceHandle.InstanceId});");
+            var valueName = locals.Reserve("__dotboxd_handleValue", ct);
+            sb.AppendLine($"{indent}if ({handleName} is null)");
+            sb.AppendLine($"{indent}{{");
+            sb.AppendLine($"{indent}    return null;");
+            sb.AppendLine($"{indent}}}");
+            sb.AppendLine($"{indent}var {valueName} = {handleName}.Value;");
+            EmitSubServiceHandleValidation(sb, valueName, info.ServiceName, indent);
+            sb.AppendLine($"{indent}return new {subProxyType}(this._invoker, {valueName}.{ServicesGeneratorMemberNames.ServiceHandle.InstanceId});");
         }
         else
         {
+            EmitSubServiceHandleValidation(sb, handleName, info.ServiceName, indent);
             sb.AppendLine($"{indent}return new {subProxyType}(this._invoker, {handleName}.{ServicesGeneratorMemberNames.ServiceHandle.InstanceId});");
         }
     }
@@ -166,11 +174,29 @@ internal static class ProxyInvocationEmitter
         sb.AppendLine($"{indent}var {handleName} = {invocation}.GetAwaiter().GetResult();");
         if (info.AllowsNull)
         {
-            sb.AppendLine($"{indent}return {handleName} is null ? null : new {subProxyType}(this._invoker, {handleName}.Value.{ServicesGeneratorMemberNames.ServiceHandle.InstanceId});");
+            var valueName = locals.Reserve("__dotboxd_handleValue", ct);
+            sb.AppendLine($"{indent}if ({handleName} is null)");
+            sb.AppendLine($"{indent}{{");
+            sb.AppendLine($"{indent}    return null;");
+            sb.AppendLine($"{indent}}}");
+            sb.AppendLine($"{indent}var {valueName} = {handleName}.Value;");
+            EmitSubServiceHandleValidation(sb, valueName, info.ServiceName, indent);
+            sb.AppendLine($"{indent}return new {subProxyType}(this._invoker, {valueName}.{ServicesGeneratorMemberNames.ServiceHandle.InstanceId});");
         }
         else
         {
+            EmitSubServiceHandleValidation(sb, handleName, info.ServiceName, indent);
             sb.AppendLine($"{indent}return new {subProxyType}(this._invoker, {handleName}.{ServicesGeneratorMemberNames.ServiceHandle.InstanceId});");
         }
+    }
+
+    private static void EmitSubServiceHandleValidation(StringBuilder sb, string handleName, string serviceName, string indent)
+    {
+        var actual = handleName + "." + ServicesGeneratorMemberNames.ServiceHandle.ServiceName;
+        var expected = LiteralHelpers.EscapeStringLiteral(serviceName);
+        sb.AppendLine($"{indent}if (!global::System.String.Equals({actual}, \"{expected}\", global::System.StringComparison.Ordinal))");
+        sb.AppendLine($"{indent}{{");
+        sb.AppendLine($"{indent}    throw new {ServicesGeneratorTypeNames.GlobalServiceProtocolException}(\"ServiceHandle.ServiceName did not match expected sub-service '{expected}'.\");");
+        sb.AppendLine($"{indent}}}");
     }
 }
