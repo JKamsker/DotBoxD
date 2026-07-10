@@ -72,7 +72,9 @@ foreach ($document in $documents) {
     $fenceLength = 0
     foreach ($line in Get-Content -LiteralPath $document.FullName) {
         $lineNumber++
-        if (Test-FencedCodeLine $line ([ref] $fenceCharacter) ([ref] $fenceLength)) { continue }
+        if (Test-FencedCodeLine -Line $line -FenceCharacter ([ref] $fenceCharacter) -FenceLength ([ref] $fenceLength)) {
+            continue
+        }
 
         foreach ($match in [regex]::Matches($line, '!?\[[^\]]*\]\((?<target>[^\s\)]+)')) {
             $target = [uri]::UnescapeDataString($match.Groups["target"].Value.Trim('<', '>'))
