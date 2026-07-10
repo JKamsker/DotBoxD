@@ -43,6 +43,8 @@ generators with no runtime reflection on the hot path.
 
 📖 **Start here:** [**Why DotBoxD?** — the isolation-vs-latency dilemma in three diagrams](https://dotboxd.kamsker.at/why-dotboxd/).
 Full guide, tutorials, examples, and the generated API reference live at <https://dotboxd.kamsker.at/>.
+The opt-in tooling for pausing real server-executed kernels is covered in
+[Remote kernel debugging](docs-site/src/content/docs/concepts/remote-kernel-debugging.md).
 
 **How:** one C# contract, delivered three ways.
 
