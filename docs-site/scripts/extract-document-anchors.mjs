@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { extname, resolve } from 'node:path';
 import GithubSlugger from 'github-slugger';
 import { toString } from 'mdast-util-to-string';
+import remarkFrontmatter from 'remark-frontmatter';
 import remarkMdx from 'remark-mdx';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
@@ -28,7 +29,7 @@ function addMdxAnchors(node, anchors) {
 
 async function extractAnchors(filePath) {
   const source = await readFile(filePath, 'utf8');
-  const processor = unified().use(remarkParse);
+  const processor = unified().use(remarkParse).use(remarkFrontmatter);
   if (extname(filePath).toLowerCase() === '.mdx') processor.use(remarkMdx);
 
   const tree = processor.parse(source);
