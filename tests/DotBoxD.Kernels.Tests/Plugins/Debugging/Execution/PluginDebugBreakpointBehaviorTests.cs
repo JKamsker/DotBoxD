@@ -69,6 +69,46 @@ public sealed class PluginDebugBreakpointBehaviorTests
     }
 
     [Fact]
+    public async Task Non_boolean_breakpoint_condition_reports_error_and_stops()
+    {
+        var fixture = await DebugFixture.CreateAsync();
+        await using var cleanup = fixture;
+        _ = await fixture.SetBreakpointAsync(new { condition = "e_Amount" });
+
+        var execution = fixture.ExecuteAsync(120);
+        var error = await fixture.Events.NextAsync();
+        var stopped = await fixture.Events.NextAsync();
+
+        Assert.Equal("stderr", error.GetProperty("category").GetString());
+        Assert.Contains("Bool", error.GetProperty("output").GetString(), StringComparison.Ordinal);
+        Assert.Equal("breakpointConditionError", stopped.GetProperty("reason").GetString());
+        _ = await fixture.SuccessAsync(
+            PluginDebugCommands.Continue,
+            new { runId = stopped.GetProperty("runId").GetString() });
+        Assert.True(await execution);
+    }
+
+    [Fact]
+    public async Task Logpoint_renders_invalid_failed_and_unclosed_interpolations_without_stopping()
+    {
+        var fixture = await DebugFixture.CreateAsync();
+        await using var cleanup = fixture;
+        _ = await fixture.SetBreakpointAsync(new
+        {
+            logMessage = "bool={e_Amount > 0}, string={e_DamageType}, empty={}, error={missing}, tail={unterminated"
+        });
+
+        var execution = fixture.ExecuteAsync(120);
+        var output = await fixture.Events.NextAsync();
+
+        Assert.Equal("console", output.GetProperty("category").GetString());
+        var text = output.GetProperty("output").GetString();
+        Assert.StartsWith("bool=true, string=fire, empty=<invalid expression>, error=<error:", text, StringComparison.Ordinal);
+        Assert.EndsWith("tail={unterminated", text, StringComparison.Ordinal);
+        Assert.True(await execution);
+    }
+
+    [Fact]
     public async Task Sandbox_exception_publishes_a_stop_before_the_runtime_error_escapes()
     {
         var events = new EventQueue();

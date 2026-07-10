@@ -99,7 +99,9 @@ internal sealed class PluginDebugExecutionRequestHandler(PluginDebugSession sess
             int? hitCount = null;
             if (breakpoint.TryGetProperty("hitCount", out var hitValue))
             {
-                if (!hitValue.TryGetInt32(out var count) || count <= 0)
+                if (hitValue.ValueKind != JsonValueKind.Number ||
+                    !hitValue.TryGetInt32(out var count) ||
+                    count <= 0)
                 {
                     throw new ArgumentException("Breakpoint hitCount must be a positive integer.");
                 }
