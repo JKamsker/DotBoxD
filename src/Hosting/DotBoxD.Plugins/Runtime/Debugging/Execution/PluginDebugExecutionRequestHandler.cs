@@ -173,6 +173,7 @@ internal sealed class PluginDebugExecutionRequestHandler(PluginDebugSession sess
             .Select(execution => new
             {
                 runId = execution.Checkpoint.RunId.ToString(),
+                pluginId = execution.PluginId,
                 name = execution.PluginId + ":" + execution.Checkpoint.Frame.FunctionId,
                 reason = execution.Reason
             })
@@ -195,6 +196,7 @@ internal sealed class PluginDebugExecutionRequestHandler(PluginDebugSession sess
             frames.Add(new
             {
                 frameId = FrameId(runId!, frame.Depth),
+                pluginId = stopped.PluginId,
                 functionId = frame.FunctionId,
                 depth = frame.Depth,
                 nodeId = ReferenceEquals(frame, stopped.Checkpoint.Frame)

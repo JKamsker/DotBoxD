@@ -127,7 +127,9 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
         }
 
         var arguments = request.GetProperty("arguments");
-        _pluginId = RequiredString(arguments, "pluginId");
+        _pluginId = arguments.TryGetProperty("pluginId", out var pluginId) && pluginId.ValueKind == JsonValueKind.String
+            ? pluginId.GetString() ?? string.Empty
+            : string.Empty;
         _bridge = await ConnectBridgeAsync(arguments, cancellationToken).ConfigureAwait(false);
         _inspection = new DapInspectionHandler(connection, _bridge, _pluginId);
         _breakpoints = new DapBreakpointHandler(connection, _bridge, _pluginId);

@@ -8,6 +8,10 @@ internal sealed class DapBreakpointHandler(
     BridgeClient bridge,
     string pluginId)
 {
+    private readonly Dictionary<string, BreakpointBinding[]> _sourceBindings =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _configuredPluginIds = new(StringComparer.Ordinal);
+
     public async ValueTask HandleAsync(JsonElement request, CancellationToken cancellationToken)
     {
         var arguments = request.GetProperty("arguments");
@@ -29,11 +33,8 @@ internal sealed class DapBreakpointHandler(
         EnsureBridgeSuccess(resolvedResponse);
         var resolved = Property(resolvedResponse.GetProperty("body"), "Breakpoints", "breakpoints")
             .EnumerateArray().Select(item => item.Clone()).ToArray();
-        _ = await bridge.RemoteAsync(
-                PluginDebugCommands.SetBreakpoints,
-                new { pluginId, breakpoints = BuildRemoteBreakpoints(requested, resolved) },
-                cancellationToken)
-            .ConfigureAwait(false);
+        _sourceBindings[path] = BuildBindings(requested, resolved);
+        await SynchronizeRemoteBreakpointsAsync(cancellationToken).ConfigureAwait(false);
         await connection.RespondAsync(
                 request,
                 true,
@@ -43,9 +44,30 @@ internal sealed class DapBreakpointHandler(
             .ConfigureAwait(false);
     }
 
-    private static object[] BuildRemoteBreakpoints(JsonElement[] requested, JsonElement[] resolved)
+    private async ValueTask SynchronizeRemoteBreakpointsAsync(CancellationToken cancellationToken)
     {
-        var breakpoints = new List<object>();
+        var groups = _sourceBindings.Values
+            .SelectMany(item => item)
+            .GroupBy(item => item.PluginId, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Select(item => item.Specification).ToArray());
+        var pluginIds = groups.Keys.Concat(_configuredPluginIds).Distinct(StringComparer.Ordinal).ToArray();
+        foreach (var id in pluginIds)
+        {
+            groups.TryGetValue(id, out var breakpoints);
+            _ = await bridge.RemoteAsync(
+                    PluginDebugCommands.SetBreakpoints,
+                    new { pluginId = id, breakpoints = breakpoints ?? [] },
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        _configuredPluginIds.Clear();
+        _configuredPluginIds.UnionWith(groups.Keys);
+    }
+
+    private static BreakpointBinding[] BuildBindings(JsonElement[] requested, JsonElement[] resolved)
+    {
+        var bindings = new List<BreakpointBinding>();
         for (var index = 0; index < resolved.Length; index++)
         {
             var mapped = resolved[index];
@@ -55,16 +77,21 @@ internal sealed class DapBreakpointHandler(
             }
 
             var source = requested[index];
-            breakpoints.Add(new
+            foreach (var binding in Property(mapped, "Bindings", "bindings").EnumerateArray())
             {
-                nodeId = Property(mapped, "NodeId", "nodeId").GetString(),
-                condition = OptionalString(source, "condition"),
-                hitCount = ParseHitCount(OptionalString(source, "hitCondition")),
-                logMessage = OptionalString(source, "logMessage")
-            });
+                bindings.Add(new BreakpointBinding(
+                    Property(binding, "PluginId", "pluginId").GetString()!,
+                    new
+                    {
+                        nodeId = Property(binding, "NodeId", "nodeId").GetString(),
+                        condition = OptionalString(source, "condition"),
+                        hitCount = ParseHitCount(OptionalString(source, "hitCondition")),
+                        logMessage = OptionalString(source, "logMessage")
+                    }));
+            }
         }
 
-        return breakpoints.ToArray();
+        return bindings.ToArray();
     }
 
     private static object DapBreakpoint(JsonElement resolved, int index)
@@ -109,94 +136,6 @@ internal sealed class DapBreakpointHandler(
             throw new DebugAdapterException("bridgeError", response.GetProperty("error").GetString()!);
         }
     }
+
+    private sealed record BreakpointBinding(string PluginId, object Specification);
 }
-
-internal sealed class DapVariableStore
-{
-    private readonly Dictionary<int, DapVariableHandle> _handles = [];
-    private int _nextReference;
-
-    public object Scopes(string frameId)
-    {
-        var arguments = Add(new DapVariableHandle(frameId, "arguments", default));
-        var locals = Add(new DapVariableHandle(frameId, "locals", default));
-        return new
-        {
-            scopes = new[]
-            {
-                new { name = "Arguments", variablesReference = arguments, expensive = false },
-                new { name = "Locals", variablesReference = locals, expensive = false }
-            }
-        };
-    }
-
-    public bool TryGet(int reference, out DapVariableHandle handle) =>
-        _handles.TryGetValue(reference, out handle!);
-
-    public DapVariableHandle Get(int reference) =>
-        TryGet(reference, out var handle)
-            ? handle
-            : throw new DebugAdapterException("staleVariables", "The variable reference is no longer available.");
-
-    public object[] ScopeVariables(JsonElement variables) =>
-        variables.EnumerateArray().Select(Variable).ToArray();
-
-    public object[] Expand(JsonElement value)
-    {
-        if (value.TryGetProperty("children", out var children))
-        {
-            return children.EnumerateArray().Select(child => Child(
-                child.GetProperty("name").GetString()!, child.GetProperty("value"))).ToArray();
-        }
-
-        return value.TryGetProperty("entries", out var entries)
-            ? entries.EnumerateArray().Select(entry => Child(
-                "[" + Display(entry.GetProperty("key")) + "]", entry.GetProperty("value"))).ToArray()
-            : [];
-    }
-
-    public int ValueReference(JsonElement value)
-        => value.TryGetProperty("children", out _) || value.TryGetProperty("entries", out _)
-            ? Add(new DapVariableHandle(string.Empty, string.Empty, value.Clone()))
-            : 0;
-
-    public static string Display(JsonElement value)
-    {
-        if (!value.TryGetProperty("value", out var scalar) || scalar.ValueKind == JsonValueKind.Null)
-        {
-            return value.GetProperty("type").GetString() ?? "unit";
-        }
-
-        return scalar.ValueKind == JsonValueKind.String ? scalar.GetString()! : scalar.ToString();
-    }
-
-    private object Variable(JsonElement variable)
-    {
-        var assigned = variable.GetProperty("assigned").GetBoolean();
-        var value = variable.GetProperty("value");
-        return new
-        {
-            name = variable.GetProperty("name").GetString(),
-            value = assigned && value.ValueKind == JsonValueKind.Object ? Display(value) : "<unassigned>",
-            type = variable.GetProperty("type").GetString(),
-            variablesReference = assigned && value.ValueKind == JsonValueKind.Object ? ValueReference(value) : 0
-        };
-    }
-
-    private object Child(string name, JsonElement value) => new
-    {
-        name,
-        value = Display(value),
-        type = value.GetProperty("type").GetString(),
-        variablesReference = ValueReference(value)
-    };
-
-    private int Add(DapVariableHandle handle)
-    {
-        var reference = Interlocked.Increment(ref _nextReference);
-        _handles[reference] = handle;
-        return reference;
-    }
-}
-
-internal sealed record DapVariableHandle(string FrameId, string Scope, JsonElement Value);

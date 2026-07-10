@@ -48,7 +48,7 @@ internal sealed class PluginDebugBridgeRequestHandler(
     {
         var lines = request.GetProperty("lines").EnumerateArray().Select(item => item.GetInt32()).ToArray();
         var resolution = sources.Resolve(
-            RequiredString(request, "pluginId"),
+            OptionalString(request, "pluginId"),
             RequiredString(request, "path"),
             lines);
         return new { id, success = true, body = resolution };
@@ -56,7 +56,7 @@ internal sealed class PluginDebugBridgeRequestHandler(
 
     private object Source(string id, JsonElement request)
     {
-        var content = sources.Source(RequiredString(request, "pluginId"), RequiredString(request, "path"));
+        var content = sources.Source(OptionalString(request, "pluginId"), RequiredString(request, "path"));
         return content is null
             ? new { id, success = false, content = (string?)null }
             : new { id, success = true, content = (string?)content };
@@ -65,7 +65,7 @@ internal sealed class PluginDebugBridgeRequestHandler(
     private object Location(string id, JsonElement request)
     {
         var location = sources.Location(
-            RequiredString(request, "pluginId"),
+            OptionalString(request, "pluginId"),
             RequiredString(request, "nodeId"));
         return new { id, success = location is not null, body = location };
     }
@@ -83,6 +83,11 @@ internal sealed class PluginDebugBridgeRequestHandler(
 
     private static string ReadId(JsonElement request)
         => request.TryGetProperty("id", out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString() ?? string.Empty
+            : string.Empty;
+
+    private static string OptionalString(JsonElement request, string name)
+        => request.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
             ? value.GetString() ?? string.Empty
             : string.Empty;
 }

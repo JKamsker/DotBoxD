@@ -15,7 +15,7 @@ internal sealed class PluginDebugSourceCatalog(Func<string, byte[]?> sourceReade
         ArgumentNullException.ThrowIfNull(package);
         var sources = package.DebugInfo is null
             ? VirtualSources(package)
-            : MappedSources(package.DebugInfo);
+            : MappedSources(package.Manifest.PluginId, package.DebugInfo);
         lock (_gate)
         {
             _packages[package.Manifest.PluginId] = sources;
@@ -24,43 +24,26 @@ internal sealed class PluginDebugSourceCatalog(Func<string, byte[]?> sourceReade
 
     public SourceResolution Resolve(string pluginId, string path, IReadOnlyList<int> lines)
     {
-        PackageSources package;
-        lock (_gate)
-        {
-            package = _packages.TryGetValue(pluginId, out var found)
-                ? found
-                : throw new KeyNotFoundException($"Plugin source map '{pluginId}' is not registered.");
-        }
-
         var normalized = Normalize(path);
-        var document = package.Documents.FirstOrDefault(item =>
-            string.Equals(Normalize(item.Path), normalized, StringComparison.OrdinalIgnoreCase));
-        if (document is null)
+        var packages = Packages(pluginId);
+        if (packages.Count == 0)
         {
-            return new SourceResolution(path, package.VirtualSource, lines.Select(Unmapped).ToArray());
+            throw new KeyNotFoundException($"Plugin source map '{pluginId}' is not registered.");
         }
 
-        var checksumMatches = document.IsVirtual || MatchesChecksum(document);
-        var points = package.Points
-            .Where(point => string.Equals(point.Span.DocumentId, document.Id, StringComparison.Ordinal))
-            .Where(point => point.Span.SequencePointKind != SourceSequencePointKind.Hidden)
-            .ToArray();
-        var breakpoints = lines.Select(line => ResolveLine(line, points, checksumMatches)).ToArray();
-        return new SourceResolution(document.Path, document.IsVirtual ? package.VirtualSource : null, breakpoints);
+        var document = packages.SelectMany(item => item.Documents)
+            .FirstOrDefault(item => PathsEqual(item.Path, normalized));
+        var content = packages.FirstOrDefault(item => PathsEqual(item.VirtualPath, normalized))?.VirtualSource;
+        var breakpoints = lines.Select(line => ResolveLine(line, packages, normalized)).ToArray();
+        return new SourceResolution(document?.Path ?? path, content, breakpoints);
     }
 
     public string? Source(string pluginId, string path)
     {
         lock (_gate)
         {
-            if (!_packages.TryGetValue(pluginId, out var package))
-            {
-                return null;
-            }
-
-            return string.Equals(Normalize(package.VirtualPath ?? string.Empty), Normalize(path), StringComparison.Ordinal)
-                ? package.VirtualSource
-                : null;
+            return SelectPackages(pluginId)
+                .FirstOrDefault(package => PathsEqual(package.VirtualPath, Normalize(path)))?.VirtualSource;
         }
     }
 
@@ -69,7 +52,9 @@ internal sealed class PluginDebugSourceCatalog(Func<string, byte[]?> sourceReade
         PackageSources package;
         lock (_gate)
         {
-            if (!_packages.TryGetValue(pluginId, out package!))
+            package = SelectPackages(pluginId)
+                .FirstOrDefault(item => item.Points.Any(point => point.NodeId.Value == nodeId))!;
+            if (package is null)
             {
                 return null;
             }
@@ -106,32 +91,54 @@ internal sealed class PluginDebugSourceCatalog(Func<string, byte[]?> sourceReade
         }
     }
 
-    private static ResolvedBreakpoint ResolveLine(
+    private ResolvedBreakpoint ResolveLine(
         int line,
-        IReadOnlyList<KernelSequencePoint> points,
-        bool checksumMatches)
+        IReadOnlyList<PackageSources> packages,
+        string normalizedPath)
     {
-        var point = points
-            .Where(candidate => candidate.Span.Line == line)
-            .OrderBy(candidate => candidate.Span.Column)
-            .FirstOrDefault();
-        if (point is null)
+        var bindings = new List<ResolvedNodeBinding>();
+        var columns = new List<int>();
+        var hadStaleDocument = false;
+        foreach (var package in packages)
         {
-            return Unmapped(line);
+            var document = package.Documents.FirstOrDefault(item => PathsEqual(item.Path, normalizedPath));
+            if (document is null)
+            {
+                continue;
+            }
+
+            if (!document.IsVirtual && !MatchesChecksum(document))
+            {
+                hadStaleDocument = true;
+                continue;
+            }
+
+            var points = package.Points
+                .Where(point => string.Equals(point.Span.DocumentId, document.Id, StringComparison.Ordinal))
+                .Where(point => point.Span.SequencePointKind != SourceSequencePointKind.Hidden)
+                .Where(point => point.Span.Line == line);
+            foreach (var point in points)
+            {
+                bindings.Add(new ResolvedNodeBinding(package.PluginId, point.NodeId.Value));
+                columns.Add(point.Span.Column);
+            }
         }
 
-        return checksumMatches
-            ? new ResolvedBreakpoint(line, point.Span.Column, point.NodeId.Value, Verified: true, null)
-            : new ResolvedBreakpoint(line, point.Span.Column, null, Verified: false, "Source checksum differs from the built plugin package.");
+        var distinct = bindings.Distinct().ToArray();
+        return distinct.Length > 0
+            ? new ResolvedBreakpoint(line, columns.Min(), distinct[0].NodeId, Verified: true, null, distinct)
+            : hadStaleDocument
+                ? new ResolvedBreakpoint(line, 0, null, Verified: false, "Source checksum differs from the built plugin package.", [])
+                : Unmapped(line);
     }
 
     private static ResolvedBreakpoint Unmapped(int line) =>
-        new(line, 0, null, Verified: false, "No executable kernel sequence point exists on this line.");
+        new(line, 0, null, Verified: false, "No executable kernel sequence point exists on this line.", []);
 
-    private static PackageSources MappedSources(KernelDebugInfo info)
+    private static PackageSources MappedSources(string pluginId, KernelDebugInfo info)
     {
         var documents = info.Documents.Select(document => new SourceDocument(document, IsVirtual: false)).ToArray();
-        return new PackageSources(documents, info.SequencePoints, null, null);
+        return new PackageSources(pluginId, documents, info.SequencePoints, null, null);
     }
 
     private static PackageSources VirtualSources(PluginPackage package)
@@ -154,6 +161,7 @@ internal sealed class PluginDebugSourceCatalog(Func<string, byte[]?> sourceReade
         var source = text.ToString();
         var document = KernelDebugDocument.FromSource("virtual", path, source);
         return new PackageSources(
+            package.Manifest.PluginId,
             [new SourceDocument(document, IsVirtual: true)],
             points,
             path,
@@ -161,6 +169,22 @@ internal sealed class PluginDebugSourceCatalog(Func<string, byte[]?> sourceReade
     }
 
     private static string Normalize(string path) => path.Replace('\\', '/');
+
+    private IReadOnlyList<PackageSources> Packages(string pluginId)
+    {
+        lock (_gate)
+        {
+            return SelectPackages(pluginId).ToArray();
+        }
+    }
+
+    private IEnumerable<PackageSources> SelectPackages(string pluginId)
+        => string.IsNullOrWhiteSpace(pluginId) || pluginId == "*"
+            ? _packages.Values
+            : _packages.TryGetValue(pluginId, out var package) ? [package] : [];
+
+    private static bool PathsEqual(string? path, string normalized)
+        => path is not null && string.Equals(Normalize(path), normalized, StringComparison.OrdinalIgnoreCase);
 
     private sealed record SourceDocument(KernelDebugDocument Document, bool IsVirtual)
     {
@@ -170,6 +194,7 @@ internal sealed class PluginDebugSourceCatalog(Func<string, byte[]?> sourceReade
     }
 
     private sealed record PackageSources(
+        string PluginId,
         IReadOnlyList<SourceDocument> Documents,
         IReadOnlyList<KernelSequencePoint> Points,
         string? VirtualPath,
@@ -186,7 +211,10 @@ internal sealed record ResolvedBreakpoint(
     int Column,
     string? NodeId,
     bool Verified,
-    string? Message);
+    string? Message,
+    IReadOnlyList<ResolvedNodeBinding> Bindings);
+
+internal sealed record ResolvedNodeBinding(string PluginId, string NodeId);
 
 internal sealed record SourceLocation(
     string Path,

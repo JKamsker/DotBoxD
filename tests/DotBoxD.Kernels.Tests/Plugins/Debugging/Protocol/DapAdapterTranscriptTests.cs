@@ -92,8 +92,7 @@ public sealed class DapAdapterTranscriptTests
             Request(1, "initialize", new { adapterID = "dotboxd-test", linesStartAt1 = true, columnsStartAt1 = true }),
             Request(2, "attach", new
             {
-                processId = descriptor.ProcessId,
-                pluginId = package.Manifest.PluginId
+                processId = descriptor.ProcessId
             }),
             Request(3, "setBreakpoints", new
             {
@@ -132,6 +131,40 @@ public sealed class DapAdapterTranscriptTests
         Assert.Contains(messages, item => item.GetProperty("type").GetString() == "event" && item.GetProperty("event").GetString() == "initialized");
         Assert.Contains(messages, item => item.GetProperty("type").GetString() == "event" && item.GetProperty("event").GetString() == "terminated");
         Assert.Equal(5, messages.Count(item => item.GetProperty("type").GetString() == "response" && item.GetProperty("success").GetBoolean()));
+    }
+
+    [Fact]
+    public async Task Source_resolution_returns_all_plugin_bindings_for_a_shared_sequence_point()
+    {
+        const string source = "return damage;";
+        await using var bridge = PluginDebugBridge.Start(new PluginDebugBridgeOptions
+        {
+            WaitForDebuggerBeforeInstall = false,
+            SourceReader = _ => Encoding.UTF8.GetBytes(source)
+        });
+        var control = new RecordingControl();
+        bridge.AttachControl(control);
+        var package = FireDamagePluginPackage.Create();
+        var document = KernelDebugDocument.FromSource("shared", "/source/Shared.cs", source);
+        var point = new KernelSequencePoint(
+            SandboxNodeMap.Create(package.Module).Nodes[0].Id,
+            new SourceSpan(0, 0, document.Id, 0, 1));
+        var debugInfo = new KernelDebugInfo([document], [point]);
+        bridge.RegisterPackage(package with { Manifest = package.Manifest with { PluginId = "shared-a" }, DebugInfo = debugInfo });
+        bridge.RegisterPackage(package with { Manifest = package.Manifest with { PluginId = "shared-b" }, DebugInfo = debugInfo });
+        await bridge.PublishAsync(Bootstrap(control.SessionToken));
+        await using var client = await BridgeClient.ConnectByProcessIdAsync(
+            bridge.Descriptor.ProcessId,
+            TimeSpan.FromSeconds(5),
+            CancellationToken.None);
+
+        var response = await client.SendAsync(
+            "resolve",
+            new Dictionary<string, object?> { ["pluginId"] = string.Empty, ["path"] = document.Path, ["lines"] = new[] { 0 } },
+            CancellationToken.None);
+
+        var breakpoint = Assert.Single(response.GetProperty("body").GetProperty("Breakpoints").EnumerateArray());
+        Assert.Equal(2, breakpoint.GetProperty("Bindings").GetArrayLength());
     }
 
     private static byte[] Bootstrap(string token)

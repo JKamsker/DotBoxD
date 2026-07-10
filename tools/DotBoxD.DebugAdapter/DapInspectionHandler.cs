@@ -9,6 +9,7 @@ internal sealed class DapInspectionHandler(
     string pluginId)
 {
     private readonly Dictionary<int, string> _threads = [];
+    private readonly Dictionary<int, string> _threadPlugins = [];
     private readonly Dictionary<string, int> _threadIds = new(StringComparer.Ordinal);
     private readonly Dictionary<int, string> _frames = [];
     private readonly DapVariableStore _variableStore = new();
@@ -44,6 +45,7 @@ internal sealed class DapInspectionHandler(
         {
             var runId = envelope.Payload.GetProperty("runId").GetString()!;
             var threadId = ThreadId(runId);
+            _threadPlugins[threadId] = envelope.Payload.GetProperty("pluginId").GetString()!;
             var reason = envelope.Payload.GetProperty("reason").GetString();
             await connection.EventAsync(
                     "stopped",
@@ -72,11 +74,7 @@ internal sealed class DapInspectionHandler(
     {
         var body = await bridge.RemoteAsync(PluginDebugCommands.Threads, null, cancellationToken).ConfigureAwait(false);
         var threads = body.GetProperty("threads").EnumerateArray()
-            .Select(thread => new
-            {
-                id = ThreadId(thread.GetProperty("runId").GetString()!),
-                name = thread.GetProperty("name").GetString()
-            })
+            .Select(DapThread)
             .ToArray();
         return new { threads };
     }
@@ -85,6 +83,7 @@ internal sealed class DapInspectionHandler(
     {
         var threadId = Arguments(request).GetProperty("threadId").GetInt32();
         var runId = RunId(threadId);
+        var stoppedPluginId = _threadPlugins.GetValueOrDefault(threadId, pluginId);
         var body = await bridge.RemoteAsync(
                 PluginDebugCommands.StackTrace,
                 new { runId },
@@ -95,7 +94,7 @@ internal sealed class DapInspectionHandler(
         {
             var frameId = Interlocked.Increment(ref _nextFrameId);
             _frames[frameId] = frame.GetProperty("frameId").GetString()!;
-            var location = await LocationAsync(frame, cancellationToken).ConfigureAwait(false);
+            var location = await LocationAsync(frame, stoppedPluginId, cancellationToken).ConfigureAwait(false);
             frames.Add(new
             {
                 id = frameId,
@@ -205,6 +204,7 @@ internal sealed class DapInspectionHandler(
 
     private async ValueTask<(object? Source, int Line, int Column, int? EndLine, int? EndColumn)> LocationAsync(
         JsonElement frame,
+        string stoppedPluginId,
         CancellationToken cancellationToken)
     {
         if (!frame.TryGetProperty("nodeId", out var node) || node.ValueKind != JsonValueKind.String)
@@ -214,7 +214,7 @@ internal sealed class DapInspectionHandler(
 
         var response = await bridge.SendAsync(
                 "location",
-                new Dictionary<string, object?> { ["pluginId"] = pluginId, ["nodeId"] = node.GetString() },
+                new Dictionary<string, object?> { ["pluginId"] = stoppedPluginId, ["nodeId"] = node.GetString() },
                 cancellationToken)
             .ConfigureAwait(false);
         if (!response.GetProperty("success").GetBoolean())
@@ -244,6 +244,17 @@ internal sealed class DapInspectionHandler(
         _threadIds[runId] = id;
         _threads[id] = runId;
         return id;
+    }
+
+    private object DapThread(JsonElement thread)
+    {
+        var id = ThreadId(thread.GetProperty("runId").GetString()!);
+        if (thread.TryGetProperty("pluginId", out var value) && value.ValueKind == JsonValueKind.String)
+        {
+            _threadPlugins[id] = value.GetString()!;
+        }
+
+        return new { id, name = thread.GetProperty("name").GetString() };
     }
 
     private string Frame(int frameId)
