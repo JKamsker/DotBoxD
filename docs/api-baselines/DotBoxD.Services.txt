@@ -16,7 +16,7 @@ public async ValueTask<Payload> ReceiveValueAsync(CancellationToken ct = default
 public async ValueTask<RpcFrame> ReceiveFrameValueAsync(CancellationToken ct = default)
 public bool DisableInboundRequestCancellation { get; init; }
 public bool EnableLowAllocationValueTaskInvocations { get; init; }
-public bool IsBreaking => Kind is RpcContractChangeKind.Removed or RpcContractChangeKind.SignatureChanged
+public bool IsBreaking => Kind is RpcContractChangeKind.Removed or RpcContractChangeKind.SignatureChanged or RpcContractChangeKind.UnsupportedVersion
 public bool IsConnected =>
 public bool IsConnected => _inner.IsConnected
 public bool IsConnected => Peer.IsConnected && _transport.IsConnected
@@ -32,6 +32,7 @@ public class ServiceException : Exception
 public class ServiceNotFoundException : ServiceException
 public class ServiceProtocolException : ServiceException
 public class ServiceTimeoutException : ServiceException
+public const int CurrentFormatVersion = 1
 public const int DefaultInboundQueueCapacity = 1024
 public const int DefaultMaxAcceptedPeers = 1024
 public const int DefaultMaxConcurrentInboundDispatch = 1
@@ -93,6 +94,7 @@ public enum RpcContractChangeKind
 public enum RpcContractChangeKind.Added
 public enum RpcContractChangeKind.Removed
 public enum RpcContractChangeKind.SignatureChanged
+public enum RpcContractChangeKind.UnsupportedVersion
 public enum RpcStreamKind : byte
 public enum RpcStreamKind.Binary = 1
 public enum RpcStreamKind.Items = 2
@@ -118,6 +120,7 @@ public IAsyncEnumerable<T> InvokeAsyncEnumerableOnInstance<TRequest, T>( string 
 public IAsyncEnumerable<T> InvokeAsyncEnumerableOnInstance<TRequest, T>(string service, string instanceId, string method, TRequest request, RpcStreamAttachment[]? streams = null, CancellationToken ct = default) =>
 public InstanceRegistry() : this(DefaultMaxInstances) { }
 public InstanceRegistry(int maxInstances)
+public int FormatVersion { get; init; } = CurrentFormatVersion
 public int Length => _length
 public int Length => Memory.Length
 public int MaxConcurrentInboundDispatch { get; init; }
@@ -359,6 +362,7 @@ public ValueTask<TResponse> InvokeValueOnInstanceAsync<TRequest, TResponse>(stri
 public ValueTask<TResponse> InvokeValueOnInstanceAsync<TResponse>(string service, string instanceId, string method, CancellationToken ct = default) =>
 public void Advance(int count)
 public void Dispose()
+public void EnsureCompatibleWith(RpcContractManifest previous)
 public void Release(string serviceName, string instanceId)
 public void ReleaseAll()
 public void ReleaseStream(RpcStreamHandle handle) =>

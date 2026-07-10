@@ -7,6 +7,10 @@ namespace DotBoxD.Services.Generated;
 /// <summary>A deterministic, serializable snapshot of source-generated RPC wire contracts.</summary>
 public sealed record RpcContractManifest(IReadOnlyList<RpcContractService> Services)
 {
+    public const int CurrentFormatVersion = 1;
+
+    public int FormatVersion { get; init; } = CurrentFormatVersion;
+
     public static RpcContractManifest Create(params Assembly[] assemblies)
         => Create((IEnumerable<Assembly>)assemblies);
 
@@ -43,7 +47,7 @@ public sealed record RpcContractManifest(IReadOnlyList<RpcContractService> Servi
 
     public string Serialize()
     {
-        var lines = new List<string>();
+        var lines = new List<string> { $"manifest|{FormatVersion}" };
         foreach (var service in Services)
         {
             lines.Add($"service|{Encode(service.WireName)}|{Encode(service.ContractType)}");
@@ -62,6 +66,19 @@ public sealed record RpcContractManifest(IReadOnlyList<RpcContractService> Servi
         {
             throw new ArgumentNullException(nameof(previous));
         }
+
+        if (FormatVersion != CurrentFormatVersion || previous.FormatVersion != CurrentFormatVersion)
+        {
+            return
+            [
+                new RpcContractChange(
+                    RpcContractChangeKind.UnsupportedVersion,
+                    "$manifest",
+                    previous.FormatVersion.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    FormatVersion.ToString(System.Globalization.CultureInfo.InvariantCulture))
+            ];
+        }
+
         var current = Flatten(this);
         var old = Flatten(previous);
         var changes = new List<RpcContractChange>();
@@ -88,13 +105,26 @@ public sealed record RpcContractManifest(IReadOnlyList<RpcContractService> Servi
         return changes.OrderBy(change => change.Contract, StringComparer.Ordinal).ToArray();
     }
 
+    public void EnsureCompatibleWith(RpcContractManifest previous)
+    {
+        var breakingChanges = Diff(previous).Where(change => change.IsBreaking).ToArray();
+        if (breakingChanges.Length == 0)
+        {
+            return;
+        }
+
+        var contracts = string.Join(", ", breakingChanges.Select(change => change.Contract));
+        throw new InvalidOperationException($"RPC contract manifest contains breaking changes: {contracts}.");
+    }
+
     private static RpcContractMethod Method(GeneratedMethod method)
     {
         var parameters = string.Join(",", method.Parameters
             .OrderBy(parameter => parameter.Position)
-            .Select(parameter => $"{parameter.Position}:{TypeName(parameter.Type)}:" +
+            .Select(parameter => $"{parameter.Position}:{RpcContractTypeShape.Describe(parameter.Type)}:" +
                 $"{parameter.IsCancellationToken}:{parameter.HasDefaultValue}:{Default(parameter.DefaultValue)}"));
-        var signature = $"{TypeName(method.ReturnType)}|{TypeName(method.ResultType)}|{method.ReturnKind}|" +
+        var signature = $"{RpcContractTypeShape.Describe(method.ReturnType)}|" +
+            $"{RpcContractTypeShape.Describe(method.ResultType)}|{method.ReturnKind}|" +
             $"{method.ReturnsNestedService}|{parameters}";
         return new RpcContractMethod(method.WireName, signature);
     }
@@ -124,7 +154,8 @@ public enum RpcContractChangeKind
 {
     Added,
     Removed,
-    SignatureChanged
+    SignatureChanged,
+    UnsupportedVersion
 }
 
 public sealed record RpcContractChange(
@@ -133,5 +164,5 @@ public sealed record RpcContractChange(
     string? PreviousSignature,
     string? CurrentSignature)
 {
-    public bool IsBreaking => Kind is RpcContractChangeKind.Removed or RpcContractChangeKind.SignatureChanged;
+    public bool IsBreaking => Kind is RpcContractChangeKind.Removed or RpcContractChangeKind.SignatureChanged or RpcContractChangeKind.UnsupportedVersion;
 }
