@@ -95,6 +95,26 @@ internal static class InvokeAsyncServerSurface
             string.Equals(name.Identifier.ValueText, InvokeAsyncMethod, StringComparison.Ordinal);
     }
 
+    public static bool TryCreateLowerToIrMethodDiagnostic(
+        SemanticModel model,
+        InvocationExpressionSyntax invocation,
+        CancellationToken cancellationToken,
+        out PluginKernelDiagnostic diagnostic)
+    {
+        diagnostic = null!;
+        if (ResolvedMethod(model, invocation, cancellationToken) is not { } method ||
+            !LowerToIrMethodReader.TryReadUnsupportedKind(method, model.Compilation, out var kind))
+        {
+            return false;
+        }
+
+        diagnostic = new PluginKernelDiagnostic(
+            "[LowerToIrMethod] uses unsupported LoweredIrMethodKind value '" + kind +
+            "'. Supported value: LoweredIrMethodKind.AnonymousInvocation.",
+            PluginDiagnosticLocation.From(invocation.GetLocation()));
+        return true;
+    }
+
     public static IMethodSymbol? ResolvedMethod(
         SemanticModel model,
         InvocationExpressionSyntax invocation,
