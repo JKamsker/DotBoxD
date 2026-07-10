@@ -58,9 +58,11 @@ jobs:
           cache-dependency-path: '**/*.csproj'
 
       - name: Run Services benchmarks
+        # Async round trips keep tiering beyond ShortRun's three warmups. More samples prevent
+        # transient startup behavior from becoming a labeled-PR regression failure.
         run: >-
           dotnet run -c Release --project benchmarks/DotBoxD.Services.Benchmarks --
-          --filter '*' --job short --exporters json
+          --filter '*' --job short --warmupCount 10 --iterationCount 10 --exporters json
           --artifacts artifacts/benchmarks/services
 
       - name: Run Kernels benchmarks
