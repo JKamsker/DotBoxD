@@ -2,7 +2,10 @@ using System.Text.Json;
 using System.Threading.Channels;
 using DotBoxD.Kernels.Debugging;
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
+using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
+using DotBoxD.Kernels.Tests.Plugins.Rpc;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Debugging;
 using DotBoxD.Plugins.Kernel;
@@ -136,6 +139,44 @@ public sealed class PluginDebugPauseScopeTests
         Assert.True(debug.IsAttached);
     }
 
+    [Fact]
+    public async Task Generated_server_extension_loop_stops_in_the_real_interpreter()
+    {
+        var events = new EventQueue();
+        using var server = DebugServer(KernelDebugPauseScope.Execution);
+        using var owner = server.CreateSession();
+        await using var debug = owner.CreateDebugSession(events);
+        var package = PluginAnalyzerGeneratedPackageFactory.Create(
+            RpcKernelLoopControlGenerationTests.SumPositivesContinueSource,
+            "Sample.LoopContinuePluginPackage");
+        var nodeId = SandboxNodeMap.Create(package.Module).GetDescriptor(Loop(package.Module.Functions[0].Body)).Id;
+        _ = await SuccessAsync(debug, PluginDebugCommands.SetBreakpoints, new
+        {
+            pluginId = package.Manifest.PluginId,
+            nodeIds = new[] { nodeId.Value }
+        });
+        _ = await SuccessAsync(debug, PluginDebugCommands.Attach);
+        var kernel = await owner.InstallServerExtensionAsync(package);
+        var values = SandboxValue.FromList(
+            [SandboxValue.FromInt32(2), SandboxValue.FromInt32(4)],
+            SandboxType.I32);
+
+        var run = kernel.InvokeServerExtensionAsync([values]).AsTask();
+        var stopped = await events.NextAsync();
+        Assert.Equal(nodeId.Value, stopped.GetProperty("nodeId").GetString());
+        _ = await SuccessAsync(debug, PluginDebugCommands.SetBreakpoints, new
+        {
+            pluginId = package.Manifest.PluginId,
+            nodeIds = Array.Empty<string>()
+        });
+        _ = await SuccessAsync(debug, PluginDebugCommands.Continue, new
+        {
+            runId = stopped.GetProperty("runId").GetString()
+        });
+
+        Assert.Equal(6, Assert.IsType<I32Value>(await run).Value);
+    }
+
     private static PluginServer DebugServer(KernelDebugPauseScope scope)
         => PluginServer.Create(
             defaultPolicy: PluginAddendumTestPolicies.LongWall(),
@@ -156,6 +197,18 @@ public sealed class PluginDebugPauseScopeTests
     private static SandboxNodeId StatementNode(PluginPackage package)
         => SandboxNodeMap.Create(package.Module).Nodes.First(node =>
             node.FunctionId == package.Entrypoints.ShouldHandle && node.Kind == SandboxNodeKind.Statement).Id;
+
+    private static ForRangeStatement Loop(IEnumerable<Statement> statements)
+        => Loops(statements).Single();
+
+    private static IEnumerable<ForRangeStatement> Loops(IEnumerable<Statement> statements)
+        => statements.SelectMany(statement => statement switch
+        {
+            ForRangeStatement loop => new[] { loop }.Concat(Loops(loop.Body)),
+            IfStatement branch => Loops(branch.Then).Concat(Loops(branch.Else)),
+            WhileStatement loop => Loops(loop.Body),
+            _ => []
+        });
 
     private static PluginPackage WithPluginId(PluginPackage package, string pluginId)
     {

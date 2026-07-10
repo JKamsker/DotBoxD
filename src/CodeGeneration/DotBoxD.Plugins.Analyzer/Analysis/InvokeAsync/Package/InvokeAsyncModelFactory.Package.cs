@@ -1,7 +1,6 @@
 using DotBoxD.Plugins.Analyzer.Analysis.Debugging;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using static DotBoxD.Plugins.Analyzer.Analysis.Rpc.DotBoxDRpcJsonLowerer;
-using TypeNames = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNames.TypeNames;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
 
@@ -79,49 +78,11 @@ internal static partial class InvokeAsyncModelFactory
         System.Text.StringBuilder builder,
         InvokeAsyncCallShape shape,
         KernelSourceLocationModel source)
-    {
-        var points = SequencePoints(source).ToArray();
-        builder.Append("        var spans = new ").Append(TypeNames.GlobalSourceSpan).AppendLine("[]");
-        builder.AppendLine("        {");
-        foreach (var point in points)
-        {
-            builder.Append("            new ").Append(TypeNames.GlobalSourceSpan).Append('(')
-                .Append(point.StartLine).Append(", ").Append(point.StartColumn).Append(", ")
-                .Append(LiteralReader.StringLiteral(point.DocumentId)).Append(", ")
-                .Append(point.EndLine).Append(", ").Append(point.EndColumn).AppendLine("),");
-        }
-
-        builder.AppendLine("        };");
-        builder.Append("        var module = ").Append(TypeNames.GlobalKernelDebugModuleMapper)
-            .AppendLine(".ApplyFunctionSequenceSpans(package.Module, new global::System.Collections.Generic.Dictionary<string, global::System.Collections.Generic.IReadOnlyList<global::DotBoxD.Kernels.Model.SourceSpan>> { [\"Invoke\"] = spans });");
-        builder.Append("        var documents = new ").Append(TypeNames.GlobalKernelDebugDocument).AppendLine("[]");
-        builder.AppendLine("        {");
-        foreach (var document in points.GroupBy(point => point.DocumentId, StringComparer.Ordinal)
-                     .Select(group => group.First()))
-        {
-            builder.Append("            new ").Append(TypeNames.GlobalKernelDebugDocument).Append('(')
-                .Append(LiteralReader.StringLiteral(document.DocumentId)).Append(", ")
-                .Append(LiteralReader.StringLiteral(document.Path)).Append(", ")
-                .Append(LiteralReader.StringLiteral(document.Sha256Checksum)).AppendLine("),");
-        }
-
-        builder.AppendLine("        };");
-        builder.Append("        var bindings = new ").Append(TypeNames.GlobalKernelDebugVariableBinding).AppendLine("[]");
-        builder.AppendLine("        {");
-        foreach (var name in shape.DebugParameterNames)
-        {
-            builder.Append("            new ").Append(TypeNames.GlobalKernelDebugVariableBinding).Append("(\"Invoke\", ")
-                .Append(LiteralReader.StringLiteral(name)).Append(", ")
-                .Append(LiteralReader.StringLiteral(name)).AppendLine("),");
-        }
-
-        builder.AppendLine("        };");
-        builder.Append("        var debugInfo = ").Append(TypeNames.GlobalKernelDebugInfo)
-            .AppendLine(".Create(module, documents, bindings);");
-    }
-
-    private static IEnumerable<KernelSourceLocationModel> SequencePoints(KernelSourceLocationModel source)
-        => source.SequencePoints.Count == 0 ? [source] : source.SequencePoints;
+        => SingleFunctionDebugInfoSourceEmitter.Emit(
+            builder,
+            "Invoke",
+            source,
+            shape.DebugParameterNames.Select(name => (name, name)).ToArray());
 
     private static string HintName(string ns, string packageName)
         => string.IsNullOrWhiteSpace(ns)

@@ -1,3 +1,4 @@
+using DotBoxD.Kernels.Debugging;
 using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 using DotBoxD.Plugins;
 
@@ -86,6 +87,33 @@ public sealed class ServerExtensionScopedHandleReviewTests
             typeof(DotBoxD.Services.Attributes.RpcServiceAttribute));
 
         Assert.Empty(HostCall(package).Arguments);
+    }
+
+    [Fact]
+    public void Awaited_server_binding_emits_a_distinct_sequence_point_and_source_argument()
+    {
+        var source = Prelude + """
+            public ScopedCallKernel(IGameWorldAccess world) => _world = world;
+
+            [ServerExtensionMethod]
+            public async ValueTask<bool> KillOneAsync(string id, HookContext ctx)
+            {
+                var monster = _world.Monsters.Get(id);
+                return await monster.KillAsync();
+            }
+        }
+        """;
+        var package = PluginAnalyzerGeneratedPackageFactory.Create(
+            source,
+            "Sample.ScopedCallPluginPackage",
+            typeof(DotBoxD.Services.Attributes.RpcServiceAttribute));
+
+        var debugInfo = Assert.IsType<KernelDebugInfo>(package.DebugInfo);
+        Assert.True(Assert.Single(debugInfo.Documents).MatchesSource(source));
+        Assert.Contains(debugInfo.VariableBindings, binding => binding.SourceName == "id");
+        Assert.Contains(debugInfo.SequencePoints, point =>
+            point.Span.Line == source[..source.IndexOf("return await", StringComparison.Ordinal)]
+                .Count(character => character == '\n') + 1);
     }
 
     private static CallExpression HostCall(PluginPackage package)
