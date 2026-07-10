@@ -1,3 +1,4 @@
+using DotBoxD.Plugins.Analyzer.Analysis.Debugging;
 using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
@@ -241,7 +242,8 @@ internal static partial class InvokeAsyncModelFactory
             throw new NotSupportedException("call site is not interceptable by the C# compiler.");
         }
 
-        var package = EmitPackage(ns, packageName, pluginId, shape, bodyJson, effects, capabilities);
+        var source = KernelSourceLocationModel.Create(pluginId + ":Invoke", shape.Block, cancellationToken);
+        var package = EmitPackage(ns, packageName, pluginId, shape, bodyJson, effects, capabilities, source);
         return new InvokeAsyncResult(package, interception, null);
     }
 

@@ -16,6 +16,9 @@ public sealed class InvokeAsyncGenerationTests
         Assert.Contains("$anon:", source, StringComparison.Ordinal);
         Assert.Contains("host.world.getHealth", source, StringComparison.Ordinal);
         Assert.Contains("game.world.monster.read.health", source, StringComparison.Ordinal);
+        Assert.Contains("KernelDebugInfo.Create(module, [document], bindings)", source, StringComparison.Ordinal);
+        Assert.Contains("ApplyFunctionSpans(package.Module", source, StringComparison.Ordinal);
+        Assert.Contains("DebugInfo = debugInfo", source, StringComparison.Ordinal);
     }
 
     [Fact]
