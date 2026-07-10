@@ -75,6 +75,30 @@ public sealed class DapAdapterTranscriptTests
     }
 
     [Fact]
+    public async Task Abrupt_adapter_disconnect_detaches_the_remote_debug_session()
+    {
+        await using var bridge = PluginDebugBridge.Start(new PluginDebugBridgeOptions
+        {
+            WaitForDebuggerBeforeInstall = false
+        });
+        var control = new RecordingControl();
+        bridge.AttachControl(control);
+        await bridge.PublishAsync(Bootstrap(control.SessionToken));
+        var client = await BridgeClient.ConnectAsync(
+            bridge.Descriptor.PipeName,
+            bridge.Descriptor.DiscoveryToken,
+            CancellationToken.None);
+        _ = await client.RemoteAsync(PluginDebugCommands.Attach, new { }, CancellationToken.None);
+
+        await client.DisposeAsync();
+
+        await control.DisconnectReceived.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(
+            new[] { PluginDebugCommands.Attach, PluginDebugCommands.Disconnect },
+            control.Commands);
+    }
+
+    [Fact]
     public async Task Standard_dap_lifecycle_authenticates_bridge_resolves_breakpoint_and_configures_session()
     {
         await using var bridge = PluginDebugBridge.Start(new PluginDebugBridgeOptions
@@ -216,11 +240,18 @@ public sealed class DapAdapterTranscriptTests
 
         public List<(string Command, JsonElement Payload)> Payloads { get; } = [];
 
+        public TaskCompletionSource DisconnectReceived { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public ValueTask<byte[]> ExchangeAsync(byte[] message, CancellationToken cancellationToken = default)
         {
             var request = PluginDebugProtocol.Decode(message, 1024 * 1024);
             Commands.Add(request.Kind);
             Payloads.Add((request.Kind, request.Payload.Clone()));
+            if (request.Kind == PluginDebugCommands.Disconnect)
+            {
+                DisconnectReceived.TrySetResult();
+            }
             object body = request.Kind == PluginDebugCommands.Initialize
                 ? new { supported = true }
                 : request.Kind == PluginDebugCommands.SetBreakpoints

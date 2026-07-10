@@ -16,6 +16,7 @@ namespace DotBoxD.Pushdown.Services;
 public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDisposable
 {
     private readonly PluginDebugBridgeOptions _options;
+    private readonly PluginDebugRemoteConnection _remote;
     private readonly PluginDebugSourceCatalog _sources;
     private readonly PluginDebugBridgeRequestHandler _requests;
     private readonly CancellationTokenSource _lifetime = new();
@@ -26,18 +27,18 @@ public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDispo
     private readonly TaskCompletionSource _configured =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Task _runTask;
-    private IPluginDebugControlRpcService? _control;
     private int _disposed;
 
     private PluginDebugBridge(PluginDebugBridgeOptions options)
     {
         _options = options;
+        _remote = new PluginDebugRemoteConnection(options.MaxFrameBytes);
         var pipeName = "dotboxd-debug-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(24));
         var token = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
         Descriptor = PluginDebugBridgeDiscovery.Publish(
             new PluginDebugBridgeDescriptor(Environment.ProcessId, pipeName, token));
         _sources = new PluginDebugSourceCatalog(options.SourceReader ?? PluginDebugBridgeDiscovery.ReadSource);
-        _requests = new PluginDebugBridgeRequestHandler(ExchangeRemoteAsync, _sources, MarkConfigured);
+        _requests = new PluginDebugBridgeRequestHandler(_remote.ExchangeAsync, _sources, MarkConfigured);
         _runTask = RunAsync(_lifetime.Token);
     }
 
@@ -54,11 +55,7 @@ public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDispo
     /// <summary>Attaches the remote control proxy after the plugin's existing peer has connected.</summary>
     public void AttachControl(IPluginDebugControlRpcService control)
     {
-        ArgumentNullException.ThrowIfNull(control);
-        if (Interlocked.CompareExchange(ref _control, control, null) is not null)
-        {
-            throw new InvalidOperationException("A remote debug control endpoint is already attached.");
-        }
+        _remote.Attach(control);
     }
 
     /// <summary>Registers client-only source maps before installation.</summary>
@@ -182,6 +179,7 @@ public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDispo
         {
             connection.Cancel();
             await PluginDebugBridgeProtocol.IgnoreCancellationAsync(events).ConfigureAwait(false);
+            await _remote.DisconnectAsync(sessionToken).ConfigureAwait(false);
         }
     }
 
@@ -202,13 +200,6 @@ public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDispo
             var response = await _requests.HandleAsync(request.RootElement, cancellationToken).ConfigureAwait(false);
             await WriteAsync(stream, response, cancellationToken).ConfigureAwait(false);
         }
-    }
-
-    private async ValueTask<byte[]> ExchangeRemoteAsync(byte[] payload, CancellationToken cancellationToken)
-    {
-        var control = Volatile.Read(ref _control)
-            ?? throw new InvalidOperationException("The remote debug control endpoint is not connected.");
-        return await control.ExchangeAsync(payload, cancellationToken).ConfigureAwait(false);
     }
 
     private void MarkConfigured() => _configured.TrySetResult();
