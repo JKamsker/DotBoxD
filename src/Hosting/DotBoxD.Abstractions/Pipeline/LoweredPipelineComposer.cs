@@ -20,13 +20,6 @@ namespace DotBoxD.Abstractions;
 /// </list>
 /// Each step's <c>$dotboxd.current</c> placeholder is rewritten to the scoped variable holding the value that
 /// flows into that step, so projections compose without name capture.
-/// <para>
-/// Because the two entrypoints are independent, a projection that a later filter depends on is evaluated both
-/// in <c>ShouldHandle</c> (to gate) and again in <c>Handle</c> (to produce the result). The lowered fragments
-/// the generator emits are pure, so this is a redundant computation rather than a duplicated side effect;
-/// <c>ShouldHandle</c> stops at the last filter, so a projection with no filter after it is not evaluated
-/// there at all.
-/// </para>
 /// </remarks>
 public static class LoweredPipelineComposer
 {
@@ -74,11 +67,15 @@ public static class LoweredPipelineComposer
     // reached it. A mismatch means the steps were not produced (or ordered) as one coherent pipeline.
     private static SandboxType ValidateAndInputType(IReadOnlyList<LoweredPipelineStep> steps)
     {
-        var inputType = CurrentParameter(steps[0], 0).Type;
-        var currentTag = steps[0].InputType;
+        var first = steps[0] ?? throw new ArgumentNullException(nameof(LoweredPipelineComposition.Steps));
+        var inputType = CurrentParameter(first, 0).Type;
+        var currentTag = first.InputType ?? throw new ArgumentNullException(nameof(LoweredPipelineStep.InputType));
         for (var i = 0; i < steps.Count; i++)
         {
-            var step = steps[i];
+            var step = steps[i] ?? throw new ArgumentNullException(nameof(LoweredPipelineComposition.Steps));
+            ArgumentNullException.ThrowIfNull(step.InputType, nameof(LoweredPipelineStep.InputType));
+            ArgumentNullException.ThrowIfNull(step.OutputType, nameof(LoweredPipelineStep.OutputType));
+            ArgumentNullException.ThrowIfNull(step.Value, nameof(LoweredPipelineStep.Value));
             _ = CurrentParameter(step, i);
             if (step.Kind is not (LoweredPipelineStepKind.Filter or LoweredPipelineStepKind.Projection))
             {
@@ -109,14 +106,21 @@ public static class LoweredPipelineComposer
 
     private static Parameter CurrentParameter(LoweredPipelineStep step, int index)
     {
-        if (step.Parameters.Count != 1 ||
-            !string.Equals(step.Parameters[0].Name, CurrentPlaceholder, StringComparison.Ordinal))
+        ArgumentNullException.ThrowIfNull(step.Parameters);
+        if (step.Parameters.Count != 1)
         {
             throw new ArgumentException(
                 $"step {index} must declare exactly one '{CurrentPlaceholder}' parameter.");
         }
 
-        return step.Parameters[0];
+        var parameter = step.Parameters[0] ?? throw new ArgumentNullException(nameof(LoweredPipelineStep.Parameters));
+        if (!string.Equals(parameter.Name, CurrentPlaceholder, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                $"step {index} must declare exactly one '{CurrentPlaceholder}' parameter.");
+        }
+
+        return parameter;
     }
 
     // Handle returns the value produced by the last projection; when the pipeline has no projection at all it
@@ -265,8 +269,8 @@ public static class LoweredPipelineComposer
         var effects = new SortedSet<string>(StringComparer.Ordinal);
         foreach (var step in steps)
         {
-            capabilities.UnionWith(step.RequiredCapabilities);
-            effects.UnionWith(step.Effects);
+            AddAll(capabilities, step.RequiredCapabilities, nameof(LoweredPipelineStep.RequiredCapabilities));
+            AddAll(effects, step.Effects, nameof(LoweredPipelineStep.Effects));
         }
 
         var metadata = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -281,5 +285,12 @@ public static class LoweredPipelineComposer
         }
 
         return metadata;
+    }
+
+    private static void AddAll(SortedSet<string> values, IReadOnlyList<string>? source, string paramName)
+    {
+        ArgumentNullException.ThrowIfNull(source, paramName);
+        foreach (var value in source)
+            values.Add(value ?? throw new ArgumentNullException(paramName));
     }
 }
