@@ -28,6 +28,7 @@
     <Project Path="src/Kernels/DotBoxD.Kernels.Runtime/DotBoxD.Kernels.Runtime.csproj" />
     <Project Path="src/Kernels/DotBoxD.Kernels.Interpreter/DotBoxD.Kernels.Interpreter.csproj" />
     <Project Path="src/Kernels/DotBoxD.Kernels.Compiler/DotBoxD.Kernels.Compiler.csproj" />
+    <Project Path="src/Kernels/DotBoxD.Kernels.Debugging.Clr/DotBoxD.Kernels.Debugging.Clr.csproj" />
     <Project Path="src/Kernels/DotBoxD.Kernels.Verifier/DotBoxD.Kernels.Verifier.csproj" />
     <Project Path="src/Kernels/DotBoxD.Kernels.Serialization.Json/DotBoxD.Kernels.Serialization.Json.csproj" />
   </Folder>
