@@ -47,6 +47,11 @@ public sealed class DebuggerIntegrationAssetTests
             project.Descendants().Where(item => item.Name.LocalName == "Target"),
             item => item.Attribute("Name")?.Value == "PrepareVsixIntermediateOutput" &&
                     item.Attribute("BeforeTargets")?.Value == "GenerateFileManifest");
+        Assert.All(
+            manifest.Descendants().Where(item => item.Name.LocalName == "InstallationTarget"),
+            target => Assert.Equal(
+                "amd64",
+                target.Elements().Single(item => item.Name.LocalName == "ProductArchitecture").Value));
         Assert.Contains(
             manifest.Descendants().Where(item => item.Name.LocalName == "Asset"),
             item => item.Attribute("Path")?.Value == "AdapterRegistration.pkgdef");
