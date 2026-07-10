@@ -37,12 +37,16 @@ public bool IsKnownBuiltIn(int maxDepth = 8) => IsKnown(this, 0, maxDepth, Empty
 public bool IsRecord => Arguments.Count > 0 && StringComparer.Ordinal.Equals(Name, RecordName)
 public bool IsValidMapKey() => IsValidMapKey(declaredOpaqueIdTypes: null)
 public bool IsValidMapKey(IReadOnlySet<string>? declaredOpaqueIdTypes)
+public bool MatchesSource(string source)
+public bool MatchesSourceBytes(ReadOnlySpan<byte> source)
 public bool RequireDeterministic { get; init; }
 public bool Succeeded { get; init; }
 public bool Success { get; init; }
 public bool TryGet(string id, out BindingSignature binding)
 public bool TryGetCapabilityGrantValidator(string capabilityId, out CapabilityGrantValidator validator)
+public bool TryGetDocument(string documentId, out KernelDebugDocument? document)
 public bool TryGetGrant(string capabilityId, out CapabilityGrant grant)
+public bool TryGetSequencePoint(SandboxNodeId nodeId, out KernelSequencePoint? sequencePoint)
 public CancellationToken CancellationToken { get; }
 public CancellationTokenSource CreateWallTimeToken()
 public CapabilityGrant GetCapability(string capabilityId)
@@ -129,6 +133,9 @@ public enum SandboxNodeKind
 public enum SandboxNodeKind.Expression
 public enum SandboxNodeKind.Function
 public enum SandboxNodeKind.Statement
+public enum SourceSequencePointKind
+public enum SourceSequencePointKind.Hidden
+public enum SourceSequencePointKind.Normal
 public ExecutionMode ActualMode { get => _actualMode; init => _actualMode = RequireDefinedMode(value, nameof(ActualMode)); }
 public ExecutionMode Mode { get; init; } = ExecutionMode.Auto
 public ExecutionPlan( string moduleHash, string planHash, ExecutionPlanSeal planSeal, string policyHash, string bindingManifestHash, SandboxModule module, SandboxPolicy policy, BindingRegistry bindings, ResourceLimits budget, IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis, IReadOnlyDictionary<string, IReadOnlySet<string>>? bindingReferences = null)
@@ -152,6 +159,8 @@ public int Minor { get => _minor; init => _minor = RequireNonNegative(value, nam
 public int NextRandomInt32(int minInclusive, int maxExclusive)
 public int Patch { get => _patch; init => _patch = RequireNonNegative(value, nameof(Patch)); }
 public int Version { get; }
+public int? EndColumn { get => _endColumn; init => _endColumn = ValidateOptionalCoordinate(value, nameof(EndColumn)); }
+public int? EndLine { get => _endLine; init => _endLine = ValidateOptionalCoordinate(value, nameof(EndLine)); }
 public interface IAuditSink
 public interface IBindingCatalog
 public interface ISandboxDebugFrame
@@ -168,6 +177,9 @@ public IReadOnlyList<BindingSignature> Signatures => _signatures
 public IReadOnlyList<CapabilityGrant> Grants { get; init; }
 public IReadOnlyList<CapabilityRequest> CapabilityRequests { get => _capabilityRequests; init => _capabilityRequests = ModelCopy.List(value); }
 public IReadOnlyList<Expression> Arguments { get => _arguments; init => _arguments = ModelCopy.List(value); }
+public IReadOnlyList<KernelDebugDocument> Documents { get; }
+public IReadOnlyList<KernelDebugVariableBinding> VariableBindings { get; }
+public IReadOnlyList<KernelSequencePoint> SequencePoints { get; }
 public IReadOnlyList<Parameter> Parameters { get => _parameters; init => _parameters = ModelCopy.List(value); }
 public IReadOnlyList<SandboxAuditEvent> Events { get; }
 public IReadOnlyList<SandboxDiagnostic> Diagnostics { get; }
@@ -183,6 +195,10 @@ public IReadOnlyList<Statement> Then { get => _then; init => _then = ModelCopy.L
 public IReadOnlySet<string> DeclaredOpaqueIdTypes { get; init; }
 public ISandboxDebugFrame Frame { get; }
 public ISandboxExecutionDebugHook? DebugHook { get; init; }
+public KernelDebugDocument(string id, string path, string sha256Checksum)
+public KernelDebugInfo( IReadOnlyList<KernelDebugDocument> documents, IReadOnlyList<KernelSequencePoint> sequencePoints, IReadOnlyList<KernelDebugVariableBinding>? variableBindings = null)
+public KernelDebugVariableBinding( string functionId, string slotName, string sourceName, SandboxNodeId? scopeStart = null, SandboxNodeId? scopeEnd = null)
+public KernelSequencePoint(SandboxNodeId nodeId, SourceSpan span)
 public long AllocatedBytes { get => _allocatedBytes; init => _allocatedBytes = RequireNonNegative(value, nameof(AllocatedBytes)); }
 public long AllocatedBytes => _allocatedBytes
 public long AuditCheckpoint() => Audit.EventsWritten
@@ -263,6 +279,9 @@ public SandboxNodeDescriptor GetDescriptor(Statement statement)
 public SandboxNodeDescriptor Node { get; }
 public SandboxNodeDescriptor( SandboxNodeId id, string functionId, SandboxNodeKind kind, string structuralPath, SourceSpan? sourceSpan)
 public SandboxNodeId Id { get; }
+public SandboxNodeId NodeId { get; }
+public SandboxNodeId? ScopeEnd { get; }
+public SandboxNodeId? ScopeStart { get; }
 public SandboxNodeId(string value)
 public SandboxNodeKind Kind { get; }
 public SandboxPath Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
@@ -314,6 +333,7 @@ public sealed class BindingRegistryBuilder
 public sealed class ExecutionPlan
 public sealed class ExecutionPlanSeal : IEquatable<ExecutionPlanSeal>
 public sealed class InMemoryAuditSink : IAuditSink
+public sealed class KernelDebugInfo
 public sealed class ResourceMeter
 public sealed class SandboxNodeMap
 public sealed class SandboxPolicyBuilder
@@ -340,6 +360,9 @@ public sealed record GuidValue(System.Guid Value) : SandboxValue
 public sealed record I32Value(int Value) : SandboxValue
 public sealed record I64Value(long Value) : SandboxValue
 public sealed record IfStatement(Expression Condition, IReadOnlyList<Statement> Then, IReadOnlyList<Statement> Else, SourceSpan Span)
+public sealed record KernelDebugDocument
+public sealed record KernelDebugVariableBinding
+public sealed record KernelSequencePoint
 public sealed record ListValue(IReadOnlyList<SandboxValue> Values, SandboxType ItemType) : SandboxValue, IReadOnlyList<SandboxValue>
 public sealed record LiteralExpression(SandboxValue Value, SourceSpan Span) : Expression(Span)
 public sealed record MapValue( IReadOnlyDictionary<SandboxValue, SandboxValue> Values, SandboxType KeyType, SandboxType ValueType) : SandboxValue
@@ -371,12 +394,14 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
 public sealed record SandboxUri(string Value)
 public sealed record SandboxUriValue(SandboxUri Value) : SandboxValue
 public sealed record SemVersion(int Major, int Minor, int Patch)
-public sealed record SourceSpan(int Line, int Column)
+public sealed record SourceSpan( int Line, int Column, string? DocumentId = null, int? EndLine = null, int? EndColumn = null, SourceSequencePointKind SequencePointKind = SourceSequencePointKind.Normal)
 public sealed record StringValue(string Value) : SandboxValue
 public sealed record UnaryExpression(string Operator, Expression Operand, SourceSpan Span) : Expression(Span)
 public sealed record UnitValue : SandboxValue
 public sealed record VariableExpression(string Name, SourceSpan Span) : Expression(Span)
 public sealed record WhileStatement(Expression Condition, IReadOnlyList<Statement> Body, SourceSpan Span) : Statement(Span)
+public SourceSequencePointKind SequencePointKind { get; init; }
+public SourceSpan Span { get; }
 public SourceSpan? SourceSpan { get; }
 public static BindingCostModel Fixed(long baseFuel) => new(baseFuel)
 public static BindingCostModel PerByte(long baseFuel, long perByteFuel)
@@ -435,6 +460,9 @@ public static IReadOnlyDictionary<string, string> Create( string resourceKind, D
 public static IReadOnlyList<SandboxValue> BindArguments(SandboxFunction function, SandboxValue input)
 public static IReadOnlySet<string> Collect(SandboxModule module, IBindingCatalog bindings, string? entrypoint)
 public static IReadOnlySet<string> Collect(SandboxModule module, IBindingCatalog bindings)
+public static KernelDebugDocument FromSource(string id, string path, string source)
+public static KernelDebugDocument FromSourceBytes(string id, string path, ReadOnlySpan<byte> source)
+public static KernelDebugInfo Create( SandboxModule module, IReadOnlyList<KernelDebugDocument> documents, IReadOnlyList<KernelDebugVariableBinding>? variableBindings = null)
 public static long Add(long left, long right)
 public static long Copy(int sourceCount, int addedCount = 0)
 public static long Divide(long left, long right)
@@ -504,23 +532,29 @@ public string CreateChargedStringConcat(string left, string right)
 public string CreateChargedSubstring(string value, int startIndex, int length)
 public string FunctionId { get; }
 public string Hash => (_hash ??= CreateHashCache()).Value
+public string Id { get; }
 public string Kind { get => _kind; init => _kind = value ?? throw new ArgumentNullException(nameof(Kind)); }
 public string ManifestHash { get; }
 public string Message { get => _message; init => _message = ValidateText(value, nameof(Message)); }
 public string ModuleHash { get; }
 public string Name { get; }
 public string Name { get; init; } = Name ?? throw new ArgumentNullException(nameof(Name))
+public string Path { get; }
 public string PlanHash { get; }
 public string PolicyHash { get; }
 public string PolicyId { get => _policyId; init { _policyId = value; ResetHash(); } }
 public string RelativePath { get => _relativePath; init => _relativePath = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
 public string SafeMessage { get; init; }
+public string Sha256Checksum { get; }
+public string SlotName { get; }
+public string SourceName { get; }
 public string StructuralPath { get; }
 public string TypeName { get => _typeName; init => _typeName = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
 public string Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
 public string Value { get; init; }
 public string Value => _value
 public string? ArtifactHash { get; init; }
+public string? DocumentId { get => _documentId; init => _documentId = ValidateDocumentId(value); }
 public TimeSpan EffectiveWallTime => MaxWallTime ?? TimeSpan.FromMilliseconds(100)
 public TimeSpan RemainingWallTime()
 public ulong? RandomSeed { get => _randomSeed; init { _randomSeed = value; ResetHash(); } }
