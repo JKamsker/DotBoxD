@@ -43,6 +43,34 @@ public sealed class LoweredPipelineCarrierValidationTests
     }
 
     [Fact]
+    public void Composer_rejects_steps_with_null_parameter_name()
+    {
+        var step = Step(LoweredPipelineStepKind.Filter, "i32", "bool", SandboxType.I32) with
+        {
+            Parameters = [new Parameter("$dotboxd.current", SandboxType.I32) with { Name = null! }]
+        };
+
+        var exception = Assert.ThrowsAny<ArgumentException>(() => LoweredPipelineComposer.Compose(
+            new LoweredPipelineComposition("null-parameter-name", [step], SandboxType.I32)));
+
+        Assert.Equal("Name", exception.ParamName);
+    }
+
+    [Fact]
+    public void Composer_rejects_steps_with_null_parameter_type()
+    {
+        var step = Step(LoweredPipelineStepKind.Filter, "i32", "bool", SandboxType.I32) with
+        {
+            Parameters = [new Parameter("$dotboxd.current", SandboxType.I32) with { Type = null! }]
+        };
+
+        var exception = Assert.ThrowsAny<ArgumentException>(() => LoweredPipelineComposer.Compose(
+            new LoweredPipelineComposition("null-parameter-type", [step], SandboxType.I32)));
+
+        Assert.Equal("Type", exception.ParamName);
+    }
+
+    [Fact]
     public void Composer_rejects_steps_with_null_input_type()
     {
         var step = Step(LoweredPipelineStepKind.Filter, "i32", "bool", SandboxType.I32) with
@@ -54,6 +82,17 @@ public sealed class LoweredPipelineCarrierValidationTests
             new LoweredPipelineComposition("null-input-type", [step], SandboxType.I32)));
 
         Assert.Equal("InputType", exception.ParamName);
+    }
+
+    [Fact]
+    public void Composer_rejects_scalar_input_tag_parameter_type_mismatches()
+    {
+        var step = Step(LoweredPipelineStepKind.Filter, "string", "bool", SandboxType.I32);
+
+        var exception = Assert.Throws<ArgumentException>(() => LoweredPipelineComposer.Compose(
+            new LoweredPipelineComposition("input-type-mismatch", [step], SandboxType.String)));
+
+        Assert.Contains("parameter type", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
