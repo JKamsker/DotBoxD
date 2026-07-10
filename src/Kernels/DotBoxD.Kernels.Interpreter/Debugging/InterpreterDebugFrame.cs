@@ -174,7 +174,7 @@ internal static class SandboxDebugValueReplacer
         int depth,
         SandboxValue replacement)
     {
-        if (index >= list.Count)
+        if (index < 0 || index >= list.Count)
         {
             throw Invalid("debug list index is out of range");
         }
@@ -191,7 +191,7 @@ internal static class SandboxDebugValueReplacer
         int depth,
         SandboxValue replacement)
     {
-        if (index >= record.Fields.Count)
+        if (index < 0 || index >= record.Fields.Count)
         {
             throw Invalid("debug record field is out of range");
         }

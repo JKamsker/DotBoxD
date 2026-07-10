@@ -163,7 +163,9 @@ public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDispo
             return;
         }
 
-        var sessionToken = await _sessionToken.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        var sessionToken = await _sessionToken.Task
+            .WaitAsync(_options.DebuggerWaitTimeout, cancellationToken)
+            .ConfigureAwait(false);
         await WriteAsync(
                 stream,
                 new { kind = "authentication", success = true, sessionToken, protocolVersion = PluginDebugProtocol.Version },

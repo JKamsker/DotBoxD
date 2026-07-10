@@ -191,6 +191,7 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
             .ConfigureAwait(false);
         if (command != "pause")
         {
+            RequireInspection().InvalidateStoppedState();
             await connection.EventAsync("continued", new { allThreadsContinued = true }, cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -210,6 +211,8 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
                 // A lost remote session is already disconnected.
             }
         }
+
+        _inspection?.InvalidateStoppedState();
 
         await connection.RespondAsync(request, true, new { }, null, cancellationToken).ConfigureAwait(false);
         await connection.EventAsync("terminated", new { }, cancellationToken).ConfigureAwait(false);

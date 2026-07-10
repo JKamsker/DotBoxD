@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DotBoxD.Kernels.Debugging;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins.Debugging;
 
@@ -81,6 +82,30 @@ public sealed class PluginDebugValueCodecTests
             PluginDebugValueCodec.Snapshot(new UnsupportedValue()));
 
         Assert.Contains(nameof(UnsupportedValue), exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Nested_debug_paths_decode_list_record_and_map_segments_with_their_original_types()
+    {
+        var type = SandboxType.List(SandboxType.Record([
+            SandboxType.Map(SandboxType.String, SandboxType.I64)
+        ]));
+        var payload = JsonSerializer.Deserialize<JsonElement>(
+            """
+            {"path":[
+              {"kind":"list","index":2},
+              {"kind":"record","index":0},
+              {"kind":"map","key":{"type":"String","value":"score"}}
+            ]}
+            """);
+
+        var path = PluginDebugValuePathParser.Parse(payload, type);
+
+        Assert.Equal(2, Assert.IsType<SandboxDebugListIndex>(path[0]).Index);
+        Assert.Equal(0, Assert.IsType<SandboxDebugRecordField>(path[1]).Index);
+        Assert.Equal(
+            SandboxValue.FromString("score"),
+            Assert.IsType<SandboxDebugMapValue>(path[2]).Key);
     }
 
     private static void AssertInvalid(string json, SandboxType type, string expectedError)

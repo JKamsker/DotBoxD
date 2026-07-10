@@ -32,18 +32,31 @@ public sealed partial class PluginServer
             .ConfigureAwait(false);
         PluginPackageValidator.ValidatePrepared(package, plan, Events, installPolicy);
         var kernels = new InstalledKernel[degreeOfParallelism];
-        for (var i = 0; i < kernels.Length; i++)
+        var created = 0;
+        try
         {
-            kernels[i] = CreateInstalledKernel(plan, package, owner: null);
-        }
+            for (; created < kernels.Length; created++)
+            {
+                kernels[created] = CreateInstalledKernel(plan, package, owner: null);
+            }
 
-        var pool = new InstalledKernelPool(kernels);
-        lock (_poolGate)
+            var pool = new InstalledKernelPool(kernels);
+            lock (_poolGate)
+            {
+                _kernelPools.Add(pool);
+            }
+
+            return pool;
+        }
+        catch
         {
-            _kernelPools.Add(pool);
-        }
+            for (var index = 0; index < created; index++)
+            {
+                kernels[index].Revoke();
+            }
 
-        return pool;
+            throw;
+        }
     }
 
     private async ValueTask<InstalledKernel> InstallServerExtensionCoreAsync(

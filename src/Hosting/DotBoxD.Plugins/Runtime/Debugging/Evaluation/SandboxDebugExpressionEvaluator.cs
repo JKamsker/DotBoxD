@@ -106,17 +106,29 @@ internal static class SandboxDebugExpressionEvaluator
             {
                 var operation = Advance().Text;
                 var right = ParseComparison();
-                if (!value.Type.Equals(right.Type))
-                {
-                    throw Invalid("Equality operands must have the same sandbox type.");
-                }
-
-                var equal = value.Equals(right);
+                var equal = NumericEqual(value, right) ?? (value.Type.Equals(right.Type)
+                    ? value.Equals(right)
+                    : throw Invalid("Equality operands must have compatible sandbox types."));
                 value = SandboxValue.FromBool(operation == "==" ? equal : !equal);
             }
 
             return value;
         }
+
+        private static bool? NumericEqual(SandboxValue left, SandboxValue right)
+            => (left, right) switch
+            {
+                (I32Value l, I32Value r) => l.Value == r.Value,
+                (I32Value l, I64Value r) => l.Value == r.Value,
+                (I64Value l, I32Value r) => l.Value == r.Value,
+                (I64Value l, I64Value r) => l.Value == r.Value,
+                (F64Value l, I32Value r) => l.Value == r.Value,
+                (F64Value l, I64Value r) => l.Value == r.Value,
+                (I32Value l, F64Value r) => l.Value == r.Value,
+                (I64Value l, F64Value r) => l.Value == r.Value,
+                (F64Value l, F64Value r) => l.Value == r.Value,
+                _ => null
+            };
 
         private SandboxValue ParseComparison()
         {

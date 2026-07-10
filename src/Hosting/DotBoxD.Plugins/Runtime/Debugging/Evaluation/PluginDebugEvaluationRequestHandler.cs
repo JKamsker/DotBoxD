@@ -71,7 +71,20 @@ internal sealed class PluginDebugEvaluationRequestHandler(PluginDebugSession ses
             return EvaluationError(result);
         }
 
-        if (!frame.TrySetVariable(variable.Name, result.Value!, out var writeError))
+        IReadOnlyList<Kernels.Debugging.SandboxDebugValuePathSegment> path;
+        try
+        {
+            path = PluginDebugValuePathParser.Parse(payload, variable.Type);
+        }
+        catch (ArgumentException exception)
+        {
+            return PluginDebugHandlerResult.Error("invalidWrite", exception.Message);
+        }
+
+        var written = path.Count == 0
+            ? frame.TrySetVariable(variable.Name, result.Value!, out var writeError)
+            : frame.TrySetMember(variable.Name, path, result.Value!, out writeError);
+        if (!written)
         {
             return PluginDebugHandlerResult.Error(
                 "invalidWrite",

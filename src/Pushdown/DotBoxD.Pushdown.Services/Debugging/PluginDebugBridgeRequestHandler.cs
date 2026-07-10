@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DotBoxD.Plugins.Debugging;
 
 namespace DotBoxD.Pushdown.Services;
 
@@ -14,7 +15,8 @@ internal sealed class PluginDebugBridgeRequestHandler(
         {
             return await DispatchAsync(id, request, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or KeyNotFoundException)
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or
+            KeyNotFoundException or FormatException or OverflowException or PluginDebugProtocolException)
         {
             return new { id, success = false, error = exception.Message };
         }

@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using DotBoxD.Kernels.Sandbox;
 using Microsoft.CodeAnalysis;
@@ -12,6 +14,8 @@ namespace DotBoxD.Kernels.Debugging.Clr;
 
 internal static class ClrDebugEvaluationEngine
 {
+    private static readonly ConcurrentDictionary<string, Assembly> LoadedImages = new(StringComparer.Ordinal);
+
     public static async ValueTask<ClrDebugValue> EvaluateAsync(
         string expression,
         bool allowAwait,
@@ -64,9 +68,7 @@ internal static class ClrDebugEvaluationEngine
         IReadOnlyCollection<string> imports,
         IReadOnlyCollection<ReadOnlyMemory<byte>> assemblyImages)
     {
-        var trustedPlatformAssemblies = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))?
-            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
-            ?? throw new InvalidOperationException("Trusted platform assembly metadata is unavailable.");
+        var trustedPlatformAssemblies = TrustedPlatformAssemblyPaths();
         Assembly[] packageAssemblies = [typeof(SandboxValue).Assembly, typeof(ClrDebugEvaluationEngine).Assembly];
         var metadata = trustedPlatformAssemblies
             .Concat(packageAssemblies.Concat(references).Select(assembly => assembly.Location))
@@ -91,8 +93,25 @@ internal static class ClrDebugEvaluationEngine
     {
         foreach (var image in assemblyImages)
         {
-            Assembly.Load(image.ToArray());
+            var bytes = image.ToArray();
+            var identity = System.Convert.ToHexString(SHA256.HashData(bytes));
+            _ = LoadedImages.GetOrAdd(identity, _ => Assembly.Load(bytes));
         }
+    }
+
+    private static string[] TrustedPlatformAssemblyPaths()
+    {
+        var configured = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return configured.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
+        }
+
+        return AppDomain.CurrentDomain.GetAssemblies()
+            .Select(assembly => assembly.Location)
+            .Where(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     private static string BuildSource(string expression, IEnumerable<string> variableNames)

@@ -48,6 +48,7 @@ public sealed class PluginDebugRequestValidationTests
         [
             "{\"pluginId\":\"plugin\"}",
             "{\"pluginId\":\"plugin\",\"nodeIds\":{}}",
+            "{\"pluginId\":\"plugin\",\"nodeIds\":[42]}",
             "{\"pluginId\":\"plugin\",\"breakpoints\":{}}",
             "{\"pluginId\":\"plugin\",\"breakpoints\":[{}]}",
             "{\"pluginId\":\"plugin\",\"breakpoints\":[{\"nodeId\":\"v1:function:s0\",\"condition\":42}]}",

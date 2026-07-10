@@ -68,7 +68,7 @@ internal sealed class DapBreakpointHandler(
     private static BreakpointBinding[] BuildBindings(JsonElement[] requested, JsonElement[] resolved)
     {
         var bindings = new List<BreakpointBinding>();
-        for (var index = 0; index < resolved.Length; index++)
+        for (var index = 0; index < Math.Min(resolved.Length, requested.Length); index++)
         {
             var mapped = resolved[index];
             if (!Property(mapped, "Verified", "verified").GetBoolean())
@@ -79,8 +79,14 @@ internal sealed class DapBreakpointHandler(
             var source = requested[index];
             foreach (var binding in Property(mapped, "Bindings", "bindings").EnumerateArray())
             {
+                var pluginId = Property(binding, "PluginId", "pluginId").GetString();
+                if (string.IsNullOrWhiteSpace(pluginId))
+                {
+                    throw new DebugAdapterException("invalidBinding", "A breakpoint binding is missing its plugin ID.");
+                }
+
                 bindings.Add(new BreakpointBinding(
-                    Property(binding, "PluginId", "pluginId").GetString()!,
+                    pluginId,
                     new
                     {
                         nodeId = Property(binding, "NodeId", "nodeId").GetString(),

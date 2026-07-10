@@ -70,6 +70,15 @@ internal sealed class DapInspectionHandler(
             ? runId
             : throw new DebugAdapterException("staleThread", "The selected kernel execution is no longer stopped.");
 
+    public void InvalidateStoppedState()
+    {
+        _threads.Clear();
+        _threadPlugins.Clear();
+        _threadIds.Clear();
+        _frames.Clear();
+        _variableStore.Clear();
+    }
+
     private async ValueTask<object> ThreadsAsync(CancellationToken cancellationToken)
     {
         var body = await bridge.RemoteAsync(PluginDebugCommands.Threads, null, cancellationToken).ConfigureAwait(false);
@@ -127,7 +136,7 @@ internal sealed class DapInspectionHandler(
 
         if (handle.Value.ValueKind != JsonValueKind.Undefined)
         {
-            return new { variables = _variableStore.Expand(handle.Value) };
+            return new { variables = _variableStore.Expand(handle) };
         }
 
         var body = await bridge.RemoteAsync(
@@ -135,7 +144,7 @@ internal sealed class DapInspectionHandler(
                 new { frameId = handle.FrameId },
                 cancellationToken)
             .ConfigureAwait(false);
-        var variables = _variableStore.ScopeVariables(body.GetProperty(handle.Scope));
+        var variables = _variableStore.ScopeVariables(body.GetProperty(handle.Scope), handle);
         return new { variables };
     }
 
@@ -146,7 +155,7 @@ internal sealed class DapInspectionHandler(
         var frameId = Frame(arguments.GetProperty("frameId").GetInt32());
         var body = await bridge.RemoteAsync(
                 PluginDebugCommands.Evaluate,
-                new { frameId, expression, allowAwait = expression.Contains("await", StringComparison.Ordinal) },
+                new { frameId, expression, allowAwait = IsDebugConsole(arguments) },
                 cancellationToken)
             .ConfigureAwait(false);
         var value = body.GetProperty("value");
@@ -157,11 +166,13 @@ internal sealed class DapInspectionHandler(
     {
         var arguments = Arguments(request);
         var handle = _variableStore.Get(arguments.GetProperty("variablesReference").GetInt32());
+        var name = arguments.GetProperty("name").GetString()!;
         return SetExpressionCoreAsync(
             handle.FrameId,
-            arguments.GetProperty("name").GetString()!,
+            handle.VariableName ?? name,
             arguments.GetProperty("value").GetString()!,
-            cancellationToken);
+            cancellationToken,
+            handle.VariableName is null ? null : _variableStore.ChildPath(handle, name));
     }
 
     private ValueTask<object> SetExpressionAsync(JsonElement request, CancellationToken cancellationToken)
@@ -178,11 +189,12 @@ internal sealed class DapInspectionHandler(
         string frameId,
         string expression,
         string value,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyList<object>? path = null)
     {
         var body = await bridge.RemoteAsync(
                 PluginDebugCommands.SetExpression,
-                new { frameId, expression, valueExpression = value },
+                new { frameId, expression, valueExpression = value, path },
                 cancellationToken)
             .ConfigureAwait(false);
         var result = body.GetProperty("value");
@@ -277,9 +289,18 @@ internal sealed class DapInspectionHandler(
 
     private static int? OptionalInt(JsonElement value, string first, string second)
     {
-        var property = Property(value, first, second);
+        if (!value.TryGetProperty(first, out var property) && !value.TryGetProperty(second, out property))
+        {
+            return null;
+        }
+
         return property.ValueKind == JsonValueKind.Number ? property.GetInt32() : null;
     }
+
+    private static bool IsDebugConsole(JsonElement arguments)
+        => arguments.TryGetProperty("context", out var context) &&
+           context.ValueKind == JsonValueKind.String &&
+           string.Equals(context.GetString(), "repl", StringComparison.Ordinal);
 
     private static void EnsureBridgeSuccess(JsonElement response)
     {

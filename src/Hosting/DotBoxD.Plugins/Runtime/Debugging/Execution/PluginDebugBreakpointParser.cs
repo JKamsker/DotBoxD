@@ -10,7 +10,9 @@ internal sealed class PluginDebugBreakpointParser(int maxExpressionLength)
         if (payload.TryGetProperty("nodeIds", out var nodeIds) && nodeIds.ValueKind == JsonValueKind.Array)
         {
             return nodeIds.EnumerateArray()
-                .Select(value => new PluginDebugBreakpointSpec(new SandboxNodeId(value.GetString() ?? string.Empty)))
+                .Select(value => value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(value.GetString())
+                    ? new PluginDebugBreakpointSpec(new SandboxNodeId(value.GetString()!))
+                    : throw new ArgumentException("Each nodeIds entry must be a non-empty string."))
                 .DistinctBy(breakpoint => breakpoint.NodeId)
                 .ToArray();
         }
