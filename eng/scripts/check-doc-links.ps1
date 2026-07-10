@@ -90,7 +90,7 @@ foreach ($document in $documents) {
             $targetParts = $target.Split('#', 2)
             $path = $targetParts[0].Split('?', 2)[0]
             $fragment = if ($targetParts.Count -eq 2) { $targetParts[1] } else { '' }
-            if ($path -match '^(https?|mailto|tel):' -or
+            if ($path -match '^[a-z][a-z0-9+.-]*:' -or
                 $path.StartsWith('//') -or
                 $path.StartsWith('/api/') -or
                 $path.Contains('{')) {
