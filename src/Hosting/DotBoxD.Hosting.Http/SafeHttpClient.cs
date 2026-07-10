@@ -197,6 +197,7 @@ public static class SafeHttpClient
         }
 
         var addresses = await dnsResolver(host, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         if (addresses.Count == 0 ||
             !grant.AllowPrivateNetwork && addresses.Any(SafeIpAddressClassifier.IsNonGlobal))
         {
