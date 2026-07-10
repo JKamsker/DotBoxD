@@ -9,13 +9,14 @@ namespace DotBoxD.Services.Tests.Coverage.Core;
 public sealed class FailedResponseErrorDetailsTests
 {
     [Theory]
-    [InlineData(null, "RemoteServiceException", "ErrorMessage")]
-    [InlineData("boom", null, "ErrorType")]
-    [InlineData(null, null, "ErrorMessage")]
+    [InlineData(null, "RemoteServiceException", "ErrorMessage", "missing required")]
+    [InlineData("boom", null, "ErrorType", "missing required")]
+    [InlineData(null, null, "ErrorMessage", "missing required")]
     public void RpcResponse_failed_encode_requires_error_details(
         string? errorMessage,
         string? errorType,
-        string fieldName)
+        string fieldName,
+        string expectedReason)
     {
         var serializer = new MessagePackRpcSerializer();
         var writer = new ArrayBufferWriter<byte>();
@@ -29,18 +30,20 @@ public sealed class FailedResponseErrorDetailsTests
 
         AssertInvalidErrorDetails(
             () => serializer.Serialize(writer, response),
-            fieldName);
+            fieldName,
+            expectedReason);
     }
 
     [Theory]
-    [InlineData("", "RemoteServiceException", "ErrorMessage")]
-    [InlineData("   ", "RemoteServiceException", "ErrorMessage")]
-    [InlineData("boom", "", "ErrorType")]
-    [InlineData("boom", "   ", "ErrorType")]
+    [InlineData("", "RemoteServiceException", "ErrorMessage", "blank")]
+    [InlineData("   ", "RemoteServiceException", "ErrorMessage", "blank")]
+    [InlineData("boom", "", "ErrorType", "blank")]
+    [InlineData("boom", "   ", "ErrorType", "blank")]
     public void RpcResponse_failed_encode_rejects_blank_error_details(
         string errorMessage,
         string errorType,
-        string fieldName)
+        string fieldName,
+        string expectedReason)
     {
         var serializer = new MessagePackRpcSerializer();
         var writer = new ArrayBufferWriter<byte>();
@@ -54,21 +57,23 @@ public sealed class FailedResponseErrorDetailsTests
 
         AssertInvalidErrorDetails(
             () => serializer.Serialize(writer, response),
-            fieldName);
+            fieldName,
+            expectedReason);
     }
 
     [Theory]
-    [InlineData(false, null, true, "RemoteServiceException", "ErrorMessage")]
-    [InlineData(true, "boom", false, null, "ErrorType")]
-    [InlineData(true, null, true, "RemoteServiceException", "ErrorMessage")]
-    [InlineData(true, "boom", true, null, "ErrorType")]
-    [InlineData(true, null, true, null, "ErrorMessage")]
+    [InlineData(false, null, true, "RemoteServiceException", "ErrorMessage", "missing required")]
+    [InlineData(true, "boom", false, null, "ErrorType", "missing required")]
+    [InlineData(true, null, true, "RemoteServiceException", "ErrorMessage", "missing required")]
+    [InlineData(true, "boom", true, null, "ErrorType", "missing required")]
+    [InlineData(true, null, true, null, "ErrorMessage", "missing required")]
     public void RpcResponse_failed_decode_requires_error_details(
         bool includeErrorMessage,
         string? errorMessage,
         bool includeErrorType,
         string? errorType,
-        string fieldName)
+        string fieldName,
+        string expectedReason)
     {
         var serializer = new MessagePackRpcSerializer();
         var payload = WriteFailedResponse(
@@ -79,18 +84,20 @@ public sealed class FailedResponseErrorDetailsTests
 
         AssertInvalidErrorDetails(
             () => serializer.Deserialize<RpcResponse>(payload),
-            fieldName);
+            fieldName,
+            expectedReason);
     }
 
     [Theory]
-    [InlineData("", "RemoteServiceException", "ErrorMessage")]
-    [InlineData("   ", "RemoteServiceException", "ErrorMessage")]
-    [InlineData("boom", "", "ErrorType")]
-    [InlineData("boom", "   ", "ErrorType")]
+    [InlineData("", "RemoteServiceException", "ErrorMessage", "blank")]
+    [InlineData("   ", "RemoteServiceException", "ErrorMessage", "blank")]
+    [InlineData("boom", "", "ErrorType", "blank")]
+    [InlineData("boom", "   ", "ErrorType", "blank")]
     public void RpcResponse_failed_decode_rejects_blank_error_details(
         string errorMessage,
         string errorType,
-        string fieldName)
+        string fieldName,
+        string expectedReason)
     {
         var serializer = new MessagePackRpcSerializer();
         var payload = WriteFailedResponse(
@@ -101,7 +108,8 @@ public sealed class FailedResponseErrorDetailsTests
 
         AssertInvalidErrorDetails(
             () => serializer.Deserialize<RpcResponse>(payload),
-            fieldName);
+            fieldName,
+            expectedReason);
     }
 
     [Fact]
@@ -126,10 +134,14 @@ public sealed class FailedResponseErrorDetailsTests
         Assert.Equal(response.ErrorType, decoded.ErrorType);
     }
 
-    private static void AssertInvalidErrorDetails(Action action, string fieldName)
+    private static void AssertInvalidErrorDetails(
+        Action action,
+        string fieldName,
+        string expectedReason)
     {
         var ex = Assert.Throws<MessagePackSerializationException>(action);
         Assert.Contains(fieldName, ex.Message, StringComparison.Ordinal);
+        Assert.Contains(expectedReason, ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("error", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
