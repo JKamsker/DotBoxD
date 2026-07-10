@@ -8,6 +8,7 @@ public async ValueTask DispatchAsync( string subscriptionId, ReadOnlyMemory<byte
 public async ValueTask FlushUpdatesAsync(CancellationToken cancellationToken = default)
 public async ValueTask HandleAsync<TEvent>( IPluginEventAdapter<TEvent> adapter, TEvent e, CancellationToken cancellationToken = default)
 public async ValueTask ModifySettingsAsync( IReadOnlyDictionary<string, object?> values, bool atomic = false, CancellationToken cancellationToken = default)
+public async ValueTask PublishBootstrapAsync(CancellationToken cancellationToken = default)
 public async ValueTask UpdateSettingsAsync( string pluginId, IReadOnlyDictionary<string, object?> values, bool atomic = false, CancellationToken cancellationToken = default)
 public async ValueTask<bool> ShouldHandleAsync<TEvent>( IPluginEventAdapter<TEvent> adapter, TEvent e, CancellationToken cancellationToken = default)
 public async ValueTask<byte[]> DispatchResultAsync( string subscriptionId, ReadOnlyMemory<byte> contextValue, HookContext context, CancellationToken cancellationToken = default)

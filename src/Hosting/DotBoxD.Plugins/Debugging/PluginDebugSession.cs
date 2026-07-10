@@ -214,6 +214,36 @@ public sealed class PluginDebugSession : IPluginDebugControlEndpoint, IDisposabl
         }
     }
 
+    /// <summary>
+    /// Publishes the authenticated session bootstrap over the configured reverse endpoint. Connection helpers
+    /// call this after both duplex services have been provisioned; manual transports may do the same.
+    /// </summary>
+    public async ValueTask PublishBootstrapAsync(CancellationToken cancellationToken = default)
+    {
+        var envelope = new PluginDebugEnvelope(
+            PluginDebugProtocol.Version,
+            "session",
+            "bootstrap",
+            SessionToken,
+            JsonSerializer.SerializeToElement(new
+            {
+                protocolVersion = PluginDebugProtocol.Version,
+                sessionToken = SessionToken
+            }));
+        try
+        {
+            await _events.PublishAsync(
+                    PluginDebugProtocol.Encode(envelope, Options.MaxMessageBytes),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch
+        {
+            DetachCore();
+            throw;
+        }
+    }
+
     private void OnLeaseExpired() => DetachCore();
 
     private static PluginDebugProtocolException Unauthorized()
