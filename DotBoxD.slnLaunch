@@ -1,14 +1,16 @@
 [
   {
-    "Name": "GameServer + Plugin Debug",
+    "Name": "GameServer + Plugin + Kernel Bridge",
     "Projects": [
       {
         "Path": "samples\\GameServer\\Examples.GameServer.Server\\Examples.GameServer.Server.csproj",
-        "Action": "Start"
+        "Action": "Start",
+        "DebugTarget": "GameServer - Wait for Plugin (Debug)"
       },
       {
         "Path": "samples\\GameServer\\Examples.GameServer.Plugin\\Examples.GameServer.Plugin.csproj",
-        "Action": "Start"
+        "Action": "Start",
+        "DebugTarget": "GameServer Plugin (Debug)"
       }
     ]
   }

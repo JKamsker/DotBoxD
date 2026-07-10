@@ -53,5 +53,10 @@
     <PackageVersion Include="Basic.Reference.Assemblies.Net80" Version="1.7.9" />
     <PackageVersion Include="Microsoft.NETFramework.ReferenceAssemblies.net461" Version="1.0.3" />
     <PackageVersion Include="System.Threading.Tasks.Extensions" Version="4.5.4" />
+
+    <!-- Optional Visual Studio Debug Adapter Host packaging (not referenced by runtime packages). -->
+    <PackageVersion Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3" />
+    <PackageVersion Include="Microsoft.VisualStudio.Debugger.DebugAdapterHost.Interfaces" Version="17.10.10123.1-preview" />
+    <PackageVersion Include="Microsoft.VSSDK.BuildTools" Version="17.14.2142" />
   </ItemGroup>
 </Project>
