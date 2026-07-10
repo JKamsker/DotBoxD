@@ -11,18 +11,87 @@ namespace DotBoxD.Queryable.Planning;
 /// </summary>
 public sealed record EventQueryPlan
 {
+    private IReadOnlyList<IndexedPredicate> _indexedPredicates = null!;
+    private IReadOnlyList<IndexedPredicate> _routingKeys = null!;
+    private QueryFilter? _residualFilter;
+    private IndexCoverage _coverage;
+
     /// <summary>All index-covered predicates (equality and range).</summary>
-    public required IReadOnlyList<IndexedPredicate> IndexedPredicates { get; init; }
+    public required IReadOnlyList<IndexedPredicate> IndexedPredicates
+    {
+        get => _indexedPredicates;
+        init => _indexedPredicates = RequirePredicates(value, nameof(IndexedPredicates));
+    }
 
     /// <summary>The equality predicates usable as exact-match routing keys.</summary>
-    public required IReadOnlyList<IndexedPredicate> RoutingKeys { get; init; }
+    public required IReadOnlyList<IndexedPredicate> RoutingKeys
+    {
+        get => _routingKeys;
+        init => _routingKeys = RequirePredicates(value, nameof(RoutingKeys));
+    }
 
     /// <summary>The residual filter to evaluate after index prefiltering, or <see langword="null"/> when fully covered.</summary>
-    public QueryFilter? ResidualFilter { get; init; }
+    public QueryFilter? ResidualFilter
+    {
+        get => _residualFilter;
+        init
+        {
+            if (value is not null && _coverage == IndexCoverage.Full)
+            {
+                throw ResidualCoverageMismatch(_coverage);
+            }
+
+            _residualFilter = value;
+        }
+    }
 
     /// <summary>How much of the filter the index covers.</summary>
-    public required IndexCoverage Coverage { get; init; }
+    public required IndexCoverage Coverage
+    {
+        get => _coverage;
+        init
+        {
+            EnsureKnownCoverage(value);
+            if ((value == IndexCoverage.Full) == (_residualFilter is not null))
+            {
+                throw ResidualCoverageMismatch(value);
+            }
+
+            _coverage = value;
+        }
+    }
 
     /// <summary>Whether the plan exposes at least one exact-match routing key for indexed dispatch.</summary>
     public bool IsRoutable => RoutingKeys.Count > 0;
+
+    private static IReadOnlyList<IndexedPredicate> RequirePredicates(
+        IReadOnlyList<IndexedPredicate>? predicates,
+        string paramName)
+    {
+        ArgumentNullException.ThrowIfNull(predicates, paramName);
+        for (var i = 0; i < predicates.Count; i++)
+        {
+            if (predicates[i] is null)
+            {
+                throw new ArgumentException("Event query plan predicate collections cannot contain null entries.", paramName);
+            }
+        }
+
+        return predicates;
+    }
+
+    private static void EnsureKnownCoverage(IndexCoverage coverage)
+    {
+        if (coverage is not (IndexCoverage.None or IndexCoverage.Partial or IndexCoverage.Full))
+        {
+            throw new ArgumentOutOfRangeException(nameof(Coverage), coverage, "Event query plan coverage is not defined.");
+        }
+    }
+
+    private static ArgumentException ResidualCoverageMismatch(IndexCoverage coverage)
+        => new(
+            coverage == IndexCoverage.Full
+                ? "Fully covered event query plans cannot carry a residual filter."
+                : "Partially or uncovered event query plans require a residual filter.",
+            nameof(ResidualFilter));
 }
