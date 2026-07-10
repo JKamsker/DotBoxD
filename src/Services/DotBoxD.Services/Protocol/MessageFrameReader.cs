@@ -17,6 +17,14 @@ internal static class MessageFrameReader
 
     public static void ValidateOutgoingFrame(ReadOnlySpan<byte> frame, int maxMessageSize)
     {
+        if (maxMessageSize < MessageFramer.HeaderSize)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxMessageSize),
+                maxMessageSize,
+                "Maximum message size must be at least the DotBoxD frame header size.");
+        }
+
         if (frame.Length < MessageFramer.HeaderSize)
         {
             throw new InvalidDataException($"DotBoxD frame is too small: {frame.Length} bytes.");
