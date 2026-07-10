@@ -214,6 +214,8 @@ if (-not $SkipLinkValidation) {
     & (Join-Path $PSScriptRoot "check-doc-links.ps1")
 }
 
+& (Join-Path $PSScriptRoot "check-diagnostic-docs.ps1")
+
 Assert-DocsDoNotContain "Sandbox\.Parse" "JSON IR import is Sandbox.ImportJson"
 Assert-DocsDoNotContain "tenant://123/config" "file grants use canonical filesystem roots"
 Assert-DocsDoNotContain "Proposed Public C# API" "public API document is no longer proposed"
