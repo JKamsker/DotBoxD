@@ -5,9 +5,7 @@ namespace DotBoxD.Kernels.Tests.Samples.GameServer;
 public sealed class EventIndexStatsContractTests
 {
     [Theory]
-    [InlineData(-1, 0, 0, nameof(EventIndexStats.Considered))]
-    [InlineData(1, -1, 0, nameof(EventIndexStats.Prefiltered))]
-    [InlineData(1, 0, -1, nameof(EventIndexStats.Dispatched))]
+    [MemberData(nameof(NegativeCounterValues))]
     public void Constructor_rejects_negative_counter_values(
         long considered,
         long prefiltered,
@@ -37,9 +35,7 @@ public sealed class EventIndexStatsContractTests
     }
 
     [Theory]
-    [InlineData(-1, 0, 0, nameof(EventIndexStats.Considered))]
-    [InlineData(1, -1, 0, nameof(EventIndexStats.Prefiltered))]
-    [InlineData(1, 0, -1, nameof(EventIndexStats.Dispatched))]
+    [MemberData(nameof(NegativeCounterValues))]
     public void Initializer_rejects_negative_counter_values(
         long considered,
         long prefiltered,
@@ -58,9 +54,7 @@ public sealed class EventIndexStatsContractTests
     }
 
     [Theory]
-    [InlineData(-1, 0, 0, nameof(EventIndexStats.Considered))]
-    [InlineData(1, -1, 0, nameof(EventIndexStats.Prefiltered))]
-    [InlineData(1, 0, -1, nameof(EventIndexStats.Dispatched))]
+    [MemberData(nameof(NegativeCounterValues))]
     public void With_copy_rejects_negative_counter_values(
         long considered,
         long prefiltered,
@@ -79,4 +73,12 @@ public sealed class EventIndexStatsContractTests
 
         Assert.Equal(parameterName, exception.ParamName);
     }
+
+    public static TheoryData<long, long, long, string> NegativeCounterValues()
+        => new()
+        {
+            { -1, 0, 0, nameof(EventIndexStats.Considered) },
+            { 1, -1, 0, nameof(EventIndexStats.Prefiltered) },
+            { 1, 0, -1, nameof(EventIndexStats.Dispatched) },
+        };
 }
