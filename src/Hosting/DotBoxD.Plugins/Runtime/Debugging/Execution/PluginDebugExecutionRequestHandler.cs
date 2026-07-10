@@ -5,6 +5,7 @@ namespace DotBoxD.Plugins.Debugging;
 
 internal sealed class PluginDebugExecutionRequestHandler(PluginDebugSession session)
 {
+    private readonly PluginDebugBreakpointParser _breakpoints = new(session.Options.MaxExpressionLength);
     private readonly PluginDebugEvaluationRequestHandler _evaluation = new(session);
 
     public async ValueTask<PluginDebugHandlerResult?> HandleAsync(
@@ -51,7 +52,7 @@ internal sealed class PluginDebugExecutionRequestHandler(PluginDebugSession sess
 
         try
         {
-            var parsed = ParseBreakpoints(payload);
+            var parsed = _breakpoints.Parse(payload);
             session.ExecutionState.SetBreakpoints(pluginId!, parsed);
             return PluginDebugHandlerResult.Ok(new
             {
@@ -66,83 +67,6 @@ internal sealed class PluginDebugExecutionRequestHandler(PluginDebugSession sess
         {
             return PluginDebugHandlerResult.Error("invalidBreakpoint", exception.Message);
         }
-    }
-
-    private IReadOnlyList<PluginDebugBreakpointSpec> ParseBreakpoints(JsonElement payload)
-    {
-        if (payload.TryGetProperty("nodeIds", out var nodeIds) && nodeIds.ValueKind == JsonValueKind.Array)
-        {
-            return nodeIds.EnumerateArray()
-                .Select(value => new PluginDebugBreakpointSpec(new SandboxNodeId(value.GetString() ?? string.Empty)))
-                .DistinctBy(breakpoint => breakpoint.NodeId)
-                .ToArray();
-        }
-
-        if (!payload.TryGetProperty("breakpoints", out var breakpoints) ||
-            breakpoints.ValueKind != JsonValueKind.Array)
-        {
-            throw new ArgumentException("setBreakpoints requires nodeIds or breakpoints.");
-        }
-
-        var parsed = new List<PluginDebugBreakpointSpec>();
-        foreach (var breakpoint in breakpoints.EnumerateArray())
-        {
-            if (!TryReadString(breakpoint, "nodeId", out var nodeId))
-            {
-                throw new ArgumentException("Each breakpoint requires a structural nodeId.");
-            }
-
-            var condition = OptionalString(breakpoint, "condition");
-            var logMessage = OptionalString(breakpoint, "logMessage");
-            EnsureExpressionLimit(condition, "condition");
-            EnsureExpressionLimit(logMessage, "logMessage");
-            int? hitCount = null;
-            if (breakpoint.TryGetProperty("hitCount", out var hitValue))
-            {
-                if (hitValue.ValueKind != JsonValueKind.Number ||
-                    !hitValue.TryGetInt32(out var count) ||
-                    count <= 0)
-                {
-                    throw new ArgumentException("Breakpoint hitCount must be a positive integer.");
-                }
-
-                hitCount = count;
-            }
-
-            parsed.Add(new PluginDebugBreakpointSpec(new SandboxNodeId(nodeId!), condition, hitCount, logMessage));
-        }
-
-        return parsed.DistinctBy(breakpoint => breakpoint.NodeId).ToArray();
-    }
-
-    private void EnsureExpressionLimit(string? value, string name)
-    {
-        if (value?.Length > session.Options.MaxExpressionLength)
-        {
-            throw new ArgumentException(
-                $"Breakpoint {name} exceeds the {session.Options.MaxExpressionLength}-character host limit.");
-        }
-    }
-
-    private static string? OptionalString(JsonElement payload, string name)
-    {
-        if (!payload.TryGetProperty(name, out var value))
-        {
-            return null;
-        }
-
-        if (value.ValueKind != JsonValueKind.String)
-        {
-            throw new ArgumentException($"Breakpoint {name} must be a string.");
-        }
-
-        var text = value.GetString();
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            throw new ArgumentException($"Breakpoint {name} cannot be empty.");
-        }
-
-        return text;
     }
 
     private PluginDebugHandlerResult Pause()
