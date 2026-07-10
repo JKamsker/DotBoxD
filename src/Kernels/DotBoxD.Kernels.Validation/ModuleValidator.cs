@@ -10,6 +10,8 @@ using DotBoxD.Kernels;
 
 public sealed class ModuleValidator
 {
+    private const string DotBoxDRequiredCapabilitiesMetadataKey = "dotboxd.requiredCapabilities";
+
     private static readonly IReadOnlySet<string> NoDeclaredOpaqueIdTypes =
         new HashSet<string>(StringComparer.Ordinal);
 
@@ -99,6 +101,7 @@ public sealed class ModuleValidator
         IReadOnlyDictionary<string, IReadOnlySet<string>> bindingReferences)
     {
         var required = new HashSet<string>(StringComparer.Ordinal);
+        AddModuleRequiredCapabilityMetadata(module, required);
         foreach (var function in module.Functions)
         {
             if (!function.IsEntrypoint)
@@ -131,6 +134,22 @@ public sealed class ModuleValidator
         }
 
         return required;
+    }
+
+    private static void AddModuleRequiredCapabilityMetadata(
+        SandboxModule module,
+        HashSet<string> required)
+    {
+        if (!module.Metadata.TryGetValue(DotBoxDRequiredCapabilitiesMetadataKey, out var metadata) ||
+            string.IsNullOrWhiteSpace(metadata))
+        {
+            return;
+        }
+
+        foreach (var capability in metadata.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            required.Add(capability);
+        }
     }
 
     private static bool RequiresRuntimeAsync(BindingSignature binding)

@@ -23,7 +23,10 @@ public sealed class LoweredPipelineComposerTests
             new LoweredPipelineComposition("mergeable-pipeline", steps, SandboxType.String));
 
         var host = SandboxTestHost.Create();
-        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000_000).Build());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create()
+            .Grant("probe.read.distance", new { })
+            .WithFuel(1_000_000)
+            .Build());
 
         var pass = Record(5, "target-1");
         var fail = Record(3, "target-2");
