@@ -24,12 +24,15 @@ public sealed class EventIndexStatsContractTests
     [InlineData(0, 1, 0)]
     [InlineData(0, 0, 1)]
     [InlineData(1, 1, 1)]
-    public void Constructor_rejects_completed_snapshots_with_more_outcomes_than_considered(
+    public void Constructor_allows_non_quiescent_non_negative_snapshots(
         long considered,
         long prefiltered,
         long dispatched)
     {
-        _ = Assert.ThrowsAny<ArgumentException>(
-            () => _ = new EventIndexStats(considered, prefiltered, dispatched));
+        var stats = new EventIndexStats(considered, prefiltered, dispatched);
+
+        Assert.Equal(considered, stats.Considered);
+        Assert.Equal(prefiltered, stats.Prefiltered);
+        Assert.Equal(dispatched, stats.Dispatched);
     }
 }
