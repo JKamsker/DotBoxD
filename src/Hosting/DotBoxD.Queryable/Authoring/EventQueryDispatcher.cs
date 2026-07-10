@@ -92,7 +92,7 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
         {
             return;
         }
-
+        context.CancellationToken.ThrowIfCancellationRequested();
         try
         {
             await entry.Dispatch(projected, context).ConfigureAwait(false);
