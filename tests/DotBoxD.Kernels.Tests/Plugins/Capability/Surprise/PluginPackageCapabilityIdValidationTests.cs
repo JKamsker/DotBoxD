@@ -32,9 +32,23 @@ public sealed partial class PluginPackageValidationTests
         var ex = await Assert.ThrowsAsync<SandboxValidationException>(
             async () => await server.InstallAsync(invalid).AsTask());
 
-        Assert.Contains(ex.Diagnostics, d =>
-            d.Message.Contains("requiredCapabilities", StringComparison.Ordinal) &&
-            d.Message.Contains("capability id", StringComparison.Ordinal) &&
-            d.Message.Contains(malformedCapability, StringComparison.Ordinal));
+        Assert.Contains(ex.Diagnostics, d => MatchesMalformedRequiredCapability(
+            d,
+            "Plugin manifest",
+            malformedCapability));
+        Assert.Contains(ex.Diagnostics, d => MatchesMalformedRequiredCapability(
+            d,
+            "Plugin module metadata",
+            malformedCapability));
     }
+
+    private static bool MatchesMalformedRequiredCapability(
+        SandboxDiagnostic diagnostic,
+        string source,
+        string malformedCapability)
+        => diagnostic.Code == "DBXK052" &&
+           diagnostic.Message.Contains(source, StringComparison.Ordinal) &&
+           diagnostic.Message.Contains("requiredCapabilities", StringComparison.Ordinal) &&
+           diagnostic.Message.Contains("capability id", StringComparison.Ordinal) &&
+           diagnostic.Message.Contains(malformedCapability, StringComparison.Ordinal);
 }
