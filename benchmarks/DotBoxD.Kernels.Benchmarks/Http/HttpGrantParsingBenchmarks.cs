@@ -60,5 +60,5 @@ public class HttpGrantParsingBenchmarks
     }
 
     private static ValueTask<IReadOnlyList<IPAddress>> StaticDns(string host, CancellationToken cancellationToken)
-        => ValueTask.FromResult<IReadOnlyList<IPAddress>>([IPAddress.Parse("203.0.113.10")]);
+        => ValueTask.FromResult<IReadOnlyList<IPAddress>>([IPAddress.Parse("93.184.216.34")]);
 }
