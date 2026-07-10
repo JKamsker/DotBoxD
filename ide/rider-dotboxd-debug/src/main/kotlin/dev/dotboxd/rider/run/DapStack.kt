@@ -33,9 +33,10 @@ class DapExecutionStack(
                 val server = requireNotNull(remote())
                 val response = server.stackTrace(StackTraceArguments().apply {
                     threadId = this@DapExecutionStack.threadId
+                    startFrame = firstFrameIndex
                     levels = 100
-                }).get()
-                val frames = response.stackFrames.orEmpty().drop(firstFrameIndex)
+                }).awaitDap()
+                val frames = response.stackFrames.orEmpty()
                     .map { DapStackFrame(it, server, values) }
                 container.addStackFrames(frames, true)
             } catch (exception: Exception) {
@@ -57,7 +58,7 @@ private class DapStackFrame(
     override fun computeChildren(node: XCompositeNode) {
         AppExecutorUtil.getAppExecutorService().execute {
             try {
-                val scopes = remote.scopes(ScopesArguments().apply { frameId = frame.id }).get().scopes.orEmpty()
+                val scopes = remote.scopes(ScopesArguments().apply { frameId = frame.id }).awaitDap().scopes.orEmpty()
                 if (scopes.isEmpty()) {
                     node.addChildren(XValueChildrenList.EMPTY, true)
                     return@execute
@@ -66,7 +67,7 @@ private class DapStackFrame(
                 for (scope in scopes) {
                     val response = remote.variables(org.eclipse.lsp4j.debug.VariablesArguments().apply {
                         variablesReference = scope.variablesReference
-                    }).get()
+                    }).awaitDap()
                     response.variables.orEmpty().forEach {
                         children.add(it.name, values.variable(it, scope.variablesReference))
                     }
@@ -86,7 +87,7 @@ private class DapStackFrame(
                         this.expression = expression
                         frameId = frame.id
                         context = if (position == null) EvaluateArgumentsContext.REPL else EvaluateArgumentsContext.HOVER
-                    }).get()
+                    }).awaitDap()
                     callback.evaluated(values.evaluated(response))
                 } catch (exception: Exception) {
                     callback.errorOccurred(exception.message ?: "evaluate failed")
@@ -102,7 +103,7 @@ private class DapStackFrame(
             val response = remote.source(SourceArguments().apply {
                 this.source = source
                 sourceReference = source.sourceReference
-            }).get()
+            }).awaitDap()
             LightVirtualFile(source.name ?: "DotBoxD IR", PlainTextFileType.INSTANCE, response.content)
         } else {
             LocalFileSystem.getInstance().refreshAndFindFileByPath(path) ?: return null

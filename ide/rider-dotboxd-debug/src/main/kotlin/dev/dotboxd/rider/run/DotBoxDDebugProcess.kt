@@ -26,6 +26,7 @@ import org.eclipse.lsp4j.debug.StepOutArguments
 import org.eclipse.lsp4j.debug.StoppedEventArguments
 import org.eclipse.lsp4j.debug.launch.DSPLauncher
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
@@ -72,12 +73,12 @@ class DotBoxDDebugProcess(
                     val frameId = server.stackTrace(StackTraceArguments().apply {
                         threadId = activeThread.get()
                         levels = 1
-                    }).get().stackFrames?.firstOrNull()?.id
+                    }).awaitDap().stackFrames?.firstOrNull()?.id
                     val response = server.evaluate(EvaluateArguments().apply {
                         this.expression = expression
                         this.frameId = frameId
                         context = EvaluateArgumentsContext.REPL
-                    }).get()
+                    }).awaitDap()
                     callback.evaluated(values.evaluated(response))
                 } catch (exception: Exception) {
                     callback.errorOccurred(exception.message ?: "evaluate failed")
@@ -89,7 +90,7 @@ class DotBoxDDebugProcess(
     override fun stop() {
         val server = remote.getAndSet(null)
         AppExecutorUtil.getAppExecutorService().execute {
-            runCatching { server?.disconnect(DisconnectArguments().apply { terminateDebuggee = false })?.get() }
+            runCatching { server?.disconnect(DisconnectArguments().apply { terminateDebuggee = false })?.awaitDap() }
                 .onFailure { log.warn("DotBoxD DAP disconnect failed", it) }
             handler.destroyProcess()
         }
@@ -101,15 +102,14 @@ class DotBoxDDebugProcess(
             val launcher = DSPLauncher.createClientLauncher(client, process.inputStream, process.outputStream)
             val server = launcher.remoteProxy
             remote.set(server)
-            client.remote.set(server)
             launcher.startListening()
-            server.initialize(DotBoxDDapClient.initializeArguments()).get()
+            server.initialize(DotBoxDDapClient.initializeArguments()).awaitDap()
             server.attach(linkedMapOf<String, Any>("processId" to configuration.processId).apply {
                 configuration.pauseScope
                     .takeUnless { it == DotBoxDRunConfiguration.HOST_DEFAULT_PAUSE_SCOPE }
                     ?.let { put("pauseScope", it) }
                 configuration.pluginId.takeIf(String::isNotBlank)?.let { put("pluginId", it) }
-            }).get()
+            }).awaitDap()
         } catch (exception: Exception) {
             log.warn("DotBoxD DAP connection failed", exception)
             ApplicationManager.getApplication().invokeLater {
@@ -121,7 +121,7 @@ class DotBoxDDebugProcess(
 
     private fun configurationDone() {
         try {
-            remote.get()?.configurationDone(org.eclipse.lsp4j.debug.ConfigurationDoneArguments())?.get()
+            remote.get()?.configurationDone(org.eclipse.lsp4j.debug.ConfigurationDoneArguments())?.awaitDap()
         } catch (exception: Exception) {
             log.warn("DotBoxD DAP configuration failed", exception)
             ApplicationManager.getApplication().invokeLater {
@@ -144,7 +144,7 @@ class DotBoxDDebugProcess(
         override fun computeExecutionStacks(container: XExecutionStackContainer) {
             AppExecutorUtil.getAppExecutorService().execute {
                 try {
-                    val stacks = requireNotNull(remote.get()).threads().get().threads.orEmpty().map {
+                    val stacks = requireNotNull(remote.get()).threads().awaitDap().threads.orEmpty().map {
                         DapExecutionStack(it.name, it.id, remote::get, values)
                     }
                     container.addExecutionStack(stacks, true)
@@ -155,9 +155,19 @@ class DotBoxDDebugProcess(
         }
     }
 
-    private fun control(command: IDebugProtocolServer.(Int) -> Any?) {
+    private fun control(command: IDebugProtocolServer.(Int) -> CompletableFuture<*>) {
         val threadId = activeThread.get().takeIf { it > 0 } ?: return
-        remote.get()?.command(threadId)
+        val server = remote.get() ?: return
+        AppExecutorUtil.getAppExecutorService().execute {
+            try {
+                server.command(threadId).awaitDap()
+            } catch (exception: Exception) {
+                log.warn("DotBoxD DAP control command failed", exception)
+                ApplicationManager.getApplication().invokeLater {
+                    session.reportError("DotBoxD kernel debugger: ${exception.message}")
+                }
+            }
+        }
     }
 
     private fun outputType(category: String?) = when (category) {

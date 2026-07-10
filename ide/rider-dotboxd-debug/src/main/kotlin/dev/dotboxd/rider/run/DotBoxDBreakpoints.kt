@@ -36,7 +36,6 @@ class DotBoxDBreakpoints(
                 try {
                     val server = remote() ?: return@execute
                     grouped.forEach { (path, breakpoints) -> push(server, path, breakpoints) }
-                    onComplete()
                 } catch (exception: Exception) {
                     log.warn("DotBoxD breakpoint synchronization failed", exception)
                 } finally {
@@ -85,8 +84,11 @@ class DotBoxDBreakpoints(
         ApplicationManager.getApplication().invokeLater {
             breakpoints.forEachIndexed { index, breakpoint ->
                 val result = results.getOrNull(index)
-                if (result?.isVerified != false) session.setBreakpointVerified(breakpoint)
-                else session.setBreakpointInvalid(breakpoint, result.message ?: "The kernel source map did not bind this breakpoint.")
+                if (result?.isVerified == true) session.setBreakpointVerified(breakpoint)
+                else session.setBreakpointInvalid(
+                    breakpoint,
+                    result?.message ?: "The kernel source map did not bind this breakpoint.",
+                )
             }
         }
     }

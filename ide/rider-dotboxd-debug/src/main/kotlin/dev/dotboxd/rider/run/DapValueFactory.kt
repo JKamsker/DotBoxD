@@ -38,7 +38,7 @@ class DapValueFactory(
                                 variablesReference = parentReference
                                 name = value.name
                                 this.value = newValue
-                            }).get()
+                            }).awaitDap()
                             value.value = response.value
                             value.type = response.type
                             callback.valueModified()
@@ -71,7 +71,7 @@ class DapValueFactory(
             try {
                 val response = requireNotNull(remote()).variables(VariablesArguments().apply {
                     variablesReference = reference
-                }).get()
+                }).awaitDap()
                 val children = XValueChildrenList()
                 response.variables.orEmpty().forEach { children.add(it.name, variable(it, reference)) }
                 node.addChildren(children, true)

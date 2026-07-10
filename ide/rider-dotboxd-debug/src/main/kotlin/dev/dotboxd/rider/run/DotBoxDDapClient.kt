@@ -5,8 +5,6 @@ import org.eclipse.lsp4j.debug.InitializeRequestArgumentsPathFormat
 import org.eclipse.lsp4j.debug.OutputEventArguments
 import org.eclipse.lsp4j.debug.StoppedEventArguments
 import org.eclipse.lsp4j.debug.services.IDebugProtocolClient
-import org.eclipse.lsp4j.debug.services.IDebugProtocolServer
-import java.util.concurrent.atomic.AtomicReference
 
 class DotBoxDDapClient(
     private val onInitialized: () -> Unit,
@@ -14,8 +12,6 @@ class DotBoxDDapClient(
     private val onOutput: (OutputEventArguments) -> Unit,
     private val onTerminated: () -> Unit,
 ) : IDebugProtocolClient {
-    val remote = AtomicReference<IDebugProtocolServer?>()
-
     override fun initialized() = onInitialized()
     override fun stopped(arguments: StoppedEventArguments) = onStopped(arguments)
     override fun output(arguments: OutputEventArguments) = onOutput(arguments)

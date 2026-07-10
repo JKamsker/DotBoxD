@@ -35,9 +35,8 @@ tasks.withType<KotlinCompile>().configureEach {
 val adapterProject = layout.projectDirectory.file("../../tools/DotBoxD.DebugAdapter/DotBoxD.DebugAdapter.csproj")
 val adapterOutput = layout.buildDirectory.dir("dotboxd-debug-adapter")
 val publishAdapter by tasks.registering(Exec::class) {
-    inputs.file(adapterProject)
-    inputs.files(fileTree("../../tools/DotBoxD.DebugAdapter") { include("**/*.cs") })
     outputs.dir(adapterOutput)
+    outputs.upToDateWhen { false }
     commandLine(
         "dotnet", "publish", adapterProject.asFile.absolutePath,
         "-c", "Release", "--nologo", "-o", adapterOutput.get().asFile.absolutePath,

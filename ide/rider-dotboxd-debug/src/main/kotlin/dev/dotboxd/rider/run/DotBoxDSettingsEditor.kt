@@ -43,7 +43,7 @@ class DotBoxDSettingsEditor : SettingsEditor<DotBoxDRunConfiguration>() {
     }
 
     override fun applyEditorTo(configuration: DotBoxDRunConfiguration) {
-        configuration.processId = (process.selectedItem as? DotBoxDBridgeDescriptor)?.processId ?: 0
+        (process.selectedItem as? DotBoxDBridgeDescriptor)?.processId?.let { configuration.processId = it }
         configuration.pluginId = pluginId.text.trim()
         configuration.pauseScope = pauseScope.selectedItem as? String
             ?: DotBoxDRunConfiguration.HOST_DEFAULT_PAUSE_SCOPE
