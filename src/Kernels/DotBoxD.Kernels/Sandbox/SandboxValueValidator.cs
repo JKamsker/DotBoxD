@@ -14,6 +14,10 @@ public static class SandboxValueValidator
         SandboxErrorCode errorCode,
         string message)
     {
+        ArgumentNullException.ThrowIfNull(value);
+        ArgumentNullException.ThrowIfNull(expectedType);
+        ArgumentNullException.ThrowIfNull(message);
+
         // Scalars have no nested structure, so they can never form a cycle and need
         // no traversal bookkeeping. Validate them inline to avoid allocating the
         // HashSet/Stack the recursive collection walk requires; this is the hot path
