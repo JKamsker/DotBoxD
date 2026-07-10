@@ -2,6 +2,7 @@ namespace DotBoxD.Kernels.Sandbox;
 
 internal static class SandboxTypeRules
 {
+    private const int DefaultMaxDepth = 8;
     private const int MaxOpaqueIdNameLength = 64;
 
     private static readonly HashSet<string> AllowedScalars = new(StringComparer.Ordinal) {
@@ -45,15 +46,18 @@ internal static class SandboxTypeRules
         => IsKnown(type, 0, maxDepth, EmptyOpaqueIdTypes);
 
     public static bool IsForbidden(SandboxType type)
+        => IsForbidden(type, 0, DefaultMaxDepth);
+
+    private static bool IsForbidden(SandboxType type, int depth, int maxDepth)
     {
-        if (SandboxType.IsForbiddenName(type.Name))
+        if (depth > maxDepth || SandboxType.IsForbiddenName(type.Name))
         {
             return true;
         }
 
         for (var i = 0; i < type.Arguments.Count; i++)
         {
-            if (IsForbidden(type.Arguments[i]))
+            if (IsForbidden(type.Arguments[i], depth + 1, maxDepth))
             {
                 return true;
             }

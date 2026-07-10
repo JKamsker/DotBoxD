@@ -15,6 +15,21 @@ public sealed class SandboxRecordContractTests
     }
 
     [Fact]
+    public void Empty_record_types_fail_closed_for_all_public_construction_paths()
+    {
+        var nonEmptyRecord = SandboxType.Record([SandboxType.I32]);
+
+        Assert.Throws<ArgumentException>(() =>
+            new SandboxType(SandboxType.RecordName, []));
+
+        Assert.Throws<ArgumentException>(() =>
+            nonEmptyRecord with { Arguments = [] });
+
+        Assert.Throws<ArgumentException>(() =>
+            SandboxType.Scalar("PlayerId") with { Name = SandboxType.RecordName });
+    }
+
+    [Fact]
     public void Owned_record_factory_rejects_null_array_before_wrapping()
     {
         var ex = Assert.Throws<ArgumentNullException>(() =>

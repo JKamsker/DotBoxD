@@ -64,4 +64,16 @@ public sealed class SandboxTypeTests
 
         Assert.False(type.IsKnownBuiltIn());
     }
+
+    [Fact]
+    public void IsForbidden_fails_closed_for_types_beyond_known_depth_limit()
+    {
+        var type = SandboxType.Scalar("PlayerId");
+        for (var i = 0; i < 10; i++)
+        {
+            type = SandboxType.List(type);
+        }
+
+        Assert.True(type.IsForbidden());
+    }
 }

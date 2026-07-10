@@ -5,11 +5,30 @@ namespace DotBoxD.Kernels.Sandbox;
 
 public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Arguments)
 {
-    private IReadOnlyList<SandboxType> _arguments = CopyArguments(Arguments);
+    private string _name = RequireName(Name);
+    private IReadOnlyList<SandboxType> _arguments = CopyArguments(Name, Arguments);
 
-    public string Name { get; init; } = Name ?? throw new ArgumentNullException(nameof(Name));
+    public string Name
+    {
+        get => _name;
+        init
+        {
+            var name = RequireName(value);
+            RequireValidRecordShape(name, _arguments, nameof(value));
+            _name = name;
+        }
+    }
 
-    public IReadOnlyList<SandboxType> Arguments { get => _arguments; init => _arguments = CopyArguments(value); }
+    public IReadOnlyList<SandboxType> Arguments
+    {
+        get => _arguments;
+        init
+        {
+            var arguments = CopyArguments(value);
+            RequireValidRecordShape(_name, arguments, nameof(value));
+            _arguments = arguments;
+        }
+    }
 
     private static readonly HashSet<string> ForbiddenNames = new(StringComparer.OrdinalIgnoreCase) {
         "Object", "Dynamic", "Type", "Assembly", "MemberInfo", "MethodInfo", "PropertyInfo",
@@ -109,6 +128,18 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
     public bool IsValidMapKey(IReadOnlySet<string>? declaredOpaqueIdTypes)
         => SandboxTypeRules.IsValidMapKey(this, declaredOpaqueIdTypes);
 
+    private static string RequireName(string name)
+        => name ?? throw new ArgumentNullException(nameof(name));
+
+    private static IReadOnlyList<SandboxType> CopyArguments(
+        string name,
+        IReadOnlyList<SandboxType> arguments)
+    {
+        var snapshot = CopyArguments(arguments);
+        RequireValidRecordShape(name, snapshot, nameof(arguments));
+        return snapshot;
+    }
+
     private static IReadOnlyList<SandboxType> CopyArguments(IReadOnlyList<SandboxType> arguments)
     {
         var snapshot = ModelCopy.List(arguments);
@@ -121,6 +152,17 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
         }
 
         return snapshot;
+    }
+
+    private static void RequireValidRecordShape(
+        string name,
+        IReadOnlyList<SandboxType> arguments,
+        string paramName)
+    {
+        if (StringComparer.Ordinal.Equals(name, RecordName) && arguments.Count == 0)
+        {
+            throw new ArgumentException("Record types must declare at least one field.", paramName);
+        }
     }
 
     public bool Equals(SandboxType? other)
