@@ -31,6 +31,31 @@ public sealed class FailedResponseErrorDetailsTests
     }
 
     [Theory]
+    [InlineData("", "RemoteServiceException", "ErrorMessage")]
+    [InlineData("   ", "RemoteServiceException", "ErrorMessage")]
+    [InlineData("boom", "", "ErrorType")]
+    [InlineData("boom", "   ", "ErrorType")]
+    public void RpcResponse_failed_encode_rejects_blank_error_details(
+        string errorMessage,
+        string errorType,
+        string fieldName)
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var writer = new ArrayBufferWriter<byte>();
+        var response = new RpcResponse
+        {
+            MessageId = 7,
+            IsSuccess = false,
+            ErrorMessage = errorMessage,
+            ErrorType = errorType,
+        };
+
+        AssertInvalidErrorDetails(
+            () => serializer.Serialize(writer, response),
+            fieldName);
+    }
+
+    [Theory]
     [InlineData(false, null, true, "RemoteServiceException")]
     [InlineData(true, "boom", false, null)]
     [InlineData(true, null, true, "RemoteServiceException")]
@@ -51,6 +76,57 @@ public sealed class FailedResponseErrorDetailsTests
 
         Assert.Throws<MessagePackSerializationException>(
             () => serializer.Deserialize<RpcResponse>(payload));
+    }
+
+    [Theory]
+    [InlineData("", "RemoteServiceException", "ErrorMessage")]
+    [InlineData("   ", "RemoteServiceException", "ErrorMessage")]
+    [InlineData("boom", "", "ErrorType")]
+    [InlineData("boom", "   ", "ErrorType")]
+    public void RpcResponse_failed_decode_rejects_blank_error_details(
+        string errorMessage,
+        string errorType,
+        string fieldName)
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var payload = WriteFailedResponse(
+            includeErrorMessage: true,
+            errorMessage,
+            includeErrorType: true,
+            errorType);
+
+        AssertInvalidErrorDetails(
+            () => serializer.Deserialize<RpcResponse>(payload),
+            fieldName);
+    }
+
+    [Fact]
+    public void RpcResponse_failed_round_trips_nonblank_error_details()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var writer = new ArrayBufferWriter<byte>();
+        var response = new RpcResponse
+        {
+            MessageId = 7,
+            IsSuccess = false,
+            ErrorMessage = "boom",
+            ErrorType = "RemoteServiceException",
+        };
+
+        serializer.Serialize(writer, response);
+
+        var decoded = serializer.Deserialize<RpcResponse>(writer.WrittenMemory.ToArray());
+        Assert.False(decoded.IsSuccess);
+        Assert.Equal(response.MessageId, decoded.MessageId);
+        Assert.Equal(response.ErrorMessage, decoded.ErrorMessage);
+        Assert.Equal(response.ErrorType, decoded.ErrorType);
+    }
+
+    private static void AssertInvalidErrorDetails(Action action, string fieldName)
+    {
+        var ex = Assert.Throws<MessagePackSerializationException>(action);
+        Assert.Contains(fieldName, ex.Message, StringComparison.Ordinal);
+        Assert.Contains("error", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     private static byte[] WriteFailedResponse(
