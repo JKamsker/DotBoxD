@@ -24,10 +24,22 @@ internal static class PluginModuleCollectionValidator
             return true;
         }
 
-        return ValidateNoNullElements(
+        var hasErrors = ValidateNoNullElements(
             capabilityRequests,
             "capabilityRequests",
             diagnostics);
+        for (var i = 0; i < capabilityRequests.Count; i++)
+        {
+            var request = capabilityRequests[i];
+            if (request is null)
+            {
+                continue;
+            }
+
+            hasErrors |= ValidateCapabilityRequestId(request.Id, i, diagnostics);
+        }
+
+        return hasErrors;
     }
 
     private static bool ValidateFunctions(
@@ -68,5 +80,22 @@ internal static class PluginModuleCollectionValidator
         }
 
         return hasErrors;
+    }
+
+    private static bool ValidateCapabilityRequestId(
+        string? capabilityId,
+        int index,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        if (!string.IsNullOrWhiteSpace(capabilityId) && !capabilityId.Any(char.IsControl))
+        {
+            return false;
+        }
+
+        diagnostics.Add(new SandboxDiagnostic(
+            "E-IR-ID",
+            "Plugin module capabilityRequests entry at index " +
+            $"{index} capability id must be non-empty and must not contain control characters."));
+        return true;
     }
 }
