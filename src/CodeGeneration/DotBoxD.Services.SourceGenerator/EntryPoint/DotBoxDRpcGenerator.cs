@@ -13,13 +13,16 @@ namespace DotBoxD.Services.SourceGenerator.EntryPoint;
 [Generator(LanguageNames.CSharp)]
 public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
 {
+    private const string DiagnosticHelpBase = "https://dotboxd.kamsker.at/reference/diagnostics/#";
+
     private static readonly DiagnosticDescriptor s_generatorErrorRule = new(
         id: "DBXS001",
         title: "DotBoxD source generator error",
         messageFormat: "DotBoxD failed to generate for '{0}': {1}",
         category: "DotBoxD.Services.SourceGenerator",
         defaultSeverity: DiagnosticSeverity.Error,
-        isEnabledByDefault: true);
+        isEnabledByDefault: true,
+        helpLinkUri: DiagnosticHelpBase + "dbxs001");
 
     private static readonly DiagnosticDescriptor s_unsupportedMethodRule = new(
         id: "DBXS002",
@@ -27,7 +30,8 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
         messageFormat: "DotBoxD cannot generate code for '{0}.{1}': {2}",
         category: "DotBoxD.Services.SourceGenerator",
         defaultSeverity: DiagnosticSeverity.Error,
-        isEnabledByDefault: true);
+        isEnabledByDefault: true,
+        helpLinkUri: DiagnosticHelpBase + "dbxs002");
 
     private static readonly DiagnosticDescriptor s_unsupportedServiceRule = new(
         id: "DBXS003",
@@ -35,7 +39,8 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
         messageFormat: "DotBoxD cannot generate code for service '{0}': {1}",
         category: "DotBoxD.Services.SourceGenerator",
         defaultSeverity: DiagnosticSeverity.Error,
-        isEnabledByDefault: true);
+        isEnabledByDefault: true,
+        helpLinkUri: DiagnosticHelpBase + "dbxs003");
 
     private static readonly DiagnosticDescriptor s_asyncSiblingCollisionRule = new(
         id: "DBXS004",
@@ -43,7 +48,8 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
         messageFormat: "DotBoxD cannot project '{0}.{1}' onto its async sibling: {2}",
         category: "DotBoxD.Services.SourceGenerator",
         defaultSeverity: DiagnosticSeverity.Warning,
-        isEnabledByDefault: true);
+        isEnabledByDefault: true,
+        helpLinkUri: DiagnosticHelpBase + "dbxs004");
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {

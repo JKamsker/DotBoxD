@@ -38,6 +38,7 @@ public sealed partial class RpcPeer
             _cts = new CancellationTokenSource();
             _inbound.Start(_cts.Token);
             _readLoop = Task.Run(() => _readLoopRunner.RunAsync(_cts.Token));
+            RpcTelemetry.PeerStarted();
         }
     }
 
@@ -108,17 +109,24 @@ public sealed partial class RpcPeer
 
         _sender.Dispose();
         cts?.Dispose();
+        if (readLoop is not null)
+        {
+            RpcTelemetry.PeerStopped();
+        }
     }
 
     private void RaiseProtocolError(
         int messageId,
         MessageType messageType,
         string message,
-        Exception? error) =>
+        Exception? error)
+    {
+        RpcTelemetry.ProtocolFrameRejected(messageType, serializationFailure: error is not null);
         RpcEventHandlerInvoker.Raise(
             ProtocolError,
             this,
             new RpcProtocolErrorEventArgs(_channel.RemoteEndpoint, messageId, messageType, message, error));
+    }
 
     private void RaiseDispatchError(RpcPeerInboundRequest inbound, Exception error) =>
         RpcEventHandlerInvoker.Raise(

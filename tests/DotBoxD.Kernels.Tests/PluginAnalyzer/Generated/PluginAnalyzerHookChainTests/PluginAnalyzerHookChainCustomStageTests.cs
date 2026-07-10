@@ -37,7 +37,7 @@ public sealed class PluginAnalyzerHookChainCustomStageTests
             """);
 
         var diagnostic = Assert.Single(result.Diagnostics.Where(d => d.Id == "DBXK114"));
-        Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.DoesNotContain(
             result.GeneratedTrees,
             tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
@@ -74,7 +74,7 @@ public sealed class PluginAnalyzerHookChainCustomStageTests
             """);
 
         var diagnostic = Assert.Single(result.Diagnostics.Where(d => d.Id == "DBXK114"));
-        Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.DoesNotContain(
             result.GeneratedTrees,
             tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));

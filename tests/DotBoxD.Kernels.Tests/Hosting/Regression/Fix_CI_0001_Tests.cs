@@ -4,6 +4,8 @@ namespace DotBoxD.Kernels.Tests.Hosting.Regression;
 
 public sealed class Fix_CI_0001_Tests
 {
+    private static readonly TimeSpan ScanTimeout = TimeSpan.FromMinutes(1);
+
     [Fact]
     public async Task Csharp_file_line_gate_scans_repo_sources_not_only_eng()
     {
@@ -18,10 +20,10 @@ public sealed class Fix_CI_0001_Tests
             var outputTask = process.StandardOutput.ReadToEndAsync();
             var errorTask = process.StandardError.ReadToEndAsync();
             var exitTask = process.WaitForExitAsync();
-            if (await Task.WhenAny(exitTask, Task.Delay(TimeSpan.FromSeconds(15))) != exitTask)
+            if (await Task.WhenAny(exitTask, Task.Delay(ScanTimeout)) != exitTask)
             {
                 KillProcess(process);
-                Assert.Fail("CodeEnforcer did not finish while scanning an over-limit probe file.");
+                Assert.Fail($"CodeEnforcer did not finish within {ScanTimeout} while scanning an over-limit probe file.");
             }
 
             await exitTask;

@@ -10,13 +10,26 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime;
 
 internal static class HookChainRuntimeTestCompiler
 {
-    public static Assembly Compile(string source, bool enableInterceptors)
+    public static Assembly Compile(
+        string source,
+        bool enableInterceptors,
+        string? suppressedDiagnosticId = null)
     {
         var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
         if (enableInterceptors)
         {
             parseOptions = parseOptions.WithFeatures(
                 [new KeyValuePair<string, string>("InterceptorsNamespaces", "DotBoxD.Plugins.Generated")]);
+        }
+
+        var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary);
+        if (suppressedDiagnosticId is not null)
+        {
+            compilationOptions = compilationOptions.WithSpecificDiagnosticOptions(
+                new Dictionary<string, ReportDiagnostic>
+                {
+                    [suppressedDiagnosticId] = ReportDiagnostic.Suppress,
+                });
         }
 
         var compilation = CSharpCompilation.Create(
@@ -27,7 +40,7 @@ internal static class HookChainRuntimeTestCompiler
                 .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(ChainAggroEvent).Assembly.Location)),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            compilationOptions);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: parseOptions);

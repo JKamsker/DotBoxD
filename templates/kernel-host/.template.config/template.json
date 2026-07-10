@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "DotBoxD",
+  "classifications": [ "DotBoxD", "Sandbox", "Kernel" ],
+  "identity": "DotBoxD.Templates.KernelHost",
+  "name": "DotBoxD kernel host",
+  "shortName": "dotboxd-kernel-host",
+  "sourceName": "DotBoxDKernelHostTemplate",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  }
+}

@@ -7,6 +7,7 @@
       Descriptor: {
         Id: DBXS002,
         Title: Unsupported DotBoxD method shape,
+        HelpLink: https://dotboxd.kamsker.at/reference/diagnostics/#dbxs002,
         MessageFormat: DotBoxD cannot generate code for '{0}.{1}': {2},
         Category: DotBoxD.Services.SourceGenerator,
         DefaultSeverity: Error,

@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using CsCheck;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
@@ -17,55 +18,46 @@ public sealed class FuzzBreadthTests
     [Fact]
     public void Json_importer_fuzz_rejects_malformed_expression_shapes_with_diagnostics()
     {
-        var random = new Random(0x51AFE001);
-
-        for (var i = 0; i < 60; i++)
+        Gen.Int.Sample(seed =>
         {
+            var random = new Random(seed);
+            var i = seed;
             var json = ModuleJson(i, InvalidExpression(random).ToJsonString(JsonOptions));
 
             var ex = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import(json));
 
             Assert.NotEmpty(ex.Diagnostics);
             Assert.All(ex.Diagnostics, d => Assert.StartsWith("E-JSON-", d.Code, StringComparison.Ordinal));
-        }
+        }, seed: "0N0XIzNsQ0O2", iter: 60, threads: 1);
     }
 
     [Fact]
     public void Canonical_hash_fuzz_is_stable_across_json_property_order()
     {
-        var random = new Random(0x51AFE002);
-
-        for (var i = 0; i < 40; i++)
+        Gen.Int.Sample(seed =>
         {
+            var random = new Random(seed);
+            var i = seed;
             var expression = ValidExpression(random, depth: 4).ToJsonString(JsonOptions);
             var first = JsonImporter.Import(ModuleJson(i, expression, shuffled: false));
             var second = JsonImporter.Import(ModuleJson(i, expression, shuffled: true));
 
             Assert.Equal(CanonicalModuleHasher.Hash(first), CanonicalModuleHasher.Hash(second));
-        }
+        }, seed: "0N0XIzNsQ0O2", iter: 40, threads: 1);
     }
 
     [Fact]
     public void Policy_hash_fuzz_distinguishes_parameter_and_limit_values()
-    {
-        var random = new Random(0x51AFE003);
-        var hashes = new HashSet<string>(StringComparer.Ordinal);
-
-        for (var i = 0; i < 40; i++)
+        => Gen.Int.Sample(seed =>
         {
-            var policy = SandboxPolicyBuilder.Create()
-                .WithPolicyId("fuzz-policy")
-                .Grant("fuzz.cap", new Dictionary<string, string>
-                {
-                    ["tenant"] = Token(random),
-                    ["limit"] = i.ToString(System.Globalization.CultureInfo.InvariantCulture)
-                }, SandboxEffect.Cpu)
-                .WithFuel(1_000 + i)
-                .Build();
+            var random = new Random(seed);
+            var tenant = Token(random);
+            var baseline = PolicyHash(tenant, limit: seed, fuel: 1_000);
 
-            Assert.True(hashes.Add(policy.Hash), $"duplicate policy hash at case {i}");
-        }
-    }
+            Assert.NotEqual(baseline, PolicyHash(tenant + "-changed", limit: seed, fuel: 1_000));
+            Assert.NotEqual(baseline, PolicyHash(tenant, limit: seed + 1L, fuel: 1_000));
+            Assert.NotEqual(baseline, PolicyHash(tenant, limit: seed, fuel: 1_001));
+        }, seed: "0N0XIzNsQ0O2", iter: 40, threads: 1);
 
     [Fact]
     public void Policy_hash_is_stable_across_grant_parameter_order()
@@ -81,21 +73,18 @@ public sealed class FuzzBreadthTests
     }
 
     [Fact]
-    public async Task Verifier_fuzz_reports_diagnostics_for_malformed_bytes()
+    public void Verifier_fuzz_reports_diagnostics_for_malformed_bytes()
     {
-        var random = new Random(0x51AFE004);
         var verifier = new GeneratedAssemblyVerifier();
         var policy = VerificationPolicy.BoxedValueDefaults();
-
-        for (var i = 0; i < 30; i++)
+        Gen.Byte.Array[1, 255].Sample(bytes =>
         {
-            var bytes = new byte[random.Next(1, 256)];
-            random.NextBytes(bytes);
-            var result = await verifier.VerifyAsync(bytes, Manifest(bytes), policy, CancellationToken.None);
+            var result = verifier.VerifyAsync(bytes, Manifest(bytes), policy, CancellationToken.None)
+                .AsTask().GetAwaiter().GetResult();
 
             Assert.False(result.Succeeded);
             Assert.NotEmpty(result.Diagnostics);
-        }
+        }, seed: "0N0XIzNsQ0O2", iter: 30, threads: 1);
     }
 
     private static JsonObject InvalidExpression(Random random)
@@ -184,6 +173,18 @@ public sealed class FuzzBreadthTests
         return Convert.ToHexString(bytes) +
                random.Next(0, 1_000_000).ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
+
+    private static string PolicyHash(string tenant, long limit, long fuel)
+        => SandboxPolicyBuilder.Create()
+            .WithPolicyId("fuzz-policy")
+            .Grant("fuzz.cap", new Dictionary<string, string>
+            {
+                ["tenant"] = tenant,
+                ["limit"] = limit.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            }, SandboxEffect.Cpu)
+            .WithFuel(fuel)
+            .Build()
+            .Hash;
 
     private static ArtifactManifest Manifest(byte[] bytes)
     {

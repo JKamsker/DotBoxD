@@ -1,3 +1,5 @@
+#pragma warning disable DBXK111 // Deliberately compile one unsupported projection to verify the native fallback.
+
 namespace DotBoxD.Plugins.Generated.Tests;
 
 /// <summary>

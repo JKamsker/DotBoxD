@@ -1,0 +1,71 @@
+name: coverage-guided-fuzz
+
+on:
+  schedule:
+    - cron: '37 3 * * 6'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sharpfuzz:
+    name: SharpFuzz (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [json, verifier]
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
+        with:
+          dotnet-version: 10.0.x
+      - name: Install AFL++ and SharpFuzz instrumentation
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes afl++
+          dotnet tool install --global SharpFuzz.CommandLine --version 2.3.0
+      - name: Build and instrument harness
+        run: |
+          dotnet publish tools/Fuzzing/DotBoxD.Fuzzing/DotBoxD.Fuzzing.csproj -c Release -o artifacts/fuzz/app
+          sharpfuzz artifacts/fuzz/app/DotBoxD.Fuzzing.dll
+      - name: Fuzz for five minutes
+        env:
+          AFL_SKIP_CPUFREQ: '1'
+          AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES: '1'
+        run: >-
+          afl-fuzz -V 300
+          -i tools/Fuzzing/corpus/${{ matrix.target }}
+          -o artifacts/fuzz/findings/${{ matrix.target }}
+          -- dotnet artifacts/fuzz/app/DotBoxD.Fuzzing.dll ${{ matrix.target }}
+      - name: Minimize crashes and hangs
+        if: always()
+        shell: bash
+        run: |
+          set -u
+          source_root="artifacts/fuzz/findings/${{ matrix.target }}/default"
+          output_root="artifacts/fuzz/minimized/${{ matrix.target }}"
+          mkdir -p "$output_root"
+          for category in crashes hangs; do
+            input_dir="$source_root/$category"
+            [[ -d "$input_dir" ]] || continue
+            for input in "$input_dir"/id:*; do
+              [[ -f "$input" ]] || continue
+              output="$output_root/${category}-$(basename "$input")"
+              afl-tmin -i "$input" -o "$output" -- \
+                dotnet artifacts/fuzz/app/DotBoxD.Fuzzing.dll ${{ matrix.target }} || cp "$input" "$output"
+            done
+          done
+      - name: Upload minimized findings
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-findings-${{ matrix.target }}
+          path: |
+            artifacts/fuzz/minimized/${{ matrix.target }}/**/*
+            artifacts/fuzz/findings/${{ matrix.target }}/**/*
+          if-no-files-found: warn
+          retention-days: 30
