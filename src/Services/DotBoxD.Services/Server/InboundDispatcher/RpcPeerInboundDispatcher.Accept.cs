@@ -41,6 +41,7 @@ internal sealed partial class RpcPeerInboundDispatcher
         var result = await _queue.EnqueueAsync(inbound, loopCt).ConfigureAwait(false);
         if (result == InboundEnqueueResult.Dropped)
         {
+            RpcTelemetry.QueueSaturated();
             await SendQueueFullErrorAsync(messageId, loopCt).ConfigureAwait(false);
         }
 

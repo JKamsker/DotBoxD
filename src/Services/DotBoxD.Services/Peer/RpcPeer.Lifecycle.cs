@@ -119,11 +119,14 @@ public sealed partial class RpcPeer
         int messageId,
         MessageType messageType,
         string message,
-        Exception? error) =>
+        Exception? error)
+    {
+        RpcTelemetry.ProtocolFrameRejected(messageType, serializationFailure: error is not null);
         RpcEventHandlerInvoker.Raise(
             ProtocolError,
             this,
             new RpcProtocolErrorEventArgs(_channel.RemoteEndpoint, messageId, messageType, message, error));
+    }
 
     private void RaiseDispatchError(RpcPeerInboundRequest inbound, Exception error) =>
         RpcEventHandlerInvoker.Raise(
