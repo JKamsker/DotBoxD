@@ -12,6 +12,44 @@ public sealed class ExceptionTransformerWhitespaceTypeTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task HandlerException_TransformerBlankMessage_FallsBackToInternalError(string? message)
+    {
+        var serverOptions = new RpcPeerOptions
+        {
+            ExceptionTransformer = _ => new RpcErrorInfo(message!, "APP_BLANK"),
+        };
+
+        var (clientConnection, serverConnection) = InMemoryPipe.CreateConnectionPair();
+        var server = RpcPeer.Over(serverConnection, new MessagePackRpcSerializer(), serverOptions)
+            .ProvideGameService(new TestGameService())
+            .Start();
+        var client = RpcPeer.Over(
+                clientConnection,
+                new MessagePackRpcSerializer(),
+                new RpcPeerOptions { RequestTimeout = TimeSpan.FromSeconds(8) })
+            .Start();
+
+        try
+        {
+            var game = client.GetGameService();
+
+            var ex = await Assert.ThrowsAsync<RemoteServiceException>(
+                () => game.GetPlayerStateAsync(new PlayerId { Id = "ghost" }).WaitAsync(Timeout));
+
+            Assert.Equal("Internal error.", ex.Message);
+            Assert.Equal(RpcErrorTypes.InternalError, ex.RemoteExceptionType);
+        }
+        finally
+        {
+            await client.DisposeAsync();
+            await server.DisposeAsync();
+        }
+    }
+
     [Fact]
     public async Task HandlerException_TransformerWhitespaceType_FallsBackToInternalError()
     {
