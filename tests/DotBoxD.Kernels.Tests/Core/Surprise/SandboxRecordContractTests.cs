@@ -1,0 +1,32 @@
+using DotBoxD.Kernels.Sandbox;
+
+namespace DotBoxD.Kernels.Tests.Core;
+
+public sealed class SandboxRecordContractTests
+{
+    [Fact]
+    public void Empty_record_factories_fail_closed_at_public_boundary()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            SandboxValue.FromRecord(Array.Empty<SandboxValue>()));
+
+        Assert.Throws<ArgumentException>(() =>
+            SandboxType.Record(Array.Empty<SandboxType>()));
+    }
+
+    [Fact]
+    public void Non_empty_records_report_known_self_type_and_validate()
+    {
+        var value = SandboxValue.FromRecord([
+            SandboxValue.FromInt32(42),
+            SandboxValue.FromString("ready")
+        ]);
+
+        var type = value.Type;
+
+        Assert.True(type.IsRecord);
+        Assert.True(type.IsKnown());
+        Assert.Equal(SandboxType.Record([SandboxType.I32, SandboxType.String]), type);
+        SandboxValueValidator.RequireType(value, type, "bad input");
+    }
+}
