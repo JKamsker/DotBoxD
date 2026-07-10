@@ -90,6 +90,7 @@ public sealed class RpcPeerSession : IAsyncDisposable
                 throw new InvalidOperationException("Transport connected without publishing an RPC channel.");
             peer = RpcPeer.Over(channel, serializer, options);
             configurePeer?.Invoke(peer);
+            ct.ThrowIfCancellationRequested();
             peer.Start();
             return new RpcPeerSession(transport, peer);
         }

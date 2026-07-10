@@ -35,7 +35,6 @@ public sealed class RpcPeerSessionConfigureCancellationTests
 
         var disposedBeforeCleanup = transport.Disposed;
         var channelConnectedBeforeCleanup = channel.IsConnected;
-        var receiveCalledBeforeCleanup = channel.ReceiveCalled;
         var peerStartedBeforeCleanup = configuredPeer?.HasStarted;
         var peerDisposedBeforeCleanup = configuredPeer?.IsDisposed;
 
@@ -51,7 +50,7 @@ public sealed class RpcPeerSessionConfigureCancellationTests
         Assert.NotNull(configuredPeer);
         Assert.False(peerStartedBeforeCleanup);
         Assert.True(peerDisposedBeforeCleanup);
-        Assert.False(receiveCalledBeforeCleanup);
+        Assert.False(channel.ReceiveCalled);
         Assert.Null(session);
     }
 
