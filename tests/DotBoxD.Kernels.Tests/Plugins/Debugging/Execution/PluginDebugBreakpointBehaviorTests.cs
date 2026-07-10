@@ -2,6 +2,8 @@ using System.Text.Json;
 using System.Threading.Channels;
 using DotBoxD.Kernels.Debugging;
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Debugging;
@@ -64,6 +66,67 @@ public sealed class PluginDebugBreakpointBehaviorTests
         Assert.Equal("console", output.GetProperty("category").GetString());
         Assert.Equal("damage=120, minimum=100", output.GetProperty("output").GetString());
         Assert.True(await execution);
+    }
+
+    [Fact]
+    public async Task Sandbox_exception_publishes_a_stop_before_the_runtime_error_escapes()
+    {
+        var events = new EventQueue();
+        using var server = PluginServer.Create(
+            defaultPolicy: PluginAddendumTestPolicies.LongWall(),
+            executionMode: ExecutionMode.Interpreted,
+            remoteDebugOptions: new PluginRemoteDebugOptions
+            {
+                Enabled = true,
+                DefaultPauseScope = KernelDebugPauseScope.Execution,
+                AllowedPauseScopes = [KernelDebugPauseScope.Execution]
+            });
+        using var owner = server.CreateSession();
+        await using var debug = owner.CreateDebugSession(events);
+        _ = await SuccessAsync(debug, PluginDebugCommands.Attach);
+        var package = FailingPackage();
+        var kernel = await owner.InstallAsync(package);
+
+        var execution = kernel.ShouldHandleAsync(
+                DamageEventAdapter.Instance,
+                new DamageEvent("fire", 120, "player-1"))
+            .AsTask();
+        var stopped = await events.NextAsync();
+
+        Assert.Equal("exception", stopped.GetProperty("reason").GetString());
+        Assert.True(stopped.TryGetProperty("error", out var error));
+        Assert.NotEqual(JsonValueKind.Null, error.ValueKind);
+        _ = await SuccessAsync(debug, PluginDebugCommands.Continue, new
+        {
+            runId = stopped.GetProperty("runId").GetString()
+        });
+        await Assert.ThrowsAsync<SandboxRuntimeException>(() => execution);
+    }
+
+    private static PluginPackage FailingPackage()
+    {
+        var package = FireDamagePluginPackage.Create();
+        var function = package.Module.Functions.Single(candidate =>
+            candidate.Id == package.Entrypoints.ShouldHandle);
+        var span = function.Body[0].Span;
+        var division = new BinaryExpression(
+            new LiteralExpression(SandboxValue.FromInt32(1), span),
+            "/",
+            new LiteralExpression(SandboxValue.FromInt32(0), span),
+            span);
+        var comparison = new BinaryExpression(
+            division,
+            ">",
+            new LiteralExpression(SandboxValue.FromInt32(0), span),
+            span);
+        var rewritten = function with { Body = [new ReturnStatement(comparison, span)] };
+        var functions = package.Module.Functions
+            .Select(candidate => candidate.Id == function.Id ? rewritten : candidate)
+            .ToArray();
+        return PluginPackage.Create(
+            package.Manifest,
+            package.Module with { Functions = functions },
+            package.Entrypoints);
     }
 
     private sealed class DebugFixture : IAsyncDisposable

@@ -104,6 +104,27 @@ public sealed class TrustedClrPluginDebugEvaluatorTests
         Assert.Contains("time limit", result.Error!.SafeMessage, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Worker_provider_enforces_memory_limit_by_terminating_child_process()
+    {
+        var evaluator = ClrPluginDebugEvaluators.CreateTrustedWorker(
+            new TrustedWorkerDebugEvaluatorOptions
+            {
+                TimeLimit = TimeSpan.FromSeconds(20),
+                MemoryLimitBytes = 128L * 1024 * 1024
+            });
+
+        var result = await evaluator.EvaluateAsync(
+            new PluginDebugEvaluationRequest(
+                new TestFrame(SandboxValue.FromInt32(1)),
+                "new Func<int>(() => { var bytes = new byte[256 * 1024 * 1024]; " +
+                "System.Array.Fill(bytes, (byte)1); System.Threading.Thread.Sleep(5000); " +
+                "return amount + bytes[0]; })()"));
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("memory limit", result.Error!.SafeMessage, StringComparison.Ordinal);
+    }
+
     private sealed class TestFrame(SandboxValue amount) : ISandboxDebugFrame
     {
         public string FunctionId => "test";

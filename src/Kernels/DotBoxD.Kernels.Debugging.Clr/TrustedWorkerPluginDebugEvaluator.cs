@@ -147,6 +147,7 @@ internal static class ClrDebugWorkerClient
         {
             while (!process.HasExited)
             {
+                process.Refresh();
                 if (process.WorkingSet64 > memoryLimitBytes)
                 {
                     process.Kill(entireProcessTree: true);
