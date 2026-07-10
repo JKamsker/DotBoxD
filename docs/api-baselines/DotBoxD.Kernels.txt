@@ -45,6 +45,7 @@ public CancellationToken CancellationToken { get; }
 public CancellationTokenSource CreateWallTimeToken()
 public CapabilityGrant GetCapability(string capabilityId)
 public CapabilityGrant GetGrant(string capabilityId)
+public const int CurrentVersion = 1
 public const int MaxTextLiteralLength = 65_536
 public const SandboxEffect Pure = SandboxEffect.Cpu | SandboxEffect.Alloc
 public const string Async = "dotboxd.runtime.async"
@@ -111,6 +112,10 @@ public enum SandboxErrorCode.VerifierFailure
 public enum SandboxIsolation
 public enum SandboxIsolation.InProcess
 public enum SandboxIsolation.WorkerProcess
+public enum SandboxNodeKind
+public enum SandboxNodeKind.Expression
+public enum SandboxNodeKind.Function
+public enum SandboxNodeKind.Statement
 public ExecutionMode ActualMode { get => _actualMode; init => _actualMode = RequireDefinedMode(value, nameof(ActualMode)); }
 public ExecutionMode Mode { get; init; } = ExecutionMode.Auto
 public ExecutionPlan( string moduleHash, string planHash, ExecutionPlanSeal planSeal, string policyHash, string bindingManifestHash, SandboxModule module, SandboxPolicy policy, BindingRegistry bindings, ResourceLimits budget, IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis, IReadOnlyDictionary<string, IReadOnlySet<string>>? bindingReferences = null)
@@ -132,6 +137,7 @@ public int Major { get => _major; init => _major = RequireNonNegative(value, nam
 public int Minor { get => _minor; init => _minor = RequireNonNegative(value, nameof(Minor)); }
 public int NextRandomInt32(int minInclusive, int maxExclusive)
 public int Patch { get => _patch; init => _patch = RequireNonNegative(value, nameof(Patch)); }
+public int Version { get; }
 public interface IAuditSink
 public interface IBindingCatalog
 public IReadOnlyDictionary<SandboxValue, SandboxValue> Values { get => _values; init => _values = Snapshot(value); }
@@ -150,6 +156,7 @@ public IReadOnlyList<Parameter> Parameters { get => _parameters; init => _parame
 public IReadOnlyList<SandboxAuditEvent> Events { get; }
 public IReadOnlyList<SandboxDiagnostic> Diagnostics { get; }
 public IReadOnlyList<SandboxFunction> Functions { get => _functions; init => _functions = ModelCopy.List(value); }
+public IReadOnlyList<SandboxNodeDescriptor> Nodes { get; }
 public IReadOnlyList<SandboxType> Arguments { get => _arguments; init => _arguments = CopyArguments(value); }
 public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = BindingParameterTypes.Copy(value, nameof(Parameters)); }
 public IReadOnlyList<SandboxValue> Fields { get => _fields; init => _fields = Snapshot(value); }
@@ -224,6 +231,13 @@ public SandboxErrorCode Code { get; init; }
 public SandboxErrorCode? ErrorCode { get; init; }
 public SandboxIsolation Isolation { get; init; } = SandboxIsolation.InProcess
 public SandboxModule Module { get; }
+public SandboxNodeDescriptor GetDescriptor(Expression expression)
+public SandboxNodeDescriptor GetDescriptor(SandboxFunction function)
+public SandboxNodeDescriptor GetDescriptor(Statement statement)
+public SandboxNodeDescriptor( SandboxNodeId id, string functionId, SandboxNodeKind kind, string structuralPath, SourceSpan? sourceSpan)
+public SandboxNodeId Id { get; }
+public SandboxNodeId(string value)
+public SandboxNodeKind Kind { get; }
 public SandboxPath Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
 public SandboxPolicy Build()
 public SandboxPolicy Policy { get; }
@@ -271,6 +285,7 @@ public sealed class ExecutionPlan
 public sealed class ExecutionPlanSeal : IEquatable<ExecutionPlanSeal>
 public sealed class InMemoryAuditSink : IAuditSink
 public sealed class ResourceMeter
+public sealed class SandboxNodeMap
 public sealed class SandboxPolicyBuilder
 public sealed class SandboxRuntimeException : Exception
 public sealed class SandboxValidationException : Exception
@@ -310,6 +325,8 @@ public sealed record SandboxExecutionOptions
 public sealed record SandboxExecutionResult
 public sealed record SandboxFunction( string Id, bool IsEntrypoint, IReadOnlyList<Parameter> Parameters, SandboxType ReturnType, IReadOnlyList<Statement> Body, SandboxEffect? DeclaredEffects = null)
 public sealed record SandboxModule( string Id, SemVersion Version, SemVersion TargetSandboxVersion, IReadOnlyList<CapabilityRequest> CapabilityRequests, IReadOnlyList<SandboxFunction> Functions, IReadOnlyDictionary<string, string> Metadata)
+public sealed record SandboxNodeDescriptor
+public sealed record SandboxNodeId
 public sealed record SandboxPath(string RelativePath)
 public sealed record SandboxPathValue(SandboxPath Value) : SandboxValue
 public sealed record SandboxPolicy( string PolicyId, SandboxEffect AllowedEffects, IReadOnlyList<CapabilityGrant> Grants, ResourceLimits ResourceLimits, bool Deterministic = false, DateTimeOffset? LogicalNow = null, ulong? RandomSeed = null, IReadOnlySet<string>? DeclaredOpaqueIdTypes = null)
@@ -325,6 +342,7 @@ public sealed record UnaryExpression(string Operator, Expression Operand, Source
 public sealed record UnitValue : SandboxValue
 public sealed record VariableExpression(string Name, SourceSpan Span) : Expression(Span)
 public sealed record WhileStatement(Expression Condition, IReadOnlyList<Statement> Body, SourceSpan Span) : Statement(Span)
+public SourceSpan? SourceSpan { get; }
 public static BindingCostModel Fixed(long baseFuel) => new(baseFuel)
 public static BindingCostModel PerByte(long baseFuel, long perByteFuel)
 public static BindingCostModel PerReturnedByte(long baseFuel, long perByteFuel)
@@ -392,6 +410,7 @@ public static long Negate(long value)
 public static long Read(int count = 0) => BaseCost + Math.Max(0, count)
 public static long Remainder(long left, long right)
 public static long Subtract(long left, long right)
+public static SandboxNodeMap Create(SandboxModule module)
 public static SandboxPolicyBuilder Create() => new()
 public static SandboxRunId New() => new(Guid.NewGuid())
 public static SandboxType Bool { get; } = Scalar("Bool")
@@ -448,6 +467,7 @@ public string BindingManifestHash { get; }
 public string Code { get => _code; init => _code = ValidateText(value, nameof(Code)); }
 public string CreateChargedStringConcat(string left, string right)
 public string CreateChargedSubstring(string value, int startIndex, int length)
+public string FunctionId { get; }
 public string Hash => (_hash ??= CreateHashCache()).Value
 public string Kind { get => _kind; init => _kind = value ?? throw new ArgumentNullException(nameof(Kind)); }
 public string ManifestHash { get; }
@@ -459,9 +479,11 @@ public string PolicyHash { get; }
 public string PolicyId { get => _policyId; init { _policyId = value; ResetHash(); } }
 public string RelativePath { get => _relativePath; init => _relativePath = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
 public string SafeMessage { get; init; }
+public string StructuralPath { get; }
 public string TypeName { get => _typeName; init => _typeName = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
 public string Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
 public string Value { get; init; }
+public string Value => _value
 public string? ArtifactHash { get; init; }
 public TimeSpan EffectiveWallTime => MaxWallTime ?? TimeSpan.FromMilliseconds(100)
 public TimeSpan RemainingWallTime()
