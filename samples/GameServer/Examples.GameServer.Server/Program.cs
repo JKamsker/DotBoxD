@@ -78,7 +78,12 @@ internal static class Program
         // provisioning both services; when the connection drops it disposes the session and unloads the
         // kernels it owned.
         await using var host = await GamePluginHost
-            .StartAsync(server, sink, world, options.ExternalPluginPipeName)
+            .StartAsync(
+                server,
+                sink,
+                world,
+                options.ExternalPluginPipeName,
+                enableKernelDebugging: KernelDebuggingRequested())
             .ConfigureAwait(false);
         Console.WriteLine($"[server] listening for plugin on pipe '{host.PipeName}'.");
 
@@ -223,6 +228,9 @@ internal static class Program
         {
         }
     }
+
+    private static bool KernelDebuggingRequested()
+        => string.Equals(Environment.GetEnvironmentVariable("DOTBOXD_KERNEL_DEBUG"), "1", StringComparison.Ordinal);
 
     private static Dictionary<string, int> PlayerHpById(GameWorld world)
         => world.Players().ToDictionary(p => p.Id, p => p.Hp, StringComparer.Ordinal);

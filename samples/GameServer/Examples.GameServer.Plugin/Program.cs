@@ -1,6 +1,7 @@
 using DotBoxD.Kernels.Game.Plugin.Authoring;
 using DotBoxD.Kernels.Game.Plugin.Kernels;
 using DotBoxD.Kernels.Game.Server.Abstractions.Events;
+using DotBoxD.Pushdown.Services;
 
 namespace DotBoxD.Kernels.Game.Plugin;
 
@@ -43,8 +44,18 @@ internal static class Program
 
         Console.WriteLine($"[plugin] connecting to server pipe '{pipeName}'...");
 
-        using IGameWorldServer server = GamePluginServerBuilder
-            .FromPipeName(pipeName)
+        await using var debugBridge = KernelDebuggingRequested()
+            ? PluginDebugBridge.Start()
+            : null;
+        if (debugBridge is not null)
+        {
+            Console.WriteLine($"[plugin] kernel debug bridge ready for PID {debugBridge.Descriptor.ProcessId}.");
+        }
+
+        var builder = debugBridge is null
+            ? GamePluginServerBuilder.FromPipeName(pipeName)
+            : GamePluginServerBuilder.FromPipeNameWithKernelDebugging(pipeName, debugBridge);
+        using IGameWorldServer server = builder
             .Setup(s =>
             {
                 // Build() is sync and does no I/O; StartAsync() ships the recorded IR.
@@ -79,6 +90,9 @@ internal static class Program
 
         return 0;
     }
+
+    private static bool KernelDebuggingRequested()
+        => string.Equals(Environment.GetEnvironmentVariable("DOTBOXD_KERNEL_DEBUG"), "1", StringComparison.Ordinal);
 
     internal static void ConfigureRuntimeHooks(IGameWorldServer server)
     {

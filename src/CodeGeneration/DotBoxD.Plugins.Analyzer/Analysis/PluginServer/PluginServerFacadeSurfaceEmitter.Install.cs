@@ -10,7 +10,7 @@ internal static class PluginServerFacadeInstallSurfaceEmitter
         AppendCaptureInvokeAsync(builder, model);
         AppendKernelAccessors(builder);
         AppendAnonymousKernelInstall(builder);
-        AppendPackageInstallHelpers(builder);
+        AppendPackageInstallHelpers(builder, model);
         AppendLiveSettingHelpers(builder);
         AppendInstalledPackageGuards(builder);
     }
@@ -183,10 +183,11 @@ internal static class PluginServerFacadeInstallSurfaceEmitter
         builder.AppendLine("        => ((global::System.Collections.Generic.ICollection<global::System.Collections.Generic.KeyValuePair<string, global::System.Lazy<global::System.Threading.Tasks.Task<string>>>>)_anonymousKernels).Remove(new global::System.Collections.Generic.KeyValuePair<string, global::System.Lazy<global::System.Threading.Tasks.Task<string>>>(pluginId, install));");
     }
 
-    private static void AppendPackageInstallHelpers(StringBuilder builder)
+    private static void AppendPackageInstallHelpers(StringBuilder builder, PluginServerFacadeModel model)
     {
         builder.AppendLine("    private async global::System.Threading.Tasks.ValueTask<string> InstallPluginPackageAsync(global::DotBoxD.Plugins.PluginPackage package, global::System.Threading.CancellationToken cancellationToken = default)");
         builder.AppendLine("    {");
+        AppendDebugPreparation(builder, model);
         builder.AppendLine("        var pluginId = await RequireControl().InstallPluginAsync(global::DotBoxD.Plugins.Json.PluginPackageJsonSerializer.Export(package), cancellationToken).ConfigureAwait(false);");
         builder.AppendLine("        RequireInstalledPackageId(package, pluginId);");
         builder.AppendLine("        cancellationToken.ThrowIfCancellationRequested();");
@@ -195,6 +196,7 @@ internal static class PluginServerFacadeInstallSurfaceEmitter
         builder.AppendLine("    }");
         builder.AppendLine("    private async global::System.Threading.Tasks.ValueTask<string> InstallSubscriptionPackageAsync(global::DotBoxD.Plugins.PluginPackage package, global::System.Threading.CancellationToken cancellationToken = default)");
         builder.AppendLine("    {");
+        AppendDebugPreparation(builder, model);
         builder.AppendLine("        var pluginId = await RequireControl().InstallSubscriptionAsync(global::DotBoxD.Plugins.Json.PluginPackageJsonSerializer.Export(package), cancellationToken).ConfigureAwait(false);");
         builder.AppendLine("        RequireInstalledPackageId(package, pluginId);");
         builder.AppendLine("        cancellationToken.ThrowIfCancellationRequested();");
@@ -203,17 +205,31 @@ internal static class PluginServerFacadeInstallSurfaceEmitter
         builder.AppendLine("    }");
         builder.AppendLine("    private async global::System.Threading.Tasks.ValueTask<string> InstallServerExtensionPackageAsync(global::DotBoxD.Plugins.PluginPackage package, global::System.Threading.CancellationToken cancellationToken = default)");
         builder.AppendLine("    {");
+        AppendDebugPreparation(builder, model);
         builder.AppendLine("        var pluginId = await RequireControl().InstallServerExtensionAsync(global::DotBoxD.Plugins.Json.PluginPackageJsonSerializer.Export(package), cancellationToken).ConfigureAwait(false);");
         builder.AppendLine("        RequireInstalledPackageId(package, pluginId);");
         builder.AppendLine("        cancellationToken.ThrowIfCancellationRequested();");
         builder.AppendLine("        MarkInstalled(package);");
         builder.AppendLine("        return pluginId;");
         builder.AppendLine("    }");
+        if (model.EmitPipeBuilder)
+        {
+            builder.AppendLine("    private global::System.Threading.Tasks.ValueTask PrepareDebugPackageAsync(global::DotBoxD.Plugins.PluginPackage package, global::System.Threading.CancellationToken cancellationToken)");
+            builder.AppendLine("        => _debugBridge is null ? global::System.Threading.Tasks.ValueTask.CompletedTask : _debugBridge.PreparePackageAsync(package, cancellationToken);");
+        }
         builder.AppendLine("    private void MarkInstalled(global::DotBoxD.Plugins.PluginPackage package)");
         builder.AppendLine("    {");
         builder.AppendLine("        _installedPluginIds.Add(package.Manifest.PluginId);");
         builder.AppendLine("        RecordLiveSettingDefaults(package);");
         builder.AppendLine("    }");
+    }
+
+    private static void AppendDebugPreparation(StringBuilder builder, PluginServerFacadeModel model)
+    {
+        if (model.EmitPipeBuilder)
+        {
+            builder.AppendLine("        await PrepareDebugPackageAsync(package, cancellationToken).ConfigureAwait(false);");
+        }
     }
 
     private static void AppendLiveSettingHelpers(StringBuilder builder)
