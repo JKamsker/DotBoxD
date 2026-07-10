@@ -86,6 +86,7 @@ export default defineConfig({
           label: 'Reference',
           items: [
             { label: 'Diagnostics (DBXS / DBXK)', slug: 'reference/diagnostics' },
+            { label: 'Consumer testing kit', slug: 'reference/testing' },
             { label: 'Schemas', slug: 'reference/schemas' },
             { label: 'Glossary', slug: 'reference/glossary' },
             {
