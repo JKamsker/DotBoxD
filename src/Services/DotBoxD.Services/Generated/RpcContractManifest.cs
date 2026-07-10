@@ -158,25 +158,16 @@ public enum RpcContractChangeKind
     UnsupportedVersion
 }
 
-public sealed record RpcContractChange
+public sealed record RpcContractChange(
+    RpcContractChangeKind Kind,
+    string Contract,
+    string? PreviousSignature,
+    string? CurrentSignature)
 {
-    private RpcContractChangeKind _kind;
-    private string _contract = string.Empty;
-    private string? _previousSignature;
-    private string? _currentSignature;
-
-    public RpcContractChange(
-        RpcContractChangeKind kind,
-        string contract,
-        string? previousSignature,
-        string? currentSignature)
-    {
-        Validate(kind, contract, previousSignature, currentSignature);
-        _kind = kind;
-        _contract = contract;
-        _previousSignature = previousSignature;
-        _currentSignature = currentSignature;
-    }
+    private RpcContractChangeKind _kind = ValidateAndReturn(Kind, Contract, PreviousSignature, CurrentSignature);
+    private string _contract = Contract;
+    private string? _previousSignature = PreviousSignature;
+    private string? _currentSignature = CurrentSignature;
 
     public RpcContractChangeKind Kind
     {
@@ -265,4 +256,14 @@ public sealed record RpcContractChange
             or RpcContractChangeKind.Removed
             or RpcContractChangeKind.SignatureChanged
             or RpcContractChangeKind.UnsupportedVersion;
+
+    private static RpcContractChangeKind ValidateAndReturn(
+        RpcContractChangeKind kind,
+        string contract,
+        string? previousSignature,
+        string? currentSignature)
+    {
+        Validate(kind, contract, previousSignature, currentSignature);
+        return kind;
+    }
 }
