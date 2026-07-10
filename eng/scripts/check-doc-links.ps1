@@ -6,7 +6,21 @@ $documents = @(
     Get-Item -LiteralPath (Join-Path $root "README.md"), (Join-Path $root "CONTRIBUTING.md")
     Get-ChildItem -LiteralPath $siteRoot -Recurse -File -Include "*.md", "*.mdx"
 )
+$anchorExtractor = Join-Path $root "docs-site/scripts/extract-document-anchors.mjs"
+$sluggerModule = Join-Path $root "docs-site/node_modules/github-slugger"
+if (-not (Test-Path -LiteralPath $sluggerModule -PathType Container)) {
+    throw "Documentation anchor validation requires the docs-site dependencies. Run 'npm ci' in docs-site first."
+}
+$documentPaths = @($documents.FullName) | ConvertTo-Json -Compress
+$anchorJson = $documentPaths | & node $anchorExtractor
+if ($LASTEXITCODE -ne 0) { throw "Documentation anchor extraction failed with exit code $LASTEXITCODE." }
+$extractedAnchors = $anchorJson | ConvertFrom-Json -AsHashtable
 $anchorCache = @{}
+foreach ($entry in $extractedAnchors.GetEnumerator()) {
+    $anchors = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($anchor in $entry.Value) { [void] $anchors.Add($anchor) }
+    $anchorCache[[System.IO.Path]::GetFullPath($entry.Key)] = $anchors
+}
 
 # docs/design, docs/legacy, docs/Task, and docs/Specs are engineering records rather
 # than the published documentation set. They deliberately retain links to historical
@@ -46,30 +60,9 @@ function Test-FencedCodeLine(
 }
 
 function Get-DocumentAnchorSet([string] $Path) {
-    if ($anchorCache.ContainsKey($Path)) { return ,$anchorCache[$Path] }
-    $anchors = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-    $slugCounts = @{}
-    $fenceCharacter = $null
-    $fenceLength = 0
-    foreach ($line in Get-Content -LiteralPath $Path) {
-        if (Test-FencedCodeLine $line ([ref] $fenceCharacter) ([ref] $fenceLength)) { continue }
-
-        foreach ($match in [regex]::Matches($line, '(?:id|name)=["''](?<id>[^"'']+)["'']')) {
-            [void] $anchors.Add($match.Groups['id'].Value)
-        }
-        if ($line -notmatch '^\s{0,3}#{1,6}\s+(?<heading>.+?)\s*#*\s*$') { continue }
-
-        $slug = $matches['heading'].ToLowerInvariant()
-        $slug = [regex]::Replace($slug, '<[^>]+>|[`*_~]', '')
-        $slug = [regex]::Replace($slug, '[^\p{L}\p{Nd}\s-]', '')
-        $slug = [regex]::Replace($slug.Trim(), '\s', '-')
-        if ([string]::IsNullOrWhiteSpace($slug)) { continue }
-        $count = if ($slugCounts.ContainsKey($slug)) { [int] $slugCounts[$slug] + 1 } else { 0 }
-        $slugCounts[$slug] = $count
-        [void] $anchors.Add($(if ($count -eq 0) { $slug } else { "$slug-$count" }))
-    }
-    $anchorCache[$Path] = $anchors
-    return ,$anchors
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    if (-not $anchorCache.ContainsKey($fullPath)) { throw "No anchors were extracted for '$fullPath'." }
+    return ,$anchorCache[$fullPath]
 }
 
 $failures = [System.Collections.Generic.List[string]]::new()
