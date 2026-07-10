@@ -9,7 +9,10 @@ public sealed class RpcReadErrorEventArgs : EventArgs
 {
     public RpcReadErrorEventArgs(string remoteEndpoint, Exception error)
     {
-        RemoteEndpoint = remoteEndpoint ?? throw new ArgumentNullException(nameof(remoteEndpoint));
+        RemoteEndpoint = DiagnosticArgumentGuard.RequireNonBlank(
+            remoteEndpoint,
+            nameof(remoteEndpoint),
+            "Remote endpoint");
         Error = error ?? throw new ArgumentNullException(nameof(error));
     }
 

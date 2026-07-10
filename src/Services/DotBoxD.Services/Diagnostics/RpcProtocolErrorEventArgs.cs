@@ -24,7 +24,10 @@ public sealed class RpcProtocolErrorEventArgs : EventArgs
         string message,
         Exception? error)
     {
-        RemoteEndpoint = remoteEndpoint ?? throw new ArgumentNullException(nameof(remoteEndpoint));
+        RemoteEndpoint = DiagnosticArgumentGuard.RequireNonBlank(
+            remoteEndpoint,
+            nameof(remoteEndpoint),
+            "Remote endpoint");
         MessageId = messageId;
         MessageType = messageType;
         if (message is null)
