@@ -83,12 +83,7 @@ public sealed class RpcPeerStreamArrayNullContractTests
     {
         Assert.False(string.IsNullOrWhiteSpace(scenario));
         await using var pair = StartPeerPairWithoutServices();
-
-        var ex = await Record.ExceptionAsync(() => invoke(pair.Client).WaitAsync(Timeout));
-
-        var argument = Assert.IsType<ArgumentNullException>(ex);
-        Assert.Equal("streams", argument.ParamName);
-        Assert.Equal(0, pair.ClientChannel.SendCount);
+        await AssertRejectsNullStreamsAsync(pair, () => invoke(pair.Client));
     }
 
     [Theory]
@@ -99,9 +94,12 @@ public sealed class RpcPeerStreamArrayNullContractTests
     {
         Assert.False(string.IsNullOrWhiteSpace(scenario));
         await using var pair = StartPeerPairWithoutServices();
+        await AssertRejectsNullStreamsAsync(pair, () => invoke((IRpcInvoker)pair.Client));
+    }
 
-        var invoker = (IRpcInvoker)pair.Client;
-        var ex = await Record.ExceptionAsync(() => invoke(invoker).WaitAsync(Timeout));
+    private static async Task AssertRejectsNullStreamsAsync(PeerPair pair, Func<Task> invoke)
+    {
+        var ex = await Record.ExceptionAsync(() => invoke().WaitAsync(Timeout));
 
         var argument = Assert.IsType<ArgumentNullException>(ex);
         Assert.Equal("streams", argument.ParamName);
