@@ -67,9 +67,12 @@ public sealed record PluginRemoteDebugOptions
                 nameof(AllowedPauseScopes));
         }
 
-        if (StopLease <= TimeSpan.Zero || StopLease == Timeout.InfiniteTimeSpan)
+        if (StopLease <= TimeSpan.Zero || StopLease.TotalMilliseconds > uint.MaxValue - 1)
         {
-            throw new ArgumentOutOfRangeException(nameof(StopLease), StopLease, "The stop lease must be positive.");
+            throw new ArgumentOutOfRangeException(
+                nameof(StopLease),
+                StopLease,
+                "The stop lease must be positive and within the platform timer range.");
         }
 
         EnsurePositive(MaxSnapshotBytes, nameof(MaxSnapshotBytes));

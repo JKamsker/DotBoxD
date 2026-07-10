@@ -1,5 +1,6 @@
 using DotBoxD.Hosting.Execution;
 using DotBoxD.Kernels.Policies;
+using DotBoxD.Plugins.Debugging;
 using DotBoxD.Plugins.Kernel;
 using DotBoxD.Plugins.Runtime;
 using DotBoxD.Plugins.Runtime.Rpc;
@@ -24,11 +25,13 @@ public sealed partial class PluginServer : IDisposable
         IPluginMessageSink messages,
         ExecutionMode executionMode,
         Action<SubscriptionDeliveryFault>? onSubscriptionFault,
-        Action<ResultHookFault>? onResultHookFault)
+        Action<ResultHookFault>? onResultHookFault,
+        PluginRemoteDebugOptions? remoteDebugOptions)
     {
         _host = host;
         _defaultPolicy = defaultPolicy;
         _executionMode = executionMode;
+        _debugCoordinator = new PluginDebugCoordinator(remoteDebugOptions);
         Events = new PluginEventAdapterRegistry();
         Kernels = new KernelRegistry();
         Hooks = new HookRegistry(messages, Events, Kernels, InstallChainPackage, onResultHookFault, ThrowIfDisposed);
@@ -68,12 +71,15 @@ public sealed partial class PluginServer : IDisposable
         SandboxPolicy? defaultPolicy = null,
         ExecutionMode executionMode = ExecutionMode.Auto,
         Action<SubscriptionDeliveryFault>? onSubscriptionFault = null,
-        Action<ResultHookFault>? onResultHookFault = null)
+        Action<ResultHookFault>? onResultHookFault = null,
+        PluginRemoteDebugOptions? remoteDebugOptions = null)
     {
         if (!Enum.IsDefined(executionMode))
         {
             throw new ArgumentOutOfRangeException(nameof(executionMode));
         }
+
+        remoteDebugOptions?.Validate();
 
         messages ??= new InMemoryPluginMessageSink();
         var host = Hosting.Execution.SandboxHost.Create(builder =>
@@ -90,7 +96,8 @@ public sealed partial class PluginServer : IDisposable
             .WithFuel(100_000)
             .WithMaxHostCalls(1_000)
             .Build();
-        return new PluginServer(host, defaultPolicy, messages, executionMode, onSubscriptionFault, onResultHookFault);
+        return new PluginServer(
+            host, defaultPolicy, messages, executionMode, onSubscriptionFault, onResultHookFault, remoteDebugOptions);
     }
 
     /// <summary>
@@ -255,6 +262,7 @@ public sealed partial class PluginServer : IDisposable
     {
         if (Interlocked.Exchange(ref _disposed, 1) == 0)
         {
+            _debugCoordinator.Dispose();
             // Revoke running kernels before tearing down the host so an in-flight publish cannot call
             // into a disposed SandboxHost; revocation cancels each kernel's execution token first.
             foreach (var kernel in Kernels.Snapshot())
