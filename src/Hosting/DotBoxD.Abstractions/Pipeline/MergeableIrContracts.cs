@@ -16,9 +16,19 @@ public enum LoweredPipelineStepKind
 /// The method must expose a sibling overload accepting <see cref="LoweredPipelineStep"/>.
 /// </summary>
 [AttributeUsage(AttributeTargets.Parameter, Inherited = false)]
-public sealed class LowerToIrAttribute(LoweredPipelineStepKind kind) : Attribute
+public sealed class LowerToIrAttribute : Attribute
 {
-    public LoweredPipelineStepKind Kind { get; } = kind;
+    public LowerToIrAttribute(LoweredPipelineStepKind kind)
+        => Kind = ValidateStepKind(kind, nameof(kind));
+
+    public LoweredPipelineStepKind Kind { get; }
+
+    private static LoweredPipelineStepKind ValidateStepKind(
+        LoweredPipelineStepKind kind,
+        string parameterName)
+        => Enum.IsDefined(kind)
+            ? kind
+            : throw new ArgumentOutOfRangeException(parameterName, kind, "Unsupported lowered pipeline step kind.");
 }
 
 /// <summary>
@@ -30,14 +40,14 @@ public sealed class IRBodyOfAttribute : Attribute
 {
     public IRBodyOfAttribute(string parameterName)
     {
-        ParameterName = parameterName;
+        ParameterName = ValidateParameterName(parameterName);
         StepKind = LoweredPipelineStepKind.Projection;
     }
 
     public IRBodyOfAttribute(string parameterName, LoweredPipelineStepKind stepKind)
     {
-        ParameterName = parameterName;
-        StepKind = stepKind;
+        ParameterName = ValidateParameterName(parameterName);
+        StepKind = ValidateStepKind(stepKind);
         HasExplicitStepKind = true;
     }
 
@@ -46,6 +56,23 @@ public sealed class IRBodyOfAttribute : Attribute
     public LoweredPipelineStepKind StepKind { get; }
 
     public bool HasExplicitStepKind { get; }
+
+    private static string ValidateParameterName(string parameterName)
+    {
+        ArgumentNullException.ThrowIfNull(parameterName);
+
+        return string.IsNullOrWhiteSpace(parameterName)
+            ? throw new ArgumentException("Parameter name cannot be blank.", nameof(parameterName))
+            : parameterName;
+    }
+
+    private static LoweredPipelineStepKind ValidateStepKind(LoweredPipelineStepKind stepKind)
+        => Enum.IsDefined(stepKind)
+            ? stepKind
+            : throw new ArgumentOutOfRangeException(
+                nameof(stepKind),
+                stepKind,
+                "Unsupported lowered pipeline step kind.");
 }
 
 /// <summary>

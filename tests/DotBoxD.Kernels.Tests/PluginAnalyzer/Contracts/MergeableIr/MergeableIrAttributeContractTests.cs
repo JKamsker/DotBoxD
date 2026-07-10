@@ -37,8 +37,11 @@ public sealed class MergeableIrAttributeContractTests
     public void Ir_body_of_attribute_rejects_null_parameter_name()
     {
         var exception = Assert.Throws<ArgumentNullException>(() => new IRBodyOfAttribute(null!));
+        var explicitException = Assert.Throws<ArgumentNullException>(
+            () => new IRBodyOfAttribute(null!, LoweredPipelineStepKind.Filter));
 
         Assert.Equal("parameterName", exception.ParamName);
+        Assert.Equal("parameterName", explicitException.ParamName);
     }
 
     [Theory]
@@ -48,8 +51,11 @@ public sealed class MergeableIrAttributeContractTests
     public void Ir_body_of_attribute_rejects_blank_parameter_name(string parameterName)
     {
         var exception = Assert.Throws<ArgumentException>(() => new IRBodyOfAttribute(parameterName));
+        var explicitException = Assert.Throws<ArgumentException>(
+            () => new IRBodyOfAttribute(parameterName, LoweredPipelineStepKind.Filter));
 
         Assert.Equal("parameterName", exception.ParamName);
+        Assert.Equal("parameterName", explicitException.ParamName);
     }
 
     [Fact]
