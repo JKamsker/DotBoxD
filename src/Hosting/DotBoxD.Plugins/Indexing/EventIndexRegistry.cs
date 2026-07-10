@@ -215,9 +215,27 @@ public sealed partial class EventIndexRegistry
 /// </summary>
 public readonly record struct EventIndexStats(long Considered, long Prefiltered, long Dispatched)
 {
-    public long Considered { get; init; } = ValidateNonNegative(Considered, nameof(Considered));
-    public long Prefiltered { get; init; } = ValidateNonNegative(Prefiltered, nameof(Prefiltered));
-    public long Dispatched { get; init; } = ValidateNonNegative(Dispatched, nameof(Dispatched));
+    private readonly long _considered = ValidateNonNegative(Considered, nameof(Considered));
+    private readonly long _prefiltered = ValidateNonNegative(Prefiltered, nameof(Prefiltered));
+    private readonly long _dispatched = ValidateNonNegative(Dispatched, nameof(Dispatched));
+
+    public long Considered
+    {
+        get => _considered;
+        init => _considered = ValidateNonNegative(value, nameof(Considered));
+    }
+
+    public long Prefiltered
+    {
+        get => _prefiltered;
+        init => _prefiltered = ValidateNonNegative(value, nameof(Prefiltered));
+    }
+
+    public long Dispatched
+    {
+        get => _dispatched;
+        init => _dispatched = ValidateNonNegative(value, nameof(Dispatched));
+    }
 
     private static long ValidateNonNegative(long value, string paramName)
     {
