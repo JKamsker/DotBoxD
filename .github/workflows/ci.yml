@@ -670,6 +670,14 @@ jobs:
         shell: pwsh
         run: ./eng/scripts/check-package-consumer-smoke.ps1 -PackageDirectory artifacts/packages -Configuration $env:CONFIGURATION
 
+      - name: Check netstandard package consumer smoke
+        shell: pwsh
+        run: >-
+          ./eng/scripts/check-netstandard-package-smoke.ps1
+          -PackageDirectory artifacts/packages
+          -ExpectedVersion '${{ steps.version.outputs.version }}'
+          -Configuration $env:CONFIGURATION
+
       - name: Upload NuGet packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
