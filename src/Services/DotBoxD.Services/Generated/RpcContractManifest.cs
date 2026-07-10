@@ -9,6 +9,8 @@ public sealed record RpcContractManifest(IReadOnlyList<RpcContractService> Servi
 {
     public const int CurrentFormatVersion = 1;
 
+    public IReadOnlyList<RpcContractService> Services { get; init; } = ValidateServices(Services);
+
     public int FormatVersion { get; init; } = CurrentFormatVersion;
 
     public static RpcContractManifest Create(params Assembly[] assemblies)
@@ -134,6 +136,36 @@ public sealed record RpcContractManifest(IReadOnlyList<RpcContractService> Servi
                 new KeyValuePair<string, string>($"{service.WireName}/{method.WireName}", method.Signature)))
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
 
+    private static IReadOnlyList<RpcContractService> ValidateServices(IReadOnlyList<RpcContractService>? services)
+    {
+        if (services is null)
+        {
+            throw new ArgumentNullException(nameof(Services));
+        }
+
+        var uniqueContracts = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var service in services)
+        {
+            if (service is null)
+            {
+                throw new ArgumentNullException(nameof(Services));
+            }
+
+            foreach (var method in service.Methods)
+            {
+                var contract = $"{service.WireName}/{method.WireName}";
+                if (!uniqueContracts.Add(contract))
+                {
+                    throw new ArgumentException(
+                        $"RPC contract manifest contains duplicate wire contract '{contract}'.",
+                        nameof(Services));
+                }
+            }
+        }
+
+        return services;
+    }
+
     private static string TypeName(Type? type) => type?.FullName ?? string.Empty;
 
     private static string Default(object? value) => value is null
@@ -146,9 +178,39 @@ public sealed record RpcContractManifest(IReadOnlyList<RpcContractService> Servi
 public sealed record RpcContractService(
     string WireName,
     string ContractType,
-    IReadOnlyList<RpcContractMethod> Methods);
+    IReadOnlyList<RpcContractMethod> Methods)
+{
+    public string WireName { get; init; } = WireName ?? throw new ArgumentNullException(nameof(WireName));
 
-public sealed record RpcContractMethod(string WireName, string Signature);
+    public string ContractType { get; init; } = ContractType ?? throw new ArgumentNullException(nameof(ContractType));
+
+    public IReadOnlyList<RpcContractMethod> Methods { get; init; } = ValidateMethods(Methods);
+
+    private static IReadOnlyList<RpcContractMethod> ValidateMethods(IReadOnlyList<RpcContractMethod>? methods)
+    {
+        if (methods is null)
+        {
+            throw new ArgumentNullException(nameof(Methods));
+        }
+
+        foreach (var method in methods)
+        {
+            if (method is null)
+            {
+                throw new ArgumentNullException(nameof(Methods));
+            }
+        }
+
+        return methods;
+    }
+}
+
+public sealed record RpcContractMethod(string WireName, string Signature)
+{
+    public string WireName { get; init; } = WireName ?? throw new ArgumentNullException(nameof(WireName));
+
+    public string Signature { get; init; } = Signature ?? throw new ArgumentNullException(nameof(Signature));
+}
 
 public enum RpcContractChangeKind
 {
