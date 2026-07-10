@@ -8,6 +8,32 @@ namespace DotBoxD.Kernels.Tests.Debugging;
 public sealed class PluginDebugMetadataCarrierTests
 {
     [Fact]
+    public void Generated_named_kernel_maps_should_handle_handle_and_source_variables()
+    {
+        var package = FireDamagePluginPackage.Create();
+
+        var debugInfo = Assert.IsType<KernelDebugInfo>(package.DebugInfo);
+        Assert.Equal(2, debugInfo.Documents.Count);
+        Assert.All(debugInfo.Documents, document =>
+        {
+            Assert.EndsWith("FireDamageKernel.cs", document.Path, StringComparison.Ordinal);
+            Assert.True(document.MatchesSource(File.ReadAllText(document.Path)));
+        });
+        var nodes = SandboxNodeMap.Create(package.Module).Nodes.ToDictionary(node => node.Id);
+        var mappedFunctions = debugInfo.SequencePoints
+            .Select(point => nodes[point.NodeId].FunctionId)
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.Contains(package.Entrypoints.ShouldHandle, mappedFunctions);
+        Assert.Contains(package.Entrypoints.Handle, mappedFunctions);
+        Assert.Contains(debugInfo.VariableBindings, binding =>
+            binding.FunctionId == package.Entrypoints.ShouldHandle &&
+            binding.SourceName == "e.Amount");
+        Assert.Contains(debugInfo.VariableBindings, binding =>
+            binding.FunctionId == package.Entrypoints.Handle &&
+            binding.SourceName == "e.TargetId");
+    }
+
+    [Fact]
     public void Package_and_ir_kernel_preserve_client_only_debug_info()
     {
         var generated = FireDamagePluginPackage.Create();

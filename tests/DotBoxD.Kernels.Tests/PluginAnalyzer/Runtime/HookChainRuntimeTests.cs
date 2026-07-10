@@ -1,4 +1,5 @@
 using System.Reflection;
+using DotBoxD.Kernels.Debugging;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Runtime;
 using static DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.HookChainRuntimeTestCompiler;
@@ -46,6 +47,24 @@ public sealed class HookChainRuntimeTests
                     .Run((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
         }
         """;
+
+    [Fact]
+    public void A_lowered_chain_carries_source_maps_for_its_filter_and_terminal()
+    {
+        var package = PackageFrom(Compile(ChainSource, enableInterceptors: true));
+
+        var debugInfo = Assert.IsType<KernelDebugInfo>(package.DebugInfo);
+        Assert.Equal(2, debugInfo.Documents.Count);
+        Assert.All(debugInfo.Documents, document => Assert.True(document.MatchesSource(ChainSource)));
+        var nodes = SandboxNodeMap.Create(package.Module).Nodes.ToDictionary(node => node.Id);
+        var functions = debugInfo.SequencePoints
+            .Select(point => nodes[point.NodeId].FunctionId)
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.Contains(package.Entrypoints.ShouldHandle, functions);
+        Assert.Contains(package.Entrypoints.Handle, functions);
+        Assert.Contains(debugInfo.VariableBindings, binding => binding.SourceName == "e.Distance");
+        Assert.Contains(debugInfo.VariableBindings, binding => binding.SourceName == "e.MonsterId");
+    }
 
     [Fact]
     public async Task A_lowered_one_parameter_Where_chain_runs_only_when_its_condition_holds()

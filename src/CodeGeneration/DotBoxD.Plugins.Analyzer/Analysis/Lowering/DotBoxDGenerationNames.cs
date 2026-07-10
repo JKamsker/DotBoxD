@@ -121,6 +121,11 @@ internal static partial class DotBoxDGenerationNames
         public const string GlobalUnaryExpression = GlobalPrefix + "DotBoxD.Kernels.UnaryExpression";
         public const string GlobalBinaryExpression = GlobalPrefix + "DotBoxD.Kernels.BinaryExpression";
         public const string GlobalSourceSpan = GlobalPrefix + "DotBoxD.Kernels.Model.SourceSpan";
+        public const string GlobalSourceSequencePointKind = GlobalPrefix + "DotBoxD.Kernels.Model.SourceSequencePointKind";
+        public const string GlobalKernelDebugDocument = GlobalPrefix + "DotBoxD.Kernels.Debugging.KernelDebugDocument";
+        public const string GlobalKernelDebugInfo = GlobalPrefix + "DotBoxD.Kernels.Debugging.KernelDebugInfo";
+        public const string GlobalKernelDebugModuleMapper = GlobalPrefix + "DotBoxD.Kernels.Debugging.KernelDebugModuleMapper";
+        public const string GlobalKernelDebugVariableBinding = GlobalPrefix + "DotBoxD.Kernels.Debugging.KernelDebugVariableBinding";
         public const string GlobalSemVersion = GlobalPrefix + "DotBoxD.Kernels.Model.SemVersion";
         public const string GlobalSandboxType = GlobalPrefix + "DotBoxD.Kernels.Sandbox.SandboxType";
         public const string GlobalSandboxValue = GlobalPrefix + "DotBoxD.Kernels.Sandbox.SandboxValue";

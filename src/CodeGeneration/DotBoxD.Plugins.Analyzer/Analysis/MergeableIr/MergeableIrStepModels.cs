@@ -1,3 +1,4 @@
+using DotBoxD.Plugins.Analyzer.Analysis.Debugging;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -19,7 +20,12 @@ internal sealed record MergeableIrStepModel(
     string ValueSource,
     EquatableArray<string> RequiredCapabilities,
     EquatableArray<string> Effects,
-    MergeableIrStepInterception Interception);
+    MergeableIrStepInterception Interception)
+{
+    public KernelSourceLocationModel? Source { get; init; }
+
+    public string? InputSourceName { get; init; }
+}
 
 internal sealed record MergeableIrStepInterception(
     string AttributeSyntax,

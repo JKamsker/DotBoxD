@@ -139,6 +139,13 @@ internal static partial class ResultHookChain
             ResultType = resultType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             ResultLocalTerminal = isLocal,
         };
+        kernelModel = HookChainDebugSourceFactory.ApplyToResult(
+            kernelModel,
+            invocation,
+            stages,
+            terminalLambda,
+            isLocal,
+            cancellationToken);
 
         var interception = Interception(
             invocation,

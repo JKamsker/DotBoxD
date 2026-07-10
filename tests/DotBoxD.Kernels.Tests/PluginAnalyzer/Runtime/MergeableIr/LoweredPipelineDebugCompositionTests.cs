@@ -1,11 +1,27 @@
 using DotBoxD.Kernels.Debugging;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.TestFixtures.MergeableIr;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime;
 
 public sealed class LoweredPipelineDebugCompositionTests
 {
+    [Fact]
+    public void Generated_where_and_select_steps_compose_with_local_source_maps()
+    {
+        var steps = MergeableIrPipelineFixture.ConfigureSteps();
+
+        var result = LoweredPipelineDebugComposer.Compose(
+            new LoweredPipelineComposition("generated-pipeline", steps, SandboxType.String));
+
+        Assert.All(steps, step => Assert.NotNull(step.DebugInfo));
+        var debugInfo = Assert.IsType<KernelDebugInfo>(result.DebugInfo);
+        Assert.Equal(2, debugInfo.Documents.Count);
+        Assert.NotEmpty(debugInfo.SequencePoints);
+        Assert.Contains(debugInfo.VariableBindings, binding => binding.SourceName == "e");
+    }
+
     [Fact]
     public void Debug_composer_preserves_documents_duplicated_stage_maps_and_source_variables()
     {

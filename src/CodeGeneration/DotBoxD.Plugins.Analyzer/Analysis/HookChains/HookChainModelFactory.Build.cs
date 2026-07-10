@@ -47,6 +47,13 @@ internal static partial class HookChainModelFactory
             eventShape,
             lowered,
             collectors);
+        modelResult = HookChainDebugSourceFactory.ApplyToSend(
+            modelResult,
+            invocation,
+            prepared.Stages,
+            prepared.TerminalLambda,
+            prepared.InstallKind == HookChainInterceptorInstallKind.LocalCallback,
+            cancellationToken);
         var interception = BuildSendHookInterception(
             invocation,
             model,

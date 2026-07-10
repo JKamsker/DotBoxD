@@ -10,4 +10,6 @@ internal static class MergeableIrContractNames
     public const string GlobalIRFunc = DotBoxDGenerationNames.TypeNames.GlobalPrefix + "DotBoxD.Abstractions.IRFunc";
     public const string GlobalLoweredPipelineStepKind =
         DotBoxDGenerationNames.TypeNames.GlobalPrefix + "DotBoxD.Abstractions.LoweredPipelineStepKind";
+    public const string GlobalLoweredPipelineDebugInfo =
+        DotBoxDGenerationNames.TypeNames.GlobalPrefix + "DotBoxD.Abstractions.LoweredPipelineDebugInfo";
 }

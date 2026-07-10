@@ -1,3 +1,4 @@
+using DotBoxD.Plugins.Analyzer.Analysis.Debugging;
 using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
@@ -122,7 +123,14 @@ internal static class MergeableIrStepModelFactory
             value.Source,
             EquatableArray<string>.FromOwned([.. capabilities]),
             EquatableArray<string>.FromOwned([.. effects]),
-            interception);
+            interception)
+        {
+            Source = KernelSourceLocationModel.Create(
+                "pipeline:" + id,
+                lambda,
+                cancellationToken),
+            InputSourceName = parameterName
+        };
     }
 
     private static MergeableIrStepInterception Interception(

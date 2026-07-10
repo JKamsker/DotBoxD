@@ -426,6 +426,7 @@ public static class BindingReferenceCollector
 public static class CanonicalModuleHasher
 public static class CapabilityPattern
 public static class EntrypointBinder
+public static class KernelDebugModuleMapper
 public static class ResourceLimitValidation
 public static class RunSummaryAuditFields
 public static class RuntimeCapabilityIds
@@ -473,6 +474,7 @@ public static long Negate(long value)
 public static long Read(int count = 0) => BaseCost + Math.Max(0, count)
 public static long Remainder(long left, long right)
 public static long Subtract(long left, long right)
+public static SandboxModule ApplyFunctionSpans( SandboxModule module, IReadOnlyDictionary<string, SourceSpan> functionSpans)
 public static SandboxNodeMap Create(SandboxModule module)
 public static SandboxPolicyBuilder Create() => new()
 public static SandboxRunId New() => new(Guid.NewGuid())

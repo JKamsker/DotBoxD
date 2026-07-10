@@ -1,3 +1,4 @@
+using DotBoxD.Plugins.Analyzer.Analysis.Debugging;
 using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
@@ -187,6 +188,8 @@ internal static class PluginKernelModelFactory
             RequiredCapabilities: EquatableArray<string>.FromOwned([.. capabilities]),
             IndexPredicates: indexPredicates,
             IndexCoversPredicate: indexCoversPredicate);
+        model = KernelSourceLocationModel.ApplyToNamedKernel(
+            model, pluginId, shouldHandle, handle, cancellationToken);
         return new PluginKernelModelResult(model, null);
     }
 

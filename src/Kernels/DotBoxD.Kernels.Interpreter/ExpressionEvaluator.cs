@@ -1,6 +1,6 @@
-using DotBoxD.Kernels.Interpreter.Frame;
-using DotBoxD.Kernels.Interpreter.Debugging;
 using DotBoxD.Kernels.Debugging;
+using DotBoxD.Kernels.Interpreter.Debugging;
+using DotBoxD.Kernels.Interpreter.Frame;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 
