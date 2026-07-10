@@ -198,6 +198,7 @@ public static partial class KernelRpcMarshaller
 
     public static object? FromSandboxValue(SandboxValue value, Type type)
     {
+        ArgumentNullException.ThrowIfNull(value);
         ArgumentNullException.ThrowIfNull(type);
         if (TryCoreFromSandboxValue(value, type, out var core))
         {
