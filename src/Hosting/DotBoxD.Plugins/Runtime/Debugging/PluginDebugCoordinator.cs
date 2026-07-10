@@ -113,13 +113,21 @@ internal sealed class PluginDebugCoordinator : IDisposable
             return;
         }
 
-        if (pause.Created)
+        try
         {
-            await PluginDebugStopPublisher.PublishAsync(target.Session, kernel, checkpoint, reason, cancellationToken)
-                .ConfigureAwait(false);
-        }
+            if (pause.Created)
+            {
+                await PluginDebugStopPublisher.PublishAsync(target.Session, kernel, checkpoint, reason, cancellationToken)
+                    .ConfigureAwait(false);
+            }
 
-        await pause.Wait.WaitAsync(cancellationToken).ConfigureAwait(false);
+            await pause.Wait.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (pause.Created && cancellationToken.IsCancellationRequested)
+        {
+            Resume(target.Session, checkpoint.RunId.ToString());
+            throw;
+        }
     }
 
     private CheckpointTarget FindCheckpointTarget(InstalledKernel kernel, SandboxRunId runId)

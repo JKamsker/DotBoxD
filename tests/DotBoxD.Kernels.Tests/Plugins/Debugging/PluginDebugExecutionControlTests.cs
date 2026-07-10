@@ -131,6 +131,44 @@ public sealed class PluginDebugExecutionControlTests
         Assert.Equal(1, events.Count);
     }
 
+    [Fact]
+    public async Task Canceling_a_stopped_execution_releases_its_server_dispatch_gate()
+    {
+        var events = new BlockingEvents();
+        using var server = DebugServer(KernelDebugPauseScope.Server, ExecutionMode.Interpreted);
+        using var owner = server.CreateSession();
+        await using var debug = owner.CreateDebugSession(events);
+        var package = FireDamagePluginPackage.Create();
+        var nodeId = StatementNode(package, package.Entrypoints.ShouldHandle);
+        _ = await ExchangeAsync(
+            debug,
+            PluginDebugCommands.SetBreakpoints,
+            new { pluginId = package.Manifest.PluginId, nodeIds = new[] { nodeId.Value } });
+        _ = await ExchangeAsync(debug, PluginDebugCommands.Attach);
+        var kernel = await owner.InstallAsync(package);
+        using var cancellation = new CancellationTokenSource();
+
+        var execution = kernel.ShouldHandleAsync(
+                DamageEventAdapter.Instance,
+                new DamageEvent("fire", 120, "canceled"),
+                cancellation.Token)
+            .AsTask();
+        await events.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        _ = await ExchangeAsync(
+            debug,
+            PluginDebugCommands.SetBreakpoints,
+            new { pluginId = package.Manifest.PluginId, nodeIds = Array.Empty<string>() });
+
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => execution);
+        var next = kernel.ShouldHandleAsync(
+                DamageEventAdapter.Instance,
+                new DamageEvent("fire", 120, "next"))
+            .AsTask();
+        Assert.True(await next.WaitAsync(TimeSpan.FromSeconds(2)));
+    }
+
     private static PluginServer DebugServer(KernelDebugPauseScope scope, ExecutionMode executionMode)
         => PluginServer.Create(
             defaultPolicy: PluginAddendumTestPolicies.LongWall(),
@@ -182,6 +220,18 @@ public sealed class PluginDebugExecutionControlTests
         {
             var message = await _next.Task.WaitAsync(TimeSpan.FromSeconds(5));
             return PluginDebugProtocol.Decode(message, 1024 * 1024).Payload;
+        }
+    }
+
+    private sealed class BlockingEvents : IPluginDebugEventEndpoint
+    {
+        public TaskCompletionSource Started { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async ValueTask PublishAsync(byte[] message, CancellationToken cancellationToken = default)
+        {
+            Started.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
         }
     }
 }
