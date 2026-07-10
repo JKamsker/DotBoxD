@@ -2,8 +2,8 @@ name: benchmarks
 
 # BenchmarkDotNet suites. Runs weekly, on demand, and on a PR only when it carries the
 # 'benchmark' label. Results are tracked over time with github-action-benchmark; regression
-# gating + auto-push are restricted to the scheduled main-branch run so PR/manual runs only
-# measure and never fail or rewrite history.
+# gating runs on labeled pull requests and the scheduled main-branch run. Only scheduled main
+# runs track and push benchmark history; manual runs only measure.
 #
 # BenchmarkDotNet's JSON exporter writes one *-report-full-compressed.json per benchmark
 # class. github-action-benchmark consumes a single file, so each suite's per-class reports
@@ -37,7 +37,7 @@ jobs:
       deployments: write
       pull-requests: write
     env:
-      # Only the scheduled run on main may gate on regressions and push history.
+      # Scheduled main runs track and push history; PRs and scheduled main runs may gate alerts.
       IS_TRACKING_RUN: ${{ github.event_name == 'schedule' && github.ref == 'refs/heads/main' }}
       IS_GATING_RUN: ${{ github.event_name == 'pull_request' || (github.event_name == 'schedule' && github.ref == 'refs/heads/main') }}
 
