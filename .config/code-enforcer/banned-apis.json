@@ -16,7 +16,12 @@
     {
       "name": "No raw process spawning in shipping runtime code",
       "forbiddenIn": [ "src/**" ],
-      "allowedIn": [],
+      "allowedIn": [
+        {
+          "path": "src/Kernels/DotBoxD.Kernels.Debugging.Clr/TrustedWorkerPluginDebugEvaluator.cs",
+          "reason": "The opt-in TrustedWorker evaluator owns the reviewed disposable child-process boundary and enforces host-configured time and memory limits around it."
+        }
+      ],
       "symbols": [
         {
           "name": "Process.Start",
