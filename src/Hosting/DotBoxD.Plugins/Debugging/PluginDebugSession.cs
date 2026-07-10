@@ -16,6 +16,7 @@ public sealed class PluginDebugSession : IPluginDebugControlEndpoint, IDisposabl
     private readonly PluginDebugRequestHandler _requests;
     private readonly byte[] _tokenBytes = RandomNumberGenerator.GetBytes(TokenByteCount);
     private readonly Timer _leaseTimer;
+    private CancellationTokenSource _attachmentCancellation = new();
     private bool _attached;
     private bool _disposed;
     private KernelDebugPauseScope _pauseScope;
@@ -75,6 +76,7 @@ public sealed class PluginDebugSession : IPluginDebugControlEndpoint, IDisposabl
     public void Dispose()
     {
         bool detach;
+        CancellationTokenSource attachmentCancellation;
         lock (_gate)
         {
             if (_disposed)
@@ -85,15 +87,18 @@ public sealed class PluginDebugSession : IPluginDebugControlEndpoint, IDisposabl
             _disposed = true;
             detach = _attached;
             _attached = false;
+            attachmentCancellation = _attachmentCancellation;
             _leaseTimer.Change(-1, -1);
         }
 
+        attachmentCancellation.Cancel();
         if (detach)
         {
             _coordinator.Detach(this);
         }
 
         _leaseTimer.Dispose();
+        attachmentCancellation.Dispose();
     }
 
     public ValueTask DisposeAsync()
@@ -116,6 +121,8 @@ public sealed class PluginDebugSession : IPluginDebugControlEndpoint, IDisposabl
 
             _pauseScope = pauseScope;
             _attached = true;
+            _attachmentCancellation.Dispose();
+            _attachmentCancellation = new CancellationTokenSource();
             _leaseTimer.Change(Options.StopLease, Timeout.InfiniteTimeSpan);
             return true;
         }
@@ -167,6 +174,7 @@ public sealed class PluginDebugSession : IPluginDebugControlEndpoint, IDisposabl
         ArgumentException.ThrowIfNullOrEmpty(kind);
         ArgumentNullException.ThrowIfNull(payload);
         string id;
+        CancellationToken attachmentCancellation;
         lock (_gate)
         {
             if (!_attached || _disposed)
@@ -175,6 +183,7 @@ public sealed class PluginDebugSession : IPluginDebugControlEndpoint, IDisposabl
             }
 
             id = Interlocked.Increment(ref _nextEventId).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            attachmentCancellation = _attachmentCancellation.Token;
         }
 
         var envelope = new PluginDebugEnvelope(
@@ -185,10 +194,18 @@ public sealed class PluginDebugSession : IPluginDebugControlEndpoint, IDisposabl
             JsonSerializer.SerializeToElement(payload));
         try
         {
+            using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                attachmentCancellation);
             await _events.PublishAsync(
                     PluginDebugProtocol.Encode(envelope, Options.MaxMessageBytes),
-                    cancellationToken)
+                    linkedCancellation.Token)
                 .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (
+            attachmentCancellation.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            // Detach/lease expiry is the successful cleanup path for an in-flight reverse publication.
         }
         catch
         {
@@ -205,13 +222,20 @@ public sealed class PluginDebugSession : IPluginDebugControlEndpoint, IDisposabl
     private void DetachCore()
     {
         bool detach;
+        CancellationTokenSource? attachmentCancellation = null;
         lock (_gate)
         {
             detach = _attached;
             _attached = false;
+            if (detach)
+            {
+                attachmentCancellation = _attachmentCancellation;
+            }
+
             _leaseTimer.Change(-1, -1);
         }
 
+        attachmentCancellation?.Cancel();
         if (detach)
         {
             _coordinator.Detach(this);

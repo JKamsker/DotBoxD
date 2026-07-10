@@ -8,6 +8,13 @@ public static class PluginDebugCommands
     public const string SetBreakpoints = "setBreakpoints";
     public const string Pause = "pause";
     public const string Continue = "continue";
+    public const string StepIn = "stepIn";
+    public const string StepOver = "stepOver";
+    public const string StepOut = "stepOut";
+    public const string Threads = "threads";
+    public const string StackTrace = "stackTrace";
+    public const string Variables = "variables";
+    public const string SetVariable = "setVariable";
     public const string Heartbeat = "heartbeat";
     public const string Disconnect = "disconnect";
 }

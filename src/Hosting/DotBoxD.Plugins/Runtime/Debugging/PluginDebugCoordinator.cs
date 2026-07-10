@@ -130,7 +130,7 @@ internal sealed class PluginDebugCoordinator : IDisposable
 
         if (created)
         {
-            candidate.ExecutionState.RecordStopped(checkpoint);
+            candidate.ExecutionState.RecordStopped(kernel.Manifest.PluginId, checkpoint, reason);
             await candidate.PublishEventAsync(
                     "stopped",
                     new
@@ -139,7 +139,14 @@ internal sealed class PluginDebugCoordinator : IDisposable
                         pluginId = kernel.Manifest.PluginId,
                         nodeId = checkpoint.Node.Id.Value,
                         checkpointKind = checkpoint.Kind.ToString(),
-                        reason
+                        reason,
+                        error = checkpoint.Error is null
+                            ? null
+                            : new
+                            {
+                                code = checkpoint.Error.Code.ToString(),
+                                message = checkpoint.Error.SafeMessage
+                            }
                     },
                     cancellationToken)
                 .ConfigureAwait(false);

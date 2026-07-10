@@ -54,6 +54,13 @@ public const string Initialize = "initialize"
 public const string Pause = "pause"
 public const string SendBindingId = "host.message.send"
 public const string SetBreakpoints = "setBreakpoints"
+public const string SetVariable = "setVariable"
+public const string StackTrace = "stackTrace"
+public const string StepIn = "stepIn"
+public const string StepOut = "stepOut"
+public const string StepOver = "stepOver"
+public const string Threads = "threads"
+public const string Variables = "variables"
 public delegate ValueTask RemoteLocalPush(string subscriptionId, ReadOnlyMemory<byte> projectedValue, CancellationToken cancellationToken)
 public delegate ValueTask<byte[]> RemoteLocalResultRequest( string subscriptionId, ReadOnlyMemory<byte> contextValue, CancellationToken cancellationToken)
 public Delegate? ProjectedPayloadDecoder { get; }
