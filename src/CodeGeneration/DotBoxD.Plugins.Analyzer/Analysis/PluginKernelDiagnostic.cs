@@ -3,14 +3,19 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis;
 
-internal sealed record PluginKernelDiagnostic(string Message, PluginDiagnosticLocation? Location)
+internal sealed record PluginKernelDiagnostic(
+    string Message,
+    PluginDiagnosticLocation? Location,
+    bool UseHookResultContractRule = false)
 {
     public static PluginKernelDiagnostic Create(SyntaxToken token, string message)
         => new(message, PluginDiagnosticLocation.From(token.GetLocation()));
 
     public Diagnostic ToDiagnostic()
         => Diagnostic.Create(
-            PluginAnalyzerDiagnostics.UnsupportedKernelShapeRule,
+            UseHookResultContractRule
+                ? PluginAnalyzerDiagnostics.HookResultContractRule
+                : PluginAnalyzerDiagnostics.UnsupportedKernelShapeRule,
             Location?.ToLocation() ?? Microsoft.CodeAnalysis.Location.None,
             Message);
 }
