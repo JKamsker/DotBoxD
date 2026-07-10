@@ -678,6 +678,14 @@ jobs:
           -ExpectedVersion '${{ steps.version.outputs.version }}'
           -Configuration $env:CONFIGURATION
 
+      - name: Check project template smoke
+        shell: pwsh
+        run: >-
+          ./eng/scripts/check-template-smoke.ps1
+          -PackageDirectory artifacts/packages
+          -ExpectedVersion '${{ steps.version.outputs.version }}'
+          -Configuration $env:CONFIGURATION
+
       - name: Upload NuGet packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
