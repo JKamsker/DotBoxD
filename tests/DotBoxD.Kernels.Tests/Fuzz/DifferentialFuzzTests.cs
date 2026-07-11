@@ -137,7 +137,7 @@ public sealed class DifferentialFuzzTests
     {
         var seed = (long)index;
         return seed < 0
-            ? $"differential-fuzz-negative-{(-seed).ToString(CultureInfo.InvariantCulture)}"
+            ? $"differential-fuzz-n{(-seed).ToString(CultureInfo.InvariantCulture)}"
             : $"differential-fuzz-{seed.ToString(CultureInfo.InvariantCulture)}";
     }
 
