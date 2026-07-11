@@ -12,6 +12,13 @@ $launcherLog = Join-Path $artifacts 'launcher.log'
 $resultLog = Join-Path $artifacts 'result.txt'
 $guardian = Join-Path $root 'samples/GameServer/Examples.GameServer.Plugin/Kernels/GuardianKernel.cs'
 $pluginProgram = Join-Path $root 'samples/GameServer/Examples.GameServer.Plugin/Program.cs'
+$serverProject = 'samples\GameServer\Examples.GameServer.Server\Examples.GameServer.Server.csproj'
+$pluginProject = 'samples\GameServer\Examples.GameServer.Plugin\Examples.GameServer.Plugin.csproj'
+$debugProfiles = @(
+    [PSCustomObject]@{ Project = $serverProject; Profile = 'GameServer - Wait for Plugin (Debug)' },
+    [PSCustomObject]@{ Project = $pluginProject; Profile = 'GameServer Plugin (Debug)' }
+)
+$profileBackups = @{}
 $windowsPowerShell = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
 $devenv = $null
@@ -45,6 +52,38 @@ function Stop-ExamplesAndVisualStudio {
                 $_.CommandLine.Contains('Examples.GameServer', [StringComparison]::OrdinalIgnoreCase)))
     } | ForEach-Object {
         Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Set-ProjectDebugProfiles {
+    foreach ($item in $debugProfiles) {
+        $userFile = Join-Path $root ($item.Project + '.user')
+        $backup = $null
+        if (Test-Path $userFile) {
+            $backup = Join-Path ([IO.Path]::GetTempPath()) ([Guid]::NewGuid().ToString('N') + '.csproj.user')
+            Copy-Item -LiteralPath $userFile -Destination $backup
+        }
+        $profileBackups[$userFile] = $backup
+        Set-Content -LiteralPath $userFile -Encoding utf8 -Value @"
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ActiveDebugProfile>$($item.Profile)</ActiveDebugProfile>
+  </PropertyGroup>
+</Project>
+"@
+    }
+}
+
+function Restore-ProjectDebugProfiles {
+    foreach ($entry in $profileBackups.GetEnumerator()) {
+        if ($null -ne $entry.Value) {
+            Copy-Item -LiteralPath $entry.Value -Destination $entry.Key -Force
+            Remove-Item -LiteralPath $entry.Value -Force
+        }
+        else {
+            Remove-Item -LiteralPath $entry.Key -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 
@@ -181,6 +220,8 @@ try {
         Invoke-Checked $vsixInstaller @('/quiet', '/force', $resolvedVsix)
     }
 
+    Set-ProjectDebugProfiles
+
     Push-Location $root
     Invoke-Checked dotnet @('build', 'samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj', '-c', 'Debug', '--nologo')
     Invoke-Checked dotnet @('build', 'samples/GameServer/Examples.GameServer.Plugin/Examples.GameServer.Plugin.csproj', '-c', 'Debug', '--nologo')
@@ -191,7 +232,12 @@ try {
     Wait-ForDte
     $env:DOTBOXD_E2E_GUARDIAN = $guardian
     $env:DOTBOXD_E2E_PLUGIN_PROGRAM = $pluginProgram
+    $env:DOTBOXD_E2E_SERVER_PROJECT = $serverProject
+    $env:DOTBOXD_E2E_PLUGIN_PROJECT = $pluginProject
     Invoke-Dte @'
+$dte.Solution.SolutionBuild.StartupProjects = [object[]]@(
+    $env:DOTBOXD_E2E_SERVER_PROJECT,
+    $env:DOTBOXD_E2E_PLUGIN_PROJECT)
 while ($dte.Debugger.Breakpoints.Count -gt 0) { $dte.Debugger.Breakpoints.Item(1).Delete() }
 $null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_PLUGIN_PROGRAM, 46)
 $dte.ExecuteCommand('Debug.Start')
@@ -230,4 +276,5 @@ finally {
         Pop-Location
     }
     Stop-ExamplesAndVisualStudio
+    Restore-ProjectDebugProfiles
 }
