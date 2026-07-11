@@ -32,7 +32,7 @@ class RiderKernelDebuggerE2ETest {
         val guardian = root.resolve("samples/GameServer/Examples.GameServer.Plugin/Kernels/GuardianKernel.cs")
         val existingBridges = liveBridgeProcessIds()
         val existingExamples = exampleProcessIds(root)
-        var launchedExamples = emptyList<Process>()
+        var launchedExamples: ExternalExamples? = null
         try {
             rider.clearDotNetBreakpoints()
             rider.addDotNetBreakpoint(guardian.toString(), 35)
@@ -46,20 +46,20 @@ class RiderKernelDebuggerE2ETest {
                 runRegisteredRunnerDirectly = System.getProperty("dotboxd.e2e.external-launch", "false").toBoolean(),
             )
 
-            val firstPredicate = awaitStop(rider) {
+            val firstPredicate = awaitStop(rider, launchedExamples) {
                 it.path.endsWith("GuardianKernel.cs") && it.line == 35
             }
             rider.resume()
-            val firstHandle = awaitStop(rider) {
+            val firstHandle = awaitStop(rider, launchedExamples) {
                 it.path.endsWith("GuardianKernel.cs") && it.line == 44
             }
             rider.resume()
-            val repeatedPredicate = awaitStop(rider) {
+            val repeatedPredicate = awaitStop(rider, launchedExamples) {
                 it.path.endsWith("GuardianKernel.cs") &&
                     it.line == 35 && it.stackName != firstPredicate.stackName
             }
             rider.resume()
-            val repeatedHandle = awaitStop(rider) {
+            val repeatedHandle = awaitStop(rider, launchedExamples) {
                 it.path.endsWith("GuardianKernel.cs") && it.line == 44
             }
 
@@ -67,53 +67,25 @@ class RiderKernelDebuggerE2ETest {
             assertTrue(firstPredicate.stackName != firstHandle.stackName)
             assertTrue(repeatedPredicate.stackName != repeatedHandle.stackName)
         } finally {
-            launchedExamples.forEach { it.destroyForcibly() }
+            launchedExamples?.destroy()
             stopNewExampleProcesses(root, existingExamples)
         }
     }
 
-    private fun startExamples(rider: RiderDriver, root: Path): List<Process> {
+    private fun startExamples(rider: RiderDriver, root: Path): ExternalExamples? {
         if (!System.getProperty("dotboxd.e2e.external-launch", "false").toBoolean()) {
             rider.startRunConfiguration("Start Examples")
-            return emptyList()
+            return null
         }
 
-        val processes = mutableListOf<Process>()
-        try {
-            processes += startExample(
-                root,
-                "samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj",
-                "GameServer - Wait for Plugin (Debug)",
-            )
-            processes += startExample(
-                root,
-                "samples/GameServer/Examples.GameServer.Plugin/Examples.GameServer.Plugin.csproj",
-                "GameServer Plugin (Debug)",
-            )
-            return processes
-        } catch (exception: RuntimeException) {
-            processes.forEach { it.destroyForcibly() }
-            throw exception
-        }
+        return ExternalExamples.start(root)
     }
 
-    private fun startExample(root: Path, project: String, profile: String): Process =
-        ProcessBuilder(
-            "dotnet",
-            "run",
-            "--project",
-            project,
-            "-c",
-            "Debug",
-            "--no-build",
-            "--launch-profile",
-            profile,
-        ).directory(root.toFile())
-            .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-            .redirectError(ProcessBuilder.Redirect.DISCARD)
-            .start()
-
-    private fun awaitStop(rider: RiderDriver, predicate: (DebugStop) -> Boolean): DebugStop {
+    private fun awaitStop(
+        rider: RiderDriver,
+        examples: ExternalExamples?,
+        predicate: (DebugStop) -> Boolean,
+    ): DebugStop {
         var result: DebugStop? = null
         var observed: DebugStop? = null
         try {
@@ -122,7 +94,10 @@ class RiderKernelDebuggerE2ETest {
             }
         } catch (exception: RuntimeException) {
             throw AssertionError(
-                "Expected kernel stop was not observed. Last stop=$observed; ${rider.debugSummary()}",
+                buildString {
+                    append("Expected kernel stop was not observed. Last stop=$observed; ${rider.debugSummary()}")
+                    examples?.let { append("\n${it.diagnostics()}") }
+                },
                 exception,
             )
         }

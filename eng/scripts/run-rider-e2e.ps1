@@ -12,6 +12,7 @@ $standardError = Join-Path $artifactDirectory 'rider.stderr.log'
 $testOutput = Join-Path $artifactDirectory 'test.stdout.log'
 $testError = Join-Path $artifactDirectory 'test.stderr.log'
 $ideaLog = Join-Path $pluginDirectory '.intellijPlatform/sandbox/dotboxd-kernel-debug-rider/RD-2025.2.1/log_runIdeForUiTests/idea.log'
+$adapterLog = Join-Path $pluginDirectory '.intellijPlatform/sandbox/dotboxd-kernel-debug-rider/RD-2025.2.1/log_runIdeForUiTests/dotboxd-kernel-debug-adapter.log'
 $riderProcess = $null
 $testProcess = $null
 
@@ -49,6 +50,7 @@ New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
 Stop-RiderProcesses -1
 Stop-ExampleProcesses
 Remove-Item $ideaLog -Force -ErrorAction SilentlyContinue
+Remove-Item $adapterLog -Force -ErrorAction SilentlyContinue
 
 try {
     Push-Location $repositoryRoot
@@ -148,5 +150,8 @@ finally {
 
     if (Test-Path $ideaLog) {
         Copy-Item $ideaLog (Join-Path $artifactDirectory 'idea.log') -Force
+    }
+    if (Test-Path $adapterLog) {
+        Copy-Item $adapterLog (Join-Path $artifactDirectory 'adapter.log') -Force
     }
 }
