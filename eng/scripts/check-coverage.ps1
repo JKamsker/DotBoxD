@@ -239,7 +239,7 @@ function Measure-Bucket($bucket) {
     }
 }
 
-$results = @($buckets | ForEach-Object { Measure-Bucket $_ })
+$results = @($buckets | ForEach-Object { Measure-Bucket $_ } | Where-Object { $null -ne $_ })
 $failures = @($results | Where-Object { $_.LineRate -lt $_.LineFloor -or $_.BranchRate -lt $_.BranchFloor })
 
 if ([string]::IsNullOrWhiteSpace($SummaryPath)) {
