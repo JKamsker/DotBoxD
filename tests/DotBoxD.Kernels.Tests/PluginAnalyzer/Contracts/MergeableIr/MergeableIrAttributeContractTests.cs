@@ -34,6 +34,14 @@ public sealed class MergeableIrAttributeContractTests
     }
 
     [Fact]
+    public void Lower_to_ir_method_attribute_accepts_defined_method_kind()
+    {
+        var attribute = new LowerToIrMethodAttribute(LoweredIrMethodKind.AnonymousInvocation);
+
+        Assert.Equal(LoweredIrMethodKind.AnonymousInvocation, attribute.Kind);
+    }
+
+    [Fact]
     public void Ir_body_of_attribute_rejects_null_parameter_name()
     {
         var exception = Assert.Throws<ArgumentNullException>(() => new IRBodyOfAttribute(null!));
@@ -74,5 +82,14 @@ public sealed class MergeableIrAttributeContractTests
             () => new IRBodyOfAttribute("predicate", (LoweredPipelineStepKind)99));
 
         Assert.Equal("stepKind", exception.ParamName);
+    }
+
+    [Fact]
+    public void Lower_to_ir_method_attribute_rejects_undefined_method_kind()
+    {
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(
+            () => new LowerToIrMethodAttribute((LoweredIrMethodKind)99));
+
+        Assert.Equal("kind", exception.ParamName);
     }
 }

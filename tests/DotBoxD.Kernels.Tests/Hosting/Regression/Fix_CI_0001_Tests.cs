@@ -58,8 +58,29 @@ public sealed class Fix_CI_0001_Tests
         startInfo.ArgumentList.Add(Path.Combine("eng", "scripts", "check-csharp-file-lines.ps1"));
         startInfo.ArgumentList.Add("-FailAt");
         startInfo.ArgumentList.Add("350");
+        RemoveCoverageProfilerEnvironment(startInfo);
         return Process.Start(startInfo)
             ?? throw new InvalidOperationException("Could not start PowerShell.");
+    }
+
+    private static void RemoveCoverageProfilerEnvironment(ProcessStartInfo startInfo)
+    {
+        foreach (var key in new[]
+        {
+            "CORECLR_ENABLE_PROFILING",
+            "CORECLR_PROFILER",
+            "CORECLR_PROFILER_PATH",
+            "CORECLR_PROFILER_PATH_32",
+            "CORECLR_PROFILER_PATH_64",
+            "COR_ENABLE_PROFILING",
+            "COR_PROFILER",
+            "COR_PROFILER_PATH",
+            "COR_PROFILER_PATH_32",
+            "COR_PROFILER_PATH_64"
+        })
+        {
+            startInfo.Environment.Remove(key);
+        }
     }
 
     private static void KillProcess(Process process)

@@ -99,7 +99,7 @@ public LiteralExpression Int64(long value)
 public LiteralExpression Literal(SandboxValue value)
 public LiteralExpression String(string value)
 public LowerToIrAttribute(LoweredPipelineStepKind kind)
-public LoweredIrMethodKind Kind { get; } = kind
+public LoweredIrMethodKind Kind { get; }
 public LoweredPipelineStep Step { get; }
 public LoweredPipelineStepKind Kind { get; }
 public LoweredPipelineStepKind StepKind { get; }
@@ -130,7 +130,8 @@ public sealed class IRInvocation<TDelegate, TReturn> where TDelegate : Delegate
 public sealed class KernelMethodAttribute : Attribute
 public sealed class LiveSettingAttribute : Attribute
 public sealed class LowerToIrAttribute : Attribute
-public sealed class LowerToIrMethodAttribute(LoweredIrMethodKind kind) : Attribute
+public LowerToIrMethodAttribute(LoweredIrMethodKind kind)
+public sealed class LowerToIrMethodAttribute : Attribute
 public sealed class NativeOnlyAttribute : Attribute
 public sealed class PipelineSurfaceAttribute : Attribute
 public sealed class PluginAttribute : Attribute
