@@ -284,12 +284,10 @@ public static class LoweredPipelineComposer
         {
             metadata[RequiredCapabilitiesMetadataKey] = string.Join(";", capabilities);
         }
-
         if (effects.Count != 0)
         {
             metadata[EffectsMetadataKey] = string.Join(",", effects);
         }
-
         return metadata;
     }
 

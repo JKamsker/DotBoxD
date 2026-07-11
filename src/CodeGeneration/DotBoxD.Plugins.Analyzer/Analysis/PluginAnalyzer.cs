@@ -197,46 +197,6 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         RecordStaticConstructorReachability(context, helperGraph, field);
     }
 
-    private static void AnalyzeTypeOf(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
-    {
-        var type = ((ITypeOfOperation)context.Operation).Type;
-        if (context.ContainingSymbol is not IMethodSymbol method)
-        {
-            ReportForbiddenInInitializer(context, type);
-            RecordForbiddenInitializerReference(context, helperGraph, type);
-            RecordForbiddenDelegateInitializer(context, helperGraph, type);
-            RecordForbiddenHelperPropertyInitializer(context, helperGraph, type);
-            return;
-        }
-
-        ReportAndRecordIfForbidden(context, helperGraph, method, type);
-    }
-
-    // A method group / delegate reference to a helper (e.g. items.Select(Helper.Danger)) is an
-    // IMethodReferenceOperation, not an invocation, so without this it never adds a caller -> helper edge
-    // and a forbidden API in the referenced helper escapes the call graph.
-    private static void AnalyzeMethodReference(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
-    {
-        var reference = (IMethodReferenceOperation)context.Operation;
-        if (context.ContainingSymbol is not IMethodSymbol method)
-        {
-            ReportForbiddenInInitializer(context, reference.Method.ContainingType);
-            RecordForbiddenInitializerReference(context, helperGraph, reference.Method.ContainingType);
-            RecordForbiddenDelegateInitializer(context, helperGraph, reference.Method.ContainingType);
-            RecordDelegateInitializerTarget(context, helperGraph, reference.Method);
-            RecordStaticConstructorReachability(context, helperGraph, reference.Method);
-            RecordForbiddenHelperPropertyInitializer(context, helperGraph, reference.Method.ContainingType);
-            RecordInitializerRootCall(context, helperGraph, reference.Method);
-            return;
-        }
-
-        ReportAndRecordIfForbidden(context, helperGraph, method, reference.Method.ContainingType);
-        RecordDelegateInitializerTarget(context, helperGraph, reference.Method);
-        RecordStaticConstructorReachability(context, helperGraph, reference.Method);
-        helperGraph.RecordCall(method, reference.Method, context.Operation.Syntax.GetLocation());
-        ReportLocalUseIfInvalid(context, reference.Method);
-    }
-
     private static bool HasAttribute(ISymbol symbol, string metadataName)
         => symbol.GetAttributes().Any(a => string.Equals(
             a.AttributeClass?.ToDisplayString(),

@@ -210,7 +210,6 @@ public sealed class ModuleValidationResultContractTests
 
     private static ModuleValidationResult ValidResult()
         => Create();
-
     private static Action ThrowingAction(Func<ModuleValidationResult> create)
         => () => _ = create();
 
@@ -226,7 +225,6 @@ public sealed class ModuleValidationResultContractTests
             moduleEffects,
             requiredCapabilities ?? RequiredCapabilities(),
             bindingReferences ?? BindingReferences());
-
     private static ModuleValidationResult CreateRaw(
         IReadOnlyList<SandboxDiagnostic> diagnostics,
         IReadOnlyDictionary<string, FunctionAnalysis> functions,
@@ -240,16 +238,13 @@ public sealed class ModuleValidationResultContractTests
             moduleEffects,
             requiredCapabilities,
             bindingReferences);
-
     private static IReadOnlyList<SandboxDiagnostic> Diagnostics()
         => [Diagnostic()];
-
     private static IReadOnlyDictionary<string, FunctionAnalysis> Functions()
         => new Dictionary<string, FunctionAnalysis>(StringComparer.Ordinal)
         {
             ["main"] = Analysis()
         };
-
     private static IReadOnlySet<string> RequiredCapabilities()
         => new HashSet<string>(StringComparer.Ordinal) { "log.write" };
 
@@ -280,34 +275,25 @@ public sealed class ModuleValidationResultContractTests
 
     private static SandboxEffect UndefinedEffect()
         => (SandboxEffect)(1 << 20);
-
     private static IReadOnlySet<string> References()
         => new HashSet<string>(StringComparer.Ordinal) { "log.write" };
-
     private sealed class NullKeyDictionary<TValue>(TValue value) : IReadOnlyDictionary<string, TValue>
     {
         public int Count => 1;
-
         public IEnumerable<string> Keys => [null!];
-
         public IEnumerable<TValue> Values => [value];
-
         public TValue this[string key] => value;
-
         public bool ContainsKey(string key)
             => key is null;
-
         public bool TryGetValue(string key, out TValue dictionaryValue)
         {
             dictionaryValue = value;
             return key is null;
         }
-
         public IEnumerator<KeyValuePair<string, TValue>> GetEnumerator()
         {
             yield return new KeyValuePair<string, TValue>(null!, value);
         }
-
         IEnumerator IEnumerable.GetEnumerator()
             => GetEnumerator();
     }
