@@ -5,6 +5,7 @@ namespace DotBoxD.Kernels.Game.Server;
 /// <summary>Runs repeatable combat rounds at a pace suitable for stepping through installed kernels.</summary>
 internal static class ContinuousSimulation
 {
+    private const string StartGateVariable = "DOTBOXD_E2E_CONTINUOUS_START_GATE";
     private const int TicksPerRound = 6;
     private static readonly TimeSpan TickInterval = TimeSpan.FromMilliseconds(500);
 
@@ -22,6 +23,7 @@ internal static class ContinuousSimulation
         Console.CancelKeyPress += cancel;
         try
         {
+            await WaitForStartGateAsync(stopping.Token).ConfigureAwait(false);
             Console.WriteLine("[server] continuous mode active; press Ctrl+C or stop the run configuration to exit.");
             for (var round = 1; !stopping.IsCancellationRequested; round++)
             {
@@ -47,6 +49,23 @@ internal static class ContinuousSimulation
         {
             Console.CancelKeyPress -= cancel;
         }
+    }
+
+    private static async Task WaitForStartGateAsync(CancellationToken cancellationToken)
+    {
+        var path = Environment.GetEnvironmentVariable(StartGateVariable);
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        Console.WriteLine("[server] waiting for Rider E2E breakpoint synchronization...");
+        while (!File.Exists(path))
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken).ConfigureAwait(false);
+        }
+
+        Console.WriteLine("[server] Rider E2E breakpoints synchronized; starting continuous simulation.");
     }
 
     private static void PrintEffects(IReadOnlyList<string> effects)
