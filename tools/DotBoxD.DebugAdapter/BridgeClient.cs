@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.IO.Pipes;
 using System.Text.Json;
+using DotBoxD.DebugAdapter.Diagnostics;
 using DotBoxD.Plugins.Debugging;
 using DotBoxD.Pushdown.Services;
 
@@ -132,8 +133,11 @@ internal sealed class BridgeClient : IAsyncDisposable
 
         try
         {
+            AdapterDiagnostics.Write($"bridge send {kind} {id}");
             await WriteAsync(request, cancellationToken).ConfigureAwait(false);
-            return await completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            var response = await completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            AdapterDiagnostics.Write($"bridge response {kind} {id}");
+            return response;
         }
         finally
         {
@@ -146,6 +150,7 @@ internal sealed class BridgeClient : IAsyncDisposable
         object? payload,
         CancellationToken cancellationToken)
     {
+        AdapterDiagnostics.Write("bridge remote " + command);
         var envelope = new PluginDebugEnvelope(
             PluginDebugProtocol.Version,
             command,

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.InteropServices;
 using EnvDTE;
 using Microsoft.VisualStudio;
@@ -15,8 +16,6 @@ public sealed class DotBoxDKernelAutoAttachPackage : AsyncPackage
     private const string ActivityLogSource = "DotBoxD Kernel Debugger";
 
     private static readonly Guid KernelDebugEngineId = new("82F49048-CECF-432B-B6D6-F78030C89496");
-    private static readonly Guid ManagedDotNetDebugEngineId = new("FB0D4648-F776-4980-95F8-BB7F36EBC1EE");
-    private static readonly Guid LocalPortSupplierId = new("708C1ECA-FF48-11D2-904F-00C04FA302A1");
     private readonly HashSet<int> _autoAttachedProcessIds = [];
     private DTE? _dte;
     private DebuggerEvents? _debuggerEvents;
@@ -73,9 +72,15 @@ public sealed class DotBoxDKernelAutoAttachPackage : AsyncPackage
                 if (processId is { } candidateProcessId)
                 {
                     await JoinableTaskFactory.SwitchToMainThreadAsync();
+                    if (_dte?.Debugger.CurrentMode != dbgDebugMode.dbgRunMode)
+                    {
+                        await Task.Delay(TimeSpan.FromMilliseconds(250)).ConfigureAwait(false);
+                        continue;
+                    }
+
                     if (_autoAttachedProcessIds.Add(candidateProcessId))
                     {
-                        ReattachWithKernelDebugger(candidateProcessId);
+                        LaunchKernelDebugger(candidateProcessId);
                         ActivityLog.LogInformation(
                             ActivityLogSource,
                             $"Automatically enabled kernel debugging for process {candidateProcessId}.");
@@ -94,7 +99,7 @@ public sealed class DotBoxDKernelAutoAttachPackage : AsyncPackage
         }
     }
 
-    private void ReattachWithKernelDebugger(int processId)
+    private void LaunchKernelDebugger(int processId)
     {
         ThreadHelper.ThrowIfNotOnUIThread();
         if (_debugger is null || _dte is null)
@@ -102,55 +107,34 @@ public sealed class DotBoxDKernelAutoAttachPackage : AsyncPackage
             return;
         }
 
-        DetachPluginProcess(processId);
         using var process = System.Diagnostics.Process.GetProcessById(processId);
-        var executablePath = process.MainModule?.FileName
-            ?? throw new InvalidOperationException($"The executable for process {processId} is unavailable.");
-        var engineIds = new[] { KernelDebugEngineId, ManagedDotNetDebugEngineId };
-        var engines = Marshal.AllocCoTaskMem(Marshal.SizeOf<Guid>() * engineIds.Length);
-        try
+        if (process.HasExited)
         {
-            for (var index = 0; index < engineIds.Length; index++)
-            {
-                Marshal.StructureToPtr(
-                    engineIds[index],
-                    IntPtr.Add(engines, Marshal.SizeOf<Guid>() * index),
-                    false);
-            }
+            throw new InvalidOperationException($"Plugin process {processId} exited before kernel debugging started.");
+        }
 
-            var target = new VsDebugTargetInfo3
-            {
-                dlo = (uint)DEBUG_LAUNCH_OPERATION.DLO_AlreadyRunning,
-                bstrExe = executablePath,
-                bstrCurDir = Path.GetDirectoryName(executablePath),
-                bstrOptions = "{}",
-                dwDebugEngineCount = (uint)engineIds.Length,
-                pDebugEngines = engines,
-                guidPortSupplier = LocalPortSupplierId,
-                dwProcessId = (uint)processId
-            };
-            ErrorHandler.ThrowOnFailure(_debugger.LaunchDebugTargets3(
-                1,
-                [target],
-                [new VsDebugTargetProcessInfo()]));
-        }
-        finally
+        var extensionDirectory = Path.GetDirectoryName(typeof(DotBoxDKernelAutoAttachPackage).Assembly.Location)
+            ?? throw new InvalidOperationException("The VSIX installation directory is unavailable.");
+        var companionExecutable = Path.Combine(extensionDirectory, "adapter", "DotBoxD.DebugAdapter.exe");
+        if (!File.Exists(companionExecutable))
         {
-            Marshal.FreeCoTaskMem(engines);
+            throw new FileNotFoundException("The packaged DotBoxD debug adapter is missing.", companionExecutable);
         }
-    }
 
-    private void DetachPluginProcess(int processId)
-    {
-        ThreadHelper.ThrowIfNotOnUIThread();
-        foreach (EnvDTE.Process process in _dte!.Debugger.DebuggedProcesses)
+        var target = new VsDebugTargetInfo3
         {
-            if (process.ProcessID == processId)
-            {
-                process.Detach(false);
-                return;
-            }
-        }
+            dlo = (uint)DEBUG_LAUNCH_OPERATION.DLO_CreateProcess,
+            bstrExe = companionExecutable,
+            bstrCurDir = Path.GetDirectoryName(companionExecutable),
+            bstrOptions = "{\"request\":\"attach\",\"processId\":" +
+                processId.ToString(CultureInfo.InvariantCulture) + "}",
+            guidLaunchDebugEngine = KernelDebugEngineId,
+            fSendToOutputWindow = true
+        };
+        ErrorHandler.ThrowOnFailure(_debugger.LaunchDebugTargets3(
+            1,
+            [target],
+            [new VsDebugTargetProcessInfo()]));
     }
 
 }

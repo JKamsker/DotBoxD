@@ -26,14 +26,21 @@ public sealed class DebugAdapterLauncher : IAdapterLauncher
         {
             throw new ArgumentNullException(nameof(launchInfo));
         }
-        if (launchInfo.LaunchType != LaunchType.Attach || launchInfo.AttachProcessId <= 0)
+        if (launchInfo.LaunchType == LaunchType.Attach && launchInfo.AttachProcessId > 0)
         {
-            throw new InvalidOperationException("DotBoxD kernel debugging attaches to a plugin process that already owns a debug bridge.");
+            launchInfo.LaunchJson = "{\"request\":\"attach\",\"processId\":" +
+                launchInfo.AttachProcessId.ToString(CultureInfo.InvariantCulture) + "}";
+            WriteDiagnostic($"configure attach {launchInfo.AttachProcessId}");
+            return;
         }
 
-        launchInfo.LaunchJson = "{\"request\":\"attach\",\"processId\":" +
-            launchInfo.AttachProcessId.ToString(CultureInfo.InvariantCulture) + "}";
-        WriteDiagnostic($"configure attach {launchInfo.AttachProcessId}");
+        if (launchInfo.LaunchType != LaunchType.Launch || string.IsNullOrWhiteSpace(launchInfo.LaunchJson))
+        {
+            throw new InvalidOperationException(
+                "DotBoxD kernel debugging requires an attach process id or companion-target launch options.");
+        }
+
+        WriteDiagnostic("configure companion target");
     }
 
     public ITargetHostProcess LaunchAdapter(IAdapterLaunchInfo launchInfo, ITargetHostInterop targetInterop)
@@ -54,14 +61,33 @@ public sealed class DebugAdapterLauncher : IAdapterLauncher
         {
             throw new FileNotFoundException("The packaged DotBoxD debug adapter is missing.", adapter);
         }
+        var dotnetHost = ResolveDotNetHost();
 
         WriteDiagnostic("launch adapter");
-        var process = targetInterop.ExecuteCommandAsync("dotnet", Quote(adapter));
+        var diagnosticPath = Environment.GetEnvironmentVariable("DOTBOXD_VSIX_DIAGNOSTIC_LOG");
+        var arguments = Quote(adapter);
+        if (!string.IsNullOrWhiteSpace(diagnosticPath))
+        {
+            arguments += " --diagnostic-log " + Quote(diagnosticPath);
+        }
+
+        var process = targetInterop.ExecuteCommandAsync(dotnetHost, arguments);
         WriteDiagnostic("adapter launched");
         return process;
     }
 
     private static string Quote(string value) => "\"" + value.Replace("\"", "\\\"") + "\"";
+
+    private static string ResolveDotNetHost()
+    {
+        var dotnetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT");
+        var host = string.IsNullOrWhiteSpace(dotnetRoot)
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet", "dotnet.exe")
+            : Path.Combine(dotnetRoot, "dotnet.exe");
+        return File.Exists(host)
+            ? host
+            : throw new FileNotFoundException("The .NET host required by DotBoxD.DebugAdapter was not found.", host);
+    }
 
     private static void WriteDiagnostic(string message)
     {

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DotBoxD.DebugAdapter.Diagnostics;
 using DotBoxD.Plugins.Debugging;
 
 namespace DotBoxD.DebugAdapter;
@@ -35,12 +36,15 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
 
     private async ValueTask HandleSafelyAsync(JsonElement request, CancellationToken cancellationToken)
     {
+        AdapterDiagnostics.Write("request " + request.GetProperty("command").GetString());
         try
         {
             await HandleAsync(request, cancellationToken).ConfigureAwait(false);
+            AdapterDiagnostics.Write("completed " + request.GetProperty("command").GetString());
         }
         catch (DebugAdapterException exception)
         {
+            AdapterDiagnostics.Write("adapter error " + exception.Code + ": " + exception.Message);
             await connection.RespondAsync(
                     request,
                     success: false,
@@ -51,6 +55,7 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
         }
         catch (Exception exception)
         {
+            AdapterDiagnostics.Write("unhandled error " + exception);
             await connection.RespondAsync(request, false, null, exception.Message, cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -182,24 +187,35 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
                 _ => PluginDebugCommands.Continue
             };
             payload = new { runId = RequireInspection().RunId(threadId) };
+            RequireInspection().BeginResume();
         }
 
-        _ = await bridge.RemoteAsync(remoteCommand, payload, cancellationToken).ConfigureAwait(false);
-        await connection.RespondAsync(
-                request,
-                true,
-                command == "continue" ? new { allThreadsContinued = false } : new { },
-                null,
-                cancellationToken)
-            .ConfigureAwait(false);
-        if (controlledThreadId is { } resumedThreadId)
+        try
         {
-            RequireInspection().InvalidateStoppedState(resumedThreadId);
-            await connection.EventAsync(
-                    "continued",
-                    new { threadId = resumedThreadId, allThreadsContinued = false },
+            _ = await bridge.RemoteAsync(remoteCommand, payload, cancellationToken).ConfigureAwait(false);
+            await connection.RespondAsync(
+                    request,
+                    true,
+                    command == "continue" ? new { allThreadsContinued = false } : new { },
+                    null,
                     cancellationToken)
                 .ConfigureAwait(false);
+            if (controlledThreadId is { } resumedThreadId)
+            {
+                RequireInspection().InvalidateStoppedState(resumedThreadId);
+                await connection.EventAsync(
+                        "continued",
+                        new { threadId = resumedThreadId, allThreadsContinued = false },
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            if (controlledThreadId is not null)
+            {
+                await RequireInspection().CompleteResumeAsync().ConfigureAwait(false);
+            }
         }
     }
 
@@ -268,8 +284,14 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
 
 internal static class Program
 {
-    public static async Task<int> Main()
+    public static async Task<int> Main(string[] args)
     {
+        var diagnosticArgument = Array.IndexOf(args, "--diagnostic-log");
+        if (diagnosticArgument >= 0 && diagnosticArgument + 1 < args.Length)
+        {
+            AdapterDiagnostics.Configure(args[diagnosticArgument + 1]);
+        }
+
         var connection = new DapConnection(System.Console.OpenStandardInput(), System.Console.OpenStandardOutput());
         await using var session = new DapSession(connection);
         await session.RunAsync(CancellationToken.None).ConfigureAwait(false);

@@ -8,10 +8,13 @@ $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $artifacts = Join-Path $root 'artifacts/vs26-e2e'
 $activityLog = Join-Path $artifacts 'ActivityLog.xml'
 $launcherLog = Join-Path $artifacts 'launcher.log'
+$resultLog = Join-Path $artifacts 'result.txt'
 $guardian = Join-Path $root 'samples/GameServer/Examples.GameServer.Plugin/Kernels/GuardianKernel.cs'
+$pluginProgram = Join-Path $root 'samples/GameServer/Examples.GameServer.Plugin/Program.cs'
 $windowsPowerShell = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
 $devenv = $null
+$stackCursor = 0
 
 function Invoke-Checked([string] $FilePath, [string[]] $Arguments) {
     & $FilePath @Arguments
@@ -72,34 +75,55 @@ function Wait-ForKernelAttach {
     }
 }
 
+function Wait-ForManagedStop {
+    $deadline = [DateTime]::UtcNow + $StopTimeout
+    do {
+        Start-Sleep -Milliseconds 200
+        $json = Invoke-Dte @'
+if ([int]$dte.Debugger.CurrentMode -eq 2) {
+    [PSCustomObject]@{
+        File = $dte.ActiveDocument.FullName
+        Line = $dte.ActiveDocument.Selection.CurrentLine
+    } | ConvertTo-Json -Compress
+}
+'@
+        $stop = $json | Where-Object { $_ } | Select-Object -Last 1
+        if ($stop) { $stop = $stop | ConvertFrom-Json }
+    } until (($stop -and $stop.File -like '*Examples.GameServer.Plugin*Program.cs') -or
+        [DateTime]::UtcNow -ge $deadline)
+    if (-not $stop -or $stop.File -notlike '*Examples.GameServer.Plugin*Program.cs') {
+        throw "Expected a managed plugin Program.cs stop. Last stop: $($stop | ConvertTo-Json -Compress)."
+    }
+    return $stop
+}
+
 function Wait-ForStop([int] $ExpectedLine) {
     $deadline = [DateTime]::UtcNow + $StopTimeout
     do {
         Start-Sleep -Milliseconds 200
-        $json = Invoke-Dte @"
-if ([int]`$dte.Debugger.CurrentMode -eq 2) {
-    `$frame = `$dte.Debugger.CurrentStackFrame
-    [PSCustomObject]@{
-        File = `$frame.FileName
-        Line = `$frame.LineNumber
-        Function = `$frame.FunctionName
-    } | ConvertTo-Json -Compress
-}
-"@
-        $stop = $json | Where-Object { $_ } | Select-Object -Last 1
-        if ($stop) {
-            $stop = $stop | ConvertFrom-Json
+        $mode = Invoke-Dte '[int]$dte.Debugger.CurrentMode'
+        $stackLines = @(Select-String $launcherLog -Pattern ' adapter stack \d+ (.+) line (\d+)$' -ErrorAction SilentlyContinue)
+        for ($index = $script:stackCursor; $mode -eq 2 -and $index -lt $stackLines.Count; $index++) {
+            $match = [regex]::Match($stackLines[$index].Line, ' adapter stack \d+ (.+) line (\d+)$')
+            if ($match.Success -and [int] $match.Groups[2].Value -eq $ExpectedLine) {
+                $stop = [PSCustomObject]@{
+                    File = $guardian
+                    Line = $ExpectedLine
+                    Function = $match.Groups[1].Value
+                }
+                $script:stackCursor = $index + 1
+                break
+            }
         }
-    } until (($stop -and $stop.File -like '*GuardianKernel.cs' -and $stop.Line -eq $ExpectedLine) -or
-        [DateTime]::UtcNow -ge $deadline)
-    if (-not $stop -or $stop.File -notlike '*GuardianKernel.cs' -or $stop.Line -ne $ExpectedLine) {
+    } until ($stop -or [DateTime]::UtcNow -ge $deadline)
+    if (-not $stop) {
         throw "Expected GuardianKernel.cs:$ExpectedLine. Last stop: $($stop | ConvertTo-Json -Compress)."
     }
     return $stop
 }
 
 New-Item -ItemType Directory -Path $artifacts -Force | Out-Null
-Remove-Item $activityLog, $launcherLog -Force -ErrorAction SilentlyContinue
+Remove-Item $activityLog, $launcherLog, $resultLog -Force -ErrorAction SilentlyContinue
 Stop-ExamplesAndVisualStudio
 
 try {
@@ -122,13 +146,18 @@ try {
     Start-Process $devenv -ArgumentList @((Join-Path $root 'DotBoxD.slnx'), '/log', $activityLog) -WorkingDirectory $root | Out-Null
     Wait-ForDte
     $env:DOTBOXD_E2E_GUARDIAN = $guardian
+    $env:DOTBOXD_E2E_PLUGIN_PROGRAM = $pluginProgram
     Invoke-Dte @'
-foreach ($breakpoint in @($dte.Debugger.Breakpoints)) {
-    if ($null -ne $breakpoint) { $breakpoint.Delete() }
-}
+while ($dte.Debugger.Breakpoints.Count -gt 0) { $dte.Debugger.Breakpoints.Item(1).Delete() }
+$null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_PLUGIN_PROGRAM, 46)
+$dte.ExecuteCommand('Debug.Start')
+'@ | Out-Null
+    $managedStop = Wait-ForManagedStop
+    Invoke-Dte @'
+while ($dte.Debugger.Breakpoints.Count -gt 0) { $dte.Debugger.Breakpoints.Item(1).Delete() }
 $null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_GUARDIAN, 35)
 $null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_GUARDIAN, 44)
-$dte.ExecuteCommand('Debug.Start')
+$dte.Debugger.Go($false)
 '@ | Out-Null
     Wait-ForKernelAttach
 
@@ -143,7 +172,12 @@ $dte.ExecuteCommand('Debug.Start')
     if ($predicate1.Function -eq $handle1.Function -or $predicate2.Function -eq $handle2.Function) {
         throw 'Where and Run stops did not preserve distinct kernel stack identities.'
     }
+    Set-Content $resultLog "PASS: managed Program.cs:$($managedStop.Line) and kernel 35, 44, 35, 44."
     Write-Host 'Visual Studio 2026 kernel debugger E2E passed: 35, 44, 35, 44.'
+}
+catch {
+    Set-Content $resultLog ("FAIL: " + $_.Exception)
+    throw
 }
 finally {
     while ((Get-Location).Path -ne $root -and (Get-Location).Path.StartsWith($root)) {

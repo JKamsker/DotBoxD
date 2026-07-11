@@ -24,10 +24,13 @@ public sealed class DapInspectionHandlerTests
         var handler = new DapInspectionHandler(new DapConnection(Stream.Null, output), client, string.Empty);
 
         await handler.OnRemoteEventAsync(Stopped(sessionToken, "first-run", "first-plugin"));
-        await handler.OnRemoteEventAsync(Stopped(sessionToken, "second-run", "second-plugin"));
+        handler.BeginResume();
         handler.InvalidateStoppedState(1);
+        await handler.OnRemoteEventAsync(Stopped(sessionToken, "second-run", "second-plugin"));
 
         Assert.Throws<DebugAdapterException>(() => handler.RunId(1));
+        Assert.Throws<DebugAdapterException>(() => handler.RunId(2));
+        await handler.CompleteResumeAsync();
         Assert.Equal("second-run", handler.RunId(2));
         output.Position = 0;
         var reader = new DapConnection(output, Stream.Null);

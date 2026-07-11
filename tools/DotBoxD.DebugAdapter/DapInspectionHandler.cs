@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DotBoxD.DebugAdapter.Diagnostics;
 using DotBoxD.Plugins.Debugging;
 using static DotBoxD.DebugAdapter.DapInspectionJson;
 
@@ -11,6 +12,8 @@ internal sealed class DapInspectionHandler(
 {
     private readonly DapStoppedExecutionStore _stopped = new();
     private readonly DapVariableStore _variableStore = new();
+    private readonly Dictionary<int, object> _stackTraces = [];
+    private readonly DapResumeStopBuffer _resumeStops = new();
 
     public bool Handles(string command) => command is
         "threads" or "stackTrace" or "scopes" or "variables" or "evaluate" or
@@ -39,13 +42,16 @@ internal sealed class DapInspectionHandler(
     {
         if (envelope.Kind == "stopped")
         {
-            var runId = envelope.Payload.GetProperty("runId").GetString()!;
-            var threadId = _stopped.RecordThread(runId, envelope.Payload.GetProperty("pluginId").GetString()!);
-            var reason = envelope.Payload.GetProperty("reason").GetString();
-            await connection.EventAsync(
-                    "stopped",
-                    new { reason = DapStopReason(reason), threadId, allThreadsStopped = false })
-                .ConfigureAwait(false);
+            var pending = new DapPendingStop(
+                envelope.Payload.GetProperty("runId").GetString()!,
+                envelope.Payload.GetProperty("pluginId").GetString()!,
+                envelope.Payload.GetProperty("reason").GetString());
+            if (_resumeStops.TryBuffer(pending))
+            {
+                return;
+            }
+
+            await EmitStoppedAsync(pending).ConfigureAwait(false);
         }
         else if (envelope.Kind == "output")
         {
@@ -62,13 +68,25 @@ internal sealed class DapInspectionHandler(
 
     public string RunId(int threadId) => _stopped.RunId(threadId);
 
+    public void BeginResume() => _resumeStops.BeginResume();
+
+    public async ValueTask CompleteResumeAsync()
+    {
+        foreach (var stop in _resumeStops.CompleteResume())
+        {
+            await EmitStoppedAsync(stop).ConfigureAwait(false);
+        }
+    }
+
     public void InvalidateStoppedState(int threadId)
     {
+        _stackTraces.Remove(threadId);
         _variableStore.RemoveFrames(_stopped.RemoveThread(threadId));
     }
 
     public void InvalidateAllStoppedState()
     {
+        _stackTraces.Clear();
         _stopped.Clear();
         _variableStore.Clear();
     }
@@ -85,6 +103,11 @@ internal sealed class DapInspectionHandler(
     private async ValueTask<object> StackTraceAsync(JsonElement request, CancellationToken cancellationToken)
     {
         var threadId = Arguments(request).GetProperty("threadId").GetInt32();
+        if (_stackTraces.TryGetValue(threadId, out var cached))
+        {
+            return cached;
+        }
+
         var runId = RunId(threadId);
         var stoppedPluginId = _stopped.PluginId(threadId, pluginId);
         var body = await bridge.RemoteAsync(
@@ -97,6 +120,8 @@ internal sealed class DapInspectionHandler(
         {
             var frameId = _stopped.AddFrame(threadId, frame.GetProperty("frameId").GetString()!);
             var location = await LocationAsync(frame, stoppedPluginId, cancellationToken).ConfigureAwait(false);
+            AdapterDiagnostics.Write(
+                $"stack {threadId} {frame.GetProperty("functionId").GetString()} line {location.Line}");
             frames.Add(new
             {
                 id = frameId,
@@ -109,7 +134,9 @@ internal sealed class DapInspectionHandler(
             });
         }
 
-        return new { stackFrames = frames, totalFrames = frames.Count };
+        var result = new { stackFrames = frames, totalFrames = frames.Count };
+        _stackTraces[threadId] = result;
+        return result;
     }
 
     private object Scopes(JsonElement request)
@@ -250,5 +277,13 @@ internal sealed class DapInspectionHandler(
     }
 
     private string Frame(int frameId) => _stopped.Frame(frameId);
+
+    private ValueTask EmitStoppedAsync(DapPendingStop stop)
+    {
+        var threadId = _stopped.RecordThread(stop.RunId, stop.PluginId);
+        return connection.EventAsync(
+            "stopped",
+            new { reason = DapStopReason(stop.Reason), threadId, allThreadsStopped = false });
+    }
 
 }
