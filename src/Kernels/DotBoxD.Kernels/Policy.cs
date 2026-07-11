@@ -4,6 +4,7 @@ using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Kernels;
 
+using System.Collections.Frozen;
 using System.Collections.ObjectModel;
 
 public sealed record CapabilityGrant(
@@ -102,11 +103,11 @@ public sealed record SandboxPolicy(
             }
         }
 
-        return new HashSet<string>(declared, StringComparer.Ordinal);
+        return declared.ToFrozenSet(StringComparer.Ordinal);
     }
 
     private static readonly IReadOnlySet<string> EmptyOpaqueIdTypes =
-        new HashSet<string>(StringComparer.Ordinal);
+        Array.Empty<string>().ToFrozenSet(StringComparer.Ordinal);
 
     public DateTimeOffset GrantClock
         => Deterministic && LogicalNow is not null ? LogicalNow.Value : DateTimeOffset.UtcNow;

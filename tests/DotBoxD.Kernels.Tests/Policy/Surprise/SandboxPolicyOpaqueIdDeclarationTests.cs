@@ -20,9 +20,21 @@ public sealed class SandboxPolicyOpaqueIdDeclarationTests
 
         Assert.Contains(before.Diagnostics, IsOpaqueIdPolicyDiagnostic);
 
-        if (exposedPolicy.DeclaredOpaqueIdTypes is ISet<string> mutableDeclarations)
+        if (exposedPolicy.DeclaredOpaqueIdTypes is ISet<string> { IsReadOnly: false } mutableDeclarations)
         {
-            mutableDeclarations.Add("PlayerId");
+            try
+            {
+                mutableDeclarations.Add("PlayerId");
+
+                var afterMutation = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
+                    await host.PrepareAsync(module, targetPolicy));
+
+                Assert.Contains(afterMutation.Diagnostics, IsOpaqueIdPolicyDiagnostic);
+            }
+            finally
+            {
+                mutableDeclarations.Remove("PlayerId");
+            }
         }
 
         var after = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
@@ -87,7 +99,8 @@ public sealed class SandboxPolicyOpaqueIdDeclarationTests
         };
 
     private static bool IsOpaqueIdPolicyDiagnostic(SandboxDiagnostic diagnostic)
-        => diagnostic.Code == "E-TYPE-UNKNOWN" ||
+        => (diagnostic.Code == "E-TYPE-UNKNOWN" &&
+            diagnostic.Message.Contains("PlayerId", StringComparison.Ordinal)) ||
            (diagnostic.Code == "E-POLICY-OPAQUE-ID" &&
             diagnostic.Message.Contains("opaque", StringComparison.OrdinalIgnoreCase));
 
