@@ -74,6 +74,11 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
         RpcStreamAttachment[] streams,
         CancellationToken ct = default)
     {
+        if (streams is null)
+        {
+            throw new ArgumentNullException(nameof(streams));
+        }
+
         using var received = await SendRequestAsync(service, method, request, instanceId: null, streams, ct).ConfigureAwait(false);
         return DeserializeNonStreamingResponse<TResponse>(received);
     }
@@ -101,6 +106,11 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
         RpcStreamAttachment[] streams,
         CancellationToken ct = default)
     {
+        if (streams is null)
+        {
+            throw new ArgumentNullException(nameof(streams));
+        }
+
         using var received = await SendRequestAsync(service, method, request, instanceId: null, streams, ct).ConfigureAwait(false);
         EnsureNoResponsePayload(received);
     }
