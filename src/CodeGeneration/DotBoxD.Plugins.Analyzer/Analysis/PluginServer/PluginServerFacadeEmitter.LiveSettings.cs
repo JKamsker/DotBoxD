@@ -15,6 +15,7 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("        public LiveSettingsHandle(" + PluginServerIdentifier.Escape(model.ClassName) + " owner, string pluginId) { _owner = owner; _pluginId = pluginId; }");
         builder.AppendLine("        public global::DotBoxD.Abstractions.ILiveSettingsHandle<TKernel> Set<TValue>(global::System.Linq.Expressions.Expression<global::System.Func<TKernel, TValue>> member, TValue value)");
         builder.AppendLine("        {");
+        builder.AppendLine("            _owner.ThrowIfDisposed();");
         builder.AppendLine("            if (member is null) throw new global::System.ArgumentNullException(nameof(member));");
         builder.AppendLine("            var body = member.Body is global::System.Linq.Expressions.UnaryExpression unary ? unary.Operand : member.Body;");
         builder.AppendLine("            if (body is not global::System.Linq.Expressions.MemberExpression { Member: global::System.Reflection.PropertyInfo property })");
@@ -39,6 +40,7 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("        }");
         builder.AppendLine("        public async global::System.Threading.Tasks.ValueTask ApplyAsync(bool atomic = false)");
         builder.AppendLine("        {");
+        builder.AppendLine("            _owner.ThrowIfDisposed();");
         builder.AppendLine("            _owner.RequireInstalledKernel<TKernel>(_pluginId);");
         builder.AppendLine("            await _owner.RequireControl().UpdateSettingsAsync(_pluginId, _updates.ToArray(), atomic, default).ConfigureAwait(false);");
         builder.AppendLine("            foreach (var value in _pendingValues)");
@@ -50,6 +52,7 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("        }");
         builder.AppendLine("        public async global::System.Threading.Tasks.ValueTask SetValuesAsync(global::System.Action<TKernel> set, bool atomic = false)");
         builder.AppendLine("        {");
+        builder.AppendLine("            _owner.ThrowIfDisposed();");
         builder.AppendLine("            if (set is null) throw new global::System.ArgumentNullException(nameof(set));");
         builder.AppendLine("            var currentValues = _owner.SnapshotLiveSettingValues(_pluginId);");
         builder.AppendLine("            var draft = new TKernel();");
