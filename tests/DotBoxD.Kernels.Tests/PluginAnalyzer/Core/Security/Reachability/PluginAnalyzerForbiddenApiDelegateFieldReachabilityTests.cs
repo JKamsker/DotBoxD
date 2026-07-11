@@ -49,6 +49,8 @@ public sealed class PluginAnalyzerForbiddenApiDelegateFieldReachabilityTests
     private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string source)
     {
         var compilation = CreateCompilation(source);
+        Assert.Empty(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+
         var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(new DotBoxD.Plugins.Analyzer.Analysis.PluginAnalyzer());
         return await compilation.WithAnalyzers(analyzers).GetAnalyzerDiagnosticsAsync();
     }
