@@ -23,7 +23,10 @@ public sealed class LoweredPipelineComposerTests
             new LoweredPipelineComposition("mergeable-pipeline", steps, SandboxType.String));
 
         var host = SandboxTestHost.Create();
-        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000_000).Build());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create()
+            .Grant("probe.read.distance", new { })
+            .WithFuel(1_000_000)
+            .Build());
 
         var pass = Record(5, "target-1");
         var fail = Record(3, "target-2");
@@ -67,6 +70,27 @@ public sealed class LoweredPipelineComposerTests
             new LoweredPipelineComposition("mergeable-pipeline", steps, SandboxType.String));
 
         Assert.Equal("probe.read.distance;probe.read.health", module.Metadata["dotboxd.requiredCapabilities"]);
+    }
+
+    [Fact]
+    public async Task Composed_step_capabilities_are_enforced_by_policy()
+    {
+        var steps = MergeableIrPipelineFixture.ConfigureSteps().ToArray();
+        steps[0] = steps[0] with
+        {
+            RequiredCapabilities = ["probe.read.secret"],
+            Effects = [nameof(SandboxEffect.HostStateRead)]
+        };
+        var module = LoweredPipelineComposer.Compose(
+            new LoweredPipelineComposition("metadata-policy", steps, SandboxType.String));
+        var host = SandboxTestHost.Create();
+
+        var exception = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
+            await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000_000).Build()));
+
+        Assert.Contains(exception.Diagnostics, d =>
+            d.Code == "E-POLICY-CAP" &&
+            d.Message.Contains("probe.read.secret", StringComparison.Ordinal));
     }
 
     [Fact]

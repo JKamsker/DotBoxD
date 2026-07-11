@@ -18,9 +18,18 @@ public sealed class PluginEventAdapterMetadataValidationTests
         => AssertInvalidMetadataRejected(new InvalidMetadataAdapter(string.Empty, ValidParameters));
 
     [Fact]
+    public void RegisterEventAdapter_rejects_whitespace_event_name()
+        => AssertInvalidMetadataRejected(new InvalidMetadataAdapter("   ", ValidParameters));
+
+    [Fact]
     public void RegisterEventAdapter_rejects_null_parameter_name()
         => AssertInvalidMetadataRejected(
             new InvalidMetadataAdapter(nameof(AdapterMetadataEvent), [new Parameter(null!, SandboxType.String)]));
+
+    [Fact]
+    public void RegisterEventAdapter_rejects_whitespace_parameter_name()
+        => AssertInvalidMetadataRejected(
+            new InvalidMetadataAdapter(nameof(AdapterMetadataEvent), [new Parameter("   ", SandboxType.String)]));
 
     [Fact]
     public void RegisterEventAdapter_rejects_null_parameter_element()

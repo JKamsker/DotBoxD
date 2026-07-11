@@ -53,7 +53,8 @@ internal static class HookFireAsyncModelFactory
                     contextType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
                     resultType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
                     ContextAttributes(contextType),
-                    IsEffectivelyPublic(contextType) && IsEffectivelyPublic(resultType) ? "public" : "internal"),
+                    IsEffectivelyPublic(contextType) && IsEffectivelyPublic(resultType) ? "public" : "internal",
+                    IsAssemblyClsCompliant(context.SemanticModel.Compilation)),
                 null);
         }
 
@@ -153,6 +154,23 @@ internal static class HookFireAsyncModelFactory
         }
 
         return true;
+    }
+
+    private static bool IsAssemblyClsCompliant(Compilation compilation)
+    {
+        foreach (var attribute in compilation.Assembly.GetAttributes())
+        {
+            if (attribute.AttributeClass?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) !=
+                "global::System.CLSCompliantAttribute")
+            {
+                continue;
+            }
+
+            return attribute.ConstructorArguments.Length == 1 &&
+                attribute.ConstructorArguments[0].Value is true;
+        }
+
+        return false;
     }
 
     private static EquatableArray<string> ContextAttributes(INamedTypeSymbol contextType)

@@ -142,6 +142,7 @@ internal static partial class HostServiceBindingFactory
         DateTimeOffset startedAt,
         object? firstArgument)
     {
+        context.Checkpoint();
         var resourceId = firstArgument is string id ? $"entity:{id}" : bindingId;
         context.Audit.Write(new SandboxAuditEvent(
             context.RunId,

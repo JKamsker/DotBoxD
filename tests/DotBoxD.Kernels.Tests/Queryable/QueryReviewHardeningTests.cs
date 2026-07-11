@@ -271,6 +271,13 @@ public sealed class QueryReviewHardeningTests
     }
 
     [Fact]
+    public void Query_filter_in_does_not_expose_mutable_values_snapshot()
+    {
+        var filter = QueryFilter.In("Damage", [QueryValue.FromInteger(1)]);
+        Assert.False(filter.Values is QueryValue[]);
+    }
+
+    [Fact]
     public void Query_projection_construct_snapshots_its_fields()
     {
         var fields = new List<QueryProjectionField> { QueryProjectionField.FromMember("a", "X") };
