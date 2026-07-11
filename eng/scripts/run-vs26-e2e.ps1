@@ -1,6 +1,7 @@
 param(
     [TimeSpan] $StartupTimeout = [TimeSpan]::FromMinutes(2),
-    [TimeSpan] $StopTimeout = [TimeSpan]::FromSeconds(30)
+    [TimeSpan] $StopTimeout = [TimeSpan]::FromSeconds(30),
+    [string] $VsixPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -155,12 +156,21 @@ try {
     if (-not (Test-Path $vswhere)) {
         throw "vswhere was not found at $vswhere."
     }
-    $installation = & $vswhere -latest -products Microsoft.VisualStudio.Product.Community `
+    $installation = & $vswhere -latest -products * `
         -version '[18.0,19.0)' -property installationPath
     if ([string]::IsNullOrWhiteSpace($installation)) {
-        throw 'Visual Studio Community 2026 was not found.'
+        throw 'Visual Studio 2026 was not found.'
     }
     $devenv = Join-Path $installation 'Common7/IDE/devenv.exe'
+
+    if (-not [string]::IsNullOrWhiteSpace($VsixPath)) {
+        $resolvedVsix = (Resolve-Path $VsixPath).Path
+        $vsixInstaller = Join-Path $installation 'Common7/IDE/VSIXInstaller.exe'
+        if (-not (Test-Path $vsixInstaller)) {
+            throw "VSIXInstaller was not found at $vsixInstaller."
+        }
+        Invoke-Checked $vsixInstaller @('/quiet', '/force', $resolvedVsix)
+    }
 
     Push-Location $root
     Invoke-Checked dotnet @('build', 'samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj', '-c', 'Debug', '--nologo')
