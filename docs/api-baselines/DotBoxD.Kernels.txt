@@ -28,10 +28,10 @@ public bool GrantsCapability(string capabilityId, DateTimeOffset now)
 public bool GrantsCapability(string capabilityId)
 public bool HasBindingAuditSince( BindingDescriptor descriptor, long checkpoint, bool success, SandboxErrorCode? expectedErrorCode, SandboxRunId runId, string moduleHash, string policyHash)
 public bool IsAsync { get; init; }
-public bool IsForbidden() => IsForbidden(this)
-public bool IsKnown(int maxDepth = 8) => IsKnown(this, 0, maxDepth, declaredOpaqueIdTypes: null)
+public bool IsForbidden() => SandboxTypeRules.IsForbidden(this)
+public bool IsKnown(int maxDepth = 8) => SandboxTypeRules.IsKnown(this, maxDepth, declaredOpaqueIdTypes: null)
 public bool IsKnown(IReadOnlySet<string> declaredOpaqueIdTypes, int maxDepth = 8)
-public bool IsKnownBuiltIn(int maxDepth = 8) => IsKnown(this, 0, maxDepth, EmptyOpaqueIdTypes)
+public bool IsKnownBuiltIn(int maxDepth = 8) => SandboxTypeRules.IsKnownBuiltIn(this, maxDepth)
 public bool IsRecord => Arguments.Count > 0 && StringComparer.Ordinal.Equals(Name, RecordName)
 public bool IsValidMapKey() => IsValidMapKey(declaredOpaqueIdTypes: null)
 public bool IsValidMapKey(IReadOnlySet<string>? declaredOpaqueIdTypes)
@@ -150,7 +150,7 @@ public IReadOnlyList<Parameter> Parameters { get => _parameters; init => _parame
 public IReadOnlyList<SandboxAuditEvent> Events { get; }
 public IReadOnlyList<SandboxDiagnostic> Diagnostics { get; }
 public IReadOnlyList<SandboxFunction> Functions { get => _functions; init => _functions = ModelCopy.List(value); }
-public IReadOnlyList<SandboxType> Arguments { get => _arguments; init => _arguments = CopyArguments(value); }
+public IReadOnlyList<SandboxType> Arguments { get; init; }
 public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = BindingParameterTypes.Copy(value, nameof(Parameters)); }
 public IReadOnlyList<SandboxValue> Fields { get => _fields; init => _fields = Snapshot(value); }
 public IReadOnlyList<SandboxValue> Values { get => this; init => _values = Snapshot(value); }
@@ -401,7 +401,7 @@ public static SandboxType I32 { get; } = Scalar("I32")
 public static SandboxType I64 { get; } = Scalar("I64")
 public static SandboxType List(SandboxType item)
 public static SandboxType Map(SandboxType key, SandboxType value)
-public static SandboxType Record(IReadOnlyList<SandboxType> fields) => new(RecordName, fields)
+public static SandboxType Record(IReadOnlyList<SandboxType> fields)
 public static SandboxType SandboxPath { get; } = Scalar("SandboxPath")
 public static SandboxType SandboxUri { get; } = Scalar("SandboxUri")
 public static SandboxType Scalar(string name)
@@ -453,7 +453,7 @@ public string Kind { get => _kind; init => _kind = value ?? throw new ArgumentNu
 public string ManifestHash { get; }
 public string Message { get => _message; init => _message = ValidateText(value, nameof(Message)); }
 public string ModuleHash { get; }
-public string Name { get; init; } = Name ?? throw new ArgumentNullException(nameof(Name))
+public string Name { get; init; }
 public string PlanHash { get; }
 public string PolicyHash { get; }
 public string PolicyId { get => _policyId; init { _policyId = value; ResetHash(); } }
