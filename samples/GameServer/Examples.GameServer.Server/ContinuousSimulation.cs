@@ -45,6 +45,11 @@ internal static class ContinuousSimulation
         {
             Console.WriteLine("[server] stopping continuous simulation...");
         }
+        catch (Exception exception)
+        {
+            Console.Error.WriteLine($"[server] continuous simulation failed: {exception}");
+            throw;
+        }
         finally
         {
             Console.CancelKeyPress -= cancel;
