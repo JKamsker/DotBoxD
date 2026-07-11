@@ -102,7 +102,8 @@ public LoweredIrMethodKind Kind { get; } = kind
 public LoweredPipelineStep Step { get; }
 public LoweredPipelineStepKind Kind { get; } = kind
 public LoweredPipelineStepKind StepKind { get; }
-public PipelineTransport Transport { get; } = transport
+public PipelineSurfaceAttribute(PipelineTransport transport)
+public PipelineTransport Transport { get; }
 public PluginAttribute(string? id = null) => Id = id
 public PolymorphicHandleAttribute(string keyMember)
 public SandboxEffect Effects { get; }
@@ -130,7 +131,7 @@ public sealed class LiveSettingAttribute : Attribute
 public sealed class LowerToIrAttribute(LoweredPipelineStepKind kind) : Attribute
 public sealed class LowerToIrMethodAttribute(LoweredIrMethodKind kind) : Attribute
 public sealed class NativeOnlyAttribute : Attribute
-public sealed class PipelineSurfaceAttribute(PipelineTransport transport) : Attribute
+public sealed class PipelineSurfaceAttribute : Attribute
 public sealed class PluginAttribute : Attribute
 public sealed class PolymorphicHandleAttribute : Attribute
 public sealed class ServerExtensionAttribute : Attribute
