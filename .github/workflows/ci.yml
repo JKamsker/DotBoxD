@@ -376,7 +376,7 @@ jobs:
           $vsix = Get-ChildItem 'ide/visualstudio/DotBoxD.KernelDebug.Vsix' -Filter '*.vsix' -Recurse |
             Select-Object -First 1
           if ($null -eq $vsix) { throw 'VSIX build produced no package.' }
-          ./eng/scripts/run-vs26-e2e.ps1 -VsixPath $vsix.FullName
+          ./eng/scripts/run-vs26-e2e.ps1 -VsixPath $vsix.FullName -InstallVsixForAllUsers
 
       - name: Upload Visual Studio 2026 E2E diagnostics
         if: always()

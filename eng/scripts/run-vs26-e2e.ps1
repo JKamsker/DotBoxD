@@ -1,7 +1,8 @@
 param(
     [TimeSpan] $StartupTimeout = [TimeSpan]::FromMinutes(2),
     [TimeSpan] $StopTimeout = [TimeSpan]::FromSeconds(30),
-    [string] $VsixPath
+    [string] $VsixPath,
+    [switch] $InstallVsixForAllUsers
 )
 
 $ErrorActionPreference = 'Stop'
@@ -217,7 +218,12 @@ try {
         if (-not (Test-Path $vsixInstaller)) {
             throw "VSIXInstaller was not found at $vsixInstaller."
         }
-        Invoke-Checked $vsixInstaller @('/quiet', '/force', $resolvedVsix)
+        $installerArguments = @('/quiet', '/force')
+        if ($InstallVsixForAllUsers) {
+            $installerArguments += '/admin'
+        }
+        $installerArguments += $resolvedVsix
+        Invoke-Checked $vsixInstaller $installerArguments
     }
 
     Set-ProjectDebugProfiles
