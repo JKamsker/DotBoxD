@@ -37,10 +37,12 @@ public sealed class ExperimentalAttributeTypeMetadataTests
 
         using var scope = new AssertionScope();
         proxy.Should().Contain(
-            "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBXEXP_TYPE\")]\n" +
+            "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBXEXP_TYPE\", " +
+            "UrlFormat = \"https://example.test/{0}\", Message = \"Use the stable API.\")]\n" +
             "    public sealed class LegacyProxy :");
         asyncSibling.Should().Contain(
-            "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBXEXP_TYPE\")]\n" +
+            "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBXEXP_TYPE\", " +
+            "UrlFormat = \"https://example.test/{0}\", Message = \"Use the stable API.\")]\n" +
             "    public interface ILegacyAsync");
         generatedDiagnostics.Should().BeEmpty(
             "generated source should not emit compiler experimental diagnostics for accepted service contracts");
@@ -97,7 +99,7 @@ public sealed class ExperimentalAttributeTypeMetadataTests
 
         namespace Regress.ExperimentalType
         {
-            [Experimental("DBXEXP_TYPE")]
+            [Experimental("DBXEXP_TYPE", UrlFormat = "https://example.test/{0}", Message = "Use the stable API.")]
             [RpcService]
             public interface ILegacy
             {

@@ -15,7 +15,8 @@ public sealed class ServerExtensionClientTypeExperimentalAttributeSurpriseTests
         RpcMemberMetadataGeneratorHarness.AssertGeneratedSourceContains(
             result.GeneratedSources,
             "EchoKernelServerExtensionClient",
-            "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBXEXP_TYPE\")]");
+            "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBXEXP_TYPE\", " +
+            "UrlFormat = \"https://example.test/{0}\", Message = \"Use the stable API.\")]");
         AssertDirectGeneratedClientUseReportsExperimentalDiagnostic(result.GeneratedTrees);
     }
 
@@ -29,7 +30,8 @@ public sealed class ServerExtensionClientTypeExperimentalAttributeSurpriseTests
         RpcMemberMetadataGeneratorHarness.AssertGeneratedSourceContains(
             result.GeneratedSources,
             "EchoKernelServerExtensionClient",
-            "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBX-EXP\")]");
+            "[global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute(\"DBX-EXP\", " +
+            "UrlFormat = \"https://example.test/{0}\", Message = \"Use the stable API.\")]");
         Assert.DoesNotContain(
             result.GeneratedSources,
             source => source.Contains("#pragma warning disable DBX-EXP", StringComparison.Ordinal));
@@ -138,7 +140,7 @@ public sealed class ServerExtensionClientTypeExperimentalAttributeSurpriseTests
             public DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }
         }
 
-        [Experimental("DBXEXP_TYPE")]
+        [Experimental("DBXEXP_TYPE", UrlFormat = "https://example.test/{0}", Message = "Use the stable API.")]
         public interface IEchoService
         {
             ValueTask<int> EchoAsync(int value, CancellationToken cancellationToken = default);
