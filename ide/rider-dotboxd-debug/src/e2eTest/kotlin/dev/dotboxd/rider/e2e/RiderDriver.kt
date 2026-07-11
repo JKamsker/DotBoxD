@@ -54,7 +54,7 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
             """
             const project = projectOf(component);
             const path = '${js(path.replace('\\', '/'))}';
-            const file = com.intellij.openapi.vfs.LocalFileSystem.getInstance().refreshAndFindFileByPath(path);
+            const file = com.intellij.openapi.vfs.LocalFileSystem.getInstance().findFileByPath(path);
             if (!file) throw 'Breakpoint file not found: ' + path;
             const types = com.intellij.xdebugger.XDebuggerUtil.getInstance().getLineBreakpointTypes();
             let type = null;
