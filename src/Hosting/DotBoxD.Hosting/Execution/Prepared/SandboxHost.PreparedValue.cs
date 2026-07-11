@@ -75,7 +75,7 @@ public sealed partial class SandboxHost
         {
             return PreparedExecutionResult.FromResult(Publish(CompiledFailureResult(plan, options, ex.Error)));
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             var error = new SandboxError(SandboxErrorCode.Cancelled, "execution cancelled");
             return PreparedExecutionResult.FromResult(Publish(CompiledFailureResult(plan, options, error)));
