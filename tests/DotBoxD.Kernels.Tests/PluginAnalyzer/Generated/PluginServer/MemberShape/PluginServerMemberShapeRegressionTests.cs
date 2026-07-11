@@ -38,7 +38,11 @@ public sealed partial class PluginServerMemberShapeRegressionTests
         PluginServerGenerationTestDriver.AssertNoCompilationErrors(outputCompilation);
         Assert.Contains("private sealed class InventoryPluginService", generated, StringComparison.Ordinal);
         Assert.Contains(
-            "public global::Regression.Game.IInventory Inventory => new InventoryPluginService(_owner, _inner.Inventory);",
+            "public global::Regression.Game.IInventory Inventory",
+            generated,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "return new InventoryPluginService(_owner, _inner.Inventory);",
             generated,
             StringComparison.Ordinal);
     }
@@ -191,10 +195,11 @@ public sealed partial class PluginServerMemberShapeRegressionTests
 
         PluginServerGenerationTestDriver.AssertNoCompilationErrors(outputCompilation);
         Assert.Contains(
-            "IServerExtensionClientAccessor.ServerExtensions => _owner;",
+            "IServerExtensionClientAccessor.ServerExtensions => _owner.RequireFacade();",
             generated,
             StringComparison.Ordinal);
-        Assert.Contains("public string ServerExtensions => _inner.ServerExtensions;", generated, StringComparison.Ordinal);
+        Assert.Contains("public string ServerExtensions", generated, StringComparison.Ordinal);
+        Assert.Contains("return _inner.ServerExtensions;", generated, StringComparison.Ordinal);
     }
 
     [Fact]
