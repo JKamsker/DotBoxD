@@ -360,6 +360,16 @@ jobs:
           dotnet build $project -c Release
           if ($LASTEXITCODE -ne 0) { throw "VSIX build failed (exit $LASTEXITCODE)." }
 
+      - name: Initialize Visual Studio 2026 profile
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+          $installation = & $vswhere -latest -products * -version '[18.0,19.0)' -property installationPath
+          if ([string]::IsNullOrWhiteSpace($installation)) { throw 'Visual Studio 2026 was not found.' }
+          $devenv = Join-Path $installation 'Common7/IDE/devenv.com'
+          & $devenv /ResetSettings General /Command File.Exit
+          if ($LASTEXITCODE -ne 0) { throw "Visual Studio profile initialization failed (exit $LASTEXITCODE)." }
+
       - name: Run Visual Studio 2026 kernel debugger E2E tests
         shell: pwsh
         run: |
