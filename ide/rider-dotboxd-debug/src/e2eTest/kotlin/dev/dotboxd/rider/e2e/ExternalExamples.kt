@@ -8,7 +8,7 @@ import java.time.Duration
 internal class ExternalExamples private constructor(
     private val processes: List<ExampleProcess>,
 ) {
-    fun destroy() = processes.forEach { it.process.destroyForcibly() }
+    fun destroy() = processes.asReversed().forEach { it.process.destroyForcibly() }
 
     fun diagnostics(): String = processes.joinToString(separator = "\n") { example ->
         buildString {
@@ -56,7 +56,7 @@ internal class ExternalExamples private constructor(
                     mapOf("DOTBOXD_E2E_SKIP_ADVANCED_USAGE" to "1"),
                 )
                 launched += plugin
-                awaitOutput(plugin, "[plugin] kernels live; holding until server completes...")
+                awaitOutput(plugin, "[plugin] kernel debug bridge ready for PID ")
                 return ExternalExamples(launched)
             } catch (exception: Exception) {
                 val examples = ExternalExamples(launched)
