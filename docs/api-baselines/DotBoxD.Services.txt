@@ -146,7 +146,9 @@ public interface IServerTransport : IAsyncDisposable
 public interface IServiceDispatcher
 public interface ITransport : IAsyncDisposable
 public IReadOnlyList<GeneratedMethod> Methods { get; init; } = Array.Empty<GeneratedMethod>()
+public IReadOnlyList<RpcContractMethod> Methods { get; init; } = ValidateMethods(Methods)
 public IReadOnlyList<RpcContractChange> Diff(RpcContractManifest previous)
+public IReadOnlyList<RpcContractService> Services { get; init; } = ValidateServices(Services)
 public IRpcChannel? Connection => Volatile.Read(ref _disposed) == 0 ? _connection : null
 public IServiceProvider? ServiceProvider { get; init; }
 public long? MaxInboundBytes { get; init; }
@@ -284,6 +286,7 @@ public static void WriteFrame(IBufferWriter<byte> writer, int messageId, Message
 public Stream GetStream(RpcStreamHandle handle)
 public StreamConnection( Stream stream, string? remoteEndpoint = null, bool ownsStream = true, int maxMessageSize = MessageFramer.MaxMessageSize, TimeSpan? frameReadIdleTimeout = null)
 public string Contract { get; init; }
+public string ContractType { get; init; } = ContractType ?? throw new ArgumentNullException(nameof(ContractType))
 public string Fingerprint { get; }
 public string InstanceId { get; set; } = string.Empty
 public string Message { get; }
@@ -301,6 +304,8 @@ public string Serialize()
 public string ServiceName { get; }
 public string ServiceName { get; set; } = string.Empty
 public string? CurrentSignature { get; init; }
+public string Signature { get; init; } = Signature ?? throw new ArgumentNullException(nameof(Signature))
+public string WireName { get; init; } = WireName ?? throw new ArgumentNullException(nameof(WireName))
 public string? ErrorMessage { get; set; }
 public string? ErrorType { get; set; }
 public string? InstanceId { get; }
