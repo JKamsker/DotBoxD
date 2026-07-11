@@ -37,31 +37,27 @@ public sealed class ServerExtensionInvokeArgumentContractTests
 
     [Fact]
     public async Task InvokeServerExtensionAsync_rejects_null_single_argument_at_public_boundary()
-    {
-        var package = PluginAnalyzerGeneratedPackageFactory.Create(
+        => await AssertRejectsNullArgumentAsync(
             SingleArgumentSource,
-            "Sample.SingleArgumentPluginPackage");
-
-        using var server = PluginServer.Create(defaultPolicy: PurePolicy());
-        var kernel = await server.InstallServerExtensionAsync(package);
-        var arguments = new SandboxValue[] { null! };
-
-        var ex = await Assert.ThrowsAnyAsync<ArgumentException>(
-            () => kernel.InvokeServerExtensionAsync(arguments).AsTask());
-
-        Assert.Equal("arguments", ex.ParamName);
-    }
+            "Sample.SingleArgumentPluginPackage",
+            [null!]);
 
     [Fact]
     public async Task InvokeServerExtensionAsync_rejects_null_multi_argument_at_public_boundary()
-    {
-        var package = PluginAnalyzerGeneratedPackageFactory.Create(
+        => await AssertRejectsNullArgumentAsync(
             TwoArgumentSource,
-            "Sample.TwoArgumentPluginPackage");
+            "Sample.TwoArgumentPluginPackage",
+            [null!, SandboxValue.FromInt32(2)]);
+
+    private static async Task AssertRejectsNullArgumentAsync(
+        string source,
+        string packageName,
+        SandboxValue[] arguments)
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create(source, packageName);
 
         using var server = PluginServer.Create(defaultPolicy: PurePolicy());
         var kernel = await server.InstallServerExtensionAsync(package);
-        var arguments = new SandboxValue[] { null!, SandboxValue.FromInt32(2) };
 
         var ex = await Assert.ThrowsAnyAsync<ArgumentException>(
             () => kernel.InvokeServerExtensionAsync(arguments).AsTask());
