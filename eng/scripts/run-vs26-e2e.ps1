@@ -98,6 +98,7 @@ function Wait-ForDte {
 if ($dte.Solution.IsOpen -and
     $null -ne $dte.Debugger -and
     $null -ne $dte.Debugger.Breakpoints -and
+    $null -ne $dte.Solution.SolutionBuild -and
     $dte.Commands.Item('Debug.Start').IsAvailable) {
     'ready'
 }
@@ -241,7 +242,9 @@ try {
     $env:DOTBOXD_E2E_SERVER_PROJECT = $serverProject
     $env:DOTBOXD_E2E_PLUGIN_PROJECT = $pluginProject
     Invoke-Dte @'
-$dte.Solution.SolutionBuild.StartupProjects = [object[]]@(
+$solutionBuild = $dte.Solution.SolutionBuild
+if ($null -eq $solutionBuild) { throw 'Visual Studio did not expose SolutionBuild after startup.' }
+$solutionBuild.StartupProjects = [object[]]@(
     $env:DOTBOXD_E2E_SERVER_PROJECT,
     $env:DOTBOXD_E2E_PLUGIN_PROJECT)
 while ($dte.Debugger.Breakpoints.Count -gt 0) { $dte.Debugger.Breakpoints.Item(1).Delete() }
