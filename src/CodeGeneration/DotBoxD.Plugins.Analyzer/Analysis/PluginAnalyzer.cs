@@ -98,6 +98,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             RecordForbiddenInitializerReference(context, helperGraph, invocation.TargetMethod.ContainingType);
             RecordForbiddenDelegateInitializer(context, helperGraph, invocation.TargetMethod.ContainingType);
             RecordStaticConstructorReachability(context, helperGraph, invocation.TargetMethod);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, invocation.TargetMethod.ContainingType);
             RecordInitializerRootCall(context, helperGraph, invocation.TargetMethod);
             return;
         }
@@ -117,6 +118,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             RecordForbiddenInitializerReference(context, helperGraph, creation.Type);
             RecordForbiddenDelegateInitializer(context, helperGraph, creation.Type);
             RecordStaticConstructorReachability(context, helperGraph, creation.Type);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, creation.Type);
             if (creation.Constructor is { } initializerConstructor)
             {
                 RecordInitializerRootCall(context, helperGraph, initializerConstructor);
@@ -142,6 +144,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             RecordForbiddenInitializerReference(context, helperGraph, property.ContainingType);
             RecordForbiddenDelegateInitializer(context, helperGraph, property.ContainingType);
             RecordStaticConstructorReachability(context, helperGraph, property);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, property.ContainingType);
             RecordInitializerPropertyRootCall(context, helperGraph, property);
             RecordInitializerMemberReference(context, helperGraph, property);
             return;
@@ -166,7 +169,6 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             helperGraph.RecordCall(method, setter, location);
         }
 
-        helperGraph.RecordRootMemberReference(method, property, location);
     }
 
     private static void AnalyzeFieldReference(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
@@ -179,6 +181,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             RecordInitializerMemberReference(context, helperGraph, field);
             RecordForbiddenDelegateInitializer(context, helperGraph, field.ContainingType);
             RecordStaticConstructorReachability(context, helperGraph, field);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, field.ContainingType);
             return;
         }
 
@@ -202,6 +205,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             ReportForbiddenInInitializer(context, type);
             RecordForbiddenInitializerReference(context, helperGraph, type);
             RecordForbiddenDelegateInitializer(context, helperGraph, type);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, type);
             return;
         }
 
@@ -221,6 +225,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             RecordForbiddenDelegateInitializer(context, helperGraph, reference.Method.ContainingType);
             RecordDelegateInitializerTarget(context, helperGraph, reference.Method);
             RecordStaticConstructorReachability(context, helperGraph, reference.Method);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, reference.Method.ContainingType);
             RecordInitializerRootCall(context, helperGraph, reference.Method);
             return;
         }

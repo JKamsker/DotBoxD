@@ -28,6 +28,24 @@ public sealed partial class PluginAnalyzer
             type!.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
     }
 
+    // A helper auto-property initializer runs before the getter returns its value. When an event kernel reads
+    // that property, the existing property-reference path records a root edge to the getter; mark the getter
+    // tainted here so a forbidden host API in the initializer is not hidden behind the auto-property.
+    private static void RecordForbiddenHelperPropertyInitializer(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        ITypeSymbol? type)
+    {
+        if (context.ContainingSymbol is not IPropertySymbol { GetMethod: { } getter } property ||
+            IsEventKernel(property.ContainingType) ||
+            !IsForbiddenHostApi(type))
+        {
+            return;
+        }
+
+        helperGraph.RecordForbidden(getter, type!);
+    }
+
     // A helper invoked (or referenced as a method group) from a field/property initializer in an event kernel is
     // a call-graph root: its body may transitively reach a forbidden host API even though the directly referenced
     // type is benign. Record it so the existing taint propagation flags it at the initializer site.
