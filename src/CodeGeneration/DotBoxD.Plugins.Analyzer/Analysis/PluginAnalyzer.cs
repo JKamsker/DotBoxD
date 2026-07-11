@@ -94,6 +94,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, invocation.TargetMethod.ContainingType);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, invocation.TargetMethod.ContainingType);
             RecordInitializerRootCall(context, helperGraph, invocation.TargetMethod);
             return;
         }
@@ -109,6 +110,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, creation.Type);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, creation.Type);
             if (creation.Constructor is { } initializerConstructor)
             {
                 RecordInitializerRootCall(context, helperGraph, initializerConstructor);
@@ -130,6 +132,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, property.ContainingType);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, property.ContainingType);
             RecordInitializerPropertyRootCall(context, helperGraph, property);
             return;
         }
@@ -159,6 +162,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, field.ContainingType);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, field.ContainingType);
             return;
         }
 
@@ -171,6 +175,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, type);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, type);
             return;
         }
 
@@ -186,6 +191,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, reference.Method.ContainingType);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, reference.Method.ContainingType);
             RecordInitializerRootCall(context, helperGraph, reference.Method);
             return;
         }
