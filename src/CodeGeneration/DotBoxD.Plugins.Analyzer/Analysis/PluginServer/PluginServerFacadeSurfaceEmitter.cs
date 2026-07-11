@@ -49,6 +49,7 @@ internal static class PluginServerFacadeSurfaceEmitter
     public static void AppendServerInterface(StringBuilder builder, PluginServerFacadeModel model)
     {
         PluginServerXmlDocumentation.Append(builder, string.Empty, model.WorldDocumentation);
+        PluginServerClsComplianceAttributeSource.AppendFalse(builder, model);
         builder.Append(model.Accessibility).Append(" interface ").Append(model.ServerInterfaceName)
             .Append(" : ").Append(model.WorldType)
             .Append(", global::DotBoxD.Abstractions.IPluginServer<").Append(model.WorldType)
