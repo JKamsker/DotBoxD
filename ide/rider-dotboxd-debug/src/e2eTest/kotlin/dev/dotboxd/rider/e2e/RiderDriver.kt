@@ -174,7 +174,7 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
         )
     }
 
-    fun stopAll() {
+    fun requestStopAll() {
         run(
             """
             const project = projectOf(component);
@@ -187,7 +187,7 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
                     if (handler && !handler.isProcessTerminated()) handler.destroyProcess();
                 }
             }});
-            com.intellij.openapi.application.ApplicationManager.getApplication().invokeAndWait(action);
+            com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(action);
             """,
         )
     }

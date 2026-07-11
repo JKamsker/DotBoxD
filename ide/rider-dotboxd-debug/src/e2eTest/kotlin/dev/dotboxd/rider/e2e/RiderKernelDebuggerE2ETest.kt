@@ -69,8 +69,11 @@ class RiderKernelDebuggerE2ETest {
             val nextHandle = awaitStop(rider) { it.path.endsWith("GuardianKernel.cs") && it.line == 44 }
             assertTrue(nextPredicate.stackName != nextHandle.stackName || nextPredicate.line != nextHandle.line)
         } finally {
-            rider.stopAll()
-            stopNewExampleProcesses(root, existingExamples)
+            try {
+                rider.requestStopAll()
+            } finally {
+                stopNewExampleProcesses(root, existingExamples)
+            }
         }
     }
 
