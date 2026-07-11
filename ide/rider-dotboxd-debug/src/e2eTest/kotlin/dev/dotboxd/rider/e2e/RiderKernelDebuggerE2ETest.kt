@@ -38,8 +38,13 @@ class RiderKernelDebuggerE2ETest {
             rider.addDotNetBreakpoint(guardian.toString(), 35)
             rider.addDotNetBreakpoint(guardian.toString(), 44)
             launchedExamples = startExamples(rider, root)
-            val pluginProcessId = awaitPluginBridge(existingBridges)
-            rider.attachToKernels(pluginProcessId)
+            val pluginProcessId = awaitPluginBridge(existingBridges, root)
+            // Hosted Rider has no interactive license session, so its product-level launch helper is suppressed.
+            // Invoking the registered runner directly still exercises the real adapter and XDebugger integration.
+            rider.attachToKernels(
+                pluginProcessId,
+                runRegisteredRunnerDirectly = System.getProperty("dotboxd.e2e.external-launch", "false").toBoolean(),
+            )
 
             val firstPredicate = awaitStop(rider) {
                 it.path.endsWith("GuardianKernel.cs") && it.line == 35
@@ -124,10 +129,14 @@ class RiderKernelDebuggerE2ETest {
         return requireNotNull(result)
     }
 
-    private fun awaitPluginBridge(existing: Set<Long>): Long {
+    private fun awaitPluginBridge(existing: Set<Long>, root: Path): Long {
         var result: Long? = null
         waitFor(Duration.ofMinutes(3), Duration.ofMillis(250)) {
-            liveBridgeProcessIds().firstOrNull { it !in existing }?.also { result = it } != null
+            liveBridgeProcessIds().firstOrNull { processId ->
+                processId !in existing && ProcessHandle.of(processId)
+                    .filter { isPluginProcess(it, root) }
+                    .isPresent
+            }?.also { result = it } != null
         }
         return requireNotNull(result)
     }
@@ -162,9 +171,17 @@ class RiderKernelDebuggerE2ETest {
     }
 
     private fun isExampleProcess(process: ProcessHandle, root: Path): Boolean {
-        val commandLine = process.info().commandLine().orElse("").replace('\\', '/')
+        val command = process.info().command().orElse("").replace('\\', '/')
         val normalizedRoot = root.toString().replace('\\', '/')
-        return commandLine.startsWith(normalizedRoot, ignoreCase = true) &&
-            commandLine.contains("Examples.GameServer", ignoreCase = true)
+        return command.contains(normalizedRoot, ignoreCase = true) &&
+            command.contains("Examples.GameServer", ignoreCase = true)
+    }
+
+    private fun isPluginProcess(process: ProcessHandle, root: Path): Boolean {
+        val command = process.info().command().orElse("").replace('\\', '/')
+        val normalizedRoot = root.toString().replace('\\', '/')
+        val executable = Path.of(command).fileName?.toString()?.removeSuffix(".exe").orEmpty()
+        return command.contains(normalizedRoot, ignoreCase = true) &&
+            executable.equals("Examples.GameServer.Plugin", ignoreCase = true)
     }
 }

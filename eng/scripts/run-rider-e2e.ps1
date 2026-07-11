@@ -115,6 +115,10 @@ try {
     }
     $testProcess.WaitForExit()
     if ($testProcess.ExitCode -ne 0) {
+        Write-Host 'Rider E2E standard output:'
+        Get-Content $testOutput -ErrorAction SilentlyContinue
+        Write-Host 'Rider E2E standard error:'
+        Get-Content $testError -ErrorAction SilentlyContinue
         throw "Rider E2E tests failed with exit code $($testProcess.ExitCode)."
     }
 

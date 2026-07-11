@@ -87,7 +87,7 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
         )
     }
 
-    fun attachToKernels(processId: Long) {
+    fun attachToKernels(processId: Long, runRegisteredRunnerDirectly: Boolean) {
         run(
             """
             const project = projectOf(component);
@@ -103,10 +103,22 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
                 type.getConfigurationFactories()[0]
             );
             settings.getConfiguration().setProcessId($processId);
-            com.intellij.execution.ProgramRunnerUtil.executeConfiguration(
-                settings,
-                com.intellij.execution.executors.DefaultDebugExecutor.getDebugExecutorInstance()
-            );
+            const executor = com.intellij.execution.executors.DefaultDebugExecutor.getDebugExecutorInstance();
+            if ($runRegisteredRunnerDirectly) {
+                const configuration = settings.getConfiguration();
+                const runner = com.intellij.execution.runners.ProgramRunner.getRunner(
+                    executor.getId(),
+                    configuration
+                );
+                if (!runner) throw 'DotBoxD debug program runner is unavailable';
+                const environment = com.intellij.execution.runners.ExecutionEnvironmentBuilder
+                    .create(project, executor, configuration)
+                    .runner(runner)
+                    .build();
+                runner.execute(environment);
+            } else {
+                com.intellij.execution.ProgramRunnerUtil.executeConfiguration(settings, executor);
+            }
             """,
         )
     }

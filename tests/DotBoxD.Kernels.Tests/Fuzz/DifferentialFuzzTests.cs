@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using CsCheck;
@@ -27,7 +26,7 @@ public sealed class DifferentialFuzzTests
         using var host = SandboxTestHost.Create(compiler: true);
         var random = new Random(seed);
         var expression = Expression(random, depth: 4);
-        var json = ModuleJson(seed, expression);
+        var json = ModuleJson(expression);
         var module = await host.ImportJsonAsync(json);
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(10_000).Build());
         var input = Input(random);
@@ -108,10 +107,10 @@ public sealed class DifferentialFuzzTests
             _ => "mul"
         };
 
-    private static string ModuleJson(int index, JsonObject expression)
+    private static string ModuleJson(JsonObject expression)
         => new JsonObject
         {
-            ["id"] = ModuleId(index),
+            ["id"] = "differential-fuzz-case",
             ["version"] = "1.0.0",
             ["functions"] = new JsonArray {
                 new JsonObject {
@@ -132,9 +131,6 @@ public sealed class DifferentialFuzzTests
                 }
             }
         }.ToJsonString(JsonOptions);
-
-    private static string ModuleId(int index)
-        => $"differential-fuzz-{index.ToString(CultureInfo.InvariantCulture)}";
 
     private static JsonObject Parameter(string name)
         => new()
