@@ -229,7 +229,16 @@ internal sealed class BridgeClient : IAsyncDisposable
                 }
                 else if (kind == "sourcesChanged" && SourcesChangedReceiver is { } sourcesChanged)
                 {
-                    _ = Task.Run(async () => await sourcesChanged().ConfigureAwait(false), CancellationToken.None);
+                    // Refresh sends requests whose responses are consumed by this loop, so awaiting here deadlocks.
+                    var refresh = Task.Run(
+                        async () => await sourcesChanged().ConfigureAwait(false),
+                        cancellationToken);
+                    _ = refresh.ContinueWith(
+                        static task => Console.Error.WriteLine(
+                            $"DotBoxD source refresh failed: {task.Exception!.GetBaseException().Message}"),
+                        CancellationToken.None,
+                        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                        TaskScheduler.Default);
                 }
             }
         }
@@ -275,9 +284,4 @@ internal sealed class BridgeClient : IAsyncDisposable
             throw new DebugAdapterException("bridgeError", response.GetProperty("error").GetString()!);
         }
     }
-}
-
-internal sealed class DebugAdapterException(string code, string message) : Exception(message)
-{
-    public string Code { get; } = code;
 }

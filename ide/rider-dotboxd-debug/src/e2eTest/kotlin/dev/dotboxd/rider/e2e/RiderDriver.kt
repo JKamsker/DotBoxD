@@ -103,6 +103,7 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
                 type.getConfigurationFactories()[0]
             );
             settings.getConfiguration().setProcessId($processId);
+            settings.getConfiguration().setPauseScope('Execution');
             const executor = com.intellij.execution.executors.DefaultDebugExecutor.getDebugExecutorInstance();
             if ($runRegisteredRunnerDirectly) {
                 const configuration = settings.getConfiguration();

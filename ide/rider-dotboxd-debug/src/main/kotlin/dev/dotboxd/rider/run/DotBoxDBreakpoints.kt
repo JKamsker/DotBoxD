@@ -30,17 +30,15 @@ class DotBoxDBreakpoints(
         .toTypedArray()
 
     fun pushAll(onComplete: () -> Unit) {
-        ApplicationManager.getApplication().invokeLater {
-            val grouped = lineBreakpoints().groupBy { it.sourcePosition!!.file.path }
-            AppExecutorUtil.getAppExecutorService().execute {
-                try {
-                    val server = remote() ?: return@execute
-                    grouped.forEach { (path, breakpoints) -> push(server, path, breakpoints) }
-                } catch (exception: Exception) {
-                    log.warn("DotBoxD breakpoint synchronization failed", exception)
-                } finally {
-                    onComplete()
-                }
+        AppExecutorUtil.getAppExecutorService().execute {
+            try {
+                val server = remote() ?: return@execute
+                val grouped = lineBreakpoints().groupBy { it.sourcePosition!!.file.path }
+                grouped.forEach { (path, breakpoints) -> push(server, path, breakpoints) }
+            } catch (exception: Exception) {
+                log.warn("DotBoxD breakpoint synchronization failed", exception)
+            } finally {
+                onComplete()
             }
         }
     }

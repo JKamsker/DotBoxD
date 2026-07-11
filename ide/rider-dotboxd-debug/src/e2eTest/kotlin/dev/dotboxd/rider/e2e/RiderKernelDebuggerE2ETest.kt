@@ -45,6 +45,7 @@ class RiderKernelDebuggerE2ETest {
                 pluginProcessId,
                 runRegisteredRunnerDirectly = System.getProperty("dotboxd.e2e.external-launch", "false").toBoolean(),
             )
+            launchedExamples?.releaseAfterBreakpointsReady()
 
             val firstPredicate = awaitStop(rider, launchedExamples) {
                 it.path.endsWith("GuardianKernel.cs") && it.line == 35

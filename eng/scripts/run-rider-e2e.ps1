@@ -89,6 +89,8 @@ try {
         }
         catch {
             $ready = $false
+        }
+        if (-not $ready) {
             Start-Sleep -Milliseconds 500
         }
     } until ($ready -or [DateTime]::UtcNow -ge $deadline)

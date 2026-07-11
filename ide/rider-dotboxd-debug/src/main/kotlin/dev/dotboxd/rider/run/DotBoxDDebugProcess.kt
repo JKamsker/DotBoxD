@@ -123,9 +123,7 @@ class DotBoxDDebugProcess(
             launcher.startListening()
             server.initialize(DotBoxDDapClient.initializeArguments()).awaitDap()
             server.attach(linkedMapOf<String, Any>("processId" to configuration.processId).apply {
-                configuration.pauseScope
-                    .takeUnless { it == DotBoxDRunConfiguration.HOST_DEFAULT_PAUSE_SCOPE }
-                    ?.let { put("pauseScope", it) }
+                dapPauseScope(configuration.pauseScope)?.let { put("pauseScope", it) }
                 configuration.pluginId.takeIf(String::isNotBlank)?.let { put("pluginId", it) }
             }).awaitDap()
             adapterAttached.set(true)
@@ -174,10 +172,8 @@ class DotBoxDDebugProcess(
                 log.warn("DotBoxD stopped stack resolution failed", it)
                 DapExecutionStack(displayName, threadId, remote::get, values)
             }
-            ApplicationManager.getApplication().invokeLater {
-                stoppedExecution.stopped(threadId)
-                session.positionReached(DapSuspendContext(threadId, stack))
-            }
+            stoppedExecution.stopped(threadId)
+            session.positionReached(DapSuspendContext(threadId, stack))
         }
     }
 

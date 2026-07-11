@@ -25,6 +25,10 @@ internal static class GamePluginHost
             string.IsNullOrWhiteSpace(pipeName) ? "dotboxd-game-" + Guid.NewGuid().ToString("N") : pipeName,
             (peer, session) =>
             {
+                peer.Disconnected += (_, args) => Console.Error.WriteLine(
+                    args.Error is null
+                        ? "[server] plugin peer closed without a read error."
+                        : $"[server] plugin peer read failed: {args.Error}");
                 // Reverse-direction proxy: the plugin PROVIDES IPluginEventCallback, the server GETS it to push
                 // filtered+projected values back for remote RunLocal chains over the same bidirectional pipe.
                 var eventCallback =

@@ -62,3 +62,7 @@ private class DotBoxDDebugRunProfileState : RunProfileState {
     ): com.intellij.execution.ExecutionResult =
         throw com.intellij.execution.ExecutionException("DotBoxD's debug runner starts this configuration.")
 }
+
+internal fun dapPauseScope(value: String): String? =
+    value.takeUnless { it == DotBoxDRunConfiguration.HOST_DEFAULT_PAUSE_SCOPE }
+        ?.replaceFirstChar { it.lowercaseChar() }
