@@ -4,7 +4,7 @@
   "maxFilesPerRootDir": 5,
   "maxLinesSoft": 350,
   "maxLinesHard": 500,
-  "maxSoftLimitViolations": 25,
+  "maxSoftLimitViolations": 24,
   "maxPartFileCount": 0,
   "maxSourceMultiFilePartialTypeCount": 66
 }

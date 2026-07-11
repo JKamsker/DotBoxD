@@ -41,14 +41,12 @@ internal static class Program
             configureHost: worldHost.AddBindings,
             defaultPolicy: ServerPolicy.Create(),
             executionMode: ExecutionMode.Compiled,
-            remoteDebugOptions: kernelDebugging
-                ? new PluginRemoteDebugOptions
-                {
-                    Enabled = true,
-                    DefaultPauseScope = KernelDebugPauseScope.Execution,
-                    AllowedPauseScopes = [KernelDebugPauseScope.Execution]
-                }
-                : null);
+            remoteDebugOptions: kernelDebugging ? new PluginRemoteDebugOptions
+            {
+                Enabled = true,
+                DefaultPauseScope = KernelDebugPauseScope.Execution,
+                AllowedPauseScopes = [KernelDebugPauseScope.Execution]
+            } : null);
 
         _ = server.Events.Resolve<MonsterAggroEvent>();
         _ = server.Events.Resolve<AttackEvent>();
