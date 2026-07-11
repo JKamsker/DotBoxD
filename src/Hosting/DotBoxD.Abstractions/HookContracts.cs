@@ -23,7 +23,7 @@ public sealed class HookAttribute : Attribute
 {
     public HookAttribute(string name, Type resultType)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        HookContractIdentifiers.ValidateDottedIdentifier(name, nameof(name));
         ArgumentNullException.ThrowIfNull(resultType);
 
         Name = name;
