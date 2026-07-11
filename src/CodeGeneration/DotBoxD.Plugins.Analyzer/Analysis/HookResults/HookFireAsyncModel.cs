@@ -4,7 +4,8 @@ internal sealed record HookFireAsyncModel(
     string ContextTypeFullName,
     string ResultTypeFullName,
     EquatableArray<string> Attributes,
-    string Accessibility);
+    string Accessibility,
+    bool IsAssemblyClsCompliant);
 
 internal sealed record HookFireAsyncModelResult(
     HookFireAsyncModel? Model,

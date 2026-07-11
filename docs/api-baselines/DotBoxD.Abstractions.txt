@@ -98,9 +98,10 @@ public LiteralExpression Int32(int value)
 public LiteralExpression Int64(long value)
 public LiteralExpression Literal(SandboxValue value)
 public LiteralExpression String(string value)
+public LowerToIrAttribute(LoweredPipelineStepKind kind)
 public LoweredIrMethodKind Kind { get; } = kind
 public LoweredPipelineStep Step { get; }
-public LoweredPipelineStepKind Kind { get; } = kind
+public LoweredPipelineStepKind Kind { get; }
 public LoweredPipelineStepKind StepKind { get; }
 public PipelineTransport Transport { get; } = transport
 public PluginAttribute(string? id = null) => Id = id
@@ -127,7 +128,7 @@ public sealed class IRInvocation<TCaptures, TDelegate, TReturn> where TCaptures 
 public sealed class IRInvocation<TDelegate, TReturn> where TDelegate : Delegate
 public sealed class KernelMethodAttribute : Attribute
 public sealed class LiveSettingAttribute : Attribute
-public sealed class LowerToIrAttribute(LoweredPipelineStepKind kind) : Attribute
+public sealed class LowerToIrAttribute : Attribute
 public sealed class LowerToIrMethodAttribute(LoweredIrMethodKind kind) : Attribute
 public sealed class NativeOnlyAttribute : Attribute
 public sealed class PipelineSurfaceAttribute(PipelineTransport transport) : Attribute

@@ -108,7 +108,7 @@ public sealed partial class SandboxHost : IDisposable
         ArgumentNullException.ThrowIfNull(input);
         options ??= DefaultExecutionOptions;
         ExecutionPlanGuard.EnsurePrepared(plan, _bindings, _planSigningKey, _preparedPlans);
-        if (TryGetPreDispatchResult(plan, entrypoint, options, out var preDispatchResult))
+        if (TryGetPreDispatchResult(plan, entrypoint, options, cancellationToken, out var preDispatchResult))
         {
             return Publish(preDispatchResult);
         }
@@ -147,6 +147,7 @@ public sealed partial class SandboxHost : IDisposable
         ExecutionPlan plan,
         string entrypoint,
         SandboxExecutionOptions options,
+        CancellationToken cancellationToken,
         out SandboxExecutionResult result)
     {
         if (!Enum.IsDefined(options.Mode))
@@ -167,6 +168,12 @@ public sealed partial class SandboxHost : IDisposable
             return true;
         }
 
+        if (cancellationToken.IsCancellationRequested)
+        {
+            result = PreDispatchCancelledResult(plan, options);
+            return true;
+        }
+
         if (TryGetCapabilityDenial(plan, entrypoint, out var denial))
         {
             result = CapabilityDeniedResult(plan, options, denial);
@@ -181,6 +188,30 @@ public sealed partial class SandboxHost : IDisposable
 
         result = null!;
         return false;
+    }
+
+    private static SandboxExecutionResult PreDispatchCancelledResult(
+        ExecutionPlan plan,
+        SandboxExecutionOptions options)
+    {
+        var runId = options.RunId ?? SandboxRunId.New();
+        var budget = new ResourceMeter(plan.Budget);
+        var startedAt = AuditTime(plan);
+        var error = new SandboxError(SandboxErrorCode.Cancelled, "execution cancelled");
+        var audit = new InMemoryAuditSink();
+        WriteFailedRunSummary(audit, runId, startedAt, plan, budget, options.Mode, error, false);
+        return new SandboxExecutionResult
+        {
+            Succeeded = false,
+            Error = error,
+            ResourceUsage = budget.Snapshot(),
+            AuditEvents = audit.OwnedEventSnapshot(),
+            ActualMode = options.Mode,
+            ExecutionDispatched = false,
+            ModuleHash = plan.ModuleHash,
+            PlanHash = plan.PlanHash,
+            PolicyHash = plan.PolicyHash
+        };
     }
 
     private SandboxExecutionResult Publish(SandboxExecutionResult result)

@@ -41,9 +41,9 @@ internal static class PluginEventAdapterShapeValidator
         string eventName,
         IReadOnlyList<Parameter> parameters)
     {
-        if (string.IsNullOrEmpty(eventName))
+        if (string.IsNullOrWhiteSpace(eventName))
         {
-            throw CreateException("Plugin event adapter event name must be non-empty.");
+            throw CreateException("Plugin event adapter event name must be non-empty and non-whitespace.");
         }
 
         if (parameters is null)
@@ -59,9 +59,9 @@ internal static class PluginEventAdapterShapeValidator
                 throw CreateException("Plugin event adapter parameters must not contain null entries.");
             }
 
-            if (string.IsNullOrEmpty(parameter.Name))
+            if (string.IsNullOrWhiteSpace(parameter.Name))
             {
-                throw CreateException("Plugin event adapter parameter names must be non-empty.");
+                throw CreateException("Plugin event adapter parameter names must be non-empty and non-whitespace.");
             }
         }
 

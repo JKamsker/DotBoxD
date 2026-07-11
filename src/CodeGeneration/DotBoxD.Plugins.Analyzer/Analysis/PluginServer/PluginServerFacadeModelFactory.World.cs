@@ -183,4 +183,10 @@ internal static partial class PluginServerFacadeModelFactory
 
         return fallback?.ElementType;
     }
+
+    private static bool AssemblyEnablesClsCompliance(Compilation compilation)
+        => compilation.Assembly.GetAttributes().Any(static attribute =>
+            string.Equals(attribute.AttributeClass?.ToDisplayString(), "System.CLSCompliantAttribute", StringComparison.Ordinal) &&
+            attribute.ConstructorArguments.Length == 1 &&
+            attribute.ConstructorArguments[0].Value is true);
 }

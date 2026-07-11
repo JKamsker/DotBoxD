@@ -80,6 +80,7 @@ internal static partial class PluginServerFacadeEmitter
             builder,
             string.Empty,
             "Generated plugin-side client for the remote world domain. Call StartAsync before using runtime domain, hook, subscription, or server extension APIs.");
+        PluginServerClsComplianceAttributeSource.AppendFalse(builder, model);
         builder.Append(model.Accessibility).Append(" partial class ")
             .Append(PluginServerIdentifier.Escape(model.ClassName))
             .Append(" : ").AppendLine(model.ServerInterfaceName);
