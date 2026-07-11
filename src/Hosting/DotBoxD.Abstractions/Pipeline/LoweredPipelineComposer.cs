@@ -21,9 +21,12 @@ public static class LoweredPipelineComposer
     public static SandboxModule Compose(LoweredPipelineComposition composition)
     {
         ArgumentNullException.ThrowIfNull(composition);
-        ArgumentException.ThrowIfNullOrEmpty(composition.ModuleId);
-        ArgumentException.ThrowIfNullOrEmpty(composition.ShouldHandleFunctionId);
-        ArgumentException.ThrowIfNullOrEmpty(composition.HandleFunctionId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(
+            composition.ModuleId, nameof(LoweredPipelineComposition.ModuleId));
+        ArgumentException.ThrowIfNullOrWhiteSpace(
+            composition.ShouldHandleFunctionId, nameof(LoweredPipelineComposition.ShouldHandleFunctionId));
+        ArgumentException.ThrowIfNullOrWhiteSpace(
+            composition.HandleFunctionId, nameof(LoweredPipelineComposition.HandleFunctionId));
         if (string.Equals(composition.ShouldHandleFunctionId, composition.HandleFunctionId, StringComparison.Ordinal))
         {
             throw new ArgumentException(
