@@ -103,13 +103,10 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
                 type.getConfigurationFactories()[0]
             );
             settings.getConfiguration().setProcessId($processId);
-            const action = new java.lang.Runnable({ run: function() {
-                com.intellij.execution.ProgramRunnerUtil.executeConfiguration(
-                    settings,
-                    com.intellij.execution.executors.DefaultDebugExecutor.getDebugExecutorInstance()
-                );
-            }});
-            com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(action);
+            com.intellij.execution.ProgramRunnerUtil.executeConfiguration(
+                settings,
+                com.intellij.execution.executors.DefaultDebugExecutor.getDebugExecutorInstance()
+            );
             """,
         )
     }
@@ -165,8 +162,7 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
             const project = projectOf(component);
             const session = com.intellij.xdebugger.XDebuggerManager.getInstance(project).getCurrentSession();
             if (!session || !session.isSuspended()) throw 'No suspended DotBoxD debug session';
-            const action = new java.lang.Runnable({ run: function() { session.resume(); }});
-            com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(action);
+            session.resume();
             """,
         )
     }

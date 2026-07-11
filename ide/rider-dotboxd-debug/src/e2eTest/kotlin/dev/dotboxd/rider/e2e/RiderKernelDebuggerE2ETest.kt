@@ -30,48 +30,83 @@ class RiderKernelDebuggerE2ETest {
         rider.awaitReady()
         val root = Path.of(System.getProperty("dotboxd.e2e.root")).toAbsolutePath().normalize()
         val guardian = root.resolve("samples/GameServer/Examples.GameServer.Plugin/Kernels/GuardianKernel.cs")
-        val program = root.resolve("samples/GameServer/Examples.GameServer.Plugin/Program.cs")
         val existingBridges = liveBridgeProcessIds()
         val existingExamples = exampleProcessIds(root)
+        var launchedExamples = emptyList<Process>()
         try {
             rider.clearDotNetBreakpoints()
-            rider.addDotNetBreakpoint(program.toString(), 113)
-            rider.addDotNetBreakpoint(program.toString(), 115)
-            rider.startRunConfiguration("Start Examples")
+            rider.addDotNetBreakpoint(guardian.toString(), 35)
+            rider.addDotNetBreakpoint(guardian.toString(), 44)
+            launchedExamples = startExamples(rider, root)
             val pluginProcessId = awaitPluginBridge(existingBridges)
             rider.attachToKernels(pluginProcessId)
 
-            awaitStop(rider) { it.path.endsWith("Program.cs") && it.line == 113 }
-            rider.resume()
-            awaitStop(rider) { it.path.endsWith("Program.cs") && it.line == 115 }
-
-            rider.clearDotNetBreakpoints()
-            rider.addDotNetBreakpoint(guardian.toString(), 35)
-            rider.resume()
-            val first = awaitStop(rider) { it.path.endsWith("GuardianKernel.cs") }
-            rider.resume()
-            val repeated = awaitStop(rider) {
-                it.path.endsWith("GuardianKernel.cs") && it.stackName != first.stackName
-            }
-            assertEquals(first.line, repeated.line)
-
-            rider.addDotNetBreakpoint(guardian.toString(), 44)
-            rider.resume()
-
-            val handle = awaitStop(rider) { it.path.endsWith("GuardianKernel.cs") && it.line == 44 }
-            assertTrue(repeated.stackName != handle.stackName || repeated.line != handle.line)
-
-            rider.resume()
-            val nextPredicate = awaitStop(rider) {
-                it.path.endsWith("GuardianKernel.cs") && it.line == repeated.line
+            val firstPredicate = awaitStop(rider) {
+                it.path.endsWith("GuardianKernel.cs") && it.line == 35
             }
             rider.resume()
-            val nextHandle = awaitStop(rider) { it.path.endsWith("GuardianKernel.cs") && it.line == 44 }
-            assertTrue(nextPredicate.stackName != nextHandle.stackName || nextPredicate.line != nextHandle.line)
+            val firstHandle = awaitStop(rider) {
+                it.path.endsWith("GuardianKernel.cs") && it.line == 44
+            }
+            rider.resume()
+            val repeatedPredicate = awaitStop(rider) {
+                it.path.endsWith("GuardianKernel.cs") &&
+                    it.line == 35 && it.stackName != firstPredicate.stackName
+            }
+            rider.resume()
+            val repeatedHandle = awaitStop(rider) {
+                it.path.endsWith("GuardianKernel.cs") && it.line == 44
+            }
+
+            assertEquals(firstPredicate.line, repeatedPredicate.line)
+            assertTrue(firstPredicate.stackName != firstHandle.stackName)
+            assertTrue(repeatedPredicate.stackName != repeatedHandle.stackName)
         } finally {
+            launchedExamples.forEach { it.destroyForcibly() }
             stopNewExampleProcesses(root, existingExamples)
         }
     }
+
+    private fun startExamples(rider: RiderDriver, root: Path): List<Process> {
+        if (!System.getProperty("dotboxd.e2e.external-launch", "false").toBoolean()) {
+            rider.startRunConfiguration("Start Examples")
+            return emptyList()
+        }
+
+        val processes = mutableListOf<Process>()
+        try {
+            processes += startExample(
+                root,
+                "samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj",
+                "GameServer - Wait for Plugin (Debug)",
+            )
+            processes += startExample(
+                root,
+                "samples/GameServer/Examples.GameServer.Plugin/Examples.GameServer.Plugin.csproj",
+                "GameServer Plugin (Debug)",
+            )
+            return processes
+        } catch (exception: RuntimeException) {
+            processes.forEach { it.destroyForcibly() }
+            throw exception
+        }
+    }
+
+    private fun startExample(root: Path, project: String, profile: String): Process =
+        ProcessBuilder(
+            "dotnet",
+            "run",
+            "--project",
+            project,
+            "-c",
+            "Debug",
+            "--no-build",
+            "--launch-profile",
+            profile,
+        ).directory(root.toFile())
+            .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+            .redirectError(ProcessBuilder.Redirect.DISCARD)
+            .start()
 
     private fun awaitStop(rider: RiderDriver, predicate: (DebugStop) -> Boolean): DebugStop {
         var result: DebugStop? = null

@@ -95,8 +95,11 @@ try {
         throw "Rider did not expose its UI test endpoint within $StartupTimeout."
     }
 
+    $testArguments = @(
+        'e2eTest', '--console=plain', '-PdotboxdE2eExternalLaunch=true'
+    )
     $testProcess = Start-Process -FilePath $gradle `
-        -ArgumentList @('e2eTest', '--console=plain') `
+        -ArgumentList $testArguments `
         -WorkingDirectory $pluginDirectory `
         -RedirectStandardOutput $testOutput `
         -RedirectStandardError $testError `
@@ -110,6 +113,7 @@ try {
     if (-not $testProcess.HasExited) {
         throw 'Rider E2E tests did not complete within 10 minutes after Rider became ready.'
     }
+    $testProcess.WaitForExit()
     if ($testProcess.ExitCode -ne 0) {
         throw "Rider E2E tests failed with exit code $($testProcess.ExitCode)."
     }

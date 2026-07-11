@@ -77,6 +77,10 @@ tasks.register<Test>("e2eTest") {
     shouldRunAfter(tasks.test)
     systemProperty("remote-robot-url", providers.gradleProperty("remoteRobotUrl").getOrElse("http://127.0.0.1:8082"))
     systemProperty("dotboxd.e2e.root", layout.projectDirectory.dir("../..").asFile.absolutePath)
+    systemProperty(
+        "dotboxd.e2e.external-launch",
+        providers.gradleProperty("dotboxdE2eExternalLaunch").getOrElse("false"),
+    )
 }
 
 intellijPlatformTesting.runIde {
