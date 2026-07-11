@@ -57,6 +57,12 @@ try {
     )
     Pop-Location
 
+    Push-Location $pluginDirectory
+    Invoke-Checked $gradle @(
+        'prepareSandbox_runIdeForUiTests', '--console=plain', '--no-daemon'
+    )
+    Pop-Location
+
     $riderProcess = Start-Process -FilePath $gradle `
         -ArgumentList @('runIdeForUiTests', '--console=plain', '--no-daemon') `
         -WorkingDirectory $pluginDirectory `
