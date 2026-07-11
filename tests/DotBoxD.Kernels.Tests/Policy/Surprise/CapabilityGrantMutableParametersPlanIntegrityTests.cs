@@ -6,6 +6,36 @@ namespace DotBoxD.Kernels.Tests.Policy;
 public sealed class CapabilityGrantMutableParametersPlanIntegrityTests
 {
     [Fact]
+    public void CapabilityGrant_parameters_initializer_rejects_null()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            new CapabilityGrant("file.read", new Dictionary<string, string>())
+            {
+                Parameters = null!
+            });
+    }
+
+    [Fact]
+    public void CapabilityGrant_with_expression_snapshots_parameters()
+    {
+        var original = new CapabilityGrant("file.read", new Dictionary<string, string>
+        {
+            ["root"] = "original"
+        });
+        var replacement = new Dictionary<string, string>
+        {
+            ["root"] = "prepared"
+        };
+
+        var updated = original with { Parameters = replacement };
+
+        replacement["root"] = "mutated";
+
+        Assert.Equal("original", original.Parameters["root"]);
+        Assert.Equal("prepared", updated.Parameters["root"]);
+    }
+
+    [Fact]
     public async Task Prepared_file_read_plan_does_not_observe_mutated_grant_parameters()
     {
         using var preparedRoot = PolicyMutationTestSupport.TempDirectory.Create();

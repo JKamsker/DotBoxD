@@ -11,16 +11,19 @@ public sealed record CapabilityGrant(
     string GrantedBy = "host-policy",
     string Reason = "")
 {
-    private readonly IReadOnlyDictionary<string, string>? _parameters = SnapshotParameters(Parameters);
+    private readonly IReadOnlyDictionary<string, string> _parameters = SnapshotParameters(Parameters);
 
     public IReadOnlyDictionary<string, string> Parameters
     {
-        get => _parameters!;
-        init => _parameters = value is null ? null : SnapshotParameters(value);
+        get => _parameters;
+        init => _parameters = SnapshotParameters(value);
     }
 
     private static IReadOnlyDictionary<string, string> SnapshotParameters(IReadOnlyDictionary<string, string> parameters)
-        => ModelCopy.StringDictionary(parameters);
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
+        return ModelCopy.StringDictionary(parameters);
+    }
 }
 
 public sealed record SandboxPolicy(
