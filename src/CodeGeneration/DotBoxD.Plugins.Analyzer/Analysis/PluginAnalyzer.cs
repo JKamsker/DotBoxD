@@ -176,8 +176,14 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         }
 
         ReportAndRecordIfForbidden(context, helperGraph, method, field.ContainingType);
-        helperGraph.RecordRootMemberReference(method, field, context.Operation.Syntax.GetLocation());
-        RecordDelegateFieldReference(context, helperGraph, method, field);
+        if (IsDelegateType(field.Type))
+        {
+            RecordDelegateFieldReference(context, helperGraph, method, field);
+        }
+        else
+        {
+            helperGraph.RecordRootMemberReference(method, field, context.Operation.Syntax.GetLocation());
+        }
     }
 
     private static void AnalyzeTypeOf(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
