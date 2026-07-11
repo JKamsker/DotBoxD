@@ -18,7 +18,8 @@ internal static class GamePluginHost
         GameCommandSink sink,
         GameWorld world,
         string? pipeName = null,
-        bool enableKernelDebugging = false)
+        bool enableKernelDebugging = false,
+        bool allowIdleConnection = false)
         => PluginConnectionHost<GamePluginControlService>.StartAsync(
             server,
             string.IsNullOrWhiteSpace(pipeName) ? "dotboxd-game-" + Guid.NewGuid().ToString("N") : pipeName,
@@ -40,5 +41,8 @@ internal static class GamePluginHost
                     new GameWorldAccess(world));
                 return service;
             },
-            new PluginConnectionDebugOptions(enableKernelDebugging));
+            new PluginConnectionDebugOptions(enableKernelDebugging),
+            allowIdleConnection
+                ? new NamedPipeTransportOptions(FrameReadIdleTimeout: Timeout.InfiniteTimeSpan)
+                : NamedPipeTransportOptions.Default);
 }

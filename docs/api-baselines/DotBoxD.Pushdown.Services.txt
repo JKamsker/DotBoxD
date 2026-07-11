@@ -24,7 +24,7 @@ public sealed class PluginDebugControlRpcDispatcher : IServiceDispatcher, INonSt
 public sealed class PluginDebugControlRpcProxy : IPluginDebugControlRpcService
 public sealed class PluginDebugEventRpcDispatcher : IServiceDispatcher, INonStreamingServiceDispatcher
 public sealed class PluginDebugEventRpcProxy : IPluginDebugEventRpcService
-public sealed record NamedPipeTransportOptions(bool AllowUnsafeLowEntropyName = false)
+public sealed record NamedPipeTransportOptions( bool AllowUnsafeLowEntropyName = false, TimeSpan? FrameReadIdleTimeout = null)
 public sealed record PluginConnectionDebugOptions(bool Enabled = true)
 public sealed record PluginDebugBridgeDescriptor(int ProcessId, string PipeName, string DiscoveryToken)
 public sealed record PluginDebugBridgeOptions
@@ -43,6 +43,7 @@ public static RpcPeer ProvidePluginDebugEvents( this RpcPeer peer, IPluginDebugE
 public static Task<PluginConnectionHost<TConnection>> StartAsync( PluginServer server, IServerTransport transport, Func<RpcPeer, PluginSession, TConnection> configure, PluginConnectionDebugOptions debugOptions, RpcPeerOptions? options = null)
 public static Task<PluginConnectionHost<TConnection>> StartAsync( PluginServer server, IServerTransport transport, Func<RpcPeer, PluginSession, TConnection> configure, RpcPeerOptions? options = null)
 public static Task<PluginConnectionHost<TConnection>> StartAsync( PluginServer server, string pipeName, Func<RpcPeer, PluginSession, TConnection> configure, PluginConnectionDebugOptions debugOptions, RpcPeerOptions? options = null)
+public static Task<PluginConnectionHost<TConnection>> StartAsync( PluginServer server, string pipeName, Func<RpcPeer, PluginSession, TConnection> configure, PluginConnectionDebugOptions debugOptions, NamedPipeTransportOptions transportOptions, RpcPeerOptions? options = null)
 public static Task<PluginConnectionHost<TConnection>> StartAsync( PluginServer server, string pipeName, Func<RpcPeer, PluginSession, TConnection> configure, RpcPeerOptions? options = null)
 public static Task<RpcPeerSession> ConnectAsync( ITransport transport, Action<RpcPeer> configurePeer, RpcPeerOptions? options = null, CancellationToken cancellationToken = default)
 public static Task<RpcPeerSession> ConnectAsync( ITransport transport, RpcPeerOptions? options = null, CancellationToken cancellationToken = default)

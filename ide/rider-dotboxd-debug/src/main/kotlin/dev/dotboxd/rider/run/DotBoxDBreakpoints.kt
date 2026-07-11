@@ -81,6 +81,13 @@ class DotBoxDBreakpoints(
             this.breakpoints = breakpoints.map(::sourceBreakpoint).toTypedArray()
         }).get(10, TimeUnit.SECONDS)
         val results = response.breakpoints.orEmpty()
+        log.info(
+            "DotBoxD breakpoint sync for $path: " +
+                breakpoints.mapIndexed { index, breakpoint ->
+                    val result = results.getOrNull(index)
+                    "${breakpoint.line + 1}=${if (result?.isVerified == true) "verified" else result?.message ?: "unbound"}"
+                }.joinToString(),
+        )
         ApplicationManager.getApplication().invokeLater {
             breakpoints.forEachIndexed { index, breakpoint ->
                 val result = results.getOrNull(index)

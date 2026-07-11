@@ -27,7 +27,10 @@ import org.eclipse.lsp4j.debug.StoppedEventArguments
 import org.eclipse.lsp4j.debug.launch.DSPLauncher
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 class DotBoxDDebugProcess(
@@ -37,14 +40,21 @@ class DotBoxDDebugProcess(
 ) : XDebugProcess(session) {
     private val log = logger<DotBoxDDebugProcess>()
     private val remote = AtomicReference<IDebugProtocolServer?>()
-    private val activeThread = AtomicInteger(-1)
+    private val adapterAttached = AtomicBoolean()
+    private val initializedEventPending = AtomicBoolean()
+    private val stoppedExecution = StoppedExecutionState()
+    private val stoppedEvents = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "DotBoxD stopped-event resolver").apply { isDaemon = true }
+    }
     private val console = com.intellij.execution.filters.TextConsoleBuilderFactory.getInstance()
         .createBuilder(configuration.project).console
     private val values = DapValueFactory(remote::get, session::rebuildViews)
-    private val breakpoints = DotBoxDBreakpoints(session, remote::get)
+    private val breakpoints = DotBoxDBreakpoints(session) {
+        remote.get().takeIf { adapterAttached.get() }
+    }
     private val client = DotBoxDDapClient(
-        onInitialized = { breakpoints.pushAll(::configurationDone) },
-        onStopped = { ApplicationManager.getApplication().invokeLater { stopped(it) } },
+        onInitialized = ::adapterInitialized,
+        onStopped = ::stopped,
         onOutput = { console.print(it.output.orEmpty(), outputType(it.category)) },
         onTerminated = { ApplicationManager.getApplication().invokeLater(session::stop) },
     )
@@ -60,7 +70,7 @@ class DotBoxDDebugProcess(
     override fun getEditorsProvider(): XDebuggerEditorsProvider = EditorsProvider
 
     override fun resume(context: XSuspendContext?) = control { continue_(ContinueArguments().apply { threadId = it }) }
-    override fun startPausing() = control { pause(PauseArguments().apply { threadId = it }) }
+    override fun startPausing() = pause()
     override fun startStepOver(context: XSuspendContext?) = control { next(NextArguments().apply { threadId = it }) }
     override fun startStepInto(context: XSuspendContext?) = control { stepIn(StepInArguments().apply { threadId = it }) }
     override fun startStepOut(context: XSuspendContext?) = control { stepOut(StepOutArguments().apply { threadId = it }) }
@@ -70,8 +80,14 @@ class DotBoxDDebugProcess(
             AppExecutorUtil.getAppExecutorService().execute {
                 try {
                     val server = requireNotNull(remote.get())
+                    val threadId = stoppedExecution.current()
+                    if (threadId == null) {
+                        callback.errorOccurred("No kernel execution is stopped.")
+                        return@execute
+                    }
+
                     val frameId = server.stackTrace(StackTraceArguments().apply {
-                        threadId = activeThread.get()
+                        this.threadId = threadId
                         levels = 1
                     }).awaitDap().stackFrames?.firstOrNull()?.id
                     val response = server.evaluate(EvaluateArguments().apply {
@@ -88,6 +104,8 @@ class DotBoxDDebugProcess(
     }
 
     override fun stop() {
+        stoppedExecution.clear()
+        stoppedEvents.shutdownNow()
         val server = remote.getAndSet(null)
         AppExecutorUtil.getAppExecutorService().execute {
             runCatching { server?.disconnect(DisconnectArguments().apply { terminateDebuggee = false })?.awaitDap() }
@@ -110,12 +128,27 @@ class DotBoxDDebugProcess(
                     ?.let { put("pauseScope", it) }
                 configuration.pluginId.takeIf(String::isNotBlank)?.let { put("pluginId", it) }
             }).awaitDap()
+            adapterAttached.set(true)
+            synchronizeBreakpointsIfReady()
         } catch (exception: Exception) {
+            adapterAttached.set(false)
+            remote.set(null)
             log.warn("DotBoxD DAP connection failed", exception)
             ApplicationManager.getApplication().invokeLater {
-                session.reportError("DotBoxD kernel debugger: ${exception.message}")
+                session.reportError("DotBoxD kernel debugger: ${connectionFailureMessage(exception)}")
                 session.stop()
             }
+        }
+    }
+
+    private fun adapterInitialized() {
+        initializedEventPending.set(true)
+        synchronizeBreakpointsIfReady()
+    }
+
+    private fun synchronizeBreakpointsIfReady() {
+        if (adapterAttached.get() && initializedEventPending.compareAndSet(true, false)) {
+            breakpoints.pushAll(::configurationDone)
         }
     }
 
@@ -125,7 +158,7 @@ class DotBoxDDebugProcess(
         } catch (exception: Exception) {
             log.warn("DotBoxD DAP configuration failed", exception)
             ApplicationManager.getApplication().invokeLater {
-                session.reportError("DotBoxD kernel debugger: ${exception.message}")
+                session.reportError("DotBoxD kernel debugger: ${connectionFailureMessage(exception)}")
                 session.stop()
             }
         }
@@ -133,13 +166,26 @@ class DotBoxDDebugProcess(
 
     private fun stopped(arguments: StoppedEventArguments) {
         val threadId = arguments.threadId?.takeIf { it > 0 } ?: return
-        activeThread.set(threadId)
-        session.positionReached(DapSuspendContext(threadId))
+        stoppedEvents.execute {
+            val displayName = "Kernel execution $threadId"
+            val stack = runCatching {
+                DapExecutionStack.withTopFrame(displayName, threadId, remote::get, values)
+            }.getOrElse {
+                log.warn("DotBoxD stopped stack resolution failed", it)
+                DapExecutionStack(displayName, threadId, remote::get, values)
+            }
+            ApplicationManager.getApplication().invokeLater {
+                stoppedExecution.stopped(threadId)
+                session.positionReached(DapSuspendContext(threadId, stack))
+            }
+        }
     }
 
-    private inner class DapSuspendContext(private val threadId: Int) : XSuspendContext() {
-        override fun getActiveExecutionStack(): XExecutionStack =
-            DapExecutionStack("Kernel execution $threadId", threadId, remote::get, values)
+    private inner class DapSuspendContext(
+        private val threadId: Int,
+        private val activeStack: DapExecutionStack,
+    ) : XSuspendContext() {
+        override fun getActiveExecutionStack(): XExecutionStack = activeStack
 
         override fun computeExecutionStacks(container: XExecutionStackContainer) {
             AppExecutorUtil.getAppExecutorService().execute {
@@ -156,15 +202,33 @@ class DotBoxDDebugProcess(
     }
 
     private fun control(command: IDebugProtocolServer.(Int) -> CompletableFuture<*>) {
-        val threadId = activeThread.get().takeIf { it > 0 } ?: return
-        val server = remote.get() ?: return
+        val threadId = stoppedExecution.claim() ?: return
+        val server = remote.get() ?: run {
+            stoppedExecution.restore(threadId)
+            return
+        }
         AppExecutorUtil.getAppExecutorService().execute {
             try {
                 server.command(threadId).awaitDap()
             } catch (exception: Exception) {
+                stoppedExecution.restore(threadId)
                 log.warn("DotBoxD DAP control command failed", exception)
                 ApplicationManager.getApplication().invokeLater {
-                    session.reportError("DotBoxD kernel debugger: ${exception.message}")
+                    session.reportError("DotBoxD kernel debugger: ${connectionFailureMessage(exception)}")
+                }
+            }
+        }
+    }
+
+    private fun pause() {
+        val server = remote.get() ?: return
+        AppExecutorUtil.getAppExecutorService().execute {
+            try {
+                server.pause(PauseArguments().apply { threadId = stoppedExecution.current() ?: 0 }).awaitDap()
+            } catch (exception: Exception) {
+                log.warn("DotBoxD DAP pause failed", exception)
+                ApplicationManager.getApplication().invokeLater {
+                    session.reportError("DotBoxD kernel debugger: ${connectionFailureMessage(exception)}")
                 }
             }
         }
@@ -174,6 +238,14 @@ class DotBoxDDebugProcess(
         "stderr", "important" -> com.intellij.execution.ui.ConsoleViewContentType.ERROR_OUTPUT
         "console" -> com.intellij.execution.ui.ConsoleViewContentType.SYSTEM_OUTPUT
         else -> com.intellij.execution.ui.ConsoleViewContentType.NORMAL_OUTPUT
+    }
+
+    private fun connectionFailureMessage(exception: Exception): String {
+        val failure = if (exception is ExecutionException) exception.cause ?: exception else exception
+        return when (failure) {
+            is TimeoutException -> "adapter request timed out"
+            else -> failure.message?.takeIf(String::isNotBlank) ?: failure.javaClass.simpleName
+        }
     }
 
     private object EditorsProvider : XDebuggerEditorsProvider() {

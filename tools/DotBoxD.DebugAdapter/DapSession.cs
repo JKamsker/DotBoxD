@@ -134,6 +134,7 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
         _inspection = new DapInspectionHandler(connection, _bridge, _pluginId);
         _breakpoints = new DapBreakpointHandler(connection, _bridge, _pluginId);
         _bridge.EventReceiver = _inspection.OnRemoteEventAsync;
+        _bridge.SourcesChangedReceiver = _breakpoints.OnSourcesChangedAsync;
         _ = await _bridge.RemoteAsync(PluginDebugCommands.Initialize, null, cancellationToken).ConfigureAwait(false);
         var pauseScope = arguments.TryGetProperty("pauseScope", out var scope)
             ? scope.GetString()
@@ -163,6 +164,7 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
         var bridge = RequireBridge();
         string remoteCommand;
         object? payload;
+        int? controlledThreadId = null;
         if (command == "pause")
         {
             remoteCommand = PluginDebugCommands.Pause;
@@ -171,6 +173,7 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
         else
         {
             var threadId = request.GetProperty("arguments").GetProperty("threadId").GetInt32();
+            controlledThreadId = threadId;
             remoteCommand = command switch
             {
                 "next" => PluginDebugCommands.StepOver,
@@ -185,14 +188,17 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
         await connection.RespondAsync(
                 request,
                 true,
-                command == "continue" ? new { allThreadsContinued = true } : new { },
+                command == "continue" ? new { allThreadsContinued = false } : new { },
                 null,
                 cancellationToken)
             .ConfigureAwait(false);
-        if (command != "pause")
+        if (controlledThreadId is { } resumedThreadId)
         {
-            RequireInspection().InvalidateStoppedState();
-            await connection.EventAsync("continued", new { allThreadsContinued = true }, cancellationToken)
+            RequireInspection().InvalidateStoppedState(resumedThreadId);
+            await connection.EventAsync(
+                    "continued",
+                    new { threadId = resumedThreadId, allThreadsContinued = false },
+                    cancellationToken)
                 .ConfigureAwait(false);
         }
     }
@@ -212,7 +218,7 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
             }
         }
 
-        _inspection?.InvalidateStoppedState();
+        _inspection?.InvalidateAllStoppedState();
 
         await connection.RespondAsync(request, true, new { }, null, cancellationToken).ConfigureAwait(false);
         await connection.EventAsync("terminated", new { }, cancellationToken).ConfigureAwait(false);

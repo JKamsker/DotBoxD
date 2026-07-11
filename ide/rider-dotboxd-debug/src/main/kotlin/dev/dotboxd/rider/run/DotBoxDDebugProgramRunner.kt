@@ -14,6 +14,9 @@ import com.intellij.xdebugger.XDebugProcessStarter
 import com.intellij.xdebugger.XDebugSession
 import com.intellij.xdebugger.XDebuggerManager
 import java.io.File
+import java.io.InputStream
+import java.net.URL
+import java.security.MessageDigest
 
 class DotBoxDDebugProgramRunner : GenericProgramRunner<RunnerSettings>() {
     override fun getRunnerId() = "DotBoxDKernelDebugProgramRunner"
@@ -64,8 +67,21 @@ class DotBoxDDebugProgramRunner : GenericProgramRunner<RunnerSettings>() {
         val version = plugin?.version?.replace(Regex("[^A-Za-z0-9._-]"), "_") ?: "development"
         val output = File(com.intellij.openapi.application.PathManager.getTempPath(), "dotboxd-rider/$version/adapter")
         val marker = File(output, "DotBoxD.DebugAdapter.dll")
-        if (!marker.isFile) extractAdapter(output)
+        if (!marker.isFile || !resourceMatches(resource, marker)) extractAdapter(output)
         return marker
+    }
+
+    private fun resourceMatches(resource: URL, marker: File): Boolean =
+        resource.openStream().use(::sha256).contentEquals(marker.inputStream().use(::sha256))
+
+    private fun sha256(input: InputStream): ByteArray {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) return digest.digest()
+            digest.update(buffer, 0, read)
+        }
     }
 
     private fun extractAdapter(output: File) {

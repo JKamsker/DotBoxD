@@ -72,15 +72,36 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
         Func<RpcPeer, PluginSession, TConnection> configure,
         PluginConnectionDebugOptions debugOptions,
         RpcPeerOptions? options = null)
+        => StartAsync(
+            server,
+            pipeName,
+            configure,
+            debugOptions,
+            NamedPipeTransportOptions.Default,
+            options);
+
+    /// <summary>Starts a named-pipe host with explicit transport and peer options for long-lived sessions.</summary>
+    public static Task<PluginConnectionHost<TConnection>> StartAsync(
+        PluginServer server,
+        string pipeName,
+        Func<RpcPeer, PluginSession, TConnection> configure,
+        PluginConnectionDebugOptions debugOptions,
+        NamedPipeTransportOptions transportOptions,
+        RpcPeerOptions? options = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(pipeName);
         ArgumentNullException.ThrowIfNull(debugOptions);
+        ArgumentNullException.ThrowIfNull(transportOptions);
         return StartCoreAsync(
             server,
             pipeName,
             configure,
             debugOptions,
-            configurePeer => RpcMessagePackIpc.ListenNamedPipe(pipeName, configurePeer, options));
+            configurePeer => RpcMessagePackIpc.ListenNamedPipe(
+                pipeName,
+                configurePeer,
+                transportOptions,
+                options));
     }
 
     /// <summary>

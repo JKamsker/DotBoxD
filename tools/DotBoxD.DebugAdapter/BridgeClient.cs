@@ -27,6 +27,8 @@ internal sealed class BridgeClient : IAsyncDisposable
 
     public Func<PluginDebugEnvelope, ValueTask>? EventReceiver { get; set; }
 
+    public Func<ValueTask>? SourcesChangedReceiver { get; set; }
+
     public static async Task<BridgeClient> ConnectAsync(
         string pipeName,
         string discoveryToken,
@@ -208,7 +210,8 @@ internal sealed class BridgeClient : IAsyncDisposable
                     continue;
                 }
 
-                if (root.GetProperty("kind").GetString() == "event")
+                var kind = root.GetProperty("kind").GetString();
+                if (kind == "event")
                 {
                     var envelope = PluginDebugProtocol.Decode(
                         Convert.FromBase64String(root.GetProperty("payload").GetString()!),
@@ -217,6 +220,10 @@ internal sealed class BridgeClient : IAsyncDisposable
                     {
                         await handler(envelope).ConfigureAwait(false);
                     }
+                }
+                else if (kind == "sourcesChanged" && SourcesChangedReceiver is { } sourcesChanged)
+                {
+                    _ = Task.Run(async () => await sourcesChanged().ConfigureAwait(false), CancellationToken.None);
                 }
             }
         }

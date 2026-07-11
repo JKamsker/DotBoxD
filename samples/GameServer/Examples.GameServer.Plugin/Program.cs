@@ -2,6 +2,7 @@ using DotBoxD.Kernels.Game.Plugin.Authoring;
 using DotBoxD.Kernels.Game.Plugin.Kernels;
 using DotBoxD.Kernels.Game.Server.Abstractions.Events;
 using DotBoxD.Pushdown.Services;
+using DotBoxD.Services.Peer;
 
 namespace DotBoxD.Kernels.Game.Plugin;
 
@@ -45,16 +46,26 @@ internal static class Program
         Console.WriteLine($"[plugin] connecting to server pipe '{pipeName}'...");
 
         await using var debugBridge = KernelDebuggingRequested()
-            ? PluginDebugBridge.Start()
+            ? PluginDebugBridge.Start(new PluginDebugBridgeOptions
+            {
+                // Continuous debug rounds make late attachment safe and keep the compound launch non-blocking.
+                WaitForDebuggerBeforeInstall = false
+            })
             : null;
         if (debugBridge is not null)
         {
             Console.WriteLine($"[plugin] kernel debug bridge ready for PID {debugBridge.Descriptor.ProcessId}.");
         }
 
+        var transportOptions = new NamedPipeTransportOptions(FrameReadIdleTimeout: Timeout.InfiniteTimeSpan);
+        var connectionOptions = new RpcPeerOptions { RequestTimeout = Timeout.InfiniteTimeSpan };
         var builder = debugBridge is null
-            ? GamePluginServerBuilder.FromPipeName(pipeName)
-            : GamePluginServerBuilder.FromPipeNameWithKernelDebugging(pipeName, debugBridge);
+            ? GamePluginServerBuilder.FromPipeName(pipeName, transportOptions, connectionOptions)
+            : GamePluginServerBuilder.FromPipeNameWithKernelDebugging(
+                pipeName,
+                debugBridge,
+                transportOptions,
+                connectionOptions);
         using IGameWorldServer server = builder
             .Setup(s =>
             {

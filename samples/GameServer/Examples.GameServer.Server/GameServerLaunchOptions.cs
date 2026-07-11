@@ -1,15 +1,20 @@
 namespace DotBoxD.Kernels.Game.Server;
 
-internal sealed record GameServerLaunchOptions(bool UseBuilder, string? ExternalPluginPipeName)
+internal sealed record GameServerLaunchOptions(
+    bool UseBuilder,
+    bool Continuous,
+    string? ExternalPluginPipeName)
 {
     public const string Usage =
-        "Usage: Examples.GameServer.Server [--use-builder] [--external-plugin --pipe-name <named-pipe-name>]";
+        "Usage: Examples.GameServer.Server [--use-builder] [--continuous] " +
+        "[--external-plugin --pipe-name <named-pipe-name>]";
 
     public bool LaunchPlugin => ExternalPluginPipeName is null;
 
     public static bool TryParse(string[] args, out GameServerLaunchOptions options, out string error)
     {
         var useBuilder = false;
+        var continuous = false;
         var externalPlugin = false;
         string? pipeName = null;
 
@@ -19,6 +24,10 @@ internal sealed record GameServerLaunchOptions(bool UseBuilder, string? External
             {
                 case "--use-builder":
                     useBuilder = true;
+                    break;
+
+                case "--continuous":
+                    continuous = true;
                     break;
 
                 case "--external-plugin":
@@ -54,14 +63,14 @@ internal sealed record GameServerLaunchOptions(bool UseBuilder, string? External
             return Fail(out options, out error, "--use-builder only applies when the server launches the plugin.");
         }
 
-        options = new GameServerLaunchOptions(useBuilder, pipeName);
+        options = new GameServerLaunchOptions(useBuilder, continuous, pipeName);
         error = string.Empty;
         return true;
     }
 
     private static bool Fail(out GameServerLaunchOptions options, out string error, string message)
     {
-        options = new GameServerLaunchOptions(false, null);
+        options = new GameServerLaunchOptions(false, false, null);
         error = message;
         return false;
     }

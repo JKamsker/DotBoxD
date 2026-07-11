@@ -151,6 +151,9 @@ public sealed class DapAdapterTranscriptTests
         Assert.True(remoteBreakpoints.Length == 1, JsonSerializer.Serialize(messages));
         var breakpoint = remoteBreakpoints[0];
         Assert.StartsWith("v1:", breakpoint.GetProperty("nodeId").GetString(), StringComparison.Ordinal);
+        Assert.False(breakpoint.TryGetProperty("condition", out _));
+        Assert.False(breakpoint.TryGetProperty("hitCount", out _));
+        Assert.False(breakpoint.TryGetProperty("logMessage", out _));
 
         Assert.Contains(messages, item => item.GetProperty("type").GetString() == "event" && item.GetProperty("event").GetString() == "initialized");
         Assert.Contains(messages, item => item.GetProperty("type").GetString() == "event" && item.GetProperty("event").GetString() == "terminated");

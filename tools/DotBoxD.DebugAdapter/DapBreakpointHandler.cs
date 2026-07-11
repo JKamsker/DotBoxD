@@ -8,6 +8,9 @@ internal sealed class DapBreakpointHandler(
     BridgeClient bridge,
     string pluginId)
 {
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly Dictionary<string, JsonElement[]> _sourceRequests =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, BreakpointBinding[]> _sourceBindings =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _configuredPluginIds = new(StringComparer.Ordinal);
@@ -19,6 +22,60 @@ internal sealed class DapBreakpointHandler(
         var requested = arguments.TryGetProperty("breakpoints", out var breakpointValues)
             ? breakpointValues.EnumerateArray().Select(item => item.Clone()).ToArray()
             : [];
+        JsonElement[] resolved;
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            _sourceRequests[path] = requested;
+            resolved = await ResolveAsync(path, requested, cancellationToken).ConfigureAwait(false);
+            await SynchronizeRemoteBreakpointsAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+
+        await connection.RespondAsync(
+                request,
+                true,
+                new { breakpoints = resolved.Select(DapBreakpoint).ToArray() },
+                null,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async ValueTask OnSourcesChangedAsync()
+    {
+        var changed = new List<JsonElement>();
+        await _gate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            foreach (var (path, requested) in _sourceRequests)
+            {
+                changed.AddRange(await ResolveAsync(path, requested, CancellationToken.None).ConfigureAwait(false));
+            }
+
+            await SynchronizeRemoteBreakpointsAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+
+        for (var index = 0; index < changed.Count; index++)
+        {
+            await connection.EventAsync(
+                    "breakpoint",
+                    new { reason = "changed", breakpoint = DapBreakpoint(changed[index], index) })
+                .ConfigureAwait(false);
+        }
+    }
+
+    private async ValueTask<JsonElement[]> ResolveAsync(
+        string path,
+        JsonElement[] requested,
+        CancellationToken cancellationToken)
+    {
         var lines = requested.Select(item => item.GetProperty("line").GetInt32()).ToArray();
         var resolvedResponse = await bridge.SendAsync(
                 "resolve",
@@ -34,14 +91,7 @@ internal sealed class DapBreakpointHandler(
         var resolved = Property(resolvedResponse.GetProperty("body"), "Breakpoints", "breakpoints")
             .EnumerateArray().Select(item => item.Clone()).ToArray();
         _sourceBindings[path] = BuildBindings(requested, resolved);
-        await SynchronizeRemoteBreakpointsAsync(cancellationToken).ConfigureAwait(false);
-        await connection.RespondAsync(
-                request,
-                true,
-                new { breakpoints = resolved.Select(DapBreakpoint).ToArray() },
-                null,
-                cancellationToken)
-            .ConfigureAwait(false);
+        return resolved;
     }
 
     private async ValueTask SynchronizeRemoteBreakpointsAsync(CancellationToken cancellationToken)
@@ -87,17 +137,34 @@ internal sealed class DapBreakpointHandler(
 
                 bindings.Add(new BreakpointBinding(
                     pluginId,
-                    new
-                    {
-                        nodeId = Property(binding, "NodeId", "nodeId").GetString(),
-                        condition = OptionalString(source, "condition"),
-                        hitCount = ParseHitCount(OptionalString(source, "hitCondition")),
-                        logMessage = OptionalString(source, "logMessage")
-                    }));
+                    BreakpointSpecification(source, binding)));
             }
         }
 
         return bindings.ToArray();
+    }
+
+    private static IReadOnlyDictionary<string, object> BreakpointSpecification(
+        JsonElement source,
+        JsonElement binding)
+    {
+        var specification = new Dictionary<string, object>(StringComparer.Ordinal)
+        {
+            ["nodeId"] = Property(binding, "NodeId", "nodeId").GetString()
+                ?? throw new DebugAdapterException("invalidBinding", "A breakpoint binding is missing its node ID.")
+        };
+        AddOptional(specification, "condition", OptionalString(source, "condition"));
+        AddOptional(specification, "hitCount", ParseHitCount(OptionalString(source, "hitCondition")));
+        AddOptional(specification, "logMessage", OptionalString(source, "logMessage"));
+        return specification;
+    }
+
+    private static void AddOptional(Dictionary<string, object> target, string name, object? value)
+    {
+        if (value is not null)
+        {
+            target[name] = value;
+        }
     }
 
     private static object DapBreakpoint(JsonElement resolved, int index)

@@ -24,8 +24,9 @@ class DapExecutionStack(
     private val threadId: Int,
     private val remote: () -> IDebugProtocolServer?,
     private val values: DapValueFactory,
+    private val topFrame: XStackFrame? = null,
 ) : XExecutionStack(displayName) {
-    override fun getTopFrame(): XStackFrame? = null
+    override fun getTopFrame(): XStackFrame? = topFrame
 
     override fun computeStackFrames(firstFrameIndex: Int, container: XStackFrameContainer) {
         AppExecutorUtil.getAppExecutorService().execute {
@@ -42,6 +43,29 @@ class DapExecutionStack(
             } catch (exception: Exception) {
                 container.errorOccurred(exception.message ?: "stackTrace failed")
             }
+        }
+    }
+
+    companion object {
+        fun withTopFrame(
+            displayName: String,
+            threadId: Int,
+            remote: () -> IDebugProtocolServer?,
+            values: DapValueFactory,
+        ): DapExecutionStack {
+            val server = requireNotNull(remote())
+            val frame = server.stackTrace(StackTraceArguments().apply {
+                this.threadId = threadId
+                startFrame = 0
+                levels = 1
+            }).awaitDap().stackFrames.orEmpty().firstOrNull()
+            return DapExecutionStack(
+                displayName,
+                threadId,
+                remote,
+                values,
+                frame?.let { DapStackFrame(it, server, values) },
+            )
         }
     }
 }

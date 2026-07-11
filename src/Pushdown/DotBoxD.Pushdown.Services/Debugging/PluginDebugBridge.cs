@@ -20,7 +20,7 @@ public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDispo
     private readonly PluginDebugSourceCatalog _sources;
     private readonly PluginDebugBridgeRequestHandler _requests;
     private readonly CancellationTokenSource _lifetime = new();
-    private readonly Channel<byte[]> _events = Channel.CreateUnbounded<byte[]>();
+    private readonly Channel<LocalBridgeEvent> _events = Channel.CreateUnbounded<LocalBridgeEvent>();
     private readonly SemaphoreSlim _writeGate = new(1, 1);
     private readonly TaskCompletionSource<string> _sessionToken =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -59,7 +59,11 @@ public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDispo
     }
 
     /// <summary>Registers client-only source maps before installation.</summary>
-    public void RegisterPackage(PluginPackage package) => _sources.Register(package);
+    public void RegisterPackage(PluginPackage package)
+    {
+        _sources.Register(package);
+        _events.Writer.TryWrite(LocalBridgeEvent.SourcesChanged());
+    }
 
     /// <summary>Registers package maps and waits until the adapter has sent configurationDone.</summary>
     public async ValueTask PreparePackageAsync(
@@ -100,7 +104,7 @@ public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDispo
     {
         ArgumentNullException.ThrowIfNull(message);
         CaptureBootstrap(message);
-        return _events.Writer.WriteAsync(message.ToArray(), cancellationToken);
+        return _events.Writer.WriteAsync(LocalBridgeEvent.Remote(message.ToArray()), cancellationToken);
     }
 
     public async ValueTask DisposeAsync()
@@ -208,12 +212,9 @@ public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDispo
 
     private async Task SendEventsAsync(Stream stream, CancellationToken cancellationToken)
     {
-        await foreach (var message in _events.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        await foreach (var bridgeEvent in _events.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
-            await WriteAsync(
-                    stream,
-                    new { kind = "event", payload = Convert.ToBase64String(message) },
-                    cancellationToken)
+            await WriteAsync(stream, bridgeEvent.Message, cancellationToken)
                 .ConfigureAwait(false);
         }
     }

@@ -9,6 +9,18 @@ internal sealed class DapVariableStore
 
     public void Clear() => _handles.Clear();
 
+    public void RemoveFrames(IReadOnlySet<string> frameIds)
+    {
+        var references = _handles
+            .Where(item => frameIds.Contains(item.Value.FrameId))
+            .Select(item => item.Key)
+            .ToArray();
+        foreach (var reference in references)
+        {
+            _handles.Remove(reference);
+        }
+    }
+
     public object Scopes(string frameId)
     {
         var arguments = Add(new DapVariableHandle(frameId, "arguments", default, null, []));

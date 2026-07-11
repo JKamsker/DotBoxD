@@ -3,13 +3,14 @@
   "profiles": {
     "Examples.GameServer.Server": {
       "commandName": "Project",
+      "commandLineArgs": "--continuous",
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development"
       }
     },
     "GameServer - Wait for Plugin (Debug)": {
       "commandName": "Project",
-      "commandLineArgs": "--external-plugin --pipe-name dotboxd-game-debug-0123456789abcdef",
+      "commandLineArgs": "--continuous --external-plugin --pipe-name dotboxd-game-debug-0123456789abcdef",
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development",
         "DOTBOXD_KERNEL_DEBUG": "1",

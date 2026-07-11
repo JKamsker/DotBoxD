@@ -9,13 +9,8 @@ internal sealed class DapInspectionHandler(
     BridgeClient bridge,
     string pluginId)
 {
-    private readonly Dictionary<int, string> _threads = [];
-    private readonly Dictionary<int, string> _threadPlugins = [];
-    private readonly Dictionary<string, int> _threadIds = new(StringComparer.Ordinal);
-    private readonly Dictionary<int, string> _frames = [];
+    private readonly DapStoppedExecutionStore _stopped = new();
     private readonly DapVariableStore _variableStore = new();
-    private int _nextThreadId;
-    private int _nextFrameId;
 
     public bool Handles(string command) => command is
         "threads" or "stackTrace" or "scopes" or "variables" or "evaluate" or
@@ -45,12 +40,11 @@ internal sealed class DapInspectionHandler(
         if (envelope.Kind == "stopped")
         {
             var runId = envelope.Payload.GetProperty("runId").GetString()!;
-            var threadId = ThreadId(runId);
-            _threadPlugins[threadId] = envelope.Payload.GetProperty("pluginId").GetString()!;
+            var threadId = _stopped.RecordThread(runId, envelope.Payload.GetProperty("pluginId").GetString()!);
             var reason = envelope.Payload.GetProperty("reason").GetString();
             await connection.EventAsync(
                     "stopped",
-                    new { reason = DapStopReason(reason), threadId, allThreadsStopped = true })
+                    new { reason = DapStopReason(reason), threadId, allThreadsStopped = false })
                 .ConfigureAwait(false);
         }
         else if (envelope.Kind == "output")
@@ -66,17 +60,16 @@ internal sealed class DapInspectionHandler(
         }
     }
 
-    public string RunId(int threadId)
-        => _threads.TryGetValue(threadId, out var runId)
-            ? runId
-            : throw new DebugAdapterException("staleThread", "The selected kernel execution is no longer stopped.");
+    public string RunId(int threadId) => _stopped.RunId(threadId);
 
-    public void InvalidateStoppedState()
+    public void InvalidateStoppedState(int threadId)
     {
-        _threads.Clear();
-        _threadPlugins.Clear();
-        _threadIds.Clear();
-        _frames.Clear();
+        _variableStore.RemoveFrames(_stopped.RemoveThread(threadId));
+    }
+
+    public void InvalidateAllStoppedState()
+    {
+        _stopped.Clear();
         _variableStore.Clear();
     }
 
@@ -93,7 +86,7 @@ internal sealed class DapInspectionHandler(
     {
         var threadId = Arguments(request).GetProperty("threadId").GetInt32();
         var runId = RunId(threadId);
-        var stoppedPluginId = _threadPlugins.GetValueOrDefault(threadId, pluginId);
+        var stoppedPluginId = _stopped.PluginId(threadId, pluginId);
         var body = await bridge.RemoteAsync(
                 PluginDebugCommands.StackTrace,
                 new { runId },
@@ -102,8 +95,7 @@ internal sealed class DapInspectionHandler(
         var frames = new List<object>();
         foreach (var frame in body.GetProperty("frames").EnumerateArray())
         {
-            var frameId = Interlocked.Increment(ref _nextFrameId);
-            _frames[frameId] = frame.GetProperty("frameId").GetString()!;
+            var frameId = _stopped.AddFrame(threadId, frame.GetProperty("frameId").GetString()!);
             var location = await LocationAsync(frame, stoppedPluginId, cancellationToken).ConfigureAwait(false);
             frames.Add(new
             {
@@ -160,7 +152,7 @@ internal sealed class DapInspectionHandler(
                 cancellationToken)
             .ConfigureAwait(false);
         var value = body.GetProperty("value");
-        return new { result = DapVariableStore.Display(value), type = value.GetProperty("type").GetString(), variablesReference = _variableStore.ValueReference(value) };
+        return new { result = DapVariableStore.Display(value), type = value.GetProperty("type").GetString(), variablesReference = _variableStore.ValueReference(value, frameId) };
     }
 
     private ValueTask<object> SetVariableAsync(JsonElement request, CancellationToken cancellationToken)
@@ -199,7 +191,7 @@ internal sealed class DapInspectionHandler(
                 cancellationToken)
             .ConfigureAwait(false);
         var result = body.GetProperty("value");
-        return new { value = DapVariableStore.Display(result), type = result.GetProperty("type").GetString(), variablesReference = _variableStore.ValueReference(result) };
+        return new { value = DapVariableStore.Display(result), type = result.GetProperty("type").GetString(), variablesReference = _variableStore.ValueReference(result, frameId) };
     }
 
     private async ValueTask<object> SourceAsync(JsonElement request, CancellationToken cancellationToken)
@@ -246,33 +238,17 @@ internal sealed class DapInspectionHandler(
             OptionalInt(location, "EndColumn", "endColumn"));
     }
 
-    private int ThreadId(string runId)
-    {
-        if (_threadIds.TryGetValue(runId, out var existing))
-        {
-            return existing;
-        }
-
-        var id = Interlocked.Increment(ref _nextThreadId);
-        _threadIds[runId] = id;
-        _threads[id] = runId;
-        return id;
-    }
-
     private object DapThread(JsonElement thread)
     {
-        var id = ThreadId(thread.GetProperty("runId").GetString()!);
-        if (thread.TryGetProperty("pluginId", out var value) && value.ValueKind == JsonValueKind.String)
-        {
-            _threadPlugins[id] = value.GetString()!;
-        }
+        var stoppedPluginId = thread.TryGetProperty("pluginId", out var value) &&
+            value.ValueKind == JsonValueKind.String
+                ? value.GetString()
+                : null;
+        var id = _stopped.RecordThread(thread.GetProperty("runId").GetString()!, stoppedPluginId);
 
         return new { id, name = thread.GetProperty("name").GetString() };
     }
 
-    private string Frame(int frameId)
-        => _frames.TryGetValue(frameId, out var frame)
-            ? frame
-            : throw new DebugAdapterException("staleFrame", "The selected stack frame is no longer stopped.");
+    private string Frame(int frameId) => _stopped.Frame(frameId);
 
 }

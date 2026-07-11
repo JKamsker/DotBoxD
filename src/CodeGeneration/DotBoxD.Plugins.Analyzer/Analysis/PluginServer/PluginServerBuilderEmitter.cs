@@ -50,15 +50,40 @@ internal static class PluginServerBuilderEmitter
             "    ",
             "Creates a builder that connects to a running game server by named pipe when StartAsync is called.");
         builder.AppendLine("    public static " + model.ClassName + "Builder FromPipeName(string pipeName)");
-        builder.AppendLine("        => new((configurePeer, ct) => new global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>(global::DotBoxD.Pushdown.Services.RpcMessagePackIpc.ConnectNamedPipeAsync(pipeName, configurePeer, cancellationToken: ct)));");
+        builder.AppendLine("        => FromPipeName(pipeName, options: null);");
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "    ",
+            "Creates a builder that connects with explicit peer options, such as an infinite timeout for a long-lived host session.");
+        builder.AppendLine("    public static " + model.ClassName + "Builder FromPipeName(string pipeName, global::DotBoxD.Services.Peer.RpcPeerOptions? options)");
+        builder.AppendLine("        => FromPipeName(pipeName, global::DotBoxD.Pushdown.Services.NamedPipeTransportOptions.Default, options);");
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "    ",
+            "Creates a builder that connects with explicit named-pipe transport and peer options.");
+        builder.AppendLine("    public static " + model.ClassName + "Builder FromPipeName(string pipeName, global::DotBoxD.Pushdown.Services.NamedPipeTransportOptions transportOptions, global::DotBoxD.Services.Peer.RpcPeerOptions? options = null)");
+        builder.AppendLine("        => new((configurePeer, ct) => new global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>(global::DotBoxD.Pushdown.Services.RpcMessagePackIpc.ConnectNamedPipeAsync(pipeName, configurePeer, namedPipeOptions: transportOptions, options: options, cancellationToken: ct)));");
         PluginServerXmlDocumentation.AppendSummary(
             builder,
             "    ",
             "Creates a pipe builder that exposes source maps through an explicitly started local debug bridge before setup packages are installed.");
         builder.AppendLine("    public static " + model.ClassName + "Builder FromPipeNameWithKernelDebugging(string pipeName, global::DotBoxD.Pushdown.Services.PluginDebugBridge debugBridge)");
+        builder.AppendLine("        => FromPipeNameWithKernelDebugging(pipeName, debugBridge, options: null);");
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "    ",
+            "Creates a debugging pipe builder with explicit peer options, such as an infinite timeout for a long-lived host session.");
+        builder.AppendLine("    public static " + model.ClassName + "Builder FromPipeNameWithKernelDebugging(string pipeName, global::DotBoxD.Pushdown.Services.PluginDebugBridge debugBridge, global::DotBoxD.Services.Peer.RpcPeerOptions? options)");
+        builder.AppendLine("        => FromPipeNameWithKernelDebugging(pipeName, debugBridge, global::DotBoxD.Pushdown.Services.NamedPipeTransportOptions.Default, options);");
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "    ",
+            "Creates a debugging pipe builder with explicit named-pipe transport and peer options.");
+        builder.AppendLine("    public static " + model.ClassName + "Builder FromPipeNameWithKernelDebugging(string pipeName, global::DotBoxD.Pushdown.Services.PluginDebugBridge debugBridge, global::DotBoxD.Pushdown.Services.NamedPipeTransportOptions transportOptions, global::DotBoxD.Services.Peer.RpcPeerOptions? options = null)");
         builder.AppendLine("    {");
         builder.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(debugBridge);");
-        builder.AppendLine("        return new((configurePeer, ct) => new global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>(global::DotBoxD.Pushdown.Services.RpcMessagePackIpc.ConnectNamedPipeAsync(pipeName, peer => { global::DotBoxD.Pushdown.Services.PluginDebugRpcPeerExtensions.ProvidePluginDebugEvents(peer, debugBridge); configurePeer?.Invoke(peer); }, cancellationToken: ct)), debugBridge);");
+        builder.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(transportOptions);");
+        builder.AppendLine("        return new((configurePeer, ct) => new global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>(global::DotBoxD.Pushdown.Services.RpcMessagePackIpc.ConnectNamedPipeAsync(pipeName, peer => { global::DotBoxD.Pushdown.Services.PluginDebugRpcPeerExtensions.ProvidePluginDebugEvents(peer, debugBridge); configurePeer?.Invoke(peer); }, namedPipeOptions: transportOptions, options: options, cancellationToken: ct)), debugBridge);");
         builder.AppendLine("    }");
     }
 
