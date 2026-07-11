@@ -11,7 +11,18 @@ internal sealed class ForbiddenHelperCallGraph
     private readonly ConcurrentBag<RootHelperCall> _rootCalls = [];
 
     public void RecordForbidden(IMethodSymbol method, ITypeSymbol type)
-        => _forbidden.TryAdd(method.OriginalDefinition, type);
+        => _forbidden.TryAdd(Normalize(method), type);
+
+    public void RecordForbiddenInitializer(ISymbol initializer, ITypeSymbol type)
+    {
+        if (initializer is not (IFieldSymbol or IPropertySymbol) ||
+            initializer.DeclaringSyntaxReferences.Length == 0)
+        {
+            return;
+        }
+
+        _forbidden.TryAdd(Normalize(initializer), type);
+    }
 
     public void RecordCall(IMethodSymbol caller, IMethodSymbol target, Location location)
     {
@@ -21,7 +32,7 @@ internal sealed class ForbiddenHelperCallGraph
             return;
         }
 
-        var normalizedTarget = target.OriginalDefinition;
+        var normalizedTarget = Normalize(target);
         if (PluginAnalyzer.IsEventKernel(caller.ContainingType))
         {
             _rootCalls.Add(new RootHelperCall(normalizedTarget, location));
@@ -33,25 +44,56 @@ internal sealed class ForbiddenHelperCallGraph
             return;
         }
 
-        _helperEdges.Add(new HelperEdge(caller.OriginalDefinition, normalizedTarget));
+        _helperEdges.Add(new HelperEdge(Normalize(caller), normalizedTarget));
     }
 
-    // A field/property initializer in an event kernel runs when the kernel is constructed in-host, so a helper
-    // invoked from one is a call-graph ROOT exactly like a helper called from a kernel method body. Its
-    // ContainingSymbol is the field/property (not a method), so RecordCall never sees it; record the root here so
-    // taint that reaches the target through its own body (e.g. Helper.Danger -> System.IO.File) is reported at
-    // the initializer site. Mirrors RecordCall's root rules: the target must be declared in source and must not
-    // itself be an event-kernel member (those are analyzed directly).
-    public void RecordInitializerRootCall(INamedTypeSymbol containingType, IMethodSymbol target, Location location)
+    // A source field/property initializer can either be a kernel root or an intermediate helper node. Its
+    // ContainingSymbol is the field/property (not a method), so RecordCall never sees it.
+    public void RecordInitializerRootCall(ISymbol initializer, IMethodSymbol target, Location location)
     {
         if (target.DeclaringSyntaxReferences.Length == 0 ||
-            !PluginAnalyzer.IsEventKernel(containingType) ||
+            initializer is not (IFieldSymbol or IPropertySymbol) ||
             PluginAnalyzer.IsEventKernel(target.ContainingType))
         {
             return;
         }
 
-        _rootCalls.Add(new RootHelperCall(target.OriginalDefinition, location));
+        var normalizedTarget = Normalize(target);
+        if (PluginAnalyzer.IsEventKernel(initializer.ContainingType))
+        {
+            _rootCalls.Add(new RootHelperCall(normalizedTarget, location));
+            return;
+        }
+
+        if (initializer.DeclaringSyntaxReferences.Length != 0)
+        {
+            _helperEdges.Add(new HelperEdge(Normalize(initializer), normalizedTarget));
+        }
+    }
+
+    public void RecordInitializerMemberReference(ISymbol initializer, ISymbol target)
+    {
+        if (initializer is not (IFieldSymbol or IPropertySymbol) ||
+            initializer.DeclaringSyntaxReferences.Length == 0 ||
+            !IsStaticSourceMember(target) ||
+            PluginAnalyzer.IsEventKernel(target.ContainingType))
+        {
+            return;
+        }
+
+        _helperEdges.Add(new HelperEdge(Normalize(initializer), Normalize(target)));
+    }
+
+    public void RecordRootMemberReference(IMethodSymbol caller, ISymbol target, Location location)
+    {
+        if (!PluginAnalyzer.IsEventKernel(caller.ContainingType) ||
+            !IsStaticSourceMember(target) ||
+            PluginAnalyzer.IsEventKernel(target.ContainingType))
+        {
+            return;
+        }
+
+        _rootCalls.Add(new RootHelperCall(Normalize(target), location));
     }
 
     public void ReportDiagnostics(CompilationAnalysisContext context)
@@ -114,6 +156,19 @@ internal sealed class ForbiddenHelperCallGraph
 
         return tainted;
     }
+
+    private static bool IsStaticSourceMember(ISymbol symbol)
+        => symbol.DeclaringSyntaxReferences.Length != 0 &&
+            symbol is IFieldSymbol { IsStatic: true } or IPropertySymbol { IsStatic: true };
+
+    private static ISymbol Normalize(ISymbol symbol)
+        => symbol switch
+        {
+            IMethodSymbol method => method.OriginalDefinition,
+            IPropertySymbol property => property.OriginalDefinition,
+            IFieldSymbol field => field.OriginalDefinition,
+            _ => symbol
+        };
 
     private readonly record struct HelperEdge(ISymbol Caller, ISymbol Target);
 
