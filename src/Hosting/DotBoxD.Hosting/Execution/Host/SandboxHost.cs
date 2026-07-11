@@ -108,7 +108,7 @@ public sealed partial class SandboxHost : IDisposable
         ArgumentNullException.ThrowIfNull(input);
         options ??= DefaultExecutionOptions;
         ExecutionPlanGuard.EnsurePrepared(plan, _bindings, _planSigningKey, _preparedPlans);
-        if (TryGetPreDispatchResult(plan, entrypoint, options, out var preDispatchResult))
+        if (TryGetPreDispatchResult(plan, entrypoint, options, cancellationToken, out var preDispatchResult))
         {
             return Publish(preDispatchResult);
         }
@@ -147,6 +147,7 @@ public sealed partial class SandboxHost : IDisposable
         ExecutionPlan plan,
         string entrypoint,
         SandboxExecutionOptions options,
+        CancellationToken cancellationToken,
         out SandboxExecutionResult result)
     {
         if (!Enum.IsDefined(options.Mode))
@@ -164,6 +165,12 @@ public sealed partial class SandboxHost : IDisposable
                 plan,
                 options,
                 $"sandbox isolation '{(int)options.Isolation}' is not supported");
+            return true;
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            result = PreDispatchCancelledResult(plan, options);
             return true;
         }
 
