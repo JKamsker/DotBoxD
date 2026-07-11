@@ -103,6 +103,16 @@ public sealed class ModuleValidationResultContractTests
                 ["main"] = new HashSet<string>(StringComparer.Ordinal) { null! }
             }))
         ];
+        yield return
+        [
+            "BindingReferences",
+            ThrowingAction(() => Create(bindingReferences: BindingReferencesWith("")))
+        ];
+        yield return
+        [
+            "BindingReferences",
+            ThrowingAction(() => Create(bindingReferences: BindingReferencesWith("   ")))
+        ];
     }
 
     public static IEnumerable<object[]> MalformedInitEvidenceInputs()
@@ -114,6 +124,8 @@ public sealed class ModuleValidationResultContractTests
         yield return ["BindingReferences", ThrowingAction(() => ValidResult() with { BindingReferences = new NullKeyDictionary<IReadOnlySet<string>>(References()) })];
         yield return ["BindingReferences", ThrowingAction(() => ValidResult() with { BindingReferences = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal) { ["main"] = null! } })];
         yield return ["BindingReferences", ThrowingAction(() => ValidResult() with { BindingReferences = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal) { ["main"] = new HashSet<string>(StringComparer.Ordinal) { null! } } })];
+        yield return ["BindingReferences", ThrowingAction(() => ValidResult() with { BindingReferences = BindingReferencesWith("") })];
+        yield return ["BindingReferences", ThrowingAction(() => ValidResult() with { BindingReferences = BindingReferencesWith("   ") })];
     }
 
     [Theory]
@@ -245,6 +257,13 @@ public sealed class ModuleValidationResultContractTests
         => new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
         {
             ["main"] = References()
+        };
+
+    private static IReadOnlyDictionary<string, IReadOnlySet<string>> BindingReferencesWith(
+        string bindingId)
+        => new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
+        {
+            ["main"] = new HashSet<string>(StringComparer.Ordinal) { bindingId }
         };
 
     private static SandboxDiagnostic Diagnostic()

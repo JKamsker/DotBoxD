@@ -83,6 +83,23 @@ public sealed class ExecutionPlanContractTests
         Assert.Equal("bindingReferences", exception.ParamName);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Constructor_rejects_blank_binding_reference_elements_at_public_boundary(
+        string bindingId)
+    {
+        var bindingReferences = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
+        {
+            ["main"] = new HashSet<string>(StringComparer.Ordinal) { bindingId }
+        };
+
+        var exception = Assert.ThrowsAny<ArgumentException>(() =>
+            CreatePlan(bindingReferences: bindingReferences));
+
+        Assert.Equal("bindingReferences", exception.ParamName);
+    }
+
     private static ExecutionPlan CreatePlan(
         IReadOnlyDictionary<string, FunctionAnalysis>? functionAnalysis = null,
         IReadOnlyDictionary<string, IReadOnlySet<string>>? bindingReferences = null)
