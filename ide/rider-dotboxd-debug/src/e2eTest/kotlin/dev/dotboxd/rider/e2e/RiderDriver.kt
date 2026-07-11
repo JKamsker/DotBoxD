@@ -17,7 +17,11 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
             call<Boolean>(
                 """
                 const project = projectOf(component);
-                project && !com.intellij.openapi.project.DumbService.isDumb(project);
+                const configuration = project
+                    ? com.intellij.execution.RunManager.getInstance(project)
+                        .findConfigurationByName('Start Examples')
+                    : null;
+                project && !project.isDisposed() && configuration != null;
                 """,
             )
         }
