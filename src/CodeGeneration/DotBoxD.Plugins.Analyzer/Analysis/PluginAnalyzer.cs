@@ -94,6 +94,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, invocation.TargetMethod.ContainingType);
+            RecordForbiddenInitializerReference(context, helperGraph, invocation.TargetMethod.ContainingType);
             RecordInitializerRootCall(context, helperGraph, invocation.TargetMethod);
             return;
         }
@@ -109,6 +110,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, creation.Type);
+            RecordForbiddenInitializerReference(context, helperGraph, creation.Type);
             if (creation.Constructor is { } initializerConstructor)
             {
                 RecordInitializerRootCall(context, helperGraph, initializerConstructor);
@@ -130,7 +132,9 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, property.ContainingType);
+            RecordForbiddenInitializerReference(context, helperGraph, property.ContainingType);
             RecordInitializerPropertyRootCall(context, helperGraph, property);
+            RecordInitializerMemberReference(context, helperGraph, property);
             return;
         }
 
@@ -151,6 +155,8 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         {
             helperGraph.RecordCall(method, setter, location);
         }
+
+        helperGraph.RecordRootMemberReference(method, property, location);
     }
 
     private static void AnalyzeFieldReference(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
@@ -159,10 +165,13 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, field.ContainingType);
+            RecordForbiddenInitializerReference(context, helperGraph, field.ContainingType);
+            RecordInitializerMemberReference(context, helperGraph, field);
             return;
         }
 
         ReportAndRecordIfForbidden(context, helperGraph, method, field.ContainingType);
+        helperGraph.RecordRootMemberReference(method, field, context.Operation.Syntax.GetLocation());
     }
 
     private static void AnalyzeTypeOf(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
@@ -171,6 +180,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, type);
+            RecordForbiddenInitializerReference(context, helperGraph, type);
             return;
         }
 
@@ -186,6 +196,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, reference.Method.ContainingType);
+            RecordForbiddenInitializerReference(context, helperGraph, reference.Method.ContainingType);
             RecordInitializerRootCall(context, helperGraph, reference.Method);
             return;
         }
