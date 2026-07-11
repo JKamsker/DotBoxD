@@ -13,13 +13,15 @@ public sealed record SandboxModule(
     IReadOnlyList<SandboxFunction> Functions,
     IReadOnlyDictionary<string, string> Metadata)
 {
-    private IReadOnlyList<CapabilityRequest> _capabilityRequests = ModelCopy.List(CapabilityRequests);
-    private IReadOnlyList<SandboxFunction> _functions = ModelCopy.List(Functions);
-    private IReadOnlyDictionary<string, string> _metadata = ModelCopy.StringDictionary(Metadata);
+    private IReadOnlyList<CapabilityRequest> _capabilityRequests = ModelCopy.List(
+        CapabilityRequests,
+        nameof(CapabilityRequests));
+    private IReadOnlyList<SandboxFunction> _functions = ModelCopy.List(Functions, nameof(Functions));
+    private IReadOnlyDictionary<string, string> _metadata = ModelCopy.StringDictionary(Metadata, nameof(Metadata));
 
-    public IReadOnlyList<CapabilityRequest> CapabilityRequests { get => _capabilityRequests; init => _capabilityRequests = ModelCopy.List(value); }
-    public IReadOnlyList<SandboxFunction> Functions { get => _functions; init => _functions = ModelCopy.List(value); }
-    public IReadOnlyDictionary<string, string> Metadata { get => _metadata; init => _metadata = ModelCopy.StringDictionary(value); }
+    public IReadOnlyList<CapabilityRequest> CapabilityRequests { get => _capabilityRequests; init => _capabilityRequests = ModelCopy.List(value, nameof(CapabilityRequests)); }
+    public IReadOnlyList<SandboxFunction> Functions { get => _functions; init => _functions = ModelCopy.List(value, nameof(Functions)); }
+    public IReadOnlyDictionary<string, string> Metadata { get => _metadata; init => _metadata = ModelCopy.StringDictionary(value, nameof(Metadata)); }
 }
 
 public sealed record SandboxFunction(
@@ -30,11 +32,11 @@ public sealed record SandboxFunction(
     IReadOnlyList<Statement> Body,
     SandboxEffect? DeclaredEffects = null)
 {
-    private IReadOnlyList<Parameter> _parameters = ModelCopy.List(Parameters);
-    private IReadOnlyList<Statement> _body = ModelCopy.List(Body);
+    private IReadOnlyList<Parameter> _parameters = ModelCopy.List(Parameters, nameof(Parameters));
+    private IReadOnlyList<Statement> _body = ModelCopy.List(Body, nameof(Body));
 
-    public IReadOnlyList<Parameter> Parameters { get => _parameters; init => _parameters = ModelCopy.List(value); }
-    public IReadOnlyList<Statement> Body { get => _body; init => _body = ModelCopy.List(value); }
+    public IReadOnlyList<Parameter> Parameters { get => _parameters; init => _parameters = ModelCopy.List(value, nameof(Parameters)); }
+    public IReadOnlyList<Statement> Body { get => _body; init => _body = ModelCopy.List(value, nameof(Body)); }
 }
 
 public sealed record Parameter(string Name, SandboxType Type);
@@ -50,26 +52,26 @@ public sealed record ExpressionStatement(Expression Value, SourceSpan Span) : St
 public sealed record IfStatement(Expression Condition, IReadOnlyList<Statement> Then, IReadOnlyList<Statement> Else, SourceSpan Span)
     : Statement(Span)
 {
-    private IReadOnlyList<Statement> _then = ModelCopy.List(Then);
-    private IReadOnlyList<Statement> _else = ModelCopy.List(Else);
+    private IReadOnlyList<Statement> _then = ModelCopy.List(Then, nameof(Then));
+    private IReadOnlyList<Statement> _else = ModelCopy.List(Else, nameof(Else));
 
-    public IReadOnlyList<Statement> Then { get => _then; init => _then = ModelCopy.List(value); }
-    public IReadOnlyList<Statement> Else { get => _else; init => _else = ModelCopy.List(value); }
+    public IReadOnlyList<Statement> Then { get => _then; init => _then = ModelCopy.List(value, nameof(Then)); }
+    public IReadOnlyList<Statement> Else { get => _else; init => _else = ModelCopy.List(value, nameof(Else)); }
 }
 
 public sealed record WhileStatement(Expression Condition, IReadOnlyList<Statement> Body, SourceSpan Span) : Statement(Span)
 {
-    private IReadOnlyList<Statement> _body = ModelCopy.List(Body);
+    private IReadOnlyList<Statement> _body = ModelCopy.List(Body, nameof(Body));
 
-    public IReadOnlyList<Statement> Body { get => _body; init => _body = ModelCopy.List(value); }
+    public IReadOnlyList<Statement> Body { get => _body; init => _body = ModelCopy.List(value, nameof(Body)); }
 }
 
 public sealed record ForRangeStatement(string LocalName, Expression Start, Expression End, IReadOnlyList<Statement> Body, SourceSpan Span)
     : Statement(Span)
 {
-    private IReadOnlyList<Statement> _body = ModelCopy.List(Body);
+    private IReadOnlyList<Statement> _body = ModelCopy.List(Body, nameof(Body));
 
-    public IReadOnlyList<Statement> Body { get => _body; init => _body = ModelCopy.List(value); }
+    public IReadOnlyList<Statement> Body { get => _body; init => _body = ModelCopy.List(value, nameof(Body)); }
 }
 
 /// <summary>Skips to the next iteration of the innermost enclosing loop (<c>continue;</c>).</summary>
@@ -91,7 +93,7 @@ public sealed record BinaryExpression(Expression Left, string Operator, Expressi
 public sealed record CallExpression(string Name, IReadOnlyList<Expression> Arguments, SandboxType? GenericType, SourceSpan Span)
     : Expression(Span)
 {
-    private IReadOnlyList<Expression> _arguments = ModelCopy.List(Arguments);
+    private IReadOnlyList<Expression> _arguments = ModelCopy.List(Arguments, nameof(Arguments));
 
-    public IReadOnlyList<Expression> Arguments { get => _arguments; init => _arguments = ModelCopy.List(value); }
+    public IReadOnlyList<Expression> Arguments { get => _arguments; init => _arguments = ModelCopy.List(value, nameof(Arguments)); }
 }
