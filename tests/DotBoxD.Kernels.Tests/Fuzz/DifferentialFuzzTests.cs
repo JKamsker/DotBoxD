@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using CsCheck;
@@ -21,6 +20,20 @@ public sealed class DifferentialFuzzTests
             seed: "0N0XIzNsQ0O2",
             iter: 40,
             threads: 1);
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(int.MinValue)]
+    [InlineData(0)]
+    [InlineData(int.MaxValue)]
+    public async Task Fuzz_seed_produces_an_importable_module_id(int seed)
+    {
+        using var host = SandboxTestHost.Create();
+
+        var module = await host.ImportJsonAsync(ModuleJson(seed, new JsonObject { ["i32"] = 0 }));
+
+        Assert.NotNull(module);
+    }
 
     private static async Task RunCaseAsync(int seed)
     {
@@ -134,7 +147,19 @@ public sealed class DifferentialFuzzTests
         }.ToJsonString(JsonOptions);
 
     private static string ModuleId(int index)
-        => $"differential-fuzz-{index.ToString(CultureInfo.InvariantCulture)}";
+    {
+        const int tokenLength = 7;
+        var value = unchecked((uint)index);
+        Span<char> token = stackalloc char[tokenLength];
+
+        for (var tokenIndex = token.Length - 1; tokenIndex >= 0; tokenIndex--)
+        {
+            token[tokenIndex] = (char)('a' + (int)(value % 26));
+            value /= 26;
+        }
+
+        return "differentialfuzz" + new string(token);
+    }
 
     private static JsonObject Parameter(string name)
         => new()
