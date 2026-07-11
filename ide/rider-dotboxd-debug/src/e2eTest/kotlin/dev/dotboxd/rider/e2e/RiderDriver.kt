@@ -50,7 +50,7 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
 
     fun addDotNetBreakpoint(path: String, line: Int) {
         require(line > 0)
-        run(
+        runOffEdt(
             """
             const project = projectOf(component);
             const path = '${js(path.replace('\\', '/'))}';
@@ -195,6 +195,8 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
     private inline fun <reified T> call(script: String): T = frame.callJs(prologue + script.trimIndent(), true)
 
     private fun run(script: String) = frame.runJs(prologue + script.trimIndent(), true)
+
+    private fun runOffEdt(script: String) = frame.runJs(prologue + script.trimIndent(), false)
 
     private fun js(value: String): String = value.replace("\\", "\\\\").replace("'", "\\'")
 
