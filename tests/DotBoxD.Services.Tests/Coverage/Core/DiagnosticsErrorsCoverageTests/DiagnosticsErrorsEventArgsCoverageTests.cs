@@ -51,6 +51,15 @@ public sealed class EventArgsCoverageTests
         Assert.Equal("remoteEndpoint", ex.ParamName);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\t")]
+    public void RpcDisconnectedEventArgs_RejectsBlankRemoteEndpoint(string remoteEndpoint)
+    {
+        DiagnosticAssert.Argument(() => new RpcDisconnectedEventArgs(remoteEndpoint, error: null), "remoteEndpoint");
+    }
+
     [Fact]
     public void RpcReadErrorEventArgs_ExposesEndpointAndError()
     {
@@ -66,6 +75,15 @@ public sealed class EventArgsCoverageTests
     {
         DiagnosticAssert.ArgumentNull(() => new RpcReadErrorEventArgs(null!, new Exception("read")), "remoteEndpoint");
         DiagnosticAssert.ArgumentNull(() => new RpcReadErrorEventArgs("ep", null!), "error");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\t")]
+    public void RpcReadErrorEventArgs_RejectsBlankRemoteEndpoint(string remoteEndpoint)
+    {
+        DiagnosticAssert.Argument(() => new RpcReadErrorEventArgs(remoteEndpoint, new Exception("read")), "remoteEndpoint");
     }
 
     [Fact]
@@ -100,6 +118,20 @@ public sealed class EventArgsCoverageTests
         DiagnosticAssert.ArgumentNull(
             () => new RpcProtocolErrorEventArgs("ep", 7, MessageType.Request, null!),
             "message");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\t")]
+    public void RpcProtocolErrorEventArgs_RejectsBlankRemoteEndpoint(string remoteEndpoint)
+    {
+        DiagnosticAssert.Argument(
+            () => new RpcProtocolErrorEventArgs(remoteEndpoint, 7, MessageType.Request, "bad header"),
+            "remoteEndpoint");
+        DiagnosticAssert.Argument(
+            () => new RpcProtocolErrorEventArgs(remoteEndpoint, 7, MessageType.Request, "bad header", new Exception("decode")),
+            "remoteEndpoint");
     }
 
     [Theory]
@@ -160,6 +192,17 @@ public sealed class EventArgsCoverageTests
         DiagnosticAssert.ArgumentNull(
             () => new RpcDispatchErrorEventArgs("ep", 1, "Game", "Status", null, null!),
             "error");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\t")]
+    public void RpcDispatchErrorEventArgs_RejectsBlankRemoteEndpoint(string remoteEndpoint)
+    {
+        DiagnosticAssert.Argument(
+            () => new RpcDispatchErrorEventArgs(remoteEndpoint, 1, "Game", "Status", null, new Exception("x")),
+            "remoteEndpoint");
     }
 
     [Theory]
