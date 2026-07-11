@@ -24,6 +24,9 @@ internal sealed class ForbiddenHelperCallGraph
         _forbidden.TryAdd(Normalize(initializer), type);
     }
 
+    public void RecordForbidden(IFieldSymbol field, ITypeSymbol type)
+        => _forbidden.TryAdd(Normalize(field), type);
+
     public void RecordCall(IMethodSymbol caller, IMethodSymbol target, Location location)
     {
         if (target.DeclaringSyntaxReferences.Length == 0 ||
@@ -45,6 +48,39 @@ internal sealed class ForbiddenHelperCallGraph
         }
 
         _helperEdges.Add(new HelperEdge(Normalize(caller), normalizedTarget));
+    }
+
+    public void RecordDelegateFieldTarget(IFieldSymbol field, IMethodSymbol target)
+    {
+        if (field.DeclaringSyntaxReferences.Length == 0 ||
+            target.DeclaringSyntaxReferences.Length == 0)
+        {
+            return;
+        }
+
+        _helperEdges.Add(new HelperEdge(Normalize(field), target.OriginalDefinition));
+    }
+
+    public void RecordDelegateFieldReference(IMethodSymbol caller, IFieldSymbol field, Location location)
+    {
+        if (field.DeclaringSyntaxReferences.Length == 0)
+        {
+            return;
+        }
+
+        var normalizedField = Normalize(field);
+        if (PluginAnalyzer.IsEventKernel(caller.ContainingType))
+        {
+            _rootCalls.Add(new RootHelperCall(normalizedField, location));
+            return;
+        }
+
+        if (caller.DeclaringSyntaxReferences.Length == 0)
+        {
+            return;
+        }
+
+        _helperEdges.Add(new HelperEdge(caller.OriginalDefinition, normalizedField));
     }
 
     // A source field/property initializer can either be a kernel root or an intermediate helper node. Its
@@ -173,4 +209,7 @@ internal sealed class ForbiddenHelperCallGraph
     private readonly record struct HelperEdge(ISymbol Caller, ISymbol Target);
 
     private readonly record struct RootHelperCall(ISymbol Target, Location Location);
+
+    private static ISymbol Normalize(IFieldSymbol field)
+        => field.OriginalDefinition;
 }
