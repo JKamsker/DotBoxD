@@ -15,25 +15,10 @@ public sealed class WorkerFileAuditGrantValidationTests
     public async Task Worker_rejects_file_write_audit_that_violates_file_grant_constraints()
     {
         using var temp = TempDirectory.Create();
-        var worker = new ForgedFileWriteWorker("blocked.txt", "ok");
+        var worker = new ForgedFileWriteWorker("blocked.txt", "ok", ".txt", "create");
         using var host = FileHost(worker);
         var module = await host.ImportJsonAsync(FileWriteJson("allowed.json", "ok"));
-        var policy = SandboxPolicyBuilder.Create()
-            .AllowRuntimeAsync()
-            .Grant(
-                "file.write",
-                new Dictionary<string, string>
-                {
-                    ["root"] = temp.Path,
-                    ["allowCreate"] = "true",
-                    ["allowOverwrite"] = "false",
-                    ["maxBytesPerRun"] = "1024",
-                    ["allowedExtensions"] = ".json"
-                },
-                SandboxEffect.FileWrite | SandboxEffect.Audit,
-                limits => limits with { MaxFileBytesWritten = 1024 })
-            .WithFuel(1_000)
-            .Build();
+        var policy = FileWritePolicy(temp.Path, allowCreate: true, allowOverwrite: false, allowedExtensions: ".json");
         var plan = await host.PrepareAsync(module, policy);
 
         var result = await host.ExecuteAsync(
@@ -61,25 +46,10 @@ public sealed class WorkerFileAuditGrantValidationTests
     public async Task Worker_accepts_redacted_file_write_audit_with_extension_evidence()
     {
         using var temp = TempDirectory.Create();
-        var worker = new ForgedFileWriteWorker("[redacted]", "ok", ".txt");
+        var worker = new ForgedFileWriteWorker("[redacted]", "ok", ".txt", "create");
         using var host = FileHost(worker);
         var module = await host.ImportJsonAsync(FileWriteJson("token.txt", "ok"));
-        var policy = SandboxPolicyBuilder.Create()
-            .AllowRuntimeAsync()
-            .Grant(
-                "file.write",
-                new Dictionary<string, string>
-                {
-                    ["root"] = temp.Path,
-                    ["allowCreate"] = "true",
-                    ["allowOverwrite"] = "false",
-                    ["maxBytesPerRun"] = "1024",
-                    ["allowedExtensions"] = ".txt"
-                },
-                SandboxEffect.FileWrite | SandboxEffect.Audit,
-                limits => limits with { MaxFileBytesWritten = 1024 })
-            .WithFuel(1_000)
-            .Build();
+        var policy = FileWritePolicy(temp.Path, allowCreate: true, allowOverwrite: false, allowedExtensions: ".txt");
         var plan = await host.PrepareAsync(module, policy);
 
         var result = await host.ExecuteAsync(
@@ -90,6 +60,49 @@ public sealed class WorkerFileAuditGrantValidationTests
 
         Assert.True(result.Succeeded, result.Error?.SafeMessage);
         Assert.DoesNotContain(result.AuditEvents, e => e.Kind == "WorkerIsolationFailed");
+    }
+
+    [Fact]
+    public async Task Worker_rejects_file_write_audit_that_forges_disallowed_create()
+    {
+        using var temp = TempDirectory.Create();
+        var worker = new ForgedFileWriteWorker("created.txt", "ok", ".txt", "create");
+        using var host = FileHost(worker);
+        var module = await host.ImportJsonAsync(FileWriteJson("created.txt", "ok"));
+        var policy = FileWritePolicy(temp.Path, allowCreate: false, allowOverwrite: true, allowedExtensions: ".txt");
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.Unit,
+            new SandboxExecutionOptions { Isolation = SandboxIsolation.WorkerProcess });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.HostFailure, result.Error!.Code);
+        Assert.Contains(result.AuditEvents, e => e.Kind == "WorkerIsolationFailed");
+    }
+
+    [Fact]
+    public async Task Worker_rejects_file_write_audit_that_forges_disallowed_overwrite()
+    {
+        using var temp = TempDirectory.Create();
+        await File.WriteAllTextAsync(System.IO.Path.Combine(temp.Path, "existing.txt"), "before");
+        var worker = new ForgedFileWriteWorker("existing.txt", "ok", ".txt", "overwrite");
+        using var host = FileHost(worker);
+        var module = await host.ImportJsonAsync(FileWriteJson("existing.txt", "ok"));
+        var policy = FileWritePolicy(temp.Path, allowCreate: true, allowOverwrite: false, allowedExtensions: ".txt");
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.Unit,
+            new SandboxExecutionOptions { Isolation = SandboxIsolation.WorkerProcess });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.HostFailure, result.Error!.Code);
+        Assert.Contains(result.AuditEvents, e => e.Kind == "WorkerIsolationFailed");
     }
 
     private static SandboxHost FileHost(ISandboxWorkerClient worker)
@@ -130,10 +143,33 @@ public sealed class WorkerFileAuditGrantValidationTests
         }
         """;
 
+    private static SandboxPolicy FileWritePolicy(
+        string root,
+        bool allowCreate,
+        bool allowOverwrite,
+        string allowedExtensions)
+        => SandboxPolicyBuilder.Create()
+            .AllowRuntimeAsync()
+            .Grant(
+                "file.write",
+                new Dictionary<string, string>
+                {
+                    ["root"] = root,
+                    ["allowCreate"] = allowCreate.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    ["allowOverwrite"] = allowOverwrite.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    ["maxBytesPerRun"] = "1024",
+                    ["allowedExtensions"] = allowedExtensions
+                },
+                SandboxEffect.FileWrite | SandboxEffect.Audit,
+                limits => limits with { MaxFileBytesWritten = 1024 })
+            .WithFuel(1_000)
+            .Build();
+
     private sealed class ForgedFileWriteWorker(
         string auditPath,
         string text,
-        string? pathExtension = null) : ISandboxWorkerClient
+        string? pathExtension = null,
+        string? writeDisposition = null) : ISandboxWorkerClient
     {
         public SandboxExecutionResult? Result { get; private set; }
 
@@ -168,7 +204,7 @@ public sealed class WorkerFileAuditGrantValidationTests
                 Effect: SandboxEffect.FileWrite,
                 ResourceId: $"sandbox://file.write/{auditPath}",
                 Bytes: byteCount,
-                Fields: BindingFields(plan, timestamp, byteCount, pathExtension)));
+                Fields: BindingFields(plan, timestamp, byteCount, pathExtension, writeDisposition)));
 
             Result = new SandboxExecutionResult
             {
@@ -216,7 +252,8 @@ public sealed class WorkerFileAuditGrantValidationTests
             ExecutionPlan plan,
             DateTimeOffset timestamp,
             long byteCount,
-            string? pathExtension)
+            string? pathExtension,
+            string? writeDisposition)
         {
             var fields = new Dictionary<string, string>(
                 BindingAuditFields.Create(
@@ -232,16 +269,18 @@ public sealed class WorkerFileAuditGrantValidationTests
                 fields["pathExtension"] = pathExtension;
             }
 
+            if (writeDisposition is not null)
+            {
+                fields["writeDisposition"] = writeDisposition;
+            }
+
             return fields;
         }
     }
-
     private sealed class TempDirectory : IDisposable
     {
         private TempDirectory(string path) => Path = path;
-
         public string Path { get; }
-
         public static TempDirectory Create()
         {
             var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "dotboxd-" + Guid.NewGuid().ToString("N"));

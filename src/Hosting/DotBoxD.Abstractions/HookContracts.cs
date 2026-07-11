@@ -86,7 +86,7 @@ public sealed class PolymorphicHandleAttribute : Attribute
 {
     public PolymorphicHandleAttribute(string keyMember)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(keyMember);
+        HookContractIdentifiers.ValidateIdentifier(keyMember, nameof(keyMember));
 
         KeyMember = keyMember;
     }
@@ -110,8 +110,8 @@ public sealed class HandleSubtypeAttribute : Attribute
     {
         ArgumentNullException.ThrowIfNull(subtype);
         ArgumentException.ThrowIfNullOrWhiteSpace(discriminator);
-        ValidateDottedIdentifier(bindingPrefix, nameof(bindingPrefix));
-        ValidateDottedIdentifier(capability, nameof(capability));
+        HookContractIdentifiers.ValidateDottedIdentifier(bindingPrefix, nameof(bindingPrefix));
+        HookContractIdentifiers.ValidateDottedIdentifier(capability, nameof(capability));
 
         Subtype = subtype;
         Discriminator = discriminator;
@@ -126,14 +126,27 @@ public sealed class HandleSubtypeAttribute : Attribute
     public string BindingPrefix { get; }
 
     public string Capability { get; }
+}
 
-    private static void ValidateDottedIdentifier(string value, string paramName)
+file static class HookContractIdentifiers
+{
+    public static void ValidateDottedIdentifier(string value, string paramName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value, paramName);
 
         if (!HasDottedIdentifierGrammar(value))
         {
             throw new ArgumentException("Value must be a dot-separated identifier.", paramName);
+        }
+    }
+
+    public static void ValidateIdentifier(string value, string paramName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value, paramName);
+
+        if (!HasIdentifierGrammar(value))
+        {
+            throw new ArgumentException("Value must be an identifier.", paramName);
         }
     }
 
@@ -172,6 +185,24 @@ public sealed class HandleSubtypeAttribute : Attribute
         }
 
         return !expectingSegmentStart;
+    }
+
+    private static bool HasIdentifierGrammar(string value)
+    {
+        if (!IsIdentifierStart(value[0]))
+        {
+            return false;
+        }
+
+        for (var i = 1; i < value.Length; i++)
+        {
+            if (!IsIdentifierPart(value[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool IsIdentifierStart(char ch)

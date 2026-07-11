@@ -39,10 +39,42 @@ public sealed class HostServiceBindingCancellationTests
         }
     }
 
+    [Fact]
+    public async Task Completed_service_binding_return_cancels_without_successful_binding_audit()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var world = new CancelingProbeWorld(cancellation.Cancel);
+        using var host = SandboxHost.Create(
+            builder => builder.AddBindingsFrom<ICancelingProbeWorld>(world));
+        var plan = await host.PrepareAsync(CancelingBindingModule(), CancelingProbePolicy());
+
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.Unit,
+            new SandboxExecutionOptions { Mode = ExecutionMode.Interpreted },
+            cancellation.Token);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.Cancelled, result.Error!.Code);
+        Assert.DoesNotContain(
+            result.AuditEvents,
+            e => e.Kind == "BindingCall" && e.BindingId == CancelingBindingId && e.Success);
+    }
+
     private interface IAsyncProbeWorld
     {
         [HostCapability("probe.read.async", HostBindingEffect.HostStateRead)]
         Task<int> GetAsync();
+    }
+
+    private interface ICancelingProbeWorld
+    {
+        [HostBinding(
+            CancelingBindingId,
+            "probe.read.canceling",
+            SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+        int GetValue();
     }
 
     private sealed class AsyncProbeWorld : IAsyncProbeWorld
@@ -61,6 +93,15 @@ public sealed class HostServiceBindingCancellationTests
         }
     }
 
+    private sealed class CancelingProbeWorld(Action cancel) : ICancelingProbeWorld
+    {
+        public int GetValue()
+        {
+            cancel();
+            return 42;
+        }
+    }
+
     private static SandboxPolicy AsyncProbePolicy()
         => SandboxPolicyBuilder.Create()
             .Grant("probe.read.async", new { }, SandboxEffect.HostStateRead)
@@ -68,6 +109,16 @@ public sealed class HostServiceBindingCancellationTests
             .WithFuel(1_000)
             .WithMaxHostCalls(10)
             .WithWallTime(TimeSpan.FromMilliseconds(30))
+            .Build();
+
+    private const string CancelingBindingId = "host.probe.canceling.getValue";
+
+    private static SandboxPolicy CancelingProbePolicy()
+        => SandboxPolicyBuilder.Create()
+            .Grant("probe.read.canceling", new { }, SandboxEffect.HostStateRead)
+            .WithFuel(1_000)
+            .WithMaxHostCalls(10)
+            .WithWallTime(TimeSpan.FromSeconds(1))
             .Build();
 
     private static SandboxModule AsyncBindingModule()
@@ -83,6 +134,22 @@ public sealed class HostServiceBindingCancellationTests
                     [],
                     SandboxType.I32,
                     [new ReturnStatement(new CallExpression(BindingId, [], null, Span), Span)])
+            ],
+            new Dictionary<string, string>(StringComparer.Ordinal));
+
+    private static SandboxModule CancelingBindingModule()
+        => new(
+            "canceling-host-service-binding-probe",
+            SemVersion.One,
+            SemVersion.One,
+            [],
+            [
+                new SandboxFunction(
+                    "main",
+                    true,
+                    [],
+                    SandboxType.I32,
+                    [new ReturnStatement(new CallExpression(CancelingBindingId, [], null, Span), Span)])
             ],
             new Dictionary<string, string>(StringComparer.Ordinal));
 }

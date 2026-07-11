@@ -141,17 +141,35 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
                 "Successful RPC response must not contain error fields.");
         }
 
-        if (!response.IsSuccess &&
-            (response.ErrorMessage is null || response.ErrorType is null))
+        if (!response.IsSuccess)
         {
-            throw new RpcEnvelopeValidationException(
-                "Error RPC response must contain error message and error type.");
+            ThrowIfMissingOrBlankErrorDetail(
+                response.ErrorMessage,
+                nameof(RpcResponse.ErrorMessage));
+            ThrowIfMissingOrBlankErrorDetail(
+                response.ErrorType,
+                nameof(RpcResponse.ErrorType));
         }
 
         if (!response.IsSuccess && response.Stream is not null)
         {
             throw new RpcEnvelopeValidationException(
                 "Error RPC response must not contain a stream handle.");
+        }
+    }
+
+    private static void ThrowIfMissingOrBlankErrorDetail(string? value, string fieldName)
+    {
+        if (value is null)
+        {
+            throw new RpcEnvelopeValidationException(
+                $"Error RPC response is missing required {fieldName}.");
+        }
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new RpcEnvelopeValidationException(
+                $"Error RPC response contains blank {fieldName}.");
         }
     }
 

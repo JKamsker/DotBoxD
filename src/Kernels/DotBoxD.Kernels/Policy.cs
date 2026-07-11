@@ -4,8 +4,7 @@ using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Kernels;
 
-using System.Collections.ObjectModel;
-
+using System.Collections.Frozen;
 public sealed record CapabilityGrant(
     string Id,
     IReadOnlyDictionary<string, string> Parameters,
@@ -13,8 +12,19 @@ public sealed record CapabilityGrant(
     string GrantedBy = "host-policy",
     string Reason = "")
 {
-    public IReadOnlyDictionary<string, string> Parameters { get; init; } =
-        new ReadOnlyDictionary<string, string>(new Dictionary<string, string>(Parameters, StringComparer.Ordinal));
+    private readonly IReadOnlyDictionary<string, string> _parameters = SnapshotParameters(Parameters);
+
+    public IReadOnlyDictionary<string, string> Parameters
+    {
+        get => _parameters;
+        init => _parameters = SnapshotParameters(value);
+    }
+
+    private static IReadOnlyDictionary<string, string> SnapshotParameters(IReadOnlyDictionary<string, string> parameters)
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
+        return ModelCopy.StringDictionary(parameters);
+    }
 }
 
 public sealed record SandboxPolicy(
@@ -102,11 +112,11 @@ public sealed record SandboxPolicy(
             }
         }
 
-        return new HashSet<string>(declared, StringComparer.Ordinal);
+        return declared.ToFrozenSet(StringComparer.Ordinal);
     }
 
     private static readonly IReadOnlySet<string> EmptyOpaqueIdTypes =
-        new HashSet<string>(StringComparer.Ordinal);
+        Array.Empty<string>().ToFrozenSet(StringComparer.Ordinal);
 
     public DateTimeOffset GrantClock
         => Deterministic && LogicalNow is not null ? LogicalNow.Value : DateTimeOffset.UtcNow;

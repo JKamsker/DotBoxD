@@ -28,6 +28,11 @@ internal sealed partial class RpcPeerOutboundInvoker
         RpcStreamAttachment[] streams,
         CancellationToken ct = default)
     {
+        if (streams is null)
+        {
+            throw new ArgumentNullException(nameof(streams));
+        }
+
         instanceId = ValidateInstanceId(instanceId);
         using var received = await SendRequestAsync(service, method, request, instanceId, streams, ct)
             .ConfigureAwait(false);
@@ -74,6 +79,11 @@ internal sealed partial class RpcPeerOutboundInvoker
         RpcStreamAttachment[] streams,
         CancellationToken ct = default)
     {
+        if (streams is null)
+        {
+            throw new ArgumentNullException(nameof(streams));
+        }
+
         instanceId = ValidateInstanceId(instanceId);
         using var received = await SendRequestAsync(service, method, request, instanceId, streams, ct)
             .ConfigureAwait(false);

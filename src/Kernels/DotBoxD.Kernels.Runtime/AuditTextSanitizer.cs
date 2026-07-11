@@ -49,6 +49,8 @@ public static partial class AuditTextSanitizer
 
     public static string SanitizeAndRedact(string message)
     {
+        ArgumentNullException.ThrowIfNull(message);
+
         if (!RequiresSanitization(message))
         {
             return message;
@@ -100,6 +102,8 @@ public static partial class AuditTextSanitizer
 
     public static string RedactPathSegments(string path)
     {
+        ArgumentNullException.ThrowIfNull(path);
+
         if (!MayContainSecretPathSegment(path))
         {
             return path;

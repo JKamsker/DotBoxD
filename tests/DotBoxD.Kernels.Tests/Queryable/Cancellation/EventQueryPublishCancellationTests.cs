@@ -72,4 +72,47 @@ public sealed class EventQueryPublishCancellationTests
         Assert.Equal(1, handle.Matches);
         Assert.Equal(0, handle.Dispatches);
     }
+
+    [Fact]
+    public async Task Projection_cancellation_stops_before_subscription_handler_dispatch()
+    {
+        var host = new EventQueryHost();
+        using var cancellation = new CancellationTokenSource();
+        var handlerInvoked = false;
+
+        var handle = await host.Query<ProjectionCancelEvent>()
+            .Where(e => e.AttackerId == "player-1")
+            .Select(e => new DamageProjection(e.Damage))
+            .SubscribeAsync((_, _) =>
+            {
+                handlerInvoked = true;
+                return ValueTask.CompletedTask;
+            });
+
+        var context = new HookContext(new InMemoryPluginMessageSink(), cancellation.Token);
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await host.PublishAsync(new ProjectionCancelEvent("player-1", cancellation), context));
+
+        Assert.True(cancellation.IsCancellationRequested);
+        Assert.False(handlerInvoked);
+        Assert.Equal(1, handle.FilterEvaluations);
+        Assert.Equal(1, handle.Matches);
+        Assert.Equal(0, handle.Dispatches);
+    }
+
+    private sealed class ProjectionCancelEvent(string attackerId, CancellationTokenSource cancellation)
+    {
+        public string AttackerId { get; } = attackerId;
+
+        public int Damage
+        {
+            get
+            {
+                cancellation.Cancel();
+                return 9;
+            }
+        }
+    }
+
+    private sealed record DamageProjection(int Damage);
 }

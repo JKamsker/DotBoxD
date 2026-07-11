@@ -185,12 +185,12 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
         }
     }
 
-    private static void ThrowIfEmptyRequiredName(string value, string fieldName)
+    private static void ThrowIfEmptyOrWhitespaceRequiredName(string value, string fieldName)
     {
-        if (value.Length == 0)
+        if (string.IsNullOrWhiteSpace(value))
         {
             throw new RpcEnvelopeValidationException(
-                $"RPC request contains empty required {fieldName}.");
+                $"RPC request contains empty or whitespace required {fieldName}.");
         }
     }
 
@@ -202,7 +202,7 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
                 $"RPC request is missing required {fieldName}.");
         }
 
-        ThrowIfEmptyRequiredName(value, fieldName);
+        ThrowIfEmptyOrWhitespaceRequiredName(value, fieldName);
         RpcEnvelopeStringValidation.ThrowIfMalformedUtf16(value, "request", fieldName);
     }
 
