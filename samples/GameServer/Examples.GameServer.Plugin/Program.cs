@@ -94,7 +94,11 @@ internal static class Program
             .ApplyAsync(atomic: true);
 
         // The advanced surface (handles, server-extension calls, InvokeAsync probes) lives in its own file.
-        await AdvancedUsage.RunAsync(server);
+        // The Rider E2E harness skips it so Guardian breakpoint coverage has no dependency on unrelated demos.
+        if (PluginLaunchMode.RunAdvancedUsage)
+        {
+            await AdvancedUsage.RunAsync(server);
+        }
 
         Console.WriteLine("[plugin] kernels live; holding until server completes...");
         await server.HoldUntilShutdownAsync();

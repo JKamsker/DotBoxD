@@ -53,6 +53,7 @@ internal class ExternalExamples private constructor(
                     "plugin",
                     "samples/GameServer/Examples.GameServer.Plugin/Examples.GameServer.Plugin.csproj",
                     "GameServer Plugin (Debug)",
+                    mapOf("DOTBOXD_E2E_SKIP_ADVANCED_USAGE" to "1"),
                 )
                 launched += plugin
                 awaitOutput(plugin, "[plugin] kernels live; holding until server completes...")
@@ -70,12 +71,13 @@ internal class ExternalExamples private constructor(
             name: String,
             project: String,
             profile: String,
+            environment: Map<String, String> = emptyMap(),
         ): ExampleProcess {
             val stdout = artifactDirectory.resolve("$name.stdout.log")
             val stderr = artifactDirectory.resolve("$name.stderr.log")
             Files.deleteIfExists(stdout)
             Files.deleteIfExists(stderr)
-            val process = ProcessBuilder(
+            val builder = ProcessBuilder(
                 "dotnet",
                 "run",
                 "--project",
@@ -88,7 +90,8 @@ internal class ExternalExamples private constructor(
             ).directory(root.toFile())
                 .redirectOutput(stdout.toFile())
                 .redirectError(stderr.toFile())
-                .start()
+            builder.environment().putAll(environment)
+            val process = builder.start()
             return ExampleProcess(name, process, stdout, stderr)
         }
 
