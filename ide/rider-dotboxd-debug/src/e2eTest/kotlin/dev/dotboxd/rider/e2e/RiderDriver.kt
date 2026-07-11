@@ -50,7 +50,6 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
 
     fun addDotNetBreakpoint(path: String, line: Int) {
         require(line > 0)
-        val previousCount = dotNetBreakpointCount()
         runOffEdt(
             """
             const project = projectOf(component);
@@ -63,17 +62,11 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
                 if (String(types[i].getId()) === 'DotNet Breakpoints') type = types[i];
             }
             if (!type) throw 'Rider .NET line breakpoint type is unavailable';
-            const action = new java.lang.Runnable({ run: function() {
-                const manager = com.intellij.xdebugger.XDebuggerManager.getInstance(project).getBreakpointManager();
-                const properties = type.createBreakpointProperties(file, ${line - 1});
-                manager.addLineBreakpoint(type, file.getUrl(), ${line - 1}, properties);
-            }});
-            com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(action);
+            const manager = com.intellij.xdebugger.XDebuggerManager.getInstance(project).getBreakpointManager();
+            const properties = type.createBreakpointProperties(file, ${line - 1});
+            manager.addLineBreakpoint(type, file.getUrl(), ${line - 1}, properties);
             """,
         )
-        waitFor(Duration.ofMinutes(1), Duration.ofMillis(200)) {
-            dotNetBreakpointCount() > previousCount
-        }
     }
 
     fun clearDotNetBreakpoints() {
@@ -180,27 +173,9 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
 
     private inline fun <reified T> call(script: String): T = frame.callJs(prologue + script.trimIndent(), true)
 
-    private inline fun <reified T> callOffEdt(script: String): T =
-        frame.callJs(prologue + script.trimIndent(), false)
-
     private fun run(script: String) = frame.runJs(prologue + script.trimIndent(), true)
 
     private fun runOffEdt(script: String) = frame.runJs(prologue + script.trimIndent(), false)
-
-    private fun dotNetBreakpointCount(): Int = callOffEdt(
-        """
-        const project = projectOf(component);
-        const breakpoints = com.intellij.xdebugger.XDebuggerManager.getInstance(project)
-            .getBreakpointManager().getAllBreakpoints();
-        let count = 0;
-        for (let i = 0; i < breakpoints.length; i++) {
-            if (String(breakpoints[i].getType().getId()) === 'DotNet Breakpoints') {
-                count++;
-            }
-        }
-        count;
-        """,
-    )
 
     private fun js(value: String): String = value.replace("\\", "\\\\").replace("'", "\\'")
 
