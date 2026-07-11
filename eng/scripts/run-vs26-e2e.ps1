@@ -25,13 +25,13 @@ function Invoke-Checked([string] $FilePath, [string[]] $Arguments) {
 }
 
 function Invoke-Dte([string] $Script) {
-    $result = & $windowsPowerShell -NoProfile -NonInteractive -Command @"
+    $result = @(& $windowsPowerShell -NoProfile -NonInteractive -Command @"
 `$ErrorActionPreference = 'Stop'
 `$dte = [Runtime.InteropServices.Marshal]::GetActiveObject('VisualStudio.DTE.18.0')
 $Script
-"@
+"@ 2>&1)
     if ($LASTEXITCODE -ne 0) {
-        throw 'Visual Studio automation command failed.'
+        throw "Visual Studio automation command failed: $($result -join [Environment]::NewLine)"
     }
     return $result
 }
@@ -50,16 +50,25 @@ function Stop-ExamplesAndVisualStudio {
 
 function Wait-ForDte {
     $deadline = [DateTime]::UtcNow + $StartupTimeout
+    $stableSamples = 0
     do {
         Start-Sleep -Milliseconds 500
         try {
-            $ready = Invoke-Dte "if (`$dte.Solution.IsOpen) { 'ready' }" 2>$null
+            $ready = Invoke-Dte @'
+if ($dte.Solution.IsOpen -and
+    $null -ne $dte.Debugger -and
+    $null -ne $dte.Debugger.Breakpoints -and
+    $dte.Commands.Item('Debug.Start').IsAvailable) {
+    'ready'
+}
+'@ 2>$null
         }
         catch {
             $ready = $null
         }
-    } until ($ready -contains 'ready' -or [DateTime]::UtcNow -ge $deadline)
-    if ($ready -notcontains 'ready') {
+        $stableSamples = if ($ready -contains 'ready') { $stableSamples + 1 } else { 0 }
+    } until ($stableSamples -ge 2 -or [DateTime]::UtcNow -ge $deadline)
+    if ($stableSamples -lt 2) {
         throw "Visual Studio did not open DotBoxD within $StartupTimeout."
     }
 }
