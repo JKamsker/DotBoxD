@@ -9,11 +9,7 @@ public sealed class HostBindingAttributeEffectValidationContractTests
     {
         var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(ExplicitHostBindingSource());
 
-        Assert.Contains(
-            diagnostics,
-            diagnostic => diagnostic.Id == "DBXK100" &&
-                          diagnostic.GetMessage().Contains("HostBinding", StringComparison.Ordinal) &&
-                          diagnostic.GetMessage().Contains("effect", StringComparison.OrdinalIgnoreCase));
+        AssertHasHostBindingEffectDiagnostic(diagnostics);
     }
 
     [Fact]
@@ -21,6 +17,12 @@ public sealed class HostBindingAttributeEffectValidationContractTests
     {
         var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(AutoHostBindingSource());
 
+        AssertHasHostBindingEffectDiagnostic(diagnostics);
+    }
+
+    private static void AssertHasHostBindingEffectDiagnostic(
+        IReadOnlyList<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
+    {
         Assert.Contains(
             diagnostics,
             diagnostic => diagnostic.Id == "DBXK100" &&
