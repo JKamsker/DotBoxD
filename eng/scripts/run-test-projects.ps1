@@ -69,6 +69,22 @@ function Assert-TrxHasExecutedTests([string] $TrxPath, [string] $ProjectName) {
     }
 }
 
+function Get-FailedTrxTests([string] $TrxPath) {
+    if (-not (Test-Path -LiteralPath $TrxPath)) {
+        return @()
+    }
+
+    try {
+        [xml] $trx = Get-Content -Raw -LiteralPath $TrxPath
+        return @($trx.SelectNodes("//*[local-name()='UnitTestResult']") | Where-Object {
+            [string] $_.outcome -eq "Failed"
+        } | ForEach-Object { [string] $_.testName } | Sort-Object -Unique)
+    } catch {
+        Write-Warning "Could not read failed test names from '$TrxPath': $($_.Exception.Message)"
+        return @()
+    }
+}
+
 $projectPaths = @($Projects | ForEach-Object { Resolve-ProjectPath $_ } | Where-Object {
     $null -ne $_
 })
@@ -81,6 +97,7 @@ $failed = $false
 foreach ($projectPath in $projectPaths) {
     $projectName = Split-Path $projectPath -LeafBase
     $passed = $false
+    $failedTestsBeforeRetry = @()
 
     foreach ($attempt in 1..$Attempts) {
         $trxFileName = "$projectName-$safeSuiteName-attempt$attempt.trx"
@@ -115,11 +132,15 @@ foreach ($projectPath in $projectPaths) {
 
         if ($exitCode -eq 0) {
             Assert-TrxHasExecutedTests (Join-Path $resultsPath $trxFileName) $projectName
+            foreach ($testName in @($failedTestsBeforeRetry | Sort-Object -Unique)) {
+                Write-Host "::warning title=Flaky test::$testName failed before $projectName passed on retry in suite $SuiteName."
+            }
             $passed = $true
             break
         }
 
         if ($attempt -lt $Attempts) {
+            $failedTestsBeforeRetry += Get-FailedTrxTests (Join-Path $resultsPath $trxFileName)
             Write-Host "::warning::$projectName failed in suite $SuiteName on attempt $attempt (exit $exitCode); retrying once."
         }
     }

@@ -47,7 +47,7 @@ public sealed partial class PluginAnalyzerTests
             out var generatorDiagnostics);
 
         Assert.Empty(generatorDiagnostics.Where(d => d.Severity.Equals(DiagnosticSeverity.Error)));
-        var generatedTree = Assert.Single(driver.GetRunResult().GeneratedTrees);
+        var generatedTree = Assert.Single(PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()).GeneratedTrees);
         var generated = generatedTree.GetText().ToString();
 
         Assert.Contains("public static class FireDamagePluginPackage", generated);
@@ -90,7 +90,7 @@ public sealed partial class PluginAnalyzerTests
             out var generatorDiagnostics);
 
         Assert.Contains(generatorDiagnostics, d => d.Id == "DBXK100");
-        Assert.Empty(driver.GetRunResult().GeneratedTrees);
+        Assert.Empty(PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()).GeneratedTrees);
     }
 
     [Fact]
@@ -130,7 +130,7 @@ public sealed partial class PluginAnalyzerTests
             d => d.Id == "DBXK100" &&
                  d.GetMessage().Contains("top-level", StringComparison.OrdinalIgnoreCase) &&
                  d.GetMessage().Contains("nested", StringComparison.OrdinalIgnoreCase));
-        Assert.Empty(driver.GetRunResult().GeneratedTrees);
+        Assert.Empty(PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()).GeneratedTrees);
     }
 
     [Fact]
@@ -167,7 +167,7 @@ public sealed partial class PluginAnalyzerTests
             out var generatorDiagnostics);
 
         Assert.Contains(generatorDiagnostics, d => d.Id == "DBXK100");
-        Assert.Empty(driver.GetRunResult().GeneratedTrees);
+        Assert.Empty(PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()).GeneratedTrees);
     }
 
     [Fact]
@@ -200,7 +200,7 @@ public sealed partial class PluginAnalyzerTests
             out var generatorDiagnostics);
 
         Assert.Contains(generatorDiagnostics, d => d.Id == "DBXK100");
-        Assert.Empty(driver.GetRunResult().GeneratedTrees);
+        Assert.Empty(PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()).GeneratedTrees);
     }
 
     [Fact]
@@ -235,7 +235,7 @@ public sealed partial class PluginAnalyzerTests
             out var generatorDiagnostics);
 
         Assert.Contains(generatorDiagnostics, d => d.Id == "DBXK100");
-        Assert.Empty(driver.GetRunResult().GeneratedTrees);
+        Assert.Empty(PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()).GeneratedTrees);
     }
 
     [Fact]
@@ -268,7 +268,7 @@ public sealed partial class PluginAnalyzerTests
             out var generatorDiagnostics);
 
         Assert.Empty(generatorDiagnostics.Where(d => d.Severity.Equals(DiagnosticSeverity.Error)));
-        var generated = Assert.Single(driver.GetRunResult().GeneratedTrees).GetText().ToString();
+        var generated = Assert.Single(PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()).GeneratedTrees).GetText().ToString();
         Assert.Contains("Var(\"e_TargetId\")", generated);
         Assert.Empty(outputCompilation.GetDiagnostics().Where(d => d.Severity.Equals(DiagnosticSeverity.Error)));
     }

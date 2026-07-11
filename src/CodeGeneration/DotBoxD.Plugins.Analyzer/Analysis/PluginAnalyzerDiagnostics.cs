@@ -5,10 +5,10 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 internal static class PluginAnalyzerDiagnostics
 {
     internal const string ShippedRulesHelpLinkBase =
-        "https://github.com/JKamsker/DotBoxD/blob/main/src/CodeGeneration/DotBoxD.Plugins.Analyzer/AnalyzerReleases.Shipped.md#";
+        "https://dotboxd.kamsker.at/reference/diagnostics/#";
 
     internal const string UnshippedRulesHelpLinkBase =
-        "https://github.com/JKamsker/DotBoxD/blob/main/src/CodeGeneration/DotBoxD.Plugins.Analyzer/AnalyzerReleases.Unshipped.md#";
+        "https://dotboxd.kamsker.at/reference/diagnostics/#";
 
     public static readonly DiagnosticDescriptor UnsupportedKernelShapeRule = new(
         "DBXK100",
@@ -18,7 +18,7 @@ internal static class PluginAnalyzerDiagnostics
         DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "Plugin package generation supports a restricted kernel expression subset; interpolation holes may be strings or supported invariant string-convertible numeric types.",
-        helpLinkUri: UnshippedRulesHelpLinkBase + "DBXK100");
+        helpLinkUri: UnshippedRulesHelpLinkBase + "dbxk100");
 
     // A remote RunLocal chain (RemoteHookRegistry / RemoteSubscriptionRegistry) is only intercepted when its
     // Where/Select stages lower to verified IR. When a stage cannot be lowered (an unsupported projection or
@@ -31,11 +31,11 @@ internal static class PluginAnalyzerDiagnostics
             + "predicate{0}), so the generator does not intercept it and the runtime terminal throws "
             + "NotSupportedException; use a supported projection/predicate shape",
         "DotBoxD.Kernels.Generation",
-        DiagnosticSeverity.Info,
+        DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "A recognized remote RunLocal hook chain whose Where/Select stages cannot be lowered is skipped "
             + "by the generator; without interception its native terminal throws at runtime.",
-        helpLinkUri: UnshippedRulesHelpLinkBase + "DBXK111");
+        helpLinkUri: UnshippedRulesHelpLinkBase + "dbxk111");
 
     // A normal Run terminal has no native fallback: if a recognized chain cannot be lowered, the runtime terminal
     // throws DBXK062 when the authoring chain is configured. Report that specific generator skip instead of the
@@ -47,11 +47,11 @@ internal static class PluginAnalyzerDiagnostics
             + "or terminal body), so the generator does not intercept it and the runtime terminal throws DBXK062; "
             + "use a supported hook-chain shape or bind a kernel class with Use/Register{0}",
         "DotBoxD.Kernels.Generation",
-        DiagnosticSeverity.Warning,
+        DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "A recognized Run hook chain that cannot be lowered is skipped by the generator; without "
             + "interception its native terminal throws DBXK062 when the chain is configured.",
-        helpLinkUri: UnshippedRulesHelpLinkBase + "DBXK114");
+        helpLinkUri: UnshippedRulesHelpLinkBase + "dbxk114");
 
     public static readonly DiagnosticDescriptor ServerExtensionGraftCollisionRule = new(
         "DBXK115",
@@ -63,7 +63,7 @@ internal static class PluginAnalyzerDiagnostics
         isEnabledByDefault: true,
         description: "Generated server-extension grafts must have unique receiver, name, parameter-type, and "
             + "namespace combinations so extension lookup is unambiguous.",
-        helpLinkUri: UnshippedRulesHelpLinkBase + "DBXK115");
+        helpLinkUri: UnshippedRulesHelpLinkBase + "dbxk115");
 
     public static readonly DiagnosticDescriptor LocalContextMemberRule = new(
         "DBXK116",
@@ -74,7 +74,7 @@ internal static class PluginAnalyzerDiagnostics
         isEnabledByDefault: true,
         description: "[NativeOnly] marks server-authored context helpers that may only run natively; they cannot be "
             + "used in lowered hook chains or server-extension bodies.",
-        helpLinkUri: UnshippedRulesHelpLinkBase + "DBXK116");
+        helpLinkUri: UnshippedRulesHelpLinkBase + "dbxk116");
 
     // A [HookResult] record must declare the control fields the generated builders (and the runtime
     // abstain/fallthrough contract) depend on. Without them the builders cannot be emitted, so surface the
@@ -89,7 +89,7 @@ internal static class PluginAnalyzerDiagnostics
         description: "A [HookResult] type must be a top-level readonly record struct that declares a 'bool Success' "
             + "field and a 'string? Reason' field, so the generated Ok()/Reject() builders and the runtime "
             + "abstain/fallthrough contract are well-defined.",
-        helpLinkUri: UnshippedRulesHelpLinkBase + "DBXK112");
+        helpLinkUri: UnshippedRulesHelpLinkBase + "dbxk112");
 
     // A result-returning hook chain (On<TContext>().…​.Register/RegisterLocal) is only intercepted when its
     // context carries [Hook], its handler returns the associated result type, and its filter/handler lower to
@@ -100,12 +100,12 @@ internal static class PluginAnalyzerDiagnostics
         "Result hook chain is not lowered and will throw at runtime",
         "{0}",
         "DotBoxD.Kernels.Generation",
-        DiagnosticSeverity.Info,
+        DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "A recognized result-returning hook chain whose context lacks [Hook], whose handler returns the "
             + "wrong result type, or whose filter/handler cannot be lowered is skipped by the generator; without "
             + "interception its native Register/RegisterLocal terminal throws at runtime.",
-        helpLinkUri: UnshippedRulesHelpLinkBase + "DBXK113");
+        helpLinkUri: UnshippedRulesHelpLinkBase + "dbxk113");
 
     public static readonly DiagnosticDescriptor SourceGeneratorFailureRule = new(
         "DBXK117",
@@ -116,5 +116,76 @@ internal static class PluginAnalyzerDiagnostics
         isEnabledByDefault: true,
         description: "An unexpected plugin source generator failure was isolated to the affected syntax or output "
             + "stage. The generator skipped that item instead of failing the whole generation pass.",
-        helpLinkUri: UnshippedRulesHelpLinkBase + "DBXK117");
+        helpLinkUri: UnshippedRulesHelpLinkBase + "dbxk117");
+}
+
+internal static class PluginIdValidation
+{
+    public static string? ErrorMessage(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Any(char.IsControl))
+        {
+            return "Plugin id must be a non-empty stable identifier and must not contain control characters.";
+        }
+
+        return IsStablePluginId(value!)
+            ? null
+            : "Plugin id must be a stable identifier: use ASCII letters, digits, '.', '_' or '-', " +
+              "start and end with a letter or digit, and do not use empty dot segments.";
+    }
+
+    private static bool IsStablePluginId(string value)
+        => IsGeneratedAnonymousPluginId(value) ||
+           value.Length <= 128 &&
+           IsAsciiLetterOrDigit(value[0]) &&
+           IsAsciiLetterOrDigit(value[value.Length - 1]) &&
+           HasStablePluginIdBody(value);
+
+    private static bool HasStablePluginIdBody(string value)
+    {
+        var previousWasDot = false;
+        foreach (var ch in value)
+        {
+            if (ch == '.')
+            {
+                if (previousWasDot)
+                {
+                    return false;
+                }
+
+                previousWasDot = true;
+                continue;
+            }
+
+            previousWasDot = false;
+            if (!IsAsciiLetterOrDigit(ch) && ch is not '-' and not '_')
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsGeneratedAnonymousPluginId(string value)
+    {
+        const string prefix = "$anon:";
+        if (!value.StartsWith(prefix, StringComparison.Ordinal) || value.Length == prefix.Length)
+        {
+            return false;
+        }
+
+        for (var i = prefix.Length; i < value.Length; i++)
+        {
+            if (!IsAsciiLetterOrDigit(value[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsAsciiLetterOrDigit(char ch)
+        => ch is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9';
 }

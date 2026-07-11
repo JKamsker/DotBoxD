@@ -42,7 +42,9 @@ public sealed class PluginAnalyzerHookChainProjectionTests
 
         var generated = string.Join(Environment.NewLine, result.GeneratedTrees.Select(tree => tree.ToString()));
 
-        Assert.Equal(2, CountOccurrences(generated, "host.probe.label"));
+        // The fused terminal package evaluates the projection once in ShouldHandle and once in Handle. The
+        // explicit IRFunc sidecar for the Select stage carries the same lowered binding once more.
+        Assert.Equal(3, CountOccurrences(generated, "host.probe.label"));
     }
 
     private static int CountOccurrences(string text, string value)
@@ -72,7 +74,7 @@ public sealed class PluginAnalyzerHookChainProjectionTests
             [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: ParseOptions);
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out _, out _);
-        return driver.GetRunResult();
+        return PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult());
     }
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()

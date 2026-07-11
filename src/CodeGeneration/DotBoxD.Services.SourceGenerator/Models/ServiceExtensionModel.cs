@@ -12,6 +12,8 @@ internal sealed record ServiceExtensionModel(
     string Namespace,
     string InterfaceName,
     string ServiceName,
+    string ObsoleteAttribute,
+    string ExperimentalDiagnosticId,
     EquatableArray<ServicePropertyModel> Properties,
     EquatableArray<SubServiceInfo> MethodSubServices)
 {
@@ -37,6 +39,8 @@ internal sealed record ServiceExtensionModel(
             service.Namespace,
             service.InterfaceName,
             service.ServiceName,
+            service.ObsoleteAttribute,
+            service.ExperimentalDiagnosticId,
             service.Properties,
             methodSubServices.ToEquatableArray());
     }

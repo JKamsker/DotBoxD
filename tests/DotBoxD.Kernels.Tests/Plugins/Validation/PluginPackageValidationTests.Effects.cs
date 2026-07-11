@@ -25,4 +25,25 @@ public sealed partial class PluginPackageValidationTests
             d.Code == "DBXK040" &&
             d.Message.Contains("declared more than once", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public async Task Install_rejects_null_manifest_effects_with_diagnostic()
+    {
+        var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
+        var package = FireDamagePluginPackage.Create();
+        var invalid = package with
+        {
+            Manifest = package.Manifest with
+            {
+                Effects = [.. package.Manifest.Effects, null!]
+            }
+        };
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
+            async () => await server.InstallAsync(invalid).AsTask());
+
+        Assert.Contains(ex.Diagnostics, d =>
+            d.Code == "DBXK040" &&
+            d.Message.Contains("is not supported", StringComparison.Ordinal));
+    }
 }

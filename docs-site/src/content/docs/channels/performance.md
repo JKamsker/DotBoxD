@@ -4,7 +4,7 @@ description: 'Channel calls are cheap by construction: the generated proxy and d
 ---
 Channel calls are cheap by construction: the generated proxy and dispatcher marshal each contract
 method with source-generated code, so there is no runtime reflection on the hot path, and payloads
-move as framed binary MessagePack frames rather than per-call reflective serialization (see
+move as binary MessagePack frames rather than per-call reflective serialization (see
 [Services](/concepts/services/)). The switches on this page shave the remaining per-call
 allocation off that baseline — reach for them only on measured hot paths.
 

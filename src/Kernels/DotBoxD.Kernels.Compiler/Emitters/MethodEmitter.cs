@@ -138,7 +138,33 @@ internal sealed class MethodEmitter
     }
     private void EmitForRange(ForRangeStatement range)
     {
-        if (F64LoopFastPathEmitter.TryEmit(
+        if (TryEmitForRangeFastPath(range))
+        {
+            return;
+        }
+
+        _nonNegativeF64Locals.Clear();
+        EmitGenericForRange(range);
+    }
+
+    private bool TryEmitForRangeFastPath(ForRangeStatement range)
+    {
+        if (TryEmitF64ForRangeFastPath(range))
+        {
+            return true;
+        }
+
+        if (TryEmitBranchedF64ForRangeFastPath(range))
+        {
+            return true;
+        }
+
+        return TryEmitIntegerForRangeFastPath(range);
+    }
+
+    private bool TryEmitF64ForRangeFastPath(ForRangeStatement range)
+    {
+        if (!F64LoopFastPathEmitter.TryEmit(
             range,
             _il,
             _stackPlan,
@@ -147,14 +173,21 @@ internal sealed class MethodEmitter
             Declare,
             out var nonNegativeTarget))
         {
-            _nonNegativeF64Locals.Clear();
-            if (nonNegativeTarget is not null)
-            {
-                _nonNegativeF64Locals.Add(nonNegativeTarget);
-            }
-            return;
+            return false;
         }
-        if (BranchedF64LoopFastPathEmitter.TryEmit(
+
+        _nonNegativeF64Locals.Clear();
+        if (nonNegativeTarget is not null)
+        {
+            _nonNegativeF64Locals.Add(nonNegativeTarget);
+        }
+
+        return true;
+    }
+
+    private bool TryEmitBranchedF64ForRangeFastPath(ForRangeStatement range)
+    {
+        if (!BranchedF64LoopFastPathEmitter.TryEmit(
             range,
             _il,
             _stackPlan,
@@ -164,9 +197,15 @@ internal sealed class MethodEmitter
             _nonNegativeF64Locals,
             Declare))
         {
-            _nonNegativeF64Locals.Clear();
-            return;
+            return false;
         }
+
+        _nonNegativeF64Locals.Clear();
+        return true;
+    }
+
+    private bool TryEmitIntegerForRangeFastPath(ForRangeStatement range)
+    {
         if (MapGetI32LoopFastPathEmitter.TryEmit(range, _il, _stackPlan, Declare) ||
             ListGetI32LoopFastPathEmitter.TryEmit(range, _il, _stackPlan, Declare) ||
             ListCountLoopFastPathEmitter.TryEmit(range, _il, _stackPlan, Declare) ||
@@ -178,9 +217,14 @@ internal sealed class MethodEmitter
             BulkMeteredLoopFastPathEmitter.TryEmit(range, _il, _stackPlan, _expressions, Declare))
         {
             _nonNegativeF64Locals.Clear();
-            return;
+            return true;
         }
-        _nonNegativeF64Locals.Clear();
+
+        return false;
+    }
+
+    private void EmitGenericForRange(ForRangeStatement range)
+    {
         var index = _il.DeclareLocal(typeof(int));
         var end = _il.DeclareLocal(typeof(int));
         _expressions.EmitAs(range.Start, StackKind.I32);

@@ -148,7 +148,7 @@ public sealed class AnalyzerDefaultValueEmitterMatrixTests
         var generated = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
-        Assert.Contains("UseGeneratedChain", generated, StringComparison.Ordinal);
+        Assert.Contains("IRKernel.FromPackage", generated, StringComparison.Ordinal);
         if (testCase.KernelExpected is not null)
         {
             Assert.Contains(testCase.KernelExpected, generated, StringComparison.Ordinal);

@@ -32,14 +32,14 @@ internal static class HookResultBuilderEmitter
         var indent = string.Empty;
         if (model.Namespace is not null)
         {
-            builder.Append("namespace ").Append(model.Namespace).AppendLine();
+            builder.Append("namespace ").Append(EscapeNamespace(model.Namespace)).AppendLine();
             builder.AppendLine("{");
             indent = "    ";
         }
 
         // The partial always declares IHookResult (the runtime abstain/fallthrough contract); its Success field
         // satisfies the member. Builder members are added only when the author did not declare them.
-        builder.Append(indent).Append(model.DeclarationKeywords).Append(' ').Append(model.TypeName)
+        builder.Append(indent).Append(model.DeclarationKeywords).Append(' ').Append(EscapeIdentifier(model.TypeName))
             .Append(" : ").AppendLine(HookResultInterface);
         builder.Append(indent).AppendLine("{");
 
@@ -71,7 +71,7 @@ internal static class HookResultBuilderEmitter
             return;
         }
 
-        builder.Append(indent).Append("public static ").Append(model.TypeName).AppendLine(" Ok()");
+        builder.Append(indent).Append("public static ").Append(EscapeIdentifier(model.TypeName)).AppendLine(" Ok()");
         builder.Append(indent).AppendLine("    => new() { Success = true };");
         builder.AppendLine();
     }
@@ -83,7 +83,7 @@ internal static class HookResultBuilderEmitter
             return;
         }
 
-        builder.Append(indent).Append("public static ").Append(model.TypeName).AppendLine(" Reject(string? reason = null)");
+        builder.Append(indent).Append("public static ").Append(EscapeIdentifier(model.TypeName)).AppendLine(" Reject(string? reason = null)");
         builder.Append(indent).AppendLine("    => new() { Success = false, Reason = reason };");
         builder.AppendLine();
     }
@@ -96,7 +96,7 @@ internal static class HookResultBuilderEmitter
             return;
         }
 
-        builder.Append(indent).Append("public ").Append(model.TypeName).Append(' ').Append(methodName)
+        builder.Append(indent).Append("public ").Append(EscapeIdentifier(model.TypeName)).Append(' ').Append(methodName)
             .Append('(').Append(field.TypeFullName).Append(' ').Append(field.ParameterName).AppendLine(")");
         builder.Append(indent).Append("    => this with { ").Append(EscapeIdentifier(field.Name)).Append(" = ")
             .Append(field.ParameterName).AppendLine(" };");
@@ -113,6 +113,9 @@ internal static class HookResultBuilderEmitter
 
         return kind == SyntaxKind.None ? name : "@" + name;
     }
+
+    private static string EscapeNamespace(string namespaceName)
+        => string.Join(".", namespaceName.Split('.').Select(EscapeIdentifier));
 
     private static bool Contains(EquatableArray<HookResultExistingMember> members, string name, int parameterCount)
     {

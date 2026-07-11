@@ -6,4 +6,6 @@ namespace DotBoxD.Services.Tests.GeneratedFixtures;
 public interface IDispatchCancellationService
 {
     int Record(int value);
+
+    Task<int> RecordAfterCancelAsync(int value, CancellationToken ct = default);
 }

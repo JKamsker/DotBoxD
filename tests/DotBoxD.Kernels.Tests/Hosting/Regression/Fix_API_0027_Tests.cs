@@ -4,6 +4,7 @@ namespace DotBoxD.Kernels.Tests.Hosting.Regression;
 
 public sealed class Fix_API_0027_Tests
 {
+    // The prose docs moved under docs-site/ (Astro Starlight migration); the design/spec docs stayed in docs/.
     private static readonly string[] CurrentServerExtensionDocumentation =
     [
         "README.md",

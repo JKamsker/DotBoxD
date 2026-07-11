@@ -98,16 +98,41 @@ public sealed partial class RpcHost : IAsyncDisposable
 
     private async Task AddPeerAsync(IRpcChannel connection)
     {
-        if (!_admission.TryAcquire(out var admission))
+        var accepted = await TryCreatePeerAsync(connection).ConfigureAwait(false);
+        if (accepted is null)
         {
-            await connection.DisposeAsync().ConfigureAwait(false);
             return;
         }
 
-        RpcPeer peer;
+        var (peer, admission) = accepted;
+        var configure = _configure.Snapshot();
+        if (!await TryConfigurePeerAsync(peer, admission, configure).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        peer.Disconnected += OnPeerDisconnected;
+        if (!TryRegisterPeer(peer, admission))
+        {
+            await DisposeUnregisteredPeerAsync(peer, admission).ConfigureAwait(false);
+            return;
+        }
+
+        await StartRegisteredPeerAsync(peer).ConfigureAwait(false);
+    }
+
+    private async ValueTask<AcceptedPeer?> TryCreatePeerAsync(IRpcChannel connection)
+    {
+        if (!_admission.TryAcquire(out var admission))
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+            return null;
+        }
+
         try
         {
-            peer = _peerFactoryForTest?.Invoke(connection) ?? RpcPeer.Over(connection, _serializer, _options);
+            var peer = _peerFactoryForTest?.Invoke(connection) ?? RpcPeer.Over(connection, _serializer, _options);
+            return new AcceptedPeer(peer, admission);
         }
         catch
         {
@@ -115,14 +140,21 @@ public sealed partial class RpcHost : IAsyncDisposable
             await connection.DisposeAsync().ConfigureAwait(false);
             throw;
         }
+    }
 
-        var configure = _configure.Snapshot();
+    private async ValueTask<bool> TryConfigurePeerAsync(
+        RpcPeer peer,
+        RpcHostPeerAdmission.RpcHostPeerAdmissionLease admission,
+        IReadOnlyList<Action<RpcPeer>> configure)
+    {
         try
         {
             foreach (var configurePeer in configure)
             {
                 configurePeer(peer);
             }
+
+            return true;
         }
         catch (Exception ex)
         {
@@ -130,33 +162,36 @@ public sealed partial class RpcHost : IAsyncDisposable
             RpcEventHandlerInvoker.Raise(AcceptError, this, new RpcHostErrorEventArgs(ex));
             admission.Dispose();
             await peer.DisposeAsync().ConfigureAwait(false);
-            return;
+            return false;
         }
+    }
 
-        peer.Disconnected += OnPeerDisconnected;
-
-        bool registered;
+    private bool TryRegisterPeer(RpcPeer peer, RpcHostPeerAdmission.RpcHostPeerAdmissionLease admission)
+    {
         lock (_lifecycleLock)
         {
             // Only register a peer the host will still manage. StopCoreAsync drains in-flight
             // hand-offs before CloseAllAsync, so a peer registered here is guaranteed to be closed by
             // the host; one rejected here (the host is stopping/stopped/disposed) is disposed below
             // instead of leaking its channel and read loop past shutdown.
-            registered = Volatile.Read(ref _disposed) == 0 && _stopTask is null && _cts is not null;
-            if (registered)
-            {
-                registered = _peers.TryAdd(peer, admission);
-            }
+            return Volatile.Read(ref _disposed) == 0 &&
+                _stopTask is null &&
+                _cts is not null &&
+                _peers.TryAdd(peer, admission);
         }
+    }
 
-        if (!registered)
-        {
-            peer.Disconnected -= OnPeerDisconnected;
-            admission.Dispose();
-            await peer.DisposeAsync().ConfigureAwait(false);
-            return;
-        }
+    private async ValueTask DisposeUnregisteredPeerAsync(
+        RpcPeer peer,
+        RpcHostPeerAdmission.RpcHostPeerAdmissionLease admission)
+    {
+        peer.Disconnected -= OnPeerDisconnected;
+        admission.Dispose();
+        await peer.DisposeAsync().ConfigureAwait(false);
+    }
 
+    private async ValueTask StartRegisteredPeerAsync(RpcPeer peer)
+    {
         // Raise PeerConnected BEFORE starting the read loop. peer.Start() launches the read loop,
         // which on an already-closed channel immediately fires Disconnected -> PeerDisconnected; doing
         // it before this event could surface PeerDisconnected ahead of PeerConnected for the same peer.
@@ -186,6 +221,10 @@ public sealed partial class RpcHost : IAsyncDisposable
             throw;
         }
     }
+
+    private sealed record AcceptedPeer(
+        RpcPeer Peer,
+        RpcHostPeerAdmission.RpcHostPeerAdmissionLease Admission);
 
     private void RaiseAcceptError(Exception ex) =>
         RpcEventHandlerInvoker.Raise(AcceptError, this, new RpcHostErrorEventArgs(ex));

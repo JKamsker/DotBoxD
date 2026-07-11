@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using CsCheck;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Serialization.Json.Hosting;
@@ -13,24 +15,25 @@ public sealed class DifferentialFuzzTests
     private static readonly string[] Parameters = ["a", "b", "c"];
 
     [Fact]
-    public async Task Pure_i32_json_fuzz_cases_match_interpreter_and_compiler()
+    public void Pure_i32_json_fuzz_cases_match_interpreter_and_compiler()
+        => Gen.Int.Sample(
+            seed => RunCaseAsync(seed).GetAwaiter().GetResult(),
+            seed: "0N0XIzNsQ0O2",
+            iter: 40,
+            threads: 1);
+
+    private static async Task RunCaseAsync(int seed)
     {
-        var host = SandboxTestHost.Create(compiler: true);
-        var random = new Random(0x51AFE);
-
-        for (var index = 0; index < 40; index++)
-        {
-            var expression = Expression(random, depth: 4);
-            var json = ModuleJson(index, expression);
-            var module = await host.ImportJsonAsync(json);
-            var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(10_000).Build());
-            var input = Input(random);
-
-            var interpreted = await ExecuteAsync(host, plan, input, ExecutionMode.Interpreted);
-            var compiled = await ExecuteAsync(host, plan, input, ExecutionMode.Compiled);
-
-            AssertEqual(index, json, interpreted, compiled);
-        }
+        using var host = SandboxTestHost.Create(compiler: true);
+        var random = new Random(seed);
+        var expression = Expression(random, depth: 4);
+        var json = ModuleJson(seed, expression);
+        var module = await host.ImportJsonAsync(json);
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(10_000).Build());
+        var input = Input(random);
+        var interpreted = await ExecuteAsync(host, plan, input, ExecutionMode.Interpreted);
+        var compiled = await ExecuteAsync(host, plan, input, ExecutionMode.Compiled);
+        AssertEqual(seed, json, interpreted, compiled);
     }
 
     private static async ValueTask<SandboxExecutionResult> ExecuteAsync(
@@ -108,7 +111,7 @@ public sealed class DifferentialFuzzTests
     private static string ModuleJson(int index, JsonObject expression)
         => new JsonObject
         {
-            ["id"] = $"differential-fuzz-{index}",
+            ["id"] = ModuleId(index),
             ["version"] = "1.0.0",
             ["functions"] = new JsonArray {
                 new JsonObject {
@@ -129,6 +132,9 @@ public sealed class DifferentialFuzzTests
                 }
             }
         }.ToJsonString(JsonOptions);
+
+    private static string ModuleId(int index)
+        => $"differential-fuzz-{index.ToString(CultureInfo.InvariantCulture)}";
 
     private static JsonObject Parameter(string name)
         => new()

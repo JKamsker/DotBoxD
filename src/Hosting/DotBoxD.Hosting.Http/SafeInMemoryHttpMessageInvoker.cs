@@ -11,7 +11,12 @@ public sealed class SafeInMemoryHttpMessageInvoker : HttpMessageInvoker
         string? location = null,
         string? finalRequestUri = null,
         TimeSpan? responseDelay = null)
-        : this(Encoding.UTF8.GetBytes(response), statusCode, location, finalRequestUri, responseDelay)
+        : this(
+            Encoding.UTF8.GetBytes(response ?? throw new ArgumentNullException(nameof(response))),
+            statusCode,
+            location,
+            finalRequestUri,
+            responseDelay)
     {
     }
 

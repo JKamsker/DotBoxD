@@ -13,10 +13,13 @@ public sealed class RpcDispatchErrorEventArgs : EventArgs
         string? instanceId,
         Exception error)
     {
-        RemoteEndpoint = remoteEndpoint ?? throw new ArgumentNullException(nameof(remoteEndpoint));
+        RemoteEndpoint = DiagnosticArgumentGuard.RequireNonBlank(
+            remoteEndpoint,
+            nameof(remoteEndpoint),
+            "Remote endpoint");
         MessageId = messageId;
-        ServiceName = serviceName ?? throw new ArgumentNullException(nameof(serviceName));
-        MethodName = methodName ?? throw new ArgumentNullException(nameof(methodName));
+        ServiceName = DiagnosticArgumentGuard.RequireNonBlank(serviceName, nameof(serviceName), "Service name");
+        MethodName = DiagnosticArgumentGuard.RequireNonBlank(methodName, nameof(methodName), "Method name");
         InstanceId = instanceId;
         Error = error ?? throw new ArgumentNullException(nameof(error));
     }
@@ -38,4 +41,5 @@ public sealed class RpcDispatchErrorEventArgs : EventArgs
 
     /// <summary>The dispatch or response-send failure.</summary>
     public Exception Error { get; }
+
 }

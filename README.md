@@ -1,6 +1,6 @@
 # DotBoxD
 
-> Source-generated, contract-first .NET extension runtime: **Services**, **Kernels**, **Pushdown**.
+> A source-generated, contract-first **plugin system for .NET hosts** — Services (RPC), Kernels (sandboxed logic), Pushdown (server-side batching).
 
 [![CI](https://github.com/JKamsker/DotBoxD/actions/workflows/ci.yml/badge.svg)](https://github.com/JKamsker/DotBoxD/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/JKamsker/DotBoxD/actions/workflows/codeql.yml/badge.svg)](https://github.com/JKamsker/DotBoxD/actions/workflows/codeql.yml)
@@ -9,23 +9,55 @@
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4.svg)](https://dotnet.microsoft.com/)
 [![Docs](https://img.shields.io/badge/docs-online-2ea44f.svg)](https://dotboxd.kamsker.at/)
 
-📖 **Documentation site:** <https://dotboxd.kamsker.at/> — guide, tutorials, examples, and the
-generated API reference.
+**For .NET hosts — game servers, desktop apps, backend services — that must run untrusted
+third-party plugins safely.** The Services stack targets `netstandard2.1`; Unity/IL2CPP deployments
+must use generated MessagePack DTO formatters and validate their own IL2CPP build. The Kernels and
+Pushdown stack targets `net10.0`.
 
-DotBoxD lets a host and its clients share **one C# contract** and use it in three different ways,
-all driven by Roslyn source generators (no runtime reflection on the hot path):
+## The problem
 
-- **Services** — the host implements a contract; clients call it remotely over RPC.
-- **Kernels** — a client supplies validated logic the host runs safely inside a metered sandbox.
+.NET cannot safely isolate arbitrary code **in-process**: AppDomains are gone, and
+`AssemblyLoadContext` is a loading feature, **not** a security boundary. The only thing the OS can
+truly isolate is a whole *process*, so the safe way to run untrusted plugins is an unprivileged
+**sidecar** behind IPC. That safe design imposes two costs: **round-trips** — every interaction
+crosses the process boundary, so an N-item loop pays latency × N — and the **filter-API dilemma** —
+the host vendor (who is *not* the plugin author) has to design an event-filter API blind, and it is
+always either too coarse (oversharing plus overhead) or too exhaustive (endless unused options, still
+not expressive enough). If your .NET host must accept third-party plugins safely, you pay both costs.
+
+## The answer
+
+DotBoxD is a **complete plugin system for .NET hosts** that keeps the process boundary but gives
+plugin *logic* a safe way back into the host: a validated, capability-gated, fuel-metered in-process
+sandbox that runs restricted IR (intermediate representation) — never loaded C#/IL. Author-written
+filters, projections, and batches are compiled down to that IR at build time and run next to the
+host's data, so:
+
+- **Event pipelines push only server-side filtered/projected data** — 0 round-trips.
+- **Pushdown collapses N calls into 1.**
+- **The plugin author — not the vendor — writes the filter.**
+
+It also ships the rest of the plugin-system ceremony (transports, codecs, generated
+proxies/dispatchers, registries, lifecycle such as unload-on-disconnect), all driven by Roslyn source
+generators with no runtime reflection on the hot path.
+
+📖 **Start here:** [**Why DotBoxD?** — the isolation-vs-latency dilemma in three diagrams](https://dotboxd.kamsker.at/why-dotboxd/).
+Full guide, tutorials, examples, and the generated API reference live at <https://dotboxd.kamsker.at/>.
+
+**How:** one C# contract, delivered three ways.
+
+- **Services** — the host implements a contract; clients call it remotely over RPC. A typed proxy and
+  dispatcher are generated from the same interface, so they cannot drift; AOT deployments also need a
+  generated/static codec resolver.
+- **Kernels** — a client supplies validated logic the host runs safely inside a fuel-metered sandbox.
+  Downstream, this event-pipeline flavor is called *Query (RunLocal)*.
 - **Pushdown** — a plugin ships its *own* sandboxed batch operation that runs *server-side*, looping
-  over the host's existing fine-grained bindings so many small remote calls collapse into one round-trip.
-
-The Services and channel libraries target `netstandard2.1`, so they run on **Unity / IL2CPP**.
-The Kernels and Pushdown stack targets `net10.0`.
+  over the host's existing fine-grained bindings so many small remote calls collapse into one
+  round-trip.
 
 ---
 
-## The 3 ways to use one contract
+## The three ways to use one contract
 
 The snippets below use the real, compiling API. The maintained runnable example is the GameServer
 sample at [`samples/GameServer/Examples.GameServer.Server`](samples/GameServer/Examples.GameServer.Server),
@@ -111,12 +143,12 @@ if (result.Succeeded && result.Value is I32Value total)
 
 ### 3. Pushdown — plugins ship server-side batch operations
 
-This is the payoff. The host is typically **frozen at release** and exposes only **fine-grained**
-bindings (e.g. "kill *one* monster"); it ships **no batch operations**. A client that needs to act on
-many entities would otherwise make **one remote call per entity**. With pushdown, a **plugin supplies its
-own server-side aggregate** as a sandboxed **server extension**: the analyzer lowers its C# batch method
-to verified IR that runs server-side, looping over the host's *existing* bindings. The server is never
-recompiled — only the plugin changes — and N round-trips collapse into **one**.
+This is the payoff. The host is typically **frozen at release** and exposes only fine-grained
+bindings (e.g. "kill *one* monster"); it ships no batch operations. A client that needs to act on
+many entities would otherwise make one remote call per entity. With pushdown, a plugin supplies its
+own server-side aggregate as a sandboxed server extension: the analyzer lowers its C# batch method
+to verified IR that runs server-side, looping over the host's *existing* bindings. The server is
+never recompiled — only the plugin changes — and **N round-trips collapse into one**.
 
 ```csharp
 // The host (frozen at release) exposes only a fine-grained binding — there is NO batch method here.
@@ -167,13 +199,10 @@ dotnet add package DotBoxD --prerelease
 
 # Unity / netstandard2.1 service bundle:
 dotnet add package DotBoxD.Services.All --prerelease
-
-# Preview pushdown IPC addon (prerelease while upstream deps are prerelease):
-dotnet add package DotBoxD.Pushdown.Services --prerelease
 ```
 
 Then read [Getting started](https://dotboxd.kamsker.at/getting-started/) for first-service, first-kernel, and
-pushdown walkthroughs, or run the maintained example:
+pushdown walkthroughs, or run the GameServer sample:
 
 ```bash
 dotnet run -c Release --project samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
@@ -183,10 +212,9 @@ dotnet run -c Release --project samples/GameServer/Examples.GameServer.Server/Ex
 
 ## Installing from NuGet
 
-Most consumers start with a meta-package (`DotBoxD` for the full net10.0 stack, `DotBoxD.Services.All`
-for the Unity/netstandard2.1 service bundle). To pull individual packages instead, add only the pieces
-you need. Main-branch CI packages are published as `0.1.0-ci.*` prereleases; omit `--prerelease` once
-you target a stable tag release.
+To pull individual packages instead of a meta-package, add only the pieces you need. Main-branch CI
+packages are published as `0.1.0-ci.*` prereleases; omit `--prerelease` once you target a stable tag
+release.
 
 ```bash
 # Host orchestration (SandboxHost: import, prepare, execute kernels under policy):
@@ -210,7 +238,7 @@ dotnet add package DotBoxD.Plugins --prerelease
 # Source generator + analyzer that turns [Plugin] kernels into package-backed plugins:
 dotnet add package DotBoxD.Plugins.Analyzer --prerelease
 
-# Preview MessagePack IPC addon that runs kernels next to host services (prerelease):
+# Preview pushdown IPC addon:
 dotnet add package DotBoxD.Pushdown.Services --prerelease
 ```
 
@@ -270,11 +298,11 @@ and `DBXK###` (kernels/plugins). See [the docs overview](https://dotboxd.kamsker
 | Package | Purpose | TFM | Stability |
 |---------|---------|-----|-----------|
 | [`DotBoxD`](https://www.nuget.org/packages/DotBoxD) | Meta-package: the full net10.0 stack (Services + Kernels + Pushdown) | net10.0 | Preview |
-| [`DotBoxD.Services.All`](https://www.nuget.org/packages/DotBoxD.Services.All) | Meta-package: service + Unity bundle | netstandard2.1 | Stable · **Unity/IL2CPP** |
-| [`DotBoxD.Services`](https://www.nuget.org/packages/DotBoxD.Services) | Contract attributes, `RpcPeer`/`RpcHost`, dispatch, and bundled source generator | netstandard2.1 | Stable · **Unity/IL2CPP** |
-| [`DotBoxD.Codecs.MessagePack`](https://www.nuget.org/packages/DotBoxD.Codecs.MessagePack) | MessagePack serializer for the wire format | netstandard2.1 | Stable · **Unity/IL2CPP** |
-| [`DotBoxD.Transports.Tcp`](https://www.nuget.org/packages/DotBoxD.Transports.Tcp) | TCP transport | netstandard2.1 | Stable · **Unity/IL2CPP** |
-| [`DotBoxD.Transports.NamedPipes`](https://www.nuget.org/packages/DotBoxD.Transports.NamedPipes) | Named-pipe transport (local IPC) | netstandard2.1 | Stable · **Unity/IL2CPP** |
+| [`DotBoxD.Services.All`](https://www.nuget.org/packages/DotBoxD.Services.All) | Meta-package: service + channel bundle | netstandard2.1 | Stable API · AOT configuration required |
+| [`DotBoxD.Services`](https://www.nuget.org/packages/DotBoxD.Services) | Contract attributes, `RpcPeer`/`RpcHost`, dispatch, and bundled source generator | netstandard2.1 | Stable API |
+| [`DotBoxD.Codecs.MessagePack`](https://www.nuget.org/packages/DotBoxD.Codecs.MessagePack) | MessagePack serializer for the wire format | netstandard2.1 | Stable API · generated resolver required for AOT |
+| [`DotBoxD.Transports.Tcp`](https://www.nuget.org/packages/DotBoxD.Transports.Tcp) | TCP transport | netstandard2.1 | Stable API |
+| [`DotBoxD.Transports.NamedPipes`](https://www.nuget.org/packages/DotBoxD.Transports.NamedPipes) | Named-pipe transport (local IPC) | netstandard2.1 | Stable API |
 | [`DotBoxD.Abstractions`](https://www.nuget.org/packages/DotBoxD.Abstractions) | Plugin-to-host authoring contracts (`[Plugin]`, `IEventKernel<TEvent>`) | net10.0 | Preview |
 | [`DotBoxD.Kernels`](https://www.nuget.org/packages/DotBoxD.Kernels) | IR model, policy model, resource metering, canonical hashing | net10.0 | Preview |
 | [`DotBoxD.Kernels.Validation`](https://www.nuget.org/packages/DotBoxD.Kernels.Validation) | Structural, type, effect, policy, binding validation | net10.0 | Preview |
@@ -298,11 +326,10 @@ published as a standalone package.
 
 After installing, these are the entry points you'll reach for:
 
-- `DotBoxD.Services`: `[RpcService]` contracts, `RpcPeer` / `RpcHost`, and the generated
-  `Provide{Service}` / `Get<TService>()` wiring.
-- `DotBoxD.Hosting`: `SandboxHost` — import, validate, prepare, and execute kernels under policy.
-- `DotBoxD.Kernels.Serialization.Json`: JSON IR import **and export** round-trip via
-  `JsonImporter` and `JsonExporter`.
+- `DotBoxD.Services`: `[RpcService]`, `RpcPeer` / `RpcHost`, and the generated `Provide{Service}` /
+  `Get<TService>()` wiring.
+- `DotBoxD.Hosting`: `SandboxHost`.
+- `DotBoxD.Kernels.Serialization.Json`: `JsonImporter` / `JsonExporter`.
 - `DotBoxD.Pushdown.Services`: the MessagePack IPC bridge that runs kernels next to host services.
 
 ---

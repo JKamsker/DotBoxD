@@ -88,12 +88,12 @@ public sealed partial class PluginSession
     /// Opt-in convenience over public primitives: hand-write the equivalent with
     /// <see cref="InstallStagedAsync"/> + your wire action + <see cref="Promote"/> on success /
     /// <see cref="Uninstall"/> by the staged kernel's <see cref="InstalledKernel.InstallId"/> on failure (passing
-    /// the plugin id instead would target the live incumbent in a hot-replace, not the staged kernel). <b>The
-    /// <paramref name="validate"/> and <paramref name="wire"/> callbacks run while the session gate is held</b>,
-    /// so they must only touch server-side routing (e.g. <see cref="PluginServer.WireHook"/> /
-    /// <see cref="PluginServer.WireSubscription"/>) and must NOT call back into this session
-    /// (<see cref="InstallAsync"/> / <see cref="InstallStagedAsync"/> / <see cref="Promote"/> /
-    /// <see cref="Uninstall"/> / <see cref="Owns"/> / <see cref="TryGetOwned"/> /
+    /// the plugin id instead would target the live incumbent in a hot-replace, not the staged kernel). The
+    /// <paramref name="validate"/> and <paramref name="policy"/> callbacks run before the session gate is held.
+    /// The <paramref name="wire"/> callback runs while the session gate is held, so it must only touch server-side
+    /// routing (e.g. <see cref="PluginServer.WireHook"/> / <see cref="PluginServer.WireSubscription"/>) and must
+    /// NOT call back into this session (<see cref="InstallAsync"/> / <see cref="InstallStagedAsync"/> /
+    /// <see cref="Promote"/> / <see cref="Uninstall"/> / <see cref="Owns"/> / <see cref="TryGetOwned"/> /
     /// <see cref="UpdateSettingsAsync"/>), which would deadlock on the non-reentrant gate.
     /// </remarks>
     public async ValueTask<InstalledKernel> InstallAndWireAsync(
@@ -106,19 +106,40 @@ public sealed partial class PluginSession
         ArgumentNullException.ThrowIfNull(package);
         ArgumentNullException.ThrowIfNull(wire);
 
+        await EnsureUsableSessionAsync(cancellationToken).ConfigureAwait(false);
+
+        validate?.Invoke(package);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ThrowIfDisposed();
+
+            if (TryReuseOwnedLocalTerminal(package, out var existing))
+            {
+                return existing;
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+
+        var installPolicy = policy?.Invoke(package);
+        cancellationToken.ThrowIfCancellationRequested();
+
         InstalledKernel? staged = null;
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             ThrowIfDisposed();
-            validate?.Invoke(package);
 
             if (TryReuseOwnedLocalTerminal(package, out var existing))
             {
                 return existing;
             }
 
-            var installPolicy = policy?.Invoke(package);
             // Stage as a non-current instance, wire, then promote — all while holding the gate. Dispose takes the
             // same gate, so it cannot interleave between the install and the wire to revoke the kernel out from
             // under us (it tears the kernel down only after we release), and the incumbent is displaced only once
@@ -126,8 +147,10 @@ public sealed partial class PluginSession
             staged = await _server.InstallOwnedStagedAsync(this, package, installPolicy, cancellationToken)
                 .ConfigureAwait(false);
             _ownedInstallIds.Add(staged.InstallId);
+            cancellationToken.ThrowIfCancellationRequested();
 
             wire(staged);
+            cancellationToken.ThrowIfCancellationRequested();
 
             _server.PromoteOwned(this, staged);
             return staged;
@@ -152,6 +175,19 @@ public sealed partial class PluginSession
             }
 
             throw;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private async ValueTask EnsureUsableSessionAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ThrowIfDisposed();
         }
         finally
         {

@@ -69,46 +69,68 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         INamedTypeSymbol named,
         RecordMember derived)
     {
-        var lowered = expression switch
-        {
-            ParenthesizedExpressionSyntax parenthesized =>
-                LowerDerivedExpression(parenthesized.Expression, memberBindings, named, derived),
-
-            LiteralExpressionSyntax literal =>
-                LiteralJson(literal.Token.Value),
-
-            IdentifierNameSyntax identifier
-                when memberBindings.TryGetValue(identifier.Identifier.ValueText, out var bound) =>
-                bound,
-
-            MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } thisMember
-                when memberBindings.TryGetValue(thisMember.Name.Identifier.ValueText, out var boundThis) =>
-                boundThis,
-
-            PrefixUnaryExpressionSyntax unary =>
-                unary.Kind() switch
-                {
-                    SyntaxKind.LogicalNotExpression => Obj(
-                        ("unary", Str("not")),
-                        ("operand", LowerDerivedExpression(unary.Operand, memberBindings, named, derived))),
-                    SyntaxKind.UnaryMinusExpression => Obj(
-                        ("unary", Str("-")),
-                        ("operand", LowerDerivedExpression(unary.Operand, memberBindings, named, derived))),
-                    SyntaxKind.UnaryPlusExpression =>
-                        LowerDerivedExpression(unary.Operand, memberBindings, named, derived),
-                    _ => throw DerivedNotSupported(named, derived),
-                },
-
-            BinaryExpressionSyntax binary =>
-                LowerBinary(
-                    binary,
-                    part => LowerDerivedExpression(part, memberBindings, named, derived)),
-
-            _ => throw DerivedNotSupported(named, derived)
-        };
+        var lowered = TryLowerDerivedTerminal(expression, memberBindings, named, derived) ??
+                      TryLowerDerivedUnary(expression, memberBindings, named, derived) ??
+                      TryLowerDerivedBinary(expression, memberBindings, named, derived) ??
+                      throw DerivedNotSupported(named, derived);
 
         return ApplyNumericConversion(expression, lowered);
     }
+
+    private string? TryLowerDerivedTerminal(
+        ExpressionSyntax expression,
+        IReadOnlyDictionary<string, string> memberBindings,
+        INamedTypeSymbol named,
+        RecordMember derived)
+        => expression switch
+        {
+            ParenthesizedExpressionSyntax parenthesized =>
+                LowerDerivedExpression(parenthesized.Expression, memberBindings, named, derived),
+            LiteralExpressionSyntax literal =>
+                LiteralJson(literal.Token.Value),
+            IdentifierNameSyntax identifier =>
+                BoundDerivedMember(memberBindings, identifier.Identifier.ValueText),
+            MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } thisMember =>
+                BoundDerivedMember(memberBindings, thisMember.Name.Identifier.ValueText),
+            _ => null
+        };
+
+    private static string? BoundDerivedMember(IReadOnlyDictionary<string, string> memberBindings, string name)
+        => memberBindings.TryGetValue(name, out var bound) ? bound : null;
+
+    private string? TryLowerDerivedUnary(
+        ExpressionSyntax expression,
+        IReadOnlyDictionary<string, string> memberBindings,
+        INamedTypeSymbol named,
+        RecordMember derived)
+    {
+        if (expression is not PrefixUnaryExpressionSyntax unary)
+        {
+            return null;
+        }
+
+        return unary.Kind() switch
+        {
+            SyntaxKind.LogicalNotExpression => Obj(
+                ("unary", Str("not")),
+                ("operand", LowerDerivedExpression(unary.Operand, memberBindings, named, derived))),
+            SyntaxKind.UnaryMinusExpression => Obj(
+                ("unary", Str("-")),
+                ("operand", LowerDerivedExpression(unary.Operand, memberBindings, named, derived))),
+            SyntaxKind.UnaryPlusExpression =>
+                LowerDerivedExpression(unary.Operand, memberBindings, named, derived),
+            _ => throw DerivedNotSupported(named, derived),
+        };
+    }
+
+    private string? TryLowerDerivedBinary(
+        ExpressionSyntax expression,
+        IReadOnlyDictionary<string, string> memberBindings,
+        INamedTypeSymbol named,
+        RecordMember derived)
+        => expression is BinaryExpressionSyntax binary
+            ? LowerBinary(binary, part => LowerDerivedExpression(part, memberBindings, named, derived))
+            : null;
 
     private static System.NotSupportedException DerivedNotSupported(INamedTypeSymbol named, RecordMember derived)
         => new(

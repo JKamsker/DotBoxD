@@ -8,6 +8,37 @@ namespace DotBoxD.Kernels.Tests.Core;
 public sealed class SandboxValueValidatorTests
 {
     [Fact]
+    public void RequireType_rejects_malformed_list_item_type_without_null_reference()
+    {
+        var value = new ListValue([], null!);
+
+        var ex = Assert.Throws<SandboxRuntimeException>(() =>
+            SandboxValueValidator.RequireType(
+                value,
+                SandboxType.List(SandboxType.I32),
+                "bad input"));
+
+        Assert.Equal(SandboxErrorCode.InvalidInput, ex.Error.Code);
+    }
+
+    [Fact]
+    public void RequireType_rejects_malformed_map_key_type_without_null_reference()
+    {
+        var value = new MapValue(
+            new Dictionary<SandboxValue, SandboxValue>(),
+            null!,
+            SandboxType.I32);
+
+        var ex = Assert.Throws<SandboxRuntimeException>(() =>
+            SandboxValueValidator.RequireType(
+                value,
+                SandboxType.Map(SandboxType.String, SandboxType.I32),
+                "bad input"));
+
+        Assert.Equal(SandboxErrorCode.InvalidInput, ex.Error.Code);
+    }
+
+    [Fact]
     public void RequireType_accepts_nested_structural_values()
     {
         var recordType = SandboxType.Record([

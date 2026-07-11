@@ -14,10 +14,6 @@ public sealed class LoweringFailClosedInvariantTests
             "InitializerName",
             "Anonymous member-name inference returns null so the caller can reject unnameable fields with context."),
         new(
-            "Lowering/Expressions/Primitives/DotBoxDConstantExpressionLowerer.cs",
-            "LowerDefault",
-            "Default-literal lowering returns null for normal scalar defaults that are handled by the generic path."),
-        new(
             "Lowering/Expressions/KernelMethods/DotBoxDKernelMethodInliner.DescriptorShape.Helpers.cs",
             "SandboxTypeExpressionShape",
             "Descriptor shape probing returns null for absent or non-shape metadata before the caller rejects stale descriptors."),

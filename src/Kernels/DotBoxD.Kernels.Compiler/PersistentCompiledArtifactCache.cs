@@ -37,6 +37,11 @@ public sealed partial class PersistentCompiledArtifactCache
         CancellationToken cancellationToken)
     {
         PersistentCompiledArtifactCacheValidator.ValidateCacheKey(cacheKey);
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(entrypoint);
+        ArgumentNullException.ThrowIfNull(verifier);
+        ArgumentNullException.ThrowIfNull(policy);
+
         return await WithEntryLockAsync(
                 cacheKey,
                 () => TryReadCoreAsync(cacheKey, plan, entrypoint, verifier, policy, cancellationToken),
@@ -54,6 +59,13 @@ public sealed partial class PersistentCompiledArtifactCache
         CancellationToken cancellationToken)
     {
         PersistentCompiledArtifactCacheValidator.ValidateCacheKey(cacheKey);
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(entrypoint);
+        ArgumentNullException.ThrowIfNull(assemblyBytes);
+        ArgumentNullException.ThrowIfNull(manifest);
+        ArgumentNullException.ThrowIfNull(verification);
+        ArgumentNullException.ThrowIfNull(policy);
+
         await WithEntryLockAsync(
                 cacheKey,
                 () => WriteCoreAsync(cacheKey, plan, entrypoint, assemblyBytes, manifest, verification, policy, cancellationToken),
@@ -198,57 +210,6 @@ public sealed partial class PersistentCompiledArtifactCache
             PersistentCompiledArtifactCachePublisher.DeleteEntryIfExists(tempPath);
         }
     }
-    private static async ValueTask<T> ReadJsonAsync<T>(string path, CancellationToken cancellationToken)
-    {
-        var stream = File.OpenRead(path);
-        await using (stream.ConfigureAwait(false))
-        {
-            try
-            {
-                return await JsonSerializer.DeserializeAsync<T>(stream, JsonOptions, cancellationToken).ConfigureAwait(false) ??
-                       throw new JsonException("empty json file");
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException
-                and not JsonException
-                and not IOException
-                and not UnauthorizedAccessException)
-            {
-                // A cached model can round-trip through System.Text.Json yet still fail to
-                // construct because its defensive normalization (e.g. ArtifactManifest copying
-                // OptimizationFlags, which rejects a null collection) throws while materializing
-                // invalid persisted data. Convert any such materialization failure into a
-                // JsonException so the cache read path fails closed and routes the entry to
-                // quarantine + recompile, instead of surfacing an unhandled exception that aborts
-                // execution. Cancellation and the already-handled IO/JSON failures propagate as-is.
-                throw new JsonException(
-                    $"cached '{typeof(T).Name}' metadata could not be materialized: {ex.Message}",
-                    ex);
-            }
-        }
-    }
-
-    private static async ValueTask WriteJsonAsync<T>(string path, T value, CancellationToken cancellationToken)
-    {
-        var stream = DurableCreate(path);
-        await using (stream.ConfigureAwait(false))
-        {
-            await JsonSerializer.SerializeAsync(stream, value, JsonOptions, cancellationToken).ConfigureAwait(false);
-            await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
-            stream.Flush(flushToDisk: true);
-        }
-    }
-
-    private static async ValueTask WriteBytesAsync(string path, byte[] bytes, CancellationToken cancellationToken)
-    {
-        var stream = DurableCreate(path);
-        await using (stream.ConfigureAwait(false))
-        {
-            await stream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
-            await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
-            stream.Flush(flushToDisk: true);
-        }
-    }
-
     private void Quarantine(string entryPath)
     {
         if (!Directory.Exists(entryPath))
@@ -272,15 +233,6 @@ public sealed partial class PersistentCompiledArtifactCache
         PersistentCompiledArtifactCacheQuarantine.Prune(quarantineRoot);
     }
 
-    private static FileStream DurableCreate(string path)
-        => new(
-            path,
-            FileMode.CreateNew,
-            FileAccess.Write,
-            FileShare.None,
-            bufferSize: 4096,
-            FileOptions.WriteThrough);
-
     private static string CacheInvalidReason(Exception exception)
         => exception switch
         {
@@ -293,8 +245,3 @@ public sealed partial class PersistentCompiledArtifactCache
         };
 
 }
-
-public sealed record CompiledCacheLookup(
-    CompiledCacheStatus Status,
-    CompiledArtifact? Artifact,
-    string? InvalidReason = null);

@@ -76,6 +76,15 @@ internal static partial class DotBoxDKernelMethodInliner
 
     private static void ValidateDescriptorSourceShape(ExpressionSyntax expression)
     {
+        ValidateDescriptorInvocations(expression);
+        ValidateDescriptorCreations(expression);
+        ValidateDescriptorArrays(expression);
+        ValidateDescriptorForbiddenSyntax(expression);
+        ValidateDescriptorMemberAccess(expression);
+    }
+
+    private static void ValidateDescriptorInvocations(ExpressionSyntax expression)
+    {
         foreach (var invocation in expression.DescendantNodesAndSelf().OfType<InvocationExpressionSyntax>())
         {
             if (!IsAllowedInvocation(invocation.Expression))
@@ -83,7 +92,10 @@ internal static partial class DotBoxDKernelMethodInliner
                 throw new NotSupportedException("Generated descriptor contains unsupported expression source.");
             }
         }
+    }
 
+    private static void ValidateDescriptorCreations(ExpressionSyntax expression)
+    {
         foreach (var creation in expression.DescendantNodesAndSelf().OfType<ObjectCreationExpressionSyntax>())
         {
             if (!IsCallExpression(creation.Type) ||
@@ -97,7 +109,10 @@ internal static partial class DotBoxDKernelMethodInliner
         {
             throw new NotSupportedException("Generated descriptor contains unsupported expression source.");
         }
+    }
 
+    private static void ValidateDescriptorArrays(ExpressionSyntax expression)
+    {
         foreach (var array in expression.DescendantNodesAndSelf().OfType<ArrayCreationExpressionSyntax>())
         {
             if (!IsSandboxTypeArray(array.Type))
@@ -110,7 +125,10 @@ internal static partial class DotBoxDKernelMethodInliner
         {
             throw new NotSupportedException("Generated descriptor contains unsupported expression source.");
         }
+    }
 
+    private static void ValidateDescriptorForbiddenSyntax(ExpressionSyntax expression)
+    {
         foreach (var spread in expression.DescendantNodesAndSelf().OfType<SpreadElementSyntax>())
         {
             throw new NotSupportedException("Generated descriptor contains unsupported expression source.");
@@ -120,7 +138,10 @@ internal static partial class DotBoxDKernelMethodInliner
         {
             throw new NotSupportedException("Generated descriptor contains unsupported expression source.");
         }
+    }
 
+    private static void ValidateDescriptorMemberAccess(ExpressionSyntax expression)
+    {
         foreach (var member in expression.DescendantNodesAndSelf().OfType<MemberAccessExpressionSyntax>())
         {
             if (!IsAllowedMemberAccess(member))
@@ -157,10 +178,9 @@ internal static partial class DotBoxDKernelMethodInliner
            string.Equals(type.ElementType.ToString(), DotBoxDGenerationNames.TypeNames.GlobalSandboxType, StringComparison.Ordinal);
 
     private static bool AllowedHelper(string name)
-        => name is "Var" or "Str" or "Int32ToStr" or "ConcatString" or "StringLength" or
-            "StringSubstring" or "StringEquals" or "I32" or "I64" or "F64" or "Bool" or "Not" or
-            "Neg" or "Eq" or "Ne" or "Ge" or "Gt" or "Le" or "Lt" or "And" or "Or" or
-            "Add" or "Sub" or "Mul" or "Div" or "Mod";
+        => string.Equals(name, "Var", StringComparison.Ordinal) ||
+           PrimitiveLiteralHelpers.Contains(name) ||
+           InvocationShapeResolvers.ContainsKey(name);
 
     private static bool IsCallExpression(TypeSyntax type)
     {

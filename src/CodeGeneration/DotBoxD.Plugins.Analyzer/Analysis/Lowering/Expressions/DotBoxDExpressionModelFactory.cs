@@ -5,6 +5,42 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 
 internal static partial class DotBoxDExpressionModelFactory
 {
+    private static readonly Dictionary<SyntaxKind, BinaryLowerer> BinaryLowerers = new()
+    {
+        [SyntaxKind.EqualsExpression] = static (binary, context, left, right, allocates) =>
+            LowerEqualityBinary(binary, context, left, right, negate: false, allocates),
+        [SyntaxKind.NotEqualsExpression] = static (binary, context, left, right, allocates) =>
+            LowerEqualityBinary(binary, context, left, right, negate: true, allocates),
+        [SyntaxKind.GreaterThanOrEqualExpression] = static (_, _, left, right, allocates) =>
+            NumericBinary(DotBoxDGenerationNames.Helpers.Ge, DotBoxDOperatorNames.GreaterThanOrEqual, left, right, comparison: true, allocates),
+        [SyntaxKind.GreaterThanExpression] = static (_, _, left, right, allocates) =>
+            NumericBinary(DotBoxDGenerationNames.Helpers.Gt, DotBoxDOperatorNames.GreaterThan, left, right, comparison: true, allocates),
+        [SyntaxKind.LessThanOrEqualExpression] = static (_, _, left, right, allocates) =>
+            NumericBinary(DotBoxDGenerationNames.Helpers.Le, DotBoxDOperatorNames.LessThanOrEqual, left, right, comparison: true, allocates),
+        [SyntaxKind.LessThanExpression] = static (_, _, left, right, allocates) =>
+            NumericBinary(DotBoxDGenerationNames.Helpers.Lt, DotBoxDOperatorNames.LessThan, left, right, comparison: true, allocates),
+        [SyntaxKind.LogicalAndExpression] = static (_, _, left, right, allocates) =>
+            BoolBinary(DotBoxDGenerationNames.Helpers.And, DotBoxDOperatorNames.LogicalAnd, left, right, allocates),
+        [SyntaxKind.LogicalOrExpression] = static (_, _, left, right, allocates) =>
+            BoolBinary(DotBoxDGenerationNames.Helpers.Or, DotBoxDOperatorNames.LogicalOr, left, right, allocates),
+        [SyntaxKind.AddExpression] = static (_, _, left, right, allocates) => AddBinary(left, right, allocates),
+        [SyntaxKind.SubtractExpression] = static (_, _, left, right, allocates) =>
+            NumericBinary(DotBoxDGenerationNames.Helpers.Sub, DotBoxDOperatorNames.Minus, left, right, comparison: false, allocates),
+        [SyntaxKind.MultiplyExpression] = static (_, _, left, right, allocates) =>
+            NumericBinary(DotBoxDGenerationNames.Helpers.Mul, DotBoxDOperatorNames.Multiply, left, right, comparison: false, allocates),
+        [SyntaxKind.DivideExpression] = static (_, _, left, right, allocates) =>
+            NumericBinary(DotBoxDGenerationNames.Helpers.Div, DotBoxDOperatorNames.Divide, left, right, comparison: false, allocates),
+        [SyntaxKind.ModuloExpression] = static (_, _, left, right, allocates) =>
+            NumericBinary(DotBoxDGenerationNames.Helpers.Mod, DotBoxDOperatorNames.Modulo, left, right, comparison: false, allocates),
+    };
+
+    private delegate DotBoxDExpressionModel BinaryLowerer(
+        BinaryExpressionSyntax binary,
+        DotBoxDExpressionLoweringContext context,
+        DotBoxDExpressionModel left,
+        DotBoxDExpressionModel right,
+        bool allocates);
+
     public static DotBoxDExpressionModel Create(
         ExpressionSyntax expression,
         DotBoxDExpressionLoweringContext context)
@@ -21,32 +57,12 @@ internal static partial class DotBoxDExpressionModelFactory
         {
             return constant;
         }
-        return expression switch
+        if (TryLowerBySyntax(expression, context, out var lowered))
         {
-            ParenthesizedExpressionSyntax parenthesized => Lower(parenthesized.Expression, context),
-            PrefixUnaryExpressionSyntax unary => LowerUnary(unary, context),
-            BinaryExpressionSyntax binary => LowerBinary(binary, context),
-            InvocationExpressionSyntax invocation =>
-                DotBoxDInvocationExpressionLowerer.Lower(invocation, context, part => Lower(part, context)),
-            IsPatternExpressionSyntax pattern => DotBoxDPatternExpressionLowerer.Lower(pattern, context, part => Lower(part, context)),
-            IdentifierNameSyntax identifier when TryLowerImplicitThisIdentifier(identifier, context) is { } implicitThis =>
-                implicitThis,
-            IdentifierNameSyntax identifier => DotBoxDIdentifierExpressionLowerer.Lower(identifier, context),
-            MemberAccessExpressionSyntax member
-                when DotBoxDStringExpressionLowerer.TryLowerMember(member, context, part => Lower(part, context)) is { } lowered =>
-                lowered,
-            MemberAccessExpressionSyntax member => LowerMemberAccess(member, context),
-            InterpolatedStringExpressionSyntax interpolated =>
-                DotBoxDInterpolatedStringExpressionLowerer.Lower(interpolated, part => Lower(part, context)),
-            BaseObjectCreationExpressionSyntax creation
-                when DotBoxDRecordCreationExpressionLowerer.TryLower(creation, context, part => Lower(part, context)) is { } record =>
-                record,
-            AnonymousObjectCreationExpressionSyntax anonymous
-                when DotBoxDAnonymousObjectCreationExpressionLowerer.TryLower(anonymous, context, part => Lower(part, context)) is { } anonymousRecord =>
-                anonymousRecord,
-            LiteralExpressionSyntax literal => DotBoxDLiteralExpressionLowerer.Lower(literal),
-            _ => Unsupported(expression)
-        };
+            return lowered;
+        }
+
+        return Unsupported(expression);
     }
     private static DotBoxDExpressionModel LowerUnary(
         PrefixUnaryExpressionSyntax unary,
@@ -61,13 +77,13 @@ internal static partial class DotBoxDExpressionModelFactory
         {
             SyntaxKind.LogicalNotExpression => Unary(
                 DotBoxDGenerationNames.Helpers.Not,
-                DotBoxDGenerationNames.Operators.LogicalNot,
+                DotBoxDOperatorNames.LogicalNot,
                 operand,
                 DotBoxDGenerationNames.ManifestTypes.Bool,
                 DotBoxDGenerationNames.ManifestTypes.Bool),
             SyntaxKind.UnaryMinusExpression => DotBoxDNumericExpressionLowerer.Unary(
                 DotBoxDGenerationNames.Helpers.Neg,
-                DotBoxDGenerationNames.Operators.Minus,
+                DotBoxDOperatorNames.Minus,
                 operand),
             _ => Unsupported(unary)
         };
@@ -94,49 +110,25 @@ internal static partial class DotBoxDExpressionModelFactory
         var right = Lower(binary.Right, context);
         DotBoxDNumericConstantPromoter.Promote(binary, context, ref left, ref right);
         var allocates = left.Allocates || right.Allocates;
-        return binary.Kind() switch
-        {
-            SyntaxKind.EqualsExpression => LowerEquality(negate: false),
-            SyntaxKind.NotEqualsExpression => LowerEquality(negate: true),
-            SyntaxKind.GreaterThanOrEqualExpression => LowerNumeric(DotBoxDGenerationNames.Helpers.Ge,
-                DotBoxDGenerationNames.Operators.GreaterThanOrEqual, comparison: true),
-            SyntaxKind.GreaterThanExpression => LowerNumeric(DotBoxDGenerationNames.Helpers.Gt,
-                DotBoxDGenerationNames.Operators.GreaterThan, comparison: true),
-            SyntaxKind.LessThanOrEqualExpression => LowerNumeric(DotBoxDGenerationNames.Helpers.Le,
-                DotBoxDGenerationNames.Operators.LessThanOrEqual, comparison: true),
-            SyntaxKind.LessThanExpression => LowerNumeric(DotBoxDGenerationNames.Helpers.Lt,
-                DotBoxDGenerationNames.Operators.LessThan, comparison: true),
-            SyntaxKind.LogicalAndExpression => LowerBool(
-                DotBoxDGenerationNames.Helpers.And, DotBoxDGenerationNames.Operators.LogicalAnd),
-            SyntaxKind.LogicalOrExpression => LowerBool(
-                DotBoxDGenerationNames.Helpers.Or, DotBoxDGenerationNames.Operators.LogicalOr),
-            SyntaxKind.AddExpression => AddBinary(left, right, allocates),
-            SyntaxKind.SubtractExpression => LowerNumeric(DotBoxDGenerationNames.Helpers.Sub,
-                DotBoxDGenerationNames.Operators.Minus, comparison: false),
-            SyntaxKind.MultiplyExpression => LowerNumeric(DotBoxDGenerationNames.Helpers.Mul,
-                DotBoxDGenerationNames.Operators.Multiply, comparison: false),
-            SyntaxKind.DivideExpression => LowerNumeric(DotBoxDGenerationNames.Helpers.Div,
-                DotBoxDGenerationNames.Operators.Divide, comparison: false),
-            SyntaxKind.ModuloExpression => LowerNumeric(DotBoxDGenerationNames.Helpers.Mod,
-                DotBoxDGenerationNames.Operators.Modulo, comparison: false),
-            _ => Unsupported(binary)
-        };
-
-        DotBoxDExpressionModel LowerEquality(bool negate)
-            => DotBoxDEqualityExpressionLowerer.Lower(
-                left,
-                right,
-                negate,
-                allocates,
-                ConvertedType(binary.Left, context),
-                ConvertedType(binary.Right, context));
-
-        DotBoxDExpressionModel LowerNumeric(string helper, string symbol, bool comparison)
-            => NumericBinary(helper, symbol, left, right, comparison, allocates);
-
-        DotBoxDExpressionModel LowerBool(string helper, string symbol)
-            => BoolBinary(helper, symbol, left, right, allocates);
+        return BinaryLowerers.TryGetValue(binary.Kind(), out var lower)
+            ? lower(binary, context, left, right, allocates)
+            : Unsupported(binary);
     }
+
+    private static DotBoxDExpressionModel LowerEqualityBinary(
+        BinaryExpressionSyntax binary,
+        DotBoxDExpressionLoweringContext context,
+        DotBoxDExpressionModel left,
+        DotBoxDExpressionModel right,
+        bool negate,
+        bool allocates)
+        => DotBoxDEqualityExpressionLowerer.Lower(
+            left,
+            right,
+            negate,
+            allocates,
+            ConvertedType(binary.Left, context),
+            ConvertedType(binary.Right, context));
     private static DotBoxDExpressionModel AddBinary(
         DotBoxDExpressionModel left,
         DotBoxDExpressionModel right,
@@ -158,7 +150,7 @@ internal static partial class DotBoxDExpressionModelFactory
 
         return NumericBinary(
             DotBoxDGenerationNames.Helpers.Add,
-            DotBoxDGenerationNames.Operators.Add,
+            DotBoxDOperatorNames.Add,
             left,
             right,
             comparison: false,
@@ -196,31 +188,9 @@ internal static partial class DotBoxDExpressionModelFactory
         var memberName = member.Name.Identifier.ValueText;
         if (member.Expression is IdentifierNameSyntax identifier)
         {
-            // Projected record fields win over same-named event properties.
-            if (context.ProjectedElementName is { } projectedName &&
-                string.Equals(identifier.Identifier.ValueText, projectedName, StringComparison.Ordinal))
+            if (TryLowerIdentifierMemberAccess(identifier, member, memberName, context) is { } identifierMember)
             {
-                if (TryLowerProjectedRecordField(memberName, context) is { } projectedField)
-                {
-                    return projectedField;
-                }
-            }
-            else if (string.Equals(identifier.Identifier.ValueText, context.EventParameterName, StringComparison.Ordinal))
-            {
-                for (var i = 0; i < context.EventProperties.Count; i++)
-                {
-                    var property = context.EventProperties[i];
-                    if (string.Equals(property.Name, memberName, StringComparison.Ordinal))
-                    {
-                        CollectEventPropertyCapability(member, context);
-                        return new DotBoxDExpressionModel(
-                            $"{DotBoxDGenerationNames.Helpers.Var}({LiteralReader.StringLiteral(EventVariable(memberName))})",
-                            property.Type,
-                            false);
-                    }
-                }
-
-                throw new NotSupportedException($"Unknown event property '{memberName}'.");
+                return identifierMember;
             }
         }
 
@@ -241,6 +211,48 @@ internal static partial class DotBoxDExpressionModelFactory
         }
 
         return Unsupported(member);
+    }
+
+    private static DotBoxDExpressionModel? TryLowerIdentifierMemberAccess(
+        IdentifierNameSyntax identifier,
+        MemberAccessExpressionSyntax member,
+        string memberName,
+        DotBoxDExpressionLoweringContext context)
+    {
+        // Projected record fields win over same-named event properties.
+        if (context.ProjectedElementName is { } projectedName &&
+            string.Equals(identifier.Identifier.ValueText, projectedName, StringComparison.Ordinal))
+        {
+            return TryLowerProjectedRecordField(memberName, context);
+        }
+
+        if (!string.Equals(identifier.Identifier.ValueText, context.EventParameterName, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        return LowerEventParameterMember(member, memberName, context);
+    }
+
+    private static DotBoxDExpressionModel LowerEventParameterMember(
+        MemberAccessExpressionSyntax member,
+        string memberName,
+        DotBoxDExpressionLoweringContext context)
+    {
+        for (var i = 0; i < context.EventProperties.Count; i++)
+        {
+            var property = context.EventProperties[i];
+            if (string.Equals(property.Name, memberName, StringComparison.Ordinal))
+            {
+                CollectEventPropertyCapability(member, context);
+                return new DotBoxDExpressionModel(
+                    $"{DotBoxDGenerationNames.Helpers.Var}({LiteralReader.StringLiteral(EventVariable(memberName))})",
+                    property.Type,
+                    false);
+            }
+        }
+
+        throw new NotSupportedException($"Unknown event property '{memberName}'.");
     }
 
     public static string EventVariable(string name) => DotBoxDGenerationNames.GeneratedVariables.EventPrefix + name;

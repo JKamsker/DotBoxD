@@ -18,7 +18,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             $"Server extension cast '{cast}'");
     }
 
-    private string ApplyNumericConversion(ExpressionSyntax expression, string lowered)
+    internal string ApplyNumericConversion(ExpressionSyntax expression, string lowered)
     {
         var type = _model.GetTypeInfo(expression, _cancellationToken);
         if (type.Type is null ||
@@ -30,13 +30,13 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return ApplyNumericConversion(type.Type, type.ConvertedType, lowered);
     }
 
-    private string ApplyNumericConversion(ExpressionSyntax expression, ITypeSymbol targetType, string lowered)
+    internal string ApplyNumericConversion(ExpressionSyntax expression, ITypeSymbol targetType, string lowered)
     {
         var sourceType = _model.GetTypeInfo(expression, _cancellationToken).Type;
         return sourceType is null ? lowered : ApplyNumericConversion(sourceType, targetType, lowered);
     }
 
-    private string ApplyNumericConversion(ITypeSymbol sourceType, ITypeSymbol targetType, string lowered)
+    internal string ApplyNumericConversion(ITypeSymbol sourceType, ITypeSymbol targetType, string lowered)
         => TryApplyNumericConversion(sourceType, targetType, lowered, out var converted) ? converted : lowered;
 
     private string ApplyRequiredNumericConversion(

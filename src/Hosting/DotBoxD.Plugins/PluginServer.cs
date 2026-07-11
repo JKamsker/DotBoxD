@@ -102,6 +102,7 @@ public sealed partial class PluginServer : IDisposable
     {
         ArgumentNullException.ThrowIfNull(package);
         ThrowIfDisposed();
+        PluginPackageRootValidator.Validate(package);
         var required = _host.GetRequiredCapabilities(package.Module)
             .ToHashSet(StringComparer.Ordinal);
         if (package.Manifest.RpcEntrypoint is null)
@@ -124,7 +125,7 @@ public sealed partial class PluginServer : IDisposable
         ThrowIfDisposed();
         Hooks.EnsureCanRegister(adapter);
         Subscriptions.EnsureCanRegister(adapter);
-        Events.Register(adapter);
+        Events.Register(adapter, ThrowIfDisposed);
         return this;
     }
 

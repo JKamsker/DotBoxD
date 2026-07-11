@@ -17,12 +17,16 @@ public static class PluginMessageBindings
         this SandboxHostBuilder builder,
         IPluginMessageSink sink)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+
         builder.AddBinding(CreateSend(sink));
         return builder;
     }
 
     public static BindingDescriptor CreateSend(IPluginMessageSink sink)
     {
+        ArgumentNullException.ThrowIfNull(sink);
+
         var invoker = new PluginMessageSendInvoker(sink);
         return new BindingDescriptor(
             SendBindingId,

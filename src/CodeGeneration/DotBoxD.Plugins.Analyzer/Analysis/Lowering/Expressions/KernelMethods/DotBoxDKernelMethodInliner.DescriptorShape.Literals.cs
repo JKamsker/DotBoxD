@@ -20,19 +20,39 @@ internal static partial class DotBoxDKernelMethodInliner
         var expression = arguments[0].Expression;
         return name switch
         {
-            "Str" when LiteralValue(expression) is string =>
-                DescriptorShape.Simple(DotBoxDGenerationNames.ManifestTypes.String, allocates: true),
-            "I32" when TryInt32Literal(expression) =>
-                DescriptorShape.Simple(DotBoxDGenerationNames.ManifestTypes.Int),
-            "I64" when TryInt64Literal(expression) =>
-                DescriptorShape.Simple(DotBoxDGenerationNames.ManifestTypes.Long),
-            "F64" when TryFiniteDoubleLiteral(expression) =>
-                DescriptorShape.Simple(DotBoxDGenerationNames.ManifestTypes.Double),
-            "Bool" when LiteralValue(expression) is bool =>
-                DescriptorShape.Simple(DotBoxDGenerationNames.ManifestTypes.Bool),
+            "Str" => PrimitiveStringLiteralShape(expression),
+            "I32" => PrimitiveI32LiteralShape(expression),
+            "I64" => PrimitiveI64LiteralShape(expression),
+            "F64" => PrimitiveF64LiteralShape(expression),
+            "Bool" => PrimitiveBoolLiteralShape(expression),
             _ => throw new NotSupportedException("Generated descriptor contains stale literal metadata.")
         };
     }
+
+    private static DescriptorShape PrimitiveStringLiteralShape(ExpressionSyntax expression)
+        => LiteralValue(expression) is string
+            ? DescriptorShape.Simple(DotBoxDGenerationNames.ManifestTypes.String, allocates: true)
+            : throw new NotSupportedException("Generated descriptor contains stale literal metadata.");
+
+    private static DescriptorShape PrimitiveI32LiteralShape(ExpressionSyntax expression)
+        => TryInt32Literal(expression)
+            ? DescriptorShape.Simple(DotBoxDGenerationNames.ManifestTypes.Int)
+            : throw new NotSupportedException("Generated descriptor contains stale literal metadata.");
+
+    private static DescriptorShape PrimitiveI64LiteralShape(ExpressionSyntax expression)
+        => TryInt64Literal(expression)
+            ? DescriptorShape.Simple(DotBoxDGenerationNames.ManifestTypes.Long)
+            : throw new NotSupportedException("Generated descriptor contains stale literal metadata.");
+
+    private static DescriptorShape PrimitiveF64LiteralShape(ExpressionSyntax expression)
+        => TryFiniteDoubleLiteral(expression)
+            ? DescriptorShape.Simple(DotBoxDGenerationNames.ManifestTypes.Double)
+            : throw new NotSupportedException("Generated descriptor contains stale literal metadata.");
+
+    private static DescriptorShape PrimitiveBoolLiteralShape(ExpressionSyntax expression)
+        => LiteralValue(expression) is bool
+            ? DescriptorShape.Simple(DotBoxDGenerationNames.ManifestTypes.Bool)
+            : throw new NotSupportedException("Generated descriptor contains stale literal metadata.");
 
     private static bool TryInt32Literal(ExpressionSyntax expression)
         => TryInt32Value(expression, out _);
@@ -72,21 +92,32 @@ internal static partial class DotBoxDKernelMethodInliner
 
     private static bool TryInt64LiteralValue(ExpressionSyntax expression, out long value)
     {
-        var negative = false;
-        if (expression is PrefixUnaryExpressionSyntax prefix &&
-            prefix.OperatorToken.IsKind(SyntaxKind.MinusToken))
-        {
-            negative = true;
-            expression = prefix.Operand;
-        }
-
+        expression = UnwrapNegativeLiteral(expression, out var negative);
         if (expression is not LiteralExpressionSyntax literal)
         {
             value = 0;
             return false;
         }
 
-        switch (literal.Token.Value)
+        return TryInt64LiteralTokenValue(literal.Token.Value, negative, out value);
+    }
+
+    private static ExpressionSyntax UnwrapNegativeLiteral(ExpressionSyntax expression, out bool negative)
+    {
+        negative = false;
+        if (expression is PrefixUnaryExpressionSyntax prefix &&
+            prefix.OperatorToken.IsKind(SyntaxKind.MinusToken))
+        {
+            negative = true;
+            return prefix.Operand;
+        }
+
+        return expression;
+    }
+
+    private static bool TryInt64LiteralTokenValue(object? tokenValue, bool negative, out long value)
+    {
+        switch (tokenValue)
         {
             case int number:
                 value = negative ? -number : number;

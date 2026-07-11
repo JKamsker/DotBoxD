@@ -296,7 +296,3 @@ internal sealed class DotBoxDExpressionLoweringContext
             _inlineStack);
     }
 }
-
-internal sealed record PatternCaptureBinding(
-    DotBoxDExpressionModel Key,
-    Microsoft.CodeAnalysis.INamedTypeSymbol Subtype);

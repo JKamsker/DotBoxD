@@ -86,7 +86,7 @@ public sealed class PolymorphicHandleAttribute : Attribute
 {
     public PolymorphicHandleAttribute(string keyMember)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(keyMember);
+        HookContractIdentifiers.ValidateIdentifier(keyMember, nameof(keyMember));
 
         KeyMember = keyMember;
     }
@@ -110,8 +110,8 @@ public sealed class HandleSubtypeAttribute : Attribute
     {
         ArgumentNullException.ThrowIfNull(subtype);
         ArgumentException.ThrowIfNullOrWhiteSpace(discriminator);
-        ArgumentException.ThrowIfNullOrWhiteSpace(bindingPrefix);
-        ArgumentException.ThrowIfNullOrWhiteSpace(capability);
+        HookContractIdentifiers.ValidateDottedIdentifier(bindingPrefix, nameof(bindingPrefix));
+        HookContractIdentifiers.ValidateDottedIdentifier(capability, nameof(capability));
 
         Subtype = subtype;
         Discriminator = discriminator;
@@ -126,4 +126,88 @@ public sealed class HandleSubtypeAttribute : Attribute
     public string BindingPrefix { get; }
 
     public string Capability { get; }
+}
+
+file static class HookContractIdentifiers
+{
+    public static void ValidateDottedIdentifier(string value, string paramName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value, paramName);
+
+        if (!HasDottedIdentifierGrammar(value))
+        {
+            throw new ArgumentException("Value must be a dot-separated identifier.", paramName);
+        }
+    }
+
+    public static void ValidateIdentifier(string value, string paramName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value, paramName);
+
+        if (!HasIdentifierGrammar(value))
+        {
+            throw new ArgumentException("Value must be an identifier.", paramName);
+        }
+    }
+
+    private static bool HasDottedIdentifierGrammar(string value)
+    {
+        var expectingSegmentStart = true;
+        for (var i = 0; i < value.Length; i++)
+        {
+            var ch = value[i];
+            if (ch == '.')
+            {
+                if (expectingSegmentStart)
+                {
+                    return false;
+                }
+
+                expectingSegmentStart = true;
+                continue;
+            }
+
+            if (expectingSegmentStart)
+            {
+                if (!IsIdentifierStart(ch))
+                {
+                    return false;
+                }
+
+                expectingSegmentStart = false;
+                continue;
+            }
+
+            if (!IsIdentifierPart(ch))
+            {
+                return false;
+            }
+        }
+
+        return !expectingSegmentStart;
+    }
+
+    private static bool HasIdentifierGrammar(string value)
+    {
+        if (!IsIdentifierStart(value[0]))
+        {
+            return false;
+        }
+
+        for (var i = 1; i < value.Length; i++)
+        {
+            if (!IsIdentifierPart(value[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsIdentifierStart(char ch)
+        => ch is (>= 'A' and <= 'Z') or (>= 'a' and <= 'z') or '_';
+
+    private static bool IsIdentifierPart(char ch)
+        => IsIdentifierStart(ch) || ch is >= '0' and <= '9';
 }

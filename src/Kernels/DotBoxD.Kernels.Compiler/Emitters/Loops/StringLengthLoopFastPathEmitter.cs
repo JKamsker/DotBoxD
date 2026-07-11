@@ -233,17 +233,12 @@ internal static class StringLengthLoopFastPathEmitter
 
     private static bool CanUseDirectStringLength(IBindingCatalog bindings)
         => bindings.TryGet("string.length", out var binding) &&
-           binding.Compiled is { Kind: "RuntimeStub" } &&
-           binding.Compiled.Type == typeof(CompiledRuntime).FullName &&
-           binding.Compiled.Method == nameof(Kernels.Runtime.CompiledRuntime.StringLength) &&
-           binding.Parameters.Count == 1 &&
-           binding.Parameters[0].Equals(SandboxType.String) &&
-           binding.ReturnType.Equals(SandboxType.I32) &&
-           binding.RequiredCapability is null &&
-           binding.Safety == BindingSafety.PureIntrinsic &&
-           binding.AuditLevel == AuditLevel.None &&
-           binding.CostModel.MaxCallsPerRun is null &&
-           (binding.Effects & ~(SandboxEffect.Cpu | SandboxEffect.Alloc)) == SandboxEffect.None;
+           CompiledIntrinsicBindingMatcher.IsPureRuntimeStub(
+               binding,
+               nameof(Kernels.Runtime.CompiledRuntime.StringLength),
+               SandboxType.I32,
+               [SandboxType.String],
+               requireUnboundedCost: true);
 
     private readonly record struct LoopPlan(
         string Target,

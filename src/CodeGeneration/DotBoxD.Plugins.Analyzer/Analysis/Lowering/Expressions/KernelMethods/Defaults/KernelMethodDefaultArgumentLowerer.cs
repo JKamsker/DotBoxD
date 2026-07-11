@@ -41,88 +41,107 @@ internal static class KernelMethodDefaultArgumentLowerer
         IParameterSymbol parameter)
     {
         var type = DotBoxDTypeNameReader.KernelMethodTypeName(parameterType);
-        if (parameterType is INamedTypeSymbol { TypeKind: TypeKind.Enum } enumType && value is not null)
-        {
-            var raw = EnumDefaultValue(enumType, value);
-            return DotBoxDRpcTypeMapper.EnumUsesI64(enumType)
-                ? new DotBoxDExpressionModel(
-                    $"{DotBoxDGenerationNames.Helpers.I64}({LiteralReader.ObjectLiteral(raw)})",
-                    type,
-                    false)
-                : new DotBoxDExpressionModel(
-                    $"{DotBoxDGenerationNames.Helpers.I32}({LiteralReader.ObjectLiteral(unchecked((int)raw))})",
-                    type,
-                    false);
-        }
+        if (TryLowerEnumDefault(parameterType, value, type) is { } enumDefault)
+            return enumDefault;
 
+        if (TryLowerFrameworkValue(parameterType, value, parameter) is { } frameworkValue)
+            return frameworkValue;
+
+        if (TryLowerScalarLiteral(type, value) is { } scalarLiteral)
+            return scalarLiteral;
+
+        throw UnsupportedDefaultValue(parameter);
+    }
+
+    private static DotBoxDExpressionModel? TryLowerEnumDefault(ITypeSymbol parameterType, object? value, string type)
+    {
+        if (parameterType is not INamedTypeSymbol { TypeKind: TypeKind.Enum } enumType || value is null)
+            return null;
+
+        var raw = EnumDefaultValue(enumType, value);
+        return DotBoxDRpcTypeMapper.EnumUsesI64(enumType)
+            ? new DotBoxDExpressionModel(
+                $"{DotBoxDGenerationNames.Helpers.I64}({LiteralReader.ObjectLiteral(raw)})",
+                type,
+                false)
+            : new DotBoxDExpressionModel(
+                $"{DotBoxDGenerationNames.Helpers.I32}({LiteralReader.ObjectLiteral(unchecked((int)raw))})",
+                type,
+                false);
+    }
+
+    private static DotBoxDExpressionModel? TryLowerFrameworkValue(
+        ITypeSymbol parameterType,
+        object? value,
+        IParameterSymbol parameter)
+    {
         if (parameterType.SpecialType == SpecialType.System_DateTime && value is DateTime dateTime)
-        {
             return LowerDateTimeDefault(parameterType, dateTime, parameter);
-        }
 
         if (DotBoxDRpcTypeMapper.IsDecimalWireType(parameterType) && value is decimal decimalValue)
-        {
-            return new(
-                DecimalRecord(parameterType, decimalValue),
-                DotBoxDGenerationNames.ManifestTypes.Record,
-                true);
-        }
+            return new(DecimalRecord(parameterType, decimalValue), DotBoxDGenerationNames.ManifestTypes.Record, true);
 
-        if (DotBoxDRpcTypeMapper.IsGuid(parameterType) &&
-            value is Guid guid &&
-            guid == Guid.Empty &&
-            TryLowerFrameworkDefault(parameterType) is { } guidDefault)
-        {
-            return guidDefault;
-        }
+        if (value is null)
+            return TryLowerFrameworkDefault(parameterType);
 
-        if (value is null && TryLowerFrameworkDefault(parameterType) is { } frameworkDefault)
-        {
-            return frameworkDefault;
-        }
-
-        return type switch
-        {
-            DotBoxDGenerationNames.ManifestTypes.Bool when value is bool boolean => new(
-                $"{DotBoxDGenerationNames.Helpers.Bool}({LiteralReader.ObjectLiteral(boolean)})",
-                DotBoxDGenerationNames.ManifestTypes.Bool,
-                false),
-            DotBoxDGenerationNames.ManifestTypes.Int when value is int number => new(
-                $"{DotBoxDGenerationNames.Helpers.I32}({LiteralReader.ObjectLiteral(number)})",
-                DotBoxDGenerationNames.ManifestTypes.Int,
-                false),
-            DotBoxDGenerationNames.ManifestTypes.Long when value is int number => new(
-                $"{DotBoxDGenerationNames.Helpers.I64}({LiteralReader.ObjectLiteral((long)number)})",
-                DotBoxDGenerationNames.ManifestTypes.Long,
-                false),
-            DotBoxDGenerationNames.ManifestTypes.Long when value is long number => new(
-                $"{DotBoxDGenerationNames.Helpers.I64}({LiteralReader.ObjectLiteral(number)})",
-                DotBoxDGenerationNames.ManifestTypes.Long,
-                false),
-            DotBoxDGenerationNames.ManifestTypes.Double when value is int number => new(
-                $"{DotBoxDGenerationNames.Helpers.F64}({LiteralReader.ObjectLiteral((double)number)})",
-                DotBoxDGenerationNames.ManifestTypes.Double,
-                false),
-            DotBoxDGenerationNames.ManifestTypes.Double when value is long number => new(
-                $"{DotBoxDGenerationNames.Helpers.F64}({LiteralReader.ObjectLiteral((double)number)})",
-                DotBoxDGenerationNames.ManifestTypes.Double,
-                false),
-            DotBoxDGenerationNames.ManifestTypes.Double when value is float number && IsFinite(number) => new(
-                $"{DotBoxDGenerationNames.Helpers.F64}({LiteralReader.ObjectLiteral((double)number)})",
-                DotBoxDGenerationNames.ManifestTypes.Double,
-                false),
-            DotBoxDGenerationNames.ManifestTypes.Double when value is double number && IsFinite(number) => new(
-                $"{DotBoxDGenerationNames.Helpers.F64}({LiteralReader.ObjectLiteral(number)})",
-                DotBoxDGenerationNames.ManifestTypes.Double,
-                false),
-            DotBoxDGenerationNames.ManifestTypes.String when value is string text => new(
-                $"{DotBoxDGenerationNames.Helpers.Str}({LiteralReader.StringLiteral(text)})",
-                DotBoxDGenerationNames.ManifestTypes.String,
-                true),
-            _ => throw new NotSupportedException(
-                $"[KernelMethod] '{parameter.ContainingSymbol.Name}' optional parameter '{parameter.Name}' has an unsupported default value.")
-        };
+        return value is Guid guid && guid == Guid.Empty ? TryLowerFrameworkDefault(parameterType) : null;
     }
+
+    private static DotBoxDExpressionModel? TryLowerScalarLiteral(string type, object? value)
+        => TryLowerBool(type, value) ??
+           TryLowerInt(type, value) ??
+           TryLowerLong(type, value) ??
+           TryLowerDouble(type, value) ??
+           TryLowerString(type, value);
+
+    private static DotBoxDExpressionModel? TryLowerBool(string type, object? value)
+        => type == DotBoxDGenerationNames.ManifestTypes.Bool && value is bool boolean
+            ? new($"{DotBoxDGenerationNames.Helpers.Bool}({LiteralReader.ObjectLiteral(boolean)})", type, false)
+            : null;
+
+    private static DotBoxDExpressionModel? TryLowerInt(string type, object? value)
+        => type == DotBoxDGenerationNames.ManifestTypes.Int && value is int number
+            ? new($"{DotBoxDGenerationNames.Helpers.I32}({LiteralReader.ObjectLiteral(number)})", type, false)
+            : null;
+
+    private static DotBoxDExpressionModel? TryLowerLong(string type, object? value)
+        => type == DotBoxDGenerationNames.ManifestTypes.Long
+            ? TryLowerLongValue(value, type)
+            : null;
+
+    private static DotBoxDExpressionModel? TryLowerLongValue(object? value, string type)
+        => value switch
+        {
+            int number => new($"{DotBoxDGenerationNames.Helpers.I64}({LiteralReader.ObjectLiteral((long)number)})", type, false),
+            long number => new($"{DotBoxDGenerationNames.Helpers.I64}({LiteralReader.ObjectLiteral(number)})", type, false),
+            _ => null,
+        };
+
+    private static DotBoxDExpressionModel? TryLowerDouble(string type, object? value)
+        => type == DotBoxDGenerationNames.ManifestTypes.Double
+            ? TryLowerDoubleValue(value, type)
+            : null;
+
+    private static DotBoxDExpressionModel? TryLowerDoubleValue(object? value, string type)
+        => value switch
+        {
+            int number => F64((double)number, type),
+            long number => F64((double)number, type),
+            float number when IsFinite(number) => F64(number, type),
+            double number when IsFinite(number) => F64(number, type),
+            _ => null,
+        };
+
+    private static DotBoxDExpressionModel? TryLowerString(string type, object? value)
+        => type == DotBoxDGenerationNames.ManifestTypes.String && value is string text
+            ? new($"{DotBoxDGenerationNames.Helpers.Str}({LiteralReader.StringLiteral(text)})", type, true)
+            : null;
+
+    private static DotBoxDExpressionModel F64(double value, string type)
+        => new($"{DotBoxDGenerationNames.Helpers.F64}({LiteralReader.ObjectLiteral(value)})", type, false);
+
+    private static NotSupportedException UnsupportedDefaultValue(IParameterSymbol parameter)
+        => new($"[KernelMethod] '{parameter.ContainingSymbol.Name}' optional parameter '{parameter.Name}' has an unsupported default value.");
 
     private static DotBoxDExpressionModel LowerDateTimeDefault(
         ITypeSymbol type,

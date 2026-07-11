@@ -28,15 +28,16 @@ public bool GrantsCapability(string capabilityId, DateTimeOffset now)
 public bool GrantsCapability(string capabilityId)
 public bool HasBindingAuditSince( BindingDescriptor descriptor, long checkpoint, bool success, SandboxErrorCode? expectedErrorCode, SandboxRunId runId, string moduleHash, string policyHash)
 public bool IsAsync { get; init; }
-public bool IsForbidden() => IsForbidden(this)
-public bool IsKnown(int maxDepth = 8) => IsKnown(this, 0, maxDepth, declaredOpaqueIdTypes: null)
+public bool IsForbidden() => SandboxTypeRules.IsForbidden(this)
+public bool IsKnown(int maxDepth = 8) => SandboxTypeRules.IsKnown(this, maxDepth, declaredOpaqueIdTypes: null)
 public bool IsKnown(IReadOnlySet<string> declaredOpaqueIdTypes, int maxDepth = 8)
-public bool IsKnownBuiltIn(int maxDepth = 8) => IsKnown(this, 0, maxDepth, EmptyOpaqueIdTypes)
+public bool IsKnownBuiltIn(int maxDepth = 8) => SandboxTypeRules.IsKnownBuiltIn(this, maxDepth)
 public bool IsRecord => Arguments.Count > 0 && StringComparer.Ordinal.Equals(Name, RecordName)
 public bool IsValidMapKey() => IsValidMapKey(declaredOpaqueIdTypes: null)
 public bool IsValidMapKey(IReadOnlySet<string>? declaredOpaqueIdTypes)
 public bool RequireDeterministic { get; init; }
 public bool Succeeded { get; init; }
+public bool Success { get; init; }
 public bool TryGet(string id, out BindingSignature binding)
 public bool TryGetCapabilityGrantValidator(string capabilityId, out CapabilityGrantValidator validator)
 public bool TryGetGrant(string capabilityId, out CapabilityGrant grant)
@@ -57,8 +58,10 @@ public DateTimeOffset AuditTimestamp()
 public DateTimeOffset GrantClock
 public DateTimeOffset UtcNow()
 public DateTimeOffset? LogicalNow { get => _logicalNow; init { _logicalNow = value; ResetHash(); } }
+public delegate bool BindingAuditResourceValidator( CapabilityGrant grant, SandboxAuditEvent auditEvent)
 public delegate ValueTask<SandboxValue> BindingInvoker( SandboxContext context, IReadOnlyList<SandboxValue> args, CancellationToken cancellationToken)
 public delegate void CapabilityGrantValidator( CapabilityGrant grant, ICollection<SandboxDiagnostic> diagnostics)
+public DiagnosticSeverity Severity { get => _severity; init => _severity = ValidateSeverity(value); }
 public enum AuditLevel
 public enum AuditLevel.FullInputOutput
 public enum AuditLevel.None
@@ -108,7 +111,7 @@ public enum SandboxErrorCode.VerifierFailure
 public enum SandboxIsolation
 public enum SandboxIsolation.InProcess
 public enum SandboxIsolation.WorkerProcess
-public ExecutionMode ActualMode { get; init; }
+public ExecutionMode ActualMode { get => _actualMode; init => _actualMode = RequireDefinedMode(value, nameof(ActualMode)); }
 public ExecutionMode Mode { get; init; } = ExecutionMode.Auto
 public ExecutionPlan( string moduleHash, string planHash, ExecutionPlanSeal planSeal, string policyHash, string bindingManifestHash, SandboxModule module, SandboxPolicy policy, BindingRegistry bindings, ResourceLimits budget, IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis, IReadOnlyDictionary<string, IReadOnlySet<string>>? bindingReferences = null)
 public ExecutionPlanSeal PlanSeal { get; }
@@ -117,9 +120,13 @@ public IAuditSink Audit { get; }
 public IDisposable BeginBindingReturnCreditScope() => ReturnCredits.BeginScope()
 public IEnumerator<SandboxValue> GetEnumerator()
 public int AutoCompileThreshold { get; init; } = 20
+public int Column { get => _column; init => _column = ValidateCoordinate(value, nameof(Column)); }
 public int CompareTo(SemVersion? other)
 public int Count => _values.Count
+public int HostCalls { get => _hostCalls; init => _hostCalls = RequireNonNegative(value, nameof(HostCalls)); }
 public int HostCalls { get; private set; }
+public int Line { get => _line; init => _line = ValidateCoordinate(value, nameof(Line)); }
+public int LogEvents { get => _logEvents; init => _logEvents = RequireNonNegative(value, nameof(LogEvents)); }
 public int LogEvents { get; private set; }
 public int Major { get => _major; init => _major = RequireNonNegative(value, nameof(Major)); }
 public int Minor { get => _minor; init => _minor = RequireNonNegative(value, nameof(Minor)); }
@@ -133,39 +140,51 @@ public IReadOnlyDictionary<string, IReadOnlySet<string>> BindingReferences { get
 public IReadOnlyDictionary<string, SandboxFunction> FunctionLookup
 public IReadOnlyDictionary<string, string> BindingAuditFields( string resourceKind, DateTimeOffset startedAt, long? bytesRead = null, long? bytesWritten = null)
 public IReadOnlyDictionary<string, string> Metadata { get => _metadata; init => _metadata = ModelCopy.StringDictionary(value); }
-public IReadOnlyDictionary<string, string> Parameters { get; init; } =
+public IReadOnlyDictionary<string, string> Parameters { get; init; }
 public IReadOnlyDictionary<string, string>? Fields { get => _fields; init => _fields = CopyFields(value); }
 public IReadOnlyList<BindingSignature> Signatures => _signatures
-public IReadOnlyList<CapabilityGrant> Grants
+public IReadOnlyList<CapabilityGrant> Grants { get; init; }
 public IReadOnlyList<CapabilityRequest> CapabilityRequests { get => _capabilityRequests; init => _capabilityRequests = ModelCopy.List(value); }
 public IReadOnlyList<Expression> Arguments { get => _arguments; init => _arguments = ModelCopy.List(value); }
 public IReadOnlyList<Parameter> Parameters { get => _parameters; init => _parameters = ModelCopy.List(value); }
-public IReadOnlyList<SandboxAuditEvent> Events
-public IReadOnlyList<SandboxDiagnostic> Diagnostics { get; } = ModelCopy.List(diagnostics)
+public IReadOnlyList<SandboxAuditEvent> Events { get; }
+public IReadOnlyList<SandboxDiagnostic> Diagnostics { get; }
 public IReadOnlyList<SandboxFunction> Functions { get => _functions; init => _functions = ModelCopy.List(value); }
-public IReadOnlyList<SandboxType> Arguments { get => _arguments; init => _arguments = ModelCopy.List(value); }
-public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = ModelCopy.List(value); }
+public IReadOnlyList<SandboxType> Arguments { get; init; }
+public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = BindingParameterTypes.Copy(value, nameof(Parameters)); }
 public IReadOnlyList<SandboxValue> Fields { get => _fields; init => _fields = Snapshot(value); }
 public IReadOnlyList<SandboxValue> Values { get => this; init => _values = Snapshot(value); }
 public IReadOnlyList<Statement> Body { get => _body; init => _body = ModelCopy.List(value); }
 public IReadOnlyList<Statement> Else { get => _else; init => _else = ModelCopy.List(value); }
 public IReadOnlyList<Statement> Then { get => _then; init => _then = ModelCopy.List(value); }
-public IReadOnlySet<string> DeclaredOpaqueIdTypes
-public long AllocatedBytes { get; private set; }
+public IReadOnlySet<string> DeclaredOpaqueIdTypes { get; init; }
+public long AllocatedBytes { get => _allocatedBytes; init => _allocatedBytes = RequireNonNegative(value, nameof(AllocatedBytes)); }
+public long AllocatedBytes => _allocatedBytes
 public long AuditCheckpoint() => Audit.EventsWritten
+public long CollectionElements { get => _collectionElements; init => _collectionElements = RequireNonNegative(value, nameof(CollectionElements)); }
 public long CollectionElements { get; private set; }
-public long EventsWritten => _sequence
-public long FileBytesRead { get; private set; }
-public long FileBytesWritten { get; private set; }
+public long EventsWritten { get; }
+public long FileBytesRead { get => _fileBytesRead; init => _fileBytesRead = RequireNonNegative(value, nameof(FileBytesRead)); }
+public long FileBytesRead => _fileBytesRead
+public long FileBytesWritten { get => _fileBytesWritten; init => _fileBytesWritten = RequireNonNegative(value, nameof(FileBytesWritten)); }
+public long FileBytesWritten => _fileBytesWritten
+public long FuelUsed { get => _fuelUsed; init => _fuelUsed = RequireNonNegative(value, nameof(FuelUsed)); }
 public long FuelUsed { get; private set; }
+public long LoopIterations { get => _loopIterations; init => _loopIterations = RequireNonNegative(value, nameof(LoopIterations)); }
 public long LoopIterations { get; private set; }
-public long NetworkBytesRead { get; private set; }
-public long NetworkBytesWritten { get; private set; }
+public long MaxFuel { get => _maxFuel; init => _maxFuel = RequireNonNegative(value, nameof(MaxFuel)); }
+public long NetworkBytesRead { get => _networkBytesRead; init => _networkBytesRead = RequireNonNegative(value, nameof(NetworkBytesRead)); }
+public long NetworkBytesRead => _networkBytesRead
+public long NetworkBytesWritten { get => _networkBytesWritten; init => _networkBytesWritten = RequireNonNegative(value, nameof(NetworkBytesWritten)); }
+public long NetworkBytesWritten => _networkBytesWritten
+public long StringBytes { get => _stringBytes; init => _stringBytes = RequireNonNegative(value, nameof(StringBytes)); }
 public long StringBytes { get; private set; }
+public long? Bytes { get => _bytes; init => _bytes = RequireNonNegative(value, nameof(Bytes)); }
 public override bool Equals(object? obj) => Equals(obj as ExecutionPlanSeal)
 public override int GetHashCode()
 public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(_value)
 public override SandboxType Type
+public override SandboxType Type { get; }
 public override SandboxType Type => SandboxType.Bool
 public override SandboxType Type => SandboxType.F64
 public override SandboxType Type => SandboxType.Guid
@@ -175,7 +194,6 @@ public override SandboxType Type => SandboxType.List(ItemType)
 public override SandboxType Type => SandboxType.Map(KeyType, ValueType)
 public override SandboxType Type => SandboxType.SandboxPath
 public override SandboxType Type => SandboxType.SandboxUri
-public override SandboxType Type => SandboxType.Scalar(TypeName)
 public override SandboxType Type => SandboxType.String
 public override SandboxType Type => SandboxType.Unit
 public override string ToString()
@@ -187,7 +205,7 @@ public override string ToString() => Value
 public override string ToString() => Value.ToString("N")
 public readonly record struct ShortCircuitOperands(Expression First, Expression Second, bool Reordered)
 public RecordValue(IReadOnlyList<SandboxValue> Fields)
-public required IReadOnlyList<SandboxAuditEvent> AuditEvents
+public required IReadOnlyList<SandboxAuditEvent> AuditEvents { get; init; }
 public required SandboxResourceUsage ResourceUsage { get; init; }
 public required string ModuleHash { get; init; }
 public required string PlanHash { get; init; }
@@ -199,8 +217,11 @@ public ResourceMeter Budget { get; }
 public ResourceMeter(ResourceLimits limits)
 public SandboxContext( SandboxRunId runId, SandboxPolicy policy, ResourceMeter budget, BindingRegistry bindings, IAuditSink audit, CancellationToken cancellationToken, IReadOnlySet<string>? allowedBindingIds = null, string? moduleHash = null, string? policyHash = null)
 public SandboxEffect AllowedEffects { get => _allowedEffects; init { _allowedEffects = value; ResetHash(); } }
+public SandboxEffect Effect { get => _effect; init => _effect = RequireKnownEffect(value, nameof(Effect)); }
 public SandboxError Error { get; }
 public SandboxError? Error { get; init; }
+public SandboxErrorCode Code { get; init; }
+public SandboxErrorCode? ErrorCode { get; init; }
 public SandboxIsolation Isolation { get; init; } = SandboxIsolation.InProcess
 public SandboxModule Module { get; }
 public SandboxPath Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
@@ -235,10 +256,12 @@ public SandboxPolicyBuilder WithMaxTotalStringBytes(long bytes)
 public SandboxPolicyBuilder WithPolicyId(string policyId)
 public SandboxPolicyBuilder WithWallTime(TimeSpan maxWallTime)
 public SandboxResourceUsage Snapshot()
+public SandboxRunId RunId { get => _runId; init => _runId = value ?? throw new ArgumentNullException(nameof(RunId)); }
 public SandboxRunId RunId { get; }
 public SandboxRunId? RunId { get; init; }
 public SandboxRuntimeException(SandboxError error)
 public SandboxUri Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
+public SandboxValidationException(IReadOnlyList<SandboxDiagnostic> diagnostics)
 public SandboxValue ChargeBindingReturn(BindingDescriptor descriptor, SandboxValue value)
 public SandboxValue this[int index] => _values[index]
 public SandboxValue? Value { get; init; }
@@ -247,15 +270,15 @@ public sealed class BindingRegistryBuilder
 public sealed class ExecutionPlan
 public sealed class ExecutionPlanSeal : IEquatable<ExecutionPlanSeal>
 public sealed class InMemoryAuditSink : IAuditSink
+public sealed class ResourceMeter
 public sealed class SandboxPolicyBuilder
 public sealed class SandboxRuntimeException : Exception
-public sealed class SandboxValidationException( IReadOnlyList<SandboxDiagnostic> diagnostics)
-public sealed partial class ResourceMeter
+public sealed class SandboxValidationException : Exception
 public sealed partial class SandboxContext
 public sealed record AssignmentStatement(string Name, Expression Value, SourceSpan Span) : Statement(Span)
 public sealed record BinaryExpression(Expression Left, string Operator, Expression Right, SourceSpan Span) : Expression(Span)
 public sealed record BindingCostModel( long BaseFuel, long PerByteFuel = 0, bool AllocationFromReturnBytes = false, int? MaxCallsPerRun = null)
-public sealed record BindingDescriptor( string Id, SemVersion Version, IReadOnlyList<SandboxType> Parameters, SandboxType ReturnType, SandboxEffect Effects, string? RequiredCapability, BindingCostModel CostModel, AuditLevel AuditLevel, BindingSafety Safety, BindingInvoker Invoke, CompiledBinding Compiled, CapabilityGrantValidator? GrantValidator = null)
+public sealed record BindingDescriptor( string Id, SemVersion Version, IReadOnlyList<SandboxType> Parameters, SandboxType ReturnType, SandboxEffect Effects, string? RequiredCapability, BindingCostModel CostModel, AuditLevel AuditLevel, BindingSafety Safety, BindingInvoker Invoke, CompiledBinding Compiled, CapabilityGrantValidator? GrantValidator = null, BindingAuditResourceValidator? AuditResourceValidator = null)
 public sealed record BindingSignature( string Id, SemVersion Version, IReadOnlyList<SandboxType> Parameters, SandboxType ReturnType, SandboxEffect Effects, string? RequiredCapability, BindingCostModel CostModel, AuditLevel AuditLevel, BindingSafety Safety, CompiledBinding Compiled)
 public sealed record BoolValue(bool Value) : SandboxValue
 public sealed record BreakStatement(SourceSpan Span) : Statement(Span)
@@ -376,12 +399,12 @@ public static SandboxType F64 { get; } = Scalar("F64")
 public static SandboxType Guid { get; } = Scalar("Guid")
 public static SandboxType I32 { get; } = Scalar("I32")
 public static SandboxType I64 { get; } = Scalar("I64")
-public static SandboxType List(SandboxType item) => new("List", [item])
-public static SandboxType Map(SandboxType key, SandboxType value) => new("Map", [key, value])
-public static SandboxType Record(IReadOnlyList<SandboxType> fields) => new(RecordName, fields)
+public static SandboxType List(SandboxType item)
+public static SandboxType Map(SandboxType key, SandboxType value)
+public static SandboxType Record(IReadOnlyList<SandboxType> fields)
 public static SandboxType SandboxPath { get; } = Scalar("SandboxPath")
 public static SandboxType SandboxUri { get; } = Scalar("SandboxUri")
-public static SandboxType Scalar(string name) => new(name, [])
+public static SandboxType Scalar(string name)
 public static SandboxType String { get; } = Scalar("String")
 public static SandboxType Unit { get; } = Scalar("Unit")
 public static SandboxValue Add(SandboxValue left, SandboxValue right)
@@ -396,7 +419,7 @@ public static SandboxValue FromList(IReadOnlyList<SandboxValue> values)
 public static SandboxValue FromMap( IReadOnlyDictionary<SandboxValue, SandboxValue> values, SandboxType keyType, SandboxType valueType)
 public static SandboxValue FromOpaqueId(string typeName, string value)
 public static SandboxValue FromPath(string value)
-public static SandboxValue FromRecord(IReadOnlyList<SandboxValue> fields) => new RecordValue(fields)
+public static SandboxValue FromRecord(IReadOnlyList<SandboxValue> fields)
 public static SandboxValue FromString(string value)
 public static SandboxValue FromUri(string value)
 public static SandboxValue GetArgument( SandboxValue input, int index, int parameterCount, SandboxType expectedType)
@@ -422,18 +445,23 @@ public static void Validate(ResourceLimits limits)
 public static void ValidateInputShape(SandboxValue input, int parameterCount)
 public string AuditKind { get; init; } = BindingAuditKinds.BindingCall
 public string BindingManifestHash { get; }
+public string Code { get => _code; init => _code = ValidateText(value, nameof(Code)); }
 public string CreateChargedStringConcat(string left, string right)
 public string CreateChargedSubstring(string value, int startIndex, int length)
 public string Hash => (_hash ??= CreateHashCache()).Value
+public string Kind { get => _kind; init => _kind = RequireKind(value); }
 public string ManifestHash { get; }
+public string Message { get => _message; init => _message = ValidateText(value, nameof(Message)); }
 public string ModuleHash { get; }
+public string Name { get; init; }
 public string PlanHash { get; }
 public string PolicyHash { get; }
 public string PolicyId { get => _policyId; init { _policyId = value; ResetHash(); } }
 public string RelativePath { get => _relativePath; init => _relativePath = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
+public string SafeMessage { get; init; }
 public string TypeName { get => _typeName; init => _typeName = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
-public string Value
 public string Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
+public string Value { get; init; }
 public string? ArtifactHash { get; init; }
 public TimeSpan EffectiveWallTime => MaxWallTime ?? TimeSpan.FromMilliseconds(100)
 public TimeSpan RemainingWallTime()

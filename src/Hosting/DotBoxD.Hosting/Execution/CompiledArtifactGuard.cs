@@ -23,6 +23,21 @@ internal static class CompiledArtifactGuard
     // and determinism flag that CacheKeyBuilder.Build reads) plus the entrypoint.
     private static readonly ConcurrentDictionary<(string PlanHash, string Entrypoint), ExpectedCacheKeys> ExpectedCacheKeyCache =
         new();
+    private static readonly ManifestMatchRule[] ManifestMatchRules =
+    [
+        new(static (manifest, _) => manifest.ArtifactVersion == 1),
+        new(static (manifest, plan) => StringComparer.Ordinal.Equals(manifest.ModuleHash, plan.ModuleHash)),
+        new(static (manifest, plan) => StringComparer.Ordinal.Equals(manifest.PlanHash, plan.PlanHash)),
+        new(static (manifest, plan) => StringComparer.Ordinal.Equals(manifest.PolicyHash, plan.PolicyHash)),
+        new(static (manifest, plan) => StringComparer.Ordinal.Equals(manifest.BindingManifestHash, plan.BindingManifestHash)),
+        new(static (manifest, _) => StringComparer.Ordinal.Equals(manifest.CompilerVersion, CacheKeyBuilder.CompilerVersion)),
+        new(static (manifest, _) => StringComparer.Ordinal.Equals(manifest.TypeSystemVersion, CacheKeyBuilder.TypeSystemVersion)),
+        new(static (manifest, _) => StringComparer.Ordinal.Equals(manifest.EffectAnalysisVersion, CacheKeyBuilder.EffectAnalysisVersion)),
+        new(static (manifest, _) => StringComparer.Ordinal.Equals(manifest.VerifierVersion, DefaultVerificationPolicy.VerifierVersion)),
+        new(static (manifest, _) => StringComparer.Ordinal.Equals(manifest.RuntimeFacadeHash, DefaultVerificationPolicy.RuntimeFacadeHash)),
+        new(static (manifest, _) => StringComparer.Ordinal.Equals(manifest.LanguageVersion, CacheKeyBuilder.LanguageVersion)),
+        new(static (manifest, _) => StringComparer.Ordinal.Equals(manifest.TargetFramework, CacheKeyBuilder.TargetFramework)),
+    ];
 
     public static async ValueTask<MaterializedCompiledArtifact> MaterializeExecutableAsync(
         CompiledArtifact artifact,
@@ -87,36 +102,17 @@ internal static class CompiledArtifactGuard
             throw Invalid("compiled artifact runtime form is not supported");
         }
 
-        if (!artifact.Verification.Succeeded ||
-            !StringComparer.Ordinal.Equals(artifact.AssemblyHash, artifact.Verification.AssemblyHash) ||
-            !StringComparer.Ordinal.Equals(artifact.Verification.VerifierVersion, DefaultVerificationPolicy.VerifierVersion) ||
-            !StringComparer.Ordinal.Equals(artifact.AssemblyHash, manifest.AssemblyHash))
+        if (!VerificationMatchesArtifact(artifact, manifest))
         {
             throw Invalid("compiled artifact verification does not match artifact hash");
         }
 
-        if (artifact.RuntimeForm == CompiledRuntimeFormKind.LoadedAssembly && artifact.AssemblyBytesMemory.Length == 0)
+        if (!RuntimeFormPayloadMatches(artifact))
         {
-            throw Invalid("loaded compiled artifact did not include assembly bytes");
+            throw Invalid(RuntimeFormPayloadMessage(artifact.RuntimeForm));
         }
 
-        if (artifact.RuntimeForm == CompiledRuntimeFormKind.DynamicMethod && artifact.AssemblyBytesMemory.Length != 0)
-        {
-            throw Invalid("dynamic method artifact must not include assembly bytes");
-        }
-
-        if (manifest.ArtifactVersion != 1 ||
-            manifest.ModuleHash != plan.ModuleHash ||
-            manifest.PlanHash != plan.PlanHash ||
-            manifest.PolicyHash != plan.PolicyHash ||
-            manifest.BindingManifestHash != plan.BindingManifestHash ||
-            manifest.CompilerVersion != CacheKeyBuilder.CompilerVersion ||
-            manifest.TypeSystemVersion != CacheKeyBuilder.TypeSystemVersion ||
-            manifest.EffectAnalysisVersion != CacheKeyBuilder.EffectAnalysisVersion ||
-            manifest.VerifierVersion != DefaultVerificationPolicy.VerifierVersion ||
-            manifest.RuntimeFacadeHash != DefaultVerificationPolicy.RuntimeFacadeHash ||
-            manifest.LanguageVersion != CacheKeyBuilder.LanguageVersion ||
-            manifest.TargetFramework != CacheKeyBuilder.TargetFramework)
+        if (!ManifestMatchesPlan(manifest, plan))
         {
             throw Invalid("compiled artifact manifest does not match execution plan");
         }
@@ -127,6 +123,38 @@ internal static class CompiledArtifactGuard
         {
             throw Invalid("compiled artifact optimization flags do not match cache key");
         }
+    }
+
+    private static bool VerificationMatchesArtifact(CompiledArtifact artifact, ArtifactManifest manifest)
+        => artifact.Verification.Succeeded &&
+           StringComparer.Ordinal.Equals(artifact.AssemblyHash, artifact.Verification.AssemblyHash) &&
+           StringComparer.Ordinal.Equals(artifact.Verification.VerifierVersion, DefaultVerificationPolicy.VerifierVersion) &&
+           StringComparer.Ordinal.Equals(artifact.AssemblyHash, manifest.AssemblyHash);
+
+    private static bool RuntimeFormPayloadMatches(CompiledArtifact artifact)
+        => artifact.RuntimeForm switch
+        {
+            CompiledRuntimeFormKind.LoadedAssembly => artifact.AssemblyBytesMemory.Length != 0,
+            CompiledRuntimeFormKind.DynamicMethod => artifact.AssemblyBytesMemory.Length == 0,
+            _ => true,
+        };
+
+    private static string RuntimeFormPayloadMessage(CompiledRuntimeFormKind runtimeForm)
+        => runtimeForm == CompiledRuntimeFormKind.LoadedAssembly
+            ? "loaded compiled artifact did not include assembly bytes"
+            : "dynamic method artifact must not include assembly bytes";
+
+    private static bool ManifestMatchesPlan(ArtifactManifest manifest, ExecutionPlan plan)
+    {
+        foreach (var rule in ManifestMatchRules)
+        {
+            if (!rule.Matches(manifest, plan))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static string ExpectedOptimizationFlag(string cacheKey, ExecutionPlan plan, string entrypoint)
@@ -154,6 +182,8 @@ internal static class CompiledArtifactGuard
             (Plan: plan, Entrypoint: entrypoint));
 
     private readonly record struct ExpectedCacheKeys(string BoxedValues, string Optimized);
+
+    private readonly record struct ManifestMatchRule(Func<ArtifactManifest, ExecutionPlan, bool> Matches);
 
     private static void EnsureAssemblyBytesMatchHash(CompiledArtifact artifact)
     {

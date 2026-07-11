@@ -6,36 +6,52 @@ namespace DotBoxD.Plugins.Runtime.Lifecycle;
 
 internal static class LiveSettingTypeConverter
 {
+    private static readonly Dictionary<Type, string> ClrTypeNames = new()
+    {
+        [typeof(bool)] = PluginManifestNames.LiveSettingTypes.Bool,
+        [typeof(int)] = PluginManifestNames.LiveSettingTypes.Int,
+        [typeof(long)] = PluginManifestNames.LiveSettingTypes.Long,
+        [typeof(double)] = PluginManifestNames.LiveSettingTypes.Double,
+        [typeof(string)] = PluginManifestNames.LiveSettingTypes.String,
+    };
+
+    private static readonly Dictionary<Type, Func<object?, object?>> ClrCoercers = new()
+    {
+        [typeof(string)] = static value => Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty,
+        [typeof(bool)] = static value => value is string text
+            ? bool.Parse(text)
+            : Convert.ToBoolean(value, CultureInfo.InvariantCulture),
+        [typeof(int)] = CoerceInt32,
+        [typeof(long)] = static value => value is string text
+            ? long.Parse(text, CultureInfo.InvariantCulture)
+            : ToExactInt64(value),
+        [typeof(double)] = static value => FiniteDouble(value),
+    };
+
+    private static readonly Dictionary<Type, Func<object, long>> ExactInt64Converters = new()
+    {
+        [typeof(bool)] = static _ => throw new InvalidCastException(),
+        [typeof(sbyte)] = static value => (sbyte)value,
+        [typeof(byte)] = static value => (byte)value,
+        [typeof(short)] = static value => (short)value,
+        [typeof(ushort)] = static value => (ushort)value,
+        [typeof(int)] = static value => (int)value,
+        [typeof(uint)] = static value => (uint)value,
+        [typeof(long)] = static value => (long)value,
+        [typeof(ulong)] = static value => checked((long)(ulong)value),
+        [typeof(double)] = static value => ToExactInt64FromDouble((double)value),
+        [typeof(float)] = static value => ToExactInt64FromDouble((float)value),
+        [typeof(decimal)] = static value =>
+            decimal.ToInt64(decimal.Truncate((decimal)value) == (decimal)value ? (decimal)value : throw new OverflowException()),
+        [typeof(string)] = static value => long.Parse((string)value, CultureInfo.InvariantCulture),
+    };
+
     public static string FromClrType(Type type)
     {
         var actual = RequireSupportedClrType(type);
-
-        if (actual == typeof(bool))
-        {
-            return PluginManifestNames.LiveSettingTypes.Bool;
-        }
-
-        if (actual == typeof(int))
-        {
-            return PluginManifestNames.LiveSettingTypes.Int;
-        }
-
-        if (actual == typeof(long))
-        {
-            return PluginManifestNames.LiveSettingTypes.Long;
-        }
-
-        if (actual == typeof(double))
-        {
-            return PluginManifestNames.LiveSettingTypes.Double;
-        }
-
-        if (actual == typeof(string))
-        {
-            return PluginManifestNames.LiveSettingTypes.String;
-        }
-
-        throw Diagnostic($"Live setting type '{type.Name}' is not supported.");
+        return ClrTypeNames.TryGetValue(actual, out var name)
+            ? name
+            : throw Diagnostic($"Live setting type '{type.Name}' is not supported.");
     }
 
     public static SandboxType ToSandboxType(string type)
@@ -84,42 +100,25 @@ internal static class LiveSettingTypeConverter
             return actual == typeof(string) ? string.Empty : Activator.CreateInstance(actual);
         }
 
-        if (actual == typeof(string))
+        if (ClrCoercers.TryGetValue(actual, out var coercer))
         {
-            return Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
-        }
-
-        if (actual == typeof(bool))
-        {
-            return value is string text ? bool.Parse(text) : Convert.ToBoolean(value, CultureInfo.InvariantCulture);
-        }
-
-        if (actual == typeof(int))
-        {
-            var asLong = value is string text
-                ? long.Parse(text, CultureInfo.InvariantCulture)
-                : ToExactInt64(value);
-            if (asLong is < int.MinValue or > int.MaxValue)
-            {
-                throw new OverflowException();
-            }
-
-            return (int)asLong;
-        }
-
-        if (actual == typeof(long))
-        {
-            return value is string text
-                ? long.Parse(text, CultureInfo.InvariantCulture)
-                : ToExactInt64(value);
-        }
-
-        if (actual == typeof(double))
-        {
-            return FiniteDouble(value);
+            return coercer(value);
         }
 
         throw Diagnostic($"Live setting type '{actual.Name}' is not supported.");
+    }
+
+    private static object CoerceInt32(object? value)
+    {
+        var asLong = value is string text
+            ? long.Parse(text, CultureInfo.InvariantCulture)
+            : ToExactInt64(value);
+        if (asLong is < int.MinValue or > int.MaxValue)
+        {
+            throw new OverflowException();
+        }
+
+        return (int)asLong;
     }
 
     public static object? CoerceClr(string type, object? value)
@@ -206,24 +205,16 @@ internal static class LiveSettingTypeConverter
     }
 
     private static long ToExactInt64(object? value)
-        => value switch
+    {
+        if (value is null)
         {
-            null => 0L,
-            bool => throw new InvalidCastException(),
-            sbyte v => v,
-            byte v => v,
-            short v => v,
-            ushort v => v,
-            int v => v,
-            uint v => v,
-            long v => v,
-            ulong v => checked((long)v),
-            double v => ToExactInt64FromDouble(v),
-            float v => ToExactInt64FromDouble(v),
-            decimal v => decimal.ToInt64(decimal.Truncate(v) == v ? v : throw new OverflowException()),
-            string text => long.Parse(text, CultureInfo.InvariantCulture),
-            _ => Convert.ToInt64(value, CultureInfo.InvariantCulture)
-        };
+            return 0L;
+        }
+
+        return ExactInt64Converters.TryGetValue(value.GetType(), out var converter)
+            ? converter(value)
+            : Convert.ToInt64(value, CultureInfo.InvariantCulture);
+    }
 
     private static long ToExactInt64FromDouble(double value)
     {
@@ -281,10 +272,5 @@ internal static class LiveSettingTypeConverter
     }
 
     private static string TypeName(Type type)
-        => type == typeof(int) ? PluginManifestNames.LiveSettingTypes.Int :
-           type == typeof(long) ? PluginManifestNames.LiveSettingTypes.Long :
-           type == typeof(double) ? PluginManifestNames.LiveSettingTypes.Double :
-           type == typeof(bool) ? PluginManifestNames.LiveSettingTypes.Bool :
-           type == typeof(string) ? PluginManifestNames.LiveSettingTypes.String :
-           type.Name;
+        => ClrTypeNames.TryGetValue(type, out var name) ? name : type.Name;
 }

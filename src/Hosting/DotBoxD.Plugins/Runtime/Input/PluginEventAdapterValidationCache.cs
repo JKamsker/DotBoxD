@@ -41,9 +41,9 @@ internal static class PluginEventAdapterShapeValidator
         string eventName,
         IReadOnlyList<Parameter> parameters)
     {
-        if (string.IsNullOrEmpty(eventName))
+        if (string.IsNullOrWhiteSpace(eventName))
         {
-            throw CreateException("Plugin event adapter event name must be non-empty.");
+            throw CreateException("Plugin event adapter event name must be non-empty and non-whitespace.");
         }
 
         if (parameters is null)
@@ -59,18 +59,36 @@ internal static class PluginEventAdapterShapeValidator
                 throw CreateException("Plugin event adapter parameters must not contain null entries.");
             }
 
-            if (string.IsNullOrEmpty(parameter.Name))
+            if (string.IsNullOrWhiteSpace(parameter.Name))
             {
-                throw CreateException("Plugin event adapter parameter names must be non-empty.");
+                throw CreateException("Plugin event adapter parameter names must be non-empty and non-whitespace.");
             }
         }
 
         if (adapter is IPluginEventValueWriter<TEvent> writer &&
-            writer.EventValueCount != parameters.Count)
+            ReadEventValueCount(writer) != parameters.Count)
         {
             throw CreateException("Plugin event value writer count does not match adapter parameters.");
         }
     }
+
+    internal static int ReadEventValueCount<TEvent>(IPluginEventValueWriter<TEvent> writer)
+    {
+        try
+        {
+            return writer.EventValueCount;
+        }
+        catch (Exception ex) when (IsAdapterCallbackFailure(ex))
+        {
+            throw CallbackException(nameof(IPluginEventValueWriter<TEvent>.EventValueCount));
+        }
+    }
+
+    internal static SandboxValidationException CallbackException(string callbackName)
+        => CreateException("Plugin event value writer callback '" + callbackName + "' failed.");
+
+    internal static bool IsAdapterCallbackFailure(Exception ex)
+        => ex is not SandboxValidationException and not OperationCanceledException;
 
     private static SandboxValidationException CreateException(string message) =>
         new([

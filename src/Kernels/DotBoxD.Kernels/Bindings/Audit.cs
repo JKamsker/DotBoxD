@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Kernels.Bindings;
@@ -27,29 +26,6 @@ public static class BindingAuditKinds
     public const string BindingCall = "BindingCall";
     public const string SandboxLog = "SandboxLog";
     public const string PluginMessage = "PluginMessage";
-}
-
-public sealed record SandboxAuditEvent(
-    SandboxRunId RunId,
-    string Kind,
-    DateTimeOffset Timestamp,
-    bool Success,
-    string? BindingId = null,
-    string? CapabilityId = null,
-    SandboxEffect Effect = SandboxEffect.None,
-    string? ResourceId = null,
-    SandboxErrorCode? ErrorCode = null,
-    string? Message = null,
-    long? Bytes = null,
-    IReadOnlyDictionary<string, string>? Fields = null,
-    long SequenceNumber = 0)
-{
-    private IReadOnlyDictionary<string, string>? _fields = CopyFields(Fields);
-
-    public IReadOnlyDictionary<string, string>? Fields { get => _fields; init => _fields = CopyFields(value); }
-
-    private static IReadOnlyDictionary<string, string>? CopyFields(IReadOnlyDictionary<string, string>? fields)
-        => fields is null ? null : ModelCopy.StringDictionary(fields);
 }
 
 internal sealed class OwnedAuditEventSnapshot(IList<SandboxAuditEvent> list)
@@ -82,9 +58,29 @@ public sealed class InMemoryAuditSink : IAuditSink
     private long _sequence;
 
     public IReadOnlyList<SandboxAuditEvent> Events
-        => _events is null ? Array.Empty<SandboxAuditEvent>() : _events.ToArray();
+    {
+        get
+        {
+            return CopyEvents();
+        }
+    }
 
-    public long EventsWritten => _sequence;
+    public long EventsWritten
+    {
+        get
+        {
+            var events = Volatile.Read(ref _events);
+            if (events is null)
+            {
+                return 0;
+            }
+
+            lock (events)
+            {
+                return _sequence;
+            }
+        }
+    }
 
     /// <summary>
     /// Produces a single owned, immutable snapshot of the recorded events.
@@ -92,13 +88,43 @@ public sealed class InMemoryAuditSink : IAuditSink
     /// retained by the sink, so result construction can adopt it without copying again.
     /// </summary>
     internal IReadOnlyList<SandboxAuditEvent> SnapshotEvents()
-        => _events is null || _events.Count == 0 ? EmptySnapshot : new OwnedAuditEventSnapshot(_events.ToArray());
+    {
+        var events = CopyEvents();
+        return events.Length == 0
+            ? EmptySnapshot
+            : new OwnedAuditEventSnapshot(events);
+    }
+
+    private SandboxAuditEvent[] CopyEvents()
+    {
+        var events = Volatile.Read(ref _events);
+        if (events is null)
+        {
+            return Array.Empty<SandboxAuditEvent>();
+        }
+
+        lock (events)
+        {
+            return events.Count == 0 ? Array.Empty<SandboxAuditEvent>() : events.ToArray();
+        }
+    }
 
     public void Write(SandboxAuditEvent auditEvent)
     {
-        var sequence = ++_sequence;
-        _events ??= new List<SandboxAuditEvent>();
-        _events.Add(auditEvent with { SequenceNumber = sequence });
+        ArgumentNullException.ThrowIfNull(auditEvent);
+
+        var events = Volatile.Read(ref _events);
+        if (events is null)
+        {
+            var created = new List<SandboxAuditEvent>();
+            events = Interlocked.CompareExchange(ref _events, created, null) ?? created;
+        }
+
+        lock (events)
+        {
+            var sequence = ++_sequence;
+            events.Add(auditEvent with { SequenceNumber = sequence });
+        }
     }
 
     public bool HasBindingAuditSince(
@@ -110,38 +136,51 @@ public sealed class InMemoryAuditSink : IAuditSink
         string moduleHash,
         string policyHash)
     {
-        // Sequence numbers are assigned monotonically on append (Write sets
-        // SequenceNumber = ++_sequence) and _events is never reordered or
-        // pruned, so _events[i].SequenceNumber == i + 1. A checkpoint is the
-        // sequence count recorded before the current binding call, which means
-        // the first event with SequenceNumber > checkpoint lives at list index
-        // checkpoint. Start enumeration there instead of rescanning prior
-        // events, avoiding O(N^2) enforcement work over a run.
-        var events = _events;
+        var events = Volatile.Read(ref _events);
         if (events is null)
         {
             return false;
         }
 
-        for (var index = StartIndexAfter(checkpoint, events.Count); index < events.Count; index++)
+        lock (events)
         {
-            var e = events[index];
-            if (e.RunId == runId &&
-                e.Success == success &&
-                StringComparer.Ordinal.Equals(e.Kind, descriptor.AuditKind) &&
-                StringComparer.Ordinal.Equals(e.BindingId, descriptor.Id) &&
-                CapabilityMatches(e, descriptor) &&
-                EffectMatches(e, descriptor) &&
-                !string.IsNullOrWhiteSpace(e.ResourceId) &&
-                HasRequiredFields(e, moduleHash, policyHash) &&
-                ResultMatches(e, success, expectedErrorCode))
+            // Sequence numbers are assigned monotonically on append (Write sets
+            // SequenceNumber = ++_sequence) and _events is never reordered or
+            // pruned, so _events[i].SequenceNumber == i + 1. A checkpoint is the
+            // sequence count recorded before the current binding call, which means
+            // the first event with SequenceNumber > checkpoint lives at list index
+            // checkpoint. Start enumeration there instead of rescanning prior
+            // events, avoiding O(N^2) enforcement work over a run.
+            for (var index = StartIndexAfter(checkpoint, events.Count); index < events.Count; index++)
             {
-                return true;
+                var e = events[index];
+                if (BindingAuditMatches(e, descriptor, success, expectedErrorCode, runId, moduleHash, policyHash))
+                {
+                    return true;
+                }
             }
-        }
 
-        return false;
+            return false;
+        }
     }
+
+    private static bool BindingAuditMatches(
+        SandboxAuditEvent auditEvent,
+        BindingDescriptor descriptor,
+        bool success,
+        SandboxErrorCode? expectedErrorCode,
+        SandboxRunId runId,
+        string moduleHash,
+        string policyHash)
+        => auditEvent.RunId == runId &&
+           auditEvent.Success == success &&
+           StringComparer.Ordinal.Equals(auditEvent.Kind, descriptor.AuditKind) &&
+           StringComparer.Ordinal.Equals(auditEvent.BindingId, descriptor.Id) &&
+           CapabilityMatches(auditEvent, descriptor) &&
+           EffectMatches(auditEvent, descriptor) &&
+           !string.IsNullOrWhiteSpace(auditEvent.ResourceId) &&
+           HasRequiredFields(auditEvent, moduleHash, policyHash) &&
+           ResultMatches(auditEvent, success, expectedErrorCode);
 
     private static int StartIndexAfter(long checkpoint, int eventCount)
     {

@@ -1,4 +1,5 @@
 using DotBoxD.Services.Buffers;
+using DotBoxD.Services.Diagnostics;
 using DotBoxD.Services.Exceptions;
 using DotBoxD.Services.Streaming.Core;
 
@@ -75,6 +76,7 @@ internal sealed partial class RpcPeerOutboundInvoker
                 {
                     TrySendCancelForSentRequest(requestSent, messageId);
                     ct.ThrowIfCancellationRequested();
+                    RpcTelemetry.RequestTimedOut();
                     throw new ServiceTimeoutException($"Request to {service}.{method} timed out.");
                 }
                 catch (OperationCanceledException) when (pending.CancellationKind == PendingCancellationKind.Caller)

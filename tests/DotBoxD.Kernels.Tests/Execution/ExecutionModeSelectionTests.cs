@@ -191,13 +191,14 @@ public sealed class ExecutionModeSelectionTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.ValidationError, result.Error!.Code);
-        Assert.Equal(invalidMode, result.ActualMode);
+        Assert.Equal(ExecutionMode.Auto, result.ActualMode);
         Assert.False(result.ExecutionDispatched);
         Assert.Equal(0, compiler.Calls);
         Assert.Contains(result.AuditEvents, e => e.Kind == "InvalidExecutionOptions");
         Assert.DoesNotContain(result.AuditEvents, e => e.Kind == "CompilerUnavailable");
         var summary = Assert.Single(result.AuditEvents, e => e.Kind == "RunSummary");
-        Assert.Equal("123", summary.Fields!["mode"]);
+        Assert.Equal("Auto", summary.Fields!["mode"]);
+        Assert.Equal("Auto", summary.Fields["executionMode"]);
         Assert.Equal("False", summary.Fields["executionDispatched"]);
     }
 
@@ -290,8 +291,7 @@ public sealed class ExecutionModeSelectionTests
         Assert.Contains(result.AuditEvents, e =>
             e.Kind == "RunSummary" && !e.Success && e.ErrorCode == SandboxErrorCode.HostFailure);
     }
-    private static SandboxHost HostWithCompiler(ISandboxCompiler compiler)
-        => SandboxHost.Create(builder =>
+    private static SandboxHost HostWithCompiler(ISandboxCompiler compiler) => SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using CsCheck;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
@@ -12,35 +13,12 @@ public sealed class RuntimeFuzzCoverageTests
     private static readonly string[] Parameters = ["a", "b", "c"];
 
     [Fact]
-    public async Task Generated_pure_modules_prepare_and_execute_under_deadline()
-    {
-        using var host = SandboxTestHost.Create();
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var random = new Random(0x51AFE100);
-
-        for (var i = 0; i < 30; i++)
-        {
-            var module = await host.ImportJsonAsync(PureModuleJson(i, Expression(random, 3)), cancellation.Token);
-            var plan = await host.PrepareAsync(
-                module,
-                SandboxPolicyBuilder.Create()
-                    .WithFuel(50_000)
-                    .WithWallTime(TimeSpan.FromSeconds(2))
-                    .Build(),
-                cancellation.Token);
-
-            var result = await host.ExecuteAsync(
-                plan,
-                "main",
-                Input(random),
-                new SandboxExecutionOptions { Mode = ExecutionMode.Interpreted },
-                cancellation.Token);
-
-            Assert.True(result.Succeeded, $"case {i}: {result.Error?.SafeMessage}");
-            Assert.Equal(ExecutionMode.Interpreted, result.ActualMode);
-            Assert.IsType<I32Value>(result.Value);
-        }
-    }
+    public void Generated_pure_modules_prepare_and_execute_under_deadline()
+        => Gen.Int.Sample(
+            seed => RunPureCaseAsync(seed).GetAwaiter().GetResult(),
+            seed: "0N0XIzNsQ0O2",
+            iter: 30,
+            threads: 1);
 
     [Fact]
     public async Task Generated_file_modules_require_policy_then_execute_with_grant()
@@ -89,6 +67,34 @@ public sealed class RuntimeFuzzCoverageTests
             SandboxValue.FromInt32(random.Next(-3, 4)),
             SandboxValue.FromInt32(random.Next(-3, 4))
         ]);
+
+    private static async Task RunPureCaseAsync(int seed)
+    {
+        using var host = SandboxTestHost.Create();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var random = new Random(seed);
+        var module = await host.ImportJsonAsync(
+            PureModuleJson(seed, Expression(random, 3)),
+            cancellation.Token);
+        var plan = await host.PrepareAsync(
+            module,
+            SandboxPolicyBuilder.Create()
+                .WithFuel(50_000)
+                .WithWallTime(TimeSpan.FromSeconds(2))
+                .Build(),
+            cancellation.Token);
+
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            Input(random),
+            new SandboxExecutionOptions { Mode = ExecutionMode.Interpreted },
+            cancellation.Token);
+
+        Assert.True(result.Succeeded, $"seed {seed}: {result.Error?.SafeMessage}");
+        Assert.Equal(ExecutionMode.Interpreted, result.ActualMode);
+        Assert.IsType<I32Value>(result.Value);
+    }
 
     private static string Expression(Random random, int depth)
     {

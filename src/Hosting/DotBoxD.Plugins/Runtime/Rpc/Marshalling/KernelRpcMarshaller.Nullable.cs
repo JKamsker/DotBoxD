@@ -4,6 +4,23 @@ namespace DotBoxD.Plugins.Runtime.Rpc;
 
 public static partial class KernelRpcMarshaller
 {
+    private static readonly Dictionary<Type, Func<SandboxValue>> NullableZeroValueFactories = new()
+    {
+        [typeof(bool)] = static () => SandboxValue.FromBool(false),
+        [typeof(int)] = static () => SandboxValue.FromInt32(0),
+        [typeof(long)] = static () => SandboxValue.FromInt64(0L),
+        [typeof(float)] = static () => SandboxValue.FromDouble(0D),
+        [typeof(double)] = static () => SandboxValue.FromDouble(0D),
+        [typeof(Guid)] = static () => SandboxValue.FromGuid(Guid.Empty),
+        [typeof(DateTime)] = NullableDateTimeZeroValue,
+        [typeof(DateTimeOffset)] = NullableDateTimeZeroValue,
+        [typeof(decimal)] = static () => DecimalToSandboxValue(default),
+        [typeof(DateOnly)] = static () => SandboxValue.FromInt32(0),
+        [typeof(TimeOnly)] = static () => SandboxValue.FromInt64(0L),
+        [typeof(TimeSpan)] = static () => SandboxValue.FromInt64(0L),
+        [typeof(CancellationToken)] = static () => SandboxValue.FromBool(false)
+    };
+
     internal static void RejectNullableValueTypesForServerExtension(Type type)
     {
         if (ContainsNullableValueType(type, []))
@@ -101,49 +118,22 @@ public static partial class KernelRpcMarshaller
 
     private static SandboxValue NullableZeroValue(Type underlying)
     {
-        if (underlying == typeof(bool))
-            return SandboxValue.FromBool(false);
-        if (underlying == typeof(int))
-            return SandboxValue.FromInt32(0);
-        if (underlying == typeof(long))
-            return SandboxValue.FromInt64(0L);
-        if (underlying == typeof(float) || underlying == typeof(double))
-            return SandboxValue.FromDouble(0D);
-        if (underlying == typeof(Guid))
-            return SandboxValue.FromGuid(Guid.Empty);
-        if (IsDateTimeWireType(underlying))
-            return NullableDateTimeZeroValue();
-        if (underlying == typeof(decimal))
-            return DecimalToSandboxValue(default);
-        if (underlying == typeof(DateOnly))
-            return SandboxValue.FromInt32(0);
-        if (underlying == typeof(TimeOnly))
-            return SandboxValue.FromInt64(0L);
-        if (underlying == typeof(TimeSpan))
-            return SandboxValue.FromInt64(0L);
-        if (underlying == typeof(CancellationToken))
-            return SandboxValue.FromBool(false);
+        if (NullableZeroValueFactories.TryGetValue(underlying, out var factory))
+        {
+            return factory();
+        }
+
         if (underlying.IsEnum)
+        {
             return EnumUsesI64(underlying) ? SandboxValue.FromInt64(0L) : SandboxValue.FromInt32(0);
+        }
 
         throw UnsupportedNullableUnderlying(underlying);
     }
 
     private static void EnsureSupportedNullableUnderlying(Type underlying)
     {
-        if (underlying == typeof(bool) ||
-            underlying == typeof(int) ||
-            underlying == typeof(long) ||
-            underlying == typeof(float) ||
-            underlying == typeof(double) ||
-            underlying == typeof(Guid) ||
-            IsDateTimeWireType(underlying) ||
-            underlying == typeof(decimal) ||
-            underlying == typeof(DateOnly) ||
-            underlying == typeof(TimeOnly) ||
-            underlying == typeof(TimeSpan) ||
-            underlying == typeof(CancellationToken) ||
-            underlying.IsEnum)
+        if (NullableZeroValueFactories.ContainsKey(underlying) || underlying.IsEnum)
         {
             return;
         }
@@ -173,25 +163,46 @@ public static partial class KernelRpcMarshaller
             return IsSupportedNullableUnderlying(underlying) ? null : underlying;
         }
 
-        if (ElementType(type) is { } elementType &&
-            UnsupportedNullableValueType(elementType, visited) is { } unsupportedElement)
+        return UnsupportedNestedNullableValueType(type, visited);
+    }
+
+    private static Type? UnsupportedNestedNullableValueType(Type type, HashSet<Type> visited)
+    {
+        if (UnsupportedNullableElementType(type, visited) is { } unsupportedElement)
         {
             return unsupportedElement;
         }
 
-        if (MapTypes(type) is { } mapTypes)
+        if (UnsupportedNullableMapType(type, visited) is { } unsupportedMap)
         {
-            if (UnsupportedNullableValueType(mapTypes.Key, visited) is { } unsupportedKey)
-            {
-                return unsupportedKey;
-            }
-
-            if (UnsupportedNullableValueType(mapTypes.Value, visited) is { } unsupportedValue)
-            {
-                return unsupportedValue;
-            }
+            return unsupportedMap;
         }
 
+        return UnsupportedNullableDtoFieldType(type, visited);
+    }
+
+    private static Type? UnsupportedNullableElementType(Type type, HashSet<Type> visited)
+        => ElementType(type) is { } elementType
+            ? UnsupportedNullableValueType(elementType, visited)
+            : null;
+
+    private static Type? UnsupportedNullableMapType(Type type, HashSet<Type> visited)
+    {
+        if (MapTypes(type) is not { } mapTypes)
+        {
+            return null;
+        }
+
+        if (UnsupportedNullableValueType(mapTypes.Key, visited) is { } unsupportedKey)
+        {
+            return unsupportedKey;
+        }
+
+        return UnsupportedNullableValueType(mapTypes.Value, visited);
+    }
+
+    private static Type? UnsupportedNullableDtoFieldType(Type type, HashSet<Type> visited)
+    {
         if (DtoShape(type) is { } shape)
         {
             foreach (var field in shape.Fields)
@@ -218,18 +229,39 @@ public static partial class KernelRpcMarshaller
             return true;
         }
 
-        if (ElementType(type) is { } elementType && ContainsNullableValueType(elementType, visited))
+        if (ContainsNullableElementType(type, visited))
         {
             return true;
         }
 
-        if (MapTypes(type) is { } mapTypes &&
-            (ContainsNullableValueType(mapTypes.Key, visited) ||
-             ContainsNullableValueType(mapTypes.Value, visited)))
+        if (ContainsNullableMapType(type, visited))
         {
             return true;
         }
 
+        return ContainsNullableDtoFieldType(type, visited);
+    }
+
+    private static bool ContainsNullableElementType(Type type, HashSet<Type> visited)
+        => ElementType(type) is { } elementType && ContainsNullableValueType(elementType, visited);
+
+    private static bool ContainsNullableMapType(Type type, HashSet<Type> visited)
+    {
+        if (MapTypes(type) is not { } mapTypes)
+        {
+            return false;
+        }
+
+        if (ContainsNullableValueType(mapTypes.Key, visited))
+        {
+            return true;
+        }
+
+        return ContainsNullableValueType(mapTypes.Value, visited);
+    }
+
+    private static bool ContainsNullableDtoFieldType(Type type, HashSet<Type> visited)
+    {
         if (DtoShape(type) is { } shape)
         {
             foreach (var field in shape.Fields)

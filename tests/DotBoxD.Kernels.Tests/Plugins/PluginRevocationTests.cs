@@ -1,4 +1,3 @@
-using System.Reflection;
 using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
@@ -56,28 +55,32 @@ public sealed class PluginRevocationTests
     [Fact]
     public async Task Uninstall_removes_kernel_handler_from_hook_pipeline()
     {
-        using var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
+        var messages = new InMemoryPluginMessageSink();
+        using var server = DotBoxD.Plugins.PluginServer.Create(messages, defaultPolicy: LongWallPluginPolicy());
         var kernel = await server.InstallAsync(FireDamagePluginPackage.Create());
-        var pipeline = server.Hooks.On<DamageEvent>().Use(kernel);
-        Assert.Equal(1, HandlerCount(pipeline));
+        server.Hooks.On<DamageEvent>().Use(kernel);
+        await server.Hooks.PublishAsync(new DamageEvent("fire", 120, "before"));
 
         Assert.True((bool)server.Uninstall("fire-damage"));
+        await server.Hooks.PublishAsync(new DamageEvent("fire", 120, "after"));
 
-        Assert.Equal(0, HandlerCount(pipeline));
+        Assert.Equal(["before"], messages.Messages.Select(message => message.TargetId));
     }
 
     [Fact]
     public async Task Session_dispose_removes_owned_kernel_handler_from_hook_pipeline()
     {
-        using var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
+        var messages = new InMemoryPluginMessageSink();
+        using var server = DotBoxD.Plugins.PluginServer.Create(messages, defaultPolicy: LongWallPluginPolicy());
         var session = server.CreateSession();
         var kernel = await session.InstallAsync(FireDamagePluginPackage.Create());
-        var pipeline = server.Hooks.On<DamageEvent>().Use(kernel);
-        Assert.Equal(1, HandlerCount(pipeline));
+        server.Hooks.On<DamageEvent>().Use(kernel);
+        await server.Hooks.PublishAsync(new DamageEvent("fire", 120, "before"));
 
         session.Dispose();
+        await server.Hooks.PublishAsync(new DamageEvent("fire", 120, "after"));
 
-        Assert.Equal(0, HandlerCount(pipeline));
+        Assert.Equal(["before"], messages.Messages.Select(message => message.TargetId));
     }
 
     [Fact]
@@ -232,18 +235,4 @@ public sealed class PluginRevocationTests
             .WithWallTime(TimeSpan.FromSeconds(10))
             .Build();
 
-    private static int HandlerCount<TEvent>(HookPipeline<TEvent, HookContext> pipeline)
-    {
-        var handlerSetField = typeof(HookPipeline<TEvent, HookContext>).GetField(
-            "_handlerSet",
-            BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(handlerSetField);
-        var handlerSet = handlerSetField.GetValue(pipeline)!;
-        var handlersField = handlerSet.GetType().GetField(
-            "_handlers",
-            BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(handlersField);
-        var handlers = (Array)handlersField.GetValue(handlerSet)!;
-        return handlers.Length;
-    }
 }

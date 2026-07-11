@@ -8,6 +8,16 @@ namespace DotBoxD.Kernels.Interpreter.Internal.Expressions;
 // per-subexpression metering (1 + left + right).
 internal sealed class I32ComparisonPlan
 {
+    private static readonly Dictionary<string, Comparison> Comparisons = new(StringComparer.Ordinal)
+    {
+        ["<"] = Comparison.Lt,
+        ["<="] = Comparison.Lte,
+        [">"] = Comparison.Gt,
+        [">="] = Comparison.Gte,
+        ["=="] = Comparison.Eq,
+        ["!="] = Comparison.Ne
+    };
+
     private readonly Comparison _op;
     private readonly I32ExpressionPlan _left;
     private readonly I32ExpressionPlan _right;
@@ -45,22 +55,14 @@ internal sealed class I32ComparisonPlan
         out I32ComparisonPlan plan)
     {
         plan = null!;
-        if (expression is not BinaryExpression { Operator: "==" or "!=" or "<" or "<=" or ">" or ">=" } binary ||
+        if (expression is not BinaryExpression binary ||
+            !Comparisons.TryGetValue(binary.Operator, out var op) ||
             !I32ExpressionPlan.TryCreate(binary.Left, frame, assumedInt32Local, calls, out var left) ||
             !I32ExpressionPlan.TryCreate(binary.Right, frame, assumedInt32Local, calls, out var right))
         {
             return false;
         }
 
-        var op = binary.Operator switch
-        {
-            "<" => Comparison.Lt,
-            "<=" => Comparison.Lte,
-            ">" => Comparison.Gt,
-            ">=" => Comparison.Gte,
-            "==" => Comparison.Eq,
-            _ => Comparison.Ne
-        };
         plan = new I32ComparisonPlan(op, left, right);
         return true;
     }

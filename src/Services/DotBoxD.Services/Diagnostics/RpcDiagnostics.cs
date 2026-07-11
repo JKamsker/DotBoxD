@@ -15,6 +15,8 @@ public static class RpcDiagnostics
 
     internal static void Report(string operation, Exception error)
     {
+        RpcTelemetry.ReportDiagnosticError(operation, error);
+
         try
         {
             Trace.TraceError($"{operation}: {error.GetType().Name}: {error.Message}");

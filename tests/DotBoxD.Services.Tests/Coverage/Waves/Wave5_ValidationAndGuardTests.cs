@@ -225,6 +225,7 @@ public sealed class Wave5_ValidationAndGuardTests
                 MessageId = -1,
                 IsSuccess = false,
                 ErrorMessage = "Failed",
+                ErrorType = "Remote",
             },
             ReadOnlySpan<byte>.Empty);
 

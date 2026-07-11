@@ -23,81 +23,120 @@ internal static class BindingCompiledTargetValidator
         "CeilF64",
         "RoundF64"
     };
+    private static readonly IReadOnlyDictionary<string, (SandboxType Return, SandboxType[] Parameters)> DirectCompiledSignatures =
+        new Dictionary<string, (SandboxType Return, SandboxType[] Parameters)>(StringComparer.Ordinal)
+        {
+            ["Int32ToStringInvariant"] = (SandboxType.String, [SandboxType.I32]),
+            ["StringLength"] = (SandboxType.I32, [SandboxType.String]),
+            ["ConcatString"] = (SandboxType.String, [SandboxType.String, SandboxType.String]),
+            ["AbsI32"] = (SandboxType.I32, [SandboxType.I32]),
+            ["MinI32"] = (SandboxType.I32, [SandboxType.I32, SandboxType.I32]),
+            ["MaxI32"] = (SandboxType.I32, [SandboxType.I32, SandboxType.I32]),
+            ["ClampI32"] = (SandboxType.I32, [SandboxType.I32, SandboxType.I32, SandboxType.I32]),
+            ["SqrtF64"] = (SandboxType.F64, [SandboxType.F64]),
+            ["FloorF64"] = (SandboxType.F64, [SandboxType.F64]),
+            ["CeilF64"] = (SandboxType.F64, [SandboxType.F64]),
+            ["RoundF64"] = (SandboxType.F64, [SandboxType.F64])
+        };
 
     public static void Validate(BindingDescriptor binding, List<SandboxDiagnostic> diagnostics)
+        => Validate(
+            binding.Id,
+            binding.Compiled,
+            binding.Safety,
+            binding.AuditLevel,
+            binding.ReturnType,
+            binding.Parameters,
+            diagnostics);
+
+    public static void Validate(BindingSignature binding, List<SandboxDiagnostic> diagnostics)
+        => Validate(
+            binding.Id,
+            binding.Compiled,
+            binding.Safety,
+            binding.AuditLevel,
+            binding.ReturnType,
+            binding.Parameters,
+            diagnostics);
+
+    private static void Validate(
+        string bindingId,
+        CompiledBinding compiled,
+        BindingSafety safety,
+        AuditLevel auditLevel,
+        SandboxType returnType,
+        IReadOnlyList<SandboxType> parameters,
+        List<SandboxDiagnostic> diagnostics)
     {
-        if (binding.Compiled.Kind != RuntimeStubKind)
+        if (compiled.Kind != RuntimeStubKind)
         {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-COMPILED", $"binding '{binding.Id}' has unsupported compiled target kind"));
+            diagnostics.Add(new SandboxDiagnostic("E-BINDING-COMPILED", $"binding '{bindingId}' has unsupported compiled target kind"));
         }
 
-        if (string.IsNullOrWhiteSpace(binding.Compiled.Type) ||
-            string.IsNullOrWhiteSpace(binding.Compiled.Method))
+        if (string.IsNullOrWhiteSpace(compiled.Type) ||
+            string.IsNullOrWhiteSpace(compiled.Method))
         {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-COMPILED", $"binding '{binding.Id}' has an incomplete compiled target"));
+            diagnostics.Add(new SandboxDiagnostic("E-BINDING-COMPILED", $"binding '{bindingId}' has an incomplete compiled target"));
             return;
         }
 
-        if (binding.Compiled.Type != ApprovedCompiledRuntimeType ||
-            !ApprovedCompiledRuntimeMethods.Contains(binding.Compiled.Method))
+        if (compiled.Type != ApprovedCompiledRuntimeType ||
+            !ApprovedCompiledRuntimeMethods.Contains(compiled.Method))
         {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-COMPILED", $"binding '{binding.Id}' points compiled code outside the approved runtime stub surface"));
+            diagnostics.Add(new SandboxDiagnostic("E-BINDING-COMPILED", $"binding '{bindingId}' points compiled code outside the approved runtime stub surface"));
             return;
         }
 
-        if (binding.Compiled.Method != GenericBindingStub && binding.Safety != BindingSafety.PureIntrinsic)
+        if (compiled.Method != GenericBindingStub && safety != BindingSafety.PureIntrinsic)
         {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-COMPILED", $"binding '{binding.Id}' uses a direct compiled runtime method but is not a pure intrinsic"));
+            diagnostics.Add(new SandboxDiagnostic("E-BINDING-COMPILED", $"binding '{bindingId}' uses a direct compiled runtime method but is not a pure intrinsic"));
         }
 
-        if (binding.Compiled.Method != GenericBindingStub && binding.AuditLevel != AuditLevel.None)
+        if (compiled.Method != GenericBindingStub && auditLevel != AuditLevel.None)
         {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-COMPILED", $"binding '{binding.Id}' uses a direct compiled runtime method but requires binding audit"));
+            diagnostics.Add(new SandboxDiagnostic("E-BINDING-COMPILED", $"binding '{bindingId}' uses a direct compiled runtime method but requires binding audit"));
         }
 
-        ValidateDirectCompiledSignature(binding, diagnostics);
+        ValidateDirectCompiledSignature(bindingId, compiled, returnType, parameters, diagnostics);
     }
 
-    private static void ValidateDirectCompiledSignature(BindingDescriptor binding, List<SandboxDiagnostic> diagnostics)
+    private static void ValidateDirectCompiledSignature(
+        string bindingId,
+        CompiledBinding compiled,
+        SandboxType returnType,
+        IReadOnlyList<SandboxType> parameters,
+        List<SandboxDiagnostic> diagnostics)
     {
-        if (binding.Compiled.Method == GenericBindingStub)
+        if (compiled.Method == GenericBindingStub)
         {
             return;
         }
 
-        var expected = DirectCompiledSignature(binding.Compiled.Method);
-        if (!binding.ReturnType.Equals(expected.Return) ||
-            binding.Parameters.Count != expected.Parameters.Length)
+        var expected = DirectCompiledSignature(compiled.Method);
+        if (!returnType.Equals(expected.Return) ||
+            parameters.Count != expected.Parameters.Length)
         {
-            diagnostics.Add(DirectSignatureDiagnostic(binding));
+            diagnostics.Add(DirectSignatureDiagnostic(bindingId));
             return;
         }
 
         for (var i = 0; i < expected.Parameters.Length; i++)
         {
-            if (!binding.Parameters[i].Equals(expected.Parameters[i]))
+            if (!parameters[i].Equals(expected.Parameters[i]))
             {
-                diagnostics.Add(DirectSignatureDiagnostic(binding));
+                diagnostics.Add(DirectSignatureDiagnostic(bindingId));
                 return;
             }
         }
     }
 
     private static (SandboxType Return, SandboxType[] Parameters) DirectCompiledSignature(string method)
-        => method switch
-        {
-            "Int32ToStringInvariant" => (SandboxType.String, [SandboxType.I32]),
-            "StringLength" => (SandboxType.I32, [SandboxType.String]),
-            "ConcatString" => (SandboxType.String, [SandboxType.String, SandboxType.String]),
-            "AbsI32" => (SandboxType.I32, [SandboxType.I32]),
-            "MinI32" or "MaxI32" => (SandboxType.I32, [SandboxType.I32, SandboxType.I32]),
-            "ClampI32" => (SandboxType.I32, [SandboxType.I32, SandboxType.I32, SandboxType.I32]),
-            "SqrtF64" or "FloorF64" or "CeilF64" or "RoundF64" => (SandboxType.F64, [SandboxType.F64]),
-            _ => (SandboxType.Unit, [])
-        };
+        => DirectCompiledSignatures.TryGetValue(method, out var signature)
+            ? signature
+            : (SandboxType.Unit, []);
 
-    private static SandboxDiagnostic DirectSignatureDiagnostic(BindingDescriptor binding)
+    private static SandboxDiagnostic DirectSignatureDiagnostic(string bindingId)
         => new(
             "E-BINDING-COMPILED",
-            $"binding '{binding.Id}' direct compiled runtime signature does not match the binding shape");
+            $"binding '{bindingId}' direct compiled runtime signature does not match the binding shape");
 }

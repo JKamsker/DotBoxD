@@ -11,8 +11,7 @@ internal static class RpcPayloadReconstructibilityInspector
         ITypeSymbol type,
         string role,
         CancellationToken ct) =>
-        Inspect(
-            type,
+        Inspect(type,
             role,
             ct,
             new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default),
@@ -36,25 +35,60 @@ internal static class RpcPayloadReconstructibilityInspector
         {
             return null;
         }
+        return InspectNamed(
+            named,
+            role,
+            ct,
+            visitedOriginalDefinitions,
+            requireConstructible);
+    }
 
+    private static string? InspectNamed(
+        INamedTypeSymbol named,
+        string role,
+        CancellationToken ct,
+        HashSet<INamedTypeSymbol> visitedOriginalDefinitions,
+        bool requireConstructible)
+    {
+        return InspectTypeArguments(named, role, ct, visitedOriginalDefinitions) ??
+               InspectConstructibility(named, role, ct, visitedOriginalDefinitions, requireConstructible) ??
+               InspectDtoGraph(named, role, ct, visitedOriginalDefinitions);
+    }
+
+    private static string? InspectTypeArguments(
+        INamedTypeSymbol named,
+        string role,
+        CancellationToken ct,
+        HashSet<INamedTypeSymbol> visitedOriginalDefinitions)
+    {
         foreach (var arg in named.TypeArguments)
         {
-            var argumentReason = Inspect(arg, role, ct, visitedOriginalDefinitions, requireConstructible: true);
+            var argumentReason = Inspect(arg, role, ct, visitedOriginalDefinitions, true);
             if (argumentReason is not null)
             {
                 return argumentReason;
             }
         }
 
-        if (requireConstructible)
-        {
-            var constructibilityReason = GetNonConstructibleDtoReason(named, role, ct);
-            if (constructibilityReason is not null)
-            {
-                return constructibilityReason;
-            }
-        }
+        return null;
+    }
 
+    private static string? InspectConstructibility(
+        INamedTypeSymbol named,
+        string role,
+        CancellationToken ct,
+        HashSet<INamedTypeSymbol> visitedOriginalDefinitions,
+        bool requireConstructible)
+        => requireConstructible
+            ? GetNonConstructibleDtoReason(named, role, ct, visitedOriginalDefinitions)
+            : null;
+
+    private static string? InspectDtoGraph(
+        INamedTypeSymbol named,
+        string role,
+        CancellationToken ct,
+        HashSet<INamedTypeSymbol> visitedOriginalDefinitions)
+    {
         if (!CanInspectDtoMembers(named) || !visitedOriginalDefinitions.Add(named.OriginalDefinition))
         {
             return null;
@@ -62,37 +96,49 @@ internal static class RpcPayloadReconstructibilityInspector
 
         try
         {
-            var reconstructibilityReason = RpcPayloadConstructorReconstructibility.GetUnsupportedReason(named, role);
-            if (reconstructibilityReason is not null)
-            {
-                return reconstructibilityReason;
-            }
-
-            foreach (var member in named.GetMembers())
-            {
-                ct.ThrowIfCancellationRequested();
-
-                var reason = member switch
-                {
-                    IPropertySymbol property => InspectProperty(property, role, ct, visitedOriginalDefinitions),
-                    IFieldSymbol field => InspectField(field, role, ct, visitedOriginalDefinitions),
-                    _ => null,
-                };
-                if (reason is not null)
-                {
-                    return reason;
-                }
-            }
-
-            return named.BaseType is null
-                ? null
-                : Inspect(named.BaseType, role, ct, visitedOriginalDefinitions, requireConstructible: false);
+            return RpcPayloadConstructorReconstructibility.GetUnsupportedReason(named, role) ??
+                   InspectDtoMembers(named, role, ct, visitedOriginalDefinitions) ??
+                   InspectBaseType(named, role, ct, visitedOriginalDefinitions);
         }
         finally
         {
             visitedOriginalDefinitions.Remove(named.OriginalDefinition);
         }
     }
+
+    private static string? InspectDtoMembers(
+        INamedTypeSymbol named,
+        string role,
+        CancellationToken ct,
+        HashSet<INamedTypeSymbol> visitedOriginalDefinitions)
+    {
+        foreach (var member in named.GetMembers())
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var reason = member switch
+            {
+                IPropertySymbol property => InspectProperty(property, role, ct, visitedOriginalDefinitions),
+                IFieldSymbol field => InspectField(field, role, ct, visitedOriginalDefinitions),
+                _ => null,
+            };
+            if (reason is not null)
+            {
+                return reason;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? InspectBaseType(
+        INamedTypeSymbol named,
+        string role,
+        CancellationToken ct,
+        HashSet<INamedTypeSymbol> visitedOriginalDefinitions)
+        => named.BaseType is null
+            ? null
+            : Inspect(named.BaseType, role, ct, visitedOriginalDefinitions, requireConstructible: false);
 
     private static string? InspectProperty(
         IPropertySymbol property,
@@ -102,7 +148,8 @@ internal static class RpcPayloadReconstructibilityInspector
     {
         if (property.IsStatic ||
             property.Parameters.Length != 0 ||
-            property.DeclaredAccessibility != Accessibility.Public)
+            property.DeclaredAccessibility != Accessibility.Public ||
+            RpcPayloadIgnoredMember.IsIgnored(property))
         {
             return null;
         }
@@ -123,7 +170,8 @@ internal static class RpcPayloadReconstructibilityInspector
     {
         if (field.IsStatic ||
             field.IsImplicitlyDeclared ||
-            field.DeclaredAccessibility != Accessibility.Public)
+            field.DeclaredAccessibility != Accessibility.Public ||
+            RpcPayloadIgnoredMember.IsIgnored(field))
         {
             return null;
         }
@@ -139,14 +187,15 @@ internal static class RpcPayloadReconstructibilityInspector
     private static string? GetNonConstructibleDtoReason(
         INamedTypeSymbol type,
         string role,
-        CancellationToken ct)
+        CancellationToken ct,
+        HashSet<INamedTypeSymbol> visitedOriginalDefinitions)
     {
         if (!IsUserDtoNamespace(type) || HasRpcServiceAttribute(type, ct))
         {
             return null;
         }
 
-        return type.TypeKind switch
+        var defaultReason = type.TypeKind switch
         {
             TypeKind.Interface =>
                 $"{role} uses interface DTO '{type.ToDisplayString()}'; RPC payload DTOs must be concrete so the wire contract can be reconstructed.",
@@ -154,6 +203,19 @@ internal static class RpcPayloadReconstructibilityInspector
                 $"{role} uses abstract DTO '{type.ToDisplayString()}'; RPC payload DTOs must be concrete so the wire contract can be reconstructed.",
             _ => null,
         };
+        if (defaultReason is null)
+        {
+            return null;
+        }
+        return RpcPayloadUnionResolver.TryRead(type, role, ct, out var cases, out var unionReason)
+            ? unionReason ?? RpcPayloadUnionCaseInspector.Inspect(
+                type,
+                cases,
+                role,
+                ct,
+                visitedOriginalDefinitions,
+                Inspect)
+            : defaultReason;
     }
 
     private static bool CanInspectDtoMembers(INamedTypeSymbol type)
@@ -163,7 +225,6 @@ internal static class RpcPayloadReconstructibilityInspector
         {
             return false;
         }
-
         return IsUserDtoNamespace(type);
     }
 

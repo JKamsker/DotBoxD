@@ -1,5 +1,8 @@
 # Contributing to DotBoxD
 
+Dependency updates must follow the [restore reproducibility policy](docs/restore-reproducibility.md),
+including its explicit trigger for introducing lock files.
+
 Thanks for your interest in DotBoxD. This guide covers building, testing, the CI gates your change
 must pass, and commit conventions.
 

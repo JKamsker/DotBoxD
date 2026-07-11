@@ -12,10 +12,7 @@ internal static partial class HookChainModelFactory
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        var unwrappedReceiver = HookChainAliasResolver.UnwrapTransparentExpression(receiver);
-        if (unwrappedReceiver is not IdentifierNameSyntax receiverIdentifier ||
-            model.GetSymbolInfo(receiverIdentifier, cancellationToken).Symbol is not ILocalSymbol receiverLocal ||
-            terminal.FirstAncestorOrSelf<BlockSyntax>() is not { } block)
+        if (!TryGetReceiverScanContext(receiver, terminal, model, cancellationToken, out var receiverLocal, out var block))
         {
             return false;
         }
@@ -30,22 +27,88 @@ internal static partial class HookChainModelFactory
                 continue;
             }
 
-            if (invocation.Expression is not MemberAccessExpressionSyntax access ||
-                access.Name.Identifier.ValueText is not (WhereMethod or SelectMethod) ||
-                !IsHookStageInvocation(invocation, model, cancellationToken) ||
-                !ExpressionReferencesLocal(access.Expression, receiverLocal, model, cancellationToken, depth: 0))
+            if (!IsStageInvocationOnReceiver(invocation, receiverLocal, model, cancellationToken))
             {
                 continue;
             }
 
-            if (IsDiscardedStage(invocation) ||
-                IsAssignedBackToReceiver(invocation, receiverLocal, model, cancellationToken))
+            if (StageMutatesReceiver(invocation, receiverLocal, model, cancellationToken))
             {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private static bool TryGetReceiverScanContext(
+        ExpressionSyntax receiver,
+        InvocationExpressionSyntax terminal,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        out ILocalSymbol receiverLocal,
+        out BlockSyntax block)
+    {
+        receiverLocal = null!;
+        block = null!;
+        var unwrappedReceiver = HookChainAliasResolver.UnwrapTransparentExpression(receiver);
+        if (unwrappedReceiver is not IdentifierNameSyntax receiverIdentifier)
+        {
+            return false;
+        }
+
+        if (model.GetSymbolInfo(receiverIdentifier, cancellationToken).Symbol is not ILocalSymbol local)
+        {
+            return false;
+        }
+
+        if (terminal.FirstAncestorOrSelf<BlockSyntax>() is not { } containingBlock)
+        {
+            return false;
+        }
+
+        receiverLocal = local;
+        block = containingBlock;
+        return true;
+    }
+
+    private static bool IsStageInvocationOnReceiver(
+        InvocationExpressionSyntax invocation,
+        ILocalSymbol receiverLocal,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (invocation.Expression is not MemberAccessExpressionSyntax access)
+        {
+            return false;
+        }
+
+        if (RoleOf(invocation, model, cancellationToken) is not
+            (PipelineCallRole.Filter or PipelineCallRole.Projection))
+        {
+            return false;
+        }
+
+        if (!IsHookStageInvocation(invocation, model, cancellationToken))
+        {
+            return false;
+        }
+
+        return ExpressionReferencesLocal(access.Expression, receiverLocal, model, cancellationToken, depth: 0);
+    }
+
+    private static bool StageMutatesReceiver(
+        InvocationExpressionSyntax invocation,
+        ILocalSymbol receiverLocal,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (IsDiscardedStage(invocation))
+        {
+            return true;
+        }
+
+        return IsAssignedBackToReceiver(invocation, receiverLocal, model, cancellationToken);
     }
 
     private static bool IsDiscardedStage(InvocationExpressionSyntax invocation)
@@ -56,7 +119,7 @@ internal static partial class HookChainModelFactory
         SemanticModel model,
         CancellationToken cancellationToken)
         => model.GetTypeInfo(invocation, cancellationToken).Type is INamedTypeSymbol type &&
-           ReceiverKind(type) is not null;
+           ReceiverKind(type, model.Compilation) is not null;
 
     private static bool IsAssignedBackToReceiver(
         InvocationExpressionSyntax invocation,

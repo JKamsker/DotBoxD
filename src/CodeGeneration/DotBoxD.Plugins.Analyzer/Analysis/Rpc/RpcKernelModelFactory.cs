@@ -19,128 +19,22 @@ internal static partial class RpcKernelModelFactory
     public static RpcKernelModelResult? Create(GeneratorAttributeSyntaxContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (context.TargetSymbol is not INamedTypeSymbol type ||
-            context.TargetNode is not ClassDeclarationSyntax declaration)
+        if (!TryGetTarget(context, out var type, out var declaration))
         {
             return null;
         }
 
-        var pluginId = PluginId(context.Attributes, type.Name);
-        if (string.IsNullOrWhiteSpace(pluginId))
+        if (ValidateTarget(type, declaration, context.Attributes) is { } failure)
         {
-            return Fail(declaration, "Server extension id must be a non-empty string.");
+            return failure;
         }
 
-        if (type.IsGenericType || type.TypeParameters.Length > 0)
-        {
-            return Fail(declaration, $"Generated server extension '{type.Name}' cannot be generic.");
-        }
-
-        if (type.ContainingType is not null)
-        {
-            return Fail(declaration, $"Server extension kernels must be top-level types; '{type.ToDisplayString()}' is nested.");
-        }
-
+        var pluginId = PluginId(context.Attributes, type.Name)!;
         var serviceType = ServiceType(context.Attributes);
         var graftType = GraftType(context.Attributes);
-
         try
         {
-            var graft = RpcServerExtensionGraft.Create(type, graftType);
-            var method = ResolveBatchMethod(type, context.SemanticModel.Compilation);
-            ValidateBatchMethodParameters(method);
-            var liveSettings = PluginSymbolReader.LiveSettings(type, context.SemanticModel, cancellationToken);
-            if (ContainsUnsupported(liveSettings))
-            {
-                throw new NotSupportedException("Live settings must use supported scalar types.");
-            }
-
-            ValidateGeneratedParameterNames(method, liveSettings, graft);
-            IMethodSymbol? serviceMethod = null;
-            RpcKernelClientExtensions? clientExtensions = null;
-            RpcKernelClientMethodExtension? directClientMethod = null;
-            if (serviceType is not null)
-            {
-                serviceMethod = RpcKernelClientProxyEmitter.ResolveServiceMethod(
-                    serviceType,
-                    method,
-                    context.SemanticModel.Compilation);
-                clientExtensions = RpcKernelClientExtensionModelFactory.Resolve(type, method);
-                RpcKernelClientExtensionModelFactory.ValidateLanguageVersion(
-                    clientExtensions,
-                    context.SemanticModel.SyntaxTree.Options);
-                ValidateGeneratedClientTypeCollisions(type, clientExtensions);
-            }
-            else if (graft is not null)
-            {
-                directClientMethod = RpcKernelClientExtensionModelFactory.ResolveClientMethod(method, graft.ReceiverType);
-                if (directClientMethod is not null &&
-                    !SymbolEqualityComparer.Default.Equals(directClientMethod.ReceiverType, graft.ReceiverType))
-                {
-                    throw new NotSupportedException(
-                        $"Server extension client method receiver '{directClientMethod.ReceiverType.ToDisplayString()}' " +
-                        $"must match the class receiver '{graft.ReceiverType.ToDisplayString()}'.");
-                }
-
-                if (directClientMethod is not null)
-                {
-                    ValidateGeneratedTypeCollision(type, type.Name + "DirectServerExtensionClientExtensions");
-                }
-            }
-            else if (RpcKernelClientExtensionModelFactory.HasClientPropertyAttribute(type))
-            {
-                RejectClientPropertyWithoutService(type);
-            }
-            else if (RpcKernelClientExtensionModelFactory.HasReceiverExtensionAttribute(method))
-            {
-                throw new NotSupportedException(
-                    "[ServerExtensionMethod] requires a service-backed or receiver-grafted [ServerExtension] class.");
-            }
-            var body = MethodBody(method, cancellationToken);
-            var capabilities = new SortedSet<string>(StringComparer.Ordinal);
-            var effects = new SortedSet<string>(StringComparer.Ordinal);
-            var contextParameter = method.Parameters[method.Parameters.Length - 1];
-            var lowerer = new DotBoxDRpcJsonLowerer(
-                context.SemanticModel,
-                capabilities,
-                effects,
-                cancellationToken,
-                serverContextParameterName: contextParameter.Name,
-                serverContextType: contextParameter.Type);
-            var hasReceiverId = RpcKernelReceiverHandleSeeder.TrySeed(lowerer, type, graft);
-            var bodyJson = body.Block is { } block
-                ? lowerer.LowerBody(block)
-                : lowerer.LowerExpressionBody(body.Expression!, method.ReturnsVoid);
-
-            effects.Add("Cpu");
-            if (lowerer.Allocates)
-            {
-                effects.Add("Alloc");
-            }
-
-            var source = EmitPackage(
-                type,
-                pluginId!,
-                method,
-                bodyJson,
-                effects,
-                capabilities,
-                liveSettings,
-                serviceType,
-                serviceMethod,
-                clientExtensions,
-                directClientMethod,
-                graft,
-                hasReceiverId,
-                context.SemanticModel.Compilation);
-            var grafts = RpcKernelGraftSignatureFactory.Create(
-                type,
-                method,
-                serviceMethod,
-                clientExtensions,
-                directClientMethod,
-                graft);
-            return new RpcKernelModelResult(source, null, grafts);
+            return CreateValidated(context, cancellationToken, type, pluginId, serviceType, graftType);
         }
         catch (NotSupportedException ex)
         {
@@ -242,6 +136,16 @@ internal static partial class RpcKernelModelFactory
         var builder = new System.Text.StringBuilder();
         builder.AppendLine("// <auto-generated/>");
         builder.AppendLine("#nullable enable");
+        builder.Append("#pragma warning disable CS0612, CS0618, CS3001, CS3002, CS3003");
+        if (serviceType is not null)
+        {
+            foreach (var diagnosticId in RpcTypeMetadataAttributeSource.ExperimentalDiagnosticIds(serviceType))
+            {
+                builder.Append(", ").Append(diagnosticId);
+            }
+        }
+
+        builder.AppendLine();
         if (!string.IsNullOrEmpty(ns))
         {
             builder.Append("namespace ").Append(ns).AppendLine(";");

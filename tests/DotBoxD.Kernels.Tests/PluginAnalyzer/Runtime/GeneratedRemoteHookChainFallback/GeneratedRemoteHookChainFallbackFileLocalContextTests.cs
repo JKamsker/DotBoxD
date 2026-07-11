@@ -31,7 +31,7 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
             [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: ParseOptions);
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out _);
-        var result = driver.GetRunResult();
+        var result = PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult());
         var diagnostics = result.Diagnostics.ToArray();
 
         Assert.Contains(

@@ -1,6 +1,7 @@
 using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
+using DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -13,17 +14,55 @@ internal static class PluginKernelModelFactory
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (context.TargetSymbol is not INamedTypeSymbol type ||
-            context.TargetNode is not ClassDeclarationSyntax declaration)
+        if (!TryGetKernelDeclaration(context, out var type, out var declaration))
         {
             return null;
         }
 
         var pluginId = PluginSymbolReader.PluginId(context.Attributes) ?? KernelId(type.Name);
         var eventTypes = PluginSymbolReader.EventTypes(type);
-        if (string.IsNullOrWhiteSpace(pluginId))
+        if (ValidateKernelDeclaration(type, declaration, pluginId, eventTypes) is { } validationFailure)
         {
-            return Fail(declaration, "Plugin id must be a non-empty string.");
+            return validationFailure;
+        }
+
+        try
+        {
+            return CreateValidated(context, type, pluginId!, eventTypes[0], cancellationToken);
+        }
+        catch (NotSupportedException ex)
+        {
+            return Fail(declaration, ex.Message);
+        }
+    }
+
+    private static bool TryGetKernelDeclaration(
+        GeneratorAttributeSyntaxContext context,
+        out INamedTypeSymbol type,
+        out ClassDeclarationSyntax declaration)
+    {
+        if (context.TargetSymbol is INamedTypeSymbol kernelType &&
+            context.TargetNode is ClassDeclarationSyntax classDeclaration)
+        {
+            type = kernelType;
+            declaration = classDeclaration;
+            return true;
+        }
+
+        type = null!;
+        declaration = null!;
+        return false;
+    }
+
+    private static PluginKernelModelResult? ValidateKernelDeclaration(
+        INamedTypeSymbol type,
+        ClassDeclarationSyntax declaration,
+        string? pluginId,
+        IReadOnlyList<INamedTypeSymbol> eventTypes)
+    {
+        if (PluginIdValidation.ErrorMessage(pluginId) is { } pluginIdError)
+        {
+            return Fail(declaration, pluginIdError);
         }
 
         if (type.IsGenericType || type.TypeParameters.Length > 0)
@@ -48,103 +87,116 @@ internal static class PluginKernelModelFactory
             return Fail(declaration, "Plugin kernels must implement exactly one IEventKernel<TEvent>.");
         }
 
-        var validatedPluginId = pluginId!;
-        var eventType = eventTypes[0];
-        try
+        return null;
+    }
+
+    private static PluginKernelModelResult CreateValidated(
+        GeneratorAttributeSyntaxContext context,
+        INamedTypeSymbol type,
+        string pluginId,
+        INamedTypeSymbol eventType,
+        CancellationToken cancellationToken)
+    {
+        var hookMetadata = PluginKernelHookMetadataReader.Read(
+            eventType,
+            context.SemanticModel.Compilation,
+            cancellationToken);
+        if (hookMetadata.Diagnostic is not null)
         {
-            var shouldHandle = InterfaceMethodSyntax(context, type, DotBoxDGenerationNames.Entrypoints.ShouldHandle, cancellationToken);
-            var handle = InterfaceMethodSyntax(context, type, DotBoxDGenerationNames.Entrypoints.Handle, cancellationToken);
-            var eventProperties = PluginSymbolReader.EventProperties(eventType);
-            if (ContainsUnsupported(eventProperties))
-            {
-                throw new NotSupportedException(PluginKernelUnsupportedShapeMessage.EventProperties(eventType));
-            }
-
-            var liveSettings = PluginSymbolReader.LiveSettings(type, context.SemanticModel, cancellationToken);
-            if (ContainsUnsupported(liveSettings))
-            {
-                throw new NotSupportedException("Live settings must use supported scalar types.");
-            }
-
-            ValidateGeneratedParameterNames(eventProperties, liveSettings);
-
-            var eventParameterName = ParameterName(
-                shouldHandle,
-                DotBoxDGenerationNames.KernelMethodParameters.EventIndex,
-                DotBoxDGenerationNames.DefaultEventParameterName);
-            var contextParameterName = ParameterName(
-                shouldHandle,
-                DotBoxDGenerationNames.KernelMethodParameters.ContextIndex,
-                DotBoxDGenerationNames.DefaultContextParameterName);
-            var handleEventParameterName = ParameterName(
-                handle,
-                DotBoxDGenerationNames.KernelMethodParameters.EventIndex,
-                DotBoxDGenerationNames.DefaultEventParameterName);
-            var handleContextParameterName = ParameterName(
-                handle,
-                DotBoxDGenerationNames.KernelMethodParameters.ContextIndex,
-                DotBoxDGenerationNames.DefaultContextParameterName);
-            // Collectors for the whole kernel: ShouldHandle + Handle lowering deposit every capability the
-            // verified IR needs (Send, [HostBinding] calls, gated event-property reads) and every extra
-            // sandbox effect a [HostBinding] declares. Sorted for deterministic, incrementality-stable output.
-            var capabilities = new SortedSet<string>(StringComparer.Ordinal);
-            var effects = new SortedSet<string>(StringComparer.Ordinal);
-            var shouldHandleContext = new DotBoxDExpressionLoweringContext(
-                eventParameterName,
-                eventProperties,
-                liveSettings,
-                context.SemanticModel,
-                cancellationToken,
-                capabilities: capabilities,
-                effects: effects);
-            var shouldHandleBody = DotBoxDShouldHandleBodyModelFactory.Create(shouldHandle, shouldHandleContext);
-
-            // Issue #51: mine host-readable index metadata from the kernel's ShouldHandle the same way inline
-            // chains mine it from .Where(...). Live-setting and other non-constant comparisons resolve to no
-            // constant, so they stay non-indexed (default, false) exactly as before.
-            var (indexPredicates, indexCoversPredicate) = HookChainIndexPredicateExtractor.ExtractFromShouldHandle(
-                shouldHandle,
-                eventParameterName,
-                eventProperties,
-                context.SemanticModel,
-                cancellationToken);
-
-            var handleModel = DotBoxDHandleModelFactory.Create(
-                handle,
-                handleEventParameterName,
-                handleContextParameterName,
-                eventProperties,
-                liveSettings,
-                context.SemanticModel,
-                cancellationToken,
-                capabilities,
-                effects);
-            var handleBody = DotBoxDHandleBodyModelFactory.FromSend(handleModel);
-            var model = new PluginKernelModel(
-                PluginId: validatedPluginId,
-                Namespace: type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString(),
-                KernelName: type.Name,
-                PackageName: PackageName(type.Name),
-                EventName: EventTypeName.HookOrQualified(eventType),
-                EventParameterName: eventParameterName,
-                ContextParameterName: contextParameterName,
-                HandleEventParameterName: handleEventParameterName,
-                HandleContextParameterName: handleContextParameterName,
-                EventProperties: eventProperties,
-                LiveSettings: liveSettings,
-                ShouldHandle: shouldHandleBody,
-                HandleBody: handleBody,
-                HandleReturnTypeSource: DotBoxDGenerationNames.TypeNames.GlobalSandboxType + ".Unit",
-                ManifestEffects: DotBoxDManifestEffectModel.Create(shouldHandleBody, handleBody, effects),
-                RequiredCapabilities: EquatableArray<string>.FromOwned([.. capabilities]),
-                IndexPredicates: indexPredicates,
-                IndexCoversPredicate: indexCoversPredicate);
-            return new PluginKernelModelResult(model, null);
+            return new PluginKernelModelResult(null, hookMetadata.Diagnostic);
         }
-        catch (NotSupportedException ex)
+
+        var shouldHandle = InterfaceMethodSyntax(context, type, DotBoxDGenerationNames.Entrypoints.ShouldHandle, cancellationToken);
+        var handle = InterfaceMethodSyntax(context, type, DotBoxDGenerationNames.Entrypoints.Handle, cancellationToken);
+        var eventProperties = PluginSymbolReader.EventProperties(eventType);
+        if (ContainsUnsupported(eventProperties))
         {
-            return Fail(declaration, ex.Message);
+            throw new NotSupportedException(PluginKernelUnsupportedShapeMessage.EventProperties(eventType));
         }
+
+        var liveSettings = PluginSymbolReader.LiveSettings(type, context.SemanticModel, cancellationToken);
+        if (ContainsUnsupported(liveSettings))
+        {
+            throw new NotSupportedException("Live settings must use supported scalar types.");
+        }
+
+        ValidateGeneratedParameterNames(eventProperties, liveSettings);
+
+        var eventParameterName = ParameterName(
+            shouldHandle,
+            DotBoxDGenerationNames.KernelMethodParameters.EventIndex,
+            DotBoxDGenerationNames.DefaultEventParameterName);
+        var contextParameterName = ParameterName(
+            shouldHandle,
+            DotBoxDGenerationNames.KernelMethodParameters.ContextIndex,
+            DotBoxDGenerationNames.DefaultContextParameterName);
+        var handleEventParameterName = ParameterName(
+            handle,
+            DotBoxDGenerationNames.KernelMethodParameters.EventIndex,
+            DotBoxDGenerationNames.DefaultEventParameterName);
+        var handleContextParameterName = ParameterName(
+            handle,
+            DotBoxDGenerationNames.KernelMethodParameters.ContextIndex,
+            DotBoxDGenerationNames.DefaultContextParameterName);
+        // Collectors for the whole kernel: ShouldHandle + Handle lowering deposit every capability the
+        // verified IR needs (Send, [HostBinding] calls, gated event-property reads) and every extra
+        // sandbox effect a [HostBinding] declares. Sorted for deterministic, incrementality-stable output.
+        var capabilities = new SortedSet<string>(StringComparer.Ordinal);
+        var effects = new SortedSet<string>(StringComparer.Ordinal);
+        var shouldHandleContext = new DotBoxDExpressionLoweringContext(
+            eventParameterName,
+            eventProperties,
+            liveSettings,
+            context.SemanticModel,
+            cancellationToken,
+            capabilities: capabilities,
+            effects: effects);
+        var shouldHandleBody = DotBoxDShouldHandleBodyModelFactory.Create(shouldHandle, shouldHandleContext);
+
+        // Issue #51: mine host-readable index metadata from the kernel's ShouldHandle the same way inline
+        // chains mine it from .Where(...). Live-setting and other non-constant comparisons resolve to no
+        // constant, so they stay non-indexed (default, false) exactly as before.
+        var (indexPredicates, indexCoversPredicate) = HookChainIndexPredicateExtractor.ExtractFromShouldHandle(
+            shouldHandle,
+            eventParameterName,
+            eventProperties,
+            context.SemanticModel,
+            cancellationToken);
+
+        var handleModel = DotBoxDHandleModelFactory.Create(
+            handle,
+            handleEventParameterName,
+            handleContextParameterName,
+            eventProperties,
+            liveSettings,
+            context.SemanticModel,
+            cancellationToken,
+            capabilities,
+            effects);
+        var handleBody = DotBoxDHandleBodyModelFactory.FromSend(handleModel);
+        var model = new PluginKernelModel(
+            PluginId: pluginId,
+            Namespace: type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString(),
+            KernelName: type.Name,
+            PackageName: PackageName(type.Name),
+            GeneratedPackageAttributes: GeneratedPackageAttributeSource.FromKernel(type),
+            GeneratedAttributeSource: string.Empty,
+            EventName: hookMetadata.EventName,
+            EventParameterName: eventParameterName,
+            ContextParameterName: contextParameterName,
+            HandleEventParameterName: handleEventParameterName,
+            HandleContextParameterName: handleContextParameterName,
+            PackageAttributes: PluginServerFlowAttributeSource.TypeAttributes(type),
+            EventProperties: eventProperties,
+            LiveSettings: liveSettings,
+            ShouldHandle: shouldHandleBody,
+            HandleBody: handleBody,
+            HandleReturnTypeSource: DotBoxDGenerationNames.TypeNames.GlobalSandboxType + ".Unit",
+            ManifestEffects: DotBoxDManifestEffectModel.Create(shouldHandleBody, handleBody, effects),
+            RequiredCapabilities: EquatableArray<string>.FromOwned([.. capabilities]),
+            IndexPredicates: indexPredicates,
+            IndexCoversPredicate: indexCoversPredicate);
+        return new PluginKernelModelResult(model, null);
     }
 
     private static PluginKernelModelResult Fail(ClassDeclarationSyntax declaration, string message)

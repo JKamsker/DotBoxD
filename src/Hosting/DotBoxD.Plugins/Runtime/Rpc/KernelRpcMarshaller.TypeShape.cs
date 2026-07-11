@@ -15,6 +15,12 @@ public static partial class KernelRpcMarshaller
     private static readonly ConcurrentDictionary<Type, RecordShape> RecordShapeCache = new();
     private static readonly ConcurrentDictionary<Type, OptionalRecordShape> DtoShapeCache = new();
 
+    private static readonly HashSet<Type> NonDtoShapeTypes =
+    [
+        typeof(TimeSpan),
+        typeof(string)
+    ];
+
     private static Type? ElementType(Type type)
         => ElementTypeCache.GetOrAdd(type, static candidate => new OptionalType(FindElementType(candidate))).Value;
 
@@ -70,17 +76,7 @@ public static partial class KernelRpcMarshaller
 
     private static RecordShape? FindDtoShape(Type type)
     {
-        if (IsDateTimeWireType(type) ||
-            IsDecimalWireType(type) ||
-            IsFrameworkStructWireType(type) ||
-            type == typeof(TimeSpan) ||
-            type == typeof(string) ||
-            type.IsPrimitive ||
-            type.IsEnum ||
-            ElementType(type) is not null ||
-            MapTypes(type) is not null ||
-            !(type.IsClass || type.IsValueType) ||
-            ImplementsGenericEnumerable(type))
+        if (IsNonDtoShape(type))
         {
             return null;
         }
@@ -88,6 +84,26 @@ public static partial class KernelRpcMarshaller
         var shape = GetRecordShape(type);
         return shape.Fields.Count > 0 ? shape : null;
     }
+
+    private static bool IsNonDtoShape(Type type)
+        => IsKnownNonDtoShape(type) ||
+           IsCollectionShape(type) ||
+           !IsDtoContainerShape(type) ||
+           ImplementsGenericEnumerable(type);
+
+    private static bool IsKnownNonDtoShape(Type type)
+        => NonDtoShapeTypes.Contains(type) ||
+           IsDateTimeWireType(type) ||
+           IsDecimalWireType(type) ||
+           IsFrameworkStructWireType(type) ||
+           type.IsPrimitive ||
+           type.IsEnum;
+
+    private static bool IsCollectionShape(Type type)
+        => ElementType(type) is not null || MapTypes(type) is not null;
+
+    private static bool IsDtoContainerShape(Type type)
+        => type.IsClass || type.IsValueType;
 
     private static IList CreateList(Type elementType, int capacity)
         => ListFactoryCache.GetOrAdd(elementType, CreateListFactory)(capacity);
@@ -188,43 +204,49 @@ public static partial class KernelRpcMarshaller
             }
 
             const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly;
-            foreach (var property in baseType.GetProperties(flags))
-            {
-                if (property.GetMethod is not null &&
-                    property.GetIndexParameters().Length == 0 &&
-                    !string.Equals(property.Name, "EqualityContract", StringComparison.Ordinal) &&
-                    !IsIgnoredMember(property))
-                {
-                    throw new NotSupportedException(
-                        $"Server extension DTO '{type}' inherits public properties from base type " +
-                        $"'{baseType}'; flatten the DTO into a single type.");
-                }
-            }
+            RejectInheritedDtoProperties(type, baseType, flags);
+            RejectInheritedDtoFields(type, baseType, flags);
+        }
+    }
 
-            foreach (var field in baseType.GetFields(flags))
+    private static void RejectInheritedDtoProperties(Type type, Type baseType, BindingFlags flags)
+    {
+        foreach (var property in baseType.GetProperties(flags))
+        {
+            if (property.GetMethod is not null &&
+                property.GetIndexParameters().Length == 0 &&
+                !string.Equals(property.Name, "EqualityContract", StringComparison.Ordinal) &&
+                !IsIgnoredMember(property))
             {
-                if (!field.IsLiteral && !IsIgnoredMember(field))
-                {
-                    throw new NotSupportedException(
-                        $"Server extension DTO '{type}' inherits public fields from base type " +
-                        $"'{baseType}'; flatten the DTO into a single type.");
-                }
+                throw new NotSupportedException(
+                    $"Server extension DTO '{type}' inherits public properties from base type " +
+                    $"'{baseType}'; flatten the DTO into a single type.");
             }
         }
     }
 
-    // A member marked [IgnoreDataMember] (System.Runtime.Serialization) is non-wire — a lazily-resolved or
-    // computed member, not serialized data — so it is excluded from the marshalled record shape, matching the
-    // analyzer (DotBoxDRpcTypeMapper.IsIgnoredDataMember) and the convention event adapter so all three readers
-    // agree on the wire field set. Matched by name via GetCustomAttributesData so the attribute need not load.
+    private static void RejectInheritedDtoFields(Type type, Type baseType, BindingFlags flags)
+    {
+        foreach (var field in baseType.GetFields(flags))
+        {
+            if (!field.IsLiteral && !IsIgnoredMember(field))
+            {
+                throw new NotSupportedException(
+                    $"Server extension DTO '{type}' inherits public fields from base type " +
+                    $"'{baseType}'; flatten the DTO into a single type.");
+            }
+        }
+    }
+
+    // A member marked with a known serializer ignore attribute is non-wire: lazily-resolved or computed
+    // state, not serialized data. Exclude it from the marshalled record shape so the analyzer, convention
+    // event adapter, and record decoder agree on the wire field set. Matched by name via
+    // GetCustomAttributesData so the attribute need not load.
     internal static bool IsIgnoredMember(MemberInfo member)
     {
         foreach (var attribute in member.GetCustomAttributesData())
         {
-            if (string.Equals(
-                    attribute.AttributeType.FullName,
-                    "System.Runtime.Serialization.IgnoreDataMemberAttribute",
-                    StringComparison.Ordinal))
+            if (IsIgnoreAttribute(attribute.AttributeType.FullName))
             {
                 return true;
             }
@@ -232,6 +254,12 @@ public static partial class KernelRpcMarshaller
 
         return false;
     }
+
+    private static bool IsIgnoreAttribute(string? typeName) =>
+        typeName is "System.Runtime.Serialization.IgnoreDataMemberAttribute"
+            or "System.Text.Json.Serialization.JsonIgnoreAttribute"
+            or "MessagePack.IgnoreMemberAttribute";
+
     private readonly record struct OptionalType(Type? Value);
 
     private readonly record struct OptionalMapTypes((Type Key, Type Value)? Value);

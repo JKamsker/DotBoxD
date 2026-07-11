@@ -139,8 +139,17 @@ post-steps:
       import sys
 
       outputs_path = "/tmp/gh-aw/safeoutputs.jsonl"
+      agent_output_path = "/tmp/gh-aw/agent_output.json"
       prefix = os.environ["SURPRISE_PR_TITLE_PREFIX"]
       repo = os.environ["GITHUB_REPOSITORY"]
+
+      def replace_with_noop(reason: str) -> None:
+          noop = {"type": "noop", "message": reason}
+          with open(outputs_path, "w", encoding="utf-8") as handle:
+              handle.write(json.dumps(noop, separators=(",", ":")) + "\n")
+          with open(agent_output_path, "w", encoding="utf-8") as handle:
+              json.dump({"items": [noop], "errors": []}, handle, separators=(",", ":"))
+          print(f"::warning::{reason}", file=sys.stderr)
 
       create_pr_items = []
       with open(outputs_path, encoding="utf-8") as handle:
@@ -151,13 +160,17 @@ post-steps:
               try:
                   item = json.loads(text)
               except json.JSONDecodeError as exc:
-                  print(f"::error::Invalid safe-output JSON on line {line_number}: {exc}", file=sys.stderr)
-                  sys.exit(1)
+                  replace_with_noop(f"Skipping malformed red-test safe-output JSON on line {line_number}: {exc}")
+                  sys.exit(0)
               if item.get("type") == "create_pull_request":
                   create_pr_items.append(item)
 
       if not create_pr_items:
           print("No create_pull_request safe output found.")
+          sys.exit(0)
+
+      if len(create_pr_items) > 1:
+          replace_with_noop("Skipping red-test safe output because more than one create_pull_request item was emitted.")
           sys.exit(0)
 
       result = subprocess.run(
@@ -180,9 +193,9 @@ post-steps:
           stderr=subprocess.PIPE,
       )
       if result.returncode != 0:
-          print("::error::Unable to list open PRs for duplicate validation.", file=sys.stderr)
+          print("::warning::Unable to list open PRs for duplicate validation.", file=sys.stderr)
           print(result.stderr, file=sys.stderr)
-          sys.exit(result.returncode)
+          sys.exit(0)
 
       open_prs = json.loads(result.stdout or "[]")
       open_titles = {pr.get("title", ""): pr for pr in open_prs}
@@ -190,90 +203,44 @@ post-steps:
       for item in create_pr_items:
           title = str(item.get("title") or "").strip()
           if not title:
-              print("::error::create_pull_request must include a non-empty title.", file=sys.stderr)
-              sys.exit(1)
+              replace_with_noop("Skipping red-test PR output because create_pull_request omitted a non-empty title.")
+              sys.exit(0)
 
           final_title = title if title.startswith(prefix) else prefix + title
           for candidate_title in {title, final_title}:
               duplicate = open_titles.get(candidate_title)
               if duplicate:
-                  print(
-                      f"::error::Duplicate open surprise PR title found: #{duplicate.get('number')} {duplicate.get('url')}",
-                      file=sys.stderr,
+                  replace_with_noop(
+                      "Skipping duplicate red-test PR output because an open PR already has the same title: "
+                      f"#{duplicate.get('number')} {duplicate.get('url')}"
                   )
-                  sys.exit(1)
+                  sys.exit(0)
 
           body = str(item.get("body") or item.get("description") or "")
           required_sections = ["Duplicate check", "Red test", "Expected failure", "Validation"]
           missing = [section for section in required_sections if section.lower() not in body.lower()]
           if missing:
-              print(
-                  "::error::create_pull_request body must include these sections: " + ", ".join(missing),
-                  file=sys.stderr,
+              replace_with_noop(
+                  "Skipping red-test PR output because the body is missing required section(s): " +
+                  ", ".join(missing)
               )
-              sys.exit(1)
+              sys.exit(0)
+
+          body_lower = body.lower()
+          missing_evidence = []
+          if "failed as expected" not in body_lower:
+              missing_evidence.append("Failed as expected")
+          if "dotnet test" not in body_lower:
+              missing_evidence.append("dotnet test")
+          if missing_evidence:
+              replace_with_noop(
+                  "Skipping red-test PR output because the Validation section does not record focused red-test evidence: " +
+                  ", ".join(missing_evidence)
+              )
+              sys.exit(0)
 
       print(f"Validated {len(create_pr_items)} create_pull_request safe output(s) against {len(open_prs)} open PR(s).")
       PY
-
-  - name: Setup .NET for red-test validation
-    if: steps.surprise-red-test-guard.outputs.should_validate == 'true'
-    uses: actions/setup-dotnet@v4
-    with:
-      dotnet-version: 10.0.x
-
-  - name: Materialize safe-output patch for red-test validation
-    if: steps.surprise-red-test-guard.outputs.should_validate == 'true'
-    shell: bash
-    run: |
-      set -euo pipefail
-      base_sha="${GITHUB_SHA:-}"
-      current_sha="$(git rev-parse HEAD)"
-      has_workspace_changes=false
-      git diff --quiet || has_workspace_changes=true
-      git diff --cached --quiet || has_workspace_changes=true
-
-      if [ "$has_workspace_changes" = false ] && [ -n "$base_sha" ] && [ "$current_sha" = "$base_sha" ]; then
-        shopt -s nullglob
-        patches=(/tmp/gh-aw/aw-*.patch)
-        if [ "${#patches[@]}" -eq 0 ]; then
-          echo "::error::Safe output requested a PR, but no workspace changes or patch artifact were found."
-          exit 1
-        fi
-        if [ "${#patches[@]}" -gt 1 ]; then
-          printf '::error::Expected one safe-output patch, found %s: %s\n' "${#patches[@]}" "${patches[*]}"
-          exit 1
-        fi
-        git apply --check "${patches[0]}"
-        git apply "${patches[0]}"
-      fi
-
-      git status --short
-
-  - name: Restore before red-test validation
-    if: steps.surprise-red-test-guard.outputs.should_validate == 'true'
-    run: dotnet restore DotBoxD.slnx
-
-  - name: Build before red-test validation
-    if: steps.surprise-red-test-guard.outputs.should_validate == 'true'
-    run: GITHUB_ACTIONS=true dotnet build DotBoxD.slnx -c Release --no-restore
-
-  - name: Verify the proposed tests are red
-    if: steps.surprise-red-test-guard.outputs.should_validate == 'true'
-    shell: bash
-    run: |
-      set -euo pipefail
-      log="/tmp/gh-aw/red-test-validation.log"
-      set +e
-      GITHUB_ACTIONS=true dotnet test DotBoxD.slnx -c Release --no-build > "$log" 2>&1
-      status=$?
-      set -e
-      tail -n 200 "$log"
-      if [ "$status" -eq 0 ]; then
-        echo "::error::The proposed red-test PR passed dotnet test; refusing to create a PR without a failing regression test."
-        exit 1
-      fi
-      echo "Red-test validation failed as expected with exit code ${status}."
 ---
 
 # Library Surprise Red-Test Worker
@@ -356,10 +323,11 @@ Before requesting `create_pull_request`:
   expected reason.
 - If the focused test unexpectedly passes, remove the changes and call `noop`.
 
-The workflow runs its own post-step validation as well: it builds the proposed
-branch and requires `dotnet test DotBoxD.slnx -c Release --no-build` to fail
-before the PR is created. This is intentional; these PRs are supposed to be red
-test reports for confirmed bugs.
+The workflow's post-step validation checks the safe-output shape, exact open PR
+title duplicates, and the PR body's recorded focused red-test evidence. It does
+not use a whole-solution post-step `dotnet test` run as the red proof:
+safe-output processing is downstream of the agent job, and broad test runs can
+hide focused race repros. The in-run focused failing command is the authority.
 
 The companion fixer is driven by the `Library Surprise Fix Dispatcher`, which scans open unfixed
 `[surprise-red-test]` PRs (it does NOT depend on PR CI — this run's in-run red proof is the

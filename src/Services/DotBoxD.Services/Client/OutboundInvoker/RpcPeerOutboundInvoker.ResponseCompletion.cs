@@ -12,46 +12,17 @@ internal sealed partial class RpcPeerOutboundInvoker
     {
         if (!MessageFramer.TryReadFrame(frame.Memory, out _, out var messageType, out var envelope, out var payload))
         {
-            _pending.TryFail(
-                messageId,
-                new ServiceProtocolException("Malformed response frame."));
+            FailPending(messageId, "Malformed response frame.");
             return false;
         }
 
-        RpcResponse response;
-        try
+        if (!TryReadResponseEnvelope(messageId, envelope, out var response))
         {
-            response = _serializer.Deserialize<RpcResponse>(envelope);
-        }
-        catch
-        {
-            _pending.TryFail(
-                messageId,
-                new ServiceProtocolException("Malformed response envelope."));
             return false;
         }
 
-        if (response.MessageId != messageId)
+        if (!ValidateResponseFrame(messageId, messageType, payload.Length, response))
         {
-            _pending.TryFail(
-                messageId,
-                new ServiceProtocolException("Response envelope message id does not match frame header."));
-            return false;
-        }
-
-        if (messageType == MessageType.Error && response.IsSuccess)
-        {
-            _pending.TryFail(
-                messageId,
-                new ServiceProtocolException("Malformed error response frame."));
-            return false;
-        }
-
-        if (messageType == MessageType.Error && payload.Length != 0)
-        {
-            _pending.TryFail(
-                messageId,
-                new ServiceProtocolException("Error response payload is not allowed."));
             return false;
         }
 
@@ -78,6 +49,51 @@ internal sealed partial class RpcPeerOutboundInvoker
             return false;
         }
     }
+
+    private bool TryReadResponseEnvelope(int messageId, ReadOnlyMemory<byte> envelope, out RpcResponse response)
+    {
+        try
+        {
+            response = _serializer.Deserialize<RpcResponse>(envelope);
+            return true;
+        }
+        catch
+        {
+            response = default;
+            FailPending(messageId, "Malformed response envelope.");
+            return false;
+        }
+    }
+
+    private bool ValidateResponseFrame(
+        int messageId,
+        MessageType messageType,
+        int payloadLength,
+        RpcResponse response)
+    {
+        if (response.MessageId != messageId)
+        {
+            FailPending(messageId, "Response envelope message id does not match frame header.");
+            return false;
+        }
+
+        if (messageType == MessageType.Error && response.IsSuccess)
+        {
+            FailPending(messageId, "Malformed error response frame.");
+            return false;
+        }
+
+        if (messageType == MessageType.Error && payloadLength != 0)
+        {
+            FailPending(messageId, "Error response payload is not allowed.");
+            return false;
+        }
+
+        return true;
+    }
+
+    private void FailPending(int messageId, string message)
+        => _pending.TryFail(messageId, new ServiceProtocolException(message));
 
     public bool TryCompleteResponse(int messageId, Payload frame) =>
         TryCompleteResponse(messageId, new RpcFrame(frame));

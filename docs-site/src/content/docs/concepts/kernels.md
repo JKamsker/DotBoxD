@@ -9,13 +9,13 @@ or arbitrary host calls.
 ## Why Kernels (the sandbox behind Query filters and Pushdown batches)?
 
 **The problem.** Two of DotBoxD's three modes run *code the plugin author wrote* inside the host
-process: the [Query pipeline](/tutorials/event-pipeline-runlocal/) lowers `Where`/`Select` to
+process: the [Query (RunLocal) pipeline](/tutorials/event-pipeline-runlocal/) lowers `Where`/`Select` to
 server-side logic, and [Pushdown](/concepts/pushdown/) lowers a batch method that loops the host's bindings
 server-side. Running that logic as C#/IL would hand it full CLR access. The alternative — filtering
 client-side or bloating a frozen host with every batch op — either wastes the wire or is impossible.
 The kernel is the shared substrate that makes accepting untrusted author logic safe.
 
-**The payoff.** A kernel is validated restricted IR, capability-gated, and metered: fuel (fuel is an
+**The payoff.** A kernel is validated restricted IR, capability-gated, and metered: fuel (an
 abstract instruction budget — each operation costs fuel, and the kernel is stopped when the budget
 runs out), loop iterations, call depth, list length, output bytes, and per-capability quotas. A buggy or hostile
 kernel cannot exhaust host resources or reach disallowed effects, and it can touch only the

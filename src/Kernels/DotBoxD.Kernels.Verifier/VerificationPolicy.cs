@@ -1,4 +1,3 @@
-using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Verifier.Generated;
 
 namespace DotBoxD.Kernels.Verifier;
@@ -6,6 +5,7 @@ namespace DotBoxD.Kernels.Verifier;
 using System.Collections.Frozen;
 using System.Security.Cryptography;
 using System.Text;
+using static DotBoxD.Kernels.Verifier.VerificationPolicyDefaults;
 using static DotBoxD.Kernels.Verifier.VerifierTypeNames;
 
 public sealed record VerificationPolicy(
@@ -18,21 +18,23 @@ public sealed record VerificationPolicy(
     string VerifierVersion,
     VerificationManifestIdentity? ExpectedManifestIdentity = null)
 {
-    private IReadOnlySet<string> _allowedAssemblies = Freeze(AllowedAssemblies);
-    private IReadOnlySet<string> _allowedAssemblyIdentities = Freeze(AllowedAssemblyIdentities);
-    private IReadOnlySet<string> _allowedTypes = Freeze(AllowedTypes);
-    private IReadOnlySet<string> _allowedMembers = Freeze(AllowedMembers);
-    private IReadOnlySet<string> _forbiddenTypePrefixes = Freeze(ForbiddenTypePrefixes);
-    private IReadOnlySet<string> _runtimeFacadeIdentities = Freeze(RuntimeFacadeIdentities);
+    private IReadOnlySet<string> _allowedAssemblies = Freeze(AllowedAssemblies, nameof(AllowedAssemblies));
+    private IReadOnlySet<string> _allowedAssemblyIdentities = Freeze(AllowedAssemblyIdentities, nameof(AllowedAssemblyIdentities));
+    private IReadOnlySet<string> _allowedTypes = Freeze(AllowedTypes, nameof(AllowedTypes));
+    private IReadOnlySet<string> _allowedMembers = Freeze(AllowedMembers, nameof(AllowedMembers));
+    private IReadOnlySet<string> _forbiddenTypePrefixes = Freeze(ForbiddenTypePrefixes, nameof(ForbiddenTypePrefixes));
+    private IReadOnlySet<string> _runtimeFacadeIdentities = Freeze(RuntimeFacadeIdentities, nameof(RuntimeFacadeIdentities));
+    private string _verifierVersion = RequireVersion(VerifierVersion, nameof(VerifierVersion));
     private string? _allowlistHash;
     private string? _runtimeFacadeHash;
 
-    public IReadOnlySet<string> AllowedAssemblies { get => _allowedAssemblies; init { _allowedAssemblies = Freeze(value); InvalidateHashes(); } }
-    public IReadOnlySet<string> AllowedAssemblyIdentities { get => _allowedAssemblyIdentities; init { _allowedAssemblyIdentities = Freeze(value); InvalidateHashes(); } }
-    public IReadOnlySet<string> AllowedTypes { get => _allowedTypes; init { _allowedTypes = Freeze(value); InvalidateHashes(); } }
-    public IReadOnlySet<string> AllowedMembers { get => _allowedMembers; init { _allowedMembers = Freeze(value); InvalidateHashes(); } }
-    public IReadOnlySet<string> ForbiddenTypePrefixes { get => _forbiddenTypePrefixes; init { _forbiddenTypePrefixes = Freeze(value); InvalidateHashes(); } }
-    public IReadOnlySet<string> RuntimeFacadeIdentities { get => _runtimeFacadeIdentities; init { _runtimeFacadeIdentities = Freeze(value); InvalidateHashes(); } }
+    public IReadOnlySet<string> AllowedAssemblies { get => _allowedAssemblies; init { _allowedAssemblies = Freeze(value, nameof(AllowedAssemblies)); InvalidateHashes(); } }
+    public IReadOnlySet<string> AllowedAssemblyIdentities { get => _allowedAssemblyIdentities; init { _allowedAssemblyIdentities = Freeze(value, nameof(AllowedAssemblyIdentities)); InvalidateHashes(); } }
+    public IReadOnlySet<string> AllowedTypes { get => _allowedTypes; init { _allowedTypes = Freeze(value, nameof(AllowedTypes)); InvalidateHashes(); } }
+    public IReadOnlySet<string> AllowedMembers { get => _allowedMembers; init { _allowedMembers = Freeze(value, nameof(AllowedMembers)); InvalidateHashes(); } }
+    public IReadOnlySet<string> ForbiddenTypePrefixes { get => _forbiddenTypePrefixes; init { _forbiddenTypePrefixes = Freeze(value, nameof(ForbiddenTypePrefixes)); InvalidateHashes(); } }
+    public IReadOnlySet<string> RuntimeFacadeIdentities { get => _runtimeFacadeIdentities; init { _runtimeFacadeIdentities = Freeze(value, nameof(RuntimeFacadeIdentities)); InvalidateHashes(); } }
+    public string VerifierVersion { get => _verifierVersion; init => _verifierVersion = RequireVersion(value, nameof(VerifierVersion)); }
 
     public static VerificationPolicy BoxedValueDefaults()
         => new(
@@ -227,7 +229,10 @@ public sealed record VerificationPolicy(
     public bool IsMemberAllowed(string memberSignature) => AllowedMembers.Contains(memberSignature);
 
     public VerificationPolicy WithExpectedManifest(VerificationManifestIdentity identity)
-        => this with { ExpectedManifestIdentity = identity };
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+        return this with { ExpectedManifestIdentity = identity };
+    }
 
     public string AllowlistHash
         => _allowlistHash ??= Hash(
@@ -270,30 +275,21 @@ public sealed record VerificationPolicy(
         builder.Append(value.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append(':').Append(value);
     }
 
-    private static IReadOnlySet<string> Freeze(IEnumerable<string> values)
+    private static IReadOnlySet<string> Freeze(IEnumerable<string> values, string parameterName)
     {
-        ArgumentNullException.ThrowIfNull(values);
+        ArgumentNullException.ThrowIfNull(values, parameterName);
+        if (values.Any(static value => value is null))
+        {
+            throw new ArgumentException("Values cannot contain null entries.", parameterName);
+        }
+
         return values.ToFrozenSet(StringComparer.Ordinal);
     }
 
-    private static string RuntimeMember(string name, string parameters, string returnType)
-        => $"{CompiledRuntimeName}.{name}({parameters}):{returnType}";
-
-    private static string DotBoxDAssemblyVersion()
-        => typeof(SandboxValue).Assembly.GetName().Version?.ToString() ?? "0.0.0.0";
-
-    private static string AssemblyIdentity(string name, string version, string culture, string publicKeyToken)
-        => $"{name}, Version={version}, Culture={culture}, PublicKeyToken={publicKeyToken}";
-
-    private static IReadOnlySet<string> RuntimeFacadeIdentityDefaults()
-        => new HashSet<string>(StringComparer.Ordinal) {
-            AssemblyModuleIdentity(typeof(SandboxValue).Assembly),
-            AssemblyModuleIdentity(typeof(Runtime.CompiledRuntime).Assembly)
-        };
-
-    private static string AssemblyModuleIdentity(System.Reflection.Assembly assembly)
+    private static string RequireVersion(string? value, string parameterName)
     {
-        var name = assembly.GetName();
-        return $"{name.Name}, Version={name.Version}, Mvid={assembly.ManifestModule.ModuleVersionId:N}";
+        ArgumentException.ThrowIfNullOrWhiteSpace(value, parameterName);
+        return value;
     }
+
 }

@@ -12,11 +12,14 @@ public interface IPluginServer<TWorld>
 
     ValueTask<TReturn> InvokeAsync<TReturn>(
         Func<TWorld, ValueTask<TReturn>> lambda,
+        [IRBodyOf(nameof(lambda))] IRInvocation<Func<TWorld, ValueTask<TReturn>>, TReturn>? irInvocation = null,
         CancellationToken cancellationToken = default);
 
     ValueTask<TReturn> InvokeAsync<TCaptures, TReturn>(
         TCaptures captures,
         RemoteServerInvocation<TWorld, TCaptures, TReturn> lambda,
+        [IRBodyOf(nameof(lambda))]
+        IRInvocation<TCaptures, RemoteServerInvocation<TWorld, TCaptures, TReturn>, TReturn>? irInvocation = null,
         CancellationToken cancellationToken = default)
         where TCaptures : class;
 
@@ -114,15 +117,24 @@ public sealed class GeneratedKernelMethodDescriptorAttribute(
 {
     public int Version { get; } = version;
 
-    public Type ContextType { get; } = contextType;
+    public Type ContextType { get; } = contextType ?? throw new ArgumentNullException(nameof(contextType));
 
-    public string MethodMetadataName { get; } = methodMetadataName;
+    public string MethodMetadataName { get; } = RequireMetadata(methodMetadataName, nameof(methodMetadataName));
 
-    public string NormalizedSignature { get; } = normalizedSignature;
+    public string NormalizedSignature { get; } = RequireMetadata(normalizedSignature, nameof(normalizedSignature));
 
-    public string DescriptorHash { get; } = descriptorHash;
+    public string DescriptorHash { get; } = RequireMetadata(descriptorHash, nameof(descriptorHash));
 
-    public string DescriptorPayload { get; } = descriptorPayload;
+    public string DescriptorPayload { get; } = RequireMetadata(descriptorPayload, nameof(descriptorPayload));
+
+    private static string RequireMetadata(string value, string paramName)
+    {
+        ArgumentNullException.ThrowIfNull(value, paramName);
+
+        return string.IsNullOrWhiteSpace(value)
+            ? throw new ArgumentException("Generated metadata value cannot be empty or whitespace.", paramName)
+            : value;
+    }
 }
 
 /// <summary>
@@ -136,11 +148,13 @@ public sealed class GeneratedPluginServerRegistryAttribute(
     Type contextType)
     : Attribute
 {
-    public GeneratedPluginServerRegistryKind Kind { get; } = kind;
+    public GeneratedPluginServerRegistryKind Kind { get; } = Enum.IsDefined(kind)
+        ? kind
+        : throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported generated registry kind.");
 
-    public Type ServerType { get; } = serverType;
+    public Type ServerType { get; } = serverType ?? throw new ArgumentNullException(nameof(serverType));
 
-    public Type ContextType { get; } = contextType;
+    public Type ContextType { get; } = contextType ?? throw new ArgumentNullException(nameof(contextType));
 }
 
 public enum GeneratedPluginServerRegistryKind
@@ -163,11 +177,19 @@ public enum HostBindingEffect
 /// Declares the capability and host-state effects required by an analyzer-visible host binding contract.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, Inherited = false)]
-public sealed class HostCapabilityAttribute(string capability, HostBindingEffect effects) : Attribute
+public sealed class HostCapabilityAttribute : Attribute
 {
-    public string Capability { get; } = capability;
+    public HostCapabilityAttribute(string capability, HostBindingEffect effects)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(capability);
 
-    public HostBindingEffect Effects { get; } = effects;
+        Capability = capability;
+        Effects = effects;
+    }
+
+    public string Capability { get; }
+
+    public HostBindingEffect Effects { get; }
 }
 
 /// <summary>Wire client used by generated server-extension proxies.</summary>

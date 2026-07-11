@@ -30,9 +30,14 @@ internal static class HookChainAliasResolver
         CancellationToken cancellationToken)
     {
         expression = UnwrapTransparentExpression(expression);
+        var expressionModel = HookChainSemanticModelResolver.For(expression, model);
+        if (expressionModel is null)
+        {
+            return null;
+        }
 
         if (expression is not IdentifierNameSyntax identifier ||
-            model.GetSymbolInfo(identifier, cancellationToken).Symbol is not ILocalSymbol local)
+            expressionModel.GetSymbolInfo(identifier, cancellationToken).Symbol is not ILocalSymbol local)
         {
             return null;
         }
@@ -43,7 +48,7 @@ internal static class HookChainAliasResolver
                 {
                     Initializer.Value: { } initializer
                 } declarator &&
-                !IsMutatedBetweenDeclarationAndUse(local, declarator, identifier, model, cancellationToken))
+                !IsMutatedBetweenDeclarationAndUse(local, declarator, identifier, expressionModel, cancellationToken))
             {
                 return initializer;
             }
@@ -82,7 +87,8 @@ internal static class HookChainAliasResolver
                 continue;
             }
 
-            if (IsMutationOfLocal(node, local, model, cancellationToken))
+            var nodeModel = HookChainSemanticModelResolver.For(node, model);
+            if (nodeModel is not null && IsMutationOfLocal(node, local, nodeModel, cancellationToken))
             {
                 return true;
             }
@@ -148,8 +154,16 @@ internal static class HookChainAliasResolver
         CancellationToken cancellationToken)
     {
         expression = UnwrapTransparentExpression(expression);
+        var expressionModel = HookChainSemanticModelResolver.For(expression, model);
+        if (expressionModel is null)
+        {
+            return false;
+        }
+
         if (expression is IdentifierNameSyntax identifier &&
-            SymbolEqualityComparer.Default.Equals(model.GetSymbolInfo(identifier, cancellationToken).Symbol, local))
+            SymbolEqualityComparer.Default.Equals(
+                expressionModel.GetSymbolInfo(identifier, cancellationToken).Symbol,
+                local))
         {
             return true;
         }
@@ -159,7 +173,7 @@ internal static class HookChainAliasResolver
             foreach (var argument in tuple.Arguments)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (ExpressionNamesLocal(argument.Expression, local, model, cancellationToken))
+                if (ExpressionNamesLocal(argument.Expression, local, expressionModel, cancellationToken))
                 {
                     return true;
                 }
@@ -168,4 +182,5 @@ internal static class HookChainAliasResolver
 
         return false;
     }
+
 }

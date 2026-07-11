@@ -11,6 +11,9 @@ public static class BindingAuditFields
         long? bytesRead = null,
         long? bytesWritten = null)
     {
+        ArgumentNullException.ThrowIfNull(moduleHash);
+        ArgumentNullException.ThrowIfNull(policyHash);
+
         // Reserve capacity for the two base fields, the optional byte fields, and the
         // module/policy hashes so the final dictionary is built once with no intermediate copy.
         var fields = BuildBaseFields(resourceKind, startedAt, deterministic, bytesRead, bytesWritten, extraCapacity: 2);
@@ -37,6 +40,9 @@ public static class BindingAuditFields
         long? bytesRead = null,
         long? bytesWritten = null)
     {
+        ArgumentNullException.ThrowIfNull(moduleHash);
+        ArgumentNullException.ThrowIfNull(policyHash);
+
         var fields = BuildBaseFields(resourceKind, startedAt, deterministic, bytesRead, bytesWritten, extraCapacity + 2);
         fields["moduleHash"] = moduleHash;
         fields["policyHash"] = policyHash;
@@ -51,6 +57,8 @@ public static class BindingAuditFields
         long? bytesWritten,
         int extraCapacity)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(resourceKind);
+
         const int baseFieldCount = 2;
         var optionalByteFields = (bytesRead is null ? 0 : 1) + (bytesWritten is null ? 0 : 1);
         var capacity = baseFieldCount + optionalByteFields + extraCapacity;
@@ -70,6 +78,8 @@ public static class BindingAuditFields
     {
         if (bytes is not null)
         {
+            ArgumentOutOfRangeException.ThrowIfNegative(bytes.Value, key);
+
             fields[key] = bytes.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
     }

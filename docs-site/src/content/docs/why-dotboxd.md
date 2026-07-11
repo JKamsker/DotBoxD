@@ -66,7 +66,8 @@ flowchart TD
 ## The answer: keep the boundary, move the logic
 
 DotBoxD keeps the process boundary — and gives plugin *logic* a safe way back into the host: a
-**validated in-process sandbox**. Author code lowers at compile time to restricted IR that the
+**validated in-process sandbox**. Author code lowers at compile time to restricted IR (intermediate
+representation) that the
 host validates, capability-gates, and fuel-meters before running. It is never loaded C#/IL, so the
 host can accept it from an untrusted plugin — and it runs next to the host's data, without
 per-item round-trips.

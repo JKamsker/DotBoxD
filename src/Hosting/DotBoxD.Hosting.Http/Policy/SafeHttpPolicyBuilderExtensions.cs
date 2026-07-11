@@ -74,7 +74,7 @@ public static class SafeHttpPolicyBuilderExtensions
 
         foreach (var entry in entries)
         {
-            if (entry.Contains(',') || !isValid(entry))
+            if (entry is null || entry.Contains(',') || !isValid(entry))
             {
                 throw new ArgumentException($"Each value must be {description} and must not contain commas.", paramName);
             }

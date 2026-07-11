@@ -7,14 +7,11 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 internal static class RegistrationAccumulatorModelFactory
 {
-    public const string TargetAttribute =
-        "DotBoxD.Abstractions.GeneratePluginRegistrationAccumulatorAttribute";
+    public const string TargetAttribute = "DotBoxD.Abstractions.GeneratePluginRegistrationAccumulatorAttribute";
 
-    public const string RootAttribute =
-        "DotBoxD.Abstractions.GeneratePluginRegistrationRootAccumulatorAttribute";
+    public const string RootAttribute = "DotBoxD.Abstractions.GeneratePluginRegistrationRootAccumulatorAttribute";
 
-    private static readonly SymbolDisplayFormat FullyQualifiedFormat =
-        SymbolDisplayFormat.FullyQualifiedFormat;
+    private static readonly SymbolDisplayFormat FullyQualifiedFormat = SymbolDisplayFormat.FullyQualifiedFormat;
 
     private const string FlushMemberName = "FlushAsync";
 
@@ -47,6 +44,8 @@ internal static class RegistrationAccumulatorModelFactory
                 TypeName(type),
                 accumulatorName,
                 methodName,
+                RegistrationAccumulatorMetadataAttributeSource.TypeAttributes(type),
+                RegistrationAccumulatorMetadataAttributeSource.MethodAttributes(method),
                 typeParameters,
                 Location(declaration));
             return new RegistrationAccumulatorGenerationResult(model, null, null);
@@ -78,6 +77,7 @@ internal static class RegistrationAccumulatorModelFactory
                 Namespace(type),
                 TypeName(type),
                 accumulatorName,
+                RegistrationAccumulatorMetadataAttributeSource.TypeAttributes(type),
                 PublicInstanceProperties(type, context.SemanticModel.Compilation),
                 Location(declaration));
             return new RegistrationAccumulatorGenerationResult(null, model, null);
@@ -274,10 +274,7 @@ internal static class RegistrationAccumulatorModelFactory
             ? Identifier(parameter.Name)
             : type.ToDisplayString(FullyQualifiedFormat);
 
-    private static string Identifier(string name)
-    {
-        return RequiresEscaping(name) ? "@" + name : name;
-    }
+    private static string Identifier(string name) => RequiresEscaping(name) ? "@" + name : name;
 
     private static bool RequiresEscaping(string name)
         => SyntaxFacts.GetKeywordKind(name) != SyntaxKind.None ||

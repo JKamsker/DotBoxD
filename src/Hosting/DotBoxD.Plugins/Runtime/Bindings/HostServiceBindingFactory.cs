@@ -18,7 +18,7 @@ internal static partial class HostServiceBindingFactory
     {
         var payloadType = UnwrapReturnType(interfaceMethod.ReturnType);
         var parameters = interfaceMethod.GetParameters()
-            .Select(parameter => ServerExtensionSandboxTypeOf(parameter.ParameterType))
+            .Select(HostBindingParameterSandboxTypeOf)
             .ToArray();
         var returnType = payloadType is null ? SandboxType.Unit : ServerExtensionSandboxTypeOf(payloadType);
         var (id, requiredCapability, effects, isAsync) =
@@ -44,6 +44,23 @@ internal static partial class HostServiceBindingFactory
         KernelRpcMarshaller.RejectNullableValueTypesForServerExtension(type);
         return KernelRpcMarshaller.SandboxTypeOf(type);
     }
+
+    private static SandboxType HostBindingParameterSandboxTypeOf(ParameterInfo parameter)
+    {
+        if (parameter.ParameterType.IsByRef)
+        {
+            var method = (MethodInfo)parameter.Member;
+            throw new InvalidOperationException(
+                $"HostBinding method '{method.DeclaringType?.FullName}.{method.Name}' declares unsupported " +
+                $"{ByRefParameterKind(parameter)} parameter '{parameter.Name}'; " +
+                "by-reference HostBinding parameters are not supported.");
+        }
+
+        return ServerExtensionSandboxTypeOf(parameter.ParameterType);
+    }
+
+    private static string ByRefParameterKind(ParameterInfo parameter)
+        => parameter.IsOut ? "out" : parameter.IsIn ? "in" : "ref";
 
     private static BindingDescriptor CreateDescriptor(
         string id,
@@ -125,6 +142,7 @@ internal static partial class HostServiceBindingFactory
         DateTimeOffset startedAt,
         object? firstArgument)
     {
+        context.Checkpoint();
         var resourceId = firstArgument is string id ? $"entity:{id}" : bindingId;
         context.Audit.Write(new SandboxAuditEvent(
             context.RunId,

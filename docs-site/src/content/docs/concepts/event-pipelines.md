@@ -5,7 +5,7 @@ description: 'An event pipeline lets a plugin react to a host event without rece
 An **event pipeline** lets a plugin react to a host event *without receiving every event over the wire*. You
 author one fluent chain — `server.Hooks.On<TEvent>().Where(...).Select(...).<terminal>(...)` — and the
 [`DotBoxD.Plugins.Analyzer`](https://github.com/JKamsker/DotBoxD/tree/main/src/CodeGeneration/DotBoxD.Plugins.Analyzer)
-lowers the `Where` filter and `Select` projection to verified server-side [kernel IR](/concepts/kernels/). The host
+lowers the `Where` filter and `Select` projection to verified server-side [kernel IR](/concepts/kernels/) — a restricted intermediate representation. The host
 does the matching and shaping first, so only the values you actually asked for cross the pipe — and only for
 events that pass the filter. It is the event-push counterpart to [Pushdown](/concepts/pushdown/): both move author
 logic next to the host's data instead of round-tripping.
@@ -124,6 +124,8 @@ the `Where`/`Select` lower and the terminal delegate stays native.
 - [Event-pipeline tutorial](/tutorials/event-pipeline-runlocal/) — build a pipeline end to end against
   the maintained sample, with the runnable chains from
   [`LocalReactions.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Authoring/LocalReactions.cs).
+- [Hand-written IR hook pipeline](/tutorials/handwritten-ir-hook-pipeline/) — install and wire the same
+  hook shape yourself with public `PluginPackage`, `PluginSession`, and `PluginServer` primitives.
 - [Kernels](/concepts/kernels/) — the validated, fuel-metered sandbox the `Where`/`Select` IR runs inside, and what
   `Use<TKernel>` installs.
 - [Pushdown](/concepts/pushdown/) — the sibling server-side mode: aggregate N round-trips into one instead of

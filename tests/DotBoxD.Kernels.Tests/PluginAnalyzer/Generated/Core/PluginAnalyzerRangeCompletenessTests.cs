@@ -102,7 +102,7 @@ public sealed class PluginAnalyzerRangeCompletenessTests
             parseOptions: ParseOptions);
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var diagnostics);
 
-        var result = driver.GetRunResult();
+        var result = PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult());
         if (result.GeneratedTrees.Length > 0)
         {
             Assert.Empty(diagnostics.Where(d => d.Severity.Equals(DiagnosticSeverity.Error)));

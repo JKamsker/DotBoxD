@@ -17,7 +17,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "Hook filters and kernel handlers must use approved safe facades instead of host APIs.",
-        helpLinkUri: PluginAnalyzerDiagnostics.ShippedRulesHelpLinkBase + "DBXK001",
+        helpLinkUri: PluginAnalyzerDiagnostics.ShippedRulesHelpLinkBase + "dbxk001",
         customTags: [WellKnownDiagnosticTags.CompilationEnd]);
 
     public static readonly DiagnosticDescriptor LiveSettingTypeRule = new(
@@ -28,7 +28,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "Live settings must use supported scalar types.",
-        helpLinkUri: PluginAnalyzerDiagnostics.ShippedRulesHelpLinkBase + "DBXK020");
+        helpLinkUri: PluginAnalyzerDiagnostics.ShippedRulesHelpLinkBase + "dbxk020");
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
         => ImmutableArray.Create(

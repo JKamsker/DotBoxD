@@ -8,6 +8,44 @@ namespace DotBoxD.Services.SourceGenerator.Generation;
 
 internal static class DispatcherCaseGenerator
 {
+    private static readonly Dictionary<MethodReturnKind, DispatcherReturnGenerator> ReturnGenerators = new()
+    {
+        [MethodReturnKind.Void] = static (sb, _, _, call) =>
+        {
+            sb.AppendLine($"                    {call};");
+            sb.AppendLine("                    return;");
+        },
+        [MethodReturnKind.Sync] = static (sb, _, _, call) =>
+        {
+            sb.AppendLine($"                    var result = {call};");
+            AppendCancellationCheckpoint(sb);
+            sb.AppendLine($"                    serializer.{ServicesGeneratorMemberNames.Serializer.Serialize}(output, result);");
+            sb.AppendLine("                    return;");
+        },
+        [MethodReturnKind.Task] = static (sb, _, _, call) => GenerateTaskReturn(sb, call),
+        [MethodReturnKind.ValueTask] = static (sb, _, _, call) => GenerateValueTaskReturn(sb, call),
+        [MethodReturnKind.ValueTaskOf] = static (sb, _, _, call) => GenerateSerializedAwaitedResult(sb, call),
+        [MethodReturnKind.TaskOf] = static (sb, _, _, call) => GenerateSerializedAwaitedResult(sb, call),
+        [MethodReturnKind.TaskOfSubService] = static (sb, _, method, call) => DispatcherSubServiceReturnGenerator.Generate(sb, method, call),
+        [MethodReturnKind.ValueTaskOfSubService] = static (sb, _, method, call) => DispatcherSubServiceReturnGenerator.Generate(sb, method, call),
+        [MethodReturnKind.SyncSubService] = static (sb, _, method, call) => DispatcherSubServiceReturnGenerator.Generate(sb, method, call),
+        [MethodReturnKind.AsyncEnumerable] = static (sb, _, _, call) => GenerateStreamingReturn(sb, call),
+        [MethodReturnKind.Stream] = static (sb, _, _, call) => GenerateStreamingReturn(sb, call),
+        [MethodReturnKind.Pipe] = static (sb, _, _, call) => GenerateStreamingReturn(sb, call),
+        [MethodReturnKind.TaskOfAsyncEnumerable] = static (sb, _, _, call) => GenerateAwaitedStreamingReturn(sb, call),
+        [MethodReturnKind.ValueTaskOfAsyncEnumerable] = static (sb, _, _, call) => GenerateAwaitedStreamingReturn(sb, call),
+        [MethodReturnKind.TaskOfStream] = static (sb, _, _, call) => GenerateAwaitedStreamingReturn(sb, call),
+        [MethodReturnKind.ValueTaskOfStream] = static (sb, _, _, call) => GenerateAwaitedStreamingReturn(sb, call),
+        [MethodReturnKind.TaskOfPipe] = static (sb, _, _, call) => GenerateAwaitedStreamingReturn(sb, call),
+        [MethodReturnKind.ValueTaskOfPipe] = static (sb, _, _, call) => GenerateAwaitedStreamingReturn(sb, call),
+    };
+
+    private delegate void DispatcherReturnGenerator(
+        StringBuilder sb,
+        ServiceModel service,
+        MethodModel method,
+        string call);
+
     public static void Generate(
         StringBuilder sb,
         ServiceModel service,
@@ -151,71 +189,56 @@ internal static class DispatcherCaseGenerator
             return;
         }
 
-        switch (method.ReturnKind)
+        if (ReturnGenerators.TryGetValue(method.ReturnKind, out var generate))
         {
-            case MethodReturnKind.Void:
-                sb.AppendLine($"                    {call};");
-                sb.AppendLine("                    return;");
-                break;
-
-            case MethodReturnKind.Sync:
-                sb.AppendLine($"                    var result = {call};");
-                sb.AppendLine($"                    serializer.{ServicesGeneratorMemberNames.Serializer.Serialize}(output, result);");
-                sb.AppendLine("                    return;");
-                break;
-
-            case MethodReturnKind.Task:
-                sb.AppendLine($"                    var __dotboxd_task = {call};");
-                sb.AppendLine("                    if (!__dotboxd_task.IsCompletedSuccessfully)");
-                sb.AppendLine("                    {");
-                sb.AppendLine("                        await __dotboxd_task;");
-                sb.AppendLine("                    }");
-                sb.AppendLine("                    return;");
-                break;
-
-            case MethodReturnKind.ValueTask:
-                sb.AppendLine($"                    var __dotboxd_task = {call};");
-                sb.AppendLine("                    if (!__dotboxd_task.IsCompletedSuccessfully)");
-                sb.AppendLine("                    {");
-                sb.AppendLine("                        await __dotboxd_task;");
-                sb.AppendLine("                        return;");
-                sb.AppendLine("                    }");
-                sb.AppendLine("                    __dotboxd_task.GetAwaiter().GetResult();");
-                sb.AppendLine("                    return;");
-                break;
-
-            case MethodReturnKind.ValueTaskOf:
-            case MethodReturnKind.TaskOf:
-                GenerateAwaitedResult(sb, call);
-                sb.AppendLine($"                    serializer.{ServicesGeneratorMemberNames.Serializer.Serialize}(output, __dotboxd_result);");
-                sb.AppendLine("                    return;");
-                break;
-
-            case MethodReturnKind.TaskOfSubService:
-            case MethodReturnKind.ValueTaskOfSubService:
-            case MethodReturnKind.SyncSubService:
-                DispatcherSubServiceReturnGenerator.Generate(sb, method, call);
-                break;
-
-            case MethodReturnKind.AsyncEnumerable:
-            case MethodReturnKind.Stream:
-            case MethodReturnKind.Pipe:
-                sb.AppendLine($"                    var result = {call};");
-                sb.AppendLine($"                    streaming.{ServicesGeneratorMemberNames.RpcStreamingContext.SetResponse}(result);");
-                sb.AppendLine("                    return;");
-                break;
-
-            case MethodReturnKind.TaskOfAsyncEnumerable:
-            case MethodReturnKind.ValueTaskOfAsyncEnumerable:
-            case MethodReturnKind.TaskOfStream:
-            case MethodReturnKind.ValueTaskOfStream:
-            case MethodReturnKind.TaskOfPipe:
-            case MethodReturnKind.ValueTaskOfPipe:
-                GenerateAwaitedResult(sb, call);
-                sb.AppendLine($"                    streaming.{ServicesGeneratorMemberNames.RpcStreamingContext.SetResponse}(__dotboxd_result);");
-                sb.AppendLine("                    return;");
-                break;
+            generate(sb, service, method, call);
         }
+    }
+
+    private static void GenerateTaskReturn(StringBuilder sb, string call)
+    {
+        sb.AppendLine($"                    var __dotboxd_task = {call};");
+        sb.AppendLine("                    if (!__dotboxd_task.IsCompletedSuccessfully)");
+        sb.AppendLine("                    {");
+        sb.AppendLine("                        await __dotboxd_task;");
+        sb.AppendLine("                    }");
+        sb.AppendLine("                    return;");
+    }
+
+    private static void GenerateValueTaskReturn(StringBuilder sb, string call)
+    {
+        sb.AppendLine($"                    var __dotboxd_task = {call};");
+        sb.AppendLine("                    if (!__dotboxd_task.IsCompletedSuccessfully)");
+        sb.AppendLine("                    {");
+        sb.AppendLine("                        await __dotboxd_task;");
+        sb.AppendLine("                        return;");
+        sb.AppendLine("                    }");
+        sb.AppendLine("                    __dotboxd_task.GetAwaiter().GetResult();");
+        sb.AppendLine("                    return;");
+    }
+
+    private static void GenerateSerializedAwaitedResult(StringBuilder sb, string call)
+    {
+        GenerateAwaitedResult(sb, call);
+        AppendCancellationCheckpoint(sb);
+        sb.AppendLine($"                    serializer.{ServicesGeneratorMemberNames.Serializer.Serialize}(output, __dotboxd_result);");
+        sb.AppendLine("                    return;");
+    }
+
+    private static void GenerateStreamingReturn(StringBuilder sb, string call)
+    {
+        sb.AppendLine($"                    var result = {call};");
+        AppendCancellationCheckpoint(sb);
+        sb.AppendLine($"                    streaming.{ServicesGeneratorMemberNames.RpcStreamingContext.SetResponse}(result);");
+        sb.AppendLine("                    return;");
+    }
+
+    private static void GenerateAwaitedStreamingReturn(StringBuilder sb, string call)
+    {
+        GenerateAwaitedResult(sb, call);
+        AppendCancellationCheckpoint(sb);
+        sb.AppendLine($"                    streaming.{ServicesGeneratorMemberNames.RpcStreamingContext.SetResponse}(__dotboxd_result);");
+        sb.AppendLine("                    return;");
     }
 
     private static void GenerateAwaitedResult(StringBuilder sb, string call)
@@ -224,5 +247,10 @@ internal static class DispatcherCaseGenerator
         sb.AppendLine("                    var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully");
         sb.AppendLine("                        ? __dotboxd_task.Result");
         sb.AppendLine("                        : await __dotboxd_task;");
+    }
+
+    private static void AppendCancellationCheckpoint(StringBuilder sb)
+    {
+        sb.AppendLine("                    ct.ThrowIfCancellationRequested();");
     }
 }

@@ -4,6 +4,7 @@ using DotBoxD.Plugins.Runtime.Subscriptions;
 
 namespace DotBoxD.Plugins.Runtime;
 
+[PipelineSurface(PipelineTransport.Local)]
 public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEvent>
 {
     private readonly object _gate = new();
@@ -15,6 +16,7 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
     private readonly KernelRegistry _kernels;
     private readonly Func<PluginPackage, InstalledKernel>? _installer;
     private readonly Action<SubscriptionDeliveryFault>? _onFault;
+    private readonly Action? _throwIfDisposed;
     private readonly KernelHandlerSet<TEvent, TContext> _handlerSet = new();
 
     internal SubscriptionPipeline(
@@ -23,7 +25,8 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
         ServerContextFactory<TContext> contextFactory,
         KernelRegistry kernels,
         Func<PluginPackage, InstalledKernel>? installer = null,
-        Action<SubscriptionDeliveryFault>? onFault = null)
+        Action<SubscriptionDeliveryFault>? onFault = null,
+        Action? throwIfDisposed = null)
     {
         _adapter = adapter;
         _messages = messages;
@@ -32,6 +35,7 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
         _kernels = kernels;
         _installer = installer;
         _onFault = onFault;
+        _throwIfDisposed = throwIfDisposed;
     }
 
     public SubscriptionPipeline<TEvent, TContext> UseGeneratedChain(PluginPackage package)
@@ -78,13 +82,14 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
             throw;
         }
     }
-
-    public SubscriptionPipeline<TEvent, TContext> Where(Func<TEvent, TContext, bool> filter)
+    public SubscriptionPipeline<TEvent, TContext> Where(
+        Func<TEvent, TContext, bool> filter,
+        [IRBodyOf(nameof(filter))] IRFunc<TEvent, TContext, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
+        _ = irFilter?.Step;
         return Where((e, context) => ValueTask.FromResult(filter(e, context)));
     }
-
     public SubscriptionPipeline<TEvent, TContext> Where(Func<TEvent, TContext, ValueTask<bool>> filter)
     {
         ArgumentNullException.ThrowIfNull(filter);
@@ -95,26 +100,25 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
 
         return this;
     }
-
-    public SubscriptionPipeline<TEvent, TContext> Where(Func<TEvent, bool> filter)
+    public SubscriptionPipeline<TEvent, TContext> Where(
+        Func<TEvent, bool> filter,
+        [IRBodyOf(nameof(filter))] IRFunc<TEvent, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
+        _ = irFilter?.Step;
         return Where((e, _) => filter(e));
     }
-
     public SubscriptionPipeline<TEvent, TContext> Where(Func<TEvent, ValueTask<bool>> filter)
     {
         ArgumentNullException.ThrowIfNull(filter);
         return Where((e, _) => filter(e));
     }
-
     public SubscriptionPipeline<TEvent, TContext> InvokeHostHandler(Func<TEvent, TContext, ValueTask> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
         _handlerSet.Add((e, _, context) => handler(e, context));
         return this;
     }
-
     public SubscriptionPipeline<TEvent, TContext> InvokeHostHandler(Action<TEvent, TContext> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
@@ -124,61 +128,88 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
             return ValueTask.CompletedTask;
         });
     }
-
     public SubscriptionPipeline<TEvent, TContext> InvokeHostHandler(Func<TEvent, ValueTask> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
         return InvokeHostHandler((e, _) => handler(e));
     }
-
     public SubscriptionPipeline<TEvent, TContext> InvokeHostHandler(Action<TEvent> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
         return InvokeHostHandler((e, _) => handler(e));
     }
-
     public SubscriptionPipeline<TEvent, TContext> RunLocal(Func<TEvent, TContext, ValueTask> handler)
         => InvokeHostHandler(handler);
-
     public SubscriptionPipeline<TEvent, TContext> RunLocal(Action<TEvent, TContext> handler)
         => InvokeHostHandler(handler);
-
     public SubscriptionPipeline<TEvent, TContext> RunLocal(Func<TEvent, ValueTask> handler)
         => InvokeHostHandler(handler);
-
     public SubscriptionPipeline<TEvent, TContext> RunLocal(Action<TEvent> handler)
         => InvokeHostHandler(handler);
-
-    public SubscriptionStage<TEvent, TNext, TContext> Select<TNext>(Func<TEvent, TContext, TNext> projection)
+    public SubscriptionStage<TEvent, TNext, TContext> Select<TNext>(
+        Func<TEvent, TContext, TNext> projection,
+        [IRBodyOf(nameof(projection))] IRFunc<TEvent, TContext, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
+        _ = irProjection?.Step;
         return new SubscriptionStage<TEvent, TNext, TContext>(
             this,
             (e, ctx) => ValueTask.FromResult((true, projection(e, ctx))));
     }
-
-    public SubscriptionStage<TEvent, TNext, TContext> Select<TNext>(Func<TEvent, TNext> projection)
+    public SubscriptionStage<TEvent, TNext, TContext> Select<TNext>(
+        Func<TEvent, TNext> projection,
+        [IRBodyOf(nameof(projection))] IRFunc<TEvent, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
+        _ = irProjection?.Step;
         return Select((e, _) => projection(e));
     }
+    public SubscriptionPipeline<TEvent, TContext> Run(
+        Func<TEvent, TContext, ValueTask> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedChain(Hooks.HookLowering.RequiredPackage(irHandler, nameof(irHandler)));
+    }
 
-    public SubscriptionPipeline<TEvent, TContext> Run(Func<TEvent, TContext, ValueTask> handler)
-        => throw Hooks.HookLowering.NotLowered();
+    public SubscriptionPipeline<TEvent, TContext> Run(
+        Action<TEvent, TContext> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return Run((e, context) =>
+        {
+            handler(e, context);
+            return ValueTask.CompletedTask;
+        }, irHandler);
+    }
 
-    public SubscriptionPipeline<TEvent, TContext> Run(Action<TEvent, TContext> handler)
-        => throw Hooks.HookLowering.NotLowered();
+    public SubscriptionPipeline<TEvent, TContext> Run(
+        Func<TEvent, ValueTask> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return Run((e, _) => handler(e), irHandler);
+    }
 
-    public SubscriptionPipeline<TEvent, TContext> Run(Func<TEvent, ValueTask> handler)
-        => throw Hooks.HookLowering.NotLowered();
-
-    public SubscriptionPipeline<TEvent, TContext> Run(Action<TEvent> handler)
-        => throw Hooks.HookLowering.NotLowered();
+    public SubscriptionPipeline<TEvent, TContext> Run(
+        Action<TEvent> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return Run((e, _) =>
+        {
+            handler(e);
+            return ValueTask.CompletedTask;
+        }, irHandler);
+    }
 
     public SubscriptionPipeline<TEvent, TContext> Use(InstalledKernel kernel)
     {
         ArgumentNullException.ThrowIfNull(kernel);
+        ThrowIfDisposed();
         kernel.ValidateFor(_adapter);
+        ThrowIfDisposed();
         _handlerSet.Add(kernel, (e, rawContext, _) => kernel.InvokeAsync(_adapter, e, rawContext.CancellationToken));
         return this;
     }
@@ -186,7 +217,9 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
     public SubscriptionPipeline<TEvent, TContext> Use(InstalledKernelPool pool)
     {
         ArgumentNullException.ThrowIfNull(pool);
+        ThrowIfDisposed();
         pool.ValidateFor(_adapter);
+        ThrowIfDisposed();
         _handlerSet.Add(pool, (e, rawContext, _) => pool.InvokeAsync(_adapter, e, rawContext.CancellationToken));
         return this;
     }
@@ -261,4 +294,7 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
 
     void ISubscriptionPipeline<TEvent>.Publish(TEvent e, CancellationToken cancellationToken)
         => Publish(e, cancellationToken);
+
+    private void ThrowIfDisposed()
+        => _throwIfDisposed?.Invoke();
 }

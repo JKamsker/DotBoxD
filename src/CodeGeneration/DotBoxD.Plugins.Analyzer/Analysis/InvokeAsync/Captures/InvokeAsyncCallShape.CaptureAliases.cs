@@ -16,30 +16,53 @@ internal sealed partial class InvokeAsyncCallShape
         while (changed)
         {
             changed = false;
-            foreach (var declarator in CurrentBlockNodes<VariableDeclaratorSyntax>(block))
-            {
-                if (declarator.Initializer?.Value is { } initializer &&
-                    IsCaptureBagExpression(initializer, captureParameterName, aliases, model) &&
-                    model.GetDeclaredSymbol(declarator) is ILocalSymbol local)
-                {
-                    changed |= aliases.Add(local);
-                }
-            }
-
-            foreach (var assignment in CurrentBlockNodes<AssignmentExpressionSyntax>(block))
-            {
-                if (assignment.Kind() == SyntaxKind.SimpleAssignmentExpression &&
-                    assignment.Left is IdentifierNameSyntax left &&
-                    IsCaptureBagExpression(assignment.Right, captureParameterName, aliases, model) &&
-                    model.GetSymbolInfo(left).Symbol is ILocalSymbol local)
-                {
-                    changed |= aliases.Add(local);
-                }
-            }
+            changed |= AddCaptureBagDeclaratorAliases(block, captureParameterName, model, aliases);
+            changed |= AddCaptureBagAssignmentAliases(block, captureParameterName, model, aliases);
         }
 
         ValidateCaptureBagAliasRebindings(block, captureParameterName, aliases, model);
         return aliases;
+    }
+
+    private static bool AddCaptureBagDeclaratorAliases(
+        BlockSyntax block,
+        string captureParameterName,
+        SemanticModel model,
+        HashSet<ISymbol> aliases)
+    {
+        var changed = false;
+        foreach (var declarator in CurrentBlockNodes<VariableDeclaratorSyntax>(block))
+        {
+            if (declarator.Initializer?.Value is { } initializer &&
+                IsCaptureBagExpression(initializer, captureParameterName, aliases, model) &&
+                model.GetDeclaredSymbol(declarator) is ILocalSymbol local)
+            {
+                changed |= aliases.Add(local);
+            }
+        }
+
+        return changed;
+    }
+
+    private static bool AddCaptureBagAssignmentAliases(
+        BlockSyntax block,
+        string captureParameterName,
+        SemanticModel model,
+        HashSet<ISymbol> aliases)
+    {
+        var changed = false;
+        foreach (var assignment in CurrentBlockNodes<AssignmentExpressionSyntax>(block))
+        {
+            if (assignment.Kind() == SyntaxKind.SimpleAssignmentExpression &&
+                assignment.Left is IdentifierNameSyntax left &&
+                IsCaptureBagExpression(assignment.Right, captureParameterName, aliases, model) &&
+                model.GetSymbolInfo(left).Symbol is ILocalSymbol local)
+            {
+                changed |= aliases.Add(local);
+            }
+        }
+
+        return changed;
     }
 
     private static void ValidateCaptureBagAliasRebindings(

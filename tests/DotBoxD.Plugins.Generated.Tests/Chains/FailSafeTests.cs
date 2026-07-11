@@ -38,7 +38,7 @@ public sealed record TwoListEvent(int Distance, List<int> Left, List<int> Right)
 /// <summary>
 /// Fail-safe RUNTIME behaviour: chains the generator deliberately refuses to lower (a constructor-derived DTO field,
 /// an inherited-property DTO, a converting constructor, and a non-scalar equality predicate) are not intercepted, so
-/// the real remote terminal throws <see cref="NotSupportedException"/> at runtime rather than silently corrupting or
+/// the real remote terminal throws <see cref="ArgumentNullException"/> at runtime rather than silently corrupting or
 /// dropping data. (The generated-source absence of these is asserted in DotBoxD.Kernels.Tests; this covers the
 /// runtime side.)
 /// </summary>
@@ -49,12 +49,14 @@ public sealed class FailSafeTests
     {
         using var h = new RunLocalHarness<EncounterEvent>();
 
-        Assert.Throws<NotSupportedException>(() =>
+        Assert.Throws<ArgumentNullException>(() =>
         {
+#pragma warning disable DBXK111 // Exercise the native fallback after explicit suppression.
             h.Hooks.On<EncounterEvent>()
                 .Where(e => e.Distance <= 4)
                 .Select(e => new DerivedInfo(e.Zone))
                 .RunLocal((info, ctx) => { });
+#pragma warning restore DBXK111
         });
     }
 
@@ -63,12 +65,14 @@ public sealed class FailSafeTests
     {
         using var h = new RunLocalHarness<EncounterEvent>();
 
-        Assert.Throws<NotSupportedException>(() =>
+        Assert.Throws<ArgumentNullException>(() =>
         {
+#pragma warning disable DBXK111 // Exercise the native fallback after explicit suppression.
             h.Hooks.On<EncounterEvent>()
                 .Where(e => e.Distance <= 4)
                 .Select(e => new DerivedShape(e.Zone, e.Distance))
                 .RunLocal((shape, ctx) => { });
+#pragma warning restore DBXK111
         });
     }
 
@@ -77,12 +81,14 @@ public sealed class FailSafeTests
     {
         using var h = new RunLocalHarness<EncounterEvent>();
 
-        Assert.Throws<NotSupportedException>(() =>
+        Assert.Throws<ArgumentNullException>(() =>
         {
+#pragma warning disable DBXK111 // Exercise the native fallback after explicit suppression.
             h.Hooks.On<EncounterEvent>()
                 .Where(e => e.Distance <= 4)
                 .Select(e => new ConvertingInfo(e.Distance))
                 .RunLocal((info, ctx) => { });
+#pragma warning restore DBXK111
         });
     }
 
@@ -91,12 +97,14 @@ public sealed class FailSafeTests
     {
         using var h = new RunLocalHarness<TwoListEvent>();
 
-        Assert.Throws<NotSupportedException>(() =>
+        Assert.Throws<ArgumentNullException>(() =>
         {
+#pragma warning disable DBXK111 // Exercise the native fallback after explicit suppression.
             h.Hooks.On<TwoListEvent>()
                 .Where(e => e.Left == e.Right)
                 .Select(e => e.Distance)
                 .RunLocal((distance, ctx) => { });
+#pragma warning restore DBXK111
         });
     }
 }

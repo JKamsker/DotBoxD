@@ -4,8 +4,8 @@ description: >-
   Same C# contract, three delivery strategies — Services (RPC), sandboxed Kernels, and Pushdown.
   How to choose a mode, and a map of the whole documentation.
 ---
-DotBoxD is a source-generated, contract-first .NET extension runtime. One C# contract can be used in
-three ways:
+DotBoxD is a source-generated, contract-first plugin runtime for .NET hosts. One C# contract can be
+used in three ways:
 
 New here? Install via [Getting started](/getting-started/), then work through the three
 [Tutorials](/tutorials/) — the mode links below go straight to the deep-dive concepts.
@@ -34,7 +34,7 @@ Same contract, three delivery strategies. What differs is *where the author's lo
 
 | Mode | What it solves | Direction | Round-trips | Where the author's logic runs |
 |------|----------------|-----------|-------------|-------------------------------|
-| **[Services (RPC)](/concepts/services/)** | Typed request/response interop; no hand-written marshaling, and no runtime reflection on the hot path (it compiles ahead-of-time / AOT, so it runs on Unity's IL2CPP compiler). | client → host, response back | **1 per call** | host runs the hand-written implementation; the client invokes the typed proxy |
+| **[Services (RPC)](/concepts/services/)** | Typed request/response interop with generated proxies and dispatchers; AOT deployments require generated codec formatters and explicit registry rooting. | client → host, response back | **1 per call** | host runs the hand-written implementation; the client invokes the typed proxy |
 | **[Query / event pipeline](/concepts/event-pipelines/)** | Server-side filter + projection, so only the data you need is pushed to the plugin. | server → plugin, **one-way push** | **0** | `Where`/`Select` lower (compile down) to server-side sandboxed IR; only the `RunLocal` delegate is native plugin C# |
 | **[Pushdown](/concepts/pushdown/)** | Collapse N per-entity calls into one server-side batch, next to the host's data. | client → host, **one submission** | **1, replacing N** | the author's batch method lowers to server-side sandboxed IR, looping the host's existing bindings |
 

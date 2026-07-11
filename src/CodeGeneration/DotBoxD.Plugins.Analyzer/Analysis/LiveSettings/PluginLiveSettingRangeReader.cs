@@ -6,7 +6,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class PluginLiveSettingRangeReader
 {
-    public static (string? Min, string? Max) Read(IPropertySymbol property, string type)
+    public static (string? Min, string? Max) Read(IPropertySymbol property, string type, object? defaultValue)
     {
         var range = RangeAttribute(property);
         if (range is null ||
@@ -26,6 +26,12 @@ internal static class PluginLiveSettingRangeReader
         {
             throw new NotSupportedException(
                 $"Live setting '{property.Name}' has a minimum greater than its maximum.");
+        }
+
+        if (DefaultOutsideRange(defaultValue, values.Min, values.Max, type))
+        {
+            throw new NotSupportedException(
+                $"Live setting '{property.Name}' default value must be within its declared range.");
         }
 
         return (LiteralReader.ObjectLiteral(values.Min), LiteralReader.ObjectLiteral(values.Max));
@@ -157,6 +163,22 @@ internal static class PluginLiveSettingRangeReader
         }
 
         return (double)min! > (double)max!;
+    }
+
+    private static bool DefaultOutsideRange(object? defaultValue, object? min, object? max, string type)
+    {
+        var value = RangeValue(defaultValue, type);
+        if (string.Equals(type, DotBoxDGenerationNames.ManifestTypes.Int, StringComparison.Ordinal))
+        {
+            return (int)value < (int)min! || (int)value > (int)max!;
+        }
+
+        if (string.Equals(type, DotBoxDGenerationNames.ManifestTypes.Long, StringComparison.Ordinal))
+        {
+            return (long)value < (long)min! || (long)value > (long)max!;
+        }
+
+        return (double)value < (double)min! || (double)value > (double)max!;
     }
 
     private static bool IsWhole(double value)

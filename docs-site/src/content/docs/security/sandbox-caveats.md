@@ -27,8 +27,8 @@ Async host bindings remain part of the same boundary. They are disabled by defau
 returns a genuinely pending `ValueTask` without that grant is rejected instead of being blocked on.
 
 This is the boundary DotBoxD is built to defend, and it is exercised by a required security-boundary
-test suite on every CI run. It defends against author-supplied *logic expressed as IR* — both buggy and
-many malicious authors.
+test suite on every CI run. It defends against author-supplied *logic expressed as IR* — from both buggy
+and many malicious authors.
 
 ## 2. Trusted-plugin mode — NOT a security boundary
 

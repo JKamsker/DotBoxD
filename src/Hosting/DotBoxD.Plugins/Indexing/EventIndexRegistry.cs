@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using DotBoxD.Kernels.Model;
-using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins.Kernel;
 using DotBoxD.Plugins.Runtime;
 
@@ -134,6 +133,8 @@ public sealed partial class EventIndexRegistry
                 couldMatch = true;
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (!couldMatch)
             {
                 Interlocked.Increment(ref _prefiltered);
@@ -141,7 +142,7 @@ public sealed partial class EventIndexRegistry
             }
 
             Interlocked.Increment(ref _dispatched);
-            Track(Task.Run(() => DispatchAsync(channel.Adapter, entry, value, cancellationToken, _onFault)));
+            Track(Task.Run(() => EventIndexDispatch.DispatchAsync(channel.Adapter, entry, value, cancellationToken, _onFault)));
         }
     }
 
@@ -151,9 +152,13 @@ public sealed partial class EventIndexRegistry
         ArgumentNullException.ThrowIfNull(kernel);
         lock (_gate)
         {
-            foreach (var channel in _channels.Values)
+            foreach (var pair in _channels)
             {
-                channel.Remove(kernel);
+                pair.Value.Remove(kernel);
+                if (pair.Value.IsEmpty)
+                {
+                    _channels.TryRemove(pair.Key, out _);
+                }
             }
         }
     }
@@ -175,82 +180,6 @@ public sealed partial class EventIndexRegistry
             }
 
             await Task.WhenAll(pending).ConfigureAwait(false);
-        }
-    }
-
-    private static async Task DispatchAsync<TEvent>(
-        IPluginEventAdapter<TEvent> adapter,
-        EventIndexEntry<TEvent> entry,
-        TEvent value,
-        CancellationToken cancellationToken,
-        Action<SubscriptionDeliveryFault>? onFault)
-    {
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return;
-        }
-
-        bool shouldHandle;
-        try
-        {
-            // The verified IR predicate remains the authority; manifest coverage claims are not trusted.
-            shouldHandle = entry.FullyCovered ||
-                await entry.Kernel.ShouldHandleAsync(adapter, value, cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            return;
-        }
-        catch (SandboxRuntimeException ex) when (WasCallerCancelled(ex, cancellationToken))
-        {
-            return;
-        }
-        catch (Exception ex)
-        {
-            Report<TEvent>(onFault, ex, SubscriptionDeliveryStage.Filter);
-            return;
-        }
-
-        if (!shouldHandle || cancellationToken.IsCancellationRequested)
-        {
-            return;
-        }
-
-        try
-        {
-            await entry.Kernel.HandleAsync(adapter, value, cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
-        catch (SandboxRuntimeException ex) when (WasCallerCancelled(ex, cancellationToken))
-        {
-        }
-        catch (Exception ex)
-        {
-            Report<TEvent>(onFault, ex, SubscriptionDeliveryStage.Handler);
-        }
-    }
-
-    private static bool WasCallerCancelled(SandboxRuntimeException exception, CancellationToken cancellationToken)
-        => cancellationToken.IsCancellationRequested && exception.Error.Code == SandboxErrorCode.Cancelled;
-
-    private static void Report<TEvent>(
-        Action<SubscriptionDeliveryFault>? onFault,
-        Exception exception,
-        SubscriptionDeliveryStage stage)
-    {
-        if (onFault is null)
-        {
-            return;
-        }
-
-        try
-        {
-            onFault(new SubscriptionDeliveryFault(typeof(TEvent), stage, exception));
-        }
-        catch
-        {
         }
     }
 
@@ -284,4 +213,33 @@ public sealed partial class EventIndexRegistry
 /// while <see cref="EventIndexRegistry.Publish"/> is running concurrently may observe an in-flight
 /// increment between the three reads.
 /// </summary>
-public readonly record struct EventIndexStats(long Considered, long Prefiltered, long Dispatched);
+public readonly record struct EventIndexStats(long Considered, long Prefiltered, long Dispatched)
+{
+    private readonly long _considered = ValidateNonNegative(Considered, nameof(Considered));
+    private readonly long _prefiltered = ValidateNonNegative(Prefiltered, nameof(Prefiltered));
+    private readonly long _dispatched = ValidateNonNegative(Dispatched, nameof(Dispatched));
+
+    public long Considered
+    {
+        get => _considered;
+        init => _considered = ValidateNonNegative(value, nameof(Considered));
+    }
+
+    public long Prefiltered
+    {
+        get => _prefiltered;
+        init => _prefiltered = ValidateNonNegative(value, nameof(Prefiltered));
+    }
+
+    public long Dispatched
+    {
+        get => _dispatched;
+        init => _dispatched = ValidateNonNegative(value, nameof(Dispatched));
+    }
+
+    private static long ValidateNonNegative(long value, string paramName)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(value, paramName);
+        return value;
+    }
+}

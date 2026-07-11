@@ -9,10 +9,56 @@ using DotBoxD.Kernels.Sandbox.Values;
 /// </summary>
 public static class KernelRpcValueConverter
 {
+    private static readonly Dictionary<string, KernelRpcScalarConverter> ScalarConverters = new(StringComparer.Ordinal)
+    {
+        ["Unit"] = static value =>
+        {
+            RequireWireKind(value, KernelRpcValueKind.Unit);
+            return SandboxValue.Unit;
+        },
+        ["Bool"] = static value =>
+        {
+            RequireWireKind(value, KernelRpcValueKind.Bool);
+            return SandboxValue.FromBool(value.BoolValue);
+        },
+        ["I32"] = static value =>
+        {
+            RequireWireKind(value, KernelRpcValueKind.I32);
+            return SandboxValue.FromInt32(value.Int32Value);
+        },
+        ["I64"] = static value =>
+        {
+            RequireWireKind(value, KernelRpcValueKind.I64);
+            return SandboxValue.FromInt64(value.Int64Value);
+        },
+        ["F64"] = static value =>
+        {
+            RequireWireKind(value, KernelRpcValueKind.F64);
+            return SandboxValue.FromDouble(value.DoubleValue);
+        },
+        ["String"] = static value =>
+        {
+            RequireWireKind(value, KernelRpcValueKind.String);
+            return SandboxValue.FromString(value.TextValue);
+        },
+        ["Guid"] = static value =>
+        {
+            RequireWireKind(value, KernelRpcValueKind.Guid);
+            return SandboxValue.FromGuid(value.GuidValue);
+        },
+    };
+
+    private delegate SandboxValue KernelRpcScalarConverter(KernelRpcValue value);
+
     public static KernelRpcValue FromSandboxValue(SandboxValue value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        return FromValidatedSandboxValue(value);
+        if (TryScalarFromSandboxValue(value, out var scalar))
+        {
+            return scalar;
+        }
+
+        return FromSandboxCollectionValue(value);
     }
 
     internal static void RequireDeclaredType(SandboxValue value, SandboxType expectedType)
@@ -29,15 +75,18 @@ public static class KernelRpcValueConverter
 
     private static KernelRpcValue FromValidatedSandboxValue(SandboxValue value)
     {
+        if (TryScalarFromSandboxValue(value, out var scalar))
+        {
+            return scalar;
+        }
+
+        return FromSandboxCollectionValue(value);
+    }
+
+    private static KernelRpcValue FromSandboxCollectionValue(SandboxValue value)
+    {
         return value switch
         {
-            UnitValue => KernelRpcValue.Unit(),
-            BoolValue boolean => KernelRpcValue.Bool(boolean.Value),
-            I32Value number => KernelRpcValue.Int32(number.Value),
-            I64Value number => KernelRpcValue.Int64(number.Value),
-            F64Value number => KernelRpcValue.Double(number.Value),
-            StringValue text => KernelRpcValue.String(text.Value),
-            GuidValue guid => KernelRpcValue.Guid(guid.Value),
             ListValue list => KernelRpcValue.ListFromOwnedItems(ConvertList(list)),
             RecordValue record => KernelRpcValue.RecordFromOwnedFields(ConvertList(record.Fields)),
             MapValue map => KernelRpcValue.MapFromOwnedEntries(ConvertMap(map)),
@@ -46,109 +95,135 @@ public static class KernelRpcValueConverter
         };
     }
 
+    private static bool TryScalarFromSandboxValue(SandboxValue value, out KernelRpcValue converted)
+    {
+        switch (value)
+        {
+            case UnitValue:
+                converted = KernelRpcValue.Unit();
+                return true;
+            case BoolValue boolean:
+                converted = KernelRpcValue.Bool(boolean.Value);
+                return true;
+            case I32Value number:
+                converted = KernelRpcValue.Int32(number.Value);
+                return true;
+            case I64Value number:
+                converted = KernelRpcValue.Int64(number.Value);
+                return true;
+            case F64Value number:
+                converted = KernelRpcValue.Double(number.Value);
+                return true;
+            case StringValue text:
+                converted = KernelRpcValue.String(text.Value);
+                return true;
+            case GuidValue guid:
+                converted = KernelRpcValue.Guid(guid.Value);
+                return true;
+            default:
+                converted = default;
+                return false;
+        }
+    }
+
     public static SandboxValue ToSandboxValue(KernelRpcValue value, SandboxType expectedType)
     {
         ArgumentNullException.ThrowIfNull(expectedType);
-        if (expectedType.Equals(SandboxType.Unit))
+        if (TryScalarToSandboxValue(value, expectedType, out var scalar))
         {
-            value.RequireKind(KernelRpcValueKind.Unit);
-            return SandboxValue.Unit;
-        }
-
-        if (expectedType.Equals(SandboxType.Bool))
-        {
-            value.RequireKind(KernelRpcValueKind.Bool);
-            return SandboxValue.FromBool(value.BoolValue);
-        }
-
-        if (expectedType.Equals(SandboxType.I32))
-        {
-            value.RequireKind(KernelRpcValueKind.I32);
-            return SandboxValue.FromInt32(value.Int32Value);
-        }
-
-        if (expectedType.Equals(SandboxType.I64))
-        {
-            value.RequireKind(KernelRpcValueKind.I64);
-            return SandboxValue.FromInt64(value.Int64Value);
-        }
-
-        if (expectedType.Equals(SandboxType.F64))
-        {
-            value.RequireKind(KernelRpcValueKind.F64);
-            return SandboxValue.FromDouble(value.DoubleValue);
-        }
-
-        if (expectedType.Equals(SandboxType.String))
-        {
-            value.RequireKind(KernelRpcValueKind.String);
-            return SandboxValue.FromString(value.TextValue);
-        }
-
-        if (expectedType.Equals(SandboxType.Guid))
-        {
-            value.RequireKind(KernelRpcValueKind.Guid);
-            return SandboxValue.FromGuid(value.GuidValue);
+            return scalar;
         }
 
         if (expectedType.Name == "List" && expectedType.Arguments.Count == 1)
         {
-            value.RequireKind(KernelRpcValueKind.List);
-            var itemType = expectedType.Arguments[0];
-            var source = value.ItemSpan;
-            var items = source.Length == 0
-                ? Array.Empty<SandboxValue>()
-                : new SandboxValue[source.Length];
-            for (var i = 0; i < source.Length; i++)
-            {
-                items[i] = ToSandboxValue(source[i], itemType);
-            }
-
-            return SandboxValue.FromOwnedList(items, itemType);
+            return ListToSandboxValue(value, expectedType.Arguments[0]);
         }
 
         if (expectedType.Name == "Map" && expectedType.Arguments.Count == 2)
         {
-            value.RequireKind(KernelRpcValueKind.Map);
-            var keyType = expectedType.Arguments[0];
-            var valueType = expectedType.Arguments[1];
-            var source = value.ItemSpan;
-            var entries = new MapValueBuilder(source.Length / 2);
-            for (var i = 0; i + 1 < source.Length; i += 2)
-            {
-                var key = ToSandboxValue(source[i], keyType);
-                var item = ToSandboxValue(source[i + 1], valueType);
-                if (!entries.TryAdd(key, item))
-                {
-                    throw new FormatException("Server extension IPC map payload contains a duplicate key.");
-                }
-            }
-
-            return SandboxValue.FromOwnedMap(entries, keyType, valueType);
+            return MapToSandboxValue(value, expectedType.Arguments[0], expectedType.Arguments[1]);
         }
 
         if (expectedType.IsRecord)
         {
-            value.RequireKind(KernelRpcValueKind.Record);
-            var source = value.ItemSpan;
-            if (source.Length != expectedType.Arguments.Count)
-            {
-                throw new NotSupportedException(
-                    $"Server extension IPC record expected {expectedType.Arguments.Count} field(s) but received {source.Length}.");
-            }
-
-            var fields = source.Length == 0
-                ? Array.Empty<SandboxValue>()
-                : new SandboxValue[source.Length];
-            for (var i = 0; i < source.Length; i++)
-            {
-                fields[i] = ToSandboxValue(source[i], expectedType.Arguments[i]);
-            }
-
-            return SandboxValue.FromOwnedRecord(fields);
+            return RecordToSandboxValue(value, expectedType);
         }
 
         throw new NotSupportedException($"Server extension IPC cannot marshal expected sandbox type '{expectedType}'.");
+    }
+
+    private static void RequireWireKind(KernelRpcValue value, KernelRpcValueKind expected)
+    {
+        if (value.Kind != expected)
+        {
+            throw new FormatException($"Server extension value expected '{expected}' but received '{value.Kind}'.");
+        }
+    }
+
+    private static bool TryScalarToSandboxValue(KernelRpcValue value, SandboxType expectedType, out SandboxValue result)
+    {
+        if (expectedType.Arguments.Count == 0 && ScalarConverters.TryGetValue(expectedType.Name, out var convert))
+        {
+            result = convert(value);
+            return true;
+        }
+
+        result = null!;
+        return false;
+    }
+
+    private static SandboxValue ListToSandboxValue(KernelRpcValue value, SandboxType itemType)
+    {
+        RequireWireKind(value, KernelRpcValueKind.List);
+        var source = value.ItemSpan;
+        var items = source.Length == 0
+            ? Array.Empty<SandboxValue>()
+            : new SandboxValue[source.Length];
+        for (var i = 0; i < source.Length; i++)
+        {
+            items[i] = ToSandboxValue(source[i], itemType);
+        }
+
+        return SandboxValue.FromOwnedList(items, itemType);
+    }
+
+    private static SandboxValue MapToSandboxValue(KernelRpcValue value, SandboxType keyType, SandboxType valueType)
+    {
+        RequireWireKind(value, KernelRpcValueKind.Map);
+        var source = value.ItemSpan;
+        var entries = new MapValueBuilder(source.Length / 2);
+        for (var i = 0; i + 1 < source.Length; i += 2)
+        {
+            var key = ToSandboxValue(source[i], keyType);
+            var item = ToSandboxValue(source[i + 1], valueType);
+            if (!entries.TryAdd(key, item))
+            {
+                throw new FormatException("Server extension IPC map payload contains a duplicate key.");
+            }
+        }
+
+        return SandboxValue.FromOwnedMap(entries, keyType, valueType);
+    }
+
+    private static SandboxValue RecordToSandboxValue(KernelRpcValue value, SandboxType expectedType)
+    {
+        RequireWireKind(value, KernelRpcValueKind.Record);
+        var source = value.ItemSpan;
+        if (source.Length != expectedType.Arguments.Count)
+        {
+            throw new NotSupportedException(
+                $"Server extension IPC record expected {expectedType.Arguments.Count} field(s) but received {source.Length}.");
+        }
+
+        var fields = source.Length == 0
+            ? Array.Empty<SandboxValue>()
+            : new SandboxValue[source.Length];
+        for (var i = 0; i < source.Length; i++)
+        {
+            fields[i] = ToSandboxValue(source[i], expectedType.Arguments[i]);
+        }
+
+        return SandboxValue.FromOwnedRecord(fields);
     }
 
     private static KernelRpcValue[] ConvertList(IReadOnlyList<SandboxValue> values)

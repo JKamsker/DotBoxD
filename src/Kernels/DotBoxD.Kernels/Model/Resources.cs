@@ -1,53 +1,70 @@
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Sandbox.Values;
+
 namespace DotBoxD.Kernels.Model;
 
-public sealed partial class ResourceMeter
+using static ResourceMeterMath;
+
+public sealed class ResourceMeter
 {
     private const int FuelDeadlineCheckInterval = 64;
     private const int LoopDeadlineCheckInterval = 4096;
-    private Dictionary<string, int>? _callsByBinding;
-    private string? _lastLimitedBindingId;
-    private int _lastLimitedBindingCalls;
+
+    private readonly ResourceHostCallTracker _hostCallTracker = new();
+    private long _allocatedBytes;
+    private long _fileBytesRead;
+    private long _fileBytesWritten;
+    private long _networkBytesRead;
+    private long _networkBytesWritten;
     private long _deadline;
     private int _chargesSinceDeadlineCheck;
+
     public ResourceMeter(ResourceLimits limits)
     {
         ResourceLimitValidation.Validate(limits);
         Limits = limits;
-        _deadline = CreateDeadline(limits);
+        _deadline = ResourceMeterDeadline.Create(limits);
     }
+
     public ResourceLimits Limits { get; }
     public long FuelUsed { get; private set; }
     public long LoopIterations { get; private set; }
-    public long AllocatedBytes { get; private set; }
+    public long AllocatedBytes => _allocatedBytes;
     public int HostCalls { get; private set; }
-    public long FileBytesRead { get; private set; }
-    public long FileBytesWritten { get; private set; }
-    public long NetworkBytesRead { get; private set; }
-    public long NetworkBytesWritten { get; private set; }
+    public long FileBytesRead => _fileBytesRead;
+    public long FileBytesWritten => _fileBytesWritten;
+    public long NetworkBytesRead => _networkBytesRead;
+    public long NetworkBytesWritten => _networkBytesWritten;
     public int LogEvents { get; private set; }
     public long CollectionElements { get; private set; }
     public long StringBytes { get; private set; }
+
     public SandboxResourceUsage Snapshot()
-        => new(
-            FuelUsed,
-            Limits.MaxFuel,
-            LoopIterations,
-            AllocatedBytes,
-            HostCalls,
-            FileBytesRead,
-            FileBytesWritten,
-            NetworkBytesRead,
-            NetworkBytesWritten,
-            LogEvents,
-            CollectionElements,
-            StringBytes);
+        => ResourceMeterSnapshot.Create(this);
+
+    internal void ResetForReuse()
+    {
+        _hostCallTracker.Reset();
+        _deadline = ResourceMeterDeadline.Create(Limits);
+        _chargesSinceDeadlineCheck = 0;
+        FuelUsed = 0;
+        LoopIterations = 0;
+        _allocatedBytes = 0;
+        HostCalls = 0;
+        _fileBytesRead = 0;
+        _fileBytesWritten = 0;
+        _networkBytesRead = 0;
+        _networkBytesWritten = 0;
+        LogEvents = 0;
+        CollectionElements = 0;
+        StringBytes = 0;
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ChargeFuel(long amount)
         => ChargeFuel(amount, FuelDeadlineCheckInterval);
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void ChargeFuel(long amount, int deadlineCheckInterval)
     {
@@ -55,44 +72,77 @@ public sealed partial class ResourceMeter
         {
             throw new ArgumentOutOfRangeException(nameof(amount));
         }
+
         FuelUsed = AddNonNegativeChecked(FuelUsed, amount, "fuel exhausted");
         if (FuelUsed > Limits.MaxFuel)
         {
             throw Quota("fuel exhausted");
         }
+
         if (++_chargesSinceDeadlineCheck >= deadlineCheckInterval)
         {
             _chargesSinceDeadlineCheck = 0;
             CheckDeadline();
         }
     }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ChargeLoopIteration(long fuelAmount)
     {
-        if (fuelAmount <= 0)
-        { throw new ArgumentOutOfRangeException(nameof(fuelAmount)); }
-        LoopIterations = AddNonNegativeChecked(LoopIterations, 1, "loop iteration budget exhausted");
+        LoopIterations = ResourceMeterUsageCharges.AddSingleLoopIteration(LoopIterations, fuelAmount);
         if (LoopIterations > Limits.MaxLoopIterations)
         {
             throw Quota("loop iteration budget exhausted");
         }
+
         ChargeFuel(fuelAmount, LoopDeadlineCheckInterval);
     }
-    public void ChargeAllocation(long bytes)
+
+    public void ChargeLoopIterations(long iterations, long fuelPerIteration)
     {
-        ThrowIfNegative(bytes, nameof(bytes));
-        AllocatedBytes = AddChecked(AllocatedBytes, bytes, "allocation budget exhausted");
-        if (AllocatedBytes > Limits.MaxAllocatedBytes)
+        var charge = ResourceMeterUsageCharges.ChargeLoopIterations(LoopIterations, Limits, iterations, fuelPerIteration);
+        if (charge.Fuel == 0)
         {
-            throw Quota("allocation budget exhausted");
+            return;
         }
+
+        LoopIterations = charge.LoopIterations;
+        if (LoopIterations > Limits.MaxLoopIterations)
+        {
+            throw Quota("loop iteration budget exhausted");
+        }
+
+        ChargeFuel(charge.Fuel);
     }
+
+    internal bool CanChargeLoopIterations(long iterations, long fuelPerIteration)
+        => ResourceMeterUsageCharges.CanChargeLoopIterations(
+            LoopIterations,
+            FuelUsed,
+            Limits,
+            iterations,
+            fuelPerIteration);
+
+    internal bool CanChargeFuel(long amount)
+        => amount >= 0 && FuelUsed <= Limits.MaxFuel - amount;
+
+    public void ChargeAllocation(long bytes)
+        => ChargeByteCounter(ref _allocatedBytes, bytes, Limits.MaxAllocatedBytes, "allocation budget exhausted");
+
     public void ChargeCollection(SandboxValue value) => ChargeCollection(value, CancellationToken.None);
+
     public void ChargeCollection(SandboxValue value, CancellationToken cancellationToken)
-        => ChargeMeasuredShape(SandboxValueShapeMeter.Measure(value, Limits, cancellationToken, this));
+    {
+        ArgumentNullException.ThrowIfNull(value);
+
+        ChargeMeasuredShape(SandboxValueShapeMeter.Measure(value, Limits, cancellationToken, this));
+    }
     public void ChargeValue(SandboxValue value) => ChargeValue(value, CancellationToken.None);
+
     public void ChargeValue(SandboxValue value, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(value);
+
         if (value is RecordValue && ValueShapeCache.TryGet(value, out var cachedRecordShape))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -100,8 +150,9 @@ public sealed partial class ResourceMeter
             return;
         }
 
-        if (TryChargeFlatScalarValue(value, cancellationToken))
+        if (ResourceFlatValueShapeMeter.TryMeasure(value, cancellationToken, out var flatShape))
         {
+            ChargeMeasuredShape(flatShape);
             return;
         }
 
@@ -112,69 +163,73 @@ public sealed partial class ResourceMeter
 
     public void ChargeString(string value)
     {
+        ArgumentNullException.ThrowIfNull(value);
+
         var bytes = SandboxLiteralConstraints.StringByteCount(value.Length);
         ChargeStringShape(new ValueShape(0, 0, 0, 0, value.Length, bytes));
     }
 
     public void ChargeStringAllocation(int charLength)
     {
-        if (charLength < 0)
+        var shape = ResourceMeterUsageCharges.GetStringAllocationShape(charLength);
+        ChargeStringShape(shape);
+    }
+
+    internal bool CanChargeStringValues(string value, long count)
+        => ResourceMeterUsageCharges.CanChargeStringValues(value, count, Limits, AllocatedBytes, StringBytes);
+
+    internal void ChargeStringValues(string value, long count)
+    {
+        var usage = ResourceMeterUsageCharges.ChargeStringValues(value, count, Limits, AllocatedBytes, StringBytes);
+        _allocatedBytes = usage.AllocatedBytes;
+        StringBytes = usage.StringBytes;
+    }
+
+    public void ChargeHostCall(string bindingId, int? maxCallsPerRun = null)
+    {
+        HostCalls = ResourceHostCallTracker.AddHostCallCount(HostCalls, 1, bindingId);
+        if (HostCalls > Limits.MaxHostCalls)
         {
-            throw new ArgumentOutOfRangeException(nameof(charLength));
+            throw ResourceHostCallTracker.HostCallQuota(bindingId);
         }
 
-        var bytes = SandboxLiteralConstraints.StringByteCount(charLength);
-        ChargeStringShape(new ValueShape(0, 0, 0, 0, charLength, bytes));
+        if (maxCallsPerRun is not null)
+        {
+            _hostCallTracker.ChargeLimitedBindingCall(bindingId, maxCallsPerRun.Value);
+        }
+    }
+
+    internal bool CanChargeHostCalls(long calls)
+        => ResourceMeterUsageCharges.CanChargeHostCalls(HostCalls, Limits, calls);
+
+    internal void ChargeHostCalls(string bindingId, long calls)
+    {
+        if (!CanChargeHostCalls(calls))
+        {
+            throw ResourceHostCallTracker.HostCallQuota(bindingId);
+        }
+
+        var count = checked((int)calls);
+        HostCalls = ResourceHostCallTracker.AddHostCallCount(HostCalls, count, bindingId);
     }
 
     public void ChargeFileRead(long bytes)
-    {
-        ThrowIfNegative(bytes, nameof(bytes));
-        FileBytesRead = AddChecked(FileBytesRead, bytes, "file read byte budget exhausted");
-        if (FileBytesRead > Limits.MaxFileBytesRead)
-        {
-            throw Quota("file read byte budget exhausted");
-        }
-    }
+        => ChargeByteCounter(ref _fileBytesRead, bytes, Limits.MaxFileBytesRead, "file read byte budget exhausted");
 
     public void ChargeFileWrite(long bytes)
-    {
-        ThrowIfNegative(bytes, nameof(bytes));
-        FileBytesWritten = AddChecked(FileBytesWritten, bytes, "file write byte budget exhausted");
-        if (FileBytesWritten > Limits.MaxFileBytesWritten)
-        {
-            throw Quota("file write byte budget exhausted");
-        }
-    }
+        => ChargeByteCounter(ref _fileBytesWritten, bytes, Limits.MaxFileBytesWritten, "file write byte budget exhausted");
 
     public void ChargeNetworkRead(long bytes)
-    {
-        ThrowIfNegative(bytes, nameof(bytes));
-        NetworkBytesRead = AddChecked(NetworkBytesRead, bytes, "network read byte budget exhausted");
-        if (NetworkBytesRead > Limits.MaxNetworkBytesRead)
-        {
-            throw Quota("network read byte budget exhausted");
-        }
-    }
+        => ChargeByteCounter(ref _networkBytesRead, bytes, Limits.MaxNetworkBytesRead, "network read byte budget exhausted");
 
     public void ChargeNetworkWrite(long bytes)
-    {
-        ThrowIfNegative(bytes, nameof(bytes));
-        NetworkBytesWritten = AddChecked(NetworkBytesWritten, bytes, "network write byte budget exhausted");
-        if (NetworkBytesWritten > Limits.MaxNetworkBytesWritten)
-        {
-            throw Quota("network write byte budget exhausted");
-        }
-    }
+        => ChargeByteCounter(ref _networkBytesWritten, bytes, Limits.MaxNetworkBytesWritten, "network write byte budget exhausted");
 
     public void ChargeLogEvent(string message)
     {
-        if (message.Length > Limits.MaxLogMessageLength)
-        {
-            throw Quota("log message length budget exhausted");
-        }
+        ArgumentNullException.ThrowIfNull(message);
 
-        LogEvents = AddChecked(LogEvents, 1, "log event budget exhausted");
+        LogEvents = ResourceMeterUsageCharges.AddLogEvent(LogEvents, message, Limits);
         if (LogEvents > Limits.MaxLogEvents)
         {
             throw Quota("log event budget exhausted");
@@ -182,81 +237,56 @@ public sealed partial class ResourceMeter
     }
 
     public void CheckDeadline()
-    {
-        if (Stopwatch.GetTimestamp() >= _deadline)
-        {
-            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.Timeout, "wall-time budget exhausted"));
-        }
-    }
+        => ResourceMeterDeadline.ThrowIfElapsed(_deadline);
 
     public TimeSpan RemainingWallTime()
+        => ResourceMeterDeadline.RemainingWallTime(_deadline);
+
+    private void ChargeMeasuredShape(in ShapeInfo info)
     {
-        var stopwatchTicks = _deadline - Stopwatch.GetTimestamp();
-        if (stopwatchTicks <= 0)
+        var scanFuel = info.Nodes / 64;
+        if (scanFuel > 0)
         {
-            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.Timeout, "wall-time budget exhausted"));
+            ChargeFuel(scanFuel);
+            CheckDeadline();
         }
 
-        var timespanTicks = Math.Ceiling(stopwatchTicks / (double)Stopwatch.Frequency * TimeSpan.TicksPerSecond);
-        if (timespanTicks >= TimeSpan.MaxValue.Ticks)
-        {
-            return TimeSpan.MaxValue;
-        }
-
-        return TimeSpan.FromTicks(Math.Max(1L, (long)timespanTicks));
+        ChargeMeasuredShape(info.Shape);
     }
 
-    private static SandboxRuntimeException Quota(string message)
-        => new(new SandboxError(SandboxErrorCode.QuotaExceeded, message));
-
-    private static void ThrowIfNegative(long amount, string paramName)
+    private void ChargeMeasuredShape(ValueShape shape)
     {
-        if (amount < 0)
+        ResourceMeterUsageCharges.ValidateCollectionShape(shape, Limits);
+        CollectionElements = AddChecked(CollectionElements, shape.Elements, "collection element budget exhausted");
+        if (CollectionElements > Limits.MaxTotalCollectionElements)
         {
-            throw new ArgumentOutOfRangeException(paramName);
+            throw Quota("collection element budget exhausted");
+        }
+
+        ChargeStringShape(shape);
+    }
+
+    private void ChargeStringShape(ValueShape shape)
+    {
+        ResourceMeterUsageCharges.ValidateStringShape(shape, Limits);
+        if (shape.StringBytes > 0)
+        {
+            ChargeAllocation(shape.StringBytes);
+        }
+
+        StringBytes = AddChecked(StringBytes, shape.StringBytes, "string byte budget exhausted");
+        if (StringBytes > Limits.MaxTotalStringBytes)
+        {
+            throw Quota("string byte budget exhausted");
         }
     }
 
-    private static long AddChecked(long current, long amount, string quotaMessage)
+    private static void ChargeByteCounter(ref long current, long bytes, long max, string quotaMessage)
     {
-        try
-        {
-            return checked(current + amount);
-        }
-        catch (OverflowException)
+        current = ResourceMeterUsageCharges.AddBytes(current, bytes, quotaMessage);
+        if (current > max)
         {
             throw Quota(quotaMessage);
         }
     }
-
-    private static long AddNonNegativeChecked(long current, long amount, string quotaMessage)
-    {
-        var result = unchecked(current + amount);
-        return result < current ? throw Quota(quotaMessage) : result;
-    }
-
-    private static int AddChecked(int current, int amount, string quotaMessage)
-    {
-        try
-        {
-            return checked(current + amount);
-        }
-        catch (OverflowException)
-        {
-            throw Quota(quotaMessage);
-        }
-    }
-
-    private static long MultiplyChecked(long left, long right, string quotaMessage)
-    {
-        try
-        {
-            return checked(left * right);
-        }
-        catch (OverflowException)
-        {
-            throw Quota(quotaMessage);
-        }
-    }
-
 }

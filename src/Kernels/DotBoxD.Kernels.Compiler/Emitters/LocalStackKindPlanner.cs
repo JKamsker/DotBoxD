@@ -7,6 +7,11 @@ using DotBoxD.Kernels;
 
 internal sealed class LocalStackKindPlanner
 {
+    private static readonly HashSet<string> BoolBinaryOperators = new(StringComparer.Ordinal)
+    {
+        "&&", "||", "==", "!=", "<", "<=", ">", ">="
+    };
+
     private readonly SandboxFunction _function;
     private readonly IBindingCatalog _bindings;
     private readonly IReadOnlyDictionary<string, FunctionAnalysis> _functionAnalysis;
@@ -30,20 +35,40 @@ internal sealed class LocalStackKindPlanner
         => Infer(expression, _localKinds);
 
     private SandboxType? Infer(Expression expression, IReadOnlyDictionary<string, StackKind> localKinds)
-        => expression switch
+    {
+        if (expression is LiteralExpression literal)
         {
-            LiteralExpression literal => literal.Value.Type,
-            VariableExpression variable => localKinds.TryGetValue(variable.Name, out var kind) && TypeOf(kind) is { } type
-                ? type
-                : LocalSeedType(variable.Name),
-            UnaryExpression { Operator: "!" } => SandboxType.Bool,
-            UnaryExpression unary => Infer(unary.Operand, localKinds),
-            BinaryExpression binary => binary.Operator is "&&" or "||" or "==" or "!=" or "<" or "<=" or ">" or ">="
+            return literal.Value.Type;
+        }
+
+        if (expression is VariableExpression variable)
+        {
+            return InferVariableType(variable, localKinds);
+        }
+
+        if (expression is UnaryExpression unary)
+        {
+            return string.Equals(unary.Operator, "!", StringComparison.Ordinal)
                 ? SandboxType.Bool
-                : Infer(binary.Left, localKinds),
-            CallExpression call => InferCallType(call),
-            _ => null
-        };
+                : Infer(unary.Operand, localKinds);
+        }
+
+        if (expression is BinaryExpression binary)
+        {
+            return BoolBinaryOperators.Contains(binary.Operator)
+                ? SandboxType.Bool
+                : Infer(binary.Left, localKinds);
+        }
+
+        return expression is CallExpression call ? InferCallType(call) : null;
+    }
+
+    private SandboxType? InferVariableType(
+        VariableExpression variable,
+        IReadOnlyDictionary<string, StackKind> localKinds)
+        => localKinds.TryGetValue(variable.Name, out var kind) && TypeOf(kind) is { } type
+            ? type
+            : LocalSeedType(variable.Name);
 
     private void InferLocalKinds()
     {

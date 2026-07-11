@@ -122,17 +122,7 @@ internal static class StringLengthForLoopRunner
     private static bool TryGetStringLengthBinding(BindingRegistry bindings, out BindingDescriptor descriptor)
     {
         if (bindings.TryGet("string.length", out var binding) &&
-            binding.Compiled is { Kind: "RuntimeStub" } &&
-            binding.Compiled.Type == typeof(Runtime.CompiledRuntime).FullName &&
-            binding.Compiled.Method == nameof(Runtime.CompiledRuntime.StringLength) &&
-            binding.Parameters.Count == 1 &&
-            binding.Parameters[0].Equals(SandboxType.String) &&
-            binding.ReturnType.Equals(SandboxType.I32) &&
-            binding.RequiredCapability is null &&
-            binding.Safety == BindingSafety.PureIntrinsic &&
-            binding.AuditLevel == AuditLevel.None &&
-            binding.CostModel.MaxCallsPerRun is null &&
-            (binding.Effects & ~(SandboxEffect.Cpu | SandboxEffect.Alloc)) == SandboxEffect.None)
+            IsSupportedStringLengthBinding(binding))
         {
             descriptor = bindings.GetDescriptor("string.length");
             return true;
@@ -141,6 +131,28 @@ internal static class StringLengthForLoopRunner
         descriptor = null!;
         return false;
     }
+
+    private static bool IsSupportedStringLengthBinding(BindingSignature binding)
+        => HasStringLengthCompiledTarget(binding) &&
+           HasStringLengthShape(binding) &&
+           HasStringLengthPolicy(binding);
+
+    private static bool HasStringLengthCompiledTarget(BindingSignature binding)
+        => binding.Compiled is { Kind: "RuntimeStub" } &&
+           binding.Compiled.Type == typeof(Runtime.CompiledRuntime).FullName &&
+           binding.Compiled.Method == nameof(Runtime.CompiledRuntime.StringLength);
+
+    private static bool HasStringLengthShape(BindingSignature binding)
+        => binding.Parameters.Count == 1 &&
+           binding.Parameters[0].Equals(SandboxType.String) &&
+           binding.ReturnType.Equals(SandboxType.I32);
+
+    private static bool HasStringLengthPolicy(BindingSignature binding)
+        => binding.RequiredCapability is null &&
+           binding.Safety == BindingSafety.PureIntrinsic &&
+           binding.AuditLevel == AuditLevel.None &&
+           binding.CostModel.MaxCallsPerRun is null &&
+           (binding.Effects & ~(SandboxEffect.Cpu | SandboxEffect.Alloc)) == SandboxEffect.None;
 
     private readonly record struct LoopPlan(
         int TargetSlot,

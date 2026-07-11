@@ -128,7 +128,7 @@ public sealed class InvokeAsyncInstallCancellationRuntimeTests
                     => await kernels.InvokeAsync(async (IGameWorldAccess world) =>
                     {
                         return 1;
-                    }, ct);
+                    }, cancellationToken: ct);
             }
 
             public sealed class RecordingControlService : IGamePluginControlService

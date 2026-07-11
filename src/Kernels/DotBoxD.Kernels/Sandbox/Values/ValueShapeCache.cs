@@ -63,17 +63,46 @@ internal static class ValueShapeCache
     }
 
     private static ValueShape MeasureScalar(SandboxValue value)
-        => value switch
+    {
+        if (IsZeroShapeScalar(value))
         {
-            UnitValue or BoolValue or I32Value or I64Value or F64Value or GuidValue => new ValueShape(0, 0, 0, 0, 0, 0),
-            StringValue text => SandboxLiteralConstraints.TextShape(text.Value),
-            OpaqueIdValue id => SandboxLiteralConstraints.TextShape(id.Value),
-            SandboxPathValue path => SandboxLiteralConstraints.TextShape(path.Value.RelativePath),
-            SandboxUriValue uri => SandboxLiteralConstraints.TextShape(uri.Value.Value),
-            _ => throw new SandboxRuntimeException(new SandboxError(
-                SandboxErrorCode.InvalidInput,
-                "unknown sandbox value kind is not supported"))
-        };
+            return new ValueShape(0, 0, 0, 0, 0, 0);
+        }
+
+        if (TryTextShape(value, out var shape))
+        {
+            return shape;
+        }
+
+        throw new SandboxRuntimeException(new SandboxError(
+            SandboxErrorCode.InvalidInput,
+            "unknown sandbox value kind is not supported"));
+    }
+
+    private static bool IsZeroShapeScalar(SandboxValue value)
+        => value is UnitValue or BoolValue or I32Value or I64Value or F64Value or GuidValue;
+
+    private static bool TryTextShape(SandboxValue value, out ValueShape shape)
+    {
+        switch (value)
+        {
+            case StringValue text:
+                shape = SandboxLiteralConstraints.TextShape(text.Value);
+                return true;
+            case OpaqueIdValue id:
+                shape = SandboxLiteralConstraints.TextShape(id.Value);
+                return true;
+            case SandboxPathValue path:
+                shape = SandboxLiteralConstraints.TextShape(path.Value.RelativePath);
+                return true;
+            case SandboxUriValue uri:
+                shape = SandboxLiteralConstraints.TextShape(uri.Value.Value);
+                return true;
+            default:
+                shape = default;
+                return false;
+        }
+    }
 
     /// <summary>Records a precomputed shape for a value built by an incremental operation.</summary>
     public static void Set(SandboxValue value, ShapeInfo info)

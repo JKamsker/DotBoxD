@@ -1,5 +1,6 @@
 param(
-    [string] $Configuration = "Release"
+    [string] $Configuration = "Release",
+    [switch] $SkipLinkValidation
 )
 
 $ErrorActionPreference = "Stop"
@@ -20,17 +21,33 @@ function Assert-ExistingPath([string] $Document, [int] $LineNumber, [string] $Pa
     }
 }
 
+function Test-IsRepoPath([string] $Path) {
+    $normalized = $Path.Replace('\', '/')
+    if ($normalized.StartsWith('./')) {
+        $normalized = $normalized.Substring(2)
+    }
+    return $normalized -in @('DotBoxD.slnx', 'DotBoxD.Packages.slnx') -or
+        $normalized.StartsWith('eng/') -or
+        $normalized.StartsWith('samples/') -or
+        $normalized.StartsWith('tests/') -or
+        $normalized.StartsWith('tools/')
+}
+
 function Test-DocumentCommands([string] $Path) {
     $lines = Get-Content -LiteralPath $Path
     for ($i = 0; $i -lt $lines.Count; $i++) {
         $line = $lines[$i].Trim()
         if ($line -match '^dotnet\s+(restore|build|test|pack)\s+(?<target>\S+)') {
-            Assert-ExistingPath $Path ($i + 1) $matches["target"]
+            if (Test-IsRepoPath $matches["target"]) {
+                Assert-ExistingPath $Path ($i + 1) $matches["target"]
+            }
             continue
         }
 
         if ($line -match '^dotnet\s+run\b.*\s--project\s+(?<project>\S+)') {
-            Assert-ExistingPath $Path ($i + 1) $matches["project"]
+            if (Test-IsRepoPath $matches["project"]) {
+                Assert-ExistingPath $Path ($i + 1) $matches["project"]
+            }
             continue
         }
 
@@ -71,6 +88,54 @@ function Write-CapturedOutput([string] $Description, [string] $OutputPath, [stri
 
     if (-not [string]::IsNullOrWhiteSpace($errorOutput)) {
         Write-Warning "$Description stderr:`n$($errorOutput.TrimEnd())"
+    }
+}
+
+function Assert-TextContains([string] $Text, [string] $Expected, [string] $Description) {
+    if (-not $Text.Contains($Expected, [System.StringComparison]::Ordinal)) {
+        throw "GameServer example smoke did not show $Description. Missing text: $Expected"
+    }
+}
+
+function Assert-TextMatches([string] $Text, [string] $Pattern, [string] $Description) {
+    if ($Text -notmatch $Pattern) {
+        throw "GameServer example smoke did not show $Description. Missing pattern: $Pattern"
+    }
+}
+
+function Read-GameServerMetric([string] $Output, [string] $Label) {
+    $pattern = "(?m)^" + [regex]::Escape($Label) + ":\s+(?<value>[0-9]+(?:\.[0-9]+)?)\s*$"
+    if ($Output -notmatch $pattern) {
+        throw "GameServer example smoke did not report '$Label'."
+    }
+
+    return [double]::Parse($matches["value"], [System.Globalization.CultureInfo]::InvariantCulture)
+}
+
+function Assert-GameServerOutput([string] $Output) {
+    Assert-TextContains $Output "=== DotBoxD.Kernels Game Server (golden example) ===" "the GameServer banner"
+    Assert-TextContains $Output "--- BASELINE (no plugins) ---" "the no-plugin baseline phase"
+    Assert-TextContains $Output "--- WITH PLUGINS (guardian calms, retaliation taunts) ---" "the with-plugin phase"
+    Assert-TextContains $Output "[server] plugin connected; event kernels and server extension are installed and live." "plugin readiness"
+
+    Assert-TextContains $Output "[plugin] Monsters.Get(monster-4).KillAsync() => True." "a scoped server-extension call"
+    Assert-TextContains $Output "[plugin] Monsters.KillMonstersAsync(...) => 3 results." "a batch server-extension call"
+    Assert-TextContains $Output "[plugin] Monsters.KillMonstersInRangeAsync(query, ...) => 3 results." "a query server-extension call"
+    Assert-TextContains $Output "[plugin] local hook RunLocal observed 1 attack event." "the plugin-side RunLocal callback"
+    Assert-TextContains $Output "[server] registered indexed subscription: AttackEvent AttackerId == player-1" "the indexed remote chain registration"
+    Assert-TextContains $Output "[server] registered indexed prefilter: AttackEvent Damage >= 5" "the indexed prefilter registration"
+    Assert-TextMatches $Output "(?m)^\s+effect: calm:" "at least one plugin-driven calm effect"
+    Assert-TextContains $Output "Plugins reduced bullying: low-level players survive longer than baseline." "the summary behavior claim"
+    Assert-TextContains $Output "On disconnect the plugin's kernels were unloaded (installed kernels now: 0)." "kernel unload after plugin disconnect"
+
+    $baseline = Read-GameServerMetric $Output "Baseline damage/tick (no plugin)"
+    $withPlugin = Read-GameServerMetric $Output "With-plugin damage/tick"
+    if ($baseline -le 0) {
+        throw "GameServer example smoke expected baseline damage to be greater than zero, but saw $baseline."
+    }
+
+    if ($withPlugin -ge $baseline) {
+        throw "GameServer example smoke expected plugin damage/tick ($withPlugin) to be lower than baseline ($baseline)."
     }
 }
 
@@ -126,16 +191,30 @@ function Invoke-GameServer([string] $ServerProject, [string] $HostDll) {
         if ($process.ExitCode -ne 0) {
             throw "GameServer example smoke test failed with exit code $($process.ExitCode)."
         }
+
+        Assert-GameServerOutput (Read-TextIfExists $outputPath)
     } finally {
         $process.Dispose()
         Remove-Item -LiteralPath $outputPath, $errorPath -Force -ErrorAction SilentlyContinue
     }
 }
 
-Test-DocumentCommands (Join-Path $root "README.md")
-Test-DocumentCommands (Join-Path $root "CONTRIBUTING.md")
-Test-DocumentCommands (Join-Path $root "docs-site/src/content/docs/getting-started.md")
-Test-DocumentCommands (Join-Path $root "docs/Specs/Addendum/Examples.md")
+$publicDocuments = @(
+    Get-Item -LiteralPath (Join-Path $root "README.md"), (Join-Path $root "CONTRIBUTING.md")
+    Get-ChildItem -LiteralPath (Join-Path $root "docs-site/src/content/docs") -Recurse -File -Include "*.md", "*.mdx"
+)
+# The repository's design, legacy, task, and specification trees are engineering
+# records, not published user documentation. Dedicated checks below continue to
+# validate the current claims and examples that those records are expected to keep.
+foreach ($document in $publicDocuments) {
+    Test-DocumentCommands $document.FullName
+}
+
+if (-not $SkipLinkValidation) {
+    & (Join-Path $PSScriptRoot "check-doc-links.ps1")
+}
+
+& (Join-Path $PSScriptRoot "check-diagnostic-docs.ps1")
 
 Assert-DocsDoNotContain "Sandbox\.Parse" "JSON IR import is Sandbox.ImportJson"
 Assert-DocsDoNotContain "tenant://123/config" "file grants use canonical filesystem roots"

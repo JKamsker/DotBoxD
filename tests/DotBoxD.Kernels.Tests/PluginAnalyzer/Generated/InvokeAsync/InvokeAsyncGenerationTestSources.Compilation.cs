@@ -38,7 +38,7 @@ internal static partial class InvokeAsyncGenerationTestSources
             emit.Success,
             string.Join(Environment.NewLine, emit.Diagnostics.Select(diagnostic => diagnostic.ToString())));
 
-        return driver.GetRunResult();
+        return PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult());
     }
 
     internal static IReadOnlyList<Diagnostic> RunGeneratorAndGetErrorDiagnostics(string source)
@@ -62,6 +62,7 @@ internal static partial class InvokeAsyncGenerationTestSources
             compilation,
             out var outputCompilation,
             out var generatorDiagnostics);
+        PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(generatorDiagnostics);
 
         return generatorDiagnostics
             .Concat(outputCompilation.GetDiagnostics())

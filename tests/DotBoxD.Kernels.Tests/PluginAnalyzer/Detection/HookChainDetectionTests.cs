@@ -80,7 +80,7 @@ public sealed class HookChainDetectionTests
             [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: ParseOptions);
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out _);
-        var result = driver.GetRunResult();
+        var result = PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult());
         var diagnostics = result.Diagnostics.AddRange(await AnalyzeCompilationAsync(output));
         return (diagnostics, result.GeneratedTrees);
     }

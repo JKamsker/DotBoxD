@@ -37,42 +37,110 @@ internal static class DotBoxDConstantExpressionLowerer
             throw new NotSupportedException($"Unsupported plugin constant expression '{expression}'.");
         }
 
-        // An enum constant (e.g. GamePhase.Battle) lowers to its underlying integer literal — the same I32/I64
-        // representation an enum event property or enum DTO field carries (by underlying width). Convert handles
-        // narrow (byte/short/…) and wide (uint/long/ulong) backing types. Only applied when the caller imposes no
-        // explicit target type. This is what lets `e.Phase == GamePhase.Battle` filters and
-        // `Select(e => new Dto(e.Id, GamePhase.Battle))` projections lower.
-        if (targetType is null && type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
+        if (TryLowerEnumConstant(targetType, constant.Value, type, out var enumConstant))
         {
-            return DotBoxDRpcTypeMapper.EnumUsesI64(enumType)
-                ? Int64(EnumConstantToInt64(constant.Value, enumType))
-                : Int32(Convert.ToInt32(constant.Value, System.Globalization.CultureInfo.InvariantCulture));
+            return enumConstant;
         }
 
-        if (DotBoxDRpcTypeMapper.IsDecimalWireType(type) &&
-            constant.Value is decimal decimalValue &&
-            (targetType is null || string.Equals(targetType, DotBoxDGenerationNames.ManifestTypes.Record, StringComparison.Ordinal)))
+        if (TryLowerDecimalConstant(targetType, constant.Value, type, out var decimalConstant))
         {
-            return DecimalRecord(decimalValue, type);
+            return decimalConstant;
         }
 
         return Lower(expression, constant.Value, targetType ?? DotBoxDTypeNameReader.SandboxTypeName(type));
     }
 
+    private static bool TryLowerEnumConstant(
+        string? targetType,
+        object? value,
+        ITypeSymbol type,
+        out DotBoxDExpressionModel model)
+    {
+        model = null!;
+        if (targetType is not null)
+        {
+            return false;
+        }
+
+        if (type.TypeKind != TypeKind.Enum || type is not INamedTypeSymbol enumType)
+        {
+            return false;
+        }
+
+        // An enum constant lowers to the same I32/I64 representation an enum property or DTO field carries.
+        model = DotBoxDRpcTypeMapper.EnumUsesI64(enumType)
+            ? Int64(EnumConstantToInt64(value, enumType))
+            : Int32(Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture));
+        return true;
+    }
+
+    private static bool TryLowerDecimalConstant(
+        string? targetType,
+        object? value,
+        ITypeSymbol type,
+        out DotBoxDExpressionModel model)
+    {
+        model = null!;
+        if (!DotBoxDRpcTypeMapper.IsDecimalWireType(type))
+        {
+            return false;
+        }
+
+        if (value is not decimal decimalValue)
+        {
+            return false;
+        }
+
+        if (targetType is not null &&
+            !string.Equals(targetType, DotBoxDGenerationNames.ManifestTypes.Record, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        model = DecimalRecord(decimalValue, type);
+        return true;
+    }
+
     private static DotBoxDExpressionModel Lower(ExpressionSyntax expression, object? value, string type)
         => type switch
         {
-            DotBoxDGenerationNames.ManifestTypes.Bool when value is bool boolean => Bool(boolean),
-            DotBoxDGenerationNames.ManifestTypes.Int when value is int number => Int32(number),
-            DotBoxDGenerationNames.ManifestTypes.Long when value is int number => Int64(number),
-            DotBoxDGenerationNames.ManifestTypes.Long when value is long number => Int64(number),
-            DotBoxDGenerationNames.ManifestTypes.Double when value is int number => Float64(number),
-            DotBoxDGenerationNames.ManifestTypes.Double when value is long number => Float64(number),
-            DotBoxDGenerationNames.ManifestTypes.Double when value is float number && IsFinite(number) => Float64(number),
-            DotBoxDGenerationNames.ManifestTypes.Double when value is double number && IsFinite(number) => Float64(number),
-            DotBoxDGenerationNames.ManifestTypes.String when value is string text => String(text),
-            _ => throw new NotSupportedException($"Unsupported plugin constant expression '{expression}'.")
+            DotBoxDGenerationNames.ManifestTypes.Bool => LowerBool(expression, value),
+            DotBoxDGenerationNames.ManifestTypes.Int => LowerInt32(expression, value),
+            DotBoxDGenerationNames.ManifestTypes.Long => LowerInt64(expression, value),
+            DotBoxDGenerationNames.ManifestTypes.Double => LowerFloat64(expression, value),
+            DotBoxDGenerationNames.ManifestTypes.String => LowerString(expression, value),
+            _ => UnsupportedConstant(expression),
         };
+
+    private static DotBoxDExpressionModel LowerBool(ExpressionSyntax expression, object? value)
+        => value is bool boolean ? Bool(boolean) : UnsupportedConstant(expression);
+
+    private static DotBoxDExpressionModel LowerInt32(ExpressionSyntax expression, object? value)
+        => value is int number ? Int32(number) : UnsupportedConstant(expression);
+
+    private static DotBoxDExpressionModel LowerInt64(ExpressionSyntax expression, object? value)
+        => value switch
+        {
+            int number => Int64(number),
+            long number => Int64(number),
+            _ => UnsupportedConstant(expression),
+        };
+
+    private static DotBoxDExpressionModel LowerFloat64(ExpressionSyntax expression, object? value)
+        => value switch
+        {
+            int number => Float64(number),
+            long number => Float64(number),
+            float number when IsFinite(number) => Float64(number),
+            double number when IsFinite(number) => Float64(number),
+            _ => UnsupportedConstant(expression),
+        };
+
+    private static DotBoxDExpressionModel LowerString(ExpressionSyntax expression, object? value)
+        => value is string text ? String(text) : UnsupportedConstant(expression);
+
+    private static DotBoxDExpressionModel UnsupportedConstant(ExpressionSyntax expression)
+        => throw new NotSupportedException($"Unsupported plugin constant expression '{expression}'.");
 
     private static DotBoxDExpressionModel? TryLowerDefaultValue(
         ExpressionSyntax expression,
@@ -103,20 +171,46 @@ internal static class DotBoxDConstantExpressionLowerer
     }
 
     private static DotBoxDExpressionModel? LowerDefault(ITypeSymbol type, string manifestTag)
-        => manifestTag switch
+    {
+        if (string.Equals(manifestTag, DotBoxDGenerationNames.ManifestTypes.Guid, StringComparison.Ordinal))
         {
-            DotBoxDGenerationNames.ManifestTypes.Guid when DotBoxDRpcTypeMapper.IsGuid(type) => GuidDefault(),
-            DotBoxDGenerationNames.ManifestTypes.Record when DotBoxDRpcTypeMapper.IsDateTimeWireType(type) =>
-                DateTimeRecordDefault(type),
-            DotBoxDGenerationNames.ManifestTypes.Record when DotBoxDRpcTypeMapper.IsDecimalWireType(type) =>
-                DecimalRecord(default, type),
-            DotBoxDGenerationNames.ManifestTypes.Int when DotBoxDRpcTypeMapper.IsDateOnlyWireType(type) =>
-                Int32(0),
-            DotBoxDGenerationNames.ManifestTypes.Long when
-                DotBoxDRpcTypeMapper.IsTimeOnlyWireType(type) ||
-                DotBoxDRpcTypeMapper.IsTimeSpanWireType(type) => Int64(0),
-            _ => null
-        };
+            return DotBoxDRpcTypeMapper.IsGuid(type) ? GuidDefault() : null;
+        }
+
+        if (string.Equals(manifestTag, DotBoxDGenerationNames.ManifestTypes.Record, StringComparison.Ordinal))
+        {
+            return LowerRecordDefault(type);
+        }
+
+        if (string.Equals(manifestTag, DotBoxDGenerationNames.ManifestTypes.Int, StringComparison.Ordinal))
+        {
+            return DotBoxDRpcTypeMapper.IsDateOnlyWireType(type) ? Int32(0) : null;
+        }
+
+        return LowerLongDefault(type, manifestTag);
+    }
+
+    private static DotBoxDExpressionModel? LowerRecordDefault(ITypeSymbol type)
+    {
+        if (DotBoxDRpcTypeMapper.IsDateTimeWireType(type))
+        {
+            return DateTimeRecordDefault(type);
+        }
+
+        return DotBoxDRpcTypeMapper.IsDecimalWireType(type) ? DecimalRecord(default, type) : null;
+    }
+
+    private static DotBoxDExpressionModel? LowerLongDefault(ITypeSymbol type, string manifestTag)
+    {
+        if (!string.Equals(manifestTag, DotBoxDGenerationNames.ManifestTypes.Long, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        return DotBoxDRpcTypeMapper.IsTimeOnlyWireType(type) || DotBoxDRpcTypeMapper.IsTimeSpanWireType(type)
+            ? Int64(0)
+            : null;
+    }
 
     private static DotBoxDExpressionModel DateTimeRecordDefault(ITypeSymbol type)
         => new(

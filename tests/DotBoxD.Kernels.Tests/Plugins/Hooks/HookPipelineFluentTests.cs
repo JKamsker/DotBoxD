@@ -264,10 +264,10 @@ public sealed class HookPipelineFluentTests
     {
         using var server = DotBoxD.Plugins.PluginServer.Create();
 
-        var ex = Assert.Throws<SandboxValidationException>(
+        var ex = Assert.Throws<ArgumentNullException>(
             () => server.Hooks.On<Ping>().Run((p, ctx) => ValueTask.CompletedTask));
 
-        Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK062");
+        Assert.Equal("irHandler", ex.ParamName);
     }
 
     [Fact]
@@ -275,12 +275,12 @@ public sealed class HookPipelineFluentTests
     {
         using var server = DotBoxD.Plugins.PluginServer.Create();
 
-        var ex = Assert.Throws<SandboxValidationException>(
+        var ex = Assert.Throws<ArgumentNullException>(
             () => server.Hooks.On<Ping>()
                 .Select((p, ctx) => p.Value)
                 .Run((value, ctx) => ValueTask.CompletedTask));
 
-        Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK062");
+        Assert.Equal("irHandler", ex.ParamName);
     }
 
     [Fact]
@@ -290,10 +290,10 @@ public sealed class HookPipelineFluentTests
 
         // The element-only Func<TEvent, ValueTask> terminal must throw just like the (e, ctx) form: it
         // can never run as host code (a verified terminal is reached only through the lowered IR).
-        var ex = Assert.Throws<SandboxValidationException>(
+        var ex = Assert.Throws<ArgumentNullException>(
             () => server.Hooks.On<Ping>().Run(p => ValueTask.CompletedTask));
 
-        Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK062");
+        Assert.Equal("irHandler", ex.ParamName);
     }
 
     [Fact]
@@ -301,10 +301,10 @@ public sealed class HookPipelineFluentTests
     {
         using var server = DotBoxD.Plugins.PluginServer.Create();
 
-        var ex = Assert.Throws<SandboxValidationException>(
+        var ex = Assert.Throws<ArgumentNullException>(
             () => server.Hooks.On<Ping>().Run(p => { }));
 
-        Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK062");
+        Assert.Equal("irHandler", ex.ParamName);
     }
 
     [Fact]
@@ -312,11 +312,11 @@ public sealed class HookPipelineFluentTests
     {
         using var server = DotBoxD.Plugins.PluginServer.Create();
 
-        var ex = Assert.Throws<SandboxValidationException>(
+        var ex = Assert.Throws<ArgumentNullException>(
             () => server.Hooks.On<Ping>()
                 .Select(p => p.Value)
                 .Run(value => ValueTask.CompletedTask));
 
-        Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK062");
+        Assert.Equal("irHandler", ex.ParamName);
     }
 }

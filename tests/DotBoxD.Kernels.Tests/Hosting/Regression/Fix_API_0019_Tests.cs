@@ -68,6 +68,64 @@ public sealed class Fix_API_0019_Tests
         }
     }
 
+    [Theory]
+    [InlineData(null, "Meaning", "LikelyCause", "Remediation", "Code")]
+    [InlineData("DBXK999", null, "LikelyCause", "Remediation", "Meaning")]
+    [InlineData("DBXK999", "Meaning", null, "Remediation", "LikelyCause")]
+    [InlineData("DBXK999", "Meaning", "LikelyCause", null, "Remediation")]
+    public void Public_reference_rejects_null_required_text(
+        string? code,
+        string? meaning,
+        string? likelyCause,
+        string? remediation,
+        string expectedParamName)
+    {
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+            _ = new PluginDiagnosticReference(
+                code!,
+                PluginDiagnosticPhase.PackageValidation,
+                PluginDiagnosticAudience.PluginAuthor,
+                meaning!,
+                likelyCause!,
+                remediation!));
+
+        Assert.Equal(expectedParamName, exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData((PluginDiagnosticPhase)(-1))]
+    [InlineData((PluginDiagnosticPhase)999)]
+    public void Public_reference_rejects_undefined_phase(PluginDiagnosticPhase phase)
+    {
+        var exception = Assert.Throws<ArgumentException>(() =>
+            _ = new PluginDiagnosticReference(
+                "DBXK999",
+                phase,
+                PluginDiagnosticAudience.PluginAuthor,
+                "Meaning",
+                "LikelyCause",
+                "Remediation"));
+
+        Assert.Equal("Phase", exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData((PluginDiagnosticAudience)(-1))]
+    [InlineData((PluginDiagnosticAudience)999)]
+    public void Public_reference_rejects_undefined_audience(PluginDiagnosticAudience audience)
+    {
+        var exception = Assert.Throws<ArgumentException>(() =>
+            _ = new PluginDiagnosticReference(
+                "DBXK999",
+                PluginDiagnosticPhase.PackageValidation,
+                audience,
+                "Meaning",
+                "LikelyCause",
+                "Remediation"));
+
+        Assert.Equal("Audience", exception.ParamName);
+    }
+
     [Fact]
     public void TryGetReference_round_trips_known_codes()
     {

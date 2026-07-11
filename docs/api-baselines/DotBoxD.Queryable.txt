@@ -76,8 +76,8 @@ public override void Write(Utf8JsonWriter writer, EventQueryDocument value, Json
 public override void Write(Utf8JsonWriter writer, QueryFilter value, JsonSerializerOptions options)
 public override void Write(Utf8JsonWriter writer, QueryProjection value, JsonSerializerOptions options)
 public override void Write(Utf8JsonWriter writer, QueryValue value, JsonSerializerOptions options)
-public QueryComparisonOperator Operator
-public QueryFilter? ResidualFilter { get; init; }
+public QueryComparisonOperator Operator { get; init; }
+public required QueryFilter? ResidualFilter { get; init; }
 public QueryTranslationException(string message, Exception innerException)
 public QueryTranslationException(string message)
 public QueryValue? Constant { get; init; }
@@ -105,15 +105,15 @@ public sealed class QueryFilterJsonConverter : JsonConverter<QueryFilter>
 public sealed class QueryProjectionJsonConverter : JsonConverter<QueryProjection>
 public sealed class QueryTranslationException : Exception
 public sealed class QueryValueJsonConverter : JsonConverter<QueryValue>
+public sealed partial record QueryValue
 public sealed record EventQueryDocument
 public sealed record EventQueryPlan
 public sealed record IndexedPredicate
 public sealed record QueryFilter
 public sealed record QueryProjection
 public sealed record QueryProjectionField
-public sealed record QueryValue
 public static bool AreEqual(object? actual, QueryValue expected, bool ignoreCase)
-public static bool Compare(object? actual, QueryComparisonOperator op, QueryValue expected, bool ignoreCase) => op switch
+public static bool Compare(object? actual, QueryComparisonOperator op, QueryValue expected, bool ignoreCase)
 public static bool Evaluate(QueryFilter filter, object target, MemberValueReader reader)
 public static bool IsAnyEqual(object? actual, IReadOnlyList<QueryValue> candidates, bool ignoreCase)
 public static bool IsSatisfiable(QueryFilter filter)
@@ -130,7 +130,6 @@ public static class QueryFilterEvaluator
 public static class QueryFingerprint
 public static class QuerySatisfiability
 public static class QueryText
-public static class QueryValueComparer
 public static class SubscriptionRegistryQueryExtensions
 public static EventQuery<TEvent> Query<TEvent>(this SubscriptionRegistry subscriptions)
 public static EventQueryDocument Canonicalize(EventQueryDocument document)
@@ -144,6 +143,7 @@ public static IReadOnlyList<HostIndexedPredicate> ToIndexedPredicates(EventQuery
 public static IReadOnlyList<HostIndexedPredicate> ToIndexedPredicates(IReadOnlyList<IndexedPredicate> predicates)
 public static IReadOnlyList<string> Describe(EventQuerySubscriptionHandle handle)
 public static JsonSerializerOptions Options { get; } = CreateOptions(indented: false)
+public static partial class QueryValueComparer
 public static QueryFilter And(IReadOnlyList<QueryFilter> children) => Connective(QueryFilterKind.And, children)
 public static QueryFilter Canonicalize(QueryFilter filter)
 public static QueryFilter Compare( string field, QueryComparisonOperator op, QueryValue value, bool ignoreCase = false)
@@ -179,7 +179,7 @@ public static void EnsureSatisfiable(QueryFilter filter)
 public static void EnsureWithinLimits(QueryFilter filter)
 public string Field { get; init; } = string.Empty
 public string Fingerprint { get; }
-public string ToCanonicalText() => Kind switch
+public string ToCanonicalText()
 public string? ParameterKey { get; init; }
 public string? Path { get; init; }
 public string? String { get; }

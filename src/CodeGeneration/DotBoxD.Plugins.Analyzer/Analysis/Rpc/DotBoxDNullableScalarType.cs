@@ -23,17 +23,55 @@ internal static class DotBoxDNullableScalarType
            named.ConstructedFrom.SpecialType == SpecialType.System_Nullable_T;
 
     public static bool IsSupportedUnderlying(ITypeSymbol type)
-        => type.SpecialType is SpecialType.System_Boolean
-               or SpecialType.System_Int32
-               or SpecialType.System_Int64
-               or SpecialType.System_Double
-               or SpecialType.System_Single
-               or SpecialType.System_Decimal
-           || type.TypeKind == TypeKind.Enum
-           || DotBoxDRpcTypeMapper.IsGuid(type)
-           || DotBoxDRpcTypeMapper.IsDateTimeWireType(type)
-           || DotBoxDRpcTypeMapper.IsDateOnlyWireType(type)
-           || DotBoxDRpcTypeMapper.IsTimeOnlyWireType(type)
-           || DotBoxDRpcTypeMapper.IsTimeSpanWireType(type)
-           || DotBoxDRpcTypeMapper.IsCancellationTokenWireType(type);
+    {
+        if (IsSupportedSpecialType(type.SpecialType))
+        {
+            return true;
+        }
+
+        if (type.TypeKind == TypeKind.Enum)
+        {
+            return true;
+        }
+
+        return IsSupportedWireStruct(type);
+    }
+
+    private static bool IsSupportedSpecialType(SpecialType specialType)
+        => specialType is SpecialType.System_Boolean
+            or SpecialType.System_Int32
+            or SpecialType.System_Int64
+            or SpecialType.System_Double
+            or SpecialType.System_Single
+            or SpecialType.System_Decimal;
+
+    private static bool IsSupportedWireStruct(ITypeSymbol type)
+    {
+        if (DotBoxDRpcTypeMapper.IsGuid(type))
+        {
+            return true;
+        }
+
+        if (DotBoxDRpcTypeMapper.IsDateTimeWireType(type))
+        {
+            return true;
+        }
+
+        if (DotBoxDRpcTypeMapper.IsDateOnlyWireType(type))
+        {
+            return true;
+        }
+
+        if (DotBoxDRpcTypeMapper.IsTimeOnlyWireType(type))
+        {
+            return true;
+        }
+
+        if (DotBoxDRpcTypeMapper.IsTimeSpanWireType(type))
+        {
+            return true;
+        }
+
+        return DotBoxDRpcTypeMapper.IsCancellationTokenWireType(type);
+    }
 }

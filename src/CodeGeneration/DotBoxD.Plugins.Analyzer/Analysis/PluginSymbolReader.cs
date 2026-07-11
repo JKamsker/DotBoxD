@@ -120,10 +120,30 @@ internal static class PluginSymbolReader
                     $"Capability on event property '{property.Name}' must not be empty or whitespace.");
             }
 
+            if (ContainsControlCharacter(id))
+            {
+                throw new NotSupportedException(
+                    $"Capability on event property '{property.Name}' has invalid capability id; " +
+                    "capability id must not contain control characters.");
+            }
+
             return id;
         }
 
         return null;
+    }
+
+    private static bool ContainsControlCharacter(string value)
+    {
+        for (var i = 0; i < value.Length; i++)
+        {
+            if (char.IsControl(value[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static EquatableArray<LiveSettingModel> LiveSettings(
@@ -220,12 +240,17 @@ internal static class PluginSymbolReader
     {
         var syntax = DeclaringPropertySyntax(property, cancellationToken);
         var type = DotBoxDTypeNameReader.LiveSettingTypeName(property.Type);
-        var range = PluginLiveSettingRangeReader.Read(property, type);
+        var defaultValue = LiteralReader.DefaultObjectValue(
+            property.Type,
+            syntax?.Initializer?.Value,
+            semanticModel,
+            cancellationToken);
+        var range = PluginLiveSettingRangeReader.Read(property, type, defaultValue);
         return new LiveSettingModel(
             property.Name,
             type,
             LiveSettingSymbolKey(property),
-            LiteralReader.DefaultValue(property.Type, syntax?.Initializer?.Value, semanticModel, cancellationToken),
+            LiteralReader.ObjectLiteral(defaultValue),
             range.Min,
             range.Max);
     }

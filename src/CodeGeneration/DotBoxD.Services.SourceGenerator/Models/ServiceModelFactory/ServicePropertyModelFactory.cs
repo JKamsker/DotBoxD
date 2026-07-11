@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text;
 using System.Threading;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
 using DotBoxD.Services.SourceGenerator.Validation;
@@ -30,8 +31,10 @@ internal static class ServicePropertyModelFactory
                 GetImplementationType(propertySymbol),
                 propertySymbol.Type.ToDisplayString(s_qualifiedFormat),
                 ProxyType: null,
+                BuildPropertyAttributePrefix(propertySymbol, ct),
                 IsInstanceId: true,
-                SubService: null);
+                SubService: null,
+                MemberAttributePrefix: MemberAttributeFormatter.BuildPrefix(propertySymbol, ct));
             return true;
         }
 
@@ -50,9 +53,24 @@ internal static class ServicePropertyModelFactory
             GetImplementationType(propertySymbol),
             propertyType.ToDisplayString(s_qualifiedFormat),
             IdentifierHelpers.QualifyTypeName(propertyNamespace, proxyName),
+            BuildPropertyAttributePrefix(propertySymbol, ct),
             IsInstanceId: false,
-            subService);
+            subService,
+            MemberAttributeFormatter.BuildPrefix(propertySymbol, ct));
         return true;
+    }
+
+    private static string BuildPropertyAttributePrefix(IPropertySymbol property, CancellationToken ct)
+    {
+        var attributes = new StringBuilder();
+        foreach (var attr in property.GetAttributes())
+        {
+            ct.ThrowIfCancellationRequested();
+
+            NullableFlowAttributeFormatter.TryAppendMemberAttribute(attributes, attr);
+        }
+
+        return attributes.ToString();
     }
 
     private static string GetImplementationType(IPropertySymbol propertySymbol) =>

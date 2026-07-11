@@ -167,6 +167,11 @@ public abstract class RpcStreamAttachment
                     var buffer = result.Buffer;
                     try
                     {
+                        if (result.IsCanceled)
+                        {
+                            return;
+                        }
+
                         foreach (var segment in buffer)
                         {
                             if (!segment.IsEmpty)

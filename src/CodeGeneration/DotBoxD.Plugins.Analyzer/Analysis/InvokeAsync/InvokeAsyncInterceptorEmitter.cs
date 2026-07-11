@@ -63,6 +63,13 @@ internal static class InvokeAsyncInterceptorEmitter
         {
             builder.Append("            ").Append(captureType).AppendLine(" captures,");
             builder.Append("            ").Append(captureDelegateType).AppendLine(" lambda,");
+            builder.Append("            global::DotBoxD.Abstractions.IRInvocation<")
+                .Append(captureType)
+                .Append(", ")
+                .Append(captureDelegateType)
+                .Append(", ")
+                .Append(interception.ReturnType)
+                .AppendLine(">? irInvocation = null,");
             builder.AppendLine("            global::System.Threading.CancellationToken cancellationToken = default)");
         }
         else
@@ -73,6 +80,11 @@ internal static class InvokeAsyncInterceptorEmitter
                 .Append("global::System.Threading.Tasks.ValueTask<")
                 .Append(interception.ReturnType)
                 .AppendLine(">> lambda,");
+            builder.Append("            global::DotBoxD.Abstractions.IRInvocation<")
+                .Append(NoCaptureDelegateType(interception))
+                .Append(", ")
+                .Append(interception.ReturnType)
+                .AppendLine(">? irInvocation = null,");
             builder.AppendLine("            global::System.Threading.CancellationToken cancellationToken = default)");
         }
 
@@ -91,43 +103,105 @@ internal static class InvokeAsyncInterceptorEmitter
         }
 
         builder.AppendLine("            global::System.ArgumentNullException.ThrowIfNull(lambda);");
-        builder.Append("            var __pluginId = await ").Append(server).Append(".Services.EnsureAnonymousKernelAsync(")
-            .Append(Literal(interception.PluginId))
-            .Append(", ")
-            .Append(interception.PackageFullName)
-            .AppendLine(".Create, cancellationToken).ConfigureAwait(false);");
-        builder.Append($"            var __request = {DotBoxDRpcValueNames.GlobalKernelRpcBinaryCodec}.EncodeArguments(")
-            .Append(interception.ArgumentsExpression)
-            .AppendLine(");");
-        builder.Append("            var __response = await ").Append(server)
-            .AppendLine(".Services.WireClient.InvokeServerExtensionAsync(__pluginId, __request, cancellationToken).ConfigureAwait(false);");
-        builder.AppendLine($"            var __result = {DotBoxDRpcValueNames.GlobalKernelRpcBinaryCodec}.DecodeValue(__response);");
-        if (interception.SyncOutAssignments.Count > 0)
-        {
-            builder.AppendLine($"            __result.RequireKind({DotBoxDRpcValueNames.GlobalKernelRpcValueKind}.Record);");
-            builder.Append("            if (__result.ItemCount != ")
-                .Append((interception.SyncOutAssignments.Count + 1).ToString(CultureInfo.InvariantCulture))
-                .AppendLine(")");
-            builder.AppendLine("            {");
-            builder.AppendLine("                throw new global::System.NotSupportedException(\"InvokeAsync response field count did not match the generated capture shape.\");");
-            builder.AppendLine("            }");
-            builder.Append("            var __returnValue = ").Append(interception.ResultExpression).AppendLine(";");
-            for (var i = 0; i < interception.SyncOutAssignments.Count; i++)
-            {
-                builder.Append("            ").Append(interception.SyncOutAssignments[i]).AppendLine(";");
-            }
-
-            builder.AppendLine("            return __returnValue;");
-        }
-        else
-        {
-            builder.Append("            return ").Append(interception.ResultExpression).AppendLine(";");
-        }
-
+        AppendInvokeAsyncCall(builder, interception, server);
         builder.AppendLine("        }");
         builder.AppendLine();
         builder.Append(interception.Helpers);
     }
+
+    private static void AppendInvokeAsyncCall(
+        StringBuilder builder,
+        InvokeAsyncInterception interception,
+        string server)
+    {
+        builder.Append("            return await ").Append(server).Append(".InvokeAsync(");
+        if (interception.CaptureType is not null)
+        {
+            builder.Append("captures, ");
+        }
+
+        builder.Append("lambda, ");
+        AppendIrInvocation(builder, interception);
+        builder.AppendLine(", cancellationToken).ConfigureAwait(false);");
+    }
+
+    private static void AppendIrInvocation(StringBuilder builder, InvokeAsyncInterception interception)
+    {
+        if (interception.CaptureType is { } captureType &&
+            interception.CaptureDelegateType is { } captureDelegateType)
+        {
+            builder.Append("global::DotBoxD.Abstractions.IRInvocation<")
+                .Append(captureType)
+                .Append(", ")
+                .Append(captureDelegateType)
+                .Append(", ")
+                .Append(interception.ReturnType)
+                .AppendLine(">.FromGenerated(");
+            AppendIrInvocationArguments(builder, interception, "(captures, lambda) => ", "(captures, lambda, __response) => ");
+            return;
+        }
+
+        builder.Append("global::DotBoxD.Abstractions.IRInvocation<")
+            .Append(NoCaptureDelegateType(interception))
+            .Append(", ")
+            .Append(interception.ReturnType)
+            .AppendLine(">.FromGenerated(");
+        AppendIrInvocationArguments(builder, interception, "lambda => ", "(lambda, __response) => ");
+    }
+
+    private static void AppendIrInvocationArguments(
+        StringBuilder builder,
+        InvokeAsyncInterception interception,
+        string encodePrefix,
+        string decodePrefix)
+    {
+        builder.Append("                ").Append(Literal(interception.PluginId)).AppendLine(",");
+        builder.Append("                () => ").Append(interception.PackageFullName).AppendLine(".Create(),");
+        builder.Append("                ").Append(encodePrefix)
+            .Append(DotBoxDRpcValueNames.GlobalKernelRpcBinaryCodec)
+            .Append(".EncodeArguments(")
+            .Append(interception.ArgumentsExpression)
+            .AppendLine("),");
+        builder.Append("                ").Append(decodePrefix).AppendLine("{");
+        builder.Append("                    var __result = ")
+            .Append(DotBoxDRpcValueNames.GlobalKernelRpcBinaryCodec)
+            .AppendLine(".DecodeValue(__response);");
+        AppendDecodeReturn(builder, interception);
+        builder.Append("                })");
+    }
+
+    private static void AppendDecodeReturn(StringBuilder builder, InvokeAsyncInterception interception)
+    {
+        if (interception.SyncOutAssignments.Count == 0)
+        {
+            builder.Append("                    return ").Append(interception.ResultExpression).AppendLine(";");
+            return;
+        }
+
+        builder.Append("                    __result.RequireKind(")
+            .Append(DotBoxDRpcValueNames.GlobalKernelRpcValueKind)
+            .AppendLine(".Record);");
+        builder.Append("                    if (__result.ItemCount != ")
+            .Append((interception.SyncOutAssignments.Count + 1).ToString(CultureInfo.InvariantCulture))
+            .AppendLine(")");
+        builder.AppendLine("                    {");
+        builder.AppendLine("                        throw new global::System.NotSupportedException(\"InvokeAsync response field count did not match the generated capture shape.\");");
+        builder.AppendLine("                    }");
+        builder.Append("                    var __returnValue = ").Append(interception.ResultExpression).AppendLine(";");
+        for (var i = 0; i < interception.SyncOutAssignments.Count; i++)
+        {
+            builder.Append("                    ").Append(interception.SyncOutAssignments[i]).AppendLine(";");
+        }
+
+        builder.AppendLine("                    return __returnValue;");
+    }
+
+    private static string NoCaptureDelegateType(InvokeAsyncInterception interception)
+        => "global::System.Func<" +
+            interception.HostAccessType +
+            ", global::System.Threading.Tasks.ValueTask<" +
+            interception.ReturnType +
+            ">>";
 
     private static void AppendReflectionCaptureHelpers(StringBuilder builder)
     {

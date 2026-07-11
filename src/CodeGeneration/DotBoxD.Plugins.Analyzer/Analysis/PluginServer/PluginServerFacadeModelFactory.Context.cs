@@ -79,7 +79,8 @@ internal static partial class PluginServerFacadeModelFactory
                 continue;
             }
 
-            if (argument.Value.Value is string { Length: > 0 } factoryName)
+            if (argument.Value.Value is string factoryName &&
+                !string.IsNullOrWhiteSpace(factoryName))
             {
                 return factoryName;
             }
@@ -127,7 +128,7 @@ internal static partial class PluginServerFacadeModelFactory
         }
     }
 
-    private static bool IsPartialClass(INamedTypeSymbol type, CancellationToken cancellationToken)
+    internal static bool IsPartialClass(INamedTypeSymbol type, CancellationToken cancellationToken)
     {
         foreach (var reference in type.DeclaringSyntaxReferences)
         {

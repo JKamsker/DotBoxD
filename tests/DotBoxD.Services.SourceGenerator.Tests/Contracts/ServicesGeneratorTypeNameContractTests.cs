@@ -40,6 +40,11 @@ public sealed class ServicesGeneratorTypeNameContractTests
 
             [nameof(ServicesGeneratorTypeNames.RpcServiceAttribute)] = TypeName(typeof(RpcServiceAttribute)),
             [nameof(ServicesGeneratorTypeNames.RpcMethodAttribute)] = TypeName(typeof(RpcMethodAttribute)),
+            [nameof(ServicesGeneratorTypeNames.MessagePackUnionAttribute)] = "MessagePack.UnionAttribute",
+            [nameof(ServicesGeneratorTypeNames.JsonPolymorphicAttribute)] =
+                "System.Text.Json.Serialization.JsonPolymorphicAttribute",
+            [nameof(ServicesGeneratorTypeNames.JsonDerivedTypeAttribute)] =
+                "System.Text.Json.Serialization.JsonDerivedTypeAttribute",
             [nameof(ServicesGeneratorTypeNames.CancellationTokenMetadata)] = TypeName(typeof(CancellationToken)),
 
             [nameof(ServicesGeneratorTypeNames.GeneratedNamespace)] = typeof(GeneratedService).Namespace!,

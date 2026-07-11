@@ -115,6 +115,41 @@ public sealed class RpcPeerSessionTests
         Assert.False(channel.SendCalled);
     }
 
+    [Fact]
+    public async Task ConnectPeerAsync_WhenConnectCancelsTokenDoesNotConfigureOrStartPeer()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var channel = new TrackingChannel();
+        using var cts = new CancellationTokenSource();
+        var transport = new TrackingTransport(channel, beforePublish: cts.Cancel);
+        var configured = false;
+
+        RpcPeerSession? session = null;
+        var exception = await Record.ExceptionAsync(async () =>
+        {
+            session = await transport.ConnectPeerAsync(
+                serializer,
+                _ => configured = true,
+                new RpcPeerOptions { RequestTimeout = Timeout },
+                cts.Token);
+        });
+
+        var disposedBeforeCleanup = transport.Disposed;
+        var channelConnectedBeforeCleanup = channel.IsConnected;
+        var receiveCalledBeforeCleanup = channel.ReceiveCalled;
+        if (session is not null)
+        {
+            await session.DisposeAsync();
+        }
+
+        Assert.IsAssignableFrom<OperationCanceledException>(exception);
+        Assert.True(transport.ConnectCalled);
+        Assert.True(disposedBeforeCleanup);
+        Assert.False(channelConnectedBeforeCleanup);
+        Assert.False(configured);
+        Assert.False(receiveCalledBeforeCleanup);
+    }
+
     private static async Task GreetAsync(RpcPeer peer, TaskCompletionSource<string> done)
     {
         try
@@ -142,11 +177,16 @@ public sealed class RpcPeerSessionTests
     {
         private readonly IRpcChannel _connection;
         private readonly bool _ignoreCancellation;
+        private readonly Action? _beforePublish;
 
-        public TrackingTransport(IRpcChannel connection, bool ignoreCancellation = false)
+        public TrackingTransport(
+            IRpcChannel connection,
+            bool ignoreCancellation = false,
+            Action? beforePublish = null)
         {
             _connection = connection;
             _ignoreCancellation = ignoreCancellation;
+            _beforePublish = beforePublish;
         }
 
         public bool ConnectCalled { get; private set; }
@@ -165,6 +205,7 @@ public sealed class RpcPeerSessionTests
             }
 
             ConnectCalled = true;
+            _beforePublish?.Invoke();
             Connection = _connection;
             return Task.CompletedTask;
         }

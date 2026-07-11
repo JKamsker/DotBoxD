@@ -85,7 +85,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     /// map is immutable, the assignment becomes <c>dict = map.set(dict, key, value)</c> (the same
     /// rebind-the-local shape <c>list.add</c> uses). Returns null when the indexed target is not a map local.
     /// </summary>
-    private string? TryLowerMapIndexSet(
+    internal string? TryLowerMapIndexSet(
         ElementAccessExpressionSyntax element,
         ExpressionSyntax valueExpression,
         List<string> output)

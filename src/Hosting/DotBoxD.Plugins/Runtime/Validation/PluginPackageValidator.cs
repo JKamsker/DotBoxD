@@ -8,110 +8,21 @@ internal static class PluginPackageValidator
 {
     public static void Validate(PluginPackage package)
     {
+        PluginPackageRootValidator.Validate(package);
         var diagnostics = new List<SandboxDiagnostic>();
-        if (string.IsNullOrWhiteSpace(package.Manifest.PluginId))
-        {
-            diagnostics.Add(new SandboxDiagnostic("DBXK010", "Plugin id is required."));
-        }
-
-        PluginManifestTextValidator.ValidatePluginId(package.Manifest.PluginId, diagnostics);
-        PluginManifestTextValidator.ValidateText(package.Manifest.Contract, "plugin contract", diagnostics);
-
-        if (!string.Equals(package.Manifest.PluginId, package.Module.Id, StringComparison.Ordinal))
-        {
-            diagnostics.Add(new SandboxDiagnostic("DBXK011", "Plugin manifest id must match module id."));
-        }
-
-        if (!package.Module.Metadata.TryGetValue(PluginManifestNames.ModuleMetadata.PluginId, out var metadataPluginId) ||
-            !string.Equals(metadataPluginId, package.Manifest.PluginId, StringComparison.Ordinal))
-        {
-            diagnostics.Add(new SandboxDiagnostic("DBXK012", "Plugin module metadata must bind to the manifest plugin id."));
-        }
-
+        PluginPackageValidationPhases.ValidateManifestIdentity(package, diagnostics);
         var metadataKernel = ValidateModuleKernelMetadata(package, diagnostics);
-        ValidateManifestMode(package.Manifest, diagnostics);
+        PluginPackageValidationPhases.ValidateManifestMode(package.Manifest, diagnostics);
         var hasModuleCollectionErrors = PluginModuleCollectionValidator.Validate(package.Module, diagnostics);
-        if (package.Manifest.RpcEntrypoint is not null)
-        {
-            diagnostics.Add(new SandboxDiagnostic(
-                "DBXK073",
-                "Hook kernel manifests must not declare rpcEntrypoint."));
-        }
-
+        PluginPackageValidationPhases.ValidateRpcEntrypoint(package.Manifest, diagnostics);
         if (hasModuleCollectionErrors)
         {
             ThrowIfErrors(diagnostics);
         }
 
-        PluginManifestEffectValidator.Validate(package.Manifest, diagnostics);
-        ValidateRequiredCapabilities(package.Manifest, diagnostics);
-        PluginManifestCapabilityValidator.ValidateConcreteRequiredCapabilityEntries(
-            package.Manifest,
-            package.Module,
-            diagnostics);
-        ValidateEntrypoints(package, PluginEntrypointIndex.Build(package), diagnostics);
-        var liveSettings = package.Manifest.LiveSettings;
-        if (PluginManifestElementValidator.ValidateNoNullElements(liveSettings, "liveSettings", diagnostics))
-        {
-            foreach (var group in liveSettings.GroupBy(s => s.Name, StringComparer.Ordinal))
-            {
-                if (group.Skip(1).Any())
-                {
-                    diagnostics.Add(new SandboxDiagnostic("DBXK021", $"Live setting '{group.Key}' is declared more than once."));
-                }
-            }
-
-            foreach (var setting in liveSettings)
-            {
-                PluginManifestTextValidator.ValidateText(setting.Name, "live setting name", diagnostics);
-                PluginManifestTextValidator.ValidateText(setting.Type, "live setting type", diagnostics);
-                ValidateSetting(setting, diagnostics);
-            }
-        }
-
-        var subscriptions = package.Manifest.Subscriptions;
-        var subscriptionsValid = PluginManifestElementValidator.ValidateNoNullElements(
-            subscriptions,
-            "subscriptions",
-            diagnostics);
-        if (subscriptions.Count == 0)
-        {
-            diagnostics.Add(new SandboxDiagnostic("DBXK030", "At least one hook subscription is required."));
-        }
-        else if (subscriptions.Count > 1)
-        {
-            diagnostics.Add(new SandboxDiagnostic(
-                "DBXK031",
-                "A plugin package must declare exactly one hook subscription."));
-        }
-
-        if (!subscriptionsValid)
-        {
-            ThrowIfErrors(diagnostics);
-            return;
-        }
-
-        foreach (var subscription in subscriptions)
-        {
-            if (string.IsNullOrWhiteSpace(subscription.Event) || string.IsNullOrWhiteSpace(subscription.Kernel))
-            {
-                diagnostics.Add(new SandboxDiagnostic("DBXK031", "Hook subscription event and kernel are required."));
-            }
-
-            PluginManifestTextValidator.ValidateText(subscription.Event, "hook subscription event", diagnostics);
-            PluginManifestTextValidator.ValidateText(subscription.Kernel, "hook subscription kernel", diagnostics);
-            ValidateResultMetadata(subscription, diagnostics);
-            if (!string.IsNullOrWhiteSpace(metadataKernel) &&
-                !string.Equals(subscription.Kernel, metadataKernel, StringComparison.Ordinal))
-            {
-                diagnostics.Add(new SandboxDiagnostic(
-                    "DBXK013",
-                    $"Hook subscription kernel '{subscription.Kernel}' must match module kernel '{metadataKernel}'."));
-            }
-
-            PluginManifestPredicateValidator.ValidateIndexedPredicates(subscription, diagnostics);
-        }
-
+        PluginPackageValidationPhases.ValidateManifestDetails(package, diagnostics);
+        PluginPackageValidationPhases.ValidateLiveSettings(package.Manifest.LiveSettings, diagnostics);
+        PluginPackageValidationPhases.ValidateSubscriptions(package.Manifest.Subscriptions, metadataKernel, diagnostics);
         ThrowIfErrors(diagnostics);
     }
 
@@ -135,7 +46,7 @@ internal static class PluginPackageValidator
         return metadataKernel;
     }
 
-    private static void ValidateRequiredCapabilities(
+    internal static void ValidateRequiredCapabilities(
         PluginManifest manifest,
         List<SandboxDiagnostic> diagnostics)
     {
@@ -147,7 +58,7 @@ internal static class PluginPackageValidator
         }
     }
 
-    private static void ValidateResultMetadata(
+    internal static void ValidateResultMetadata(
         HookSubscriptionManifest subscription,
         List<SandboxDiagnostic> diagnostics)
     {
@@ -190,7 +101,7 @@ internal static class PluginPackageValidator
         }
     }
 
-    private static void ValidateEntrypoints(
+    internal static void ValidateEntrypoints(
         PluginPackage package,
         PluginEntrypointIndex entrypointIndex,
         List<SandboxDiagnostic> diagnostics)
@@ -205,14 +116,6 @@ internal static class PluginPackageValidator
             package.Entrypoints.Handle,
             PluginManifestNames.Entrypoints.Handle,
             diagnostics);
-    }
-
-    private static void ValidateManifestMode(PluginManifest manifest, List<SandboxDiagnostic> diagnostics)
-    {
-        if (!Enum.IsDefined(manifest.Mode))
-        {
-            diagnostics.Add(new SandboxDiagnostic("DBXK042", "Plugin manifest execution mode is not supported."));
-        }
     }
 
     private static void ValidateEntrypoint(
@@ -235,7 +138,7 @@ internal static class PluginPackageValidator
         }
     }
 
-    private static void ValidateSetting(LiveSettingDefinition setting, List<SandboxDiagnostic> diagnostics)
+    internal static void ValidateSetting(LiveSettingDefinition setting, List<SandboxDiagnostic> diagnostics)
     {
         try
         {
@@ -251,7 +154,7 @@ internal static class PluginPackageValidator
         }
     }
 
-    private static void ThrowIfErrors(IReadOnlyList<SandboxDiagnostic> diagnostics)
+    internal static void ThrowIfErrors(IReadOnlyList<SandboxDiagnostic> diagnostics)
     {
         if (diagnostics.Count > 0)
         {

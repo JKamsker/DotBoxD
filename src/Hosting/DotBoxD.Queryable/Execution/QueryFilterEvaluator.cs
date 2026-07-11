@@ -38,39 +38,52 @@ public static class QueryFilterEvaluator
             case QueryFilterKind.MatchAll:
                 return true;
             case QueryFilterKind.And:
-                foreach (var child in filter.Children)
-                {
-                    if (!EvaluateNode(child, target, reader, depth + 1, ref budget))
-                    {
-                        return false;
-                    }
-                }
-
-                return true;
+                return EvaluateAnd(filter, target, reader, depth, ref budget);
             case QueryFilterKind.Or:
-                foreach (var child in filter.Children)
-                {
-                    if (EvaluateNode(child, target, reader, depth + 1, ref budget))
-                    {
-                        return true;
-                    }
-                }
-
-                return false;
+                return EvaluateOr(filter, target, reader, depth, ref budget);
             case QueryFilterKind.Not:
                 return !EvaluateNode(filter.Children[0], target, reader, depth + 1, ref budget);
             case QueryFilterKind.Compare:
-                return QueryValueComparer.Compare(
-                    reader.Read(target, filter.Field),
-                    filter.Operator,
-                    QueryFilterInvariants.CompareValue(filter),
-                    filter.IgnoreCase);
+                return EvaluateCompare(filter, target, reader);
             case QueryFilterKind.In:
                 return EvaluateIn(filter, target, reader);
         }
 
         throw new InvalidOperationException("Query filter evaluation reached an unreachable kind.");
     }
+
+    private static bool EvaluateAnd(QueryFilter filter, object target, MemberValueReader reader, int depth, ref int budget)
+    {
+        foreach (var child in filter.Children)
+        {
+            if (!EvaluateNode(child, target, reader, depth + 1, ref budget))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool EvaluateOr(QueryFilter filter, object target, MemberValueReader reader, int depth, ref int budget)
+    {
+        foreach (var child in filter.Children)
+        {
+            if (EvaluateNode(child, target, reader, depth + 1, ref budget))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool EvaluateCompare(QueryFilter filter, object target, MemberValueReader reader)
+        => QueryValueComparer.Compare(
+            reader.Read(target, filter.Field),
+            filter.Operator,
+            QueryFilterInvariants.CompareValue(filter),
+            filter.IgnoreCase);
 
     private static bool EvaluateIn(QueryFilter filter, object target, MemberValueReader reader)
     {

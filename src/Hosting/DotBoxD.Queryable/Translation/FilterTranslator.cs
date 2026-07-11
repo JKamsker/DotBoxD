@@ -19,7 +19,22 @@ internal sealed class FilterTranslator(ParameterExpression parameter)
     public QueryFilter Translate(Expression body)
     {
         var expression = MemberPathReader.StripConvert(body);
-        return expression switch
+        if (TryTranslateLogical(expression, out var logical))
+        {
+            return logical;
+        }
+
+        if (TryTranslateComparisonExpression(expression, out var comparison))
+        {
+            return comparison;
+        }
+
+        return TranslateLeaf(expression);
+    }
+
+    private bool TryTranslateLogical(Expression expression, out QueryFilter filter)
+    {
+        filter = expression switch
         {
             BinaryExpression { NodeType: ExpressionType.AndAlso } b =>
                 QueryFilter.And([Translate(b.Left), Translate(b.Right)]),
@@ -27,7 +42,27 @@ internal sealed class FilterTranslator(ParameterExpression parameter)
                 QueryFilter.Or([Translate(b.Left), Translate(b.Right)]),
             UnaryExpression { NodeType: ExpressionType.Not } u =>
                 QueryFilter.Not(Translate(u.Operand)),
-            BinaryExpression b when TryMapOperator(b.NodeType, out var op) => TranslateComparison(b, op),
+            _ => null!
+        };
+        return filter is not null;
+    }
+
+    private bool TryTranslateComparisonExpression(Expression expression, out QueryFilter filter)
+    {
+        if (expression is BinaryExpression binary && TryMapOperator(binary.NodeType, out var op))
+        {
+            filter = TranslateComparison(binary, op);
+            return true;
+        }
+
+        filter = null!;
+        return false;
+    }
+
+    private QueryFilter TranslateLeaf(Expression expression)
+    {
+        return expression switch
+        {
             MethodCallExpression call =>
                 MethodCallFilterTranslator.Translate(call, parameter, MakeValue),
             MemberExpression member => TranslateBooleanMember(member),

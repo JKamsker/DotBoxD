@@ -20,6 +20,7 @@
     <PackageReference Include="System.IO.Pipelines" />
     <PackageReference Include="System.Collections.Immutable" />
     <PackageReference Include="System.Threading.Channels" />
+    <PackageReference Include="System.Diagnostics.DiagnosticSource" />
 
     <!-- Build the generator before this project so its assembly exists at pack time.
          ReferenceOutputAssembly=false: it ships as an analyzer, not a runtime reference. -->

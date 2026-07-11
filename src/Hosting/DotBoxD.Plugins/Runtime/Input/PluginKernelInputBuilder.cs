@@ -50,15 +50,15 @@ internal static class PluginKernelInputBuilder
     }
 
     private static SandboxValue Build(
-        IReadOnlyList<SandboxValue> eventValues,
+        SandboxValue[] eventValues,
         IReadOnlyList<LiveSettingDefinition> liveSettings,
         LiveSettingStore value)
     {
-        var valueCount = eventValues.Count + liveSettings.Count;
+        var valueCount = eventValues.Length + liveSettings.Count;
         return valueCount switch
         {
             0 => SandboxValue.Unit,
-            1 => eventValues.Count == 1 ? eventValues[0] : value.ToSandboxValue(liveSettings[0]),
+            1 => eventValues.Length == 1 ? eventValues[0] : value.ToSandboxValue(liveSettings[0]),
             _ => BuildList(eventValues, liveSettings, value)
         };
     }
@@ -70,8 +70,9 @@ internal static class PluginKernelInputBuilder
         IReadOnlyList<LiveSettingDefinition> liveSettings,
         LiveSettingStore value)
     {
-        var eventValues = adapter.ToSandboxValues(e);
-        PluginEventAdapterValueValidator.ValidateValues(parameters, eventValues);
+        var rawEventValues = adapter.ToSandboxValues(e);
+        PluginEventAdapterValueValidator.ValidateValues(parameters, rawEventValues);
+        var eventValues = PluginEventAdapterValueValidator.CopyValidatedValues(parameters, rawEventValues);
         return Build(eventValues, liveSettings, value);
     }
 
@@ -82,33 +83,36 @@ internal static class PluginKernelInputBuilder
         IReadOnlyList<LiveSettingDefinition> liveSettings,
         LiveSettingStore value)
     {
-        var eventValueCount = writer.EventValueCount;
+        var eventValueCount = PluginEventAdapterShapeValidator.ReadEventValueCount(writer);
+        PluginEventAdapterValueValidator.ValidateValueCount(parameters, eventValueCount);
         var valueCount = eventValueCount + liveSettings.Count;
         return valueCount switch
         {
             0 => SandboxValue.Unit,
-            1 => eventValueCount == 1 ? ReadWriterValue(writer, e, parameters, 0) : value.ToSandboxValue(liveSettings[0]),
-            _ => BuildList(writer, e, parameters, liveSettings, value)
+            1 => eventValueCount == 1
+                ? ReadWriterValue(writer, e, parameters, eventValueCount, 0)
+                : value.ToSandboxValue(liveSettings[0]),
+            _ => BuildList(writer, e, parameters, eventValueCount, liveSettings, value)
         };
     }
 
     private static SandboxValue BuildList(
-        IReadOnlyList<SandboxValue> eventValues,
+        SandboxValue[] eventValues,
         IReadOnlyList<LiveSettingDefinition> liveSettings,
         LiveSettingStore value)
     {
         if (liveSettings.Count == 0)
         {
-            return SandboxValue.FromList(eventValues, eventValues[0].Type);
+            return SandboxValue.FromOwnedList(eventValues, eventValues[0].Type);
         }
 
-        var values = new SandboxValue[eventValues.Count + liveSettings.Count];
-        for (var i = 0; i < eventValues.Count; i++)
+        var values = new SandboxValue[eventValues.Length + liveSettings.Count];
+        for (var i = 0; i < eventValues.Length; i++)
         {
             values[i] = eventValues[i];
         }
 
-        value.CopySandboxValues(liveSettings, values, eventValues.Count);
+        value.CopySandboxValues(liveSettings, values, eventValues.Length);
         return SandboxValue.FromOwnedList(values, values[0].Type);
     }
 
@@ -116,12 +120,12 @@ internal static class PluginKernelInputBuilder
         IPluginEventValueWriter<TEvent> writer,
         TEvent e,
         IReadOnlyList<Parameter> parameters,
+        int eventValueCount,
         IReadOnlyList<LiveSettingDefinition> liveSettings,
         LiveSettingStore value)
     {
-        var eventValueCount = writer.EventValueCount;
         var values = new SandboxValue[eventValueCount + liveSettings.Count];
-        writer.CopySandboxValues(e, values, 0);
+        CopyWriterValues(writer, e, values, 0);
         PluginEventAdapterValueValidator.ValidateCopiedValues(parameters, eventValueCount, values, 0);
         if (liveSettings.Count > 0)
         {
@@ -132,17 +136,17 @@ internal static class PluginKernelInputBuilder
     }
 
     private static SandboxValue BuildWithReusableBuffer(
-        IReadOnlyList<SandboxValue> eventValues,
+        SandboxValue[] eventValues,
         IReadOnlyList<LiveSettingDefinition> liveSettings,
         LiveSettingStore value,
         ref SandboxValue[]? buffer,
         ref ListValue? list)
     {
-        var valueCount = eventValues.Count + liveSettings.Count;
+        var valueCount = eventValues.Length + liveSettings.Count;
         return valueCount switch
         {
             0 => SandboxValue.Unit,
-            1 => eventValues.Count == 1 ? eventValues[0] : value.ToSandboxValue(liveSettings[0]),
+            1 => eventValues.Length == 1 ? eventValues[0] : value.ToSandboxValue(liveSettings[0]),
             _ => BuildListWithReusableBuffer(eventValues, liveSettings, value, ref buffer, ref list)
         };
     }
@@ -156,8 +160,9 @@ internal static class PluginKernelInputBuilder
         ref SandboxValue[]? buffer,
         ref ListValue? list)
     {
-        var eventValues = adapter.ToSandboxValues(e);
-        PluginEventAdapterValueValidator.ValidateValues(parameters, eventValues);
+        var rawEventValues = adapter.ToSandboxValues(e);
+        PluginEventAdapterValueValidator.ValidateValues(parameters, rawEventValues);
+        var eventValues = PluginEventAdapterValueValidator.CopyValidatedValues(parameters, rawEventValues);
         return BuildWithReusableBuffer(eventValues, liveSettings, value, ref buffer, ref list);
     }
 
@@ -170,30 +175,33 @@ internal static class PluginKernelInputBuilder
         ref SandboxValue[]? buffer,
         ref ListValue? list)
     {
-        var eventValueCount = writer.EventValueCount;
+        var eventValueCount = PluginEventAdapterShapeValidator.ReadEventValueCount(writer);
+        PluginEventAdapterValueValidator.ValidateValueCount(parameters, eventValueCount);
         var valueCount = eventValueCount + liveSettings.Count;
         return valueCount switch
         {
             0 => SandboxValue.Unit,
-            1 => eventValueCount == 1 ? ReadWriterValue(writer, e, parameters, 0) : value.ToSandboxValue(liveSettings[0]),
-            _ => BuildListWithReusableBuffer(writer, e, parameters, liveSettings, value, ref buffer, ref list)
+            1 => eventValueCount == 1
+                ? ReadWriterValue(writer, e, parameters, eventValueCount, 0)
+                : value.ToSandboxValue(liveSettings[0]),
+            _ => BuildListWithReusableBuffer(writer, e, parameters, eventValueCount, liveSettings, value, ref buffer, ref list)
         };
     }
 
     private static SandboxValue BuildListWithReusableBuffer(
-        IReadOnlyList<SandboxValue> eventValues,
+        SandboxValue[] eventValues,
         IReadOnlyList<LiveSettingDefinition> liveSettings,
         LiveSettingStore value,
         ref SandboxValue[]? buffer,
         ref ListValue? list)
     {
-        var values = RentBuffer(eventValues.Count + liveSettings.Count, ref buffer);
-        for (var i = 0; i < eventValues.Count; i++)
+        var values = RentBuffer(eventValues.Length + liveSettings.Count, ref buffer);
+        for (var i = 0; i < eventValues.Length; i++)
         {
             values[i] = eventValues[i];
         }
 
-        value.CopySandboxValues(liveSettings, values, eventValues.Count);
+        value.CopySandboxValues(liveSettings, values, eventValues.Length);
         return ReusableList(values, values[0].Type, ref list);
     }
 
@@ -201,14 +209,14 @@ internal static class PluginKernelInputBuilder
         IPluginEventValueWriter<TEvent> writer,
         TEvent e,
         IReadOnlyList<Parameter> parameters,
+        int eventValueCount,
         IReadOnlyList<LiveSettingDefinition> liveSettings,
         LiveSettingStore value,
         ref SandboxValue[]? buffer,
         ref ListValue? list)
     {
-        var eventValueCount = writer.EventValueCount;
         var values = RentBuffer(eventValueCount + liveSettings.Count, ref buffer);
-        writer.CopySandboxValues(e, values, 0);
+        CopyWriterValues(writer, e, values, 0);
         PluginEventAdapterValueValidator.ValidateCopiedValues(parameters, eventValueCount, values, 0);
         if (liveSettings.Count > 0)
         {
@@ -227,11 +235,43 @@ internal static class PluginKernelInputBuilder
         IPluginEventValueWriter<TEvent> writer,
         TEvent e,
         IReadOnlyList<Parameter> parameters,
+        int eventValueCount,
         int index)
     {
-        var eventValue = writer.ToSandboxValue(e, index);
-        PluginEventAdapterValueValidator.ValidateValue(parameters, writer.EventValueCount, index, eventValue);
+        var eventValue = ReadWriterValue(writer, e, index);
+        PluginEventAdapterValueValidator.ValidateValue(parameters, eventValueCount, index, eventValue);
         return eventValue;
+    }
+
+    private static SandboxValue ReadWriterValue<TEvent>(
+        IPluginEventValueWriter<TEvent> writer,
+        TEvent e,
+        int index)
+    {
+        try
+        {
+            return writer.ToSandboxValue(e, index);
+        }
+        catch (Exception ex) when (PluginEventAdapterShapeValidator.IsAdapterCallbackFailure(ex))
+        {
+            throw PluginEventAdapterShapeValidator.CallbackException(nameof(IPluginEventValueWriter<TEvent>.ToSandboxValue));
+        }
+    }
+
+    private static void CopyWriterValues<TEvent>(
+        IPluginEventValueWriter<TEvent> writer,
+        TEvent e,
+        SandboxValue[] destination,
+        int destinationIndex)
+    {
+        try
+        {
+            writer.CopySandboxValues(e, destination, destinationIndex);
+        }
+        catch (Exception ex) when (PluginEventAdapterShapeValidator.IsAdapterCallbackFailure(ex))
+        {
+            throw PluginEventAdapterShapeValidator.CallbackException(nameof(IPluginEventValueWriter<TEvent>.CopySandboxValues));
+        }
     }
 
     private static ListValue ReusableList(

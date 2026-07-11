@@ -19,58 +19,25 @@ internal static partial class HookResultModelFactory
     private static readonly SymbolDisplayFormat FieldTypeFormat = SymbolDisplayFormat.FullyQualifiedFormat
         .WithMiscellaneousOptions(
             SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions
+            | SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers
             | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
 
     public static HookResultModel? Create(GeneratorAttributeSyntaxContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (context.TargetSymbol is not INamedTypeSymbol type ||
-            context.TargetNode is not TypeDeclarationSyntax declaration)
+        if (!TryGetTarget(context, out var type, out var declaration))
         {
             return null;
         }
 
-        if (type.TypeParameters.Length > 0)
+        if (TryGetInvalidDeclarationResult(type, declaration, context.SemanticModel.Compilation) is { } invalid)
         {
-            return Invalid(type, declaration, $"hook result '{type.Name}' must not be generic");
+            return invalid;
         }
 
-        if (declaration.Modifiers.Any(SyntaxKind.FileKeyword))
+        if (ShouldSkipGeneration(type, declaration, context.SemanticModel.Compilation))
         {
-            return Invalid(
-                type,
-                declaration,
-                $"hook result '{type.Name}' cannot be file-local because generated builders must attach to the same public result type",
-                useUnsupportedShapeRule: true);
-        }
-
-        if (!declaration.Modifiers.Any(SyntaxKind.PartialKeyword))
-        {
-            // A non-partial [HookResult] can't have IHookResult or the Ok()/Reject() builders generated for it.
-            // If it doesn't already implement IHookResult, a later .Register/.RegisterLocal install (constrained
-            // `where TResult : struct, IHookResult`) fails with a cryptic CS0315; surface DBXK112 so the missing
-            // contract is explicit. A type that implements IHookResult by hand is valid and left alone.
-            return IsValueTypeImplementingHookResult(type, context.SemanticModel.Compilation)
-                ? null
-                : Invalid(
-                    type,
-                    declaration,
-                    $"hook result '{type.Name}' must be declared 'partial' so the generator can add IHookResult and "
-                    + "the Ok()/Reject() builders, or it must implement IHookResult and declare those builders manually");
-        }
-
-        if (type.ContainingType is not null)
-        {
-            // A nested result would be emitted as a phantom top-level type; require a top-level declaration.
-            return Invalid(type, declaration, $"hook result '{type.Name}' must be a top-level type");
-        }
-
-        if (!type.IsValueType || !type.IsReadOnly)
-        {
-            // Builders construct via `new() { ... }` and dispatch constrains TResult to a struct, so a reference
-            // (record class) result is not supported. Require readonly so generated With<Field> copies preserve
-            // value-object semantics instead of exposing mutable result structs.
-            return Invalid(type, declaration, $"hook result '{type.Name}' must be a readonly record struct");
+            return null;
         }
 
         if (declaration is not RecordDeclarationSyntax { ParameterList: { } parameters })
@@ -84,44 +51,15 @@ internal static partial class HookResultModelFactory
             return Invalid(type, declaration, $"hook result '{type.Name}' must be a positional record struct");
         }
 
-        var fields = new List<HookResultField>(primary.Parameters.Length);
-        var hasSuccess = false;
-        var hasReason = false;
-        foreach (var parameter in primary.Parameters)
-        {
-            var isSuccess = string.Equals(parameter.Name, SuccessField, StringComparison.Ordinal)
-                && parameter.Type.SpecialType == SpecialType.System_Boolean;
-            var isReason = string.Equals(parameter.Name, ReasonField, StringComparison.Ordinal)
-                && parameter.Type.SpecialType == SpecialType.System_String
-                && parameter.NullableAnnotation == NullableAnnotation.Annotated;
-            hasSuccess |= isSuccess;
-            hasReason |= isReason;
-
-            var isControl = string.Equals(parameter.Name, SuccessField, StringComparison.Ordinal)
-                || string.Equals(parameter.Name, ReasonField, StringComparison.Ordinal);
-            fields.Add(new HookResultField(
-                parameter.Name,
-                parameter.Type.ToDisplayString(FieldTypeFormat),
-                ParameterName(parameter.Name),
-                isControl));
-        }
-
-        var diagnostic = hasSuccess && hasReason
-            ? null
-            : new HookResultDiagnostic(
-                PluginDiagnosticLocation.From(declaration.Identifier.GetLocation()),
-                $"hook result '{type.Name}' must declare a 'bool Success' and a 'string? Reason' field");
-
-        return new HookResultModel(
-            type.ContainingNamespace.IsGlobalNamespace ? null : type.ContainingNamespace.ToDisplayString(),
-            type.Name,
-            DeclarationKeywords(type),
-            EquatableArray<HookResultField>.FromOwned([.. fields]),
-            EquatableArray<HookResultExistingMember>.FromOwned([.. ExistingMembers(type)]),
-            hasSuccess,
-            hasReason,
-            diagnostic);
+        return CreateModel(type, declaration, primary);
     }
+
+    private static bool ShouldSkipGeneration(
+        INamedTypeSymbol type,
+        TypeDeclarationSyntax declaration,
+        Compilation compilation)
+        => !declaration.Modifiers.Any(SyntaxKind.PartialKeyword) &&
+           IsValueTypeImplementingHookResult(type, compilation);
 
     private static HookResultModel Invalid(INamedTypeSymbol type, TypeDeclarationSyntax declaration, string message, bool useUnsupportedShapeRule = false)
         => new(

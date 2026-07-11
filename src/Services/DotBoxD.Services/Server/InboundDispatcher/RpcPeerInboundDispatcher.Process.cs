@@ -38,58 +38,41 @@ internal sealed partial class RpcPeerInboundDispatcher
     private async Task ProcessRequestAsync(RpcPeerInboundRequest inbound)
     {
         var releaseRequest = true;
-        RpcStreamingContext? streaming = null;
         try
         {
             using (inbound.Frame)
             {
-                streaming = inbound.RequiresStreamingContext || inbound.Request.Streams is { Length: > 0 }
-                    ? new RpcStreamingContext(
-                        _streams,
-                        _serializer,
-                        inbound.CancellationToken,
-                        inbound.Request.Streams)
-                    : RpcStreamingContext.Disabled;
-                using var response = await _responseBuilder.BuildAsync(
+                var streaming = CreateStreamingContext(inbound);
+                var response = await _responseBuilder.BuildAsync(
                     inbound.Request,
                     inbound.MessageId,
                     inbound.Body,
                     streaming,
                     inbound.Dispatcher,
                     inbound.CancellationToken).ConfigureAwait(false);
-                var responseStream = response.Stream;
                 try
                 {
-                    if (_sendFrameAsync is not null &&
-                        response.TryDetachWriter(out var responseWriter))
+                    var responseStream = response.Stream;
+                    try
                     {
-                        await _sendFrameAsync(responseWriter, inbound.CancellationToken).ConfigureAwait(false);
+                        await SendResponseFrameAsync(ref response, inbound.CancellationToken).ConfigureAwait(false);
                     }
-                    else
+                    catch
                     {
-                        await _sendAsync(response.FrameMemory, inbound.CancellationToken).ConfigureAwait(false);
-                    }
-                }
-                catch
-                {
-                    if (responseStream is not null)
-                    {
-                        await streaming.AbandonResponseAsync().ConfigureAwait(false);
+                        if (responseStream is not null)
+                        {
+                            await streaming.AbandonResponseAsync().ConfigureAwait(false);
+                        }
+
+                        throw;
                     }
 
-                    throw;
+                    releaseRequest = await ShouldReleaseAfterResponseAsync(inbound, response.Stream, streaming)
+                        .ConfigureAwait(false);
                 }
-
-                if (responseStream is not null)
+                finally
                 {
-                    if (StartResponseStream(inbound, responseStream, streaming))
-                    {
-                        releaseRequest = false;
-                    }
-                    else
-                    {
-                        await streaming.AbandonResponseAsync().ConfigureAwait(false);
-                    }
+                    response.Dispose();
                 }
             }
         }
@@ -120,6 +103,47 @@ internal sealed partial class RpcPeerInboundDispatcher
                 ReleaseRequest(inbound);
             }
         }
+    }
+
+    private RpcStreamingContext CreateStreamingContext(RpcPeerInboundRequest inbound)
+        => inbound.RequiresStreamingContext || inbound.Request.Streams is { Length: > 0 }
+            ? new RpcStreamingContext(
+                _streams,
+                _serializer,
+                inbound.CancellationToken,
+                inbound.Request.Streams)
+            : RpcStreamingContext.Disabled;
+
+    private ValueTask SendResponseFrameAsync(
+        ref RpcDispatchResult response,
+        CancellationToken cancellationToken)
+    {
+        if (_sendFrameAsync is not null &&
+            response.TryDetachWriter(out var responseWriter))
+        {
+            return _sendFrameAsync(responseWriter, cancellationToken);
+        }
+
+        return new ValueTask(_sendAsync(response.FrameMemory, cancellationToken));
+    }
+
+    private async ValueTask<bool> ShouldReleaseAfterResponseAsync(
+        RpcPeerInboundRequest inbound,
+        RpcStreamAttachment? responseStream,
+        RpcStreamingContext streaming)
+    {
+        if (responseStream is null)
+        {
+            return true;
+        }
+
+        if (StartResponseStream(inbound, responseStream, streaming))
+        {
+            return false;
+        }
+
+        await streaming.AbandonResponseAsync().ConfigureAwait(false);
+        return true;
     }
 
     private bool StartResponseStream(

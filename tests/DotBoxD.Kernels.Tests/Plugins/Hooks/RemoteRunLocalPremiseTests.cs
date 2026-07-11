@@ -25,10 +25,11 @@ public sealed class RemoteRunLocalPremiseTests
     {
         var evaluatedClientSide = false;
         Hooks().On<Aggro>().Where(e =>
-        {
-            evaluatedClientSide = true;
-            return e.Distance <= 4;
-        });
+            {
+                evaluatedClientSide = true;
+                return e.Distance <= 4;
+            },
+            RemoteIrTestSteps.Ir<Aggro, bool>(LoweredPipelineStepKind.Filter));
 
         Assert.False(evaluatedClientSide, "remote Where must lower to server-side IR, never run on the client");
     }
@@ -38,10 +39,11 @@ public sealed class RemoteRunLocalPremiseTests
     {
         var projectedClientSide = false;
         Hooks().On<Aggro>().Select(e =>
-        {
-            projectedClientSide = true;
-            return e.MonsterId;
-        });
+            {
+                projectedClientSide = true;
+                return e.MonsterId;
+            },
+            RemoteIrTestSteps.Ir<Aggro, string>(LoweredPipelineStepKind.Projection));
 
         Assert.False(projectedClientSide, "remote Select must lower to server-side IR, never run on the client");
     }
@@ -51,12 +53,13 @@ public sealed class RemoteRunLocalPremiseTests
     {
         var evaluatedClientSide = false;
         Hooks().On<Aggro>()
-            .Select(e => e.MonsterId)
+            .Select(e => e.MonsterId, RemoteIrTestSteps.Ir<Aggro, string>(LoweredPipelineStepKind.Projection))
             .Where(id =>
-            {
-                evaluatedClientSide = true;
-                return id.Length > 0;
-            });
+                {
+                    evaluatedClientSide = true;
+                    return id.Length > 0;
+                },
+                RemoteIrTestSteps.Ir<string, bool>(LoweredPipelineStepKind.Filter));
 
         Assert.False(evaluatedClientSide, "remote staged Where must lower to server-side IR, never run on the client");
     }
@@ -67,15 +70,17 @@ public sealed class RemoteRunLocalPremiseTests
         var ranClientSide = false;
         Subscriptions().On<Aggro>()
             .Where(e =>
-            {
-                ranClientSide = true;
-                return e.Distance <= 4;
-            })
+                {
+                    ranClientSide = true;
+                    return e.Distance <= 4;
+                },
+                RemoteIrTestSteps.Ir<Aggro, bool>(LoweredPipelineStepKind.Filter))
             .Select(e =>
-            {
-                ranClientSide = true;
-                return e.MonsterId;
-            });
+                {
+                    ranClientSide = true;
+                    return e.MonsterId;
+                },
+                RemoteIrTestSteps.Ir<Aggro, string>(LoweredPipelineStepKind.Projection));
 
         Assert.False(ranClientSide, "remote subscription Where/Select must lower to server-side IR, never run on the client");
     }
@@ -87,10 +92,11 @@ public sealed class RemoteRunLocalPremiseTests
         // must never run the predicate.
         var evaluatedClientSide = false;
         Hooks().On<Aggro>().Where(e =>
-        {
-            evaluatedClientSide = true;
-            return e.Distance <= 4;
-        });
+            {
+                evaluatedClientSide = true;
+                return e.Distance <= 4;
+            },
+            RemoteIrTestSteps.Ir<Aggro, bool>(LoweredPipelineStepKind.Filter));
 
         Assert.False(evaluatedClientSide, "remote whole-event Where must lower to server-side IR, never run on the client");
     }
@@ -100,10 +106,11 @@ public sealed class RemoteRunLocalPremiseTests
     {
         var evaluatedClientSide = false;
         Subscriptions().On<Aggro>().Where(e =>
-        {
-            evaluatedClientSide = true;
-            return e.Distance <= 4;
-        });
+            {
+                evaluatedClientSide = true;
+                return e.Distance <= 4;
+            },
+            RemoteIrTestSteps.Ir<Aggro, bool>(LoweredPipelineStepKind.Filter));
 
         Assert.False(evaluatedClientSide, "remote whole-event subscription Where must lower to server-side IR, never run on the client");
     }

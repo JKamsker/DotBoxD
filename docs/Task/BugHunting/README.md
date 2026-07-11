@@ -657,9 +657,12 @@ per-PR `surprise-fix-<pr>` lock (so a fix and a polish never edit one PR concurr
 - **Frontier.** A `sweep:fixed` PR is re-picked when its real PR CI is **red**, when it has an
   **unresolved CodeRabbit inline thread**, or when it has **actionable CodeRabbit** (nitpick/issue/
   refactor markers or an open thread) but **no polish marker** yet — i.e. exactly one guaranteed pass
-  per PR that has something to do, then quiet. CI-`pending` PRs are skipped to avoid racing a run. The
-  shared `MAX_INFLIGHT=8`, per-tick `max`, and `MAX_ATTEMPTS=4` retry cap bound cost identically to the
-  fix half; a PR the worker cannot make green hands off to a human at the cap.
+  per PR that has something to do, then quiet. CI-`pending` PRs are skipped to avoid racing a run,
+  except a CodeRabbit status that has been pending longer than
+  `CODERABBIT_PENDING_TIMEOUT_MINUTES` (60 minutes by default) is treated as stale and ignored so it
+  cannot mask red PR CI forever. The shared `MAX_INFLIGHT=8`, per-tick `max`, and `MAX_ATTEMPTS=4`
+  retry cap bound cost identically to the fix half; a PR the worker cannot make green hands off to a
+  human at the cap.
 - **Stale-branch drift is fixed structurally.** Before each dispatch the dispatcher **server-side
   merges `main` into the PR branch** (`POST /repos/{repo}/merges`, authored by the PAT so the resulting
   CI runs ungated — no clone, no secret in the agent job). The entire current red backlog (#404 #409

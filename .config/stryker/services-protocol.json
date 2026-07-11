@@ -23,9 +23,9 @@
     ],
     "concurrency": 2,
     "thresholds": {
-      "high": 1,
-      "low": 0,
-      "break": 0
+      "high": 90,
+      "low": 85,
+      "break": 85
     }
   }
 }

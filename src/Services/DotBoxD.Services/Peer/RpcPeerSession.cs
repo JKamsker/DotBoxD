@@ -85,10 +85,12 @@ public sealed class RpcPeerSession : IAsyncDisposable
         try
         {
             await transport.ConnectAsync(ct).ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
             var channel = transport.Connection ??
                 throw new InvalidOperationException("Transport connected without publishing an RPC channel.");
             peer = RpcPeer.Over(channel, serializer, options);
             configurePeer?.Invoke(peer);
+            ct.ThrowIfCancellationRequested();
             peer.Start();
             return new RpcPeerSession(transport, peer);
         }

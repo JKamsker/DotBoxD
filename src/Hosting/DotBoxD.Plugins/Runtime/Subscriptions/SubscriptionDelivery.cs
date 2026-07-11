@@ -1,3 +1,6 @@
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+
 namespace DotBoxD.Plugins.Runtime;
 
 internal static class SubscriptionDelivery
@@ -20,26 +23,60 @@ internal static class SubscriptionDelivery
             return;
         }
 
+        if (!await FiltersPassAsync(filters, e, rawContext, context, onFault).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        await PublishHandlersSafelyAsync(handlers, e, rawContext, context, onFault).ConfigureAwait(false);
+    }
+
+    private static async ValueTask<bool> FiltersPassAsync<TEvent, TContext>(
+        Func<TEvent, TContext, ValueTask<bool>>[] filters,
+        TEvent e,
+        HookContext rawContext,
+        TContext context,
+        Action<SubscriptionDeliveryFault>? onFault)
+    {
         try
         {
             for (var i = 0; i < filters.Length; i++)
             {
+                if (rawContext.CancellationToken.IsCancellationRequested)
+                {
+                    return false;
+                }
+
                 if (!await filters[i](e, context).ConfigureAwait(false))
                 {
-                    return;
+                    return false;
                 }
             }
         }
         catch (OperationCanceledException) when (rawContext.CancellationToken.IsCancellationRequested)
         {
-            return;
+            return false;
+        }
+        catch (SandboxRuntimeException ex) when (WasCallerCancelled(ex, rawContext.CancellationToken))
+        {
+            return false;
         }
         catch (Exception ex)
         {
             Report<TEvent>(onFault, ex, SubscriptionDeliveryStage.Filter);
-            return;
+            return false;
         }
 
+        return true;
+    }
+
+    private static async ValueTask PublishHandlersSafelyAsync<TEvent, TContext>(
+        Func<TEvent, HookContext, TContext, ValueTask>[] handlers,
+        TEvent e,
+        HookContext rawContext,
+        TContext context,
+        Action<SubscriptionDeliveryFault>? onFault)
+    {
         for (var i = 0; i < handlers.Length; i++)
         {
             if (rawContext.CancellationToken.IsCancellationRequested)
@@ -55,12 +92,19 @@ internal static class SubscriptionDelivery
             {
                 return;
             }
+            catch (SandboxRuntimeException ex) when (WasCallerCancelled(ex, rawContext.CancellationToken))
+            {
+                return;
+            }
             catch (Exception ex)
             {
                 Report<TEvent>(onFault, ex, SubscriptionDeliveryStage.Handler);
             }
         }
     }
+
+    private static bool WasCallerCancelled(SandboxRuntimeException exception, CancellationToken cancellationToken)
+        => cancellationToken.IsCancellationRequested && exception.Error.Code == SandboxErrorCode.Cancelled;
 
     private static void Report<TEvent>(
         Action<SubscriptionDeliveryFault>? onFault,

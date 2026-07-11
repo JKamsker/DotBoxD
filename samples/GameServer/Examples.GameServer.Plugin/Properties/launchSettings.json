@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "GameServer Plugin (Debug)": {
+      "commandName": "Project",
+      "commandLineArgs": "dotboxd-game-debug-0123456789abcdef",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

@@ -38,6 +38,7 @@ public sealed partial class RpcPeer
             _cts = new CancellationTokenSource();
             _inbound.Start(_cts.Token);
             _readLoop = Task.Run(() => _readLoopRunner.RunAsync(_cts.Token));
+            RpcTelemetry.PeerStarted();
         }
     }
 
@@ -79,6 +80,8 @@ public sealed partial class RpcPeer
 
     private async Task DisposeCoreAsync(Task? readLoop, CancellationTokenSource? cts)
     {
+        _outbound.FailPending(new ServiceConnectionException("Connection closed."));
+
         try
         {
             await _channel.DisposeAsync().ConfigureAwait(false);
@@ -101,23 +104,29 @@ public sealed partial class RpcPeer
         }
 
         await _outbound.StopCancelFramesAsync().ConfigureAwait(false);
-        _outbound.FailPending(new ServiceConnectionException("Connection closed."));
         _streams.Stop();
         await _inbound.StopAsync().ConfigureAwait(false);
 
         _sender.Dispose();
         cts?.Dispose();
+        if (readLoop is not null)
+        {
+            RpcTelemetry.PeerStopped();
+        }
     }
 
     private void RaiseProtocolError(
         int messageId,
         MessageType messageType,
         string message,
-        Exception? error) =>
+        Exception? error)
+    {
+        RpcTelemetry.ProtocolFrameRejected(messageType, serializationFailure: error is not null);
         RpcEventHandlerInvoker.Raise(
             ProtocolError,
             this,
             new RpcProtocolErrorEventArgs(_channel.RemoteEndpoint, messageId, messageType, message, error));
+    }
 
     private void RaiseDispatchError(RpcPeerInboundRequest inbound, Exception error) =>
         RpcEventHandlerInvoker.Raise(

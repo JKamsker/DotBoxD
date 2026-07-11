@@ -4,8 +4,10 @@
 
 public abstract class RpcStreamAttachment
 public async Task CloseAsync(CancellationToken ct = default)
+public async Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
 public async Task StartAsync(CancellationToken ct = default)
 public async Task<IRpcChannel> AcceptAsync(CancellationToken ct = default)
+public async Task<Payload> ReceiveAsync(CancellationToken ct = default)
 public async ValueTask DisposeAsync()
 public async ValueTask ReleaseAsync(string serviceName, string instanceId)
 public async ValueTask SendFrameValueAsync(PooledBufferWriter frame, CancellationToken ct = default)
@@ -14,7 +16,9 @@ public async ValueTask<Payload> ReceiveValueAsync(CancellationToken ct = default
 public async ValueTask<RpcFrame> ReceiveFrameValueAsync(CancellationToken ct = default)
 public bool DisableInboundRequestCancellation { get; init; }
 public bool EnableLowAllocationValueTaskInvocations { get; init; }
+public bool IsBreaking => Kind is RpcContractChangeKind.Removed or RpcContractChangeKind.SignatureChanged or RpcContractChangeKind.UnsupportedVersion
 public bool IsConnected =>
+public bool IsConnected => _inner.IsConnected
 public bool IsConnected => Peer.IsConnected && _transport.IsConnected
 public bool IsConnected => Volatile.Read(ref _disposed) == 0 && _connection.IsConnected
 public bool IsSuccess { get; set; }
@@ -28,6 +32,7 @@ public class ServiceException : Exception
 public class ServiceNotFoundException : ServiceException
 public class ServiceProtocolException : ServiceException
 public class ServiceTimeoutException : ServiceException
+public const int CurrentFormatVersion = 1
 public const int DefaultInboundQueueCapacity = 1024
 public const int DefaultMaxAcceptedPeers = 1024
 public const int DefaultMaxConcurrentInboundDispatch = 1
@@ -40,6 +45,7 @@ public const int MaxMessageSize = 16 * 1024 * 1024
 public const long DefaultMaxInboundBytes = 64L * 1024 * 1024
 public const string InboundRejected = "RpcInboundRejected"
 public const string InstanceNotFound = "RpcInstanceNotFound"
+public const string InstrumentationName = "DotBoxD.Services"
 public const string InternalError = "RpcInternalError"
 public const string MethodNotFound = "RpcMethodNotFound"
 public const string ProtocolError = "RpcProtocolError"
@@ -81,6 +87,14 @@ public enum NotFoundKind.Service
 public enum QueueFullMode
 public enum QueueFullMode.DropIncoming = 1
 public enum QueueFullMode.Wait = 0
+public enum RpcChannelOperation
+public enum RpcChannelOperation.Receive
+public enum RpcChannelOperation.Send
+public enum RpcContractChangeKind
+public enum RpcContractChangeKind.Added
+public enum RpcContractChangeKind.Removed
+public enum RpcContractChangeKind.SignatureChanged
+public enum RpcContractChangeKind.UnsupportedVersion
 public enum RpcStreamKind : byte
 public enum RpcStreamKind.Binary = 1
 public enum RpcStreamKind.Items = 2
@@ -93,6 +107,8 @@ public event EventHandler<RpcProtocolErrorEventArgs>? ProtocolError
 public event EventHandler<RpcReadErrorEventArgs>? ReadError
 public Exception Error { get; }
 public Exception? Error { get; }
+public FaultInjectingRpcChannel( IRpcChannel inner, Func<RpcChannelOperation, int, CancellationToken, ValueTask> beforeOperation, Func<ReadOnlyMemory<byte>, int, CancellationToken, ValueTask<ReadOnlyMemory<byte>>> transformSend)
+public FaultInjectingRpcChannel( IRpcChannel inner, Func<RpcChannelOperation, int, CancellationToken, ValueTask> beforeOperation)
 public Func<Exception, RpcErrorInfo?>? ExceptionTransformer { get; init; }
 public GeneratedService( Type serviceType, Type proxyType, Type dispatcherType, string serviceName, IReadOnlyList<GeneratedMethod> methods)
 public IAsyncEnumerable<T> GetAsyncEnumerable<T>(RpcStreamHandle handle)
@@ -104,18 +120,19 @@ public IAsyncEnumerable<T> InvokeAsyncEnumerableOnInstance<TRequest, T>( string 
 public IAsyncEnumerable<T> InvokeAsyncEnumerableOnInstance<TRequest, T>(string service, string instanceId, string method, TRequest request, RpcStreamAttachment[]? streams = null, CancellationToken ct = default) =>
 public InstanceRegistry() : this(DefaultMaxInstances) { }
 public InstanceRegistry(int maxInstances)
+public int FormatVersion { get; init; } = CurrentFormatVersion
 public int Length => _length
 public int Length => Memory.Length
-public int MaxConcurrentInboundDispatch
-public int MaxInboundStreamsPerPeer
-public int MaxInboundStreamsPerRequest
-public int MaxPendingRequests
+public int MaxConcurrentInboundDispatch { get; init; }
+public int MaxInboundStreamsPerPeer { get; init; }
+public int MaxInboundStreamsPerRequest { get; init; }
+public int MaxPendingRequests { get; init; }
 public int MessageId { get; }
 public int MessageId { get; set; }
 public int StreamId { get; set; }
-public int WrittenCount
-public int? InboundQueueCapacity
-public int? MaxAcceptedPeers
+public int WrittenCount { get; }
+public int? InboundQueueCapacity { get; init; }
+public int? MaxAcceptedPeers { get; init; }
 public interface IInstanceRegistry
 public interface INonStreamingServiceDispatcher
 public interface IRpcChannel : IAsyncDisposable
@@ -129,9 +146,10 @@ public interface IServerTransport : IAsyncDisposable
 public interface IServiceDispatcher
 public interface ITransport : IAsyncDisposable
 public IReadOnlyList<GeneratedMethod> Methods { get; init; } = Array.Empty<GeneratedMethod>()
+public IReadOnlyList<RpcContractChange> Diff(RpcContractManifest previous)
 public IRpcChannel? Connection => Volatile.Read(ref _disposed) == 0 ? _connection : null
 public IServiceProvider? ServiceProvider { get; init; }
-public long? MaxInboundBytes
+public long? MaxInboundBytes { get; init; }
 public Memory<byte> GetMemory(int sizeHint = 0)
 public Memory<byte> Memory =>
 public MessageType MessageType { get; }
@@ -140,16 +158,17 @@ public partial interface IRpcInvoker
 public Payload DetachPayload()
 public Pipe GetPipe(RpcStreamHandle handle)
 public PooledBufferWriter(int initialCapacity = 256)
-public QueueFullMode QueueFullMode
+public QueueFullMode QueueFullMode { get; init; }
 public readonly record struct FramedMessage(int MessageId, MessageType Type, Payload Body)
 public readonly record struct GeneratedMethod( string Name, string WireName, Type ReturnType, Type? ResultType, GeneratedReturnKind ReturnKind, bool ReturnsNestedService, IReadOnlyList<GeneratedParameter> Parameters)
 public readonly record struct GeneratedParameter( string Name, Type Type, int Position, bool IsCancellationToken, bool HasDefaultValue, object? DefaultValue)
 public readonly record struct GeneratedService( Type ServiceType, Type ProxyType, Type DispatcherType, string ServiceName)
 public readonly record struct RpcErrorInfo(string Message, string Type)
-public ReadOnlyMemory<byte> Memory
+public ReadOnlyMemory<byte> Memory { get; }
 public ReadOnlyMemory<byte> WrittenMemory =>
 public ReadOnlySpan<byte> Span =>
 public RemoteServiceException(string message, string remoteExceptionType)
+public RpcContractChangeKind Kind { get; init; }
 public RpcDiagnosticErrorEventArgs(string operation, Exception error)
 public RpcDisconnectedEventArgs(string remoteEndpoint, Exception? error)
 public RpcDispatchErrorEventArgs( string remoteEndpoint, int messageId, string serviceName, string methodName, string? instanceId, Exception error)
@@ -173,6 +192,7 @@ public RpcStreamHandle? Stream { get; set; }
 public RpcStreamHandle(int streamId, RpcStreamKind kind)
 public RpcStreamHandle[]? Streams { get; set; }
 public RpcStreamKind Kind { get; set; }
+public sealed class FaultInjectingRpcChannel : IRpcChannel
 public sealed class InstanceRegistry : IInstanceRegistry
 public sealed class Payload : IMemoryOwner<byte>
 public sealed class PooledBufferWriter : IBufferWriter<byte>, IDisposable
@@ -193,6 +213,10 @@ public sealed partial class RpcHost
 public sealed partial class RpcHost : IAsyncDisposable
 public sealed partial class RpcPeer
 public sealed partial class RpcPeer : IAsyncDisposable, IRpcInvoker
+public sealed record RpcContractChange( RpcContractChangeKind Kind, string Contract, string? PreviousSignature, string? CurrentSignature)
+public sealed record RpcContractManifest(IReadOnlyList<RpcContractService> Services)
+public sealed record RpcContractMethod(string WireName, string Signature)
+public sealed record RpcContractService( string WireName, string ContractType, IReadOnlyList<RpcContractMethod> Methods)
 public ServiceConnectionException(string message, Exception innerException) : base(message, innerException)
 public ServiceConnectionException(string message) : base(message)
 public ServiceException()
@@ -206,15 +230,19 @@ public ServiceTimeoutException(string message) : base(message)
 public SingleConnectionServerTransport(IRpcChannel connection, bool ownsConnection = false)
 public SingleConnectionTransport(IRpcChannel connection, bool ownsConnection = false)
 public Span<byte> GetSpan(int sizeHint = 0)
+public static (IRpcChannel First, IRpcChannel Second) CreatePair(int capacity = 256)
+public static ActivitySource Activities { get; } = new(InstrumentationName)
 public static async Task WriteMessageAsync( Stream stream, int messageId, MessageType type, ReadOnlyMemory<byte> payload, CancellationToken ct = default)
 public static async Task<FramedMessage?> ReadMessageAsync( Stream stream, CancellationToken ct = default)
 public static async Task<FramedMessage?> ReadMessageAsync( Stream stream, TimeSpan frameReadIdleTimeout, CancellationToken ct = default)
 public static bool TryReadFrame( ReadOnlyMemory<byte> source, out int messageId, out MessageType type, out ReadOnlyMemory<byte> envelope, out ReadOnlyMemory<byte> payload)
 public static bool TryReadFrameHeader( ReadOnlyMemory<byte> source, out int messageId, out MessageType type)
 public static class GeneratedServiceRegistry
+public static class InMemoryRpcChannel
 public static class MessageFramer
 public static class RpcDiagnostics
 public static class RpcErrorTypes
+public static class RpcTelemetry
 public static class RpcTransportExtensions
 public static class SerializerExtensions
 public static event EventHandler<RpcDiagnosticErrorEventArgs>? Error
@@ -224,6 +252,7 @@ public static IReadOnlyList<GeneratedService> GetServices(Assembly assembly)
 public static IReadOnlyList<GeneratedService> GetServices(IEnumerable<Assembly> assemblies)
 public static IServiceDispatcher CreateDispatcher(Type serviceInterface, object implementation)
 public static IServiceDispatcher CreateDispatcher<TService>(TService implementation) where TService : class
+public static Meter Metrics { get; } = new(InstrumentationName)
 public static object CreateProxy(Type serviceInterface, IRpcInvoker invoker)
 public static Payload Empty { get; } = new(Array.Empty<byte>(), 0)
 public static Payload FrameMessage<T>( ISerializer serializer, int messageId, MessageType type, T envelope, ReadOnlySpan<byte> payload)
@@ -231,6 +260,8 @@ public static Payload FrameRequest<TEnvelope, TArgument>( ISerializer serializer
 public static Payload FrameToPayload(int messageId, MessageType type, ReadOnlySpan<byte> payload)
 public static Payload Rent(int length)
 public static Payload SerializeToPayload<T>(this ISerializer serializer, T value)
+public static RpcContractManifest Create(IEnumerable<Assembly> assemblies)
+public static RpcContractManifest Create(params Assembly[] assemblies)
 public static RpcErrorInfo FromException(Exception exception) =>
 public static RpcHost Listen(IServerTransport listener, ISerializer serializer, RpcPeerOptions? options = null)
 public static RpcPeer Over(IRpcChannel channel, ISerializer serializer, RpcPeerOptions? options = null)
@@ -252,6 +283,8 @@ public static void ValidateOutgoingFrame(ReadOnlySpan<byte> frame, int maxMessag
 public static void WriteFrame(IBufferWriter<byte> writer, int messageId, MessageType type, ReadOnlySpan<byte> payload)
 public Stream GetStream(RpcStreamHandle handle)
 public StreamConnection( Stream stream, string? remoteEndpoint = null, bool ownsStream = true, int maxMessageSize = MessageFramer.MaxMessageSize, TimeSpan? frameReadIdleTimeout = null)
+public string Contract { get; init; }
+public string Fingerprint { get; }
 public string InstanceId { get; set; } = string.Empty
 public string Message { get; }
 public string MethodName { get; }
@@ -260,16 +293,20 @@ public string Operation { get; }
 public string Register(string serviceName, object instance)
 public string RemoteEndpoint { get; }
 public string RemoteEndpoint => _channel.RemoteEndpoint
+public string RemoteEndpoint => _inner.RemoteEndpoint
 public string RemoteEndpoint => _remoteEndpoint
 public string RemoteEndpoint => Peer.RemoteEndpoint
 public string RemoteExceptionType { get; }
+public string Serialize()
 public string ServiceName { get; }
 public string ServiceName { get; set; } = string.Empty
+public string? CurrentSignature { get; init; }
 public string? ErrorMessage { get; set; }
 public string? ErrorType { get; set; }
 public string? InstanceId { get; }
 public string? InstanceId { get; set; }
 public string? Name { get; set; }
+public string? PreviousSignature { get; init; }
 public struct RpcFrame : IDisposable
 public struct RpcRequest
 public struct RpcResponse
@@ -314,9 +351,10 @@ public Task<TResponse> InvokeOnInstanceAsync<TRequest, TResponse>( string servic
 public Task<TResponse> InvokeOnInstanceAsync<TRequest, TResponse>(string service, string instanceId, string method, TRequest request, CancellationToken ct = default) =>
 public Task<TResponse> InvokeOnInstanceAsync<TRequest, TResponse>(string service, string instanceId, string method, TRequest request, RpcStreamAttachment[] streams, CancellationToken ct = default) =>
 public Task<TResponse> InvokeOnInstanceAsync<TResponse>(string service, string instanceId, string method, CancellationToken ct = default) =>
-public TimeSpan RequestTimeout
+public TimeSpan RequestTimeout { get; init; }
 public TService Get<TService>() where TService : class
 public ValueTask DisposeAsync()
+public ValueTask DisposeAsync() => _inner.DisposeAsync()
 public ValueTask DisposeAsync() => new(CloseAsync())
 public ValueTask InvokeValueAsync(string service, string method, CancellationToken ct = default) =>
 public ValueTask InvokeValueAsync<TRequest>(string service, string method, TRequest request, CancellationToken ct = default) =>
@@ -328,6 +366,7 @@ public ValueTask<TResponse> InvokeValueOnInstanceAsync<TRequest, TResponse>(stri
 public ValueTask<TResponse> InvokeValueOnInstanceAsync<TResponse>(string service, string instanceId, string method, CancellationToken ct = default) =>
 public void Advance(int count)
 public void Dispose()
+public void EnsureCompatibleWith(RpcContractManifest previous)
 public void Release(string serviceName, string instanceId)
 public void ReleaseAll()
 public void ReleaseStream(RpcStreamHandle handle) =>

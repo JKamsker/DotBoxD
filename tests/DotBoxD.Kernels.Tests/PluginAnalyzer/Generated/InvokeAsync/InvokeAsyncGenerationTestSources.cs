@@ -210,7 +210,7 @@ internal static partial class InvokeAsyncGenerationTestSources
         }
         """;
 
-    internal static string UsageSource(string usage)
+    internal static string UsageSource(string usage, string serverMembers = "")
         => """
         using System;
         using System.Threading;
@@ -262,7 +262,10 @@ internal static partial class InvokeAsyncGenerationTestSources
         namespace DotBoxD.Kernels.Game.Plugin.Client
         {
             [GeneratePluginServer(Context = typeof(RemotePluginContext))]
-            public partial class RemotePluginServer : IGameWorldAccess;
+            public partial class RemotePluginServer : IGameWorldAccess
+            {
+        """ + serverMembers + """
+            }
 
             public sealed partial class RemotePluginContext;
         }

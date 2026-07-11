@@ -39,7 +39,7 @@ internal static partial class CompiledBindingDispatcher
         {
             timeout = context.CreateWallTimeToken();
             using var returnCredits = context.BeginBindingReturnCreditScope(descriptor.ReturnType);
-            var value = AwaitBinding(context, descriptor.Invoke(context, args, timeout.Token));
+            var value = AwaitBinding(context, descriptor.Invoke(context, args, timeout.Token), timeout.Token);
             context.Checkpoint();
             value = context.ChargeBindingReturn(descriptor, value);
             context.EnsureRequiredBindingSuccessAudit(descriptor, auditCheckpoint);
@@ -107,7 +107,7 @@ internal static partial class CompiledBindingDispatcher
             var pending = descriptor.Invoke.Target is IOneArgumentBindingInvoker fastInvoker
                 ? fastInvoker.Invoke(context, arg0, timeout.Token)
                 : descriptor.Invoke(context, [arg0], timeout.Token);
-            var value = AwaitBinding(context, pending);
+            var value = AwaitBinding(context, pending, timeout.Token);
             context.Checkpoint();
             value = context.ChargeBindingReturn(descriptor, value);
             context.EnsureRequiredBindingSuccessAudit(descriptor, auditCheckpoint);
@@ -176,7 +176,7 @@ internal static partial class CompiledBindingDispatcher
             var pending = descriptor.Invoke.Target is ITwoArgumentBindingInvoker fastInvoker
                 ? fastInvoker.Invoke(context, arg0, arg1, timeout.Token)
                 : descriptor.Invoke(context, [arg0, arg1], timeout.Token);
-            var value = AwaitBinding(context, pending);
+            var value = AwaitBinding(context, pending, timeout.Token);
             context.Checkpoint();
             value = context.ChargeBindingReturn(descriptor, value);
             context.EnsureRequiredBindingSuccessAudit(descriptor, auditCheckpoint);
@@ -228,7 +228,10 @@ internal static partial class CompiledBindingDispatcher
             $"binding '{descriptor.Id}' requires the '{RuntimeCapabilityIds.Async}' capability"));
     }
 
-    private static SandboxValue AwaitBinding(SandboxContext context, ValueTask<SandboxValue> pending)
+    private static SandboxValue AwaitBinding(
+        SandboxContext context,
+        ValueTask<SandboxValue> pending,
+        CancellationToken timeoutToken)
     {
         // Synchronous bindings (the common case) complete inline, so read the
         // result directly and avoid allocating a Task<SandboxValue> wrapper.
@@ -252,7 +255,7 @@ internal static partial class CompiledBindingDispatcher
                 "async pump is not installed"));
         }
 
-        return pump.RunToCompletion(pending);
+        return pump.RunToCompletion(pending, timeoutToken);
     }
 
     private sealed class AwaitPumpScope(ICompiledAwaitPump? previous) : IDisposable
@@ -267,5 +270,5 @@ internal static partial class CompiledBindingDispatcher
 
 internal interface ICompiledAwaitPump
 {
-    SandboxValue RunToCompletion(ValueTask<SandboxValue> pending);
+    SandboxValue RunToCompletion(ValueTask<SandboxValue> pending, CancellationToken cancellationToken);
 }

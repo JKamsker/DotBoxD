@@ -56,6 +56,7 @@ internal static partial class DotBoxDExpressionModelFactory
                     continue;
                 }
 
+                CollectRecordMemberCapability(fields[i], context);
                 return RecordGet(projected, i, fields[i].Type, allocates: false);
             }
         }
@@ -78,40 +79,70 @@ internal static partial class DotBoxDExpressionModelFactory
             return null;
         }
 
-        if ((string.Equals(memberName, "Count", StringComparison.Ordinal) ||
-             string.Equals(memberName, "Length", StringComparison.Ordinal)) &&
-            IsListShaped(receiverType))
+        if (TryLowerListMemberChain(member, memberName, receiverType, context) is { } listMember)
         {
+            return listMember;
+        }
+
+        return receiverType is INamedTypeSymbol named
+            ? TryLowerRecordMemberChain(member, memberName, named, context)
+            : null;
+    }
+
+    private static DotBoxDExpressionModel? TryLowerListMemberChain(
+        MemberAccessExpressionSyntax member,
+        string memberName,
+        ITypeSymbol receiverType,
+        DotBoxDExpressionLoweringContext context)
+    {
+        if (!IsListCountOrLength(memberName) || !IsListShaped(receiverType))
+        {
+            return null;
+        }
+
+        var receiver = Lower(member.Expression, context);
+        if (!string.Equals(receiver.Type, DotBoxDGenerationNames.ManifestTypes.List, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var source =
+            $"new {DotBoxDGenerationNames.TypeNames.GlobalCallExpression}(" +
+            $"{LiteralReader.StringLiteral("list.count")}, [{receiver.Source}], null, Span)";
+        return new DotBoxDExpressionModel(source, DotBoxDGenerationNames.ManifestTypes.Int, receiver.Allocates);
+    }
+
+    private static bool IsListCountOrLength(string memberName)
+        => string.Equals(memberName, "Count", StringComparison.Ordinal) ||
+           string.Equals(memberName, "Length", StringComparison.Ordinal);
+
+    private static DotBoxDExpressionModel? TryLowerRecordMemberChain(
+        MemberAccessExpressionSyntax member,
+        string memberName,
+        INamedTypeSymbol receiverType,
+        DotBoxDExpressionLoweringContext context)
+    {
+        if (!IsRecordShaped(receiverType))
+        {
+            return null;
+        }
+
+        var fields = DotBoxDRpcTypeMapper.RecordFields(receiverType);
+        for (var i = 0; i < fields.Count; i++)
+        {
+            if (!string.Equals(fields[i].Name, memberName, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             var receiver = Lower(member.Expression, context);
-            if (!string.Equals(receiver.Type, DotBoxDGenerationNames.ManifestTypes.List, StringComparison.Ordinal))
+            if (!string.Equals(receiver.Type, DotBoxDGenerationNames.ManifestTypes.Record, StringComparison.Ordinal))
             {
                 return null;
             }
 
-            var source =
-                $"new {DotBoxDGenerationNames.TypeNames.GlobalCallExpression}(" +
-                $"{LiteralReader.StringLiteral("list.count")}, [{receiver.Source}], null, Span)";
-            return new DotBoxDExpressionModel(source, DotBoxDGenerationNames.ManifestTypes.Int, receiver.Allocates);
-        }
-
-        if (receiverType is INamedTypeSymbol named && IsRecordShaped(named))
-        {
-            var fields = DotBoxDRpcTypeMapper.RecordFields(named);
-            for (var i = 0; i < fields.Count; i++)
-            {
-                if (!string.Equals(fields[i].Name, memberName, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                var receiver = Lower(member.Expression, context);
-                if (!string.Equals(receiver.Type, DotBoxDGenerationNames.ManifestTypes.Record, StringComparison.Ordinal))
-                {
-                    return null;
-                }
-
-                return RecordGet(receiver, i, fields[i].Type, receiver.Allocates);
-            }
+            CollectRecordMemberCapability(fields[i], context);
+            return RecordGet(receiver, i, fields[i].Type, receiver.Allocates);
         }
 
         return null;
@@ -182,6 +213,18 @@ internal static partial class DotBoxDExpressionModelFactory
         }
 
         if (PluginSymbolReader.Capability(property) is { } capability)
+        {
+            context.Capabilities.Add(capability);
+        }
+    }
+
+    private static void CollectRecordMemberCapability(
+        RecordMember member,
+        DotBoxDExpressionLoweringContext context)
+    {
+        if (context.Capabilities is not null &&
+            member.Symbol is IPropertySymbol property &&
+            PluginSymbolReader.Capability(property) is { } capability)
         {
             context.Capabilities.Add(capability);
         }

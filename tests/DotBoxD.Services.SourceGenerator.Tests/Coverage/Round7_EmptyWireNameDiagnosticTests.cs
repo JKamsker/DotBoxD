@@ -55,8 +55,10 @@ namespace Bug.EmptyMethodName
             .RunGenerators(GeneratorTestHelper.CreateCompilation(source))
             .GetRunResult();
 
-        Assert.Contains(
+        var diagnostic = Assert.Single(
             runResult.Diagnostics,
             d => d.Id == "DBXS002" && d.Severity == DiagnosticSeverity.Error);
+        Assert.Contains("[RpcMethod(Name = ...)]", diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.DoesNotContain("[DotBoxDMethod(Name = ...)]", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 }

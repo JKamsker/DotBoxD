@@ -14,6 +14,10 @@ public static class SandboxValueValidator
         SandboxErrorCode errorCode,
         string message)
     {
+        ArgumentNullException.ThrowIfNull(value);
+        ArgumentNullException.ThrowIfNull(expectedType);
+        ArgumentNullException.ThrowIfNull(message);
+
         // Scalars have no nested structure, so they can never form a cycle and need
         // no traversal bookkeeping. Validate them inline to avoid allocating the
         // HashSet/Stack the recursive collection walk requires; this is the hot path
@@ -54,11 +58,11 @@ public static class SandboxValueValidator
                     throw Error(errorCode, message);
                 }
 
-                RequireScalarInvariants(frame.Value, errorCode, message);
+                SandboxScalarValueValidator.RequireScalarInvariants(frame.Value, errorCode, message);
                 switch (frame.Value)
                 {
                     case OpaqueIdValue id:
-                        RequireOpaqueId(id, errorCode, message);
+                        SandboxScalarValueValidator.RequireOpaqueId(id, errorCode, message);
                         break;
                     case ListValue list:
                         PushList(list, frame.ExpectedType, active, stack, errorCode, message);
@@ -113,9 +117,9 @@ public static class SandboxValueValidator
         SandboxErrorCode errorCode,
         string message)
     {
-        if (IsBuiltInScalarType(value, expectedType))
+        if (SandboxScalarValueValidator.IsBuiltInScalarType(value, expectedType))
         {
-            RequireScalarInvariants(value, errorCode, message);
+            SandboxScalarValueValidator.RequireScalarInvariants(value, errorCode, message);
             return;
         }
 
@@ -125,10 +129,10 @@ public static class SandboxValueValidator
             throw Error(errorCode, message);
         }
 
-        RequireScalarInvariants(value, errorCode, message);
+        SandboxScalarValueValidator.RequireScalarInvariants(value, errorCode, message);
         if (value is OpaqueIdValue id)
         {
-            RequireOpaqueId(id, errorCode, message);
+            SandboxScalarValueValidator.RequireOpaqueId(id, errorCode, message);
         }
     }
 
@@ -211,63 +215,6 @@ public static class SandboxValueValidator
 
     private static SandboxRuntimeException Error(SandboxErrorCode code, string message)
         => new(new SandboxError(code, message));
-
-    private static bool IsBuiltInScalarType(SandboxValue value, SandboxType expectedType)
-        => value switch
-        {
-            UnitValue => ReferenceEquals(expectedType, SandboxType.Unit),
-            BoolValue => ReferenceEquals(expectedType, SandboxType.Bool),
-            I32Value => ReferenceEquals(expectedType, SandboxType.I32),
-            I64Value => ReferenceEquals(expectedType, SandboxType.I64),
-            F64Value => ReferenceEquals(expectedType, SandboxType.F64),
-            StringValue => ReferenceEquals(expectedType, SandboxType.String),
-            GuidValue => ReferenceEquals(expectedType, SandboxType.Guid),
-            SandboxPathValue => ReferenceEquals(expectedType, SandboxType.SandboxPath),
-            SandboxUriValue => ReferenceEquals(expectedType, SandboxType.SandboxUri),
-            _ => false
-        };
-
-    internal static void RequireScalarInvariants(
-        SandboxValue value,
-        SandboxErrorCode errorCode,
-        string message)
-    {
-        switch (value)
-        {
-            case StringValue { Value: null }:
-                throw Error(errorCode, message);
-            case F64Value number when !double.IsFinite(number.Value):
-                throw Error(errorCode, message);
-            case SandboxPathValue path:
-                if (path.Value?.RelativePath is not { } relativePath ||
-                    !SandboxLiteralConstraints.IsPortableRelativePath(relativePath))
-                {
-                    throw Error(errorCode, message);
-                }
-
-                break;
-            case SandboxUriValue uri:
-                if (uri.Value?.Value is not { } valueText ||
-                    !SandboxLiteralConstraints.IsSandboxUri(valueText))
-                {
-                    throw Error(errorCode, message);
-                }
-
-                break;
-        }
-    }
-
-    private static void RequireOpaqueId(
-        OpaqueIdValue id,
-        SandboxErrorCode errorCode,
-        string message)
-    {
-        if (!SandboxType.IsKnownOpaqueId(id.TypeName) ||
-            !SandboxLiteralConstraints.IsOpaqueId(id.Value))
-        {
-            throw Error(errorCode, message);
-        }
-    }
 
     private readonly record struct Frame(SandboxValue Value, SandboxType ExpectedType, bool Exit);
 }

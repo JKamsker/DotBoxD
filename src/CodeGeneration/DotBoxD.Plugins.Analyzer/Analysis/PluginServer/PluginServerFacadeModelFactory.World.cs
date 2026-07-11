@@ -44,7 +44,7 @@ internal static partial class PluginServerFacadeModelFactory
             "is file-local or inaccessible and cannot be named from the generated facade.");
     }
 
-    private static bool IsAccessibleFromGeneratedServer(
+    internal static bool IsAccessibleFromGeneratedServer(
         Compilation compilation,
         INamedTypeSymbol serverType,
         ISymbol symbol)
@@ -183,4 +183,10 @@ internal static partial class PluginServerFacadeModelFactory
 
         return fallback?.ElementType;
     }
+
+    private static bool AssemblyEnablesClsCompliance(Compilation compilation)
+        => compilation.Assembly.GetAttributes().Any(static attribute =>
+            string.Equals(attribute.AttributeClass?.ToDisplayString(), "System.CLSCompliantAttribute", StringComparison.Ordinal) &&
+            attribute.ConstructorArguments.Length == 1 &&
+            attribute.ConstructorArguments[0].Value is true);
 }

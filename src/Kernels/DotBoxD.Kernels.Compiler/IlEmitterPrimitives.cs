@@ -10,48 +10,36 @@ using System.Reflection.Emit;
 internal static class IlEmitterPrimitives
 {
     private static readonly ConcurrentDictionary<string, MethodInfo> RuntimeMethodCache = new();
+    private static readonly OpCode[] Int32ShortOpcodes =
+    [
+        OpCodes.Ldc_I4_M1,
+        OpCodes.Ldc_I4_0,
+        OpCodes.Ldc_I4_1,
+        OpCodes.Ldc_I4_2,
+        OpCodes.Ldc_I4_3,
+        OpCodes.Ldc_I4_4,
+        OpCodes.Ldc_I4_5,
+        OpCodes.Ldc_I4_6,
+        OpCodes.Ldc_I4_7,
+        OpCodes.Ldc_I4_8
+    ];
 
     public static void EmitInt32(ILGenerator il, int value)
     {
-        switch (value)
+        var shortIndex = value + 1;
+        if ((uint)shortIndex < (uint)Int32ShortOpcodes.Length)
         {
-            case -1:
-                il.Emit(OpCodes.Ldc_I4_M1);
-                break;
-            case 0:
-                il.Emit(OpCodes.Ldc_I4_0);
-                break;
-            case 1:
-                il.Emit(OpCodes.Ldc_I4_1);
-                break;
-            case 2:
-                il.Emit(OpCodes.Ldc_I4_2);
-                break;
-            case 3:
-                il.Emit(OpCodes.Ldc_I4_3);
-                break;
-            case 4:
-                il.Emit(OpCodes.Ldc_I4_4);
-                break;
-            case 5:
-                il.Emit(OpCodes.Ldc_I4_5);
-                break;
-            case 6:
-                il.Emit(OpCodes.Ldc_I4_6);
-                break;
-            case 7:
-                il.Emit(OpCodes.Ldc_I4_7);
-                break;
-            case 8:
-                il.Emit(OpCodes.Ldc_I4_8);
-                break;
-            case >= sbyte.MinValue and <= sbyte.MaxValue:
-                il.Emit(OpCodes.Ldc_I4_S, (sbyte)value);
-                break;
-            default:
-                il.Emit(OpCodes.Ldc_I4, value);
-                break;
+            il.Emit(Int32ShortOpcodes[shortIndex]);
+            return;
         }
+
+        if (value >= sbyte.MinValue && value <= sbyte.MaxValue)
+        {
+            il.Emit(OpCodes.Ldc_I4_S, (sbyte)value);
+            return;
+        }
+
+        il.Emit(OpCodes.Ldc_I4, value);
     }
 
     public static MethodInfo Runtime(string name)

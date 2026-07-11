@@ -78,30 +78,21 @@ internal sealed partial class RawI32ExpressionPlan
 
     private static bool CanUseDirectIntrinsic(IBindingCatalog bindings, string id, ExpressionKind kind)
         => bindings.TryGet(id, out var binding) &&
-           binding.Compiled is { Kind: "RuntimeStub" } &&
-           binding.Compiled.Type == typeof(CompiledRuntime).FullName &&
-           binding.Compiled.Method == BoxedMethod(kind) &&
-           binding.Parameters.Count == MathArgumentCount(kind) &&
-           ParametersAreI32(binding.Parameters) &&
-           binding.ReturnType.Equals(SandboxType.I32) &&
-           binding.RequiredCapability is null &&
-           binding.Safety == BindingSafety.PureIntrinsic &&
-           binding.AuditLevel == AuditLevel.None &&
-           binding.CostModel.MaxCallsPerRun is null &&
-           (binding.Effects & ~(SandboxEffect.Cpu | SandboxEffect.Alloc)) == SandboxEffect.None;
+           CompiledIntrinsicBindingMatcher.IsPureRuntimeStub(
+               binding,
+               BoxedMethod(kind),
+               SandboxType.I32,
+               I32Parameters(MathArgumentCount(kind)),
+               requireUnboundedCost: true);
 
-    private static bool ParametersAreI32(IReadOnlyList<SandboxType> parameters)
-    {
-        for (var i = 0; i < parameters.Count; i++)
+    private static SandboxType[] I32Parameters(int count)
+        => count switch
         {
-            if (!parameters[i].Equals(SandboxType.I32))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
+            1 => [SandboxType.I32],
+            2 => [SandboxType.I32, SandboxType.I32],
+            3 => [SandboxType.I32, SandboxType.I32, SandboxType.I32],
+            _ => []
+        };
 
     private static bool TryGetMathKind(string id, out ExpressionKind kind)
     {

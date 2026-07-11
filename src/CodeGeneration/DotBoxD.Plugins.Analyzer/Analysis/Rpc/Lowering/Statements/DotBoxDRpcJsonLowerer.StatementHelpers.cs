@@ -6,7 +6,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 internal sealed partial class DotBoxDRpcJsonLowerer
 {
-    private string IncrementStatement(IdentifierNameSyntax target, SyntaxKind kind)
+    internal string IncrementStatement(IdentifierNameSyntax target, SyntaxKind kind)
     {
         var op = kind is SyntaxKind.PostIncrementExpression or SyntaxKind.PreIncrementExpression ? "add" : "sub";
         return SetStatement(
@@ -24,10 +24,10 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 $"Server extension increment target type '{type.ToDisplayString()}' is not supported.")
         };
 
-    private void LowerWhile(WhileStatementSyntax loop, List<string> output)
+    internal void LowerWhile(WhileStatementSyntax loop, List<string> output)
     {
         var body = new List<string>();
-        LowerStatement(loop.Statement, body);
+        RpcJsonStatementLowerer.LowerStatement(this, loop.Statement, body);
         output.Add(Obj(
             ("op", Str("while")),
             ("condition", LowerRepeatedCondition(loop.Condition)),

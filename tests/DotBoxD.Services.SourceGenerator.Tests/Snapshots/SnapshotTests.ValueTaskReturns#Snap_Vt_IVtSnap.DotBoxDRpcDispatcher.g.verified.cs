@@ -63,6 +63,7 @@ namespace Snap.Vt
                     var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result
                         : await __dotboxd_task;
+                    ct.ThrowIfCancellationRequested();
                     serializer.Serialize(output, __dotboxd_result);
                     return;
                 }

@@ -11,7 +11,7 @@ public sealed partial class SandboxHost
             runId,
             "ExecutionFallback",
             AuditTime(plan),
-            true,
+            false,
             ResourceId: $"module:{plan.ModuleHash}",
             ErrorCode: reason.Code,
             Message: $"compiled execution fell back to interpreted mode: {reason.SafeMessage}");
@@ -65,14 +65,14 @@ public sealed partial class SandboxHost
             ResourceId: $"module:{plan.ModuleHash}",
             ErrorCode: error.Code,
             Message: error.SafeMessage));
-        WriteFailedRunSummary(audit, runId, startedAt, plan, budget, options.Mode, error, false);
+        WriteFailedRunSummary(audit, runId, startedAt, plan, budget, ExecutionMode.Auto, error, false);
         return new SandboxExecutionResult
         {
             Succeeded = false,
             Error = error,
             ResourceUsage = budget.Snapshot(),
             AuditEvents = audit.OwnedEventSnapshot(),
-            ActualMode = options.Mode,
+            ActualMode = ExecutionMode.Auto,
             ExecutionDispatched = false,
             ModuleHash = plan.ModuleHash,
             PlanHash = plan.PlanHash,

@@ -37,21 +37,18 @@ public sealed class SubscriptionRegistry
         _onFault = onFault;
         _throwIfDisposed = throwIfDisposed;
     }
-
     public SubscriptionPipeline<TEvent, HookContext> On<TEvent>()
     {
         ThrowIfDisposed();
         var adapter = _events.Resolve<TEvent>();
         return On(adapter);
     }
-
     public SubscriptionPipeline<TEvent, HookContext> On<TEvent>(IPluginEventAdapter<TEvent> adapter)
     {
         ArgumentNullException.ThrowIfNull(adapter);
         ThrowIfDisposed();
         return OnHookContext(adapter, ServerContextFactory<HookContext>.Identity);
     }
-
     public SubscriptionPipeline<TEvent, TContext> On<TEvent, TContext>(Func<HookContext, TContext> createContext)
     {
         ArgumentNullException.ThrowIfNull(createContext);
@@ -59,7 +56,6 @@ public sealed class SubscriptionRegistry
         var adapter = _events.Resolve<TEvent>();
         return On(adapter, createContext);
     }
-
     public SubscriptionPipeline<TEvent, TContext> On<TEvent, TContext>(
         IPluginEventAdapter<TEvent> adapter,
         Func<HookContext, TContext> createContext)
@@ -91,7 +87,8 @@ public sealed class SubscriptionRegistry
                 new ServerContextFactory<TContext>(createContext),
                 _kernels,
                 _installer,
-                _onFault);
+                _onFault,
+                _throwIfDisposed);
             _pipelines[key] = created;
             RegisterEventTypeLocked<TEvent>();
             return created;
@@ -119,7 +116,8 @@ public sealed class SubscriptionRegistry
                 new ServerContextFactory<HookContext>(createContext),
                 _kernels,
                 _installer,
-                _onFault);
+                _onFault,
+                _throwIfDisposed);
             _pipelines[key] = created;
             RegisterEventTypeLocked<TEvent>();
             return created;

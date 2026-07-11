@@ -1,7 +1,8 @@
 # Security Policy
 
-DotBoxD is positioned as a **safe extension runtime**, so we hold its trust boundary to a high
-standard and document it precisely. Please read the boundary model below before deploying.
+DotBoxD is a **plugin runtime for .NET hosts** whose safety rests on a real, in-process sandbox
+boundary, so we hold that boundary to a high standard and document it precisely. Please read the
+boundary model below before deploying.
 
 ## Reporting a vulnerability
 
@@ -26,7 +27,7 @@ security postures:
 
 | Mode | What runs | Boundary? |
 |------|-----------|-----------|
-| **Safe mode (Kernels)** | Validated, capability-gated, fuel/quota-metered restricted **IR** (never C#, IL, reflection, CLR member names, or arbitrary host calls). Compiled kernels are additionally verified before execution. | **Yes** — this is the real in-process boundary DotBoxD is built to defend. |
+| **Safe mode (Kernels)** | Validated, capability-gated, fuel/quota-metered restricted **IR** (intermediate representation) — never C#, IL, reflection, CLR member names, or arbitrary host calls. Compiled kernels are additionally verified before execution. | **Yes** — this is the real in-process boundary DotBoxD is built to defend. |
 | **Trusted-plugin mode** | Normal .NET assemblies loaded via `AssemblyLoadContext`. | **No.** `AssemblyLoadContext` is *not* a security sandbox — loaded code runs with the full permissions of the process. Use only for code you already trust. |
 | **Untrusted arbitrary .NET code** | Any third-party assembly you do not trust. | Requires an **OS-level** boundary — a separate worker process, container, VM, or equivalent. In-process restrictions are not sufficient. |
 

@@ -31,17 +31,18 @@ dotnet tool run dotnet-stryker -- \
   --skip-version-check
 ```
 
-Initial local baselines recorded on 2026-07-05 with Stryker.NET 4.16.0:
+Measured local baselines with Stryker.NET 4.16.0:
 
-| Scope | Mutants tested | Killed | Survived | Timeout | Killed/tested | Stryker score |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Kernel validation policy scope | 111 | 71 | 40 | 0 | 63.96% | 30.60% |
-| Services protocol/framing scope | 289 | 220 | 57 | 12 | 76.12% | 75.82% |
+| Scope | Measured | Mutants tested | Killed | Survived | Timeout | No coverage | Killed/tested | Stryker score | Break threshold |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Kernel validation policy scope | 2026-07-05 | 227 | 217 | 10 | 0 | 5 | 95.59% | 93.53% | 85% |
+| Services protocol/framing scope | 2026-07-05 | 305 | 263 | 36 | 6 | 1 | 86.23% | 87.91% | 85% |
 
 `Killed/tested` is the raw killed mutant count divided by the table's tested count. `Stryker score`
 is the tool-reported mutation score from the same run and remains the value used as the baseline
 signal.
 
-The first phase is informational: both configs set `thresholds.break` to `0`, so low mutation
-scores do not fail the workflow. Tool crashes and invalid configs should still fail. Once the
-scheduled runs are stable, raise `thresholds.break` conservatively and ratchet from there.
+Both focused scopes now have supported `thresholds.break` ratchets of 85. The remaining services
+protocol/framing undetected mutants are concentrated in equivalent empty-payload copies, `ConfigureAwait`
+continuation flags, defensive disposal paths, and redundant frame-minimum guards that are validated by
+later length checks. Tool crashes and invalid configs should still fail.

@@ -50,6 +50,14 @@ jobs:
             working-directory: src/Services/DotBoxD.Services
             config-file: ../../../.config/stryker/services-protocol.json
             output-directory: ../../../artifacts/mutation/services-protocol
+          - name: kernels-verifier
+            working-directory: src/Kernels/DotBoxD.Kernels.Verifier
+            config-file: ../../../.config/stryker/kernels-verifier.json
+            output-directory: ../../../artifacts/mutation/kernels-verifier
+          - name: codecs-messagepack
+            working-directory: src/Channels/DotBoxD.Codecs.MessagePack
+            config-file: ../../../.config/stryker/codecs-messagepack.json
+            output-directory: ../../../artifacts/mutation/codecs-messagepack
 
     steps:
       - name: Checkout

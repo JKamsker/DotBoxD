@@ -47,16 +47,16 @@ internal static class WorkerPluginMessageAuditPolicy
     {
         var allowedTargets = ReadCsv(grant, "allowedTargets");
         var targetPrefixes = ReadCsv(grant, "targetPrefixes");
-        if (allowedTargets is null && targetPrefixes is null)
-        {
-            return true;
-        }
+        return NoTargetLimits(allowedTargets, targetPrefixes) ||
+            allowedTargets is not null && allowedTargets.Contains(targetId) ||
+            PrefixTargetMatches(targetPrefixes, targetId);
+    }
 
-        if (allowedTargets is not null && allowedTargets.Contains(targetId))
-        {
-            return true;
-        }
+    private static bool NoTargetLimits(IReadOnlySet<string>? allowedTargets, IReadOnlySet<string>? targetPrefixes)
+        => allowedTargets is null && targetPrefixes is null;
 
+    private static bool PrefixTargetMatches(IReadOnlySet<string>? targetPrefixes, string targetId)
+    {
         if (targetPrefixes is null)
         {
             return false;
@@ -64,10 +64,7 @@ internal static class WorkerPluginMessageAuditPolicy
 
         foreach (var prefix in targetPrefixes)
         {
-            if (targetId.StartsWith(prefix, StringComparison.Ordinal) &&
-                (targetId.Length == prefix.Length ||
-                 prefix[^1] is '.' or ':' ||
-                 targetId[prefix.Length] is '.' or ':'))
+            if (PrefixMatchesTarget(prefix, targetId))
             {
                 return true;
             }
@@ -75,6 +72,12 @@ internal static class WorkerPluginMessageAuditPolicy
 
         return false;
     }
+
+    private static bool PrefixMatchesTarget(string prefix, string targetId)
+        => targetId.StartsWith(prefix, StringComparison.Ordinal) &&
+           (targetId.Length == prefix.Length ||
+            prefix[^1] is '.' or ':' ||
+            targetId[prefix.Length] is '.' or ':');
 
     private static bool MessageLengthMatches(CapabilityGrant grant, SandboxAuditEvent auditEvent)
     {

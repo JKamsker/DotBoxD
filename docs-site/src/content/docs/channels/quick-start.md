@@ -6,9 +6,10 @@ title: 'DotBoxD Quick Start Guide'
 Get up and running with DotBoxD in 5 minutes.
 
 Reach for RPC channels when you want request/response host capabilities behind a shared contract:
-one C# interface compiles to a typed proxy plus dispatcher, so you get easy interop with no
-hand-written marshaling and no runtime reflection on the hot path (AOT-friendly, runs on
-Unity/IL2CPP) — the interface is the single source of truth. Prefer a
+one C# interface compiles to a typed proxy plus dispatcher, so you get type-safe interop with no
+hand-written marshaling and no runtime reflection on the hot path. The interface is the single source
+of truth; AOT/IL2CPP deployments additionally require generated codec formatters, explicit registry
+rooting, and validation in the consumer build. Prefer a
 [query/event pipeline](/tutorials/event-pipeline-runlocal/) instead when the host should receive
 only server-side filtered and projected data over a one-way push, or
 [pushdown](/concepts/pushdown/) when you need to collapse N round-trips into one server-side batch.

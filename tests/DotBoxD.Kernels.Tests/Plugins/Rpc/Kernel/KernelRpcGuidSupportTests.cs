@@ -48,8 +48,13 @@ public sealed class KernelRpcGuidSupportTests
 
     [Fact]
     public void Converter_rejects_a_non_guid_wire_value_for_a_guid_type()
-        => Assert.Throws<NotSupportedException>(
+    {
+        var ex = Assert.Throws<FormatException>(
             () => KernelRpcValueConverter.ToSandboxValue(KernelRpcValue.String("x"), SandboxType.Guid));
+
+        Assert.Contains("Guid", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("String", ex.Message, StringComparison.Ordinal);
+    }
 
     [Fact]
     public void Marshaller_round_trips_a_clr_guid()

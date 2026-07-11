@@ -1,3 +1,4 @@
+using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -99,25 +100,40 @@ public sealed partial class PluginAnalyzer
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        if (containingSymbol is IMethodSymbol method &&
-            HasAttribute(method, DotBoxDMetadataNames.ServerExtensionMethodAttribute))
+        if (IsServerExtensionMethod(containingSymbol))
         {
             return true;
         }
 
         foreach (var lambda in syntax.AncestorsAndSelf().OfType<LambdaExpressionSyntax>())
         {
-            if (lambda.Parent is ArgumentSyntax argument &&
-                argument.Parent is ArgumentListSyntax argumentList &&
-                argumentList.Parent is InvocationExpressionSyntax invocation &&
-                invocation.Expression is MemberAccessExpressionSyntax member)
+            if (IsForbiddenHookChainLambda(lambda, model, cancellationToken))
             {
-                return member.Name.Identifier.ValueText is "Where" or "Select" or "Run" or "Register" &&
-                    IsHookChainReceiver(member.Expression, model, cancellationToken);
+                return true;
             }
         }
 
         return false;
+    }
+
+    private static bool IsServerExtensionMethod(ISymbol? symbol)
+        => symbol is IMethodSymbol method &&
+           HasAttribute(method, DotBoxDMetadataNames.ServerExtensionMethodAttribute);
+
+    private static bool IsForbiddenHookChainLambda(
+        LambdaExpressionSyntax lambda,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (lambda.Parent is not ArgumentSyntax argument ||
+            argument.Parent is not ArgumentListSyntax argumentList ||
+            argumentList.Parent is not InvocationExpressionSyntax invocation ||
+            invocation.Expression is not MemberAccessExpressionSyntax member)
+        {
+            return false;
+        }
+
+        return IsLoweredPipelineStep(invocation, member.Expression, model, cancellationToken);
     }
 
     private static bool IsHookChainReceiver(
@@ -125,18 +141,33 @@ public sealed partial class PluginAnalyzer
         SemanticModel model,
         CancellationToken cancellationToken)
         => model.GetTypeInfo(receiver, cancellationToken).Type is INamedTypeSymbol receiverType &&
-           IsHookChainType(receiverType);
+           PipelineRoleReader.Transport(receiverType, model.Compilation) is not null;
 
-    private static bool IsHookChainType(INamedTypeSymbol type)
-        => type.ContainingNamespace.ToDisplayString() switch
+    private static bool IsLoweredPipelineStep(
+        InvocationExpressionSyntax invocation,
+        ExpressionSyntax receiver,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        var info = model.GetSymbolInfo(invocation, cancellationToken);
+        var method = info.Symbol as IMethodSymbol ??
+            (info.CandidateSymbols.Length > 0 ? info.CandidateSymbols[0] as IMethodSymbol : null);
+        if (IsForbiddenLocalUseRole(PipelineRoleReader.RoleOf(method, model.Compilation)))
         {
-            "DotBoxD.Plugins.Runtime" => type.Name is
-                "HookPipeline" or
-                "SubscriptionPipeline" or
-                "RemoteHookPipeline" or
-                "RemoteSubscriptionPipeline",
-            "DotBoxD.Plugins.Runtime.Hooks" => type.Name is "HookStage" or "RemoteHookStage",
-            "DotBoxD.Plugins.Runtime.Subscriptions" => type.Name is "SubscriptionStage" or "RemoteSubscriptionStage",
-            _ => false,
-        };
+            return IsHookChainReceiver(receiver, model, cancellationToken);
+        }
+
+        return IsForbiddenLocalUseRole(GeneratedRemoteHookChainFallback.RoleOfUnresolvedGeneratedSurface(
+            invocation,
+            model,
+            cancellationToken,
+            method));
+    }
+
+    private static bool IsForbiddenLocalUseRole(PipelineCallRole? role)
+        => role is
+            PipelineCallRole.Filter or
+            PipelineCallRole.Projection or
+            PipelineCallRole.Run or
+            PipelineCallRole.Register;
 }

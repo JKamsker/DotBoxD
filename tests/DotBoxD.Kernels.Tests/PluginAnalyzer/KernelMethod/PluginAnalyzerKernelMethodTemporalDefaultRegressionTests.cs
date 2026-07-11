@@ -80,7 +80,7 @@ public sealed class PluginAnalyzerKernelMethodTemporalDefaultRegressionTests
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK114");
         Assert.Contains(
             result.GeneratedTrees,
-            tree => tree.ToString().Contains("UseGeneratedChain", StringComparison.Ordinal));
+            tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -117,7 +117,7 @@ public sealed class PluginAnalyzerKernelMethodTemporalDefaultRegressionTests
         Assert.Contains(result.Diagnostics, d => d.Id == "DBXK114");
         Assert.DoesNotContain(
             result.GeneratedTrees,
-            tree => tree.ToString().Contains("UseGeneratedChain", StringComparison.Ordinal));
+            tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -142,7 +142,7 @@ public sealed class PluginAnalyzerKernelMethodTemporalDefaultRegressionTests
         Assert.Contains(result.Diagnostics, d => d.Id == "DBXK114");
         Assert.DoesNotContain(
             result.GeneratedTrees,
-            tree => tree.ToString().Contains("UseGeneratedChain", StringComparison.Ordinal));
+            tree => tree.ToString().Contains("IRKernel.FromPackage", StringComparison.Ordinal));
     }
 
     private static PluginPackage HookChainPackage(Assembly assembly)

@@ -42,6 +42,7 @@ public static class MessageFramer
     /// </summary>
     public static void WriteFrame(IBufferWriter<byte> writer, int messageId, MessageType type, ReadOnlySpan<byte> payload)
     {
+        ProtocolArgumentGuard.ThrowIfNull(writer, nameof(writer));
         MessageFrameReader.ThrowIfUndefinedMessageType(type);
 
         var totalLength = MessageFrameReader.GetOutgoingFrameLength(payload.Length);
@@ -94,6 +95,7 @@ public static class MessageFramer
         T envelope,
         ReadOnlySpan<byte> payload)
     {
+        ProtocolArgumentGuard.ThrowIfNull(serializer, nameof(serializer));
         using var writer = RentFrameWriter(payload.Length);
         WriteFramePrefix(writer, messageId, type);
 
@@ -157,6 +159,7 @@ public static class MessageFramer
         TEnvelope envelope,
         TArgument argument)
     {
+        ProtocolArgumentGuard.ThrowIfNull(serializer, nameof(serializer));
         using var writer = RentFrameWriter();
         WriteFramePrefix(writer, messageId, type);
 

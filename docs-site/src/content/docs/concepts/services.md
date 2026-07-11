@@ -1,6 +1,6 @@
 ---
 title: 'Services (RPC)'
-description: 'A Service is a handwritten host capability behind a shared C# contract. Annotate an interface with'
+description: 'A Service is a handwritten host capability behind a shared C# contract: annotate an interface with [RpcService] and the source generator emits a typed proxy and dispatcher at compile time.'
 ---
 A **Service** is a handwritten host capability behind a shared C# contract. Annotate an interface with
 `[RpcService]` and the `DotBoxD.Services.SourceGenerator` emits, at compile time:
@@ -16,7 +16,11 @@ and call services. It is transport- and codec-neutral:
   for tests). Channels carry framed messages and know nothing about services.
 - **Codecs**: `DotBoxD.Codecs.MessagePack`.
 
-The Services + channel + codec libraries target **netstandard2.1**, so they run on **Unity / IL2CPP**.
+The Services + channel + codec libraries target **netstandard2.1**. Unity/IL2CPP additionally requires
+generated MessagePack DTO formatters and a static resolver; target framework compatibility alone does
+not prove an AOT build. NativeAOT/IL2CPP hosts must also directly reference the generated
+`DotBoxD.Services.Generated.DotBoxDGenerated` type (for example, read its `Services` property during
+startup) so trimming cannot remove a registry that would otherwise only be found by name.
 
 ## Why Services (RPC)?
 
@@ -35,10 +39,11 @@ marshaling — one method, one remote round-trip.
 
 Grounded aspects:
 
-- **AOT / Unity / IL2CPP reach.** There is no runtime reflection on the hot path and no assembly scan
-  — proxy/dispatcher lookup goes through a *generated* registry — so the netstandard2.1 Services stack
-  runs where IL2CPP and NativeAOT (ahead-of-time compilation) forbid dynamic reflection. The MessagePack codec is reflection-free
-  too (generated formatters).
+- **AOT / Unity / IL2CPP reach.** Proxy/dispatcher lookup goes through a generated registry rather than
+  an assembly scan. MessagePack's default resolver chain is reflection-capable, so AOT deployments must
+  supply generated DTO formatters through `MessagePackRpcSerializer.CreateWithResolver` and validate a
+  real IL2CPP/NativeAOT build for their DTO set. They must also root the generated registry explicitly;
+  the repository's NativeAOT smoke demonstrates that startup step.
 - **Peer-based, bidirectional.** Direction is configuration, not type: the same connection can both
   `Provide` and `Get`, so the host can call back into a connected plugin over one demuxed read loop —
   there is no separate client/server class on the hot path.
@@ -55,7 +60,7 @@ reach (Services is the most-mature netstandard2.1 surface).
 
 **When to prefer another mode:** to react to a high-frequency server event but only need a filtered
 subset, prefer the [event pipeline (RunLocal)](/tutorials/event-pipeline-runlocal/) — `Where` /
-`Select` lower to server-side IR so only matching, projected values cross the pipe (one-way push, no
+`Select` lower to server-side restricted IR (intermediate representation) so only matching, projected values cross the pipe (one-way push, no
 round-trips). To collapse a chatty N-call loop over the host's fine-grained bindings into one
 server-side batch, prefer [Pushdown](/concepts/pushdown/) — the batch runs as verified, capability-gated,
 fuel-metered IR.

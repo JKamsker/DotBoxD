@@ -50,6 +50,7 @@ internal static class RpcKernelDirectClientExtensionEmitter
             var request = locals.Next("__request");
             var response = locals.Next("__response");
             var result = locals.Next("__result");
+            RpcMethodMetadataAttributeSource.Append(builder, kernelMethod, "    ");
             RpcReturnFlowAttributeSource.Append(builder, kernelMethod, "    ");
             builder.Append("    public static ");
             if (isAsyncReturn)
@@ -99,6 +100,7 @@ internal static class RpcKernelDirectClientExtensionEmitter
             if (payloadReturnType is null)
             {
                 AppendInvoke(builder, isAsyncReturn, accessor, request, response, cancellationToken, assignResponse: true);
+                builder.Append("        ").Append(cancellationToken).AppendLine(".ThrowIfCancellationRequested();");
                 builder.Append($"        {DotBoxDRpcValueNames.GlobalKernelRpcBinaryCodec}.DecodeValue(").Append(response)
                     .AppendLine($").RequireKind({DotBoxDRpcValueNames.GlobalKernelRpcValueKind}.Unit);");
                 builder.AppendLine("        return;");
@@ -106,6 +108,7 @@ internal static class RpcKernelDirectClientExtensionEmitter
             else
             {
                 AppendInvoke(builder, isAsyncReturn, accessor, request, response, cancellationToken, assignResponse: true);
+                builder.Append("        ").Append(cancellationToken).AppendLine(".ThrowIfCancellationRequested();");
                 builder.Append("        var ").Append(result)
                     .Append($" = {DotBoxDRpcValueNames.GlobalKernelRpcBinaryCodec}.DecodeValue(")
                     .Append(response).AppendLine(");");

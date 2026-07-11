@@ -69,16 +69,18 @@ public sealed class QueryFilterInactiveArmValidationTests
     [Fact]
     public void Document_serialization_rejects_filter_inactive_arms()
     {
-        var document = EventQueryDocument.Create(
-            "AttackEvent",
-            new QueryFilter
+        var document = new EventQueryDocument
+        {
+            EventName = "AttackEvent",
+            Filter = new QueryFilter
             {
                 Kind = QueryFilterKind.MatchAll,
                 Value = QueryValue.FromString("hidden"),
                 Values = [QueryValue.FromInteger(1)],
                 Children = [QueryFilter.Compare("Damage", QueryComparisonOperator.Equal, QueryValue.FromInteger(5))],
             },
-            QueryProjection.Identity);
+            Projection = QueryProjection.Identity,
+        };
 
         AssertInactiveArmRejection(() => EventQueryJson.Serialize(document));
     }

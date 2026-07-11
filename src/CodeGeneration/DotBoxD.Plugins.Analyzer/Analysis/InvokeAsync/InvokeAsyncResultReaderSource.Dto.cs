@@ -148,65 +148,94 @@ internal sealed partial class InvokeAsyncResultReaderSource
         ResolvedDtoConstructor? rejectedPartial = null;
         foreach (var constructor in type.InstanceConstructors)
         {
-            if (!DotBoxDRpcTypeMapper.IsAccessibleFromGeneratedCode(constructor, _compilation) ||
-                constructor.Parameters.Length == 0)
+            if (!TryMatchConstructor(constructor, fields, out var assigned))
             {
                 continue;
             }
 
-            var matched = true;
-            var assigned = new bool[fields.Count];
-            foreach (var parameter in constructor.Parameters)
+            RpcDtoFieldMatcher.ValidateNoRefLikeParameters(
+                constructor,
+                $"InvokeAsync DTO '{type.ToDisplayString()}'");
+
+            var assignedCount = AssignedCount(assigned);
+            var resolved = new ResolvedDtoConstructor(constructor, assigned, assignedCount);
+            if (assignedCount == fields.Count)
             {
-                var fieldIndex = RpcDtoFieldMatcher.FieldIndex(fields, parameter);
-                if (fieldIndex < 0)
-                {
-                    if (parameter.HasExplicitDefaultValue)
-                    {
-                        continue;
-                    }
-
-                    matched = false;
-                    break;
-                }
-
-                if (assigned[fieldIndex])
-                {
-                    matched = false;
-                    break;
-                }
-
-                assigned[fieldIndex] = true;
+                return resolved;
             }
 
-            if (matched)
-            {
-                RpcDtoFieldMatcher.ValidateNoRefLikeParameters(
-                    constructor,
-                    $"InvokeAsync DTO '{type.ToDisplayString()}'");
-
-                var assignedCount = AssignedCount(assigned);
-                var resolved = new ResolvedDtoConstructor(constructor, assigned, assignedCount);
-                if (assignedCount == fields.Count)
-                {
-                    return resolved;
-                }
-
-                if (DotBoxDRpcTypeMapper.CanReconstructFromAssignedFields(fields, assigned, _compilation))
-                {
-                    if (partial is null || assignedCount > partial.AssignedCount)
-                    {
-                        partial = resolved;
-                    }
-                }
-                else if (rejectedPartial is null || assignedCount > rejectedPartial.AssignedCount)
-                {
-                    rejectedPartial = resolved;
-                }
-            }
+            SelectPartialConstructor(fields, resolved, ref partial, ref rejectedPartial);
         }
 
         return partial ?? rejectedPartial;
+    }
+
+    private bool TryMatchConstructor(
+        IMethodSymbol constructor,
+        IReadOnlyList<RecordMember> fields,
+        out bool[] assigned)
+    {
+        assigned = new bool[fields.Count];
+        if (!DotBoxDRpcTypeMapper.IsAccessibleFromGeneratedCode(constructor, _compilation) ||
+            constructor.Parameters.Length == 0)
+        {
+            return false;
+        }
+
+        foreach (var parameter in constructor.Parameters)
+        {
+            if (!TryAssignConstructorParameter(fields, assigned, parameter))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryAssignConstructorParameter(
+        IReadOnlyList<RecordMember> fields,
+        bool[] assigned,
+        IParameterSymbol parameter)
+    {
+        var fieldIndex = RpcDtoFieldMatcher.FieldIndex(fields, parameter);
+        if (fieldIndex < 0)
+        {
+            return parameter.HasExplicitDefaultValue;
+        }
+
+        if (assigned[fieldIndex])
+        {
+            return false;
+        }
+
+        assigned[fieldIndex] = true;
+        return true;
+    }
+
+    private void SelectPartialConstructor(
+        IReadOnlyList<RecordMember> fields,
+        ResolvedDtoConstructor candidate,
+        ref ResolvedDtoConstructor? partial,
+        ref ResolvedDtoConstructor? rejectedPartial)
+    {
+        if (DotBoxDRpcTypeMapper.CanReconstructFromAssignedFields(fields, candidate.Assigned, _compilation))
+        {
+            SelectBetterConstructor(candidate, ref partial);
+            return;
+        }
+
+        SelectBetterConstructor(candidate, ref rejectedPartial);
+    }
+
+    private static void SelectBetterConstructor(
+        ResolvedDtoConstructor candidate,
+        ref ResolvedDtoConstructor? selected)
+    {
+        if (selected is null || candidate.AssignedCount > selected.AssignedCount)
+        {
+            selected = candidate;
+        }
     }
 
     private static string Identifier(string name)

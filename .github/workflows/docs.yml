@@ -97,6 +97,10 @@ jobs:
         working-directory: docs-site
         run: npm run build
 
+      - name: Validate internal documentation links
+        shell: pwsh
+        run: ./eng/scripts/check-doc-links.ps1
+
       - name: Disable Jekyll on the published site
         # Astro emits hashed assets under _astro/, which Jekyll would otherwise ignore.
         run: touch docs-site/dist/.nojekyll

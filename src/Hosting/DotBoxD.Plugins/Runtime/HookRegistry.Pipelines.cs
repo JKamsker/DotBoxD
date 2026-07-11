@@ -4,6 +4,76 @@ namespace DotBoxD.Plugins.Runtime;
 
 public sealed partial class HookRegistry
 {
+    internal HookPipeline<TEvent, HookContext> OnForWire<TEvent>(
+        IPluginEventAdapter<TEvent> adapter,
+        out bool created)
+    {
+        ArgumentNullException.ThrowIfNull(adapter);
+        ThrowIfDisposed();
+        lock (_gate)
+        {
+            EnsureCanRegisterLocked(adapter);
+            var key = new PipelineKey(typeof(TEvent), typeof(HookContext));
+            if (_pipelines.TryGetValue(key, out var existing))
+            {
+                created = false;
+                var pipeline = (HookPipeline<TEvent, HookContext>)existing;
+                EnsureContextFactoryMatches(pipeline.UsesContextFactory, ServerContextFactory<HookContext>.Identity, "hook");
+                return pipeline;
+            }
+
+            created = true;
+            var createdPipeline = new HookPipeline<TEvent, HookContext>(
+                adapter,
+                _messages,
+                new ServerContextFactory<HookContext>(ServerContextFactory<HookContext>.Identity),
+                _kernels,
+                _installer,
+                _onFault,
+                NextResultOrder);
+            _pipelines[key] = createdPipeline;
+            RegisterEventTypeLocked<TEvent>();
+            return createdPipeline;
+        }
+    }
+
+    internal void RemoveWirePipeline<TEvent>(
+        IPluginEventAdapter<TEvent> adapter,
+        HookPipeline<TEvent, HookContext> pipeline)
+    {
+        lock (_gate)
+        {
+            var key = new PipelineKey(typeof(TEvent), typeof(HookContext));
+            if (!_pipelines.TryGetValue(key, out var existing) ||
+                !ReferenceEquals(existing, pipeline) ||
+                !pipeline.UsesAdapter(adapter))
+            {
+                return;
+            }
+
+            _pipelines.Remove(key);
+            var eventType = typeof(TEvent);
+            _pipelineFanout.Remove(eventType);
+            if (!HasPipelineForEventLocked(eventType))
+            {
+                _pipelineEventTypes.Remove(eventType);
+            }
+        }
+    }
+
+    private bool HasPipelineForEventLocked(Type eventType)
+    {
+        foreach (var key in _pipelines.Keys)
+        {
+            if (key.EventType == eventType)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private void EnsureCanRegisterLocked<TEvent>(IPluginEventAdapter<TEvent> adapter)
     {
         foreach (var (key, existing) in _pipelines)

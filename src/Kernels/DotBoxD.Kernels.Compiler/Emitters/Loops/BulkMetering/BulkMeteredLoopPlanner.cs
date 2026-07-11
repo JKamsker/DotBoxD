@@ -121,6 +121,21 @@ internal sealed class BulkMeteredLoopPlanner
 
     private bool TryMeasureScalarExpression(Expression expression, out int fuel)
     {
+        if (TryMeasureLeafExpression(expression, out fuel))
+        {
+            return true;
+        }
+
+        if (TryMeasureUnaryExpression(expression, out fuel))
+        {
+            return true;
+        }
+
+        return TryMeasureBinaryExpression(expression, out fuel);
+    }
+
+    private bool TryMeasureLeafExpression(Expression expression, out int fuel)
+    {
         switch (expression)
         {
             case LiteralExpression { Value: I32Value or I64Value or F64Value or BoolValue }:
@@ -129,21 +144,63 @@ internal sealed class BulkMeteredLoopPlanner
             case VariableExpression variable when _stackPlan.LocalKind(variable.Name) != StackKind.Boxed:
                 fuel = 1;
                 return true;
-            case UnaryExpression { Operator: "-" } unary
-                when _stackPlan.Infer(unary.Operand)?.Name is "I32" or "I64" or "F64" &&
-                     TryMeasureScalarExpression(unary.Operand, out var operandFuel):
-                fuel = 1 + operandFuel;
-                return true;
-            case BinaryExpression binary when IsSupportedBinary(binary) &&
-                                              TryMeasureScalarExpression(binary.Left, out var leftFuel) &&
-                                              TryMeasureScalarExpression(binary.Right, out var rightFuel):
-                fuel = 1 + leftFuel + rightFuel;
-                return true;
             default:
                 fuel = 0;
                 return false;
         }
     }
+
+    private bool TryMeasureUnaryExpression(Expression expression, out int fuel)
+    {
+        fuel = 0;
+        if (expression is not UnaryExpression { Operator: "-" } unary)
+        {
+            return false;
+        }
+
+        if (!IsSupportedUnaryOperand(unary.Operand))
+        {
+            return false;
+        }
+
+        if (!TryMeasureScalarExpression(unary.Operand, out var operandFuel))
+        {
+            return false;
+        }
+
+        fuel = 1 + operandFuel;
+        return true;
+    }
+
+    private bool TryMeasureBinaryExpression(Expression expression, out int fuel)
+    {
+        fuel = 0;
+        if (expression is not BinaryExpression binary)
+        {
+            return false;
+        }
+
+        if (!IsSupportedBinary(binary))
+        {
+            return false;
+        }
+
+        if (!TryMeasureScalarExpression(binary.Left, out var leftFuel))
+        {
+            return false;
+        }
+
+        if (!TryMeasureScalarExpression(binary.Right, out var rightFuel))
+        {
+            return false;
+        }
+
+        fuel = 1 + leftFuel + rightFuel;
+        return true;
+    }
+
+    private bool IsSupportedUnaryOperand(Expression expression)
+        => _stackPlan.Infer(expression)?.Name is "I32" or "I64" or "F64";
 
     private bool IsSupportedBinary(BinaryExpression binary)
     {

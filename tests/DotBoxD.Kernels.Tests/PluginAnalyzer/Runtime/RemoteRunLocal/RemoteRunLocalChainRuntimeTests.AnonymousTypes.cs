@@ -210,7 +210,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         // DerivedInfo.ZoneLength is set only in the ctor body, so it is not one of record.new's arguments. The chain
         // is skipped (not lowered) rather than emitting a 1-field record that silently omits ZoneLength — and the
         // generated code stays valid. Compile asserts emit success internally.
-        _ = Compile(DerivedFieldSource, enableInterceptors: true);
+        _ = Compile(DerivedFieldSource, enableInterceptors: true, suppressFailClosedDiagnostic: true);
         Assert.DoesNotContain("record.new", GeneratedSource(DerivedFieldSource));
     }
 
@@ -259,7 +259,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         // e.Scores == e.Scores compares two List<int> values. C# `==` is reference equality there, but the sandbox
         // compares structurally — so the predicate's meaning would change. The chain fails safe (skipped), not
         // lowered to a structural list comparison.
-        _ = Compile(NonScalarEqualitySource, enableInterceptors: true);
+        _ = Compile(NonScalarEqualitySource, enableInterceptors: true, suppressFailClosedDiagnostic: true);
         Assert.DoesNotContain("ReadProjected", GeneratedSource(NonScalarEqualitySource));
     }
 
@@ -268,7 +268,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
     {
         // DerivedShape inherits Zone from BaseInfo; RecordFields (and the runtime marshaller) see only declared
         // members, so the base property would be silently dropped. The chain is skipped instead.
-        _ = Compile(InheritedDtoSource, enableInterceptors: true);
+        _ = Compile(InheritedDtoSource, enableInterceptors: true, suppressFailClosedDiagnostic: true);
         Assert.DoesNotContain("ReadProjected", GeneratedSource(InheritedDtoSource));
     }
 
@@ -277,7 +277,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
     {
         // ConvertingInfo's ctor takes a long but the field is int; record.new declares the field's (int) sandbox
         // type while the value flows from the long parameter. The exact param/field type-match guard rejects it.
-        _ = Compile(ConvertingCtorSource, enableInterceptors: true);
+        _ = Compile(ConvertingCtorSource, enableInterceptors: true, suppressFailClosedDiagnostic: true);
         Assert.DoesNotContain("ReadProjected", GeneratedSource(ConvertingCtorSource));
     }
 }

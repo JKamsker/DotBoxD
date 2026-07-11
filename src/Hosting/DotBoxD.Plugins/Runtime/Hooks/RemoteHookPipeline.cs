@@ -3,17 +3,28 @@ using DotBoxD.Plugins.Runtime.Hooks;
 
 namespace DotBoxD.Plugins.Runtime;
 
+[PipelineSurface(PipelineTransport.Remote)]
 public sealed partial class RemoteHookPipeline<TEvent>
 {
     private readonly Func<PluginPackage, ValueTask<string>> _install;
     private readonly RemoteLocalHandlerRegistry? _localHandlers;
+    private readonly RemotePipelineIr _pipelineIr;
 
     internal RemoteHookPipeline(
         Func<PluginPackage, ValueTask<string>> install,
         RemoteLocalHandlerRegistry? localHandlers = null)
+        : this(install, localHandlers, RemotePipelineIr.Empty)
+    {
+    }
+
+    private RemoteHookPipeline(
+        Func<PluginPackage, ValueTask<string>> install,
+        RemoteLocalHandlerRegistry? localHandlers,
+        RemotePipelineIr pipelineIr)
     {
         _install = install;
         _localHandlers = localHandlers;
+        _pipelineIr = pipelineIr;
     }
 
     public RemoteHookPipeline<TEvent> Use<TKernel>() where TKernel : class
@@ -121,156 +132,52 @@ public sealed partial class RemoteHookPipeline<TEvent>
             return ValueTask.CompletedTask;
         }, decoder);
     }
-
-    /// <summary>
-    /// Installs a lowered local-terminal package and registers <paramref name="handler"/> as the client-side
-    /// terminal for the projected type <typeparamref name="TProjected"/>. Shared by this pipeline and by
-    /// <see cref="Hooks.RemoteHookStage{TEvent, TCurrent}"/> (whose projected type is its <c>TCurrent</c>).
-    /// </summary>
-    internal RemoteHookPipeline<TEvent> InstallLocal<TProjected>(PluginPackage package, Func<TProjected, HookContext, ValueTask> handler)
-    {
-        ArgumentNullException.ThrowIfNull(package);
-        ArgumentNullException.ThrowIfNull(handler);
-        ValidateSubscription(package);
-        LocalTerminalManifestValidator.ValidateRunLocal<TProjected>(package);
-        if (_localHandlers is null)
-        {
-            throw LocalHandlersNotSupported();
-        }
-
-        var subscriptionId = LocalTerminalIdentity.CreateCallbackSubscriptionId();
-        var registration = _localHandlers.Register(subscriptionId, handler);
-        try
-        {
-            _install(LocalTerminalIdentity.WithCallbackSubscriptionId(package, subscriptionId))
-                .AsTask()
-                .GetAwaiter()
-                .GetResult();
-        }
-        catch
-        {
-            registration.Dispose();
-            throw;
-        }
-
-        return this;
-    }
-
-    /// <summary>
-    /// Installs a lowered local-terminal package and registers <paramref name="handler"/> with a generated
-    /// reflection-free <paramref name="decoder"/> for the projected type <typeparamref name="TProjected"/>.
-    /// </summary>
-    internal RemoteHookPipeline<TEvent> InstallLocal<TProjected>(PluginPackage package, Func<TProjected, HookContext, ValueTask> handler, Func<KernelRpcValue, TProjected> decoder)
-    {
-        ArgumentNullException.ThrowIfNull(package);
-        ArgumentNullException.ThrowIfNull(handler);
-        ArgumentNullException.ThrowIfNull(decoder);
-        ValidateSubscription(package);
-        LocalTerminalManifestValidator.ValidateRunLocal<TProjected>(package);
-        if (_localHandlers is null)
-        {
-            throw LocalHandlersNotSupported();
-        }
-
-        var subscriptionId = LocalTerminalIdentity.CreateCallbackSubscriptionId();
-        var registration = _localHandlers.Register(subscriptionId, handler, decoder);
-        try
-        {
-            _install(LocalTerminalIdentity.WithCallbackSubscriptionId(package, subscriptionId))
-                .AsTask()
-                .GetAwaiter()
-                .GetResult();
-        }
-        catch
-        {
-            registration.Dispose();
-            throw;
-        }
-
-        return this;
-    }
-
-    internal RemoteHookPipeline<TEvent> InstallLocal<TProjected>(PluginPackage package, Func<TProjected, HookContext, ValueTask> handler, Func<ReadOnlyMemory<byte>, TProjected> decoder)
-    {
-        ArgumentNullException.ThrowIfNull(package);
-        ArgumentNullException.ThrowIfNull(handler);
-        ArgumentNullException.ThrowIfNull(decoder);
-        ValidateSubscription(package);
-        LocalTerminalManifestValidator.ValidateRunLocal<TProjected>(package);
-        if (_localHandlers is null)
-        {
-            throw LocalHandlersNotSupported();
-        }
-
-        var subscriptionId = LocalTerminalIdentity.CreateCallbackSubscriptionId();
-        var registration = _localHandlers.Register(subscriptionId, handler, decoder);
-        try
-        {
-            _install(LocalTerminalIdentity.WithCallbackSubscriptionId(package, subscriptionId))
-                .AsTask()
-                .GetAwaiter()
-                .GetResult();
-        }
-        catch
-        {
-            registration.Dispose();
-            throw;
-        }
-
-        return this;
-    }
-
-    public RemoteHookPipeline<TEvent> Where(Func<TEvent, HookContext, bool> filter)
+    public RemoteHookPipeline<TEvent> Where(
+        Func<TEvent, HookContext, bool> filter,
+        [IRBodyOf(nameof(filter))] IRFunc<TEvent, HookContext, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
-        return this;
+        return AppendStep(irFilter, nameof(irFilter));
     }
-
-    public RemoteHookPipeline<TEvent> Where(Func<TEvent, bool> filter)
+    public RemoteHookPipeline<TEvent> Where(
+        Func<TEvent, bool> filter,
+        [IRBodyOf(nameof(filter))] IRFunc<TEvent, bool>? irFilter = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
-        return this;
+        return AppendStep(irFilter, nameof(irFilter));
     }
-
-    public RemoteHookStage<TEvent, TNext> Select<TNext>(Func<TEvent, HookContext, TNext> projection)
+    public RemoteHookStage<TEvent, TNext> Select<TNext>(
+        Func<TEvent, HookContext, TNext> projection,
+        [IRBodyOf(nameof(projection))] IRFunc<TEvent, HookContext, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
-        return new RemoteHookStage<TEvent, TNext>(this);
+        return new RemoteHookStage<TEvent, TNext>(
+            AppendStep(irProjection, nameof(irProjection)));
     }
-
-    public RemoteHookStage<TEvent, TNext> Select<TNext>(Func<TEvent, TNext> projection)
+    public RemoteHookStage<TEvent, TNext> Select<TNext>(
+        Func<TEvent, TNext> projection,
+        [IRBodyOf(nameof(projection))] IRFunc<TEvent, TNext>? irProjection = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
-        return new RemoteHookStage<TEvent, TNext>(this);
+        return new RemoteHookStage<TEvent, TNext>(
+            AppendStep(irProjection, nameof(irProjection)));
     }
 
-    public RemoteHookPipeline<TEvent> Run(Func<TEvent, HookContext, ValueTask> handler)
-        => throw NotLowered();
+    internal RemoteHookPipeline<TEvent> AppendStep<TInput, TOutput>(
+        IRFunc<TInput, TOutput>? irFunc,
+        string parameterName)
+        => WithPipelineIr(_pipelineIr.Append(irFunc, parameterName));
 
-    public RemoteHookPipeline<TEvent> Run(Action<TEvent, HookContext> handler)
-        => throw NotLowered();
+    internal RemoteHookPipeline<TEvent> AppendStep<TInput, TContext, TOutput>(
+        IRFunc<TInput, TContext, TOutput>? irFunc,
+        string parameterName)
+        => WithPipelineIr(_pipelineIr.Append(irFunc, parameterName));
 
-    public RemoteHookPipeline<TEvent> Run(Func<TEvent, ValueTask> handler)
-        => throw NotLowered();
+    private RemoteHookPipeline<TEvent> WithPipelineIr(RemotePipelineIr pipelineIr)
+        => new(_install, _localHandlers, pipelineIr);
 
-    public RemoteHookPipeline<TEvent> Run(Action<TEvent> handler)
-        => throw NotLowered();
-
-    public RemoteHookPipeline<TEvent> RunLocal(Func<TEvent, HookContext, ValueTask> handler)
-        => throw LocalHandlersNotSupported();
-
-    public RemoteHookPipeline<TEvent> RunLocal(Action<TEvent, HookContext> handler)
-        => throw LocalHandlersNotSupported();
-
-    public RemoteHookPipeline<TEvent> RunLocal(Func<TEvent, ValueTask> handler)
-        => throw LocalHandlersNotSupported();
-
-    public RemoteHookPipeline<TEvent> RunLocal(Action<TEvent> handler)
-        => throw LocalHandlersNotSupported();
-
-    private static InvalidOperationException NotLowered()
-        => new("Remote hook Run(lambda) calls must be intercepted by the DotBoxD plugin generator.");
-
+    internal PluginPackage LocalTerminalPackage(IRKernel kernel)
+        => _pipelineIr.ComposeLocalTerminalPackage(kernel);
     private static NotSupportedException LocalHandlersNotSupported()
         => new("Remote hook RunLocal requires an event callback transport; use PluginServer.Hooks for local handlers.");
 

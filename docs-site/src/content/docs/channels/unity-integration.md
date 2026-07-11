@@ -23,13 +23,17 @@ A comprehensive guide to integrating DotBoxD into your Unity project for type-sa
 
 ## Overview
 
-DotBoxD is a transport-agnostic RPC framework designed with Unity compatibility as a primary goal. It uses compile-time source generation to create type-safe proxies and dispatchers, avoiding runtime reflection that causes issues with IL2CPP builds.
+DotBoxD is a plugin system for .NET hosts; its Services (RPC) surface is transport-agnostic and designed with Unity compatibility as a primary goal. It uses compile-time source generation to create type-safe proxies and dispatchers, avoiding the runtime reflection that causes issues with IL2CPP builds.
 
-**Why this works on Unity/IL2CPP:** the three libraries you drop into `Assets/Plugins` — [Services (RPC)](/concepts/services/), the channel/transport, and the [MessagePack codec](/concepts/channels-transports/) — all target `netstandard2.1` and keep runtime reflection off the hot path. One C# contract compiles to a typed proxy plus dispatcher (no hand-written marshaling), so nothing on the call path needs the dynamic codegen IL2CPP's AOT compiler rejects. Reach for this stack whenever you need type-safe client/server calls that must survive AOT; on Mono it works the same, but the netstandard2.1 / no-reflection design is what makes the IL2CPP target hold.
+**AOT boundary:** the libraries target `netstandard2.1` and service proxies/dispatchers are generated.
+MessagePack's default and contractless resolvers may still use reflection. IL2CPP deployments must run
+MessagePack's formatter generator for every DTO, compose the generated resolver statically, and pass it
+to `MessagePackRpcSerializer.CreateWithResolver`. The repository's NativeAOT smoke validates the .NET
+AOT path; Unity projects must keep an IL2CPP batch build in their own supported matrix.
 
 ### Key Features for Unity
 
-- **IL2CPP Safe**: No runtime reflection or dynamic code generation
+- **IL2CPP-capable with generated DTO formatters**: no dynamic resolver fallback
 - **Source Generators**: Compile-time proxy generation
 - **Shared Contracts**: Same C# interfaces on client and server
 - **MessagePack**: Fast binary serialization with Unity support
@@ -68,10 +72,10 @@ DotBoxD is a transport-agnostic RPC framework designed with Unity compatibility 
 - API Compatibility Level: .NET Standard 2.1
 
 ### Server Requirements
-- .NET 6.0 or newer (recommended: .NET 8.0+)
+- .NET 10.0 or newer for the server and Pushdown convenience host used in this guide
 
 ### NuGet Packages
-- `MessagePack` (2.5.x or newer)
+- `MessagePack` 3.1.7 (the repository-tested version)
 
 ---
 
@@ -117,7 +121,7 @@ Create `YourGame.Shared.csproj`:
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="MessagePack" Version="2.5.187" />
+    <PackageReference Include="MessagePack" Version="3.1.7" />
   </ItemGroup>
 
   <!-- Reference source generator for proxy/dispatcher generation -->
@@ -151,7 +155,7 @@ cp src/DotBoxD.Codecs.MessagePack/bin/Release/netstandard2.1/DotBoxD.Codecs.Mess
 cp src/YourGame.Shared/bin/Release/netstandard2.1/YourGame.Shared.dll "$UNITY_PLUGINS/"
 
 # Copy MessagePack (get from NuGet cache)
-cp ~/.nuget/packages/messagepack/2.5.187/lib/netstandard2.0/MessagePack.dll "$UNITY_PLUGINS/"
+cp ~/.nuget/packages/messagepack/3.1.7/lib/netstandard2.0/MessagePack.dll "$UNITY_PLUGINS/"
 
 echo "DLLs copied to Unity"
 ```
@@ -951,66 +955,34 @@ For IL2CPP builds, MessagePack needs AOT code generation hints:
 // Assets/Scripts/AOT/MessagePackAOTSetup.cs
 using MessagePack;
 using MessagePack.Resolvers;
+using DotBoxD.Codecs.MessagePack;
 using UnityEngine;
 
 public static class MessagePackAOTSetup
 {
+    public static MessagePackRpcSerializer Serializer { get; private set; }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Initialize()
     {
-        // Configure MessagePack for AOT
-        StaticCompositeResolver.Instance.Register(
-            GeneratedResolver.Instance,  // Your generated resolver
-            StandardResolver.Instance
-        );
+        // Directly root the generated RPC registry so IL2CPP cannot strip it.
+        _ = DotBoxD.Services.Generated.DotBoxDGenerated.Services;
 
-        var options = MessagePackSerializerOptions.Standard
-            .WithResolver(StaticCompositeResolver.Instance)
-            .WithSecurity(MessagePackSecurity.UntrustedData);
-
-        MessagePackSerializer.DefaultOptions = options;
+        // Replace YourGameGeneratedResolver with the resolver produced by this
+        // application's MessagePack source-generator configuration.
+        // Pass it to DotBoxD directly; changing MessagePack's global defaults is insufficient.
+        Serializer = MessagePackRpcSerializer.CreateWithResolver(YourGameGeneratedResolver.Instance);
     }
 }
 ```
 
 ### Generate MessagePack Formatters
 
-Add to your shared project:
-
-```csharp
-// YourGame.Shared/Generated/GeneratedResolver.cs
-// This file is auto-generated by MessagePack.Generator
-
-using MessagePack;
-using MessagePack.Formatters;
-
-public class GeneratedResolver : IFormatterResolver
-{
-    public static readonly GeneratedResolver Instance = new();
-
-    public IMessagePackFormatter<T> GetFormatter<T>()
-    {
-        return FormatterCache<T>.Formatter;
-    }
-
-    private static class FormatterCache<T>
-    {
-        public static readonly IMessagePackFormatter<T> Formatter;
-
-        static FormatterCache()
-        {
-            // Formatter lookup logic
-        }
-    }
-}
-```
-
-Use `mpc` (MessagePack Compiler) to generate formatters:
-
-```bash
-dotnet tool install -g MessagePack.Generator
-mpc -i src/YourGame.Shared/YourGame.Shared.csproj -o src/YourGame.Shared/Generated
-```
+`YourGameGeneratedResolver` is a placeholder, not a DotBoxD type. Annotate transported DTOs for
+MessagePack's source generator and replace it with the resolver produced by the shared project's build.
+Inspect the IL2CPP output to confirm
+that every transported DTO has a static formatter. Do not fall back to
+`ContractlessStandardResolver`; it is reflection-capable and does not establish AOT compatibility.
 
 ### Link.xml for IL2CPP
 
@@ -1343,7 +1315,7 @@ public class NotificationPoller : MonoBehaviour
 
 | DotBoxD Version | Unity Version | .NET Server | MessagePack |
 |----------------|---------------|-------------|-------------|
-| 1.0.x          | 2021.3+       | 6.0+        | 2.5.x       |
+| Current preview | 2021.3+      | 10.0+       | 3.1.7       |
 
 ---
 

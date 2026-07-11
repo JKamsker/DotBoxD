@@ -43,6 +43,7 @@ public class ServerExtensionProxy : DispatchProxy
         var method = MethodCache.GetOrAdd(targetMethod, static target => new ServerExtensionMethod(target));
         var cancellationToken = method.CancellationToken(args);
         cancellationToken.ThrowIfCancellationRequested();
+        PluginKernelRevocation.ThrowIfRevoked(_kernel.IsRevoked);
         var arguments = ConvertPayloadArguments(args, method.PayloadParameterTypes);
 
         return method.Materialize(_kernel.InvokeServerExtensionAsync(arguments, cancellationToken));
@@ -138,35 +139,46 @@ public class ServerExtensionProxy : DispatchProxy
 
         foreach (var method in methods)
         {
-            if (method.IsGenericMethodDefinition || method.ContainsGenericParameters)
-            {
-                throw new NotSupportedException("Server extension proxy service methods must be non-generic.");
-            }
-
-            var parameters = method.GetParameters();
-            for (var i = 0; i < parameters.Length; i++)
-            {
-                var parameterType = parameters[i].ParameterType;
-                if (IsCancellationToken(parameterType))
-                {
-                    if (i != parameters.Length - 1)
-                    {
-                        throw new NotSupportedException(
-                            "Server extension proxy cancellation tokens must be the final method parameter.");
-                    }
-
-                    continue;
-                }
-
-                ServerExtensionProxyValidation.RejectNullReferenceDefault(parameters[i]);
-                ServerExtensionProxyValidation.ValidatePayloadType(parameterType);
-            }
-
-            if (UnwrapReturnType(method.ReturnType) is { } payloadType)
-            {
-                ServerExtensionProxyValidation.ValidatePayloadType(payloadType);
-            }
+            ValidateServiceMethod(method);
         }
+    }
+
+    private static void ValidateServiceMethod(MethodInfo method)
+    {
+        if (method.IsGenericMethodDefinition || method.ContainsGenericParameters)
+        {
+            throw new NotSupportedException("Server extension proxy service methods must be non-generic.");
+        }
+
+        var parameters = method.GetParameters();
+        for (var i = 0; i < parameters.Length; i++)
+        {
+            ValidateServiceParameter(parameters, i);
+        }
+
+        if (UnwrapReturnType(method.ReturnType) is { } payloadType)
+        {
+            ServerExtensionProxyValidation.ValidatePayloadType(payloadType);
+        }
+    }
+
+    private static void ValidateServiceParameter(ParameterInfo[] parameters, int index)
+    {
+        var parameter = parameters[index];
+        var parameterType = parameter.ParameterType;
+        if (IsCancellationToken(parameterType))
+        {
+            if (index != parameters.Length - 1)
+            {
+                throw new NotSupportedException(
+                    "Server extension proxy cancellation tokens must be the final method parameter.");
+            }
+
+            return;
+        }
+
+        ServerExtensionProxyValidation.RejectNullReferenceDefault(parameter);
+        ServerExtensionProxyValidation.ValidatePayloadType(parameterType);
     }
 
     private static IEnumerable<MethodInfo> ContractMethods(Type serviceType)

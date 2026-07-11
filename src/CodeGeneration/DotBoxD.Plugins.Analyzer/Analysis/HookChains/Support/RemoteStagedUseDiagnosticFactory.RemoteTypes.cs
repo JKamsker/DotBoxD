@@ -22,25 +22,31 @@ internal static partial class RemoteStagedUseDiagnosticFactory
             return false;
         }
 
-        if (ContainsStageInvocation(expression))
+        if (RemoteStagedUseFlowAnalyzer.ContainsStageInvocation(expression))
         {
             return true;
         }
 
         expression = HookChainAliasResolver.UnwrapTransparentExpression(expression);
+        var expressionModel = HookChainSemanticModelResolver.For(expression, model);
+        if (expressionModel is null)
+        {
+            return false;
+        }
+
         if (expression is ConditionalExpressionSyntax conditional)
         {
-            return ContainsStageInvocationOrAlias(conditional.WhenTrue, model, cancellationToken, depth + 1) ||
-                ContainsStageInvocationOrAlias(conditional.WhenFalse, model, cancellationToken, depth + 1);
+            return ContainsStageInvocationOrAlias(conditional.WhenTrue, expressionModel, cancellationToken, depth + 1) ||
+                ContainsStageInvocationOrAlias(conditional.WhenFalse, expressionModel, cancellationToken, depth + 1);
         }
 
-        if (ReturnedExpression(expression, model, cancellationToken) is { } returned)
+        if (ReturnedExpression(expression, expressionModel, cancellationToken) is { } returned)
         {
-            return ContainsStageInvocationOrAlias(returned, model, cancellationToken, depth + 1);
+            return ContainsStageInvocationOrAlias(returned, expressionModel, cancellationToken, depth + 1);
         }
 
-        return HookChainAliasResolver.Initializer(expression, model, cancellationToken) is { } initializer &&
-            ContainsStageInvocationOrAlias(initializer, model, cancellationToken, depth + 1);
+        return HookChainAliasResolver.Initializer(expression, expressionModel, cancellationToken) is { } initializer &&
+            ContainsStageInvocationOrAlias(initializer, expressionModel, cancellationToken, depth + 1);
     }
 
     private static ExpressionSyntax? ReturnedExpression(
@@ -49,8 +55,9 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         CancellationToken cancellationToken)
     {
         expression = HookChainAliasResolver.UnwrapTransparentExpression(expression);
-        if (expression is not InvocationExpressionSyntax invocation ||
-            model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method)
+        var expressionModel = HookChainSemanticModelResolver.For(expression, model);
+        if (expressionModel is null ||
+            InvokedMethod(expression, expressionModel, cancellationToken) is not { } method)
         {
             return null;
         }
@@ -59,39 +66,63 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         {
             cancellationToken.ThrowIfCancellationRequested();
             var syntax = reference.GetSyntax(cancellationToken);
-            var expressionBody = syntax switch
-            {
-                MethodDeclarationSyntax methodDeclaration => methodDeclaration.ExpressionBody?.Expression,
-                LocalFunctionStatementSyntax localFunction => localFunction.ExpressionBody?.Expression,
-                _ => null
-            };
+            var expressionBody = ExpressionBody(syntax);
             if (expressionBody is not null)
             {
                 return expressionBody;
             }
 
-            var body = syntax switch
-            {
-                MethodDeclarationSyntax methodDeclaration => methodDeclaration.Body,
-                LocalFunctionStatementSyntax localFunction => localFunction.Body,
-                _ => null
-            };
+            var body = BlockBody(syntax);
             if (body is null)
             {
                 continue;
             }
 
-            var returns = body.DescendantNodes(static node =>
-                    node is not LambdaExpressionSyntax and not LocalFunctionStatementSyntax)
-                .OfType<ReturnStatementSyntax>()
-                .ToArray();
-            if (returns.Length == 1)
+            if (SingleReturnExpression(body) is { } returned)
             {
-                return returns[0].Expression;
+                return returned;
             }
         }
 
         return null;
+    }
+
+    private static IMethodSymbol? InvokedMethod(
+        ExpressionSyntax expression,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (expression is not InvocationExpressionSyntax invocation)
+        {
+            return null;
+        }
+
+        return HookChainSemanticModelResolver.For(invocation, model)?.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
+    }
+
+    private static ExpressionSyntax? ExpressionBody(SyntaxNode syntax)
+        => syntax switch
+        {
+            MethodDeclarationSyntax methodDeclaration => methodDeclaration.ExpressionBody?.Expression,
+            LocalFunctionStatementSyntax localFunction => localFunction.ExpressionBody?.Expression,
+            _ => null
+        };
+
+    private static BlockSyntax? BlockBody(SyntaxNode syntax)
+        => syntax switch
+        {
+            MethodDeclarationSyntax methodDeclaration => methodDeclaration.Body,
+            LocalFunctionStatementSyntax localFunction => localFunction.Body,
+            _ => null
+        };
+
+    private static ExpressionSyntax? SingleReturnExpression(BlockSyntax body)
+    {
+        var returns = body.DescendantNodes(static node =>
+                node is not LambdaExpressionSyntax and not LocalFunctionStatementSyntax)
+            .OfType<ReturnStatementSyntax>()
+            .ToArray();
+        return returns.Length == 1 ? returns[0].Expression : null;
     }
 
     private static bool IsGeneratedRemoteChain(
@@ -100,8 +131,10 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         CancellationToken cancellationToken)
     {
         var seed = WalkToSeed(expression, model, cancellationToken);
+        var seedModel = seed is null ? null : HookChainSemanticModelResolver.For(seed, model);
         return seed is not null &&
-            GeneratedRemoteHookChainFallback.Candidate(seed, model, cancellationToken) is not null;
+            seedModel is not null &&
+            GeneratedRemoteHookChainFallback.Candidate(seed, seedModel, cancellationToken) is not null;
     }
 
     private static InvocationExpressionSyntax? WalkToSeed(
@@ -109,43 +142,92 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        expression = HookChainAliasResolver.UnwrapTransparentExpression(expression);
-
-        if (HookChainAliasResolver.Initializer(expression, model, cancellationToken) is { } initializer)
-        {
-            return WalkToSeed(initializer, model, cancellationToken);
-        }
-
         var current = expression;
+        var currentModel = model;
         while (true)
         {
-            current = HookChainAliasResolver.UnwrapTransparentExpression(current);
-            if (HookChainAliasResolver.Initializer(current, model, cancellationToken) is { } currentInitializer)
-            {
-                current = currentInitializer;
-                continue;
-            }
-
-            if (current is not InvocationExpressionSyntax invocation ||
-                invocation.Expression is not MemberAccessExpressionSyntax access)
+            if (!TryResolveSeedExpression(current, currentModel, cancellationToken, out current, out currentModel))
             {
                 return null;
             }
 
-            var name = access.Name.Identifier.ValueText;
-            if (string.Equals(name, "On", StringComparison.Ordinal))
+            if (TrySeedInvocation(current, out var seed))
             {
-                return invocation;
+                return seed;
             }
 
+            if (!TryStageReceiver(current, out current))
+            {
+                return null;
+            }
+        }
+    }
+
+    private static bool TryResolveSeedExpression(
+        ExpressionSyntax expression,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        out ExpressionSyntax resolved,
+        out SemanticModel resolvedModel)
+    {
+        resolved = HookChainAliasResolver.UnwrapTransparentExpression(expression);
+        var semanticModel = HookChainSemanticModelResolver.For(resolved, model);
+        if (semanticModel is null)
+        {
+            resolvedModel = null!;
+            return false;
+        }
+
+        resolvedModel = semanticModel;
+        while (HookChainAliasResolver.Initializer(resolved, resolvedModel, cancellationToken) is { } initializer)
+        {
+            resolved = HookChainAliasResolver.UnwrapTransparentExpression(initializer);
+            semanticModel = HookChainSemanticModelResolver.For(resolved, resolvedModel);
+            if (semanticModel is null)
+            {
+                resolvedModel = null!;
+                return false;
+            }
+
+            resolvedModel = semanticModel;
+        }
+
+        return true;
+    }
+
+    private static bool TrySeedInvocation(ExpressionSyntax expression, out InvocationExpressionSyntax invocation)
+    {
+        if (expression is InvocationExpressionSyntax
+            {
+                Expression: MemberAccessExpressionSyntax access
+            } candidate &&
+            string.Equals(access.Name.Identifier.ValueText, "On", StringComparison.Ordinal))
+        {
+            invocation = candidate;
+            return true;
+        }
+
+        invocation = null!;
+        return false;
+    }
+
+    private static bool TryStageReceiver(ExpressionSyntax expression, out ExpressionSyntax receiver)
+    {
+        if (expression is InvocationExpressionSyntax
+            {
+                Expression: MemberAccessExpressionSyntax access
+            })
+        {
+            var name = access.Name.Identifier.ValueText;
             if (name is "Where" or "Select")
             {
-                current = access.Expression;
-                continue;
+                receiver = access.Expression;
+                return true;
             }
-
-            return null;
         }
+
+        receiver = null!;
+        return false;
     }
 
     private static bool IsRemoteChainOrStageType(ITypeSymbol? type)
@@ -159,18 +241,24 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         var ns = named.ContainingNamespace.ToDisplayString();
         return ns switch
         {
-            "DotBoxD.Plugins.Runtime" => name is
-                "RemoteHookPipeline" or
-                "RemoteHookPipelineWithContext" or
-                "RemoteSubscriptionPipeline" or
-                "RemoteSubscriptionPipelineWithContext",
-            "DotBoxD.Plugins.Runtime.Hooks" => name is "RemoteHookStage" or "RemoteHookStageWithContext",
-            "DotBoxD.Plugins.Runtime.Subscriptions" => name is
-                "RemoteSubscriptionStage" or
-                "RemoteSubscriptionStageWithContext",
+            "DotBoxD.Plugins.Runtime" => IsRemotePipelineTypeName(name),
+            "DotBoxD.Plugins.Runtime.Hooks" => IsRemoteHookStageTypeName(name),
+            "DotBoxD.Plugins.Runtime.Subscriptions" => IsRemoteSubscriptionStageTypeName(name),
             _ => false
         };
     }
+
+    private static bool IsRemotePipelineTypeName(string name)
+        => name is "RemoteHookPipeline" or
+            "RemoteHookPipelineWithContext" or
+            "RemoteSubscriptionPipeline" or
+            "RemoteSubscriptionPipelineWithContext";
+
+    private static bool IsRemoteHookStageTypeName(string name)
+        => name is "RemoteHookStage" or "RemoteHookStageWithContext";
+
+    private static bool IsRemoteSubscriptionStageTypeName(string name)
+        => name is "RemoteSubscriptionStage" or "RemoteSubscriptionStageWithContext";
 
     private static bool IsRemoteStageType(ITypeSymbol? type)
     {

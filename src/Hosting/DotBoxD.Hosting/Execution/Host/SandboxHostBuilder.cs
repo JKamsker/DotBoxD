@@ -70,6 +70,8 @@ public sealed class SandboxHostBuilder
 
     public SandboxHostBuilder UseCompilerCache(string cacheDirectory)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(cacheDirectory);
+
         _compilerCacheDirectory = cacheDirectory;
         return this;
     }

@@ -83,43 +83,98 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         var hasOutOfPositionNamedArgument = false;
         for (var ordinal = 0; ordinal < arguments.Count; ordinal++)
         {
-            var argument = arguments[ordinal];
-            if (argument.RefKindKeyword.ValueText.Length != 0)
+            if (!TryBindArgument(
+                    arguments[ordinal],
+                    ordinal,
+                    nextPositional,
+                    parameters,
+                    description,
+                    current,
+                    assigned,
+                    ref nextPositional,
+                    ref hasOutOfPositionNamedArgument))
             {
-                return Fail(description, " call cannot use ref, in, or out arguments.");
+                return false;
             }
-
-            int index;
-            if (argument.NameColon is { } name)
-            {
-                index = IndexOfParameter(parameters, name.Name.Identifier.ValueText, description);
-                if (index < 0)
-                {
-                    return false;
-                }
-
-                hasOutOfPositionNamedArgument |= index != ordinal;
-            }
-            else
-            {
-                if (hasOutOfPositionNamedArgument)
-                {
-                    return Fail(description, " call has duplicate or misplaced arguments.");
-                }
-
-                index = nextPositional;
-            }
-
-            if (index >= parameters.Count || assigned[index])
-            {
-                return Fail(description, " call has duplicate or misplaced arguments.");
-            }
-
-            current[ordinal] = (index, argument.Expression);
-            assigned[index] = true;
-            nextPositional = NextUnassigned(assigned, nextPositional);
         }
 
+        if (!ValidateRequiredParameters(assigned, parameters, description))
+        {
+            return false;
+        }
+
+        bound = new BoundRpcArguments(assigned, current);
+        return true;
+    }
+
+    private static bool TryBindArgument(
+        ArgumentSyntax argument,
+        int ordinal,
+        int nextPositionalValue,
+        IReadOnlyList<IParameterSymbol> parameters,
+        string? description,
+        (int ParameterIndex, ExpressionSyntax Expression)[] current,
+        bool[] assigned,
+        ref int nextPositional,
+        ref bool hasOutOfPositionNamedArgument)
+    {
+        if (argument.RefKindKeyword.ValueText.Length != 0)
+        {
+            return Fail(description, " call cannot use ref, in, or out arguments.");
+        }
+
+        var index = BindArgumentIndex(
+            argument,
+            ordinal,
+            nextPositionalValue,
+            parameters,
+            description,
+            ref hasOutOfPositionNamedArgument);
+        if (index < 0)
+        {
+            return false;
+        }
+
+        if (index >= parameters.Count || assigned[index])
+        {
+            return Fail(description, " call has duplicate or misplaced arguments.");
+        }
+
+        current[ordinal] = (index, argument.Expression);
+        assigned[index] = true;
+        nextPositional = NextUnassigned(assigned, nextPositional);
+        return true;
+    }
+
+    private static int BindArgumentIndex(
+        ArgumentSyntax argument,
+        int ordinal,
+        int nextPositional,
+        IReadOnlyList<IParameterSymbol> parameters,
+        string? description,
+        ref bool hasOutOfPositionNamedArgument)
+    {
+        if (argument.NameColon is { } name)
+        {
+            var index = IndexOfParameter(parameters, name.Name.Identifier.ValueText, description);
+            hasOutOfPositionNamedArgument |= index >= 0 && index != ordinal;
+            return index;
+        }
+
+        if (hasOutOfPositionNamedArgument)
+        {
+            Fail(description, " call has duplicate or misplaced arguments.");
+            return -1;
+        }
+
+        return nextPositional;
+    }
+
+    private static bool ValidateRequiredParameters(
+        bool[] assigned,
+        IReadOnlyList<IParameterSymbol> parameters,
+        string? description)
+    {
         for (var i = 0; i < assigned.Length; i++)
         {
             if (!assigned[i] && !parameters[i].HasExplicitDefaultValue)
@@ -128,7 +183,6 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             }
         }
 
-        bound = new BoundRpcArguments(assigned, current);
         return true;
     }
 

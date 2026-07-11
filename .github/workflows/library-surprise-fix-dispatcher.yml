@@ -90,9 +90,14 @@ jobs:
           # into a PR branch as the PAT's user, so the resulting pull_request CI runs
           # ungated (a bot-authored commit would sit at action_required). Never printed.
           CI_TRIGGER_TOKEN: ${{ secrets.GH_AW_CI_TRIGGER_TOKEN }}
+          # CodeRabbit can leave its legacy status context pending indefinitely.
+          # Treat only fresh pending CodeRabbit as an in-flight review; stale
+          # pending must not hide real red PR CI from the polish queue.
+          CODERABBIT_PENDING_TIMEOUT_MINUTES: "60"
         run: |
           set -euo pipefail
           python3 - <<'PY'
+          from datetime import datetime, timedelta, timezone
           import json, os, re, subprocess, sys
 
           repo = os.environ["GH_REPO"]
@@ -101,6 +106,13 @@ jobs:
               max_dispatch = int(os.environ.get("MAX_DISPATCH") or "4")
           except ValueError:
               max_dispatch = 4
+          try:
+              coderabbit_pending_timeout_minutes = int(
+                  os.environ.get("CODERABBIT_PENDING_TIMEOUT_MINUTES") or "60")
+          except ValueError:
+              coderabbit_pending_timeout_minutes = 60
+          coderabbit_pending_timeout = timedelta(
+              minutes=max(0, coderabbit_pending_timeout_minutes))
           prefix = "[surprise-red-test] "
           # Must match the marker the fix worker posts once it has polished a PR
           # (see library-surprise-fix.md). Its presence means "a polish pass has
@@ -209,6 +221,25 @@ jobs:
 
           RED_CONCLUSIONS = {"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ERROR"}
           PENDING_STATUSES = {"QUEUED", "IN_PROGRESS", "PENDING", "WAITING", "REQUESTED"}
+          CODERABBIT_STATUS_CONTEXT = "CodeRabbit"
+
+          def parse_github_time(value):
+              if not value:
+                  return None
+              try:
+                  return datetime.fromisoformat(value.replace("Z", "+00:00"))
+              except ValueError:
+                  return None
+
+          def is_stale_coderabbit_pending(check):
+              context = check.get("context") or check.get("name")
+              if context != CODERABBIT_STATUS_CONTEXT:
+                  return False
+              started_at = parse_github_time(check.get("startedAt"))
+              if started_at is None:
+                  return False
+              age = datetime.now(timezone.utc) - started_at
+              return age >= coderabbit_pending_timeout
 
           def ci_state(rollup):
               # Returns one of: red / green / pending / none.
@@ -224,12 +255,20 @@ jobs:
                   state = (c.get("state") or "").upper()   # legacy StatusContext
                   if state:
                       if state == "PENDING":
-                          pending = True
+                          if is_stale_coderabbit_pending(c):
+                              print("ignore stale CodeRabbit pending status "
+                                    f"started at {c.get('startedAt')}")
+                          else:
+                              pending = True
                       elif state in {"FAILURE", "ERROR"}:
                           red = True
                       continue
                   if status in PENDING_STATUSES and not conclusion:
-                      pending = True
+                      if is_stale_coderabbit_pending(c):
+                          print("ignore stale CodeRabbit pending check "
+                                f"started at {c.get('startedAt')}")
+                      else:
+                          pending = True
                   elif conclusion in RED_CONCLUSIONS:
                       red = True
               if pending:

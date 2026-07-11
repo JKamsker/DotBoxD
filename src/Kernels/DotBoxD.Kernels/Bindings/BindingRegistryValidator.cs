@@ -5,12 +5,7 @@ namespace DotBoxD.Kernels.Bindings;
 
 internal static class BindingRegistryValidator
 {
-    private static readonly string[] ForbiddenReferenceFragments = [
-        "System.", "Microsoft.", "Assembly.", "Type.", "Reflection.", "Process.",
-        "Environment.", "Thread.", "Task.", "DllImport", "IServiceProvider"
-    ];
-
-    private static readonly HashSet<string> BuiltInCapabilities = new(StringComparer.Ordinal) {
+    internal static readonly HashSet<string> BuiltInCapabilities = new(StringComparer.Ordinal) {
         "file.read", "file.write", "time.now", "random", "log.write"
     };
 
@@ -39,87 +34,22 @@ internal static class BindingRegistryValidator
 
     private static void ValidateBinding(BindingDescriptor binding, List<SandboxDiagnostic> diagnostics)
     {
-        ValidateIdentifier(binding.Id, "binding id", "E-BINDING-ID", diagnostics);
-        if (binding.RequiredCapability is not null)
+        if (!BindingDescriptorRequiredFieldValidator.Validate(binding, diagnostics))
         {
-            ValidateIdentifier(binding.RequiredCapability, "required capability", "E-BINDING-CAP", diagnostics);
+            return;
         }
 
-        if (!binding.Effects.ContainsOnlyKnownBits())
-        {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-EFFECT", $"binding '{binding.Id}' declares an unknown effect"));
-        }
-
-        if (binding.Effects == SandboxEffect.None)
-        {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-EFFECT", $"binding '{binding.Id}' declares no effects"));
-        }
-
-        if (!IsKnownAuditLevel(binding.AuditLevel))
-        {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-AUDIT", $"binding '{binding.Id}' declares an unknown audit level"));
-        }
-
-        if (!IsKnownAuditKind(binding.AuditKind))
-        {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-AUDIT", $"binding '{binding.Id}' declares an unknown audit kind"));
-        }
-
-        if (!IsKnownBindingSafety(binding.Safety))
-        {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-SAFETY", $"binding '{binding.Id}' declares an unknown safety classification"));
-        }
-
-        if (binding.Effects.RequiresCapability() && string.IsNullOrWhiteSpace(binding.RequiredCapability))
-        {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-CAP", $"binding '{binding.Id}' has side effects but no capability"));
-        }
-
-        if (!string.IsNullOrWhiteSpace(binding.RequiredCapability) &&
-            (binding.Effects & ~SandboxEffect.Cpu) == SandboxEffect.None)
-        {
-            diagnostics.Add(new SandboxDiagnostic(
-                "E-BINDING-EFFECT",
-                $"binding '{binding.Id}' requires a capability but declares only pure CPU effects"));
-        }
-
-        if (ReachesOutsideSandbox(binding))
-        {
-            if (string.IsNullOrWhiteSpace(binding.RequiredCapability))
-            {
-                diagnostics.Add(new SandboxDiagnostic("E-BINDING-CAP", $"binding '{binding.Id}' reaches outside the sandbox but has no capability"));
-            }
-
-            if (binding.AuditLevel == AuditLevel.None)
-            {
-                diagnostics.Add(new SandboxDiagnostic("E-BINDING-AUDIT", $"binding '{binding.Id}' reaches outside the sandbox but is not audited"));
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(binding.RequiredCapability) &&
-            !BuiltInCapabilities.Contains(binding.RequiredCapability) &&
-            binding.GrantValidator is null)
-        {
-            diagnostics.Add(new SandboxDiagnostic(
-                "E-BINDING-GRANT",
-                $"binding '{binding.Id}' uses custom capability '{binding.RequiredCapability}' without a grant validator"));
-        }
-
+        BindingValidationPhases.ValidateBindingIdentity(binding, diagnostics);
+        BindingValidationPhases.ValidateBindingEffectBits(binding, diagnostics);
+        BindingValidationPhases.ValidateBindingClassifications(binding, diagnostics);
+        BindingValidationPhases.ValidateCapabilityRequirements(binding, diagnostics);
+        BindingValidationPhases.ValidateSandboxReach(binding, diagnostics);
+        BindingValidationPhases.ValidateCustomCapabilityGrant(binding, diagnostics);
         ValidateBuiltInCapabilityEffect(binding, diagnostics);
-
-        if (binding.Safety == BindingSafety.DangerousRequiresReview)
-        {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-DANGER", $"binding '{binding.Id}' is dangerous and cannot be enabled by default"));
-        }
-
+        BindingValidationPhases.ValidateDangerousBinding(binding, diagnostics);
         ValidateCostModel(binding, diagnostics);
         BindingCompiledTargetValidator.Validate(binding, diagnostics);
-        foreach (var type in binding.Parameters)
-        {
-            ValidateType(binding, type, diagnostics);
-        }
-
-        ValidateType(binding, binding.ReturnType, diagnostics);
+        BindingValidationPhases.ValidateBindingTypes(binding, diagnostics);
     }
 
     private static void CheckDuplicateBindingIds(
@@ -187,16 +117,11 @@ internal static class BindingRegistryValidator
         return true;
     }
 
-    private static void ValidateType(
+    internal static void ValidateType(
         BindingDescriptor binding,
         SandboxType type,
         List<SandboxDiagnostic> diagnostics)
-    {
-        if (!type.IsKnownBuiltIn())
-        {
-            diagnostics.Add(new SandboxDiagnostic("E-BINDING-TYPE", $"binding '{binding.Id}' exposes forbidden or unknown type '{type}'"));
-        }
-    }
+        => BindingTypeChecks.Validate(binding.Id, type, diagnostics);
 
     private static void ValidateCostModel(BindingDescriptor binding, List<SandboxDiagnostic> diagnostics)
     {
@@ -207,74 +132,25 @@ internal static class BindingRegistryValidator
         }
     }
 
-    private static void ValidateIdentifier(
+    internal static void ValidateIdentifier(
         string value,
         string description,
         string code,
         List<SandboxDiagnostic> diagnostics)
     {
-        if (string.IsNullOrWhiteSpace(value) || ContainsControlCharacter(value))
+        if (BindingIdentifierValidator.TryValidate(value, out var message))
         {
-            diagnostics.Add(new SandboxDiagnostic(
-                code,
-                $"{description} must be non-empty and must not contain control characters"));
             return;
         }
 
-        if (ContainsForbiddenReferenceFragment(value))
-        {
-            diagnostics.Add(new SandboxDiagnostic(code, $"{description} '{value}' looks like a forbidden CLR reference"));
-        }
+        diagnostics.Add(new SandboxDiagnostic(code, $"{description} {message}"));
     }
 
-    private static bool ContainsControlCharacter(string value)
-    {
-        for (var i = 0; i < value.Length; i++)
-        {
-            if (char.IsControl(value[i]))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool ContainsForbiddenReferenceFragment(string value)
-    {
-        for (var i = 0; i < ForbiddenReferenceFragments.Length; i++)
-        {
-            if (value.Contains(ForbiddenReferenceFragments[i], StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool ReachesOutsideSandbox(BindingDescriptor binding)
+    internal static bool ReachesOutsideSandbox(BindingDescriptor binding)
         => IsExternal(binding.Safety) || binding.Effects.RequiresCapability();
 
     private static bool IsExternal(BindingSafety safety)
         => safety is BindingSafety.ReadOnlyExternal or BindingSafety.SideEffectingExternal;
-
-    private static bool IsKnownAuditLevel(AuditLevel auditLevel)
-        => auditLevel is AuditLevel.None or
-            AuditLevel.Summary or
-            AuditLevel.PerCall or
-            AuditLevel.PerResource or
-            AuditLevel.FullInputOutput;
-
-    private static bool IsKnownAuditKind(string auditKind)
-        => auditKind is BindingAuditKinds.BindingCall or BindingAuditKinds.SandboxLog or BindingAuditKinds.PluginMessage;
-
-    private static bool IsKnownBindingSafety(BindingSafety safety)
-        => safety is BindingSafety.PureIntrinsic or
-            BindingSafety.PureHostFacade or
-            BindingSafety.ReadOnlyExternal or
-            BindingSafety.SideEffectingExternal or
-            BindingSafety.DangerousRequiresReview;
 
     private static void ValidateBuiltInCapabilityEffect(
         BindingDescriptor binding,

@@ -19,6 +19,71 @@ public sealed class InvokeAsyncGenerationTests
     }
 
     [Fact]
+    public void Generated_InvokeAsync_methods_expose_explicit_ir_invocation_companions()
+    {
+        var result = RunGenerator(NoCaptureSource);
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.Contains("IRBodyOf(nameof(lambda))", source, StringComparison.Ordinal);
+        Assert.Contains("IRInvocation<global::System.Func<", source, StringComparison.Ordinal);
+        Assert.Contains("IRInvocation<TCaptures,", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Custom_named_marked_invocation_method_generates_anonymous_package()
+    {
+        var result = RunGenerator(UsageSource("""
+            public static ValueTask<int> Run(RemotePluginServer kernels)
+                => kernels.ProbeAsync(async (IGameWorldAccess world) =>
+                {
+                    return world.GetHealth("monster-1");
+                });
+            """, """
+                [LowerToIrMethod(LoweredIrMethodKind.AnonymousInvocation)]
+                public ValueTask<TReturn> ProbeAsync<TReturn>(
+                    Func<IGameWorldAccess, ValueTask<TReturn>> lambda,
+                    CancellationToken cancellationToken = default)
+                    => throw new InvalidOperationException("not lowered");
+            """));
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.Contains("AnonymousInvokeAsync", source, StringComparison.Ordinal);
+        Assert.Contains("host.world.getHealth", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Marked_anonymous_invocation_on_non_server_receiver_is_not_classified_as_InvokeAsync()
+    {
+        var result = RunGenerator("""
+            using System;
+            using System.Threading.Tasks;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public sealed class CustomPipeline
+            {
+                [LowerToIrMethod(LoweredIrMethodKind.AnonymousInvocation)]
+                public ValueTask<int> Evaluate(Func<ValueTask<int>> lambda)
+                    => throw new InvalidOperationException("not lowered");
+            }
+
+            public static class Usage
+            {
+                public static ValueTask<int> Run(CustomPipeline pipeline)
+                    => pipeline.Evaluate(() => new ValueTask<int>(42));
+            }
+            """);
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.DoesNotContain(
+            result.Diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                          diagnostic.GetMessage().Contains("InvokeAsync", StringComparison.Ordinal));
+        Assert.DoesNotContain("AnonymousInvokeAsync", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Object_snapshot_member_access_generates_record_get_package()
     {
         var result = RunGenerator(ObjectSurfaceSource);
@@ -36,6 +101,23 @@ public sealed class InvokeAsyncGenerationTests
         var result = RunGenerator(UsageSource("""
             public static ValueTask<int> Run(RemotePluginServer kernels)
                 => kernels.InvokeAsync((IGameWorldAccess world) => new ValueTask<int>(world.GetHealth("monster-1")));
+            """));
+
+        Assert.Contains(
+            result.Diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                          diagnostic.GetMessage().Contains("InvokeAsync", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Method_group_InvokeAsync_reports_InvokeAsync_diagnostic()
+    {
+        var result = RunGenerator(UsageSource("""
+            public static ValueTask<int> Run(RemotePluginServer kernels)
+                => kernels.InvokeAsync(Handle);
+
+            private static ValueTask<int> Handle(IGameWorldAccess world)
+                => new ValueTask<int>(world.GetHealth("monster-1"));
             """));
 
         Assert.Contains(

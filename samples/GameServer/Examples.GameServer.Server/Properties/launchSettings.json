@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "Examples.GameServer.Server": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    },
+    "GameServer - Wait for Plugin (Debug)": {
+      "commandName": "Project",
+      "commandLineArgs": "--external-plugin --pipe-name dotboxd-game-debug-0123456789abcdef",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development",
+        "DOTBOXD_GAME_PLUGIN_READINESS_TIMEOUT_MS": "300000"
+      }
+    }
+  }
+}

@@ -1,4 +1,3 @@
-using DotBoxD.Kernels.Model;
 using DotBoxD.Plugins.Runtime.Lifecycle;
 
 namespace DotBoxD.Plugins.Runtime.Diagnostics;
@@ -47,24 +46,6 @@ public enum PluginDiagnosticAudience
     /// <summary>The host or operator must fix the value or registration they supplied at runtime.</summary>
     HostOperator,
 }
-
-/// <summary>
-/// Public reference entry for a single runtime plugin diagnostic
-/// <see cref="SandboxDiagnostic.Code"/> emitted by the <c>DotBoxD.Plugins</c> package.
-/// </summary>
-/// <param name="Code">The stable <c>DBXK*</c> diagnostic code.</param>
-/// <param name="Phase">The runtime phase that emits the code.</param>
-/// <param name="Audience">Who must act on the diagnostic.</param>
-/// <param name="Meaning">A short human-readable description of the rule that was violated.</param>
-/// <param name="LikelyCause">The most common reason this code is emitted.</param>
-/// <param name="Remediation">Guidance for the plugin author or host operator investigating the code.</param>
-public sealed record PluginDiagnosticReference(
-    string Code,
-    PluginDiagnosticPhase Phase,
-    PluginDiagnosticAudience Audience,
-    string Meaning,
-    string LikelyCause,
-    string Remediation);
 
 /// <summary>
 /// Public, maintained reference for the runtime <c>DBXK*</c> diagnostic codes emitted by the
@@ -148,9 +129,9 @@ public static class PluginDiagnosticCodes
             "Live setting parameters are missing, misnamed, mistyped, or out of order at the end of the entrypoint.",
             "Append each live setting as a trailing parameter with the exact declared name and type."),
         new("DBXK036", PluginDiagnosticPhase.RuntimeEntrypoint, PluginDiagnosticAudience.HostOperator,
-            "An event adapter reports values that do not match the registered adapter parameters.",
-            "The host-provided IPluginEventAdapter<TEvent> returns a mismatched value count or a value with the wrong SandboxType.",
-            "Make each adapter value and IPluginEventValueWriter EventValueCount match the adapter Parameters exactly."),
+            "An event adapter reports invalid metadata or values that do not match the registered adapter parameters.",
+            "The host-provided IPluginEventAdapter<TEvent> returns blank metadata, a mismatched value count, or a value with the wrong SandboxType.",
+            "Use non-blank event and parameter names, and make each adapter value and IPluginEventValueWriter EventValueCount match the adapter Parameters exactly."),
         new("DBXK040", PluginDiagnosticPhase.PackageValidation, PluginDiagnosticAudience.PluginAuthor,
             "The manifest declares an unsupported effect, or declares no verified effects at all.",
             "An effect name is not a known SandboxEffect, or the manifest effect set is empty.",

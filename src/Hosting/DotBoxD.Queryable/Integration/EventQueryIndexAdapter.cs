@@ -60,7 +60,12 @@ public static class EventQueryIndexAdapter
         var result = new HostIndexedPredicate[predicates.Count];
         for (var i = 0; i < predicates.Count; i++)
         {
-            result[i] = ToIndexedPredicate(predicates[i]);
+            if (predicates[i] is not { } predicate)
+            {
+                throw new ArgumentException("Predicate collections cannot contain null entries.", nameof(predicates));
+            }
+
+            result[i] = ToIndexedPredicate(predicate);
         }
 
         return result;
@@ -76,6 +81,20 @@ public static class EventQueryIndexAdapter
     public static HostIndexedPredicate ToIndexedPredicate(IndexedPredicate source)
     {
         ArgumentNullException.ThrowIfNull(source);
+        if (string.IsNullOrWhiteSpace(source.Path))
+        {
+#pragma warning disable CA2208 // Preserve the malformed IndexedPredicate member name in the public exception.
+            throw new ArgumentException("Predicate paths cannot be null or empty.", nameof(IndexedPredicate.Path));
+#pragma warning restore CA2208
+        }
+
+        if (source.Value is null)
+        {
+#pragma warning disable CA2208 // Preserve the malformed IndexedPredicate member name in the public exception.
+            throw new ArgumentException("Predicate values cannot be null.", nameof(IndexedPredicate.Value));
+#pragma warning restore CA2208
+        }
+
         var (value, valueType) = ConvertValue(source.Value);
         return new HostIndexedPredicate(source.Path, ConvertOperator(source.Operator), value, valueType);
     }

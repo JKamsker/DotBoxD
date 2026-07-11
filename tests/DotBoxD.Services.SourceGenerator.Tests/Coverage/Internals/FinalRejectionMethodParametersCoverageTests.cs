@@ -28,6 +28,7 @@ public sealed class FinalRejectionMethodParametersCoverageTests
             ReturnKind: returnKind,
             DeclaredReturnType: "void",
             UnwrappedReturnType: null,
+            MemberAttributePrefix: "",
             ReturnRefKindKeyword: "",
             ReturnAttributePrefix: "",
             HasCancellationToken: hasCancellationToken,

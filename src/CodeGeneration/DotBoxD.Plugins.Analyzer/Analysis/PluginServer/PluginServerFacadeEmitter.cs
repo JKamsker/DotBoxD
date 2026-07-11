@@ -80,6 +80,7 @@ internal static partial class PluginServerFacadeEmitter
             builder,
             string.Empty,
             "Generated plugin-side client for the remote world domain. Call StartAsync before using runtime domain, hook, subscription, or server extension APIs.");
+        PluginServerClsComplianceAttributeSource.AppendFalse(builder, model);
         builder.Append(model.Accessibility).Append(" partial class ")
             .Append(PluginServerIdentifier.Escape(model.ClassName))
             .Append(" : ").AppendLine(model.ServerInterfaceName);
@@ -89,6 +90,8 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("    private readonly global::System.Collections.Concurrent.ConcurrentDictionary<string, global::System.Lazy<global::System.Threading.Tasks.Task<string>>> _anonymousKernels = new();");
         builder.AppendLine("    private readonly global::System.Collections.Generic.HashSet<string> _installedPluginIds = new(global::System.StringComparer.Ordinal);");
         builder.AppendLine("    private readonly global::System.Collections.Generic.Dictionary<global::System.Type, string> _serverExtensions = new();");
+        builder.AppendLine("    private readonly global::System.Collections.Generic.Dictionary<string, global::System.Collections.Generic.Dictionary<string, object?>> _liveSettingValues = new(global::System.StringComparer.Ordinal);");
+        builder.AppendLine("    private readonly object _liveSettingsGate = new();");
         builder.AppendLine("    private readonly global::System.Collections.Generic.List<RecordedInstall> _setupInstalls;");
         builder.Append("    private ").Append(model.ControlServiceType).AppendLine("? _control;");
         builder.Append("    private ").Append(model.WorldType).AppendLine("? _world;");
@@ -188,6 +191,7 @@ internal static partial class PluginServerFacadeEmitter
         foreach (var method in model.WorldMethods)
         {
             PluginServerXmlDocumentation.Append(builder, "    ", method.Documentation);
+            PluginServerFlowAttributeSource.Append(builder, "    ", method.Attributes);
             PluginServerFlowAttributeSource.Append(builder, "    ", method.ReturnAttributes);
             builder.Append("    public ");
             if (method.ReturnWrapperKind is PluginServerReturnWrapperKind.Task or PluginServerReturnWrapperKind.ValueTask)

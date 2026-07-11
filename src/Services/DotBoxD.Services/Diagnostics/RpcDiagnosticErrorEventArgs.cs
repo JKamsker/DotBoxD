@@ -8,7 +8,17 @@ public sealed class RpcDiagnosticErrorEventArgs : EventArgs
 {
     public RpcDiagnosticErrorEventArgs(string operation, Exception error)
     {
-        Operation = operation ?? throw new ArgumentNullException(nameof(operation));
+        if (operation is null)
+        {
+            throw new ArgumentNullException(nameof(operation));
+        }
+
+        if (string.IsNullOrWhiteSpace(operation))
+        {
+            throw new ArgumentException("Operation must not be empty or whitespace.", nameof(operation));
+        }
+
+        Operation = operation;
         Error = error ?? throw new ArgumentNullException(nameof(error));
     }
 

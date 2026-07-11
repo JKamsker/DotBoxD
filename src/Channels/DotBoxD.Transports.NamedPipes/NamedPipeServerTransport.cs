@@ -211,7 +211,7 @@ public sealed class NamedPipeServerTransport : IServerTransport
             PipeDirection.InOut,
             _maxAllowedServerInstances,
             PipeTransmissionMode.Byte,
-            PipeOptions.Asynchronous);
+            PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
     private void ClearPendingStream(NamedPipeServerStream stream)
     {
         lock (_sync)

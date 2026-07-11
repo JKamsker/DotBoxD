@@ -1,8 +1,7 @@
+using DotBoxD.Kernels;
 using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Abstractions;
-
-using DotBoxD.Kernels;
 
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class PluginAttribute : Attribute
@@ -27,7 +26,8 @@ public sealed class HostBindingAttribute : Attribute
 {
     public HostBindingAttribute(string bindingId, string capability, SandboxEffect effects)
     {
-        ArgumentNullException.ThrowIfNull(bindingId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(bindingId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(capability);
 
         BindingId = bindingId;
         Capability = capability;
@@ -36,6 +36,8 @@ public sealed class HostBindingAttribute : Attribute
 
     public HostBindingAttribute(string capability, SandboxEffect effects)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(capability);
+
         BindingId = string.Empty;
         Capability = capability;
         Effects = effects;
@@ -66,18 +68,25 @@ public sealed class HostBindingAttribute : Attribute
 
 /// <summary>
 /// Gates an event property behind a capability. Reading the property from kernel IR contributes
-/// <paramref name="id"/> to the manifest's required capabilities, so a kernel that touches the property
+/// <see cref="Id"/> to the manifest's required capabilities, so a kernel that touches the property
 /// only installs under a policy granting it. Unannotated properties stay ungated (default-allow).
 /// </summary>
 [AttributeUsage(AttributeTargets.Property)]
-public sealed class CapabilityAttribute(string id) : Attribute
+public sealed class CapabilityAttribute : Attribute
 {
-    public string Id { get; } = id;
+    public CapabilityAttribute(string id)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+
+        Id = id;
+    }
+
+    public string Id { get; }
 }
 
 /// <summary>
-/// Marks a reusable helper method whose body the DotBoxD.Kernels generator <b>inlines</b> into the kernel/hook IR
-/// at every call site, so plugin authors can factor shared gate/handler logic out of a
+/// Marks a reusable helper method whose body the DotBoxD.Kernels generator <b>inlines</b> into the kernel/hook IR at
+/// every call site, so plugin authors can factor shared gate/handler logic out of a
 /// <c>Where</c>/<c>Select</c>/<c>Run</c> lambda (or a kernel-class <c>ShouldHandle</c>/<c>Handle</c>)
 /// without leaving the sandbox. The helper can be a static method, or an instance method called on the generated
 /// server-context parameter. For example:
@@ -97,21 +106,20 @@ public sealed class CapabilityAttribute(string id) : Attribute
 /// named arguments plus supported optional parameter defaults are bound before lowering.
 /// </para>
 /// <para>
-/// Constraints (verified at generation time; a violation fails the chain/kernel safely rather than
-/// miscompiling): the method must be static or called on the server-context parameter, have an expression body
-/// or a single <c>return</c> statement, and use types the kernel marshaller can represent in the current
-/// lowering surface (scalars, supported nullable scalars, enums, GUIDs, records/DTOs, lists, and maps where
-/// that surface supports them). Recursion, generic helpers, <c>ref</c>/<c>out</c>/<c>in</c> parameters, and
-/// <c>params</c> arrays are not allowed.
+/// Constraints (verified at generation time; a violation fails the chain/kernel safely rather than miscompiling):
+/// the method must be static or called on the server-context parameter, have an expression body or a single
+/// <c>return</c> statement, and use types the kernel marshaller can represent in the current lowering surface
+/// (scalars, supported nullable scalars, enums, GUIDs, records/DTOs, lists, and maps where that surface supports them).
+/// Recursion, generic helpers, <c>ref</c>/<c>out</c>/<c>in</c> parameters, and <c>params</c> arrays are not allowed.
 /// </para>
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, Inherited = false)]
 public sealed class KernelMethodAttribute : Attribute;
 
 /// <summary>
-/// Marks a class as a <b>server extension</b>: a batch operation the plugin ships as verified IR and
-/// the server runs request/response in a single roundtrip, so a loop over many entities executes
-/// server-side (calling the host's existing bindings) instead of one network call per entity. The
+/// Marks a class as a <b>server extension</b>: a batch operation the plugin ships as verified IR and the server runs
+/// request/response in a single roundtrip, so a loop over many entities executes server-side (calling the host's
+/// existing bindings) instead of one network call per entity. The
 /// generator lowers the class's single public batch method — its body may use locals, a <c>foreach</c>
 /// over a list parameter, host bindings via <c>ctx.Host&lt;T&gt;()</c> or constructor-injected service
 /// fields, and may build and return complex objects (records/DTOs) and lists of them. For example:
@@ -132,26 +140,25 @@ public sealed class KernelMethodAttribute : Attribute;
 /// }
 /// public readonly record struct KillResult(int MonsterId, bool Success);
 /// </code>
-/// The trailing <see cref="HookContext"/> parameter is the lowering marker for host bindings (as in a
-/// kernel's <c>Handle</c>) and is not part of the wire signature. Parameters, return type, and DTO
-/// fields must use the supported scalar types, lists, or nested DTOs. Supplying the optional service
-/// interface type lets the analyzer emit a source-generated plugin-side client that marshals directly to
-/// compact server-extension value bytes instead of using a reflection proxy.
+/// The trailing <see cref="HookContext"/> parameter is the lowering marker for host bindings (as in a kernel's
+/// <c>Handle</c>) and is not part of the wire signature. Parameters, return type, and DTO fields must use supported
+/// scalar types, lists, or nested DTOs. Supplying the optional service interface type lets the analyzer emit a
+/// source-generated plugin-side client that marshals directly to compact server-extension value bytes instead of using a reflection proxy.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class ServerExtensionAttribute : Attribute
 {
-    public ServerExtensionAttribute(string id) => Id = id;
+    public ServerExtensionAttribute(string id) => Id = id ?? throw new ArgumentNullException(nameof(id));
 
     public ServerExtensionAttribute(string id, Type serviceType)
     {
-        Id = id;
-        ServiceType = serviceType;
+        Id = id ?? throw new ArgumentNullException(nameof(id));
+        ServiceType = serviceType ?? throw new ArgumentNullException(nameof(serviceType));
     }
 
     public ServerExtensionAttribute(Type grafts, string? id = null)
     {
-        Grafts = grafts;
+        Grafts = grafts ?? throw new ArgumentNullException(nameof(grafts));
         Id = id;
     }
 
@@ -171,9 +178,9 @@ public sealed class ServerExtensionAttribute : Attribute
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class ServerExtensionClientAttribute(Type receiverType, string? name = null) : Attribute
 {
-    public Type ReceiverType { get; } = receiverType;
+    public Type ReceiverType { get; } = receiverType ?? throw new ArgumentNullException(nameof(receiverType));
 
-    public string? Name { get; } = name;
+    public string? Name { get; } = ServerExtensionAttributeValidation.ValidateName(name);
 }
 
 /// <summary>
@@ -186,21 +193,43 @@ public sealed class ServerExtensionMethodAttribute(Type? receiverType = null, st
 {
     public Type? ReceiverType { get; } = receiverType;
 
-    public string? Name { get; } = name;
+    public string? Name { get; } = ServerExtensionAttributeValidation.ValidateName(name);
+}
+
+internal static class ServerExtensionAttributeValidation
+{
+    public static string? ValidateName(string? name)
+    {
+        if (name is null)
+        {
+            return null;
+        }
+
+        return string.IsNullOrWhiteSpace(name)
+            ? throw new ArgumentException("Name cannot be empty or whitespace.", nameof(name))
+            : name;
+    }
 }
 
 /// <summary>
 /// Requests a generated client-side registration accumulator for a control type. The generated accumulator
-/// queues calls to <paramref name="methodName"/> and flushes them in order when the plugin builder starts.
+/// queues calls to <see cref="MethodName"/> and flushes them in order when the plugin builder starts.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-public sealed class GeneratePluginRegistrationAccumulatorAttribute(
-    string accumulatorName,
-    string methodName) : Attribute
+public sealed class GeneratePluginRegistrationAccumulatorAttribute : Attribute
 {
-    public string AccumulatorName { get; } = accumulatorName;
+    public GeneratePluginRegistrationAccumulatorAttribute(string accumulatorName, string methodName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accumulatorName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(methodName);
 
-    public string MethodName { get; } = methodName;
+        AccumulatorName = accumulatorName;
+        MethodName = methodName;
+    }
+
+    public string AccumulatorName { get; }
+
+    public string MethodName { get; }
 }
 
 /// <summary>
@@ -208,9 +237,16 @@ public sealed class GeneratePluginRegistrationAccumulatorAttribute(
 /// control properties.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-public sealed class GeneratePluginRegistrationRootAccumulatorAttribute(string accumulatorName) : Attribute
+public sealed class GeneratePluginRegistrationRootAccumulatorAttribute : Attribute
 {
-    public string AccumulatorName { get; } = accumulatorName;
+    public GeneratePluginRegistrationRootAccumulatorAttribute(string accumulatorName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accumulatorName);
+
+        AccumulatorName = accumulatorName;
+    }
+
+    public string AccumulatorName { get; }
 }
 
 public interface IEventKernel<TEvent>
@@ -243,6 +279,8 @@ public sealed class HookContext
 {
     public HookContext(IPluginMessageSink messages, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(messages);
+
         Messages = messages;
         CancellationToken = cancellationToken;
     }
@@ -251,9 +289,8 @@ public sealed class HookContext
     public CancellationToken CancellationToken { get; }
 
     /// <summary>
-    /// Identifies a host service the kernel calls into. In verified kernel IR the call is replaced by a
-    /// sandbox binding (see <see cref="HostBindingAttribute"/>), so this marker is never invoked
-    /// directly; calling it at runtime throws.
+    /// Identifies a host service the kernel calls into. In verified kernel IR the call is replaced by a sandbox binding
+    /// (see <see cref="HostBindingAttribute"/>), so this marker is never invoked directly; calling it at runtime throws.
     /// </summary>
     public THost Host<THost>()
         where THost : class

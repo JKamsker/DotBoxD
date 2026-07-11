@@ -7,7 +7,7 @@ namespace DotBoxD.Kernels.Runtime.Bindings;
 public static class SafeTimeBindings
 {
     public static BindingDescriptor NowUnixMillis { get; } = new(
-        "time.nowUnixMillis",
+        SafeTimeBindingNames.NowUnixMillisId,
         SemVersion.One,
         [],
         SandboxType.I64,
@@ -22,16 +22,23 @@ public static class SafeTimeBindings
             var startedAt = DateTimeOffset.UtcNow;
             var timestamp = context.UtcNow();
             var value = timestamp.ToUnixTimeMilliseconds();
+            var fields = new Dictionary<string, string>(
+                context.BindingAuditFields("clock", startedAt),
+                StringComparer.Ordinal)
+            {
+                [SafeTimeBindingNames.NowUnixMillisAuditField] =
+                    value.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            };
             context.Audit.Write(new SandboxAuditEvent(
                 context.RunId,
                 "BindingCall",
                 timestamp,
                 true,
-                BindingId: "time.nowUnixMillis",
+                BindingId: SafeTimeBindingNames.NowUnixMillisId,
                 CapabilityId: "time.now",
                 Effect: SandboxEffect.Time,
                 ResourceId: "clock:utc",
-                Fields: context.BindingAuditFields("clock", startedAt)));
+                Fields: fields));
             return ValueTask.FromResult(SandboxValue.FromInt64(value));
         },
         CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));

@@ -68,18 +68,26 @@ public sealed class Fix_PAL_0022_Tests
     [Fact]
     public void Read_applies_defaults_when_optional_parameters_are_absent()
     {
-        var options = SafeFileGrantReader.Read(Grant(("root", "/root")));
+        var options = SafeFileGrantReader.Read(Grant(("root", "/root"), ("maxBytesPerRun", "1024")));
 
-        Assert.Null(options.MaxBytesPerRun);
         Assert.False(options.AllowCreate);
         Assert.False(options.AllowOverwrite);
         Assert.Null(options.AllowedExtensions);
     }
 
     [Fact]
+    public void Read_fails_closed_when_required_limit_is_absent()
+    {
+        var ex = Assert.Throws<SandboxRuntimeException>(() => SafeFileGrantReader.Read(Grant(("root", "/root"))));
+
+        Assert.Equal(SandboxErrorCode.PermissionDenied, ex.Error.Code);
+        Assert.Contains("maxBytesPerRun", ex.Error.SafeMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Read_treats_blank_extension_list_as_no_restriction()
     {
-        var options = SafeFileGrantReader.Read(Grant(("allowedExtensions", "   ")));
+        var options = SafeFileGrantReader.Read(Grant(("maxBytesPerRun", "1024"), ("allowedExtensions", "   ")));
 
         Assert.Null(options.AllowedExtensions);
     }
@@ -87,7 +95,7 @@ public sealed class Fix_PAL_0022_Tests
     [Fact]
     public void Read_extension_set_matches_case_insensitively_like_the_previous_scan()
     {
-        var options = SafeFileGrantReader.Read(Grant(("allowedExtensions", ".JSON, .Txt")));
+        var options = SafeFileGrantReader.Read(Grant(("maxBytesPerRun", "1024"), ("allowedExtensions", ".JSON, .Txt")));
 
         Assert.NotNull(options.AllowedExtensions);
         Assert.Contains(".json", options.AllowedExtensions!);
@@ -102,7 +110,7 @@ public sealed class Fix_PAL_0022_Tests
     [InlineData("allowOverwrite", "1")]
     public void Read_fails_closed_on_invalid_parameters(string key, string value)
     {
-        var grant = Grant(("root", "/root"), (key, value));
+        var grant = Grant(("root", "/root"), ("maxBytesPerRun", "1024"), (key, value));
 
         var ex = Assert.Throws<SandboxRuntimeException>(() => SafeFileGrantReader.Read(grant));
 

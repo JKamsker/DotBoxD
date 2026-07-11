@@ -35,7 +35,7 @@ so plugins live in a sidecar process behind IPC — safe, but the boundary costs
 an unwinnable filter API. DotBoxD ships that whole architecture from one C# contract (transports,
 typed RPC, event pipelines) and dissolves both costs: plugin-authored logic — filters,
 projections, batches — runs *inside the host* as a validated, fuel-metered sandbox — restricted
-IR, never loaded C#/IL.
+IR (intermediate representation), never loaded C#/IL.
 
 [Why DotBoxD? The dilemma, in three diagrams ›](/why-dotboxd/)
 
@@ -47,7 +47,8 @@ The same contract can be delivered three ways — pick by call shape:
   <Card title="Services (RPC)" icon="rocket">
     The host implements a contract; clients call it remotely over RPC (remote procedure call).
     Proxy and implementation are generated from the same interface, so they cannot drift — and it
-    compiles ahead-of-time, so it runs on Unity's IL2CPP.
+    is generated ahead of time. Unity/IL2CPP additionally needs generated codec formatters and an
+    application-specific IL2CPP build check.
 
     [Tutorial: your first service ›](/tutorials/first-service/)
   </Card>
@@ -76,7 +77,8 @@ dotnet add package DotBoxD --prerelease
 dotnet add package DotBoxD.Services.All --prerelease
 ```
 
-The Services and channel libraries target `netstandard2.1`, so they run on **Unity / IL2CPP**.
+The Services and channel libraries target `netstandard2.1`. Unity/IL2CPP consumers must additionally
+use generated/static MessagePack formatters, root the generated registry, and validate their build.
 The Kernels and Pushdown stack targets `net10.0`.
 
 ## Security in one line

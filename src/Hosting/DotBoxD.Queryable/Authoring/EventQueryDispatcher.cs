@@ -1,11 +1,11 @@
 using System.Text;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Queryable.Ast;
 using DotBoxD.Queryable.Execution;
 using DotBoxD.Queryable.Planning;
 using DotBoxD.Queryable.Serialization;
-
 namespace DotBoxD.Queryable.Authoring;
-
 /// <summary>
 /// Routes events of one type to matching query subscriptions. Subscriptions with equality predicates are
 /// indexed by a <em>composite</em> key over all their equality members, so an event becomes a candidate
@@ -19,7 +19,6 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
     private readonly object _gate = new();
     private long _eventsObserved;
     private volatile Snapshot _snapshot = Snapshot.Empty;
-
     public long EventsObserved => Interlocked.Read(ref _eventsObserved);
     public bool HasSubscriptions => !_snapshot.IsEmpty;
     public EventQuerySubscriptionHandle Register(
@@ -62,6 +61,7 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
 
         foreach (var group in snapshot.Groups)
         {
+            context.CancellationToken.ThrowIfCancellationRequested();
             if (!Snapshot.TryEventKey(group.Paths, e, reader, out var key) ||
                 !group.TryGet(key, out var bucket))
             {
@@ -80,6 +80,7 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
         TEvent e,
         HookContext context)
     {
+        context.CancellationToken.ThrowIfCancellationRequested();
         entry.Handle.RecordFilterEvaluation();
         if (!TryEvaluate(entry, e))
         {
@@ -91,7 +92,7 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
         {
             return;
         }
-
+        context.CancellationToken.ThrowIfCancellationRequested();
         try
         {
             await entry.Dispatch(projected, context).ConfigureAwait(false);
@@ -101,13 +102,17 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
         {
             throw;
         }
+        catch (SandboxRuntimeException ex) when (context.CancellationToken.IsCancellationRequested &&
+                                                ex.Error.Code == SandboxErrorCode.Cancelled)
+        {
+            throw new OperationCanceledException(null, ex, context.CancellationToken);
+        }
         catch
         {
             // Isolate one subscriber's handler failure so it cannot starve the other dynamic queries
             // matching this event — they share a single forwarding host handler at the registry layer.
         }
     }
-
     private bool TryEvaluate(EventQuerySubscriptionEntry<TEvent> entry, TEvent e)
     {
         try
@@ -119,7 +124,6 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
             return false;
         }
     }
-
     private static bool TryProject(EventQuerySubscriptionEntry<TEvent> entry, TEvent e, out object? projected)
     {
         try
@@ -208,14 +212,10 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
         public bool IsEmpty => _all.Length == 0;
 
         public EventQuerySubscriptionEntry<TEvent>[] Broad => _broad;
-
         public RoutingGroup[] Groups => _groups;
-
         public Snapshot With(EventQuerySubscriptionEntry<TEvent> entry) => new([.. _all, entry]);
-
         public Snapshot Without(EventQuerySubscriptionEntry<TEvent> entry)
             => new(_all.Where(e => !ReferenceEquals(e, entry)).ToArray());
-
         // Reused on the hot TryEventKey path; nested same-thread calls allocate their own builder.
         [ThreadStatic] private static StringBuilder? _eventKeyBuilder;
         [ThreadStatic] private static bool _eventKeyBuilderInUse;

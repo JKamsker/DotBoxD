@@ -4,7 +4,11 @@
 
 public async ValueTask<SandboxExecutionResult> ExecuteAsync( ExecutionPlan plan, string entrypoint, SandboxValue input, SandboxExecutionOptions? options = null, CancellationToken cancellationToken = default)
 public async ValueTask<SandboxExecutionResult> ExecuteInWorkerAsync( ExecutionPlan plan, string entrypoint, SandboxValue input, SandboxExecutionOptions options, CancellationToken cancellationToken = default)
+public const string InstrumentationName = "DotBoxD.Hosting"
 public ExecutionModeDecision Choose( ExecutionPlan plan, SandboxExecutionOptions options, ModuleHotnessStats hotness, CompiledCacheStatus cacheStatus)
+public int CompileFailures { get; init; }
+public int CompletedRunCount { get; init; }
+public int RunCount { get; init; }
 public interface IExecutionModeSelector
 public interface ISandboxWorkerClient
 public ModuleHotnessStats(int runCount)
@@ -29,10 +33,16 @@ public sealed partial class SandboxHost : IDisposable
 public sealed record ExecutionModeDecision(ExecutionMode Mode)
 public sealed record ModuleHotnessStats( string PlanHash, string Entrypoint, int RunCount, int CompletedRunCount, TimeSpan AverageInterpretedDuration, long AverageFuelUsed, DateTimeOffset? LastRunAt, int CompileFailures, string? LastCompiledArtifactHash)
 public sealed record SandboxWorkerProfile( bool OutOfProcess, bool SecretsIsolated, bool ResourceLimitsConfigured)
+public static ActivitySource Activities { get; } = new(InstrumentationName)
+public static class SandboxTelemetry
 public static ExecutionModeDecision Compiled { get; } = new(ExecutionMode.Compiled)
 public static ExecutionModeDecision Interpreted { get; } = new(ExecutionMode.Interpreted)
+public static Meter Metrics { get; } = new(InstrumentationName)
 public static SandboxHost Create(Action<SandboxHostBuilder>? configure = null)
 public static SandboxWorkerProfile HardenedOutOfProcess { get; } = new( OutOfProcess: true, SecretsIsolated: true, ResourceLimitsConfigured: true)
+public static void Observe(SandboxAuditEvent auditEvent)
+public string Entrypoint { get; init; }
+public string PlanHash { get; init; }
 public ValueTask<ExecutionPlan> PrepareAsync( SandboxModule module, SandboxPolicy policy, CancellationToken cancellationToken = default)
 public void Dispose()
 public void RevokeCapability(string capabilityId, string reason = "")

@@ -204,19 +204,19 @@ public sealed partial class RemoteRunLocalValidationTests
     [Fact]
     public void Unmarshallable_event_property_does_not_lower_and_RunLocal_stays_a_throwing_stub()
     {
-        var assembly = Compile(UnmarshallableEventSource);
+        var assembly = Compile(UnmarshallableEventSource, suppressFailClosedDiagnostic: true);
 
         Assert.DoesNotContain(assembly.GetTypes(), type =>
             type.Name.StartsWith("HookChain_", StringComparison.Ordinal) &&
             type.Name.EndsWith("PluginPackage", StringComparison.Ordinal));
 
         // The .RunLocal call site was not intercepted (the chain did not lower), so invoking Configure hits the
-        // runtime RunLocal stub, which throws — the un-lowered RunLocal never runs unsandboxed.
+        // explicit IR terminal without an IR package. It fails closed and never runs unsandboxed.
         var usage = assembly.GetType("ChainSample.UnmarshallableUsage")!;
         var registry = new RemoteHookRegistry(_ => ValueTask.FromResult("unused"), new RemoteLocalHandlerRegistry());
         var ex = Assert.Throws<TargetInvocationException>(() =>
             usage.GetMethod("Configure", BindingFlags.Public | BindingFlags.Static)!.Invoke(null, [registry]));
-        Assert.IsType<NotSupportedException>(ex.InnerException);
+        Assert.IsType<ArgumentNullException>(ex.InnerException);
     }
 
     private static SandboxPolicy Policy()
@@ -242,11 +242,18 @@ public sealed partial class RemoteRunLocalValidationTests
     private static PluginPackage WithCallbackSubscriptionId(PluginPackage package)
         => LocalTerminalIdentity.WithCallbackSubscriptionId(package, LocalTerminalIdentity.CreateCallbackSubscriptionId());
 
-    private static Assembly Compile(string source)
+    private static Assembly Compile(string source, bool suppressFailClosedDiagnostic = false)
     {
         var parseOptions = CSharpParseOptions.Default
             .WithLanguageVersion(LanguageVersion.Preview)
             .WithFeatures([new KeyValuePair<string, string>("InterceptorsNamespaces", "DotBoxD.Plugins.Generated")]);
+
+        var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary);
+        if (suppressFailClosedDiagnostic)
+        {
+            compilationOptions = compilationOptions.WithSpecificDiagnosticOptions(
+                new Dictionary<string, ReportDiagnostic> { ["DBXK111"] = ReportDiagnostic.Suppress });
+        }
 
         var compilation = CSharpCompilation.Create(
             "DotBoxDRemoteRunLocalValidationTest",
@@ -256,7 +263,7 @@ public sealed partial class RemoteRunLocalValidationTests
                 .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(ChainAggroEvent).Assembly.Location)),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            compilationOptions);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: parseOptions);

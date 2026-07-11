@@ -8,13 +8,23 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime;
 
 public sealed partial class RemoteRunLocalChainRuntimeTests
 {
-    private static Assembly Compile(string source, bool enableInterceptors)
+    private static Assembly Compile(
+        string source,
+        bool enableInterceptors,
+        bool suppressFailClosedDiagnostic = false)
     {
         var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
         if (enableInterceptors)
         {
             parseOptions = parseOptions.WithFeatures(
                 [new KeyValuePair<string, string>("InterceptorsNamespaces", "DotBoxD.Plugins.Generated")]);
+        }
+
+        var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary);
+        if (suppressFailClosedDiagnostic)
+        {
+            compilationOptions = compilationOptions.WithSpecificDiagnosticOptions(
+                new Dictionary<string, ReportDiagnostic> { ["DBXK111"] = ReportDiagnostic.Suppress });
         }
 
         var compilation = CSharpCompilation.Create(
@@ -25,7 +35,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
                 .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(ChainAggroEvent).Assembly.Location)),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            compilationOptions);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: parseOptions);
@@ -60,7 +70,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
             parseOptions: parseOptions);
         return string.Join(
             "\n",
-            driver.RunGenerators(compilation).GetRunResult().GeneratedTrees.Select(tree => tree.ToString()));
+            PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.RunGenerators(compilation).GetRunResult()).GeneratedTrees.Select(tree => tree.ToString()));
     }
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()

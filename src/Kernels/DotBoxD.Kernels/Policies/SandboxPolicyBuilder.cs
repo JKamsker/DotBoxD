@@ -32,6 +32,8 @@ public sealed class SandboxPolicyBuilder
         SandboxEffect allowedEffects,
         Func<ResourceLimits, ResourceLimits>? configureLimits = null)
     {
+        ArgumentNullException.ThrowIfNull(capabilityId);
+        ArgumentNullException.ThrowIfNull(parameters);
         _allowedEffects |= allowedEffects;
         _grants.Add(new CapabilityGrant(capabilityId, ParameterReader.Read(parameters)));
         if (configureLimits is not null)
@@ -42,6 +44,7 @@ public sealed class SandboxPolicyBuilder
     }
     public SandboxPolicyBuilder GrantFileRead(string root, long maxBytesPerRun)
     {
+        ArgumentNullException.ThrowIfNull(root);
         ThrowIfNegative(maxBytesPerRun, nameof(maxBytesPerRun));
         var normalizedRoot = FileGrantRoot.NormalizeCanonicalDirectory(root, nameof(root));
         _allowedEffects |= SandboxEffect.FileRead;
@@ -59,6 +62,7 @@ public sealed class SandboxPolicyBuilder
         bool allowCreate = false,
         bool allowOverwrite = false)
     {
+        ArgumentNullException.ThrowIfNull(root);
         ThrowIfNegative(maxBytesPerRun, nameof(maxBytesPerRun));
         var normalizedRoot = FileGrantRoot.NormalizeCanonicalDirectory(root, nameof(root));
         _allowedEffects |= SandboxEffect.FileWrite | SandboxEffect.Audit;

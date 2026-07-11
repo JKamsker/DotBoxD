@@ -74,39 +74,17 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         var previousIndex = -1;
         for (var ordinal = 0; ordinal < arguments.Count; ordinal++)
         {
-            var argument = arguments[ordinal];
-            if (!argument.RefKindKeyword.IsKind(SyntaxKind.None))
-            {
-                return Fail(bindingId, " arguments must be value arguments.");
-            }
-
-            var index = argument.NameColon is { } name
-                ? IndexOfParameter(parameters, name.Name.Identifier.ValueText, bindingId)
-                : nextPositional;
-            if (index < 0)
+            if (!TryBindHostBindingArgument(
+                    arguments[ordinal],
+                    parameters,
+                    assigned,
+                    current,
+                    bindingId,
+                    ref nextPositional,
+                    ref previousIndex))
             {
                 return false;
             }
-
-            if (index < previousIndex)
-            {
-                return Fail(bindingId, " named arguments must be written in parameter order.");
-            }
-
-            if (index >= parameters.Count || assigned[index])
-            {
-                return Fail(bindingId, " call has duplicate or misplaced arguments.");
-            }
-
-            if (parameters[index].RefKind != RefKind.None)
-            {
-                return Fail(bindingId, " parameters must be value parameters.");
-            }
-
-            current.Add((index, argument.Expression));
-            assigned[index] = true;
-            previousIndex = index;
-            nextPositional = NextUnassigned(assigned, nextPositional);
         }
 
         for (var i = 0; i < assigned.Length; i++)
@@ -120,6 +98,57 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         bound = new BoundHostBindingArguments(current);
         return true;
     }
+
+    private static bool TryBindHostBindingArgument(
+        ArgumentSyntax argument,
+        IReadOnlyList<IParameterSymbol> parameters,
+        bool[] assigned,
+        List<(int ParameterIndex, ExpressionSyntax Expression)> current,
+        string? bindingId,
+        ref int nextPositional,
+        ref int previousIndex)
+    {
+        if (!argument.RefKindKeyword.IsKind(SyntaxKind.None))
+        {
+            return Fail(bindingId, " arguments must be value arguments.");
+        }
+
+        var index = HostBindingParameterIndex(argument, parameters, nextPositional, bindingId);
+        if (index < 0)
+        {
+            return false;
+        }
+
+        if (index < previousIndex)
+        {
+            return Fail(bindingId, " named arguments must be written in parameter order.");
+        }
+
+        if (index >= parameters.Count || assigned[index])
+        {
+            return Fail(bindingId, " call has duplicate or misplaced arguments.");
+        }
+
+        if (parameters[index].RefKind != RefKind.None)
+        {
+            return Fail(bindingId, " parameters must be value parameters.");
+        }
+
+        current.Add((index, argument.Expression));
+        assigned[index] = true;
+        previousIndex = index;
+        nextPositional = NextUnassigned(assigned, nextPositional);
+        return true;
+    }
+
+    private static int HostBindingParameterIndex(
+        ArgumentSyntax argument,
+        IReadOnlyList<IParameterSymbol> parameters,
+        int nextPositional,
+        string? bindingId)
+        => argument.NameColon is { } name
+            ? IndexOfParameter(parameters, name.Name.Identifier.ValueText, bindingId)
+            : nextPositional;
 
     private static DotBoxDExpressionModel LowerDefaultArgument(
         IParameterSymbol parameter,
@@ -152,22 +181,83 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
 
         return expected switch
         {
-            DotBoxDGenerationNames.ManifestTypes.Bool when value is null && type.IsValueType => BoolDefault(false),
-            DotBoxDGenerationNames.ManifestTypes.Bool when value is bool boolean => BoolDefault(boolean),
-            DotBoxDGenerationNames.ManifestTypes.Int when value is null && type.IsValueType => Int32Default(0),
-            DotBoxDGenerationNames.ManifestTypes.Int when value is IConvertible number =>
-                Int32Default(number.ToInt32(System.Globalization.CultureInfo.InvariantCulture)),
-            DotBoxDGenerationNames.ManifestTypes.Long when value is null && type.IsValueType => Int64Default(0),
-            DotBoxDGenerationNames.ManifestTypes.Long when value is IConvertible number =>
-                Int64Default(number.ToInt64(System.Globalization.CultureInfo.InvariantCulture)),
-            DotBoxDGenerationNames.ManifestTypes.Double when value is null && type.IsValueType => Float64Default(0),
-            DotBoxDGenerationNames.ManifestTypes.Double when value is IConvertible number =>
-                Float64Default(number.ToDouble(System.Globalization.CultureInfo.InvariantCulture)),
-            DotBoxDGenerationNames.ManifestTypes.String when value is string text => StringDefault(text),
-            _ => throw new NotSupportedException(
-                $"Host binding '{bindingId}' argument {index} default must be a supported scalar literal.")
+            DotBoxDGenerationNames.ManifestTypes.Bool => LowerBoolDefault(type, value, bindingId, index),
+            DotBoxDGenerationNames.ManifestTypes.Int => LowerInt32Default(type, value, bindingId, index),
+            DotBoxDGenerationNames.ManifestTypes.Long => LowerInt64Default(type, value, bindingId, index),
+            DotBoxDGenerationNames.ManifestTypes.Double => LowerFloat64Default(type, value, bindingId, index),
+            DotBoxDGenerationNames.ManifestTypes.String => LowerStringDefault(value, bindingId, index),
+            _ => UnsupportedHostBindingDefault(bindingId, index)
         };
     }
+
+    private static DotBoxDExpressionModel LowerBoolDefault(
+        ITypeSymbol type,
+        object? value,
+        string bindingId,
+        int index)
+    {
+        if (value is null && type.IsValueType)
+        {
+            return BoolDefault(false);
+        }
+
+        return value is bool boolean ? BoolDefault(boolean) : UnsupportedHostBindingDefault(bindingId, index);
+    }
+
+    private static DotBoxDExpressionModel LowerInt32Default(
+        ITypeSymbol type,
+        object? value,
+        string bindingId,
+        int index)
+    {
+        if (value is null && type.IsValueType)
+        {
+            return Int32Default(0);
+        }
+
+        return value is IConvertible number
+            ? Int32Default(number.ToInt32(System.Globalization.CultureInfo.InvariantCulture))
+            : UnsupportedHostBindingDefault(bindingId, index);
+    }
+
+    private static DotBoxDExpressionModel LowerInt64Default(
+        ITypeSymbol type,
+        object? value,
+        string bindingId,
+        int index)
+    {
+        if (value is null && type.IsValueType)
+        {
+            return Int64Default(0);
+        }
+
+        return value is IConvertible number
+            ? Int64Default(number.ToInt64(System.Globalization.CultureInfo.InvariantCulture))
+            : UnsupportedHostBindingDefault(bindingId, index);
+    }
+
+    private static DotBoxDExpressionModel LowerFloat64Default(
+        ITypeSymbol type,
+        object? value,
+        string bindingId,
+        int index)
+    {
+        if (value is null && type.IsValueType)
+        {
+            return Float64Default(0);
+        }
+
+        return value is IConvertible number
+            ? Float64Default(number.ToDouble(System.Globalization.CultureInfo.InvariantCulture))
+            : UnsupportedHostBindingDefault(bindingId, index);
+    }
+
+    private static DotBoxDExpressionModel LowerStringDefault(object? value, string bindingId, int index)
+        => value is string text ? StringDefault(text) : UnsupportedHostBindingDefault(bindingId, index);
+
+    private static DotBoxDExpressionModel UnsupportedHostBindingDefault(string bindingId, int index)
+        => throw new NotSupportedException(
+            $"Host binding '{bindingId}' argument {index} default must be a supported scalar literal.");
 
     private static DotBoxDExpressionModel BoolDefault(bool value)
         => new(

@@ -6,13 +6,15 @@
     <TreatWarningsAsErrors Condition=" '$(GITHUB_ACTIONS)' == 'true' ">true</TreatWarningsAsErrors>
     <TreatWarningsAsErrors Condition=" '$(GITHUB_ACTIONS)' != 'true' ">false</TreatWarningsAsErrors>
     <WarningsNotAsErrors>NU1900</WarningsNotAsErrors>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
     <AnalysisLevel>10.0</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
     <!-- Lock files are intentionally OFF for now: with Central Package Management across many
          multi-TFM projects they are fragile to regenerate, so CI uses plain `dotnet restore`
-         (no locked-mode flag). Revisit once the package graph stabilizes. -->
+         (no locked-mode flag). The revisit trigger lives in docs/restore-reproducibility.md. -->
     <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
     <VersionPrefix>0.1.0</VersionPrefix>
     <Authors>Jonas Kamsker</Authors>

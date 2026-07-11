@@ -1,63 +1,63 @@
 {
-  "minimumLineCoverage": 80,
-  "minimumBranchCoverage": 70,
+  "minimumLineCoverage": 84,
+  "minimumBranchCoverage": 77,
   "areas": [
     {
       "name": "Kernels",
       "packagePatterns": [ "DotBoxD.Kernels*" ],
-      "minimumLineCoverage": 82,
-      "minimumBranchCoverage": 74
+      "minimumLineCoverage": 86,
+      "minimumBranchCoverage": 78
     },
     {
       "name": "Services",
       "packagePatterns": [ "DotBoxD.Services" ],
-      "minimumLineCoverage": 80,
-      "minimumBranchCoverage": 78
+      "minimumLineCoverage": 85,
+      "minimumBranchCoverage": 84
     },
     {
       "name": "Channels and transports",
       "packagePatterns": [ "DotBoxD.Codecs.MessagePack", "DotBoxD.Transports.*" ],
-      "minimumLineCoverage": 85,
-      "minimumBranchCoverage": 78
+      "minimumLineCoverage": 91,
+      "minimumBranchCoverage": 85
     },
     {
       "name": "Code generation",
       "packagePatterns": [ "DotBoxD.Plugins.Analyzer", "DotBoxD.Services.SourceGenerator", "DotBoxD.Plugins.Fody" ],
-      "minimumLineCoverage": 80,
-      "minimumBranchCoverage": 70
+      "minimumLineCoverage": 85,
+      "minimumBranchCoverage": 74
     },
     {
       "name": "Hosting and pushdown",
       "packagePatterns": [ "DotBoxD.Abstractions", "DotBoxD.Hosting*", "DotBoxD.Plugins", "DotBoxD.Queryable", "DotBoxD.Pushdown.Services" ],
-      "minimumLineCoverage": 75,
-      "minimumBranchCoverage": 72
+      "minimumLineCoverage": 81,
+      "minimumBranchCoverage": 78
     }
   ],
   "criticalAreas": [
     {
       "name": "Critical verifier",
       "packagePatterns": [ "DotBoxD.Kernels.Verifier" ],
-      "minimumLineCoverage": 88,
-      "minimumBranchCoverage": 80
+      "minimumLineCoverage": 92,
+      "minimumBranchCoverage": 85
     },
     {
       "name": "Critical runtime",
       "packagePatterns": [ "DotBoxD.Kernels.Runtime" ],
-      "minimumLineCoverage": 75,
-      "minimumBranchCoverage": 62
+      "minimumLineCoverage": 78,
+      "minimumBranchCoverage": 66
     },
     {
       "name": "Critical validation",
       "packagePatterns": [ "DotBoxD.Kernels.Validation" ],
-      "minimumLineCoverage": 85,
-      "minimumBranchCoverage": 82
+      "minimumLineCoverage": 90,
+      "minimumBranchCoverage": 88
     },
     {
       "name": "Critical services",
       "packagePatterns": [ "DotBoxD.Services" ],
-      "minimumLineCoverage": 82,
-      "minimumBranchCoverage": 80
+      "minimumLineCoverage": 85,
+      "minimumBranchCoverage": 84
     }
   ],
-  "_comment": "Coverage thresholds are conservative ratchets over shipping DotBoxD assemblies (src/) using merged Cobertura reports from the Kernels and Services coverage suites. Measured local baseline on 2026-07-05: global line 85.15%, global branch 77.80%; area baselines are intentionally rounded down so normal noise does not fail unrelated PRs. Raise thresholds toward the current values as tests improve."
+  "_comment": "Coverage thresholds are conservative ratchets over shipping DotBoxD assemblies (src/) using merged Cobertura reports from the Kernels and Services coverage suites. Measured local baseline on 2026-07-05 after issue #500 tests: global line 85.22%, global branch 77.85%; area floors are intentionally rounded down so normal noise does not fail unrelated PRs. Raise thresholds toward current values as tests improve."
 }

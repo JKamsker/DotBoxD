@@ -5,7 +5,13 @@ param(
     [int] $MaxFilesInProjectFolder = 5,
     # Ratcheting budget for soft-limit (CE0002, > $WarnAt lines) files. -1 reads
     # `maxSoftLimitViolations` from .config/code-enforcer/code-enforcer.json.
-    [int] $MaxSoftLimitViolations = -1
+    [int] $MaxSoftLimitViolations = -1,
+    # Ratcheting budget for mechanical split files named *.Part*.cs. -1 reads
+    # `maxPartFileCount` from .config/code-enforcer/code-enforcer.json.
+    [int] $MaxPartFileCount = -1,
+    # Ratcheting budget for non-generated source partial types that span multiple files.
+    # -1 reads `maxSourceMultiFilePartialTypeCount` from .config/code-enforcer/code-enforcer.json.
+    [int] $MaxSourceMultiFilePartialTypeCount = -1
 )
 
 $ErrorActionPreference = "Stop"
@@ -14,6 +20,8 @@ $root = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($PSScriptRoot, "
 $justificationPath = [System.IO.Path]::Combine($root, ".config/code-enforcer/justifications.json")
 $violations = [System.Collections.Generic.List[string]]::new()
 $warnings = [System.Collections.Generic.List[string]]::new()
+
+. ([System.IO.Path]::Combine($PSScriptRoot, "code-enforcer-csharp-scan.ps1"))
 
 function Normalize-PathText([string] $path) {
     return $path.Replace("\", "/").Trim("/")
@@ -126,6 +134,119 @@ function Test-GeneratedFile([string] $relativePath) {
     return $false
 }
 
+function Get-PartialTypeDeclarations([string] $relativePath) {
+    $declarations = @{}
+    $namespacePattern = '^\s*namespace\s+([A-Za-z_][A-Za-z0-9_.]*)\s*(;|\{)?'
+    $typePattern = '^\s*(?:(?:public|internal|private|protected|sealed|static|abstract|readonly|ref|unsafe|partial)\s+)*partial\s+(?:class|interface|struct|record(?:\s+(?:class|struct))?)\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*<([^>{}]*)>)?\b'
+    $fullPath = [System.IO.Path]::Combine($root, $relativePath)
+
+    $containsPartial = $false
+    foreach ($rawLine in [System.IO.File]::ReadLines($fullPath)) {
+        if ($rawLine.Contains("partial", [StringComparison]::Ordinal)) {
+            $containsPartial = $true
+            break
+        }
+    }
+
+    if (-not $containsPartial) {
+        return [System.Collections.Generic.List[object]]::new()
+    }
+
+    $namespaceRegex = [System.Text.RegularExpressions.Regex]::new($namespacePattern)
+    $typeRegex = [System.Text.RegularExpressions.Regex]::new($typePattern)
+    $fileScopedNamespace = ""
+    $namespaceScopes = [System.Collections.Generic.List[object]]::new()
+    $pendingNamespace = $null
+    $braceDepth = 0
+    $inBlockComment = $false
+    $inVerbatimString = $false
+    $rawStringQuoteCount = 0
+
+    foreach ($rawLine in [System.IO.File]::ReadLines($fullPath)) {
+        $line = Get-CSharpLineForDeclarationScan `
+            $rawLine `
+            ([ref] $inBlockComment) `
+            ([ref] $inVerbatimString) `
+            ([ref] $rawStringQuoteCount)
+        Pop-ClosedNamespaces $namespaceScopes $braceDepth
+
+        $namespaceMatch = $namespaceRegex.Match($line)
+        if ($namespaceMatch.Success) {
+            $declaredNamespace = $namespaceMatch.Groups[1].Value
+            $namespaceDelimiter = $namespaceMatch.Groups[2].Value
+
+            if ($namespaceDelimiter -eq ";") {
+                $fileScopedNamespace = $declaredNamespace
+                $namespaceScopes.Clear()
+                $pendingNamespace = $null
+            }
+            elseif ($line.Contains("{")) {
+                $parentNamespace = Get-ActiveNamespace $namespaceScopes $fileScopedNamespace
+                $namespaceScopes.Add([pscustomobject]@{
+                        Name = Join-NamespaceName $parentNamespace $declaredNamespace
+                        Depth = $braceDepth + 1
+                    })
+                $pendingNamespace = $null
+            }
+            else {
+                $pendingNamespace = $declaredNamespace
+            }
+        }
+        elseif ($null -ne $pendingNamespace -and $line.Contains("{")) {
+            $parentNamespace = Get-ActiveNamespace $namespaceScopes $fileScopedNamespace
+            $namespaceScopes.Add([pscustomobject]@{
+                    Name = Join-NamespaceName $parentNamespace $pendingNamespace
+                    Depth = $braceDepth + 1
+                })
+            $pendingNamespace = $null
+        }
+
+        $currentNamespace = Get-ActiveNamespace $namespaceScopes $fileScopedNamespace
+        $match = $typeRegex.Match($line)
+        if ($match.Success) {
+            $typeName = $match.Groups[1].Value
+            $genericParameters = $match.Groups[2].Value
+            $arity = 0
+            if (-not [string]::IsNullOrWhiteSpace($genericParameters)) {
+                $arity = @($genericParameters -split "," | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count
+            }
+
+            $key = if ([string]::IsNullOrWhiteSpace($currentNamespace)) {
+                '{0}`{1}' -f $typeName, $arity
+            }
+            else {
+                '{0}.{1}`{2}' -f $currentNamespace, $typeName, $arity
+            }
+
+            $displayName = if ([string]::IsNullOrWhiteSpace($currentNamespace)) { $typeName } else { "$currentNamespace.$typeName" }
+            if ($arity -gt 0) {
+                $displayName += "<" + (($genericParameters -split "," | ForEach-Object { $_.Trim() }) -join ", ") + ">"
+            }
+
+            $declarations[$key] = $displayName
+        }
+
+        $openBraces = $line.Length - $line.Replace("{", "").Length
+        $closeBraces = $line.Length - $line.Replace("}", "").Length
+        $braceDepth += $openBraces - $closeBraces
+        if ($braceDepth -lt 0) {
+            $braceDepth = 0
+        }
+
+        Pop-ClosedNamespaces $namespaceScopes $braceDepth
+    }
+
+    $result = [System.Collections.Generic.List[object]]::new()
+    foreach ($key in $declarations.Keys) {
+        $result.Add([pscustomobject]@{
+                Key = $key
+                DisplayName = $declarations[$key]
+            })
+    }
+
+    return $result
+}
+
 function Get-LineCount([string] $relativePath) {
     $count = 0
     foreach ($line in [System.IO.File]::ReadLines([System.IO.Path]::Combine($root, $relativePath))) {
@@ -142,6 +263,27 @@ function Get-Folder([string] $relativePath) {
     }
 
     return Normalize-PathText $folder
+}
+
+function Get-CodeEnforcerConfigInt([string] $propertyName, [int] $fallback) {
+    $configPath = [System.IO.Path]::Combine($root, ".config/code-enforcer/code-enforcer.json")
+    if (-not [System.IO.File]::Exists($configPath)) {
+        return $fallback
+    }
+
+    $configDocument = [System.Text.Json.JsonDocument]::Parse([System.IO.File]::ReadAllText($configPath))
+    try {
+        $field = [System.Text.Json.JsonElement]::new()
+        if ($configDocument.RootElement.TryGetProperty($propertyName, [ref] $field) -and
+            $field.ValueKind -eq [System.Text.Json.JsonValueKind]::Number) {
+            return $field.GetInt32()
+        }
+    }
+    finally {
+        $configDocument.Dispose()
+    }
+
+    return $fallback
 }
 
 $justifiedFiles = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
@@ -161,6 +303,62 @@ if ([System.IO.File]::Exists($justificationPath)) {
 }
 
 $csharpFiles = @(Get-RepositoryCSharpFiles | Where-Object { -not (Test-GeneratedFile $_) })
+$partFileBudget = $MaxPartFileCount
+if ($partFileBudget -lt 0) {
+    $partFileBudget = Get-CodeEnforcerConfigInt "maxPartFileCount" 0
+}
+
+$partFiles = @($csharpFiles | Where-Object { [System.IO.Path]::GetFileName($_) -match '(?i)\.Part\d+\.cs$' })
+if ($partFiles.Count -gt $partFileBudget) {
+    $sample = ($partFiles | Sort-Object | Select-Object -First 10) -join ", "
+    $violations.Add("CE0007 mechanical partial split budget exceeded: $($partFiles.Count) file(s) named *.Part*.cs, budget is $partFileBudget. Rename/refactor split files around behavior or support types instead of Class.PartN.cs. Sample: $sample")
+}
+elseif ($partFiles.Count -lt $partFileBudget) {
+    [System.Console]::Out.WriteLine("CodeEnforcer: *.Part*.cs count ($($partFiles.Count)) is below the budget ($partFileBudget). Lower maxPartFileCount in .config/code-enforcer/code-enforcer.json to lock in the improvement.")
+}
+
+$sourcePartialTypeBudget = $MaxSourceMultiFilePartialTypeCount
+if ($sourcePartialTypeBudget -lt 0) {
+    $sourcePartialTypeBudget = Get-CodeEnforcerConfigInt "maxSourceMultiFilePartialTypeCount" 0
+}
+
+$sourcePartialTypeFiles = @{}
+foreach ($file in ($csharpFiles | Where-Object { $_ -like "src/*" })) {
+    foreach ($declaration in (Get-PartialTypeDeclarations $file)) {
+        if (-not $sourcePartialTypeFiles.ContainsKey($declaration.Key)) {
+            $sourcePartialTypeFiles[$declaration.Key] = [pscustomobject]@{
+                DisplayName = $declaration.DisplayName
+                Files = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+            }
+        }
+
+        [void] $sourcePartialTypeFiles[$declaration.Key].Files.Add($file)
+    }
+}
+
+$sourceMultiFilePartialTypes = [System.Collections.Generic.List[object]]::new()
+foreach ($typeKey in $sourcePartialTypeFiles.Keys) {
+    $entry = $sourcePartialTypeFiles[$typeKey]
+    $fileCount = $entry.Files.Count
+    if ($fileCount -gt 1) {
+        $sourceMultiFilePartialTypes.Add([pscustomobject]@{
+                TypeName = $entry.DisplayName
+                FileCount = $fileCount
+            })
+    }
+}
+
+if ($sourceMultiFilePartialTypes.Count -gt $sourcePartialTypeBudget) {
+    $sample = ($sourceMultiFilePartialTypes |
+        Sort-Object -Property @{ Expression = "FileCount"; Descending = $true }, TypeName |
+        Select-Object -First 10 |
+        ForEach-Object { "$($_.TypeName) ($($_.FileCount) files)" }) -join ", "
+    $violations.Add("CE0008 source multi-file partial type budget exceeded: $($sourceMultiFilePartialTypes.Count) type(s), budget is $sourcePartialTypeBudget. Extract collaborators or document and intentionally ratchet the budget. Sample: $sample")
+}
+elseif ($sourceMultiFilePartialTypes.Count -lt $sourcePartialTypeBudget) {
+    [System.Console]::Out.WriteLine("CodeEnforcer: source multi-file partial type count ($($sourceMultiFilePartialTypes.Count)) is below the budget ($sourcePartialTypeBudget). Lower maxSourceMultiFilePartialTypeCount in .config/code-enforcer/code-enforcer.json to lock in the improvement.")
+}
+
 $filesByFolder = @{}
 foreach ($file in $csharpFiles) {
     $lineCount = Get-LineCount $file
@@ -220,20 +418,7 @@ foreach ($warning in $warnings) {
 $softLimitCount = $warnings.Count
 $budget = $MaxSoftLimitViolations
 if ($budget -lt 0) {
-    $configPath = [System.IO.Path]::Combine($root, ".config/code-enforcer/code-enforcer.json")
-    if ([System.IO.File]::Exists($configPath)) {
-        $configDocument = [System.Text.Json.JsonDocument]::Parse([System.IO.File]::ReadAllText($configPath))
-        try {
-            $field = [System.Text.Json.JsonElement]::new()
-            if ($configDocument.RootElement.TryGetProperty("maxSoftLimitViolations", [ref] $field) -and
-                $field.ValueKind -eq [System.Text.Json.JsonValueKind]::Number) {
-                $budget = $field.GetInt32()
-            }
-        }
-        finally {
-            $configDocument.Dispose()
-        }
-    }
+    $budget = Get-CodeEnforcerConfigInt "maxSoftLimitViolations" $budget
 }
 
 if ($budget -ge 0) {

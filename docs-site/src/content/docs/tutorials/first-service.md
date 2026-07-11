@@ -32,9 +32,9 @@ A few grounded reasons this design earns its place:
   Unsupported shapes surface as build-time diagnostics (`DBXS001`–`DBXS004`) — for example a
   `ref`/`in`/`out` parameter or a generic/nested interface is rejected at compile time.
 - **No runtime reflection on the hot path.** Proxy/dispatcher lookup goes through a *generated* registry
-  rather than scanning assemblies, and the MessagePack codec uses generated formatters. That is why the
-  Services stack targets `netstandard2.1` and runs on **Unity / IL2CPP** and NativeAOT, where runtime
-  reflection and dynamic codegen are stripped or forbidden.
+  rather than scanning assemblies. The Services stack targets `netstandard2.1`, but an AOT deployment
+  must explicitly root its generated registry, supply generated/static MessagePack formatters, and
+  validate the resulting NativeAOT or IL2CPP build.
 - **Peer-based and bidirectional.** A connection is a symmetric `RpcPeer`: the same object can `Provide`
   local services and `Get` proxies for remote ones over one read loop, so the host can call *back* into
   a connecting plugin over the same wire — no separate client/server class on the hot path.
@@ -67,7 +67,7 @@ Three pieces, mirroring how the GameServer sample is laid out (shared abstractio
   `netstandard2.1` Services stack or the full test suite — not for building this walkthrough.) The
   named-pipe IPC helper used below (`RpcMessagePackIpc`) ships in `DotBoxD.Pushdown.Services`, which
   targets `net10.0`, so target `net10.0` for the host and client in this tutorial. (The pure
-  Services/channel stack is `netstandard2.1` and also runs on Unity/IL2CPP — see
+  Services/channel stack is `netstandard2.1` and can be configured for Unity/IL2CPP — see
   [Unity note](#unity-and-the-netstandard21-stack) at the end.)
 
 ## Step 1 — Create the projects and install the package
@@ -338,8 +338,9 @@ Real contracts to read next:
 
 ### Unity and the netstandard2.1 stack
 
-The pure Services/channel stack targets `netstandard2.1` and runs on **Unity / IL2CPP**. For a Unity
-service bundle, install the meta-package instead:
+The pure Services/channel stack targets `netstandard2.1`; that is necessary but not sufficient for
+**Unity / IL2CPP**. A Unity deployment also needs generated/static MessagePack formatters, explicit
+generated-registry rooting, and a successful IL2CPP build for its DTO set. Install the service bundle:
 
 ```bash
 dotnet add package DotBoxD.Services.All --prerelease
@@ -355,7 +356,7 @@ generated `[RpcService]` proxy, dispatcher, and `Provide`/`Get` extensions are i
 - [**Event pipelines (RunLocal)**](/tutorials/event-pipeline-runlocal/) — the next tutorial: subscribe to a
   server event, push the `Where`/`Select` filter server-side, and react locally.
 - [Services concepts](/concepts/services/) — the dispatch model, peers/hosts, and streaming.
-- [Kernels concept](/concepts/kernels/) — run *validated client logic* inside a metered
+- [Kernels concept](/concepts/kernels/) — run *validated client logic* inside a fuel-metered
   sandbox (the second of the three modes).
 - [Project README](https://github.com/JKamsker/DotBoxD/blob/main/README.md) — the three modes side by side, the full package matrix, and the
   security/trust boundary.

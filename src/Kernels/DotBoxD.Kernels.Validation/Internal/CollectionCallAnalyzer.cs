@@ -8,16 +8,20 @@ internal delegate SandboxType ExpressionAnalyzer(
     FunctionScope scope,
     ref SandboxEffect effects,
     ref bool canReorder);
-internal sealed partial class CollectionCallAnalyzer
+internal sealed class CollectionCallAnalyzer
 {
     private readonly List<SandboxDiagnostic> _diagnostics;
     private readonly ExpressionAnalyzer _analyzeExpression;
     private readonly IReadOnlySet<string> _declaredOpaqueIdTypes;
+    private readonly CollectionMapCallAnalyzer _mapCalls;
+    private readonly CollectionRecordCallAnalyzer _recordCalls;
     public CollectionCallAnalyzer(List<SandboxDiagnostic> diagnostics, ExpressionAnalyzer analyzeExpression, IReadOnlySet<string> declaredOpaqueIdTypes)
     {
         _diagnostics = diagnostics;
         _analyzeExpression = analyzeExpression;
         _declaredOpaqueIdTypes = declaredOpaqueIdTypes;
+        _mapCalls = new CollectionMapCallAnalyzer(diagnostics, analyzeExpression, declaredOpaqueIdTypes);
+        _recordCalls = new CollectionRecordCallAnalyzer(diagnostics, analyzeExpression, declaredOpaqueIdTypes);
     }
     public bool TryAnalyze(
         CallExpression call,
@@ -31,6 +35,24 @@ internal sealed partial class CollectionCallAnalyzer
             type = SandboxType.Unit;
             return false;
         }
+        if (TryAnalyzeListCall(call, scope, ref effects, ref canReorder, out type) ||
+            TryAnalyzeMapCall(call, scope, ref effects, ref canReorder, out type) ||
+            TryAnalyzeRecordCall(call, scope, ref effects, ref canReorder, out type))
+        {
+            return true;
+        }
+
+        type = SandboxType.Unit;
+        return true;
+    }
+
+    private bool TryAnalyzeListCall(
+        CallExpression call,
+        FunctionScope scope,
+        ref SandboxEffect effects,
+        ref bool canReorder,
+        out SandboxType type)
+    {
         type = call.Name switch
         {
             "list.empty" => AnalyzeListEmpty(call, ref effects),
@@ -38,16 +60,44 @@ internal sealed partial class CollectionCallAnalyzer
             "list.count" => AnalyzeListCount(call, scope, ref effects, ref canReorder),
             "list.get" => AnalyzeListGet(call, scope, ref effects, ref canReorder),
             "list.add" => AnalyzeListAdd(call, scope, ref effects, ref canReorder),
-            "map.empty" => AnalyzeMapEmpty(call, ref effects),
-            "map.containsKey" => AnalyzeMapContainsKey(call, scope, ref effects, ref canReorder),
-            "map.get" => AnalyzeMapGet(call, scope, ref effects, ref canReorder),
-            "map.set" => AnalyzeMapSet(call, scope, ref effects, ref canReorder),
-            "map.remove" => AnalyzeMapRemove(call, scope, ref effects, ref canReorder),
-            "record.new" => AnalyzeRecordNew(call, scope, ref effects, ref canReorder),
-            "record.get" => AnalyzeRecordGet(call, scope, ref effects, ref canReorder),
-            _ => SandboxType.Unit
+            _ => null!
         };
-        return true;
+        return type is not null;
+    }
+
+    private bool TryAnalyzeMapCall(
+        CallExpression call,
+        FunctionScope scope,
+        ref SandboxEffect effects,
+        ref bool canReorder,
+        out SandboxType type)
+    {
+        type = call.Name switch
+        {
+            "map.empty" => _mapCalls.AnalyzeMapEmpty(call, ref effects),
+            "map.containsKey" => _mapCalls.AnalyzeMapContainsKey(call, scope, ref effects, ref canReorder),
+            "map.get" => _mapCalls.AnalyzeMapGet(call, scope, ref effects, ref canReorder),
+            "map.set" => _mapCalls.AnalyzeMapSet(call, scope, ref effects, ref canReorder),
+            "map.remove" => _mapCalls.AnalyzeMapRemove(call, scope, ref effects, ref canReorder),
+            _ => null!
+        };
+        return type is not null;
+    }
+
+    private bool TryAnalyzeRecordCall(
+        CallExpression call,
+        FunctionScope scope,
+        ref SandboxEffect effects,
+        ref bool canReorder,
+        out SandboxType type)
+    {
+        type = call.Name switch
+        {
+            "record.new" => _recordCalls.AnalyzeRecordNew(call, scope, ref effects, ref canReorder),
+            "record.get" => _recordCalls.AnalyzeRecordGet(call, scope, ref effects, ref canReorder),
+            _ => null!
+        };
+        return type is not null;
     }
     private SandboxType AnalyzeListEmpty(CallExpression call, ref SandboxEffect effects)
     {
@@ -139,106 +189,6 @@ internal sealed partial class CollectionCallAnalyzer
         Require(itemType, listType.Arguments[0], call.Arguments[1].Span);
         return listType;
     }
-    private SandboxType AnalyzeMapEmpty(CallExpression call, ref SandboxEffect effects)
-    {
-        effects |= SandboxEffect.Alloc;
-        if (call.Arguments.Count != 0)
-        {
-            Arity(call, 0);
-        }
-        var mapType = RequireMapGeneric(call);
-        return mapType ?? SandboxType.Map(SandboxType.Unit, SandboxType.Unit);
-    }
-    private SandboxType AnalyzeMapContainsKey(
-        CallExpression call,
-        FunctionScope scope,
-        ref SandboxEffect effects,
-        ref bool canReorder)
-    {
-        if (call.Arguments.Count != 2)
-        {
-            Arity(call, 2);
-            return SandboxType.Bool;
-        }
-        var mapType = RequireMap(
-            _analyzeExpression(call.Arguments[0], scope, ref effects, ref canReorder),
-            call.Arguments[0].Span);
-        var keyType = _analyzeExpression(call.Arguments[1], scope, ref effects, ref canReorder);
-        if (mapType is not null)
-        {
-            Require(keyType, mapType.Arguments[0], call.Arguments[1].Span);
-        }
-        return SandboxType.Bool;
-    }
-    private SandboxType AnalyzeMapGet(
-        CallExpression call,
-        FunctionScope scope,
-        ref SandboxEffect effects,
-        ref bool canReorder)
-    {
-        if (call.Arguments.Count != 2)
-        {
-            Arity(call, 2);
-            return SandboxType.Unit;
-        }
-        var mapType = RequireMap(
-            _analyzeExpression(call.Arguments[0], scope, ref effects, ref canReorder),
-            call.Arguments[0].Span);
-        var keyType = _analyzeExpression(call.Arguments[1], scope, ref effects, ref canReorder);
-        if (mapType is null)
-        {
-            return SandboxType.Unit;
-        }
-        Require(keyType, mapType.Arguments[0], call.Arguments[1].Span);
-        return mapType.Arguments[1];
-    }
-    private SandboxType AnalyzeMapSet(
-        CallExpression call,
-        FunctionScope scope,
-        ref SandboxEffect effects,
-        ref bool canReorder)
-    {
-        effects |= SandboxEffect.Alloc;
-        if (call.Arguments.Count != 3)
-        {
-            Arity(call, 3);
-            return SandboxType.Map(SandboxType.Unit, SandboxType.Unit);
-        }
-        var mapType = RequireMap(
-            _analyzeExpression(call.Arguments[0], scope, ref effects, ref canReorder),
-            call.Arguments[0].Span);
-        var keyType = _analyzeExpression(call.Arguments[1], scope, ref effects, ref canReorder);
-        var valueType = _analyzeExpression(call.Arguments[2], scope, ref effects, ref canReorder);
-        if (mapType is null)
-        {
-            return SandboxType.Map(keyType, valueType);
-        }
-        Require(keyType, mapType.Arguments[0], call.Arguments[1].Span);
-        Require(valueType, mapType.Arguments[1], call.Arguments[2].Span);
-        return mapType;
-    }
-    private SandboxType AnalyzeMapRemove(
-        CallExpression call,
-        FunctionScope scope,
-        ref SandboxEffect effects,
-        ref bool canReorder)
-    {
-        effects |= SandboxEffect.Alloc;
-        if (call.Arguments.Count != 2)
-        {
-            Arity(call, 2);
-            return SandboxType.Map(SandboxType.Unit, SandboxType.Unit);
-        }
-        var mapType = RequireMap(
-            _analyzeExpression(call.Arguments[0], scope, ref effects, ref canReorder),
-            call.Arguments[0].Span);
-        var keyType = _analyzeExpression(call.Arguments[1], scope, ref effects, ref canReorder);
-        if (mapType is not null)
-        {
-            Require(keyType, mapType.Arguments[0], call.Arguments[1].Span);
-        }
-        return mapType ?? SandboxType.Map(keyType, SandboxType.Unit);
-    }
     private SandboxType? RequireList(SandboxType actual, SourceSpan span)
     {
         if (actual.Name == "List" && actual.Arguments.Count == 1)
@@ -250,38 +200,12 @@ internal sealed partial class CollectionCallAnalyzer
         return null;
     }
 
-    private SandboxType? RequireMap(SandboxType actual, SourceSpan span)
+    private void CheckKnownType(SandboxType type, SourceSpan span)
     {
-        if (actual.Name == "Map" && actual.Arguments.Count == 2)
+        if (!type.IsKnown(_declaredOpaqueIdTypes))
         {
-            RequireMapKey(actual.Arguments[0], span);
-            return actual;
+            _diagnostics.Add(new SandboxDiagnostic("E-TYPE-UNKNOWN", $"unknown or forbidden type '{type}'", Span: span));
         }
-
-        _diagnostics.Add(new SandboxDiagnostic("E-TYPE-MISMATCH", $"expected Map<K,V>, got {actual}", Span: span));
-        return null;
-    }
-
-    private SandboxType? RequireMapGeneric(CallExpression call)
-    {
-        if (call.GenericType is null)
-        {
-            _diagnostics.Add(new SandboxDiagnostic("E-CALL-GENERIC", "map.empty requires Map<K,V> genericType", Span: call.Span));
-            return null;
-        }
-
-        CheckKnownType(call.GenericType, call.Span);
-        return RequireMap(call.GenericType, call.Span);
-    }
-
-    private void RequireMapKey(SandboxType keyType, SourceSpan span)
-    {
-        if (keyType.IsValidMapKey(_declaredOpaqueIdTypes))
-        {
-            return;
-        }
-
-        _diagnostics.Add(new SandboxDiagnostic("E-TYPE-MAP-KEY", $"map key type '{keyType}' is not supported", Span: span));
     }
 
     private void Require(SandboxType actual, SandboxType expected, SourceSpan span)
@@ -297,4 +221,8 @@ internal sealed partial class CollectionCallAnalyzer
             "E-CALL-ARITY",
             $"{call.Name} expects {expected} argument{(expected == 1 ? "" : "s")}",
             Span: call.Span));
+
+    private static bool IsCollectionCall(string name)
+        => SandboxCollectionFuel.IsCollectionIntrinsic(name) ||
+           name is "record.new" or "record.get";
 }

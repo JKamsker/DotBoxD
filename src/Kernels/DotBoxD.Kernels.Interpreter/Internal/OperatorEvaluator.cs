@@ -40,26 +40,65 @@ internal static class OperatorEvaluator
         SandboxValue left,
         SandboxValue right,
         SandboxContext context)
-        => binary.Operator switch
+    {
+        if (string.Equals(binary.Operator, "+", StringComparison.Ordinal))
         {
-            "+" when left is StringValue l && right is StringValue r => Concat(l.Value, r.Value, context),
-            "+" => SandboxNumericOperations.Add(left, right),
-            "-" => SandboxNumericOperations.Subtract(left, right),
-            "*" => SandboxNumericOperations.Multiply(left, right),
-            "/" => SandboxNumericOperations.Divide(left, right),
-            "%" => SandboxNumericOperations.Remainder(left, right),
+            return ApplyAdd(left, right, context);
+        }
+
+        if (IsComparisonOrEquality(binary.Operator))
+        {
+            return ApplyComparisonOrEquality(binary.Operator, left, right);
+        }
+
+        return ApplyNumericNonAdd(binary.Operator, left, right);
+    }
+
+    private static bool IsComparisonOrEquality(string op)
+        => op switch
+        {
+            "==" => true,
+            "!=" => true,
+            "<" => true,
+            "<=" => true,
+            ">" => true,
+            ">=" => true,
+            _ => false
+        };
+
+    private static SandboxValue ApplyComparisonOrEquality(string op, SandboxValue left, SandboxValue right)
+        => op switch
+        {
             "==" => SandboxValue.FromBool(Equals(left, right)),
             "!=" => SandboxValue.FromBool(!Equals(left, right)),
             "<" => SandboxNumericOperations.LessThan(left, right),
             "<=" => SandboxNumericOperations.LessThanOrEqual(left, right),
             ">" => SandboxNumericOperations.GreaterThan(left, right),
             ">=" => SandboxNumericOperations.GreaterThanOrEqual(left, right),
-            _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported binary operator"))
+            _ => throw UnsupportedBinaryOperator()
         };
+
+    private static SandboxValue ApplyNumericNonAdd(string op, SandboxValue left, SandboxValue right)
+        => op switch
+        {
+            "-" => SandboxNumericOperations.Subtract(left, right),
+            "*" => SandboxNumericOperations.Multiply(left, right),
+            "/" => SandboxNumericOperations.Divide(left, right),
+            "%" => SandboxNumericOperations.Remainder(left, right),
+            _ => throw UnsupportedBinaryOperator()
+        };
+
+    private static SandboxValue ApplyAdd(SandboxValue left, SandboxValue right, SandboxContext context)
+        => left is StringValue l && right is StringValue r
+            ? Concat(l.Value, r.Value, context)
+            : SandboxNumericOperations.Add(left, right);
 
     private static SandboxValue Concat(string left, string right, SandboxContext context)
     {
         var text = context.CreateChargedStringConcat(left, right);
         return SandboxValue.FromString(text);
     }
+
+    private static SandboxRuntimeException UnsupportedBinaryOperator()
+        => new(new SandboxError(SandboxErrorCode.ValidationError, "unsupported binary operator"));
 }

@@ -56,10 +56,10 @@ public sealed class HashIdentityTests
     public void Binding_manifest_hash_distinguishes_delimiter_heavy_signatures()
     {
         var first = new BindingRegistryBuilder()
-            .Add(TestBinding("a@b", [SandboxType.I32]))
+            .Add(TestBinding("test.a.b", [SandboxType.I32]))
             .Build();
         var second = new BindingRegistryBuilder()
-            .Add(TestBinding("a", [SandboxType.I32]))
+            .Add(TestBinding("test.a", [SandboxType.I32]))
             .Build();
 
         Assert.NotEqual(first.ManifestHash, second.ManifestHash);

@@ -92,6 +92,7 @@ internal static class GeneratorTestHelper
 
     public enum GeneratedKind
     {
+        Async,
         Proxy,
         Dispatcher,
     }
@@ -109,7 +110,12 @@ internal static class GeneratorTestHelper
         var prefix = string.IsNullOrEmpty(@namespace)
             ? GlobalPrefix(interfaceName)
             : NamespaceIdentifierPrefix(@namespace) + "_" + interfaceName;
-        var suffix = kind == GeneratedKind.Proxy ? "DotBoxDRpcProxy" : "DotBoxDRpcDispatcher";
+        var suffix = kind switch
+        {
+            GeneratedKind.Async => "DotBoxDRpcAsync",
+            GeneratedKind.Proxy => "DotBoxDRpcProxy",
+            _ => "DotBoxDRpcDispatcher",
+        };
         return $"{prefix}.{suffix}.g.cs";
     }
 

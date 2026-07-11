@@ -5,6 +5,11 @@ namespace DotBoxD.Plugins.Runtime;
 
 internal static class PluginKernelRevocation
 {
+    internal static SandboxError Error()
+        => new(
+            SandboxErrorCode.PolicyDenied,
+            "plugin kernel capability was revoked");
+
     public static void ThrowIfRevoked(bool revoked)
     {
         if (!revoked)
@@ -12,8 +17,6 @@ internal static class PluginKernelRevocation
             return;
         }
 
-        throw new SandboxRuntimeException(new SandboxError(
-            SandboxErrorCode.PolicyDenied,
-            "plugin kernel capability was revoked"));
+        throw new SandboxRuntimeException(Error());
     }
 }

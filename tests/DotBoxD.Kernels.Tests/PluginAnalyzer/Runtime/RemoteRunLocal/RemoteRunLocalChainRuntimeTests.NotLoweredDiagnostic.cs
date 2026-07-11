@@ -9,7 +9,7 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime;
 /// <summary>
 /// DBXK111 coverage: a recognized remote <c>RunLocal</c> chain whose <c>Where</c>/<c>Select</c> stages cannot be
 /// lowered is skipped by the generator and would throw <see cref="System.NotSupportedException"/> at runtime. The
-/// generator now reports DBXK111 (Info) so the cause is visible at build time instead of being a silent skip; a
+/// generator now reports DBXK111 (Error) so the broken shape fails closed at build time; a
 /// chain that lowers reports nothing. Shares the fail-safe source constants + the <c>TrustedPlatformReferences</c>
 /// helper with the other <see cref="RemoteRunLocalChainRuntimeTests"/> partials.
 /// </summary>
@@ -80,7 +80,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         var diagnostic = Assert.Single(
             ChainGeneratorDiagnostics(source),
             d => string.Equals(d.Id, "DBXK111", StringComparison.Ordinal));
-        Assert.Equal(DiagnosticSeverity.Info, diagnostic.Severity);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
             ChainGeneratorDiagnostics(ReorderedDtoConstructorEvaluationOrderSource),
             d => string.Equals(d.Id, "DBXK111", StringComparison.Ordinal));
 
-        Assert.Equal(DiagnosticSeverity.Info, diagnostic.Severity);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Contains("evaluation order", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
@@ -101,7 +101,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
             ChainGeneratorDiagnostics(ReorderedDtoInitializerEvaluationOrderSource),
             d => string.Equals(d.Id, "DBXK111", StringComparison.Ordinal));
 
-        Assert.Equal(DiagnosticSeverity.Info, diagnostic.Severity);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Contains("evaluation order", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
@@ -132,6 +132,6 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: parseOptions);
-        return driver.RunGenerators(compilation).GetRunResult().Diagnostics;
+        return PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.RunGenerators(compilation).GetRunResult()).Diagnostics;
     }
 }

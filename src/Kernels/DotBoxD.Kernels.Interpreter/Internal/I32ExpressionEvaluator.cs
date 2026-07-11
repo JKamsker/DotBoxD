@@ -30,15 +30,29 @@ internal static class I32ExpressionEvaluator
         => expression switch
         {
             LiteralExpression { Value: I32Value } => true,
-            VariableExpression variable => frame?.CanReadInt32(variable.Name) == true ||
-                                           (variable.Name == assumedInt32Local && frame?.IsInt32Local(variable.Name) == true),
+            VariableExpression variable => CanEvaluateVariable(variable, frame, assumedInt32Local),
             UnaryExpression { Operator: "-" } unary => CanEvaluate(unary.Operand, frame, calls, assumedInt32Local),
-            BinaryExpression binary when binary.Operator is "+" or "-" or "*" or "/" or "%"
-                => CanEvaluate(binary.Left, frame, calls, assumedInt32Local) &&
-                   CanEvaluate(binary.Right, frame, calls, assumedInt32Local),
+            BinaryExpression binary => CanEvaluateBinary(binary, frame, calls, assumedInt32Local),
             CallExpression call => calls?.CanEvaluateInt32Call(call) == true,
             _ => false
         };
+
+    private static bool CanEvaluateVariable(
+        VariableExpression variable,
+        InterpreterFrame? frame,
+        string? assumedInt32Local)
+        => frame?.CanReadInt32(variable.Name) == true ||
+           variable.Name == assumedInt32Local &&
+           frame?.IsInt32Local(variable.Name) == true;
+
+    private static bool CanEvaluateBinary(
+        BinaryExpression binary,
+        InterpreterFrame? frame,
+        I32CallEvaluator? calls,
+        string? assumedInt32Local)
+        => binary.Operator is "+" or "-" or "*" or "/" or "%" &&
+           CanEvaluate(binary.Left, frame, calls, assumedInt32Local) &&
+           CanEvaluate(binary.Right, frame, calls, assumedInt32Local);
 
     public static int Evaluate(
         Expression expression,
@@ -64,10 +78,13 @@ internal static class I32ExpressionEvaluator
             LiteralExpression { Value: I32Value } => 1,
             VariableExpression => 1,
             UnaryExpression { Operator: "-" } unary => 1 + FuelCost(unary.Operand),
-            BinaryExpression binary when binary.Operator is "+" or "-" or "*" or "/" or "%"
+            BinaryExpression binary when IsFuelCostBinaryOperator(binary.Operator)
                 => 1 + FuelCost(binary.Left) + FuelCost(binary.Right),
             _ => throw Unsupported()
         };
+
+    private static bool IsFuelCostBinaryOperator(string op)
+        => op is "+" or "-" or "*" or "/" or "%";
 
     public static int EvaluateUnmetered(Expression expression, InterpreterFrame frame)
         => expression switch

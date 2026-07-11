@@ -13,6 +13,11 @@ public static class SerializerExtensions
     /// </summary>
     public static Payload SerializeToPayload<T>(this ISerializer serializer, T value)
     {
+        if (serializer is null)
+        {
+            throw new ArgumentNullException(nameof(serializer));
+        }
+
         using var writer = PooledBufferWriter.Rent();
         serializer.Serialize(writer, value);
         return writer.DetachPayload();

@@ -6,8 +6,8 @@ description: 'Pushdown turns many small remote calls into one validated server-s
 typically **frozen at release** and exposes only **fine-grained** bindings — it ships no batch
 operations. Instead of the client looping (one round-trip per entity), a **plugin ships its own
 server-side batch aggregate** as a sandboxed **server extension**: the analyzer lowers a C# batch
-method to verified IR that runs server-side, looping over the host's *existing* bindings. Only the
-plugin changes; the server is never recompiled.
+method to verified restricted IR (intermediate representation) that runs server-side, looping over
+the host's *existing* bindings. Only the plugin changes; the server is never recompiled.
 
 ## Why Pushdown? (and when to use it)
 

@@ -18,7 +18,7 @@ public sealed class BindingAuditConsistencyTests
 
     [Theory]
     [MemberData(nameof(Modes))]
-    public async Task Success_audit_with_error_code_does_not_satisfy_required_audit(ExecutionMode mode)
+    public async Task Success_audit_with_error_code_fails_before_required_audit_validation(ExecutionMode mode)
     {
         var host = Host(TestBindingBehavior.WritesSuccessAuditWithErrorCode);
         var module = await host.ImportJsonAsync(ModuleJson());
@@ -32,7 +32,12 @@ public sealed class BindingAuditConsistencyTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.BindingFailure, result.Error!.Code);
-        Assert.Contains("required audit", result.Error.SafeMessage, StringComparison.Ordinal);
+        Assert.Contains("binding 'test.audited' failed", result.Error.SafeMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain(result.AuditEvents, e =>
+            e.Kind == "BindingCall" &&
+            e.BindingId == "test.audited" &&
+            e.Success &&
+            e.ErrorCode is not null);
     }
 
     [Theory]

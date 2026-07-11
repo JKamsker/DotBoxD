@@ -61,7 +61,7 @@ internal sealed class CompiledAsyncWorker(Func<SandboxExecutionResult> execute)
         private readonly int _ownerThreadId = Environment.CurrentManagedThreadId;
         private bool _disposed;
 
-        public SandboxValue RunToCompletion(ValueTask<SandboxValue> pending)
+        public SandboxValue RunToCompletion(ValueTask<SandboxValue> pending, CancellationToken cancellationToken)
         {
             var task = pending.AsTask();
             if (!task.IsCompleted)
@@ -74,8 +74,13 @@ internal sealed class CompiledAsyncWorker(Func<SandboxExecutionResult> execute)
                     TaskScheduler.Default);
             }
 
+            using var cancellationSignal = cancellationToken.Register(
+                static state => ((CompiledAwaitPump)state!).Signal(),
+                this);
+
             while (!task.IsCompleted)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (TryDequeue(out var item))
                 {
                     Invoke(item);

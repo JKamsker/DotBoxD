@@ -64,7 +64,7 @@ internal static partial class HostServiceBindingFactory
         MethodInfo handleInterfaceMethod)
         => factoryInterfaceMethod.GetParameters()
             .Concat(handleInterfaceMethod.GetParameters())
-            .Select(parameter => ServerExtensionSandboxTypeOf(parameter.ParameterType))
+            .Select(HostBindingParameterSandboxTypeOf)
             .ToArray();
 
     private static BindingDescriptor CreateHandleDescriptor(

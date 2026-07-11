@@ -8,6 +8,19 @@ internal readonly record struct HostServiceBindingRouteSignature(string Value)
 {
     private const int MaxDepth = 8;
 
+    private static readonly HashSet<Type> KnownNonDtoTypes =
+    [
+        typeof(string),
+        typeof(DateTime),
+        typeof(DateTimeOffset),
+        typeof(TimeSpan),
+        typeof(DateOnly),
+        typeof(TimeOnly),
+        typeof(Index),
+        typeof(Range),
+        typeof(CancellationToken)
+    ];
+
     public static HostServiceBindingRouteSignature ForMethod(MethodInfo method)
     {
         var parameters = method.GetParameters();
@@ -183,15 +196,7 @@ internal readonly record struct HostServiceBindingRouteSignature(string Value)
     }
 
     private static bool IsNonDto(Type type)
-        => type == typeof(string) ||
-           type == typeof(DateTime) ||
-           type == typeof(DateTimeOffset) ||
-           type == typeof(TimeSpan) ||
-           type == typeof(DateOnly) ||
-           type == typeof(TimeOnly) ||
-           type == typeof(Index) ||
-           type == typeof(Range) ||
-           type == typeof(CancellationToken) ||
+        => KnownNonDtoTypes.Contains(type) ||
            type.IsPrimitive ||
            type.IsEnum ||
            TryGetElementType(type, out _) ||

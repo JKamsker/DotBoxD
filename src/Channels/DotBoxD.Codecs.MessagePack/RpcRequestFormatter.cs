@@ -14,6 +14,14 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
     private static readonly byte[] MethodNameKey = Encoding.UTF8.GetBytes("MethodName");
     private static readonly byte[] InstanceIdKey = Encoding.UTF8.GetBytes("InstanceId");
     private static readonly byte[] StreamsKey = Encoding.UTF8.GetBytes("Streams");
+    private static readonly RpcRequestFieldName[] FieldNames =
+    [
+        new("MessageId", MessageIdKey, RpcRequestField.MessageId),
+        new("ServiceName", ServiceNameKey, RpcRequestField.ServiceName),
+        new("MethodName", MethodNameKey, RpcRequestField.MethodName),
+        new("InstanceId", InstanceIdKey, RpcRequestField.InstanceId),
+        new("Streams", StreamsKey, RpcRequestField.Streams)
+    ];
 
     private RpcRequestFormatter()
     {
@@ -43,47 +51,62 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
         writer.WriteString(InstanceIdKey);
         WriteNullableString(ref writer, value.InstanceId);
         writer.WriteString(StreamsKey);
-        GetStreamsFormatter(options).Serialize(ref writer, value.Streams!, options);
+        WriteStreams(ref writer, value.Streams, options);
     }
 
     public RpcRequest Deserialize(ref MessagePackReader reader, MessagePackSerializerOptions options)
     {
         var count = reader.ReadMapHeader();
-        var request = new RpcRequest();
-        var seenMessageId = false;
-        var seenServiceName = false;
-        var seenMethodName = false;
-        var seenInstanceId = false;
-        var seenStreams = false;
+        var state = new RpcRequestReadState(options);
 
         for (var i = 0; i < count; i++)
         {
-            switch (ReadField(ref reader))
+            state.ReadField(ReadField(ref reader), ref reader);
+        }
+
+        state.ValidateRequiredFields();
+        return state.Request;
+    }
+
+    private sealed class RpcRequestReadState(MessagePackSerializerOptions options)
+    {
+        private bool _seenMessageId;
+        private bool _seenServiceName;
+        private bool _seenMethodName;
+        private bool _seenInstanceId;
+        private bool _seenStreams;
+        private RpcRequest _request = new();
+
+        public RpcRequest Request => _request;
+
+        public void ReadField(RpcRequestField field, ref MessagePackReader reader)
+        {
+            switch (field)
             {
                 case RpcRequestField.MessageId:
-                    ThrowIfDuplicate(seenMessageId, nameof(RpcRequest.MessageId));
-                    seenMessageId = true;
-                    request.MessageId = reader.ReadInt32();
+                    ThrowIfDuplicate(_seenMessageId, nameof(RpcRequest.MessageId));
+                    _seenMessageId = true;
+                    _request.MessageId = reader.ReadInt32();
                     break;
                 case RpcRequestField.ServiceName:
-                    ThrowIfDuplicate(seenServiceName, nameof(RpcRequest.ServiceName));
-                    seenServiceName = true;
-                    request.ServiceName = ReadCachedName(ref reader)!;
+                    ThrowIfDuplicate(_seenServiceName, nameof(RpcRequest.ServiceName));
+                    _seenServiceName = true;
+                    _request.ServiceName = ReadCachedName(ref reader)!;
                     break;
                 case RpcRequestField.MethodName:
-                    ThrowIfDuplicate(seenMethodName, nameof(RpcRequest.MethodName));
-                    seenMethodName = true;
-                    request.MethodName = ReadCachedName(ref reader)!;
+                    ThrowIfDuplicate(_seenMethodName, nameof(RpcRequest.MethodName));
+                    _seenMethodName = true;
+                    _request.MethodName = ReadCachedName(ref reader)!;
                     break;
                 case RpcRequestField.InstanceId:
-                    ThrowIfDuplicate(seenInstanceId, nameof(RpcRequest.InstanceId));
-                    seenInstanceId = true;
-                    request.InstanceId = reader.ReadString();
+                    ThrowIfDuplicate(_seenInstanceId, nameof(RpcRequest.InstanceId));
+                    _seenInstanceId = true;
+                    _request.InstanceId = reader.ReadString();
                     break;
                 case RpcRequestField.Streams:
-                    ThrowIfDuplicate(seenStreams, nameof(RpcRequest.Streams));
-                    seenStreams = true;
-                    request.Streams = GetStreamsFormatter(options).Deserialize(ref reader, options);
+                    ThrowIfDuplicate(_seenStreams, nameof(RpcRequest.Streams));
+                    _seenStreams = true;
+                    _request.Streams = ReadStreams(ref reader, options);
                     break;
                 default:
                     MessagePackEnvelopeSkipper.SkipUnknownField(ref reader, "RPC request");
@@ -91,41 +114,66 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
             }
         }
 
-        if (!seenMessageId)
+        public void ValidateRequiredFields()
         {
-            throw new RpcEnvelopeValidationException(
-                "RPC request is missing required MessageId.");
+            if (!_seenMessageId)
+            {
+                throw new RpcEnvelopeValidationException(
+                    "RPC request is missing required MessageId.");
+            }
+
+            ThrowIfMissingRequiredName(_seenServiceName ? _request.ServiceName : null, nameof(RpcRequest.ServiceName));
+            ThrowIfMissingRequiredName(_seenMethodName ? _request.MethodName : null, nameof(RpcRequest.MethodName));
+            RpcEnvelopeStringValidation.ThrowIfMalformedUtf16(
+                _request.InstanceId,
+                "request",
+                nameof(RpcRequest.InstanceId));
         }
-
-        if (!seenServiceName || request.ServiceName is null)
-        {
-            throw new RpcEnvelopeValidationException(
-                "RPC request is missing required ServiceName.");
-        }
-
-        ThrowIfEmptyRequiredName(request.ServiceName, nameof(RpcRequest.ServiceName));
-
-        if (!seenMethodName || request.MethodName is null)
-        {
-            throw new RpcEnvelopeValidationException(
-                "RPC request is missing required MethodName.");
-        }
-
-        ThrowIfEmptyRequiredName(request.MethodName, nameof(RpcRequest.MethodName));
-        RpcEnvelopeStringValidation.ThrowIfMalformedUtf16(
-            request.InstanceId,
-            "request",
-            nameof(RpcRequest.InstanceId));
-
-        return request;
     }
 
-    private static IMessagePackFormatter<RpcStreamHandle[]> GetStreamsFormatter(
+    private static void WriteStreams(
+        ref MessagePackWriter writer,
+        RpcStreamHandle[]? streams,
         MessagePackSerializerOptions options)
     {
-        return options.Resolver.GetFormatter<RpcStreamHandle[]>()
-            ?? throw new MessagePackSerializationException(
-            "No MessagePack formatter is registered for RPC stream handles.");
+        if (streams is null)
+        {
+            writer.WriteNil();
+            return;
+        }
+
+        writer.WriteArrayHeader(streams.Length);
+        foreach (var stream in streams)
+        {
+            RpcStreamHandleFormatter.Instance.Serialize(ref writer, stream, options);
+        }
+    }
+
+    private static RpcStreamHandle[]? ReadStreams(
+        ref MessagePackReader reader,
+        MessagePackSerializerOptions options)
+    {
+        if (reader.TryReadNil())
+        {
+            return null;
+        }
+
+        options.Security.DepthStep(ref reader);
+        try
+        {
+            var count = reader.ReadArrayHeader();
+            var streams = new RpcStreamHandle[count];
+            for (var i = 0; i < count; i++)
+            {
+                streams[i] = RpcStreamHandleFormatter.Instance.Deserialize(ref reader, options);
+            }
+
+            return streams;
+        }
+        finally
+        {
+            reader.Depth--;
+        }
     }
 
     private static void ThrowIfDuplicate(bool alreadySeen, string fieldName)
@@ -137,12 +185,12 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
         }
     }
 
-    private static void ThrowIfEmptyRequiredName(string value, string fieldName)
+    private static void ThrowIfEmptyOrWhitespaceRequiredName(string value, string fieldName)
     {
-        if (value.Length == 0)
+        if (string.IsNullOrWhiteSpace(value))
         {
             throw new RpcEnvelopeValidationException(
-                $"RPC request contains empty required {fieldName}.");
+                $"RPC request contains empty or whitespace required {fieldName}.");
         }
     }
 
@@ -154,7 +202,7 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
                 $"RPC request is missing required {fieldName}.");
         }
 
-        ThrowIfEmptyRequiredName(value, fieldName);
+        ThrowIfEmptyOrWhitespaceRequiredName(value, fieldName);
         RpcEnvelopeStringValidation.ThrowIfMalformedUtf16(value, "request", fieldName);
     }
 
@@ -185,43 +233,36 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
     {
         if (reader.TryReadStringSpan(out var utf8))
         {
-            if (utf8.SequenceEqual(MessageIdKey))
-            {
-                return RpcRequestField.MessageId;
-            }
-
-            if (utf8.SequenceEqual(ServiceNameKey))
-            {
-                return RpcRequestField.ServiceName;
-            }
-
-            if (utf8.SequenceEqual(MethodNameKey))
-            {
-                return RpcRequestField.MethodName;
-            }
-
-            if (utf8.SequenceEqual(InstanceIdKey))
-            {
-                return RpcRequestField.InstanceId;
-            }
-
-            if (utf8.SequenceEqual(StreamsKey))
-            {
-                return RpcRequestField.Streams;
-            }
-
-            return RpcRequestField.Unknown;
+            return ReadField(utf8);
         }
 
-        return reader.ReadString() switch
+        return ReadField(reader.ReadString());
+    }
+
+    private static RpcRequestField ReadField(ReadOnlySpan<byte> utf8)
+    {
+        foreach (var field in FieldNames)
         {
-            "MessageId" => RpcRequestField.MessageId,
-            "ServiceName" => RpcRequestField.ServiceName,
-            "MethodName" => RpcRequestField.MethodName,
-            "InstanceId" => RpcRequestField.InstanceId,
-            "Streams" => RpcRequestField.Streams,
-            _ => RpcRequestField.Unknown,
-        };
+            if (utf8.SequenceEqual(field.Utf8Name))
+            {
+                return field.Field;
+            }
+        }
+
+        return RpcRequestField.Unknown;
+    }
+
+    private static RpcRequestField ReadField(string? name)
+    {
+        foreach (var field in FieldNames)
+        {
+            if (string.Equals(name, field.Name, StringComparison.Ordinal))
+            {
+                return field.Field;
+            }
+        }
+
+        return RpcRequestField.Unknown;
     }
 
     private enum RpcRequestField
@@ -232,5 +273,21 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
         MethodName,
         InstanceId,
         Streams,
+    }
+
+    private readonly struct RpcRequestFieldName
+    {
+        public RpcRequestFieldName(string name, byte[] utf8Name, RpcRequestField field)
+        {
+            Name = name;
+            Utf8Name = utf8Name;
+            Field = field;
+        }
+
+        public string Name { get; }
+
+        public byte[] Utf8Name { get; }
+
+        public RpcRequestField Field { get; }
     }
 }

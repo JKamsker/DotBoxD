@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "DotBoxD",
+  "classifications": [ "DotBoxD", "RPC", "Service" ],
+  "identity": "DotBoxD.Templates.ServiceOnly",
+  "name": "DotBoxD service-only host and client",
+  "shortName": "dotboxd-service",
+  "sourceName": "DotBoxDServiceTemplate",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  }
+}

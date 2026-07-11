@@ -51,6 +51,45 @@ public sealed partial class EventIndexCancellationTests
         return PluginPackage.Create(manifest, module, new KernelEntrypoints("ShouldHandle", "Handle"));
     }
 
+    private static PluginPackage GetterCancellationPackage()
+    {
+        const string pluginId = "indexed-getter-cancellation";
+        var eventName = typeof(GetterCancelsEvent).FullName!;
+        var manifest = new PluginManifest(
+            pluginId,
+            $"IEventKernel<{eventName}>",
+            ExecutionMode.Auto,
+            ["Cpu", "Alloc"],
+            [],
+            [
+                new HookSubscriptionManifest(
+                    eventName,
+                    pluginId)
+                {
+                    IndexedPredicates =
+                    [
+                        new IndexedPredicate(
+                            nameof(GetterCancelsEvent.AttackerId),
+                            IndexPredicateOperator.Equals,
+                            "player-1",
+                            "string")
+                    ]
+                }
+            ]);
+        var module = new SandboxModule(
+            pluginId,
+            SemVersion.One,
+            SemVersion.One,
+            [],
+            [GetterCancellationShouldHandle(), GetterCancellationHandle()],
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["kernel"] = pluginId,
+                ["pluginId"] = pluginId
+            });
+        return PluginPackage.Create(manifest, module, new KernelEntrypoints("ShouldHandle", "Handle"));
+    }
+
     private static SandboxFunction CancellationShouldHandle(bool cancelInFilter)
     {
         Expression predicate = new BinaryExpression(
@@ -87,6 +126,33 @@ public sealed partial class EventIndexCancellationTests
         return new SandboxFunction("Handle", true, EventParameters(), SandboxType.Unit, body);
     }
 
+    private static SandboxFunction GetterCancellationShouldHandle()
+    {
+        var predicate = new BinaryExpression(
+            new VariableExpression("e_AttackerId", Span),
+            "==",
+            new LiteralExpression(SandboxValue.FromString("player-1"), Span),
+            Span);
+
+        return new SandboxFunction(
+            "ShouldHandle",
+            true,
+            GetterCancellationEventParameters(),
+            SandboxType.Bool,
+            [new ReturnStatement(predicate, Span)]);
+    }
+
+    private static SandboxFunction GetterCancellationHandle()
+        => new(
+            "Handle",
+            true,
+            GetterCancellationEventParameters(),
+            SandboxType.Unit,
+            [
+                new ExpressionStatement(new CallExpression("test.record", [], null, Span), Span),
+                new ReturnStatement(new LiteralExpression(SandboxValue.Unit, Span), Span)
+            ]);
+
     private static Parameter[] EventParameters()
         =>
         [
@@ -94,6 +160,12 @@ public sealed partial class EventIndexCancellationTests
             new("e_TargetId", SandboxType.String),
             new("e_Damage", SandboxType.I32),
             new("e_AttackerLevel", SandboxType.I32)
+        ];
+
+    private static Parameter[] GetterCancellationEventParameters()
+        =>
+        [
+            new("e_AttackerId", SandboxType.String)
         ];
 
     private static BindingDescriptor CancelBinding(Action cancel)
@@ -110,6 +182,24 @@ public sealed partial class EventIndexCancellationTests
             (_, _, _) =>
             {
                 cancel();
+                return ValueTask.FromResult(SandboxValue.FromBool(true));
+            },
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+
+    private static BindingDescriptor RecordBinding(Action record)
+        => new(
+            "test.record",
+            SemVersion.One,
+            [],
+            SandboxType.Bool,
+            SandboxEffect.Cpu,
+            null,
+            BindingCostModel.Fixed(1),
+            AuditLevel.None,
+            BindingSafety.PureHostFacade,
+            (_, _, _) =>
+            {
+                record();
                 return ValueTask.FromResult(SandboxValue.FromBool(true));
             },
             CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));

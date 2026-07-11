@@ -23,6 +23,50 @@ public static class CacheKeyBuilder
     public static string RuntimeFacadeHash => VerificationPolicy.BoxedValueDefaults().RuntimeFacadeHash;
 
     public static string Build(ExecutionPlan plan, string entrypoint, VerificationPolicy policy, bool optimize)
+    {
+        ValidateInputs(plan, entrypoint, policy);
+
+        return BuildCore(plan, entrypoint, policy, optimize);
+    }
+
+    public static VerificationManifestIdentity BuildManifestIdentity(
+        ExecutionPlan plan,
+        string entrypoint,
+        VerificationPolicy policy,
+        bool optimize)
+    {
+        ValidateInputs(plan, entrypoint, policy);
+
+        return new(
+            1,
+            BuildCore(plan, entrypoint, policy, optimize),
+            plan.ModuleHash,
+            plan.PlanHash,
+            plan.PolicyHash,
+            plan.BindingManifestHash,
+            policy.RuntimeFacadeHash,
+            CompilerVersion,
+            TypeSystemVersion,
+            EffectAnalysisVersion,
+            policy.VerifierVersion,
+            LanguageVersion,
+            TargetFramework,
+            [optimize ? "opt" : "boxed-values"]);
+    }
+
+    private static void ValidateInputs(ExecutionPlan plan, string entrypoint, VerificationPolicy policy)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(entrypoint);
+        ArgumentNullException.ThrowIfNull(policy);
+
+        if (string.IsNullOrWhiteSpace(entrypoint))
+        {
+            throw new ArgumentException("Entrypoint must not be blank.", nameof(entrypoint));
+        }
+    }
+
+    private static string BuildCore(ExecutionPlan plan, string entrypoint, VerificationPolicy policy, bool optimize)
         => HashParts(
             "dotboxd-cache-v2",
             plan.ModuleHash,
@@ -40,27 +84,6 @@ public static class CacheKeyBuilder
             TargetFramework,
             optimize ? "opt" : "boxed-values",
             plan.Policy.Deterministic ? "deterministic" : "nondeterministic");
-
-    public static VerificationManifestIdentity BuildManifestIdentity(
-        ExecutionPlan plan,
-        string entrypoint,
-        VerificationPolicy policy,
-        bool optimize)
-        => new(
-            1,
-            Build(plan, entrypoint, policy, optimize),
-            plan.ModuleHash,
-            plan.PlanHash,
-            plan.PolicyHash,
-            plan.BindingManifestHash,
-            policy.RuntimeFacadeHash,
-            CompilerVersion,
-            TypeSystemVersion,
-            EffectAnalysisVersion,
-            policy.VerifierVersion,
-            LanguageVersion,
-            TargetFramework,
-            [optimize ? "opt" : "boxed-values"]);
 
     private static string HashParts(params string[] parts)
     {

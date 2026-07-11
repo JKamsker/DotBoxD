@@ -34,8 +34,9 @@ public sealed class MessagePackRpcSerializer : ISerializer
     }
 
     /// <summary>
-    /// Creates a MessagePack serializer optimized for Unity compatibility.
-    /// Uses ContractlessStandardResolver which doesn't require attributes.
+    /// Creates the legacy contractless serializer preset used by some Unity projects.
+    /// ContractlessStandardResolver may use reflection and is not an IL2CPP/AOT guarantee;
+    /// AOT applications should call <see cref="CreateWithResolver"/> with generated formatters.
     /// </summary>
     public static MessagePackRpcSerializer CreateUnityCompatible()
     {
@@ -48,7 +49,7 @@ public sealed class MessagePackRpcSerializer : ISerializer
     /// Creates a serializer using the supplied resolver plus DotBoxD's binary payload formatters.
     /// </summary>
     public static MessagePackRpcSerializer CreateWithResolver(IFormatterResolver resolver) =>
-        new(CreateOptions(resolver));
+        new(CreateOptions(resolver ?? throw new ArgumentNullException(nameof(resolver))));
 
     /// <summary>
     /// Creates MessagePack options that include DotBoxD's payload formatters before user resolvers.
@@ -65,7 +66,7 @@ public sealed class MessagePackRpcSerializer : ISerializer
         }
 
         var extraCount = resolvers.Length;
-        var effectiveResolvers = new IFormatterResolver[extraCount + 3];
+        var effectiveResolvers = new IFormatterResolver[extraCount + 4];
         for (var i = 0; i < extraCount; i++)
         {
             // Reject null elements eagerly: a null slipped into CompositeResolver.Create otherwise
@@ -74,9 +75,10 @@ public sealed class MessagePackRpcSerializer : ISerializer
                 ?? throw new ArgumentException("Resolvers must not contain null elements.", nameof(resolvers));
         }
 
-        effectiveResolvers[extraCount] = NativeDateTimeResolver.Instance;
-        effectiveResolvers[extraCount + 1] = StandardResolver.Instance;
-        effectiveResolvers[extraCount + 2] = ContractlessStandardResolver.Instance;
+        effectiveResolvers[extraCount] = WellFormedStringResolver.Instance;
+        effectiveResolvers[extraCount + 1] = NativeDateTimeResolver.Instance;
+        effectiveResolvers[extraCount + 2] = StandardResolver.Instance;
+        effectiveResolvers[extraCount + 3] = ContractlessStandardResolver.Instance;
 
         return MessagePackSerializerOptions.Standard
             .WithResolver(CompositeResolver.Create(
@@ -84,7 +86,9 @@ public sealed class MessagePackRpcSerializer : ISerializer
                 {
                     RpcRequestFormatter.Instance,
                     RpcResponseFormatter.Instance,
+                    RpcStreamHandleFormatter.Instance,
                     ReadOnlyMemoryByteFormatter.Instance,
+                    RpcObjectFormatter.Instance,
                 },
                 effectiveResolvers))
             .WithSecurity(MessagePackSecurity.UntrustedData);
@@ -97,8 +101,20 @@ public sealed class MessagePackRpcSerializer : ISerializer
 
     public void Serialize<T>(System.Buffers.IBufferWriter<byte> writer, T value)
     {
+        if (writer is null)
+        {
+            throw new ArgumentNullException(nameof(writer));
+        }
+
+        ThrowIfUnsupportedObjectDeclaredScalar(typeof(T), value);
+
         try
         {
+            if (ConstructorReplayGuard.TrySerialize(writer, value, _options))
+            {
+                return;
+            }
+
             MessagePackSerializer.Serialize(writer, value, _options);
         }
         catch (MessagePackSerializationException ex)
@@ -109,6 +125,22 @@ public sealed class MessagePackRpcSerializer : ISerializer
             }
 
             throw;
+        }
+    }
+
+    private static void ThrowIfUnsupportedObjectDeclaredScalar<T>(Type declaredType, T value)
+    {
+        if (declaredType != typeof(object) || value is null)
+        {
+            return;
+        }
+
+        var runtimeType = value.GetType();
+        if (runtimeType == typeof(Guid) || runtimeType == typeof(DateTimeOffset))
+        {
+            throw new MessagePackSerializationException(
+                $"{runtimeType.FullName} cannot be serialized through an object-declared payload " +
+                "because MessagePack cannot deserialize it back to the same CLR type without a declared target type.");
         }
     }
 

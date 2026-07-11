@@ -7,6 +7,8 @@ internal sealed record RegistrationAccumulatorTargetModel(
     string ReceiverTypeName,
     string AccumulatorName,
     string MethodName,
+    EquatableArray<string> Attributes,
+    EquatableArray<string> MethodAttributes,
     EquatableArray<RegistrationTypeParameterModel> TypeParameters,
     PluginDiagnosticLocation Location);
 
@@ -18,6 +20,7 @@ internal sealed record RegistrationRootAccumulatorModel(
     string Namespace,
     string ReceiverTypeName,
     string AccumulatorName,
+    EquatableArray<string> Attributes,
     EquatableArray<RegistrationRootPropertyModel> Properties,
     PluginDiagnosticLocation Location);
 

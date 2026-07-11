@@ -8,6 +8,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- Negative runtime fixtures intentionally compile unsupported chains after the public diagnostic was
+         raised to Error. Generator unit tests still assert the diagnostic and its severity. -->
+    <NoWarn>$(NoWarn);DBXK111</NoWarn>
     <!-- Opt the generated interceptors namespace into C# interceptors, exactly as a real plugin project does. -->
     <DotBoxDGeneratedInterceptorsNamespace>DotBoxD.Plugins.Generated</DotBoxDGeneratedInterceptorsNamespace>
     <InterceptorsNamespaces>$(InterceptorsNamespaces);$(DotBoxDGeneratedInterceptorsNamespace)</InterceptorsNamespaces>

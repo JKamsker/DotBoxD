@@ -41,6 +41,11 @@ internal sealed partial class InvokeAsyncResultReaderSource
         };
 
     private string ReadComplexExpression(ITypeSymbol type, string expression)
+        => ReadFrameworkExpression(type, expression) ??
+           ReadStructuredExpression(type, expression) ??
+           throw new NotSupportedException($"InvokeAsync return type '{type.ToDisplayString()}' is not supported.");
+
+    private string? ReadFrameworkExpression(ITypeSymbol type, string expression)
     {
         if (DotBoxDRpcTypeMapper.IsGuid(type))
         {
@@ -82,6 +87,11 @@ internal sealed partial class InvokeAsyncResultReaderSource
             return $"{EnsureRangeValueReader()}({expression})";
         }
 
+        return null;
+    }
+
+    private string? ReadStructuredExpression(ITypeSymbol type, string expression)
+    {
         if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
         {
             return $"{EnsureEnumValueReader(enumType)}({expression})";
@@ -102,7 +112,7 @@ internal sealed partial class InvokeAsyncResultReaderSource
             return $"{EnsureDtoReader(named)}({expression})";
         }
 
-        throw new NotSupportedException($"InvokeAsync return type '{type.ToDisplayString()}' is not supported.");
+        return null;
     }
 
     private string EnsureListReader(ITypeSymbol type)

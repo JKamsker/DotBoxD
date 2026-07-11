@@ -91,7 +91,7 @@ var plugin = peer.GetPluginCallbacks();
 
 For full symmetry both processes do the same thing — each wraps its end of the pipe in an
 `RpcPeer`, provides its own service, and gets a proxy to the other side over the one connection.
-Set `InboundQueueCapacity` (or `null` for unbounded) and `QueueFullMode` to bound how queued
+Set `InboundQueueCapacity` (or `null` for unbounded) and `QueueFullMode` to control how queued
 inbound requests are handled under pressure, and raise `MaxConcurrentInboundDispatch` above the
 default `1` for bounded-concurrent dispatch instead of strict serial-per-connection handling.
 

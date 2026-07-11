@@ -41,6 +41,7 @@ internal sealed partial class RpcPeerInboundDispatcher
         var result = await _queue.EnqueueAsync(inbound, loopCt).ConfigureAwait(false);
         if (result == InboundEnqueueResult.Dropped)
         {
+            RpcTelemetry.QueueSaturated();
             await SendQueueFullErrorAsync(messageId, loopCt).ConfigureAwait(false);
         }
 
@@ -103,22 +104,15 @@ internal sealed partial class RpcPeerInboundDispatcher
         }
 
         var dispatcher = _responseBuilder.ResolveDispatcher(request, out var requiresStreamingContext);
-        var requestCts = !_disableInboundRequestCancellation ||
-            request.Streams is not null ||
-            requiresStreamingContext
-                ? new CancellationTokenSource()
-                : null;
-        if (!_activeInbound.TryAdd(messageId, requestCts))
+        var requestCts = CreateRequestCancellationSource(request, requiresStreamingContext);
+        if (!TryTrackInboundRequest(messageId, requestCts, out protocolError))
         {
-            requestCts?.Dispose();
-            protocolError = "Duplicate request message id.";
             return false;
         }
 
-        if (Volatile.Read(ref _stopped) != 0 || loopCt.IsCancellationRequested)
+        if (RequestAcceptanceStopped(loopCt))
         {
-            _activeInbound.Remove(messageId, requestCts);
-            requestCts?.Dispose();
+            RemoveTrackedInboundRequest(messageId, requestCts);
             protocolError = null;
             return false;
         }
@@ -137,8 +131,7 @@ internal sealed partial class RpcPeerInboundDispatcher
         }
         catch (ServiceProtocolException ex)
         {
-            _activeInbound.Remove(messageId, requestCts);
-            requestCts?.Dispose();
+            RemoveTrackedInboundRequest(messageId, requestCts);
             inbound = default;
             protocolError = ex.Message;
             protocolException = ex;
@@ -146,5 +139,42 @@ internal sealed partial class RpcPeerInboundDispatcher
         }
 
         return true;
+    }
+
+    private CancellationTokenSource? CreateRequestCancellationSource(
+        RpcRequest request,
+        bool requiresStreamingContext)
+        => RequestNeedsCancellationSource(request, requiresStreamingContext)
+            ? new CancellationTokenSource()
+            : null;
+
+    private bool RequestNeedsCancellationSource(RpcRequest request, bool requiresStreamingContext)
+        => !_disableInboundRequestCancellation ||
+           request.Streams is not null ||
+           requiresStreamingContext;
+
+    private bool TryTrackInboundRequest(
+        int messageId,
+        CancellationTokenSource? requestCts,
+        out string? protocolError)
+    {
+        if (_activeInbound.TryAdd(messageId, requestCts))
+        {
+            protocolError = null;
+            return true;
+        }
+
+        requestCts?.Dispose();
+        protocolError = "Duplicate request message id.";
+        return false;
+    }
+
+    private bool RequestAcceptanceStopped(CancellationToken loopCt)
+        => Volatile.Read(ref _stopped) != 0 || loopCt.IsCancellationRequested;
+
+    private void RemoveTrackedInboundRequest(int messageId, CancellationTokenSource? requestCts)
+    {
+        _activeInbound.Remove(messageId, requestCts);
+        requestCts?.Dispose();
     }
 }

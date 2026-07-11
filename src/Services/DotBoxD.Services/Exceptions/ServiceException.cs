@@ -83,11 +83,18 @@ public class ServiceNotFoundException : ServiceException
 
     public ServiceNotFoundException(string message, NotFoundKind kind) : base(message)
     {
-        Kind = kind;
+        Kind = ValidateKind(kind);
     }
 
     /// <summary>Which lookup produced this not-found result.</summary>
     public NotFoundKind Kind { get; }
+
+    private static NotFoundKind ValidateKind(NotFoundKind kind) =>
+        kind switch
+        {
+            NotFoundKind.Service or NotFoundKind.Method or NotFoundKind.Instance => kind,
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown service not-found kind."),
+        };
 }
 
 /// <summary>

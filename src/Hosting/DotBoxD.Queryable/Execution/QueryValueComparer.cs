@@ -14,22 +14,12 @@ namespace DotBoxD.Queryable.Execution;
 /// than throwing — and an incomparable pair is also <see langword="false"/> under
 /// <see cref="QueryComparisonOperator.NotEqual"/>, never a match.
 /// </summary>
-public static class QueryValueComparer
+public static partial class QueryValueComparer
 {
     /// <summary>Evaluates <c>actual op expected</c>.</summary>
-    public static bool Compare(object? actual, QueryComparisonOperator op, QueryValue expected, bool ignoreCase) => op switch
-    {
-        QueryComparisonOperator.Equal => AreEqual(actual, expected, ignoreCase),
-        QueryComparisonOperator.NotEqual => TryAreEqual(actual, expected, ignoreCase, out var equal) && !equal,
-        QueryComparisonOperator.GreaterThan => Ordered(actual, expected, ignoreCase) is { } c && c > 0,
-        QueryComparisonOperator.GreaterThanOrEqual => Ordered(actual, expected, ignoreCase) is { } c && c >= 0,
-        QueryComparisonOperator.LessThan => Ordered(actual, expected, ignoreCase) is { } c && c < 0,
-        QueryComparisonOperator.LessThanOrEqual => Ordered(actual, expected, ignoreCase) is { } c && c <= 0,
-        QueryComparisonOperator.StringContains => StringMatch(actual, expected, ignoreCase, MatchMode.Contains),
-        QueryComparisonOperator.StringStartsWith => StringMatch(actual, expected, ignoreCase, MatchMode.StartsWith),
-        QueryComparisonOperator.StringEndsWith => StringMatch(actual, expected, ignoreCase, MatchMode.EndsWith),
-        _ => false,
-    };
+    public static bool Compare(object? actual, QueryComparisonOperator op, QueryValue expected, bool ignoreCase)
+        => ComparisonEvaluators.TryGetValue(op, out var evaluator) &&
+           evaluator(actual, expected, ignoreCase);
 
     /// <summary>Returns <see langword="true"/> when <paramref name="actual"/> equals any of <paramref name="candidates"/>.</summary>
     public static bool IsAnyEqual(object? actual, IReadOnlyList<QueryValue> candidates, bool ignoreCase)
@@ -65,57 +55,9 @@ public static class QueryValueComparer
             return true;
         }
 
-        switch (expected.Kind)
+        if (EqualityEvaluators.TryGetValue(expected.Kind, out var evaluator))
         {
-            case QueryValueKind.Null:
-                equal = false;
-                return true;
-            case QueryValueKind.Boolean:
-                if (actual is bool b)
-                {
-                    equal = b == expected.Boolean;
-                    return true;
-                }
-
-                break;
-            case QueryValueKind.String:
-                if (actual is string s)
-                {
-                    equal = string.Equals(s, expected.String, ignoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
-                    return true;
-                }
-
-                break;
-            case QueryValueKind.Integer:
-                return TryAreNumericEqual(actual, (decimal)expected.Integer, () => (double)expected.Integer, out equal);
-            case QueryValueKind.UnsignedInteger:
-                return TryAreNumericEqual(actual, (decimal)expected.UnsignedInteger, () => (double)expected.UnsignedInteger, out equal);
-            case QueryValueKind.Decimal:
-                return TryAreNumericEqual(actual, expected.Decimal, () => (double)expected.Decimal, out equal);
-            case QueryValueKind.Number:
-                if (TryToDouble(actual, out var dn))
-                {
-                    equal = dn.Equals(expected.Number);
-                    return true;
-                }
-
-                break;
-            case QueryValueKind.Guid:
-                if (actual is Guid g)
-                {
-                    equal = g == expected.Guid;
-                    return true;
-                }
-
-                break;
-            case QueryValueKind.Timestamp:
-                if (TryToInstantTicks(actual, out var ticks))
-                {
-                    equal = ticks == expected.Timestamp.UtcTicks;
-                    return true;
-                }
-
-                break;
+            return evaluator(actual, expected, ignoreCase, out equal);
         }
 
         equal = false;
@@ -143,28 +85,9 @@ public static class QueryValueComparer
     }
 
     private static int? Ordered(object? actual, QueryValue expected, bool ignoreCase)
-    {
-        switch (expected.Kind)
-        {
-            case QueryValueKind.Integer:
-                return OrderedNumeric(actual, (decimal)expected.Integer, () => (double)expected.Integer);
-            case QueryValueKind.UnsignedInteger:
-                return OrderedNumeric(actual, (decimal)expected.UnsignedInteger, () => (double)expected.UnsignedInteger);
-            case QueryValueKind.Decimal:
-                return OrderedNumeric(actual, expected.Decimal, () => (double)expected.Decimal);
-            case QueryValueKind.Number:
-                return TryToDouble(actual, out var dn) ? dn.CompareTo(expected.Number) : null;
-            case QueryValueKind.Timestamp:
-                return TryToInstantTicks(actual, out var ticks) ? ticks.CompareTo(expected.Timestamp.UtcTicks) : null;
-            case QueryValueKind.String:
-                return actual is string s
-                    ? string.Compare(s, expected.String, ignoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)
-                    : null;
-            default:
-                // Guid (and Null/Boolean) have no meaningful ordering -> range operators evaluate false.
-                return null;
-        }
-    }
+        => OrderEvaluators.TryGetValue(expected.Kind, out var evaluator)
+            ? evaluator(actual, expected, ignoreCase)
+            : null;
 
     private static int? OrderedNumeric(object? actual, decimal expected, Func<double> expectedAsDouble)
     {

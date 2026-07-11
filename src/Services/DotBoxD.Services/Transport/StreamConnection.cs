@@ -150,6 +150,11 @@ public sealed class StreamConnection : IRpcFrameChannel
 
     public async ValueTask SendFrameValueAsync(PooledBufferWriter frame, CancellationToken ct = default)
     {
+        if (frame is null)
+        {
+            throw new ArgumentNullException(nameof(frame));
+        }
+
         try
         {
             await SendValueAsync(frame.WrittenMemory, ct).ConfigureAwait(false);

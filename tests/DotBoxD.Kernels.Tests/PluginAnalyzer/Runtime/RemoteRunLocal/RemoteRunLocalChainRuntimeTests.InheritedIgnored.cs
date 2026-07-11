@@ -1,4 +1,5 @@
 using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime;
 
@@ -30,6 +31,12 @@ public abstract record ScopedGameEvent
     public AmbientScope Scope { get; init; } = new();
 }
 
+public abstract record JsonScopedGameEvent
+{
+    [JsonIgnore]
+    public AmbientScope Scope { get; init; } = new();
+}
+
 /// <summary>A derived sealed positional record carrying rich wire fields and inheriting the ignored member.</summary>
 public sealed record ScopedEncounterEvent(
     Guid EncounterId,
@@ -37,6 +44,13 @@ public sealed record ScopedEncounterEvent(
     int Distance,
     string Zone,
     int[] MonsterIds) : ScopedGameEvent;
+
+public sealed record JsonScopedEncounterEvent(
+    Guid EncounterId,
+    GamePhase Phase,
+    int Distance,
+    string Zone,
+    int[] MonsterIds) : JsonScopedGameEvent;
 
 /// <summary>
 /// A whole-event <c>RunLocal</c> on an event that inherits a non-wire <c>[IgnoreDataMember]</c> member of a
@@ -51,6 +65,14 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         {
             public static void Configure(RemoteHookRegistry hooks)
                 => hooks.On<Ev.ScopedEncounterEvent>().Where(e => e.Distance <= 4).RunLocal((e, ctx) => { });
+        }
+        """;
+
+    private const string JsonScopedWholeEventSource = Prelude + """
+        public static class JsonScopedWholeEventUsage
+        {
+            public static void Configure(RemoteHookRegistry hooks)
+                => hooks.On<Ev.JsonScopedEncounterEvent>().Where(e => e.Distance <= 4).RunLocal((e, ctx) => { });
         }
         """;
 
@@ -82,6 +104,29 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         // The ignored, non-wire member was never marshalled: had it been treated as a wire field, encode would
         // have produced an extra slot the 5-parameter constructor could not align, corrupting the fields above.
         // On decode it is simply its default initializer, not a carried value.
+        Assert.NotNull(received.Scope);
+    }
+
+    [Fact]
+    public async Task Whole_event_inheriting_a_json_ignored_member_lowers_and_round_trips_its_wire_fields()
+    {
+        var matching = new JsonScopedEncounterEvent(
+            SampleId, GamePhase.Victory, Distance: 3, Zone: "crypt", MonsterIds: [3, 1, 4, 1, 5]);
+        var filtered = matching with { Distance = 99 };
+
+        var payload = await PushFirstMatching(JsonScopedWholeEventSource, matching, filtered);
+
+        AssertJsonScopedEncounter(DecodeReflective<JsonScopedEncounterEvent>(payload));
+        AssertJsonScopedEncounter(DecodeGenerated<JsonScopedEncounterEvent>(JsonScopedWholeEventSource, payload));
+    }
+
+    private static void AssertJsonScopedEncounter(JsonScopedEncounterEvent received)
+    {
+        Assert.Equal(SampleId, received.EncounterId);
+        Assert.Equal(GamePhase.Victory, received.Phase);
+        Assert.Equal(3, received.Distance);
+        Assert.Equal("crypt", received.Zone);
+        Assert.Equal(new[] { 3, 1, 4, 1, 5 }, received.MonsterIds);
         Assert.NotNull(received.Scope);
     }
 }

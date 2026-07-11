@@ -1,10 +1,10 @@
-using DotBoxD.Services.Buffers;
 using Xunit;
+using BufferPayload = DotBoxD.Services.Buffers.Payload;
 
 namespace DotBoxD.Services.Tests.Protocol;
 
 /// <summary>
-/// Regression tests for <see cref="Payload"/> disposal: the shared <see cref="Payload.Empty"/>
+/// Regression tests for <see cref="BufferPayload"/> disposal: the shared <see cref="BufferPayload.Empty"/>
 /// singleton must stay reusable after Dispose, and Dispose must be idempotent and thread-safe so a
 /// rented buffer can never be returned to the pool more than once.
 /// </summary>
@@ -15,18 +15,18 @@ public sealed class PayloadTests
     {
         // Empty wraps a zero-length array; Dispose must never null it out or later use of the shared
         // singleton would throw ObjectDisposedException.
-        Payload.Empty.Dispose();
-        Payload.Empty.Dispose();
+        BufferPayload.Empty.Dispose();
+        BufferPayload.Empty.Dispose();
 
-        Assert.Equal(0, Payload.Empty.Length);
-        Assert.True(Payload.Empty.Span.IsEmpty);
-        Assert.True(Payload.Empty.Memory.IsEmpty);
+        Assert.Equal(0, BufferPayload.Empty.Length);
+        Assert.True(BufferPayload.Empty.Span.IsEmpty);
+        Assert.True(BufferPayload.Empty.Memory.IsEmpty);
     }
 
     [Fact]
     public void Dispose_CalledTwice_IsIdempotent()
     {
-        var payload = Payload.Rent(64);
+        var payload = BufferPayload.Rent(64);
         payload.Dispose();
 
         // A second dispose must not throw and must not return the buffer to the pool a second time.
@@ -42,7 +42,7 @@ public sealed class PayloadTests
         // so racing disposers can never double-return the same rented buffer to ArrayPool.
         for (var iteration = 0; iteration < 200; iteration++)
         {
-            var payload = Payload.Rent(128);
+            var payload = BufferPayload.Rent(128);
             var start = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             var racers = new Task[8];
             for (var i = 0; i < racers.Length; i++)

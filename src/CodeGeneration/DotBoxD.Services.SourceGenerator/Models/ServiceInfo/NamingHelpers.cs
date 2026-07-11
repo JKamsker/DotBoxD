@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
 
 namespace DotBoxD.Services.SourceGenerator.Models;
@@ -5,6 +7,72 @@ namespace DotBoxD.Services.SourceGenerator.Models;
 /// <summary>Shared helpers used by both the proxy and dispatcher emitters.</summary>
 internal static class NamingHelpers
 {
+    private static readonly Dictionary<MethodReturnKind, Func<string?, string>> DeclaredReturnTypeFormatters = new()
+    {
+        [MethodReturnKind.Void] = static _ => "void",
+        [MethodReturnKind.Sync] = static type => type!,
+        [MethodReturnKind.SyncSubService] = static type => type!,
+        [MethodReturnKind.Task] = static _ => ServicesGeneratorTypeNames.GlobalTask,
+        [MethodReturnKind.TaskOf] = static type => ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalTask, type!),
+        [MethodReturnKind.ValueTask] = static _ => ServicesGeneratorTypeNames.GlobalValueTask,
+        [MethodReturnKind.ValueTaskOf] = static type => ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalValueTask, type!),
+        [MethodReturnKind.TaskOfSubService] = static type => ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalTask, type!),
+        [MethodReturnKind.ValueTaskOfSubService] = static type => ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalValueTask, type!),
+        [MethodReturnKind.AsyncEnumerable] = static type => ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalIAsyncEnumerable, type!),
+        [MethodReturnKind.TaskOfAsyncEnumerable] = static type => ServicesGeneratorTypeNames.Generic(
+            ServicesGeneratorTypeNames.GlobalTask,
+            ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalIAsyncEnumerable, type!)),
+        [MethodReturnKind.ValueTaskOfAsyncEnumerable] = static type => ServicesGeneratorTypeNames.Generic(
+            ServicesGeneratorTypeNames.GlobalValueTask,
+            ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalIAsyncEnumerable, type!)),
+        [MethodReturnKind.Stream] = static _ => ServicesGeneratorTypeNames.GlobalStream,
+        [MethodReturnKind.TaskOfStream] = static _ =>
+            ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalTask, ServicesGeneratorTypeNames.GlobalStream),
+        [MethodReturnKind.ValueTaskOfStream] = static _ =>
+            ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalValueTask, ServicesGeneratorTypeNames.GlobalStream),
+        [MethodReturnKind.Pipe] = static _ => ServicesGeneratorTypeNames.GlobalPipe,
+        [MethodReturnKind.TaskOfPipe] = static _ =>
+            ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalTask, ServicesGeneratorTypeNames.GlobalPipe),
+        [MethodReturnKind.ValueTaskOfPipe] = static _ =>
+            ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalValueTask, ServicesGeneratorTypeNames.GlobalPipe),
+    };
+
+    private static readonly HashSet<MethodReturnKind> AsyncReturnKinds =
+    [
+        MethodReturnKind.Task,
+        MethodReturnKind.TaskOf,
+        MethodReturnKind.ValueTask,
+        MethodReturnKind.ValueTaskOf,
+        MethodReturnKind.TaskOfSubService,
+        MethodReturnKind.ValueTaskOfSubService,
+        MethodReturnKind.AsyncEnumerable,
+        MethodReturnKind.TaskOfAsyncEnumerable,
+        MethodReturnKind.ValueTaskOfAsyncEnumerable,
+        MethodReturnKind.TaskOfStream,
+        MethodReturnKind.ValueTaskOfStream,
+        MethodReturnKind.TaskOfPipe,
+        MethodReturnKind.ValueTaskOfPipe,
+    ];
+
+    private static readonly HashSet<MethodReturnKind> ValueReturnKinds =
+    [
+        MethodReturnKind.Sync,
+        MethodReturnKind.SyncSubService,
+        MethodReturnKind.TaskOf,
+        MethodReturnKind.ValueTaskOf,
+        MethodReturnKind.TaskOfSubService,
+        MethodReturnKind.ValueTaskOfSubService,
+        MethodReturnKind.AsyncEnumerable,
+        MethodReturnKind.TaskOfAsyncEnumerable,
+        MethodReturnKind.ValueTaskOfAsyncEnumerable,
+        MethodReturnKind.Stream,
+        MethodReturnKind.TaskOfStream,
+        MethodReturnKind.ValueTaskOfStream,
+        MethodReturnKind.Pipe,
+        MethodReturnKind.TaskOfPipe,
+        MethodReturnKind.ValueTaskOfPipe,
+    ];
+
     /// <summary>
     /// Strips a leading <c>I</c> if it is followed by an uppercase letter (the C# convention
     /// for interface names). Avoids accidentally stripping the <c>I</c> from names like
@@ -25,66 +93,13 @@ internal static class NamingHelpers
     /// declaration, so the generated proxy signature exactly matches.
     /// </summary>
     public static string GetDeclaredReturnTypeText(MethodReturnKind kind, string? unwrappedReturnType)
-    {
-        return kind switch
-        {
-            MethodReturnKind.Void => "void",
-            MethodReturnKind.Sync => unwrappedReturnType!,
-            MethodReturnKind.SyncSubService => unwrappedReturnType!,
-            MethodReturnKind.Task => ServicesGeneratorTypeNames.GlobalTask,
-            MethodReturnKind.TaskOf => ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalTask, unwrappedReturnType!),
-            MethodReturnKind.ValueTask => ServicesGeneratorTypeNames.GlobalValueTask,
-            MethodReturnKind.ValueTaskOf => ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalValueTask, unwrappedReturnType!),
-            MethodReturnKind.TaskOfSubService => ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalTask, unwrappedReturnType!),
-            MethodReturnKind.ValueTaskOfSubService => ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalValueTask, unwrappedReturnType!),
-            MethodReturnKind.AsyncEnumerable => ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalIAsyncEnumerable, unwrappedReturnType!),
-            MethodReturnKind.TaskOfAsyncEnumerable => ServicesGeneratorTypeNames.Generic(
-                ServicesGeneratorTypeNames.GlobalTask,
-                ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalIAsyncEnumerable, unwrappedReturnType!)),
-            MethodReturnKind.ValueTaskOfAsyncEnumerable => ServicesGeneratorTypeNames.Generic(
-                ServicesGeneratorTypeNames.GlobalValueTask,
-                ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalIAsyncEnumerable, unwrappedReturnType!)),
-            MethodReturnKind.Stream => ServicesGeneratorTypeNames.GlobalStream,
-            MethodReturnKind.TaskOfStream => ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalTask, ServicesGeneratorTypeNames.GlobalStream),
-            MethodReturnKind.ValueTaskOfStream => ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalValueTask, ServicesGeneratorTypeNames.GlobalStream),
-            MethodReturnKind.Pipe => ServicesGeneratorTypeNames.GlobalPipe,
-            MethodReturnKind.TaskOfPipe => ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalTask, ServicesGeneratorTypeNames.GlobalPipe),
-            MethodReturnKind.ValueTaskOfPipe => ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalValueTask, ServicesGeneratorTypeNames.GlobalPipe),
-            _ => "void",
-        };
-    }
+        => DeclaredReturnTypeFormatters.TryGetValue(kind, out var format)
+            ? format(unwrappedReturnType)
+            : "void";
 
-    public static bool IsAsync(MethodReturnKind kind) =>
-        kind == MethodReturnKind.Task ||
-        kind == MethodReturnKind.TaskOf ||
-        kind == MethodReturnKind.ValueTask ||
-        kind == MethodReturnKind.ValueTaskOf ||
-        kind == MethodReturnKind.TaskOfSubService ||
-        kind == MethodReturnKind.ValueTaskOfSubService ||
-        kind == MethodReturnKind.AsyncEnumerable ||
-        kind == MethodReturnKind.TaskOfAsyncEnumerable ||
-        kind == MethodReturnKind.ValueTaskOfAsyncEnumerable ||
-        kind == MethodReturnKind.TaskOfStream ||
-        kind == MethodReturnKind.ValueTaskOfStream ||
-        kind == MethodReturnKind.TaskOfPipe ||
-        kind == MethodReturnKind.ValueTaskOfPipe;
+    public static bool IsAsync(MethodReturnKind kind) => AsyncReturnKinds.Contains(kind);
 
-    public static bool HasReturnValue(MethodReturnKind kind) =>
-        kind == MethodReturnKind.Sync ||
-        kind == MethodReturnKind.SyncSubService ||
-        kind == MethodReturnKind.TaskOf ||
-        kind == MethodReturnKind.ValueTaskOf ||
-        kind == MethodReturnKind.TaskOfSubService ||
-        kind == MethodReturnKind.ValueTaskOfSubService ||
-        kind == MethodReturnKind.AsyncEnumerable ||
-        kind == MethodReturnKind.TaskOfAsyncEnumerable ||
-        kind == MethodReturnKind.ValueTaskOfAsyncEnumerable ||
-        kind == MethodReturnKind.Stream ||
-        kind == MethodReturnKind.TaskOfStream ||
-        kind == MethodReturnKind.ValueTaskOfStream ||
-        kind == MethodReturnKind.Pipe ||
-        kind == MethodReturnKind.TaskOfPipe ||
-        kind == MethodReturnKind.ValueTaskOfPipe;
+    public static bool HasReturnValue(MethodReturnKind kind) => ValueReturnKinds.Contains(kind);
 
     public static bool IsSubServiceReturn(MethodReturnKind kind) =>
         kind == MethodReturnKind.SyncSubService ||

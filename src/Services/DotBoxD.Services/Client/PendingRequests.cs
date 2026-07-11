@@ -4,15 +4,12 @@ namespace DotBoxD.Services.Client;
 internal sealed class PendingRequests : IDisposable
 {
     private readonly object _requestsGate = new();
-    private readonly object _timeoutGate = new();
     private readonly Dictionary<int, IPendingResponse> _requests = new();
-    private readonly Timer _timeoutTimer;
-    private long _nextTimeoutTimestamp = long.MaxValue;
-    private int _disposed;
+    private readonly PendingRequestTimeoutScheduler _timeouts;
 
     public PendingRequests()
     {
-        _timeoutTimer = new Timer(static state => ((PendingRequests)state!).CancelExpired(), this, Timeout.Infinite, Timeout.Infinite);
+        _timeouts = new PendingRequestTimeoutScheduler(CancelExpired);
     }
 
     public int Count { get { lock (_requestsGate) { return _requests.Count; } } }
@@ -23,14 +20,15 @@ internal sealed class PendingRequests : IDisposable
         int messageId,
         bool captureCallerCancellation,
         bool captureTimeoutTarget,
+        CancellationToken callerToken,
         string service,
         string method,
         out PendingUnaryResponse<TResponse> pending)
     {
         var candidate = captureTimeoutTarget
-            ? new PendingUnaryResponseWithTimeout<TResponse>(this, messageId, service, method)
+            ? new PendingUnaryResponseWithTimeout<TResponse>(this, messageId, service, method, callerToken)
             : captureCallerCancellation
-                ? new CancellablePendingUnaryResponse<TResponse>(this, messageId)
+                ? new CancellablePendingUnaryResponse<TResponse>(this, messageId, callerToken)
                 : new PendingUnaryResponse<TResponse>(messageId);
 
         return TryAddCore(messageId, candidate, out pending);
@@ -100,10 +98,9 @@ internal sealed class PendingRequests : IDisposable
             return;
         }
 
-        var timeoutTicks = MillisecondsToStopwatchTicks((long)Math.Ceiling(timeout.TotalMilliseconds));
-        var deadline = Stopwatch.GetTimestamp() + timeoutTicks;
+        var deadline = PendingRequestTimeoutScheduler.GetDeadline(timeout);
         pending.SetTimeoutDeadline(deadline);
-        ScheduleTimeout(deadline);
+        _timeouts.Schedule(deadline);
     }
 
     public bool TryFail(int messageId, Exception error)
@@ -160,125 +157,8 @@ internal sealed class PendingRequests : IDisposable
 
     public void Dispose()
     {
-        lock (_timeoutGate)
-        {
-            if (_disposed != 0)
-            {
-                return;
-            }
-
-            _disposed = 1;
-            _timeoutTimer.Dispose();
-        }
+        _timeouts.Dispose();
     }
-
-    private void ScheduleTimeout(long deadline)
-    {
-        lock (_timeoutGate)
-        {
-            if (_disposed != 0 || deadline >= _nextTimeoutTimestamp)
-            {
-                return;
-            }
-
-            _nextTimeoutTimestamp = deadline;
-            ScheduleTimerLocked();
-        }
-    }
-
-    private void CancelExpired()
-    {
-        lock (_timeoutGate)
-        {
-            if (_disposed != 0)
-            {
-                return;
-            }
-
-            _nextTimeoutTimestamp = long.MaxValue;
-        }
-
-        var now = Stopwatch.GetTimestamp();
-        var next = long.MaxValue;
-        List<IPendingResponse>? expired = null;
-        lock (_requestsGate)
-        {
-            foreach (var pair in _requests)
-            {
-                var deadline = pair.Value.TimeoutDeadline;
-                if (deadline == long.MaxValue)
-                {
-                    continue;
-                }
-
-                if (deadline <= now)
-                {
-                    expired ??= new List<IPendingResponse>();
-                    expired.Add(pair.Value);
-                }
-                else if (deadline < next)
-                {
-                    next = deadline;
-                }
-            }
-
-            if (expired is not null)
-            {
-                for (var i = 0; i < expired.Count; i++)
-                {
-                    var pending = expired[i];
-                    TryRemoveCore(pending.MessageId, pending);
-                }
-            }
-        }
-
-        if (expired is not null)
-        {
-            for (var i = 0; i < expired.Count; i++)
-            {
-                expired[i].TrySetCanceled(PendingCancellationKind.Timeout);
-            }
-        }
-
-        lock (_timeoutGate)
-        {
-            if (_disposed != 0)
-            {
-                return;
-            }
-
-            if (next < _nextTimeoutTimestamp)
-            {
-                _nextTimeoutTimestamp = next;
-            }
-
-            ScheduleTimerLocked();
-        }
-    }
-
-    private void ScheduleTimerLocked()
-    {
-        if (_disposed != 0)
-            return;
-
-        if (_nextTimeoutTimestamp == long.MaxValue)
-        {
-            _timeoutTimer.Change(Timeout.Infinite, Timeout.Infinite);
-            return;
-        }
-
-        var remainingTicks = Math.Max(0, _nextTimeoutTimestamp - Stopwatch.GetTimestamp());
-        var dueMilliseconds = Math.Min(
-            int.MaxValue,
-            Math.Max(1, StopwatchTicksToMilliseconds(remainingTicks)));
-        _timeoutTimer.Change(dueMilliseconds, Timeout.Infinite);
-    }
-
-    private static long MillisecondsToStopwatchTicks(long milliseconds) =>
-        checked(milliseconds * Stopwatch.Frequency / 1000);
-
-    private static long StopwatchTicksToMilliseconds(long ticks) =>
-        ticks * 1000 / Stopwatch.Frequency;
 
     private bool TryRemove(int messageId, IPendingResponse pending)
     {
@@ -297,4 +177,82 @@ internal sealed class PendingRequests : IDisposable
         _requests.Remove(messageId);
         return true;
     }
+
+    private void CancelExpired()
+    {
+        var scan = ScanExpiredRequests(Stopwatch.GetTimestamp());
+        CancelExpiredResponses(scan.Expired);
+        _timeouts.Reschedule(scan.Next);
+    }
+
+    private TimeoutScan ScanExpiredRequests(long now)
+    {
+        var next = long.MaxValue;
+        List<IPendingResponse>? expired = null;
+        lock (_requestsGate)
+        {
+            foreach (var pair in _requests)
+            {
+                TrackPendingDeadline(pair.Value, now, ref next, ref expired);
+            }
+
+            RemoveExpiredRequestsLocked(expired);
+        }
+
+        return new TimeoutScan(expired, next);
+    }
+
+    private static void TrackPendingDeadline(
+        IPendingResponse pending,
+        long now,
+        ref long next,
+        ref List<IPendingResponse>? expired)
+    {
+        var deadline = pending.TimeoutDeadline;
+        if (deadline == long.MaxValue)
+        {
+            return;
+        }
+
+        if (deadline <= now)
+        {
+            expired ??= new List<IPendingResponse>();
+            expired.Add(pending);
+            return;
+        }
+
+        if (deadline < next)
+        {
+            next = deadline;
+        }
+    }
+
+    private void RemoveExpiredRequestsLocked(List<IPendingResponse>? expired)
+    {
+        if (expired is null)
+        {
+            return;
+        }
+
+        for (var i = 0; i < expired.Count; i++)
+        {
+            var pending = expired[i];
+            TryRemoveCore(pending.MessageId, pending);
+        }
+    }
+
+    private static void CancelExpiredResponses(List<IPendingResponse>? expired)
+    {
+        if (expired is null)
+        {
+            return;
+        }
+
+        for (var i = 0; i < expired.Count; i++)
+        {
+            expired[i].TrySetCanceled(PendingCancellationKind.Timeout);
+        }
+    }
+
+    private readonly record struct TimeoutScan(List<IPendingResponse>? Expired, long Next);
 }

@@ -5,20 +5,30 @@ namespace DotBoxD.Kernels.Sandbox;
 
 public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Arguments)
 {
-    private IReadOnlyList<SandboxType> _arguments = ModelCopy.List(Arguments);
+    private string _name = RequireName(Name);
+    private IReadOnlyList<SandboxType> _arguments = CopyArguments(Name, Arguments);
 
-    public IReadOnlyList<SandboxType> Arguments { get => _arguments; init => _arguments = ModelCopy.List(value); }
+    public string Name
+    {
+        get => _name;
+        init
+        {
+            var name = RequireName(value);
+            RequireValidRecordShape(name, _arguments, nameof(value));
+            _name = name;
+        }
+    }
 
-    private const int MaxOpaqueIdNameLength = 64;
-
-    private static readonly HashSet<string> AllowedScalars = new(StringComparer.Ordinal) {
-        "Unit", "Bool", "I32", "I64", "F64", "String", "Guid",
-        "SandboxPath", "SandboxUri"
-    };
-
-    private static readonly HashSet<string> MapKeyScalars = new(StringComparer.Ordinal) {
-        "Bool", "I32", "I64", "String", "SandboxPath", "SandboxUri"
-    };
+    public IReadOnlyList<SandboxType> Arguments
+    {
+        get => _arguments;
+        init
+        {
+            var arguments = CopyArguments(value);
+            RequireValidRecordShape(_name, arguments, nameof(value));
+            _arguments = arguments;
+        }
+    }
 
     private static readonly HashSet<string> ForbiddenNames = new(StringComparer.OrdinalIgnoreCase) {
         "Object", "Dynamic", "Type", "Assembly", "MemberInfo", "MethodInfo", "PropertyInfo",
@@ -42,18 +52,40 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
 
     public const string RecordName = "Record";
 
-    public static SandboxType Scalar(string name) => new(name, []);
+    public static SandboxType Scalar(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        return new(name, []);
+    }
 
-    public static SandboxType List(SandboxType item) => new("List", [item]);
+    public static SandboxType List(SandboxType item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        return new("List", [item]);
+    }
 
-    public static SandboxType Map(SandboxType key, SandboxType value) => new("Map", [key, value]);
+    public static SandboxType Map(SandboxType key, SandboxType value)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(value);
+        return new("Map", [key, value]);
+    }
 
     /// <summary>
     /// A composite record/object type: an ordered, positional list of field types (≥ 1). Field names are
     /// not part of the structural type — the analyzer and the host marshaling layer map fields to a C#
     /// DTO's declared member order. Records can nest (a field may itself be a record, list, or map).
     /// </summary>
-    public static SandboxType Record(IReadOnlyList<SandboxType> fields) => new(RecordName, fields);
+    public static SandboxType Record(IReadOnlyList<SandboxType> fields)
+    {
+        ArgumentNullException.ThrowIfNull(fields);
+        if (fields.Count == 0)
+        {
+            throw new ArgumentException("Record types must declare at least one field.", nameof(fields));
+        }
+
+        return new(RecordName, fields);
+    }
 
     public bool IsRecord => Arguments.Count > 0 && StringComparer.Ordinal.Equals(Name, RecordName);
 
@@ -74,56 +106,64 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
         => IsWellFormedOpaqueIdName(name);
 
     public static bool IsWellFormedOpaqueIdName(string name)
-    {
-        if (string.IsNullOrEmpty(name) ||
-            name.Length > MaxOpaqueIdNameLength ||
-            AllowedScalars.Contains(name) ||
-            name is "List" or "Map" or RecordName ||
-            IsForbiddenName(name) ||
-            !char.IsAsciiLetterUpper(name[0]))
-        {
-            return false;
-        }
-
-        for (var i = 1; i < name.Length; i++)
-        {
-            var character = name[i];
-            if (!char.IsAsciiLetterOrDigit(character) && character != '_')
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
+        => SandboxTypeRules.IsWellFormedOpaqueIdName(name);
 
     // Open structural check: any well-formed opaque-id brand is accepted. Used by runtime value
     // validation, which sees only types from an already-policy-validated module.
-    public bool IsKnown(int maxDepth = 8) => IsKnown(this, 0, maxDepth, declaredOpaqueIdTypes: null);
+    public bool IsKnown(int maxDepth = 8) => SandboxTypeRules.IsKnown(this, maxDepth, declaredOpaqueIdTypes: null);
 
     // Host-gated structural check: an opaque-id brand is accepted only when the host declared it.
     // Used by module validation (declaredOpaqueIdTypes from the policy) and, with an empty set, by
     // the binding registry (built-in scalars only).
     public bool IsKnown(IReadOnlySet<string> declaredOpaqueIdTypes, int maxDepth = 8)
-        => IsKnown(this, 0, maxDepth, declaredOpaqueIdTypes);
+        => SandboxTypeRules.IsKnown(this, maxDepth, declaredOpaqueIdTypes);
 
     // Strict structural check: built-in scalars and collections only, no opaque-id brands.
-    public bool IsKnownBuiltIn(int maxDepth = 8) => IsKnown(this, 0, maxDepth, EmptyOpaqueIdTypes);
+    public bool IsKnownBuiltIn(int maxDepth = 8) => SandboxTypeRules.IsKnownBuiltIn(this, maxDepth);
 
-    public bool IsForbidden() => IsForbidden(this);
+    public bool IsForbidden() => SandboxTypeRules.IsForbidden(this);
 
     public bool IsValidMapKey() => IsValidMapKey(declaredOpaqueIdTypes: null);
 
     public bool IsValidMapKey(IReadOnlySet<string>? declaredOpaqueIdTypes)
-        => Arguments.Count == 0 &&
-           (MapKeyScalars.Contains(Name) || IsAcceptedOpaqueIdBrand(Name, declaredOpaqueIdTypes));
+        => SandboxTypeRules.IsValidMapKey(this, declaredOpaqueIdTypes);
 
-    private static readonly IReadOnlySet<string> EmptyOpaqueIdTypes =
-        new HashSet<string>(StringComparer.Ordinal);
+    private static string RequireName(string name)
+        => name ?? throw new ArgumentNullException(nameof(name));
 
-    private static bool IsAcceptedOpaqueIdBrand(string name, IReadOnlySet<string>? declaredOpaqueIdTypes)
-        => IsWellFormedOpaqueIdName(name) &&
-           (declaredOpaqueIdTypes is null || declaredOpaqueIdTypes.Contains(name));
+    private static IReadOnlyList<SandboxType> CopyArguments(
+        string name,
+        IReadOnlyList<SandboxType> arguments)
+    {
+        var snapshot = CopyArguments(arguments);
+        RequireValidRecordShape(name, snapshot, nameof(arguments));
+        return snapshot;
+    }
+
+    private static IReadOnlyList<SandboxType> CopyArguments(IReadOnlyList<SandboxType> arguments)
+    {
+        var snapshot = ModelCopy.List(arguments);
+        for (var i = 0; i < snapshot.Count; i++)
+        {
+            if (snapshot[i] is null)
+            {
+                throw new ArgumentException("Type arguments must not contain null elements.", nameof(arguments));
+            }
+        }
+
+        return snapshot;
+    }
+
+    private static void RequireValidRecordShape(
+        string name,
+        IReadOnlyList<SandboxType> arguments,
+        string paramName)
+    {
+        if (StringComparer.Ordinal.Equals(name, RecordName) && arguments.Count == 0)
+        {
+            throw new ArgumentException("Record types must declare at least one field.", paramName);
+        }
+    }
 
     public bool Equals(SandboxType? other)
     {
@@ -180,64 +220,4 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
         return builder.ToString();
     }
 
-    private static bool IsKnown(SandboxType type, int depth, int maxDepth, IReadOnlySet<string>? declaredOpaqueIdTypes)
-    {
-        if (depth > maxDepth ||
-            string.IsNullOrEmpty(type.Name) ||
-            IsForbiddenName(type.Name))
-        {
-            return false;
-        }
-
-        if (type.Arguments.Count == 0)
-        {
-            return AllowedScalars.Contains(type.Name) ||
-                   IsAcceptedOpaqueIdBrand(type.Name, declaredOpaqueIdTypes);
-        }
-
-        if (type.Name == "List")
-        {
-            return type.Arguments.Count == 1 &&
-                   IsKnown(type.Arguments[0], depth + 1, maxDepth, declaredOpaqueIdTypes);
-        }
-
-        if (type.Name == RecordName)
-        {
-            // A record is a positional tuple of known field types (≥ 1). Field types may nest, so each
-            // recurses with an incremented depth against the same bound.
-            for (var i = 0; i < type.Arguments.Count; i++)
-            {
-                if (!IsKnown(type.Arguments[i], depth + 1, maxDepth, declaredOpaqueIdTypes))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        return type.Name == "Map" &&
-               type.Arguments.Count == 2 &&
-               type.Arguments[0].IsValidMapKey(declaredOpaqueIdTypes) &&
-               IsKnown(type.Arguments[0], depth + 1, maxDepth, declaredOpaqueIdTypes) &&
-               IsKnown(type.Arguments[1], depth + 1, maxDepth, declaredOpaqueIdTypes);
-    }
-
-    private static bool IsForbidden(SandboxType type)
-    {
-        if (IsForbiddenName(type.Name))
-        {
-            return true;
-        }
-
-        for (var i = 0; i < type.Arguments.Count; i++)
-        {
-            if (IsForbidden(type.Arguments[i]))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
 }

@@ -55,7 +55,7 @@ public sealed class RemoteTypedServerContextTests
         string? observed = null;
 
         registry.On<RemoteEvent, RemoteContext>(ctx => new RemoteContext(ctx, "subscription"))
-            .Select(e => e.Id)
+            .Select(e => e.Id, RemoteIrTestSteps.Ir<RemoteEvent, string>(LoweredPipelineStepKind.Projection))
             .UseGeneratedLocalChain(
                 PackageFor<RemoteEvent>(projectedType: "string"),
                 (string id, RemoteContext ctx) =>

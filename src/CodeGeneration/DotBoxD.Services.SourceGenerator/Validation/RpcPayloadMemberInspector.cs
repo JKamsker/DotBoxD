@@ -94,8 +94,18 @@ internal static class DtoPayloadMemberInspector
     private static ITypeSymbol? MemberType(ISymbol member)
         => member switch
         {
-            IPropertySymbol { IsStatic: false, Parameters.Length: 0, DeclaredAccessibility: Accessibility.Public } property => property.Type,
-            IFieldSymbol { IsStatic: false, IsImplicitlyDeclared: false, DeclaredAccessibility: Accessibility.Public } field => field.Type,
+            IPropertySymbol
+            {
+                IsStatic: false,
+                Parameters.Length: 0,
+                DeclaredAccessibility: Accessibility.Public
+            } property when !RpcPayloadIgnoredMember.IsIgnored(property) => property.Type,
+            IFieldSymbol
+            {
+                IsStatic: false,
+                IsImplicitlyDeclared: false,
+                DeclaredAccessibility: Accessibility.Public
+            } field when !RpcPayloadIgnoredMember.IsIgnored(field) => field.Type,
             _ => null,
         };
 

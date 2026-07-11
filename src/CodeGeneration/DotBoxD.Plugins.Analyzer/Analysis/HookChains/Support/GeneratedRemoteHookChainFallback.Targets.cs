@@ -35,62 +35,16 @@ internal static partial class GeneratedRemoteHookChainFallback
         }
 
         expression = HookChainAliasResolver.UnwrapTransparentExpression(expression);
-        if (model.GetTypeInfo(expression, cancellationToken).Type is INamedTypeSymbol registryType &&
-            TargetFromRegistryMarker(registryType, model.Compilation) is { } marked)
+        var context = new RegistryTargetContext(expression, model, cancellationToken, depth);
+        foreach (var resolver in RegistryTargetResolvers)
         {
-            return marked;
+            if (resolver(context) is { } target)
+            {
+                return target;
+            }
         }
 
-        if (expression is MemberAccessExpressionSyntax registryAccess &&
-            TargetFromGeneratedServerMember(registryAccess, model, cancellationToken) is { } generated)
-        {
-            return generated;
-        }
-
-        if (expression is ConditionalAccessExpressionSyntax conditionalAccess &&
-            TargetFromConditionalAccessGeneratedServerMember(conditionalAccess, model, cancellationToken) is { } conditionalGenerated)
-        {
-            return conditionalGenerated;
-        }
-
-        if (expression is MemberAccessExpressionSyntax tupleElementAccess &&
-            TargetFromTupleElementAccess(tupleElementAccess, model, cancellationToken, depth) is { } tupleElementTarget)
-        {
-            return tupleElementTarget;
-        }
-
-        if (expression is MemberAccessExpressionSyntax anonymousObjectAccess &&
-            TargetFromAnonymousObjectPropertyAccess(anonymousObjectAccess, model, cancellationToken, depth) is { } anonymousTarget)
-        {
-            return anonymousTarget;
-        }
-
-        if (expression is ConditionalExpressionSyntax conditional &&
-            TargetFromConditionalRegistryExpression(conditional, model, cancellationToken, depth) is { } conditionalTarget)
-        {
-            return conditionalTarget;
-        }
-
-        if (expression is BinaryExpressionSyntax coalesce &&
-            TargetFromCoalesceRegistryExpression(coalesce, model, cancellationToken, depth) is { } coalesceTarget)
-        {
-            return coalesceTarget;
-        }
-
-        if (expression is SwitchExpressionSyntax switchExpression &&
-            TargetFromSwitchRegistryExpression(switchExpression, model, cancellationToken, depth) is { } switchTarget)
-        {
-            return switchTarget;
-        }
-
-        if (expression is AssignmentExpressionSyntax assignment &&
-            TargetFromAssignmentRegistryExpression(assignment, model, cancellationToken, depth) is { } assignmentTarget)
-        {
-            return assignmentTarget;
-        }
-
-        return TargetFromDeclaredRegistryExpression(expression, model, cancellationToken) ??
-            TargetFromLocalAlias(expression, model, cancellationToken, depth);
+        return null;
     }
 
     private static GeneratedRemoteHookChainTarget? TargetFromAssignmentRegistryExpression(
@@ -143,13 +97,7 @@ internal static partial class GeneratedRemoteHookChainFallback
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        var kind = registryName.Identifier.ValueText switch
-        {
-            "Hooks" => GeneratedRemoteHookChainKind.Hook,
-            "Subscriptions" => GeneratedRemoteHookChainKind.Subscription,
-            _ => (GeneratedRemoteHookChainKind?)null
-        };
-        if (kind is null)
+        if (!TryRemoteHookChainKind(registryName, out var kind))
         {
             return null;
         }
@@ -157,25 +105,17 @@ internal static partial class GeneratedRemoteHookChainFallback
         var serverExpression = HookChainAliasResolver.UnwrapTransparentExpression(serverExpressionSyntax);
         string? context = null;
         INamedTypeSymbol? contextType = null;
-        if (model.GetTypeInfo(serverExpression, cancellationToken).Type is INamedTypeSymbol serverType &&
-            HasGeneratePluginServerAttribute(serverType, model.Compilation))
+        if (TryResolveAttributedServerTarget(
+                kind,
+                serverExpression,
+                registryExpression,
+                model,
+                cancellationToken,
+                out var attributedTarget,
+                out context,
+                out contextType))
         {
-            contextType = GeneratedContextType(serverType, model.Compilation);
-            if (contextType is null)
-            {
-                return null;
-            }
-
-            context = contextType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            if (model.GetSymbolInfo(registryExpression, cancellationToken).Symbol is IPropertySymbol property &&
-                property.Type is INamedTypeSymbol registryType)
-            {
-                return TargetFromRegistryMarker(registryType, model.Compilation) is { } marked &&
-                    marked.Kind == kind.Value &&
-                    string.Equals(marked.ServerContextTypeFullName, context, StringComparison.Ordinal)
-                    ? marked
-                    : null;
-            }
+            return attributedTarget;
         }
 
         context ??= ContextFromOwnedGeneratedServerExpression(serverExpression, model, cancellationToken);
@@ -184,8 +124,73 @@ internal static partial class GeneratedRemoteHookChainFallback
             return null;
         }
 
-        return new GeneratedRemoteHookChainTarget(kind.Value, context, contextType);
+        return new GeneratedRemoteHookChainTarget(kind, context, contextType);
     }
+
+    private static bool TryRemoteHookChainKind(
+        SimpleNameSyntax registryName,
+        out GeneratedRemoteHookChainKind kind)
+    {
+        switch (registryName.Identifier.ValueText)
+        {
+            case "Hooks":
+                kind = GeneratedRemoteHookChainKind.Hook;
+                return true;
+            case "Subscriptions":
+                kind = GeneratedRemoteHookChainKind.Subscription;
+                return true;
+            default:
+                kind = default;
+                return false;
+        }
+    }
+
+    private static bool TryResolveAttributedServerTarget(
+        GeneratedRemoteHookChainKind kind,
+        ExpressionSyntax serverExpression,
+        ExpressionSyntax registryExpression,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        out GeneratedRemoteHookChainTarget? target,
+        out string? context,
+        out INamedTypeSymbol? contextType)
+    {
+        target = null;
+        context = null;
+        contextType = null;
+        if (model.GetTypeInfo(serverExpression, cancellationToken).Type is not INamedTypeSymbol serverType ||
+            !HasGeneratePluginServerAttribute(serverType, model.Compilation))
+        {
+            return false;
+        }
+
+        contextType = GeneratedContextType(serverType, model.Compilation);
+        if (contextType is null)
+        {
+            return true;
+        }
+
+        context = contextType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        if (model.GetSymbolInfo(registryExpression, cancellationToken).Symbol is IPropertySymbol property &&
+            property.Type is INamedTypeSymbol registryType)
+        {
+            target = MatchingRegistryMarker(kind, registryType, context, model.Compilation);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static GeneratedRemoteHookChainTarget? MatchingRegistryMarker(
+        GeneratedRemoteHookChainKind kind,
+        INamedTypeSymbol registryType,
+        string context,
+        Compilation compilation)
+        => TargetFromRegistryMarker(registryType, compilation) is { } marked &&
+           marked.Kind == kind &&
+           string.Equals(marked.ServerContextTypeFullName, context, StringComparison.Ordinal)
+            ? marked
+            : null;
 
     private static GeneratedRemoteHookChainTarget? TargetFromDeclaredRegistryExpression(
         ExpressionSyntax expression,

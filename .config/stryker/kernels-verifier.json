@@ -1,0 +1,22 @@
+{
+  "stryker-config": {
+    "solution": "../../../DotBoxD.slnx",
+    "project": "DotBoxD.Kernels.Verifier.csproj",
+    "test-projects": [
+      "../../../tests/DotBoxD.Kernels.Tests/DotBoxD.Kernels.Tests.csproj"
+    ],
+    "configuration": "Release",
+    "target-framework": "net10.0",
+    "test-case-filter": "FullyQualifiedName~Verifier|FullyQualifiedName~GeneratedAssembly",
+    "mutation-level": "standard",
+    "mutate": [
+      "Generated/GeneratedAssemblyVerifier*.cs",
+      "Generated/ManifestIdentityVerifier.cs",
+      "MetadataTableVerifier.cs",
+      "OpCodeVerifier.cs"
+    ],
+    "reporters": ["progress", "html", "json", "markdown"],
+    "concurrency": 2,
+    "thresholds": { "high": 80, "low": 70, "break": 0 }
+  }
+}

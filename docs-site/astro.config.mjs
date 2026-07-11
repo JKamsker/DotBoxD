@@ -44,6 +44,7 @@ export default defineConfig({
             { label: '1 · First service (RPC)', slug: 'tutorials/first-service' },
             { label: '2 · Event pipelines (RunLocal)', slug: 'tutorials/event-pipeline-runlocal' },
             { label: '3 · Pushdown server extension', slug: 'tutorials/pushdown-server-extension' },
+            { label: '4 · Hand-written IR hook pipeline', slug: 'tutorials/handwritten-ir-hook-pipeline' },
           ],
         },
         {
@@ -55,6 +56,7 @@ export default defineConfig({
             { label: 'Event pipelines', slug: 'concepts/event-pipelines' },
             { label: 'Host bindings', slug: 'concepts/host-bindings' },
             { label: 'Kernel runtime', slug: 'concepts/runtime' },
+            { label: 'Determinism contract', slug: 'concepts/determinism' },
             { label: 'Channels & transports', slug: 'concepts/channels-transports' },
           ],
         },
@@ -64,6 +66,10 @@ export default defineConfig({
             { label: 'Overview', slug: 'examples' },
             { label: 'GameServer walkthrough', slug: 'examples/gameserver-walkthrough' },
             { label: 'Coverage gaps', slug: 'examples/coverage-gaps' },
+            {
+              label: 'Project templates',
+              link: 'https://github.com/JKamsker/DotBoxD/tree/main/templates',
+            },
           ],
         },
         {
@@ -80,6 +86,7 @@ export default defineConfig({
           label: 'Reference',
           items: [
             { label: 'Diagnostics (DBXS / DBXK)', slug: 'reference/diagnostics' },
+            { label: 'Consumer testing kit', slug: 'reference/testing' },
             { label: 'Schemas', slug: 'reference/schemas' },
             { label: 'Glossary', slug: 'reference/glossary' },
             {

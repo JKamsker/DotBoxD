@@ -7,9 +7,11 @@ public async ValueTask WriteAsync( string cacheKey, ExecutionPlan plan, string e
 public async ValueTask<CompiledArtifact> CompileAsync( ExecutionPlan plan, CompileOptions options, CancellationToken cancellationToken)
 public async ValueTask<CompiledCacheLookup> TryReadAsync( string cacheKey, ExecutionPlan plan, string entrypoint, IGeneratedAssemblyVerifier verifier, VerificationPolicy policy, CancellationToken cancellationToken)
 public bool EntryExists(string cacheKey)
-public byte[] AssemblyBytes
+public byte[] AssemblyBytes { get; init; }
+public CompiledArtifact? Artifact { get; init; }
 public CompiledArtifact( byte[] assemblyBytes, string assemblyHash, ArtifactManifest manifest, VerificationResult verification, SandboxCompiledEntrypoint entrypoint, CompiledRuntimeFormKind runtimeForm, CompiledCacheStatus cacheStatus = CompiledCacheStatus.None, string? cacheInvalidReason = null)
 public CompiledCacheStatus CacheStatus { get; init; }
+public CompiledCacheStatus Status { get; init; }
 public CompiledRuntimeFormKind RuntimeForm { get; init; }
 public const string CanonicalizerVersion = CanonicalModuleHasher.CanonicalizerVersion
 public const string CompilerVersion = "dotboxd-compiler-9"
@@ -43,5 +45,7 @@ public static VerificationManifestIdentity BuildManifestIdentity( ExecutionPlan 
 public string ArtifactHash => AssemblyHash
 public string AssemblyHash { get; init; }
 public string EntryPath(string cacheKey)
+public string Entrypoint { get; init; }
 public string? CacheInvalidReason { get; init; }
+public string? InvalidReason { get; init; }
 public VerificationResult Verification { get; init; }

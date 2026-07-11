@@ -224,8 +224,8 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
     public void Eligible_local_chains_emit_a_generated_reflection_free_decoder()
     {
         // Projection chain (e.MonsterId -> string): the package exposes a strongly-typed reader that reads the
-        // scalar straight off the wire value — no SandboxValue, no reflection — and the interceptor passes it as
-        // the 3rd UseGeneratedLocalChain argument.
+        // scalar straight off the wire value — no SandboxValue, no reflection — and the interceptor passes it
+        // through the explicit IRKernel companion argument.
         var projection = GeneratedSource(RemoteRunLocalSource);
         Assert.Contains(
             "public static string ReadProjected(global::DotBoxD.Plugins.KernelRpcValue value)",
@@ -235,7 +235,8 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
             "public static string ReadProjectedPayload(global::System.ReadOnlyMemory<byte> payload)",
             projection,
             StringComparison.Ordinal);
-        Assert.Contains(".Create(), handler, ", projection, StringComparison.Ordinal);
+        Assert.Contains("RunLocal(handler, global::DotBoxD.Plugins.IRKernel.FromPackage(", projection, StringComparison.Ordinal);
+        Assert.Contains(".Create(), ", projection, StringComparison.Ordinal);
         Assert.Contains(".ReadProjectedPayload)", projection, StringComparison.Ordinal);
 
         // Whole-event chain (the event record itself): the generated reader reconstructs the DTO via its real
@@ -249,7 +250,8 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
             "ReadProjectedPayload(global::System.ReadOnlyMemory<byte> payload)",
             wholeEvent,
             StringComparison.Ordinal);
-        Assert.Contains(".Create(), handler, ", wholeEvent, StringComparison.Ordinal);
+        Assert.Contains("RunLocal(handler, global::DotBoxD.Plugins.IRKernel.FromPackage(", wholeEvent, StringComparison.Ordinal);
+        Assert.Contains(".Create(), ", wholeEvent, StringComparison.Ordinal);
     }
 
     private static byte[] EncodeString(string value)

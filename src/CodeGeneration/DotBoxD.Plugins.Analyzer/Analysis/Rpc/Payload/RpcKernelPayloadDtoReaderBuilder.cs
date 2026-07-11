@@ -11,7 +11,7 @@ internal static class RpcKernelPayloadDtoReaderBuilder
         IReadOnlyList<RecordMember> fields,
         Compilation? compilation = null)
     {
-        if (TryResolveConstructor(type, fields, compilation) is { } constructor)
+        if (RpcDtoConstructorResolver.TryResolve(type, fields, compilation) is { } constructor)
         {
             var construction = "new " + TypeName(type) + "(" +
                 string.Join(", ", DtoConstructorArguments(fields, constructor.Symbol)) + ")";
@@ -23,7 +23,11 @@ internal static class RpcKernelPayloadDtoReaderBuilder
                     "does not assign every public field and the remaining fields are not settable.");
             }
 
-            ThrowIfRequiredReadOnlyMembersNeedSetsRequiredMembers(type, fields, constructor.Symbol, compilation);
+            RpcDtoConstructorResolver.ThrowIfRequiredReadOnlyMembersNeedSetsRequiredMembers(
+                type,
+                fields,
+                constructor.Symbol,
+                compilation);
             return BuildInitializer(construction, fields, constructor.Assigned, compilation);
         }
 
@@ -151,76 +155,6 @@ internal static class RpcKernelPayloadDtoReaderBuilder
         }
     }
 
-    private static ResolvedDtoConstructor? TryResolveConstructor(
-        INamedTypeSymbol type,
-        IReadOnlyList<RecordMember> fields,
-        Compilation? compilation)
-    {
-        ResolvedDtoConstructor? partial = null;
-        ResolvedDtoConstructor? rejectedPartial = null;
-        foreach (var constructor in type.InstanceConstructors)
-        {
-            if (!DotBoxDRpcTypeMapper.IsAccessibleFromGeneratedCode(constructor, compilation) ||
-                constructor.Parameters.Length == 0)
-            {
-                continue;
-            }
-
-            var matched = true;
-            var assigned = new bool[fields.Count];
-            foreach (var parameter in constructor.Parameters)
-            {
-                var fieldIndex = RpcDtoFieldMatcher.FieldIndex(fields, parameter);
-                if (fieldIndex < 0)
-                {
-                    if (parameter.HasExplicitDefaultValue)
-                    {
-                        continue;
-                    }
-
-                    matched = false;
-                    break;
-                }
-
-                if (assigned[fieldIndex])
-                {
-                    matched = false;
-                    break;
-                }
-
-                assigned[fieldIndex] = true;
-            }
-
-            if (matched)
-            {
-                RpcDtoFieldMatcher.ValidateNoRefLikeParameters(
-                    constructor,
-                    $"Server extension DTO '{type.ToDisplayString()}'");
-
-                var assignedCount = AssignedCount(assigned);
-                var resolved = new ResolvedDtoConstructor(constructor, assigned, assignedCount);
-                if (assignedCount == fields.Count)
-                {
-                    return resolved;
-                }
-
-                if (DotBoxDRpcTypeMapper.CanReconstructFromAssignedFields(fields, assigned, compilation))
-                {
-                    if (partial is null || assignedCount > partial.AssignedCount)
-                    {
-                        partial = resolved;
-                    }
-                }
-                else if (rejectedPartial is null || assignedCount > rejectedPartial.AssignedCount)
-                {
-                    rejectedPartial = resolved;
-                }
-            }
-        }
-
-        return partial ?? rejectedPartial;
-    }
-
     private static string FieldLocal(int index)
         => "__field" + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
@@ -229,45 +163,4 @@ internal static class RpcKernelPayloadDtoReaderBuilder
 
     private static string Identifier(string name) => "@" + name;
 
-    private static int AssignedCount(bool[] assigned)
-        => assigned.Count(static item => item);
-
-    private static void ThrowIfRequiredReadOnlyMembersNeedSetsRequiredMembers(
-        INamedTypeSymbol type,
-        IReadOnlyList<RecordMember> fields,
-        IMethodSymbol constructor,
-        Compilation? compilation)
-    {
-        if (HasSetsRequiredMembers(constructor))
-        {
-            return;
-        }
-
-        foreach (var field in fields)
-        {
-            if (IsRequiredMember(field) &&
-                !DotBoxDRpcTypeMapper.IsObjectInitializerWritable(field, compilation))
-            {
-                throw new NotSupportedException(
-                    $"Server extension DTO '{type.ToDisplayString()}' required field '{field.Name}' is read-only; " +
-                    "mark the constructor with SetsRequiredMembers or make the member settable.");
-            }
-        }
-    }
-
-    private static bool IsRequiredMember(RecordMember field)
-        => field.Symbol switch
-        {
-            IPropertySymbol property => property.IsRequired,
-            IFieldSymbol fieldSymbol => fieldSymbol.IsRequired,
-            _ => false,
-        };
-
-    private static bool HasSetsRequiredMembers(IMethodSymbol constructor)
-        => constructor.GetAttributes().Any(attribute => string.Equals(
-            attribute.AttributeClass?.ToDisplayString(),
-            "System.Diagnostics.CodeAnalysis.SetsRequiredMembersAttribute",
-            StringComparison.Ordinal));
-
-    private sealed record ResolvedDtoConstructor(IMethodSymbol Symbol, bool[] Assigned, int AssignedCount);
 }

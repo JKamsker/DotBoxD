@@ -41,6 +41,7 @@ $publicSurfaceAccessibilityPattern = "^(public|protected\s+internal|internal\s+p
 function Normalize-ApiLine([string] $Line) {
     $trimmed = Remove-LineComment $Line
     $trimmed = $trimmed.Trim()
+    $trimmed = Remove-LeadingAttributeLists $trimmed
     if ([string]::IsNullOrWhiteSpace($trimmed) -or
         $trimmed.StartsWith("//", [StringComparison]::Ordinal) -or
         $trimmed.StartsWith("[", [StringComparison]::Ordinal)) {
@@ -62,6 +63,38 @@ function Normalize-ApiLine([string] $Line) {
     }
 
     return $normalized
+}
+
+function Remove-LeadingAttributeLists([string] $Line) {
+    $text = $Line.Trim()
+    while ($text.StartsWith("[", [StringComparison]::Ordinal)) {
+        $depth = 0
+        $closedIndex = -1
+        for ($index = 0; $index -lt $text.Length; $index++) {
+            if ($text[$index] -eq "[") {
+                $depth++
+            } elseif ($text[$index] -eq "]") {
+                $depth--
+                if ($depth -eq 0) {
+                    $closedIndex = $index
+                    break
+                }
+            }
+        }
+
+        if ($closedIndex -lt 0) {
+            return $text
+        }
+
+        $remaining = $text.Substring($closedIndex + 1).TrimStart()
+        if ($remaining.Length -gt 0 -and ",)]};=".Contains($remaining[0], [StringComparison]::Ordinal)) {
+            return $text
+        }
+
+        $text = $remaining
+    }
+
+    return $text
 }
 
 function Remove-LineComment([string] $Line) {
@@ -294,8 +327,8 @@ function Normalize-ApiDeclaration([string] $Declaration) {
     $lines = New-Object "System.Collections.Generic.List[string]"
     foreach ($line in ($Declaration -split "\r?\n")) {
         $trimmed = (Remove-LineComment $line).Trim()
-        if (-not [string]::IsNullOrWhiteSpace($trimmed) -and
-            -not $trimmed.StartsWith("[", [StringComparison]::Ordinal)) {
+        $trimmed = Remove-LeadingAttributeLists $trimmed
+        if (-not [string]::IsNullOrWhiteSpace($trimmed)) {
             $lines.Add($trimmed)
         }
     }
@@ -351,6 +384,75 @@ function Normalize-GenericConstraintLine([string] $Line) {
     }
 
     return $constraint.TrimEnd(";").Trim()
+}
+
+function Try-FormatBlockPropertyApi(
+    [string] $ApiLine,
+    [string[]] $Lines,
+    [int] $StartIndex,
+    [ref] $Index) {
+    if ($ApiLine -match "\b(class|delegate|enum|event|interface|record|struct)\b" -or
+        $ApiLine.Contains("(", [StringComparison]::Ordinal) -or
+        $ApiLine.Contains("=>", [StringComparison]::Ordinal) -or
+        $ApiLine.Contains("=", [StringComparison]::Ordinal)) {
+        return $null
+    }
+
+    $openIndex = -1
+    for ($candidateIndex = $StartIndex; $candidateIndex -lt $Lines.Count; $candidateIndex++) {
+        $candidate = (Remove-LineComment $Lines[$candidateIndex]).Trim()
+        if ([string]::IsNullOrWhiteSpace($candidate) -or
+            $candidate.StartsWith("[", [StringComparison]::Ordinal)) {
+            continue
+        }
+
+        if ($candidate -ne "{") {
+            return $null
+        }
+
+        $openIndex = $candidateIndex
+        break
+    }
+
+    if ($openIndex -lt 0) {
+        return $null
+    }
+
+    $accessors = New-Object "System.Collections.Generic.List[string]"
+    $braceDepth = 0
+    for ($memberIndex = $openIndex; $memberIndex -lt $Lines.Count; $memberIndex++) {
+        $trimmed = (Remove-LineComment $Lines[$memberIndex]).Trim()
+        if ($trimmed -match "^(?<modifier>public|protected\s+internal|internal\s+protected|protected|internal|private)?\s*(?<accessor>get|set|init)\b") {
+            $accessor = $Matches.accessor
+            if (-not [string]::IsNullOrWhiteSpace($Matches.modifier)) {
+                $accessor = "$($Matches.modifier) $accessor"
+            }
+
+            if (-not $accessors.Contains($accessor)) {
+                $accessors.Add($accessor)
+            }
+        }
+
+        foreach ($character in $trimmed.ToCharArray()) {
+            if ($character -eq "{") {
+                $braceDepth++
+            } elseif ($character -eq "}") {
+                $braceDepth--
+            }
+        }
+
+        if ($braceDepth -le 0 -and $memberIndex -gt $openIndex) {
+            $Index.Value = $memberIndex
+            break
+        }
+    }
+
+    if ($accessors.Count -eq 0) {
+        return $null
+    }
+
+    $accessorText = (($accessors | ForEach-Object { "$_;" }) -join " ")
+    return "$ApiLine { $accessorText }"
 }
 
 function Add-EnumMembers([string[]] $Lines, [System.Collections.Generic.HashSet[string]] $Api, [System.Collections.Generic.List[bool]] $ContainingTypePublic) {
@@ -482,6 +584,11 @@ function Get-PackageApi([hashtable] $Package) {
 
             if ($apiLine.Contains("<", [StringComparison]::Ordinal)) {
                 $apiLine = Normalize-ApiDeclaration (Add-GenericConstraints $line $lines ($index + 1) ([ref] $index))
+            }
+
+            $blockPropertyApiLine = Try-FormatBlockPropertyApi $apiLine $lines ($index + 1) ([ref] $index)
+            if ($null -ne $blockPropertyApiLine) {
+                $apiLine = $blockPropertyApiLine
             }
 
             [void] $api.Add($apiLine)

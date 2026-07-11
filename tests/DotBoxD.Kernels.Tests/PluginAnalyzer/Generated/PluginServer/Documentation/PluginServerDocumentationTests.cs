@@ -122,7 +122,7 @@ public sealed class PluginServerDocumentationTests
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var diagnostics);
 
         Assert.Empty(diagnostics.Where(d => d.Severity.Equals(DiagnosticSeverity.Error)));
-        return (driver.GetRunResult(), outputCompilation);
+        return (PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()), outputCompilation);
     }
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()

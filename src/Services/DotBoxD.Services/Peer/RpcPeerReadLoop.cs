@@ -89,6 +89,12 @@ internal sealed class RpcPeerReadLoop
                 break;
             }
 
+            if (ct.IsCancellationRequested)
+            {
+                frame.Dispose();
+                break;
+            }
+
             if (frame.Length == 0)
             {
                 frame.Dispose();

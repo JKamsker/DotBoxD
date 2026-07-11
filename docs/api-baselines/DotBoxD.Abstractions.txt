@@ -3,10 +3,36 @@
 # Update intentionally with scripts/check-api-compat-baseline.ps1 -Update when approving public API changes.
 
 protected static NotSupportedException ControlPlaneOnly()
+public BinaryExpression Add(Expression left, Expression right)
+public BinaryExpression And(Expression left, Expression right)
+public BinaryExpression Binary(Expression left, string @operator, Expression right)
+public BinaryExpression Divide(Expression left, Expression right)
+public BinaryExpression Equal(Expression left, Expression right)
+public BinaryExpression GreaterThan(Expression left, Expression right)
+public BinaryExpression GreaterThanOrEqual(Expression left, Expression right)
+public BinaryExpression LessThan(Expression left, Expression right)
+public BinaryExpression LessThanOrEqual(Expression left, Expression right)
+public BinaryExpression Multiply(Expression left, Expression right)
+public BinaryExpression NotEqual(Expression left, Expression right)
+public BinaryExpression Or(Expression left, Expression right)
+public BinaryExpression Remainder(Expression left, Expression right)
+public BinaryExpression Subtract(Expression left, Expression right)
+public bool HasExplicitStepKind { get; }
 public bool IsAsync { get; set; }
 public bool IsAutoBinding => BindingId.Length == 0
 public bool Success { get; }
+public CallExpression Call(string name, IReadOnlyList<Expression> arguments, SandboxType? genericType = null)
+public CallExpression Call(string name, params Expression[] arguments)
+public CallExpression Field(int index)
+public CallExpression ListCount(Expression list)
+public CallExpression ListGet(Expression list, Expression index)
+public CallExpression MapGet(Expression map, Expression key)
+public CallExpression Record(params Expression[] fields)
+public CallExpression RecordGet(Expression record, int index)
+public CallExpression StringLength(Expression text)
 public CancellationToken CancellationToken { get; }
+public CapabilityAttribute(string id)
+public const string CurrentParameterName = "$dotboxd.current"
 public delegate ValueTask<TReturn> RemoteServerInvocation<TWorld, TCaptures, TReturn>( TWorld world, TCaptures captures)
 public enum GeneratedPluginServerRegistryKind
 public enum GeneratedPluginServerRegistryKind.Hook
@@ -16,13 +42,29 @@ public enum HostBindingEffect.Allocates = 4
 public enum HostBindingEffect.HostStateRead = 1
 public enum HostBindingEffect.HostStateWrite = 2
 public enum HostBindingEffect.None = 0
-public GeneratedPluginServerRegistryKind Kind { get; } = kind
+public enum LoweredIrMethodKind
+public enum LoweredIrMethodKind.AnonymousInvocation
+public enum LoweredPipelineStepKind
+public enum LoweredPipelineStepKind.Filter
+public enum LoweredPipelineStepKind.Projection
+public enum PipelineTransport
+public enum PipelineTransport.Local = 0
+public enum PipelineTransport.Remote = 1
+public Func<object> PackageFactory { get; }
+public Func<TCaptures, TDelegate, byte[]> EncodeArguments { get; }
+public Func<TCaptures, TDelegate, ReadOnlyMemory<byte>, TReturn> DecodeResult { get; }
+public Func<TDelegate, byte[]> EncodeArguments { get; }
+public Func<TDelegate, ReadOnlyMemory<byte>, TReturn> DecodeResult { get; }
+public GeneratedPluginServerRegistryKind Kind { get; } = Enum.IsDefined(kind)
+public GeneratePluginRegistrationAccumulatorAttribute(string accumulatorName, string methodName)
+public GeneratePluginRegistrationRootAccumulatorAttribute(string accumulatorName)
 public HandleSubtypeAttribute( Type subtype, string discriminator, string bindingPrefix, string capability)
 public HookAttribute(string name, Type resultType)
 public HookContext(IPluginMessageSink messages, CancellationToken cancellationToken)
 public HostBindingAttribute(string bindingId, string capability, SandboxEffect effects)
 public HostBindingAttribute(string capability, SandboxEffect effects)
-public HostBindingEffect Effects { get; } = effects
+public HostBindingEffect Effects { get; }
+public HostCapabilityAttribute(string capability, HostBindingEffect effects)
 public InMemoryPluginMessageSink()
 public InMemoryPluginMessageSink(int maxMessages)
 public int Version { get; } = version
@@ -39,62 +81,114 @@ public interface IServerExtensionClientRegistry : IServerExtensionWireClient
 public interface IServerExtensionWireClient
 public interface IServiceControl : IExtensibleControl
 public IPluginMessageSink Messages { get; }
-public IReadOnlyList<PluginMessage> Messages
+public IRBodyOfAttribute(string parameterName, LoweredPipelineStepKind stepKind)
+public IRBodyOfAttribute(string parameterName)
+public IReadOnlyList<LoweredPipelineStep> Steps { get; init; }
+public IReadOnlyList<Parameter> Parameters { get; init; }
+public IReadOnlyList<PluginMessage> Messages { get; }
+public IReadOnlyList<Statement> Prefix { get; init; }
+public IReadOnlyList<string> Effects { get; init; }
+public IReadOnlyList<string> RequiredCapabilities { get; init; }
+public IRExpressionBuilder()
+public IRExpressionBuilder(SourceSpan span)
+public LiteralExpression Bool(bool value)
+public LiteralExpression Double(double value)
+public LiteralExpression Guid(Guid value)
+public LiteralExpression Int32(int value)
+public LiteralExpression Int64(long value)
+public LiteralExpression Literal(SandboxValue value)
+public LiteralExpression String(string value)
+public LowerToIrAttribute(LoweredPipelineStepKind kind)
+public LoweredIrMethodKind Kind { get; } = kind
+public LoweredPipelineStep Step { get; }
+public LoweredPipelineStepKind Kind { get; }
+public LoweredPipelineStepKind StepKind { get; }
+public PipelineTransport Transport { get; } = transport
 public PluginAttribute(string? id = null) => Id = id
 public PolymorphicHandleAttribute(string keyMember)
 public SandboxEffect Effects { get; }
-public sealed class CapabilityAttribute(string id) : Attribute
+public sealed class CapabilityAttribute : Attribute
 public sealed class GeneratedKernelMethodDescriptorAttribute( int version, Type contextType, string methodMetadataName, string normalizedSignature, string descriptorHash, string descriptorPayload)
 public sealed class GeneratedPluginServerRegistryAttribute( GeneratedPluginServerRegistryKind kind, Type serverType, Type contextType)
-public sealed class GeneratePluginRegistrationAccumulatorAttribute( string accumulatorName, string methodName) : Attribute
-public sealed class GeneratePluginRegistrationRootAccumulatorAttribute(string accumulatorName) : Attribute
+public sealed class GeneratePluginRegistrationAccumulatorAttribute : Attribute
+public sealed class GeneratePluginRegistrationRootAccumulatorAttribute : Attribute
 public sealed class GeneratePluginServerAttribute : Attribute
 public sealed class HandleSubtypeAttribute : Attribute
 public sealed class HookAttribute : Attribute
 public sealed class HookContext
 public sealed class HookResultAttribute : Attribute
 public sealed class HostBindingAttribute : Attribute
-public sealed class HostCapabilityAttribute(string capability, HostBindingEffect effects) : Attribute
+public sealed class HostCapabilityAttribute : Attribute
 public sealed class InMemoryPluginMessageSink : IPluginMessageSink
+public sealed class IRBodyOfAttribute : Attribute
+public sealed class IRExpressionBuilder
+public sealed class IRFunc<TInput, TContext, TOutput>
+public sealed class IRFunc<TInput, TOutput>
+public sealed class IRInvocation<TCaptures, TDelegate, TReturn> where TCaptures : class where TDelegate : Delegate
+public sealed class IRInvocation<TDelegate, TReturn> where TDelegate : Delegate
 public sealed class KernelMethodAttribute : Attribute
 public sealed class LiveSettingAttribute : Attribute
+public sealed class LowerToIrAttribute : Attribute
+public sealed class LowerToIrMethodAttribute(LoweredIrMethodKind kind) : Attribute
 public sealed class NativeOnlyAttribute : Attribute
+public sealed class PipelineSurfaceAttribute(PipelineTransport transport) : Attribute
 public sealed class PluginAttribute : Attribute
 public sealed class PolymorphicHandleAttribute : Attribute
 public sealed class ServerExtensionAttribute : Attribute
 public sealed class ServerExtensionClientAttribute(Type receiverType, string? name = null) : Attribute
 public sealed class ServerExtensionMethodAttribute(Type? receiverType = null, string? name = null) : Attribute
+public sealed record LoweredPipelineComposition( string ModuleId, IReadOnlyList<LoweredPipelineStep> Steps, SandboxType ResultType)
+public sealed record LoweredPipelineStep( LoweredPipelineStepKind Kind, string InputType, string OutputType, IReadOnlyList<Parameter> Parameters, IReadOnlyList<Statement> Prefix, Expression Value, IReadOnlyList<string> RequiredCapabilities, IReadOnlyList<string> Effects)
 public sealed record PluginMessage(string TargetId, string Message)
+public SemVersion TargetSandboxVersion { get; init; } = new(1, 0, 0)
+public SemVersion Version { get; init; } = new(1, 0, 0)
 public ServerExtensionAttribute(string id, Type serviceType)
-public ServerExtensionAttribute(string id) => Id = id
+public ServerExtensionAttribute(string id) => Id = id ?? throw new ArgumentNullException(nameof(id))
 public ServerExtensionAttribute(Type grafts, string? id = null)
-public string AccumulatorName { get; } = accumulatorName
+public SourceSpan Span { get; }
+public static class LoweredPipelineComposer
+public static IRFunc<TInput, TContext, TOutput> FromStep(LoweredPipelineStep step) => new(step)
+public static IRFunc<TInput, TOutput> FromStep(LoweredPipelineStep step) => new(step)
+public static IRInvocation<TCaptures, TDelegate, TReturn> FromGenerated( string pluginId, Func<object> packageFactory, Func<TCaptures, TDelegate, byte[]> encodeArguments, Func<TCaptures, TDelegate, ReadOnlyMemory<byte>, TReturn> decodeResult)
+public static IRInvocation<TDelegate, TReturn> FromGenerated( string pluginId, Func<object> packageFactory, Func<TDelegate, byte[]> encodeArguments, Func<TDelegate, ReadOnlyMemory<byte>, TReturn> decodeResult)
+public static SandboxModule Compose(LoweredPipelineComposition composition)
+public string AccumulatorName { get; }
 public string BindingId { get; }
 public string BindingPrefix { get; }
 public string Capability { get; }
-public string Capability { get; } = capability
-public string DescriptorHash { get; } = descriptorHash
-public string DescriptorPayload { get; } = descriptorPayload
+public string DescriptorHash { get; } = RequireMetadata(descriptorHash, nameof(descriptorHash))
+public string DescriptorPayload { get; } = RequireMetadata(descriptorPayload, nameof(descriptorPayload))
 public string Discriminator { get; }
-public string Id { get; } = id
+public string HandleFunctionId { get; init; } = "Handle"
+public string Id { get; }
 public string KeyMember { get; }
-public string MethodMetadataName { get; } = methodMetadataName
-public string MethodName { get; } = methodName
+public string Message { get; init; }
+public string MethodMetadataName { get; } = RequireMetadata(methodMetadataName, nameof(methodMetadataName))
+public string MethodName { get; }
 public string Name { get; }
-public string NormalizedSignature { get; } = normalizedSignature
+public string NormalizedSignature { get; } = RequireMetadata(normalizedSignature, nameof(normalizedSignature))
+public string ParameterName { get; }
+public string PluginId { get; }
+public string ShouldHandleFunctionId { get; init; } = "ShouldHandle"
+public string TargetId { get; init; }
 public string? ContextFactory { get; set; }
 public string? Id { get; }
-public string? Name { get; } = name
+public string? Name { get; } = ServerExtensionAttributeValidation.ValidateName(name)
 public THost Host<THost>() where THost : class
-public Type ContextType { get; } = contextType
-public Type ReceiverType { get; } = receiverType
+public Type ContextType { get; } = contextType ?? throw new ArgumentNullException(nameof(contextType))
+public Type ReceiverType { get; } = receiverType ?? throw new ArgumentNullException(nameof(receiverType))
 public Type ResultType { get; }
-public Type ServerType { get; } = serverType
+public Type ServerType { get; } = serverType ?? throw new ArgumentNullException(nameof(serverType))
 public Type Subtype { get; }
 public Type? Context { get; set; }
 public Type? ControlService { get; set; }
 public Type? Grafts { get; }
 public Type? ReceiverType { get; } = receiverType
 public Type? ServiceType { get; }
+public UnaryExpression Negate(Expression value)
+public UnaryExpression Not(Expression value)
+public UnaryExpression Unary(string @operator, Expression value)
 public ValueTask SendAsync(string targetId, string message, CancellationToken cancellationToken = default)
+public VariableExpression Current()
+public VariableExpression Variable(string name)
 public void Send(string targetId, string message)

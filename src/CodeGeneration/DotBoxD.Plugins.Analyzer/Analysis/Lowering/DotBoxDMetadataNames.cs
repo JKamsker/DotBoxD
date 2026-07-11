@@ -9,6 +9,9 @@ internal static class DotBoxDMetadataNames
     public const string HostBindingAttribute = DotBoxDGenerationNames.TypeNames.HostBindingAttribute;
     public const string CapabilityAttribute = DotBoxDGenerationNames.TypeNames.CapabilityAttribute;
     public const string KernelMethodAttribute = DotBoxDGenerationNames.TypeNames.KernelMethodAttribute;
+    public const string LowerToIrAttribute = DotBoxDGenerationNames.TypeNames.LowerToIrAttribute;
+    public const string IRBodyOfAttribute = DotBoxDGenerationNames.TypeNames.IRBodyOfAttribute;
+    public const string LowerToIrMethodAttribute = DotBoxDGenerationNames.TypeNames.LowerToIrMethodAttribute;
     public const string NativeOnlyAttribute = DotBoxDGenerationNames.TypeNames.NativeOnlyAttribute;
     public const string ServerExtensionAttribute = DotBoxDGenerationNames.TypeNames.ServerExtensionAttribute;
     public const string ServerExtensionClientAttribute = DotBoxDGenerationNames.TypeNames.ServerExtensionClientAttribute;
@@ -26,6 +29,7 @@ internal static class DotBoxDMetadataNames
     public const string ServerInvocationDelegateOriginal = DotBoxDGenerationNames.TypeNames.ServerInvocationDelegateOriginal;
     public const string GameWorldAccessType = DotBoxDGenerationNames.TypeNames.GameWorldAccessType;
     public const string GameWorldMonsterSnapshotType = DotBoxDGenerationNames.TypeNames.GameWorldMonsterSnapshotType;
+    public const string ExperimentalAttribute = "System.Diagnostics.CodeAnalysis.ExperimentalAttribute";
 
     public static bool IsRpcServiceAttribute(string? typeName) =>
         typeName is RpcServiceAttribute;

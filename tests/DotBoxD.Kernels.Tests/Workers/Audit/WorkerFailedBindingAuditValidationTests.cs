@@ -51,7 +51,7 @@ public sealed class WorkerFailedBindingAuditValidationTests
             e.ErrorCode == SandboxErrorCode.VerifierFailure);
         Assert.Contains(result.AuditEvents, e =>
             e.Kind == "ExecutionFallback" &&
-            e.Success &&
+            !e.Success &&
             e.ErrorCode == SandboxErrorCode.VerifierFailure);
         Assert.DoesNotContain(result.AuditEvents, e => e.Kind == "WorkerIsolationFailed");
     }
@@ -164,7 +164,7 @@ public sealed class WorkerFailedBindingAuditValidationTests
                 runId,
                 "ExecutionFallback",
                 DateTimeOffset.UtcNow,
-                true,
+                false,
                 ResourceId: $"module:{plan.ModuleHash}",
                 ErrorCode: SandboxErrorCode.VerifierFailure,
                 Message: "compiled artifact failed verification; fell back to interpreted mode"));

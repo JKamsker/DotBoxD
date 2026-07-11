@@ -5,16 +5,17 @@
 public static async ValueTask WriteTextAsync( SandboxContext context, SandboxPath path, string text, CancellationToken cancellationToken)
 public static async ValueTask<string> ReadTextAsync( SandboxContext context, SandboxPath path, CancellationToken cancellationToken)
 public static BindingDescriptor Info { get; } = Create("log.info", "info")
-public static BindingDescriptor NextI32 { get; } = new( "random.nextI32", SemVersion.One, SandboxType.I32, SandboxEffect.Cpu | SandboxEffect.Random, "random", BindingCostModel.Fixed(3), AuditLevel.PerCall, BindingSafety.ReadOnlyExternal, (context, args, cancellationToken) => { cancellationToken.ThrowIfCancellationRequested(); var startedAt = DateTimeOffset.UtcNow; var min = ((I32Value)args[0]).Value; var max = ((I32Value)args[1]).Value; var value = context.NextRandomInt32(min, max); var timestamp = context.AuditTimestamp(); context.Audit.Write(new SandboxAuditEvent( context.RunId, "BindingCall", timestamp, true, BindingId: "random.nextI32", CapabilityId: "random", Effect: SandboxEffect.Random, ResourceId: "random:i32", Fields: context.BindingAuditFields("random", startedAt))); return ValueTask.FromResult(SandboxValue.FromInt32(value)); }, CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)))
-public static BindingDescriptor NowUnixMillis { get; } = new( "time.nowUnixMillis", SemVersion.One, SandboxType.I64, SandboxEffect.Cpu | SandboxEffect.Time, "time.now", BindingCostModel.Fixed(2), AuditLevel.PerCall, BindingSafety.ReadOnlyExternal, (context, _, cancellationToken) => { cancellationToken.ThrowIfCancellationRequested(); var startedAt = DateTimeOffset.UtcNow; var timestamp = context.UtcNow(); var value = timestamp.ToUnixTimeMilliseconds(); context.Audit.Write(new SandboxAuditEvent( context.RunId, "BindingCall", timestamp, true, BindingId: "time.nowUnixMillis", CapabilityId: "time.now", Effect: SandboxEffect.Time, ResourceId: "clock:utc", Fields: context.BindingAuditFields("clock", startedAt))); return ValueTask.FromResult(SandboxValue.FromInt64(value)); }, CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)))
-public static BindingDescriptor ReadText { get; } = new( "file.readText", SemVersion.One, SandboxType.String, SandboxEffect.Cpu | SandboxEffect.Alloc | SandboxEffect.FileRead, "file.read", BindingCostModel.Fixed(50), AuditLevel.PerResource, BindingSafety.ReadOnlyExternal, async (context, args, cancellationToken) => { var text = await SafeFileSystem.ReadTextAsync(context, ((SandboxPathValue)args[0]).Value, cancellationToken) .ConfigureAwait(false); return SandboxValue.FromString(text); }, CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)))
+public static BindingDescriptor NextI32 { get; } = new( "random.nextI32", SemVersion.One, [SandboxType.I32, SandboxType.I32], SandboxType.I32, SandboxEffect.Cpu | SandboxEffect.Random, "random", BindingCostModel.Fixed(3), AuditLevel.PerCall, BindingSafety.ReadOnlyExternal, (context, args, cancellationToken) => { cancellationToken.ThrowIfCancellationRequested(); var startedAt = DateTimeOffset.UtcNow; var min = ((I32Value)args[0]).Value; var max = ((I32Value)args[1]).Value; var value = context.NextRandomInt32(min, max); var timestamp = context.AuditTimestamp(); context.Audit.Write(new SandboxAuditEvent( context.RunId, "BindingCall", timestamp, true, BindingId: "random.nextI32", CapabilityId: "random", Effect: SandboxEffect.Random, ResourceId: "random:i32", Fields: RandomAuditFields(context, startedAt, min, max, value))); return ValueTask.FromResult(SandboxValue.FromInt32(value)); }, CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)))
+public static BindingDescriptor NowUnixMillis { get; } = new( SafeTimeBindingNames.NowUnixMillisId, SemVersion.One, [], SandboxType.I64, SandboxEffect.Cpu | SandboxEffect.Time, "time.now", BindingCostModel.Fixed(2), AuditLevel.PerCall, BindingSafety.ReadOnlyExternal, (context, _, cancellationToken) => { cancellationToken.ThrowIfCancellationRequested(); var startedAt = DateTimeOffset.UtcNow; var timestamp = context.UtcNow(); var value = timestamp.ToUnixTimeMilliseconds(); var fields = new Dictionary<string, string>( context.BindingAuditFields("clock", startedAt), StringComparer.Ordinal) { [SafeTimeBindingNames.NowUnixMillisAuditField] = value.ToString(System.Globalization.CultureInfo.InvariantCulture) }; context.Audit.Write(new SandboxAuditEvent( context.RunId, "BindingCall", timestamp, true, BindingId: SafeTimeBindingNames.NowUnixMillisId, CapabilityId: "time.now", Effect: SandboxEffect.Time, ResourceId: "clock:utc", Fields: fields)); return ValueTask.FromResult(SandboxValue.FromInt64(value)); }, CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)))
+public static BindingDescriptor ReadText { get; } = new( "file.readText", SemVersion.One, [SandboxType.SandboxPath], SandboxType.String, SandboxEffect.Cpu | SandboxEffect.Alloc | SandboxEffect.FileRead, "file.read", BindingCostModel.Fixed(50), AuditLevel.PerResource, BindingSafety.ReadOnlyExternal, async (context, args, cancellationToken) => { var text = await SafeFileSystem.ReadTextAsync(context, ((SandboxPathValue)args[0]).Value, cancellationToken) .ConfigureAwait(false); return SandboxValue.FromString(text); }, CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)))
 public static BindingDescriptor Warn { get; } = Create("log.warn", "warn")
-public static BindingDescriptor WriteText { get; } = new( "file.writeText", SemVersion.One, SandboxType.Unit, SandboxEffect.Cpu | SandboxEffect.FileWrite | SandboxEffect.Audit, "file.write", BindingCostModel.Fixed(50), AuditLevel.PerResource, BindingSafety.SideEffectingExternal, async (context, args, cancellationToken) => { await SafeFileSystem.WriteTextAsync( context, ((SandboxPathValue)args[0]).Value, ((StringValue)args[1]).Value, cancellationToken).ConfigureAwait(false); return SandboxValue.Unit; }, CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)))
+public static BindingDescriptor WriteText { get; } = new( "file.writeText", SemVersion.One, [SandboxType.SandboxPath, SandboxType.String], SandboxType.Unit, SandboxEffect.Cpu | SandboxEffect.FileWrite | SandboxEffect.Audit, "file.write", BindingCostModel.Fixed(50), AuditLevel.PerResource, BindingSafety.SideEffectingExternal, async (context, args, cancellationToken) => { await SafeFileSystem.WriteTextAsync( context, ((SandboxPathValue)args[0]).Value, ((StringValue)args[1]).Value, cancellationToken).ConfigureAwait(false); return SandboxValue.Unit; }, CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)))
 public static BindingRegistryBuilder AddDefaultPureBindings(this BindingRegistryBuilder builder)
 public static BindingRegistryBuilder AddFileBindings(this BindingRegistryBuilder builder)
 public static BindingRegistryBuilder AddLogBindings(this BindingRegistryBuilder builder)
 public static BindingRegistryBuilder AddRandomBindings(this BindingRegistryBuilder builder)
 public static BindingRegistryBuilder AddTimeBindings(this BindingRegistryBuilder builder)
+public static bool AsBool(SandboxValue value) => ((BoolValue)value).Value
 public static bool CanBulkChargeBindingCalls(SandboxContext context, string id, int count)
 public static bool CanBulkChargeBindingCallsScaled( SandboxContext context, string id, int iterations, int callsPerIteration)
 public static bool CanBulkChargeFuel(SandboxContext context, long fuelPerUnit, int count)
@@ -23,22 +24,50 @@ public static bool CanBulkChargeLoopIterationsAndFuel( SandboxContext context, i
 public static bool CanBulkChargeSandboxValue(SandboxContext context, SandboxValue value, int count)
 public static bool CanUseModuloBranchAccumulatorRaw( SandboxContext context, int current, int iterations, int divisor, int match, int thenDelta, int elseDelta, int loopFuel, int thenFuel, int elseFuel)
 public static bool CanUseModuloIndexAccumulatorRaw( SandboxContext context, int current, int index, int end, int divisor, int conditionFuel, int loopFuel)
+public static bool EqF64Raw(double left, double right) => left == right
+public static bool EqI32Raw(int left, int right) => left == right
+public static bool EqI64Raw(long left, long right) => left == right
+public static bool GteF64Raw(double left, double right) => left >= right
+public static bool GteI32Raw(int left, int right) => left >= right
+public static bool GteI64Raw(long left, long right) => left >= right
+public static bool GtF64Raw(double left, double right) => left > right
+public static bool GtI32Raw(int left, int right) => left > right
+public static bool GtI64Raw(long left, long right) => left > right
+public static bool LteF64Raw(double left, double right) => left <= right
+public static bool LteI32Raw(int left, int right) => left <= right
+public static bool LteI64Raw(long left, long right) => left <= right
+public static bool LtF64Raw(double left, double right) => left < right
+public static bool LtI32Raw(int left, int right) => left < right
+public static bool LtI64Raw(long left, long right) => left < right
+public static bool NeF64Raw(double left, double right) => left != right
+public static bool NeI32Raw(int left, int right) => left != right
+public static bool NeI64Raw(long left, long right) => left != right
 public static bool StringEqualsRaw(SandboxValue left, SandboxValue right)
 public static class DefaultSandboxBindings
 public static class MathBindings
 public static class SafeFileBindings
+public static class SafeFileSystem
 public static class SafeRandomBindings
 public static class SafeTimeBindings
 public static class StringBindings
+public static double AddF64Raw(double left, double right) => SandboxFloat64Math.Add(left, right)
 public static double AsF64(SandboxValue value) => ((F64Value)value).Value
 public static double CeilF64Raw(double value) => Math.Ceiling(value)
+public static double DivF64Raw(double left, double right) => SandboxFloat64Math.Divide(left, right)
 public static double FloorF64Raw(double value) => Math.Floor(value)
+public static double MulF64Raw(double left, double right) => SandboxFloat64Math.Multiply(left, right)
 public static double RoundF64Raw(double value) => Math.Round(value, MidpointRounding.ToEven)
 public static double SqrtF64Raw(double value)
+public static double SubF64Raw(double left, double right) => SandboxFloat64Math.Subtract(left, right)
+public static int AbsI32Raw(int value) => value == int.MinValue ? throw InvalidInput("math.abs overflow") : Math.Abs(value)
 public static int AccumulateLinearI32(SandboxContext context, int total, int inv, int iterations, int fuelPerIteration)
+public static int AddI32Raw(int left, int right) => SandboxInt32Math.Add(left, right)
 public static int AddModuloBranchDeltasI32LoopRaw( SandboxContext context, int current, int iterations, int divisor, int match, int thenDelta, int elseDelta, int loopFuel, int thenFuel, int elseFuel)
 public static int AddModuloIndexAccumulatorI32LoopRaw( SandboxContext context, int current, int index, int end, int divisor, int conditionFuel, int loopFuel)
+public static int AddRemI32Raw(int left, int right, int divisor) => SandboxInt32Math.Remainder(SandboxInt32Math.Add(left, right), divisor)
+public static int AsI32(SandboxValue value) => ((I32Value)value).Value
 public static int ClampI32Raw(int value, int min, int max)
+public static int DivI32Raw(int left, int right) => SandboxInt32Math.Divide(left, right)
 public static int ListCountRaw(SandboxValue value)
 public static int ListGetI32Raw(SandboxValue value, int index)
 public static int ListI32ReaderAddRemainderCycleFromZeroRaw( SandboxContext context, object reader, int current, int iterations, int divisor, int loopFuelPerIteration, long readFuel)
@@ -46,15 +75,26 @@ public static int ListI32ReaderGetRaw(object reader, int index)
 public static int ListI32ReaderGetRemainderRaw(object reader, int value, int divisor)
 public static int MapCountRaw(SandboxValue value)
 public static int MapGetI32Raw(SandboxValue value, SandboxValue key)
+public static int MaxI32Raw(int left, int right) => Math.Max(left, right)
+public static int MinI32Raw(int left, int right) => Math.Min(left, right)
+public static int MulI32Raw(int left, int right) => SandboxInt32Math.Multiply(left, right)
+public static int NegI32Raw(int value) => SandboxInt32Math.Negate(value)
+public static int RemI32Raw(int left, int right) => SandboxInt32Math.Remainder(left, right)
 public static int StringLengthRaw(SandboxValue value) => ((StringValue)value).Value.Length
+public static int SubI32Raw(int left, int right) => SandboxInt32Math.Subtract(left, right)
 public static IReadOnlyList<BindingDescriptor> All { get; } = [
+public static long AddI64Raw(long left, long right) => SandboxInt64Math.Add(left, right)
 public static long AsI64(SandboxValue value) => ((I64Value)value).Value
+public static long DivI64Raw(long left, long right) => SandboxInt64Math.Divide(left, right)
 public static long ListReadFuelRaw(int count) => SandboxCollectionFuel.Read(count)
+public static long MulI64Raw(long left, long right) => SandboxInt64Math.Multiply(left, right)
+public static long NegI64Raw(long value) => SandboxInt64Math.Negate(value)
+public static long RemI64Raw(long left, long right) => SandboxInt64Math.Remainder(left, right)
+public static long SubI64Raw(long left, long right) => SandboxInt64Math.Subtract(left, right)
 public static object CreateMeteredListI32ReaderRaw(SandboxContext context, SandboxValue value)
 public static object ListI32ReaderRaw(SandboxValue value)
 public static partial class AuditTextSanitizer
 public static partial class CompiledRuntime
-public static partial class SafeFileSystem
 public static partial class SafeLogBindings
 public static SandboxType TypeList(SandboxType itemType) => SandboxType.List(itemType)
 public static SandboxType TypeMap(SandboxType keyType, SandboxType valueType) => SandboxType.Map(keyType, valueType)
@@ -66,6 +106,7 @@ public static SandboxValue AbsI32(SandboxValue value)
 public static SandboxValue Add(SandboxValue left, SandboxValue right) => SandboxNumericOperations.Add(left, right)
 public static SandboxValue AddI32(SandboxValue left, SandboxValue right) => I32(SandboxInt32Math.Add(AsI32(left), AsI32(right)))
 public static SandboxValue And(SandboxValue left, SandboxValue right) => Bool(AsBool(left) && AsBool(right))
+public static SandboxValue Bool(bool value) => SandboxValue.FromBool(value)
 public static SandboxValue CallBinding(SandboxContext context, string id, SandboxValue[] args)
 public static SandboxValue CallBinding1(SandboxContext context, string id, SandboxValue arg0)
 public static SandboxValue CallBinding2(SandboxContext context, string id, SandboxValue arg0, SandboxValue arg1)
@@ -83,6 +124,7 @@ public static SandboxValue Gte(SandboxValue left, SandboxValue right) => Sandbox
 public static SandboxValue GteI32(SandboxValue left, SandboxValue right) => Bool(AsI32(left) >= AsI32(right))
 public static SandboxValue GtI32(SandboxValue left, SandboxValue right) => Bool(AsI32(left) > AsI32(right))
 public static SandboxValue GuidLiteralValue(string value)
+public static SandboxValue I32(int value) => SandboxValue.FromInt32(value)
 public static SandboxValue I64(long value) => SandboxValue.FromInt64(value)
 public static SandboxValue Int32ToStringInvariant(SandboxContext context, SandboxValue value)
 public static SandboxValue ListAdd(SandboxContext context, SandboxValue list, SandboxValue item)
@@ -135,13 +177,18 @@ public static SandboxValue[] CreateLiteralValueArray(int count)
 public static SandboxValue[] CreateValueArray(SandboxContext context, int count)
 public static string RedactPathSegments(string path)
 public static string SanitizeAndRedact(string message)
+public static void ChargeBindingCall(SandboxContext context, string id) => context.ChargeBindingCall(context.GetBindingDescriptor(id))
 public static void ChargeBindingCalls(SandboxContext context, string id, int count)
 public static void ChargeBindingCallsScaled( SandboxContext context, string id, int iterations, int callsPerIteration)
 public static void ChargeBulkFuel(SandboxContext context, long fuelPerUnit, int count)
+public static void ChargeFuel(SandboxContext context, int amount) => context.ChargeFuel(amount)
 public static void ChargeFuel64(SandboxContext context, long amount) => context.ChargeFuel(amount)
+public static void ChargeLoopIteration(SandboxContext context, int fuelAmount) => context.ChargeLoopIteration(fuelAmount)
 public static void ChargeSandboxValue(SandboxContext context, SandboxValue value) => context.ChargeValue(value)
 public static void ChargeSandboxValues(SandboxContext context, SandboxValue value, int count)
 public static void ChargeValueArray(SandboxContext context, int count)
 public static void EnterCall(SandboxContext context) => context.EnterCall()
+public static void EnterInlineCall(SandboxContext context) => context.EnterCall()
 public static void ExitCall(SandboxContext context) => context.ExitCall()
+public static void ExitInlineCall(SandboxContext context) => context.ExitCall()
 public static void ValidateEntrypointInput(SandboxValue input, int parameterCount)

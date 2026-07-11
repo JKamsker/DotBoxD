@@ -175,139 +175,27 @@ internal sealed class ExpressionEmitter
             return StackKind.Boxed;
         }
 
-        if (binary.Operator is "+" or "-" or "*" or "/" or "%" && _stackPlan.Infer(binary.Left) is { Name: "I32" })
+        if (BinaryRuntimeCalls.TryGetRaw(
+            binary.Operator,
+            _stackPlan.Infer(binary.Left),
+            _stackPlan.Infer(binary.Right),
+            out var raw))
         {
-            EmitAs(binary.Left, StackKind.I32);
-            EmitAs(binary.Right, StackKind.I32);
-            var raw = binary.Operator switch
-            {
-                "+" => nameof(Kernels.Runtime.CompiledRuntime.AddI32Raw),
-                "-" => nameof(Kernels.Runtime.CompiledRuntime.SubI32Raw),
-                "*" => nameof(Kernels.Runtime.CompiledRuntime.MulI32Raw),
-                "/" => nameof(Kernels.Runtime.CompiledRuntime.DivI32Raw),
-                "%" => nameof(Kernels.Runtime.CompiledRuntime.RemI32Raw),
-                _ => throw Unsupported("operator not supported by compiler")
-            };
-            _il.Emit(OpCodes.Call, Runtime(raw));
-            return StackKind.I32;
+            EmitAs(binary.Left, raw.LeftKind);
+            EmitAs(binary.Right, raw.RightKind);
+            _il.Emit(OpCodes.Call, Runtime(raw.RuntimeMethod));
+            return raw.ResultKind;
         }
 
-        if (binary.Operator is "+" or "-" or "*" or "/" or "%" &&
-            _stackPlan.Infer(binary.Left) is { Name: "I64" } &&
-            _stackPlan.Infer(binary.Right) is { Name: "I64" })
+        if (BinaryRuntimeCalls.TryGetBoxed(binary.Operator, out var method))
         {
-            EmitAs(binary.Left, StackKind.I64);
-            EmitAs(binary.Right, StackKind.I64);
-            var raw = binary.Operator switch
-            {
-                "+" => nameof(Kernels.Runtime.CompiledRuntime.AddI64Raw),
-                "-" => nameof(Kernels.Runtime.CompiledRuntime.SubI64Raw),
-                "*" => nameof(Kernels.Runtime.CompiledRuntime.MulI64Raw),
-                "/" => nameof(Kernels.Runtime.CompiledRuntime.DivI64Raw),
-                "%" => nameof(Kernels.Runtime.CompiledRuntime.RemI64Raw),
-                _ => throw Unsupported("operator not supported by compiler")
-            };
-            _il.Emit(OpCodes.Call, Runtime(raw));
-            return StackKind.I64;
+            EmitAs(binary.Left, StackKind.Boxed);
+            EmitAs(binary.Right, StackKind.Boxed);
+            _il.Emit(OpCodes.Call, Runtime(method));
+            return StackKind.Boxed;
         }
 
-        if (binary.Operator is "+" or "-" or "*" or "/" &&
-            _stackPlan.Infer(binary.Left) is { Name: "F64" } &&
-            _stackPlan.Infer(binary.Right) is { Name: "F64" })
-        {
-            EmitAs(binary.Left, StackKind.F64);
-            EmitAs(binary.Right, StackKind.F64);
-            var raw = binary.Operator switch
-            {
-                "+" => nameof(Kernels.Runtime.CompiledRuntime.AddF64Raw),
-                "-" => nameof(Kernels.Runtime.CompiledRuntime.SubF64Raw),
-                "*" => nameof(Kernels.Runtime.CompiledRuntime.MulF64Raw),
-                "/" => nameof(Kernels.Runtime.CompiledRuntime.DivF64Raw),
-                _ => throw Unsupported("operator not supported by compiler")
-            };
-            _il.Emit(OpCodes.Call, Runtime(raw));
-            return StackKind.F64;
-        }
-
-        if (binary.Operator is "==" or "!=" or "<" or "<=" or ">" or ">=" &&
-            _stackPlan.Infer(binary.Left) is { Name: "I32" } &&
-            _stackPlan.Infer(binary.Right) is { Name: "I32" })
-        {
-            EmitAs(binary.Left, StackKind.I32);
-            EmitAs(binary.Right, StackKind.I32);
-            var raw = binary.Operator switch
-            {
-                "<" => nameof(Kernels.Runtime.CompiledRuntime.LtI32Raw),
-                "<=" => nameof(Kernels.Runtime.CompiledRuntime.LteI32Raw),
-                ">" => nameof(Kernels.Runtime.CompiledRuntime.GtI32Raw),
-                ">=" => nameof(Kernels.Runtime.CompiledRuntime.GteI32Raw),
-                "==" => nameof(Kernels.Runtime.CompiledRuntime.EqI32Raw),
-                "!=" => nameof(Kernels.Runtime.CompiledRuntime.NeI32Raw),
-                _ => throw Unsupported("operator not supported by compiler")
-            };
-            _il.Emit(OpCodes.Call, Runtime(raw));
-            return StackKind.Bool;
-        }
-
-        if (binary.Operator is "==" or "!=" or "<" or "<=" or ">" or ">=" &&
-            _stackPlan.Infer(binary.Left) is { Name: "I64" } &&
-            _stackPlan.Infer(binary.Right) is { Name: "I64" })
-        {
-            EmitAs(binary.Left, StackKind.I64);
-            EmitAs(binary.Right, StackKind.I64);
-            var raw = binary.Operator switch
-            {
-                "<" => nameof(Kernels.Runtime.CompiledRuntime.LtI64Raw),
-                "<=" => nameof(Kernels.Runtime.CompiledRuntime.LteI64Raw),
-                ">" => nameof(Kernels.Runtime.CompiledRuntime.GtI64Raw),
-                ">=" => nameof(Kernels.Runtime.CompiledRuntime.GteI64Raw),
-                "==" => nameof(Kernels.Runtime.CompiledRuntime.EqI64Raw),
-                "!=" => nameof(Kernels.Runtime.CompiledRuntime.NeI64Raw),
-                _ => throw Unsupported("operator not supported by compiler")
-            };
-            _il.Emit(OpCodes.Call, Runtime(raw));
-            return StackKind.Bool;
-        }
-
-        if (binary.Operator is "==" or "!=" or "<" or "<=" or ">" or ">=" &&
-            _stackPlan.Infer(binary.Left) is { Name: "F64" } &&
-            _stackPlan.Infer(binary.Right) is { Name: "F64" })
-        {
-            EmitAs(binary.Left, StackKind.F64);
-            EmitAs(binary.Right, StackKind.F64);
-            var raw = binary.Operator switch
-            {
-                "<" => nameof(Kernels.Runtime.CompiledRuntime.LtF64Raw),
-                "<=" => nameof(Kernels.Runtime.CompiledRuntime.LteF64Raw),
-                ">" => nameof(Kernels.Runtime.CompiledRuntime.GtF64Raw),
-                ">=" => nameof(Kernels.Runtime.CompiledRuntime.GteF64Raw),
-                "==" => nameof(Kernels.Runtime.CompiledRuntime.EqF64Raw),
-                "!=" => nameof(Kernels.Runtime.CompiledRuntime.NeF64Raw),
-                _ => throw Unsupported("operator not supported by compiler")
-            };
-            _il.Emit(OpCodes.Call, Runtime(raw));
-            return StackKind.Bool;
-        }
-
-        EmitAs(binary.Left, StackKind.Boxed);
-        EmitAs(binary.Right, StackKind.Boxed);
-        var method = binary.Operator switch
-        {
-            "+" => nameof(Kernels.Runtime.CompiledRuntime.Add),
-            "-" => nameof(Kernels.Runtime.CompiledRuntime.Sub),
-            "*" => nameof(Kernels.Runtime.CompiledRuntime.Mul),
-            "/" => nameof(Kernels.Runtime.CompiledRuntime.Div),
-            "%" => nameof(Kernels.Runtime.CompiledRuntime.Rem),
-            "==" => nameof(Kernels.Runtime.CompiledRuntime.Eq),
-            "!=" => nameof(Kernels.Runtime.CompiledRuntime.Ne),
-            "<" => nameof(Kernels.Runtime.CompiledRuntime.Lt),
-            "<=" => nameof(Kernels.Runtime.CompiledRuntime.Lte),
-            ">" => nameof(Kernels.Runtime.CompiledRuntime.Gt),
-            ">=" => nameof(Kernels.Runtime.CompiledRuntime.Gte),
-            _ => throw Unsupported("operator not supported by compiler")
-        };
-        _il.Emit(OpCodes.Call, Runtime(method));
-        return StackKind.Boxed;
+        throw Unsupported("operator not supported by compiler");
     }
 
     private void EmitCall(CallExpression call)

@@ -5,10 +5,42 @@ namespace DotBoxD.Kernels.Sandbox;
 public static class SandboxCollectionFuel
 {
     private const long BaseCost = 2;
+    private static readonly HashSet<string> CollectionIntrinsics = new(StringComparer.Ordinal)
+    {
+        "list.empty",
+        "list.of",
+        "list.count",
+        "list.get",
+        "list.add",
+        "map.empty",
+        "map.containsKey",
+        "map.get",
+        "map.set",
+        "map.remove"
+    };
+
+    private static readonly HashSet<string> EmptyCalls = new(StringComparer.Ordinal)
+    {
+        "list.empty",
+        "map.empty"
+    };
+
+    private static readonly HashSet<string> ReadCalls = new(StringComparer.Ordinal)
+    {
+        "list.count",
+        "list.get",
+        "map.containsKey",
+        "map.get"
+    };
+
+    private static readonly HashSet<string> AddCalls = new(StringComparer.Ordinal)
+    {
+        "list.add",
+        "map.set"
+    };
 
     public static bool IsCollectionIntrinsic(string callName)
-        => callName is "list.empty" or "list.of" or "list.count" or "list.get" or "list.add"
-            or "map.empty" or "map.containsKey" or "map.get" or "map.set" or "map.remove";
+        => CollectionIntrinsics.Contains(callName);
 
     public static long Empty() => BaseCost;
 
@@ -31,15 +63,29 @@ public static class SandboxCollectionFuel
             minimumOne);
 
     public static long EstimateCall(string callName, int argumentCount)
-        => callName switch
+    {
+        if (EmptyCalls.Contains(callName))
         {
-            "list.empty" or "map.empty" => Empty(),
-            "list.of" => Copy(argumentCount),
-            "list.count" or "list.get" or "map.containsKey" or "map.get" => Read(),
-            "list.add" or "map.set" => Copy(argumentCount, addedCount: 1),
-            "map.remove" => Copy(argumentCount),
-            _ => 0
-        };
+            return Empty();
+        }
+
+        if (string.Equals(callName, "list.of", StringComparison.Ordinal))
+        {
+            return Copy(argumentCount);
+        }
+
+        if (ReadCalls.Contains(callName))
+        {
+            return Read();
+        }
+
+        if (AddCalls.Contains(callName))
+        {
+            return Copy(argumentCount, addedCount: 1);
+        }
+
+        return string.Equals(callName, "map.remove", StringComparison.Ordinal) ? Copy(argumentCount) : 0;
+    }
 
     private static long AllocationBytes(long elementCount, int bytesPerElement, bool minimumOne)
     {

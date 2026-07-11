@@ -14,10 +14,12 @@ The communication substrate is deliberately separated from Services and Kernels:
   - `DotBoxD.Transports.NamedPipes` — local-machine IPC.
   - an in-process channel is used by tests/benchmarks.
 - **Codecs** — wire serialization behind a codec abstraction:
-  - `DotBoxD.Codecs.MessagePack` — compact binary, zero-reflection with the generated formatters.
+  - `DotBoxD.Codecs.MessagePack` — compact binary with hardened DotBoxD envelope formatters.
 
-All of these target **netstandard2.1** (Unity/IL2CPP friendly). A connection handshake negotiates
-protocol version, framing limits, and codec.
+All of these target **netstandard2.1**. The current wire does **not** negotiate protocol version,
+framing limits, codec, or contracts: both peers must be configured compatibly before connecting. Use
+`RpcContractManifest.Fingerprint` in an application-level readiness exchange when deployments need an
+explicit contract check.
 
 ## Why the stack is transport/codec-neutral (and when to pick each transport)
 
@@ -69,12 +71,10 @@ Grounded aspects:
 - **Codec neutrality is the same trick applied to bytes.** `RpcPeer`/`RpcHost` take an `ISerializer`;
   swapping codecs is passing a different one. The
   [MessagePack codec](https://github.com/JKamsker/DotBoxD/blob/main/src/Channels/DotBoxD.Codecs.MessagePack/MessagePackRpcSerializer.cs)
-  is zero-reflection *by design* — it composes DotBoxD's own binary formatters ahead of the standard
-  resolvers and hardens the boundary with `MessagePackSecurity.UntrustedData` (validate untrusted input
-  at the edge). A `CreateUnityCompatible()` variant swaps in a contractless resolver for attribute-free
-  DTOs. Zero runtime reflection is what makes both the codec swap and the transport swap safe under
-  Unity/IL2CPP AOT (see [unity-integration](/channels/unity-integration/)); the `netstandard2.1`
-  target above is the same story.
+  composes DotBoxD's binary envelope formatters ahead of MessagePack resolvers and enables
+  `MessagePackSecurity.UntrustedData`. Its default and `CreateUnityCompatible()` resolver chains include
+  reflection-capable standard/contractless fallbacks; they are **not** an IL2CPP guarantee. For AOT,
+  generate DTO formatters and pass only the generated/static resolver through `CreateWithResolver`.
 
 ### When to reach for each transport
 
@@ -83,7 +83,7 @@ Grounded aspects:
 | **Named pipes** (`DotBoxD.Transports.NamedPipes`) | Same machine, cross-process IPC | Separate package so TCP-only hosts take no pipe dependency; duplex, so one pipe can both serve and call. See [named-pipe transport](/channels/named-pipe-transport/). |
 | **TCP** (`DotBoxD.Transports.Tcp`) | Cross-host / over the network | Default [quick-start](/channels/quick-start/) transport; faces untrusted networks, so `TcpConnection` ships a slow-loris defense (`DefaultFrameReadIdleTimeout`, 30s). |
 | **WebSocket** (you implement it) | Browser clients, Unity WebGL, or HTTP-based connectivity | Not shipped — implement the three interfaces from the [WebSocket guide](/channels/websocket-setup/). |
-| **In-process** (in-memory `IRpcChannel`) | Tests and benchmarks, no OS transport | Lives in test/benchmark code, not a shipped `src/` package. |
+| **In-process** (`InMemoryRpcChannel`) | Tests and benchmarks, no OS transport | Shipped in `DotBoxD.Services.Testing`, with `FaultInjectingRpcChannel` for deterministic failures. |
 
 Backpressure and the near-zero-allocation `ValueTask<T>` path are peer options, orthogonal to the
 transport you pick — see [performance](/channels/performance/).

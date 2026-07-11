@@ -35,12 +35,18 @@ internal sealed class I64ExpressionPlan
             ExpressionKind.Literal => _literal,
             ExpressionKind.RawVariable => frame.ReadRawInt64Slot(_slot),
             ExpressionKind.Negate => SandboxInt64Math.Negate(_left!.Evaluate(frame)),
+            ExpressionKind.RemainderByConst => FastRemainder(_left!.Evaluate(frame), _literal, _magic),
+            _ => EvaluateBinary(frame)
+        };
+
+    private long EvaluateBinary(InterpreterFrame frame)
+        => _kind switch
+        {
             ExpressionKind.Add => SandboxInt64Math.Add(_left!.Evaluate(frame), _right!.Evaluate(frame)),
             ExpressionKind.Subtract => SandboxInt64Math.Subtract(_left!.Evaluate(frame), _right!.Evaluate(frame)),
             ExpressionKind.Multiply => SandboxInt64Math.Multiply(_left!.Evaluate(frame), _right!.Evaluate(frame)),
             ExpressionKind.Divide => SandboxInt64Math.Divide(_left!.Evaluate(frame), _right!.Evaluate(frame)),
             ExpressionKind.Remainder => SandboxInt64Math.Remainder(_left!.Evaluate(frame), _right!.Evaluate(frame)),
-            ExpressionKind.RemainderByConst => FastRemainder(_left!.Evaluate(frame), _literal, _magic),
             _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported i64 expression"))
         };
 
@@ -71,36 +77,128 @@ internal sealed class I64ExpressionPlan
         System.Func<int, bool> canReadSlot,
         out I64ExpressionPlan plan)
     {
-        switch (expression)
+        if (TryCreateLiteral(expression, out plan))
         {
-            case LiteralExpression { Value: I64Value value }:
-                plan = new I64ExpressionPlan(ExpressionKind.Literal, literal: value.Value);
-                return true;
-            case VariableExpression variable:
-                var slot = frame.GetSlot(variable.Name);
-                if (!frame.IsI64Slot(slot) || !canReadSlot(slot))
-                {
-                    plan = null!;
-                    return false;
-                }
-
-                plan = new I64ExpressionPlan(ExpressionKind.RawVariable, slot);
-                return true;
-            case UnaryExpression { Operator: "-" } unary when TryCreate(unary.Operand, frame, canReadSlot, out var operand):
-                plan = new I64ExpressionPlan(ExpressionKind.Negate, left: operand);
-                return true;
-            case BinaryExpression { Operator: "%", Right: LiteralExpression { Value: I64Value divisor } } modByConst
-                when divisor.Value > 0 && TryCreate(modByConst.Left, frame, canReadSlot, out var dividend):
-                plan = new I64ExpressionPlan(ExpressionKind.RemainderByConst, literal: divisor.Value, magic: MagicFor(divisor.Value), left: dividend);
-                return true;
-            case BinaryExpression { Operator: "+" or "-" or "*" or "/" or "%" } binary
-                when TryCreate(binary.Left, frame, canReadSlot, out var left) && TryCreate(binary.Right, frame, canReadSlot, out var right):
-                plan = new I64ExpressionPlan(BinaryKind(binary.Operator), left: left, right: right);
-                return true;
-            default:
-                plan = null!;
-                return false;
+            return true;
         }
+
+        if (TryCreateVariable(expression, frame, canReadSlot, out plan))
+        {
+            return true;
+        }
+
+        if (TryCreateUnary(expression, frame, canReadSlot, out plan))
+        {
+            return true;
+        }
+
+        return TryCreateBinary(expression, frame, canReadSlot, out plan);
+    }
+
+    private static bool TryCreateLiteral(Expression expression, out I64ExpressionPlan plan)
+    {
+        if (expression is LiteralExpression { Value: I64Value value })
+        {
+            plan = new I64ExpressionPlan(ExpressionKind.Literal, literal: value.Value);
+            return true;
+        }
+
+        plan = null!;
+        return false;
+    }
+
+    private static bool TryCreateVariable(
+        Expression expression,
+        InterpreterFrame frame,
+        Func<int, bool> canReadSlot,
+        out I64ExpressionPlan plan)
+    {
+        if (expression is not VariableExpression variable)
+        {
+            plan = null!;
+            return false;
+        }
+
+        var slot = frame.GetSlot(variable.Name);
+        if (!frame.IsI64Slot(slot) || !canReadSlot(slot))
+        {
+            plan = null!;
+            return false;
+        }
+
+        plan = new I64ExpressionPlan(ExpressionKind.RawVariable, slot);
+        return true;
+    }
+
+    private static bool TryCreateUnary(
+        Expression expression,
+        InterpreterFrame frame,
+        Func<int, bool> canReadSlot,
+        out I64ExpressionPlan plan)
+    {
+        if (expression is UnaryExpression { Operator: "-" } unary &&
+            TryCreate(unary.Operand, frame, canReadSlot, out var operand))
+        {
+            plan = new I64ExpressionPlan(ExpressionKind.Negate, left: operand);
+            return true;
+        }
+
+        plan = null!;
+        return false;
+    }
+
+    private static bool TryCreateBinary(
+        Expression expression,
+        InterpreterFrame frame,
+        Func<int, bool> canReadSlot,
+        out I64ExpressionPlan plan)
+    {
+        if (TryCreateRemainderByConstant(expression, frame, canReadSlot, out plan))
+        {
+            return true;
+        }
+
+        if (expression is not BinaryExpression { Operator: "+" or "-" or "*" or "/" or "%" } binary)
+        {
+            plan = null!;
+            return false;
+        }
+
+        if (!TryCreate(binary.Left, frame, canReadSlot, out var left) ||
+            !TryCreate(binary.Right, frame, canReadSlot, out var right))
+        {
+            plan = null!;
+            return false;
+        }
+
+        plan = new I64ExpressionPlan(BinaryKind(binary.Operator), left: left, right: right);
+        return true;
+    }
+
+    private static bool TryCreateRemainderByConstant(
+        Expression expression,
+        InterpreterFrame frame,
+        Func<int, bool> canReadSlot,
+        out I64ExpressionPlan plan)
+    {
+        if (expression is BinaryExpression
+            {
+                Operator: "%",
+                Right: LiteralExpression { Value: I64Value divisor }
+            } modByConst &&
+            divisor.Value > 0 &&
+            TryCreate(modByConst.Left, frame, canReadSlot, out var dividend))
+        {
+            plan = new I64ExpressionPlan(
+                ExpressionKind.RemainderByConst,
+                literal: divisor.Value,
+                magic: MagicFor(divisor.Value),
+                left: dividend);
+            return true;
+        }
+
+        plan = null!;
+        return false;
     }
 
     private static ExpressionKind BinaryKind(string op)

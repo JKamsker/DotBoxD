@@ -162,16 +162,43 @@ internal static partial class DotBoxDKernelMethodInliner
 
         return member.Name.Identifier.ValueText switch
         {
-            "List" when args.Length == 1 && SandboxTypeExpressionShape(args[0]) is { } item =>
-                DescriptorShape.Composite(DotBoxDGenerationNames.ManifestTypes.List, [item]),
-            "Map" when args.Length == 2 &&
-                SandboxTypeExpressionShape(args[0]) is { } key &&
-                SandboxTypeExpressionShape(args[1]) is { } value =>
-                DescriptorShape.Composite(DotBoxDGenerationNames.ManifestTypes.Map, [key, value]),
-            "Record" when args.Length == 1 && RecordFields(args[0]) is { } fields =>
-                DescriptorShape.Composite(DotBoxDGenerationNames.ManifestTypes.Record, fields),
+            "List" => SandboxTypeListShape(args),
+            "Map" => SandboxTypeMapShape(args),
+            "Record" => SandboxTypeRecordShape(args),
             _ => null
         };
+    }
+
+    private static DescriptorShape? SandboxTypeListShape(ExpressionSyntax[] args)
+    {
+        if (args.Length != 1 || SandboxTypeExpressionShape(args[0]) is not { } item)
+        {
+            return null;
+        }
+
+        return DescriptorShape.Composite(DotBoxDGenerationNames.ManifestTypes.List, [item]);
+    }
+
+    private static DescriptorShape? SandboxTypeMapShape(ExpressionSyntax[] args)
+    {
+        if (args.Length != 2 ||
+            SandboxTypeExpressionShape(args[0]) is not { } key ||
+            SandboxTypeExpressionShape(args[1]) is not { } value)
+        {
+            return null;
+        }
+
+        return DescriptorShape.Composite(DotBoxDGenerationNames.ManifestTypes.Map, [key, value]);
+    }
+
+    private static DescriptorShape? SandboxTypeRecordShape(ExpressionSyntax[] args)
+    {
+        if (args.Length != 1 || RecordFields(args[0]) is not { } fields)
+        {
+            return null;
+        }
+
+        return DescriptorShape.Composite(DotBoxDGenerationNames.ManifestTypes.Record, fields);
     }
 
     private static ExpressionSyntax[]? SandboxTypeArguments(InvocationExpressionSyntax invocation)

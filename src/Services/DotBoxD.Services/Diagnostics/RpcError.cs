@@ -46,9 +46,14 @@ internal static class RpcErrors
 
             if (transformed is { } info)
             {
+                if (string.IsNullOrWhiteSpace(info.Message))
+                {
+                    return new RpcError("Internal error.", RpcErrorTypes.InternalError);
+                }
+
                 return new RpcError(
-                    Truncate(info.Message ?? string.Empty),
-                    string.IsNullOrEmpty(info.Type) ? RpcErrorTypes.InternalError : Truncate(info.Type));
+                    Truncate(info.Message),
+                    string.IsNullOrWhiteSpace(info.Type) ? RpcErrorTypes.InternalError : Truncate(info.Type));
             }
         }
 

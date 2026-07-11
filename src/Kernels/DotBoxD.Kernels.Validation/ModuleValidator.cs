@@ -1,6 +1,7 @@
 using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Validation.Bindings;
 using DotBoxD.Kernels.Validation.Model;
 
 namespace DotBoxD.Kernels.Validation;
@@ -9,6 +10,8 @@ using DotBoxD.Kernels;
 
 public sealed class ModuleValidator
 {
+    private const string DotBoxDRequiredCapabilitiesMetadataKey = "dotboxd.requiredCapabilities";
+
     private static readonly IReadOnlySet<string> NoDeclaredOpaqueIdTypes =
         new HashSet<string>(StringComparer.Ordinal);
 
@@ -36,6 +39,7 @@ public sealed class ModuleValidator
 
         var diagnostics = new List<SandboxDiagnostic>();
         StructuralValidator.Validate(module, diagnostics, declaredOpaqueIdTypes);
+        CatalogBindingSignatureValidator.ValidateCatalog(bindings, diagnostics);
         if (diagnostics.Count > 0)
         {
             return ModuleValidationResult.Failure(diagnostics);
@@ -47,10 +51,16 @@ public sealed class ModuleValidator
         SandboxEffect requiredEffects;
         try
         {
+            bindingReferences = BindingReferenceCollector.CollectByFunction(module, bindings);
+            CatalogBindingSignatureValidator.ValidateReferenced(module, bindingReferences, bindings, diagnostics);
+            if (diagnostics.Count > 0)
+            {
+                return ModuleValidationResult.Failure(diagnostics);
+            }
+
             var analyzer = new FunctionAnalyzer(module, bindings, diagnostics, declaredOpaqueIdTypes);
             functions = analyzer.AnalyzeAll();
             requiredEffects = RequiredEffects(module, functions);
-            bindingReferences = BindingReferenceCollector.CollectByFunction(module, bindings);
             requiredCapabilities = RequiredCapabilities(module, bindings, bindingReferences);
             PolicyResolver.Validate(module, bindings, policy, requiredEffects, requiredCapabilities, diagnostics);
         }
@@ -91,6 +101,7 @@ public sealed class ModuleValidator
         IReadOnlyDictionary<string, IReadOnlySet<string>> bindingReferences)
     {
         var required = new HashSet<string>(StringComparer.Ordinal);
+        AddModuleRequiredCapabilityMetadata(module, required);
         foreach (var function in module.Functions)
         {
             if (!function.IsEntrypoint)
@@ -123,6 +134,22 @@ public sealed class ModuleValidator
         }
 
         return required;
+    }
+
+    private static void AddModuleRequiredCapabilityMetadata(
+        SandboxModule module,
+        HashSet<string> required)
+    {
+        if (!module.Metadata.TryGetValue(DotBoxDRequiredCapabilitiesMetadataKey, out var metadata) ||
+            string.IsNullOrWhiteSpace(metadata))
+        {
+            return;
+        }
+
+        foreach (var capability in metadata.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            required.Add(capability);
+        }
     }
 
     private static bool RequiresRuntimeAsync(BindingSignature binding)

@@ -5,7 +5,7 @@ namespace DotBoxD.Hosting;
 
 using DotBoxD.Kernels;
 
-internal sealed partial class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
+internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
 {
     public async ValueTask<SandboxExecutionResult> ExecuteAsync(
         ExecutionPlan plan,
@@ -58,7 +58,7 @@ internal sealed partial class SandboxWorkerExecutor(ConfiguredSandboxWorker? wor
                     WorkerCancellationOrTimeoutError(cancellationToken));
             }
 
-            return ValidateWorkerResult(plan, entrypoint, options, result, out var error)
+            return SandboxWorkerResultValidator.Validate(plan, entrypoint, options, result, out var error)
                 ? result with
                 {
                     AuditEvents = result.AuditEvents.ToSequencedArray(),

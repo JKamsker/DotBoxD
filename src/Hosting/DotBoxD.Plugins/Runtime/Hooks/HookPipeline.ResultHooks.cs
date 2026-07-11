@@ -11,24 +11,6 @@ public partial class HookPipeline<TEvent, TContext>
     private readonly Hooks.ResultHookSlot<TEvent, TContext> _resultHooks;
     private readonly Dictionary<Type, object> _resultDispatchOptions = [];
 
-    public HookPipeline<TEvent, TContext> Register<TResult>(Func<TEvent, TResult> handler, int priority = 0)
-        => throw Hooks.HookLowering.ResultNotLowered();
-
-    public HookPipeline<TEvent, TContext> Register<TResult>(
-        Func<TEvent, TContext, TResult> handler,
-        int priority = 0)
-        => throw Hooks.HookLowering.ResultNotLowered();
-
-    public HookPipeline<TEvent, TContext> RegisterLocal<TResult>(
-        Func<TEvent, TResult> handler,
-        int priority = 0)
-        => throw Hooks.HookLowering.ResultNotLowered();
-
-    public HookPipeline<TEvent, TContext> RegisterLocal<TResult>(
-        Func<TEvent, TContext, TResult> handler,
-        int priority = 0)
-        => throw Hooks.HookLowering.ResultNotLowered();
-
     public HookPipeline<TEvent, TContext> UseGeneratedResultChain<TResult>(PluginPackage package, int priority = 0)
         where TResult : struct, IHookResult
     {
@@ -175,7 +157,14 @@ public partial class HookPipeline<TEvent, TContext>
             typeof(TEvent),
             typeof(DotBoxD.Abstractions.HookAttribute),
             inherit: false);
-        if (hook is null || hook.ResultType == resultType)
+        if (hook is null)
+        {
+            throw ResultValidationError(
+                $"Hook context '{typeof(TEvent).FullName}' must declare [Hook] with a result type " +
+                $"before installing result hook '{resultType.FullName}'.");
+        }
+
+        if (hook.ResultType == resultType)
         {
             return;
         }

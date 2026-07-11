@@ -43,6 +43,11 @@ public static class RunSummaryAuditFields
         string? materializationStatus = null,
         bool executionDispatched = true)
     {
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(budget);
+        RequireDefinedMode(mode);
+        ArgumentException.ThrowIfNullOrWhiteSpace(cacheStatus);
+
         var fields = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["mode"] = mode.ToString(),
@@ -86,6 +91,14 @@ public static class RunSummaryAuditFields
         return fields;
     }
 
+    private static void RequireDefinedMode(ExecutionMode mode)
+    {
+        if (!Enum.IsDefined(mode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(mode), mode, "Run summary execution mode must be defined.");
+        }
+    }
+
     private static void AddIfPresent(IDictionary<string, string> fields, string key, string? value)
     {
         if (!string.IsNullOrWhiteSpace(value))
@@ -101,6 +114,21 @@ public static class RunSummaryAuditFields
             return Redacted;
         }
 
+        var span = TrimPolicyId(policyId);
+        if (!IsPolicyIdLengthAllowed(span.Length) ||
+            !IsPolicyIdTextSafe(policyId, span) ||
+            ContainsSecretMarker(policyId, span.Start, span.Length))
+        {
+            return Redacted;
+        }
+
+        return span.Start == 0 && span.Length == policyId.Length
+            ? policyId
+            : policyId.Substring(span.Start, span.Length);
+    }
+
+    private static PolicyIdSpan TrimPolicyId(string policyId)
+    {
         var start = 0;
         var end = policyId.Length - 1;
         while (start <= end && IsPolicyIdTrimChar(policyId[start]))
@@ -113,29 +141,24 @@ public static class RunSummaryAuditFields
             end--;
         }
 
-        var length = end - start + 1;
-        if (length is <= 0 or > 128)
-        {
-            return Redacted;
-        }
+        return new PolicyIdSpan(start, end - start + 1);
+    }
 
-        for (var i = start; i <= end; i++)
+    private static bool IsPolicyIdLengthAllowed(int length)
+        => length is > 0 and <= 128;
+
+    private static bool IsPolicyIdTextSafe(string policyId, PolicyIdSpan span)
+    {
+        for (var i = span.Start; i < span.Start + span.Length; i++)
         {
             var c = policyId[i];
             if (char.IsControl(c) || !IsPolicyIdChar(c))
             {
-                return Redacted;
+                return false;
             }
         }
 
-        if (ContainsSecretMarker(policyId, start, length))
-        {
-            return Redacted;
-        }
-
-        return start == 0 && length == policyId.Length
-            ? policyId
-            : policyId.Substring(start, length);
+        return true;
     }
 
     private static bool IsPolicyIdTrimChar(char c)
@@ -157,4 +180,6 @@ public static class RunSummaryAuditFields
 
         return false;
     }
+
+    private readonly record struct PolicyIdSpan(int Start, int Length);
 }

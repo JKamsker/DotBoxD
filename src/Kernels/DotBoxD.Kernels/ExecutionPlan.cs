@@ -46,7 +46,7 @@ public sealed class ExecutionPlan
         Policy = policy;
         Bindings = bindings;
         Budget = budget;
-        FunctionAnalysis = ModelCopy.Dictionary(functionAnalysis);
+        FunctionAnalysis = CopyFunctionAnalysis(functionAnalysis);
         BindingReferences = CopyBindingReferences(bindingReferences ?? BindingReferenceCollector.CollectByFunction(module, bindings));
     }
 
@@ -157,12 +157,56 @@ public sealed class ExecutionPlan
             hasHostBinding: true);
     }
 
+    private static IReadOnlyDictionary<string, FunctionAnalysis> CopyFunctionAnalysis(
+        IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis)
+    {
+        ArgumentNullException.ThrowIfNull(functionAnalysis);
+        var copy = new Dictionary<string, FunctionAnalysis>(functionAnalysis.Count, StringComparer.Ordinal);
+        foreach (var item in functionAnalysis)
+        {
+            if (string.IsNullOrWhiteSpace(item.Key))
+            {
+                throw new ArgumentException("Function analysis keys cannot be null or whitespace.", nameof(functionAnalysis));
+            }
+            if (item.Value is null)
+            {
+                throw new ArgumentException("Function analysis entries cannot be null.", nameof(functionAnalysis));
+            }
+            if (item.Value.ReturnType is null)
+            {
+                throw new ArgumentException("Function analysis entries must declare a return type.", nameof(functionAnalysis));
+            }
+            if (!item.Value.Effects.ContainsOnlyKnownBits())
+            {
+                throw new ArgumentException(
+                    "Function analysis entries must contain only known effect bits.",
+                    nameof(functionAnalysis));
+            }
+            copy.Add(item.Key, item.Value);
+        }
+
+        return new System.Collections.ObjectModel.ReadOnlyDictionary<string, FunctionAnalysis>(copy);
+    }
+
     private static IReadOnlyDictionary<string, IReadOnlySet<string>> CopyBindingReferences(
         IReadOnlyDictionary<string, IReadOnlySet<string>> bindingReferences)
     {
+        ArgumentNullException.ThrowIfNull(bindingReferences);
         var copy = new Dictionary<string, IReadOnlySet<string>>(bindingReferences.Count, StringComparer.Ordinal);
         foreach (var item in bindingReferences)
         {
+            if (string.IsNullOrWhiteSpace(item.Key))
+            {
+                throw new ArgumentException("Binding reference keys cannot be null or whitespace.", nameof(bindingReferences));
+            }
+            if (item.Value is null)
+            {
+                throw new ArgumentException("Binding reference sets cannot be null.", nameof(bindingReferences));
+            }
+            if (item.Value.Contains(null!))
+            {
+                throw new ArgumentException("Binding reference entries cannot be null.", nameof(bindingReferences));
+            }
             copy.Add(item.Key, item.Value.ToFrozenSet(StringComparer.Ordinal));
         }
 
@@ -221,34 +265,4 @@ public enum SandboxIsolation
 {
     InProcess,
     WorkerProcess
-}
-
-public sealed record SandboxExecutionResult
-{
-    private IReadOnlyList<SandboxAuditEvent> _auditEvents = [];
-
-    public bool Succeeded { get; init; }
-    public SandboxValue? Value { get; init; }
-    public SandboxError? Error { get; init; }
-    public required SandboxResourceUsage ResourceUsage { get; init; }
-    public required IReadOnlyList<SandboxAuditEvent> AuditEvents
-    {
-        get => _auditEvents;
-        init => _auditEvents = AdoptOrCopy(value);
-    }
-
-    // An already-owned, immutable snapshot (for example the one produced on the execution
-    // hot path) can be adopted directly; any other input is still defensively copied so
-    // external list/array identity never escapes into the public result.
-    private static IReadOnlyList<SandboxAuditEvent> AdoptOrCopy(IReadOnlyList<SandboxAuditEvent> value)
-        => value is OwnedAuditEventSnapshot owned
-            ? owned
-            : ModelCopy.List(value);
-
-    public ExecutionMode ActualMode { get; init; }
-    public bool ExecutionDispatched { get; init; }
-    public required string ModuleHash { get; init; }
-    public required string PlanHash { get; init; }
-    public required string PolicyHash { get; init; }
-    public string? ArtifactHash { get; init; }
 }

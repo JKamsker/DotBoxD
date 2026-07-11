@@ -4,7 +4,7 @@ description: 'This tutorial walks through Pushdown, the third way DotBoxD lets a
 ---
 This tutorial walks through **Pushdown**, the third way DotBoxD lets a host and its clients share one C# contract. You will take a host that exposes only a *fine-grained* binding ("kill one monster") and, **without recompiling the host**, ship a plugin that adds a *batch* aggregate ("kill these N monsters") which runs server-side and collapses N remote round-trips into **one**.
 
-The payoff: the batch method is plain C#, but the analyzer lowers it to the same verified, capability-gated, fuel-metered IR that event kernels run under. It is untrusted-author code running under a real sandbox — not a trusted plugin with full CLR access.
+The payoff: the batch method is plain C#, but the analyzer lowers it to the same verified, capability-gated, fuel-metered restricted IR (intermediate representation) that event kernels run under. It is untrusted-author code running under a real sandbox — not a trusted plugin with full CLR access.
 
 Everything below uses the real, compiling API. The canonical snippet lives in [`README.md`](https://github.com/JKamsker/DotBoxD/blob/main/README.md) (section "3. Pushdown"); the runnable example is the GameServer sample under [`samples/GameServer`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer).
 

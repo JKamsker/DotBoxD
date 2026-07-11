@@ -110,7 +110,7 @@ public sealed partial class PluginAnalyzerKernelMethodDescriptorTests
         Assert.Empty(generatorDiagnostics.Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
         Assert.Empty(outputCompilation.GetDiagnostics().Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
         var reference = EmitReference(outputCompilation);
-        return (driver.GetRunResult(), reference);
+        return (PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()), reference);
     }
 
     private static MetadataReference CompilePlainReference(string source, string assemblyName)
@@ -130,6 +130,7 @@ public sealed partial class PluginAnalyzerKernelMethodDescriptorTests
             compilation,
             out var outputCompilation,
             out var generatorDiagnostics);
+        PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(generatorDiagnostics);
         return generatorDiagnostics.Concat(outputCompilation.GetDiagnostics()).ToArray();
     }
 

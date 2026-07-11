@@ -13,13 +13,16 @@ namespace DotBoxD.Services.SourceGenerator.EntryPoint;
 [Generator(LanguageNames.CSharp)]
 public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
 {
+    private const string DiagnosticHelpBase = "https://dotboxd.kamsker.at/reference/diagnostics/#";
+
     private static readonly DiagnosticDescriptor s_generatorErrorRule = new(
         id: "DBXS001",
         title: "DotBoxD source generator error",
         messageFormat: "DotBoxD failed to generate for '{0}': {1}",
         category: "DotBoxD.Services.SourceGenerator",
         defaultSeverity: DiagnosticSeverity.Error,
-        isEnabledByDefault: true);
+        isEnabledByDefault: true,
+        helpLinkUri: DiagnosticHelpBase + "dbxs001");
 
     private static readonly DiagnosticDescriptor s_unsupportedMethodRule = new(
         id: "DBXS002",
@@ -27,7 +30,8 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
         messageFormat: "DotBoxD cannot generate code for '{0}.{1}': {2}",
         category: "DotBoxD.Services.SourceGenerator",
         defaultSeverity: DiagnosticSeverity.Error,
-        isEnabledByDefault: true);
+        isEnabledByDefault: true,
+        helpLinkUri: DiagnosticHelpBase + "dbxs002");
 
     private static readonly DiagnosticDescriptor s_unsupportedServiceRule = new(
         id: "DBXS003",
@@ -35,7 +39,8 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
         messageFormat: "DotBoxD cannot generate code for service '{0}': {1}",
         category: "DotBoxD.Services.SourceGenerator",
         defaultSeverity: DiagnosticSeverity.Error,
-        isEnabledByDefault: true);
+        isEnabledByDefault: true,
+        helpLinkUri: DiagnosticHelpBase + "dbxs003");
 
     private static readonly DiagnosticDescriptor s_asyncSiblingCollisionRule = new(
         id: "DBXS004",
@@ -43,7 +48,8 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
         messageFormat: "DotBoxD cannot project '{0}.{1}' onto its async sibling: {2}",
         category: "DotBoxD.Services.SourceGenerator",
         defaultSeverity: DiagnosticSeverity.Warning,
-        isEnabledByDefault: true);
+        isEnabledByDefault: true,
+        helpLinkUri: DiagnosticHelpBase + "dbxs004");
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
@@ -158,6 +164,10 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
             .Select(static (projection, _) => projection.Bundle)
             .WithTrackingName("ServiceBundles");
 
+        var emitClsNonCompliantAttributes = context.CompilationProvider
+            .Select(static (compilation, _) => AssemblyClsCompliance.IsEnabled(compilation))
+            .WithTrackingName("EmitClsNonCompliantAttributes");
+
         var siblingCollisions = projections
             .SelectMany(static (projection, _) => projection.SiblingCollisions.Array)
             .WithTrackingName("SiblingCollisions");
@@ -170,25 +180,27 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
                 d.MethodName,
                 d.Reason)));
 
-        context.RegisterSourceOutput(bundles, static (spc, bundle) =>
+        context.RegisterSourceOutput(bundles.Combine(emitClsNonCompliantAttributes), static (spc, pair) =>
         {
+            var bundle = pair.Left;
+            var emitClsNonCompliantAttribute = pair.Right;
             try
             {
                 var hintPrefix = HintNameBuilder.Prefix(bundle.Model);
                 var ct = spc.CancellationToken;
-                var proxySource = ProxyGenerator.Generate(bundle.Model, bundle.SiblingMethods, ct);
+                var proxySource = ProxyGenerator.Generate(bundle.Model, bundle.SiblingMethods, emitClsNonCompliantAttribute, ct);
                 spc.AddSource(
                     $"{hintPrefix}.DotBoxDRpcProxy.g.cs",
                     SourceText.From(proxySource, Encoding.UTF8));
 
-                var dispatcherSource = DispatcherGenerator.Generate(bundle.Model, ct);
+                var dispatcherSource = DispatcherGenerator.Generate(bundle.Model, emitClsNonCompliantAttribute, ct);
                 spc.AddSource(
                     $"{hintPrefix}.DotBoxDRpcDispatcher.g.cs",
                     SourceText.From(dispatcherSource, Encoding.UTF8));
 
                 if (!bundle.SiblingMethods.IsEmpty)
                 {
-                    var asyncSource = AsyncInterfaceGenerator.Generate(bundle.Model, bundle.SiblingMethods, ct);
+                    var asyncSource = AsyncInterfaceGenerator.Generate(bundle.Model, bundle.SiblingMethods, emitClsNonCompliantAttribute, ct);
                     spc.AddSource(
                         $"{hintPrefix}.DotBoxDRpcAsync.g.cs",
                         SourceText.From(asyncSource, Encoding.UTF8));
@@ -222,8 +234,9 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
             .Select(static (arr, ct) => ServiceModelOrdering.Sort(arr, ct))
             .WithTrackingName("AllServiceMetadata");
 
-        context.RegisterSourceOutput(allServices, static (spc, services) =>
+        context.RegisterSourceOutput(allServices.Combine(emitClsNonCompliantAttributes), static (spc, pair) =>
         {
+            var services = pair.Left;
             if (services.IsEmpty)
             {
                 return;
@@ -231,7 +244,7 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
 
             try
             {
-                var extensionsSource = ExtensionsGenerator.Generate(services, spc.CancellationToken);
+                var extensionsSource = ExtensionsGenerator.Generate(services, pair.Right, spc.CancellationToken);
                 spc.AddSource(
                     "DotBoxDRpcExtensions.g.cs",
                     SourceText.From(extensionsSource, Encoding.UTF8));
@@ -250,8 +263,9 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
             }
         });
 
-        context.RegisterSourceOutput(allServiceMetadata, static (spc, services) =>
+        context.RegisterSourceOutput(allServiceMetadata.Combine(emitClsNonCompliantAttributes), static (spc, pair) =>
         {
+            var services = pair.Left;
             if (services.IsEmpty)
             {
                 return;
@@ -259,7 +273,7 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
 
             try
             {
-                var factorySource = GeneratedFactoryGenerator.Generate(services, spc.CancellationToken);
+                var factorySource = GeneratedFactoryGenerator.Generate(services, pair.Right, spc.CancellationToken);
                 spc.AddSource(
                     "DotBoxDGenerated.g.cs",
                     SourceText.From(factorySource, Encoding.UTF8));

@@ -57,6 +57,7 @@ internal static partial class GeneratedRemoteHookChainFallback
 
     public static HookChainInterception CreateInterception(
         string attributeSyntax,
+        string generatedAttributeSource,
         string eventTypeFullName,
         bool receiverIsStage,
         string terminalElementTypeFullName,
@@ -95,6 +96,7 @@ internal static partial class GeneratedRemoteHookChainFallback
 
         return new HookChainInterception(
             attributeSyntax,
+            generatedAttributeSource,
             receiverType,
             handlerType,
             pipelineType,
@@ -131,6 +133,7 @@ internal static partial class GeneratedRemoteHookChainFallback
 
     public static HookChainInterception CreateResultInterception(
         string attributeSyntax,
+        string generatedAttributeSource,
         string eventTypeFullName,
         bool receiverIsStage,
         string resultTypeFullName,
@@ -171,6 +174,7 @@ internal static partial class GeneratedRemoteHookChainFallback
 
         return new HookChainInterception(
             attributeSyntax,
+            generatedAttributeSource,
             receiverType,
             handlerType,
             pipelineType,

@@ -7,7 +7,8 @@ relevant NuGet packages and regression-tested for drift against the importer.
 
 These schemas are published first-class because the source generators and attributes are opt-in sugar over
 these public primitives, never lock-in ([design guidelines](https://github.com/JKamsker/DotBoxD/blob/main/rules/design-guidelines.md)):
-you can hand-author or validate the same IR module or plugin manifest against the schema without any
+you can hand-author or validate the same restricted IR (intermediate representation) module or plugin
+manifest against the schema without any
 generator, so reach for them when you need to emit, inspect, or verify a payload by hand.
 
 | Schema | File | Accepted by |
@@ -21,5 +22,6 @@ with the code that consumes it, so a schema change that diverges from the import
 ## See also
 
 - [Kernels](/concepts/kernels/)
+- [Hand-written IR hook pipeline](/tutorials/handwritten-ir-hook-pipeline/)
 - [Pushdown Step 6 — hand-authoring the payload](/tutorials/pushdown-server-extension/#step-6--diagnostics-and-the-no-lock-in-principle)
 - [Glossary](/reference/glossary/)

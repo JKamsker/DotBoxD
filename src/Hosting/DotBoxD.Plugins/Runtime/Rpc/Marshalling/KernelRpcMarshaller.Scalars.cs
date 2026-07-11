@@ -4,41 +4,73 @@ namespace DotBoxD.Plugins.Runtime.Rpc;
 
 public static partial class KernelRpcMarshaller
 {
+    private static readonly Dictionary<Type, ScalarToSandboxConverter> ScalarToSandboxConverters = new()
+    {
+        [typeof(bool)] = static value => SandboxValue.FromBool((bool)value!),
+        [typeof(int)] = static value => SandboxValue.FromInt32((int)value!),
+        [typeof(long)] = static value => SandboxValue.FromInt64((long)value!),
+        [typeof(double)] = static value => SandboxValue.FromDouble((double)value!),
+        [typeof(float)] = static value => SandboxValue.FromDouble((float)value!),
+        [typeof(string)] = static value => SandboxValue.FromString((string)value!),
+        [typeof(Guid)] = static value => SandboxValue.FromGuid((Guid)value!),
+        [typeof(DateOnly)] = static value => SandboxValue.FromInt32(((DateOnly)value!).DayNumber),
+        [typeof(TimeOnly)] = static value => SandboxValue.FromInt64(((TimeOnly)value!).Ticks),
+        [typeof(TimeSpan)] = static value => SandboxValue.FromInt64(((TimeSpan)value!).Ticks),
+        [typeof(CancellationToken)] = static value => SandboxValue.FromBool(((CancellationToken)value!).IsCancellationRequested),
+    };
+
+    private static readonly Dictionary<Type, ScalarFromSandboxConverter> ScalarFromSandboxConverters = new()
+    {
+        [typeof(bool)] = static (SandboxValue value, out object? result) => TryUnbox<BoolValue>(value, out result, static item => item.Value),
+        [typeof(int)] = static (SandboxValue value, out object? result) => TryUnbox<I32Value>(value, out result, static item => item.Value),
+        [typeof(long)] = static (SandboxValue value, out object? result) => TryUnbox<I64Value>(value, out result, static item => item.Value),
+        [typeof(double)] = static (SandboxValue value, out object? result) => TryUnbox<F64Value>(value, out result, static item => item.Value),
+        [typeof(float)] = static (SandboxValue value, out object? result) =>
+            TryUnbox<F64Value>(value, out result, static item => DoubleToSingle(item.Value)),
+        [typeof(string)] = static (SandboxValue value, out object? result) => TryUnbox<StringValue>(value, out result, static item => item.Value),
+        [typeof(Guid)] = static (SandboxValue value, out object? result) => TryUnbox<GuidValue>(value, out result, static item => item.Value),
+        [typeof(DateOnly)] = static (SandboxValue value, out object? result) =>
+            TryUnbox<I32Value>(value, out result, static item => DateOnlyFromDayNumber(item.Value)),
+        [typeof(TimeOnly)] = static (SandboxValue value, out object? result) =>
+            TryUnbox<I64Value>(value, out result, static item => TimeOnlyFromTicks(item.Value)),
+        [typeof(TimeSpan)] = static (SandboxValue value, out object? result) =>
+            TryUnbox<I64Value>(value, out result, static item => new TimeSpan(item.Value)),
+        [typeof(CancellationToken)] = static (SandboxValue value, out object? result) =>
+            TryUnbox<BoolValue>(value, out result, static item => new CancellationToken(item.Value)),
+    };
+
+    private delegate SandboxValue ScalarToSandboxConverter(object? value);
+
+    private delegate bool ScalarFromSandboxConverter(SandboxValue value, out object? result);
+
     private static SandboxValue? TryScalarToSandbox(object? value, Type type)
-        => type switch
-        {
-            var t when t == typeof(bool) => SandboxValue.FromBool((bool)value!),
-            var t when t == typeof(int) => SandboxValue.FromInt32((int)value!),
-            var t when t == typeof(long) => SandboxValue.FromInt64((long)value!),
-            var t when t == typeof(double) => SandboxValue.FromDouble((double)value!),
-            var t when t == typeof(float) => SandboxValue.FromDouble((float)value!),
-            var t when t == typeof(string) => SandboxValue.FromString((string)value!),
-            var t when t == typeof(Guid) => SandboxValue.FromGuid((Guid)value!),
-            var t when t == typeof(DateOnly) => SandboxValue.FromInt32(((DateOnly)value!).DayNumber),
-            var t when t == typeof(TimeOnly) => SandboxValue.FromInt64(((TimeOnly)value!).Ticks),
-            var t when t == typeof(TimeSpan) => SandboxValue.FromInt64(((TimeSpan)value!).Ticks),
-            var t when t == typeof(CancellationToken) => SandboxValue.FromBool(((CancellationToken)value!).IsCancellationRequested),
-            _ => null
-        };
+        => ScalarToSandboxConverters.TryGetValue(type, out var convert) ? convert(value) : null;
 
     private static bool TryScalarFromSandbox(SandboxValue value, Type type, out object? result)
     {
-        result = (type, value) switch
+        if (ScalarFromSandboxConverters.TryGetValue(type, out var convert))
         {
-            (var t, BoolValue b) when t == typeof(bool) => b.Value,
-            (var t, I32Value i) when t == typeof(int) => i.Value,
-            (var t, I64Value l) when t == typeof(long) => l.Value,
-            (var t, F64Value d) when t == typeof(double) => d.Value,
-            (var t, F64Value d) when t == typeof(float) => DoubleToSingle(d.Value),
-            (var t, StringValue s) when t == typeof(string) => s.Value,
-            (var t, GuidValue g) when t == typeof(Guid) => g.Value,
-            (var t, I32Value i) when t == typeof(DateOnly) => DateOnlyFromDayNumber(i.Value),
-            (var t, I64Value l) when t == typeof(TimeOnly) => TimeOnlyFromTicks(l.Value),
-            (var t, I64Value l) when t == typeof(TimeSpan) => new TimeSpan(l.Value),
-            (var t, BoolValue b) when t == typeof(CancellationToken) => new CancellationToken(b.Value),
-            _ => null
-        };
-        return result is not null;
+            return convert(value, out result);
+        }
+
+        result = null;
+        return false;
+    }
+
+    private static bool TryUnbox<TValue>(
+        SandboxValue value,
+        out object? result,
+        Func<TValue, object> convert)
+        where TValue : SandboxValue
+    {
+        if (value is TValue typed)
+        {
+            result = convert(typed);
+            return true;
+        }
+
+        result = null;
+        return false;
     }
 
     private static Array ToArray(IReadOnlyList<SandboxValue> values, Type elementType)

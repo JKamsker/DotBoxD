@@ -2,7 +2,7 @@ using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Kernels.Runtime.Bindings.FileSystem;
 
-public static partial class SafeFileSystem
+public static class SafeFileSystem
 {
     private static readonly AsyncLocal<Func<string>?> TempSuffixFactory = new();
     internal static readonly AsyncLocal<Action?> BeforeTempCreateForTests = new();

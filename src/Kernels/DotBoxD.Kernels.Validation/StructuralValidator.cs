@@ -1,4 +1,5 @@
 using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Kernels.Validation;
@@ -14,37 +15,57 @@ internal static class StructuralValidator
         IReadOnlySet<string> declaredOpaqueIdTypes)
     {
         CheckIdentifier(module.Id, "module id", diagnostics);
-        if (!SandboxLanguage.Supports(module.TargetSandboxVersion))
+        CheckRequiredVersion(module.Version, "module version", diagnostics);
+        if (module.TargetSandboxVersion is null)
+        {
+            diagnostics.Add(new SandboxDiagnostic("E-IR-VERSION", "target sandbox version must not be null"));
+        }
+        else if (!SandboxLanguage.Supports(module.TargetSandboxVersion))
         {
             diagnostics.Add(new SandboxDiagnostic(
                 "E-IR-VERSION",
                 $"target sandbox version '{module.TargetSandboxVersion}' is not supported by runtime '{SandboxLanguage.CurrentVersionText}'"));
         }
 
+        var hasNullCapabilityRequests = CheckNullEntries(module.CapabilityRequests, "capabilityRequests", null, diagnostics);
         foreach (var request in module.CapabilityRequests)
         {
-            CheckIdentifier(request.Id, "capability id", diagnostics);
+            if (request is null)
+            {
+                continue;
+            }
+
+            CheckCapabilityRequest(request, diagnostics);
             CheckOptionalText(request.Reason, "capability reason", diagnostics);
         }
 
-        CheckDuplicateCapabilityRequests(module.CapabilityRequests, diagnostics);
+        if (!hasNullCapabilityRequests)
+        {
+            StructuralDuplicateValidator.CheckCapabilityRequests(module.CapabilityRequests, diagnostics);
+        }
 
         foreach (var item in module.Metadata)
         {
             CheckIdentifier(item.Key, "metadata key", diagnostics);
-            CheckText(item.Value, "metadata value", diagnostics);
+            CheckText(item.Value, $"metadata value for key '{item.Key}'", diagnostics);
         }
 
-        CheckDuplicateFunctionIds(module.Functions, diagnostics);
-
-        if (!HasEntrypoint(module.Functions))
-        {
-            diagnostics.Add(new SandboxDiagnostic("E-STRUCT-ENTRY", "module must declare at least one entry function"));
-        }
+        FunctionCollectionValidator.Validate(module.Functions, diagnostics);
 
         foreach (var function in module.Functions)
         {
-            ValidateFunction(function, diagnostics, declaredOpaqueIdTypes);
+            if (function is not null)
+            {
+                ValidateFunction(function, diagnostics, declaredOpaqueIdTypes);
+            }
+        }
+    }
+
+    private static void CheckRequiredVersion(SemVersion? version, string description, List<SandboxDiagnostic> diagnostics)
+    {
+        if (version is null)
+        {
+            diagnostics.Add(new SandboxDiagnostic("E-IR-VERSION", $"{description} must not be null"));
         }
     }
 
@@ -54,17 +75,22 @@ internal static class StructuralValidator
         IReadOnlySet<string> declaredOpaqueIdTypes)
     {
         CheckIdentifier(function.Id, "function id", diagnostics);
-        CheckType(function.ReturnType, diagnostics, declaredOpaqueIdTypes);
+        CheckType(function.ReturnType, $"function '{function.Id}' return type", diagnostics, declaredOpaqueIdTypes);
+        CheckDeclaredEffects(function, diagnostics);
         var hasNullParameters = CheckNullEntries(function.Parameters, "parameters", function.Id, diagnostics);
         CheckNullEntries(function.Body, "body", function.Id, diagnostics);
 
         if (!hasNullParameters)
         {
-            CheckDuplicateParameters(function, diagnostics);
+            StructuralDuplicateValidator.CheckParameters(function, diagnostics);
             foreach (var parameter in function.Parameters)
             {
                 CheckIdentifier(parameter.Name, "parameter name", diagnostics);
-                CheckType(parameter.Type, diagnostics, declaredOpaqueIdTypes);
+                CheckType(
+                    parameter.Type,
+                    $"function '{function.Id}' parameter '{parameter.Name}' type",
+                    diagnostics,
+                    declaredOpaqueIdTypes);
             }
         }
 
@@ -83,7 +109,7 @@ internal static class StructuralValidator
     private static bool CheckNullEntries<T>(
         IReadOnlyList<T> values,
         string collectionName,
-        string functionId,
+        string? functionId,
         List<SandboxDiagnostic> diagnostics)
     {
         var hasNull = false;
@@ -95,153 +121,51 @@ internal static class StructuralValidator
             }
 
             hasNull = true;
+            var message = functionId is null
+                ? $"{collectionName} entry at index {i} must not be null"
+                : $"function '{functionId}' {collectionName} entry at index {i} must not be null";
             diagnostics.Add(new SandboxDiagnostic(
                 "E-STRUCT-NULL",
-                $"function '{functionId}' {collectionName} entry at index {i} must not be null"));
+                message));
         }
 
         return hasNull;
     }
 
-    private static void CheckDuplicateCapabilityRequests(
-        IReadOnlyList<CapabilityRequest> requests,
-        List<SandboxDiagnostic> diagnostics)
+    private static void CheckCapabilityRequest(CapabilityRequest request, List<SandboxDiagnostic> diagnostics)
     {
-        if (requests.Count < 2)
+        CheckIdentifier(request.Id, "capability id", diagnostics);
+        if (request.Id is not null &&
+            (CapabilityPattern.IsWildcard(request.Id) || request.Id.EndsWith(".", StringComparison.Ordinal)))
         {
-            return;
-        }
-
-        var counts = new Dictionary<string, int>(requests.Count, StringComparer.Ordinal);
-        var nullCount = 0;
-        for (var i = 0; i < requests.Count; i++)
-        {
-            IncrementCount(counts, requests[i].Id, ref nullCount);
-        }
-
-        var reportedNull = false;
-        for (var i = 0; i < requests.Count; i++)
-        {
-            var id = requests[i].Id;
-            if (ShouldReportDuplicate(counts, id, nullCount, ref reportedNull))
-            {
-                diagnostics.Add(new SandboxDiagnostic("E-STRUCT-DUP-CAP", $"duplicate capability request '{id}'"));
-            }
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-IR-CAPABILITY",
+                $"capability request '{request.Id}' must be concrete"));
         }
     }
 
-    private static void CheckDuplicateFunctionIds(
-        IReadOnlyList<SandboxFunction> functions,
-        List<SandboxDiagnostic> diagnostics)
+    private static void CheckDeclaredEffects(SandboxFunction function, List<SandboxDiagnostic> diagnostics)
     {
-        if (functions.Count < 2)
+        if (function.DeclaredEffects is { } effects && !effects.ContainsOnlyKnownBits())
         {
-            return;
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-POLICY-EFFECT",
+                $"function '{function.Id}' has declared unknown effects"));
         }
-
-        var counts = new Dictionary<string, int>(functions.Count, StringComparer.Ordinal);
-        var nullCount = 0;
-        for (var i = 0; i < functions.Count; i++)
-        {
-            IncrementCount(counts, functions[i].Id, ref nullCount);
-        }
-
-        var reportedNull = false;
-        for (var i = 0; i < functions.Count; i++)
-        {
-            var id = functions[i].Id;
-            if (ShouldReportDuplicate(counts, id, nullCount, ref reportedNull))
-            {
-                diagnostics.Add(new SandboxDiagnostic("E-STRUCT-DUP-FN", $"duplicate function id '{id}'"));
-            }
-        }
-    }
-
-    private static void CheckDuplicateParameters(
-        SandboxFunction function,
-        List<SandboxDiagnostic> diagnostics)
-    {
-        if (function.Parameters.Count < 2)
-        {
-            return;
-        }
-
-        var counts = new Dictionary<string, int>(function.Parameters.Count, StringComparer.Ordinal);
-        var nullCount = 0;
-        for (var i = 0; i < function.Parameters.Count; i++)
-        {
-            IncrementCount(counts, function.Parameters[i].Name, ref nullCount);
-        }
-
-        var reportedNull = false;
-        for (var i = 0; i < function.Parameters.Count; i++)
-        {
-            var name = function.Parameters[i].Name;
-            if (ShouldReportDuplicate(counts, name, nullCount, ref reportedNull))
-            {
-                diagnostics.Add(new SandboxDiagnostic(
-                    "E-STRUCT-DUP-PARAM",
-                    $"duplicate parameter '{name}' in function '{function.Id}'"));
-            }
-        }
-    }
-
-    private static void IncrementCount(Dictionary<string, int> counts, string? value, ref int nullCount)
-    {
-        if (value is null)
-        {
-            nullCount++;
-            return;
-        }
-
-        counts.TryGetValue(value, out var count);
-        counts[value] = count + 1;
-    }
-
-    private static bool ShouldReportDuplicate(
-        Dictionary<string, int> counts,
-        string? value,
-        int nullCount,
-        ref bool reportedNull)
-    {
-        if (value is null)
-        {
-            if (nullCount < 2 || reportedNull)
-            {
-                return false;
-            }
-
-            reportedNull = true;
-            return true;
-        }
-
-        if (!counts.TryGetValue(value, out var count) || count < 2)
-        {
-            return false;
-        }
-
-        counts[value] = 0;
-        return true;
-    }
-
-    private static bool HasEntrypoint(IReadOnlyList<SandboxFunction> functions)
-    {
-        for (var i = 0; i < functions.Count; i++)
-        {
-            if (functions[i].IsEntrypoint)
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private static void CheckType(
-        SandboxType type,
+        SandboxType? type,
+        string description,
         List<SandboxDiagnostic> diagnostics,
         IReadOnlySet<string> declaredOpaqueIdTypes)
     {
+        if (type is null)
+        {
+            diagnostics.Add(new SandboxDiagnostic("E-STRUCT-NULL", $"{description} must not be null"));
+            return;
+        }
+
         if (type.Name == "Map" && type.Arguments.Count == 2 && !type.Arguments[0].IsValidMapKey(declaredOpaqueIdTypes))
         {
             diagnostics.Add(new SandboxDiagnostic("E-TYPE-MAP-KEY", $"map key type '{type.Arguments[0]}' is not supported"));
@@ -275,8 +199,14 @@ internal static class StructuralValidator
         }
     }
 
-    private static void CheckText(string value, string description, List<SandboxDiagnostic> diagnostics)
+    private static void CheckText(string? value, string description, List<SandboxDiagnostic> diagnostics)
     {
+        if (value is null)
+        {
+            diagnostics.Add(new SandboxDiagnostic("E-STRUCT-NULL", $"{description} must not be null"));
+            return;
+        }
+
         if (DangerousReferenceDetector.IsDangerousReference(value))
         {
             diagnostics.Add(new SandboxDiagnostic("E-IR-CLR-REF", $"{description} '{value}' looks like a forbidden CLR reference"));

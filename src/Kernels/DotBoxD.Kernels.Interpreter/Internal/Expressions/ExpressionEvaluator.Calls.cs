@@ -6,6 +6,32 @@ namespace DotBoxD.Kernels.Interpreter;
 
 internal sealed partial class ExpressionEvaluator
 {
+    private delegate SandboxValue CollectionCallHandler(
+        ExpressionEvaluator evaluator,
+        CallExpression call,
+        SandboxValue[] args);
+
+    private static readonly Dictionary<string, CollectionCallHandler> CollectionCalls = new(StringComparer.Ordinal)
+    {
+        ["list.empty"] = static (evaluator, call, _) =>
+            CollectionOperations.CreateList(call.GenericType ?? SandboxType.Unit, evaluator._context),
+        ["list.of"] = static (evaluator, _, args) => CollectionOperations.BuildList(args, evaluator._context),
+        ["list.count"] = static (evaluator, _, args) => CollectionOperations.CountList(Arg(args, 0), evaluator._context),
+        ["list.get"] = static (evaluator, _, args) => CollectionOperations.GetListItem(Arg(args, 1), Arg(args, 0), evaluator._context),
+        ["list.add"] = static (evaluator, _, args) => CollectionOperations.AddListItem(Arg(args, 1), Arg(args, 0), evaluator._context),
+        ["map.empty"] = static (evaluator, call, _) => CollectionOperations.CreateMap(
+            call.GenericType ?? SandboxType.Map(SandboxType.Unit, SandboxType.Unit),
+            evaluator._context),
+        ["map.containsKey"] = static (evaluator, _, args) => CollectionOperations.ContainsMapKey(Arg(args, 1), Arg(args, 0), evaluator._context),
+        ["map.get"] = static (evaluator, _, args) => CollectionOperations.GetMapValue(Arg(args, 1), Arg(args, 0), evaluator._context),
+        ["map.set"] = static (evaluator, _, args) => CollectionOperations.SetMapValue(Arg(args, 2), Arg(args, 1), Arg(args, 0), evaluator._context),
+        ["map.remove"] = static (evaluator, _, args) => CollectionOperations.RemoveMapValue(Arg(args, 1), Arg(args, 0), evaluator._context),
+        ["record.new"] = static (evaluator, _, args) => CollectionOperations.BuildRecord(args, evaluator._context),
+        ["record.get"] = static (evaluator, _, args) => CollectionOperations.GetRecordField(Arg(args, 1), Arg(args, 0), evaluator._context),
+        ["numeric.toI64"] = static (_, _, args) => NumericToInt64(Arg(args, 0)),
+        ["numeric.toF64"] = static (_, _, args) => NumericToDouble(Arg(args, 0)),
+    };
+
     private ValueTask<SandboxValue> EvaluateCall(CallExpression call, InterpreterFrame frame)
     {
         if (UnaryPureIntrinsicDispatcher.IsCandidate(call.Name) &&
@@ -160,30 +186,14 @@ internal sealed partial class ExpressionEvaluator
         SandboxValue[] args,
         out SandboxValue value)
     {
-        value = call.Name switch
+        if (!CollectionCalls.TryGetValue(call.Name, out var handler))
         {
-            "list.empty" => CollectionOperations.CreateList(call.GenericType ?? SandboxType.Unit, _context),
-            "list.of" => CollectionOperations.BuildList(args, _context),
-            "list.count" => CollectionOperations.CountList(Arg(args, 0), _context),
-            "list.get" => CollectionOperations.GetListItem(Arg(args, 1), Arg(args, 0), _context),
-            "list.add" => CollectionOperations.AddListItem(Arg(args, 1), Arg(args, 0), _context),
-            "map.empty" => CollectionOperations.CreateMap(
-                call.GenericType ?? SandboxType.Map(SandboxType.Unit, SandboxType.Unit),
-                _context),
-            "map.containsKey" => CollectionOperations.ContainsMapKey(Arg(args, 1), Arg(args, 0), _context),
-            "map.get" => CollectionOperations.GetMapValue(Arg(args, 1), Arg(args, 0), _context),
-            "map.set" => CollectionOperations.SetMapValue(Arg(args, 2), Arg(args, 1), Arg(args, 0), _context),
-            "map.remove" => CollectionOperations.RemoveMapValue(Arg(args, 1), Arg(args, 0), _context),
-            "record.new" => CollectionOperations.BuildRecord(args, _context),
-            "record.get" => CollectionOperations.GetRecordField(Arg(args, 1), Arg(args, 0), _context),
-            "numeric.toI64" => NumericToInt64(Arg(args, 0)),
-            "numeric.toF64" => NumericToDouble(Arg(args, 0)),
-            _ => SandboxValue.Unit
-        };
-        return call.Name is "list.empty" or "list.of" or "list.count" or "list.get" or "list.add"
-            or "map.empty" or "map.containsKey" or "map.get" or "map.set" or "map.remove"
-            or "record.new" or "record.get"
-            or "numeric.toI64" or "numeric.toF64";
+            value = SandboxValue.Unit;
+            return false;
+        }
+
+        value = handler(this, call, args);
+        return true;
     }
 
     private static SandboxValue Arg(SandboxValue[] args, int index)

@@ -60,7 +60,7 @@ public sealed class LoweringNegativeShapeMatrixTests
         [
             "remote RunLocal unsupported predicate",
             "DBXK111",
-            DiagnosticSeverity.Info,
+            DiagnosticSeverity.Error,
             """
             using System.Collections.Generic;
             using DotBoxD.Plugins.Runtime;
@@ -82,7 +82,7 @@ public sealed class LoweringNegativeShapeMatrixTests
         [
             "Run hook chain unsupported predicate",
             "DBXK114",
-            DiagnosticSeverity.Warning,
+            DiagnosticSeverity.Error,
             """
             using System.Collections.Generic;
             using DotBoxD.Plugins.Runtime;
@@ -104,7 +104,7 @@ public sealed class LoweringNegativeShapeMatrixTests
         [
             "result hook wrong result type",
             "DBXK113",
-            DiagnosticSeverity.Info,
+            DiagnosticSeverity.Error,
             """
             using DotBoxD.Plugins;
             using DotBoxD.Plugins.Runtime;
@@ -125,7 +125,7 @@ public sealed class LoweringNegativeShapeMatrixTests
             {
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<DamageCtx>()
-                        .RegisterLocal((ctx, hookContext) => new OtherResult { Success = true }, 0);
+                        .RegisterLocal((ctx, hookContext) => new OtherResult { Success = true }, priority: 0);
             }
             """
         ];

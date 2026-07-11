@@ -9,6 +9,7 @@
   <Folder Name="/Solution Items/">
     <File Path="Directory.Build.props" />
     <File Path="Directory.Packages.props" />
+    <File Path="DotBoxD.slnLaunch" />
     <File Path="global.json" />
     <File Path="README.md" />
   </Folder>
@@ -61,6 +62,7 @@
     <Project Path="tests/DotBoxD.Architecture.Tests/DotBoxD.Architecture.Tests.csproj" />
     <Project Path="tests/DotBoxD.Kernels.Tests/DotBoxD.Kernels.Tests.csproj" />
     <Project Path="tests/DotBoxD.Plugins.Generated.Tests/DotBoxD.Plugins.Generated.Tests.csproj" />
+    <Project Path="tests/DotBoxD.Kernels.TestFixtures.MergeableIr/DotBoxD.Kernels.TestFixtures.MergeableIr.csproj" />
     <Project Path="tests/DotBoxD.Kernels.TestFixtures.PluginAbstractions/DotBoxD.Kernels.TestFixtures.PluginAbstractions.csproj" />
     <Project Path="tests/DotBoxD.Kernels.TestFixtures.PluginLocal/DotBoxD.Kernels.TestFixtures.PluginLocal.csproj" />
     <Project Path="tests/DotBoxD.Services.Tests/DotBoxD.Services.Tests.csproj" />
@@ -74,11 +76,14 @@
     <Project Path="benchmarks/DotBoxD.Services.Benchmarks/DotBoxD.Services.Benchmarks.csproj" />
   </Folder>
 
-  <Folder Name="/samples/" />
+  <Folder Name="/samples/">
+    <Project Path="samples/AotSmoke/DotBoxD.AotSmoke.csproj" />
+  </Folder>
 
   <Folder Name="/tools/">
     <Project Path="tools/AgentQueue/src/AgentQueue/AgentQueue.csproj" />
     <Project Path="tools/AgentQueue/tests/AgentQueue.Tests/AgentQueue.Tests.csproj" />
+    <Project Path="tools/Fuzzing/DotBoxD.Fuzzing/DotBoxD.Fuzzing.csproj" />
   </Folder>
 
   <Properties Name="Visual Studio">

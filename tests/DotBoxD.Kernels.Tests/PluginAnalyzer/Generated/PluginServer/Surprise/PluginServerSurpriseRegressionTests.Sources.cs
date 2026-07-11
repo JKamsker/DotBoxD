@@ -1,8 +1,8 @@
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
-public sealed partial class PluginServerSurpriseRegressionTests
+internal static class PluginServerSurpriseRegressionTestSources
 {
-    private static string BaseServerSource(
+    internal static string BaseServerSource(
         string serverAccessibility = "public",
         string contextAccessibility = "public",
         string controlAccessibility = "public",

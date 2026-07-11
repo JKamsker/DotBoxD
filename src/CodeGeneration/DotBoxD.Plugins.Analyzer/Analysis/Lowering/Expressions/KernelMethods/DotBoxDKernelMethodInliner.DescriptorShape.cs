@@ -6,6 +6,47 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 
 internal static partial class DotBoxDKernelMethodInliner
 {
+    private static readonly HashSet<string> PrimitiveLiteralHelpers = new(StringComparer.Ordinal)
+    {
+        "Str",
+        "I32",
+        "I64",
+        "F64",
+        "Bool",
+    };
+
+    private static readonly Dictionary<string, InvocationShapeResolver> InvocationShapeResolvers = new(StringComparer.Ordinal)
+    {
+        ["Not"] = static (args, _) => Unary(args, DotBoxDGenerationNames.ManifestTypes.Bool, DotBoxDGenerationNames.ManifestTypes.Bool),
+        ["Int32ToStr"] = static (args, _) =>
+            Unary(args, DotBoxDGenerationNames.ManifestTypes.Int, DotBoxDGenerationNames.ManifestTypes.String, allocates: true),
+        ["StringLength"] = static (args, _) =>
+            Unary(args, DotBoxDGenerationNames.ManifestTypes.String, DotBoxDGenerationNames.ManifestTypes.Int),
+        ["StringSubstring"] = static (args, _) => StringSubstring(args),
+        ["ConcatString"] = static (args, _) =>
+            Binary(args, DotBoxDGenerationNames.ManifestTypes.String, DotBoxDGenerationNames.ManifestTypes.String, allocates: true),
+        ["StringEquals"] = static (args, _) =>
+            Binary(args, DotBoxDGenerationNames.ManifestTypes.String, DotBoxDGenerationNames.ManifestTypes.Bool),
+        ["Neg"] = static (args, _) => NumericUnary(args),
+        ["Eq"] = static (args, _) => EqualityBinary(args),
+        ["Ne"] = static (args, _) => EqualityBinary(args),
+        ["Ge"] = static (args, _) => NumericBinary(args, comparison: true),
+        ["Gt"] = static (args, _) => NumericBinary(args, comparison: true),
+        ["Le"] = static (args, _) => NumericBinary(args, comparison: true),
+        ["Lt"] = static (args, _) => NumericBinary(args, comparison: true),
+        ["And"] = static (args, _) =>
+            Binary(args, DotBoxDGenerationNames.ManifestTypes.Bool, DotBoxDGenerationNames.ManifestTypes.Bool),
+        ["Or"] = static (args, _) =>
+            Binary(args, DotBoxDGenerationNames.ManifestTypes.Bool, DotBoxDGenerationNames.ManifestTypes.Bool),
+        ["Add"] = static (args, _) => NumericBinary(args, comparison: false),
+        ["Sub"] = static (args, _) => NumericBinary(args, comparison: false),
+        ["Mul"] = static (args, _) => NumericBinary(args, comparison: false),
+        ["Div"] = static (args, _) => NumericBinary(args, comparison: false),
+        ["Mod"] = static (args, _) => NumericBinary(args, comparison: false),
+    };
+
+    private delegate DescriptorShape InvocationShapeResolver(DescriptorShape[] args, bool allocates);
+
     private static DescriptorShape RevalidateDescriptorShape(
         IMethodSymbol method,
         DotBoxDExpressionLoweringContext context,
@@ -60,7 +101,7 @@ internal static partial class DotBoxDKernelMethodInliner
         IReadOnlyDictionary<string, DescriptorShape> parameters)
     {
         var name = InvocationName(invocation.Expression);
-        if (name is "Str" or "I32" or "I64" or "F64" or "Bool")
+        if (PrimitiveLiteralHelpers.Contains(name))
         {
             return PrimitiveLiteralShape(name, invocation.ArgumentList.Arguments);
         }
@@ -69,21 +110,12 @@ internal static partial class DotBoxDKernelMethodInliner
             .Select(argument => InferDescriptorShape(argument.Expression, contextType, compilation, parameters))
             .ToArray();
         var allocates = args.Any(static arg => arg.Allocates);
-        return name switch
+        if (InvocationShapeResolvers.TryGetValue(name, out var resolver))
         {
-            "Not" => Unary(args, DotBoxDGenerationNames.ManifestTypes.Bool, DotBoxDGenerationNames.ManifestTypes.Bool),
-            "Int32ToStr" => Unary(args, DotBoxDGenerationNames.ManifestTypes.Int, DotBoxDGenerationNames.ManifestTypes.String, allocates: true),
-            "StringLength" => Unary(args, DotBoxDGenerationNames.ManifestTypes.String, DotBoxDGenerationNames.ManifestTypes.Int),
-            "StringSubstring" => StringSubstring(args),
-            "ConcatString" => Binary(args, DotBoxDGenerationNames.ManifestTypes.String, DotBoxDGenerationNames.ManifestTypes.String, true),
-            "StringEquals" => Binary(args, DotBoxDGenerationNames.ManifestTypes.String, DotBoxDGenerationNames.ManifestTypes.Bool),
-            "Neg" => NumericUnary(args),
-            "Eq" or "Ne" => EqualityBinary(args),
-            "Ge" or "Gt" or "Le" or "Lt" => NumericBinary(args, comparison: true),
-            "And" or "Or" => Binary(args, DotBoxDGenerationNames.ManifestTypes.Bool, DotBoxDGenerationNames.ManifestTypes.Bool),
-            "Add" or "Sub" or "Mul" or "Div" or "Mod" => NumericBinary(args, comparison: false),
-            _ => throw new NotSupportedException("Generated descriptor contains unsupported expression source.")
-        };
+            return resolver(args, allocates);
+        }
+
+        throw new NotSupportedException("Generated descriptor contains unsupported expression source.");
     }
 
     private static DescriptorShape InferCallExpressionShape(

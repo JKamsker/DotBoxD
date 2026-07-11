@@ -55,17 +55,20 @@ public abstract record SandboxValue
 
     public static SandboxValue FromList(IReadOnlyList<SandboxValue> values)
     {
-        ArgumentNullException.ThrowIfNull(values);
+        var ownedValues = SandboxValueCollectionValidation.CopyList(values, nameof(values));
 
         // Infer the item type from the original list and take exactly one defensive
         // snapshot via the owned-array path, instead of copying once here and again in
         // the ListValue constructor.
-        var itemType = values.Count == 0 ? SandboxType.Unit : values[0].Type;
-        return FromOwnedList(values.ToArray(), itemType);
+        var itemType = ownedValues.Length == 0 ? SandboxType.Unit : ownedValues[0].Type;
+        return ListValue.FromOwnedValues(ownedValues, itemType);
     }
 
     public static SandboxValue FromList(IReadOnlyList<SandboxValue> values, SandboxType itemType)
-        => new ListValue(values, itemType);
+    {
+        ArgumentNullException.ThrowIfNull(itemType);
+        return new ListValue(SandboxValueCollectionValidation.RequireList(values, nameof(values)), itemType);
+    }
 
     /// <summary>
     /// Builds a list value from an array the caller has just allocated, fully populated,
@@ -73,23 +76,40 @@ public abstract record SandboxValue
     /// performs. Internal because the owned-array contract cannot be enforced externally.
     /// </summary>
     internal static SandboxValue FromOwnedList(SandboxValue[] values, SandboxType itemType)
-        => ListValue.FromOwnedValues(values, itemType);
+    {
+        ArgumentNullException.ThrowIfNull(itemType);
+        SandboxValueCollectionValidation.RequireArray(values, nameof(values));
+        return ListValue.FromOwnedValues(values, itemType);
+    }
 
     public static SandboxValue FromMap(
         IReadOnlyDictionary<SandboxValue, SandboxValue> values,
         SandboxType keyType,
         SandboxType valueType)
-        => new MapValue(values, keyType, valueType);
+    {
+        ArgumentNullException.ThrowIfNull(keyType);
+        ArgumentNullException.ThrowIfNull(valueType);
+        return new MapValue(SandboxValueCollectionValidation.RequireMap(values, nameof(values)), keyType, valueType);
+    }
 
     internal static SandboxValue FromOwnedMap(
         MapValueBuilder values,
         SandboxType keyType,
         SandboxType valueType)
-        => MapValue.FromOwnedValues(values, keyType, valueType);
+    {
+        ArgumentNullException.ThrowIfNull(keyType);
+        ArgumentNullException.ThrowIfNull(valueType);
+        return MapValue.FromOwnedValues(values, keyType, valueType);
+    }
 
-    public static SandboxValue FromRecord(IReadOnlyList<SandboxValue> fields) => new RecordValue(fields);
+    public static SandboxValue FromRecord(IReadOnlyList<SandboxValue> fields)
+        => new RecordValue(SandboxValueCollectionValidation.RequireList(fields, nameof(fields)));
 
-    internal static SandboxValue FromOwnedRecord(SandboxValue[] fields) => RecordValue.FromOwnedFields(fields);
+    internal static SandboxValue FromOwnedRecord(SandboxValue[] fields)
+    {
+        SandboxValueCollectionValidation.RequireArray(fields, nameof(fields));
+        return RecordValue.FromOwnedFields(fields);
+    }
 
     private static SandboxValue[] CreateCachedI32Values()
     {
@@ -151,61 +171,6 @@ public sealed record GuidValue(System.Guid Value) : SandboxValue
     public override SandboxType Type => SandboxType.Guid;
 }
 
-file static class SandboxValueNullGuard
-{
-    public static T RequireNotNull<T>(T? value, string paramName)
-        where T : class
-        => value ?? throw new ArgumentNullException(paramName);
-}
-
-public sealed record OpaqueIdValue(string TypeName, string Value) : SandboxValue
-{
-    private string _typeName = SandboxValueNullGuard.RequireNotNull(TypeName, nameof(TypeName));
-    private string _value = SandboxValueNullGuard.RequireNotNull(Value, nameof(Value));
-
-    public string TypeName { get => _typeName; init => _typeName = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
-
-    public string Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
-
-    public override SandboxType Type => SandboxType.Scalar(TypeName);
-}
-
-public sealed record SandboxPath(string RelativePath)
-{
-    private string _relativePath = SandboxValueNullGuard.RequireNotNull(RelativePath, nameof(RelativePath));
-
-    public string RelativePath { get => _relativePath; init => _relativePath = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
-
-    public override string ToString() => RelativePath;
-}
-
-public sealed record SandboxPathValue(SandboxPath Value) : SandboxValue
-{
-    private SandboxPath _value = SandboxValueNullGuard.RequireNotNull(Value, nameof(Value));
-
-    public SandboxPath Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
-
-    public override SandboxType Type => SandboxType.SandboxPath;
-}
-
-public sealed record SandboxUri(string Value)
-{
-    private string _value = SandboxValueNullGuard.RequireNotNull(Value, nameof(Value));
-
-    public string Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
-
-    public override string ToString() => Value;
-}
-
-public sealed record SandboxUriValue(SandboxUri Value) : SandboxValue
-{
-    private SandboxUri _value = SandboxValueNullGuard.RequireNotNull(Value, nameof(Value));
-
-    public SandboxUri Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
-
-    public override SandboxType Type => SandboxType.SandboxUri;
-}
-
 public sealed record RecordValue : SandboxValue
 {
     private IReadOnlyList<SandboxValue> _fields;
@@ -221,10 +186,27 @@ public sealed record RecordValue : SandboxValue
     /// Internal because the owned-array contract cannot be enforced for external callers.
     /// </summary>
     internal static RecordValue FromOwnedFields(SandboxValue[] fields)
-        => new(new OwnedSnapshot(fields));
+    {
+        ArgumentNullException.ThrowIfNull(fields);
+        return new(new OwnedSnapshot(fields));
+    }
 
     private static IReadOnlyList<SandboxValue> Snapshot(IReadOnlyList<SandboxValue> fields)
-        => fields is OwnedSnapshot owned ? owned : ModelCopy.List(fields);
+    {
+        ArgumentNullException.ThrowIfNull(fields);
+        if (fields.Count == 0)
+        {
+            throw new ArgumentException("Record values must contain at least one field.", nameof(fields));
+        }
+
+        if (fields is OwnedSnapshot owned)
+        {
+            return owned;
+        }
+
+        var snapshot = ModelCopy.List(fields);
+        return SandboxValueCollectionValidation.RequireList(snapshot, nameof(fields));
+    }
 
     private sealed class OwnedSnapshot(SandboxValue[] fields) : IReadOnlyList<SandboxValue>
     {

@@ -147,17 +147,12 @@ internal sealed class RawF64ExpressionPlan
 
     private static bool CanUseDirectIntrinsic(IBindingCatalog bindings, string id, ExpressionKind kind)
         => bindings.TryGet(id, out var binding) &&
-           binding.Compiled is { Kind: "RuntimeStub" } &&
-           binding.Compiled.Type == typeof(CompiledRuntime).FullName &&
-           binding.Compiled.Method == BoxedMethod(kind) &&
-           binding.Parameters.Count == 1 &&
-           binding.Parameters[0].Equals(SandboxType.F64) &&
-           binding.ReturnType.Equals(SandboxType.F64) &&
-           binding.RequiredCapability is null &&
-           binding.Safety == BindingSafety.PureIntrinsic &&
-           binding.AuditLevel == AuditLevel.None &&
-           binding.CostModel.MaxCallsPerRun is null &&
-           (binding.Effects & ~(SandboxEffect.Cpu | SandboxEffect.Alloc)) == SandboxEffect.None;
+           CompiledIntrinsicBindingMatcher.IsPureRuntimeStub(
+               binding,
+               BoxedMethod(kind),
+               SandboxType.F64,
+               [SandboxType.F64],
+               requireUnboundedCost: true);
 
     private static bool TryGetKind(string id, out ExpressionKind kind)
     {

@@ -5,6 +5,22 @@ namespace DotBoxD.Plugins.Runtime;
 
 internal static class PluginManifestEffectValidator
 {
+    private static readonly IReadOnlyDictionary<string, SandboxEffect> DeclaredEffects =
+        new Dictionary<string, SandboxEffect>(StringComparer.Ordinal)
+        {
+            [nameof(SandboxEffect.Cpu)] = SandboxEffect.Cpu,
+            [nameof(SandboxEffect.Alloc)] = SandboxEffect.Alloc,
+            [nameof(SandboxEffect.Time)] = SandboxEffect.Time,
+            [nameof(SandboxEffect.Random)] = SandboxEffect.Random,
+            [nameof(SandboxEffect.FileRead)] = SandboxEffect.FileRead,
+            [nameof(SandboxEffect.FileWrite)] = SandboxEffect.FileWrite,
+            [nameof(SandboxEffect.Network)] = SandboxEffect.Network,
+            [nameof(SandboxEffect.HostStateRead)] = SandboxEffect.HostStateRead,
+            [nameof(SandboxEffect.HostStateWrite)] = SandboxEffect.HostStateWrite,
+            [nameof(SandboxEffect.Concurrency)] = SandboxEffect.Concurrency,
+            [nameof(SandboxEffect.Audit)] = SandboxEffect.Audit
+        };
+
     public static SandboxEffect Validate(
         PluginManifest manifest,
         List<SandboxDiagnostic> diagnostics)
@@ -38,24 +54,11 @@ internal static class PluginManifestEffectValidator
     }
 
     private static bool TryParseDeclaredEffect(
-        string effect,
+        string? effect,
         out SandboxEffect parsed)
     {
-        parsed = effect switch
-        {
-            nameof(SandboxEffect.Cpu) => SandboxEffect.Cpu,
-            nameof(SandboxEffect.Alloc) => SandboxEffect.Alloc,
-            nameof(SandboxEffect.Time) => SandboxEffect.Time,
-            nameof(SandboxEffect.Random) => SandboxEffect.Random,
-            nameof(SandboxEffect.FileRead) => SandboxEffect.FileRead,
-            nameof(SandboxEffect.FileWrite) => SandboxEffect.FileWrite,
-            nameof(SandboxEffect.Network) => SandboxEffect.Network,
-            nameof(SandboxEffect.HostStateRead) => SandboxEffect.HostStateRead,
-            nameof(SandboxEffect.HostStateWrite) => SandboxEffect.HostStateWrite,
-            nameof(SandboxEffect.Concurrency) => SandboxEffect.Concurrency,
-            nameof(SandboxEffect.Audit) => SandboxEffect.Audit,
-            _ => SandboxEffect.None
-        };
-        return parsed != SandboxEffect.None;
+        parsed = SandboxEffect.None;
+        return effect is not null &&
+               DeclaredEffects.TryGetValue(effect, out parsed);
     }
 }

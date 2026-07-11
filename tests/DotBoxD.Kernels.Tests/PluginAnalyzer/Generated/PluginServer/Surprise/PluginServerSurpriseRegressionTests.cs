@@ -1,5 +1,7 @@
 using Microsoft.CodeAnalysis;
 
+using static DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginServerSurpriseRegressionTestSources;
+
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
 public sealed partial class PluginServerSurpriseRegressionTests

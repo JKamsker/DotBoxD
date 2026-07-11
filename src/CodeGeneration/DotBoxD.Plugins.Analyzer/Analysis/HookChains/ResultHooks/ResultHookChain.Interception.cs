@@ -48,52 +48,145 @@ internal static partial class ResultHookChain
             hasServerContextParameter,
             isAsyncLocal,
             hasCancellationToken);
+        var installKind = ResultInstallKind(isLocal);
 
-        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol method &&
-            method.Parameters.Length >= 1 &&
-            method.Parameters[0].Type is INamedTypeSymbol handlerType &&
-            ResolvedReceiverType(method, model.GetTypeInfo(receiver, cancellationToken).Type) is { } resolvedReceiverType)
-        {
-            var resolvedReceiverFullName = resolvedReceiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            return new HookChainInterception(
-                location.GetInterceptsLocationAttributeSyntax(),
-                resolvedReceiverFullName,
-                handlerType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-                method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+        if (TryCreateSymbolResolvedInterception(
+                invocation,
+                receiver,
+                model,
+                location,
                 packageFullName,
-                isLocal ? HookChainInterceptorInstallKind.LocalResultChain : HookChainInterceptorInstallKind.ResultChain,
-                ResultTypeFullName: resultFullName);
+                resultFullName,
+                installKind,
+                cancellationToken,
+                out var symbolResolvedInterception))
+        {
+            return symbolResolvedInterception;
         }
 
-        if (model.GetTypeInfo(receiver, cancellationToken).Type is not INamedTypeSymbol receiverType ||
-            receiverType.TypeKind == TypeKind.Error)
+        if (ValidReceiverType(receiver, model, cancellationToken) is not { } receiverType)
         {
-            return generatedRemoteKind is null
-                ? null
-                : GeneratedRemoteHookChainFallback.CreateResultInterception(
-                    location.GetInterceptsLocationAttributeSyntax(),
-                    contextFullName,
-                    receiverIsStage,
-                    resultFullName,
-                    generatedRemoteServerContextTypeFullName,
-                    hasServerContextParameter,
-                    isAsyncLocal,
-                    hasCancellationToken,
-                    packageFullName,
-                    isLocal ? HookChainInterceptorInstallKind.LocalResultChain : HookChainInterceptorInstallKind.ResultChain,
-                    generatedRemoteKind.Value);
+            return CreateGeneratedResultInterception(
+                location,
+                ExperimentalAttributeSource.FromTypes(contextType, resultType),
+                contextFullName,
+                receiverIsStage,
+                resultFullName,
+                generatedRemoteServerContextTypeFullName,
+                hasServerContextParameter,
+                isAsyncLocal,
+                hasCancellationToken,
+                packageFullName,
+                installKind,
+                generatedRemoteKind);
         }
 
         var receiverFullName = receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         return new HookChainInterception(
             location.GetInterceptsLocationAttributeSyntax(),
+            ExperimentalAttributeSource.FromTypes(receiverType, contextType, resultType),
             receiverFullName,
             handlerFullName,
             receiverFullName,
             packageFullName,
-            isLocal ? HookChainInterceptorInstallKind.LocalResultChain : HookChainInterceptorInstallKind.ResultChain,
+            installKind,
             ResultTypeFullName: resultFullName);
     }
+
+    private static bool TryCreateSymbolResolvedInterception(
+        InvocationExpressionSyntax invocation,
+        ExpressionSyntax receiver,
+        SemanticModel model,
+        InterceptableLocation location,
+        string packageFullName,
+        string resultFullName,
+        HookChainInterceptorInstallKind installKind,
+        CancellationToken cancellationToken,
+        out HookChainInterception? interception)
+    {
+        interception = null;
+        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method)
+        {
+            return false;
+        }
+
+        if (method.Parameters.Length < 1)
+        {
+            return false;
+        }
+
+        if (method.Parameters[0].Type is not INamedTypeSymbol handlerType)
+        {
+            return false;
+        }
+
+        var resolvedReceiver = ResolvedReceiverType(method, model.GetTypeInfo(receiver, cancellationToken).Type);
+        if (resolvedReceiver is null)
+        {
+            return false;
+        }
+
+        interception = new HookChainInterception(
+            location.GetInterceptsLocationAttributeSyntax(),
+            ExperimentalAttributeSource.FromTypes(resolvedReceiver, handlerType, method.ReturnType),
+            resolvedReceiver.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            handlerType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            packageFullName,
+            installKind,
+            ResultTypeFullName: resultFullName);
+        return true;
+    }
+
+    private static INamedTypeSymbol? ValidReceiverType(
+        ExpressionSyntax receiver,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (model.GetTypeInfo(receiver, cancellationToken).Type is not INamedTypeSymbol receiverType)
+        {
+            return null;
+        }
+
+        return receiverType.TypeKind == TypeKind.Error ? null : receiverType;
+    }
+
+    private static HookChainInterception? CreateGeneratedResultInterception(
+        InterceptableLocation location,
+        string generatedAttributeSource,
+        string contextFullName,
+        bool receiverIsStage,
+        string resultFullName,
+        string? generatedRemoteServerContextTypeFullName,
+        bool hasServerContextParameter,
+        bool isAsyncLocal,
+        bool hasCancellationToken,
+        string packageFullName,
+        HookChainInterceptorInstallKind installKind,
+        GeneratedRemoteHookChainKind? generatedRemoteKind)
+    {
+        if (generatedRemoteKind is null)
+        {
+            return null;
+        }
+
+        return GeneratedRemoteHookChainFallback.CreateResultInterception(
+            location.GetInterceptsLocationAttributeSyntax(),
+            generatedAttributeSource,
+            contextFullName,
+            receiverIsStage,
+            resultFullName,
+            generatedRemoteServerContextTypeFullName,
+            hasServerContextParameter,
+            isAsyncLocal,
+            hasCancellationToken,
+            packageFullName,
+            installKind,
+            generatedRemoteKind.Value);
+    }
+
+    private static HookChainInterceptorInstallKind ResultInstallKind(bool isLocal)
+        => isLocal ? HookChainInterceptorInstallKind.LocalResultChain : HookChainInterceptorInstallKind.ResultChain;
 
     private static INamedTypeSymbol? ResolvedReceiverType(IMethodSymbol method, ITypeSymbol? expressionReceiverType)
         => method.ReceiverType is INamedTypeSymbol { TypeKind: not TypeKind.Error } receiverType

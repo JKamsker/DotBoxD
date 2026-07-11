@@ -14,6 +14,14 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
     private static readonly byte[] ErrorMessageKey = Encoding.UTF8.GetBytes("ErrorMessage");
     private static readonly byte[] ErrorTypeKey = Encoding.UTF8.GetBytes("ErrorType");
     private static readonly byte[] StreamKey = Encoding.UTF8.GetBytes("Stream");
+    private static readonly RpcResponseFieldName[] FieldNames =
+    [
+        new("MessageId", MessageIdKey, RpcResponseField.MessageId),
+        new("IsSuccess", IsSuccessKey, RpcResponseField.IsSuccess),
+        new("ErrorMessage", ErrorMessageKey, RpcResponseField.ErrorMessage),
+        new("ErrorType", ErrorTypeKey, RpcResponseField.ErrorType),
+        new("Stream", StreamKey, RpcResponseField.Stream)
+    ];
 
     private RpcResponseFormatter()
     {
@@ -41,41 +49,57 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
     public RpcResponse Deserialize(ref MessagePackReader reader, MessagePackSerializerOptions options)
     {
         var count = reader.ReadMapHeader();
-        var response = new RpcResponse();
-        var seenMessageId = false;
-        var seenIsSuccess = false;
-        var seenErrorMessage = false;
-        var seenErrorType = false;
-        var seenStream = false;
+        var state = new RpcResponseReadState(options);
 
         for (var i = 0; i < count; i++)
         {
-            switch (ReadField(ref reader))
+            state.ReadField(ReadField(ref reader), ref reader);
+        }
+
+        state.ValidateRequiredFields();
+        ValidateEnvelope(state.Response);
+        return state.Response;
+    }
+
+    private sealed class RpcResponseReadState(MessagePackSerializerOptions options)
+    {
+        private bool _seenMessageId;
+        private bool _seenIsSuccess;
+        private bool _seenErrorMessage;
+        private bool _seenErrorType;
+        private bool _seenStream;
+        private RpcResponse _response;
+
+        public RpcResponse Response => _response;
+
+        public void ReadField(RpcResponseField field, ref MessagePackReader reader)
+        {
+            switch (field)
             {
                 case RpcResponseField.MessageId:
-                    ThrowIfDuplicate(seenMessageId, nameof(RpcResponse.MessageId));
-                    seenMessageId = true;
-                    response.MessageId = reader.ReadInt32();
+                    ThrowIfDuplicate(_seenMessageId, nameof(RpcResponse.MessageId));
+                    _seenMessageId = true;
+                    _response.MessageId = reader.ReadInt32();
                     break;
                 case RpcResponseField.IsSuccess:
-                    ThrowIfDuplicate(seenIsSuccess, nameof(RpcResponse.IsSuccess));
-                    seenIsSuccess = true;
-                    response.IsSuccess = reader.ReadBoolean();
+                    ThrowIfDuplicate(_seenIsSuccess, nameof(RpcResponse.IsSuccess));
+                    _seenIsSuccess = true;
+                    _response.IsSuccess = reader.ReadBoolean();
                     break;
                 case RpcResponseField.ErrorMessage:
-                    ThrowIfDuplicate(seenErrorMessage, nameof(RpcResponse.ErrorMessage));
-                    seenErrorMessage = true;
-                    response.ErrorMessage = reader.ReadString();
+                    ThrowIfDuplicate(_seenErrorMessage, nameof(RpcResponse.ErrorMessage));
+                    _seenErrorMessage = true;
+                    _response.ErrorMessage = reader.ReadString();
                     break;
                 case RpcResponseField.ErrorType:
-                    ThrowIfDuplicate(seenErrorType, nameof(RpcResponse.ErrorType));
-                    seenErrorType = true;
-                    response.ErrorType = reader.ReadString();
+                    ThrowIfDuplicate(_seenErrorType, nameof(RpcResponse.ErrorType));
+                    _seenErrorType = true;
+                    _response.ErrorType = reader.ReadString();
                     break;
                 case RpcResponseField.Stream:
-                    ThrowIfDuplicate(seenStream, nameof(RpcResponse.Stream));
-                    seenStream = true;
-                    response.Stream = ReadNullableStream(ref reader, options);
+                    ThrowIfDuplicate(_seenStream, nameof(RpcResponse.Stream));
+                    _seenStream = true;
+                    _response.Stream = ReadNullableStream(ref reader, options);
                     break;
                 default:
                     MessagePackEnvelopeSkipper.SkipUnknownField(ref reader, "RPC response");
@@ -83,20 +107,20 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
             }
         }
 
-        if (!seenMessageId)
+        public void ValidateRequiredFields()
         {
-            throw new RpcEnvelopeValidationException(
-                "RPC response is missing required MessageId.");
-        }
+            if (!_seenMessageId)
+            {
+                throw new RpcEnvelopeValidationException(
+                    "RPC response is missing required MessageId.");
+            }
 
-        if (!seenIsSuccess)
-        {
-            throw new RpcEnvelopeValidationException(
-                "RPC response is missing required IsSuccess.");
+            if (!_seenIsSuccess)
+            {
+                throw new RpcEnvelopeValidationException(
+                    "RPC response is missing required IsSuccess.");
+            }
         }
-
-        ValidateEnvelope(response);
-        return response;
     }
 
     private static void ValidateEnvelope(RpcResponse response)
@@ -117,6 +141,16 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
                 "Successful RPC response must not contain error fields.");
         }
 
+        if (!response.IsSuccess)
+        {
+            ThrowIfMissingOrBlankErrorDetail(
+                response.ErrorMessage,
+                nameof(RpcResponse.ErrorMessage));
+            ThrowIfMissingOrBlankErrorDetail(
+                response.ErrorType,
+                nameof(RpcResponse.ErrorType));
+        }
+
         if (!response.IsSuccess && response.Stream is not null)
         {
             throw new RpcEnvelopeValidationException(
@@ -124,12 +158,19 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
         }
     }
 
-    private static IMessagePackFormatter<RpcStreamHandle> GetStreamFormatter(
-        MessagePackSerializerOptions options)
+    private static void ThrowIfMissingOrBlankErrorDetail(string? value, string fieldName)
     {
-        return options.Resolver.GetFormatter<RpcStreamHandle>()
-            ?? throw new MessagePackSerializationException(
-                "No MessagePack formatter is registered for RPC stream handles.");
+        if (value is null)
+        {
+            throw new RpcEnvelopeValidationException(
+                $"Error RPC response is missing required {fieldName}.");
+        }
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new RpcEnvelopeValidationException(
+                $"Error RPC response contains blank {fieldName}.");
+        }
     }
 
     private static void ThrowIfDuplicate(bool alreadySeen, string fieldName)
@@ -163,7 +204,10 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
             return;
         }
 
-        GetStreamFormatter(options).Serialize(ref writer, value.GetValueOrDefault(), options);
+        RpcStreamHandleFormatter.Instance.Serialize(
+            ref writer,
+            value.GetValueOrDefault(),
+            options);
     }
 
     private static RpcStreamHandle? ReadNullableStream(
@@ -175,50 +219,43 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
             return null;
         }
 
-        return GetStreamFormatter(options).Deserialize(ref reader, options);
+        return RpcStreamHandleFormatter.Instance.Deserialize(ref reader, options);
     }
 
     private static RpcResponseField ReadField(ref MessagePackReader reader)
     {
         if (reader.TryReadStringSpan(out var utf8))
         {
-            if (utf8.SequenceEqual(MessageIdKey))
-            {
-                return RpcResponseField.MessageId;
-            }
-
-            if (utf8.SequenceEqual(IsSuccessKey))
-            {
-                return RpcResponseField.IsSuccess;
-            }
-
-            if (utf8.SequenceEqual(ErrorMessageKey))
-            {
-                return RpcResponseField.ErrorMessage;
-            }
-
-            if (utf8.SequenceEqual(ErrorTypeKey))
-            {
-                return RpcResponseField.ErrorType;
-            }
-
-            if (utf8.SequenceEqual(StreamKey))
-            {
-                return RpcResponseField.Stream;
-            }
-
-            return RpcResponseField.Unknown;
+            return ReadField(utf8);
         }
 
-        return reader.ReadString() switch
+        return ReadField(reader.ReadString());
+    }
+
+    private static RpcResponseField ReadField(ReadOnlySpan<byte> utf8)
+    {
+        foreach (var field in FieldNames)
         {
-            "MessageId" => RpcResponseField.MessageId,
-            "IsSuccess" => RpcResponseField.IsSuccess,
-            "ErrorMessage" => RpcResponseField.ErrorMessage,
-            "ErrorType" => RpcResponseField.ErrorType,
-            "Stream" => RpcResponseField.Stream,
-            _ => RpcResponseField.Unknown,
-        };
+            if (utf8.SequenceEqual(field.Utf8Name))
+            {
+                return field.Field;
+            }
+        }
+
+        return RpcResponseField.Unknown;
+    }
+
+    private static RpcResponseField ReadField(string? name)
+    {
+        foreach (var field in FieldNames)
+        {
+            if (string.Equals(name, field.Name, StringComparison.Ordinal))
+            {
+                return field.Field;
+            }
+        }
+
+        return RpcResponseField.Unknown;
     }
 
     private enum RpcResponseField
@@ -229,5 +266,21 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
         ErrorMessage,
         ErrorType,
         Stream,
+    }
+
+    private readonly struct RpcResponseFieldName
+    {
+        public RpcResponseFieldName(string name, byte[] utf8Name, RpcResponseField field)
+        {
+            Name = name;
+            Utf8Name = utf8Name;
+            Field = field;
+        }
+
+        public string Name { get; }
+
+        public byte[] Utf8Name { get; }
+
+        public RpcResponseField Field { get; }
     }
 }

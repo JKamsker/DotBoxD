@@ -17,6 +17,7 @@ public static class EventQueryPlanner
     public static EventQueryPlan Plan(EventQueryDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
+        EventQueryDocumentInvariants.RequireValidShape(document);
         return Plan(document.Filter);
     }
 
@@ -55,37 +56,54 @@ public static class EventQueryPlanner
 
         foreach (var term in terms)
         {
-            // Host-indexable predicates feed the host index AND are fully covered there; everything else stays
-            // residual so the host re-verifies it. Equality of any non-null kind still becomes a routing key
-            // for the dispatcher's own index, even when the host cannot carry that kind.
-            var hostIndexed = TryHostIndex(term, out var hostPredicate);
-            if (hostIndexed)
-            {
-                indexed.Add(hostPredicate);
-            }
-
-            if (TryRoutingKey(term, out var routeKey))
-            {
-                routing.Add(routeKey);
-            }
-
-            if (!hostIndexed)
-            {
-                residual.Add(term);
-            }
+            AddTerm(term, indexed, routing, residual);
         }
-
-        var coverage = residual.Count == 0
-            ? IndexCoverage.Full
-            : indexed.Count == 0 ? IndexCoverage.None : IndexCoverage.Partial;
 
         return new EventQueryPlan
         {
             IndexedPredicates = indexed,
             RoutingKeys = routing,
             ResidualFilter = residual.Count == 0 ? null : QueryFilter.And(residual),
-            Coverage = coverage,
+            Coverage = Coverage(indexed, residual),
         };
+    }
+
+    private static void AddTerm(
+        QueryFilter term,
+        ICollection<IndexedPredicate> indexed,
+        ICollection<IndexedPredicate> routing,
+        ICollection<QueryFilter> residual)
+    {
+        // Host-indexable predicates feed the host index AND are fully covered there; everything else stays
+        // residual so the host re-verifies it. Equality of any non-null kind still becomes a routing key
+        // for the dispatcher's own index, even when the host cannot carry that kind.
+        var hostIndexed = TryHostIndex(term, out var hostPredicate);
+        if (hostIndexed)
+        {
+            indexed.Add(hostPredicate);
+        }
+
+        if (TryRoutingKey(term, out var routeKey))
+        {
+            routing.Add(routeKey);
+        }
+
+        if (!hostIndexed)
+        {
+            residual.Add(term);
+        }
+    }
+
+    private static IndexCoverage Coverage(
+        IReadOnlyCollection<IndexedPredicate> indexed,
+        IReadOnlyCollection<QueryFilter> residual)
+    {
+        if (residual.Count == 0)
+        {
+            return IndexCoverage.Full;
+        }
+
+        return indexed.Count == 0 ? IndexCoverage.None : IndexCoverage.Partial;
     }
 
     // A host-indexable predicate: a non-ignore-case comparison whose value kind the host index vocabulary

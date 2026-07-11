@@ -5,6 +5,24 @@ namespace DotBoxD.CodeGeneration.Shared.Defaults;
 
 internal static class ParameterDefaultValueEmitter
 {
+    private static readonly System.Collections.Generic.Dictionary<SpecialType, object> RuntimeDefaults = new()
+    {
+        [SpecialType.System_Boolean] = false,
+        [SpecialType.System_Char] = '\0',
+        [SpecialType.System_SByte] = (sbyte)0,
+        [SpecialType.System_Byte] = (byte)0,
+        [SpecialType.System_Int16] = (short)0,
+        [SpecialType.System_UInt16] = (ushort)0,
+        [SpecialType.System_Int32] = 0,
+        [SpecialType.System_UInt32] = 0U,
+        [SpecialType.System_Int64] = 0L,
+        [SpecialType.System_UInt64] = 0UL,
+        [SpecialType.System_Single] = 0F,
+        [SpecialType.System_Double] = 0D,
+        [SpecialType.System_Decimal] = 0M,
+        [SpecialType.System_DateTime] = default(System.DateTime),
+    };
+
     public static bool HasDefaultValue(IParameterSymbol parameter)
         => parameter.HasExplicitDefaultValue ||
            ParameterDefaultMetadataReader.HasOptionalMetadata(parameter);
@@ -125,24 +143,34 @@ internal static class ParameterDefaultValueEmitter
     {
         if (parameter.HasExplicitDefaultValue)
         {
-            var explicitDefaultValue = parameter.ExplicitDefaultValue;
-            if (explicitDefaultValue is not null ||
-                parameter.Type.IsReferenceType ||
-                parameter.Type.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
-            {
-                value = explicitDefaultValue;
-                return true;
-            }
+            return TryGetExplicitRuntimeDefaultValue(parameter, out value);
+        }
 
-            if (TryGetRuntimeDefaultValue(parameter.Type, out value))
-            {
-                return true;
-            }
+        return TryGetMetadataRuntimeDefaultValue(parameter, out value);
+    }
 
+    private static bool TryGetExplicitRuntimeDefaultValue(IParameterSymbol parameter, out object? value)
+    {
+        var explicitDefaultValue = parameter.ExplicitDefaultValue;
+        if (explicitDefaultValue is not null ||
+            parameter.Type.IsReferenceType ||
+            parameter.Type.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
+        {
             value = explicitDefaultValue;
             return true;
         }
 
+        if (TryGetRuntimeDefaultValue(parameter.Type, out value))
+        {
+            return true;
+        }
+
+        value = explicitDefaultValue;
+        return true;
+    }
+
+    private static bool TryGetMetadataRuntimeDefaultValue(IParameterSymbol parameter, out object? value)
+    {
         if (!ParameterDefaultMetadataReader.HasOptionalMetadata(parameter))
         {
             value = null;
@@ -200,50 +228,9 @@ internal static class ParameterDefaultValueEmitter
             return true;
         }
 
-        switch (type.SpecialType)
+        if (RuntimeDefaults.TryGetValue(type.SpecialType, out value))
         {
-            case SpecialType.System_Boolean:
-                value = false;
-                return true;
-            case SpecialType.System_Char:
-                value = '\0';
-                return true;
-            case SpecialType.System_SByte:
-                value = (sbyte)0;
-                return true;
-            case SpecialType.System_Byte:
-                value = (byte)0;
-                return true;
-            case SpecialType.System_Int16:
-                value = (short)0;
-                return true;
-            case SpecialType.System_UInt16:
-                value = (ushort)0;
-                return true;
-            case SpecialType.System_Int32:
-                value = 0;
-                return true;
-            case SpecialType.System_UInt32:
-                value = 0U;
-                return true;
-            case SpecialType.System_Int64:
-                value = 0L;
-                return true;
-            case SpecialType.System_UInt64:
-                value = 0UL;
-                return true;
-            case SpecialType.System_Single:
-                value = 0F;
-                return true;
-            case SpecialType.System_Double:
-                value = 0D;
-                return true;
-            case SpecialType.System_Decimal:
-                value = 0M;
-                return true;
-            case SpecialType.System_DateTime:
-                value = default(System.DateTime);
-                return true;
+            return true;
         }
 
         if (type.Name == nameof(System.Guid) &&
@@ -264,35 +251,13 @@ internal static class ParameterDefaultValueEmitter
 
     private static bool TryGetEnumRuntimeDefaultValue(INamedTypeSymbol enumType, out object value)
     {
-        switch (enumType.EnumUnderlyingType?.SpecialType)
+        if (enumType.EnumUnderlyingType is { } underlying &&
+            RuntimeDefaults.TryGetValue(underlying.SpecialType, out value!))
         {
-            case SpecialType.System_SByte:
-                value = (sbyte)0;
-                return true;
-            case SpecialType.System_Byte:
-                value = (byte)0;
-                return true;
-            case SpecialType.System_Int16:
-                value = (short)0;
-                return true;
-            case SpecialType.System_UInt16:
-                value = (ushort)0;
-                return true;
-            case SpecialType.System_Int32:
-                value = 0;
-                return true;
-            case SpecialType.System_UInt32:
-                value = 0U;
-                return true;
-            case SpecialType.System_Int64:
-                value = 0L;
-                return true;
-            case SpecialType.System_UInt64:
-                value = 0UL;
-                return true;
-            default:
-                value = 0;
-                return false;
+            return true;
         }
+
+        value = 0;
+        return false;
     }
 }

@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="CsCheck" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="4.14.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net461" PrivateAssets="all" />
@@ -32,6 +33,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DotBoxD.Kernels.TestFixtures.PluginAbstractions\DotBoxD.Kernels.TestFixtures.PluginAbstractions.csproj" />
+    <ProjectReference Include="..\DotBoxD.Kernels.TestFixtures.MergeableIr\DotBoxD.Kernels.TestFixtures.MergeableIr.csproj" />
     <ProjectReference Include="..\DotBoxD.Kernels.TestFixtures.PluginLocal\DotBoxD.Kernels.TestFixtures.PluginLocal.csproj" />
     <ProjectReference Include="..\..\src\CodeGeneration\DotBoxD.Plugins.Analyzer\DotBoxD.Plugins.Analyzer.csproj" />
     <ProjectReference Include="..\..\src\CodeGeneration\DotBoxD.Plugins.Fody\DotBoxD.Plugins.Fody.csproj" />

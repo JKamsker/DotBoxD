@@ -24,10 +24,23 @@ public sealed class RpcProtocolErrorEventArgs : EventArgs
         string message,
         Exception? error)
     {
-        RemoteEndpoint = remoteEndpoint ?? throw new ArgumentNullException(nameof(remoteEndpoint));
+        RemoteEndpoint = DiagnosticArgumentGuard.RequireNonBlank(
+            remoteEndpoint,
+            nameof(remoteEndpoint),
+            "Remote endpoint");
         MessageId = messageId;
         MessageType = messageType;
-        Message = message ?? throw new ArgumentNullException(nameof(message));
+        if (message is null)
+        {
+            throw new ArgumentNullException(nameof(message));
+        }
+
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            throw new ArgumentException("Message must not be empty or whitespace.", nameof(message));
+        }
+
+        Message = message;
         Error = error;
     }
 

@@ -37,52 +37,19 @@ internal static partial class HookChainModelFactory
             ? DotBoxDGenerationNames.TypeNames.GlobalPrefix + chainModel.PackageName
             : DotBoxDGenerationNames.TypeNames.GlobalPrefix + chainModel.Namespace + "." + chainModel.PackageName;
 
-        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol method &&
-            method.Parameters.Length >= 1 &&
-            model.GetTypeInfo(receiver, cancellationToken).Type is INamedTypeSymbol expressionReceiverType &&
-            ResolvedReceiverType(method, expressionReceiverType) is { } receiverType &&
-            ReceiverKind(receiverType) is not null)
-        {
-            // When the terminal projection is an anonymous type, neither the receiver (RemoteHookStage<TEvent, T>)
-            // nor the handler (Func/Action<T, ...>) can spell T in C# source. Emit a GENERIC interceptor whose
-            // arity matches the interceptable method's generic context (CS9177): EVERY receiver type argument
-            // becomes a type parameter (reusing the receiver's own parameter names), and the receiver/handler/
-            // return types reference those parameters. Roslyn infers them - including the anonymous one - at the
-            // call site, so the emitted source never names the anonymous type.
-            if (projectedTypeSymbol is INamedTypeSymbol { IsAnonymousType: true } anonymousProjection &&
-                method.Parameters[0].Type is INamedTypeSymbol handlerType)
-            {
-                var typeParameters = receiverType.ConstructedFrom.TypeParameters;
-                var substitution = new Dictionary<ISymbol, string>(SymbolEqualityComparer.Default);
-                for (var i = 0; i < receiverType.TypeArguments.Length && i < typeParameters.Length; i++)
-                {
-                    substitution[receiverType.TypeArguments[i]] = typeParameters[i].Name;
-                }
-
-                return new HookChainInterception(
-                    location.GetInterceptsLocationAttributeSyntax(),
-                    RewriteWithTypeParameters(receiverType, substitution),
-                    RewriteWithTypeParameters(handlerType, substitution),
-                    RewriteWithTypeParameters((INamedTypeSymbol)method.ReturnType, substitution),
-                    packageFullName,
-                    installKind,
-                    hasLocalDecoder,
-                    hasLocalDecoder && substitution.TryGetValue(anonymousProjection, out var decoderTypeArgument)
-                        ? decoderTypeArgument
-                        : null,
-                    string.Join(", ", typeParameters.Select(parameter => parameter.Name)),
-                    BypassReceiverStage: BypassReceiverStage(receiverType));
-            }
-
-            return new HookChainInterception(
-                location.GetInterceptsLocationAttributeSyntax(),
-                receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-                method.Parameters[0].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-                method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+        if (TryKnownReceiverInterception(
+                invocation,
+                model,
+                receiver,
                 packageFullName,
                 installKind,
                 hasLocalDecoder,
-                BypassReceiverStage: BypassReceiverStage(receiverType));
+                projectedTypeSymbol,
+                location.GetInterceptsLocationAttributeSyntax(),
+                cancellationToken,
+                out var knownInterception))
+        {
+            return knownInterception;
         }
 
         if (generatedRemoteKind is null)
@@ -103,6 +70,7 @@ internal static partial class HookChainModelFactory
 
         return GeneratedRemoteHookChainFallback.CreateInterception(
             location.GetInterceptsLocationAttributeSyntax(),
+            ExperimentalAttributeSource.FromTypes(eventType, projectedTypeSymbol),
             eventType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             stages.Any(stage => stage.IsSelect),
             terminalElementTypeFullName,
@@ -114,6 +82,127 @@ internal static partial class HookChainModelFactory
             generatedRemoteKind.Value,
             hasLocalDecoder);
     }
+
+    private static bool TryKnownReceiverInterception(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        ExpressionSyntax receiver,
+        string packageFullName,
+        HookChainInterceptorInstallKind installKind,
+        bool hasLocalDecoder,
+        ITypeSymbol? projectedTypeSymbol,
+        string attributeSyntax,
+        CancellationToken cancellationToken,
+        out HookChainInterception interception)
+    {
+        interception = null!;
+        if (!TryKnownReceiverContext(invocation, model, receiver, cancellationToken, out var context))
+        {
+            return false;
+        }
+
+        interception = TryAnonymousProjectionInterception(
+                context,
+                projectedTypeSymbol,
+                attributeSyntax,
+                packageFullName,
+                installKind,
+                hasLocalDecoder) ??
+            OrdinaryReceiverInterception(context, attributeSyntax, packageFullName, installKind, hasLocalDecoder);
+        return true;
+    }
+
+    private static bool TryKnownReceiverContext(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        ExpressionSyntax receiver,
+        CancellationToken cancellationToken,
+        out KnownReceiverInterceptionContext context)
+    {
+        context = default;
+        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method ||
+            method.Parameters.Length < 1 ||
+            model.GetTypeInfo(receiver, cancellationToken).Type is not INamedTypeSymbol expressionReceiverType)
+        {
+            return false;
+        }
+
+        var receiverType = ResolvedReceiverType(method, expressionReceiverType);
+        if (receiverType is null || ReceiverKind(receiverType, model.Compilation) is null)
+        {
+            return false;
+        }
+
+        context = new KnownReceiverInterceptionContext(method, receiverType);
+        return true;
+    }
+
+    private static HookChainInterception? TryAnonymousProjectionInterception(
+        KnownReceiverInterceptionContext context,
+        ITypeSymbol? projectedTypeSymbol,
+        string attributeSyntax,
+        string packageFullName,
+        HookChainInterceptorInstallKind installKind,
+        bool hasLocalDecoder)
+    {
+        if (projectedTypeSymbol is not INamedTypeSymbol { IsAnonymousType: true } anonymousProjection ||
+            context.Method.Parameters[0].Type is not INamedTypeSymbol handlerType ||
+            context.Method.ReturnType is not INamedTypeSymbol returnType)
+        {
+            return null;
+        }
+
+        var receiverType = context.ReceiverType;
+        var typeParameters = receiverType.ConstructedFrom.TypeParameters;
+        var substitution = TypeParameterSubstitution(receiverType, typeParameters);
+        return new HookChainInterception(
+            attributeSyntax,
+            ExperimentalAttributeSource.FromTypes(receiverType, handlerType, returnType),
+            RewriteWithTypeParameters(receiverType, substitution),
+            RewriteWithTypeParameters(handlerType, substitution),
+            RewriteWithTypeParameters(returnType, substitution),
+            packageFullName,
+            installKind,
+            hasLocalDecoder,
+            hasLocalDecoder && substitution.TryGetValue(anonymousProjection, out var decoderTypeArgument)
+                ? decoderTypeArgument
+                : null,
+            string.Join(", ", typeParameters.Select(parameter => parameter.Name)),
+            BypassReceiverStage: BypassReceiverStage(receiverType));
+    }
+
+    private static Dictionary<ISymbol, string> TypeParameterSubstitution(
+        INamedTypeSymbol receiverType,
+        IReadOnlyList<ITypeParameterSymbol> typeParameters)
+    {
+        var substitution = new Dictionary<ISymbol, string>(SymbolEqualityComparer.Default);
+        for (var i = 0; i < receiverType.TypeArguments.Length && i < typeParameters.Count; i++)
+        {
+            substitution[receiverType.TypeArguments[i]] = typeParameters[i].Name;
+        }
+
+        return substitution;
+    }
+
+    private static HookChainInterception OrdinaryReceiverInterception(
+        KnownReceiverInterceptionContext context,
+        string attributeSyntax,
+        string packageFullName,
+        HookChainInterceptorInstallKind installKind,
+        bool hasLocalDecoder)
+        => new(
+            attributeSyntax,
+            ExperimentalAttributeSource.FromTypes(
+                context.ReceiverType,
+                context.Method.Parameters[0].Type,
+                context.Method.ReturnType),
+            context.ReceiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            context.Method.Parameters[0].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            context.Method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            packageFullName,
+            installKind,
+            hasLocalDecoder,
+            BypassReceiverStage: BypassReceiverStage(context.ReceiverType));
 
     private static bool BypassReceiverStage(INamedTypeSymbol receiverType)
     {
@@ -162,6 +251,10 @@ internal static partial class HookChainModelFactory
                 "anonymous terminal projections on generated-server chains require a named record projection",
             _ => "the call site is not interceptable"
         };
+
+    private readonly record struct KnownReceiverInterceptionContext(
+        IMethodSymbol Method,
+        INamedTypeSymbol ReceiverType);
 
     private enum InterceptionFailureReason
     {

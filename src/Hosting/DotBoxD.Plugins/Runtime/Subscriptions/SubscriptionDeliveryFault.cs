@@ -21,7 +21,33 @@ public enum SubscriptionDeliveryStage
 /// <param name="EventType">The event type whose delivery faulted.</param>
 /// <param name="Stage">The delivery stage that threw.</param>
 /// <param name="Exception">The exception that was caught.</param>
-public readonly record struct SubscriptionDeliveryFault(
+public sealed record SubscriptionDeliveryFault(
     Type EventType,
     SubscriptionDeliveryStage Stage,
-    Exception Exception);
+    Exception Exception)
+{
+    private Type _eventType = EventType ?? throw new ArgumentNullException(nameof(EventType));
+    private SubscriptionDeliveryStage _stage = Defined(Stage);
+    private Exception _exception = Exception ?? throw new ArgumentNullException(nameof(Exception));
+
+    public Type EventType
+    {
+        get => _eventType;
+        init => _eventType = value ?? throw new ArgumentNullException(nameof(EventType));
+    }
+
+    public SubscriptionDeliveryStage Stage
+    {
+        get => _stage;
+        init => _stage = Defined(value);
+    }
+
+    public Exception Exception
+    {
+        get => _exception;
+        init => _exception = value ?? throw new ArgumentNullException(nameof(Exception));
+    }
+
+    private static SubscriptionDeliveryStage Defined(SubscriptionDeliveryStage value)
+        => Enum.IsDefined(value) ? value : throw new ArgumentOutOfRangeException(nameof(Stage));
+}

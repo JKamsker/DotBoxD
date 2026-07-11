@@ -174,23 +174,50 @@ internal static class KernelMethodArgumentReuseValidator
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return expression switch
+        var current = UnwrapParentheses(expression);
+        if (IsRepeatableLeaf(current))
         {
-            ParenthesizedExpressionSyntax parenthesized =>
-                IsRepeatableArgument(parenthesized.Expression, callSiteSemanticModel, cancellationToken),
-            LiteralExpressionSyntax => true,
-            IdentifierNameSyntax => true,
+            return true;
+        }
+
+        return current switch
+        {
             MemberAccessExpressionSyntax member =>
                 IsRepeatableMemberAccess(member, callSiteSemanticModel, cancellationToken),
             PrefixUnaryExpressionSyntax unary =>
                 IsRepeatableArgument(unary.Operand, callSiteSemanticModel, cancellationToken),
             BinaryExpressionSyntax binary =>
-                IsRepeatableArgument(binary.Left, callSiteSemanticModel, cancellationToken) &&
-                IsRepeatableArgument(binary.Right, callSiteSemanticModel, cancellationToken),
-            _ when expression.IsKind(SyntaxKind.DefaultLiteralExpression) => true,
-            DefaultExpressionSyntax => true,
+                IsRepeatableBinary(binary, callSiteSemanticModel, cancellationToken),
             _ => false
         };
+    }
+
+    private static ExpressionSyntax UnwrapParentheses(ExpressionSyntax expression)
+    {
+        var current = expression;
+        while (current is ParenthesizedExpressionSyntax parenthesized)
+        {
+            current = parenthesized.Expression;
+        }
+
+        return current;
+    }
+
+    private static bool IsRepeatableLeaf(ExpressionSyntax expression)
+        => expression is LiteralExpressionSyntax or IdentifierNameSyntax or DefaultExpressionSyntax ||
+           expression.IsKind(SyntaxKind.DefaultLiteralExpression);
+
+    private static bool IsRepeatableBinary(
+        BinaryExpressionSyntax binary,
+        SemanticModel? callSiteSemanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (!IsRepeatableArgument(binary.Left, callSiteSemanticModel, cancellationToken))
+        {
+            return false;
+        }
+
+        return IsRepeatableArgument(binary.Right, callSiteSemanticModel, cancellationToken);
     }
 
     private static bool IsRepeatableMemberAccess(

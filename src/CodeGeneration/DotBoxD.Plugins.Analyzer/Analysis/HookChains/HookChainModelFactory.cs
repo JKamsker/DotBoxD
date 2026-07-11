@@ -1,4 +1,3 @@
-using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -66,76 +65,14 @@ internal static partial class HookChainModelFactory
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        if (invocation.Expression is not MemberAccessExpressionSyntax terminalAccess)
+        if (!TryPrepareChain(invocation, model, cancellationToken, out var prepared))
         {
             return null;
         }
 
-        var terminalMethod = terminalAccess.Name.Identifier.ValueText;
-        if (HasPriorDiscardedStageOnReceiver(terminalAccess.Expression, invocation, model, cancellationToken))
-        {
-            return null;
-        }
+        prepared.Stages.Reverse(); // seed-to-terminal order
 
-        var stages = new List<HookChainStage>();
-        var seed = WalkToSeed(terminalAccess.Expression, stages, model, cancellationToken);
-        if (seed is null)
-        {
-            return null;
-        }
-
-        var receiverKind = ReceiverKind(model, terminalAccess.Expression, cancellationToken);
-        var receiverIsKnownHookChain = receiverKind is not null;
-        var generatedRemoteTarget = receiverIsKnownHookChain
-            ? null
-            : GeneratedRemoteHookChainFallback.Candidate(seed, model, cancellationToken);
-        if (!receiverIsKnownHookChain && generatedRemoteTarget is null)
-        {
-            return null;
-        }
-
-        var generatedRemoteKind = receiverIsKnownHookChain ? null : generatedRemoteTarget?.Kind;
-        var generatedRemoteServerContextTypeFullName = generatedRemoteTarget is { } target
-            ? GeneratedRemoteHookChainFallback.ServerContextTypeFullName(model, seed, target, cancellationToken)
-            : null;
-        var installKind = InstallKind(terminalMethod, receiverKind, generatedRemoteKind);
-        if (installKind is null)
-        {
-            return null;
-        }
-        RejectUnsupportedServerContextType(ServerContextType(model, terminalAccess.Expression, seed, generatedRemoteTarget, cancellationToken), seed, terminalAccess.Name);
-
-        ValidateServerContextType(seed, receiverKind, generatedRemoteTarget, model, cancellationToken);
-
-        // Run/RunLocal take a single lambda; Register/RegisterLocal take (lambda, priority) — accept the leading
-        // lambda for the result terminals so the trailing priority argument does not reject the chain.
-        var isResultTerminal = installKind is HookChainInterceptorInstallKind.ResultChain
-            or HookChainInterceptorInstallKind.LocalResultChain;
-        if (!(isResultTerminal ? TryLeadingLambda(invocation, out var terminalLambda) : TryLambda(invocation, out terminalLambda)))
-        {
-            return null;
-        }
-
-        var (terminalElementParam, terminalContextParam, terminalIsAsyncLocal, terminalHasCancellationToken) =
-            installKind == HookChainInterceptorInstallKind.LocalResultChain
-                ? ResultLocalLambdaParameters(invocation, terminalLambda, model, cancellationToken)
-                : ResultLocalTerminalShape.From(LambdaParameters(terminalLambda));
-        if (terminalElementParam is null)
-        {
-            return null;
-        }
-
-        stages.Reverse(); // seed-to-terminal order
-
-        if (!GeneratedRemoteHookChainFallback.TryEventType(model, seed, cancellationToken, out var eventType))
-        {
-            return null;
-        }
-
-        ValidateEventType(eventType, seed, cancellationToken);
-
-        var eventProperties = PluginSymbolReader.EventProperties(eventType);
-        if (ContainsUnsupported(eventProperties))
+        if (!TryEventShape(prepared.Seed, model, cancellationToken, out var eventShape))
         {
             return null;
         }
@@ -143,152 +80,8 @@ internal static partial class HookChainModelFactory
         // Result-returning hooks (Register/RegisterLocal) lower the filter the same way, but the Handle returns
         // the result record (Register) or Unit with an in-process delegate (RegisterLocal); they install via the
         // result-chain entrypoints. Delegated to keep the Send-terminal path below focused.
-        if (installKind is HookChainInterceptorInstallKind.ResultChain or HookChainInterceptorInstallKind.LocalResultChain)
-        {
-            return ResultHookChain.Build(
-                invocation,
-                terminalAccess.Expression,
-                model,
-                cancellationToken,
-                stages,
-                eventType,
-                eventProperties,
-                terminalLambda,
-                terminalElementParam,
-                terminalContextParam,
-                installKind == HookChainInterceptorInstallKind.LocalResultChain,
-                terminalIsAsyncLocal,
-                terminalHasCancellationToken,
-                generatedRemoteKind,
-                generatedRemoteServerContextTypeFullName);
-        }
-
-        // Collectors for the whole chain: every Where/Select/terminal-Send deposits the capabilities its
-        // IR needs (Send, [HostBinding] calls, gated event-property reads) and every extra sandbox effect
-        // a [HostBinding] declares. Sorted for deterministic, incrementality-stable output.
-        var capabilities = new SortedSet<string>(StringComparer.Ordinal);
-        var effects = new SortedSet<string>(StringComparer.Ordinal);
-
-        var terminalElementTypeFullName = TerminalElementTypeFullName(
-            stages,
-            eventProperties,
-            eventType,
-            model,
-            cancellationToken);
-        var terminalContextType = terminalContextParam is null
-            ? null
-            : LambdaParameterType(terminalLambda, terminalContextParam, model, cancellationToken);
-        var shouldHandle = HookChainStageLowerer.CreateShouldHandle(
-            stages,
-            eventProperties,
-            model,
-            cancellationToken,
-            capabilities,
-            effects);
-        var localCallbackProjection = installKind == HookChainInterceptorInstallKind.LocalCallback
-            ? LocalCallbackProjection(
-                stages,
-                eventProperties,
-                eventType,
-                model,
-                cancellationToken,
-                capabilities,
-                effects)
-            : null;
-        var handleBody = installKind == HookChainInterceptorInstallKind.LocalCallback
-            ? LocalCallbackHandleBody(localCallbackProjection)
-            : LowerRunHandle(
-                stages,
-                terminalLambda,
-                terminalElementParam,
-                terminalContextParam,
-                terminalContextType,
-                eventProperties,
-                model,
-                cancellationToken,
-                capabilities,
-                effects);
-        // The CLR type the terminal handler receives: the final Select element, or the whole event when there is
-        // no Select. Anonymous projections are not source-nameable, so interception needs this symbol even for
-        // ordinary remote Run chains to emit a generic interceptor and let Roslyn infer the anonymous argument.
-        var projectedTypeSymbol = ProjectedTypeSymbol(stages, eventType, model, cancellationToken);
-        RejectUnsupportedProjectedType(installKind.Value, projectedTypeSymbol, terminalAccess.Name);
-
-        // An anonymous type CAN be the terminal (pushed) projection — it has a real metadata identity Roslyn can
-        // infer as a type ARGUMENT — but it has no C#-source-nameable name. The interceptor handles it by binding
-        // the projection slot as a generic type PARAMETER. The local decoder is generic too and creates a matching
-        // anonymous-object literal, so it still avoids the reflective registration path.
-        var projectionIsUnnameable = projectedTypeSymbol is INamedTypeSymbol { IsAnonymousType: true };
-
-        var handleReturnType = installKind == HookChainInterceptorInstallKind.LocalCallback
-            ? LocalCallbackHandleReturnType(localCallbackProjection, projectedTypeSymbol)
-            : DotBoxDGenerationNames.TypeNames.GlobalSandboxType + ".Unit";
-
-        // The reflection-free decoder for the pushed value's projected type (final Select element, or the whole
-        // event when there is no Select). Null for a non-local chain or a type that is not wire-eligible — those
-        // keep the reflective 2-arg registration so they do not regress.
-        var localDecoderSource = installKind == HookChainInterceptorInstallKind.LocalCallback
-            ? BuildLocalDecoderSource(projectedTypeSymbol, model.Compilation)
-            : null;
-
-        var (indexPredicates, indexCoversPredicate) = HookChainIndexPredicateExtractor.Extract(
-            stages,
-            eventProperties,
-            model,
-            cancellationToken);
-
-        var chainId = HookChainIdentity.Compute(invocation);
-        var kernelName = "HookChain_" + chainId;
-        var modelResult = new PluginKernelModel(
-            PluginId: "chain-" + chainId,
-            Namespace: HookChainIdentity.Namespace(invocation),
-            KernelName: kernelName,
-            PackageName: kernelName + "PluginPackage",
-            EventName: EventTypeName.HookOrQualified(eventType),
-            EventParameterName: DotBoxDGenerationNames.DefaultEventParameterName,
-            ContextParameterName: terminalContextParam ?? DotBoxDGenerationNames.DefaultContextParameterName,
-            HandleEventParameterName: terminalElementParam,
-            HandleContextParameterName: terminalContextParam ?? DotBoxDGenerationNames.DefaultContextParameterName,
-            EventProperties: eventProperties,
-            LiveSettings: default,
-            ShouldHandle: shouldHandle,
-            HandleBody: handleBody,
-            HandleReturnTypeSource: handleReturnType,
-            ManifestEffects: ManifestEffects(installKind.Value, shouldHandle, handleBody, effects),
-            RequiredCapabilities: EquatableArray<string>.FromOwned([.. capabilities]),
-            IndexPredicates: indexPredicates,
-            IndexCoversPredicate: indexCoversPredicate)
-        {
-            // Persist the local-terminal nature in the manifest (a host-readable mark) so the runtime knows to
-            // push rather than run. Even no-Select RunLocal chains are emitted as an explicit event-record
-            // projection, so ordinary Unit-returning Run packages cannot be relabeled into native callbacks.
-            LocalTerminal = installKind == HookChainInterceptorInstallKind.LocalCallback,
-            ProjectedType = LocalProjectedManifestType(localCallbackProjection, projectedTypeSymbol),
-            LocalDecoderSource = localDecoderSource,
-        };
-
-        var interception = Interception(
-            invocation,
-            model,
-            modelResult,
-            terminalAccess.Expression,
-            eventType,
-            stages,
-            terminalElementTypeFullName,
-            generatedRemoteKind,
-            installKind.Value,
-            generatedRemoteServerContextTypeFullName,
-            terminalContextParam is not null,
-            TerminalReturnsVoid(terminalLambda, model, cancellationToken),
-            localDecoderSource is not null,
-            projectedTypeSymbol,
-            out var interceptionFailureReason,
-            cancellationToken);
-        if (interception is null)
-        {
-            throw new NotSupportedException(InterceptionFailureDetail(interceptionFailureReason));
-        }
-
-        return new HookChainResult(modelResult, interception);
+        return IsResultTerminal(prepared.InstallKind)
+            ? BuildResultHookChain(invocation, model, cancellationToken, prepared, eventShape)
+            : BuildSendHookChain(invocation, model, cancellationToken, prepared, eventShape);
     }
 }

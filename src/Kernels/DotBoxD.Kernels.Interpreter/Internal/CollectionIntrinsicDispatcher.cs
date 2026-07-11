@@ -19,6 +19,21 @@ using DotBoxD.Kernels;
 /// </summary>
 internal static class CollectionIntrinsicDispatcher
 {
+    private static readonly IReadOnlyDictionary<string, int> FixedArities =
+        new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            ["list.empty"] = 0,
+            ["map.empty"] = 0,
+            ["list.count"] = 1,
+            ["list.get"] = 2,
+            ["list.add"] = 2,
+            ["record.get"] = 2,
+            ["map.containsKey"] = 2,
+            ["map.get"] = 2,
+            ["map.set"] = 3,
+            ["map.remove"] = 2
+        };
+
     /// <summary>
     /// Returns the fixed arity of a collection intrinsic, or <c>-1</c> when the call is
     /// not a fixed-arity collection intrinsic eligible for array-free dispatch. The
@@ -26,20 +41,7 @@ internal static class CollectionIntrinsicDispatcher
     /// general array path because it must observe the exact argument count.
     /// </summary>
     public static int FixedArity(string name)
-        => name switch
-        {
-            "list.empty" => 0,
-            "map.empty" => 0,
-            "list.count" => 1,
-            "list.get" => 2,
-            "list.add" => 2,
-            "record.get" => 2,
-            "map.containsKey" => 2,
-            "map.get" => 2,
-            "map.set" => 3,
-            "map.remove" => 2,
-            _ => -1
-        };
+        => FixedArities.TryGetValue(name, out var arity) ? arity : -1;
 
     /// <summary>
     /// Dispatches a fixed-arity collection intrinsic from already-evaluated operands.
@@ -52,13 +54,77 @@ internal static class CollectionIntrinsicDispatcher
         SandboxValue arg1,
         SandboxValue arg2,
         SandboxContext context)
-        => call.Name switch
+    {
+        if (TryDispatchList(call, arg0, arg1, context, out var listResult))
+        {
+            return listResult;
+        }
+
+        if (TryDispatchRecord(call, arg0, arg1, context, out var recordResult))
+        {
+            return recordResult;
+        }
+
+        if (TryDispatchMap(call, arg0, arg1, arg2, context, out var mapResult))
+        {
+            return mapResult;
+        }
+
+        throw new SandboxRuntimeException(
+            new SandboxError(SandboxErrorCode.ValidationError, $"'{call.Name}' is not a fixed-arity collection intrinsic"));
+    }
+
+    private static bool TryDispatchList(
+        CallExpression call,
+        SandboxValue arg0,
+        SandboxValue arg1,
+        SandboxContext context,
+        out SandboxValue result)
+    {
+        result = call.Name switch
         {
             "list.empty" => CollectionOperations.CreateList(call.GenericType ?? SandboxType.Unit, context),
             "list.count" => CollectionOperations.CountList(arg0, context),
             "list.get" => CollectionOperations.GetListItem(arg1, arg0, context),
             "list.add" => CollectionOperations.AddListItem(arg1, arg0, context),
-            "record.get" => CollectionOperations.GetRecordField(arg1, arg0, context),
+            _ => SandboxValue.Unit
+        };
+        return call.Name is "list.empty" or "list.count" or "list.get" or "list.add";
+    }
+
+    private static bool TryDispatchRecord(
+        CallExpression call,
+        SandboxValue arg0,
+        SandboxValue arg1,
+        SandboxContext context,
+        out SandboxValue result)
+    {
+        if (call.Name == "record.get")
+        {
+            result = CollectionOperations.GetRecordField(arg1, arg0, context);
+            return true;
+        }
+
+        result = SandboxValue.Unit;
+        return false;
+    }
+
+    private static bool TryDispatchMap(
+        CallExpression call,
+        SandboxValue arg0,
+        SandboxValue arg1,
+        SandboxValue arg2,
+        SandboxContext context,
+        out SandboxValue result)
+    {
+        if (!IsMapCall(call.Name))
+        {
+            result = SandboxValue.Unit;
+            return false;
+        }
+
+        result = call.Name switch
+        {
             "map.empty" => CollectionOperations.CreateMap(
                 call.GenericType ?? SandboxType.Map(SandboxType.Unit, SandboxType.Unit),
                 context),
@@ -66,7 +132,11 @@ internal static class CollectionIntrinsicDispatcher
             "map.get" => CollectionOperations.GetMapValue(arg1, arg0, context),
             "map.set" => CollectionOperations.SetMapValue(arg2, arg1, arg0, context),
             "map.remove" => CollectionOperations.RemoveMapValue(arg1, arg0, context),
-            _ => throw new SandboxRuntimeException(
-                new SandboxError(SandboxErrorCode.ValidationError, $"'{call.Name}' is not a fixed-arity collection intrinsic"))
+            _ => SandboxValue.Unit
         };
+        return true;
+    }
+
+    private static bool IsMapCall(string name)
+        => name is "map.empty" or "map.containsKey" or "map.get" or "map.set" or "map.remove";
 }

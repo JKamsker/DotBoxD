@@ -11,7 +11,7 @@ using DotBoxD.Kernels;
 /// non-async fast path whenever the underlying expression completes synchronously,
 /// allocating an async state machine only when a host binding is still pending.
 /// </summary>
-internal sealed class StatementExecutor
+internal sealed partial class StatementExecutor
 {
     private readonly SandboxContext _context;
     private readonly ExpressionEvaluator _expressions;
@@ -211,16 +211,7 @@ internal sealed class StatementExecutor
     }
     private ValueTask<SandboxValue?> RunForLoop(ForRangeStatement statement, int start, int end, InterpreterFrame frame)
     {
-        // Try each unboxed loop fast-path in order; `||` short-circuits so the first match runs and wins.
-        if (MapGetI32ForLoopRunner.TryRun(statement, start, end, frame, _context, _options) ||
-            ListGetI32ForLoopRunner.TryRun(statement, start, end, frame, _context, _options) ||
-            ListCountForLoopRunner.TryRun(statement, start, end, frame, _context, _options) ||
-            StringLengthForLoopRunner.TryRun(statement, start, end, frame, _context, _options) ||
-            I32ForLoopRunner.TryRun(statement, start, end, frame, _context, _options, _calls) ||
-            BranchedI32ForLoopRunner.TryRun(statement, start, end, frame, _context, _options, _calls) ||
-            BranchedF64ForLoopRunner.TryRun(statement, start, end, frame, _context, _options, _calls) ||
-            F64ForLoopRunner.TryRun(statement, start, end, frame, _context, _options) ||
-            I64ForLoopRunner.TryRun(statement, start, end, frame, _context, _options))
+        if (TryRunForLoopFastPath(statement, start, end, frame))
         {
             return default;
         }

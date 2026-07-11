@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
 
-internal static class InvokeAsyncArgumentWriterSource
+internal static partial class InvokeAsyncArgumentWriterSource
 {
     public static string WriteExpression(ITypeSymbol type, string expression)
         => WriteExpression(type, expression, depth: 0);
@@ -23,68 +23,12 @@ internal static class InvokeAsyncArgumentWriterSource
 
     private static string WriteComplexExpression(ITypeSymbol type, string expression, int depth)
     {
-        if (DotBoxDRpcTypeMapper.IsGuid(type))
+        foreach (var resolver in ComplexWriteResolvers)
         {
-            return $"{DotBoxDRpcValueNames.GlobalKernelRpcValue}.Guid({expression})";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsDateTimeWireType(type))
-        {
-            return IsDateTimeOffset(type)
-                ? WriteDateTimeOffsetExpression(expression, depth)
-                : WriteDateTimeExpression(expression, depth);
-        }
-
-        if (DotBoxDRpcTypeMapper.IsDecimalWireType(type))
-        {
-            return WriteDecimalExpression(expression, depth);
-        }
-
-        if (DotBoxDRpcTypeMapper.IsTimeSpanWireType(type))
-        {
-            return $"{DotBoxDRpcValueNames.GlobalKernelRpcValue}.Int64({expression}.Ticks)";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsDateOnlyWireType(type))
-        {
-            return $"{DotBoxDRpcValueNames.GlobalKernelRpcValue}.Int32({expression}.DayNumber)";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsTimeOnlyWireType(type))
-        {
-            return $"{DotBoxDRpcValueNames.GlobalKernelRpcValue}.Int64({expression}.Ticks)";
-        }
-
-        if (DotBoxDRpcTypeMapper.IsIndexWireType(type))
-        {
-            return WriteIndexExpression(expression);
-        }
-
-        if (DotBoxDRpcTypeMapper.IsRangeWireType(type))
-        {
-            return WriteRangeExpression(expression);
-        }
-
-        if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
-        {
-            return DotBoxDRpcTypeMapper.EnumUsesI64(enumType)
-                ? $"{DotBoxDRpcValueNames.GlobalKernelRpcValue}.Int64(unchecked((long){expression}))"
-                : $"{DotBoxDRpcValueNames.GlobalKernelRpcValue}.Int32(unchecked((int){expression}))";
-        }
-
-        if (DotBoxDRpcTypeMapper.ListElementType(type) is { } elementType)
-        {
-            return WriteListExpression(type, elementType, expression, depth);
-        }
-
-        if (DotBoxDRpcTypeMapper.MapTypes(type) is { } map)
-        {
-            return WriteMapExpression(type, map.Key, map.Value, expression, depth);
-        }
-
-        if (type is INamedTypeSymbol named && DotBoxDRpcTypeMapper.IsRecordDto(named))
-        {
-            return WriteRecordExpression(named, expression, depth);
+            if (resolver(type, expression, depth, out var result))
+            {
+                return result;
+            }
         }
 
         throw new NotSupportedException(

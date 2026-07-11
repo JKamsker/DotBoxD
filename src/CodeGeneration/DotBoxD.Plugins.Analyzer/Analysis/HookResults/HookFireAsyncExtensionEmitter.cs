@@ -40,6 +40,11 @@ internal static class HookFireAsyncExtensionEmitter
         var classAccessibility = models.Any(static model => string.Equals(model.Accessibility, "public", StringComparison.Ordinal))
             ? "public"
             : "internal";
+        if (models.Any(static model => model.IsAssemblyClsCompliant))
+        {
+            builder.AppendLine("[global::System.CLSCompliant(false)]");
+        }
+
         builder.Append(classAccessibility).AppendLine(" static class HookRegistryFireAsyncExtensions");
         builder.AppendLine("{");
         foreach (var model in models)
@@ -53,6 +58,11 @@ internal static class HookFireAsyncExtensionEmitter
 
     private static void EmitDefaultOverload(StringBuilder builder, HookFireAsyncModel model)
     {
+        foreach (var attribute in model.Attributes)
+        {
+            builder.Append("    ").AppendLine(attribute);
+        }
+
         builder.Append("    ").Append(model.Accessibility).Append(" static global::System.Threading.Tasks.ValueTask<")
             .Append(model.ResultTypeFullName).AppendLine("?> FireAsync(");
         builder.AppendLine("        this global::DotBoxD.Plugins.Runtime.HookRegistry hooks,");

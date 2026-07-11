@@ -11,16 +11,7 @@ internal static class DotBoxDKernelMethodArgumentLowerer
         ExpressionSyntax expression,
         DotBoxDExpressionLoweringContext context)
     {
-        if (context.EventParameterName.Length == 0 ||
-            expression is not IdentifierNameSyntax identifier ||
-            string.Equals(identifier.Identifier.ValueText, context.ProjectedElementName, StringComparison.Ordinal) ||
-            !string.Equals(identifier.Identifier.ValueText, context.EventParameterName, StringComparison.Ordinal) ||
-            parameter.Type is not INamedTypeSymbol recordType ||
-            !string.Equals(
-                SandboxTypeSourceEmitter.ManifestTag(recordType),
-                DotBoxDGenerationNames.ManifestTypes.Record,
-                StringComparison.Ordinal) ||
-            SandboxTypeSourceEmitter.TryEmit(recordType) is not { } recordTypeSource)
+        if (!TryGetWholeEventRecordType(parameter, expression, context, out var recordType, out var recordTypeSource))
         {
             return null;
         }
@@ -29,22 +20,68 @@ internal static class DotBoxDKernelMethodArgumentLowerer
         var fieldSources = new string[fields.Count];
         for (var i = 0; i < fields.Count; i++)
         {
-            var property = EventProperty(fields[i].Name, context);
-            var fieldTag = SandboxTypeSourceEmitter.ManifestTag(fields[i].Type);
-            if (property is null ||
-                !string.Equals(property.Type, fieldTag, StringComparison.Ordinal))
+            if (!TryGetWholeEventFieldSource(recordType, fields[i], context, out fieldSources[i]))
             {
                 return null;
             }
-
-            CollectPropertyCapability(recordType, fields[i].Name, context);
-            fieldSources[i] = EventPropertySource(fields[i].Name);
         }
 
         return new DotBoxDExpressionModel(
             DotBoxDRecordCreationExpressionLowerer.RecordNew(fieldSources, recordTypeSource),
             DotBoxDGenerationNames.ManifestTypes.Record,
             true);
+    }
+
+    private static bool TryGetWholeEventRecordType(
+        IParameterSymbol parameter,
+        ExpressionSyntax expression,
+        DotBoxDExpressionLoweringContext context,
+        out INamedTypeSymbol recordType,
+        out string recordTypeSource)
+    {
+        recordType = null!;
+        recordTypeSource = string.Empty;
+        if (context.EventParameterName.Length == 0 ||
+            expression is not IdentifierNameSyntax identifier ||
+            string.Equals(identifier.Identifier.ValueText, context.ProjectedElementName, StringComparison.Ordinal) ||
+            !string.Equals(identifier.Identifier.ValueText, context.EventParameterName, StringComparison.Ordinal) ||
+            parameter.Type is not INamedTypeSymbol candidate)
+        {
+            return false;
+        }
+
+        if (!string.Equals(
+                SandboxTypeSourceEmitter.ManifestTag(candidate),
+                DotBoxDGenerationNames.ManifestTypes.Record,
+                StringComparison.Ordinal) ||
+            SandboxTypeSourceEmitter.TryEmit(candidate) is not { } typeSource)
+        {
+            return false;
+        }
+
+        recordType = candidate;
+        recordTypeSource = typeSource;
+        return true;
+    }
+
+    private static bool TryGetWholeEventFieldSource(
+        INamedTypeSymbol recordType,
+        RecordMember field,
+        DotBoxDExpressionLoweringContext context,
+        out string source)
+    {
+        source = string.Empty;
+        var property = EventProperty(field.Name, context);
+        var fieldTag = SandboxTypeSourceEmitter.ManifestTag(field.Type);
+        if (property is null ||
+            !string.Equals(property.Type, fieldTag, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        CollectPropertyCapability(recordType, field.Name, context);
+        source = EventPropertySource(field.Name);
+        return true;
     }
 
     private static EventPropertyModel? EventProperty(string name, DotBoxDExpressionLoweringContext context)
@@ -77,18 +114,9 @@ internal static class DotBoxDKernelMethodArgumentLowerer
 
         foreach (var property in recordType.GetMembers(propertyName).OfType<IPropertySymbol>())
         {
-            foreach (var attribute in property.GetAttributes())
+            if (PluginSymbolReader.Capability(property) is { } capability)
             {
-                if (string.Equals(
-                        attribute.AttributeClass?.ToDisplayString(),
-                        DotBoxDMetadataNames.CapabilityAttribute,
-                        StringComparison.Ordinal) &&
-                    attribute.ConstructorArguments.Length == 1 &&
-                    attribute.ConstructorArguments[0].Value is string id &&
-                    !string.IsNullOrEmpty(id))
-                {
-                    context.Capabilities.Add(id);
-                }
+                context.Capabilities.Add(capability);
             }
         }
     }

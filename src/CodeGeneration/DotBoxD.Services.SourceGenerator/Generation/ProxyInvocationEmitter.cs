@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
@@ -7,6 +8,51 @@ namespace DotBoxD.Services.SourceGenerator.Generation;
 
 internal static class ProxyInvocationEmitter
 {
+    private static readonly Dictionary<MethodReturnKind, ProxyReturnEmitter> ReturnEmitters = new()
+    {
+        [MethodReturnKind.Void] = static (context) =>
+            context.Builder.AppendLine($"{context.Indent}{context.Invocation}.GetAwaiter().GetResult();"),
+        [MethodReturnKind.Sync] = static (context) =>
+            context.Builder.AppendLine($"{context.Indent}return {context.Invocation}.GetAwaiter().GetResult();"),
+        [MethodReturnKind.Stream] = static (context) =>
+            context.Builder.AppendLine($"{context.Indent}return {context.Invocation}.GetAwaiter().GetResult();"),
+        [MethodReturnKind.Pipe] = static (context) =>
+            context.Builder.AppendLine($"{context.Indent}return {context.Invocation}.GetAwaiter().GetResult();"),
+        [MethodReturnKind.AsyncEnumerable] = static (context) =>
+            context.Builder.AppendLine($"{context.Indent}return {context.Invocation};"),
+        [MethodReturnKind.Task] = static (context) => EmitTaskLikeReturn(context),
+        [MethodReturnKind.ValueTask] = static (context) => EmitTaskLikeReturn(context),
+        [MethodReturnKind.TaskOf] = static (context) => EmitTaskLikeReturn(context),
+        [MethodReturnKind.TaskOfStream] = static (context) => EmitTaskLikeReturn(context),
+        [MethodReturnKind.TaskOfPipe] = static (context) => EmitTaskLikeReturn(context),
+        [MethodReturnKind.TaskOfAsyncEnumerable] = static (context) => EmitTaskLikeReturn(context),
+        [MethodReturnKind.ValueTaskOf] = static (context) => EmitTaskLikeReturn(context),
+        [MethodReturnKind.ValueTaskOfStream] = static (context) => EmitWrappedValueTaskReturn(context),
+        [MethodReturnKind.ValueTaskOfPipe] = static (context) => EmitWrappedValueTaskReturn(context),
+        [MethodReturnKind.ValueTaskOfAsyncEnumerable] = static (context) => EmitWrappedValueTaskReturn(context),
+        [MethodReturnKind.TaskOfSubService] = static (context) => EmitSubServiceReturn(context),
+        [MethodReturnKind.ValueTaskOfSubService] = static (context) => EmitSubServiceReturn(context),
+        [MethodReturnKind.SyncSubService] = static (context) =>
+            EmitSyncSubServiceReturn(
+                context.Builder,
+                context.Method,
+                context.Invocation,
+                context.Locals,
+                context.CancellationToken,
+                context.Indent),
+    };
+
+    private delegate void ProxyReturnEmitter(ProxyReturnContext context);
+
+    private readonly record struct ProxyReturnContext(
+        StringBuilder Builder,
+        MethodModel Method,
+        string Invocation,
+        GeneratedLocalNames Locals,
+        CancellationToken CancellationToken,
+        string Indent,
+        bool CaptureSynchronousExceptions);
+
     public static void Emit(
         StringBuilder sb,
         MethodModel method,
@@ -16,57 +62,40 @@ internal static class ProxyInvocationEmitter
         string indent = "            ",
         bool captureSynchronousExceptions = true)
     {
-        switch (method.ReturnKind)
+        if (ReturnEmitters.TryGetValue(method.ReturnKind, out var emit))
         {
-            case MethodReturnKind.Void:
-                sb.AppendLine($"{indent}{invocation}.GetAwaiter().GetResult();");
-                break;
-            case MethodReturnKind.Sync:
-                sb.AppendLine($"{indent}return {invocation}.GetAwaiter().GetResult();");
-                break;
-            case MethodReturnKind.Stream:
-            case MethodReturnKind.Pipe:
-                sb.AppendLine($"{indent}return {invocation}.GetAwaiter().GetResult();");
-                break;
-            case MethodReturnKind.AsyncEnumerable:
-                sb.AppendLine($"{indent}return {invocation};");
-                break;
-            case MethodReturnKind.Task:
-                EmitTaskLikeReturn(sb, method, invocation, locals, ct, indent, captureSynchronousExceptions);
-                break;
-            case MethodReturnKind.ValueTask:
-                EmitTaskLikeReturn(sb, method, invocation, locals, ct, indent, captureSynchronousExceptions);
-                break;
-            case MethodReturnKind.TaskOf:
-            case MethodReturnKind.TaskOfStream:
-            case MethodReturnKind.TaskOfPipe:
-            case MethodReturnKind.TaskOfAsyncEnumerable:
-                EmitTaskLikeReturn(sb, method, invocation, locals, ct, indent, captureSynchronousExceptions);
-                break;
-            case MethodReturnKind.ValueTaskOfStream:
-            case MethodReturnKind.ValueTaskOfPipe:
-            case MethodReturnKind.ValueTaskOfAsyncEnumerable:
-                EmitTaskLikeReturn(
-                    sb,
-                    method,
-                    $"new {ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalValueTask, ProxyFaultedReturnEmitter.GetValueTaskResultType(method))}({invocation})",
-                    locals,
-                    ct,
-                    indent,
-                    captureSynchronousExceptions);
-                break;
-            case MethodReturnKind.ValueTaskOf:
-                EmitTaskLikeReturn(sb, method, invocation, locals, ct, indent, captureSynchronousExceptions);
-                break;
-            case MethodReturnKind.TaskOfSubService:
-            case MethodReturnKind.ValueTaskOfSubService:
-                EmitSubServiceReturn(sb, method, invocation, locals, ct, indent);
-                break;
-            case MethodReturnKind.SyncSubService:
-                EmitSyncSubServiceReturn(sb, method, invocation, locals, ct, indent);
-                break;
+            emit(new ProxyReturnContext(sb, method, invocation, locals, ct, indent, captureSynchronousExceptions));
         }
     }
+
+    private static void EmitTaskLikeReturn(ProxyReturnContext context)
+        => EmitTaskLikeReturn(
+            context.Builder,
+            context.Method,
+            context.Invocation,
+            context.Locals,
+            context.CancellationToken,
+            context.Indent,
+            context.CaptureSynchronousExceptions);
+
+    private static void EmitWrappedValueTaskReturn(ProxyReturnContext context)
+        => EmitTaskLikeReturn(
+            context.Builder,
+            context.Method,
+            $"new {ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalValueTask, ProxyFaultedReturnEmitter.GetValueTaskResultType(context.Method))}({context.Invocation})",
+            context.Locals,
+            context.CancellationToken,
+            context.Indent,
+            context.CaptureSynchronousExceptions);
+
+    private static void EmitSubServiceReturn(ProxyReturnContext context)
+        => EmitSubServiceReturn(
+            context.Builder,
+            context.Method,
+            context.Invocation,
+            context.Locals,
+            context.CancellationToken,
+            context.Indent);
 
     private static void EmitTaskLikeReturn(
         StringBuilder sb,
@@ -115,10 +144,18 @@ internal static class ProxyInvocationEmitter
         {
             // ServiceHandle is a struct, so the nullable wire type is Nullable<ServiceHandle>;
             // unwrap via .Value before reading InstanceId.
-            sb.AppendLine($"{indent}return {handleName} is null ? null : new {subProxyType}(this._invoker, {handleName}.Value.{ServicesGeneratorMemberNames.ServiceHandle.InstanceId});");
+            var valueName = locals.Reserve("__dotboxd_handleValue", ct);
+            sb.AppendLine($"{indent}if ({handleName} is null)");
+            sb.AppendLine($"{indent}{{");
+            sb.AppendLine($"{indent}    return null;");
+            sb.AppendLine($"{indent}}}");
+            sb.AppendLine($"{indent}var {valueName} = {handleName}.Value;");
+            EmitSubServiceHandleValidation(sb, valueName, info.ServiceName, indent);
+            sb.AppendLine($"{indent}return new {subProxyType}(this._invoker, {valueName}.{ServicesGeneratorMemberNames.ServiceHandle.InstanceId});");
         }
         else
         {
+            EmitSubServiceHandleValidation(sb, handleName, info.ServiceName, indent);
             sb.AppendLine($"{indent}return new {subProxyType}(this._invoker, {handleName}.{ServicesGeneratorMemberNames.ServiceHandle.InstanceId});");
         }
     }
@@ -137,11 +174,29 @@ internal static class ProxyInvocationEmitter
         sb.AppendLine($"{indent}var {handleName} = {invocation}.GetAwaiter().GetResult();");
         if (info.AllowsNull)
         {
-            sb.AppendLine($"{indent}return {handleName} is null ? null : new {subProxyType}(this._invoker, {handleName}.Value.{ServicesGeneratorMemberNames.ServiceHandle.InstanceId});");
+            var valueName = locals.Reserve("__dotboxd_handleValue", ct);
+            sb.AppendLine($"{indent}if ({handleName} is null)");
+            sb.AppendLine($"{indent}{{");
+            sb.AppendLine($"{indent}    return null;");
+            sb.AppendLine($"{indent}}}");
+            sb.AppendLine($"{indent}var {valueName} = {handleName}.Value;");
+            EmitSubServiceHandleValidation(sb, valueName, info.ServiceName, indent);
+            sb.AppendLine($"{indent}return new {subProxyType}(this._invoker, {valueName}.{ServicesGeneratorMemberNames.ServiceHandle.InstanceId});");
         }
         else
         {
+            EmitSubServiceHandleValidation(sb, handleName, info.ServiceName, indent);
             sb.AppendLine($"{indent}return new {subProxyType}(this._invoker, {handleName}.{ServicesGeneratorMemberNames.ServiceHandle.InstanceId});");
         }
+    }
+
+    private static void EmitSubServiceHandleValidation(StringBuilder sb, string handleName, string serviceName, string indent)
+    {
+        var actual = handleName + "." + ServicesGeneratorMemberNames.ServiceHandle.ServiceName;
+        var expected = LiteralHelpers.EscapeStringLiteral(serviceName);
+        sb.AppendLine($"{indent}if (!global::System.String.Equals({actual}, \"{expected}\", global::System.StringComparison.Ordinal))");
+        sb.AppendLine($"{indent}{{");
+        sb.AppendLine($"{indent}    throw new {ServicesGeneratorTypeNames.GlobalServiceProtocolException}(\"ServiceHandle.ServiceName did not match expected sub-service '{expected}'.\");");
+        sb.AppendLine($"{indent}}}");
     }
 }

@@ -191,28 +191,45 @@ current event/value first and the server context second. The same rule applies t
 ```csharp
 public sealed class HookPipeline<TEvent, TServerContext>
 {
-    public HookPipeline<TEvent, TServerContext> Where(Func<TEvent, bool> filter);
-    public HookPipeline<TEvent, TServerContext> Where(Func<TEvent, TServerContext, bool> filter);
+    public HookPipeline<TEvent, TServerContext> Where(
+        Func<TEvent, bool> filter,
+        [IRBodyOf(nameof(filter))] IRFunc<TEvent, bool>? irFilter = null);
+    public HookPipeline<TEvent, TServerContext> Where(
+        Func<TEvent, TServerContext, bool> filter,
+        [IRBodyOf(nameof(filter))] IRFunc<TEvent, TServerContext, bool>? irFilter = null);
 
-    public HookStage<TEvent, TNext, TServerContext> Select<TNext>(Func<TEvent, TNext> projection);
     public HookStage<TEvent, TNext, TServerContext> Select<TNext>(
-        Func<TEvent, TServerContext, TNext> projection);
+        Func<TEvent, TNext> projection,
+        [IRBodyOf(nameof(projection))] IRFunc<TEvent, TNext>? irProjection = null);
+    public HookStage<TEvent, TNext, TServerContext> Select<TNext>(
+        Func<TEvent, TServerContext, TNext> projection,
+        [IRBodyOf(nameof(projection))] IRFunc<TEvent, TServerContext, TNext>? irProjection = null);
 
     // Lowered by the analyzer to verified IR. Un-lowered, it throws.
-    public HookPipeline<TEvent, TServerContext> Run(Func<TEvent, ValueTask> handler);
-    public HookPipeline<TEvent, TServerContext> Run(Func<TEvent, TServerContext, ValueTask> handler);
+    public HookPipeline<TEvent, TServerContext> Run(
+        Func<TEvent, ValueTask> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null);
+    public HookPipeline<TEvent, TServerContext> Run(
+        Func<TEvent, TServerContext, ValueTask> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null);
 
     // Native host/plugin process code.
     public HookPipeline<TEvent, TServerContext> RunLocal(Func<TEvent, ValueTask> handler);
     public HookPipeline<TEvent, TServerContext> RunLocal(
         Func<TEvent, TServerContext, ValueTask> handler);
 
-    public HookPipeline<TEvent, TServerContext> Register<TResult>(Func<TEvent, TResult> handler);
     public HookPipeline<TEvent, TServerContext> Register<TResult>(
-        Func<TEvent, TServerContext, TResult> handler);
-    public HookPipeline<TEvent, TServerContext> RegisterLocal<TResult>(Func<TEvent, TResult> handler);
+        Func<TEvent, TResult> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null);
+    public HookPipeline<TEvent, TServerContext> Register<TResult>(
+        Func<TEvent, TServerContext, TResult> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null);
     public HookPipeline<TEvent, TServerContext> RegisterLocal<TResult>(
-        Func<TEvent, TServerContext, TResult> handler);
+        Func<TEvent, TResult> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null);
+    public HookPipeline<TEvent, TServerContext> RegisterLocal<TResult>(
+        Func<TEvent, TServerContext, TResult> handler,
+        [IRBodyOf(nameof(handler))] IRKernel? irHandler = null);
 }
 ```
 
@@ -222,6 +239,21 @@ extend the declared partial context with pure helper methods marked `[KernelMeth
 inline into the chain. Host calls flow through analyzer-visible host-service contracts annotated with
 `[HostBinding]`; use `RunLocal` / `RegisterLocal` when the handler needs arbitrary in-process
 services from the generated server context.
+
+When the IR must be assembled from runtime data instead of a source lambda, pass the explicit companion
+yourself:
+
+```csharp
+var ir = IRBuilder.For<MonsterAggroEvent>();
+
+server.Hooks.On<MonsterAggroEvent>()
+    .Where(
+        e => e.Distance <= maxDistance,
+        ir.Filter(e => e.LessThanOrEqual(e.Field(2), e.Int32(maxDistance))));
+```
+
+That call is not a special case: the runtime sees the same public `IRFunc` carrier the source generator would
+have injected, and remote APIs still reject a missing IR body instead of falling back to local execution.
 
 For example, the generated context supplies the raw hook plumbing, while the plugin adds domain
 members in a partial:

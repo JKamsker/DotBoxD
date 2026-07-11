@@ -30,6 +30,9 @@ public static class SandboxDescriptorGuards
            value.Contains(", PublicKeyToken=", StringComparison.OrdinalIgnoreCase);
 
     private static bool ContainsMetadataToken(string value)
+        => ContainsCompactMetadataToken(value) || ContainsPrefixedMetadataToken(value);
+
+    private static bool ContainsCompactMetadataToken(string value)
     {
         for (var index = 0; index <= value.Length - 8; index++)
         {
@@ -42,6 +45,11 @@ public static class SandboxDescriptorGuards
             }
         }
 
+        return false;
+    }
+
+    private static bool ContainsPrefixedMetadataToken(string value)
+    {
         for (var index = 0; index <= value.Length - 10; index++)
         {
             if (!IsPrefixedMetadataToken(value.AsSpan(index, 4)))

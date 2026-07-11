@@ -49,15 +49,15 @@ public enum VerifierDiagnosticCategory.HostVersionMismatch
 public enum VerifierDiagnosticCategory.MalformedArtifact
 public enum VerifierDiagnosticCategory.UnsupportedGeneratedShape
 public interface IGeneratedAssemblyVerifier
-public IReadOnlyList<string> OptimizationFlags
-public IReadOnlyList<string>? OptimizationFlags
-public IReadOnlyList<VerificationDiagnostic> Diagnostics
-public IReadOnlySet<string> AllowedAssemblies { get => _allowedAssemblies; init { _allowedAssemblies = Freeze(value); InvalidateHashes(); } }
-public IReadOnlySet<string> AllowedAssemblyIdentities { get => _allowedAssemblyIdentities; init { _allowedAssemblyIdentities = Freeze(value); InvalidateHashes(); } }
-public IReadOnlySet<string> AllowedMembers { get => _allowedMembers; init { _allowedMembers = Freeze(value); InvalidateHashes(); } }
-public IReadOnlySet<string> AllowedTypes { get => _allowedTypes; init { _allowedTypes = Freeze(value); InvalidateHashes(); } }
-public IReadOnlySet<string> ForbiddenTypePrefixes { get => _forbiddenTypePrefixes; init { _forbiddenTypePrefixes = Freeze(value); InvalidateHashes(); } }
-public IReadOnlySet<string> RuntimeFacadeIdentities { get => _runtimeFacadeIdentities; init { _runtimeFacadeIdentities = Freeze(value); InvalidateHashes(); } }
+public IReadOnlyList<string> OptimizationFlags { get; init; }
+public IReadOnlyList<string>? OptimizationFlags { get; init; }
+public IReadOnlyList<VerificationDiagnostic> Diagnostics { get; init; }
+public IReadOnlySet<string> AllowedAssemblies { get => _allowedAssemblies; init { _allowedAssemblies = Freeze(value, nameof(AllowedAssemblies)); InvalidateHashes(); } }
+public IReadOnlySet<string> AllowedAssemblyIdentities { get => _allowedAssemblyIdentities; init { _allowedAssemblyIdentities = Freeze(value, nameof(AllowedAssemblyIdentities)); InvalidateHashes(); } }
+public IReadOnlySet<string> AllowedMembers { get => _allowedMembers; init { _allowedMembers = Freeze(value, nameof(AllowedMembers)); InvalidateHashes(); } }
+public IReadOnlySet<string> AllowedTypes { get => _allowedTypes; init { _allowedTypes = Freeze(value, nameof(AllowedTypes)); InvalidateHashes(); } }
+public IReadOnlySet<string> ForbiddenTypePrefixes { get => _forbiddenTypePrefixes; init { _forbiddenTypePrefixes = Freeze(value, nameof(ForbiddenTypePrefixes)); InvalidateHashes(); } }
+public IReadOnlySet<string> RuntimeFacadeIdentities { get => _runtimeFacadeIdentities; init { _runtimeFacadeIdentities = Freeze(value, nameof(RuntimeFacadeIdentities)); InvalidateHashes(); } }
 public sealed partial class GeneratedAssemblyVerifier
 public sealed partial class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifier
 public sealed record ArtifactManifest( int ArtifactVersion, string CacheKey, string ModuleHash, string PlanHash, string PolicyHash, string BindingManifestHash, string RuntimeFacadeHash, string CompilerVersion, string TypeSystemVersion, string EffectAnalysisVersion, string VerifierVersion, string LanguageVersion, string TargetFramework, IReadOnlyList<string> OptimizationFlags, string AssemblyHash, DateTimeOffset CreatedAt)
@@ -72,6 +72,26 @@ public static IReadOnlyList<VerifierDiagnosticReference> All => References
 public static VerificationManifestIdentity FromManifest(ArtifactManifest manifest)
 public static VerificationPolicy BoxedValueDefaults()
 public string AllowlistHash
+public string AssemblyHash { get; init; }
+public string BindingManifestHash { get; init; }
+public string CacheKey { get; init; }
+public string Code { get; init => field = RequireText(value, nameof(Code)); } = RequireText(Code, nameof(Code))
+public string Code { get; init; }
+public string CompilerVersion { get; init; }
+public string EffectAnalysisVersion { get; init; }
+public string LanguageVersion { get; init; }
+public string LikelyCause { get; init => field = RequireText(value, nameof(LikelyCause)); } =
+public string Meaning { get; init => field = RequireText(value, nameof(Meaning)); } = RequireText(Meaning, nameof(Meaning))
+public string Message { get; init; }
+public string ModuleHash { get; init; }
+public string PlanHash { get; init; }
+public string PolicyHash { get; init; }
+public string Remediation { get; init => field = RequireText(value, nameof(Remediation)); } =
 public string RuntimeFacadeHash
+public string RuntimeFacadeHash { get; init; }
+public string TargetFramework { get; init; }
+public string TypeSystemVersion { get; init; }
+public string VerifierVersion { get => _verifierVersion; init => _verifierVersion = RequireVersion(value, nameof(VerifierVersion)); }
+public string VerifierVersion { get; init; }
 public ValueTask<VerificationResult> VerifyAsync( ReadOnlyMemory<byte> assemblyBytes, ArtifactManifest manifest, VerificationPolicy policy, CancellationToken cancellationToken)
 public VerificationPolicy WithExpectedManifest(VerificationManifestIdentity identity)

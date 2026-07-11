@@ -19,27 +19,7 @@ internal static class PluginManifestPredicateValidator
 
         foreach (var predicate in indexedPredicates)
         {
-            PluginManifestTextValidator.ValidateText(predicate.Path, "indexed predicate path", diagnostics);
-            if (!Enum.IsDefined(predicate.Operator))
-            {
-                diagnostics.Add(new SandboxDiagnostic(
-                    "DBXK046",
-                    $"Indexed predicate operator '{predicate.Operator}' is not supported."));
-            }
-
-            if (predicate.ValueType is not ("bool" or "int" or "long" or "double" or "string"))
-            {
-                diagnostics.Add(new SandboxDiagnostic(
-                    "DBXK047",
-                    $"Indexed predicate value type '{predicate.ValueType}' is not supported."));
-            }
-            else if (!ValueMatchesType(predicate.Value, predicate.ValueType))
-            {
-                // JSON import already parses by valueType; this closes in-memory package construction.
-                diagnostics.Add(new SandboxDiagnostic(
-                    "DBXK049",
-                    $"Indexed predicate value '{predicate.Value ?? "null"}' does not match its declared value type '{predicate.ValueType}'."));
-            }
+            ValidateIndexedPredicate(predicate, diagnostics);
         }
 
         if (subscription.IndexCoversPredicate && indexedPredicates.Count == 0)
@@ -49,6 +29,38 @@ internal static class PluginManifestPredicateValidator
                 "A hook subscription cannot claim full index coverage with no indexed predicates."));
         }
     }
+
+    private static void ValidateIndexedPredicate(IndexedPredicate predicate, List<SandboxDiagnostic> diagnostics)
+    {
+        PluginManifestTextValidator.ValidateText(predicate.Path, "indexed predicate path", diagnostics);
+        if (!Enum.IsDefined(predicate.Operator))
+        {
+            diagnostics.Add(new SandboxDiagnostic(
+                "DBXK046",
+                $"Indexed predicate operator '{predicate.Operator}' is not supported."));
+        }
+
+        if (!IsSupportedValueType(predicate.ValueType))
+        {
+            diagnostics.Add(new SandboxDiagnostic(
+                "DBXK047",
+                $"Indexed predicate value type '{predicate.ValueType}' is not supported."));
+            return;
+        }
+
+        if (ValueMatchesType(predicate.Value, predicate.ValueType))
+        {
+            return;
+        }
+
+        // JSON import already parses by valueType; this closes in-memory package construction.
+        diagnostics.Add(new SandboxDiagnostic(
+            "DBXK049",
+            $"Indexed predicate value '{predicate.Value ?? "null"}' does not match its declared value type '{predicate.ValueType}'."));
+    }
+
+    private static bool IsSupportedValueType(string valueType)
+        => valueType is "bool" or "int" or "long" or "double" or "string";
 
     private static bool ValueMatchesType(object? value, string valueType)
         => valueType switch

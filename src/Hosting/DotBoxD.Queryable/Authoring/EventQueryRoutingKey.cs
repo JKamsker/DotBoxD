@@ -96,6 +96,16 @@ internal readonly record struct EventQueryRoutingKey(
             case QueryValueKind.String:
                 builder.Append('S').Append(Text);
                 return;
+            default:
+                AppendExtendedValueToken(builder);
+                return;
+        }
+    }
+
+    private void AppendExtendedValueToken(StringBuilder builder)
+    {
+        switch (Kind)
+        {
             case QueryValueKind.Guid:
                 builder.Append('G');
                 AppendGuidN(builder, Guid);

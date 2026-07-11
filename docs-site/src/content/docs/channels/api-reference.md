@@ -57,7 +57,7 @@ var result = await svc.DoAsync(/* ... */);
 ```
 
 Setting `RpcPeerOptions.RejectInboundCalls = true` makes the caller's get-only intent explicit:
-the other side receives an explicit "this peer does not accept inbound calls" error rather than a
+the other side receives a clear "this peer does not accept inbound calls" error rather than a
 "service not found" error. It is not an authentication or authorization boundary.
 
 #### `RpcPeer`
@@ -398,7 +398,7 @@ MessagePack-based serializer.
 // Default configuration
 var serializer = new MessagePackRpcSerializer();
 
-// Unity-compatible (contractless)
+// Legacy Unity contractless preset (reflection-capable; not an AOT guarantee)
 var serializer = MessagePackRpcSerializer.CreateUnityCompatible();
 
 // Custom options
@@ -410,7 +410,7 @@ var serializer = MessagePackRpcSerializer.CreateWithResolver(myResolver);
 
 | Method | Description |
 |--------|-------------|
-| `CreateUnityCompatible()` | Creates serializer optimized for Unity/AOT |
+| `CreateUnityCompatible()` | Legacy contractless preset; reflection-capable and not an AOT guarantee |
 | `CreateWithResolver(IFormatterResolver)` | Creates serializer with a custom resolver chain |
 | `CreateOptions(params IFormatterResolver[])` | Builds hardened MessagePack options with DotBoxD formatters |
 

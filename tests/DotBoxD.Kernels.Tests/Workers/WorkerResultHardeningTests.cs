@@ -132,7 +132,7 @@ public sealed class WorkerResultHardeningTests
         var worker = new TestWorker
         {
             Succeeded = false,
-            ResultError = new SandboxError((SandboxErrorCode)123456, "undefined worker error")
+            ResultError = SandboxErrorTestFactory.WithCode((SandboxErrorCode)123456, "undefined worker error")
         };
         var host = Host(worker);
         var plan = await PrepareAsync(host, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());

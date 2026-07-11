@@ -19,15 +19,37 @@ public static partial class KernelRpcMarshaller
     private static object EnumFromInt32(Type type, int value)
     {
         var underlying = Enum.GetUnderlyingType(type);
-        if (underlying == typeof(byte) && (value < byte.MinValue || value > byte.MaxValue) ||
-            underlying == typeof(sbyte) && (value < sbyte.MinValue || value > sbyte.MaxValue) ||
-            underlying == typeof(short) && (value < short.MinValue || value > short.MaxValue) ||
-            underlying == typeof(ushort) && (value < ushort.MinValue || value > ushort.MaxValue))
+        if (IsInt32EnumValueOutOfRange(underlying, value))
         {
             throw EnumOutOfRange(type, value);
         }
 
         return Enum.ToObject(type, value);
+    }
+
+    private static bool IsInt32EnumValueOutOfRange(Type underlying, int value)
+    {
+        if (underlying == typeof(byte))
+        {
+            return value < byte.MinValue || value > byte.MaxValue;
+        }
+
+        if (underlying == typeof(sbyte))
+        {
+            return value < sbyte.MinValue || value > sbyte.MaxValue;
+        }
+
+        if (underlying == typeof(short))
+        {
+            return value < short.MinValue || value > short.MaxValue;
+        }
+
+        if (underlying == typeof(ushort))
+        {
+            return value < ushort.MinValue || value > ushort.MaxValue;
+        }
+
+        return false;
     }
 
     private static object EnumFromInt64(Type type, long value)

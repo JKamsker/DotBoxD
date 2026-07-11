@@ -9,6 +9,22 @@ using static DotBoxD.Kernels.Compiler.IlEmitterPrimitives;
 
 internal static class F64MathIntrinsicEmitter
 {
+    private static readonly Dictionary<string, F64Intrinsic> Intrinsics = new(StringComparer.Ordinal)
+    {
+        ["math.sqrt"] = new(
+            nameof(Kernels.Runtime.CompiledRuntime.SqrtF64Raw),
+            nameof(Kernels.Runtime.CompiledRuntime.SqrtF64)),
+        ["math.floor"] = new(
+            nameof(Kernels.Runtime.CompiledRuntime.FloorF64Raw),
+            nameof(Kernels.Runtime.CompiledRuntime.FloorF64)),
+        ["math.ceil"] = new(
+            nameof(Kernels.Runtime.CompiledRuntime.CeilF64Raw),
+            nameof(Kernels.Runtime.CompiledRuntime.CeilF64)),
+        ["math.round"] = new(
+            nameof(Kernels.Runtime.CompiledRuntime.RoundF64Raw),
+            nameof(Kernels.Runtime.CompiledRuntime.RoundF64)),
+    };
+
     public static bool TryEmit(
         Expression expression,
         IBindingCatalog bindings,
@@ -37,42 +53,46 @@ internal static class F64MathIntrinsicEmitter
 
     private static bool TryGetRawIntrinsic(CallExpression call, IBindingCatalog bindings, out string rawMethod)
     {
-        rawMethod = call.Name switch
+        rawMethod = string.Empty;
+        if (!Intrinsics.TryGetValue(call.Name, out var intrinsic))
         {
-            "math.sqrt" => nameof(Kernels.Runtime.CompiledRuntime.SqrtF64Raw),
-            "math.floor" => nameof(Kernels.Runtime.CompiledRuntime.FloorF64Raw),
-            "math.ceil" => nameof(Kernels.Runtime.CompiledRuntime.CeilF64Raw),
-            "math.round" => nameof(Kernels.Runtime.CompiledRuntime.RoundF64Raw),
-            _ => ""
-        };
+            return false;
+        }
 
-        return rawMethod.Length > 0 &&
-           bindings.TryGet(call.Name, out var binding) &&
-           binding.Compiled is { Kind: "RuntimeStub" } &&
-           binding.Compiled.Type == typeof(Runtime.CompiledRuntime).FullName &&
-           binding.Compiled.Method == BoxedMethod(call.Name) &&
-           binding.Parameters.Count == 1 &&
-           binding.Parameters[0].Equals(SandboxType.F64) &&
-           binding.ReturnType.Equals(SandboxType.F64) &&
-           binding.RequiredCapability is null &&
-           binding.Safety == BindingSafety.PureIntrinsic &&
-           binding.AuditLevel == AuditLevel.None &&
-           (binding.Effects & ~(SandboxEffect.Cpu | SandboxEffect.Alloc)) == SandboxEffect.None;
+        rawMethod = intrinsic.RawMethod;
+        return bindings.TryGet(call.Name, out var binding) &&
+               CompiledIntrinsicBindingMatcher.IsPureRuntimeStub(
+                   binding,
+                   intrinsic.BoxedMethod,
+                   SandboxType.F64,
+                   [SandboxType.F64]);
     }
 
-    private static string BoxedMethod(string bindingId)
-        => bindingId switch
-        {
-            "math.sqrt" => nameof(Kernels.Runtime.CompiledRuntime.SqrtF64),
-            "math.floor" => nameof(Kernels.Runtime.CompiledRuntime.FloorF64),
-            "math.ceil" => nameof(Kernels.Runtime.CompiledRuntime.CeilF64),
-            "math.round" => nameof(Kernels.Runtime.CompiledRuntime.RoundF64),
-            _ => ""
-        };
+    private readonly record struct F64Intrinsic(string RawMethod, string BoxedMethod);
 }
 
 internal static class I32MathIntrinsicEmitter
 {
+    private static readonly Dictionary<string, I32Intrinsic> Intrinsics = new(StringComparer.Ordinal)
+    {
+        ["math.abs"] = new(
+            nameof(Kernels.Runtime.CompiledRuntime.AbsI32Raw),
+            nameof(Kernels.Runtime.CompiledRuntime.AbsI32),
+            1),
+        ["math.min"] = new(
+            nameof(Kernels.Runtime.CompiledRuntime.MinI32Raw),
+            nameof(Kernels.Runtime.CompiledRuntime.MinI32),
+            2),
+        ["math.max"] = new(
+            nameof(Kernels.Runtime.CompiledRuntime.MaxI32Raw),
+            nameof(Kernels.Runtime.CompiledRuntime.MaxI32),
+            2),
+        ["math.clamp"] = new(
+            nameof(Kernels.Runtime.CompiledRuntime.ClampI32Raw),
+            nameof(Kernels.Runtime.CompiledRuntime.ClampI32),
+            3),
+    };
+
     public static bool TryEmit(
         Expression expression,
         IBindingCatalog bindings,
@@ -113,56 +133,31 @@ internal static class I32MathIntrinsicEmitter
         out string rawMethod,
         out int argumentCount)
     {
-        rawMethod = call.Name switch
+        rawMethod = string.Empty;
+        argumentCount = 0;
+        if (!Intrinsics.TryGetValue(call.Name, out var intrinsic))
         {
-            "math.abs" => nameof(Kernels.Runtime.CompiledRuntime.AbsI32Raw),
-            "math.min" => nameof(Kernels.Runtime.CompiledRuntime.MinI32Raw),
-            "math.max" => nameof(Kernels.Runtime.CompiledRuntime.MaxI32Raw),
-            "math.clamp" => nameof(Kernels.Runtime.CompiledRuntime.ClampI32Raw),
-            _ => ""
-        };
-        argumentCount = call.Name switch
-        {
-            "math.abs" => 1,
-            "math.min" or "math.max" => 2,
-            "math.clamp" => 3,
-            _ => 0
-        };
-
-        return rawMethod.Length > 0 &&
-           bindings.TryGet(call.Name, out var binding) &&
-           binding.Compiled is { Kind: "RuntimeStub" } &&
-           binding.Compiled.Type == typeof(Runtime.CompiledRuntime).FullName &&
-           binding.Compiled.Method == BoxedMethod(call.Name) &&
-           binding.Parameters.Count == argumentCount &&
-           ParametersAreI32(binding.Parameters) &&
-           binding.ReturnType.Equals(SandboxType.I32) &&
-           binding.RequiredCapability is null &&
-           binding.Safety == BindingSafety.PureIntrinsic &&
-           binding.AuditLevel == AuditLevel.None &&
-           (binding.Effects & ~(SandboxEffect.Cpu | SandboxEffect.Alloc)) == SandboxEffect.None;
-    }
-
-    private static bool ParametersAreI32(IReadOnlyList<SandboxType> parameters)
-    {
-        for (var i = 0; i < parameters.Count; i++)
-        {
-            if (!parameters[i].Equals(SandboxType.I32))
-            {
-                return false;
-            }
+            return false;
         }
 
-        return true;
+        rawMethod = intrinsic.RawMethod;
+        argumentCount = intrinsic.ArgumentCount;
+        return bindings.TryGet(call.Name, out var binding) &&
+               CompiledIntrinsicBindingMatcher.IsPureRuntimeStub(
+                   binding,
+                   intrinsic.BoxedMethod,
+                   SandboxType.I32,
+                   I32Parameters(argumentCount));
     }
 
-    private static string BoxedMethod(string bindingId)
-        => bindingId switch
+    private static SandboxType[] I32Parameters(int count)
+        => count switch
         {
-            "math.abs" => nameof(Kernels.Runtime.CompiledRuntime.AbsI32),
-            "math.min" => nameof(Kernels.Runtime.CompiledRuntime.MinI32),
-            "math.max" => nameof(Kernels.Runtime.CompiledRuntime.MaxI32),
-            "math.clamp" => nameof(Kernels.Runtime.CompiledRuntime.ClampI32),
-            _ => ""
+            1 => [SandboxType.I32],
+            2 => [SandboxType.I32, SandboxType.I32],
+            3 => [SandboxType.I32, SandboxType.I32, SandboxType.I32],
+            _ => []
         };
+
+    private readonly record struct I32Intrinsic(string RawMethod, string BoxedMethod, int ArgumentCount);
 }
