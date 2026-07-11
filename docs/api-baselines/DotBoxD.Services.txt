@@ -147,7 +147,7 @@ public interface IServiceDispatcher
 public interface ITransport : IAsyncDisposable
 public IReadOnlyList<GeneratedMethod> Methods { get; init; } = Array.Empty<GeneratedMethod>()
 public IReadOnlyList<RpcContractMethod> Methods { get; init; } = ValidateMethods(Methods)
-public IReadOnlyList<RpcContractChange> Diff(RpcContractManifest previous)
+ public IReadOnlyList<RpcContractChange> Diff(RpcContractManifest previous)
 public IReadOnlyList<RpcContractService> Services { get; init; } = ValidateServices(Services)
 public IRpcChannel? Connection => Volatile.Read(ref _disposed) == 0 ? _connection : null
 public IServiceProvider? ServiceProvider { get; init; }
