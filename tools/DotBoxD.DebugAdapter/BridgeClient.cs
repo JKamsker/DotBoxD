@@ -1,7 +1,7 @@
-using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.IO.Pipes;
 using System.Text.Json;
+using System.Threading.Channels;
 using DotBoxD.DebugAdapter.Diagnostics;
 using DotBoxD.Plugins.Debugging;
 using DotBoxD.Pushdown.Services;
@@ -14,6 +14,9 @@ internal sealed class BridgeClient : IAsyncDisposable
     private readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> _pending = new();
     private readonly SemaphoreSlim _writeGate = new(1, 1);
     private readonly CancellationTokenSource _lifetime = new();
+    private readonly Channel<PluginDebugEnvelope> _events = Channel.CreateUnbounded<PluginDebugEnvelope>(
+        new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
+    private readonly Task _eventLoop;
     private readonly Task _readLoop;
     private int _requestId;
 
@@ -21,6 +24,7 @@ internal sealed class BridgeClient : IAsyncDisposable
     {
         _pipe = pipe;
         SessionToken = sessionToken;
+        _eventLoop = DispatchEventsAsync(_lifetime.Token);
         _readLoop = ReadLoopAsync(_lifetime.Token);
     }
 
@@ -39,12 +43,12 @@ internal sealed class BridgeClient : IAsyncDisposable
         try
         {
             await pipe.ConnectAsync(cancellationToken).ConfigureAwait(false);
-            await WriteFrameAsync(
+            await BridgeProtocolIO.WriteAsync(
                     pipe,
                     new { kind = "authenticate", token = discoveryToken },
                     cancellationToken)
                 .ConfigureAwait(false);
-            using var response = await ReadFrameAsync(pipe, cancellationToken).ConfigureAwait(false)
+            using var response = await BridgeProtocolIO.ReadAsync(pipe, cancellationToken).ConfigureAwait(false)
                 ?? throw new EndOfStreamException("Bridge closed during authentication.");
             var root = response.RootElement;
             if (!root.GetProperty("success").GetBoolean())
@@ -185,7 +189,7 @@ internal sealed class BridgeClient : IAsyncDisposable
         _pipe.Dispose();
         try
         {
-            await _readLoop.ConfigureAwait(false);
+            await Task.WhenAll(_readLoop, _eventLoop).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is OperationCanceledException or IOException or ObjectDisposedException)
         {
@@ -202,7 +206,7 @@ internal sealed class BridgeClient : IAsyncDisposable
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                using var frame = await ReadFrameAsync(_pipe, cancellationToken).ConfigureAwait(false);
+                using var frame = await BridgeProtocolIO.ReadAsync(_pipe, cancellationToken).ConfigureAwait(false);
                 if (frame is null)
                 {
                     return;
@@ -221,10 +225,7 @@ internal sealed class BridgeClient : IAsyncDisposable
                     var envelope = PluginDebugProtocol.Decode(
                         Convert.FromBase64String(root.GetProperty("payload").GetString()!),
                         1024 * 1024);
-                    if (EventReceiver is { } handler)
-                    {
-                        await handler(envelope).ConfigureAwait(false);
-                    }
+                    await _events.Writer.WriteAsync(envelope, cancellationToken).ConfigureAwait(false);
                 }
                 else if (kind == "sourcesChanged" && SourcesChangedReceiver is { } sourcesChanged)
                 {
@@ -234,10 +235,22 @@ internal sealed class BridgeClient : IAsyncDisposable
         }
         finally
         {
+            _events.Writer.TryComplete();
             var exception = new EndOfStreamException("Plugin debug bridge disconnected.");
             foreach (var completion in _pending.Values)
             {
                 completion.TrySetException(exception);
+            }
+        }
+    }
+
+    private async Task DispatchEventsAsync(CancellationToken cancellationToken)
+    {
+        await foreach (var envelope in _events.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        {
+            if (EventReceiver is { } handler)
+            {
+                await handler(envelope).ConfigureAwait(false);
             }
         }
     }
@@ -247,43 +260,12 @@ internal sealed class BridgeClient : IAsyncDisposable
         await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await WriteFrameAsync(_pipe, message, cancellationToken).ConfigureAwait(false);
+            await BridgeProtocolIO.WriteAsync(_pipe, message, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
             _writeGate.Release();
         }
-    }
-
-    private static async ValueTask WriteFrameAsync(Stream stream, object message, CancellationToken cancellationToken)
-    {
-        var payload = JsonSerializer.SerializeToUtf8Bytes(message, DapJson.Options);
-        var header = new byte[sizeof(int)];
-        BinaryPrimitives.WriteInt32LittleEndian(header, payload.Length);
-        await stream.WriteAsync(header, cancellationToken).ConfigureAwait(false);
-        await stream.WriteAsync(payload, cancellationToken).ConfigureAwait(false);
-        await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
-    }
-
-    private static async ValueTask<JsonDocument?> ReadFrameAsync(Stream stream, CancellationToken cancellationToken)
-    {
-        var header = new byte[sizeof(int)];
-        var first = await stream.ReadAsync(header, cancellationToken).ConfigureAwait(false);
-        if (first == 0)
-        {
-            return null;
-        }
-
-        await stream.ReadExactlyAsync(header.AsMemory(first), cancellationToken).ConfigureAwait(false);
-        var length = BinaryPrimitives.ReadInt32LittleEndian(header);
-        if (length <= 0 || length > 1024 * 1024)
-        {
-            throw new InvalidDataException("Bridge frame is outside the adapter limit.");
-        }
-
-        var payload = new byte[length];
-        await stream.ReadExactlyAsync(payload, cancellationToken).ConfigureAwait(false);
-        return JsonDocument.Parse(payload);
     }
 
     private static void EnsureSuccess(JsonElement response)

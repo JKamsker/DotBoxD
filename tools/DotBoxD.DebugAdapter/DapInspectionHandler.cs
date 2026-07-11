@@ -12,7 +12,7 @@ internal sealed class DapInspectionHandler(
 {
     private readonly DapStoppedExecutionStore _stopped = new();
     private readonly DapVariableStore _variableStore = new();
-    private readonly Dictionary<int, object> _stackTraces = [];
+    private readonly DapStackTraceLoader _stackTraces = new(bridge);
     private readonly DapResumeStopBuffer _resumeStops = new();
 
     public bool Handles(string command) => command is
@@ -78,10 +78,10 @@ internal sealed class DapInspectionHandler(
         }
     }
 
-    public void InvalidateStoppedState(int threadId)
+    public void InvalidateStoppedState(int threadId, bool preserveThreadIdentity = false)
     {
-        _stackTraces.Remove(threadId);
-        _variableStore.RemoveFrames(_stopped.RemoveThread(threadId));
+        _stackTraces.Invalidate(threadId);
+        _variableStore.RemoveFrames(_stopped.RemoveThread(threadId, preserveThreadIdentity));
     }
 
     public void InvalidateAllStoppedState()
@@ -103,40 +103,14 @@ internal sealed class DapInspectionHandler(
     private async ValueTask<object> StackTraceAsync(JsonElement request, CancellationToken cancellationToken)
     {
         var threadId = Arguments(request).GetProperty("threadId").GetInt32();
-        if (_stackTraces.TryGetValue(threadId, out var cached))
-        {
-            return cached;
-        }
-
-        var runId = RunId(threadId);
         var stoppedPluginId = _stopped.PluginId(threadId, pluginId);
-        var body = await bridge.RemoteAsync(
-                PluginDebugCommands.StackTrace,
-                new { runId },
+        return await _stackTraces.LoadAsync(
+                threadId,
+                RunId(threadId),
+                stoppedPluginId,
+                _stopped,
                 cancellationToken)
             .ConfigureAwait(false);
-        var frames = new List<object>();
-        foreach (var frame in body.GetProperty("frames").EnumerateArray())
-        {
-            var frameId = _stopped.AddFrame(threadId, frame.GetProperty("frameId").GetString()!);
-            var location = await LocationAsync(frame, stoppedPluginId, cancellationToken).ConfigureAwait(false);
-            AdapterDiagnostics.Write(
-                $"stack {threadId} {frame.GetProperty("functionId").GetString()} line {location.Line}");
-            frames.Add(new
-            {
-                id = frameId,
-                name = frame.GetProperty("functionId").GetString(),
-                source = location.Source,
-                line = location.Line,
-                column = location.Column,
-                endLine = location.EndLine,
-                endColumn = location.EndColumn
-            });
-        }
-
-        var result = new { stackFrames = frames, totalFrames = frames.Count };
-        _stackTraces[threadId] = result;
-        return result;
     }
 
     private object Scopes(JsonElement request)
@@ -234,37 +208,6 @@ internal sealed class DapInspectionHandler(
         return new { content = response.GetProperty("content").GetString(), mimeType = "text/plain" };
     }
 
-    private async ValueTask<(object? Source, int Line, int Column, int? EndLine, int? EndColumn)> LocationAsync(
-        JsonElement frame,
-        string stoppedPluginId,
-        CancellationToken cancellationToken)
-    {
-        if (!frame.TryGetProperty("nodeId", out var node) || node.ValueKind != JsonValueKind.String)
-        {
-            return (null, 1, 1, null, null);
-        }
-
-        var response = await bridge.SendAsync(
-                "location",
-                new Dictionary<string, object?> { ["pluginId"] = stoppedPluginId, ["nodeId"] = node.GetString() },
-                cancellationToken)
-            .ConfigureAwait(false);
-        if (!response.GetProperty("success").GetBoolean())
-        {
-            return (null, 1, 1, null, null);
-        }
-
-        var location = response.GetProperty("body");
-        var path = Property(location, "Path", "path").GetString()!;
-        var source = new { name = Path.GetFileName(path), path, sourceReference = path.StartsWith("dotboxd-ir://", StringComparison.Ordinal) ? 1 : 0 };
-        return (
-            source,
-            Property(location, "Line", "line").GetInt32(),
-            Property(location, "Column", "column").GetInt32(),
-            OptionalInt(location, "EndLine", "endLine"),
-            OptionalInt(location, "EndColumn", "endColumn"));
-    }
-
     private object DapThread(JsonElement thread)
     {
         var stoppedPluginId = thread.TryGetProperty("pluginId", out var value) &&
@@ -278,12 +221,28 @@ internal sealed class DapInspectionHandler(
 
     private string Frame(int frameId) => _stopped.Frame(frameId);
 
-    private ValueTask EmitStoppedAsync(DapPendingStop stop)
+    private async ValueTask EmitStoppedAsync(DapPendingStop stop)
     {
         var threadId = _stopped.RecordThread(stop.RunId, stop.PluginId);
-        return connection.EventAsync(
-            "stopped",
-            new { reason = DapStopReason(stop.Reason), threadId, allThreadsStopped = false });
+        try
+        {
+            _ = await _stackTraces.LoadAsync(
+                    threadId,
+                    stop.RunId,
+                    stop.PluginId,
+                    _stopped,
+                    CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is DebugAdapterException or IOException or InvalidDataException)
+        {
+            AdapterDiagnostics.Write("stack prefetch failed: " + exception.Message);
+        }
+
+        await connection.EventAsync(
+                "stopped",
+                new { reason = DapStopReason(stop.Reason), threadId, allThreadsStopped = false })
+            .ConfigureAwait(false);
     }
 
 }

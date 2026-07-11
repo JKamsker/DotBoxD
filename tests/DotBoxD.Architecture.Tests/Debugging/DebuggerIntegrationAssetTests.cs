@@ -31,12 +31,14 @@ public sealed class DebuggerIntegrationAssetTests
         var directory = Path.Combine(root, "ide/visualstudio/DotBoxD.KernelDebug.Vsix");
         var registration = File.ReadAllText(Path.Combine(directory, "AdapterRegistration.pkgdef"));
         var launcher = File.ReadAllText(Path.Combine(directory, "DebugAdapterLauncher.cs"));
+        var package = File.ReadAllText(Path.Combine(directory, "DotBoxDKernelAutoAttachPackage.cs"));
         var project = XDocument.Load(Path.Combine(directory, "DotBoxD.KernelDebug.Vsix.csproj"));
         var manifest = XDocument.Load(Path.Combine(directory, "source.extension.vsixmanifest"));
 
         Assert.Contains("\"Attach\"=dword:00000001", registration, StringComparison.Ordinal);
         Assert.Contains("{80223DBF-71D6-4568-BF29-51F9613ACE15}", registration, StringComparison.Ordinal);
         Assert.Contains("80223DBF-71D6-4568-BF29-51F9613ACE15", launcher, StringComparison.Ordinal);
+        Assert.Contains("DBGLAUNCH_BreakOneProcess", package, StringComparison.Ordinal);
         Assert.Contains(
             project.Descendants().Where(item => item.Name.LocalName == "Target"),
             item => item.Attribute("Name")?.Value == "PublishDotBoxDDebugAdapter");

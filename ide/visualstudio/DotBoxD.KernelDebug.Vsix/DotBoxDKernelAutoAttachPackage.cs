@@ -124,6 +124,7 @@ public sealed class DotBoxDKernelAutoAttachPackage : AsyncPackage
         var target = new VsDebugTargetInfo3
         {
             dlo = (uint)DEBUG_LAUNCH_OPERATION.DLO_CreateProcess,
+            LaunchFlags = (uint)__VSDBGLAUNCHFLAGS5.DBGLAUNCH_BreakOneProcess,
             bstrExe = companionExecutable,
             bstrCurDir = Path.GetDirectoryName(companionExecutable),
             bstrOptions = "{\"request\":\"attach\",\"processId\":" +

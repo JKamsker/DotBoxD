@@ -4,7 +4,7 @@
                  xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
     <Identity Id="DotBoxD.KernelDebug.87cd6bf8-ae00-4ce8-a26d-ca310be78ed9"
-              Version="0.1.11"
+              Version="0.1.12"
               Language="en-US"
               Publisher="DotBoxD" />
     <DisplayName>DotBoxD Kernel Debugger</DisplayName>

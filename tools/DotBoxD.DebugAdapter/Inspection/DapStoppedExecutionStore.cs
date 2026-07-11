@@ -19,9 +19,9 @@ internal sealed class DapStoppedExecutionStore
             {
                 threadId = ++_nextThreadId;
                 _threadIds[runId] = threadId;
-                _threads[threadId] = runId;
             }
 
+            _threads[threadId] = runId;
             if (pluginId is not null)
             {
                 _threadPlugins[threadId] = pluginId;
@@ -70,11 +70,11 @@ internal sealed class DapStoppedExecutionStore
         }
     }
 
-    public IReadOnlySet<string> RemoveThread(int threadId)
+    public IReadOnlySet<string> RemoveThread(int threadId, bool preserveIdentity = false)
     {
         lock (_gate)
         {
-            if (_threads.Remove(threadId, out var runId))
+            if (_threads.Remove(threadId, out var runId) && !preserveIdentity)
             {
                 _threadIds.Remove(runId);
             }

@@ -3,7 +3,7 @@
     <TargetFramework>net472</TargetFramework>
     <RootNamespace>DotBoxD.KernelDebug.VisualStudio</RootNamespace>
     <AssemblyName>DotBoxD.KernelDebug.Vsix</AssemblyName>
-    <VersionPrefix>0.1.11</VersionPrefix>
+    <VersionPrefix>0.1.12</VersionPrefix>
     <GeneratePkgDefFile>true</GeneratePkgDefFile>
     <UseCodebase>true</UseCodebase>
     <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>

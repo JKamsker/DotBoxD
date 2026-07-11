@@ -8,6 +8,19 @@ namespace DotBoxD.Kernels.Tests.Plugins.Debugging.Protocol;
 public sealed class DapInspectionHandlerTests
 {
     [Fact]
+    public void Step_resume_preserves_the_thread_identity_for_the_same_execution()
+    {
+        var store = new DapStoppedExecutionStore();
+        var threadId = store.RecordThread("same-run", "plugin");
+
+        _ = store.RemoveThread(threadId, preserveIdentity: true);
+        var resumedThreadId = store.RecordThread("same-run", "plugin");
+
+        Assert.Equal(threadId, resumedThreadId);
+        Assert.Equal("same-run", store.RunId(resumedThreadId));
+    }
+
+    [Fact]
     public async Task Resuming_one_execution_preserves_a_concurrent_stop()
     {
         await using var bridge = PluginDebugBridge.Start(new PluginDebugBridgeOptions

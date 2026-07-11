@@ -111,13 +111,38 @@ function Wait-ForStop([int] $ExpectedLine) {
                     Line = $ExpectedLine
                     Function = $match.Groups[1].Value
                 }
-                $script:stackCursor = $index + 1
+                $script:stackCursor = $stackLines.Count
                 break
             }
         }
     } until ($stop -or [DateTime]::UtcNow -ge $deadline)
     if (-not $stop) {
         throw "Expected GuardianKernel.cs:$ExpectedLine. Last stop: $($stop | ConvertTo-Json -Compress)."
+    }
+    return $stop
+}
+
+function Wait-ForNextKernelStop {
+    $deadline = [DateTime]::UtcNow + $StopTimeout
+    do {
+        Start-Sleep -Milliseconds 200
+        $mode = Invoke-Dte '[int]$dte.Debugger.CurrentMode'
+        $stackLines = @(Select-String $launcherLog -Pattern ' adapter stack \d+ (.+) line (\d+)$' -ErrorAction SilentlyContinue)
+        for ($index = $script:stackCursor; $mode -eq 2 -and $index -lt $stackLines.Count; $index++) {
+            $match = [regex]::Match($stackLines[$index].Line, ' adapter stack \d+ (.+) line (\d+)$')
+            if ($match.Success) {
+                $stop = [PSCustomObject]@{
+                    File = $guardian
+                    Line = [int] $match.Groups[2].Value
+                    Function = $match.Groups[1].Value
+                }
+                $script:stackCursor = $stackLines.Count
+                break
+            }
+        }
+    } until ($stop -or [DateTime]::UtcNow -ge $deadline)
+    if (-not $stop) {
+        throw 'Expected a kernel stop after Step Over.'
     }
     return $stop
 }
@@ -162,6 +187,8 @@ $dte.Debugger.Go($false)
     Wait-ForKernelAttach
 
     $predicate1 = Wait-ForStop 35
+    Invoke-Dte '$dte.Debugger.StepOver($false)' | Out-Null
+    $step = Wait-ForNextKernelStop
     Invoke-Dte '$dte.Debugger.Go($false)' | Out-Null
     $handle1 = Wait-ForStop 44
     Invoke-Dte '$dte.Debugger.Go($false)' | Out-Null
@@ -172,8 +199,8 @@ $dte.Debugger.Go($false)
     if ($predicate1.Function -eq $handle1.Function -or $predicate2.Function -eq $handle2.Function) {
         throw 'Where and Run stops did not preserve distinct kernel stack identities.'
     }
-    Set-Content $resultLog "PASS: managed Program.cs:$($managedStop.Line) and kernel 35, 44, 35, 44."
-    Write-Host 'Visual Studio 2026 kernel debugger E2E passed: 35, 44, 35, 44.'
+    Set-Content $resultLog "PASS: managed Program.cs:$($managedStop.Line), kernel step to $($step.Line), and kernel 35, 44, 35, 44."
+    Write-Host "Visual Studio 2026 kernel debugger E2E passed: step to $($step.Line), then 44, 35, 44."
 }
 catch {
     Set-Content $resultLog ("FAIL: " + $_.Exception)

@@ -202,7 +202,9 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
                 .ConfigureAwait(false);
             if (controlledThreadId is { } resumedThreadId)
             {
-                RequireInspection().InvalidateStoppedState(resumedThreadId);
+                RequireInspection().InvalidateStoppedState(
+                    resumedThreadId,
+                    preserveThreadIdentity: command != "continue");
                 await connection.EventAsync(
                         "continued",
                         new { threadId = resumedThreadId, allThreadsContinued = false },

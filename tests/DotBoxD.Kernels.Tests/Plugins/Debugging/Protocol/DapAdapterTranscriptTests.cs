@@ -11,6 +11,39 @@ namespace DotBoxD.Kernels.Tests.Plugins.Debugging.Protocol;
 public sealed class DapAdapterTranscriptTests
 {
     [Fact]
+    public async Task Event_handler_can_issue_a_bridge_request_without_blocking_the_read_loop()
+    {
+        await using var bridge = PluginDebugBridge.Start(new PluginDebugBridgeOptions
+        {
+            WaitForDebuggerBeforeInstall = false
+        });
+        var control = new RecordingControl();
+        bridge.AttachControl(control);
+        await bridge.PublishAsync(Bootstrap(control.SessionToken));
+        await using var client = await BridgeClient.ConnectAsync(
+            bridge.Descriptor.PipeName,
+            bridge.Descriptor.DiscoveryToken,
+            CancellationToken.None);
+        var received = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.EventReceiver = async envelope =>
+        {
+            Assert.Equal("output", envelope.Kind);
+            _ = await client.RemoteAsync(PluginDebugCommands.Threads, null, CancellationToken.None);
+            received.TrySetResult();
+        };
+        var output = new PluginDebugEnvelope(
+            PluginDebugProtocol.Version,
+            "output",
+            Guid.NewGuid().ToString("N"),
+            control.SessionToken,
+            JsonSerializer.SerializeToElement(new { category = "console", output = "test" }));
+
+        await bridge.PublishAsync(PluginDebugProtocol.Encode(output, 1024 * 1024));
+
+        await received.Task.WaitAsync(TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
     public async Task Bridge_rejects_wrong_discovery_token_without_losing_listener()
     {
         await using var bridge = PluginDebugBridge.Start(new PluginDebugBridgeOptions
