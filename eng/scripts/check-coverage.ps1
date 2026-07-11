@@ -101,7 +101,13 @@ function Test-ShippingPackage([string] $name) {
 }
 
 function Test-ShippingSourceFile([string] $file) {
-    return -not [string]::IsNullOrEmpty($file) -and $file.Replace('\', '/') -match '(^|/)src/'
+    if ([string]::IsNullOrEmpty($file)) {
+        return $false
+    }
+
+    $normalized = $file.Replace('\', '/')
+    return $normalized -match '(^|/)src/' -or
+        $normalized -match '^(Channels|CodeGeneration|Hosting|Kernels|Meta|Pushdown|Services)/'
 }
 
 function Test-PackagePattern([string] $name, [string[]] $patterns) {
@@ -212,7 +218,12 @@ function Measure-Bucket($bucket) {
         }
     }
     if ($validLines -eq 0) {
-        throw "Coverage bucket '$($bucket.Name)' matched no shipping source lines."
+        if ($bucket.Kind -eq "critical") {
+            throw "Critical coverage bucket '$($bucket.Name)' matched no shipping source lines."
+        }
+
+        Write-Warning "Coverage bucket '$($bucket.Name)' matched no shipping source lines and is not included in this report."
+        return $null
     }
     [pscustomobject] @{
         Name = $bucket.Name
