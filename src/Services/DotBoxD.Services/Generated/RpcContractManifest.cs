@@ -222,7 +222,7 @@ public sealed record RpcContractService(
         {
             if (values[i] is null)
             {
-                throw new ArgumentException("Collection cannot contain null elements.", paramName);
+                throw new ArgumentNullException(paramName);
             }
         }
 
