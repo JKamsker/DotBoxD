@@ -449,7 +449,7 @@ public string Code { get => _code; init => _code = ValidateText(value, nameof(Co
 public string CreateChargedStringConcat(string left, string right)
 public string CreateChargedSubstring(string value, int startIndex, int length)
 public string Hash => (_hash ??= CreateHashCache()).Value
-public string Kind { get => _kind; init => _kind = value ?? throw new ArgumentNullException(nameof(Kind)); }
+public string Kind { get => _kind; init => _kind = RequireKind(value); }
 public string ManifestHash { get; }
 public string Message { get => _message; init => _message = ValidateText(value, nameof(Message)); }
 public string ModuleHash { get; }
