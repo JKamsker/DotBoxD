@@ -62,8 +62,13 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
         foreach (var group in snapshot.Groups)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
-            if (!Snapshot.TryEventKey(group.Paths, e, reader, out var key) ||
-                !group.TryGet(key, out var bucket))
+            if (!Snapshot.TryEventKey(group.Paths, e, reader, context.CancellationToken, out var key))
+            {
+                continue;
+            }
+
+            context.CancellationToken.ThrowIfCancellationRequested();
+            if (!group.TryGet(key, out var bucket))
             {
                 continue;
             }
@@ -233,7 +238,12 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
             return builder.ToString();
         }
 
-        public static bool TryEventKey(string[] sortedPaths, TEvent e, MemberValueReader reader, out string key)
+        public static bool TryEventKey(
+            string[] sortedPaths,
+            TEvent e,
+            MemberValueReader reader,
+            CancellationToken cancellationToken,
+            out string key)
         {
             var reuseThreadBuilder = !_eventKeyBuilderInUse;
             var builder = reuseThreadBuilder ? _eventKeyBuilder ??= new StringBuilder() : new StringBuilder();
@@ -247,7 +257,9 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
                 builder.Clear();
                 foreach (var path in sortedPaths)
                 {
-                    if (!EventQueryRoutingKey.TryFromRuntime(path, reader.Read(e!, path), out var runtimeKey))
+                    var value = reader.Read(e!, path);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!EventQueryRoutingKey.TryFromRuntime(path, value, out var runtimeKey))
                     {
                         key = string.Empty;
                         return false;
