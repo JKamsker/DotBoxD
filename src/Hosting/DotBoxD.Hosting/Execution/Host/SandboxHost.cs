@@ -190,6 +190,30 @@ public sealed partial class SandboxHost : IDisposable
         return false;
     }
 
+    private static SandboxExecutionResult PreDispatchCancelledResult(
+        ExecutionPlan plan,
+        SandboxExecutionOptions options)
+    {
+        var runId = options.RunId ?? SandboxRunId.New();
+        var budget = new ResourceMeter(plan.Budget);
+        var startedAt = AuditTime(plan);
+        var error = new SandboxError(SandboxErrorCode.Cancelled, "execution cancelled");
+        var audit = new InMemoryAuditSink();
+        WriteFailedRunSummary(audit, runId, startedAt, plan, budget, options.Mode, error, false);
+        return new SandboxExecutionResult
+        {
+            Succeeded = false,
+            Error = error,
+            ResourceUsage = budget.Snapshot(),
+            AuditEvents = audit.OwnedEventSnapshot(),
+            ActualMode = options.Mode,
+            ExecutionDispatched = false,
+            ModuleHash = plan.ModuleHash,
+            PlanHash = plan.PlanHash,
+            PolicyHash = plan.PolicyHash
+        };
+    }
+
     private SandboxExecutionResult Publish(SandboxExecutionResult result)
     {
         if (_auditObservers.Length == 0)
