@@ -114,7 +114,11 @@ jobs:
           Copy-Item $vsix.FullName $archive
           $expanded = Join-Path $env:RUNNER_TEMP 'dotboxd-kernel-debug'
           Expand-Archive $archive $expanded
-          foreach ($required in @('AdapterRegistration.pkgdef', 'adapter/DotBoxD.DebugAdapter.dll')) {
+          foreach ($required in @(
+            'AdapterRegistration.pkgdef',
+            'DotBoxD.KernelDebug.Vsix.pkgdef',
+            'adapter/DotBoxD.DebugAdapter.dll'
+          )) {
             if (-not (Test-Path (Join-Path $expanded $required))) {
               throw "VSIX is missing $required."
             }

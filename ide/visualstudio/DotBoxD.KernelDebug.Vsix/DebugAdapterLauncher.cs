@@ -16,6 +16,8 @@ public sealed class DebugAdapterLauncher : IAdapterLauncher
         {
             throw new ArgumentNullException(nameof(context));
         }
+
+        WriteDiagnostic("initialize");
     }
 
     public void UpdateLaunchOptions(IAdapterLaunchInfo launchInfo)
@@ -31,6 +33,7 @@ public sealed class DebugAdapterLauncher : IAdapterLauncher
 
         launchInfo.LaunchJson = "{\"request\":\"attach\",\"processId\":" +
             launchInfo.AttachProcessId.ToString(CultureInfo.InvariantCulture) + "}";
+        WriteDiagnostic($"configure attach {launchInfo.AttachProcessId}");
     }
 
     public ITargetHostProcess LaunchAdapter(IAdapterLaunchInfo launchInfo, ITargetHostInterop targetInterop)
@@ -52,8 +55,29 @@ public sealed class DebugAdapterLauncher : IAdapterLauncher
             throw new FileNotFoundException("The packaged DotBoxD debug adapter is missing.", adapter);
         }
 
-        return targetInterop.ExecuteCommandAsync("dotnet", Quote(adapter));
+        WriteDiagnostic("launch adapter");
+        var process = targetInterop.ExecuteCommandAsync("dotnet", Quote(adapter));
+        WriteDiagnostic("adapter launched");
+        return process;
     }
 
     private static string Quote(string value) => "\"" + value.Replace("\"", "\\\"") + "\"";
+
+    private static void WriteDiagnostic(string message)
+    {
+        var path = Environment.GetEnvironmentVariable("DOTBOXD_VSIX_DIAGNOSTIC_LOG");
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        try
+        {
+            File.AppendAllText(path, $"{DateTime.UtcNow:O} {message}{Environment.NewLine}");
+        }
+        catch (Exception)
+        {
+            // Diagnostic logging must never affect debugger startup.
+        }
+    }
 }

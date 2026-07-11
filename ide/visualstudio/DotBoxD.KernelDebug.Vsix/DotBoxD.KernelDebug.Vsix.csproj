@@ -3,13 +3,19 @@
     <TargetFramework>net472</TargetFramework>
     <RootNamespace>DotBoxD.KernelDebug.VisualStudio</RootNamespace>
     <AssemblyName>DotBoxD.KernelDebug.Vsix</AssemblyName>
-    <GeneratePkgDefFile>false</GeneratePkgDefFile>
+    <VersionPrefix>0.1.10</VersionPrefix>
+    <GeneratePkgDefFile>true</GeneratePkgDefFile>
+    <UseCodebase>true</UseCodebase>
     <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
     <IncludeDebugSymbolsInVSIXContainer>false</IncludeDebugSymbolsInVSIXContainer>
     <CopyBuildOutputToOutputDirectory>false</CopyBuildOutputToOutputDirectory>
     <CopyOutputSymbolsToOutputDirectory>false</CopyOutputSymbolsToOutputDirectory>
+    <CopyVsixManifestToOutput>false</CopyVsixManifestToOutput>
     <IsPackable>false</IsPackable>
     <DotBoxDDisableExtraAnalyzers>true</DotBoxDDisableExtraAnalyzers>
+    <!-- Microsoft.VisualStudio.Shell.15.0 brings MessagePack 2.5.192 only as a compile-time SDK
+         dependency. Runtime assets are excluded below; Visual Studio supplies its own host assemblies. -->
+    <NoWarn>$(NoWarn);NU1902;NU1903</NoWarn>
     <DebugAdapterPublishDir>$(BaseIntermediateOutputPath)debug-adapter\</DebugAdapterPublishDir>
     <VsixIntermediateOutputPath>$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\vsix\</VsixIntermediateOutputPath>
     <FileManifest>$(VsixIntermediateOutputPath)files.json</FileManifest>
@@ -23,11 +29,14 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.VisualStudio.Shell.15.0" PrivateAssets="all" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.VisualStudio.Shell.Interop" PrivateAssets="all" ExcludeAssets="runtime" />
     <PackageReference Include="Microsoft.VisualStudio.Debugger.DebugAdapterHost.Interfaces" PrivateAssets="all" ExcludeAssets="runtime" />
     <PackageReference Include="Microsoft.VSSDK.BuildTools" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
+    <None Remove="extension.vsixmanifest" />
     <None Include="source.extension.vsixmanifest" />
     <Content Include="AdapterRegistration.pkgdef">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
@@ -48,11 +57,16 @@
   </Target>
 
   <Import Project="$(VSToolsPath)\vssdk\Microsoft.VsSDK.targets" />
+  <Target Name="SetPkgDefAssemblyToProcess" BeforeTargets="GeneratePkgDef">
+    <PropertyGroup>
+      <CreatePkgDefAssemblyToProcess>$(IntermediateOutputPath)$(TargetName).dll</CreatePkgDefAssemblyToProcess>
+    </PropertyGroup>
+  </Target>
   <Target Name="PrepareVsixIntermediateOutput" BeforeTargets="GenerateFileManifest">
     <MakeDir Directories="$(VsixIntermediateOutputPath)" />
   </Target>
   <Target Name="BuildVsixContainer"
           AfterTargets="Build"
-          DependsOnTargets="CreateVsixContainer"
+          DependsOnTargets="GeneratePkgDef;CreateVsixContainer"
           Condition="'$(OS)' == 'Windows_NT'" />
 </Project>
