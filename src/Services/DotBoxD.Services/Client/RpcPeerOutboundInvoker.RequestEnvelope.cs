@@ -7,14 +7,14 @@ internal sealed partial class RpcPeerOutboundInvoker
 {
     private static void ValidateTarget(string service, string method)
     {
-        if (string.IsNullOrEmpty(service))
+        if (string.IsNullOrWhiteSpace(service))
         {
-            throw new ArgumentException("Service name must not be null or empty.", nameof(service));
+            throw new ArgumentException("Service name must not be null, empty, or whitespace.", nameof(service));
         }
 
-        if (string.IsNullOrEmpty(method))
+        if (string.IsNullOrWhiteSpace(method))
         {
-            throw new ArgumentException("Method name must not be null or empty.", nameof(method));
+            throw new ArgumentException("Method name must not be null, empty, or whitespace.", nameof(method));
         }
     }
 
