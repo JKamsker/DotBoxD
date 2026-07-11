@@ -274,9 +274,14 @@ internal static class MergeableIrMarkedCallReader
 
     private static bool IsDefaultIrArgument(ExpressionSyntax expression)
     {
-        while (expression is ParenthesizedExpressionSyntax parenthesized)
+        while (expression is ParenthesizedExpressionSyntax or CastExpressionSyntax)
         {
-            expression = parenthesized.Expression;
+            expression = expression switch
+            {
+                ParenthesizedExpressionSyntax parenthesized => parenthesized.Expression,
+                CastExpressionSyntax cast => cast.Expression,
+                _ => expression
+            };
         }
 
         return expression.IsKind(SyntaxKind.NullLiteralExpression) ||

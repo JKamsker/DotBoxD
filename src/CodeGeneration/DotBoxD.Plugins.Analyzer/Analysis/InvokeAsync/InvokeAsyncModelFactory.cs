@@ -38,6 +38,15 @@ internal static partial class InvokeAsyncModelFactory
         SemanticModel model,
         CancellationToken cancellationToken)
     {
+        if (InvokeAsyncServerSurface.TryCreateLowerToIrMethodDiagnostic(
+                model,
+                invocation,
+                cancellationToken,
+                out var diagnostic))
+        {
+            return new InvokeAsyncResult(null, null, diagnostic);
+        }
+
         if (IsUnqualifiedInvocationExpression(invocation.Expression))
         {
             return TryCreateUnqualified(invocation, model, cancellationToken);

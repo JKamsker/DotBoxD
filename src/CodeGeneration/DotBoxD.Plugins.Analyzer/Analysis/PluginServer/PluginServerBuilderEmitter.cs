@@ -10,6 +10,7 @@ internal static class PluginServerBuilderEmitter
             builder,
             string.Empty,
             "Builder for the generated plugin server. Use Setup to record installs without I/O, then Build to create the runtime facade.");
+        PluginServerClsComplianceAttributeSource.AppendFalse(builder, model);
         builder.Append(model.Accessibility).Append(" sealed class ").Append(model.ClassName).AppendLine("Builder");
         builder.AppendLine("{");
         AppendFieldsAndConstructors(builder, model);

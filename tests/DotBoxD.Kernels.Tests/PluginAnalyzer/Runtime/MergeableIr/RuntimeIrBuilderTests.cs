@@ -21,7 +21,10 @@ public sealed class RuntimeIrBuilderTests
             new LoweredPipelineComposition("runtime-builder", [filter, projection], SandboxType.String));
 
         var host = SandboxTestHost.Create();
-        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000_000).Build());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create()
+            .Grant("event.read.distance", new { })
+            .WithFuel(1_000_000)
+            .Build());
 
         var gateTrue = await host.ExecuteAsync(plan, "ShouldHandle", Record(5, "target-1"));
         var gateFalse = await host.ExecuteAsync(plan, "ShouldHandle", Record(3, "target-2"));

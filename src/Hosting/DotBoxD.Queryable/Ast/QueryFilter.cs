@@ -152,7 +152,7 @@ public sealed record QueryFilter
             : new QueryFilter { Kind = kind, Children = [.. flattened] };
     }
 
-    private static QueryValue[] SnapshotValues(IReadOnlyList<QueryValue> values)
+    private static IReadOnlyList<QueryValue> SnapshotValues(IReadOnlyList<QueryValue> values)
     {
         var snapshot = new QueryValue[values.Count];
         for (var i = 0; i < values.Count; i++)
@@ -161,6 +161,6 @@ public sealed record QueryFilter
                 ?? throw new ArgumentException("QueryFilter In nodes require Values to contain only non-null QueryValue elements.", nameof(values));
         }
 
-        return snapshot;
+        return Array.AsReadOnly(snapshot);
     }
 }

@@ -23,6 +23,7 @@ public sealed partial class InstalledKernel
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(arguments);
+        ThrowIfContainsNullArgument(arguments);
         if (Manifest.RpcEntrypoint is not { } entrypoint)
         {
             throw new InvalidOperationException(
@@ -141,6 +142,17 @@ public sealed partial class InstalledKernel
         }
 
         return SandboxValue.FromOwnedList(values, values[0].Type);
+    }
+
+    private static void ThrowIfContainsNullArgument(IReadOnlyList<SandboxValue> arguments)
+    {
+        for (var i = 0; i < arguments.Count; i++)
+        {
+            if (arguments[i] is null)
+            {
+                throw new ArgumentException("Server extension arguments cannot contain null values.", nameof(arguments));
+            }
+        }
     }
 
     private static SandboxFunction? FindRpcEntrypoint(PluginPackage package)

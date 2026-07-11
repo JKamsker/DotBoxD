@@ -254,7 +254,10 @@ public LiveSettingStore(IEnumerable<ILiveSetting> settings)
 public LiveUpdateMode UpdateMode { get; set; }
 public LiveValue(string name, T value)
 public LiveValue<T> BindValue<T>(string name, T initialValue)
+public long Considered { get; init; }
+public long Dispatched { get; init; }
 public long Int64Value { get; }
+public long Prefiltered { get; init; }
 public long ReadInt64()
 public LoweredPipelineStep FilterStep( Func<IRExpressionBuilder, Expression> build, IEnumerable<string>? requiredCapabilities = null, IEnumerable<string>? effects = null)
 public LoweredPipelineStep ProjectionStep( Type outputType, Func<IRExpressionBuilder, Expression> build, IEnumerable<string>? requiredCapabilities = null, IEnumerable<string>? effects = null)

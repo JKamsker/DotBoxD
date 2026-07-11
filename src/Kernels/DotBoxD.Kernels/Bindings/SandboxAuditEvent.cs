@@ -21,7 +21,7 @@ public sealed record SandboxAuditEvent(
     private const string AuditByteCounterMessage = "audit byte counters must be non-negative.";
 
     private SandboxRunId _runId = RunId ?? throw new ArgumentNullException(nameof(RunId));
-    private string _kind = Kind ?? throw new ArgumentNullException(nameof(Kind));
+    private string _kind = RequireKind(Kind);
     private bool _success = Success;
     private SandboxEffect _effect = RequireKnownEffect(Effect, nameof(Effect));
     private SandboxErrorCode? _errorCode = RequireTerminalState(Success, ErrorCode, nameof(ErrorCode));
@@ -29,7 +29,7 @@ public sealed record SandboxAuditEvent(
     private IReadOnlyDictionary<string, string>? _fields = CopyFields(Fields);
 
     public SandboxRunId RunId { get => _runId; init => _runId = value ?? throw new ArgumentNullException(nameof(RunId)); }
-    public string Kind { get => _kind; init => _kind = value ?? throw new ArgumentNullException(nameof(Kind)); }
+    public string Kind { get => _kind; init => _kind = RequireKind(value); }
     public bool Success
     {
         get => _success;
@@ -53,6 +53,13 @@ public sealed record SandboxAuditEvent(
 
     public long? Bytes { get => _bytes; init => _bytes = RequireNonNegative(value, nameof(Bytes)); }
     public IReadOnlyDictionary<string, string>? Fields { get => _fields; init => _fields = CopyFields(value); }
+
+    private static string RequireKind(string kind)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(kind, nameof(Kind));
+
+        return kind;
+    }
 
     private static SandboxEffect RequireKnownEffect(SandboxEffect effect, string paramName)
         => effect.ContainsOnlyKnownBits()

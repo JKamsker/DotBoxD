@@ -30,6 +30,7 @@ internal static class PluginServerSetupEmitter
             builder,
             string.Empty,
             "Setup-time registration surface. Actions recorded here are replayed when the generated plugin server starts.");
+        PluginServerClsComplianceAttributeSource.AppendFalse(builder, model);
         builder.Append(model.Accessibility).Append(" interface ").Append(model.SetupInterfaceName).AppendLine();
         builder.AppendLine("{");
         PluginServerXmlDocumentation.AppendSummary(
@@ -62,6 +63,7 @@ internal static class PluginServerSetupEmitter
                 builder,
                 string.Empty,
                 "Setup-time server-extension accumulator for the " + control.Name + " domain control.");
+            PluginServerClsComplianceAttributeSource.AppendFalse(builder, model);
             builder.Append(model.Accessibility).Append(" interface ").Append(control.AccumulatorInterfaceName).AppendLine();
             builder.AppendLine("{");
             PluginServerXmlDocumentation.AppendSummary(

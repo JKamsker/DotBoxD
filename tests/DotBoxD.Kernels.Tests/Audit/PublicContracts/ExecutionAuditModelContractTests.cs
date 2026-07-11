@@ -123,6 +123,36 @@ public sealed class ExecutionAuditModelContractTests
     }
 
     [Fact]
+    public void Audit_event_accepts_binding_call_kind()
+    {
+        var auditEvent = ValidAuditEvent();
+
+        Assert.Equal(BindingAuditKinds.BindingCall, auditEvent.Kind);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("\t")]
+    public void Audit_event_rejects_blank_kind_on_construction(string kind)
+    {
+        AssertPublicArgumentException("Kind", () => _ = new SandboxAuditEvent(
+            SandboxRunId.New(),
+            kind,
+            DateTimeOffset.UtcNow,
+            Success: true));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("\t")]
+    public void Audit_event_rejects_blank_kind_with_init(string kind)
+    {
+        AssertPublicArgumentException("Kind", () => _ = ValidAuditEvent() with { Kind = kind });
+    }
+
+    [Fact]
     public void Audit_event_rejects_null_field_values()
     {
         AssertPublicArgumentException("Fields", () => _ = ValidAuditEvent() with

@@ -213,4 +213,33 @@ public sealed partial class EventIndexRegistry
 /// while <see cref="EventIndexRegistry.Publish"/> is running concurrently may observe an in-flight
 /// increment between the three reads.
 /// </summary>
-public readonly record struct EventIndexStats(long Considered, long Prefiltered, long Dispatched);
+public readonly record struct EventIndexStats(long Considered, long Prefiltered, long Dispatched)
+{
+    private readonly long _considered = ValidateNonNegative(Considered, nameof(Considered));
+    private readonly long _prefiltered = ValidateNonNegative(Prefiltered, nameof(Prefiltered));
+    private readonly long _dispatched = ValidateNonNegative(Dispatched, nameof(Dispatched));
+
+    public long Considered
+    {
+        get => _considered;
+        init => _considered = ValidateNonNegative(value, nameof(Considered));
+    }
+
+    public long Prefiltered
+    {
+        get => _prefiltered;
+        init => _prefiltered = ValidateNonNegative(value, nameof(Prefiltered));
+    }
+
+    public long Dispatched
+    {
+        get => _dispatched;
+        init => _dispatched = ValidateNonNegative(value, nameof(Dispatched));
+    }
+
+    private static long ValidateNonNegative(long value, string paramName)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(value, paramName);
+        return value;
+    }
+}

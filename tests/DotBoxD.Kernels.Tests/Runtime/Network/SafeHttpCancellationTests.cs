@@ -82,9 +82,48 @@ public sealed class SafeHttpCancellationTests
         Assert.Equal(SandboxErrorCode.Cancelled, auditEvent.ErrorCode);
     }
 
+    [Theory]
+    [InlineData(false, "127.0.0.1")]
+    [InlineData(true, "10.0.0.1")]
+    public async Task GetTextAsync_with_token_cancelled_after_dns_private_address_reports_cancelled(
+        bool cancelContext,
+        string privateAddress)
+    {
+        using var operationCancellation = new CancellationTokenSource();
+        using var contextCancellation = new CancellationTokenSource();
+        var scenario = CreateScenario(
+            contextCancellation.Token,
+            onDnsResolved: cancelContext ? contextCancellation.Cancel : operationCancellation.Cancel,
+            IPAddress.Parse(privateAddress));
+
+        var ex = await Assert.ThrowsAsync<SandboxRuntimeException>(async () =>
+            await SafeHttpClient.GetTextAsync(
+                scenario.Context,
+                new SandboxUri("https://api.example.com/config"),
+                new SafeInMemoryHttpMessageInvoker("remote-config"),
+                scenario.Dns,
+                operationCancellation.Token));
+
+        Assert.Equal(1, scenario.DnsCalls);
+        var auditEvent = Assert.Single(scenario.Audit.Events, e => e.BindingId == "net.http.get" && !e.Success);
+        var failures = new List<string>();
+        if (ex.Error.Code != SandboxErrorCode.Cancelled)
+        {
+            failures.Add($"expected exception code Cancelled, observed {ex.Error.Code}");
+        }
+
+        if (auditEvent.ErrorCode != SandboxErrorCode.Cancelled)
+        {
+            failures.Add($"expected audit error Cancelled, observed {auditEvent.ErrorCode}");
+        }
+
+        Assert.Empty(failures);
+    }
+
     private static SafeHttpCancellationScenario CreateScenario(
         CancellationToken contextToken,
-        Action? onDnsResolved = null)
+        Action? onDnsResolved = null,
+        params IPAddress[] addresses)
     {
         var audit = new InMemoryAuditSink();
         var policy = SandboxPolicyBuilder.Create()
@@ -104,7 +143,8 @@ public sealed class SafeHttpCancellationTests
         {
             scenario.DnsCalls++;
             onDnsResolved?.Invoke();
-            return ValueTask.FromResult<IReadOnlyList<IPAddress>>([IPAddress.Parse("93.184.216.34")]);
+            return ValueTask.FromResult<IReadOnlyList<IPAddress>>(
+                addresses.Length == 0 ? [IPAddress.Parse("93.184.216.34")] : addresses);
         };
 
         return scenario;

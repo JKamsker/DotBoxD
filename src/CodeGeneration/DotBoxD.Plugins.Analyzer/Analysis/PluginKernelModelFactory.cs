@@ -98,6 +98,15 @@ internal static class PluginKernelModelFactory
         INamedTypeSymbol eventType,
         CancellationToken cancellationToken)
     {
+        var hookMetadata = PluginKernelHookMetadataReader.Read(
+            eventType,
+            context.SemanticModel.Compilation,
+            cancellationToken);
+        if (hookMetadata.Diagnostic is not null)
+        {
+            return new PluginKernelModelResult(null, hookMetadata.Diagnostic);
+        }
+
         var shouldHandle = InterfaceMethodSyntax(context, type, DotBoxDGenerationNames.Entrypoints.ShouldHandle, cancellationToken);
         var handle = InterfaceMethodSyntax(context, type, DotBoxDGenerationNames.Entrypoints.Handle, cancellationToken);
         var eventProperties = PluginSymbolReader.EventProperties(eventType);
@@ -173,7 +182,7 @@ internal static class PluginKernelModelFactory
             PackageName: PackageName(type.Name),
             GeneratedPackageAttributes: GeneratedPackageAttributeSource.FromKernel(type),
             GeneratedAttributeSource: string.Empty,
-            EventName: EventTypeName.HookOrQualified(eventType),
+            EventName: hookMetadata.EventName,
             EventParameterName: eventParameterName,
             ContextParameterName: contextParameterName,
             HandleEventParameterName: handleEventParameterName,

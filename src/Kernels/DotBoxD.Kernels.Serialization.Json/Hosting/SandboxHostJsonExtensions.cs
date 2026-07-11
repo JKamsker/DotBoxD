@@ -10,6 +10,7 @@ public static class SandboxHostJsonExtensions
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(host);
+        ArgumentNullException.ThrowIfNull(jsonIr);
         cancellationToken.ThrowIfCancellationRequested();
         return ValueTask.FromResult(JsonImporter.Import(jsonIr));
     }

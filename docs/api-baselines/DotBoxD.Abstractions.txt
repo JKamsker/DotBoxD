@@ -106,8 +106,9 @@ public LoweredPipelineCompositionResult(SandboxModule module, KernelDebugInfo? d
 public LoweredPipelineDebugInfo? DebugInfo { get; init; }
 public LoweredPipelineDebugInfo( IReadOnlyList<KernelDebugDocument> documents, string? inputSourceName = null, IReadOnlyList<SourceSpan>? sequenceSpans = null)
 public LoweredPipelineStep Step { get; }
-public LoweredPipelineStepKind Kind { get; } = kind
+public LoweredPipelineStepKind Kind { get; }
 public LoweredPipelineStepKind StepKind { get; }
+public LowerToIrAttribute(LoweredPipelineStepKind kind)
 public PipelineTransport Transport { get; } = transport
 public PluginAttribute(string? id = null) => Id = id
 public PolymorphicHandleAttribute(string keyMember)
@@ -135,7 +136,7 @@ public sealed class IRInvocation<TDelegate, TReturn> where TDelegate : Delegate
 public sealed class KernelMethodAttribute : Attribute
 public sealed class LiveSettingAttribute : Attribute
 public sealed class LoweredPipelineDebugInfo
-public sealed class LowerToIrAttribute(LoweredPipelineStepKind kind) : Attribute
+public sealed class LowerToIrAttribute : Attribute
 public sealed class LowerToIrMethodAttribute(LoweredIrMethodKind kind) : Attribute
 public sealed class NativeOnlyAttribute : Attribute
 public sealed class PipelineSurfaceAttribute(PipelineTransport transport) : Attribute

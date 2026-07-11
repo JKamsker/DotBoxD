@@ -12,6 +12,7 @@ internal static class WorkerFileAuditGrantValidator
     private const string FileRead = "file.read";
     private const string FileWrite = "file.write";
     private const string PathExtensionField = "pathExtension";
+    private const string WriteDispositionField = "writeDisposition";
     private const string RedactedSegment = "[redacted]";
 
     public static bool Matches(ExecutionPlan plan, SandboxAuditEvent auditEvent, DateTimeOffset grantClock)
@@ -57,7 +58,8 @@ internal static class WorkerFileAuditGrantValidator
         {
             var options = SafeFileGrantReader.Read(grant);
             return BytesMatch(options, bytes) &&
-                ExtensionMatches(options, auditEvent);
+                ExtensionMatches(options, auditEvent) &&
+                WriteDispositionMatches(options, auditEvent);
         }
         catch (SandboxRuntimeException)
         {
@@ -91,6 +93,26 @@ internal static class WorkerFileAuditGrantValidator
         }
 
         return options.AllowedExtensions.Contains(resourceExtension);
+    }
+
+    private static bool WriteDispositionMatches(SafeFileGrantOptions options, SandboxAuditEvent auditEvent)
+    {
+        if (auditEvent.CapabilityId != FileWrite)
+        {
+            return true;
+        }
+
+        if (auditEvent.Fields?.TryGetValue(WriteDispositionField, out var disposition) != true)
+        {
+            return false;
+        }
+
+        return disposition switch
+        {
+            "create" => options.AllowCreate,
+            "overwrite" => options.AllowOverwrite,
+            _ => false
+        };
     }
 
     private static bool IsValidExtension(string extension)
