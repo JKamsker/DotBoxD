@@ -9,8 +9,11 @@ $gradle = Join-Path $pluginDirectory 'gradlew.bat'
 $artifactDirectory = Join-Path $repositoryRoot 'artifacts/rider-e2e'
 $standardOutput = Join-Path $artifactDirectory 'rider.stdout.log'
 $standardError = Join-Path $artifactDirectory 'rider.stderr.log'
+$testOutput = Join-Path $artifactDirectory 'test.stdout.log'
+$testError = Join-Path $artifactDirectory 'test.stderr.log'
 $ideaLog = Join-Path $pluginDirectory '.intellijPlatform/sandbox/dotboxd-kernel-debug-rider/RD-2025.2.1/log_runIdeForUiTests/idea.log'
 $riderProcess = $null
+$testProcess = $null
 
 function Invoke-Checked([string] $FilePath, [string[]] $Arguments) {
     & $FilePath @Arguments
@@ -43,6 +46,8 @@ function Stop-ExampleProcesses {
 }
 
 New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
+Stop-RiderProcesses -1
+Stop-ExampleProcesses
 Remove-Item $ideaLog -Force -ErrorAction SilentlyContinue
 
 try {
@@ -59,7 +64,7 @@ try {
 
     Push-Location $pluginDirectory
     Invoke-Checked $gradle @(
-        'prepareSandbox_runIdeForUiTests', '--console=plain', '--no-daemon'
+        'prepareSandbox_runIdeForUiTests', 'e2eTestClasses', '--console=plain'
     )
     Pop-Location
 
@@ -78,7 +83,7 @@ try {
         }
         try {
             Invoke-WebRequest 'http://127.0.0.1:8082' -UseBasicParsing -TimeoutSec 2 | Out-Null
-            $ready = $true
+            $ready = Test-Path $ideaLog
         }
         catch {
             $ready = $false
@@ -90,10 +95,28 @@ try {
         throw "Rider did not expose its UI test endpoint within $StartupTimeout."
     }
 
-    Push-Location $pluginDirectory
-    Invoke-Checked $gradle @('e2eTest', '--console=plain', '--no-daemon')
-    Pop-Location
+    $testProcess = Start-Process -FilePath $gradle `
+        -ArgumentList @('e2eTest', '--console=plain') `
+        -WorkingDirectory $pluginDirectory `
+        -RedirectStandardOutput $testOutput `
+        -RedirectStandardError $testError `
+        -WindowStyle Hidden `
+        -PassThru
 
+    $testDeadline = [DateTime]::UtcNow + [TimeSpan]::FromMinutes(10)
+    while (-not $testProcess.HasExited -and [DateTime]::UtcNow -lt $testDeadline) {
+        Start-Sleep -Milliseconds 500
+    }
+    if (-not $testProcess.HasExited) {
+        throw 'Rider E2E tests did not complete within 10 minutes after Rider became ready.'
+    }
+    if ($testProcess.ExitCode -ne 0) {
+        throw "Rider E2E tests failed with exit code $($testProcess.ExitCode)."
+    }
+
+    if (-not (Test-Path $ideaLog)) {
+        throw 'Rider did not create its expected idea.log.'
+    }
     $debuggerErrors = Select-String -Path $ideaLog -Pattern @(
         'ResponseErrorException',
         'selected kernel execution is no longer stopped',
@@ -106,6 +129,9 @@ try {
 finally {
     while ((Get-Location).Path -ne $repositoryRoot -and (Get-Location).Path.StartsWith($repositoryRoot)) {
         Pop-Location
+    }
+    if ($null -ne $testProcess -and -not $testProcess.HasExited) {
+        Stop-Process -Id $testProcess.Id -Force -ErrorAction SilentlyContinue
     }
     if ($null -ne $riderProcess) {
         Stop-RiderProcesses $riderProcess.Id
