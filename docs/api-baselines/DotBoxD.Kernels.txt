@@ -140,7 +140,7 @@ public IReadOnlyDictionary<string, IReadOnlySet<string>> BindingReferences { get
 public IReadOnlyDictionary<string, SandboxFunction> FunctionLookup
 public IReadOnlyDictionary<string, string> BindingAuditFields( string resourceKind, DateTimeOffset startedAt, long? bytesRead = null, long? bytesWritten = null)
 public IReadOnlyDictionary<string, string> Metadata { get => _metadata; init => _metadata = ModelCopy.StringDictionary(value); }
-public IReadOnlyDictionary<string, string> Parameters { get; init; } =
+public IReadOnlyDictionary<string, string> Parameters { get; init; }
 public IReadOnlyDictionary<string, string>? Fields { get => _fields; init => _fields = CopyFields(value); }
 public IReadOnlyList<BindingSignature> Signatures => _signatures
 public IReadOnlyList<CapabilityGrant> Grants { get; init; }
