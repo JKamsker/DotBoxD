@@ -113,9 +113,20 @@ public enum LoweredIrMethodKind
 /// Marks a method whose lambda argument should be lowered into a generated anonymous IR package.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
-public sealed class LowerToIrMethodAttribute(LoweredIrMethodKind kind) : Attribute
+public sealed class LowerToIrMethodAttribute : Attribute
 {
-    public LoweredIrMethodKind Kind { get; } = kind;
+    public LowerToIrMethodAttribute(LoweredIrMethodKind kind)
+        => Kind = ValidateMethodKind(kind);
+
+    public LoweredIrMethodKind Kind { get; }
+
+    private static LoweredIrMethodKind ValidateMethodKind(LoweredIrMethodKind kind)
+        => Enum.IsDefined(kind)
+            ? kind
+            : throw new ArgumentOutOfRangeException(
+                nameof(kind),
+                kind,
+                "Unsupported lowered IR method kind.");
 }
 
 /// <summary>
