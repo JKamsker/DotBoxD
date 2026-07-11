@@ -113,10 +113,23 @@ public sealed record ModuleValidationResult(
         {
             copy.Add(
                 RequireNonNull(item.Key, paramName, "Dictionary keys cannot be null."),
-                CopySet(RequireNonNull(item.Value, paramName, "Dictionary values cannot be null."), paramName));
+                CopyBindingReferenceSet(
+                    RequireNonNull(item.Value, paramName, "Dictionary values cannot be null."),
+                    paramName));
         }
 
         return new ReadOnlyDictionary<string, IReadOnlySet<string>>(copy);
+    }
+
+    private static IReadOnlySet<string> CopyBindingReferenceSet(IReadOnlySet<string> values, string paramName)
+    {
+        var copy = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var value in values)
+        {
+            copy.Add(RequireBindingReferenceId(value, paramName));
+        }
+
+        return copy.ToFrozenSet(StringComparer.Ordinal);
     }
 
     private static SandboxEffect ValidateModuleEffects(SandboxEffect effects, string paramName)
@@ -150,5 +163,14 @@ public sealed record ModuleValidationResult(
         }
 
         return value;
+    }
+
+    private static string RequireBindingReferenceId(string value, string paramName)
+    {
+        RequireNonNull(value, paramName, "Set values cannot be null.");
+
+        return string.IsNullOrWhiteSpace(value)
+            ? throw new ArgumentException("Binding reference IDs cannot be blank.", paramName)
+            : value;
     }
 }
