@@ -3,7 +3,6 @@
   "profiles": {
     "Examples.GameServer.Server": {
       "commandName": "Project",
-      "commandLineArgs": "--continuous",
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development"
       }
