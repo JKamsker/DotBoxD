@@ -68,7 +68,8 @@ public sealed class RpcHostStartCancellationRegressionTests
         public Task<IRpcChannel> AcceptAsync(CancellationToken ct = default)
         {
             Interlocked.Increment(ref _acceptCalls);
-            throw new InvalidOperationException("The accept loop should not start.");
+            return Task.FromException<IRpcChannel>(
+                new InvalidOperationException("The accept loop should not start."));
         }
 
         public Task StopAsync(CancellationToken ct = default)
