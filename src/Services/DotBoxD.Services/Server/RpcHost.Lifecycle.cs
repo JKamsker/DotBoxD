@@ -46,6 +46,8 @@ public sealed partial class RpcHost
                 throw new InvalidOperationException("Host is already running.");
             }
 
+            ct.ThrowIfCancellationRequested();
+
             var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             _cts = cts;
             _starting = true;
@@ -293,8 +295,5 @@ public sealed partial class RpcHost
         }
     }
 
-    private readonly record struct StartRecovery(
-        CancellationTokenSource Cts,
-        bool DisposeCts,
-        Exception? Failure);
+    private readonly record struct StartRecovery(CancellationTokenSource Cts, bool DisposeCts, Exception? Failure);
 }
