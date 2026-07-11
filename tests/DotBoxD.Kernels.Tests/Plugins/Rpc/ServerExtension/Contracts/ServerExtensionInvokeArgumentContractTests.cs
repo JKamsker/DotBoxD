@@ -1,61 +1,30 @@
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
-using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 using DotBoxD.Plugins;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 
 public sealed class ServerExtensionInvokeArgumentContractTests
 {
-    private const string SingleArgumentSource = """
-        using DotBoxD.Abstractions;
-        using DotBoxD.Kernels;
-        using DotBoxD.Plugins;
-
-        namespace Sample;
-
-        [ServerExtension("single-argument")]
-        public sealed partial class SingleArgumentKernel
-        {
-            public int Echo(int value, HookContext ctx) => value;
-        }
-        """;
-
-    private const string TwoArgumentSource = """
-        using DotBoxD.Abstractions;
-        using DotBoxD.Kernels;
-        using DotBoxD.Plugins;
-
-        namespace Sample;
-
-        [ServerExtension("two-argument")]
-        public sealed partial class TwoArgumentKernel
-        {
-            public int Add(int left, int right, HookContext ctx) => left + right;
-        }
-        """;
+    private static readonly SourceSpan Span = new(1, 1);
 
     [Fact]
     public async Task InvokeServerExtensionAsync_rejects_null_single_argument_at_public_boundary()
         => await AssertRejectsNullArgumentAsync(
-            SingleArgumentSource,
-            "Sample.SingleArgumentPluginPackage",
+            CreateSingleArgumentPackage(),
             [null!]);
 
     [Fact]
     public async Task InvokeServerExtensionAsync_rejects_null_multi_argument_at_public_boundary()
         => await AssertRejectsNullArgumentAsync(
-            TwoArgumentSource,
-            "Sample.TwoArgumentPluginPackage",
+            CreateTwoArgumentPackage(),
             [null!, SandboxValue.FromInt32(2)]);
 
     private static async Task AssertRejectsNullArgumentAsync(
-        string source,
-        string packageName,
+        PluginPackage package,
         SandboxValue[] arguments)
     {
-        var package = PluginAnalyzerGeneratedPackageFactory.Create(source, packageName);
-
         using var server = PluginServer.Create(defaultPolicy: PurePolicy());
         var kernel = await server.InstallServerExtensionAsync(package);
 
@@ -63,6 +32,53 @@ public sealed class ServerExtensionInvokeArgumentContractTests
             () => kernel.InvokeServerExtensionAsync(arguments).AsTask());
 
         Assert.Equal("arguments", ex.ParamName);
+    }
+
+    private static PluginPackage CreateSingleArgumentPackage()
+        => CreatePackage(
+            "single-argument",
+            "Echo",
+            [new Parameter("value", SandboxType.I32)],
+            new ReturnStatement(new VariableExpression("value", Span), Span));
+
+    private static PluginPackage CreateTwoArgumentPackage()
+        => CreatePackage(
+            "two-argument",
+            "Add",
+            [new Parameter("left", SandboxType.I32), new Parameter("right", SandboxType.I32)],
+            new ReturnStatement(new VariableExpression("left", Span), Span));
+
+    private static PluginPackage CreatePackage(
+        string pluginId,
+        string entrypoint,
+        IReadOnlyList<Parameter> parameters,
+        Statement returnStatement)
+    {
+        var function = new SandboxFunction(
+            entrypoint,
+            IsEntrypoint: true,
+            parameters,
+            SandboxType.I32,
+            [returnStatement]);
+        var module = new SandboxModule(
+            pluginId,
+            SemVersion.One,
+            SemVersion.One,
+            [],
+            [function],
+            new Dictionary<string, string> { ["pluginId"] = pluginId, ["kernel"] = entrypoint });
+        var manifest = new PluginManifest(
+            pluginId,
+            entrypoint,
+            ExecutionMode.Auto,
+            ["Cpu"],
+            [],
+            [])
+        {
+            RpcEntrypoint = entrypoint
+        };
+
+        return PluginPackage.Create(manifest, module, new KernelEntrypoints(entrypoint, entrypoint));
     }
 
     private static SandboxPolicy PurePolicy()
