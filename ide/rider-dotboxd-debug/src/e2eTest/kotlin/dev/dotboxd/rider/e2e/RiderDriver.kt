@@ -174,24 +174,6 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
         )
     }
 
-    fun requestStopAll() {
-        run(
-            """
-            const project = projectOf(component);
-            const action = new java.lang.Runnable({ run: function() {
-                const sessions = com.intellij.xdebugger.XDebuggerManager.getInstance(project).getDebugSessions();
-                for (let i = 0; i < sessions.length; i++) sessions[i].stop();
-                const handlers = com.intellij.execution.ExecutionManager.getInstance(project).getRunningProcesses();
-                for (let i = 0; i < handlers.length; i++) {
-                    const handler = handlers[i];
-                    if (handler && !handler.isProcessTerminated()) handler.destroyProcess();
-                }
-            }});
-            com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(action);
-            """,
-        )
-    }
-
     private inline fun <reified T> call(script: String): T = frame.callJs(prologue + script.trimIndent(), true)
 
     private fun run(script: String) = frame.runJs(prologue + script.trimIndent(), true)
