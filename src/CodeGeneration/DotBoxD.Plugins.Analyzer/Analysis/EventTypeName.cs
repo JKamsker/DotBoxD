@@ -51,9 +51,56 @@ internal static class EventTypeName
             throw new NotSupportedException("[Hook] name must not be empty or whitespace.");
         }
 
+        if (!HasDottedIdentifierGrammar(declaredName))
+        {
+            throw new NotSupportedException("[Hook] name must be a dot-separated identifier.");
+        }
+
         hookName = declaredName;
         return true;
     }
+
+    private static bool HasDottedIdentifierGrammar(string value)
+    {
+        var expectingSegmentStart = true;
+        foreach (var ch in value)
+        {
+            if (ch == '.')
+            {
+                if (expectingSegmentStart)
+                {
+                    return false;
+                }
+
+                expectingSegmentStart = true;
+                continue;
+            }
+
+            if (expectingSegmentStart)
+            {
+                if (!IsIdentifierStart(ch))
+                {
+                    return false;
+                }
+
+                expectingSegmentStart = false;
+                continue;
+            }
+
+            if (!IsIdentifierPart(ch))
+            {
+                return false;
+            }
+        }
+
+        return !expectingSegmentStart;
+    }
+
+    private static bool IsIdentifierStart(char ch)
+        => ch is (>= 'A' and <= 'Z') or (>= 'a' and <= 'z') or '_';
+
+    private static bool IsIdentifierPart(char ch)
+        => IsIdentifierStart(ch) || ch is >= '0' and <= '9';
 
     private static string TypeName(ITypeSymbol type)
         => type switch
