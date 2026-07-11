@@ -19,6 +19,16 @@ internal static class ModelCopy
         return new ReadOnlyCollection<T>(values.ToArray());
     }
 
+    public static IReadOnlyList<T> List<T>(IEnumerable<T> values, string parameterName)
+    {
+        if (values is null)
+        {
+            throw new ArgumentNullException(parameterName);
+        }
+
+        return List(values);
+    }
+
     private static class EmptyReadOnlyList<T>
     {
         public static readonly ReadOnlyCollection<T> Instance = new(Array.Empty<T>());
@@ -42,6 +52,18 @@ internal static class ModelCopy
         ArgumentNullException.ThrowIfNull(values);
         return new ReadOnlyDictionary<string, string>(
             new Dictionary<string, string>(values, StringComparer.Ordinal));
+    }
+
+    public static IReadOnlyDictionary<string, string> StringDictionary(
+        IReadOnlyDictionary<string, string> values,
+        string parameterName)
+    {
+        if (values is null)
+        {
+            throw new ArgumentNullException(parameterName);
+        }
+
+        return StringDictionary(values);
     }
 
     public static IReadOnlyDictionary<string, TValue> Dictionary<TValue>(
