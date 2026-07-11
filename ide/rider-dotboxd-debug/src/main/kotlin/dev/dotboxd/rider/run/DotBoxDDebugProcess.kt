@@ -174,10 +174,8 @@ class DotBoxDDebugProcess(
                 log.warn("DotBoxD stopped stack resolution failed", it)
                 DapExecutionStack(displayName, threadId, remote::get, values)
             }
-            ApplicationManager.getApplication().invokeLater {
-                stoppedExecution.stopped(threadId)
-                session.positionReached(DapSuspendContext(threadId, stack))
-            }
+            stoppedExecution.stopped(threadId)
+            session.positionReached(DapSuspendContext(threadId, stack))
         }
     }
 
