@@ -52,7 +52,7 @@ internal static class GeneratedServiceMetadataValidator
                 $"Generated service metadata service type must be an interface. Received {FormatType(service.ServiceType)}.",
                 paramName);
         }
-        if (string.IsNullOrEmpty(service.ServiceName))
+        if (string.IsNullOrWhiteSpace(service.ServiceName))
         {
             throw new ArgumentException("Generated service metadata must include a service name.", paramName);
         }
@@ -91,11 +91,11 @@ internal static class GeneratedServiceMetadataValidator
 
     private static void ValidateMethod(GeneratedMethod method, string paramName)
     {
-        if (string.IsNullOrEmpty(method.Name))
+        if (string.IsNullOrWhiteSpace(method.Name))
         {
             throw new ArgumentException("Generated method metadata must include a method name.", paramName);
         }
-        if (string.IsNullOrEmpty(method.WireName))
+        if (string.IsNullOrWhiteSpace(method.WireName))
         {
             throw new ArgumentException("Generated method metadata must include a wire name.", paramName);
         }
@@ -121,7 +121,7 @@ internal static class GeneratedServiceMetadataValidator
         for (var i = 0; i < parameters.Count; i++)
         {
             var parameter = parameters[i];
-            if (string.IsNullOrEmpty(parameter.Name))
+            if (string.IsNullOrWhiteSpace(parameter.Name))
             {
                 throw new ArgumentException("Generated parameter metadata must include a parameter name.", paramName);
             }
