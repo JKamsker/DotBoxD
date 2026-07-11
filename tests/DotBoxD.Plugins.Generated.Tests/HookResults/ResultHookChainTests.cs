@@ -15,7 +15,7 @@ public sealed record CombatDamageContext(CombatRelation Relation, int Damage);
 [HookResult]
 public readonly partial record struct CombatDamageResult(bool Success, string? Reason, int Damage);
 
-[Hook("combat.optional-damage", typeof(OptionalDamageResult))]
+[Hook("combat.optional_damage", typeof(OptionalDamageResult))]
 public sealed record OptionalDamageContext(int Damage, bool CanDie);
 
 [HookResult]
