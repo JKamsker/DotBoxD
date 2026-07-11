@@ -5,7 +5,6 @@ using DotBoxD.Kernels.Sandbox;
 namespace DotBoxD.Kernels;
 
 using System.Collections.Frozen;
-using System.Collections.ObjectModel;
 public sealed record CapabilityGrant(
     string Id,
     IReadOnlyDictionary<string, string> Parameters,
