@@ -110,13 +110,13 @@ internal static class PluginKernelModelFactory
         var shouldHandle = InterfaceMethodSyntax(context, type, DotBoxDGenerationNames.Entrypoints.ShouldHandle, cancellationToken);
         var handle = InterfaceMethodSyntax(context, type, DotBoxDGenerationNames.Entrypoints.Handle, cancellationToken);
         var eventProperties = PluginSymbolReader.EventProperties(eventType);
-        if (ContainsUnsupported(eventProperties))
+        if (PluginKernelShapeValidation.ContainsUnsupported(eventProperties))
         {
             throw new NotSupportedException(PluginKernelUnsupportedShapeMessage.EventProperties(eventType));
         }
 
         var liveSettings = PluginSymbolReader.LiveSettings(type, context.SemanticModel, cancellationToken);
-        if (ContainsUnsupported(liveSettings))
+        if (PluginKernelShapeValidation.ContainsUnsupported(liveSettings))
         {
             throw new NotSupportedException("Live settings must use supported scalar types.");
         }
@@ -325,29 +325,4 @@ internal static class PluginKernelModelFactory
         return builder.ToString();
     }
 
-    private static bool ContainsUnsupported(EquatableArray<EventPropertyModel> eventProperties)
-    {
-        for (var i = 0; i < eventProperties.Count; i++)
-        {
-            if (eventProperties[i].Type == DotBoxDGenerationNames.ManifestTypes.Unsupported)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool ContainsUnsupported(EquatableArray<LiveSettingModel> liveSettings)
-    {
-        for (var i = 0; i < liveSettings.Count; i++)
-        {
-            if (liveSettings[i].Type == DotBoxDGenerationNames.ManifestTypes.Unsupported)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
 }
