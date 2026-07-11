@@ -49,6 +49,15 @@ public sealed class PipelineExplicitIrContractTests
         Assert.Equal(transport, surface!.Transport);
     }
 
+    [Fact]
+    public void Pipeline_surface_attribute_rejects_unknown_transport()
+    {
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(
+            () => new PipelineSurfaceAttribute((PipelineTransport)42));
+
+        Assert.Equal("transport", exception.ParamName);
+    }
+
     [Theory]
     [MemberData(nameof(SurfaceTypes))]
     public void Lowerable_stage_methods_expose_ir_func_companion(Type type, PipelineTransport _)
