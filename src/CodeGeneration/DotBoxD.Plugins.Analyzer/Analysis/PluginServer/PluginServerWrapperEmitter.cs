@@ -124,7 +124,14 @@ internal static class PluginServerWrapperEmitter
         }
 
         builder.Append(method.ReturnType).Append(' ').Append(PluginServerIdentifier.Escape(method.Name))
-            .Append('(').Append(ParameterList(method)).Append(") => ");
+            .Append('(').Append(ParameterList(method)).Append(')');
+        if (PluginServerReturnWrapperCancellationEmitter.RequiresAsyncReturnWrapperBlock(method))
+        {
+            AppendAsyncReturnWrapperBlock(builder, method, indent, ownerFieldName, innerFieldName);
+            return;
+        }
+
+        builder.Append(" => ");
         if (method.ReturnWrapperName is null)
         {
             builder.Append("((").Append(method.ReceiverType).Append(')').Append(innerFieldName).Append(").")
@@ -145,6 +152,26 @@ internal static class PluginServerWrapperEmitter
         builder.Append("new ").Append(method.ReturnWrapperName).Append('(').Append(ownerFieldName).Append(", ((")
             .Append(method.ReceiverType).Append(')').Append(innerFieldName).Append(").")
             .Append(PluginServerIdentifier.Escape(method.Name)).Append('(').Append(ArgumentList(method)).AppendLine("));");
+    }
+
+    private static void AppendAsyncReturnWrapperBlock(
+        StringBuilder builder,
+        PluginServerForwardedMethod method,
+        string indent,
+        string ownerFieldName,
+        string innerFieldName)
+    {
+        var localName = PluginServerReturnWrapperCancellationEmitter.UniqueLocalName("__dotboxdResult", method);
+        builder.AppendLine();
+        builder.Append(indent).AppendLine("{");
+        builder.Append(indent).Append("    var ").Append(localName).Append(" = await ((")
+            .Append(method.ReceiverType).Append(')').Append(innerFieldName).Append(").")
+            .Append(PluginServerIdentifier.Escape(method.Name)).Append('(').Append(ArgumentList(method))
+            .AppendLine(").ConfigureAwait(false);");
+        PluginServerReturnWrapperCancellationEmitter.AppendCancellationChecks(builder, method, indent + "    ");
+        builder.Append(indent).Append("    return new ").Append(method.ReturnWrapperName).Append('(')
+            .Append(ownerFieldName).Append(", ").Append(localName).AppendLine(");");
+        builder.Append(indent).AppendLine("}");
     }
 
     private static WrapperBackingFields ResolveBackingFields(
