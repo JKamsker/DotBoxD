@@ -118,9 +118,11 @@ internal static class ProxyInvocationEmitter
         sb.AppendLine($"{indent}    return {returnExpression};");
         sb.AppendLine($"{indent}}}");
         var canceledName = locals.Reserve("__dotboxd_canceled", ct);
-        sb.AppendLine($"{indent}catch ({ServicesGeneratorTypeNames.GlobalOperationCanceledException} {canceledName}) when ({canceledName}.CancellationToken.IsCancellationRequested)");
+        var cancellationFilter = ProxyFaultedReturnEmitter.BuildCancellationCatchFilter(method, canceledName, ct);
+        var cancellationToken = ProxyFaultedReturnEmitter.BuildCancellationTokenExpression(method, canceledName, ct);
+        sb.AppendLine($"{indent}catch ({ServicesGeneratorTypeNames.GlobalOperationCanceledException} {canceledName}) when ({cancellationFilter})");
         sb.AppendLine($"{indent}{{");
-        sb.AppendLine($"{indent}    return {ProxyFaultedReturnEmitter.BuildCanceled(method, canceledName)};");
+        sb.AppendLine($"{indent}    return {ProxyFaultedReturnEmitter.BuildCanceled(method, cancellationToken)};");
         sb.AppendLine($"{indent}}}");
         sb.AppendLine($"{indent}catch ({ServicesGeneratorTypeNames.GlobalException} {exceptionName})");
         sb.AppendLine($"{indent}{{");
