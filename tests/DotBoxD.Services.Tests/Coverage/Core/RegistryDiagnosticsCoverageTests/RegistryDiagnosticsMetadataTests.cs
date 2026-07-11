@@ -40,6 +40,34 @@ public sealed class RegistryDiagnosticsMetadataTests
     }
 
     [Theory]
+    [MemberData(nameof(InvalidRegistrationServices))]
+    public void Register_RejectsMalformedCollectionMetadataBeforePublishing(
+        string scenario,
+        GeneratedService service)
+    {
+        var baseline = ValidNullCollectionMetadataService() with { Methods = new[] { ValidMethod() } };
+        GeneratedServiceRegistry.Register<INullCollectionMetadataService>(
+            _ => new NullCollectionMetadataProxy(),
+            _ => new NullCollectionMetadataDispatcher(),
+            baseline);
+
+        var register = () => GeneratedServiceRegistry.Register<INullCollectionMetadataService>(
+            _ => new NullCollectionMetadataProxy(),
+            _ => new NullCollectionMetadataDispatcher(),
+            service);
+        var ex = AllowsDerivedArgumentException(scenario)
+            ? Assert.ThrowsAny<ArgumentException>(register)
+            : Assert.Throws<ArgumentException>(register);
+
+        Assert.Equal("service", ex.ParamName);
+
+        var published = GeneratedServiceRegistry.GetService<INullCollectionMetadataService>();
+        var method = Assert.Single(published.Methods);
+        Assert.Equal("DoAsync", method.Name);
+        Assert.Single(method.Parameters);
+    }
+
+    [Theory]
     [MemberData(nameof(InvalidCatalogServices))]
     public void RegisterServices_RejectsMalformedMethodMetadataBeforePublishing(
         string scenario,
@@ -61,8 +89,16 @@ public sealed class RegistryDiagnosticsMetadataTests
     private static bool AllowsDerivedArgumentException(string scenario)
         => scenario.StartsWith("Null", StringComparison.Ordinal);
 
+    public static TheoryData<string, GeneratedService> InvalidRegistrationServices => new()
+    {
+        { "NullMethods", ValidNullCollectionMetadataService() with { Methods = null! } },
+        { "NullParameters", NullCollectionServiceWithMethod(ValidMethod() with { Parameters = null! }) }
+    };
+
     public static TheoryData<string, GeneratedService> InvalidCatalogServices => new()
     {
+        { "NullMethods", ValidInvalidMetadataService() with { Methods = null! } },
+        { "NullParameters", ServiceWithMethod(ValidMethod() with { Parameters = null! }) },
         { "NullMethodName", ServiceWithMethod(ValidMethod() with { Name = null! }) },
         { "EmptyMethodName", ServiceWithMethod(ValidMethod() with { Name = string.Empty }) },
         { "NullWireName", ServiceWithMethod(ValidMethod() with { WireName = null! }) },
@@ -100,6 +136,16 @@ public sealed class RegistryDiagnosticsMetadataTests
     private static GeneratedService ServiceWithMethod(GeneratedMethod method) =>
         ValidInvalidMetadataService() with { Methods = new[] { method } };
 
+    private static GeneratedService ValidNullCollectionMetadataService() =>
+        new(
+            typeof(INullCollectionMetadataService),
+            typeof(NullCollectionMetadataProxy),
+            typeof(NullCollectionMetadataDispatcher),
+            "NullCollectionMetadata");
+
+    private static GeneratedService NullCollectionServiceWithMethod(GeneratedMethod method) =>
+        ValidNullCollectionMetadataService() with { Methods = new[] { method } };
+
     private static GeneratedMethod ValidMethod() =>
         new(
             "DoAsync",
@@ -124,7 +170,17 @@ public sealed class RegistryDiagnosticsMetadataTests
         Task DoAsync(CancellationToken ct = default);
     }
 
+    public interface INullCollectionMetadataService
+    {
+        Task DoAsync(CancellationToken ct = default);
+    }
+
     private sealed class InvalidMetadataProxy : IInvalidMetadataService
+    {
+        public Task DoAsync(CancellationToken ct = default) => Task.CompletedTask;
+    }
+
+    private sealed class NullCollectionMetadataProxy : INullCollectionMetadataService
     {
         public Task DoAsync(CancellationToken ct = default) => Task.CompletedTask;
     }
@@ -132,6 +188,19 @@ public sealed class RegistryDiagnosticsMetadataTests
     private sealed class InvalidMetadataDispatcher : IServiceDispatcher
     {
         public string ServiceName => "InvalidMetadata";
+
+        public Task DispatchAsync(
+            string method,
+            ReadOnlyMemory<byte> payload,
+            ISerializer serializer,
+            IInstanceRegistry registry,
+            IBufferWriter<byte> output,
+            CancellationToken ct = default) => Task.CompletedTask;
+    }
+
+    private sealed class NullCollectionMetadataDispatcher : IServiceDispatcher
+    {
+        public string ServiceName => "NullCollectionMetadata";
 
         public Task DispatchAsync(
             string method,

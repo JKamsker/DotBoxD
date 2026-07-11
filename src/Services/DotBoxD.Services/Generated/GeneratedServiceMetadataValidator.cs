@@ -80,7 +80,7 @@ internal static class GeneratedServiceMetadataValidator
     {
         if (methods is null)
         {
-            return;
+            throw new ArgumentException("Generated service metadata must include a methods collection.", paramName);
         }
 
         for (var i = 0; i < methods.Count; i++)
@@ -115,7 +115,7 @@ internal static class GeneratedServiceMetadataValidator
     {
         if (parameters is null)
         {
-            return;
+            throw new ArgumentException("Generated method metadata must include a parameters collection.", paramName);
         }
 
         for (var i = 0; i < parameters.Count; i++)
