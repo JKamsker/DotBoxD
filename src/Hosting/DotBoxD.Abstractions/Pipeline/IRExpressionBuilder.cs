@@ -54,22 +54,31 @@ public sealed class IRExpressionBuilder
         => RecordGet(Current(), index);
 
     public CallExpression RecordGet(Expression record, int index)
-        => Call("record.get", record, Int32(index));
+        => Call("record.get", RequireExpression(record, nameof(record)), Int32(index));
 
     public CallExpression Record(params Expression[] fields)
-        => Call("record.new", fields);
+    {
+        ArgumentNullException.ThrowIfNull(fields);
+        return Call("record.new", fields);
+    }
 
     public CallExpression ListCount(Expression list)
-        => Call("list.count", list);
+        => Call("list.count", RequireExpression(list, nameof(list)));
 
     public CallExpression ListGet(Expression list, Expression index)
-        => Call("list.get", list, index);
+        => Call(
+            "list.get",
+            RequireExpression(list, nameof(list)),
+            RequireExpression(index, nameof(index)));
 
     public CallExpression MapGet(Expression map, Expression key)
-        => Call("map.get", map, key);
+        => Call(
+            "map.get",
+            RequireExpression(map, nameof(map)),
+            RequireExpression(key, nameof(key)));
 
     public CallExpression StringLength(Expression text)
-        => Call("string.length", text);
+        => Call("string.length", RequireExpression(text, nameof(text)));
 
     public UnaryExpression Not(Expression value)
         => Unary("!", value);
