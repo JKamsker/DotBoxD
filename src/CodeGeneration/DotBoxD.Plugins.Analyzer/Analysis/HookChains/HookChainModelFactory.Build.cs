@@ -200,6 +200,9 @@ internal static partial class HookChainModelFactory
             ProjectedType = LocalProjectedManifestType(lowered.LocalCallbackProjection, lowered.ProjectedTypeSymbol),
             LocalDecoderSource = lowered.LocalDecoderSource,
             HandleProjectedSlotName = HookChainProjectionSlotResolver.Final(prepared.Stages),
+            HandleProjectedSourceSlotName = HookChainProjectionSlotResolver.FinalSource(
+                prepared.Stages,
+                eventShape.EventProperties),
         };
     }
 

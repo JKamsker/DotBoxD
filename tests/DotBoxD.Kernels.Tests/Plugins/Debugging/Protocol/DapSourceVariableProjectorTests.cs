@@ -59,6 +59,21 @@ public sealed class DapSourceVariableProjectorTests
         Assert.Equal("e_Distance <= 4", DapSourceVariableProjector.Translate("e.Distance <= 4", Bindings));
     }
 
+    [Fact]
+    public void Direct_projection_uses_its_assigned_source_argument()
+    {
+        var arguments = Variables(
+            ("e_MonsterId", "String", JsonSerializer.SerializeToElement(new { type = "String", value = "monster-1" })));
+        DapSourceVariableBinding[] bindings = [new("e_MonsterId", "monsterId", null, null)];
+
+        var projected = DapSourceVariableProjector.Map(arguments, bindings, includeSynthetic: true);
+        var monsterId = Assert.Single(projected.EnumerateArray());
+
+        Assert.Equal("monsterId", monsterId.GetProperty("name").GetString());
+        Assert.True(monsterId.GetProperty("assigned").GetBoolean());
+        Assert.Equal("monster-1", monsterId.GetProperty("value").GetProperty("value").GetString());
+    }
+
     private static JsonElement Variables(params (string Name, string Type, JsonElement Value)[] values)
         => JsonSerializer.SerializeToElement(values.Select(value => new
         {

@@ -55,7 +55,7 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
             await connection.RespondAsync(
                     request,
                     success: false,
-                    body: new { error = new { id = exception.Code, format = exception.Message } },
+                    body: DapErrorBody.Create(exception),
                     message: exception.Message,
                     cancellationToken)
                 .ConfigureAwait(false);

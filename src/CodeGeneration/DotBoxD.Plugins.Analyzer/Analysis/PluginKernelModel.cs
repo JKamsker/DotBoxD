@@ -33,6 +33,8 @@ internal sealed record PluginKernelModel(
 
     public string? HandleProjectedSlotName { get; init; }
 
+    public string? HandleProjectedSourceSlotName { get; init; }
+
     /// <summary>
     /// True for a lowered remote <c>RunLocal</c> chain: the verified IR filters and projects server-side and
     /// the host pushes only the result back to the plugin's native delegate. Default false for ordinary chains.

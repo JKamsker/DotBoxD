@@ -11,6 +11,23 @@ namespace DotBoxD.Kernels.Tests.Plugins.Debugging.Protocol;
 public sealed class DapAdapterTranscriptTests
 {
     [Fact]
+    public async Task Error_response_uses_the_numeric_id_required_by_dap_clients()
+    {
+        await using var input = new MemoryStream(Transcript(Request(1, "notSupported", new { })));
+        await using var output = new MemoryStream();
+        await using (var session = new DapSession(new DapConnection(input, output)))
+        {
+            await session.RunAsync(CancellationToken.None);
+        }
+
+        output.Position = 0;
+        var response = Assert.Single(await ReadDapMessagesAsync(output));
+        var error = response.GetProperty("body").GetProperty("error");
+        Assert.Equal(JsonValueKind.Number, error.GetProperty("id").ValueKind);
+        Assert.Contains("unsupportedCommand", error.GetProperty("format").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Event_handler_can_issue_a_bridge_request_without_blocking_the_read_loop()
     {
         await using var bridge = PluginDebugBridge.Start(new PluginDebugBridgeOptions

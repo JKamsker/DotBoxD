@@ -389,8 +389,14 @@ try {
             $installer = Start-Process $vsixInstaller `
                 -ArgumentList @('/quiet', '/force', "`"$resolvedVsix`"") `
                 -WindowStyle Hidden `
-                -Wait `
                 -PassThru
+            while (-not $installer.HasExited) {
+                Get-Process MSBuild -ErrorAction SilentlyContinue | Where-Object {
+                    $_.Path -and $_.Path.StartsWith($installation, [StringComparison]::OrdinalIgnoreCase)
+                } | Stop-Process -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Milliseconds 250
+                $installer.Refresh()
+            }
             if ($installer.ExitCode -ne 0) {
                 throw "VSIXInstaller failed with exit code $($installer.ExitCode)."
             }

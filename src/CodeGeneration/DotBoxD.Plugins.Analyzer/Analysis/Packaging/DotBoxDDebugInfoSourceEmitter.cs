@@ -123,6 +123,7 @@ internal static class DotBoxDDebugInfoSourceEmitter
             model.EventParameterName,
             model.ContextParameterName,
             projectedSlotName: null,
+            projectedSourceSlotName: null,
             model);
         EmitFunctionBindings(
             builder,
@@ -130,6 +131,7 @@ internal static class DotBoxDDebugInfoSourceEmitter
             model.HandleEventParameterName,
             model.HandleContextParameterName,
             model.HandleProjectedSlotName,
+            model.HandleProjectedSourceSlotName,
             model);
         builder.AppendLine("        };");
     }
@@ -140,11 +142,16 @@ internal static class DotBoxDDebugInfoSourceEmitter
         string eventParameter,
         string contextParameter,
         string? projectedSlotName,
+        string? projectedSourceSlotName,
         PluginKernelModel model)
     {
         if (projectedSlotName is not null)
         {
-            EmitVariableBinding(builder, functionId, projectedSlotName, eventParameter);
+            EmitVariableBinding(
+                builder,
+                functionId,
+                projectedSourceSlotName ?? projectedSlotName,
+                eventParameter);
         }
         else
         {

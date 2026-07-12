@@ -73,6 +73,21 @@ public sealed class HookChainDebugInfoRuntimeTests
         }
         """;
 
+    private const string ComputedProjectedRunSource = """
+        using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
+
+        namespace ChainSample;
+
+        public static class Usage
+        {
+            public static void Configure(HookRegistry hooks)
+                => hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent>()
+                    .Select(e => e.MonsterId + ":selected")
+                    .Run((monsterId, ctx) => ctx.Messages.Send(monsterId, "calm:inline"));
+        }
+        """;
+
     [Fact]
     public void Send_chain_maps_filter_and_terminal_into_both_execution_functions()
     {
@@ -96,7 +111,14 @@ public sealed class HookChainDebugInfoRuntimeTests
         var bindings = Assert.IsType<KernelDebugInfo>(package.DebugInfo).VariableBindings;
 
         Assert.Contains(bindings, binding => binding.FunctionId == "ShouldHandle" && binding.SourceName == "e.Distance");
-        Assert.Contains(bindings, binding => binding.FunctionId == "Handle" && binding.SourceName == "monsterId");
+        Assert.Contains(bindings, binding =>
+            binding.FunctionId == "Handle" &&
+            binding.SlotName == "e_MonsterId" &&
+            binding.SourceName == "monsterId");
+        Assert.DoesNotContain(bindings, binding =>
+            binding.FunctionId == "Handle" &&
+            binding.SlotName.StartsWith("$dotboxd.select.", StringComparison.Ordinal) &&
+            binding.SourceName == "monsterId");
         Assert.Contains(bindings, binding => binding.FunctionId == "Handle" && binding.SourceName == "ctx.Messages");
         Assert.DoesNotContain(bindings, binding => binding.SourceName.StartsWith("monsterId.", StringComparison.Ordinal));
     }
@@ -120,6 +142,18 @@ public sealed class HookChainDebugInfoRuntimeTests
         Assert.Contains(bindings, binding => binding.FunctionId == "Handle" && binding.SourceName == "ctx.Messages");
         Assert.Contains(bindings, binding =>
             binding.FunctionId == "Handle" && binding.SourceName == "ctx.CancellationToken");
+    }
+
+    [Fact]
+    public void Computed_projection_keeps_its_generated_value_binding()
+    {
+        var package = PackageFrom(Compile(ComputedProjectedRunSource, enableInterceptors: true));
+        var bindings = Assert.IsType<KernelDebugInfo>(package.DebugInfo).VariableBindings;
+
+        Assert.Contains(bindings, binding =>
+            binding.FunctionId == "Handle" &&
+            binding.SlotName.StartsWith("$dotboxd.select.", StringComparison.Ordinal) &&
+            binding.SourceName == "monsterId");
     }
 
     private static void AssertMapped(PluginPackage package, string source, params string[] variableNames)
