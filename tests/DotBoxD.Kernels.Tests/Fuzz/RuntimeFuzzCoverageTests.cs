@@ -21,6 +21,10 @@ public sealed class RuntimeFuzzCoverageTests
             threads: 1);
 
     [Fact]
+    public async Task Numeric_seed_does_not_look_like_a_compact_metadata_reference()
+        => await RunPureCaseAsync(23757449);
+
+    [Fact]
     public async Task Generated_file_modules_require_policy_then_execute_with_grant()
     {
         using var temp = TempDirectory.Create();
@@ -125,7 +129,7 @@ public sealed class RuntimeFuzzCoverageTests
     private static string PureModuleJson(int index, string expression)
         => $$"""
         {
-          "id": "{{ModuleId(index)}}",
+          "id": "{{FuzzModuleId.FromSeed("runtime-fuzz", index)}}",
           "version": "1.0.0",
           "functions": [
             {
@@ -158,9 +162,6 @@ public sealed class RuntimeFuzzCoverageTests
           ]
         }
         """;
-
-    private static string ModuleId(int index)
-        => $"runtime-fuzz-n{unchecked((uint)index)}";
 
     private static string FileModuleJson(int index, string path)
         => $$"""
