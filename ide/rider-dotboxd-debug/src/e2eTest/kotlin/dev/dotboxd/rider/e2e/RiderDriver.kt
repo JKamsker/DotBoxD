@@ -153,16 +153,18 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
             """
             const project = projectOf(component);
             const manager = com.intellij.xdebugger.XDebuggerManager.getInstance(project).getBreakpointManager();
-            const breakpoints = manager.getAllBreakpoints();
+            const types = com.intellij.xdebugger.XDebuggerUtil.getInstance().getLineBreakpointTypes();
+            let type = null;
+            for (let i = 0; i < types.length; i++) {
+                if (String(types[i].getId()) === 'DotNet Breakpoints') type = types[i];
+            }
+            if (!type) throw 'Rider .NET line breakpoint type is unavailable';
+            const breakpoints = manager.getBreakpoints(type).iterator();
             const result = [];
-            for (let i = 0; i < breakpoints.length; i++) {
-                const breakpoint = breakpoints[i];
-                let path = '';
-                let line = 0;
-                try {
-                    path = String(breakpoint.getFileUrl());
-                    line = breakpoint.getLine() + 1;
-                } catch (_) { continue; }
+            while (breakpoints.hasNext()) {
+                const breakpoint = breakpoints.next();
+                const path = String(breakpoint.getFileUrl());
+                const line = breakpoint.getLine() + 1;
                 result.push((breakpoint.isEnabled() ? '1' : '0') + '|' + path + '|' + line);
             }
             result.join('\n');
