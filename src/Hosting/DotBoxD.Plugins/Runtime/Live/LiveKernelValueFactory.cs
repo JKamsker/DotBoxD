@@ -44,7 +44,7 @@ internal static class LiveKernelValueFactory
         {
             if (HasSetting(settings, property.Name))
             {
-                values[property.Name] = property.GetValue(state);
+                values[property.Name] = ReadLiveProperty(property, state);
             }
         }
 
@@ -55,7 +55,7 @@ internal static class LiveKernelValueFactory
     {
         foreach (var property in LiveProperties(typeof(T)))
         {
-            property.SetValue(target, property.GetValue(source));
+            WriteLiveProperty(property, target, ReadLiveProperty(property, source));
         }
     }
 
@@ -162,7 +162,7 @@ internal static class LiveKernelValueFactory
             }
 
             var value = LiveSettingTypeConverter.CoerceClr(property.PropertyType, kernel.Value.GetObject(property.Name));
-            property.SetValue(state, value);
+            WriteLiveProperty(property, state, value);
         }
     }
 
@@ -174,12 +174,43 @@ internal static class LiveKernelValueFactory
         {
             if (HasSetting(settings, property.Name))
             {
-                values[property.Name] = property.GetValue(state);
+                values[property.Name] = ReadLiveProperty(property, state);
             }
         }
 
         kernel.CommitSynchronizedLiveValues(values);
     }
+
+    private static object? ReadLiveProperty(PropertyInfo property, object? state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        try
+        {
+            return property.GetValue(state);
+        }
+        catch (TargetInvocationException ex)
+        {
+            throw AccessorFailure(property, "getter", ex);
+        }
+    }
+
+    private static void WriteLiveProperty(PropertyInfo property, object? state, object? value)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        try
+        {
+            property.SetValue(state, value);
+        }
+        catch (TargetInvocationException ex)
+        {
+            throw AccessorFailure(property, "setter", ex);
+        }
+    }
+
+    private static Exception AccessorFailure(PropertyInfo property, string accessor, TargetInvocationException exception)
+        => new InvalidOperationException(
+            $"Live setting '{property.Name}' {accessor} failed.",
+            exception.InnerException ?? exception);
 
     private static bool HasSetting(IReadOnlyList<LiveSettingDefinition> settings, string name)
     {
