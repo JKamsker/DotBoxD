@@ -82,6 +82,42 @@ public sealed class GeneratedDispatcherCancellationRegressionTests
         Assert.Equal(0, output.WrittenCount);
     }
 
+    [Fact]
+    public async Task Generated_dispatcher_observes_deserializer_canceled_token_before_receiver_work()
+    {
+        using var source = new CancellationTokenSource();
+        var service = new RecordingDispatchCancellationService();
+        var dispatcher = GeneratedServiceRegistry.CreateDispatcher<IDispatchCancellationService>(service);
+        var method = FindMethod(nameof(IDispatchCancellationService.Record));
+        var innerSerializer = new MessagePackRpcSerializer();
+        using var payload = innerSerializer.SerializeToPayload(123);
+        var serializer = new CountingSerializer(innerSerializer, source.Cancel);
+        var registry = new InstanceRegistry();
+        var output = new ArrayBufferWriter<byte>();
+
+        var exception = await Record.ExceptionAsync(() =>
+            dispatcher.DispatchAsync(
+                method.WireName,
+                payload.Memory,
+                serializer,
+                registry,
+                output,
+                source.Token));
+
+        Assert.True(
+            exception is OperationCanceledException,
+            "Expected OperationCanceledException after deserializer-canceled dispatch token; actual " +
+            $"{exception?.GetType().Name ?? "no exception"}, " +
+            $"deserialize calls {serializer.DeserializeCalls}, " +
+            $"receiver calls {service.CallCount}, " +
+            $"serialize calls {serializer.SerializeCalls}, " +
+            $"bytes written {output.WrittenCount}.");
+        Assert.Equal(1, serializer.DeserializeCalls);
+        Assert.Equal(0, service.CallCount);
+        Assert.Equal(0, serializer.SerializeCalls);
+        Assert.Equal(0, output.WrittenCount);
+    }
+
     private static GeneratedMethod FindMethod(string name) =>
         Assert.Single(
             GeneratedServiceRegistry.GetService<IDispatchCancellationService>().Methods,
@@ -121,7 +157,7 @@ public sealed class GeneratedDispatcherCancellationRegressionTests
         }
     }
 
-    private sealed class CountingSerializer(ISerializer inner) : ISerializer
+    private sealed class CountingSerializer(ISerializer inner, Action? beforeDeserialize = null) : ISerializer
     {
         public int DeserializeCalls { get; private set; }
 
@@ -136,12 +172,14 @@ public sealed class GeneratedDispatcherCancellationRegressionTests
         public T Deserialize<T>(ReadOnlyMemory<byte> data)
         {
             DeserializeCalls++;
+            beforeDeserialize?.Invoke();
             return inner.Deserialize<T>(data);
         }
 
         public object? Deserialize(ReadOnlyMemory<byte> data, Type type)
         {
             DeserializeCalls++;
+            beforeDeserialize?.Invoke();
             return inner.Deserialize(data, type);
         }
     }
