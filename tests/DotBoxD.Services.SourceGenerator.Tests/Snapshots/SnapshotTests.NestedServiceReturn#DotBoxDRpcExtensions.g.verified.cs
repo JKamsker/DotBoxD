@@ -15,6 +15,16 @@ namespace DotBoxD.Services.Generated
         /// </summary>
         public static global::DotBoxD.Services.Peer.RpcPeer ProvideRootSnap(this global::DotBoxD.Services.Peer.RpcPeer peer, global::Snap.Nested.IRootSnap implementation)
         {
+            if (peer is null)
+            {
+                throw new global::System.ArgumentNullException(nameof(peer));
+            }
+
+            if (implementation is null)
+            {
+                throw new global::System.ArgumentNullException(nameof(implementation));
+            }
+
             peer.Provide((global::DotBoxD.Services.Server.IServiceDispatcher)new global::Snap.Nested.RootSnapDispatcher(implementation));
             peer.Provide((global::DotBoxD.Services.Server.IServiceDispatcher)new global::Snap.Nested.SubSnapDispatcher());
             return peer;
@@ -24,18 +34,45 @@ namespace DotBoxD.Services.Generated
         /// Gets a proxy to call IRootSnap on the other peer.
         /// </summary>
         public static global::Snap.Nested.IRootSnap GetRootSnap(this global::DotBoxD.Services.Peer.RpcPeer peer)
-            => peer.Get<global::Snap.Nested.IRootSnap>();
+        {
+            if (peer is null)
+            {
+                throw new global::System.ArgumentNullException(nameof(peer));
+            }
+
+            return peer.Get<global::Snap.Nested.IRootSnap>();
+        }
 
         /// <summary>
         /// Provides a ISubSnap implementation for the other peer to call.
         /// </summary>
         public static global::DotBoxD.Services.Peer.RpcPeer ProvideSubSnap(this global::DotBoxD.Services.Peer.RpcPeer peer, global::Snap.Nested.ISubSnap implementation)
-            => peer.Provide((global::DotBoxD.Services.Server.IServiceDispatcher)new global::Snap.Nested.SubSnapDispatcher(implementation));
+        {
+            if (peer is null)
+            {
+                throw new global::System.ArgumentNullException(nameof(peer));
+            }
+
+            if (implementation is null)
+            {
+                throw new global::System.ArgumentNullException(nameof(implementation));
+            }
+
+            peer.Provide((global::DotBoxD.Services.Server.IServiceDispatcher)new global::Snap.Nested.SubSnapDispatcher(implementation));
+            return peer;
+        }
 
         /// <summary>
         /// Gets a proxy to call ISubSnap on the other peer.
         /// </summary>
         public static global::Snap.Nested.ISubSnap GetSubSnap(this global::DotBoxD.Services.Peer.RpcPeer peer)
-            => peer.Get<global::Snap.Nested.ISubSnap>();
+        {
+            if (peer is null)
+            {
+                throw new global::System.ArgumentNullException(nameof(peer));
+            }
+
+            return peer.Get<global::Snap.Nested.ISubSnap>();
+        }
     }
 }
