@@ -40,6 +40,8 @@ namespace Snap.Inherit
 
         public global::System.Threading.Tasks.Task DispatchOnInstanceAsync(string instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::DotBoxD.Services.Streaming.Remote.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct = default)
         {
+            ct.ThrowIfCancellationRequested();
+
             if (!registry.TryGet("IDerived", instanceId, out var __obj) || __obj is not global::Snap.Inherit.IDerived __inst)
             {
                 throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException("Instance '" + instanceId + "' not found for service 'IDerived'.", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Instance);
