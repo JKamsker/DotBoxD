@@ -106,7 +106,7 @@ public LowerToIrAttribute(LoweredPipelineStepKind kind)
 public LowerToIrMethodAttribute(LoweredIrMethodKind kind)
 public PipelineSurfaceAttribute(PipelineTransport transport)
 public PipelineTransport Transport { get; }
-public PluginAttribute(string? id = null) => Id = id
+public PluginAttribute(string? id = null) => Id = PluginIdentityAttributeValidation.ValidateOptionalId(id)
 public PolymorphicHandleAttribute(string keyMember)
 public SandboxEffect Effects { get; }
 public sealed class CapabilityAttribute : Attribute
@@ -145,7 +145,7 @@ public sealed record PluginMessage(string TargetId, string Message)
 public SemVersion TargetSandboxVersion { get; init; } = new(1, 0, 0)
 public SemVersion Version { get; init; } = new(1, 0, 0)
 public ServerExtensionAttribute(string id, Type serviceType)
-public ServerExtensionAttribute(string id) => Id = id ?? throw new ArgumentNullException(nameof(id))
+public ServerExtensionAttribute(string id) => Id = PluginIdentityAttributeValidation.ValidateRequiredId(id)
 public ServerExtensionAttribute(Type grafts, string? id = null)
 public SourceSpan Span { get; }
 public static class LoweredPipelineComposer
