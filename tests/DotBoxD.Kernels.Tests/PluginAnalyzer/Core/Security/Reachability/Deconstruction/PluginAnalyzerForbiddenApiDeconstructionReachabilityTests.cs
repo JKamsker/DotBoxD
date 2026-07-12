@@ -46,6 +46,45 @@ public sealed class PluginAnalyzerForbiddenApiDeconstructionReachabilityTests
         AssertSingleForbiddenDiagnosticAt(source, diagnostics, "var (first, second) = new Helper();");
     }
 
+    [Fact]
+    public async Task Reports_forbidden_api_reached_through_deconstruction_initializer()
+    {
+        const string source = """
+            namespace Sample
+            {
+                using DotBoxD.Abstractions;
+                using DotBoxD.Plugins;
+
+                public sealed class Helper
+                {
+                    public void Deconstruct(out int first, out int second)
+                    {
+                        first = System.IO.File.ReadAllText("/x").Length;
+                        second = 0;
+                    }
+                }
+
+                [Plugin("deconstruction-initializer-leak")]
+                public sealed class DeconstructionKernel : IEventKernel<string>
+                {
+                    private static int first;
+                    private static int second;
+                    private static readonly int sum = (((first, second) = new Helper()).first);
+
+                    public bool ShouldHandle(string e, HookContext context) => sum > 0;
+
+                    public void Handle(string e, HookContext context) { }
+                }
+            }
+            """;
+
+        var diagnostics = await AnalyzeAsync(source);
+        AssertSingleForbiddenDiagnosticAt(
+            source,
+            diagnostics,
+            "private static readonly int sum = (((first, second) = new Helper()).first);");
+    }
+
     private static void AssertSingleForbiddenDiagnosticAt(
         string source,
         ImmutableArray<Diagnostic> diagnostics,
