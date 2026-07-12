@@ -436,13 +436,10 @@ if ($startupProjects.Count -ne 2) {
     throw "Visual Studio accepted $($startupProjects.Count) GameServer startup projects instead of 2."
 }
 while ($breakpoints.Count -gt 0) { $breakpoints.Item(1).Delete() }
+$null = $breakpoints.Add('', $env:DOTBOXD_E2E_MANAGED_PROGRAM, 36)
 $dte.ExecuteCommand('Debug.Start')
 '@ 'Visual Studio debugger startup' | Out-Null
     Wait-ForKernelAttach
-    Invoke-DteWhenReady @'
-while ($dte.Debugger.Breakpoints.Count -gt 0) { $dte.Debugger.Breakpoints.Item(1).Delete() }
-$null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_MANAGED_PROGRAM, 36)
-'@ 'Visual Studio managed breakpoint setup' | Out-Null
     Set-Content $continuousStartGate 'ready'
     $managedStop = Wait-ForManagedStop
     $companionProcesses = @(Wait-ForCompanionProcesses)
