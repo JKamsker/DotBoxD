@@ -1,3 +1,4 @@
+using System.Reflection;
 using DotBoxD.Services.Generated;
 using static DotBoxD.Services.SourceGenerator.Tests.Generation.GeneratedFactoryRegistryTestSupport;
 
@@ -75,5 +76,37 @@ public class GeneratedFactoryRegistryFallbackTests
         Assert.Equal("ILegacyService", service.ServiceName);
         Assert.Equal("LegacyServiceProxy", service.ProxyType.Name);
         Assert.Same(services, GeneratedServiceRegistry.GetServices(assembly));
+    }
+
+    [Fact]
+    public void Registry_WrapsThrowingLegacyGeneratedServicesGetterWithCatalogContext()
+    {
+        const string source = """
+            using System;
+            using System.Collections.Generic;
+            using DotBoxD.Services.Generated;
+
+            namespace DotBoxD.Services.Generated
+            {
+                public static class DotBoxDGenerated
+                {
+                    public static IReadOnlyList<GeneratedService> Services =>
+                        throw new InvalidOperationException("legacy Services getter failed");
+                }
+            }
+            """;
+
+        var assembly = CompileAndLoad(source);
+
+        var thrown = Record.Exception(() => GeneratedServiceRegistry.GetServices(assembly));
+
+        Assert.IsNotType<TargetInvocationException>(thrown);
+        var ex = Assert.IsType<InvalidOperationException>(thrown);
+        Assert.Contains("DotBoxD.Services.Generated.DotBoxDGenerated", ex.Message);
+        Assert.Contains(assembly.FullName!, ex.Message);
+        Assert.Contains("Services", ex.Message);
+
+        var inner = Assert.IsType<InvalidOperationException>(ex.InnerException);
+        Assert.Equal("legacy Services getter failed", inner.Message);
     }
 }
