@@ -140,6 +140,7 @@ internal static class ProxyInvocationEmitter
         var subProxyType = ProxyGenerationHelpers.BuildSubProxyTypeName(info.QualifiedInterfaceName);
         var handleName = locals.Reserve("__dotboxd_handle", ct);
         sb.AppendLine($"{indent}var {handleName} = await {invocation};");
+        EmitCallerCancellationRecheck(sb, method, ct, indent);
         if (info.AllowsNull)
         {
             // ServiceHandle is a struct, so the nullable wire type is Nullable<ServiceHandle>;
@@ -172,6 +173,7 @@ internal static class ProxyInvocationEmitter
         var subProxyType = ProxyGenerationHelpers.BuildSubProxyTypeName(info.QualifiedInterfaceName);
         var handleName = locals.Reserve("__dotboxd_handle", ct);
         sb.AppendLine($"{indent}var {handleName} = {invocation}.GetAwaiter().GetResult();");
+        EmitCallerCancellationRecheck(sb, method, ct, indent);
         if (info.AllowsNull)
         {
             var valueName = locals.Reserve("__dotboxd_handleValue", ct);
@@ -188,6 +190,21 @@ internal static class ProxyInvocationEmitter
             EmitSubServiceHandleValidation(sb, handleName, info.ServiceName, indent);
             sb.AppendLine($"{indent}return new {subProxyType}(this._invoker, {handleName}.{ServicesGeneratorMemberNames.ServiceHandle.InstanceId});");
         }
+    }
+
+    private static void EmitCallerCancellationRecheck(
+        StringBuilder sb,
+        MethodModel method,
+        CancellationToken ct,
+        string indent)
+    {
+        if (!method.HasCancellationToken)
+        {
+            return;
+        }
+
+        var ctArg = ProxyGenerationHelpers.GetCancellationTokenArgument(method.Parameters, ct);
+        sb.AppendLine($"{indent}{ctArg}.ThrowIfCancellationRequested();");
     }
 
     private static void EmitSubServiceHandleValidation(StringBuilder sb, string handleName, string serviceName, string indent)
