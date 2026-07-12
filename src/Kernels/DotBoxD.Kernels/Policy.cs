@@ -157,6 +157,8 @@ public sealed record SandboxPolicy(
     // matching grant in original list order is returned to preserve FirstOrDefault order.
     private bool TryGetActiveGrant(string capabilityId, DateTimeOffset now, out CapabilityGrant grant)
     {
+        ArgumentNullException.ThrowIfNull(capabilityId);
+
         var index = (_grantIndex ??= CreateGrantIndexCache()).Value;
         if (index.TryGetValue(capabilityId, out var candidates))
         {
