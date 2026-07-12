@@ -232,19 +232,67 @@ function Wait-ForCompanionProcesses {
     $deadline = [DateTime]::UtcNow + $StopTimeout
     do {
         Start-Sleep -Milliseconds 200
-        $found = @(Get-CimInstance Win32_Process | ForEach-Object {
+        $processes = @(Get-CimInstance Win32_Process | ForEach-Object {
             if ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) -and
                 $_.Name -in @('Examples.GameServer.Server.exe', 'Examples.GameServer.Plugin.exe')) {
-                [IO.Path]::GetFileNameWithoutExtension($_.Name)
+                [PSCustomObject]@{
+                    Name = [IO.Path]::GetFileNameWithoutExtension($_.Name)
+                    ProcessId = $_.ProcessId
+                }
             }
             elseif ($_.CommandLine -and $_.CommandLine.Contains('DotBoxD.DebugAdapter.dll', [StringComparison]::OrdinalIgnoreCase)) {
-                'DotBoxD.DebugAdapter'
+                [PSCustomObject]@{ Name = 'DotBoxD.DebugAdapter'; ProcessId = $_.ProcessId }
             }
-        } | Select-Object -Unique)
+        })
+        $found = @($processes.Name | Select-Object -Unique)
     } until (($expected | Where-Object { $_ -notin $found }).Count -eq 0 -or [DateTime]::UtcNow -ge $deadline)
     $missing = @($expected | Where-Object { $_ -notin $found })
     if ($missing.Count -gt 0) {
         throw "Visual Studio did not launch companion process(es): $($missing -join ', '). Found: $($found -join ', ')."
+    }
+    return $processes | Where-Object Name -In $expected
+}
+
+function Get-KernelIdeState {
+    $json = Invoke-DteWhenReady @'
+$frame = $dte.Debugger.CurrentStackFrame
+if ($null -eq $frame) { throw 'Visual Studio did not expose the stopped kernel stack frame.' }
+$document = $dte.ActiveDocument
+if ($null -eq $document) { throw 'Visual Studio did not activate the stopped kernel document.' }
+$breakpoints = @($dte.Debugger.Breakpoints | ForEach-Object {
+    [PSCustomObject]@{ File = $_.File; Line = $_.FileLine; Enabled = $_.Enabled }
+})
+[PSCustomObject]@{
+    Function = $frame.FunctionName
+    File = $document.FullName
+    Line = $document.Selection.CurrentLine
+    Breakpoints = $breakpoints
+} | ConvertTo-Json -Depth 3 -Compress
+'@ 'Visual Studio kernel source state'
+    return ($json | Where-Object { $_ } | Select-Object -Last 1) | ConvertFrom-Json
+}
+
+function Assert-KernelIdeState($State, [string] $Function, [int] $Line) {
+    if (-not [string]::Equals($State.File, $guardian, [StringComparison]::OrdinalIgnoreCase) -or
+        $State.Line -ne $Line -or $State.Function -ne $Function) {
+        throw "Visual Studio exposed an unexpected kernel frame: $($State | ConvertTo-Json -Depth 3 -Compress)."
+    }
+    $breakpoints = @($State.Breakpoints)
+    $lines = @($breakpoints | Where-Object Enabled | ForEach-Object Line | Sort-Object)
+    if ($breakpoints.Count -ne 2 -or ($lines -join ',') -ne '35,44' -or
+        @($breakpoints | Where-Object { -not [string]::Equals($_.File, $guardian, [StringComparison]::OrdinalIgnoreCase) }).Count -gt 0) {
+        throw "Visual Studio did not retain both enabled kernel breakpoints: $($breakpoints | ConvertTo-Json -Compress)."
+    }
+}
+
+function Wait-ForCompanionExit([int[]] $ProcessIds) {
+    $deadline = [DateTime]::UtcNow + $StopTimeout
+    do {
+        Start-Sleep -Milliseconds 200
+        $remaining = @($ProcessIds | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue })
+    } until ($remaining.Count -eq 0 -or [DateTime]::UtcNow -ge $deadline)
+    if ($remaining.Count -gt 0) {
+        throw "Visual Studio left companion process(es) running after Stop: $($remaining -join ', ')."
     }
 }
 
@@ -334,7 +382,7 @@ $null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_MANAGED_PROGRAM, 36)
 '@ 'Visual Studio managed breakpoint setup' | Out-Null
     Set-Content $continuousStartGate 'ready'
     $managedStop = Wait-ForManagedStop
-    Wait-ForCompanionProcesses
+    $companionProcesses = @(Wait-ForCompanionProcesses)
     Invoke-DteWhenReady @'
 while ($dte.Debugger.Breakpoints.Count -gt 0) { $dte.Debugger.Breakpoints.Item(1).Delete() }
 $null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_GUARDIAN, 35)
@@ -343,6 +391,8 @@ $dte.Debugger.Go($false)
 '@ 'Visual Studio kernel breakpoint setup' | Out-Null
 
     $predicate1 = Wait-ForStop 35
+    $predicateIdeState = Get-KernelIdeState
+    Assert-KernelIdeState $predicateIdeState $predicate1.Function 35
     Invoke-DteWhenReady '$dte.Debugger.StepOver($false)' 'Visual Studio Step Over' | Out-Null
     $step = Wait-ForNextKernelStop
     Invoke-DteWhenReady '$dte.Debugger.Go($false)' 'Visual Studio Continue' | Out-Null
@@ -351,12 +401,16 @@ $dte.Debugger.Go($false)
     $predicate2 = Wait-ForStop 35
     Invoke-DteWhenReady '$dte.Debugger.Go($false)' 'Visual Studio Continue' | Out-Null
     $handle2 = Wait-ForStop 44
+    $handleIdeState = Get-KernelIdeState
+    Assert-KernelIdeState $handleIdeState $handle2.Function 44
 
     if ($predicate1.Function -eq $handle1.Function -or $predicate2.Function -eq $handle2.Function) {
         throw 'Where and Run stops did not preserve distinct kernel stack identities.'
     }
-    Set-Content $resultLog "PASS: managed Program.cs:$($managedStop.Line); processes server/plugin/adapter; kernel step to $($step.Line); kernel 35, 44, 35, 44."
-    Write-Host "Visual Studio 2026 kernel debugger E2E passed: launched all companion processes, stepped to $($step.Line), then stopped at 44, 35, 44."
+    Invoke-DteWhenReady '$dte.Debugger.Stop($true)' 'Visual Studio debugger stop' | Out-Null
+    Wait-ForCompanionExit @($companionProcesses.ProcessId)
+    Set-Content $resultLog "PASS: managed Program.cs:$($managedStop.Line); processes server/plugin/adapter; DTE frames and breakpoints at kernel 35/44; kernel step to $($step.Line); clean debugger shutdown."
+    Write-Host "Visual Studio 2026 kernel debugger E2E passed: verified DTE frames/breakpoints, stepped to $($step.Line), and stopped all companion processes."
 }
 catch {
     Set-Content $resultLog ("FAIL: " + $_.Exception)
