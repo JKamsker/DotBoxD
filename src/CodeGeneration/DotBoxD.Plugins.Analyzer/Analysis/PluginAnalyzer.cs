@@ -59,6 +59,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             startContext.RegisterOperationAction(c => AnalyzeUsing(c, helperGraph), OperationKind.Using);
             startContext.RegisterOperationAction(c => AnalyzeUsingDeclaration(c, helperGraph), OperationKind.UsingDeclaration);
             startContext.RegisterOperationAction(c => AnalyzeDeconstruction(c, helperGraph), OperationKind.DeconstructionAssignment);
+            startContext.RegisterOperationAction(c => AnalyzeLock(c, helperGraph), OperationKind.Lock);
             startContext.RegisterOperationAction(
                 c => AnalyzeOperator(c, helperGraph),
                 OperationKind.UnaryOperator,
