@@ -144,6 +144,7 @@ public sealed class RpcStreamingContext : IRpcStreamingContext
         lock (_gate)
         {
             EnsureDispatchActive();
+            _ct.ThrowIfCancellationRequested();
             if (_response is not null)
             {
                 throw new InvalidOperationException("Only one streamed response can be set for an RPC call.");
