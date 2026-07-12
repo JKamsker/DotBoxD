@@ -108,6 +108,9 @@ public sealed class PluginDebugInspectionTests
         var third = await events.NextAsync();
         Assert.Equal("step", third.GetProperty("reason").GetString());
         Assert.Equal(runId, third.GetProperty("runId").GetString());
+        var thirdNode = SandboxNodeMap.Create(package.Module).Nodes.Single(node =>
+            node.Id.Value == third.GetProperty("nodeId").GetString());
+        Assert.NotEqual(SandboxNodeKind.Expression, thirdNode.Kind);
 
         _ = await SuccessAsync(debug, PluginDebugCommands.Continue, new { runId });
         Assert.True(await execution);

@@ -67,7 +67,10 @@ public sealed class PluginDebugSourceCatalogTests
 
         Assert.All(breakpoints, breakpoint => Assert.True(breakpoint.GetProperty("Verified").GetBoolean()));
         Assert.Equal(nodes[0].Id.Value, breakpoints[0].GetProperty("NodeId").GetString());
-        Assert.Single(breakpoints[0].GetProperty("Bindings").EnumerateArray());
+        var breakpointBinding = Assert.Single(breakpoints[0].GetProperty("Bindings").EnumerateArray());
+        var breakpointVariable = Assert.Single(
+            breakpointBinding.GetProperty("VariableBindings").EnumerateArray());
+        Assert.Equal("e.Damage", breakpointVariable.GetProperty("SourceName").GetString());
         Assert.Equal(otherFunctionNode.Id.Value, breakpoints[1].GetProperty("NodeId").GetString());
         Assert.True(breakpoints[2].GetProperty("Verified").GetBoolean());
         Assert.Equal(2, breakpoints[2].GetProperty("Line").GetInt32());

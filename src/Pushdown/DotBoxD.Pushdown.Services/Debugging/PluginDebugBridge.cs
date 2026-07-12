@@ -19,6 +19,8 @@ public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDispo
     private readonly PluginDebugRemoteConnection _remote;
     private readonly PluginDebugSourceCatalog _sources;
     private readonly PluginDebugBridgeRequestHandler _requests;
+    private readonly PluginDebugSourceRefreshTracker _sourceRefreshes = new();
+    private readonly int _localFrameBytes;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly Channel<LocalBridgeEvent> _events = Channel.CreateUnbounded<LocalBridgeEvent>();
     private readonly SemaphoreSlim _writeGate = new(1, 1);
@@ -32,13 +34,18 @@ public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDispo
     private PluginDebugBridge(PluginDebugBridgeOptions options)
     {
         _options = options;
+        _localFrameBytes = PluginDebugBridgeProtocol.WrappedEnvelopeLimit(options.MaxFrameBytes);
         _remote = new PluginDebugRemoteConnection(options.MaxFrameBytes);
         var pipeName = "dotboxd-debug-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(24));
         var token = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
         Descriptor = PluginDebugBridgeDiscovery.Publish(
             new PluginDebugBridgeDescriptor(Environment.ProcessId, pipeName, token));
         _sources = new PluginDebugSourceCatalog(options.SourceReader ?? PluginDebugBridgeDiscovery.ReadSource);
-        _requests = new PluginDebugBridgeRequestHandler(_remote.ExchangeAsync, _sources, MarkConfigured);
+        _requests = new PluginDebugBridgeRequestHandler(
+            _remote.ExchangeAsync,
+            _sources,
+            MarkConfigured,
+            _sourceRefreshes.Acknowledge);
         _runTask = RunAsync(_lifetime.Token);
     }
 
@@ -60,9 +67,14 @@ public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDispo
 
     /// <summary>Registers client-only source maps before installation.</summary>
     public void RegisterPackage(PluginPackage package)
+        => _ = RegisterPackageCore(package);
+
+    private long RegisterPackageCore(PluginPackage package)
     {
         _sources.Register(package);
-        _events.Writer.TryWrite(LocalBridgeEvent.SourcesChanged());
+        var version = _sourceRefreshes.Register();
+        _events.Writer.TryWrite(LocalBridgeEvent.SourcesChanged(version));
+        return version;
     }
 
     /// <summary>Registers package maps and waits until the adapter has sent configurationDone.</summary>
@@ -70,8 +82,8 @@ public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDispo
         PluginPackage package,
         CancellationToken cancellationToken = default)
     {
-        RegisterPackage(package);
-        await WaitForConfigurationAsync(cancellationToken).ConfigureAwait(false);
+        var sourceVersion = RegisterPackageCore(package);
+        await WaitForSourceRefreshAsync(sourceVersion, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Registers maps, waits for DAP configuration when requested, then installs the kernel.</summary>
@@ -82,8 +94,8 @@ public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDispo
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(session);
-        RegisterPackage(package);
-        await WaitForConfigurationAsync(cancellationToken).ConfigureAwait(false);
+        var sourceVersion = RegisterPackageCore(package);
+        await WaitForSourceRefreshAsync(sourceVersion, cancellationToken).ConfigureAwait(false);
         return await session.InstallAsync(package, policy, cancellationToken).ConfigureAwait(false);
     }
 
@@ -95,8 +107,8 @@ public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDispo
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(session);
-        RegisterPackage(package);
-        await WaitForConfigurationAsync(cancellationToken).ConfigureAwait(false);
+        var sourceVersion = RegisterPackageCore(package);
+        await WaitForSourceRefreshAsync(sourceVersion, cancellationToken).ConfigureAwait(false);
         return await session.InstallServerExtensionAsync(package, policy, cancellationToken).ConfigureAwait(false);
     }
 
@@ -146,9 +158,9 @@ public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDispo
                 await ServeAsync(pipe, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception exception) when (
-                exception is IOException or InvalidDataException or JsonException or ArgumentException)
+                exception is IOException or InvalidDataException or JsonException or ArgumentException or TimeoutException)
             {
-                // A malformed or abruptly closed local client cannot terminate the protected listener.
+                // A premature, malformed, or abruptly closed local client cannot terminate the protected listener.
             }
         }
     }
@@ -157,7 +169,7 @@ public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDispo
     {
         using var authentication = await PluginDebugBridgeProtocol.ReadAsync(
                 stream,
-                _options.MaxFrameBytes,
+                _localFrameBytes,
                 cancellationToken)
             .ConfigureAwait(false);
         if (!Authenticate(authentication?.RootElement))
@@ -195,7 +207,7 @@ public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDispo
         {
             using var request = await PluginDebugBridgeProtocol.ReadAsync(
                     stream,
-                    _options.MaxFrameBytes,
+                    _localFrameBytes,
                     cancellationToken)
                 .ConfigureAwait(false);
             if (request is null)
@@ -224,7 +236,7 @@ public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDispo
         await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await PluginDebugBridgeProtocol.WriteAsync(stream, message, _options.MaxFrameBytes, cancellationToken)
+            await PluginDebugBridgeProtocol.WriteAsync(stream, message, _localFrameBytes, cancellationToken)
                 .ConfigureAwait(false);
         }
         finally
@@ -249,13 +261,14 @@ public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDispo
         }
     }
 
-    private async ValueTask WaitForConfigurationAsync(CancellationToken cancellationToken)
-    {
-        if (_options.WaitForDebuggerBeforeInstall)
-        {
-            await _configured.Task.WaitAsync(_options.DebuggerWaitTimeout, cancellationToken).ConfigureAwait(false);
-        }
-    }
+    private ValueTask WaitForSourceRefreshAsync(long sourceVersion, CancellationToken cancellationToken)
+        => !_options.WaitForDebuggerBeforeInstall
+            ? ValueTask.CompletedTask
+            : _sourceRefreshes.WaitForConfigurationAsync(
+                _configured.Task,
+                sourceVersion,
+                _options.DebuggerWaitTimeout,
+                cancellationToken);
 
     private bool Authenticate(JsonElement? request)
     {
@@ -271,11 +284,6 @@ public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDispo
             System.Text.Encoding.UTF8.GetBytes(token),
             System.Text.Encoding.UTF8.GetBytes(Descriptor.DiscoveryToken));
     }
-
-    private static string RequiredString(JsonElement request, string name)
-        => request.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
-            ? value.GetString() ?? throw new ArgumentException($"Bridge request {name} is null.")
-            : throw new ArgumentException($"Bridge request {name} is required.");
 
     private static bool TryReadString(JsonElement request, string name, out string value)
     {

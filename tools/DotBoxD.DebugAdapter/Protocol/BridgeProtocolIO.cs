@@ -5,7 +5,9 @@ namespace DotBoxD.DebugAdapter;
 
 internal static class BridgeProtocolIO
 {
-    private const int MaxFrameLength = 1024 * 1024;
+    private const int RemoteEnvelopeLimit = 1024 * 1024;
+    private const int JsonHeadroom = 4096;
+    private const int MaxFrameLength = ((RemoteEnvelopeLimit + 2) / 3 * 4) + JsonHeadroom;
 
     public static async ValueTask WriteAsync(
         Stream stream,
@@ -13,6 +15,11 @@ internal static class BridgeProtocolIO
         CancellationToken cancellationToken)
     {
         var payload = JsonSerializer.SerializeToUtf8Bytes(message, DapJson.Options);
+        if (payload.Length > MaxFrameLength)
+        {
+            throw new InvalidDataException("Bridge frame is outside the adapter limit.");
+        }
+
         var header = new byte[sizeof(int)];
         BinaryPrimitives.WriteInt32LittleEndian(header, payload.Length);
         await stream.WriteAsync(header, cancellationToken).ConfigureAwait(false);

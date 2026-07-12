@@ -19,6 +19,8 @@ public sealed record PluginDebugBridgeOptions
             throw new ArgumentOutOfRangeException(nameof(MaxFrameBytes));
         }
 
+        _ = PluginDebugBridgeProtocol.WrappedEnvelopeLimit(MaxFrameBytes);
+
         if (DebuggerWaitTimeout <= TimeSpan.Zero || DebuggerWaitTimeout > TimeSpan.FromMinutes(5))
         {
             throw new ArgumentOutOfRangeException(nameof(DebuggerWaitTimeout));

@@ -44,7 +44,7 @@ internal sealed class DapBreakpointHandler(
             .ConfigureAwait(false);
     }
 
-    public async ValueTask OnSourcesChangedAsync()
+    public async ValueTask OnSourcesChangedAsync(long _)
     {
         var changed = new List<JsonElement>();
         await _gate.WaitAsync().ConfigureAwait(false);
@@ -158,14 +158,32 @@ internal sealed class DapBreakpointHandler(
         JsonElement source,
         JsonElement binding)
     {
+        var sourceBindings = Property(binding, "VariableBindings", "variableBindings")
+            .EnumerateArray()
+            .Select(item => new DapSourceVariableBinding(
+                Property(item, "SlotName", "slotName").GetString()!,
+                Property(item, "SourceName", "sourceName").GetString()!,
+                OptionalPropertyString(item, "TypeName", "typeName"),
+                OptionalPropertyString(item, "DisplayValue", "displayValue")))
+            .ToArray();
         var specification = new Dictionary<string, object>(StringComparer.Ordinal)
         {
             ["nodeId"] = Property(binding, "NodeId", "nodeId").GetString()
                 ?? throw new DebugAdapterException("invalidBinding", "A breakpoint binding is missing its node ID.")
         };
-        AddOptional(specification, "condition", OptionalString(source, "condition"));
+        AddOptional(
+            specification,
+            "condition",
+            OptionalString(source, "condition") is { } condition
+                ? DapBreakpointExpressionTranslator.TranslateCondition(condition, sourceBindings)
+                : null);
         AddOptional(specification, "hitCount", ParseHitCount(OptionalString(source, "hitCondition")));
-        AddOptional(specification, "logMessage", OptionalString(source, "logMessage"));
+        AddOptional(
+            specification,
+            "logMessage",
+            OptionalString(source, "logMessage") is { } logMessage
+                ? DapBreakpointExpressionTranslator.TranslateLogMessage(logMessage, sourceBindings)
+                : null);
         return specification;
     }
 

@@ -6,7 +6,8 @@ namespace DotBoxD.Pushdown.Services;
 internal sealed class PluginDebugBridgeRequestHandler(
     Func<byte[], CancellationToken, ValueTask<byte[]>> exchange,
     PluginDebugSourceCatalog sources,
-    Action configured)
+    Action configured,
+    Action<long> sourcesRefreshed)
 {
     public async ValueTask<object> HandleAsync(JsonElement request, CancellationToken cancellationToken)
     {
@@ -33,6 +34,7 @@ internal sealed class PluginDebugBridgeRequestHandler(
             "source" => ValueTask.FromResult(Source(id, request)),
             "location" => ValueTask.FromResult(Location(id, request)),
             "configurationDone" => ValueTask.FromResult(ConfigurationDone(id)),
+            "sourcesChangedDone" => ValueTask.FromResult(SourcesChangedDone(id, request)),
             _ => ValueTask.FromResult<object>(new { id, success = false, error = "Unsupported bridge request." })
         };
 
@@ -78,6 +80,12 @@ internal sealed class PluginDebugBridgeRequestHandler(
         return new { id, success = true };
     }
 
+    private object SourcesChangedDone(string id, JsonElement request)
+    {
+        sourcesRefreshed(RequiredInt64(request, "version"));
+        return new { id, success = true };
+    }
+
     private static string RequiredString(JsonElement request, string name)
         => request.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
             ? value.GetString() ?? throw new ArgumentException($"Bridge request {name} is null.")
@@ -87,6 +95,11 @@ internal sealed class PluginDebugBridgeRequestHandler(
         => request.TryGetProperty("id", out var value) && value.ValueKind == JsonValueKind.String
             ? value.GetString() ?? string.Empty
             : string.Empty;
+
+    private static long RequiredInt64(JsonElement request, string name)
+        => request.TryGetProperty(name, out var value) && value.TryGetInt64(out var result)
+            ? result
+            : throw new ArgumentException($"Bridge request {name} must be an integer.");
 
     private static string OptionalString(JsonElement request, string name)
         => request.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String

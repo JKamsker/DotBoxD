@@ -5,6 +5,22 @@ namespace DotBoxD.Pushdown.Services;
 
 internal static class PluginDebugBridgeProtocol
 {
+    private const int JsonHeadroom = 4096;
+
+    public static int WrappedEnvelopeLimit(int envelopeLimit)
+    {
+        var frameLimit = (((long)envelopeLimit + 2) / 3 * 4) + JsonHeadroom;
+        if (frameLimit > int.MaxValue)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(envelopeLimit),
+                envelopeLimit,
+                "The bridge envelope limit is too large to wrap in a local frame.");
+        }
+
+        return (int)frameLimit;
+    }
+
     public static async ValueTask<JsonDocument?> ReadAsync(
         Stream stream,
         int maxBytes,

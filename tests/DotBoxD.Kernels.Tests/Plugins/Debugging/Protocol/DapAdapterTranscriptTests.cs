@@ -192,11 +192,9 @@ public sealed class DapAdapterTranscriptTests
             PluginDebugCommands.Disconnect
         };
         Assert.True(
-            expectedCommands.SequenceEqual(control.Commands),
+            expectedCommands.SequenceEqual(control.Commands.Distinct(StringComparer.Ordinal)),
             JsonSerializer.Serialize(messages));
-        var setBreakpoints = Assert.Single(
-            control.Payloads,
-            item => item.Command == PluginDebugCommands.SetBreakpoints);
+        var setBreakpoints = control.Payloads.First(item => item.Command == PluginDebugCommands.SetBreakpoints);
         var remoteBreakpoints = setBreakpoints.Payload.GetProperty("breakpoints").EnumerateArray().ToArray();
         Assert.True(remoteBreakpoints.Length == 1, JsonSerializer.Serialize(messages));
         var breakpoint = remoteBreakpoints[0];

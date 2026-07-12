@@ -10,6 +10,51 @@ namespace DotBoxD.Kernels.Tests.Plugins.Debugging.Protocol;
 public sealed class PluginDebugBridgeRequestTests
 {
     [Fact]
+    public async Task Bridge_preserves_headroom_for_base64_wrapped_remote_envelopes()
+    {
+        const int payloadLength = 800_000;
+        await using var bridge = PluginDebugBridge.Start(new PluginDebugBridgeOptions
+        {
+            WaitForDebuggerBeforeInstall = false
+        });
+        var control = new LargeResponseControl(payloadLength);
+        bridge.AttachControl(control);
+        await bridge.PublishAsync(Bootstrap(control.SessionToken));
+        await using var client = await BridgeClient.ConnectAsync(
+            bridge.Descriptor.PipeName,
+            bridge.Descriptor.DiscoveryToken,
+            CancellationToken.None);
+
+        var response = await client.RemoteAsync("largeResponse", null, CancellationToken.None);
+
+        Assert.Equal(payloadLength, response.GetProperty("data").GetString()!.Length);
+    }
+
+    [Fact]
+    public async Task Bootstrap_timeout_rejects_only_the_premature_client()
+    {
+        await using var bridge = PluginDebugBridge.Start(new PluginDebugBridgeOptions
+        {
+            WaitForDebuggerBeforeInstall = false,
+            DebuggerWaitTimeout = TimeSpan.FromMilliseconds(40)
+        });
+
+        await Assert.ThrowsAsync<EndOfStreamException>(() => BridgeClient.ConnectAsync(
+            bridge.Descriptor.PipeName,
+            bridge.Descriptor.DiscoveryToken,
+            CancellationToken.None));
+
+        var token = Convert.ToHexStringLower(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        await bridge.PublishAsync(Bootstrap(token));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        await using var client = await BridgeClient.ConnectAsync(
+            bridge.Descriptor.PipeName,
+            bridge.Descriptor.DiscoveryToken,
+            timeout.Token);
+        Assert.Equal(token, client.SessionToken);
+    }
+
+    [Fact]
     public async Task Bridge_serves_mapped_and_virtual_sources_and_rejects_bad_requests()
     {
         await using var bridge = PluginDebugBridge.Start(new PluginDebugBridgeOptions
@@ -132,5 +177,27 @@ public sealed class PluginDebugBridgeRequestTests
             template.Manifest with { PluginId = pluginId },
             template.Module with { Id = pluginId, Metadata = metadata },
             template.Entrypoints);
+    }
+
+    private sealed class LargeResponseControl(int payloadLength) : IPluginDebugControlRpcService
+    {
+        public string SessionToken { get; } = Convert.ToHexStringLower(Guid.NewGuid().ToByteArray()) +
+            Convert.ToHexStringLower(Guid.NewGuid().ToByteArray());
+
+        public ValueTask<byte[]> ExchangeAsync(byte[] message, CancellationToken cancellationToken = default)
+        {
+            var request = PluginDebugProtocol.Decode(message, 1024 * 1024);
+            var response = new PluginDebugEnvelope(
+                PluginDebugProtocol.Version,
+                request.Kind + "Response",
+                request.Id,
+                SessionToken,
+                JsonSerializer.SerializeToElement(new
+                {
+                    success = true,
+                    body = new { data = new string('x', payloadLength) }
+                }));
+            return ValueTask.FromResult(PluginDebugProtocol.Encode(response, 1024 * 1024));
+        }
     }
 }

@@ -128,8 +128,17 @@ internal sealed class PluginDebugSourceCatalog(Func<string, byte[]?> sourceReade
                     .Select(group => group.First());
                 foreach (var point in points)
                 {
+                    var functionId = package.Functions.GetValueOrDefault(point.NodeId);
                     candidates.Add((
-                        new ResolvedNodeBinding(package.PluginId, point.NodeId.Value),
+                        new ResolvedNodeBinding(
+                            package.PluginId,
+                            point.NodeId.Value,
+                            package.VariableBindings
+                                .Where(binding => string.Equals(
+                                    binding.FunctionId,
+                                    functionId,
+                                    StringComparison.Ordinal))
+                                .ToArray()),
                         point.Span.Line,
                         point.Span.Column));
                 }
@@ -138,7 +147,9 @@ internal sealed class PluginDebugSourceCatalog(Func<string, byte[]?> sourceReade
 
         var resolvedLine = candidates.Count == 0 ? line : candidates.Min(candidate => candidate.Line);
         var selected = candidates.Where(candidate => candidate.Line == resolvedLine).ToArray();
-        var distinct = selected.Select(candidate => candidate.Binding).Distinct().ToArray();
+        var distinct = selected.Select(candidate => candidate.Binding)
+            .DistinctBy(binding => (binding.PluginId, binding.NodeId))
+            .ToArray();
         return distinct.Length > 0
             ? new ResolvedBreakpoint(
                 resolvedLine,
@@ -246,7 +257,10 @@ internal sealed record ResolvedBreakpoint(
     string? Message,
     IReadOnlyList<ResolvedNodeBinding> Bindings);
 
-internal sealed record ResolvedNodeBinding(string PluginId, string NodeId);
+internal sealed record ResolvedNodeBinding(
+    string PluginId,
+    string NodeId,
+    IReadOnlyList<KernelDebugVariableBinding> VariableBindings);
 
 internal sealed record SourceLocation(
     string Path,

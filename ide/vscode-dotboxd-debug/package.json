@@ -63,9 +63,9 @@
               "pauseScope": {
                 "type": "string",
                 "enum": [
-                  "Server",
-                  "PluginSession",
-                  "Execution"
+                  "server",
+                  "pluginSession",
+                  "execution"
                 ],
                 "description": "Requested pause scope; the host's allow-list remains authoritative."
               }

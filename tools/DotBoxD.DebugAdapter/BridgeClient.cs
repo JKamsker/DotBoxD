@@ -17,24 +17,28 @@ internal sealed class BridgeClient : IAsyncDisposable
     private readonly CancellationTokenSource _lifetime = new();
     private readonly Channel<PluginDebugEnvelope> _events = Channel.CreateUnbounded<PluginDebugEnvelope>(
         new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
+    private readonly BridgeSourceChangeDispatcher _sourceChanges;
     private readonly Task _eventLoop;
     private readonly Task _readLoop;
+    private readonly Task _sourceChangeLoop;
     private int _requestId;
 
     private BridgeClient(NamedPipeClientStream pipe, string sessionToken)
     {
         _pipe = pipe;
         SessionToken = sessionToken;
+        _sourceChanges = new BridgeSourceChangeDispatcher(AcknowledgeSourceChangeAsync);
         _eventLoop = DispatchEventsAsync(_lifetime.Token);
+        _sourceChangeLoop = _sourceChanges.RunAsync(_lifetime.Token);
         _readLoop = ReadLoopAsync(_lifetime.Token);
     }
 
     public string SessionToken { get; }
-
     public Func<PluginDebugEnvelope, ValueTask>? EventReceiver { get; set; }
-
-    public Func<ValueTask>? SourcesChangedReceiver { get; set; }
-
+    public Func<long, ValueTask> SourcesChangedReceiver
+    {
+        set => _sourceChanges.SetReceiver(value);
+    }
     public static async Task<BridgeClient> ConnectAsync(
         string pipeName,
         string discoveryToken,
@@ -65,7 +69,6 @@ internal sealed class BridgeClient : IAsyncDisposable
             throw;
         }
     }
-
     public static async Task<BridgeClient> ConnectByProcessIdAsync(
         int processId,
         TimeSpan timeout,
@@ -197,7 +200,7 @@ internal sealed class BridgeClient : IAsyncDisposable
         _pipe.Dispose();
         try
         {
-            await Task.WhenAll(_readLoop, _eventLoop).ConfigureAwait(false);
+            await Task.WhenAll(_readLoop, _eventLoop, _sourceChangeLoop).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is OperationCanceledException or IOException or ObjectDisposedException)
         {
@@ -235,24 +238,17 @@ internal sealed class BridgeClient : IAsyncDisposable
                         1024 * 1024);
                     await _events.Writer.WriteAsync(envelope, cancellationToken).ConfigureAwait(false);
                 }
-                else if (kind == "sourcesChanged" && SourcesChangedReceiver is { } sourcesChanged)
+                else if (kind == "sourcesChanged")
                 {
-                    // Refresh sends requests whose responses are consumed by this loop, so awaiting here deadlocks.
-                    var refresh = Task.Run(
-                        async () => await sourcesChanged().ConfigureAwait(false),
-                        cancellationToken);
-                    _ = refresh.ContinueWith(
-                        static task => Console.Error.WriteLine(
-                            $"DotBoxD source refresh failed: {task.Exception!.GetBaseException().Message}"),
-                        CancellationToken.None,
-                        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
-                        TaskScheduler.Default);
+                    await _sourceChanges.EnqueueAsync(root.GetProperty("version").GetInt64(), cancellationToken)
+                        .ConfigureAwait(false);
                 }
             }
         }
         finally
         {
             _events.Writer.TryComplete();
+            _sourceChanges.Complete();
             var exception = new EndOfStreamException("Plugin debug bridge disconnected.");
             foreach (var completion in _pending.Values)
             {
@@ -270,6 +266,15 @@ internal sealed class BridgeClient : IAsyncDisposable
                 await handler(envelope).ConfigureAwait(false);
             }
         }
+    }
+
+    private async ValueTask AcknowledgeSourceChangeAsync(long version, CancellationToken cancellationToken)
+    {
+        _ = await SendAsync(
+                "sourcesChangedDone",
+                new Dictionary<string, object?> { ["version"] = version },
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private async ValueTask WriteAsync(object message, CancellationToken cancellationToken)

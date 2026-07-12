@@ -10,6 +10,7 @@ internal sealed class PluginDebugCoordinator : IDisposable
     private readonly HashSet<InstalledKernel> _kernels = new(ReferenceEqualityComparer.Instance);
     private readonly List<DebugPause> _pauses = [];
     private PluginDebugSession? _attached;
+    private KernelDebugPauseScope _attachedPauseScope;
     private bool _disposed;
 
     public PluginDebugCoordinator(PluginRemoteDebugOptions? options)
@@ -21,9 +22,7 @@ internal sealed class PluginDebugCoordinator : IDisposable
     }
 
     public PluginRemoteDebugOptions Options { get; }
-
     public IReadOnlySet<KernelDebugPauseScope> AllowedPauseScopes { get; }
-
     public bool TryAttach(PluginDebugSession session, KernelDebugPauseScope pauseScope)
     {
         InstalledKernel[] kernels;
@@ -35,6 +34,7 @@ internal sealed class PluginDebugCoordinator : IDisposable
             }
 
             _attached = session;
+            _attachedPauseScope = pauseScope;
             kernels = HookedKernels(session, pauseScope);
         }
 
@@ -57,7 +57,7 @@ internal sealed class PluginDebugCoordinator : IDisposable
             }
 
             _kernels.Add(kernel);
-            if (_attached is not null && ShouldHook(kernel, _attached, _attached.PauseScope))
+            if (_attached is not null && ShouldHook(kernel, _attached, _attachedPauseScope))
             {
                 hook = new PluginKernelDebugHook(this, kernel);
             }
@@ -158,7 +158,7 @@ internal sealed class PluginDebugCoordinator : IDisposable
                 return default;
             }
 
-            var pause = new DebugPause(candidate, runId, candidate.PauseScope);
+            var pause = new DebugPause(candidate, runId, _attachedPauseScope);
             _pauses.Add(pause);
             return new PauseAcquisition(pause.Resume.Task, Created: true);
         }

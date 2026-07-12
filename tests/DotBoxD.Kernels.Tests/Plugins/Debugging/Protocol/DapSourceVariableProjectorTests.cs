@@ -74,6 +74,19 @@ public sealed class DapSourceVariableProjectorTests
         Assert.Equal("monster-1", monsterId.GetProperty("value").GetProperty("value").GetString());
     }
 
+    [Fact]
+    public void Completions_include_authored_roots_and_their_members()
+    {
+        var roots = DapCompletionBuilder.Build(Bindings, string.Empty, 1);
+        var members = DapCompletionBuilder.Build(Bindings, "e.", 3);
+
+        Assert.Equal(["ctx", "e"], roots.Select(Label));
+        Assert.Equal(["Distance", "MonsterId"], members.Select(Label));
+    }
+
+    private static string? Label(object completion)
+        => JsonSerializer.SerializeToElement(completion).GetProperty("label").GetString();
+
     private static JsonElement Variables(params (string Name, string Type, JsonElement Value)[] values)
         => JsonSerializer.SerializeToElement(values.Select(value => new
         {

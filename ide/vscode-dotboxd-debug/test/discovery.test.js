@@ -5,6 +5,14 @@ const path = require('node:path');
 const test = require('node:test');
 const { discoveryDirectory, readDescriptors } = require('../discovery');
 
+test('uses protocol casing for contributed pause scopes', () => {
+  const manifest = require('../package.json');
+  const pauseScope = manifest.contributes.debuggers[0]
+    .configurationAttributes.attach.properties.pauseScope;
+
+  assert.deepEqual(pauseScope.enum, ['server', 'pluginSession', 'execution']);
+});
+
 test('uses the same per-user Linux discovery location as PluginDebugBridge', () => {
   assert.equal(
     discoveryDirectory({ environment: {}, home: '/home/plugin', platform: 'linux' }),

@@ -70,7 +70,7 @@ internal sealed class PluginDebugExecutionState
             }
 
             var runId = checkpoint.RunId.ToString();
-            if (_steps.TryGetValue(runId, out var step) && step.ShouldStop(checkpoint.Frame.Depth))
+            if (_steps.TryGetValue(runId, out var step) && step.ShouldStop(checkpoint))
             {
                 _steps.Remove(runId);
                 return PluginDebugCheckpointDecision.Stop("step");
@@ -193,14 +193,20 @@ internal sealed class PluginDebugExecutionState
 
     private sealed record StepPlan(PluginDebugStepKind Kind, int StartingDepth)
     {
-        public bool ShouldStop(int depth)
+        public bool ShouldStop(SandboxDebugCheckpoint checkpoint)
             => Kind switch
             {
                 PluginDebugStepKind.StepIn => true,
-                PluginDebugStepKind.StepOver => depth <= StartingDepth,
-                PluginDebugStepKind.StepOut => depth < StartingDepth,
+                PluginDebugStepKind.StepOver => checkpoint.Frame.Depth < StartingDepth ||
+                    (checkpoint.Frame.Depth == StartingDepth && IsSourceBoundary(checkpoint.Kind)),
+                PluginDebugStepKind.StepOut => checkpoint.Frame.Depth < StartingDepth,
                 _ => false
             };
+
+        private static bool IsSourceBoundary(SandboxDebugCheckpointKind kind)
+            => kind is SandboxDebugCheckpointKind.Statement or
+                SandboxDebugCheckpointKind.LoopIteration or
+                SandboxDebugCheckpointKind.FunctionExit;
     }
 }
 

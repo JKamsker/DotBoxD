@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Debugging;
 
@@ -18,6 +19,10 @@ public sealed class PluginDebugSessionTests
 
         Assert.True(initialized.GetProperty("success").GetBoolean());
         Assert.False(initialized.GetProperty("body").GetProperty("supported").GetBoolean());
+        Assert.Contains(
+            PluginDebugCommands.Completions,
+            initialized.GetProperty("body").GetProperty("commands").EnumerateArray()
+                .Select(command => command.GetString()));
         Assert.Equal("debuggingDisabled", ErrorCode(attached));
     }
 
@@ -135,8 +140,25 @@ public sealed class PluginDebugSessionTests
         Assert.Throws<InvalidOperationException>(() => owner.CreateDebugSession(new RecordingEvents()));
     }
 
+    [Fact]
+    public async Task Debugger_attach_and_kernel_registration_do_not_deadlock()
+    {
+        for (var iteration = 0; iteration < 20; iteration++)
+        {
+            using var server = EnabledServer();
+            using var owner = server.CreateSession();
+            await using var debug = owner.CreateDebugSession(new RecordingEvents());
+            var attach = ExchangeAsync(debug, PluginDebugCommands.Attach);
+            var install = owner.InstallAsync(FireDamagePluginPackage.Create()).AsTask();
+
+            await Task.WhenAll(attach, install).WaitAsync(TimeSpan.FromSeconds(2));
+        }
+    }
+
     private static PluginServer EnabledServer()
-        => PluginServer.Create(remoteDebugOptions: EnabledOptions());
+        => PluginServer.Create(
+            defaultPolicy: PluginAddendumTestPolicies.LongWall(),
+            remoteDebugOptions: EnabledOptions());
 
     private static PluginRemoteDebugOptions EnabledOptions()
         => new()

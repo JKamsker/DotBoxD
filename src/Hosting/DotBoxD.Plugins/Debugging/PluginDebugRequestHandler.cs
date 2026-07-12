@@ -135,6 +135,7 @@ internal sealed class PluginDebugRequestHandler(PluginDebugSession session)
             PluginDebugCommands.Threads,
             PluginDebugCommands.StackTrace,
             PluginDebugCommands.Variables,
+            PluginDebugCommands.Completions,
             PluginDebugCommands.SetVariable,
             PluginDebugCommands.Evaluate,
             PluginDebugCommands.SetExpression,
