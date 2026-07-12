@@ -74,6 +74,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
                 c => AnalyzeImplicitStringFormatting(c, helperGraph),
                 OperationKind.BinaryOperator,
                 OperationKind.Interpolation);
+            RegisterAwaitReachabilityAnalysis(startContext, helperGraph);
             RegisterForbiddenTypeSyntaxAnalysis(startContext, helperGraph);
             RegisterEnumerationSyntaxAnalysis(startContext, helperGraph);
             RegisterFixedReachabilityAnalysis(startContext, helperGraph);
