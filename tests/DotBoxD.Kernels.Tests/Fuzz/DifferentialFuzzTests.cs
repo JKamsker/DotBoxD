@@ -22,6 +22,12 @@ public sealed class DifferentialFuzzTests
             iter: 40,
             threads: 1);
 
+    [Theory]
+    [InlineData(-23_438_956)]
+    [InlineData(-23_392_650)]
+    public void Fuzz_module_ids_do_not_form_forbidden_metadata_tokens(int seed)
+        => Assert.False(SandboxDescriptorGuards.ContainsForbiddenDescriptor(ModuleId(seed)));
+
     private static async Task RunCaseAsync(int seed)
     {
         using var host = SandboxTestHost.Create(compiler: true);
@@ -136,9 +142,23 @@ public sealed class DifferentialFuzzTests
     private static string ModuleId(int index)
     {
         var seed = (long)index;
+        var encodedSeed = EncodeDigits(seed);
         return seed < 0
-            ? $"differential-fuzz-n{(-seed).ToString(CultureInfo.InvariantCulture)}"
-            : $"differential-fuzz-{seed.ToString(CultureInfo.InvariantCulture)}";
+            ? $"differential-fuzz-negative-{encodedSeed}"
+            : $"differential-fuzz-positive-{encodedSeed}";
+    }
+
+    private static string EncodeDigits(long value)
+    {
+        var digits = Math.Abs(value).ToString(CultureInfo.InvariantCulture);
+        return string.Create(digits.Length, digits, static (characters, source) =>
+        {
+            for (var index = 0; index < source.Length; index++)
+            {
+                // G through P cannot form the hexadecimal metadata-token pattern rejected by the descriptor guard.
+                characters[index] = (char)('g' + source[index] - '0');
+            }
+        });
     }
 
     private static JsonObject Parameter(string name)
