@@ -17,19 +17,8 @@ public sealed class RpcDispatchResponseBuilderCancellationRegressionTests
         using var source = new CancellationTokenSource();
         var serializer = new MessagePackRpcSerializer();
         var dispatcher = new CancelingSuccessDispatcher(source);
-        var dispatchers = new ConcurrentDictionary<string, IServiceDispatcher>();
-        Assert.True(dispatchers.TryAdd(dispatcher.ServiceName, dispatcher));
-        var builder = new RpcDispatchResponseBuilder(serializer, dispatchers);
-        var request = new RpcRequest
-        {
-            MessageId = 42,
-            ServiceName = dispatcher.ServiceName,
-            MethodName = "Cancel",
-        };
-
-        var returned = false;
-        MessageType? returnedMessageType = null;
-        var returnedPayloadBytes = 0;
+        var builder = CreateBuilder(serializer, dispatcher);
+        var request = new RpcRequest { MessageId = 42, ServiceName = dispatcher.ServiceName, MethodName = "Cancel" };
 
         var exception = await Record.ExceptionAsync(async () =>
         {
@@ -40,30 +29,45 @@ public sealed class RpcDispatchResponseBuilderCancellationRegressionTests
                 new InstanceRegistry(),
                 RpcStreamingContext.Disabled,
                 source.Token);
-
-            returned = true;
-            if (MessageFramer.TryReadFrame(
-                result.FrameMemory,
-                out _,
-                out var messageType,
-                out _,
-                out var responsePayload))
-            {
-                returnedMessageType = messageType;
-                returnedPayloadBytes = responsePayload.Length;
-            }
         });
 
-        Assert.True(
-            exception is OperationCanceledException,
-            "Expected OperationCanceledException after custom dispatcher canceled the request token; " +
-            $"actual {exception?.GetType().Name ?? "no exception"}, " +
-            $"returned {returned}, " +
-            $"token canceled {source.IsCancellationRequested}, " +
-            $"message type {returnedMessageType?.ToString() ?? "unreadable"}, " +
-            $"payload bytes {returnedPayloadBytes}.");
+        Assert.IsType<OperationCanceledException>(exception);
         Assert.True(source.IsCancellationRequested);
         Assert.Equal(1, dispatcher.CallCount);
+    }
+
+    [Fact]
+    public async Task BuildAsync_observes_pre_canceled_token_before_custom_dispatcher_work()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var dispatcher = new CountingDispatcher();
+        var builder = CreateBuilder(serializer, dispatcher);
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+
+        var exception = await Record.ExceptionAsync(async () =>
+        {
+            using var result = await builder.BuildAsync(
+                new RpcRequest { MessageId = 42, ServiceName = dispatcher.ServiceName, MethodName = "Count" },
+                messageId: 42,
+                ReadOnlyMemory<byte>.Empty,
+                new InstanceRegistry(),
+                RpcStreamingContext.Disabled,
+                canceled.Token);
+        });
+
+        Assert.IsType<OperationCanceledException>(exception);
+        Assert.Equal(0, dispatcher.CallCount);
+        Assert.Equal(0, dispatcher.OutputBytes);
+    }
+
+    private static RpcDispatchResponseBuilder CreateBuilder(
+        ISerializer serializer,
+        IServiceDispatcher dispatcher)
+    {
+        var dispatchers = new ConcurrentDictionary<string, IServiceDispatcher>();
+        Assert.True(dispatchers.TryAdd(dispatcher.ServiceName, dispatcher));
+        return new RpcDispatchResponseBuilder(serializer, dispatchers);
     }
 
     private sealed class CancelingSuccessDispatcher(CancellationTokenSource source) :
@@ -85,6 +89,31 @@ public sealed class RpcDispatchResponseBuilderCancellationRegressionTests
             CallCount++;
             source.Cancel();
             serializer.Serialize(output, 123);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class CountingDispatcher : IServiceDispatcher, INonStreamingServiceDispatcher
+    {
+        public string ServiceName => "Counting";
+
+        public int CallCount { get; private set; }
+
+        public int OutputBytes { get; private set; }
+
+        public Task DispatchAsync(
+            string method,
+            ReadOnlyMemory<byte> payload,
+            ISerializer serializer,
+            IInstanceRegistry registry,
+            IBufferWriter<byte> output,
+            CancellationToken ct = default)
+        {
+            CallCount++;
+            var span = output.GetSpan(1);
+            span[0] = 0x2A;
+            output.Advance(1);
+            OutputBytes++;
             return Task.CompletedTask;
         }
     }
