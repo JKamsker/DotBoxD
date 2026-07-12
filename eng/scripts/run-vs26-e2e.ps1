@@ -325,7 +325,9 @@ function Assert-AdapterTranscript {
     if ($missing.Count -gt 0) {
         throw "The kernel debug adapter transcript is missing request(s): $($missing -join ', ')."
     }
-    $incomplete = @($requests | Select-Object -Unique | Where-Object {
+    # Visual Studio can abandon a fire-and-forget pause sent by a transient companion
+    # adapter while multi-project startup is still selecting the active debug engine.
+    $incomplete = @($requiredCommands | Where-Object {
         $command = $_
         @($requests | Where-Object { $_ -eq $command }).Count -ne
             @($completed | Where-Object { $_ -eq $command }).Count
