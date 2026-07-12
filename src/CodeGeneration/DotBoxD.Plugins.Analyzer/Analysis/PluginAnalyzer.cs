@@ -57,6 +57,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             startContext.RegisterOperationAction(c => AnalyzeVariableDeclaration(c, helperGraph), OperationKind.VariableDeclaration);
             startContext.RegisterOperationAction(c => AnalyzeUsing(c, helperGraph), OperationKind.Using);
             startContext.RegisterOperationAction(c => AnalyzeUsingDeclaration(c, helperGraph), OperationKind.UsingDeclaration);
+            startContext.RegisterOperationAction(c => AnalyzeSpread(c, helperGraph), OperationKind.Spread);
             startContext.RegisterOperationAction(
                 c => AnalyzeOperator(c, helperGraph),
                 OperationKind.UnaryOperator,
