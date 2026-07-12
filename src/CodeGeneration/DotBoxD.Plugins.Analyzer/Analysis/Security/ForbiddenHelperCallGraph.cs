@@ -53,7 +53,7 @@ internal sealed class ForbiddenHelperCallGraph
 
     public void RecordCall(IMethodSymbol caller, IMethodSymbol target, Location location)
     {
-        if (target.DeclaringSyntaxReferences.Length == 0 ||
+        if (!IsReachableSourceMethod(target) ||
             PluginAnalyzer.IsEventKernel(target.ContainingType))
         {
             return;
@@ -72,6 +72,31 @@ internal sealed class ForbiddenHelperCallGraph
         }
 
         _helperEdges.Add(new HelperEdge(Normalize(caller), normalizedTarget));
+    }
+
+    public void RecordConstructorInitializers(IMethodSymbol constructor)
+    {
+        if (constructor.MethodKind != MethodKind.Constructor ||
+            constructor.IsStatic ||
+            constructor.ContainingType.DeclaringSyntaxReferences.Length == 0 ||
+            PluginAnalyzer.IsEventKernel(constructor.ContainingType))
+        {
+            return;
+        }
+
+        var normalizedConstructor = Normalize(constructor);
+        foreach (var member in constructor.ContainingType.GetMembers())
+        {
+            switch (member)
+            {
+                case IFieldSymbol { IsStatic: false, IsImplicitlyDeclared: false, DeclaringSyntaxReferences.Length: > 0 } field:
+                    _helperEdges.Add(new HelperEdge(normalizedConstructor, Normalize(field)));
+                    break;
+                case IPropertySymbol { IsStatic: false, IsImplicitlyDeclared: false, DeclaringSyntaxReferences.Length: > 0 } property:
+                    _helperEdges.Add(new HelperEdge(normalizedConstructor, Normalize(property)));
+                    break;
+            }
+        }
     }
 
     public void RecordDelegateFieldTarget(IFieldSymbol field, IMethodSymbol target)
@@ -247,6 +272,15 @@ internal sealed class ForbiddenHelperCallGraph
     private static bool IsStaticSourceMember(ISymbol symbol)
         => symbol.DeclaringSyntaxReferences.Length != 0 &&
             symbol is IFieldSymbol { IsStatic: true } or IPropertySymbol { IsStatic: true };
+
+    private static bool IsReachableSourceMethod(IMethodSymbol method)
+        => method.DeclaringSyntaxReferences.Length != 0 ||
+            method is
+            {
+                MethodKind: MethodKind.Constructor,
+                IsStatic: false,
+                ContainingType.DeclaringSyntaxReferences.Length: > 0
+            };
 
     private static ISymbol Normalize(ISymbol symbol)
         => symbol switch
