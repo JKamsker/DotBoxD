@@ -38,6 +38,9 @@ public sealed partial class PluginAnalyzer
         context.RegisterSyntaxNodeAction(
             c => AnalyzeCatchDeclarationType(c, helperGraph),
             SyntaxKind.CatchDeclaration);
+        context.RegisterSyntaxNodeAction(
+            c => AnalyzeConstantPatternType(c, helperGraph),
+            SyntaxKind.ConstantPattern);
     }
 
     private static void AnalyzeDeclarationPatternType(
@@ -130,12 +133,37 @@ public sealed partial class PluginAnalyzer
         }
     }
 
+    private static void AnalyzeConstantPatternType(
+        SyntaxNodeAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph)
+    {
+        if (context.Node is not ConstantPatternSyntax { Expression: { } expression })
+        {
+            return;
+        }
+
+        var symbol = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol;
+        if (symbol is ITypeSymbol type)
+        {
+            AnalyzeForbiddenTypeSymbol(context, helperGraph, expression, type);
+        }
+    }
+
     private static void AnalyzeForbiddenTypeSyntax(
         SyntaxNodeAnalysisContext context,
         ForbiddenHelperCallGraph helperGraph,
         TypeSyntax typeSyntax)
     {
         var type = context.SemanticModel.GetTypeInfo(typeSyntax, context.CancellationToken).Type;
+        AnalyzeForbiddenTypeSymbol(context, helperGraph, typeSyntax, type);
+    }
+
+    private static void AnalyzeForbiddenTypeSymbol(
+        SyntaxNodeAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        SyntaxNode locationNode,
+        ITypeSymbol? type)
+    {
         if (!TryGetForbiddenHostApi(type, out var forbidden))
         {
             return;
@@ -156,7 +184,7 @@ public sealed partial class PluginAnalyzer
 
         context.ReportDiagnostic(Diagnostic.Create(
             ForbiddenHostApiRule,
-            typeSyntax.GetLocation(),
+            locationNode.GetLocation(),
             forbidden.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
     }
 }
