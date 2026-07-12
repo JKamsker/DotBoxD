@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Reflection;
 
 namespace DotBoxD.Plugins.Runtime.Rpc;
 
@@ -11,7 +12,17 @@ public static partial class KernelRpcMarshaller
             var values = new object?[Fields.Count];
             for (var i = 0; i < Fields.Count; i++)
             {
-                values[i] = GetValue(instance, i);
+                try
+                {
+                    values[i] = GetValue(instance, i);
+                }
+                catch (Exception ex)
+                {
+                    var inner = ex is TargetInvocationException { InnerException: { } target } ? target : ex;
+                    throw new NotSupportedException(
+                        $"Server extension DTO '{_type}' field '{Fields[i].Name}' could not be read.",
+                        inner);
+                }
             }
 
             return values;
