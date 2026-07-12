@@ -61,6 +61,7 @@ namespace Snap.Two
                 case "AAsync":
                 {
                     var arg = serializer.Deserialize<int>(payload);
+                    ct.ThrowIfCancellationRequested();
                     var __dotboxd_task = receiver.AAsync(arg);
                     var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result

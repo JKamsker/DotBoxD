@@ -61,6 +61,7 @@ namespace Snap.Kw
                 case "DoAsync":
                 {
                     var args = serializer.Deserialize<(int, int)>(payload);
+                    ct.ThrowIfCancellationRequested();
                     var __dotboxd_task = receiver.DoAsync(args.Item1, args.Item2);
                     var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result

@@ -61,6 +61,7 @@ namespace Snap.Nested
                 case "GetSubAsync":
                 {
                     var arg = serializer.Deserialize<string>(payload);
+                    ct.ThrowIfCancellationRequested();
                     var __dotboxd_task = receiver.GetSubAsync(arg);
                     var __sub = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result
