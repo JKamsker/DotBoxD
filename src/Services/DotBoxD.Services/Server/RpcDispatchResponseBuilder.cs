@@ -101,6 +101,7 @@ internal sealed class RpcDispatchResponseBuilder
                 writer,
                 streaming,
                 ct).ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
             telemetry.SetResolvedOperation(dispatcher.ServiceName, request.MethodName);
             streaming.EnsureAllDeclaredInboundStreamsClaimed();
         }
