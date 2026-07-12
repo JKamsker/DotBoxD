@@ -62,6 +62,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
                 OperationKind.UnaryOperator,
                 OperationKind.BinaryOperator,
                 OperationKind.Conversion);
+            RegisterAwaitReachabilityAnalysis(startContext, helperGraph);
             RegisterForbiddenTypeSyntaxAnalysis(startContext, helperGraph);
             startContext.RegisterCompilationEndAction(helperGraph.ReportDiagnostics);
         });
