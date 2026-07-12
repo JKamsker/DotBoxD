@@ -20,6 +20,10 @@ Services, Kernels, and Pushdown.
   release pipeline with provenance attestation.
 - **Meta-packages:** `DotBoxD` (net10.0, full stack) and `DotBoxD.Services.All` (netstandard2.1,
   Unity/IL2CPP service bundle).
+- **Serializer-owned Services DTO materialization:** the Services source generator no longer rejects
+  getter-only properties, private setters, or DTO constructor layouts before the configured
+  `ISerializer` can handle them. RPC-specific payload restrictions and explicit-union validation remain
+  enforced by the generator.
 - **GameServer example:** `samples/GameServer/Examples.GameServer.Server` is the maintained
   runnable example for service IPC, event kernels, live settings, host bindings, policies, and
   kernel RPC. Removed sample coverage is tracked in
