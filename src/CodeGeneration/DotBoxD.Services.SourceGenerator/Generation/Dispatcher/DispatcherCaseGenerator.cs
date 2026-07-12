@@ -13,6 +13,7 @@ internal static class DispatcherCaseGenerator
         [MethodReturnKind.Void] = static (sb, _, _, call) =>
         {
             sb.AppendLine($"                    {call};");
+            AppendCancellationCheckpoint(sb);
             sb.AppendLine("                    return;");
         },
         [MethodReturnKind.Sync] = static (sb, _, _, call) =>
@@ -202,6 +203,7 @@ internal static class DispatcherCaseGenerator
         sb.AppendLine("                    {");
         sb.AppendLine("                        await __dotboxd_task;");
         sb.AppendLine("                    }");
+        AppendCancellationCheckpoint(sb);
         sb.AppendLine("                    return;");
     }
 
@@ -211,9 +213,11 @@ internal static class DispatcherCaseGenerator
         sb.AppendLine("                    if (!__dotboxd_task.IsCompletedSuccessfully)");
         sb.AppendLine("                    {");
         sb.AppendLine("                        await __dotboxd_task;");
+        sb.AppendLine("                        ct.ThrowIfCancellationRequested();");
         sb.AppendLine("                        return;");
         sb.AppendLine("                    }");
         sb.AppendLine("                    __dotboxd_task.GetAwaiter().GetResult();");
+        AppendCancellationCheckpoint(sb);
         sb.AppendLine("                    return;");
     }
 

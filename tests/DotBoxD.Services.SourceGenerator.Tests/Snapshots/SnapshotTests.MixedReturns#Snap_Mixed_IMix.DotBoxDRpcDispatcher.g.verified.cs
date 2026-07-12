@@ -78,6 +78,7 @@ namespace Snap.Mixed
                     {
                         await __dotboxd_task;
                     }
+                    ct.ThrowIfCancellationRequested();
                     return;
                 }
                 case "SyncAdd":
@@ -95,6 +96,7 @@ namespace Snap.Mixed
                         throw new global::DotBoxD.Services.Exceptions.ServiceProtocolException("Request payload is not allowed for a parameterless RPC method.");
                     }
                     receiver.SyncPing();
+                    ct.ThrowIfCancellationRequested();
                     return;
                 }
                 default:
