@@ -157,10 +157,12 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
             const result = [];
             for (let i = 0; i < breakpoints.length; i++) {
                 const breakpoint = breakpoints[i];
-                let position = null;
-                try { position = breakpoint.getSourcePosition(); } catch (_) { continue; }
-                const path = position && position.getFile() ? position.getFile().getPath() : '';
-                const line = position ? position.getLine() + 1 : 0;
+                let path = '';
+                let line = 0;
+                try {
+                    path = String(breakpoint.getFileUrl());
+                    line = breakpoint.getLine() + 1;
+                } catch (_) { continue; }
                 result.push((breakpoint.isEnabled() ? '1' : '0') + '|' + path + '|' + line);
             }
             result.join('\n');
@@ -169,7 +171,7 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
         if (value.isBlank()) return emptyList()
         return value.lineSequence().map { encoded ->
             val parts = encoded.split('|', limit = 3)
-            IdeBreakpoint(parts[0] == "1", parts[1], parts[2].toInt())
+            IdeBreakpoint(parts[0] == "1", parts[1].removePrefix("file://"), parts[2].toInt())
         }.toList()
     }
 
