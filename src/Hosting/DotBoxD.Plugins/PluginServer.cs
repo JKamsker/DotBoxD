@@ -167,6 +167,7 @@ public sealed partial class PluginServer : IDisposable
 
     public bool Uninstall(string pluginId)
     {
+        ArgumentNullException.ThrowIfNull(pluginId);
         ThrowIfDisposed();
         var removed = Kernels.Remove(pluginId);
         if (removed is not null)
