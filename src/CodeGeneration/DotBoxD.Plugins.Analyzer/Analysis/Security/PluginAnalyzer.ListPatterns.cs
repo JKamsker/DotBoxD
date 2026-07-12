@@ -9,20 +9,56 @@ public sealed partial class PluginAnalyzer
     private static void AnalyzeListPattern(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
         var pattern = (IListPatternOperation)context.Operation;
-        RecordListPatternPropertyAccess(context, helperGraph, pattern.LengthSymbol);
-        RecordListPatternPropertyAccess(context, helperGraph, pattern.IndexerSymbol);
+        RecordPatternMember(context, helperGraph, pattern.LengthSymbol);
+        RecordPatternMember(context, helperGraph, pattern.IndexerSymbol);
     }
 
-    private static void RecordListPatternPropertyAccess(
+    private static void AnalyzeSlicePattern(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
+    {
+        var pattern = (ISlicePatternOperation)context.Operation;
+        RecordPatternMember(context, helperGraph, pattern.SliceSymbol);
+    }
+
+    private static void RecordPatternMember(
         OperationAnalysisContext context,
         ForbiddenHelperCallGraph helperGraph,
-        ISymbol? symbol)
+        ISymbol? member)
     {
-        if (symbol is not IPropertySymbol property)
+        switch (member)
         {
+            case IMethodSymbol method:
+                RecordPatternMethod(context, helperGraph, method);
+                break;
+            case IPropertySymbol property:
+                RecordPatternProperty(context, helperGraph, property);
+                break;
+        }
+    }
+
+    private static void RecordPatternMethod(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol target)
+    {
+        if (context.ContainingSymbol is not IMethodSymbol method)
+        {
+            ReportForbiddenInInitializer(context, target.ContainingType);
+            RecordInitializerRootCall(context, helperGraph, target);
             return;
         }
 
+        ReportAndRecordIfForbidden(context, helperGraph, method, target.ContainingType);
+        RecordStaticConstructorReachability(context, helperGraph, target);
+        ReportForbiddenReferencedMethodSignature(context, target);
+        helperGraph.RecordCall(method, target, context.Operation.Syntax.GetLocation());
+        ReportLocalUseIfInvalid(context, target);
+    }
+
+    private static void RecordPatternProperty(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IPropertySymbol property)
+    {
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, property.ContainingType);

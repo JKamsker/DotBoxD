@@ -65,6 +65,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
                 c => AnalyzeCollectionExpression(c, helperGraph),
                 OperationKind.CollectionExpression);
             startContext.RegisterOperationAction(c => AnalyzeListPattern(c, helperGraph), OperationKind.ListPattern);
+            startContext.RegisterOperationAction(c => AnalyzeSlicePattern(c, helperGraph), OperationKind.SlicePattern);
             startContext.RegisterOperationAction(
                 c => AnalyzeOperator(c, helperGraph),
                 OperationKind.UnaryOperator,
