@@ -1,4 +1,4 @@
-# 14 — Observability and Audit
+# 14 - Observability and Audit
 
 ## Purpose
 

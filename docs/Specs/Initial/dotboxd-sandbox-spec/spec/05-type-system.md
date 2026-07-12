@@ -1,4 +1,4 @@
-# 05 — Type System
+# 05 - Type System
 
 ## Type-system goals
 

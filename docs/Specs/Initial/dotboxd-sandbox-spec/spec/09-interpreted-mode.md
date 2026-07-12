@@ -1,4 +1,4 @@
-# 09 — Interpreted Mode
+# 09 - Interpreted Mode
 
 ## Purpose
 

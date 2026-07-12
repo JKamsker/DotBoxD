@@ -1,4 +1,4 @@
-# Surprise Hunt Graph — GitHub-integrated bug hunting
+# Surprise Hunt Graph - GitHub-integrated bug hunting
 
 Design for a continuous, parallel bug-hunting system that uses **GitHub issues as the
 database**. The issue graph is the dedup ledger, branching is explicit, and a red-test PR
@@ -15,9 +15,9 @@ subagents. It works, but it is hitting diminishing returns for three structural 
 
 1. **No cross-iteration memory.** Each iteration and each agent starts cold, so they
    re-mine veins that are already fixed or already refuted. (Our audit notes even track
-   "refuted near-misses not to re-claim" — but that knowledge isn't fed back into the loop.)
+   "refuted near-misses not to re-claim" - but that knowledge isn't fed back into the loop.)
 2. **Area bias.** The skill's surprise inventory is almost entirely the
-   codegen / lowering / marshalling / hook-chain pipeline — the territory already swept 40+
+   codegen / lowering / marshalling / hook-chain pipeline - the territory already swept 40+
    waves and now converging. Higher-severity, under-mined veins barely appear.
 3. **No diversity enforcement.** 10 agents on one identical prompt converge on the same
    obvious targets (birthday-collision waste) instead of covering disjoint ground.
@@ -26,9 +26,9 @@ This system fixes all three: the graph is durable, queryable memory; the orchest
 assigns disjoint high-severity targets; and the frontier is explicit so agents stand on the
 accumulated log instead of re-deriving it.
 
-> **This repo already runs a 3-stage gh-aw pipeline** —
+> **This repo already runs a 3-stage gh-aw pipeline** -
 > `library-surprise-{sweep,red-test,fix}` in `.github/workflows/` (see `.github/aw/README.md`)
-> — an hourly autonomous version of the loop. Today its only memory is *open PRs*: there is no
+> - an hourly autonomous version of the loop. Today its only memory is *open PRs*: there is no
 > record of refuted/exhausted veins, no frontier, no branching, no coverage map. The issue
 > graph is exactly that missing durable layer, and it slots directly into the existing
 > pipeline. See **§13** for the gh-aw realization.
@@ -69,16 +69,16 @@ investigations; it terminates in a **bug** when a concrete surprise is found.
 Umbrella: `sweep`
 
 **Kind**
-- `sweep:lens` — root vein
-- `sweep:investigation` — a thread
-- `sweep:bug` — a concrete surprise (may also carry the existing `bug` label)
+- `sweep:lens` - root vein
+- `sweep:investigation` - a thread
+- `sweep:bug` - a concrete surprise (may also carry the existing `bug` label)
 
 **Status** (drives the frontier query)
-- `sweep:active` — mineable now
-- `sweep:exhausted` — swept, low yield; do **not** re-pick
-- `sweep:refuted` — investigated and found to be a non-bug (the "do-not-re-mine" record)
-- `sweep:proven` — a red-test PR exists, CI is red
-- `sweep:fixed` — green fix merged
+- `sweep:active` - mineable now
+- `sweep:exhausted` - swept, low yield; do **not** re-pick
+- `sweep:refuted` - investigated and found to be a non-bug (the "do-not-re-mine" record)
+- `sweep:proven` - a red-test PR exists, CI is red
+- `sweep:fixed` - green fix merged
 
 **Vein tag** (for ranking / weighting)
 - `vein:security`, `vein:concurrency`, `vein:wire`, `vein:error-path`, `vein:codegen`
@@ -99,7 +99,7 @@ gh issue create --label "sweep:investigation,vein:security" \
 Lens: #<lens>
 
 <hypothesis + what to check>"
-gh issue comment <parent> --body "Branched: #<child> — symlink race on canonical root"
+gh issue comment <parent> --body "Branched: #<child> - symlink race on canonical root"
 
 # Open a bug from an investigation
 gh issue create --label "sweep:bug,bug,vein:security" \
@@ -129,7 +129,7 @@ The **green fix** PR (existing integration flow, e.g. the #140-style batch) uses
 
 ---
 
-## 5. Dedup — search before create (the main speed win)
+## 5. Dedup - search before create (the main speed win)
 
 Before opening **any** issue, the agent searches open **and closed** issues:
 
@@ -145,14 +145,14 @@ gh issue list --state all --search "<keywords> in:title,body" \
 
 ---
 
-## 6. Claiming — parallel safety for N agents
+## 6. Claiming - parallel safety for N agents
 
 The orchestrator hands each of the N agents a **disjoint** frontier target per round
 (different lens / subsystem). Each agent then:
 
 ```bash
 gh issue edit <target> --add-assignee @me
-gh issue comment <target> --body "Claiming — round <r>, agent <id>"
+gh issue comment <target> --body "Claiming - round <r>, agent <id>"
 ```
 
 Agents skip any `sweep:active` issue that is already assigned and recently touched. Because
@@ -160,9 +160,9 @@ the subagents run with `fork:false` (shared orchestrator context), the orchestra
 partition targets directly; self-assignment is the backup guard.
 
 **Concurrency split:**
-- **Hunt phase** — parallel, read-only on the repo, writes only to GitHub (issues/comments)
+- **Hunt phase** - parallel, read-only on the repo, writes only to GitHub (issues/comments)
   and isolated red-test branches. Safe to run 10-wide.
-- **Fix / integrate phase** — serialized (existing flow). Green fixes touch shared,
+- **Fix / integrate phase** - serialized (existing flow). Green fixes touch shared,
   high-contention files (API baselines, CI required-test counts, diagnostic catalogs) and
   must not run 10-wide. Out of scope for the hunt; keep it as the current integration step.
 
@@ -201,9 +201,9 @@ so the queue can be re-weighted toward productive veins over time.
 
 ## 9. Skill composition
 
-- **`library-surprise-sweep`** (existing, `.codex/skills/`) — kept as the **technique**:
+- **`library-surprise-sweep`** (existing, `.codex/skills/`) - kept as the **technique**:
   how to find and prove a single surprise. Unchanged.
-- **`surprise-hunt-graph`** (new) — the **orchestration / bookkeeping** layer: owns the
+- **`surprise-hunt-graph`** (new) - the **orchestration / bookkeeping** layer: owns the
   GitHub protocol in this document and *calls* the technique. This is what the infinite loop
   drives.
 
@@ -213,22 +213,22 @@ so the queue can be re-weighted toward productive veins over time.
 
 All orthogonal to the mature codegen vein and to #141/#142.
 
-1. **`vein:security` — sandbox & capability security.** Path/symlink traversal,
+1. **`vein:security` - sandbox & capability security.** Path/symlink traversal,
    canonicalization mismatches, capability/grant bypass, TOCTOU on policy validation,
    resource exhaustion. Highest severity for a sandboxed plugin runtime.
    Likely targets: `SafeFileSystem`, `FilePolicyGrantValidator`, `SafeHttpGrantValidator`,
    `PolicyGrantValidator`, `AllowedExtensionParameterValidator`, `SandboxPath`.
-2. **`vein:concurrency` — concurrency & lifecycle.** Races, re-entrancy, setup-replay,
+2. **`vein:concurrency` - concurrency & lifecycle.** Races, re-entrancy, setup-replay,
    disposal / use-after-dispose, leaked handles on exception paths, cancellation correctness
    end-to-end. (Tip of this vein already showed up in #131: concurrent pending connects,
    canceled-install caching.)
-3. **`vein:wire` — wire/codec adversarial input.** MessagePack / RPC decode robustness
+3. **`vein:wire` - wire/codec adversarial input.** MessagePack / RPC decode robustness
    against a malicious or version-skewed peer: malformed/truncated frames, oversized
    payloads, length-prefix overflow, map-shape abuse.
-4. **`vein:error-path` — error & partial-failure semantics.** What happens when step N of M
+4. **`vein:error-path` - error & partial-failure semantics.** What happens when step N of M
    throws: rollback, retry idempotency (at-least-once vs exactly-once), swallowed faults,
    partial-state leaks. (Related to the result-hooks transport gap, #80.)
-5. **`vein:codegen` — codegen/lowering** (mature). Keep as a lower-priority lens; mostly
+5. **`vein:codegen` - codegen/lowering** (mature). Keep as a lower-priority lens; mostly
    covered by #141/#142 going forward.
 
 ---
@@ -282,7 +282,7 @@ State lives **only in open PRs**. No refuted/exhausted record, no frontier, no b
 
 ### What the graph adds (issue-centric memory)
 
-Every graph node is a gh-aw `safe-output` — either one you already use or a core gh-aw one:
+Every graph node is a gh-aw `safe-output` - either one you already use or a core gh-aw one:
 
 | Graph concept | gh-aw mechanism |
 |---------------|-----------------|
@@ -297,7 +297,7 @@ Every graph node is a gh-aw `safe-output` — either one you already use or a co
 
 ### Parallelism: jobs vs runs
 
-A former local subagent becomes **one agent run scoped to a lens/target** — but two GitHub
+A former local subagent becomes **one agent run scoped to a lens/target** - but two GitHub
 mechanisms can produce that fan-out, and the distinction matters:
 
 - A **matrix** (`strategy.matrix`) makes parallel **jobs inside one run** of one workflow.
@@ -306,12 +306,12 @@ mechanisms can produce that fan-out, and the distinction matters:
 | | Matrix | Dispatcher + `dispatch-workflow` |
 |---|--------|----------------------------------|
 | Unit | job per matrix cell (one run) | run per dispatch (separate) |
-| Target set | **static** list baked into the workflow | **dynamic** — chosen at runtime from the graph |
+| Target set | **static** list baked into the workflow | **dynamic** - chosen at runtime from the graph |
 | Fit | fixed lens roots | the live `sweep:active` frontier |
 | In your repo | ⚠️ verify fork exposes `strategy` in frontmatter | ✅ already used (`sweep` → `red-test`) |
 
 **Recommendation: dispatcher.** Which targets are worth advancing each tick is a runtime
-decision against the graph, not a fixed list — so a small scheduled **dispatcher** workflow
+decision against the graph, not a fixed list - so a small scheduled **dispatcher** workflow
 (the §8 orchestrator) reads the frontier and dispatches one `explore` run per eligible lens.
 Matrix is fine only for the dead-simple "one job per static vein root" case.
 
@@ -319,7 +319,7 @@ Guarantees and consequences:
 
 - **`concurrency: group: explore-${lens}`** on `explore` is the real "same lens never
   double-runs" lock; the dispatcher's in-flight check is only a cheap optimization.
-- The count is **frontier-driven, not fixed at 10** — dispatch ~one run per active vein (plus
+- The count is **frontier-driven, not fixed at 10** - dispatch ~one run per active vein (plus
   depth where a vein is productive), decided each tick. You ran 10 before to brute-force
   coverage *because there was no memory*; the graph lets you spend fewer, more precisely.
 - Fan-out also happens **across workflows**: an `explore` run that finds a bug dispatches a
@@ -331,11 +331,11 @@ Guarantees and consequences:
 ### Dispatcher (orchestrator) workflow sketch
 
 > This dispatcher is **mechanical**: read the frontier, dispatch top-K. The pre-agent step does
-> the selection deterministically, so the agent is a thin rubber stamp — you can drop `engine:`
+> the selection deterministically, so the agent is a thin rubber stamp - you can drop `engine:`
 > and make this a plain `.yml` to avoid the model call entirely. Keep it agentic only if you
 > want it to also do yield-based re-prioritization or branch dry lenses.
 >
-> **Sketch only — the authoritative, reviewed file is
+> **Sketch only - the authoritative, reviewed file is
 > `.github/workflows/library-surprise-dispatcher.md`.** The shipped version parses the lens id from
 > the run-name and compares it as an int (the substring test below lets `#14` match `#140`), filters
 > out `sweep:exhausted` lenses, and fails closed if the run-list query errors.
@@ -475,7 +475,7 @@ in the compiled lock or add fork support.)
 
 ### Changes to the three workflows
 
-> **As-built differs — see §14.** These bullets are the original proposal. Shipped v1 makes the bug
+> **As-built differs - see §14.** These bullets are the original proposal. Shipped v1 makes the bug
 > issue *optional* (the red-test PR is the bug record), does **not** attempt in-run PR↔issue linking
 > (not possible; see §14), and leaves `red-test` / `fix` unchanged.
 
@@ -496,7 +496,7 @@ in the compiled lock or add fork support.)
    - Fix commit/PR uses `Closes #<bug>`; on green push, `add-labels sweep:fixed` and close
      the bug issue.
 
-### Caveats — verify before building
+### Caveats - verify before building
 
 - **Fork safe-output support.** Confirm `JKamsker/gh-aw v0.82.0-jk.1` ships `create-issue` /
   `add-comment` / `add-labels` / `update-issue`. The current workflows only exercise
@@ -507,7 +507,7 @@ in the compiled lock or add fork support.)
   on `create-issue` per run **and** strict dedup. Keep the existing `noop` discipline.
 - **Recompile locks** after editing sources: `gh aw compile --approve --force-refresh-action-pins
   --gh-aw-ref v0.82.0-jk.1` (see `.github/aw/README.md`); never hand-edit `*.lock.yml`.
-- **Codex engine quirk** — preserve the intentional leading space in `engine.args[0]` for this
+- **Codex engine quirk** - preserve the intentional leading space in `engine.args[0]` for this
   fork (documented in `.github/aw/README.md`).
 
 ---
@@ -518,18 +518,18 @@ Implemented on branch `feat/surprise-hunt-graph` (see the PR). What actually shi
 plan above:
 
 ### Built
-- **Labels** — full `sweep:*` + `vein:*` taxonomy created on the repo.
-- **Lens issues** — #145 security, #146 concurrency, #147 wire, #148 error-path, #149 codegen
+- **Labels** - full `sweep:*` + `vein:*` taxonomy created on the repo.
+- **Lens issues** - #145 security, #146 concurrency, #147 wire, #148 error-path, #149 codegen
   (each `sweep:lens` + `sweep:active` + `vein:*`, with a charter body).
-- **`library-surprise-dispatcher.md`** — hourly orchestrator (§13 sketch, realized). Computes the
+- **`library-surprise-dispatcher.md`** - hourly orchestrator (§13 sketch, realized). Computes the
   eligible-lens frontier in a pre-agent step and dispatches `explore` per lens (cap 5).
-- **`library-surprise-explore.md`** — per-lens discovery agent. `run-name` + per-lens
+- **`library-surprise-explore.md`** - per-lens discovery agent. `run-name` + per-lens
   `concurrency` lock; safe-outputs `add-comment`/`add-labels` (`target: "*"`), `create-issue`
   (`sweep:bug`), `dispatch-workflow` (red-test). Reuses the `library-surprise-sweep` technique
   skill + the new `surprise-hunt-graph` skill.
-- **`.codex/skills/surprise-hunt-graph/`** — the graph protocol skill.
-- **`library-surprise-sweep.md`** — schedule disabled (superseded); kept for manual runs.
-- **`library-surprise-red-test.md` / `library-surprise-fix.md`** — unchanged; `explore` emits the
+- **`.codex/skills/surprise-hunt-graph/`** - the graph protocol skill.
+- **`library-surprise-sweep.md`** - schedule disabled (superseded); kept for manual runs.
+- **`library-surprise-red-test.md` / `library-surprise-fix.md`** - unchanged; `explore` emits the
   same handoff contract, so the proven workers need no edits.
 
 ### Platform constraint that shaped v1
@@ -542,30 +542,30 @@ bug record**; **lens-issue comment logs are the durable memory / dedup ledger**;
 "coarse granularity" default, so no value is lost for v1.
 
 ### Deferred (documented follow-ups)
-- **First-class bug issues with automatic PR links** — best done in a merge-triggered stage that
+- **First-class bug issues with automatic PR links** - best done in a merge-triggered stage that
   knows the PR number and can create + link the bug issue atomically.
-- **Child `sweep:investigation` issues for branching** — v1 uses lens comments (coarse). Promote to
+- **Child `sweep:investigation` issues for branching** - v1 uses lens comments (coarse). Promote to
   child issues when a sub-thread becomes independently mineable by a different agent.
-- **`sweep:proven` / `sweep:fixed` label automation** — meaningful once first-class bug issues
+- **`sweep:proven` / `sweep:fixed` label automation** - meaningful once first-class bug issues
   exist; in v1, proof/fix status is carried by the PR (open-red = proven, merged = fixed).
-- **Matrix variant** — the dispatcher (dynamic frontier) was chosen over a static matrix.
+- **Matrix variant** - the dispatcher (dynamic frontier) was chosen over a static matrix.
 
 ### Activation
 gh-aw scheduled/dispatch workflows execute from the default branch. The discovery
 `library-surprise-fix-dispatcher` now runs on a **`schedule` (`15,45 * * * *`)**, so while enabled it
-drains open unfixed red PRs on its own (`max=2` per tick, retry-capped) — this is what closes the
+drains open unfixed red PRs on its own (`max=2` per tick, retry-capped) - this is what closes the
 autonomous loop (see "the autonomous handoff was also a confound" below). The discovery
 `library-surprise-dispatcher` gates whether *new* bugs are found: enable it to run the full find→fix
 loop hands-off, or leave it disabled and let the scheduled fix-dispatcher drain the existing backlog.
 Either is paused with `gh workflow disable`. `GH_AW_CI_TRIGGER_TOKEN` alone does **not** bypass the CI
-approval gate — see "CI approval gate" below.
+approval gate - see "CI approval gate" below.
 
 ### Runtime gotcha found by live testing (fixed)
 The generic `dispatch_workflow` safe-output tool is a **no-op** in this fork: the agent's call
 returns `200 OK` but writes no collectable safe-output message, so the safe_outputs job reports
 "Found 0 messages" and **nothing is dispatched**. The correct mechanism is the auto-generated
-**per-workflow** tool — `library_surprise_explore` (dispatcher) / `library_surprise_red_test`
-(explore) — which does persist a message. Both agent prompts now name the dedicated tool
+**per-workflow** tool - `library_surprise_explore` (dispatcher) / `library_surprise_red_test`
+(explore) - which does persist a message. Both agent prompts now name the dedicated tool
 explicitly and warn off the generic one. This was invisible to compile/validate and only surfaced
 when the dispatcher ran live and created zero explore runs; the explore→red-test path happened to
 pick the dedicated tool on its own. Verified fixed: after the change the dispatcher reports "Found 5
@@ -574,36 +574,36 @@ messages" and fans out one explore run per lens.
 ### CI approval gate + the fix half was dead (found by live testing; fixed via Plan B)
 The Activation note's original claim was wrong: `GH_AW_CI_TRIGGER_TOKEN` does **not** make bot PRs
 auto-run CI. Its empty-commit push authenticates as `github-actions[bot]`, so every red-test PR's
-`ci` run sat at **`action_required`** — GitHub requires approval for workflow runs on PRs from a
+`ci` run sat at **`action_required`** - GitHub requires approval for workflow runs on PRs from a
 first-time contributor, which the bot always is (confirmed: the run `actor`/`triggering_actor` were
 `github-actions[bot]`, and the fork `/approve` REST endpoint rejects these as "not a fork PR").
 Because `library-surprise-fix` triggered on `workflow_run: ci` with `conclusion == failure`, and
-`ci` never actually ran, **fix was `skipped` on every run — the fixer half never executed a single
+`ci` never actually ran, **fix was `skipped` on every run - the fixer half never executed a single
 production fix.**
 
-**Resolution — decouple the fixer from the approval-gated CI (Plan B):**
+**Resolution - decouple the fixer from the approval-gated CI (Plan B):**
 - New **`library-surprise-fix-dispatcher.yml`** (plain Actions YAML): scans open `[surprise-red-test]`
   PRs lacking `sweep:fixed` and dispatches one **fix** worker per PR by number (busy-check dedup on the
-  `fix #<n>` run-name). Its **primary** trigger is a **`schedule` (`15,45 * * * *`)** — `workflow_run`
-  alone is not enough, see "the autonomous handoff was also a confound" below — plus `workflow_run` of
+  `fix #<n>` run-name). Its **primary** trigger is a **`schedule` (`15,45 * * * *`)** - `workflow_run`
+  alone is not enough, see "the autonomous handoff was also a confound" below - plus `workflow_run` of
   the red-test worker (human/PAT immediacy) and manual `workflow_dispatch`. `max=2` + the busy-check +
   a retry cap keep any single tick from bursting the backlog.
 - **`library-surprise-fix.md`** reworked: entry is `workflow_dispatch(pr_number)` with **per-PR
   concurrency** (`surprise-fix-<pr>`, no-cancel); the "must have a failing `ci` run" gate is
-  dropped. Proof now lives entirely in our own runs — red-test refuses to open a PR unless
-  `dotnet test` FAILS in-run, and fix refuses to push unless `dotnet test` PASSES in-run — so the
+  dropped. Proof now lives entirely in our own runs - red-test refuses to open a PR unless
+  `dotnet test` FAILS in-run, and fix refuses to push unless `dotnet test` PASSES in-run - so the
   approval-gated PR CI is not needed as proof. Fix marks the PR `sweep:fixed` on success.
 - Net: the fixer is driven by **our** red-test completion, never by an external approval-gated
   check. Works regardless of how GitHub gates bot PRs or whether any token/setting is present.
 
-**Why not just relax the approval policy (Plan A) — tested and rejected:** relaxing
+**Why not just relax the approval policy (Plan A) - tested and rejected:** relaxing
 `actions/permissions/fork-pr-contributor-approval` to `first_time_contributors_new_to_github` did
 **not** ungate bot-authored PRs. A genuine `github-actions[bot]` push (the fix worker's commit on
 PR #164) still produced a `ci` run stuck at `action_required`; GitHub gates workflow runs triggered
 by the Actions bot regardless of that policy. The runs that *did* execute during testing were all
-owner-initiated (re-runs and owner pushes), which are trusted independent of the policy — a
+owner-initiated (re-runs and owner pushes), which are trusted independent of the policy - a
 confound, not evidence. The flip gave zero benefit for this system and was reverted. The only ways
-to get real CI on bot PRs are a human PAT for the trigger push (out of scope — a user-owned
+to get real CI on bot PRs are a human PAT for the trigger push (out of scope - a user-owned
 credential) or not depending on PR CI at all, i.e. Plan B. Bot-PR `ci` checks therefore stay
 `action_required` (cosmetic); nothing in the loop reads them.
 
@@ -616,13 +616,13 @@ dispatches one fix worker per PR by number via `GITHUB_TOKEN`. Note `gh run reru
 `workflow_run`, which is one reason the fix-dispatcher keys off the red-test worker rather than off
 CI.
 
-### The autonomous handoff was ALSO a confound — `workflow_run` is suppressed for bot-dispatched red-tests (found by live testing; fixed via a schedule)
+### The autonomous handoff was ALSO a confound - `workflow_run` is suppressed for bot-dispatched red-tests (found by live testing; fixed via a schedule)
 Plan B's fix-dispatcher originally relied solely on `workflow_run` of the red-test worker. That fired
-in every early test — but only because those red-tests were **human-dispatched**. GitHub's
+in every early test - but only because those red-tests were **human-dispatched**. GitHub's
 recursion-prevention suppresses `workflow_run` events for any run whose triggering actor is
 `github-actions[bot]` (i.e. dispatched with `GITHUB_TOKEN`). The explore worker dispatches red-tests
 with `GITHUB_TOKEN`, so in fully autonomous operation their completion emits **no** `workflow_run`
-event and the fix-dispatcher never fires. The fixer half was therefore still dead for hands-off runs —
+event and the fix-dispatcher never fires. The fixer half was therefore still dead for hands-off runs -
 the same class of fail-open confound as the CI gate above.
 
 Verified 2026-07-01: in one untouched loop tick the discovery dispatcher fanned out to 5 explores,
@@ -632,22 +632,22 @@ a `JKamsker`-dispatched red-test in the same tick **did** (it dispatched the gre
 The only difference was the triggering actor.
 
 **Resolution:** make the fix-dispatcher independent of that event. It now has a **`schedule`
-(`15,45 * * * *`)** as its primary trigger — a periodic scan of open unfixed red PRs that closes the
+(`15,45 * * * *`)** as its primary trigger - a periodic scan of open unfixed red PRs that closes the
 loop regardless of who opened the PR. Two guards make a schedule safe (the reason it was originally
 omitted): `max=2` per tick + the per-PR busy-check bound the fan-out, and a **retry cap**
 (`MAX_ATTEMPTS=3`) skips a candidate that has burned N genuine (non-cancelled) completed fix runs and
 is still unfixed, so an unfixable bug can't be re-dispatched every tick forever. `workflow_run` is kept
 for instant human/PAT-dispatched immediacy. (Future immediacy option for the autonomous path: have the
-red-test worker explicitly `gh workflow run` the fix-dispatcher — `GITHUB_TOKEN` *dispatch* works even
-though its *events* are suppressed — to avoid the ≤30-min schedule latency.)
+red-test worker explicitly `gh workflow run` the fix-dispatcher - `GITHUB_TOKEN` *dispatch* works even
+though its *events* are suppressed - to avoid the ≤30-min schedule latency.)
 
-### Green/polish loop — `sweep:fixed` PRs that are still red or have open CodeRabbit (#266 follow-up 2)
+### Green/polish loop - `sweep:fixed` PRs that are still red or have open CodeRabbit (#266 follow-up 2)
 
 Original gap: once the fix worker labeled a PR `sweep:fixed`, the dispatcher's `eligible()` excluded
 it forever. But `sweep:fixed` did not guarantee a *green* PR: the worker's local gate is only
 `restore + build + owning-project test`, so failures on the CI "Security & quality gates" job (the
 repo-wide `CE0006` file-length budget, `dotnet format`, the API baseline, …) slipped through and the
-PR sat red with no retry. Separately, CodeRabbit feedback was inconsistently handled — inline threads
+PR sat red with no retry. Separately, CodeRabbit feedback was inconsistently handled - inline threads
 left unresolved (#409) and top-level "🧹 Nitpick" review bodies ignored entirely (#422, which has no
 inline threads at all).
 
@@ -656,7 +656,7 @@ per-PR `surprise-fix-<pr>` lock (so a fix and a polish never edit one PR concurr
 
 - **Frontier.** A `sweep:fixed` PR is re-picked when its real PR CI is **red**, when it has an
   **unresolved CodeRabbit inline thread**, or when it has **actionable CodeRabbit** (nitpick/issue/
-  refactor markers or an open thread) but **no polish marker** yet — i.e. exactly one guaranteed pass
+  refactor markers or an open thread) but **no polish marker** yet - i.e. exactly one guaranteed pass
   per PR that has something to do, then quiet. CI-`pending` PRs are skipped to avoid racing a run,
   except a CodeRabbit status that has been pending longer than
   `CODERABBIT_PENDING_TIMEOUT_MINUTES` (60 minutes by default) is treated as stale and ignored so it
@@ -665,7 +665,7 @@ per-PR `surprise-fix-<pr>` lock (so a fix and a polish never edit one PR concurr
   human at the cap.
 - **Stale-branch drift is fixed structurally.** Before each dispatch the dispatcher **server-side
   merges `main` into the PR branch** (`POST /repos/{repo}/merges`, authored by the PAT so the resulting
-  CI runs ungated — no clone, no secret in the agent job). The entire current red backlog (#404 #409
+  CI runs ungated - no clone, no secret in the agent job). The entire current red backlog (#404 #409
   #413 #427) was pure `CE0006` drift that main had already cleared, so the merge alone greens them.
 - **GREEN mode in the worker.** For an already-fixed PR it makes CI green "whatever it takes" (splits
   oversized files, runs `dotnet format`, refreshes the API baseline), addresses CodeRabbit **inline
@@ -678,7 +678,7 @@ per-PR `surprise-fix-<pr>` lock (so a fix and a polish never edit one PR concurr
   deliberate: the summary comment is posted through the **detection-gated `safe_outputs` job**, so the
   marker the dispatcher acts on has already passed threat detection. A resolve post-step inside the
   agent job would run **before** the `detection` job and could resolve threads from a manipulated agent
-  output — so the PAT/GraphQL mutation is kept entirely out of the agent job. The dispatcher only
+  output - so the PAT/GraphQL mutation is kept entirely out of the agent job. The dispatcher only
   resolves threads still open ∩ listed as handled, so it re-triggers a polish pass only for genuinely
   unaddressed threads and never re-resolves.
 

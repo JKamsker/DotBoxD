@@ -1,4 +1,4 @@
-# 12 — Resource Limits
+# 12 - Resource Limits
 
 ## Purpose
 

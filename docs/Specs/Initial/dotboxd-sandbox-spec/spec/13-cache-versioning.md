@@ -1,4 +1,4 @@
-# 13 — Cache and Versioning
+# 13 - Cache and Versioning
 
 ## Purpose
 

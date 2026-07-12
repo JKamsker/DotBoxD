@@ -118,7 +118,7 @@ dotnet run --project Client
 
 Your shared project needs these references:
 
-> These `ProjectReference`s assume you are building inside the cloned DotBoxD repo; if you installed from NuGet ([getting started](/getting-started/)), reference the packages instead — the `DotBoxD.Services` package bundles `DotBoxD.Services.SourceGenerator` as an analyzer automatically, so you never add the generator as a standalone reference.
+> These `ProjectReference`s assume you are building inside the cloned DotBoxD repo; if you installed from NuGet ([getting started](/getting-started/)), reference the packages instead - the `DotBoxD.Services` package bundles `DotBoxD.Services.SourceGenerator` as an analyzer automatically, so you never add the generator as a standalone reference.
 
 ```xml
 <ItemGroup>
@@ -165,7 +165,7 @@ You can use the generated factory directly when building framework-style APIs:
 ```csharp
 using DotBoxD.Services.Generated;
 
-// CreateProxy takes an IRpcInvoker — pass an RpcPeer.
+// CreateProxy takes an IRpcInvoker - pass an RpcPeer.
 var proxy = DotBoxDGenerated.CreateProxy<IMyService>(peer);
 var dispatcher = DotBoxDGenerated.CreateDispatcher<IMyService>(new MyService());
 

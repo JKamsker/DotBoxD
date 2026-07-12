@@ -5,12 +5,12 @@ Companion to [plan.md](plan.md), [ownership-auth-and-policy.md](ownership-auth-a
 
 This round revisits **how a kernel is bound**. Round 1 bound kernels *inside* a hook chain
 (`Hooks.On<MonsterAggroEvent>().Use<GuardianKernel>()`). The feedback: a kernel is better
-modelled as the implementation of a **server-published service contract**, registered by type — while
+modelled as the implementation of a **server-published service contract**, registered by type - while
 the hook chain stays for inline lambda logic.
 
 > ⚠️ **Corrected by [implementation-plan.md](implementation-plan.md) (authoritative).** A self-review
 > proved the §4 "generic wiring resolves a typed adapter from the event-**name** string" **cannot
-> compile** (`HookRegistry.On` is generic-only; `TEvent` is erased through a string) — the real
+> compile** (`HookRegistry.On` is generic-only; `TEvent` is erased through a string) - the real
 > mechanism is an internal **shape-based** wiring path. Also: ship a **`Task`-returning**
 > `Register(where:)` (the awaitable struct builder silently drops installs), and `ServiceContract` is a new
 > **analyzer-emitted** manifest field. The current lowered terminal is `Run(lambda)`, with `RunLocal(lambda)`
@@ -20,7 +20,7 @@ the hook chain stays for inline lambda logic.
 > `kernelType.AllInterfaces` ([PluginSymbolReader.cs](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginSymbolReader.cs)),
 > so it detects `IEventKernel<TEvent>` **transitively**. A server interface
 > `IMonsterAggroService : IEventKernel<MonsterAggroEvent>` that a kernel implements is therefore lowered
-> **exactly as today — no analyzer change, same two-entrypoint (`ShouldHandle`/`Handle`) IR contract.**
+> **exactly as today - no analyzer change, same two-entrypoint (`ShouldHandle`/`Handle`) IR contract.**
 
 ---
 
@@ -30,7 +30,7 @@ the hook chain stays for inline lambda logic.
 |---|---|---|
 | Unit | a kernel *class* implementing a server contract | an inline lambda *pipeline* |
 | API | `Setup(s => s.Hooks.On<TEvent>().Use<TKernel>())` / `Setup(s => s.Subscriptions.On<TEvent>().Use<TKernel>())` | `server.Hooks.On<TEvent>().Where/Select/Run/RunLocal` |
-| Strong typing | full — server publishes `IMonsterAggroService` | by `TEvent` only |
+| Strong typing | full - server publishes `IMonsterAggroService` | by `TEvent` only |
 | Lowered to IR | yes (kernel body) | yes (`Where`/`Select`/`Run` lambdas) |
 | Native escape | n/a | `RunLocal` |
 | Best for | reusable, named, settings-bearing behavior | ad-hoc filtering/projection, one-off handlers |
@@ -47,7 +47,7 @@ The server (here, the game's shared abstractions) publishes a domain interface t
 framework's `IEventKernel<TEvent>`** ([Contracts.cs](../../../src/Hosting/DotBoxD.Abstractions/Contracts.cs)):
 
 ```csharp
-// DotBoxD.Kernels.Game.Server.Abstractions — the server owns the contract; both processes reference it.
+// DotBoxD.Kernels.Game.Server.Abstractions - the server owns the contract; both processes reference it.
 public interface IMonsterAggroService : IEventKernel<MonsterAggroEvent> { }
 public interface IAttackService        : IEventKernel<AttackEvent> { }
 ```
@@ -55,7 +55,7 @@ public interface IAttackService        : IEventKernel<AttackEvent> { }
 A plugin kernel implements the **contract**, not the bare framework interface:
 
 ```csharp
-// DotBoxD.Kernels.Game.Plugin — note: implements IMonsterAggroService, not IEventKernel<MonsterAggroEvent>.
+// DotBoxD.Kernels.Game.Plugin - note: implements IMonsterAggroService, not IEventKernel<MonsterAggroEvent>.
 [Plugin("guardian")]
 public sealed partial class GuardianKernel : IMonsterAggroService
 {
@@ -77,7 +77,7 @@ Why this is better than binding a bare kernel into a hook:
 
 > MVP keeps a service interface as a **named `IEventKernel<TEvent>`** (zero extra methods) so the
 > two-entrypoint IR contract is untouched. Richer service shapes (multiple methods, non-event returns)
-> are a future extension needing analyzer work — explicitly out of scope here.
+> are a future extension needing analyzer work - explicitly out of scope here.
 
 ---
 
@@ -90,7 +90,7 @@ public partial class GamePluginServer : IGameWorldAccess;
 public sealed partial class GamePluginContext;
 ```
 
-Usage — plain, and with the optional per-event gate ("for which user does it apply?"):
+Usage - plain, and with the optional per-event gate ("for which user does it apply?"):
 
 ```csharp
 using var server = GamePluginServerBuilder
@@ -113,7 +113,7 @@ native.
   The `[Plugin]` id and the manifest's event subscription (derived from `IEventKernel<TEvent>`,
   transitively) ride along.
 - **Server side.** Installs the IR through the owning **session** (so the kernel is owned and revoked
-  on disconnect — [ownership-auth-and-policy.md](ownership-auth-and-policy.md) §2) under the **resolved
+  on disconnect - [ownership-auth-and-policy.md](ownership-auth-and-policy.md) §2) under the **resolved
   per-plugin policy** (§4 there), then wires it generically (§4 below). The optional `Where` gate is
   part of the shipped IR, so the server needs no extra wire payload for it.
 
@@ -132,7 +132,7 @@ switch (subscription)
 }
 ```
 
-With (a) **convention adapters** ([ownership-auth-and-policy.md](ownership-auth-and-policy.md) §3 — the
+With (a) **convention adapters** ([ownership-auth-and-policy.md](ownership-auth-and-policy.md) §3 - the
 server resolves an adapter by event name, no hand-written adapter) and (b) the manifest's event name,
 wiring is a single generic path:
 
@@ -143,7 +143,7 @@ server.Hooks.On(adapter).Use(kernel);   // Use(InstalledKernel) = internal wirin
 ```
 
 No per-event `case`, no hand-written adapter, no kernel-id assumptions. Adding a new service contract
-(`IShopPurchaseService : IEventKernel<PurchaseEvent>`) needs **no server wiring code** — only the event
+(`IShopPurchaseService : IEventKernel<PurchaseEvent>`) needs **no server wiring code** - only the event
 record in the shared abstractions.
 
 > **Manifest addition.** To support server-side `Get<TService>()` (§5), the manifest records an
@@ -160,22 +160,22 @@ side has which type**:
 
 | Getter | Plugin side | Server side | Ambiguity |
 |---|---|---|---|
-| `Get<TKernel>()` | ✅ natural — you authored the kernel type | ✗ server never sees the kernel type (opaque IR) | none — one `[Plugin]` id per class |
-| `Get<TService>()` | ✅ works | ✅ **the** server-side getter — server published the contract | **yes** if several kernels implement `TService` (e.g. per-user) |
+| `Get<TKernel>()` | ✅ natural - you authored the kernel type | ✗ server never sees the kernel type (opaque IR) | none - one `[Plugin]` id per class |
+| `Get<TService>()` | ✅ works | ✅ **the** server-side getter - server published the contract | **yes** if several kernels implement `TService` (e.g. per-user) |
 | `Get(string pluginId)` | ✅ | ✅ | none |
 
 Recommendations:
-- **Plugin/author code:** prefer `Get<TKernel>()` — unambiguous, strongly typed, resolves to the
+- **Plugin/author code:** prefer `Get<TKernel>()` - unambiguous, strongly typed, resolves to the
   `[Plugin]` id via `KernelTypeMetadata.PluginId` ([already exists, internal](../../../src/Hosting/DotBoxD.Plugins/Runtime/KernelTypeMetadata.cs)).
   The generated facade exposes `Get<TKernel>()` for plugin-authored live settings.
 - **Server code:** use `Get<TService>()`; throw on ambiguity and add `GetAll<TService>()` for the
   many-kernels case (per-user registrations).
 - **Either side, dynamic:** `Get(string)` stays.
 
-### 5.1 `Set(...).ApplyAsync` — strongly-typed live settings
+### 5.1 `Set(...).ApplyAsync` - strongly-typed live settings
 
 ```csharp
-// Plugin side — typed, replaces the string .Set("CalmStrength", 35) chain.
+// Plugin side - typed, replaces the string .Set("CalmStrength", 35) chain.
 await server.Get<GuardianKernel>()
     .Set(k => k.CalmStrength, 35)
     .Set(k => k.AggroRange, 6)
@@ -190,7 +190,7 @@ changed values (`LiveKernelValueFactory.ExtractSettings`) to the server.
 > **Cross-process subtlety (flag for critique).** On the plugin side the lambda runs on a *local draft*
 > (built from declared defaults / last-pushed values), then ships the resulting values over IPC
 > (`UpdateSettingsAsync`). So it is for **setting** values (`k.X = …`), not read-modify-write against
-> live server state — the plugin may not hold the current server value. For atomic read-modify-write,
+> live server state - the plugin may not hold the current server value. For atomic read-modify-write,
 > use the **server-side** `Get(id).Set(...).ApplyAsync(atomic: true)`, which mutates against live state
 > under the kernel's execution gate. (Open question §7.3.)
 
@@ -215,7 +215,7 @@ await server.Get<GuardianKernel>()
 ```
 
 ```csharp
-// PLUGIN — hook chain still available for inline lambda logic (no kernel class)
+// PLUGIN - hook chain still available for inline lambda logic (no kernel class)
 server.Hooks.On<AttackEvent>()
     .Where(e => e.AttackerLevel >= 5)                   // lowered
     .Select(e => e.AttackerId)                          // lowered projection
@@ -234,6 +234,6 @@ server.Subscriptions.On<AttackEvent>()
 2. **Plugin-side `Set(...).ApplyAsync` semantics** (§5.1): is "set-only against a local draft" acceptable, or
    do we need a read-modify-write round-trip (fetch current → apply → push) for the plugin side?
 3. **Manifest `ServiceContract` field** (§4): worth adding to enable server-side `Get<TService>()`, or
-   YAGNI — wire purely by event and look kernels up by id?
+   YAGNI - wire purely by event and look kernels up by id?
 4. **Service interface as bare marker** (§2): is `interface IFooService : IEventKernel<TEvent> {}` with
    no members too thin to justify the concept, or is the naming/typing payoff enough?

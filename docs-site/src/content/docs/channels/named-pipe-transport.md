@@ -45,7 +45,7 @@ var pluginHost = peer.GetPluginHost();
 await pluginHost.PingAsync();
 ```
 
-`RejectInboundCalls = true` signals a get-only intent — the caller does not provide any service of
+`RejectInboundCalls = true` signals a get-only intent - the caller does not provide any service of
 its own. Drop it (and add `Provide...` calls) when the caller also needs to be called back over the
 same pipe. The host can react to lifecycle events via `host.PeerConnected`, `host.PeerDisconnected`,
 and `host.AcceptError`; stop it with `await host.StopAsync()` (disposal also stops it).
@@ -89,7 +89,7 @@ await using var peer = RpcPeer
 var plugin = peer.GetPluginCallbacks();
 ```
 
-For full symmetry both processes do the same thing — each wraps its end of the pipe in an
+For full symmetry both processes do the same thing - each wraps its end of the pipe in an
 `RpcPeer`, provides its own service, and gets a proxy to the other side over the one connection.
 Set `InboundQueueCapacity` (or `null` for unbounded) and `QueueFullMode` to control how queued
 inbound requests are handled under pressure, and raise `MaxConcurrentInboundDispatch` above the

@@ -1,9 +1,9 @@
-# Server process — what the code looks like after the plan
+# Server process - what the code looks like after the plan
 
 Companion to [plan.md](plan.md). Plugin side: [plugin-walkthrough.md](plugin-walkthrough.md).
 
 This shows the **end-state code** for the trusted host process (`DotBoxD.Kernels.Game.Server`) once
-Phases A–C land. It is illustrative, not a diff — focus on *how the project reads*, not exact lines.
+Phases A–C land. It is illustrative, not a diff - focus on *how the project reads*, not exact lines.
 
 ## The mental model in one picture
 
@@ -31,7 +31,7 @@ IR in a sandbox, drives the simulation, and exposes the control plane the plugin
 
 These live in `DotBoxD.Kernels.Game.Server.Abstractions`, referenced by both processes.
 
-### Service contracts — what the server lets plugins implement
+### Service contracts - what the server lets plugins implement
 
 The server publishes a domain interface per behavior it accepts. Each **extends the framework's
 `IEventKernel<TEvent>`**, so it names the contract *and* (transitively) declares the event it handles.
@@ -65,7 +65,7 @@ public interface IGamePluginControlService
 }
 ```
 
-### Event adapters — inferred, not hand-written
+### Event adapters - inferred, not hand-written
 
 An **adapter** tells the sandbox how to marshal an event into IR values (this is what lets a kernel's
 IR read `e.Distance`). You **do not write one**: `On<TEvent>()` resolves a convention adapter that
@@ -74,13 +74,13 @@ reflects the record's readable properties in constructor order, names each sandb
 [plugin-walkthrough.md](plugin-walkthrough.md)) and the server registers nothing.
 
 Reach for an explicit adapter or the property attributes (`[OpaqueId]`, `[SandboxParam]`,
-`[SandboxIgnore]`) only when you need opaque-id branding or custom parameter names — see
+`[SandboxIgnore]`) only when you need opaque-id branding or custom parameter names - see
 [ownership-auth-and-policy.md](ownership-auth-and-policy.md) §3. The hand-written
 `MonsterAggroEventAdapter`/`AttackEventAdapter` from the old example are deleted.
 
 ---
 
-## 1. Policy lives here — as the global *ceiling*
+## 1. Policy lives here - as the global *ceiling*
 
 The server owns the sandbox policy; the plugin no longer carries a duplicate (the old
 `PluginHostPolicy` was deleted in Phase A2). `ServerPolicy.Create()` is the **global ceiling**: a
@@ -104,7 +104,7 @@ internal static class ServerPolicy
 }
 ```
 
-## 2. `Program` — a full class (mirrors the plugin)
+## 2. `Program` - a full class (mirrors the plugin)
 
 `Program` is a real `internal static class` with `Main`, like the plugin. Top-level statements move
 into `Main`; the `0`/`1` exit-code contract is preserved; the local helpers become `private static`
@@ -119,7 +119,7 @@ internal static class Program
 {
     public static async Task<int> Main(string[] args)
     {
-        // (a) Build the plugin server with the global policy ceiling. No adapter registration —
+        // (a) Build the plugin server with the global policy ceiling. No adapter registration -
         //     On<TEvent>() infers a convention adapter from the event record.
         var sink = new GameCommandSink();
         using var server = PluginServer.Create(sink, policyCeiling: ServerPolicy.CreateCeiling());
@@ -285,7 +285,7 @@ server.Hooks.On<MonsterAggroEvent>()
     .Run((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
 ```
 
-A non-default context can still be selected explicitly when a chain needs a different facade — here a
+A non-default context can still be selected explicitly when a chain needs a different facade - here a
 `CombatHookContext` that wraps the ambient context plus the world:
 
 ```csharp

@@ -19,15 +19,15 @@ dotnet add package DotBoxD.Services.All --prerelease
 
 > `--prerelease` is required while the net10.0 stack is in preview; drop it once a stable tag ships.
 
-Or reference individual packages — see the table in the root [README](https://github.com/JKamsker/DotBoxD/blob/main/README.md).
+Or reference individual packages - see the table in the root [README](https://github.com/JKamsker/DotBoxD/blob/main/README.md).
 
 ## Why DotBoxD? (and which mode to use when)
 
 Host↔plugin communication usually forces a choice between hand-written marshaling (request envelopes and
-matching each response back to its call — repetitive, easy to get subtly wrong) and a chatty stream the
+matching each response back to its call - repetitive, easy to get subtly wrong) and a chatty stream the
 client has to filter after the fact. DotBoxD starts from **one C# contract** and lowers it (compiles it
-down to a restricted IR, an intermediate representation) at compile time — no runtime reflection on the
-hot path — into whichever of **three delivery strategies** fits the call shape:
+down to a restricted IR, an intermediate representation) at compile time - no runtime reflection on the
+hot path - into whichever of **three delivery strategies** fits the call shape:
 
 - **Services (RPC):** typed request→response.
 - **Query (RunLocal):** server-side filter + projection, one-way push to the plugin.
@@ -36,7 +36,7 @@ hot path — into whichever of **three delivery strategies** fits the call shape
 RunLocal and Pushdown run author logic as validated, fuel-metered [kernel IR](/concepts/kernels/) (never trusted CLR code);
 Services is a trusted channel you guard at the transport or application layer. See
 [Choosing a mode](/overview/#choosing-a-mode) for the full comparison and the
-[glossary](/reference/glossary/) for unfamiliar terms — the three quickstarts below map one-to-one
+[glossary](/reference/glossary/) for unfamiliar terms - the three quickstarts below map one-to-one
 onto these strategies.
 
 ## First Service (RPC)
@@ -56,11 +56,11 @@ See [concepts/services.md](/concepts/services/), or [build it step by step](/tut
 3. Import the kernel JSON IR, `PrepareAsync`, then `ExecuteAsync`.
 
 See the GameServer sample or [concepts/kernels.md](/concepts/kernels/). For a concrete runnable version
-of this raw flow — `SandboxHost.Create` → `ImportJsonAsync` → `PrepareAsync` → `ExecuteAsync` under a policy —
+of this raw flow - `SandboxHost.Create` → `ImportJsonAsync` → `PrepareAsync` → `ExecuteAsync` under a policy -
 see section 2 (Kernels) of the root [README](https://github.com/JKamsker/DotBoxD/blob/main/README.md), or a
 real [JSON-IR example](https://github.com/JKamsker/DotBoxD/blob/main/docs/Specs/Initial/dotboxd-sandbox-spec/examples/example-ir.md).
-For the fluent event-pipeline equivalent — `server.Hooks` over a `GamePluginServerBuilder`, not the raw
-`SandboxHost` steps above — [build it step by step](/tutorials/event-pipeline-runlocal/).
+For the fluent event-pipeline equivalent - `server.Hooks` over a `GamePluginServerBuilder`, not the raw
+`SandboxHost` steps above - [build it step by step](/tutorials/event-pipeline-runlocal/).
 
 ## Pushdown quickstart
 
@@ -71,14 +71,14 @@ submits work in one round-trip instead of N. The GameServer sample demonstrates 
 
 ## Run the maintained example
 
-The sample lives in the repo, not the NuGet package — `git clone https://github.com/JKamsker/DotBoxD` and
+The sample lives in the repo, not the NuGet package - `git clone https://github.com/JKamsker/DotBoxD` and
 run from the repo root:
 
 ```bash
 dotnet run -c Release --project samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
 ```
 
-You should see three phases print — a baseline run, a with-plugins run, and a summary confirming the
+You should see three phases print - a baseline run, a with-plugins run, and a summary confirming the
 plugin's kernels unloaded on disconnect. For the annotated output, see
 [What the run prints](/examples/gameserver-walkthrough/#what-the-run-prints).
 

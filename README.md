@@ -1,6 +1,6 @@
 # DotBoxD
 
-> A source-generated, contract-first **plugin system for .NET hosts** — Services (RPC), Kernels (sandboxed logic), Pushdown (server-side batching).
+> A source-generated, contract-first **plugin system for .NET hosts** - Services (RPC), Kernels (sandboxed logic), Pushdown (server-side batching).
 
 [![CI](https://github.com/JKamsker/DotBoxD/actions/workflows/ci.yml/badge.svg)](https://github.com/JKamsker/DotBoxD/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/JKamsker/DotBoxD/actions/workflows/codeql.yml/badge.svg)](https://github.com/JKamsker/DotBoxD/actions/workflows/codeql.yml)
@@ -9,7 +9,7 @@
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4.svg)](https://dotnet.microsoft.com/)
 [![Docs](https://img.shields.io/badge/docs-online-2ea44f.svg)](https://dotboxd.kamsker.at/)
 
-**For .NET hosts — game servers, desktop apps, backend services — that must run untrusted
+**For .NET hosts - game servers, desktop apps, backend services - that must run untrusted
 third-party plugins safely.** The Services stack targets `netstandard2.1`; Unity/IL2CPP deployments
 must use generated MessagePack DTO formatters and validate their own IL2CPP build. The Kernels and
 Pushdown stack targets `net10.0`.
@@ -19,8 +19,8 @@ Pushdown stack targets `net10.0`.
 .NET cannot safely isolate arbitrary code **in-process**: AppDomains are gone, and
 `AssemblyLoadContext` is a loading feature, **not** a security boundary. The only thing the OS can
 truly isolate is a whole *process*, so the safe way to run untrusted plugins is an unprivileged
-**sidecar** behind IPC. That safe design imposes two costs: **round-trips** — every interaction
-crosses the process boundary, so an N-item loop pays latency × N — and the **filter-API dilemma** —
+**sidecar** behind IPC. That safe design imposes two costs: **round-trips** - every interaction
+crosses the process boundary, so an N-item loop pays latency × N - and the **filter-API dilemma** -
 the host vendor (who is *not* the plugin author) has to design an event-filter API blind, and it is
 always either too coarse (oversharing plus overhead) or too exhaustive (endless unused options, still
 not expressive enough). If your .NET host must accept third-party plugins safely, you pay both costs.
@@ -29,29 +29,29 @@ not expressive enough). If your .NET host must accept third-party plugins safely
 
 DotBoxD is a **complete plugin system for .NET hosts** that keeps the process boundary but gives
 plugin *logic* a safe way back into the host: a validated, capability-gated, fuel-metered in-process
-sandbox that runs restricted IR (intermediate representation) — never loaded C#/IL. Author-written
+sandbox that runs restricted IR (intermediate representation) - never loaded C#/IL. Author-written
 filters, projections, and batches are compiled down to that IR at build time and run next to the
 host's data, so:
 
-- **Event pipelines push only server-side filtered/projected data** — 0 round-trips.
+- **Event pipelines push only server-side filtered/projected data** - 0 round-trips.
 - **Pushdown collapses N calls into 1.**
-- **The plugin author — not the vendor — writes the filter.**
+- **The plugin author - not the vendor - writes the filter.**
 
 It also ships the rest of the plugin-system ceremony (transports, codecs, generated
 proxies/dispatchers, registries, lifecycle such as unload-on-disconnect), all driven by Roslyn source
 generators with no runtime reflection on the hot path.
 
-📖 **Start here:** [**Why DotBoxD?** — the isolation-vs-latency dilemma in three diagrams](https://dotboxd.kamsker.at/why-dotboxd/).
+📖 **Start here:** [**Why DotBoxD?** - the isolation-vs-latency dilemma in three diagrams](https://dotboxd.kamsker.at/why-dotboxd/).
 Full guide, tutorials, examples, and the generated API reference live at <https://dotboxd.kamsker.at/>.
 
 **How:** one C# contract, delivered three ways.
 
-- **Services** — the host implements a contract; clients call it remotely over RPC. A typed proxy and
+- **Services** - the host implements a contract; clients call it remotely over RPC. A typed proxy and
   dispatcher are generated from the same interface, so they cannot drift; AOT deployments also need a
   generated/static codec resolver.
-- **Kernels** — a client supplies validated logic the host runs safely inside a fuel-metered sandbox.
+- **Kernels** - a client supplies validated logic the host runs safely inside a fuel-metered sandbox.
   Downstream, this event-pipeline flavor is called *Query (RunLocal)*.
-- **Pushdown** — a plugin ships its *own* sandboxed batch operation that runs *server-side*, looping
+- **Pushdown** - a plugin ships its *own* sandboxed batch operation that runs *server-side*, looping
   over the host's existing fine-grained bindings so many small remote calls collapse into one
   round-trip.
 
@@ -65,7 +65,7 @@ which combines service IPC, event kernels, live settings, host bindings, policie
 Features that used to be split across removed samples are tracked in
 [the examples coverage-gaps page](https://dotboxd.kamsker.at/examples/coverage-gaps/).
 
-### 1. Services — define a contract, host it, call it remotely
+### 1. Services - define a contract, host it, call it remotely
 
 ```csharp
 using DotBoxD.Services.Attributes;
@@ -89,7 +89,7 @@ await using var host = RpcMessagePackIpc.ListenNamedPipe(
     peer => peer.ProvideCatalogService(new CatalogService(prices)));
 await host.StartAsync();
 
-// Client: connect and get a strongly typed proxy — calls go over the wire.
+// Client: connect and get a strongly typed proxy - calls go over the wire.
 await using var connection = await RpcMessagePackIpc.ConnectNamedPipeAsync(pipeName);
 var catalog = connection.Get<ICatalogService>();
 
@@ -100,7 +100,7 @@ The `[RpcService]` attribute drives the `DotBoxD.Services.SourceGenerator`, whic
 proxy, a dispatcher, and the `ProvideCatalogService(...)` / `Get<ICatalogService>()` extensions at
 compile time.
 
-### 2. Kernels — run validated logic under a policy
+### 2. Kernels - run validated logic under a policy
 
 A kernel is restricted JSON IR (never C#, IL, or arbitrary host calls). The host imports it,
 validates it against a capability/resource policy, and executes it inside a fuel-metered sandbox.
@@ -141,17 +141,17 @@ if (result.Succeeded && result.Value is I32Value total)
 }
 ```
 
-### 3. Pushdown — plugins ship server-side batch operations
+### 3. Pushdown - plugins ship server-side batch operations
 
 This is the payoff. The host is typically **frozen at release** and exposes only fine-grained
 bindings (e.g. "kill *one* monster"); it ships no batch operations. A client that needs to act on
 many entities would otherwise make one remote call per entity. With pushdown, a plugin supplies its
 own server-side aggregate as a sandboxed server extension: the analyzer lowers its C# batch method
 to verified IR that runs server-side, looping over the host's *existing* bindings. The server is
-never recompiled — only the plugin changes — and **N round-trips collapse into one**.
+never recompiled - only the plugin changes - and **N round-trips collapse into one**.
 
 ```csharp
-// The host (frozen at release) exposes only a fine-grained binding — there is NO batch method here.
+// The host (frozen at release) exposes only a fine-grained binding - there is NO batch method here.
 public interface IGameWorld
 {
     [HostBinding("host.world.kill", "game.world.monster.write.kill",
@@ -159,7 +159,7 @@ public interface IGameWorld
     bool Kill(int id);
 }
 
-// A PLUGIN adds its own batch aggregate. `KillMonsters` does not exist on the host — the plugin ships it.
+// A PLUGIN adds its own batch aggregate. `KillMonsters` does not exist on the host - the plugin ships it.
 // The analyzer lowers this method to verified, capability-gated, fuel-metered IR (a sandboxed kernel).
 public interface IMonsterKillerService { List<KillResult> KillMonsters(List<int> monsterIds); }
 public readonly record struct KillResult(int MonsterId, bool Success);
@@ -336,13 +336,13 @@ After installing, these are the entry points you'll reach for:
 
 ## Security: what is and isn't a boundary
 
-DotBoxD is precise about its trust boundary — read this before deploying:
+DotBoxD is precise about its trust boundary - read this before deploying:
 
 - **Safe mode is the real boundary.** A kernel is restricted IR that is validated, capability-gated,
   fuel/quota-metered, and (for compiled mode) verified before it runs. Users never supply C#, raw IL,
   CLR member names, assemblies, or arbitrary host calls.
 - **Trusted-plugin mode is NOT a security boundary.** It loads normal .NET assemblies via
-  `AssemblyLoadContext`, and **`AssemblyLoadContext` is not a sandbox** — loaded code has full CLR
+  `AssemblyLoadContext`, and **`AssemblyLoadContext` is not a sandbox** - loaded code has full CLR
   capabilities. Only use it for code you already trust.
 - **Untrusted arbitrary .NET code must be out-of-process / OS-isolated.** In-process restrictions
   defend against accidental and many malicious-author attacks, but hard multi-tenant isolation

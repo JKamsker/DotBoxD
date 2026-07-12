@@ -1,4 +1,4 @@
-# 06 — Effects and Capabilities
+# 06 - Effects and Capabilities
 
 ## Purpose
 

@@ -17,7 +17,7 @@ proven across four walls:
    loops can't be naively replaced by closed forms.
 
 The matrix benchmarks also run with `Fuel = long.MaxValue`; under any realistic fuel cap the floor is well
-within budget. The one genuinely unbounded case — collection building O(n²) — is fixed on the main branch
+within budget. The one genuinely unbounded case - collection building O(n²) - is fixed on the main branch
 (`c4e6091`, ~145–2000× faster, near-linear).
 
 ## exp/closed-form-accumulation
@@ -28,7 +28,7 @@ within budget. The one genuinely unbounded case — collection building O(n²) �
 identical bulk loop-iteration fuel.
 
 **Accept:** a small, trusted runtime primitive added to the verifier allowlist + meter classification
-(`VerificationPolicy`, `GeneratedMethodShapeSignatures`). **No safety guarantee is weakened** — charged
+(`VerificationPolicy`, `GeneratedMethodShapeSignatures`). **No safety guarantee is weakened** - charged
 fuel/iterations and the overflow behaviour are identical; the verifier still requires per-iteration metering
 on every *actual* loop.
 **Get (potential):** `string.length`, `list.count` (loop-invariant accumulation) → ~2× compiled.
@@ -36,7 +36,7 @@ on every *actual* loop.
 **Status / finding:** the primitive and verifier integration are validated (164 verifier/differential/fuel
 tests pass). But it is currently **dormant**: the matrix `string.length`/`list.count` loops do **not** use the
 dedicated `*LoopFastPathEmitter`s (their match conditions, e.g. `CanUseDirectStringLength`, don't fit the
-benchmark's registered bindings) — they run through the **general** for-range emitter. Demonstrating the win
+benchmark's registered bindings) - they run through the **general** for-range emitter. Demonstrating the win
 therefore requires detecting invariant-accumulation in the *general* loop and replicating each invariant's
 per-iteration fuel exactly (trivial for intrinsics like `list.count`; involves host-call bulk-charging for
 bindings like `string.length`). That is genuine Tier-3 optimizer scope.

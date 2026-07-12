@@ -5,7 +5,7 @@ Companion to [plan.md](plan.md), [plugin-walkthrough.md](plugin-walkthrough.md),
 
 This doc captures the second review round: five changes requested on top of the fluent-hooks design.
 Two are small/cosmetic (§1, §5); three are architecture (§2 ownership, §3 ergonomics, §4 auth+policy).
-Everything here is **design**, grounded in the current code — file/line anchors are given so the
+Everything here is **design**, grounded in the current code - file/line anchors are given so the
 proposal can be checked against reality.
 
 > ⚠️ **Superseded in part by [implementation-plan.md](implementation-plan.md) (authoritative).** A
@@ -39,7 +39,7 @@ await server.Hooks.On<AttackEvent>()
 ```
 
 **Semantics (the important part).** A `Where`/`Select` before `UseKernel<T>()` is *plugin-authored
-code*, so it is **lowered to verified IR and runs sandboxed** — never native. The analyzer
+code*, so it is **lowered to verified IR and runs sandboxed** - never native. The analyzer
 AND-composes the pre-kernel `Where`(s) into the kernel's gate at **compile time**, emitting one
 verified module owned by the same plugin:
 
@@ -57,7 +57,7 @@ element is still `TEvent` (a kernel consumes the original event via its adapter)
 different type *then* `UseKernel<T>()` is a diagnostic (`DBXK1xx`); after a `Select` the terminal must
 be `InvokeKernel`/`InvokeLocal`.
 
-**Why this is strictly better than `filter:`** — it unifies the surface (one way to gate), it makes
+**Why this is strictly better than `filter:`** - it unifies the surface (one way to gate), it makes
 the gate visibly sandboxed (it sits in the lowered chain), and it composes with `Select`.
 
 ---
@@ -74,7 +74,7 @@ goes away, its kernel goes away too (`IDisposable`, server-side IPC watching).
 revokes and replaces* any incumbent with the same id:
 
 ```csharp
-// PluginServer.cs — KernelRegistry.Add (today)
+// PluginServer.cs - KernelRegistry.Add (today)
 if (_kernels.TryGetValue(kernel.Manifest.PluginId, out var existing) && !ReferenceEquals(existing, kernel))
     revoke = existing;          // ← any caller reusing "guardian" silently kills the incumbent
 _kernels[kernel.Manifest.PluginId] = kernel;
@@ -85,7 +85,7 @@ revoke?.Revoke();
 Two concrete problems:
 - **Hijack.** Connection B installs a package whose manifest says `pluginId = "guardian"` and
   instantly revokes + replaces connection A's guardian kernel. Ids are self-asserted in the manifest.
-- **Leak.** A kernel installed by a connection survives that connection disconnecting — it keeps
+- **Leak.** A kernel installed by a connection survives that connection disconnecting - it keeps
   running against the simulation with nobody owning it.
 
 ### 2.2 Design: sessions own kernels
@@ -144,7 +144,7 @@ public sealed class PluginSession : IDisposable
 collisions instead of silently revoking:
 
 ```csharp
-// KernelRegistry.Add (revised) — fail closed on cross-owner id reuse.
+// KernelRegistry.Add (revised) - fail closed on cross-owner id reuse.
 internal void Add(InstalledKernel kernel)
 {
     lock (_gate)
@@ -162,9 +162,9 @@ internal void Add(InstalledKernel kernel)
 }
 ```
 
-> **Design choice — global vs per-owner id namespace.** Keying the dictionary by the bare `pluginId`
-> with an owner check (above) keeps ids globally unique *and* prevents collision. The alternative —
-> key by `(OwnerId, pluginId)` so two tenants may each have a "guardian" — is a product decision; it
+> **Design choice - global vs per-owner id namespace.** Keying the dictionary by the bare `pluginId`
+> with an owner check (above) keeps ids globally unique *and* prevents collision. The alternative -
+> key by `(OwnerId, pluginId)` so two tenants may each have a "guardian" - is a product decision; it
 > is called out for the critique panel (§6). The shipped example only needs collision *prevention*,
 > so the simpler owner-checked single namespace is the default proposal.
 
@@ -186,18 +186,18 @@ await using var host = RpcMessagePackIpc.ListenNamedPipe(pipeName, peer =>
 
 > **Integration point to verify (flagged for critique).** The exact DotBoxD disconnect hook
 > (`peer.OnDisconnected`/session-completion task/`IDisposable` on the peer) must be confirmed against
-> the DotBoxD package — it is referenced as a NuGet dependency, not vendored, so the precise name is
+> the DotBoxD package - it is referenced as a NuGet dependency, not vendored, so the precise name is
 > unverified here. If no event exists, fall back to a heartbeat/keepalive timeout owned by the
 > control service. The *design* (session disposal revokes owned kernels) is transport-agnostic.
 
 **Revocation already exists.** `InstalledKernel.Revoke()` cancels a per-kernel `CancellationTokenSource`
 and every entrypoint checks `IsRevoked` under the execution gate
 ([InstalledKernel.cs:46-54, 107-178](../../../src/DotBoxD.Plugins/InstalledKernel.cs)). **[already
-exists]** — sessions just need to call it on dispose. No new revocation machinery.
+exists]** - sessions just need to call it on dispose. No new revocation machinery.
 
 ---
 
-## 3. Adapter ergonomics — make it C#-native / inferred
+## 3. Adapter ergonomics - make it C#-native / inferred
 
 **Request.** Is `MonsterAggroEventAdapter` required? Can it be inferred from the type / attributes?
 
@@ -213,12 +213,12 @@ So the hand-written adapter in the walkthroughs is pure boilerplate and should b
 example**. The events collapse to plain records:
 
 ```csharp
-// DotBoxD.Kernels.Game.Server.Abstractions — this is the whole thing now.
+// DotBoxD.Kernels.Game.Server.Abstractions - this is the whole thing now.
 public sealed record MonsterAggroEvent(string MonsterId, string PlayerId, int Distance, int MonsterLevel, int PlayerLevel);
 public sealed record AttackEvent(string AttackerId, string TargetId, int Damage, int AttackerLevel);
 ```
 
-`server.Hooks.On<MonsterAggroEvent>()` resolves a convention adapter lazily — no registration, no
+`server.Hooks.On<MonsterAggroEvent>()` resolves a convention adapter lazily - no registration, no
 adapter class.
 
 ### 3.1 Two gaps worth closing (proposed, not yet built)
@@ -230,7 +230,7 @@ adapter class.
    as the zero-config fallback. Generated adapter is selected automatically via the existing
    `Instance`-property discovery in `TryDiscoverAdapter`.
 
-2. **Cases convention can't infer** — opaque-id branding and custom names. Add optional property
+2. **Cases convention can't infer** - opaque-id branding and custom names. Add optional property
    attributes as the escape hatch (only used when you need them):
 
    ```csharp
@@ -273,7 +273,7 @@ This is the largest area. The model separates four concerns that are easy to con
 | **Integrity** | Is this package *what management approved*? | signed grant envelope over the package hash |
 | **Effective policy** | What limits run *this* kernel? | resolver: ceiling ∩ grant ∩ manifest-request |
 
-### 4.1 Authentication — `IPluginIdentity` per transport
+### 4.1 Authentication - `IPluginIdentity` per transport
 
 ```csharp
 public sealed record PluginIdentity(
@@ -293,7 +293,7 @@ public interface IPluginAuthenticator
 - **`LocalProcessAuthenticator`** (named pipe / stdio, server-spawned). The server *launched* the
   child, so the child is trusted by construction; identity is taken from launch config. Hardening:
   - the pipe name already requires a 128-bit random component
-    ([RpcMessagePackIpc.cs:122-142](../../../src/DotBoxD.Pushdown.Services/RpcMessagePackIpc.cs)) —
+    ([RpcMessagePackIpc.cs:122-142](../../../src/DotBoxD.Pushdown.Services/RpcMessagePackIpc.cs)) -
     keep that (it stops other local processes guessing the pipe);
   - tighten the **named-pipe ACL to the current user** so a different local user can't connect;
   - pass a **one-time bootstrap token** to the child (env var / first stdin line) that it echoes on
@@ -307,12 +307,12 @@ public interface IPluginAuthenticator
 
 > **Transport note.** TCP/mTLS is not in `DotBoxD.Pushdown.Services` today (pipes only). The
 > authenticator interface is transport-agnostic; a `DotBoxD.Kernels.Transport.Tcp.DotBoxDRpc` with mTLS is the
-> implementation vehicle and is **explicitly out of scope for the example** — the design just must not
+> implementation vehicle and is **explicitly out of scope for the example** - the design just must not
 > preclude it. Flagged for the simplicity critic (§6): do we build the interface now or only when TCP
 > lands? Proposal: ship the interface + `LocalProcessAuthenticator` now (it's needed for §2 sessions
 > anyway); defer `CertificateAuthenticator` to when a TCP transport exists.
 
-### 4.2 Signing — distinguish *requested* from *granted*
+### 4.2 Signing - distinguish *requested* from *granted*
 
 The single most important security rule:
 
@@ -343,15 +343,15 @@ public sealed record PluginGrant(
 On install the server: verifies the signature + chain, recomputes the package hash and checks it
 equals `SignedPluginGrant.PackageHash` (so the grant can't be lifted onto a different package), checks
 `NotAfter`. `PackageHash` reuses the existing canonical hashing approach
-(`PolicyHash`/module hashing — [Policy.cs:75](../../../src/DotBoxD.Kernels/Policy.cs) shows the canonical-hash
-pattern already in the codebase). **[partially exists]** — canonical hashing exists; the signing
+(`PolicyHash`/module hashing - [Policy.cs:75](../../../src/DotBoxD.Kernels/Policy.cs) shows the canonical-hash
+pattern already in the codebase). **[partially exists]** - canonical hashing exists; the signing
 envelope + verification is new.
 
 **Dev loop:** management issues a dev cert; the dev's build signs local packages with it; in dev the
 server trusts the dev CA. Same code path as production, friendlier trust root. No special-case "dev
-mode" that weakens verification — just a different trusted CA set.
+mode" that weakens verification - just a different trusted CA set.
 
-### 4.3 Per-plugin effective policy — a resolver, not one default
+### 4.3 Per-plugin effective policy - a resolver, not one default
 
 Replace `PluginServer`'s single `_defaultPolicy`
 ([PluginServer.cs:11, 54-58, 81](../../../src/DotBoxD.Plugins/PluginServer.cs)) with a resolver. The
@@ -370,14 +370,14 @@ Resolution rules (all **fail-closed**):
   default-as-floor);
 - clamp each `ResourceLimits` field to the **min** of ceiling / identity grant / signed grant;
 - a capability is allowed only if present in **every** applicable grant;
-- the manifest's `RequestedLimits` can only further **narrow** (never widen) — a request above the
+- the manifest's `RequestedLimits` can only further **narrow** (never widen) - a request above the
   approved ceiling is **rejected**, not clamped silently (so misconfig is loud);
 - if there is no signed grant and no identity grant, fall back to the global default *as a ceiling*
   and the manifest request narrows within it (this is the "trusted local dev, no signing yet" path).
 
 `ResourceLimits` is already an immutable record with every knob
 ([ResourceLimits.cs](../../../src/DotBoxD.Kernels/Model/ResourceLimits.cs)), so the clamp is a pure
-field-wise `Math.Min` producing a new record — no mutation. `SandboxPolicy` is similarly immutable
+field-wise `Math.Min` producing a new record - no mutation. `SandboxPolicy` is similarly immutable
 with `with` semantics ([Policy.cs:16-75](../../../src/DotBoxD.Kernels/Policy.cs)). **[building blocks
 exist]**.
 
@@ -431,7 +431,7 @@ on `Program`.
    namespace allowing two tenants to each own a "guardian"?
 2. **Build the auth interface now or later** (§4.1): is shipping `IPluginAuthenticator` +
    `LocalProcessAuthenticator` before any TCP transport exists justified, or YAGNI until mTLS lands?
-   (It is needed for §2 sessions regardless — but how thin should it be?)
+   (It is needed for §2 sessions regardless - but how thin should it be?)
 3. **Signed grant vs signed package** (§4.2): sign a *grant envelope* that references the package
    hash (proposed), or sign the package itself and put approved limits inside the signed manifest?
    Trade-off: envelope lets management re-issue limits without a rebuild; signed-manifest is simpler
@@ -439,5 +439,5 @@ on `Program`.
 4. **Disconnect hook** (§2.4): confirm the real DotBoxD peer-lifecycle API; design must not depend on
    a hook that doesn't exist.
 5. **Clamp vs reject** (§4.3): silently clamp an over-broad manifest request, or reject loudly?
-   (Proposal: reject, so misconfiguration is visible — but that can break a plugin when management
+   (Proposal: reject, so misconfiguration is visible - but that can break a plugin when management
    *lowers* a ceiling. Maybe: reject at author time via analyzer, clamp at runtime with a warning.)

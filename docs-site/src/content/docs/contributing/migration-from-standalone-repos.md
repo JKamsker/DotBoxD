@@ -27,7 +27,7 @@ The original root files of ShaRPC (README, solution, license) are archived under
 
 ## Viewing the pre-merge git history
 
-Both repositories' **full histories are preserved and reachable** in this repo — they were imported via
+Both repositories' **full histories are preserved and reachable** in this repo - they were imported via
 a git *subtree merge*, so every original commit (and its author) is an ancestor of the merge commits
 `merge: import ShaRPC history ...` and `merge: import Safe-IR history ...`.
 

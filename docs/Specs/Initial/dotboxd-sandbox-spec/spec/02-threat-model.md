@@ -1,4 +1,4 @@
-# 02 — Threat Model
+# 02 - Threat Model
 
 ## Assets to protect
 

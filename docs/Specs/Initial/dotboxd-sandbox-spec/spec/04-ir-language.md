@@ -1,4 +1,4 @@
-# 04 — JSON IR
+# 04 - JSON IR
 
 ## IR design goals
 

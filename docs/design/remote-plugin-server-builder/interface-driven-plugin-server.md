@@ -1,10 +1,10 @@
-# Interface-driven plugin server + unified game surface — Design
+# Interface-driven plugin server + unified game surface - Design
 
 Companion to [plan.md](plan.md), [invoke-async.md](invoke-async.md), and
 [concept-naming-decision.md](concept-naming-decision.md).
 
 **Status:** Exploratory design, **vibe-validated** in the GameServer sample (the three sample projects were
-rewritten to the target shape; they intentionally **do not compile** — the generated halves and one
+rewritten to the target shape; they intentionally **do not compile** - the generated halves and one
 framework library are absent). Not yet implemented in the analyzer/runtime. **Date:** 2026-06-16.
 
 This record supersedes the **hand-written-control** portions of [plan.md](plan.md): the remote-control
@@ -18,9 +18,9 @@ preserved.
 
 ## 1. Problem
 
-Today every plugin-side surface — `RemotePluginServer` (facade), `RemotePluginServerBuilder`,
+Today every plugin-side surface - `RemotePluginServer` (facade), `RemotePluginServerBuilder`,
 `RemoteServiceControl`, `RemoteWorldControl`, `RemoteMonsterControl`, `RemoteEntityControl`,
-`RemoteServerExtensionControl`, `RemoteKernelHandle` — is **hand-written** in
+`RemoteServerExtensionControl`, `RemoteKernelHandle` - is **hand-written** in
 `samples/GameServer/Examples.GameServer.Plugin/Client/`. Only the registration accumulators are
 generated. That is a lot of boilerplate per game, and it duplicates the wire contract: the control method
 `RemoteMonsterControl.KillAsync` hand-forwards to `IGamePluginControlService.KillMonsterAsync`, the world
@@ -38,7 +38,7 @@ world that the server implements, the plugin proxies, and kernels consume.
 
 **One interface, three consumers.** The game declares a single async domain surface `IGameWorldAccess`. The
 **server implements it** for real. The **plugin gets an RPC proxy** generated for it (exactly like any other
-`[RpcService]`) — that proxy *is* the plugin's `GamePluginServer` facade. A **kernel gets it injected**;
+`[RpcService]`) - that proxy *is* the plugin's `GamePluginServer` facade. A **kernel gets it injected**;
 because the kernel runs on the server its calls are local (a completed `ValueTask`, no real IPC hop), but the
 dev writes them exactly like the remote calls.
 
@@ -47,7 +47,7 @@ and no `[WireCall]` mapping**. Because routing is the method's identity, there a
 annotations**. The analyzer-visible capability and effect declaration lives on the `[RpcService]`
 contract; the host still recomputes route/effect/capability metadata at install.
 
-## 3. Layering — who declares what, who owns what
+## 3. Layering - who declares what, who owns what
 
 | Layer | Lives in | Authored by | Contents |
 |---|---|---|---|
@@ -104,7 +104,7 @@ public interface IEntityControl
 { ValueTask<int> GetHealthAsync(string id); ValueTask<int> GetLevelAsync(string id); ValueTask<int> GetPositionAsync(string id); }
 ```
 
-## 4. The unified surface — why async, and the three call sites
+## 4. The unified surface - why async, and the three call sites
 
 The surface is **async** (`ValueTask<T>`). That is forced by the unification: the remote plugin path is a
 real async IPC hop, so the contract must be async; the server and kernel paths return already-completed
@@ -128,7 +128,7 @@ contract and the control surface were **different interfaces with different name
 **method's own identity**. `[WireCall]` is deleted; the separate domain methods on
 `IGamePluginControlService` are deleted (it keeps only the control-plane: install IR / settings / hold).
 
-## 6. Capabilities — one contract rule, two projections
+## 6. Capabilities - one contract rule, two projections
 
 The contract carries no `[HostBinding]`; host-service calls are auto-bindings. The metadata is split by
 what must be explicit and what can be derived:
@@ -142,8 +142,8 @@ what must be explicit and what can be derived:
 public ValueTask<bool> KillAsync(string entityId) => ValueTask.FromResult(_world.KillMonster(entityId));
 ```
 
-> **Decided — annotate the contract, do not infer everything.** The routine reads *could* be inferred
-> (`monster.read.{method}`), but `GetThreatAsync` is gated under `game.world.combat.threat` — a different
+> **Decided - annotate the contract, do not infer everything.** The routine reads *could* be inferred
+> (`monster.read.{method}`), but `GetThreatAsync` is gated under `game.world.combat.threat` - a different
 > subtree from the `monster.read.*` grants (it is the capability the guardian is deliberately denied). A
 > naming convention would force it into `monster.read.threat` and silently break that boundary. Once
 > exceptions need a home, one uniform `[HostBinding]` on the interface contract beats
@@ -151,7 +151,7 @@ public ValueTask<bool> KillAsync(string entityId) => ValueTask.FromResult(_world
 
 This **removes the drift**: route/effect/capability derivation is shared by analyzer and runtime, while the
 host still recomputes the binding metadata from its own registered services at install. The capability
-**grants** side (`ServerPolicy`) is unchanged — grants are distinct from the bindings that require them.
+**grants** side (`ServerPolicy`) is unchanged - grants are distinct from the bindings that require them.
 
 ## 7. The generated facade + builder
 
@@ -195,7 +195,7 @@ await server.HoldUntilShutdownAsync();
 
 These are grounded in the current analyzer; they are the work to make the design real.
 
-1. **RPC proxy for `IGameWorldAccess`** — the existing `[RpcService]` proxy path, extended to a nested
+1. **RPC proxy for `IGameWorldAccess`** - the existing `[RpcService]` proxy path, extended to a nested
    control graph (the root returns `IMonsterControl`/`IEntityControl`, themselves proxied).
 2. **`InvokeAsync` interceptor must track a user-named facade.** Today the receiver-type guard
    (`InvokeAsyncModelFactory.IsServerInvocationSurface`) string-compares against the constant
@@ -205,22 +205,22 @@ These are grounded in the current analyzer; they are the work to make the design
    check** (`[GeneratePluginServer]`) and feed the discovered FQN as the interceptor `ReceiverType`. The
    interceptor body calls `server.Services.EnsureAnonymousKernelAsync(...)` /
    `server.Services.WireClient.InvokeServerExtensionAsync(...)`; with the install plumbing moving to the
-   `DotBoxD.Plugins.Client` library, those two members must be reachable across assemblies — make them
+   `DotBoxD.Plugins.Client` library, those two members must be reachable across assemblies - make them
    `public` on the library type (note: `InternalsVisibleTo` cannot target the *generated* interceptor, which
    compiles into the consuming plugin assembly, so `public` is the robust choice).
 3. **Direct server-extension grafts use a hidden accessor.** Runtime control wrappers still implement the
    bare domain interface plus `IServerExtensionClientAccessor`; generated extension methods cast the receiver
    to the accessor at the call site. The public property remains `IMonsterControl`, so navigation lands on
    the hand-written domain interface while `KillMonstersAsync`/`BlinkBehindAsync` still route.
-4. **Setup accumulators** — the facade generator emits `IGamePluginSetup` and one
+4. **Setup accumulators** - the facade generator emits `IGamePluginSetup` and one
    `I{Control}Accumulator` per domain control. These are build-time surfaces only; `Build()` records install
    intent and `StartAsync()` replays it.
-5. **Bindings derived from the contract** — register sandbox host bindings from `GameWorldAccess` and its
+5. **Bindings derived from the contract** - register sandbox host bindings from `GameWorldAccess` and its
    `[HostBinding]` annotations instead of hand-written route/effect/capability copies.
 
 ## 9. Server side
 
-The server now provides **two** services per connection: the control-plane (`IGamePluginControlService` —
+The server now provides **two** services per connection: the control-plane (`IGamePluginControlService` -
 install IR, settings, hold, world snapshot) and the domain surface (`IGameWorldAccess`):
 
 ```csharp
@@ -230,21 +230,21 @@ peer.ProvideGameWorldAccess(new GameWorldAccess(world));   // generated from [Rp
 
 `GameWorldAccess` wraps the live `GameWorld`; its `Monsters`/`Entities` controls forward to the world while
 the service interfaces carry `[HostBinding]`. `GameWorldHost` no longer hand-types binding
-ids/capabilities — it derives them from `GameWorldAccess`.
+ids/capabilities - it derives them from `GameWorldAccess`.
 
 ## 10. Open questions / unresolved tensions
 
-- **[A — highest] Async surface vs sync event-kernel gates.** The unified surface is async, but
+- **[A - highest] Async surface vs sync event-kernel gates.** The unified surface is async, but
   `IEventKernel<TEvent>.ShouldHandle`/`Handle` are sync (`bool`/`void`). A guardian gate that reads the
   world (`GuardianKernel.ShouldHandle` → `ctx.Host<IGameWorldAccess>()...GetHealthAsync`) cannot `await`.
   In lowered IR the `await` is erased to a sync host-binding call (capability model unchanged), but the C#
   author shape needs a decision: **async event hooks**, or a **sync sandbox view** of the world for
   `ShouldHandle`/`Handle`. Marked at the call site in the sample.
-- **[B — resolved] Install verbs do not fit the server.** `Replace`/`Extend` now live on the build-time
+- **[B - resolved] Install verbs do not fit the server.** `Replace`/`Extend` now live on the build-time
   `Setup(...)` accumulator, not on `IGameWorldAccess`, not on `IMonsterControl`, and not on runtime
   `server.Monsters`. `Get<TKernel>()`, `InvokeAsync`, and lifecycle stay on the facade.
 - **[C] `InvokeAsync` placement.** Kept on the framework `IPluginServer<TWorld>` (and concrete on the
-  facade) rather than on `IGameWorldAccess` — the interceptor needs a concrete receiver and the locked
+  facade) rather than on `IGameWorldAccess` - the interceptor needs a concrete receiver and the locked
   decision puts `InvokeAsync` top-level. The user's original sketch had it on the game interface; this is the
   reconciliation.
 - **[D] Effect declaration.** Effects are explicit on `[HostBinding]`; the remaining design question is
@@ -254,12 +254,12 @@ ids/capabilities — it derives them from `GameWorldAccess`.
 
 ## 11. Vibe-check artifacts (in the sample; do not compile)
 
-- **`Examples.GameServer.Server.Abstractions`** — `Control/PluginAuthoringFramework.cs` (framework markers),
+- **`Examples.GameServer.Server.Abstractions`** - `Control/PluginAuthoringFramework.cs` (framework markers),
   `IGameWorldAccess.cs` (pure unified surface), `Ipc/IGamePluginControlService.cs` (trimmed to control-plane).
-- **`Examples.GameServer.Plugin`** — `GamePluginServer.cs` (the shell), `Program.cs` (the dev's wiring),
+- **`Examples.GameServer.Plugin`** - `GamePluginServer.cs` (the shell), `Program.cs` (the dev's wiring),
   `Kernels/MonsterKillerKernel.cs` (async, injected unified surface), `Kernels/GuardianKernel.cs` (carries
   the tension-A note); `Client/*` deleted.
-- **`Examples.GameServer.Server`** — `Ipc/GameWorldAccess.cs` (`IGameWorldAccess` over the world +
+- **`Examples.GameServer.Server`** - `Ipc/GameWorldAccess.cs` (`IGameWorldAccess` over the world +
   `[HostBinding]` + `ServerControlBase`), `Ipc/GamePluginControlService.cs` (domain methods removed),
   `Simulation/GameWorldHost.cs` (bindings derived from the contract), `Program.cs` (registers both services).
 

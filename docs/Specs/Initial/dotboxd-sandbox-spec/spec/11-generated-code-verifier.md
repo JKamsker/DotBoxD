@@ -1,4 +1,4 @@
-# 11 — Generated Code Verifier
+# 11 - Generated Code Verifier
 
 ## Purpose
 

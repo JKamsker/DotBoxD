@@ -206,7 +206,7 @@ Options for both `RpcPeer` and `RpcHost`.
 | `ServiceProvider` | `IServiceProvider?` | `null` | Resolves dependencies for dispatcher factories and `Provide<TService>()` |
 | `RejectInboundCalls` | `bool` | `false` | Answers inbound requests with an explicit "does not accept inbound calls" error; makes get-only intent explicit. Not an auth boundary |
 | `DisableInboundRequestCancellation` | `bool` | `false` | Disables per-request cancellation state for non-streaming inbound calls. Handlers receive `CancellationToken.None`; inbound Cancel frames for those calls are ignored |
-| `InboundQueueCapacity` | `int?` | 1024 | Max queued inbound requests (bounded read-side backpressure). `null` dispatches immediately and does not cap concurrent dispatch work — trusted/bounded transports only |
+| `InboundQueueCapacity` | `int?` | 1024 | Max queued inbound requests (bounded read-side backpressure). `null` dispatches immediately and does not cap concurrent dispatch work - trusted/bounded transports only |
 | `MaxConcurrentInboundDispatch` | `int` | 1 | Max inbound requests dispatched concurrently when `InboundQueueCapacity` is set. Default `1` dispatches serially per connection; raise it for bounded-concurrent per-connection dispatch. Ignored when `InboundQueueCapacity` is `null` |
 | `MaxInboundBytes` | `long?` | 64 MiB | Max total bytes of in-flight inbound request frames when `InboundQueueCapacity` is set. Caps peak memory independent of frame count; `null` disables. An oversized frame is still admitted when nothing else is in flight, so one large request never deadlocks. Ignored when `InboundQueueCapacity` is `null` |
 | `MaxPendingRequests` | `int` | 4096 | Max concurrent outbound calls awaiting responses |
