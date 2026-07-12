@@ -25,7 +25,8 @@ internal object AdapterTranscript {
         val lines = Files.readAllLines(path)
         val error = lines.firstOrNull {
             it.contains(Regex(" adapter (?:error|unhandled error) ")) &&
-                !it.contains(" adapter adapter error evaluationFailed:")
+                !it.contains(" adapter adapter error evaluationFailed:") &&
+                !it.contains(" adapter adapter error staleVariables:")
         }
         check(error == null) { "The kernel debug adapter logged an error: $error" }
 

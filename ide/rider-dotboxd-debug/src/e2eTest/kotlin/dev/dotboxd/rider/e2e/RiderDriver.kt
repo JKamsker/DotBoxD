@@ -226,7 +226,7 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
             const project = projectOf(component);
             const session = com.intellij.xdebugger.XDebuggerManager.getInstance(project).getCurrentSession();
             if (!session) throw 'No active DotBoxD debug session';
-            session.stop();
+            session.getDebugProcess().stop();
             """,
         )
     }
