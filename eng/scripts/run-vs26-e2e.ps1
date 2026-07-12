@@ -481,6 +481,10 @@ $expression = $dte.Debugger.GetExpression('e.Distance', $true, 5000)
     if ('e' -notin @($inspection.Locals.Name)) {
         throw "Visual Studio Locals did not expose the authored event parameter: $($inspection | ConvertTo-Json -Depth 3 -Compress)."
     }
+    $whereEvent = @($inspection.Locals | Where-Object Name -EQ 'e') | Select-Object -First 1
+    if ($whereEvent.Type -notmatch '(^|\.)MonsterAggroEvent$') {
+        throw "Visual Studio exposed e with the wrong authored type: $($inspection | ConvertTo-Json -Depth 3 -Compress)."
+    }
     Invoke-DteWhenReady @'
 while ($dte.Debugger.Breakpoints.Count -gt 0) { $dte.Debugger.Breakpoints.Item(1).Delete() }
 $null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_RUNTIME_HOOKS, 121)
@@ -500,6 +504,7 @@ $distance = $dte.Debugger.GetExpression('e.Distance', $true, 5000)
     Roots = @($roots.Name)
     EventMembers = @($event.DataMembers | ForEach-Object Name)
     ContextMembers = @($context.DataMembers | ForEach-Object Name)
+    EventType = $event.Type
     DistanceValue = $distance.Value
     IsValidDistance = $distance.IsValidValue
 } | ConvertTo-Json -Depth 3 -Compress
@@ -512,6 +517,7 @@ $distance = $dte.Debugger.GetExpression('e.Distance', $true, 5000)
         'Distance' -notin @($runInspection.EventMembers) -or
         'Messages' -notin @($runInspection.ContextMembers) -or
         'CancellationToken' -notin @($runInspection.ContextMembers) -or
+        $runInspection.EventType -notmatch '(^|\.)MonsterAggroEvent$' -or
         -not $runInspection.IsValidDistance -or
         $runInspection.DistanceValue -notmatch '^\d+$') {
         throw "Visual Studio did not expose expandable e and ctx values in Run: $($runInspection | ConvertTo-Json -Depth 3 -Compress)."

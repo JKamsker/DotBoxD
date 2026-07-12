@@ -183,6 +183,7 @@ internal static class PluginKernelModelFactory
             GeneratedPackageAttributes: GeneratedPackageAttributeSource.FromKernel(type),
             GeneratedAttributeSource: string.Empty,
             EventName: hookMetadata.EventName,
+            EventTypeName: EventTypeName.Qualified(eventType),
             EventParameterName: eventParameterName,
             ContextParameterName: contextParameterName,
             HandleEventParameterName: handleEventParameterName,

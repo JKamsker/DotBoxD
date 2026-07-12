@@ -148,6 +148,13 @@ internal static class DotBoxDDebugInfoSourceEmitter
         }
         else
         {
+            EmitSyntheticBinding(
+                builder,
+                functionId,
+                "$dotboxd.event",
+                eventParameter,
+                model.EventTypeName,
+                "{" + model.EventTypeName + "}");
             foreach (var property in model.EventProperties)
             {
                 EmitVariableBinding(

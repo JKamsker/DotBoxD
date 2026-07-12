@@ -121,6 +121,7 @@ internal static partial class ResultHookChain
             GeneratedPackageAttributes: default,
             GeneratedAttributeSource: ExperimentalAttributeSource.FromTypes(contextType, resultType),
             EventName: hookName,
+            EventTypeName: EventTypeName.Qualified(contextType),
             EventParameterName: DotBoxDGenerationNames.DefaultEventParameterName,
             ContextParameterName: terminalContextParam ?? DotBoxDGenerationNames.DefaultContextParameterName,
             HandleEventParameterName: terminalElementParam,

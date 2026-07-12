@@ -7,6 +7,7 @@ public sealed class DapSourceVariableProjectorTests
 {
     private static readonly DapSourceVariableBinding[] Bindings =
     [
+        new("$dotboxd.event", "e", "MonsterAggroEvent", "{MonsterAggroEvent}"),
         new("e_MonsterId", "e.MonsterId", null, null),
         new("e_Distance", "e.Distance", null, null),
         new("$dotboxd.context", "ctx", "HookContext", "{HookContext}"),
@@ -28,6 +29,8 @@ public sealed class DapSourceVariableProjectorTests
         var projected = DapSourceVariableProjector.Map(variables, Bindings, includeSynthetic: true);
         var authoredEvent = Assert.Single(projected.EnumerateArray(), variable =>
             variable.GetProperty("name").GetString() == "e");
+        Assert.Equal("MonsterAggroEvent", authoredEvent.GetProperty("type").GetString());
+        Assert.Equal("MonsterAggroEvent", authoredEvent.GetProperty("value").GetProperty("type").GetString());
         var children = authoredEvent.GetProperty("value").GetProperty("children").EnumerateArray().ToArray();
 
         Assert.Equal(["MonsterId", "Distance"], children.Select(child => child.GetProperty("name").GetString()));
@@ -52,7 +55,7 @@ public sealed class DapSourceVariableProjectorTests
             Bindings,
             "e",
             out var value));
-        Assert.Equal("object", value.GetProperty("type").GetString());
+        Assert.Equal("MonsterAggroEvent", value.GetProperty("type").GetString());
         Assert.Equal("e_Distance <= 4", DapSourceVariableProjector.Translate("e.Distance <= 4", Bindings));
     }
 

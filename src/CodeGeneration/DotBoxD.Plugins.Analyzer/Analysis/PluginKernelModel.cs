@@ -11,6 +11,7 @@ internal sealed record PluginKernelModel(
     EquatableArray<string> GeneratedPackageAttributes,
     string GeneratedAttributeSource,
     string EventName,
+    string EventTypeName,
     string EventParameterName,
     string ContextParameterName,
     string HandleEventParameterName,

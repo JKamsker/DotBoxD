@@ -110,6 +110,10 @@ public sealed class HookChainDebugInfoRuntimeTests
         var nodes = SandboxNodeMap.Create(package.Module).Nodes.ToDictionary(node => node.Id);
 
         Assert.All(debugInfo.SequencePoints, point => Assert.Equal("Handle", nodes[point.NodeId].FunctionId));
+        Assert.Contains(bindings, binding =>
+            binding.FunctionId == "Handle" &&
+            binding.SourceName == "e" &&
+            binding.TypeName == typeof(ChainAggroEvent).FullName);
         Assert.Contains(bindings, binding => binding.FunctionId == "Handle" && binding.SourceName == "e.MonsterId");
         Assert.Contains(bindings, binding => binding.FunctionId == "Handle" && binding.SourceName == "e.Distance");
         Assert.Contains(bindings, binding => binding.FunctionId == "Handle" && binding.SourceName == "ctx");
