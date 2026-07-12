@@ -18,8 +18,7 @@ public sealed class DerivedInfo
 /// <summary>A base record carrying a public property a derived projection would inherit.</summary>
 public record BaseInfo(string Zone);
 
-/// <summary>A projected DTO that inherits a public property (<c>Zone</c>) from <see cref="BaseInfo"/>; the marshaller
-/// only sees declared members, so the inherited one would be silently dropped — the chain fails safe.</summary>
+/// <summary>A projected DTO that inherits a public property (<c>Zone</c>) from <see cref="BaseInfo"/>.</summary>
 public sealed record DerivedShape(string Zone, int Distance) : BaseInfo(Zone);
 
 /// <summary>A projected DTO whose constructor parameter type (<c>long</c>) differs from its field type (<c>int</c>),
@@ -37,7 +36,7 @@ public sealed record TwoListEvent(int Distance, List<int> Left, List<int> Right)
 
 /// <summary>
 /// Fail-safe RUNTIME behaviour: chains the generator deliberately refuses to lower (a constructor-derived DTO field,
-/// an inherited-property DTO, a converting constructor, and a non-scalar equality predicate) are not intercepted, so
+/// a converting constructor, and a non-scalar equality predicate) are not intercepted, so
 /// the real remote terminal throws <see cref="ArgumentNullException"/> at runtime rather than silently corrupting or
 /// dropping data. (The generated-source absence of these is asserted in DotBoxD.Kernels.Tests; this covers the
 /// runtime side.)
@@ -61,19 +60,21 @@ public sealed class FailSafeTests
     }
 
     [Fact]
-    public void Inherited_property_dto_projection_is_not_intercepted()
+    public async Task Inherited_property_dto_projection_round_trips_all_members()
     {
         using var h = new RunLocalHarness<EncounterEvent>();
+        DerivedShape? received = null;
 
-        Assert.Throws<ArgumentNullException>(() =>
-        {
-#pragma warning disable DBXK111 // Exercise the native fallback after explicit suppression.
-            h.Hooks.On<EncounterEvent>()
-                .Where(e => e.Distance <= 4)
-                .Select(e => new DerivedShape(e.Zone, e.Distance))
-                .RunLocal((shape, ctx) => { });
-#pragma warning restore DBXK111
-        });
+        h.Hooks.On<EncounterEvent>()
+            .Where(e => e.Distance <= 4)
+            .Select(e => new DerivedShape(e.Zone, e.Distance))
+            .RunLocal((shape, _) => received = shape);
+
+        await h.PublishAsync(SampleEvents.Matching);
+
+        Assert.NotNull(received);
+        Assert.Equal(SampleEvents.Matching.Zone, received.Zone);
+        Assert.Equal(SampleEvents.Matching.Distance, received.Distance);
     }
 
     [Fact]

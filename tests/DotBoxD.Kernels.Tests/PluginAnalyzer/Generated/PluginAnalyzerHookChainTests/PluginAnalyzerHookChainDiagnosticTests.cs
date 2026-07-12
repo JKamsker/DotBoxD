@@ -67,6 +67,35 @@ public sealed class PluginAnalyzerHookChainDiagnosticTests
     }
 
     [Fact]
+    public void RegisterLocal_with_an_unsupported_event_member_reports_the_reason()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [Hook("damage", typeof(DamageResult))]
+            public sealed record DamageContext(short Unsupported);
+
+            [HookResult]
+            public readonly partial record struct DamageResult(bool Success, string? Reason, int Damage);
+
+            public static class Usage
+            {
+                public static void Configure(RemoteHookRegistry hooks)
+                    => hooks.On<DamageContext>()
+                        .RegisterLocal((ctx, _) => new DamageResult(true, null, ctx.Unsupported));
+            }
+            """);
+
+        var diagnostic = Assert.Single(result.Diagnostics.Where(d => d.Id == "DBXK113"));
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Contains("not wire-eligible", diagnostic.GetMessage(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Remote_staged_Use_reports_DBXK100_error_instead_of_installing_unfiltered_package()
     {
         var result = RunGenerator("""

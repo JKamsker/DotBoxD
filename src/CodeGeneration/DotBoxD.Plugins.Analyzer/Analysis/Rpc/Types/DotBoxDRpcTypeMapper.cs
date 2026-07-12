@@ -105,40 +105,95 @@ internal static partial class DotBoxDRpcTypeMapper
     /// </summary>
     public static IReadOnlyList<RecordMember> RecordFields(INamedTypeSymbol type)
     {
+        var hierarchy = DtoHierarchy(type);
         var members = new List<RecordMember>();
-        foreach (var member in type.GetMembers())
-        {
-            if (member is IPropertySymbol
-                {
-                    DeclaredAccessibility: Accessibility.Public,
-                    IsStatic: false,
-                    GetMethod: not null,
-                    IsIndexer: false
-                } property &&
-                property.GetMethod.DeclaredAccessibility == Accessibility.Public &&
-                !property.IsImplicitlyDeclared &&
-                !IsIgnoredDataMember(property))
-            {
-                members.Add(new RecordMember(property.Name, property.Type, property));
-            }
-        }
-
-        foreach (var member in type.GetMembers())
-        {
-            if (member is IFieldSymbol
-                {
-                    DeclaredAccessibility: Accessibility.Public,
-                    IsStatic: false,
-                    IsConst: false
-                } field &&
-                !field.IsImplicitlyDeclared &&
-                !IsIgnoredDataMember(field))
-            {
-                members.Add(new RecordMember(field.Name, field.Type, field));
-            }
-        }
-
+        AddRecordProperties(type, hierarchy, members);
+        AddRecordFields(type, hierarchy, members);
         return members;
+    }
+
+    private static void AddRecordProperties(
+        INamedTypeSymbol type,
+        IReadOnlyList<INamedTypeSymbol> hierarchy,
+        List<RecordMember> members)
+    {
+        foreach (var declaringType in hierarchy)
+        {
+            foreach (var member in declaringType.GetMembers())
+            {
+                if (member is IPropertySymbol property)
+                {
+                    AddRecordProperty(type, members, property);
+                }
+            }
+        }
+    }
+
+    private static void AddRecordProperty(
+        INamedTypeSymbol type,
+        List<RecordMember> members,
+        IPropertySymbol property)
+    {
+        if (!IsReadableRecordProperty(property))
+        {
+            return;
+        }
+
+        var overriddenIndex = OverriddenPropertyIndex(members, property);
+        if (IsIgnoredDataMember(property))
+        {
+            if (overriddenIndex >= 0)
+            {
+                members.RemoveAt(overriddenIndex);
+            }
+
+            return;
+        }
+
+        var recordMember = new RecordMember(property.Name, property.Type, property);
+        if (overriddenIndex >= 0)
+        {
+            members[overriddenIndex] = recordMember;
+            return;
+        }
+
+        RejectDuplicateRecordMember(type, members, property.Name);
+        members.Add(recordMember);
+    }
+
+    private static bool IsReadableRecordProperty(IPropertySymbol property)
+        => property is
+        {
+            DeclaredAccessibility: Accessibility.Public,
+            IsStatic: false,
+            GetMethod: { DeclaredAccessibility: Accessibility.Public },
+            IsIndexer: false,
+            IsImplicitlyDeclared: false
+        };
+
+    private static void AddRecordFields(
+        INamedTypeSymbol type,
+        IReadOnlyList<INamedTypeSymbol> hierarchy,
+        List<RecordMember> members)
+    {
+        foreach (var declaringType in hierarchy)
+        {
+            foreach (var member in declaringType.GetMembers())
+            {
+                if (member is IFieldSymbol
+                    {
+                        DeclaredAccessibility: Accessibility.Public,
+                        IsStatic: false,
+                        IsConst: false
+                    } field &&
+                    !field.IsImplicitlyDeclared &&
+                    !IsIgnoredDataMember(field))
+                {
+                    RejectDuplicateRecordMember(type, members, field.Name);
+                    members.Add(new RecordMember(field.Name, field.Type, field));
+                }
+            }
+        }
     }
 
     /// <summary>True when <paramref name="member"/> is marked with a known serializer ignore attribute.

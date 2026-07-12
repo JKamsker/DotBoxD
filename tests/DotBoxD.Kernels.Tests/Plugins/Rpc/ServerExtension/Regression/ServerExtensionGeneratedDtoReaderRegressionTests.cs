@@ -78,6 +78,31 @@ public sealed partial class ServerExtensionGeneratedDtoReaderRegressionTests
         }
         """;
 
+    private const string HiddenInheritedMemberDtoSource = """
+        using DotBoxD.Kernels;
+        using DotBoxD.Kernels.Sandbox;
+        using DotBoxD.Plugins;
+        using DotBoxD.Abstractions;
+
+        namespace Sample;
+
+        public class BaseInfo
+        {
+            public int Id { get; init; }
+        }
+
+        public sealed class DerivedInfo : BaseInfo
+        {
+            public new int Id { get; init; }
+        }
+
+        [ServerExtension("hidden-inherited-member")]
+        public sealed partial class HiddenInheritedMemberKernel
+        {
+            public int Use(DerivedInfo info, HookContext ctx) => info.Id;
+        }
+        """;
+
     private const string ConstructorAndInitializerDtoSource = """
         using DotBoxD.Kernels;
         using DotBoxD.Kernels.Sandbox;
@@ -200,14 +225,27 @@ public sealed partial class ServerExtensionGeneratedDtoReaderRegressionTests
     }
 
     [Fact]
-    public void Server_extension_rejects_a_dto_that_inherits_public_fields()
+    public void Server_extension_supports_a_dto_that_inherits_public_fields()
     {
-        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(InheritedFieldDtoSource);
+        var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator(InheritedFieldDtoSource);
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.Contains(
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("record.get", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Server_extension_rejects_hidden_inherited_data_members()
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(HiddenInheritedMemberDtoSource);
 
         Assert.Contains(
             diagnostics,
-            d => d.Id == "DBXK100" &&
-                 d.GetMessage().Contains("inherit public fields", StringComparison.Ordinal));
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                          diagnostic.GetMessage().Contains(
+                              "multiple public data members named 'Id'",
+                              StringComparison.Ordinal));
     }
 
     private static object CreateControl(Assembly assembly, string expectedPluginId, byte[] response)

@@ -65,15 +65,16 @@ internal sealed record HookChainNotLoweredDiagnostic(
     private Diagnostic ResultDiagnostic()
     {
         var location = Location?.ToLocation() ?? Microsoft.CodeAnalysis.Location.None;
+        var message = ResultMessage + DetailSuffix();
         return LocalResultTerminal
-            ? Diagnostic.Create(PluginAnalyzerDiagnostics.ResultHookNotLoweredRule, location, ResultMessage)
+            ? Diagnostic.Create(PluginAnalyzerDiagnostics.ResultHookNotLoweredRule, location, message)
             : Diagnostic.Create(
                 PluginAnalyzerDiagnostics.ResultHookNotLoweredRule,
                 location,
                 DiagnosticSeverity.Error,
                 additionalLocations: null,
                 properties: null,
-                ResultMessage);
+                message);
     }
 }
 
