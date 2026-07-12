@@ -8,6 +8,7 @@
           <Include>[DotBoxD.Kernels*]*,[DotBoxD.Abstractions]*,[DotBoxD.Hosting*]*,[DotBoxD.Plugins]*,[DotBoxD.Queryable]*,[DotBoxD.Pushdown.Services]*,[DotBoxD.Services.SourceGenerator]*</Include>
           <Exclude>[*.Tests]*,[DotBoxD.Kernels.TestFixtures.*]*,[DotBoxD.Services]*,[DotBoxD.Codecs.MessagePack]*,[DotBoxD.Transports.*]*,[Examples.*]*</Exclude>
           <ExcludeByFile>**/obj/**/*.cs,**/bin/**/*.cs</ExcludeByFile>
+          <SingleHit>true</SingleHit>
         </Configuration>
       </DataCollector>
     </DataCollectors>

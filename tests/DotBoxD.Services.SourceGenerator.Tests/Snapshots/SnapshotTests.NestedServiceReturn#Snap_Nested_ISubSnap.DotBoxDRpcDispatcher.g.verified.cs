@@ -40,6 +40,8 @@ namespace Snap.Nested
 
         public global::System.Threading.Tasks.Task DispatchOnInstanceAsync(string instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::DotBoxD.Services.Streaming.Remote.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct = default)
         {
+            ct.ThrowIfCancellationRequested();
+
             if (!registry.TryGet("ISubSnap", instanceId, out var __obj) || __obj is not global::Snap.Nested.ISubSnap __inst)
             {
                 throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException("Instance '" + instanceId + "' not found for service 'ISubSnap'.", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Instance);
@@ -62,6 +64,7 @@ namespace Snap.Nested
                     {
                         throw new global::DotBoxD.Services.Exceptions.ServiceProtocolException("Request payload is not allowed for a parameterless RPC method.");
                     }
+                    ct.ThrowIfCancellationRequested();
                     var __dotboxd_task = receiver.CountAsync();
                     var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result

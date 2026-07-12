@@ -52,6 +52,26 @@ public sealed class SafeHttpPublicContractTests
         Assert.Equal("response", ex.ParamName);
     }
 
+    [Theory]
+    [InlineData("location")]
+    [InlineData("finalRequestUri")]
+    public void String_response_invoker_rejects_invalid_uri_strings_with_public_parameter_name(string parameterName)
+    {
+        var ex = Assert.ThrowsAny<ArgumentException>(() =>
+        {
+            if (parameterName == "location")
+            {
+                _ = new SafeInMemoryHttpMessageInvoker("ok", location: "not a uri");
+            }
+            else
+            {
+                _ = new SafeInMemoryHttpMessageInvoker("ok", finalRequestUri: "not a uri");
+            }
+        });
+
+        Assert.Equal(parameterName, ex.ParamName);
+    }
+
     private static SandboxContext CreateContext()
     {
         var policy = SandboxPolicyBuilder.Create()

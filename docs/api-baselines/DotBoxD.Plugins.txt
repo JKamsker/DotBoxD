@@ -195,7 +195,7 @@ public IRFunc<TInput, TContext, TOutput> ProjectionWithContext<TContext, TOutput
 public IRFunc<TInput, TOutput> Projection<TOutput>( Func<IRExpressionBuilder, Expression> build, IEnumerable<string>? requiredCapabilities = null, IEnumerable<string>? effects = null)
 public KernelRegistry Kernels { get; }
 public KernelRpcPayloadReader(ReadOnlySpan<byte> payload)
-public KernelRpcValue GetItem(int index) => (_items ?? EmptyItems)[index]
+public KernelRpcValue GetItem(int index)
 public KernelRpcValue[] Items => CopyItems(_items ?? EmptyItems)
 public KernelRpcValueKind Kind { get; }
 public LiveContext<T> BindContext<T>(string name, Action<T>? initialize = null) where T : class

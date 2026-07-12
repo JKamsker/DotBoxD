@@ -46,8 +46,11 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         context.RegisterCompilationStartAction(startContext =>
         {
             var helperGraph = new ForbiddenHelperCallGraph();
+            startContext.RegisterSymbolAction(c => AnalyzeMethod(c, helperGraph), SymbolKind.Method);
             startContext.RegisterOperationAction(c => AnalyzeInvocation(c, helperGraph), OperationKind.Invocation);
+            startContext.RegisterOperationAction(c => AnalyzeDynamicInvocation(c, helperGraph), OperationKind.DynamicInvocation);
             startContext.RegisterOperationAction(c => AnalyzeObjectCreation(c, helperGraph), OperationKind.ObjectCreation);
+            startContext.RegisterOperationAction(c => AnalyzeWithExpression(c, helperGraph), OperationKind.With);
             startContext.RegisterOperationAction(c => AnalyzePropertyReference(c, helperGraph), OperationKind.PropertyReference);
             startContext.RegisterOperationAction(c => AnalyzeFieldReference(c, helperGraph), OperationKind.FieldReference);
             startContext.RegisterOperationAction(c => AnalyzeTypeOf(c, helperGraph), OperationKind.TypeOf);
@@ -57,49 +60,30 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             startContext.RegisterOperationAction(c => AnalyzeVariableDeclaration(c, helperGraph), OperationKind.VariableDeclaration);
             startContext.RegisterOperationAction(c => AnalyzeUsing(c, helperGraph), OperationKind.Using);
             startContext.RegisterOperationAction(c => AnalyzeUsingDeclaration(c, helperGraph), OperationKind.UsingDeclaration);
+            startContext.RegisterOperationAction(c => AnalyzeDeconstruction(c, helperGraph), OperationKind.DeconstructionAssignment);
+            startContext.RegisterOperationAction(c => AnalyzeLock(c, helperGraph), OperationKind.Lock);
+            startContext.RegisterOperationAction(
+                c => AnalyzeCollectionExpression(c, helperGraph),
+                OperationKind.CollectionExpression);
+            startContext.RegisterOperationAction(c => AnalyzeListPattern(c, helperGraph), OperationKind.ListPattern);
+            startContext.RegisterOperationAction(c => AnalyzeSlicePattern(c, helperGraph), OperationKind.SlicePattern);
+            startContext.RegisterOperationAction(c => AnalyzeRecursivePattern(c, helperGraph), OperationKind.RecursivePattern);
+            startContext.RegisterOperationAction(c => AnalyzeSpread(c, helperGraph), OperationKind.Spread);
             startContext.RegisterOperationAction(
                 c => AnalyzeOperator(c, helperGraph),
                 OperationKind.UnaryOperator,
                 OperationKind.BinaryOperator,
                 OperationKind.Conversion);
+            startContext.RegisterOperationAction(
+                c => AnalyzeImplicitStringFormatting(c, helperGraph),
+                OperationKind.BinaryOperator,
+                OperationKind.Interpolation);
+            RegisterAwaitReachabilityAnalysis(startContext, helperGraph);
             RegisterForbiddenTypeSyntaxAnalysis(startContext, helperGraph);
+            RegisterEnumerationSyntaxAnalysis(startContext, helperGraph);
+            RegisterFixedReachabilityAnalysis(startContext, helperGraph);
             startContext.RegisterCompilationEndAction(helperGraph.ReportDiagnostics);
         });
-    }
-
-    private static void AnalyzeMethod(SymbolAnalysisContext context)
-    {
-        var method = (IMethodSymbol)context.Symbol;
-        ReportForbiddenDeclaredMethodSignature(context, method);
-        if (!HasAttribute(method, DotBoxDMetadataNames.NativeOnlyAttribute))
-        {
-            return;
-        }
-
-        ValidateLocalMember(context, method, method);
-    }
-
-    private static void AnalyzeProperty(SymbolAnalysisContext context)
-    {
-        var property = (IPropertySymbol)context.Symbol;
-        ReportForbiddenDeclaredPropertyType(context, property);
-        if (HasAttribute(property, DotBoxDMetadataNames.NativeOnlyAttribute))
-        {
-            ValidateLocalMember(context, property, property);
-        }
-
-        if (!HasAttribute(property, DotBoxDMetadataNames.LiveSettingAttribute))
-        {
-            return;
-        }
-
-        if (!IsAllowedLiveSettingType(property.Type))
-        {
-            context.ReportDiagnostic(Diagnostic.Create(
-                LiveSettingTypeRule,
-                property.Locations.FirstOrDefault(),
-                property.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)));
-        }
     }
 
     private static void AnalyzeInvocation(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
@@ -132,9 +116,11 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             RecordForbiddenInitializerReference(context, helperGraph, creation.Type);
             RecordForbiddenDelegateInitializer(context, helperGraph, creation.Type);
             RecordStaticConstructorReachability(context, helperGraph, creation.Type);
+            RecordFinalizerReachability(context, helperGraph, creation.Type);
             RecordForbiddenHelperPropertyInitializer(context, helperGraph, creation.Type);
             if (creation.Constructor is { } initializerConstructor)
             {
+                helperGraph.RecordConstructorInitializers(initializerConstructor);
                 RecordInitializerRootCall(context, helperGraph, initializerConstructor);
             }
 
@@ -143,8 +129,10 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
 
         ReportAndRecordIfForbidden(context, helperGraph, method, creation.Type);
         RecordStaticConstructorReachability(context, helperGraph, creation.Type);
+        RecordFinalizerReachability(context, helperGraph, creation.Type);
         if (creation.Constructor is { } constructor)
         {
+            helperGraph.RecordConstructorInitializers(constructor);
             helperGraph.RecordCall(method, constructor, context.Operation.Syntax.GetLocation());
         }
     }

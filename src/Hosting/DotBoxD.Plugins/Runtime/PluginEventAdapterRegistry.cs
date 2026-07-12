@@ -237,7 +237,16 @@ public sealed class PluginEventAdapterRegistry
                 continue;
             }
 
-            var instance = StaticInstance(type) ?? Activator.CreateInstance(type);
+            object? instance;
+            try
+            {
+                instance = StaticInstance(type) ?? Activator.CreateInstance(type);
+            }
+            catch (TargetInvocationException ex) when (ex.InnerException is not null)
+            {
+                throw AdapterDiscoveryFailure(type, ex.InnerException);
+            }
+
             return (IPluginEventAdapter<TEvent>)instance!;
         }
 
@@ -270,6 +279,11 @@ public sealed class PluginEventAdapterRegistry
             .FirstOrDefault(p => string.Equals(p.Name, "Instance", StringComparison.Ordinal) &&
                                  type.IsAssignableFrom(p.PropertyType))
             ?.GetValue(null);
+
+    private static InvalidOperationException AdapterDiscoveryFailure(Type type, Exception innerException)
+        => new(
+            "Plugin event adapter '" + type.FullName + "' failed during convention discovery.",
+            innerException);
 }
 
 internal readonly record struct RegisteredPluginEventAdapter(

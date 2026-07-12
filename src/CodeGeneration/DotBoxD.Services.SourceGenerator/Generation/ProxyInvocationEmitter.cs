@@ -11,13 +11,31 @@ internal static class ProxyInvocationEmitter
     private static readonly Dictionary<MethodReturnKind, ProxyReturnEmitter> ReturnEmitters = new()
     {
         [MethodReturnKind.Void] = static (context) =>
-            context.Builder.AppendLine($"{context.Indent}{context.Invocation}.GetAwaiter().GetResult();"),
+            EmitSyncVoidReturn(context.Builder, context.Method, context.Invocation, context.CancellationToken, context.Indent),
         [MethodReturnKind.Sync] = static (context) =>
-            context.Builder.AppendLine($"{context.Indent}return {context.Invocation}.GetAwaiter().GetResult();"),
+            EmitSyncValueReturn(
+                context.Builder,
+                context.Method,
+                context.Invocation,
+                context.Locals,
+                context.CancellationToken,
+                context.Indent),
         [MethodReturnKind.Stream] = static (context) =>
-            context.Builder.AppendLine($"{context.Indent}return {context.Invocation}.GetAwaiter().GetResult();"),
+            EmitSyncValueReturn(
+                context.Builder,
+                context.Method,
+                context.Invocation,
+                context.Locals,
+                context.CancellationToken,
+                context.Indent),
         [MethodReturnKind.Pipe] = static (context) =>
-            context.Builder.AppendLine($"{context.Indent}return {context.Invocation}.GetAwaiter().GetResult();"),
+            EmitSyncValueReturn(
+                context.Builder,
+                context.Method,
+                context.Invocation,
+                context.Locals,
+                context.CancellationToken,
+                context.Indent),
         [MethodReturnKind.AsyncEnumerable] = static (context) =>
             context.Builder.AppendLine($"{context.Indent}return {context.Invocation};"),
         [MethodReturnKind.Task] = static (context) => EmitTaskLikeReturn(context),
@@ -96,6 +114,37 @@ internal static class ProxyInvocationEmitter
             context.Locals,
             context.CancellationToken,
             context.Indent);
+
+    private static void EmitSyncVoidReturn(
+        StringBuilder sb,
+        MethodModel method,
+        string invocation,
+        CancellationToken ct,
+        string indent)
+    {
+        sb.AppendLine($"{indent}{invocation}.GetAwaiter().GetResult();");
+        EmitCallerCancellationRecheck(sb, method, ct, indent);
+    }
+
+    private static void EmitSyncValueReturn(
+        StringBuilder sb,
+        MethodModel method,
+        string invocation,
+        GeneratedLocalNames locals,
+        CancellationToken ct,
+        string indent)
+    {
+        if (!method.HasCancellationToken)
+        {
+            sb.AppendLine($"{indent}return {invocation}.GetAwaiter().GetResult();");
+            return;
+        }
+
+        var resultName = locals.Reserve("__dotboxd_result", ct);
+        sb.AppendLine($"{indent}var {resultName} = {invocation}.GetAwaiter().GetResult();");
+        EmitCallerCancellationRecheck(sb, method, ct, indent);
+        sb.AppendLine($"{indent}return {resultName};");
+    }
 
     private static void EmitTaskLikeReturn(
         StringBuilder sb,

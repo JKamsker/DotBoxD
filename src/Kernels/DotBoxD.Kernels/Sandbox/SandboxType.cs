@@ -129,7 +129,15 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
         => SandboxTypeRules.IsValidMapKey(this, declaredOpaqueIdTypes);
 
     private static string RequireName(string name)
-        => name ?? throw new ArgumentNullException(nameof(name));
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Sandbox type names must not be empty or whitespace.", nameof(name));
+        }
+
+        return name;
+    }
 
     private static IReadOnlyList<SandboxType> CopyArguments(
         string name,
