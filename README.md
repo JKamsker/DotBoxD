@@ -206,11 +206,21 @@ proxies, dispatchers, and plugin factories at compile time. Diagnostics are name
 (services) and `DBXK###` (kernels/plugins). See
 [the docs overview](https://dotboxd.kamsker.at/overview/) for the full picture.
 
-## Packages
+## Installing from NuGet
 
 DotBoxD ships as two stacks. Install a meta-package, or any individual package with
 `dotnet add package <PackageId> --prerelease`. Main-branch CI packages are published as
 `0.1.0-ci.*` prereleases; omit `--prerelease` once you target a stable tag release.
+
+For a focused host or plugin setup, install only the components you use:
+
+```bash
+dotnet add package DotBoxD.Hosting --prerelease
+dotnet add package DotBoxD.Kernels.Serialization.Json --prerelease
+dotnet add package DotBoxD.Hosting.Http --prerelease
+dotnet add package DotBoxD.Plugins.Analyzer --prerelease
+dotnet add package DotBoxD.Pushdown.Services --prerelease
+```
 
 ### Services & channels stack - `netstandard2.1`, stable API
 
