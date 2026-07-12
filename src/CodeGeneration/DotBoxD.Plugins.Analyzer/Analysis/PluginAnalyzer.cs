@@ -53,6 +53,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             startContext.RegisterOperationAction(c => AnalyzeMethodReference(c, helperGraph), OperationKind.MethodReference);
             startContext.RegisterOperationAction(c => AnalyzeAnonymousFunction(c, helperGraph), OperationKind.AnonymousFunction);
             startContext.RegisterOperationAction(c => AnalyzeEventReference(c, helperGraph), OperationKind.EventReference);
+            startContext.RegisterOperationAction(c => AnalyzeVariableDeclaration(c, helperGraph), OperationKind.VariableDeclaration);
             startContext.RegisterCompilationEndAction(helperGraph.ReportDiagnostics);
         });
     }
@@ -228,15 +229,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
     }
 
     private static bool IsForbiddenHostApi(ITypeSymbol? type)
-    {
-        var name = type?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return false;
-        }
-
-        return IsForbiddenExactType(name!) || IsForbiddenNamespace(name!);
-    }
+        => TryGetForbiddenHostApi(type, out _);
 
     private static bool IsForbiddenExactType(string typeName)
         => typeName is DotBoxDGenerationNames.TypeNames.SystemActivator
