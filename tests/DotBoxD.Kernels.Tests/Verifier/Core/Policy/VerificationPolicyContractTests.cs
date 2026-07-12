@@ -14,6 +14,18 @@ public sealed class VerificationPolicyContractTests
     }
 
     [Fact]
+    public void IsMemberAllowed_rejects_null_member_signature_at_public_boundary()
+    {
+        var policy = VerificationPolicy.BoxedValueDefaults();
+
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => policy.IsMemberAllowed(null!));
+
+        Assert.Equal("memberSignature", exception.ParamName);
+        Assert.False(policy.IsMemberAllowed("DotBoxD.Does.Not.Exist::Missing()"));
+    }
+
+    [Fact]
     public void AllowedMembers_rejects_null_entries_at_public_property_boundary()
     {
         var exception = Assert.ThrowsAny<ArgumentException>(
