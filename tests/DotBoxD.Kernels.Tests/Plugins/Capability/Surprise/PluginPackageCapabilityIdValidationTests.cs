@@ -5,10 +5,12 @@ namespace DotBoxD.Kernels.Tests.Plugins;
 
 public sealed partial class PluginPackageValidationTests
 {
-    [Fact]
-    public async Task Install_rejects_empty_segment_event_read_required_capability_entries()
+    [Theory]
+    [InlineData("event.read.bad..id")]
+    [InlineData(".event.read.bad.id")]
+    [InlineData("event.read.bad.id.")]
+    public async Task Install_rejects_empty_segment_event_read_required_capability_entries(string malformedCapability)
     {
-        const string malformedCapability = "event.read.bad..id";
         var policy = PluginAddendumTestPolicies.LongWall();
         policy = policy with
         {

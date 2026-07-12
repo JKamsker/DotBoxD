@@ -256,5 +256,7 @@ internal static class PluginManifestCapabilityValidator
     }
 
     private static bool HasEmptySegment(string capability)
-        => capability.Contains("..", StringComparison.Ordinal);
+        => capability.StartsWith(".", StringComparison.Ordinal) ||
+           capability.EndsWith(".", StringComparison.Ordinal) ||
+           capability.Contains("..", StringComparison.Ordinal);
 }

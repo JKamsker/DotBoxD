@@ -107,7 +107,7 @@ function Test-ShippingSourceFile([string] $file) {
 
     $normalized = $file.Replace('\', '/')
     return $normalized -match '(^|/)src/' -or
-        $normalized -match '^(Channels|CodeGeneration|Hosting|Kernels|Meta|Pushdown|Services)/'
+        $normalized -match '(^|/)(Channels|CodeGeneration|Hosting|Kernels|Meta|Pushdown|Services)/'
 }
 
 function Test-PackagePattern([string] $name, [string[]] $patterns) {
