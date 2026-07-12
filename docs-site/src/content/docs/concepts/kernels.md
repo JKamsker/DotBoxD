@@ -6,10 +6,16 @@ A **Kernel** is client/plugin-supplied logic the host runs **safely under policy
 **IR** (intermediate representation), authored as JSON, never C#, IL, reflection, CLR member names,
 or arbitrary host calls.
 
-## Why Kernels (the sandbox behind Query filters and Pushdown batches)?
+Kernels are **the engine behind two of DotBoxD's three modes**:
+[event pipelines](/concepts/event-pipelines/) (called *Query (RunLocal)* in some API surfaces) and
+[Pushdown](/concepts/pushdown/) both compile the author's C# down to kernels. You rarely hand-write
+one — you write `Where`/`Select` chains or batch methods and the generator lowers them — but
+everything about *why that is safe* lives on this page.
+
+## Why Kernels (the sandbox behind event filters and Pushdown batches)?
 
 **The problem.** Two of DotBoxD's three modes run *code the plugin author wrote* inside the host
-process: the [Query (RunLocal) pipeline](/tutorials/event-pipeline-runlocal/) lowers `Where`/`Select` to
+process: an [event pipeline](/tutorials/event-pipeline-runlocal/) lowers `Where`/`Select` to
 server-side logic, and [Pushdown](/concepts/pushdown/) lowers a batch method that loops the host's bindings
 server-side. Running that logic as C#/IL would hand it full CLR access. The alternative — filtering
 client-side or bloating a frozen host with every batch op — either wastes the wire or is impossible.
@@ -25,11 +31,11 @@ lowerings safe to accept from less-trusted plugin authors.
 
 **Grounded specifics:**
 
-- **One boundary, two lowerings.** Query's `Where`/`Select` and Pushdown's batch run as the *same*
-  validated, fuel-metered IR. Query keeps the payoff on the wire — the filter runs server-side so
-  non-matching events never cross, and `Select` ships only the projected scalar (fewer bytes, fewer
-  wake-ups, one-way push, no round-trips). Pushdown keeps it in round-trips — N fine-grained calls
-  collapse into **one** server-side batch next to the host's data.
+- **One boundary, two lowerings.** An event pipeline's `Where`/`Select` and Pushdown's batch run as
+  the *same* validated, fuel-metered IR. Event pipelines keep the payoff on the wire — the filter
+  runs server-side so non-matching events never cross, and `Select` ships only the projected scalar
+  (fewer bytes, fewer wake-ups, one-way push, no round-trips). Pushdown keeps it in round-trips — N
+  fine-grained calls collapse into **one** server-side batch next to the host's data.
 - **Capabilities are derived, not self-asserted, and fail closed.** The manifest's required
   capabilities are the union of what the IR actually touches; install is rejected unless the host
   policy grants them, so bad code never runs. Async is itself a gated capability
@@ -38,8 +44,8 @@ lowerings safe to accept from less-trusted plugin authors.
   attribute and hand-author the same IR through the same `SandboxHost` pipeline. The generator emits
   nothing a hand-written kernel could not also request.
 
-**When to use it — and when not.** Reach for kernels (directly, or via Query/Pushdown lowering) when
-you must run author-supplied logic in-process safely. Prefer a [Service](/concepts/services/) when the logic
+**When to use it — and when not.** Reach for kernels (directly, or via event-pipeline/Pushdown
+lowering) when you must run author-supplied logic in-process safely. Prefer a [Service](/concepts/services/) when the logic
 is a host capability *you* implement and trust — it is a plain request/response RPC that needs no
 sandbox. And note the trust ceiling below: safe-mode kernels are the real boundary; trusted-plugin
 assembly loading is **not** a sandbox, and hard multi-tenant isolation against arbitrary compiled

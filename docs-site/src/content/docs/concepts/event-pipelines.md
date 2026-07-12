@@ -14,6 +14,9 @@ This page is the model — the two registries, the pipeline stages, and every te
 one end to end against the maintained sample, follow the
 [event-pipeline tutorial](/tutorials/event-pipeline-runlocal/).
 
+> **Naming:** some API surfaces and older pages call this mode *Query (RunLocal)* — same thing.
+> `RunLocal` itself is just one of the five terminals below.
+
 ## Why event pipelines? (and when to use it)
 
 **The problem it beats.** The naive way to react to a server event is to subscribe to everything and filter
@@ -80,7 +83,8 @@ pipe is exactly *the projected value of each matching event*, and nothing for ev
 
 The terminal is the last call — what happens when an event matches. Pick one on two axes: **where your
 handler runs** (in your plugin as native C#, or server-side as sandboxed IR) and **whether it returns a
-decision** the host acts on.
+decision** the host acts on. The naming rule: ***Local* means your plugin process** — `RunLocal` /
+`RegisterLocal` run your native C# in the plugin; the terminals without *Local* run server-side.
 
 | | Handler runs **in your plugin** (native C#) | Handler runs **server-side** (sandboxed IR) |
 |---|---|---|

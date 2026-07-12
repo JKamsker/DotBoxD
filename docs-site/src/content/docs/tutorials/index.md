@@ -1,9 +1,28 @@
 ---
 title: 'Tutorials'
-description: 'Four walkthroughs across the generated and hand-written DotBoxD paths. Pick by what you need before you click in:'
+description: >-
+  Three end-to-end tracks — call the host (Services), react to the host (event pipelines), extend
+  the host (Pushdown) — plus an advanced hand-written IR path.
 ---
-Four walkthroughs across the generated and hand-written DotBoxD paths. Each mode exists for a different
-reason — pick by what you need before you click in:
+Four walkthroughs, in recommended order. Tutorials 1–3 map one-to-one onto DotBoxD's three modes —
+*call*, *react*, *extend* — and each builds on vocabulary from the one before. Tutorial 4 is the
+advanced, no-generator path.
+
+| # | Tutorial | You build | Starts from |
+|---|----------|-----------|-------------|
+| 1 | [First Service (RPC)](/tutorials/first-service/) — *call the host* | A contract, a host, and a client with a generated typed proxy | An empty project |
+| 2 | [Event pipelines (RunLocal)](/tutorials/event-pipeline-runlocal/) — *react to the host* | A plugin whose `Where`/`Select` filter runs server-side | The [GameServer sample](https://github.com/JKamsker/DotBoxD/tree/main/samples/GameServer) (**clone the repo**) |
+| 3 | [Pushdown server extension](/tutorials/pushdown-server-extension/) — *extend the host* | A plugin-shipped, server-side batch operation | The GameServer sample (**clone the repo**) |
+| 4 | [Hand-written IR hook pipeline](/tutorials/handwritten-ir-hook-pipeline/) — *advanced* | The same shapes from public primitives, with no generator | Public primitives; snippets use GameServer sample types (read along) |
+
+> **Clone first for 2–4.** Tutorial 1 builds from an empty project. Pushdown and event pipelines
+> instead run against the maintained
+> [GameServer sample](https://github.com/JKamsker/DotBoxD/tree/main/samples/GameServer):
+> Pushdown's final step installs into the sample's `PluginServer`, and the event-pipeline snippets
+> reference sample-only types that will not compile in an empty project — so clone the repo and
+> read/run along.
+
+## Why each tutorial exists
 
 1. **[First Service (RPC)](/tutorials/first-service/)** — define a `[RpcService]` contract, host it, and
    call it from a client over a typed proxy. *Why this mode:* easy interop — one C# contract compiles
@@ -24,13 +43,8 @@ reason — pick by what you need before you click in:
 4. **[Hand-written IR hook pipeline](/tutorials/handwritten-ir-hook-pipeline/)** — build or load a
    `PluginPackage`, install it under policy, and wire it to hooks/subscriptions with public primitives.
    *Why this path:* no lock-in — use it when another language, build step, or custom fluent API emits the IR
-   instead of DotBoxD's generator.
-
-> **Note:** First Service builds from an empty project. Pushdown and Event pipelines (RunLocal) instead
-> run against the maintained [GameServer sample](https://github.com/JKamsker/DotBoxD/tree/main/samples/GameServer):
-> Pushdown's final step installs into the sample's `PluginServer`, and the event-pipeline snippets
-> reference sample-only types that will not compile in an empty project — so for both, clone the repo
-> and read/run along.
+   instead of DotBoxD's generator. Skip it until you need it.
 
 New to the project? Read [Getting started](/getting-started/) first, then come back here.
-For the concepts behind each mode, see the [Guide](/overview/).
+For the mental model behind the three modes, see [What is DotBoxD?](/overview/), and for the
+deep-dives, the [concept pages](/concepts/services/).

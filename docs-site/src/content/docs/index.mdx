@@ -1,7 +1,7 @@
 ---
 title: DotBoxD
 description: >-
-  DotBoxD is a contract-first plugin runtime for .NET hosts: one C# interface becomes typed RPC
+  DotBoxD is a contract-first plugin system for .NET hosts: one C# interface becomes typed RPC
   services, server-side event pipelines, and sandboxed pushdown batches — all generated at compile
   time, with no runtime reflection on the hot path.
 template: splash
@@ -9,14 +9,14 @@ editUrl: false
 hero:
   title: DotBoxD
   tagline: >-
-    The contract-first way to let plugins extend a .NET host. One C# interface becomes typed RPC,
-    filtered event pipelines, and sandboxed server-side batches — generated at compile time, with
-    no runtime reflection and no hand-written marshaling.
+    Let plugins extend your .NET host — safely. One C# interface becomes typed RPC, server-side
+    filtered events, and plugin-shipped batch operations, generated at compile time. Untrusted
+    plugin logic runs in a validated, fuel-metered sandbox — never loaded C#/IL.
   actions:
     - text: Get started
       link: /getting-started/
       icon: right-arrow
-    - text: Choose a mode
+    - text: What is DotBoxD?
       link: /overview/
       variant: minimal
       icon: open-book
@@ -31,46 +31,49 @@ import { Card, CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
 ## What is DotBoxD?
 
 **A complete plugin system for .NET hosts.** .NET can't safely isolate arbitrary code in-process,
-so plugins live in a sidecar process behind IPC — safe, but the boundary costs you round-trips and
-an unwinnable filter API. DotBoxD ships that whole architecture from one C# contract (transports,
-typed RPC, event pipelines) and dissolves both costs: plugin-authored logic — filters,
-projections, batches — runs *inside the host* as a validated, fuel-metered sandbox — restricted
-IR (intermediate representation), never loaded C#/IL.
+so plugins live in a sidecar process behind IPC — safe, but every interaction costs a round-trip,
+and the host vendor is forced to design event-filter APIs blind. DotBoxD ships that whole
+architecture from one C# contract (transports, typed RPC, event pipelines) and dissolves both
+costs: plugin-authored logic — filters, projections, batches — runs *inside the host* as a
+validated, fuel-metered sandbox. The sandbox executes restricted IR (an intermediate
+representation), never loaded C#/IL.
 
 [Why DotBoxD? The dilemma, in three diagrams ›](/why-dotboxd/)
 
-## The three ways to use one contract
+## One contract, three modes
 
-The same contract can be delivered three ways — pick by call shape:
+You write one C# interface. DotBoxD delivers it three ways — pick by call shape:
 
 <CardGrid stagger>
-  <Card title="Services (RPC)" icon="rocket">
-    The host implements a contract; clients call it remotely over RPC (remote procedure call).
-    Proxy and implementation are generated from the same interface, so they cannot drift — and it
-    is generated ahead of time. Unity/IL2CPP additionally needs generated codec formatters and an
-    application-specific IL2CPP build check.
+  <Card title="1 · Call the host — Services (RPC)" icon="rocket">
+    The host implements the contract; clients call it through a generated typed proxy. Proxy and
+    implementation come from the same interface, so they cannot drift — and it is all generated at
+    compile time.
 
     [Tutorial: your first service ›](/tutorials/first-service/)
   </Card>
-  <Card title="Kernels (Query / RunLocal)" icon="seti:shell">
-    A client supplies validated logic — e.g. a `Where`/`Select` event filter — the host runs safely
-    inside a fuel-metered sandbox, so a plugin can't run away with CPU. Downstream this mode is
-    called *Query (RunLocal)*.
+  <Card title="2 · React to the host — event pipelines" icon="seti:shell">
+    A plugin subscribes with an ordinary `Where`/`Select` chain. The filter runs *inside the host*
+    as sandboxed IR, so only matching, projected data ever crosses the wire — zero round-trips.
 
     [Tutorial: event pipelines ›](/tutorials/event-pipeline-runlocal/)
   </Card>
-  <Card title="Pushdown" icon="seti:pipeline">
-    A plugin ships its *own* sandboxed batch operation that runs **server-side**, collapsing N
-    round-trips into one validated submission.
+  <Card title="3 · Extend the host — Pushdown" icon="seti:pipeline">
+    A plugin ships its *own* batch operation that runs **server-side** over the host's existing
+    bindings, collapsing N round-trips into one validated submission — without recompiling the
+    host.
 
     [Tutorial: pushdown server extension ›](/tutorials/pushdown-server-extension/)
   </Card>
 </CardGrid>
 
+Modes 2 and 3 are powered by the same engine — the [kernel sandbox](/concepts/kernels/): validated,
+capability-gated, fuel-metered IR. Mode 1 is a trusted, hand-written host implementation.
+
 ## Install
 
 ```bash
-# Full net10.0 stack (Services + Kernels + Pushdown):
+# Full net10.0 stack — Services, the kernel sandbox, and Pushdown:
 dotnet add package DotBoxD --prerelease
 
 # Unity / netstandard2.1 service bundle:
@@ -90,23 +93,33 @@ The Kernels and Pushdown stack targets `net10.0`.
   Read [Sandbox caveats](/security/sandbox-caveats/) before deploying.
 </Aside>
 
-## Explore the docs
+## Find your path
 
 <CardGrid>
   <LinkCard
-    title="Overview & choosing a mode"
+    title="Getting started"
+    href="/getting-started/"
+    description="Install, get a first end-to-end win, and pick your track — about 10 minutes."
+  />
+  <LinkCard
+    title="What is DotBoxD? (choosing a mode)"
     href="/overview/"
-    description="Same contract, three delivery strategies — pick by call shape and trust model."
+    description="The mental model — one contract, three modes, one sandbox — and a decision table."
   />
   <LinkCard
     title="Tutorials"
     href="/tutorials/"
-    description="End-to-end walkthroughs: your first service, event pipelines with RunLocal, and a pushdown server extension."
+    description="Three end-to-end tracks — call, react, extend — plus an advanced hand-written IR path."
   />
   <LinkCard
-    title="Examples"
-    href="/examples/"
-    description="An annotated tour of the maintained GameServer sample."
+    title="Example: GameServer"
+    href="/examples/gameserver-walkthrough/"
+    description="An annotated tour of the maintained sample that ties all three modes together."
+  />
+  <LinkCard
+    title="Security model"
+    href="/security/sandbox-caveats/"
+    description="What is and isn't a boundary — read before deploying untrusted plugins."
   />
   <LinkCard
     title="API reference"

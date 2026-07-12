@@ -35,6 +35,10 @@ link for the full treatment.
 
 ## Modes and authoring
 
+- **Event pipeline** — The *react* mode: one fluent chain —
+  `server.Hooks.On<TEvent>().Where(...).Select(...).<terminal>(...)` — whose `Where`/`Select`
+  [lower to server-side kernel IR](/concepts/event-pipelines/), so only matching, projected data is
+  pushed to the plugin. Some API surfaces and older pages call this mode *Query (RunLocal)*.
 - **Pushdown** — Collapsing many small remote calls into [one validated server-side batch](/concepts/pushdown/)
   that loops the host's existing bindings next to its data.
 - **Server extension** — A plugin's [`[ServerExtension]`](/concepts/pushdown/) batch aggregate,

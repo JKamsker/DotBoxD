@@ -1,14 +1,14 @@
 ---
 title: 'Example: the GameServer sample, end to end'
-description: 'The GameServer sample is the maintained, runnable example that ties Services, Kernels, and Pushdown together in one program. It is the canonical reference…'
+description: 'The GameServer sample is the maintained, runnable example that ties Services, event pipelines, and Pushdown together in one program. It is the canonical reference…'
 ---
-The GameServer sample is the maintained, runnable example that ties **Services**, **Kernels**, and **Pushdown** together in one program. It is the canonical reference because it exercises all three modes end to end in a single process pair:
+The GameServer sample is the maintained, runnable example that ties **Services**, **event pipelines**, and **Pushdown** together in one program. It is the canonical reference because it exercises all three modes end to end in a single process pair:
 
 - **Services (RPC)** — typed interop from one C# contract.
-- **Query (RunLocal)** — the event pipeline: server-side filtering and projection so the host receives only the data it needs.
+- **Event pipelines** (*Query (RunLocal)* in API surfaces) — server-side filtering and projection so the plugin receives only the data it needs.
 - **Pushdown** — server extensions that batch work next to the data instead of round-tripping.
 
-The patterns you see here map straight onto your own host and plugins. A parent *server* process runs a small deterministic simulation; a child *plugin* process ships untrusted, sandboxed kernels to the server over a bidirectional named-pipe control plane. This page walks the sample feature by feature and maps each one to the concrete file that implements it, so you can jump straight into the real code.
+The patterns you see here map straight onto your own host and plugins. A parent *server* process runs a small deterministic simulation; a child *plugin* process ships untrusted, sandboxed kernels to the server over a bidirectional named-pipe control plane. This page walks the sample feature by feature and maps each one to the concrete file that implements it, so you can jump straight into the real code — read it after (or alongside) the [tutorials](/tutorials/) to see the pieces working together.
 
 The sample lives under [`samples/GameServer`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer) and is the example the root [`README.md`](https://github.com/JKamsker/DotBoxD/blob/main/README.md) points at for "service IPC, event kernels, live settings, host bindings, policies, and server extensions."
 

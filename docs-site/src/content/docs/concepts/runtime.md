@@ -2,7 +2,12 @@
 title: 'Kernel runtime'
 description: 'The kernel runtime executes validated IR under hard budgets. Key pieces:'
 ---
-The kernel runtime executes validated IR (intermediate representation) under hard budgets. Key pieces:
+The kernel runtime executes validated IR (intermediate representation) under hard budgets.
+
+> **Who this page is for:** people operating or security-reviewing a host — how the sandbox enforces
+> its budgets, why there are two execution backends, and which to pick. If you just want to *use*
+> kernels through event pipelines or Pushdown, the [kernels concept](/concepts/kernels/) is enough;
+> come back when you care about throughput, quotas, or audit.
 
 ## Why two backends, and why everything is metered
 

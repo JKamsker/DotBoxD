@@ -24,14 +24,17 @@ GameServer remains the prime example because it combines the core plugin model i
 - per-resource audit events from host bindings
 - least-privilege policy construction
 - compiled kernel execution
-- kernel RPC pushdown for server-side batch work
+- server-extension pushdown for server-side batch work
 - ordinary server APIs beside kernel execution
 - plugin ownership tied to the IPC connection lifetime
 
 ## No Longer Shown In Maintained Examples
 
 These capabilities are still part of the repository, but they are no longer demonstrated by a
-maintained sample project after removing the older examples:
+maintained sample project after removing the older examples. (This list is about *runnable sample
+projects*; some of the same ground is still covered inline by documentation — for example, the
+[RPC channels quick start](/channels/quick-start/) walks through a TCP client/server — and by
+focused tests.)
 
 - A standalone Services-only client/server sample over TCP.
 - Bidirectional service callbacks using two services on the same peer connection.
