@@ -47,6 +47,46 @@ public sealed class GeneratedDispatcherCancellationRegressionTests
     }
 
     [Fact]
+    public async Task Generated_instance_dispatcher_observes_pre_canceled_token_before_registry_lookup()
+    {
+        var service = new RecordingDispatchCancellationService();
+        var dispatcher = GeneratedServiceRegistry.CreateDispatcher<IDispatchCancellationService>(service);
+        var method = FindMethod(nameof(IDispatchCancellationService.Record));
+        var innerSerializer = new MessagePackRpcSerializer();
+        using var payload = innerSerializer.SerializeToPayload(123);
+        var serializer = new CountingSerializer(innerSerializer);
+        var registry = new CountingMissingInstanceRegistry();
+        var output = new ArrayBufferWriter<byte>();
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+
+        var exception = await Record.ExceptionAsync(() =>
+            dispatcher.DispatchOnInstanceAsync(
+                "missing-instance",
+                method.WireName,
+                payload.Memory,
+                serializer,
+                registry,
+                output,
+                canceled.Token));
+
+        Assert.True(
+            exception is OperationCanceledException,
+            "Expected OperationCanceledException before instance registry lookup; actual " +
+            $"{exception?.GetType().Name ?? "no exception"}, " +
+            $"registry lookups {registry.TryGetCalls}, " +
+            $"deserialize calls {serializer.DeserializeCalls}, " +
+            $"receiver calls {service.CallCount}, " +
+            $"serialize calls {serializer.SerializeCalls}, " +
+            $"bytes written {output.WrittenCount}.");
+        Assert.Equal(0, registry.TryGetCalls);
+        Assert.Equal(0, serializer.DeserializeCalls);
+        Assert.Equal(0, service.CallCount);
+        Assert.Equal(0, serializer.SerializeCalls);
+        Assert.Equal(0, output.WrittenCount);
+    }
+
+    [Fact]
     public async Task Generated_dispatcher_observes_receiver_canceled_token_before_serializing_scalar_result()
     {
         using var source = new CancellationTokenSource();
@@ -213,5 +253,29 @@ public sealed class GeneratedDispatcherCancellationRegressionTests
             DeserializeCalls++;
             return inner.Deserialize(data, type);
         }
+    }
+
+    private sealed class CountingMissingInstanceRegistry : IInstanceRegistry
+    {
+        public int TryGetCalls { get; private set; }
+
+        public string Register(string serviceName, object instance) =>
+            throw new NotSupportedException();
+
+        public bool TryGet(string serviceName, string instanceId, out object instance)
+        {
+            TryGetCalls++;
+            instance = null!;
+            return false;
+        }
+
+        public void Release(string serviceName, string instanceId) =>
+            throw new NotSupportedException();
+
+        public ValueTask ReleaseAsync(string serviceName, string instanceId) =>
+            throw new NotSupportedException();
+
+        public void ReleaseAll() =>
+            throw new NotSupportedException();
     }
 }
