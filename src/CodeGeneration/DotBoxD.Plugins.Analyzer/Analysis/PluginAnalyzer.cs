@@ -70,6 +70,10 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
                 OperationKind.UnaryOperator,
                 OperationKind.BinaryOperator,
                 OperationKind.Conversion);
+            startContext.RegisterOperationAction(
+                c => AnalyzeImplicitStringFormatting(c, helperGraph),
+                OperationKind.BinaryOperator,
+                OperationKind.Interpolation);
             RegisterForbiddenTypeSyntaxAnalysis(startContext, helperGraph);
             RegisterEnumerationSyntaxAnalysis(startContext, helperGraph);
             RegisterFixedReachabilityAnalysis(startContext, helperGraph);
