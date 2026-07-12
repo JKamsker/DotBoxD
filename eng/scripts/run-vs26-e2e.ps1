@@ -296,6 +296,53 @@ function Wait-ForCompanionExit([int[]] $ProcessIds) {
     }
 }
 
+function Assert-AdapterTranscript {
+    if (-not (Test-Path $launcherLog)) {
+        throw "Visual Studio did not create the kernel debug adapter transcript at $launcherLog."
+    }
+
+    $transcript = Get-Content -LiteralPath $launcherLog
+    $errors = @($transcript | Where-Object {
+        $_ -match ' adapter (?:error|unhandled error) '
+    })
+    if ($errors.Count -gt 0) {
+        throw "The kernel debug adapter logged an error: $($errors[0])"
+    }
+
+    $requests = @($transcript | ForEach-Object {
+        $match = [regex]::Match($_, ' adapter request (\S+)$')
+        if ($match.Success) { $match.Groups[1].Value }
+    })
+    $completed = @($transcript | ForEach-Object {
+        $match = [regex]::Match($_, ' adapter completed (\S+)$')
+        if ($match.Success) { $match.Groups[1].Value }
+    })
+    $requiredCommands = @(
+        'initialize', 'attach', 'setBreakpoints', 'configurationDone',
+        'threads', 'stackTrace', 'next', 'continue', 'disconnect'
+    )
+    $missing = @($requiredCommands | Where-Object { $_ -notin $requests })
+    if ($missing.Count -gt 0) {
+        throw "The kernel debug adapter transcript is missing request(s): $($missing -join ', ')."
+    }
+    $incomplete = @($requests | Select-Object -Unique | Where-Object {
+        $command = $_
+        @($requests | Where-Object { $_ -eq $command }).Count -ne
+            @($completed | Where-Object { $_ -eq $command }).Count
+    })
+    if ($incomplete.Count -gt 0) {
+        throw "The kernel debug adapter did not complete request(s): $($incomplete -join ', ')."
+    }
+    if (-not ($transcript | Where-Object { $_ -match ' adapter bridge remote stepOver$' })) {
+        throw 'Visual Studio Step Over did not reach the remote kernel debugger.'
+    }
+
+    $mappedStops = @($transcript | Where-Object { $_ -match ' adapter stack \d+ (ShouldHandle|Handle) line (35|44)$' })
+    if ($mappedStops.Count -lt 4) {
+        throw "Expected at least four source-mapped kernel stops, found $($mappedStops.Count)."
+    }
+}
+
 New-Item -ItemType Directory -Path $artifacts -Force | Out-Null
 Remove-Item $activityLog, $launcherLog, $resultLog, $continuousStartGate -Force -ErrorAction SilentlyContinue
 Stop-ExamplesAndVisualStudio
@@ -409,8 +456,9 @@ $dte.Debugger.Go($false)
     }
     Invoke-DteWhenReady '$dte.Debugger.Stop($true)' 'Visual Studio debugger stop' | Out-Null
     Wait-ForCompanionExit @($companionProcesses.ProcessId)
-    Set-Content $resultLog "PASS: managed Program.cs:$($managedStop.Line); processes server/plugin/adapter; DTE frames and breakpoints at kernel 35/44; kernel step to $($step.Line); clean debugger shutdown."
-    Write-Host "Visual Studio 2026 kernel debugger E2E passed: verified DTE frames/breakpoints, stepped to $($step.Line), and stopped all companion processes."
+    Assert-AdapterTranscript
+    Set-Content $resultLog "PASS: managed Program.cs:$($managedStop.Line); processes server/plugin/adapter; DTE frames and breakpoints at kernel 35/44; kernel step to $($step.Line); complete error-free adapter lifecycle; clean debugger shutdown."
+    Write-Host "Visual Studio 2026 kernel debugger E2E passed: verified DTE state, adapter lifecycle, stepping, and clean companion shutdown."
 }
 catch {
     Set-Content $resultLog ("FAIL: " + $_.Exception)

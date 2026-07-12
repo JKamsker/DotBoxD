@@ -229,7 +229,7 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
                 _ = await _bridge.RemoteAsync(PluginDebugCommands.Disconnect, null, cancellationToken)
                     .ConfigureAwait(false);
             }
-            catch (DebugAdapterException)
+            catch (Exception exception) when (exception is DebugAdapterException or IOException)
             {
                 // A lost remote session is already disconnected.
             }
