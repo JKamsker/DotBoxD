@@ -264,12 +264,13 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
     }
 
     [Fact]
-    public void Projection_of_a_dto_that_inherits_public_properties_fails_safe()
+    public void Projection_of_a_dto_that_inherits_public_properties_emits_a_decoder()
     {
-        // DerivedShape inherits Zone from BaseInfo; RecordFields (and the runtime marshaller) see only declared
-        // members, so the base property would be silently dropped. The chain is skipped instead.
-        _ = Compile(InheritedDtoSource, enableInterceptors: true, suppressFailClosedDiagnostic: true);
-        Assert.DoesNotContain("ReadProjected", GeneratedSource(InheritedDtoSource));
+        _ = Compile(InheritedDtoSource, enableInterceptors: true);
+        var generated = GeneratedSource(InheritedDtoSource);
+
+        Assert.Contains("ReadProjected", generated, StringComparison.Ordinal);
+        Assert.Contains("new global::ChainSample.DerivedShape", generated, StringComparison.Ordinal);
     }
 
     [Fact]

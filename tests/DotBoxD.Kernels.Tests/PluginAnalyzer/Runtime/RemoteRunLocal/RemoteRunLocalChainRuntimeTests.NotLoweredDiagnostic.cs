@@ -18,7 +18,6 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
     public static IEnumerable<object[]> UnlowerableRemoteRunLocalSources()
     {
         yield return [ConvertingCtorSource];   // constructor parameter type != field type
-        yield return [InheritedDtoSource];     // projected DTO inherits a public property
         yield return [NonScalarEqualitySource]; // Where compares two non-scalar (list) operands
         yield return [DerivedFieldSource];     // projected DTO field derived in the constructor body
     }

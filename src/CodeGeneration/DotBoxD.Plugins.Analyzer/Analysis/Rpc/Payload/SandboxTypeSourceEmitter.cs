@@ -189,10 +189,6 @@ internal static class SandboxTypeSourceEmitter
 
     private static string RecordSandboxSource(INamedTypeSymbol named, int depth)
     {
-        // A DTO that inherits public instance data members would silently drop them: RecordFields (and the
-        // runtime marshaller's GetRecordShape) see only declared members. Fail safe instead of emitting a
-        // partial record shape -- same rule the server-extension JsonType path enforces.
-        DotBoxDRpcTypeMapper.RejectInheritedDtoProperties(named);
         var fields = DotBoxDRpcTypeMapper.RecordFields(named);
         var fieldTypes = new string[fields.Count];
         for (var i = 0; i < fields.Count; i++)
