@@ -244,16 +244,25 @@ try {
 
     if (-not [string]::IsNullOrWhiteSpace($VsixPath)) {
         $resolvedVsix = (Resolve-Path $VsixPath).Path
-        $vsixInstaller = Join-Path $installation 'Common7/IDE/VSIXInstaller.exe'
-        if (-not (Test-Path $vsixInstaller)) {
-            throw "VSIXInstaller was not found at $vsixInstaller."
-        }
-        $installerArguments = @('/quiet', '/force')
         if ($InstallVsixForAllUsers) {
-            $installerArguments += '/admin'
+            $extensionsRoot = [IO.Path]::GetFullPath((Join-Path $installation 'Common7/IDE/Extensions'))
+            $extensionDirectory = [IO.Path]::GetFullPath((Join-Path $extensionsRoot 'DotBoxD/KernelDebug'))
+            $expectedPrefix = $extensionsRoot.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+            if (-not $extensionDirectory.StartsWith($expectedPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+                throw "Refusing to stage the VSIX outside $extensionsRoot."
+            }
+
+            Remove-Item -LiteralPath $extensionDirectory -Recurse -Force -ErrorAction SilentlyContinue
+            [IO.Compression.ZipFile]::ExtractToDirectory($resolvedVsix, $extensionDirectory)
+            Invoke-Checked (Join-Path $installation 'Common7/IDE/devenv.com') @('/UpdateConfiguration')
         }
-        $installerArguments += $resolvedVsix
-        Invoke-Checked $vsixInstaller $installerArguments
+        else {
+            $vsixInstaller = Join-Path $installation 'Common7/IDE/VSIXInstaller.exe'
+            if (-not (Test-Path $vsixInstaller)) {
+                throw "VSIXInstaller was not found at $vsixInstaller."
+            }
+            Invoke-Checked $vsixInstaller @('/quiet', '/force', $resolvedVsix)
+        }
     }
 
     Set-ProjectDebugProfiles
