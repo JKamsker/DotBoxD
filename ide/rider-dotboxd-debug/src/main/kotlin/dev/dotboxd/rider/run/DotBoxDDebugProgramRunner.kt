@@ -33,10 +33,16 @@ class DotBoxDDebugProgramRunner : GenericProgramRunner<RunnerSettings>() {
     ): RunContentDescriptor? {
         val configuration = environment.runProfile as DotBoxDRunConfiguration
         val adapter = resolveAdapter(configuration)
-        val commandLine = GeneralCommandLine("dotnet", adapter.absolutePath)
-            .withParentEnvironmentType(GeneralCommandLine.ParentEnvironmentType.CONSOLE)
+        val logDirectory = File(com.intellij.openapi.application.PathManager.getLogPath())
+        val diagnostics = File(logDirectory, "dotboxd-kernel-debug-adapter.log")
+        val stderr = File(logDirectory, "dotboxd-kernel-debug-adapter.stderr.log")
+        val commandLine = GeneralCommandLine(
+            "dotnet",
+            adapter.absolutePath,
+            "--diagnostic-log",
+            diagnostics.absolutePath,
+        ).withParentEnvironmentType(GeneralCommandLine.ParentEnvironmentType.CONSOLE)
         project.basePath?.let { commandLine.workDirectory = File(it) }
-        val stderr = File(com.intellij.openapi.application.PathManager.getLogPath(), "dotboxd-kernel-debug-adapter.log")
         val process = commandLine.toProcessBuilder()
             .redirectErrorStream(false)
             .redirectError(ProcessBuilder.Redirect.appendTo(stderr))

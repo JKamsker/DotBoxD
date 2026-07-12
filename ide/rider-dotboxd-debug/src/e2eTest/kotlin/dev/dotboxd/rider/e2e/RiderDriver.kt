@@ -148,6 +148,31 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
         return DebugStop(parts[0], parts[1].toInt(), parts[2])
     }
 
+    fun dotNetBreakpoints(): List<IdeBreakpoint> {
+        val value = call<String>(
+            """
+            const project = projectOf(component);
+            const manager = com.intellij.xdebugger.XDebuggerManager.getInstance(project).getBreakpointManager();
+            const breakpoints = manager.getAllBreakpoints();
+            const result = [];
+            for (let i = 0; i < breakpoints.length; i++) {
+                const breakpoint = breakpoints[i];
+                if (String(breakpoint.getType().getId()) !== 'DotNet Breakpoints') continue;
+                const position = breakpoint.getSourcePosition();
+                const path = position && position.getFile() ? position.getFile().getPath() : '';
+                const line = position ? position.getLine() + 1 : 0;
+                result.push((breakpoint.isEnabled() ? '1' : '0') + '|' + path + '|' + line);
+            }
+            result.join('\n');
+            """,
+        )
+        if (value.isBlank()) return emptyList()
+        return value.lineSequence().map { encoded ->
+            val parts = encoded.split('|', limit = 3)
+            IdeBreakpoint(parts[0] == "1", parts[1], parts[2].toInt())
+        }.toList()
+    }
+
     fun debugSummary(): String = call(
         """
         const project = projectOf(component);
@@ -180,6 +205,32 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
         )
     }
 
+    fun stepOver() {
+        run(
+            """
+            const project = projectOf(component);
+            const session = com.intellij.xdebugger.XDebuggerManager.getInstance(project).getCurrentSession();
+            if (!session || !session.isSuspended()) throw 'No suspended DotBoxD debug session';
+            session.stepOver(false);
+            """,
+        )
+    }
+
+    fun stopDebugSession() {
+        run(
+            """
+            const project = projectOf(component);
+            const session = com.intellij.xdebugger.XDebuggerManager.getInstance(project).getCurrentSession();
+            if (!session) throw 'No active DotBoxD debug session';
+            session.stop();
+            """,
+        )
+    }
+
+    fun hasDebugSession(): Boolean = call(
+        "com.intellij.xdebugger.XDebuggerManager.getInstance(projectOf(component)).getCurrentSession() != null;",
+    )
+
     private inline fun <reified T> call(script: String): T = frame.callJs(prologue + script.trimIndent(), true)
 
     private fun run(script: String) = frame.runJs(prologue + script.trimIndent(), true)
@@ -199,3 +250,5 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
 }
 
 internal data class DebugStop(val path: String, val line: Int, val stackName: String)
+
+internal data class IdeBreakpoint(val enabled: Boolean, val path: String, val line: Int)

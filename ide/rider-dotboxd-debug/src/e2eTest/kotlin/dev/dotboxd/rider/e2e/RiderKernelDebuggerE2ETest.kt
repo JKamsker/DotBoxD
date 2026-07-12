@@ -32,6 +32,7 @@ class RiderKernelDebuggerE2ETest {
         val guardian = root.resolve("samples/GameServer/Examples.GameServer.Plugin/Kernels/GuardianKernel.cs")
         val existingBridges = liveBridgeProcessIds()
         val existingExamples = exampleProcessIds(root)
+        val existingAdapters = adapterProcessIds()
         var launchedExamples: ExternalExamples? = null
         try {
             rider.clearDotNetBreakpoints()
@@ -45,10 +46,17 @@ class RiderKernelDebuggerE2ETest {
                 pluginProcessId,
                 runRegisteredRunnerDirectly = System.getProperty("dotboxd.e2e.external-launch", "false").toBoolean(),
             )
+            val adapterProcessId = awaitAdapter(existingAdapters)
             launchedExamples?.releaseAfterBreakpointsReady()
 
             val firstPredicate = awaitStop(rider, launchedExamples) {
                 it.path.endsWith("GuardianKernel.cs") && it.line == 35
+            }
+            assertKernelIdeState(rider, firstPredicate, guardian, 35)
+            rider.stepOver()
+            val step = awaitStop(rider, launchedExamples) {
+                it.path.endsWith("GuardianKernel.cs") &&
+                    it.stackName == firstPredicate.stackName && it.line != firstPredicate.line
             }
             rider.resume()
             val firstHandle = awaitStop(rider, launchedExamples) {
@@ -63,15 +71,42 @@ class RiderKernelDebuggerE2ETest {
             val repeatedHandle = awaitStop(rider, launchedExamples) {
                 it.path.endsWith("GuardianKernel.cs") && it.line == 44
             }
+            assertKernelIdeState(rider, repeatedHandle, guardian, 44)
 
             assertEquals(firstPredicate.line, repeatedPredicate.line)
             assertTrue(firstPredicate.stackName != firstHandle.stackName)
             assertTrue(repeatedPredicate.stackName != repeatedHandle.stackName)
+            assertTrue(step.line > 0)
+
+            rider.stopDebugSession()
+            waitFor(Duration.ofSeconds(30), Duration.ofMillis(200)) { !rider.hasDebugSession() }
+            waitFor(Duration.ofSeconds(30), Duration.ofMillis(200)) {
+                ProcessHandle.of(adapterProcessId).map(ProcessHandle::isAlive).orElse(false).not()
+            }
+            val transcript = adapterLog(root)
+            waitFor(Duration.ofSeconds(30), Duration.ofMillis(200)) {
+                Files.isRegularFile(transcript) && Files.readString(transcript).contains(" adapter completed disconnect")
+            }
+            AdapterTranscript.assertComplete(transcript)
         } finally {
             launchedExamples?.destroy()
             stopNewExampleProcesses(root, existingExamples)
         }
     }
+
+    private fun assertKernelIdeState(rider: RiderDriver, stop: DebugStop, guardian: Path, line: Int) {
+        assertEquals(guardian.normalize().toString().replace('\\', '/'), stop.path.replace('\\', '/'))
+        assertEquals(line, stop.line)
+        val breakpoints = rider.dotNetBreakpoints()
+        assertEquals(2, breakpoints.size)
+        assertEquals(listOf(35, 44), breakpoints.filter(IdeBreakpoint::enabled).map(IdeBreakpoint::line).sorted())
+        assertTrue(breakpoints.all { it.path.replace('\\', '/') == guardian.toString().replace('\\', '/') })
+    }
+
+    private fun adapterLog(root: Path): Path = root.resolve(
+        "ide/rider-dotboxd-debug/.intellijPlatform/sandbox/dotboxd-kernel-debug-rider/" +
+            "RD-2025.2.1/log_runIdeForUiTests/dotboxd-kernel-debug-adapter.log",
+    )
 
     private fun startExamples(rider: RiderDriver, root: Path): ExternalExamples? {
         if (!System.getProperty("dotboxd.e2e.external-launch", "false").toBoolean()) {
@@ -117,6 +152,14 @@ class RiderKernelDebuggerE2ETest {
         return requireNotNull(result)
     }
 
+    private fun awaitAdapter(existing: Set<Long>): Long {
+        var result: Long? = null
+        waitFor(Duration.ofSeconds(30), Duration.ofMillis(200)) {
+            adapterProcessIds().firstOrNull { it !in existing }?.also { result = it } != null
+        }
+        return requireNotNull(result)
+    }
+
     private fun liveBridgeProcessIds(): Set<Long> {
         val localData = requireNotNull(System.getenv("LOCALAPPDATA"))
         val directory = Path.of(localData, "DotBoxD", "Debug")
@@ -132,6 +175,12 @@ class RiderKernelDebuggerE2ETest {
 
     private fun exampleProcessIds(root: Path): Set<Long> = ProcessHandle.allProcesses().use { processes ->
         processes.filter { isExampleProcess(it, root) }.map(ProcessHandle::pid).toList().toSet()
+    }
+
+    private fun adapterProcessIds(): Set<Long> = ProcessHandle.allProcesses().use { processes ->
+        processes.filter {
+            it.info().commandLine().orElse("").contains("DotBoxD.DebugAdapter.dll", ignoreCase = true)
+        }.map(ProcessHandle::pid).toList().toSet()
     }
 
     private fun stopNewExampleProcesses(root: Path, existing: Set<Long>) {
