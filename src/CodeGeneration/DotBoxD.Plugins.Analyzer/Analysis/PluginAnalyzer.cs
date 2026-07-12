@@ -40,6 +40,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.EnableConcurrentExecution();
+        context.RegisterSymbolAction(AnalyzeField, SymbolKind.Field);
         context.RegisterSymbolAction(AnalyzeMethod, SymbolKind.Method);
         context.RegisterSymbolAction(AnalyzeProperty, SymbolKind.Property);
         context.RegisterCompilationStartAction(startContext =>
@@ -58,6 +59,8 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeMethod(SymbolAnalysisContext context)
     {
         var method = (IMethodSymbol)context.Symbol;
+        ReportForbiddenDeclaredMethodSignature(context, method);
+
         if (!HasAttribute(method, DotBoxDMetadataNames.NativeOnlyAttribute))
         {
             return;
@@ -69,6 +72,8 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeProperty(SymbolAnalysisContext context)
     {
         var property = (IPropertySymbol)context.Symbol;
+        ReportForbiddenDeclaredPropertyType(context, property);
+
         if (HasAttribute(property, DotBoxDMetadataNames.NativeOnlyAttribute))
         {
             ValidateLocalMember(context, property, property);
@@ -99,6 +104,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         }
 
         ReportAndRecordIfForbidden(context, helperGraph, method, invocation.TargetMethod.ContainingType);
+        ReportForbiddenReferencedMethodSignature(context, invocation.TargetMethod);
         helperGraph.RecordCall(method, invocation.TargetMethod, context.Operation.Syntax.GetLocation());
         ReportLocalUseIfInvalid(context, invocation.TargetMethod);
     }
@@ -135,6 +141,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         }
 
         ReportAndRecordIfForbidden(context, helperGraph, method, property.ContainingType);
+        ReportForbiddenReferencedType(context, property.ContainingType, property.Type);
         ReportLocalUseIfInvalid(context, property);
 
         // A forbidden API reached through a helper property's accessor body is only linked to the kernel
@@ -163,6 +170,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         }
 
         ReportAndRecordIfForbidden(context, helperGraph, method, field.ContainingType);
+        ReportForbiddenReferencedType(context, field.ContainingType, field.Type);
     }
 
     private static void AnalyzeTypeOf(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
@@ -191,6 +199,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         }
 
         ReportAndRecordIfForbidden(context, helperGraph, method, reference.Method.ContainingType);
+        ReportForbiddenReferencedMethodSignature(context, reference.Method);
         helperGraph.RecordCall(method, reference.Method, context.Operation.Syntax.GetLocation());
         ReportLocalUseIfInvalid(context, reference.Method);
     }
