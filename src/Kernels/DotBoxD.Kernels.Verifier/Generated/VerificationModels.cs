@@ -20,93 +20,93 @@ public sealed record ArtifactManifest(
     string AssemblyHash,
     DateTimeOffset CreatedAt)
 {
-    private string _cacheKey = VerificationModelCopy.Required(CacheKey, nameof(CacheKey));
-    private string _moduleHash = VerificationModelCopy.Required(ModuleHash, nameof(ModuleHash));
-    private string _planHash = VerificationModelCopy.Required(PlanHash, nameof(PlanHash));
-    private string _policyHash = VerificationModelCopy.Required(PolicyHash, nameof(PolicyHash));
-    private string _bindingManifestHash = VerificationModelCopy.Required(BindingManifestHash, nameof(BindingManifestHash));
-    private string _runtimeFacadeHash = VerificationModelCopy.Required(RuntimeFacadeHash, nameof(RuntimeFacadeHash));
-    private string _compilerVersion = VerificationModelCopy.Required(CompilerVersion, nameof(CompilerVersion));
-    private string _typeSystemVersion = VerificationModelCopy.Required(TypeSystemVersion, nameof(TypeSystemVersion));
-    private string _effectAnalysisVersion = VerificationModelCopy.Required(EffectAnalysisVersion, nameof(EffectAnalysisVersion));
-    private string _verifierVersion = VerificationModelCopy.Required(VerifierVersion, nameof(VerifierVersion));
-    private string _languageVersion = VerificationModelCopy.Required(LanguageVersion, nameof(LanguageVersion));
-    private string _targetFramework = VerificationModelCopy.Required(TargetFramework, nameof(TargetFramework));
+    private string _cacheKey = VerificationModelCopy.RequiredText(CacheKey, nameof(CacheKey));
+    private string _moduleHash = VerificationModelCopy.RequiredText(ModuleHash, nameof(ModuleHash));
+    private string _planHash = VerificationModelCopy.RequiredText(PlanHash, nameof(PlanHash));
+    private string _policyHash = VerificationModelCopy.RequiredText(PolicyHash, nameof(PolicyHash));
+    private string _bindingManifestHash = VerificationModelCopy.RequiredText(BindingManifestHash, nameof(BindingManifestHash));
+    private string _runtimeFacadeHash = VerificationModelCopy.RequiredText(RuntimeFacadeHash, nameof(RuntimeFacadeHash));
+    private string _compilerVersion = VerificationModelCopy.RequiredText(CompilerVersion, nameof(CompilerVersion));
+    private string _typeSystemVersion = VerificationModelCopy.RequiredText(TypeSystemVersion, nameof(TypeSystemVersion));
+    private string _effectAnalysisVersion = VerificationModelCopy.RequiredText(EffectAnalysisVersion, nameof(EffectAnalysisVersion));
+    private string _verifierVersion = VerificationModelCopy.RequiredText(VerifierVersion, nameof(VerifierVersion));
+    private string _languageVersion = VerificationModelCopy.RequiredText(LanguageVersion, nameof(LanguageVersion));
+    private string _targetFramework = VerificationModelCopy.RequiredText(TargetFramework, nameof(TargetFramework));
     private IReadOnlyList<string> _optimizationFlags = VerificationModelCopy.List(
         OptimizationFlags,
         nameof(OptimizationFlags));
-    private string _assemblyHash = VerificationModelCopy.Required(AssemblyHash, nameof(AssemblyHash));
+    private string _assemblyHash = VerificationModelCopy.RequiredText(AssemblyHash, nameof(AssemblyHash));
 
     public string CacheKey
     {
         get => _cacheKey;
-        init => _cacheKey = VerificationModelCopy.Required(value, nameof(CacheKey));
+        init => _cacheKey = VerificationModelCopy.RequiredText(value, nameof(CacheKey));
     }
 
     public string ModuleHash
     {
         get => _moduleHash;
-        init => _moduleHash = VerificationModelCopy.Required(value, nameof(ModuleHash));
+        init => _moduleHash = VerificationModelCopy.RequiredText(value, nameof(ModuleHash));
     }
 
     public string PlanHash
     {
         get => _planHash;
-        init => _planHash = VerificationModelCopy.Required(value, nameof(PlanHash));
+        init => _planHash = VerificationModelCopy.RequiredText(value, nameof(PlanHash));
     }
 
     public string PolicyHash
     {
         get => _policyHash;
-        init => _policyHash = VerificationModelCopy.Required(value, nameof(PolicyHash));
+        init => _policyHash = VerificationModelCopy.RequiredText(value, nameof(PolicyHash));
     }
 
     public string BindingManifestHash
     {
         get => _bindingManifestHash;
-        init => _bindingManifestHash = VerificationModelCopy.Required(value, nameof(BindingManifestHash));
+        init => _bindingManifestHash = VerificationModelCopy.RequiredText(value, nameof(BindingManifestHash));
     }
 
     public string RuntimeFacadeHash
     {
         get => _runtimeFacadeHash;
-        init => _runtimeFacadeHash = VerificationModelCopy.Required(value, nameof(RuntimeFacadeHash));
+        init => _runtimeFacadeHash = VerificationModelCopy.RequiredText(value, nameof(RuntimeFacadeHash));
     }
 
     public string CompilerVersion
     {
         get => _compilerVersion;
-        init => _compilerVersion = VerificationModelCopy.Required(value, nameof(CompilerVersion));
+        init => _compilerVersion = VerificationModelCopy.RequiredText(value, nameof(CompilerVersion));
     }
 
     public string TypeSystemVersion
     {
         get => _typeSystemVersion;
-        init => _typeSystemVersion = VerificationModelCopy.Required(value, nameof(TypeSystemVersion));
+        init => _typeSystemVersion = VerificationModelCopy.RequiredText(value, nameof(TypeSystemVersion));
     }
 
     public string EffectAnalysisVersion
     {
         get => _effectAnalysisVersion;
-        init => _effectAnalysisVersion = VerificationModelCopy.Required(value, nameof(EffectAnalysisVersion));
+        init => _effectAnalysisVersion = VerificationModelCopy.RequiredText(value, nameof(EffectAnalysisVersion));
     }
 
     public string VerifierVersion
     {
         get => _verifierVersion;
-        init => _verifierVersion = VerificationModelCopy.Required(value, nameof(VerifierVersion));
+        init => _verifierVersion = VerificationModelCopy.RequiredText(value, nameof(VerifierVersion));
     }
 
     public string LanguageVersion
     {
         get => _languageVersion;
-        init => _languageVersion = VerificationModelCopy.Required(value, nameof(LanguageVersion));
+        init => _languageVersion = VerificationModelCopy.RequiredText(value, nameof(LanguageVersion));
     }
 
     public string TargetFramework
     {
         get => _targetFramework;
-        init => _targetFramework = VerificationModelCopy.Required(value, nameof(TargetFramework));
+        init => _targetFramework = VerificationModelCopy.RequiredText(value, nameof(TargetFramework));
     }
 
     public IReadOnlyList<string> OptimizationFlags
@@ -118,7 +118,7 @@ public sealed record ArtifactManifest(
     public string AssemblyHash
     {
         get => _assemblyHash;
-        init => _assemblyHash = VerificationModelCopy.Required(value, nameof(AssemblyHash));
+        init => _assemblyHash = VerificationModelCopy.RequiredText(value, nameof(AssemblyHash));
     }
 }
 

@@ -68,6 +68,17 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
             conditionalHookChainDiagnostics,
             "conditional hook-chain diagnostic output",
             static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
+        var pipelineSurfaceDiagnostics = GeneratorGuard.AttributeValues(
+            context,
+            DotBoxDMetadataNames.PipelineSurfaceAttribute,
+            static (node, _) => node is TypeDeclarationSyntax,
+            "pipeline surface diagnostic",
+            static (ctx, ct) => PipelineSurfaceDiagnosticFactory.Create(ctx, ct));
+        GeneratorGuard.RegisterOutput(
+            context,
+            pipelineSurfaceDiagnostics,
+            "pipeline surface diagnostic output",
+            static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
 
         // Report DBXK111 for a recognized remote RunLocal chain whose stages could not be lowered, so the
         // otherwise-silent skip (and the runtime NotSupportedException it leads to) is visible at build time.

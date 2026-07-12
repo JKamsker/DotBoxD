@@ -1,3 +1,4 @@
+using System.Threading;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
 using DotBoxD.Services.SourceGenerator.Models;
 
@@ -36,21 +37,21 @@ internal static class ProxyFaultedReturnEmitter
         throw new System.InvalidOperationException("Return kind cannot carry a faulted task.");
     }
 
-    public static string BuildCanceled(MethodModel method, string exceptionName)
+    public static string BuildCanceled(MethodModel method, string cancellationTokenExpression)
     {
         if (method.ReturnKind == MethodReturnKind.Task)
         {
-            return $"{ServicesGeneratorTypeNames.GlobalTask}.FromCanceled({exceptionName}.CancellationToken)";
+            return $"{ServicesGeneratorTypeNames.GlobalTask}.FromCanceled({cancellationTokenExpression})";
         }
 
         if (IsTaskWithResult(method.ReturnKind))
         {
-            return $"{ServicesGeneratorTypeNames.GlobalTask}.FromCanceled<{GetTaskResultType(method)}>({exceptionName}.CancellationToken)";
+            return $"{ServicesGeneratorTypeNames.GlobalTask}.FromCanceled<{GetTaskResultType(method)}>({cancellationTokenExpression})";
         }
 
         if (method.ReturnKind == MethodReturnKind.ValueTask)
         {
-            return $"new {ServicesGeneratorTypeNames.GlobalValueTask}({ServicesGeneratorTypeNames.GlobalTask}.FromCanceled({exceptionName}.CancellationToken))";
+            return $"new {ServicesGeneratorTypeNames.GlobalValueTask}({ServicesGeneratorTypeNames.GlobalTask}.FromCanceled({cancellationTokenExpression}))";
         }
 
         if (IsValueTaskWithResult(method.ReturnKind))
@@ -58,10 +59,26 @@ internal static class ProxyFaultedReturnEmitter
             var valueTaskType = ServicesGeneratorTypeNames.Generic(
                 ServicesGeneratorTypeNames.GlobalValueTask,
                 GetValueTaskResultType(method));
-            return $"new {valueTaskType}({ServicesGeneratorTypeNames.GlobalTask}.FromCanceled<{GetValueTaskResultType(method)}>({exceptionName}.CancellationToken))";
+            return $"new {valueTaskType}({ServicesGeneratorTypeNames.GlobalTask}.FromCanceled<{GetValueTaskResultType(method)}>({cancellationTokenExpression}))";
         }
 
         throw new System.InvalidOperationException("Return kind cannot carry a canceled task.");
+    }
+
+    public static string BuildCancellationCatchFilter(MethodModel method, string exceptionName, CancellationToken ct)
+    {
+        var callerToken = ProxyGenerationHelpers.GetCancellationTokenArgument(method.Parameters, ct);
+        return callerToken == "default"
+            ? $"{exceptionName}.CancellationToken.IsCancellationRequested"
+            : $"{exceptionName}.CancellationToken.IsCancellationRequested || {callerToken}.IsCancellationRequested";
+    }
+
+    public static string BuildCancellationTokenExpression(MethodModel method, string exceptionName, CancellationToken ct)
+    {
+        var callerToken = ProxyGenerationHelpers.GetCancellationTokenArgument(method.Parameters, ct);
+        return callerToken == "default"
+            ? $"{exceptionName}.CancellationToken"
+            : $"{exceptionName}.CancellationToken.IsCancellationRequested ? {exceptionName}.CancellationToken : {callerToken}";
     }
 
     private static bool IsFaultableTask(MethodReturnKind returnKind) =>

@@ -29,10 +29,18 @@ internal static class ExperimentalAttributeFormatter
                 .Append(LiteralHelpers.EscapeStringLiteral(diagnosticId))
                 .Append('"');
 
-            if (TryGetUrlFormat(attr, out var urlFormat))
+            foreach (var argument in attr.NamedArguments)
             {
-                sb.Append(", UrlFormat = \"")
-                    .Append(LiteralHelpers.EscapeStringLiteral(urlFormat))
+                if (argument.Value.Value is not string value ||
+                    argument.Key is not ("UrlFormat" or "Message"))
+                {
+                    continue;
+                }
+
+                sb.Append(", ")
+                    .Append(argument.Key)
+                    .Append(" = \"")
+                    .Append(LiteralHelpers.EscapeStringLiteral(value))
                     .Append('"');
             }
 
@@ -41,21 +49,6 @@ internal static class ExperimentalAttributeFormatter
         }
 
         return ExperimentalAttributeInfo.None;
-    }
-
-    private static bool TryGetUrlFormat(AttributeData attr, out string urlFormat)
-    {
-        foreach (var argument in attr.NamedArguments)
-        {
-            if (argument.Key == "UrlFormat" && argument.Value.Value is string value)
-            {
-                urlFormat = value;
-                return true;
-            }
-        }
-
-        urlFormat = string.Empty;
-        return false;
     }
 }
 

@@ -214,6 +214,7 @@ internal static class PluginManifestCapabilityValidator
         => capability is not null &&
            capability.Length > "event.read.".Length &&
            capability.StartsWith("event.read.", StringComparison.Ordinal) &&
+           !HasEmptySegment(capability) &&
            !CapabilityPattern.IsWildcard(capability);
 
     private static void AddWildcardRequiredCapabilityDiagnostic(
@@ -228,6 +229,7 @@ internal static class PluginManifestCapabilityValidator
 
         if (!CapabilityPattern.IsWildcard(capability))
         {
+            AddMalformedRequiredCapabilityDiagnostic(source, capability, diagnostics);
             return;
         }
 
@@ -236,4 +238,25 @@ internal static class PluginManifestCapabilityValidator
             source + " requiredCapabilities must contain concrete capability ids; " +
             $"wildcard required capability '{capability}' is not allowed."));
     }
+
+    private static void AddMalformedRequiredCapabilityDiagnostic(
+        string source,
+        string capability,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        if (!HasEmptySegment(capability))
+        {
+            return;
+        }
+
+        diagnostics.Add(new SandboxDiagnostic(
+            "DBXK052",
+            source + " requiredCapabilities must contain valid capability ids; " +
+            $"capability id '{capability}' must not contain empty segments."));
+    }
+
+    private static bool HasEmptySegment(string capability)
+        => capability.StartsWith(".", StringComparison.Ordinal) ||
+           capability.EndsWith(".", StringComparison.Ordinal) ||
+           capability.Contains("..", StringComparison.Ordinal);
 }

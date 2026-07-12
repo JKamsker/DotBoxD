@@ -39,6 +39,7 @@ namespace Snap.Nested
         public async global::System.Threading.Tasks.Task<global::Snap.Nested.ISubSnap> GetSubAsync(string label, global::System.Threading.CancellationToken ct = default)
         {
             var __dotboxd_handle = await (this._instanceId is null ? this._invoker.InvokeAsync<string, global::DotBoxD.Services.Protocol.ServiceHandle>("IRootSnap", "GetSubAsync", label, ct) : this._invoker.InvokeOnInstanceAsync<string, global::DotBoxD.Services.Protocol.ServiceHandle>("IRootSnap", this._instanceId!, "GetSubAsync", label, ct));
+            ct.ThrowIfCancellationRequested();
             if (!global::System.String.Equals(__dotboxd_handle.ServiceName, "ISubSnap", global::System.StringComparison.Ordinal))
             {
                 throw new global::DotBoxD.Services.Exceptions.ServiceProtocolException("ServiceHandle.ServiceName did not match expected sub-service 'ISubSnap'.");

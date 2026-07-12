@@ -100,6 +100,32 @@ public sealed class EventQueryPublishCancellationTests
         Assert.Equal(0, handle.Dispatches);
     }
 
+    [Fact]
+    public async Task Indexed_routing_key_cancellation_stops_even_when_key_misses()
+    {
+        var host = new EventQueryHost();
+        using var cancellation = new CancellationTokenSource();
+        var handlerInvoked = false;
+
+        var handle = await host.Query<RoutingCancelEvent>()
+            .Where(e => e.AttackerId == "player-1")
+            .SubscribeAsync((_, _) =>
+            {
+                handlerInvoked = true;
+                return ValueTask.CompletedTask;
+            });
+
+        var context = new HookContext(new InMemoryPluginMessageSink(), cancellation.Token);
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await host.PublishAsync(new RoutingCancelEvent(cancellation), context));
+
+        Assert.True(cancellation.IsCancellationRequested);
+        Assert.False(handlerInvoked);
+        Assert.Equal(0, handle.FilterEvaluations);
+        Assert.Equal(0, handle.Matches);
+        Assert.Equal(0, handle.Dispatches);
+    }
+
     private sealed class ProjectionCancelEvent(string attackerId, CancellationTokenSource cancellation)
     {
         public string AttackerId { get; } = attackerId;
@@ -110,6 +136,18 @@ public sealed class EventQueryPublishCancellationTests
             {
                 cancellation.Cancel();
                 return 9;
+            }
+        }
+    }
+
+    private sealed class RoutingCancelEvent(CancellationTokenSource cancellation)
+    {
+        public string AttackerId
+        {
+            get
+            {
+                cancellation.Cancel();
+                return "player-2";
             }
         }
     }

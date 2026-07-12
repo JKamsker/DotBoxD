@@ -217,6 +217,11 @@ public sealed class NamedPipeClientTransport : ITransport
 
     private static string ValidateName(string value, string parameterName)
     {
+        if (value is null)
+        {
+            throw new ArgumentNullException(parameterName);
+        }
+
         if (string.IsNullOrWhiteSpace(value))
         {
             throw new ArgumentException("Value cannot be null, empty, or whitespace.", parameterName);

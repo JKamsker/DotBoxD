@@ -134,7 +134,12 @@ public sealed class DifferentialFuzzTests
         }.ToJsonString(JsonOptions);
 
     private static string ModuleId(int index)
-        => $"differential-fuzz-{index.ToString(CultureInfo.InvariantCulture)}";
+    {
+        var seed = (long)index;
+        return seed < 0
+            ? $"differential-fuzz-n{(-seed).ToString(CultureInfo.InvariantCulture)}"
+            : $"differential-fuzz-{seed.ToString(CultureInfo.InvariantCulture)}";
+    }
 
     private static JsonObject Parameter(string name)
         => new()

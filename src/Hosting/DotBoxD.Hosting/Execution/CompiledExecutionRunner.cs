@@ -79,7 +79,7 @@ internal static class CompiledExecutionRunner
 
             return Result(plan, artifact, budget, audit, true, value, null);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             var error = new SandboxError(SandboxErrorCode.Cancelled, "execution cancelled");
             WriteSummary(audit, runId, startedAt, plan, executable, budget, false, error);
@@ -151,7 +151,7 @@ internal static class CompiledExecutionRunner
             EnsureReturnType(plan, entrypoint, value);
             return ValueTask.FromResult(NoAuditSuccessResult(plan, artifact, budget, value));
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             var error = new SandboxError(SandboxErrorCode.Cancelled, "execution cancelled");
             return ValueTask.FromResult(FailureResult(plan, executable, options, budget, error));

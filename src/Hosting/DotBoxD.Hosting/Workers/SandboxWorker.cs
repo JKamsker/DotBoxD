@@ -63,6 +63,8 @@ public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(entrypoint);
+        ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(options);
         cancellationToken.ThrowIfCancellationRequested();
 

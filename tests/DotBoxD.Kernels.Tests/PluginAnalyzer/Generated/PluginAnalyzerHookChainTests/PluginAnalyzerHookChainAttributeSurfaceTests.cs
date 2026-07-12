@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis;
 using static DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.HookChainGeneratorTestSupport;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
@@ -54,16 +55,18 @@ public sealed class PluginAnalyzerHookChainAttributeSurfaceTests
     }
 
     [Fact]
-    public void Does_not_lower_a_pipeline_surface_with_an_unknown_transport()
+    public void Pipeline_surface_with_unknown_transport_reports_diagnostic()
     {
         var source = CustomNamedSurfaceSource
             .Replace("{0}", "[PipelineSurface((PipelineTransport)42)]", StringComparison.Ordinal);
 
         var result = RunGenerator(source);
 
-        Assert.DoesNotContain(
-            result.GeneratedTrees,
-            tree => tree.ToString().Contains("HookChain_", StringComparison.Ordinal));
+        Assert.Contains(
+            result.Diagnostics,
+            diagnostic => diagnostic.Id.StartsWith("DBXK", StringComparison.Ordinal) &&
+                diagnostic.Severity == DiagnosticSeverity.Error &&
+                diagnostic.GetMessage().Contains("PipelineTransport", StringComparison.Ordinal));
     }
 
     [Fact]

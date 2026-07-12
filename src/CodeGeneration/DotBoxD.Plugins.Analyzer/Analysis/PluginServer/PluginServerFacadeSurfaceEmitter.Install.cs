@@ -33,8 +33,10 @@ internal static class PluginServerFacadeInstallSurfaceEmitter
         builder.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(lambda);");
         builder.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(irInvocation);");
         builder.AppendLine("        var __pluginId = await Services.EnsureAnonymousKernelAsync(irInvocation.PluginId, () => RequirePluginPackage(irInvocation.PackageFactory()), cancellationToken).ConfigureAwait(false);");
+        builder.AppendLine("        cancellationToken.ThrowIfCancellationRequested();");
         builder.AppendLine("        var __request = irInvocation.EncodeArguments(lambda);");
         builder.AppendLine("        var __response = await Services.WireClient.InvokeServerExtensionAsync(__pluginId, __request, cancellationToken).ConfigureAwait(false);");
+        builder.AppendLine("        cancellationToken.ThrowIfCancellationRequested();");
         builder.AppendLine("        return irInvocation.DecodeResult(lambda, __response);");
         builder.AppendLine("    }");
     }
@@ -59,8 +61,10 @@ internal static class PluginServerFacadeInstallSurfaceEmitter
         builder.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(lambda);");
         builder.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(irInvocation);");
         builder.AppendLine("        var __pluginId = await Services.EnsureAnonymousKernelAsync(irInvocation.PluginId, () => RequirePluginPackage(irInvocation.PackageFactory()), cancellationToken).ConfigureAwait(false);");
+        builder.AppendLine("        cancellationToken.ThrowIfCancellationRequested();");
         builder.AppendLine("        var __request = irInvocation.EncodeArguments(captures, lambda);");
         builder.AppendLine("        var __response = await Services.WireClient.InvokeServerExtensionAsync(__pluginId, __request, cancellationToken).ConfigureAwait(false);");
+        builder.AppendLine("        cancellationToken.ThrowIfCancellationRequested();");
         builder.AppendLine("        return irInvocation.DecodeResult(captures, lambda, __response);");
         builder.AppendLine("    }");
     }

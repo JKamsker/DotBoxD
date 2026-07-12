@@ -19,8 +19,18 @@ public enum PipelineTransport
 /// companion parameters; the source generator supplies those companions through interceptors.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, Inherited = false, AllowMultiple = false)]
-public sealed class PipelineSurfaceAttribute(PipelineTransport transport) : Attribute
+public sealed class PipelineSurfaceAttribute : Attribute
 {
+    public PipelineSurfaceAttribute(PipelineTransport transport)
+    {
+        if (transport is not (PipelineTransport.Local or PipelineTransport.Remote))
+        {
+            throw new ArgumentOutOfRangeException(nameof(transport));
+        }
+
+        Transport = transport;
+    }
+
     /// <summary>Whether chains rooted on this surface run in-host or ship to the remote host.</summary>
-    public PipelineTransport Transport { get; } = transport;
+    public PipelineTransport Transport { get; }
 }

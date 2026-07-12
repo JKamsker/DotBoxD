@@ -12,6 +12,7 @@ internal static class DotBoxDMetadataNames
     public const string LowerToIrAttribute = DotBoxDGenerationNames.TypeNames.LowerToIrAttribute;
     public const string IRBodyOfAttribute = DotBoxDGenerationNames.TypeNames.IRBodyOfAttribute;
     public const string LowerToIrMethodAttribute = DotBoxDGenerationNames.TypeNames.LowerToIrMethodAttribute;
+    public const string PipelineSurfaceAttribute = DotBoxDGenerationNames.TypeNames.PipelineSurfaceAttribute;
     public const string NativeOnlyAttribute = DotBoxDGenerationNames.TypeNames.NativeOnlyAttribute;
     public const string ServerExtensionAttribute = DotBoxDGenerationNames.TypeNames.ServerExtensionAttribute;
     public const string ServerExtensionClientAttribute = DotBoxDGenerationNames.TypeNames.ServerExtensionClientAttribute;

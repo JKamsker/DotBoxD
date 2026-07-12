@@ -15,6 +15,11 @@ public sealed class SandboxInterpreter : ISandboxInterpreter
         SandboxExecutionOptions options,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(entrypoint);
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(options);
+
         var runId = options.RunId ?? SandboxRunId.New();
         var audit = new InMemoryAuditSink();
         var budget = new ResourceMeter(plan.Budget);

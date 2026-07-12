@@ -6,26 +6,15 @@ using Xunit;
 namespace DotBoxD.Services.Tests.Coverage.RoundsEarly;
 
 /// <summary>
-/// RED regression for the <c>_cts</c> state leak in <see cref="RpcHost"/>.<c>StartAsync</c>.
+/// Regression coverage for pre-cancelled <see cref="RpcHost"/>.<c>StartAsync</c>.
 ///
-/// When the caller-supplied <see cref="CancellationToken"/> is already cancelled but the
-/// transport's <c>StartAsync</c> still succeeds, <c>StartAsync</c> enters the
-/// <c>_stopTask is not null || cts.IsCancellationRequested</c> branch (RpcHost.cs ~line 157):
-/// it stops the just-started listener and throws
-/// <c>InvalidOperationException("Host start was stopped before it completed.")</c>. Unlike the
-/// disposed branch and the catch block, that branch does NOT null <c>_cts</c> nor dispose the
-/// linked CTS. The cancelled, undisposed <c>_cts</c> therefore lingers, so any subsequent
-/// <c>StartAsync</c> hits the <c>_cts is not null</c> guard and wrongly throws
-/// "Host is already running." even though no accept loop ever ran.
+/// The host must honor a caller token that is already cancelled before it creates host lifecycle
+/// state or touches the listener. Otherwise a pre-cancelled start can start and stop the listener
+/// just to report cancellation, and earlier fixes had to clean up leaked <c>_cts</c> state after
+/// that recovery path.
 ///
-/// Desired behaviour: a start that fails because the caller token was already cancelled must
-/// leave the host in a clean, restartable state — a later <c>StartAsync</c> with a live token
-/// must succeed (and must NOT throw "Host is already running."). The fix (null <c>_cts</c> and
-/// dispose the linked CTS in that branch, mirroring the catch block) makes this test green.
-///
-/// Fully deterministic and single-threaded: the transport's <c>StartAsync</c> simply awaits one
-/// <see cref="Task.Yield"/> and returns (it never throws and ignores its token), and its
-/// <c>AcceptAsync</c> parks on its token so the second start's accept loop stays quietly alive.
+/// Desired behaviour: a pre-cancelled start throws cancellation without starting or stopping the
+/// listener, and the host remains restartable with a live token.
 /// </summary>
 public sealed class Round2_RpcHostStartCancelStateLeakTests
 {
@@ -42,23 +31,17 @@ public sealed class Round2_RpcHostStartCancelStateLeakTests
         using var preCancelled = new CancellationTokenSource();
         preCancelled.Cancel();
 
-        // First start: the transport start succeeds but the caller token is already cancelled, so
-        // StartAsync stops the listener and throws "Host start was stopped before it completed.".
-        var firstFailure = await Assert.ThrowsAsync<InvalidOperationException>(
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => host.StartAsync(preCancelled.Token).WaitAsync(Timeout));
-        Assert.Contains("stopped before it completed", firstFailure.Message);
+        Assert.Equal(0, transport.StartCalls);
+        Assert.Equal(0, transport.StopCalls);
 
-        // The first (failed) start must have left the host restartable. On the unfixed code _cts is
-        // still the cancelled, undisposed CTS, so this second start throws "Host is already running.".
-        // That is the bug under test — assert the second start SUCCEEDS instead.
+        // The failed start must have left the host restartable.
         var secondStartFailure = await Record.ExceptionAsync(
             () => host.StartAsync().WaitAsync(Timeout));
 
         Assert.Null(secondStartFailure);
-
-        // And the transport must actually have been (re)started, proving a real restart rather than
-        // a silently swallowed no-op.
-        Assert.Equal(2, transport.StartCalls);
+        Assert.Equal(1, transport.StartCalls);
     }
 
     /// <summary>
@@ -69,8 +52,11 @@ public sealed class Round2_RpcHostStartCancelStateLeakTests
     private sealed class YieldingStartServerTransport : IServerTransport
     {
         private int _startCalls;
+        private int _stopCalls;
 
         public int StartCalls => Volatile.Read(ref _startCalls);
+
+        public int StopCalls => Volatile.Read(ref _stopCalls);
 
         public async Task StartAsync(CancellationToken ct = default)
         {
@@ -94,7 +80,11 @@ public sealed class Round2_RpcHostStartCancelStateLeakTests
             throw new OperationCanceledException();
         }
 
-        public Task StopAsync(CancellationToken ct = default) => Task.CompletedTask;
+        public Task StopAsync(CancellationToken ct = default)
+        {
+            Interlocked.Increment(ref _stopCalls);
+            return Task.CompletedTask;
+        }
 
         public ValueTask DisposeAsync() => default;
     }

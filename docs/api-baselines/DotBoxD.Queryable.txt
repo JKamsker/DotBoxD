@@ -77,7 +77,6 @@ public override void Write(Utf8JsonWriter writer, QueryFilter value, JsonSeriali
 public override void Write(Utf8JsonWriter writer, QueryProjection value, JsonSerializerOptions options)
 public override void Write(Utf8JsonWriter writer, QueryValue value, JsonSerializerOptions options)
 public QueryComparisonOperator Operator { get; init; }
-public required QueryFilter? ResidualFilter { get; init; }
 public QueryTranslationException(string message, Exception innerException)
 public QueryTranslationException(string message)
 public QueryValue? Constant { get; init; }
@@ -88,6 +87,7 @@ public required IReadOnlyList<IndexedPredicate> IndexedPredicates { get; init; }
 public required IReadOnlyList<IndexedPredicate> RoutingKeys { get; init; }
 public required QueryComparisonOperator Operator { get; init; }
 public required QueryFilter Filter { get; init; }
+public required QueryFilter? ResidualFilter { get; init; }
 public required QueryFilterKind Kind { get; init; }
 public required QueryProjection Projection { get; init; }
 public required QueryProjectionKind Kind { get; init; }
