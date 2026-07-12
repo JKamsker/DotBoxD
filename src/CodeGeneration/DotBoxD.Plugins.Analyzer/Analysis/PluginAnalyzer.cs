@@ -63,6 +63,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
                 OperationKind.BinaryOperator,
                 OperationKind.Conversion);
             RegisterForbiddenTypeSyntaxAnalysis(startContext, helperGraph);
+            RegisterEnumerationSyntaxAnalysis(startContext, helperGraph);
             startContext.RegisterCompilationEndAction(helperGraph.ReportDiagnostics);
         });
     }
