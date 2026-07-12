@@ -171,6 +171,7 @@ public sealed class RpcStreamingContext : IRpcStreamingContext
         lock (_gate)
         {
             EnsureDispatchActive();
+            _ct.ThrowIfCancellationRequested();
             ClaimDeclaredInbound(handle);
         }
 
