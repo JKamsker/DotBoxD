@@ -85,6 +85,17 @@ internal sealed class RpcDispatchResponseBuilder
             return new RpcDispatchResult(BuildErrorFrame(messageId, error), stream: null);
         }
 
+        try
+        {
+            ct.ThrowIfCancellationRequested();
+        }
+        catch (OperationCanceledException ex)
+        {
+            telemetry.MarkFailed(ex);
+            await streaming.AbandonResponseAsync().ConfigureAwait(false);
+            throw;
+        }
+
         var writer = MessageFramer.RentFrameWriter();
         MessageFramer.WriteFramePrefix(writer, messageId, MessageType.Response);
         var envelopeStart = writer.WrittenCount;
@@ -101,6 +112,7 @@ internal sealed class RpcDispatchResponseBuilder
                 writer,
                 streaming,
                 ct).ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
             telemetry.SetResolvedOperation(dispatcher.ServiceName, request.MethodName);
             streaming.EnsureAllDeclaredInboundStreamsClaimed();
         }

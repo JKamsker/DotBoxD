@@ -73,6 +73,21 @@ public sealed class ExpressionQueryTranslatorTests
     }
 
     [Fact]
+    public void TranslateFilter_wraps_throwing_constant_getters()
+    {
+        var probe = new ThrowingConstantProbe();
+
+        var ex = Assert.Throws<QueryTranslationException>(
+            () => ExpressionQueryTranslator.TranslateFilter<AttackTestEvent>(e => e.AttackerId == probe.Value));
+
+        Assert.Contains("evaluate", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("constant operand", ex.Message, StringComparison.OrdinalIgnoreCase);
+
+        var inner = Assert.IsType<InvalidOperationException>(ex.InnerException);
+        Assert.Equal("constant getter failed", inner.Message);
+    }
+
+    [Fact]
     public void TranslateFilter_supports_nested_member_path()
     {
         var filter = ExpressionQueryTranslator.TranslateFilter<SourcedTestEvent>(e => e.Source.Id == "abc");
@@ -272,5 +287,10 @@ public sealed class ExpressionQueryTranslatorTests
         // A dotted identifier path is valid.
         var ok = QueryFilter.Compare("Source.Id", QueryComparisonOperator.Equal, QueryValue.FromString("x"));
         Assert.Equal("Source.Id", ok.Field);
+    }
+
+    private sealed class ThrowingConstantProbe
+    {
+        public string Value => throw new InvalidOperationException("constant getter failed");
     }
 }

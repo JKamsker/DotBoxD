@@ -226,7 +226,11 @@ public sealed record VerificationPolicy(
             RuntimeFacadeIdentityDefaults(),
             "dotboxd-verifier-9");
 
-    public bool IsMemberAllowed(string memberSignature) => AllowedMembers.Contains(memberSignature);
+    public bool IsMemberAllowed(string memberSignature)
+    {
+        ArgumentNullException.ThrowIfNull(memberSignature);
+        return AllowedMembers.Contains(memberSignature);
+    }
 
     public VerificationPolicy WithExpectedManifest(VerificationManifestIdentity identity)
     {

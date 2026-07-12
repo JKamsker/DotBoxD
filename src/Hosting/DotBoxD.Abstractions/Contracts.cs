@@ -6,7 +6,7 @@ namespace DotBoxD.Abstractions;
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class PluginAttribute : Attribute
 {
-    public PluginAttribute(string? id = null) => Id = id;
+    public PluginAttribute(string? id = null) => Id = PluginIdentityAttributeValidation.ValidateOptionalId(id);
 
     public string? Id { get; }
 }
@@ -148,18 +148,18 @@ public sealed class KernelMethodAttribute : Attribute;
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class ServerExtensionAttribute : Attribute
 {
-    public ServerExtensionAttribute(string id) => Id = id ?? throw new ArgumentNullException(nameof(id));
+    public ServerExtensionAttribute(string id) => Id = PluginIdentityAttributeValidation.ValidateRequiredId(id);
 
     public ServerExtensionAttribute(string id, Type serviceType)
     {
-        Id = id ?? throw new ArgumentNullException(nameof(id));
+        Id = PluginIdentityAttributeValidation.ValidateRequiredId(id);
         ServiceType = serviceType ?? throw new ArgumentNullException(nameof(serviceType));
     }
 
     public ServerExtensionAttribute(Type grafts, string? id = null)
     {
         Grafts = grafts ?? throw new ArgumentNullException(nameof(grafts));
-        Id = id;
+        Id = PluginIdentityAttributeValidation.ValidateOptionalId(id);
     }
 
     public string? Id { get; }

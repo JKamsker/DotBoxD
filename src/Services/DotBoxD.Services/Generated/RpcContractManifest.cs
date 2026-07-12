@@ -209,7 +209,19 @@ public sealed record RpcContractService(
     }
 
     private static string ValidateString(string? value, string paramName)
-        => value ?? throw new ArgumentNullException(paramName);
+    {
+        if (value is null)
+        {
+            throw new ArgumentNullException(paramName);
+        }
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new ArgumentException("Value must not be empty or whitespace.", paramName);
+        }
+
+        return value;
+    }
 
     private static IReadOnlyList<T> ValidateList<T>(IReadOnlyList<T>? values, string paramName)
     {
@@ -248,5 +260,17 @@ public sealed record RpcContractMethod(string WireName, string Signature)
     }
 
     private static string ValidateString(string? value, string paramName)
-        => value ?? throw new ArgumentNullException(paramName);
+    {
+        if (value is null)
+        {
+            throw new ArgumentNullException(paramName);
+        }
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new ArgumentException("Value must not be empty or whitespace.", paramName);
+        }
+
+        return value;
+    }
 }

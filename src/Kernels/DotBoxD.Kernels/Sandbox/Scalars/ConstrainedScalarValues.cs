@@ -9,6 +9,8 @@ file static class SandboxValueNullGuard
 
 public sealed record OpaqueIdValue(string TypeName, string Value) : SandboxValue
 {
+    private const string InvalidTypeName = "<invalid-opaque-id>";
+
     private string _typeName = SandboxValueNullGuard.RequireNotNull(TypeName, nameof(TypeName));
     private string _value = SandboxValueNullGuard.RequireNotNull(Value, nameof(Value));
 
@@ -17,7 +19,7 @@ public sealed record OpaqueIdValue(string TypeName, string Value) : SandboxValue
     public string Value { get => _value; init => _value = SandboxValueNullGuard.RequireNotNull(value, nameof(value)); }
 
     public override SandboxType Type
-        => _typeName is null ? SandboxType.Scalar(string.Empty) : SandboxType.Scalar(_typeName);
+        => SandboxType.Scalar(_typeName ?? InvalidTypeName);
 }
 
 public sealed record SandboxPath(string RelativePath)

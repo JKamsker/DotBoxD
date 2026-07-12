@@ -2,7 +2,7 @@
 # Package: DotBoxD.Kernels.Verifier
 # Update intentionally with scripts/check-api-compat-baseline.ps1 -Update when approving public API changes.
 
-public bool IsMemberAllowed(string memberSignature) => AllowedMembers.Contains(memberSignature)
+public bool IsMemberAllowed(string memberSignature)
 public const string Array = "V-ARRAY"
 public const string AssemblyReference = "V-ASM-REF"
 public const string CompiledShape = "V-COMPILED-SHAPE"
