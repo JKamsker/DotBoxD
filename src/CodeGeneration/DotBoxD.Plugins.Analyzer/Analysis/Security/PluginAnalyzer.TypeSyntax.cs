@@ -24,6 +24,18 @@ public sealed partial class PluginAnalyzer
             c => AnalyzeIsExpressionType(c, helperGraph),
             SyntaxKind.IsExpression);
         context.RegisterSyntaxNodeAction(
+            c => AnalyzeAsExpressionType(c, helperGraph),
+            SyntaxKind.AsExpression);
+        context.RegisterSyntaxNodeAction(
+            c => AnalyzeCastExpressionType(c, helperGraph),
+            SyntaxKind.CastExpression);
+        context.RegisterSyntaxNodeAction(
+            c => AnalyzeDefaultExpressionType(c, helperGraph),
+            SyntaxKind.DefaultExpression);
+        context.RegisterSyntaxNodeAction(
+            c => AnalyzeArrayCreationType(c, helperGraph),
+            SyntaxKind.ArrayCreationExpression);
+        context.RegisterSyntaxNodeAction(
             c => AnalyzeCatchDeclarationType(c, helperGraph),
             SyntaxKind.CatchDeclaration);
     }
@@ -68,6 +80,46 @@ public sealed partial class PluginAnalyzer
         }
     }
 
+    private static void AnalyzeAsExpressionType(
+        SyntaxNodeAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph)
+    {
+        if (context.Node is BinaryExpressionSyntax { Right: TypeSyntax typeSyntax })
+        {
+            AnalyzeForbiddenTypeSyntax(context, helperGraph, typeSyntax);
+        }
+    }
+
+    private static void AnalyzeCastExpressionType(
+        SyntaxNodeAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph)
+    {
+        if (context.Node is CastExpressionSyntax { Type: { } typeSyntax })
+        {
+            AnalyzeForbiddenTypeSyntax(context, helperGraph, typeSyntax);
+        }
+    }
+
+    private static void AnalyzeDefaultExpressionType(
+        SyntaxNodeAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph)
+    {
+        if (context.Node is DefaultExpressionSyntax { Type: { } typeSyntax })
+        {
+            AnalyzeForbiddenTypeSyntax(context, helperGraph, typeSyntax);
+        }
+    }
+
+    private static void AnalyzeArrayCreationType(
+        SyntaxNodeAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph)
+    {
+        if (context.Node is ArrayCreationExpressionSyntax { Type: { } typeSyntax })
+        {
+            AnalyzeForbiddenTypeSyntax(context, helperGraph, typeSyntax);
+        }
+    }
+
     private static void AnalyzeCatchDeclarationType(
         SyntaxNodeAnalysisContext context,
         ForbiddenHelperCallGraph helperGraph)
@@ -84,7 +136,7 @@ public sealed partial class PluginAnalyzer
         TypeSyntax typeSyntax)
     {
         var type = context.SemanticModel.GetTypeInfo(typeSyntax, context.CancellationToken).Type;
-        if (!IsForbiddenHostApi(type))
+        if (!TryGetForbiddenHostApi(type, out var forbidden))
         {
             return;
         }
@@ -96,7 +148,7 @@ public sealed partial class PluginAnalyzer
             return;
         }
 
-        helperGraph.RecordForbidden(method, type!);
+        helperGraph.RecordForbidden(method, forbidden);
         if (!IsEventKernel(method.ContainingType))
         {
             return;
@@ -105,6 +157,6 @@ public sealed partial class PluginAnalyzer
         context.ReportDiagnostic(Diagnostic.Create(
             ForbiddenHostApiRule,
             typeSyntax.GetLocation(),
-            type!.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
+            forbidden.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
     }
 }
