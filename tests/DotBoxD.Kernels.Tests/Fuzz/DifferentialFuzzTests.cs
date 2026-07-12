@@ -22,6 +22,13 @@ public sealed class DifferentialFuzzTests
             iter: 40,
             threads: 1);
 
+    [Theory]
+    [InlineData(23696560)]
+    [InlineData(23823498)]
+    [InlineData(-23577633)]
+    public async Task Numeric_seeds_do_not_look_like_compact_metadata_references(int seed)
+        => await RunCaseAsync(seed);
+
     private static async Task RunCaseAsync(int seed)
     {
         using var host = SandboxTestHost.Create(compiler: true);
@@ -136,10 +143,12 @@ public sealed class DifferentialFuzzTests
     private static string ModuleId(int index)
     {
         var seed = (long)index;
-        return seed < 0
-            ? $"differential-fuzz-n{(-seed).ToString(CultureInfo.InvariantCulture)}"
-            : $"differential-fuzz-{seed.ToString(CultureInfo.InvariantCulture)}";
+        var magnitude = Math.Abs(seed).ToString(CultureInfo.InvariantCulture);
+        var separatedDigits = string.Join("-", magnitude.ToCharArray());
+        var sign = seed < 0 ? "n" : "p";
+        return $"differential-fuzz-{sign}{separatedDigits}";
     }
+
     private static JsonObject Parameter(string name)
         => new()
         {

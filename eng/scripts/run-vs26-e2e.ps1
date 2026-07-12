@@ -156,6 +156,18 @@ function Wait-ForKernelAttach {
     }
 }
 
+function Wait-ForAdapterConfiguration {
+    $deadline = [DateTime]::UtcNow + $StartupTimeout
+    do {
+        Start-Sleep -Milliseconds 250
+        $configured = (Test-Path $launcherLog) -and
+            (Select-String $launcherLog -Pattern 'adapter completed configurationDone' -SimpleMatch -Quiet)
+    } until ($configured -or [DateTime]::UtcNow -ge $deadline)
+    if (-not $configured) {
+        throw "The kernel debug adapter did not finish its initial configuration within $StartupTimeout."
+    }
+}
+
 function Wait-ForManagedStop {
     $deadline = [DateTime]::UtcNow + $StopTimeout
     do {
@@ -446,6 +458,10 @@ $null = $breakpoints.Add('', $env:DOTBOXD_E2E_MANAGED_PROGRAM, 36)
 $dte.ExecuteCommand('Debug.Start')
 '@ 'Visual Studio debugger startup' | Out-Null
     Wait-ForKernelAttach
+    # Keep the server behind its startup gate until the adapter has resolved Visual
+    # Studio's initial managed breakpoint. Otherwise the managed debugger can stop
+    # the server while the in-process bridge is still servicing setBreakpoints.
+    Wait-ForAdapterConfiguration
     Set-Content $continuousStartGate 'ready'
     $managedStop = Wait-ForManagedStop
     $companionProcesses = @(Wait-ForCompanionProcesses)
