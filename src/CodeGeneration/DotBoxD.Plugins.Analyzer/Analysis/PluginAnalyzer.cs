@@ -67,6 +67,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
                 OperationKind.Conversion);
             RegisterForbiddenTypeSyntaxAnalysis(startContext, helperGraph);
             RegisterEnumerationSyntaxAnalysis(startContext, helperGraph);
+            RegisterFixedReachabilityAnalysis(startContext, helperGraph);
             startContext.RegisterCompilationEndAction(helperGraph.ReportDiagnostics);
         });
     }
