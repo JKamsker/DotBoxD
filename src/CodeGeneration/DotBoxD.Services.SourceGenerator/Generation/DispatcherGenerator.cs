@@ -87,6 +87,8 @@ internal static class DispatcherGenerator
             sb.AppendLine();
             sb.AppendLine($"        public {ServicesGeneratorTypeNames.GlobalTask} {ServicesGeneratorMemberNames.ServiceDispatcher.DispatchOnInstanceAsync}(string instanceId, string method, {ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalReadOnlyMemory, "byte")} payload, {ServicesGeneratorTypeNames.GlobalSerializer} serializer, {ServicesGeneratorTypeNames.GlobalInstanceRegistry} registry, {ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalBufferWriter, "byte")} output, {ServicesGeneratorTypeNames.GlobalRpcStreamingContextInterface} streaming, {ServicesGeneratorTypeNames.GlobalCancellationToken} ct = default)");
             sb.AppendLine("        {");
+            sb.AppendLine("            ct.ThrowIfCancellationRequested();");
+            sb.AppendLine();
             sb.AppendLine($"            if (!registry.{ServicesGeneratorMemberNames.InstanceRegistry.TryGet}(\"{service.ServiceName}\", instanceId, out var __obj) || __obj is not {qualifiedInterface} __inst)");
             sb.AppendLine("            {");
             sb.AppendLine($"                throw new {ServicesGeneratorTypeNames.GlobalServiceNotFoundException}(\"Instance '\" + instanceId + \"' not found for service '{service.ServiceName}'.\", {ServicesGeneratorTypeNames.GlobalServiceNotFoundKind}.{ServicesGeneratorMemberNames.NotFoundKind.Instance});");
