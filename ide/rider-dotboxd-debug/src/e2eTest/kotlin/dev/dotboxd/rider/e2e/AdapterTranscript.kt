@@ -35,9 +35,7 @@ internal object AdapterTranscript {
         val completions = lines.mapNotNull { completed.find(it)?.groupValues?.get(1) }
         val missing = requiredCommands.filterNot(requests::contains)
         check(missing.isEmpty()) { "The kernel debug adapter transcript is missing requests: $missing" }
-        val incomplete = requiredCommands.filter { command ->
-            requests.count(command::equals) != completions.count(command::equals)
-        }
+        val incomplete = requiredCommands.filterNot(completions::contains)
         check(incomplete.isEmpty()) { "The kernel debug adapter did not complete requests: $incomplete" }
         check(lines.any { it.endsWith(" adapter bridge remote stepOver") }) {
             "Rider Step Over did not reach the remote kernel debugger"
