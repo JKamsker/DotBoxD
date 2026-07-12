@@ -85,6 +85,63 @@ function Get-FailedTrxTests([string] $TrxPath) {
     }
 }
 
+function Join-TestFilters([string] $BaseFilter, [string] $BatchFilter) {
+    if ([string]::IsNullOrWhiteSpace($BaseFilter)) {
+        return $BatchFilter
+    }
+
+    if ([string]::IsNullOrWhiteSpace($BatchFilter)) {
+        return $BaseFilter
+    }
+
+    return "($BaseFilter)&($BatchFilter)"
+}
+
+function Get-TestBatches([string] $ProjectName, [string] $SuiteName, [string] $Filter) {
+    if ($ProjectName -ne "DotBoxD.Kernels.Tests" -or $SuiteName -ne "kernels-remainder") {
+        return @([pscustomobject] @{
+            Name = ""
+            Filter = $Filter
+        })
+    }
+
+    # Keep each kernels-remainder testhost below hosted-runner memory limits.
+    $prefixes = @(
+        "Audit",
+        "Bindings",
+        "Collections",
+        "Compiled",
+        "Core",
+        "Execution",
+        "Fuzz",
+        "Hosting",
+        "Interpreter",
+        "Model",
+        "PluginAnalyzer",
+        "Plugins",
+        "Policy",
+        "Queryable",
+        "Resources",
+        "Runtime",
+        "Samples",
+        "Serialization",
+        "Strings",
+        "Tooling",
+        "Validation",
+        "Verifier",
+        "Wave9Fixes",
+        "Workers"
+    )
+
+    return @($prefixes | ForEach-Object {
+        $batchFilter = "FullyQualifiedName~DotBoxD.Kernels.Tests.$_"
+        [pscustomobject] @{
+            Name = $_
+            Filter = Join-TestFilters $Filter $batchFilter
+        }
+    })
+}
+
 $projectPaths = @($Projects | ForEach-Object { Resolve-ProjectPath $_ } | Where-Object {
     $null -ne $_
 })
@@ -96,56 +153,67 @@ $safeSuiteName = ConvertTo-SafeFileName $SuiteName
 $failed = $false
 foreach ($projectPath in $projectPaths) {
     $projectName = Split-Path $projectPath -LeafBase
-    $passed = $false
-    $failedTestsBeforeRetry = @()
+    $projectPassed = $true
+    $batches = @(Get-TestBatches $projectName $SuiteName $Filter)
 
-    foreach ($attempt in 1..$Attempts) {
-        $trxFileName = "$projectName-$safeSuiteName-attempt$attempt.trx"
-        $filterDescription = if ([string]::IsNullOrWhiteSpace($Filter)) { "all tests" } else { $Filter }
-        Write-Host "::group::dotnet test $projectName ($SuiteName; $filterDescription; attempt $attempt)"
+    foreach ($batch in $batches) {
+        $passed = $false
+        $failedTestsBeforeRetry = @()
+        $batchSuffix = if ([string]::IsNullOrWhiteSpace($batch.Name)) { "" } else { "-" + (ConvertTo-SafeFileName $batch.Name) }
+        $batchSuiteName = if ([string]::IsNullOrWhiteSpace($batch.Name)) { $SuiteName } else { "$SuiteName/$($batch.Name)" }
 
-        $arguments = @(
-            "test", $projectPath,
-            "--configuration", $Configuration,
-            "--logger", "trx;LogFileName=$trxFileName",
-            "--results-directory", $resultsPath,
-            "--blame-hang",
-            "--blame-hang-timeout", $BlameHangTimeout,
-            "--blame-hang-dump-type", "mini"
-        )
+        foreach ($attempt in 1..$Attempts) {
+            $trxFileName = "$projectName-$safeSuiteName$batchSuffix-attempt$attempt.trx"
+            $filterDescription = if ([string]::IsNullOrWhiteSpace($batch.Filter)) { "all tests" } else { $batch.Filter }
+            Write-Host "::group::dotnet test $projectName ($batchSuiteName; $filterDescription; attempt $attempt)"
 
-        if ($NoRestore) {
-            $arguments += "--no-restore"
-        }
+            $arguments = @(
+                "test", $projectPath,
+                "--configuration", $Configuration,
+                "--logger", "trx;LogFileName=$trxFileName",
+                "--results-directory", $resultsPath,
+                "--blame-hang",
+                "--blame-hang-timeout", $BlameHangTimeout,
+                "--blame-hang-dump-type", "mini"
+            )
 
-        if ($NoBuild) {
-            $arguments += "--no-build"
-        }
-
-        if (-not [string]::IsNullOrWhiteSpace($Filter)) {
-            $arguments += @("--filter", $Filter)
-        }
-
-        & dotnet @arguments
-        $exitCode = $LASTEXITCODE
-        Write-Host "::endgroup::"
-
-        if ($exitCode -eq 0) {
-            Assert-TrxHasExecutedTests (Join-Path $resultsPath $trxFileName) $projectName
-            foreach ($testName in @($failedTestsBeforeRetry | Sort-Object -Unique)) {
-                Write-Host "::warning title=Flaky test::$testName failed before $projectName passed on retry in suite $SuiteName."
+            if ($NoRestore) {
+                $arguments += "--no-restore"
             }
-            $passed = $true
-            break
+
+            if ($NoBuild) {
+                $arguments += "--no-build"
+            }
+
+            if (-not [string]::IsNullOrWhiteSpace($batch.Filter)) {
+                $arguments += @("--filter", $batch.Filter)
+            }
+
+            & dotnet @arguments
+            $exitCode = $LASTEXITCODE
+            Write-Host "::endgroup::"
+
+            if ($exitCode -eq 0) {
+                Assert-TrxHasExecutedTests (Join-Path $resultsPath $trxFileName) $projectName
+                foreach ($testName in @($failedTestsBeforeRetry | Sort-Object -Unique)) {
+                    Write-Host "::warning title=Flaky test::$testName failed before $projectName passed on retry in suite $batchSuiteName."
+                }
+                $passed = $true
+                break
+            }
+
+            if ($attempt -lt $Attempts) {
+                $failedTestsBeforeRetry += Get-FailedTrxTests (Join-Path $resultsPath $trxFileName)
+                Write-Host "::warning::$projectName failed in suite $batchSuiteName on attempt $attempt (exit $exitCode); retrying once."
+            }
         }
 
-        if ($attempt -lt $Attempts) {
-            $failedTestsBeforeRetry += Get-FailedTrxTests (Join-Path $resultsPath $trxFileName)
-            Write-Host "::warning::$projectName failed in suite $SuiteName on attempt $attempt (exit $exitCode); retrying once."
+        if (-not $passed) {
+            $projectPassed = $false
         }
     }
 
-    if (-not $passed) {
+    if (-not $projectPassed) {
         $failed = $true
     }
 }
