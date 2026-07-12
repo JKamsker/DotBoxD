@@ -137,8 +137,16 @@ public sealed class DifferentialFuzzTests
     {
         var seed = (long)index;
         return seed < 0
-            ? $"differential-fuzz-n{(-seed).ToString(CultureInfo.InvariantCulture)}"
-            : $"differential-fuzz-{seed.ToString(CultureInfo.InvariantCulture)}";
+            ? $"differential-fuzz-n{FormatSeed(-seed)}"
+            : $"differential-fuzz-{FormatSeed(seed)}";
+    }
+
+    private static string FormatSeed(long seed)
+    {
+        var digits = seed.ToString(CultureInfo.InvariantCulture);
+        return digits.Length <= 4
+            ? digits
+            : string.Concat(digits.AsSpan(0, 4), "g", digits.AsSpan(4));
     }
 
     private static JsonObject Parameter(string name)
