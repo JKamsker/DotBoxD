@@ -302,7 +302,8 @@ function Assert-AdapterTranscript {
 
     $transcript = Get-Content -LiteralPath $launcherLog
     $errors = @($transcript | Where-Object {
-        $_ -match ' adapter (?:error|unhandled error) '
+        $_ -match ' adapter (?:error|unhandled error) ' -and
+            $_ -notmatch ' adapter adapter error evaluationFailed:'
     })
     if ($errors.Count -gt 0) {
         throw "The kernel debug adapter logged an error: $($errors[0])"

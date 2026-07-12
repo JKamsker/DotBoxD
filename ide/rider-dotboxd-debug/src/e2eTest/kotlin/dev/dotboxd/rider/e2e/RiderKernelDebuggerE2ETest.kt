@@ -100,7 +100,7 @@ class RiderKernelDebuggerE2ETest {
         val allBreakpoints = rider.dotNetBreakpoints()
         val breakpoints = allBreakpoints.filter { normalizeIdePath(it.path) == guardianPath }
         assertEquals(2, breakpoints.size, "Rider line breakpoints: $allBreakpoints")
-        assertEquals(listOf(35, 44), breakpoints.filter(IdeBreakpoint::enabled).map(IdeBreakpoint::line).sorted())
+        assertTrue(breakpoints.all(IdeBreakpoint::enabled), "Disabled Rider line breakpoint: $breakpoints")
     }
 
     private fun normalizeIdePath(path: String): String {

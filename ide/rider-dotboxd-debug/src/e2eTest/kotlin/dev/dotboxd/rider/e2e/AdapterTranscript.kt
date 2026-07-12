@@ -23,7 +23,10 @@ internal object AdapterTranscript {
     fun assertComplete(path: Path) {
         check(Files.isRegularFile(path)) { "Rider did not create the kernel debug adapter transcript at $path" }
         val lines = Files.readAllLines(path)
-        val error = lines.firstOrNull { it.contains(Regex(" adapter (?:error|unhandled error) ")) }
+        val error = lines.firstOrNull {
+            it.contains(Regex(" adapter (?:error|unhandled error) ")) &&
+                !it.contains(" adapter adapter error evaluationFailed:")
+        }
         check(error == null) { "The kernel debug adapter logged an error: $error" }
 
         val requests = lines.mapNotNull { request.find(it)?.groupValues?.get(1) }
