@@ -1,8 +1,8 @@
 ---
 title: 'What is DotBoxD?'
 description: >-
-  The DotBoxD mental model — one C# contract, three delivery modes (Services, event pipelines,
-  Pushdown), one kernel sandbox — plus a decision table and a map of the documentation.
+  The DotBoxD mental model - one C# contract, three delivery modes (Services, event pipelines,
+  Pushdown), one kernel sandbox - plus a decision table and a map of the documentation.
 ---
 DotBoxD is a source-generated, contract-first **plugin system for .NET hosts**. Everything in it
 hangs off one mental model:
@@ -43,7 +43,7 @@ flowchart LR
 ```
 
 New here? Install via [Getting started](/getting-started/), then work through the
-[tutorials](/tutorials/) — one per mode, in order.
+[tutorials](/tutorials/) - one per mode, in order.
 
 ## Choosing a mode
 
@@ -57,17 +57,17 @@ What differs between the modes is *where the author's logic runs* and *what cros
 
 Decision rules:
 
-- **Services** — a one-shot request/response (fetch a price, compute a cart total). The interface is the
+- **Services** - a one-shot request/response (fetch a price, compute a cart total). The interface is the
   single source of truth, so proxy and impl cannot drift.
-- **Event pipelines** — you react to a high-frequency server event stream but only need a subset/summary
+- **Event pipelines** - you react to a high-frequency server event stream but only need a subset/summary
   locally. Because the filter runs as validated, fuel-metered IR, you can accept that logic from untrusted
   plugins safely.
-- **Pushdown** — a chatty `for each id: Kill(id)` loop that should be one batch. The server is never
+- **Pushdown** - a chatty `for each id: Kill(id)` loop that should be one batch. The server is never
   recompiled; the plugin ships the batch, which runs as verified, capability-gated, fuel-metered IR (real
   sandbox, not a trusted plugin).
 
 Event pipelines and Pushdown **both** run author-supplied logic server-side as sandboxed
-[kernels](/concepts/kernels/) — the only difference is push-to-plugin (event pipelines) vs
+[kernels](/concepts/kernels/) - the only difference is push-to-plugin (event pipelines) vs
 aggregate-and-return (Pushdown). Services instead runs a hand-written host implementation, with no
 sandbox involved.
 
@@ -79,9 +79,9 @@ looking for.
 
 ### Start
 
-- **[Why DotBoxD?](/why-dotboxd/)** — the isolation-vs-latency dilemma, in three diagrams.
-- **[Getting started](/getting-started/)** — install, a first end-to-end win, and your track.
-- **[Glossary](/reference/glossary/)** — plain-language definitions of the core terms (IR, kernel,
+- **[Why DotBoxD?](/why-dotboxd/)** - the isolation-vs-latency dilemma, in three diagrams.
+- **[Getting started](/getting-started/)** - install, a first end-to-end win, and your track.
+- **[Glossary](/reference/glossary/)** - plain-language definitions of the core terms (IR, kernel,
   pushdown, fuel, capabilities). Keep it open in a tab; every term links to its deep-dive page.
 
 ### Learn by building (tutorials & walkthroughs)
@@ -89,30 +89,30 @@ looking for.
 One per mode, in recommended order - a from-scratch tutorial, then guided walkthroughs of the
 maintained GameServer sample:
 
-1. **[Your first Service (RPC)](/tutorials/first-service/)** — a real tutorial; builds from an
+1. **[Your first Service (RPC)](/tutorials/first-service/)** - a real tutorial; builds from an
    empty project.
-2. **[Event pipelines (RunLocal)](/tutorials/event-pipeline-runlocal/)** — guided walkthrough
+2. **[Event pipelines (RunLocal)](/tutorials/event-pipeline-runlocal/)** - guided walkthrough
    (clone the repo): filter server-side, react in your plugin.
-3. **[Pushdown server extension](/tutorials/pushdown-server-extension/)** — guided walkthrough
+3. **[Pushdown server extension](/tutorials/pushdown-server-extension/)** - guided walkthrough
    (clone the repo): ship a server-side batch operation.
-4. **[Hand-written IR hook pipeline](/tutorials/handwritten-ir-hook-pipeline/)** *(advanced)* —
+4. **[Hand-written IR hook pipeline](/tutorials/handwritten-ir-hook-pipeline/)** *(advanced)* -
    the same shapes with public primitives and no generator.
 
 ### Understand (concepts)
 
-- **The three modes** — [Services](/concepts/services/),
+- **The three modes** - [Services](/concepts/services/),
   [Event pipelines](/concepts/event-pipelines/) (Hooks vs Subscriptions, the stages, and all five
   terminals), and [Pushdown](/concepts/pushdown/).
-- **The sandbox** — [Kernels](/concepts/kernels/) (what the engine is),
+- **The sandbox** - [Kernels](/concepts/kernels/) (what the engine is),
   [Host bindings](/concepts/host-bindings/) (policy-gated calls from kernels into host-owned APIs),
   the [kernel runtime](/concepts/runtime/) (interpreted vs verified-IL backends,
   fuel/quotas/capabilities), and the [determinism contract](/concepts/determinism/).
-- **The wire** — [Channels & transports](/concepts/channels-transports/): the transport/codec layer
+- **The wire** - [Channels & transports](/concepts/channels-transports/): the transport/codec layer
   the Services stack rides on (standalone packages, usable independently).
 
 ### See it running
 
-- **[GameServer walkthrough](/examples/gameserver-walkthrough/)** — an annotated tour of the
+- **[GameServer walkthrough](/examples/gameserver-walkthrough/)** - an annotated tour of the
   maintained sample combining all three modes; [examples overview](/examples/) and
   [coverage gaps](/examples/coverage-gaps/) list what it does and doesn't show.
 
@@ -126,17 +126,17 @@ transports, [Unity integration](/channels/unity-integration/), and
 
 ### Security & reference
 
-- **[Sandbox caveats](/security/sandbox-caveats/)** — what is and isn't a boundary; read before
+- **[Sandbox caveats](/security/sandbox-caveats/)** - what is and isn't a boundary; read before
   deploying. See also the top-level
   [`SECURITY.md`](https://github.com/JKamsker/DotBoxD/blob/main/SECURITY.md).
-- **[Diagnostics](/reference/diagnostics/)** — every DBXS/DBXK code, with causes and fixes.
-- **[Consumer testing kit](/reference/testing/)** — deterministic test primitives for RPC,
+- **[Diagnostics](/reference/diagnostics/)** - every DBXS/DBXK code, with causes and fixes.
+- **[Consumer testing kit](/reference/testing/)** - deterministic test primitives for RPC,
   bindings, audit, and contract compatibility.
-- **[Schemas](/reference/schemas/)** — the versioned kernel/plugin JSON Schemas.
-- **[API reference](/api/)** — generated from the source of every published package.
-- **[Specifications](https://github.com/JKamsker/DotBoxD/tree/main/docs/Specs)** — the full kernel
+- **[Schemas](/reference/schemas/)** - the versioned kernel/plugin JSON Schemas.
+- **[API reference](/api/)** - generated from the source of every published package.
+- **[Specifications](https://github.com/JKamsker/DotBoxD/tree/main/docs/Specs)** - the full kernel
   sandbox spec (IR language, type system, effects/capabilities, threat model, runtime).
-- **[Migration from standalone repos](/contributing/migration-from-standalone-repos/)** — how this
+- **[Migration from standalone repos](/contributing/migration-from-standalone-repos/)** - how this
   repo merges the former ShaRPC + Safe-IR projects and how to view their pre-merge history.
 
 ## Runnable example

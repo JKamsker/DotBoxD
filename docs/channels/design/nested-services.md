@@ -1,4 +1,4 @@
-# Nested Services in DotBoxD — Design
+# Nested Services in DotBoxD - Design
 
 > **Historical design note.** This document predates the peer-model refactor. The
 > `IRpcClient` / `RpcServer` / `RpcClientBuilder` types named below were superseded by
@@ -8,7 +8,7 @@
 
 ## 1. Wire protocol additions
 
-**Decision: Option B — add a new `InvokeOnInstanceAsync` overload AND a new `ServiceHandle` payload type.** Option A (name-mangling `IFoo@<guid>`) is rejected: it overloads `RpcRequest.ServiceName`, breaks the dispatcher registry lookup invariant (`TryGetValue(serviceName, ...)`), and forces every layer that logs / inspects service names to learn the mangling rule. Option B keeps the existing `RpcRequest` envelope alphabet-clean and isolates the new concern to a single field.
+**Decision: Option B - add a new `InvokeOnInstanceAsync` overload AND a new `ServiceHandle` payload type.** Option A (name-mangling `IFoo@<guid>`) is rejected: it overloads `RpcRequest.ServiceName`, breaks the dispatcher registry lookup invariant (`TryGetValue(serviceName, ...)`), and forces every layer that logs / inspects service names to learn the mangling rule. Option B keeps the existing `RpcRequest` envelope alphabet-clean and isolates the new concern to a single field.
 
 **New protocol fields.** Add one nullable string to `RpcRequest`:
 
@@ -26,7 +26,7 @@ public sealed class RpcRequest
 > frame's raw trailing payload (see the wire format in the API reference) so the dispatcher can read
 > them as a zero-copy slice of the receive buffer.
 
-`InstanceId` is `null` for all existing top-level service calls — the field is additive and wire-compatible because MessagePack/JSON tolerate unknown-but-absent properties.
+`InstanceId` is `null` for all existing top-level service calls - the field is additive and wire-compatible because MessagePack/JSON tolerate unknown-but-absent properties.
 
 **New return payload type** added to `DotBoxD.Services.Protocol`:
 
@@ -65,9 +65,9 @@ public interface IInstanceRegistry
 }
 ```
 
-`InstanceId` is `Guid.NewGuid().ToString("N")` — opaque and unforgeable enough; not a security boundary on its own (combined with per-connection scope, an attacker on a different connection cannot reach another connection's instances).
+`InstanceId` is `Guid.NewGuid().ToString("N")` - opaque and unforgeable enough; not a security boundary on its own (combined with per-connection scope, an attacker on a different connection cannot reach another connection's instances).
 
-**Lifetime.** Default behavior: instances live until the connection closes. A future "explicit release" message type (`MessageType.ReleaseInstance = 0x05`) can be sent by the client when its `SubServiceProxy` is disposed; if not sent (proxy was GC'd without dispose), the instance lingers until disconnect. Reference counting is rejected as out-of-scope — it requires coordinating proxy finalizers across the wire and inviting double-release races.
+**Lifetime.** Default behavior: instances live until the connection closes. A future "explicit release" message type (`MessageType.ReleaseInstance = 0x05`) can be sent by the client when its `SubServiceProxy` is disposed; if not sent (proxy was GC'd without dispose), the instance lingers until disconnect. Reference counting is rejected as out-of-scope - it requires coordinating proxy finalizers across the wire and inviting double-release races.
 
 **Where it lives.** One `IInstanceRegistry` per peer (i.e. per duplex `IRpcChannel`). `RpcPeerInboundDispatcher` owns an `InstanceRegistry`, threads it into request processing, and calls `ReleaseAll()` during `StopAsync` when the peer tears down.
 
@@ -105,7 +105,7 @@ var id = registry.Register("ISubService", result);
 return serializer.Serialize(new ServiceHandle("ISubService", id));
 ```
 
-This means `DispatchAsync` also needs `IInstanceRegistry` — extend the existing signature to take it. Existing dispatchers that don't use it simply ignore the parameter.
+This means `DispatchAsync` also needs `IInstanceRegistry` - extend the existing signature to take it. Existing dispatchers that don't use it simply ignore the parameter.
 
 ## 4. Generator changes
 
@@ -116,7 +116,7 @@ internal enum MethodReturnKind { Void, Sync, Task, TaskOf, ValueTask, ValueTaskO
     TaskOfSubService, ValueTaskOfSubService }   // NEW
 ```
 
-This stays incremental — it operates only on `IMethodSymbol.ReturnType` and an attribute name string, never on the full `Compilation`. `MethodModel` gets one additional value-equatable field carrying the sub-service interface's qualified name and its RPC service name (extracted from the same `[RpcService(Name=...)]` attribute), both as strings, preserving record equality.
+This stays incremental - it operates only on `IMethodSymbol.ReturnType` and an attribute name string, never on the full `Compilation`. `MethodModel` gets one additional value-equatable field carrying the sub-service interface's qualified name and its RPC service name (extracted from the same `[RpcService(Name=...)]` attribute), both as strings, preserving record equality.
 
 **Proxy for a sub-service-returning method.** Instead of `_invoker.InvokeAsync<ISubService>(...)` (which would fail to deserialize), emit:
 
@@ -200,20 +200,20 @@ public sealed record ServiceHandle(string ServiceName, string InstanceId);
 
 ## 6. Incrementality
 
-The detection works entirely from `IMethodSymbol.ReturnType` and a fixed attribute metadata-name string lookup — the existing `ForAttributeWithMetadataName` pipeline is unchanged. We never call `Compilation.GetSymbolsWithName` or enumerate the assembly. The new `MethodModel` fields are all `string` / enum (value-equatable). The new `SubServiceInfo` record (qualified interface name + RPC service name) is also `string`/`string` and equatable. No `Compilation`-typed value is captured in the model pipeline, so cache hit-rate stays identical to today.
+The detection works entirely from `IMethodSymbol.ReturnType` and a fixed attribute metadata-name string lookup - the existing `ForAttributeWithMetadataName` pipeline is unchanged. We never call `Compilation.GetSymbolsWithName` or enumerate the assembly. The new `MethodModel` fields are all `string` / enum (value-equatable). The new `SubServiceInfo` record (qualified interface name + RPC service name) is also `string`/`string` and equatable. No `Compilation`-typed value is captured in the model pipeline, so cache hit-rate stays identical to today.
 
 The one subtlety: detecting `[RpcService]` on a return type symbol requires walking `INamedTypeSymbol.GetAttributes()` for that symbol. This is a symbol query, not a compilation query, and is safe inside the existing `transform` lambda.
 
 ## 7. Explicitly NOT covered
 
 - Collections of sub-services (`Task<IList<ISubService>>`, dictionaries, arrays). Emit DBXS004 and refuse.
-- Sub-service interfaces as **parameter** types (bidirectional / callback). Emit DBXS005 and refuse — requires a server-initiated dispatch path that does not exist.
+- Sub-service interfaces as **parameter** types (bidirectional / callback). Emit DBXS005 and refuse - requires a server-initiated dispatch path that does not exist.
 - Reference counting or distributed GC of instances. Lifetime is "until connection closes" plus the optional explicit-release message.
 - Cross-connection instance sharing. An `InstanceId` from connection A is invisible to connection B by design.
 - Authentication / authorization scoping on sub-service handles. Out of scope; carrier-level auth still applies to the connection.
-- Sub-services returning sub-services arbitrarily deep — supported in principle by recursion of the rules above; no special test plan, just recursion.
+- Sub-services returning sub-services arbitrarily deep - supported in principle by recursion of the rules above; no special test plan, just recursion.
 - Nested generic sub-services (`ISubService<T>`). Already rejected by existing DBXS003 (generic service interfaces).
-- Serialization of a `ServiceHandle` returned in a *user DTO field* (e.g. `record Result(int Count, ISubService Inner)`). Not supported — handles must be the direct return value.
+- Serialization of a `ServiceHandle` returned in a *user DTO field* (e.g. `record Result(int Count, ISubService Inner)`). Not supported - handles must be the direct return value.
 
 ---
 

@@ -46,13 +46,13 @@ dotnet add package ShaRPC.Transports.Tcp
 
 ## Features
 
-- **Source Generator Based**: Compile-time proxy and dispatcher generation — no runtime reflection.
+- **Source Generator Based**: Compile-time proxy and dispatcher generation - no runtime reflection.
 - **Generated service catalog**: `ShaRpcGenerated.Services` exposes service/proxy/dispatcher descriptors without scanning assemblies.
 - **Generic registration sink**: `ShaRpcGenerated.RegisterServices(...)` calls host-provided generic registration APIs per generated service.
 - **Generated implementation sink**: `ShaRpcGenerated.RegisterGeneratedServices(...)` emits direct service/proxy/dispatcher generic registrations.
 - **Truly incremental generator**: value-equatable models, `ForAttributeWithMetadataName`, tracked steps. The IDE never re-runs unnecessary work, even across large edits.
 - **Async sibling interfaces**: every `[ShaRpcService]` automatically gains an `I{Name}Async` view so callers can pick a blocking or non-blocking entry point.
-- **Nested services**: a method returning another `[ShaRpcService]` interface returns a fully-working sub-proxy bound to a server-side instance — no DTO marshalling for live objects.
+- **Nested services**: a method returning another `[ShaRpcService]` interface returns a fully-working sub-proxy bound to a server-side instance - no DTO marshalling for live objects.
 - **Unity Compatible**: Works with IL2CPP and AOT compilation.
 - **Bidirectional peers**: one duplex connection can serve local services and call remote services at the same time.
 - **Transport Agnostic**: TCP, dedicated named-pipe transports, stream connections, and single-connection adapters included; easily extensible to WebSocket, Steam, etc.
@@ -231,7 +231,7 @@ sharpc/
 
 ### `samples/GameService/`
 
-The classic player-state RPC scenario — register, move, perform actions. Good
+The classic player-state RPC scenario - register, move, perform actions. Good
 introduction to the framework's basic shape.
 
 ### `samples/Inventory/`

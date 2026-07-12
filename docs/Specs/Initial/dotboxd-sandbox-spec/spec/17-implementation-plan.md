@@ -1,10 +1,10 @@
-# 17 — Implementation Plan
+# 17 - Implementation Plan
 
 ## Principle
 
 Build the sandbox in layers. Do not start with IL generation. The interpreter, validator, policy model, and bindings are the real sandbox. The compiler is an optimization backend.
 
-## Phase 0 — Core model
+## Phase 0 - Core model
 
 Deliver:
 
@@ -20,7 +20,7 @@ Acceptance:
 - canonicalization deterministic
 - module hash stable across JSON whitespace and property-order differences
 
-## Phase 1 — Validation and policy
+## Phase 1 - Validation and policy
 
 Deliver:
 
@@ -37,7 +37,7 @@ Acceptance:
 - unsafe bindings rejected
 - effect inference golden tests pass
 
-## Phase 2 — Interpreted mode
+## Phase 2 - Interpreted mode
 
 Deliver:
 
@@ -57,7 +57,7 @@ Acceptance:
 - debug trace works for basic scripts
 - interpreted execution does not create or consume compiled artifacts
 
-## Phase 3 — Runtime safe APIs
+## Phase 3 - Runtime safe APIs
 
 Deliver:
 
@@ -74,7 +74,7 @@ Acceptance:
 - no raw host objects exposed
 - audit events sanitized
 
-## Phase 4 — Compiler parity foundation
+## Phase 4 - Compiler parity foundation
 
 Deliver:
 
@@ -87,7 +87,7 @@ Acceptance:
 - interpreted and compiled backends agree for supported modules
 - operation costs assigned at IR operation level
 
-## Phase 5 — Compiled mode MVP
+## Phase 5 - Compiled mode MVP
 
 Deliver:
 
@@ -105,7 +105,7 @@ Acceptance:
 - fuel checks injected
 - interpreter/compiler differential tests pass
 
-## Phase 6 — Generated-code verifier
+## Phase 6 - Generated-code verifier
 
 Deliver:
 
@@ -121,7 +121,7 @@ Acceptance:
 - generated compiler output accepted
 - verifier failure prevents load
 
-## Phase 7 — Persistent DLL cache
+## Phase 7 - Persistent DLL cache
 
 Deliver:
 
@@ -138,7 +138,7 @@ Acceptance:
 - policy revocation invalidates artifact
 - corrupted cache quarantined
 
-## Phase 8 — Worker process isolation optional but recommended
+## Phase 8 - Worker process isolation optional but recommended
 
 Deliver:
 
@@ -154,7 +154,7 @@ Acceptance:
 - worker has no access to host secrets
 - results/audit returned to host
 
-## Phase 9 — Performance improvements
+## Phase 9 - Performance improvements
 
 Only after correctness:
 

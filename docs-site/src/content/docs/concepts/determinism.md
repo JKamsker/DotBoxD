@@ -4,7 +4,7 @@ description: Inputs that participate in deterministic sandbox execution and hash
 ---
 
 Deterministic execution is what makes kernel runs **replayable and auditable**: given the same
-inputs, a run produces the same result, audit stream, and resource usage — so you can reproduce a
+inputs, a run produces the same result, audit stream, and resource usage - so you can reproduce a
 production incident offline, regression-test plugin behavior, or trust that a cached compiled
 artifact corresponds to the module it was built from. This page defines exactly which inputs
 participate in that contract. If you never replay or audit kernel runs, you can safely skip it.

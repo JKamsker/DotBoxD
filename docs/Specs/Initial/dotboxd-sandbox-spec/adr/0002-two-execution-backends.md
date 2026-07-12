@@ -1,4 +1,4 @@
-# ADR 0002 — Support Interpreted and Compiled Backends
+# ADR 0002 - Support Interpreted and Compiled Backends
 
 ## Status
 

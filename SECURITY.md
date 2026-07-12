@@ -6,7 +6,7 @@ boundary model below before deploying.
 
 ## Reporting a vulnerability
 
-Please report suspected vulnerabilities **privately** — do not open a public issue for a security
+Please report suspected vulnerabilities **privately** - do not open a public issue for a security
 problem.
 
 - Use GitHub's **"Report a vulnerability"** (Security → Advisories) on this repository, or
@@ -20,7 +20,7 @@ to acknowledge within a few days and will coordinate a fix and disclosure timeli
 DotBoxD is pre-1.0 (`0.x`). Only the latest published version receives security fixes while the API
 stabilizes.
 
-## The trust boundary — what is and isn't a sandbox
+## The trust boundary - what is and isn't a sandbox
 
 DotBoxD has three distinct **trust postures** with very different guarantees (not to be confused
 with the three interaction modes, call/react/extend, or the `ExecutionMode` interpreter/compiler
@@ -28,9 +28,9 @@ setting):
 
 | Trust posture | What runs | Boundary? |
 |------|-----------|-----------|
-| **Safe mode (Kernels)** | Validated, capability-gated, fuel/quota-metered restricted **IR** (intermediate representation) — never C#, IL, reflection, CLR member names, or arbitrary host calls. Compiled kernels are additionally verified before execution. | **Yes** — this is the real in-process boundary DotBoxD is built to defend. |
-| **Trusted-plugin mode** | Normal .NET assemblies loaded via `AssemblyLoadContext`. | **No.** `AssemblyLoadContext` is *not* a security sandbox — loaded code runs with the full permissions of the process. Use only for code you already trust. |
-| **Untrusted arbitrary .NET code** | Any third-party assembly you do not trust. | Requires an **OS-level** boundary — a separate worker process, container, VM, or equivalent. In-process restrictions are not sufficient. |
+| **Safe mode (Kernels)** | Validated, capability-gated, fuel/quota-metered restricted **IR** (intermediate representation) - never C#, IL, reflection, CLR member names, or arbitrary host calls. Compiled kernels are additionally verified before execution. | **Yes** - this is the real in-process boundary DotBoxD is built to defend. |
+| **Trusted-plugin mode** | Normal .NET assemblies loaded via `AssemblyLoadContext`. | **No.** `AssemblyLoadContext` is *not* a security sandbox - loaded code runs with the full permissions of the process. Use only for code you already trust. |
+| **Untrusted arbitrary .NET code** | Any third-party assembly you do not trust. | Requires an **OS-level** boundary - a separate worker process, container, VM, or equivalent. In-process restrictions are not sufficient. |
 
 The kernel sandbox defends against runaway resource use, disallowed effects, and disallowed host
 access for *author-supplied logic expressed as IR*. It does **not** turn `AssemblyLoadContext` into a

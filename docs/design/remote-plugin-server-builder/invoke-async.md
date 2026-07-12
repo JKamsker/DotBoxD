@@ -1,4 +1,4 @@
-# InvokeAsync — inline-kernel and explicit capture bag (deep dive)
+# InvokeAsync - inline-kernel and explicit capture bag (deep dive)
 
 This document specifies how `server.InvokeAsync(lambda)` is detected, lowered to verified sandboxed
 IR at compile time, shipped over async IPC, and executed server-side. It also documents both capture paths:
@@ -143,7 +143,7 @@ function "$anon:<hex>" (<implicit captures>) -> <return or Record([returnValue, 
 function "$anon:<hex>" (captures: Record([...])) -> Record([returnValue, syncOut0, ...])
 ```
 
-- The lambda's `IGameWorldAccess world` parameter is **not** an IR parameter — calls on it
+- The lambda's `IGameWorldAccess world` parameter is **not** an IR parameter - calls on it
   (`world.GetMonster(id)`) lower to a host-binding call via the existing host-binding lowerer.
 - For capture-bag calls, the bag lambda parameter is the single IR parameter. Reads like `bag.MonsterId`
   lower to `record.get(Var("bag"), 0)`.
@@ -160,19 +160,19 @@ function "$anon:<hex>" (captures: Record([...])) -> Record([returnValue, syncOut
 
 Constructed exactly like `RpcKernelModelFactory.EmitPackage`:
 `pluginId = "$anon:" + HookChainIdentity.Compute(invocation)` (FNV-1a of file path + span start; verified to
-pass `ValidateText` and the descriptor guards — a colon and a hex run are not forbidden), `mode=Auto`,
+pass `ValidateText` and the descriptor guards - a colon and a hex run are not forbidden), `mode=Auto`,
 `liveSettings=[]`, `subscriptions=[]`, `rpcEntrypoint`=the function id, `requiredCapabilities`=the
 host-binding capability sink, `effects`=`Cpu` (+`Alloc` when the lowerer allocates). The generator emits
 `module.id == pluginId` **and** `module.metadata.pluginId == pluginId` identically (the existing RPC factory
 already emits `"metadata":{"kernel":…,"pluginId":…}`).
 
 The package is emitted as a generated `…$anon_<hex>PluginPackage.Create()` static whose body is
-`PluginPackageJsonSerializer.Import("<json literal>")` — identical structure to every other generated
+`PluginPackageJsonSerializer.Import("<json literal>")` - identical structure to every other generated
 package. No runtime package resolution.
 
 ---
 
-## 5. Body lowering — honest reuse boundary
+## 5. Body lowering - honest reuse boundary
 
 `DotBoxDRpcJsonLowerer.LowerBody(block)` lowers the body **statements** unchanged: locals, assignments,
 `foreach`, `if`/`else`, `record.new`, `list.Add`, `return <expr>`. What is **net-new** in
@@ -190,7 +190,7 @@ package. No runtime package resolution.
 
 ## 6. Capture marshalling (the central mechanism)
 
-A C# interceptor's non-receiver parameters must match the intercepted method's argument list **exactly** —
+A C# interceptor's non-receiver parameters must match the intercepted method's argument list **exactly** -
 it **cannot** add `out`/`ref` parameters or change the return type (confirmed by the existing
 `DotBoxDHookChainInterceptorEmitter`, whose interceptor returns `HookPipeline<TEvent>` and forwards the
 identical handler). Therefore captures cannot be threaded as extra interceptor parameters, and
@@ -274,7 +274,7 @@ decoded return value.
 
 ---
 
-## 7. Anonymous-kernel install — identity, caching, concurrency
+## 7. Anonymous-kernel install - identity, caching, concurrency
 
 Generated plugin server facades expose a generated `Services` accessor. Anonymous `InvokeAsync` kernels use
 that accessor's server-extension install and invoke path:
@@ -313,7 +313,7 @@ private ValueTask<string> InstallServerExtensionPackageAsync(PluginPackage packa
 - **Install-once-per-id-per-connection.** The `ConcurrentDictionary<string, Lazy<Task<string>>>` `GetOrAdd`
   ensures concurrent first-calls share a single install task. A naive check-then-install races: two installs
   of the same `$anon:` id trigger the same-owner reinstall guard (`KernelRegistry.Add`, DBXK060), which
-  **replaces and revokes** the incumbent — cancelling an in-flight invoke's execution gate. The concurrency-safe
+  **replaces and revokes** the incumbent - cancelling an in-flight invoke's execution gate. The concurrency-safe
   cache is **mandatory**, not an optimization.
 - **Failed installs are retryable.** If the shared install task faults or is cancelled, the generated facade removes
   that exact lazy value from `_anonymousKernels` before rethrowing. The next call for the same anonymous plugin id
@@ -346,7 +346,7 @@ Verified in `InstalledKernel.Rpc.cs`:
 - **0 captures** → 0-param entrypoint → input `SandboxValue.Unit`.
 - **1 capture** → 1-param entrypoint → input is the **bare** `arguments[0]` (not a 1-element frame). The
   generated IR body must read the bare value.
-- **N≥2 captures** → input is `SandboxValue.FromList(values, values[0].Type)` — a positional frame whose
+- **N≥2 captures** → input is `SandboxValue.FromList(values, values[0].Type)` - a positional frame whose
   declared element type is the first capture's type. Heterogeneous captures round-trip correctly because
   each wire arg was already validated against its own IR parameter type before packing; the element-type
   tag is an internal positional-frame detail the IR destructures by index.
@@ -354,7 +354,7 @@ Verified in `InstalledKernel.Rpc.cs`:
 ### Capability gating
 
 `requiredCapabilities` are derived by `DotBoxDHostBindingExpressionLowerer` from the `[HostBinding]` calls in
-the lambda body — the same sink used for named RPC kernels. `ServerPolicy.ForKernel` grants exactly the
+the lambda body - the same sink used for named RPC kernels. `ServerPolicy.ForKernel` grants exactly the
 matching namespaces; a lambda touching an ungranted binding fails at install. **No new policy
 infrastructure.**
 
@@ -374,7 +374,7 @@ new binary codec.
 
 ---
 
-## 10. Interceptor attribute dedup — hard prerequisite
+## 10. Interceptor attribute dedup - hard prerequisite
 
 `DotBoxDHookChainInterceptorEmitter.Emit` calls
 `context.AddSource("DotBoxDInterceptsLocationAttribute.g.cs", AttributeSource)`. A second emitter adding the

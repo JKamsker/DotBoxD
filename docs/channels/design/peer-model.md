@@ -1,7 +1,7 @@
 # DotBoxD Peer Model
 
 Status: implemented on `feature/peer-model`. The legacy `RpcClient` / `RpcServer` /
-`RpcPeer` and the `DuplexConnectionSplitter` have since been **removed** — `RpcPeer` and
+`RpcPeer` and the `DuplexConnectionSplitter` have since been **removed** - `RpcPeer` and
 `RpcHost` are the only surface. The wire format is unchanged, so the removal is API-only.
 
 This document describes the move from a `client` / `server` mental model to a single,
@@ -19,7 +19,7 @@ asymmetric configuration of the same type.
 2. **Direction is configuration, not type.** A "client" is a peer that only `Get`s. A
    "server" is a peer that only `Provide`s. Bidirectional is a peer that does both. There
    is no separate client/server class on the hot path.
-3. **One read loop.** The peer demuxes inbound frames by message type — `Response`/`Error`
+3. **One read loop.** The peer demuxes inbound frames by message type - `Response`/`Error`
    complete *my* pending calls; `Request`/`Cancel` hit *my* dispatchers. No connection
    splitter, no stacked server + client.
 4. **Transport-agnostic, duplex channel.** The transport unit is a duplex `IRpcChannel`
@@ -45,7 +45,7 @@ pretend they owned the socket. `RpcPeer` exploits it directly with a single loop
 
 ## Core abstractions
 
-### `IRpcChannel` — the transport unit
+### `IRpcChannel` - the transport unit
 
 ```csharp
 namespace DotBoxD.Services.Transport;
@@ -68,7 +68,7 @@ public interface IRpcChannel : IAsyncDisposable
 > the peer (provide vs. get), not in the transport. Genuinely send-only links
 > (fire-and-forget / notifications) are an explicitly out-of-scope future addition.
 
-### `IRpcInvoker` — what generated proxies depend on
+### `IRpcInvoker` - what generated proxies depend on
 
 ```csharp
 namespace DotBoxD.Services;
@@ -88,8 +88,8 @@ public interface IRpcInvoker
 }
 ```
 
-This is the transport-agnostic set of invoke verbs — no `Connect`/`IsConnected`/`Dispose`.
-Generated proxies depend on `IRpcInvoker`, which `RpcPeer` implements directly — no "client"
+This is the transport-agnostic set of invoke verbs - no `Connect`/`IsConnected`/`Dispose`.
+Generated proxies depend on `IRpcInvoker`, which `RpcPeer` implements directly - no "client"
 required.
 
 ### `RpcPeer`
@@ -160,7 +160,7 @@ public sealed class RpcPeerOptions
     // available.
     //
     // Because a peer demuxes responses, cancels, and inbound requests over a single read
-    // loop, a full Wait-mode queue parks that loop — which also pauses reading responses to
+    // loop, a full Wait-mode queue parks that loop - which also pauses reading responses to
     // this peer's own outbound calls. A bidirectional peer whose inbound handlers call back
     // into the same peer must size this above the number of inbound requests that can arrive
     // ahead of those callbacks' responses, or use null / DropIncoming; otherwise an
@@ -171,7 +171,7 @@ public sealed class RpcPeerOptions
 }
 ```
 
-### `RpcHost` — accepting many connections
+### `RpcHost` - accepting many connections
 
 The accept loop that lived inside `RpcServer` moves into a host whose *output is peers*.
 Because each accepted connection is a full peer, the host can also call back into
@@ -226,7 +226,7 @@ await using var host = RpcHost
     .ForEachPeer(peer => peer.ProvideGameService(new GameService()));
 await host.StartAsync();
 
-// Caller side — gets only; RejectInboundCalls makes the one-way intent explicit.
+// Caller side - gets only; RejectInboundCalls makes the one-way intent explicit.
 var channel = /* connect a duplex IRpcChannel */;
 await using var peer = RpcPeer
     .Over(channel, new MessagePackRpcSerializer(), new RpcPeerOptions { RejectInboundCalls = true })
@@ -259,7 +259,7 @@ await notifier.MessageReceivedAsync("welcome");
 | `RpcClient` / `IRpcClient` | `RpcPeer` (get-only) / `IRpcInvoker` | legacy client **removed** |
 | `RpcServer` + accept loop | `RpcHost` + per-conn `RpcPeer` | legacy server **removed**; accept concern is `RpcHost` |
 | `RpcPeer` + `DuplexConnectionSplitter` | `RpcPeer` (one loop) | both **removed** |
-| `IConnection` | `IRpcChannel` | `IConnection` **removed**; transports return `IRpcChannel` directly (impls unchanged — `IConnection` added no members) |
+| `IConnection` | `IRpcChannel` | `IConnection` **removed**; transports return `IRpcChannel` directly (impls unchanged - `IConnection` added no members) |
 | `serverBuilder.AddGameService(impl)` | `peer.ProvideGameService(impl)` | generated `Add…` extension **removed** |
 | `client.CreateGameServiceProxy()` | `peer.GetGameService()` | generated `Create…Proxy` extension **removed** |
 | `RpcRequest` / `RpcResponse` / `ServiceHandle` / `InstanceRegistry` | **unchanged** | wire compatibility preserved |

@@ -2,7 +2,7 @@
 title: 'RPC channels quick start'
 ---
 > **New to DotBoxD?** Start with [Getting started](/getting-started/) and the [Tutorials](/tutorials/).
-> This page and the rest of this section are the production deep dive for the RPC channel layer —
+> This page and the rest of this section are the production deep dive for the RPC channel layer -
 > transports, codecs, and the generated registry. For choosing between transports, see
 > [Channels & transports](/concepts/channels-transports/).
 
@@ -121,7 +121,7 @@ dotnet run --project Client
 
 Your shared project needs these references:
 
-> These `ProjectReference`s assume you are building inside the cloned DotBoxD repo; if you installed from NuGet ([getting started](/getting-started/)), reference the packages instead — the `DotBoxD.Services` package bundles `DotBoxD.Services.SourceGenerator` as an analyzer automatically, so you never add the generator as a standalone reference.
+> These `ProjectReference`s assume you are building inside the cloned DotBoxD repo; if you installed from NuGet ([getting started](/getting-started/)), reference the packages instead - the `DotBoxD.Services` package bundles `DotBoxD.Services.SourceGenerator` as an analyzer automatically, so you never add the generator as a standalone reference.
 
 ```xml
 <ItemGroup>
@@ -168,7 +168,7 @@ You can use the generated factory directly when building framework-style APIs:
 ```csharp
 using DotBoxD.Services.Generated;
 
-// CreateProxy takes an IRpcInvoker — pass an RpcPeer.
+// CreateProxy takes an IRpcInvoker - pass an RpcPeer.
 var proxy = DotBoxDGenerated.CreateProxy<IMyService>(peer);
 var dispatcher = DotBoxDGenerated.CreateDispatcher<IMyService>(new MyService());
 

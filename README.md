@@ -128,6 +128,9 @@ public sealed partial class MonsterKillerKernel
     }
 }
 
+// The host installs the plugin's generated kernel once under its service contract.
+await server.RegisterServerExtensionAsync<IMonsterKillerService, MonsterKillerKernel>();
+
 List<KillResult> killed = server.ServerExtension<IMonsterKillerService>().KillMonsters(ids); // 1 round-trip, not N
 ```
 
