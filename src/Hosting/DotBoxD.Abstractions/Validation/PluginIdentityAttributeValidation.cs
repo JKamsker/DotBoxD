@@ -12,7 +12,7 @@ internal static class PluginIdentityAttributeValidation
         if (!HasStablePluginIdBoundary(id) || !HasStablePluginIdBody(id))
         {
             throw new ArgumentException(
-                "Plugin id must be a stable identifier: use ASCII letters, digits, '.', '_' or '-', " +
+                "Id must be a stable identifier: use ASCII letters, digits, '.', '_' or '-', " +
                 "start and end with a letter or digit, and do not use empty dot segments.",
                 nameof(id));
         }
