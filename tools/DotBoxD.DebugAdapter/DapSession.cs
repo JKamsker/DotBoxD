@@ -11,7 +11,6 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
     private DapBreakpointHandler? _breakpoints;
     private string? _pluginId;
     private bool _finished;
-
     public async Task RunAsync(CancellationToken cancellationToken)
     {
         while (!_finished && !cancellationToken.IsCancellationRequested)
@@ -237,7 +236,6 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
         }
 
         _inspection?.InvalidateAllStoppedState();
-
         await connection.RespondAsync(request, true, new { }, null, cancellationToken).ConfigureAwait(false);
         await connection.EventAsync("terminated", new { }, cancellationToken).ConfigureAwait(false);
         _finished = true;

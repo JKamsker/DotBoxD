@@ -227,6 +227,27 @@ function Wait-ForNextKernelStop {
     return $stop
 }
 
+function Wait-ForCompanionProcesses {
+    $expected = @('Examples.GameServer.Server', 'Examples.GameServer.Plugin', 'DotBoxD.DebugAdapter')
+    $deadline = [DateTime]::UtcNow + $StopTimeout
+    do {
+        Start-Sleep -Milliseconds 200
+        $found = @(Get-CimInstance Win32_Process | ForEach-Object {
+            if ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) -and
+                $_.Name -in @('Examples.GameServer.Server.exe', 'Examples.GameServer.Plugin.exe')) {
+                [IO.Path]::GetFileNameWithoutExtension($_.Name)
+            }
+            elseif ($_.CommandLine -and $_.CommandLine.Contains('DotBoxD.DebugAdapter.dll', [StringComparison]::OrdinalIgnoreCase)) {
+                'DotBoxD.DebugAdapter'
+            }
+        } | Select-Object -Unique)
+    } until (($expected | Where-Object { $_ -notin $found }).Count -eq 0 -or [DateTime]::UtcNow -ge $deadline)
+    $missing = @($expected | Where-Object { $_ -notin $found })
+    if ($missing.Count -gt 0) {
+        throw "Visual Studio did not launch companion process(es): $($missing -join ', '). Found: $($found -join ', ')."
+    }
+}
+
 New-Item -ItemType Directory -Path $artifacts -Force | Out-Null
 Remove-Item $activityLog, $launcherLog, $resultLog, $continuousStartGate -Force -ErrorAction SilentlyContinue
 Stop-ExamplesAndVisualStudio
@@ -313,6 +334,7 @@ $null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_MANAGED_PROGRAM, 36)
 '@ 'Visual Studio managed breakpoint setup' | Out-Null
     Set-Content $continuousStartGate 'ready'
     $managedStop = Wait-ForManagedStop
+    Wait-ForCompanionProcesses
     Invoke-DteWhenReady @'
 while ($dte.Debugger.Breakpoints.Count -gt 0) { $dte.Debugger.Breakpoints.Item(1).Delete() }
 $null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_GUARDIAN, 35)
@@ -333,8 +355,8 @@ $dte.Debugger.Go($false)
     if ($predicate1.Function -eq $handle1.Function -or $predicate2.Function -eq $handle2.Function) {
         throw 'Where and Run stops did not preserve distinct kernel stack identities.'
     }
-    Set-Content $resultLog "PASS: managed Program.cs:$($managedStop.Line), kernel step to $($step.Line), and kernel 35, 44, 35, 44."
-    Write-Host "Visual Studio 2026 kernel debugger E2E passed: step to $($step.Line), then 44, 35, 44."
+    Set-Content $resultLog "PASS: managed Program.cs:$($managedStop.Line); processes server/plugin/adapter; kernel step to $($step.Line); kernel 35, 44, 35, 44."
+    Write-Host "Visual Studio 2026 kernel debugger E2E passed: launched all companion processes, stepped to $($step.Line), then stopped at 44, 35, 44."
 }
 catch {
     Set-Content $resultLog ("FAIL: " + $_.Exception)
