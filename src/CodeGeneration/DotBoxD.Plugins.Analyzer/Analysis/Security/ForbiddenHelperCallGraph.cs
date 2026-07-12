@@ -27,6 +27,33 @@ internal sealed class ForbiddenHelperCallGraph
     public void RecordForbidden(IFieldSymbol field, ITypeSymbol type)
         => _forbidden.TryAdd(Normalize(field), type);
 
+    public void RecordDispatchImplementations(IMethodSymbol method)
+    {
+        if (method.DeclaringSyntaxReferences.Length == 0 ||
+            PluginAnalyzer.IsEventKernel(method.ContainingType))
+        {
+            return;
+        }
+
+        if (method.OverriddenMethod is { } overridden)
+        {
+            _helperEdges.Add(new HelperEdge(Normalize(overridden), Normalize(method)));
+        }
+
+        foreach (var @interface in method.ContainingType.AllInterfaces)
+        {
+            foreach (var member in @interface.GetMembers(method.Name).OfType<IMethodSymbol>())
+            {
+                if (SymbolEqualityComparer.Default.Equals(
+                    method.ContainingType.FindImplementationForInterfaceMember(member),
+                    method))
+                {
+                    _helperEdges.Add(new HelperEdge(Normalize(member), Normalize(method)));
+                }
+            }
+        }
+    }
+
     public void RecordCall(IMethodSymbol caller, IMethodSymbol target, Location location)
     {
         if (target.DeclaringSyntaxReferences.Length == 0 ||
