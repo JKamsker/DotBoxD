@@ -165,6 +165,7 @@ public sealed class RpcStreamingContext : IRpcStreamingContext
     private RpcStreamReceiver GetInbound(RpcStreamHandle handle, RpcStreamKind expected)
     {
         EnsureEnabled();
+        RpcStreamValidation.ValidateHandleArgument(handle, nameof(handle));
         EnsureKind(handle, expected);
 
         lock (_gate)

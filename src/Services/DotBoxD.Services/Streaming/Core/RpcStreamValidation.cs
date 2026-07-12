@@ -92,6 +92,19 @@ internal static class RpcStreamValidation
         ValidateKind(attachment.Handle.Kind);
     }
 
+    public static void ValidateHandleArgument(RpcStreamHandle handle, string paramName)
+    {
+        if (handle.StreamId <= 0)
+        {
+            throw new ArgumentException("Stream id must be positive.", paramName);
+        }
+
+        if (!IsKnownKind(handle.Kind))
+        {
+            throw new ArgumentException($"Unknown stream kind '{handle.Kind}'.", paramName);
+        }
+    }
+
     public static void ValidateStreamId(int streamId)
     {
         if (streamId <= 0)
