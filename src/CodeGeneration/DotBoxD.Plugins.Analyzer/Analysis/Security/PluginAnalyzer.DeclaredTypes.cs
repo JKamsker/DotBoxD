@@ -1,3 +1,4 @@
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 
@@ -14,6 +15,45 @@ public sealed partial class PluginAnalyzer
         }
 
         ReportForbiddenDeclaredType(context, field.ContainingType, field.Type, field.Locations.FirstOrDefault());
+    }
+
+    private static void AnalyzeMethod(SymbolAnalysisContext context)
+    {
+        var method = (IMethodSymbol)context.Symbol;
+        ReportForbiddenDeclaredMethodSignature(context, method);
+        if (HasAttribute(method, DotBoxDMetadataNames.NativeOnlyAttribute))
+        {
+            ValidateLocalMember(context, method, method);
+        }
+    }
+
+    private static void AnalyzeMethod(SymbolAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
+    {
+        var method = (IMethodSymbol)context.Symbol;
+        helperGraph.RecordDispatchImplementations(method);
+    }
+
+    private static void AnalyzeProperty(SymbolAnalysisContext context)
+    {
+        var property = (IPropertySymbol)context.Symbol;
+        ReportForbiddenDeclaredPropertyType(context, property);
+        if (HasAttribute(property, DotBoxDMetadataNames.NativeOnlyAttribute))
+        {
+            ValidateLocalMember(context, property, property);
+        }
+
+        if (!HasAttribute(property, DotBoxDMetadataNames.LiveSettingAttribute))
+        {
+            return;
+        }
+
+        if (!IsAllowedLiveSettingType(property.Type))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                LiveSettingTypeRule,
+                property.Locations.FirstOrDefault(),
+                property.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)));
+        }
     }
 
     private static void ReportForbiddenDeclaredPropertyType(SymbolAnalysisContext context, IPropertySymbol property)

@@ -84,47 +84,6 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         });
     }
 
-    private static void AnalyzeMethod(SymbolAnalysisContext context)
-    {
-        var method = (IMethodSymbol)context.Symbol;
-        ReportForbiddenDeclaredMethodSignature(context, method);
-        if (!HasAttribute(method, DotBoxDMetadataNames.NativeOnlyAttribute))
-        {
-            return;
-        }
-
-        ValidateLocalMember(context, method, method);
-    }
-
-    private static void AnalyzeMethod(SymbolAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
-    {
-        var method = (IMethodSymbol)context.Symbol;
-        helperGraph.RecordDispatchImplementations(method);
-    }
-
-    private static void AnalyzeProperty(SymbolAnalysisContext context)
-    {
-        var property = (IPropertySymbol)context.Symbol;
-        ReportForbiddenDeclaredPropertyType(context, property);
-        if (HasAttribute(property, DotBoxDMetadataNames.NativeOnlyAttribute))
-        {
-            ValidateLocalMember(context, property, property);
-        }
-
-        if (!HasAttribute(property, DotBoxDMetadataNames.LiveSettingAttribute))
-        {
-            return;
-        }
-
-        if (!IsAllowedLiveSettingType(property.Type))
-        {
-            context.ReportDiagnostic(Diagnostic.Create(
-                LiveSettingTypeRule,
-                property.Locations.FirstOrDefault(),
-                property.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)));
-        }
-    }
-
     private static void AnalyzeInvocation(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
         var invocation = (IInvocationOperation)context.Operation;
