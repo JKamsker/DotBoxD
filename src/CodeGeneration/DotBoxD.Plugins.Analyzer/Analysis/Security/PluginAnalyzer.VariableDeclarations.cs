@@ -18,6 +18,7 @@ public sealed partial class PluginAnalyzer
         var declaration = (IVariableDeclarationOperation)context.Operation;
         foreach (var declarator in declaration.Declarators)
         {
+            RecordDynamicLocalInitializer(helperGraph, declarator);
             if (!TryGetForbiddenHostApi(declarator.Symbol.Type, out var forbidden))
             {
                 continue;
@@ -35,6 +36,28 @@ public sealed partial class PluginAnalyzer
                 forbidden.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
         }
     }
+
+    private static void RecordDynamicLocalInitializer(
+        ForbiddenHelperCallGraph helperGraph,
+        IVariableDeclaratorOperation declarator)
+    {
+        if (declarator.Symbol.Type.TypeKind != TypeKind.Dynamic)
+        {
+            return;
+        }
+
+        helperGraph.RecordDynamicLocalType(
+            declarator.Symbol,
+            DynamicInitializerType(declarator.Initializer?.Value));
+    }
+
+    private static ITypeSymbol? DynamicInitializerType(IOperation? initializer)
+        => initializer switch
+        {
+            IConversionOperation conversion => DynamicInitializerType(conversion.Operand),
+            { Type.TypeKind: not TypeKind.Dynamic } operation => operation.Type,
+            _ => null
+        };
 
     private static bool TryGetForbiddenHostApi(
         ITypeSymbol? type,
