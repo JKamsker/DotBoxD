@@ -30,6 +30,7 @@ public sealed class EventQueryHost : IEventQuerySource
     {
         ArgumentNullException.ThrowIfNull(context);
         context.CancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(e);
         return TryGetDispatcher<TEvent>() is { } dispatcher
             ? dispatcher.PublishAsync(e, context)
             : ValueTask.CompletedTask;

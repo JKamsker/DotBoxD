@@ -73,11 +73,11 @@ public sealed class VerifierManifestIdentityTests
     }
 
     [Fact]
-    public async Task Direct_verifier_rejects_missing_manifest_assembly_hash()
+    public async Task Direct_verifier_rejects_mismatched_manifest_assembly_hash()
     {
         var policy = VerificationPolicy.BoxedValueDefaults();
         var bytes = VerifierTestHelpers.BuildGeneratedAssembly(type => VerifierTestHelpers.DefineValidExecute(type));
-        var manifest = CurrentManifest(bytes, policy) with { AssemblyHash = "" };
+        var manifest = CurrentManifest(bytes, policy) with { AssemblyHash = "mismatched" };
 
         var result = await new GeneratedAssemblyVerifier().VerifyAsync(
             bytes,

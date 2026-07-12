@@ -39,19 +39,35 @@ public abstract record SandboxValue
     public static SandboxValue FromGuid(System.Guid value) => new GuidValue(value);
 
     public static SandboxValue FromOpaqueId(string typeName, string value)
-        => SandboxType.IsKnownOpaqueId(typeName) && SandboxLiteralConstraints.IsOpaqueId(value)
+    {
+        ArgumentNullException.ThrowIfNull(typeName);
+        ArgumentNullException.ThrowIfNull(value);
+
+        if (!SandboxType.IsKnownOpaqueId(typeName))
+        {
+            throw new ArgumentException("Opaque ID type names must be well-formed brand types.", nameof(typeName));
+        }
+
+        return SandboxLiteralConstraints.IsOpaqueId(value)
             ? new OpaqueIdValue(typeName, value)
-            : throw new ArgumentException("Opaque IDs must use a well-formed brand type and a safe ID value.", nameof(value));
+            : throw new ArgumentException("Opaque ID values must be safe ID values.", nameof(value));
+    }
 
     public static SandboxValue FromPath(string value)
-        => SandboxLiteralConstraints.IsPortableRelativePath(value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return SandboxLiteralConstraints.IsPortableRelativePath(value)
             ? new SandboxPathValue(new SandboxPath(value))
             : throw new ArgumentException("Sandbox paths must be portable relative paths.", nameof(value));
+    }
 
     public static SandboxValue FromUri(string value)
-        => SandboxLiteralConstraints.IsSandboxUri(value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return SandboxLiteralConstraints.IsSandboxUri(value)
             ? new SandboxUriValue(new SandboxUri(value))
             : throw new ArgumentException("Sandbox URIs must be absolute and must not include user info.", nameof(value));
+    }
 
     public static SandboxValue FromList(IReadOnlyList<SandboxValue> values)
     {

@@ -5,17 +5,32 @@ namespace DotBoxD.Kernels.Runtime.Bindings;
 public static class DefaultSandboxBindings
 {
     public static BindingRegistryBuilder AddDefaultPureBindings(this BindingRegistryBuilder builder)
-        => builder.AddRange(MathBindings.All).AddRange(StringBindings.All);
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        return builder.AddRange(MathBindings.All).AddRange(StringBindings.All);
+    }
 
     public static BindingRegistryBuilder AddFileBindings(this BindingRegistryBuilder builder)
-        => builder.Add(SafeFileBindings.ReadText).Add(SafeFileBindings.WriteText);
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        return builder.Add(SafeFileBindings.ReadText).Add(SafeFileBindings.WriteText);
+    }
 
     public static BindingRegistryBuilder AddTimeBindings(this BindingRegistryBuilder builder)
-        => builder.Add(SafeTimeBindings.NowUnixMillis);
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        return builder.Add(SafeTimeBindings.NowUnixMillis);
+    }
 
     public static BindingRegistryBuilder AddRandomBindings(this BindingRegistryBuilder builder)
-        => builder.Add(SafeRandomBindings.NextI32);
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        return builder.Add(SafeRandomBindings.NextI32);
+    }
 
     public static BindingRegistryBuilder AddLogBindings(this BindingRegistryBuilder builder)
-        => builder.Add(SafeLogBindings.Info).Add(SafeLogBindings.Warn);
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        return builder.Add(SafeLogBindings.Info).Add(SafeLogBindings.Warn);
+    }
 }

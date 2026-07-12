@@ -28,6 +28,24 @@ public sealed partial class PluginAnalyzer
             type!.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
     }
 
+    // A helper auto-property initializer runs before the getter returns its value. When an event kernel reads
+    // that property, the existing property-reference path records a root edge to the getter; mark the getter
+    // tainted here so a forbidden host API in the initializer is not hidden behind the auto-property.
+    private static void RecordForbiddenHelperPropertyInitializer(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        ITypeSymbol? type)
+    {
+        if (context.ContainingSymbol is not IPropertySymbol { GetMethod: { } getter } property ||
+            IsEventKernel(property.ContainingType) ||
+            !IsForbiddenHostApi(type))
+        {
+            return;
+        }
+
+        helperGraph.RecordForbidden(getter, type!);
+    }
+
     // A helper invoked (or referenced as a method group) from a field/property initializer in an event kernel is
     // a call-graph root: its body may transitively reach a forbidden host API even though the directly referenced
     // type is benign. Record it so the existing taint propagation flags it at the initializer site.
@@ -42,9 +60,36 @@ public sealed partial class PluginAnalyzer
         }
 
         helperGraph.RecordInitializerRootCall(
-            context.ContainingSymbol.ContainingType,
+            context.ContainingSymbol,
             target,
             context.Operation.Syntax.GetLocation());
+    }
+
+    private static void RecordForbiddenInitializerReference(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        ITypeSymbol? type)
+    {
+        if (context.ContainingSymbol is not (IFieldSymbol or IPropertySymbol) ||
+            !IsForbiddenHostApi(type))
+        {
+            return;
+        }
+
+        helperGraph.RecordForbiddenInitializer(context.ContainingSymbol, type!);
+    }
+
+    private static void RecordInitializerMemberReference(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        ISymbol target)
+    {
+        if (context.ContainingSymbol is not (IFieldSymbol or IPropertySymbol))
+        {
+            return;
+        }
+
+        helperGraph.RecordInitializerMemberReference(context.ContainingSymbol, target);
     }
 
     // A helper property read from an initializer reaches a forbidden API through the accessor it actually uses, so
@@ -60,17 +105,16 @@ public sealed partial class PluginAnalyzer
             return;
         }
 
-        var containingType = context.ContainingSymbol.ContainingType;
         var (usesGetter, usesSetter) = AccessorUsage(context.Operation);
         var location = context.Operation.Syntax.GetLocation();
         if (usesGetter && property.GetMethod is { } getter)
         {
-            helperGraph.RecordInitializerRootCall(containingType, getter, location);
+            helperGraph.RecordInitializerRootCall(context.ContainingSymbol, getter, location);
         }
 
         if (usesSetter && property.SetMethod is { } setter)
         {
-            helperGraph.RecordInitializerRootCall(containingType, setter, location);
+            helperGraph.RecordInitializerRootCall(context.ContainingSymbol, setter, location);
         }
     }
 

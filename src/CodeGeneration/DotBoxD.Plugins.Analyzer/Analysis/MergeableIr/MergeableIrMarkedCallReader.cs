@@ -13,9 +13,13 @@ internal static class MergeableIrMarkedCallReader
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method ||
-            method.IsStatic ||
-            method.IsExtensionMethod)
+        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method)
+        {
+            return null;
+        }
+
+        MergeableIrMarkedMethodDetector.ThrowIfUnsupportedExtensionReceiver(method, model.Compilation);
+        if (MergeableIrMarkedMethodDetector.IsExtensionReceiver(method) || method.IsStatic)
         {
             return null;
         }

@@ -10,24 +10,6 @@ namespace DotBoxD.Abstractions;
 /// build-time hook-chain fusion: a consumer that collected steps from a custom pipeline surface can combine
 /// them by hand, which is exactly what "delete the attribute and hand-write it" requires.
 /// </summary>
-/// <remarks>
-/// The composed module exposes two entrypoints over the pipeline input record:
-/// <list type="bullet">
-///   <item><description><c>ShouldHandle(input) -> Bool</c>: threads the input through the chain, returning
-///     <c>false</c> as soon as any filter fails, otherwise <c>true</c>.</description></item>
-///   <item><description><c>Handle(input) -> ResultType</c>: applies the projections in order (filters are
-///     already gated by <c>ShouldHandle</c>) and returns the final projected value.</description></item>
-/// </list>
-/// Each step's <c>$dotboxd.current</c> placeholder is rewritten to the scoped variable holding the value that
-/// flows into that step, so projections compose without name capture.
-/// <para>
-/// Because the two entrypoints are independent, a projection that a later filter depends on is evaluated both
-/// in <c>ShouldHandle</c> (to gate) and again in <c>Handle</c> (to produce the result). The lowered fragments
-/// the generator emits are pure, so this is a redundant computation rather than a duplicated side effect;
-/// <c>ShouldHandle</c> stops at the last filter, so a projection with no filter after it is not evaluated
-/// there at all.
-/// </para>
-/// </remarks>
 public static class LoweredPipelineComposer
 {
     private const string CurrentPlaceholder = "$dotboxd.current";
@@ -39,16 +21,19 @@ public static class LoweredPipelineComposer
     public static SandboxModule Compose(LoweredPipelineComposition composition)
     {
         ArgumentNullException.ThrowIfNull(composition);
-        ArgumentException.ThrowIfNullOrEmpty(composition.ModuleId);
-        ArgumentException.ThrowIfNullOrEmpty(composition.ShouldHandleFunctionId);
-        ArgumentException.ThrowIfNullOrEmpty(composition.HandleFunctionId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(
+            composition.ModuleId, nameof(LoweredPipelineComposition.ModuleId));
+        ArgumentException.ThrowIfNullOrWhiteSpace(
+            composition.ShouldHandleFunctionId, nameof(LoweredPipelineComposition.ShouldHandleFunctionId));
+        ArgumentException.ThrowIfNullOrWhiteSpace(
+            composition.HandleFunctionId, nameof(LoweredPipelineComposition.HandleFunctionId));
         if (string.Equals(composition.ShouldHandleFunctionId, composition.HandleFunctionId, StringComparison.Ordinal))
         {
             throw new ArgumentException(
                 "ShouldHandleFunctionId and HandleFunctionId must be distinct.", nameof(composition));
         }
 
-        var steps = composition.Steps;
+        var steps = composition.Steps ?? throw new ArgumentNullException(nameof(LoweredPipelineComposition.Steps));
         if (steps.Count == 0)
         {
             throw new ArgumentException("A pipeline composition requires at least one step.", nameof(composition));
@@ -69,17 +54,19 @@ public static class LoweredPipelineComposer
             BuildMetadata(steps));
     }
 
-    // Each step declares its input via the single $dotboxd.current placeholder parameter. The running value
-    // type only changes at a projection (its OutputType), so a filter's input must equal the value type that
-    // reached it. A mismatch means the steps were not produced (or ordered) as one coherent pipeline.
     private static SandboxType ValidateAndInputType(IReadOnlyList<LoweredPipelineStep> steps)
     {
-        var inputType = CurrentParameter(steps[0], 0).Type;
-        var currentTag = steps[0].InputType;
+        var first = steps[0] ?? throw new ArgumentNullException(nameof(LoweredPipelineComposition.Steps));
+        var inputType = CurrentParameter(first, 0).Type;
+        var currentTag = first.InputType ?? throw new ArgumentNullException(nameof(LoweredPipelineStep.InputType));
         for (var i = 0; i < steps.Count; i++)
         {
-            var step = steps[i];
-            _ = CurrentParameter(step, i);
+            var step = steps[i] ?? throw new ArgumentNullException(nameof(LoweredPipelineComposition.Steps));
+            ArgumentNullException.ThrowIfNull(step.InputType, nameof(LoweredPipelineStep.InputType));
+            ArgumentNullException.ThrowIfNull(step.OutputType, nameof(LoweredPipelineStep.OutputType));
+            ArgumentNullException.ThrowIfNull(step.Value, nameof(LoweredPipelineStep.Value));
+            ArgumentNullException.ThrowIfNull(step.Prefix, nameof(LoweredPipelineStep.Prefix));
+            var parameter = CurrentParameter(step, i);
             if (step.Kind is not (LoweredPipelineStepKind.Filter or LoweredPipelineStepKind.Projection))
             {
                 throw new ArgumentException(
@@ -98,6 +85,12 @@ public static class LoweredPipelineComposer
                     $"step {i} input shape '{step.InputType}' does not match the running pipeline shape '{currentTag}'.");
             }
 
+            if (!ParameterMatchesExactTag(parameter, step.InputType))
+            {
+                throw new ArgumentException(
+                    $"step {i} parameter type '{parameter.Type}' does not match input shape '{step.InputType}'.");
+            }
+
             if (step.Kind == LoweredPipelineStepKind.Projection)
             {
                 currentTag = step.OutputType;
@@ -109,22 +102,40 @@ public static class LoweredPipelineComposer
 
     private static Parameter CurrentParameter(LoweredPipelineStep step, int index)
     {
-        if (step.Parameters.Count != 1 ||
-            !string.Equals(step.Parameters[0].Name, CurrentPlaceholder, StringComparison.Ordinal))
+        ArgumentNullException.ThrowIfNull(step.Parameters);
+        if (step.Parameters.Count != 1)
         {
             throw new ArgumentException(
                 $"step {index} must declare exactly one '{CurrentPlaceholder}' parameter.");
         }
 
-        return step.Parameters[0];
+        var parameter = step.Parameters[0] ?? throw new ArgumentNullException(nameof(LoweredPipelineStep.Parameters));
+        ArgumentNullException.ThrowIfNull(parameter.Name, nameof(Parameter.Name));
+        ArgumentNullException.ThrowIfNull(parameter.Type, nameof(Parameter.Type));
+        if (!string.Equals(parameter.Name, CurrentPlaceholder, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                $"step {index} must declare exactly one '{CurrentPlaceholder}' parameter.");
+        }
+
+        return parameter;
     }
 
-    // Handle returns the value produced by the last projection; when the pipeline has no projection at all it
-    // returns the input record, so ResultType is checkable only in that case. A trailing filter after a
-    // projection (e.g. Select(...).Where(...)) does not change the flowing value, so it must not force
-    // ResultType back to the input type. A projected output shape is one the fragment only carries as a
-    // manifest tag, so the composer trusts the caller-supplied ResultType there and leaves any final mismatch
-    // to the verifier.
+    private static bool ParameterMatchesExactTag(Parameter parameter, string tag)
+    {
+        if (tag is "bool")
+            return parameter.Type == SandboxType.Bool;
+        if (tag is "int" or "i32")
+            return parameter.Type == SandboxType.I32;
+        if (tag is "long" or "i64")
+            return parameter.Type == SandboxType.I64;
+        if (tag is "double" or "f64")
+            return parameter.Type == SandboxType.F64;
+        if (tag is "string")
+            return parameter.Type == SandboxType.String;
+        return tag is not "guid" || parameter.Type == SandboxType.Guid;
+    }
+
     private static void ValidateResultType(
         IReadOnlyList<LoweredPipelineStep> steps,
         SandboxType resultType,
@@ -229,8 +240,7 @@ public static class LoweredPipelineComposer
 
     private static LiteralExpression Bool(bool value) => new(SandboxValue.FromBool(value), Span);
 
-    // Rewrites the fragment's $dotboxd.current placeholder to the scoped variable that currently holds the
-    // flowing value. The lowered fragment expressions are the closed set the generator emits.
+    // Rewrites the fragment's $dotboxd.current placeholder to the scoped running-value variable.
     private static Expression Rewrite(Expression expression, string current)
         => expression switch
         {
@@ -265,8 +275,8 @@ public static class LoweredPipelineComposer
         var effects = new SortedSet<string>(StringComparer.Ordinal);
         foreach (var step in steps)
         {
-            capabilities.UnionWith(step.RequiredCapabilities);
-            effects.UnionWith(step.Effects);
+            AddAll(capabilities, step.RequiredCapabilities, nameof(LoweredPipelineStep.RequiredCapabilities));
+            AddAll(effects, step.Effects, nameof(LoweredPipelineStep.Effects));
         }
 
         var metadata = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -274,12 +284,17 @@ public static class LoweredPipelineComposer
         {
             metadata[RequiredCapabilitiesMetadataKey] = string.Join(";", capabilities);
         }
-
         if (effects.Count != 0)
         {
             metadata[EffectsMetadataKey] = string.Join(",", effects);
         }
-
         return metadata;
+    }
+
+    private static void AddAll(SortedSet<string> values, IReadOnlyList<string>? source, string paramName)
+    {
+        ArgumentNullException.ThrowIfNull(source, paramName);
+        foreach (var value in source)
+            values.Add(value ?? throw new ArgumentNullException(paramName));
     }
 }

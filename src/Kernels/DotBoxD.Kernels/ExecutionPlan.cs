@@ -219,6 +219,12 @@ public sealed class ExecutionPlan
             {
                 throw new ArgumentException("Binding reference entries cannot be null.", nameof(bindingReferences));
             }
+            if (item.Value.Any(string.IsNullOrWhiteSpace))
+            {
+                throw new ArgumentException(
+                    "Binding reference entries cannot be null or whitespace.",
+                    nameof(bindingReferences));
+            }
             copy.Add(item.Key, item.Value.ToFrozenSet(StringComparer.Ordinal));
         }
 

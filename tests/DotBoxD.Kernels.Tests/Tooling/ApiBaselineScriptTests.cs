@@ -90,20 +90,43 @@ public sealed class ApiBaselineScriptTests
 
     private static async Task<string> RunPowerShellAsync(string scriptPath)
     {
-        using var process = Process.Start(new ProcessStartInfo
+        var startInfo = new ProcessStartInfo
         {
             FileName = "pwsh",
             UseShellExecute = false,
             ArgumentList = { "-NoProfile", "-NonInteractive", "-File", scriptPath },
             RedirectStandardOutput = true,
             RedirectStandardError = true
-        }) ?? throw new InvalidOperationException("Failed to start pwsh.");
+        };
+        RemoveCoverageProfilerEnvironment(startInfo);
+
+        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start pwsh.");
 
         var output = await process.StandardOutput.ReadToEndAsync();
         var error = await process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
         Assert.True(process.ExitCode == 0, error);
         return output;
+    }
+
+    private static void RemoveCoverageProfilerEnvironment(ProcessStartInfo startInfo)
+    {
+        foreach (var key in new[]
+        {
+            "CORECLR_ENABLE_PROFILING",
+            "CORECLR_PROFILER",
+            "CORECLR_PROFILER_PATH",
+            "CORECLR_PROFILER_PATH_32",
+            "CORECLR_PROFILER_PATH_64",
+            "COR_ENABLE_PROFILING",
+            "COR_PROFILER",
+            "COR_PROFILER_PATH",
+            "COR_PROFILER_PATH_32",
+            "COR_PROFILER_PATH_64"
+        })
+        {
+            startInfo.Environment.Remove(key);
+        }
     }
 
     private static string EscapePowerShellLiteral(string value)

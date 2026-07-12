@@ -42,6 +42,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         context.EnableConcurrentExecution();
         context.RegisterSymbolAction(AnalyzeMethod, SymbolKind.Method);
         context.RegisterSymbolAction(AnalyzeProperty, SymbolKind.Property);
+        context.RegisterSymbolAction(AnalyzeField, SymbolKind.Field);
         context.RegisterCompilationStartAction(startContext =>
         {
             var helperGraph = new ForbiddenHelperCallGraph();
@@ -51,6 +52,17 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             startContext.RegisterOperationAction(c => AnalyzeFieldReference(c, helperGraph), OperationKind.FieldReference);
             startContext.RegisterOperationAction(c => AnalyzeTypeOf(c, helperGraph), OperationKind.TypeOf);
             startContext.RegisterOperationAction(c => AnalyzeMethodReference(c, helperGraph), OperationKind.MethodReference);
+            startContext.RegisterOperationAction(c => AnalyzeAnonymousFunction(c, helperGraph), OperationKind.AnonymousFunction);
+            startContext.RegisterOperationAction(c => AnalyzeEventReference(c, helperGraph), OperationKind.EventReference);
+            startContext.RegisterOperationAction(c => AnalyzeVariableDeclaration(c, helperGraph), OperationKind.VariableDeclaration);
+            startContext.RegisterOperationAction(c => AnalyzeUsing(c, helperGraph), OperationKind.Using);
+            startContext.RegisterOperationAction(c => AnalyzeUsingDeclaration(c, helperGraph), OperationKind.UsingDeclaration);
+            startContext.RegisterOperationAction(
+                c => AnalyzeOperator(c, helperGraph),
+                OperationKind.UnaryOperator,
+                OperationKind.BinaryOperator,
+                OperationKind.Conversion);
+            RegisterForbiddenTypeSyntaxAnalysis(startContext, helperGraph);
             startContext.RegisterCompilationEndAction(helperGraph.ReportDiagnostics);
         });
     }
@@ -58,6 +70,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeMethod(SymbolAnalysisContext context)
     {
         var method = (IMethodSymbol)context.Symbol;
+        ReportForbiddenDeclaredMethodSignature(context, method);
         if (!HasAttribute(method, DotBoxDMetadataNames.NativeOnlyAttribute))
         {
             return;
@@ -69,6 +82,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeProperty(SymbolAnalysisContext context)
     {
         var property = (IPropertySymbol)context.Symbol;
+        ReportForbiddenDeclaredPropertyType(context, property);
         if (HasAttribute(property, DotBoxDMetadataNames.NativeOnlyAttribute))
         {
             ValidateLocalMember(context, property, property);
@@ -94,11 +108,17 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, invocation.TargetMethod.ContainingType);
+            RecordForbiddenInitializerReference(context, helperGraph, invocation.TargetMethod.ContainingType);
+            RecordForbiddenDelegateInitializer(context, helperGraph, invocation.TargetMethod.ContainingType);
+            RecordStaticConstructorReachability(context, helperGraph, invocation.TargetMethod);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, invocation.TargetMethod.ContainingType);
             RecordInitializerRootCall(context, helperGraph, invocation.TargetMethod);
             return;
         }
 
         ReportAndRecordIfForbidden(context, helperGraph, method, invocation.TargetMethod.ContainingType);
+        RecordStaticConstructorReachability(context, helperGraph, invocation.TargetMethod);
+        ReportForbiddenReferencedMethodSignature(context, invocation.TargetMethod);
         helperGraph.RecordCall(method, invocation.TargetMethod, context.Operation.Syntax.GetLocation());
         ReportLocalUseIfInvalid(context, invocation.TargetMethod);
     }
@@ -109,6 +129,10 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, creation.Type);
+            RecordForbiddenInitializerReference(context, helperGraph, creation.Type);
+            RecordForbiddenDelegateInitializer(context, helperGraph, creation.Type);
+            RecordStaticConstructorReachability(context, helperGraph, creation.Type);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, creation.Type);
             if (creation.Constructor is { } initializerConstructor)
             {
                 RecordInitializerRootCall(context, helperGraph, initializerConstructor);
@@ -118,6 +142,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         }
 
         ReportAndRecordIfForbidden(context, helperGraph, method, creation.Type);
+        RecordStaticConstructorReachability(context, helperGraph, creation.Type);
         if (creation.Constructor is { } constructor)
         {
             helperGraph.RecordCall(method, constructor, context.Operation.Syntax.GetLocation());
@@ -130,11 +155,18 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, property.ContainingType);
+            RecordForbiddenInitializerReference(context, helperGraph, property.ContainingType);
+            RecordForbiddenDelegateInitializer(context, helperGraph, property.ContainingType);
+            RecordStaticConstructorReachability(context, helperGraph, property);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, property.ContainingType);
             RecordInitializerPropertyRootCall(context, helperGraph, property);
+            RecordInitializerMemberReference(context, helperGraph, property);
             return;
         }
 
         ReportAndRecordIfForbidden(context, helperGraph, method, property.ContainingType);
+        RecordStaticConstructorReachability(context, helperGraph, property);
+        ReportForbiddenReferencedType(context, property.ContainingType, property.Type);
         ReportLocalUseIfInvalid(context, property);
 
         // A forbidden API reached through a helper property's accessor body is only linked to the kernel
@@ -151,6 +183,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         {
             helperGraph.RecordCall(method, setter, location);
         }
+
     }
 
     private static void AnalyzeFieldReference(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
@@ -159,40 +192,25 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, field.ContainingType);
+            RecordForbiddenInitializerReference(context, helperGraph, field.ContainingType);
+            RecordInitializerMemberReference(context, helperGraph, field);
+            RecordForbiddenDelegateInitializer(context, helperGraph, field.ContainingType);
+            RecordStaticConstructorReachability(context, helperGraph, field);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, field.ContainingType);
             return;
         }
 
         ReportAndRecordIfForbidden(context, helperGraph, method, field.ContainingType);
-    }
-
-    private static void AnalyzeTypeOf(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
-    {
-        var type = ((ITypeOfOperation)context.Operation).Type;
-        if (context.ContainingSymbol is not IMethodSymbol method)
+        ReportForbiddenReferencedType(context, field.ContainingType, field.Type);
+        if (IsDelegateType(field.Type))
         {
-            ReportForbiddenInInitializer(context, type);
-            return;
+            RecordDelegateFieldReference(context, helperGraph, method, field);
         }
-
-        ReportAndRecordIfForbidden(context, helperGraph, method, type);
-    }
-
-    // A method group / delegate reference to a helper (e.g. items.Select(Helper.Danger)) is an
-    // IMethodReferenceOperation, not an invocation, so without this it never adds a caller -> helper edge
-    // and a forbidden API in the referenced helper escapes the call graph.
-    private static void AnalyzeMethodReference(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
-    {
-        var reference = (IMethodReferenceOperation)context.Operation;
-        if (context.ContainingSymbol is not IMethodSymbol method)
+        else
         {
-            ReportForbiddenInInitializer(context, reference.Method.ContainingType);
-            RecordInitializerRootCall(context, helperGraph, reference.Method);
-            return;
+            helperGraph.RecordRootMemberReference(method, field, context.Operation.Syntax.GetLocation());
         }
-
-        ReportAndRecordIfForbidden(context, helperGraph, method, reference.Method.ContainingType);
-        helperGraph.RecordCall(method, reference.Method, context.Operation.Syntax.GetLocation());
-        ReportLocalUseIfInvalid(context, reference.Method);
+        RecordStaticConstructorReachability(context, helperGraph, field);
     }
 
     private static bool HasAttribute(ISymbol symbol, string metadataName)
@@ -225,15 +243,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
     }
 
     private static bool IsForbiddenHostApi(ITypeSymbol? type)
-    {
-        var name = type?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return false;
-        }
-
-        return IsForbiddenExactType(name!) || IsForbiddenNamespace(name!);
-    }
+        => TryGetForbiddenHostApi(type, out _);
 
     private static bool IsForbiddenExactType(string typeName)
         => typeName is DotBoxDGenerationNames.TypeNames.SystemActivator

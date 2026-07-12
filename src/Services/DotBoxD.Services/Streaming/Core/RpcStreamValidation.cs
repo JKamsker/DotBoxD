@@ -108,7 +108,7 @@ internal static class RpcStreamValidation
         }
     }
 
-    private static bool IsKnownKind(RpcStreamKind kind) =>
+    public static bool IsKnownKind(RpcStreamKind kind) =>
         kind == RpcStreamKind.Binary || kind == RpcStreamKind.Items;
 
     private static bool TryValidateInboundHandle(

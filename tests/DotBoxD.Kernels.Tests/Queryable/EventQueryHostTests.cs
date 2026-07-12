@@ -145,6 +145,31 @@ public sealed class EventQueryHostTests
     }
 
     [Fact]
+    public async Task Null_published_reference_events_fail_before_dispatch_metrics()
+    {
+        var host = new EventQueryHost();
+        var handlerInvoked = false;
+
+        var handle = await host.Query<string>()
+            .SubscribeAsync((_, _) =>
+            {
+                handlerInvoked = true;
+                return ValueTask.CompletedTask;
+            });
+
+        var context = NewContext();
+        var exception = await Assert.ThrowsAsync<ArgumentNullException>(
+            async () => await host.PublishAsync<string>(null!, context));
+
+        Assert.Equal("e", exception.ParamName);
+        Assert.False(handlerInvoked);
+        Assert.Equal(0, handle.EventsObserved);
+        Assert.Equal(0, handle.FilterEvaluations);
+        Assert.Equal(0, handle.Matches);
+        Assert.Equal(0, handle.Dispatches);
+    }
+
+    [Fact]
     public async Task Residual_filter_is_evaluated_on_indexed_candidates()
     {
         var host = new EventQueryHost();

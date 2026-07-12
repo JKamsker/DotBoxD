@@ -30,20 +30,16 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
         QueryFilterEvaluator.EnsureWithinLimits(document.Filter);
         var fingerprint = QueryFingerprint.Compute(document);
         var routingKeys = RoutingKeysFor(plan);
-
         EventQuerySubscriptionEntry<TEvent> entry = null!;
         var handle = new EventQuerySubscriptionHandle(
             document, plan, fingerprint, () => EventsObserved, () => entry.IsCompiled, () => Remove(entry));
         entry = new EventQuerySubscriptionEntry<TEvent>(document.Filter, routingKeys, project, dispatch, handle);
-
         lock (_gate)
         {
             _snapshot = _snapshot.With(entry);
         }
-
         return handle;
     }
-
     public async ValueTask PublishAsync(TEvent e, HookContext context)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
@@ -53,21 +49,22 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
         {
             return;
         }
-
         foreach (var entry in snapshot.Broad)
         {
             await DispatchCandidateAsync(entry, e, context).ConfigureAwait(false);
         }
-
         foreach (var group in snapshot.Groups)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
-            if (!Snapshot.TryEventKey(group.Paths, e, reader, out var key) ||
-                !group.TryGet(key, out var bucket))
+            if (!Snapshot.TryEventKey(group.Paths, e, reader, context.CancellationToken, out var key))
             {
                 continue;
             }
-
+            context.CancellationToken.ThrowIfCancellationRequested();
+            if (!group.TryGet(key, out var bucket))
+            {
+                continue;
+            }
             foreach (var entry in bucket)
             {
                 await DispatchCandidateAsync(entry, e, context).ConfigureAwait(false);
@@ -233,7 +230,12 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
             return builder.ToString();
         }
 
-        public static bool TryEventKey(string[] sortedPaths, TEvent e, MemberValueReader reader, out string key)
+        public static bool TryEventKey(
+            string[] sortedPaths,
+            TEvent e,
+            MemberValueReader reader,
+            CancellationToken cancellationToken,
+            out string key)
         {
             var reuseThreadBuilder = !_eventKeyBuilderInUse;
             var builder = reuseThreadBuilder ? _eventKeyBuilder ??= new StringBuilder() : new StringBuilder();
@@ -247,7 +249,9 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
                 builder.Clear();
                 foreach (var path in sortedPaths)
                 {
-                    if (!EventQueryRoutingKey.TryFromRuntime(path, reader.Read(e!, path), out var runtimeKey))
+                    var value = reader.Read(e!, path);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!EventQueryRoutingKey.TryFromRuntime(path, value, out var runtimeKey))
                     {
                         key = string.Empty;
                         return false;
@@ -280,9 +284,7 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
     {
         private readonly Dictionary<string, List<EventQuerySubscriptionEntry<TEvent>>> _byValue =
             new(StringComparer.Ordinal);
-
         public string[] Paths { get; } = paths;
-
         public void Add(string compositeKey, EventQuerySubscriptionEntry<TEvent> entry)
         {
             if (!_byValue.TryGetValue(compositeKey, out var bucket))
@@ -290,10 +292,8 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
                 bucket = [];
                 _byValue[compositeKey] = bucket;
             }
-
             bucket.Add(entry);
         }
-
         public bool TryGet(string compositeKey, out List<EventQuerySubscriptionEntry<TEvent>> bucket)
             => _byValue.TryGetValue(compositeKey, out bucket!);
     }

@@ -7,6 +7,8 @@ public static class EntrypointBinder
 {
     public static IReadOnlyList<SandboxValue> BindArguments(SandboxFunction function, SandboxValue input)
     {
+        ArgumentNullException.ThrowIfNull(function);
+
         var parameterCount = function.Parameters.Count;
         ValidateInputShape(input, parameterCount);
         if (parameterCount == 0)
@@ -25,6 +27,8 @@ public static class EntrypointBinder
 
     public static void ValidateInputShape(SandboxValue input, int parameterCount)
     {
+        ArgumentNullException.ThrowIfNull(input);
+
         if (parameterCount == 0)
         {
             RequireType(input, SandboxType.Unit, "entrypoint input argument mismatch");
@@ -48,6 +52,9 @@ public static class EntrypointBinder
         int parameterCount,
         SandboxType expectedType)
     {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(expectedType);
+
         if (index < 0 || index >= parameterCount)
         {
             throw InvalidInput("entrypoint input argument mismatch");

@@ -138,9 +138,11 @@ internal static class ProxyStreamSetupEmitter
         if (canReturnFaulted)
         {
             var canceledName = locals.Reserve("__dotboxd_canceled", ct);
-            sb.AppendLine($"{indent}catch ({ServicesGeneratorTypeNames.GlobalOperationCanceledException} {canceledName}) when ({canceledName}.CancellationToken.IsCancellationRequested)");
+            var cancellationFilter = ProxyFaultedReturnEmitter.BuildCancellationCatchFilter(method, canceledName, ct);
+            var cancellationToken = ProxyFaultedReturnEmitter.BuildCancellationTokenExpression(method, canceledName, ct);
+            sb.AppendLine($"{indent}catch ({ServicesGeneratorTypeNames.GlobalOperationCanceledException} {canceledName}) when ({cancellationFilter})");
             EmitReservationReleases(sb, reservations, ct, indent);
-            sb.AppendLine($"{indent}    return {ProxyFaultedReturnEmitter.BuildCanceled(method, canceledName)};");
+            sb.AppendLine($"{indent}    return {ProxyFaultedReturnEmitter.BuildCanceled(method, cancellationToken)};");
             sb.AppendLine($"{indent}}}");
 
             var exceptionName = locals.Reserve("__dotboxd_ex", ct);

@@ -41,7 +41,7 @@ internal static class CompiledNoAuditValueRunner
                 ExecutionMode.Compiled,
                 artifact.ArtifactHash);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             var error = new SandboxError(SandboxErrorCode.Cancelled, "execution cancelled");
             return PreparedExecutionResult.FromResult(

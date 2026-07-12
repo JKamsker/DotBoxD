@@ -41,15 +41,24 @@ public sealed class BindingRegistry : IBindingCatalog
     internal static BindingRegistry FromValidated(IReadOnlyList<BindingDescriptor> bindings)
         => new(bindings, validate: false);
 
-    public BindingDescriptor GetDescriptor(string id) => _bindings[id];
+    public BindingDescriptor GetDescriptor(string id)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+        return _bindings[id];
+    }
 
-    public bool Contains(string id) => _bindings.ContainsKey(id);
+    public bool Contains(string id)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+        return _bindings.ContainsKey(id);
+    }
 
     internal bool TryGetDescriptor(string id, out BindingDescriptor descriptor)
         => _bindings.TryGetValue(id, out descriptor!);
 
     public bool TryGetCapabilityGrantValidator(string capabilityId, out CapabilityGrantValidator validator)
     {
+        ArgumentNullException.ThrowIfNull(capabilityId);
         if (_grantValidators.TryGetValue(capabilityId, out var found))
         {
             validator = found;
@@ -62,6 +71,7 @@ public sealed class BindingRegistry : IBindingCatalog
 
     public bool TryGet(string id, out BindingSignature binding)
     {
+        ArgumentNullException.ThrowIfNull(id);
         if (_signaturesById.TryGetValue(id, out var signature))
         {
             binding = signature;

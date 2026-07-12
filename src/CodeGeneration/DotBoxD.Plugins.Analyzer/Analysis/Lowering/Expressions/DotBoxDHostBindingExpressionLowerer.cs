@@ -255,17 +255,24 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         }
 
         var bits = Convert.ToInt64(effects.Value, System.Globalization.CultureInfo.InvariantCulture);
+        var knownBits = 0L;
         var names = new List<string>();
         foreach (var member in enumType.GetMembers())
         {
             if (member is IFieldSymbol { HasConstantValue: true } field && field.ConstantValue is not null)
             {
                 var memberBits = Convert.ToInt64(field.ConstantValue, System.Globalization.CultureInfo.InvariantCulture);
+                knownBits |= memberBits;
                 if (memberBits != 0 && (bits & memberBits) == memberBits)
                 {
                     names.Add(field.Name);
                 }
             }
+        }
+
+        if ((bits & ~knownBits) != 0)
+        {
+            throw new NotSupportedException("HostBinding declares unknown effect bits.");
         }
 
         return names;

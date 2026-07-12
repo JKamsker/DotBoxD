@@ -220,58 +220,79 @@ $defaultMinimums = @{
 
 $resultsDirectory = Join-Path $root "artifacts/test-results/required-tests"
 New-Item -ItemType Directory -Force -Path $resultsDirectory | Out-Null
-$trxFileName = "required-tests-" + [Guid]::NewGuid().ToString("N") + ".trx"
-$filter = ($requiredNames | ForEach-Object { "FullyQualifiedName~$_" }) -join "|"
 
-$arguments = @(
-    "test", $projectPath,
-    "--configuration", $Configuration,
-    "--logger", "trx;LogFileName=$trxFileName",
-    "--results-directory", $resultsDirectory,
-    "--filter", $filter
-)
+function Read-ExecutedTestsFromTrx {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $TrxPath
+    )
 
-if ($NoBuild) {
-    $arguments += "--no-build"
-}
-
-& dotnet @arguments
-if ($LASTEXITCODE -ne 0) {
-    throw "dotnet test failed with exit code $LASTEXITCODE."
-}
-
-$trxPath = Join-Path $resultsDirectory $trxFileName
-if (-not (Test-Path -LiteralPath $trxPath)) {
-    throw "dotnet test did not produce the expected TRX file: $trxPath"
-}
-
-[xml] $trx = Get-Content -Raw -LiteralPath $trxPath
-$definitionsById = @{}
-foreach ($definition in $trx.SelectNodes("//*[local-name()='UnitTest']")) {
-    $method = $definition.SelectSingleNode("*[local-name()='TestMethod']")
-    $className = if ($null -ne $method) { [string] $method.className } else { "" }
-    $methodName = if ($null -ne $method) { [string] $method.name } else { "" }
-    $definitionsById[[string] $definition.id] = [pscustomobject] @{
-        DisplayName = [string] $definition.name
-        FullyQualifiedName = ($className + "." + $methodName).Trim(".")
-    }
-}
-
-$executed = @()
-foreach ($result in $trx.SelectNodes("//*[local-name()='UnitTestResult']")) {
-    if ([string] $result.outcome -eq "NotExecuted") {
-        continue
-    }
-
-    $definition = $definitionsById[[string] $result.testId]
-    if ($null -eq $definition) {
-        $definition = [pscustomobject] @{
-            DisplayName = [string] $result.testName
-            FullyQualifiedName = [string] $result.testName
+    [xml] $trx = Get-Content -Raw -LiteralPath $TrxPath
+    $definitionsById = @{}
+    foreach ($definition in $trx.SelectNodes("//*[local-name()='UnitTest']")) {
+        $method = $definition.SelectSingleNode("*[local-name()='TestMethod']")
+        $className = if ($null -ne $method) { [string] $method.className } else { "" }
+        $methodName = if ($null -ne $method) { [string] $method.name } else { "" }
+        $definitionsById[[string] $definition.id] = [pscustomobject] @{
+            DisplayName = [string] $definition.name
+            FullyQualifiedName = ($className + "." + $methodName).Trim(".")
         }
     }
 
-    $executed += $definition
+    $batchExecuted = @()
+    foreach ($result in $trx.SelectNodes("//*[local-name()='UnitTestResult']")) {
+        if ([string] $result.outcome -eq "NotExecuted") {
+            continue
+        }
+
+        $definition = $definitionsById[[string] $result.testId]
+        if ($null -eq $definition) {
+            $definition = [pscustomobject] @{
+                DisplayName = [string] $result.testName
+                FullyQualifiedName = [string] $result.testName
+            }
+        }
+
+        $batchExecuted += $definition
+    }
+
+    return $batchExecuted
+}
+
+$executed = @()
+# Keep large required suites out of a single long-lived test host while preserving
+# the same aggregate missing/minimum validation below.
+$batchSize = 40
+for ($offset = 0; $offset -lt $requiredNames.Count; $offset += $batchSize) {
+    $end = [Math]::Min($offset + $batchSize - 1, $requiredNames.Count - 1)
+    $batchNames = @($requiredNames[$offset..$end])
+    $trxFileName = "required-tests-" + [Guid]::NewGuid().ToString("N") + ".trx"
+    $filter = ($batchNames | ForEach-Object { "FullyQualifiedName~$_" }) -join "|"
+
+    $arguments = @(
+        "test", $projectPath,
+        "--configuration", $Configuration,
+        "--logger", "trx;LogFileName=$trxFileName",
+        "--results-directory", $resultsDirectory,
+        "--filter", $filter
+    )
+
+    if ($NoBuild) {
+        $arguments += "--no-build"
+    }
+
+    Write-Host "Running required test batch $([int]($offset / $batchSize) + 1): groups $($offset + 1)-$($end + 1) of $($requiredNames.Count)."
+    & dotnet @arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet test failed with exit code $LASTEXITCODE."
+    }
+
+    $trxPath = Join-Path $resultsDirectory $trxFileName
+    if (-not (Test-Path -LiteralPath $trxPath)) {
+        throw "dotnet test did not produce the expected TRX file: $trxPath"
+    }
+
+    $executed += Read-ExecutedTestsFromTrx -TrxPath $trxPath
 }
 
 if ($executed.Count -eq 0) {

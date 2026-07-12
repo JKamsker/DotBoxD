@@ -125,7 +125,7 @@ public sealed class RuntimeFuzzCoverageTests
     private static string PureModuleJson(int index, string expression)
         => $$"""
         {
-          "id": "runtime-fuzz-d{{unchecked((uint)index).ToString(System.Globalization.CultureInfo.InvariantCulture)}}z",
+          "id": "{{ModuleId(index)}}",
           "version": "1.0.0",
           "functions": [
             {
@@ -158,6 +158,9 @@ public sealed class RuntimeFuzzCoverageTests
           ]
         }
         """;
+
+    private static string ModuleId(int index)
+        => $"runtime-fuzz-n{unchecked((uint)index)}";
 
     private static string FileModuleJson(int index, string path)
         => $$"""

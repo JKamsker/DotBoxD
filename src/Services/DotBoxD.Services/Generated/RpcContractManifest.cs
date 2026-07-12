@@ -9,6 +9,14 @@ public sealed record RpcContractManifest(IReadOnlyList<RpcContractService> Servi
 {
     public const int CurrentFormatVersion = 1;
 
+    private readonly IReadOnlyList<RpcContractService> _services = ValidateServices(Services);
+
+    public IReadOnlyList<RpcContractService> Services
+    {
+        get => _services;
+        init => _services = ValidateServices(value);
+    }
+
     public int FormatVersion { get; init; } = CurrentFormatVersion;
 
     public static RpcContractManifest Create(params Assembly[] assemblies)
@@ -134,6 +142,36 @@ public sealed record RpcContractManifest(IReadOnlyList<RpcContractService> Servi
                 new KeyValuePair<string, string>($"{service.WireName}/{method.WireName}", method.Signature)))
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
 
+    private static IReadOnlyList<RpcContractService> ValidateServices(IReadOnlyList<RpcContractService>? services)
+    {
+        if (services is null)
+        {
+            throw new ArgumentNullException(nameof(Services));
+        }
+
+        var uniqueContracts = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var service in services)
+        {
+            if (service is null)
+            {
+                throw new ArgumentNullException(nameof(Services));
+            }
+
+            foreach (var method in service.Methods)
+            {
+                var contract = $"{service.WireName}/{method.WireName}";
+                if (!uniqueContracts.Add(contract))
+                {
+                    throw new ArgumentException(
+                        $"RPC contract manifest contains duplicate wire contract '{contract}'.",
+                        nameof(Services));
+                }
+            }
+        }
+
+        return services;
+    }
+
     private static string TypeName(Type? type) => type?.FullName ?? string.Empty;
 
     private static string Default(object? value) => value is null
@@ -146,124 +184,69 @@ public sealed record RpcContractManifest(IReadOnlyList<RpcContractService> Servi
 public sealed record RpcContractService(
     string WireName,
     string ContractType,
-    IReadOnlyList<RpcContractMethod> Methods);
-
-public sealed record RpcContractMethod(string WireName, string Signature);
-
-public enum RpcContractChangeKind
+    IReadOnlyList<RpcContractMethod> Methods)
 {
-    Added,
-    Removed,
-    SignatureChanged,
-    UnsupportedVersion
+    private readonly string _wireName = ValidateString(WireName, nameof(WireName));
+    private readonly string _contractType = ValidateString(ContractType, nameof(ContractType));
+    private readonly IReadOnlyList<RpcContractMethod> _methods = ValidateList(Methods, nameof(Methods));
+
+    public string WireName
+    {
+        get => _wireName;
+        init => _wireName = ValidateString(value, nameof(WireName));
+    }
+
+    public string ContractType
+    {
+        get => _contractType;
+        init => _contractType = ValidateString(value, nameof(ContractType));
+    }
+
+    public IReadOnlyList<RpcContractMethod> Methods
+    {
+        get => _methods;
+        init => _methods = ValidateList(value, nameof(Methods));
+    }
+
+    private static string ValidateString(string? value, string paramName)
+        => value ?? throw new ArgumentNullException(paramName);
+
+    private static IReadOnlyList<T> ValidateList<T>(IReadOnlyList<T>? values, string paramName)
+    {
+        if (values is null)
+        {
+            throw new ArgumentNullException(paramName);
+        }
+
+        for (var i = 0; i < values.Count; i++)
+        {
+            if (values[i] is null)
+            {
+                throw new ArgumentNullException(paramName);
+            }
+        }
+
+        return values;
+    }
 }
 
-public sealed record RpcContractChange(
-    RpcContractChangeKind Kind,
-    string Contract,
-    string? PreviousSignature,
-    string? CurrentSignature)
+public sealed record RpcContractMethod(string WireName, string Signature)
 {
-    private RpcContractChangeKind _kind = ValidateAndReturn(Kind, Contract, PreviousSignature, CurrentSignature);
-    private string _contract = Contract;
-    private string? _previousSignature = PreviousSignature;
-    private string? _currentSignature = CurrentSignature;
+    private readonly string _wireName = ValidateString(WireName, nameof(WireName));
+    private readonly string _signature = ValidateString(Signature, nameof(Signature));
 
-    public RpcContractChangeKind Kind
+    public string WireName
     {
-        get => _kind;
-        init
-        {
-            Validate(value, Contract, PreviousSignature, CurrentSignature);
-            _kind = value;
-        }
+        get => _wireName;
+        init => _wireName = ValidateString(value, nameof(WireName));
     }
 
-    public string Contract
+    public string Signature
     {
-        get => _contract;
-        init
-        {
-            Validate(Kind, value, PreviousSignature, CurrentSignature);
-            _contract = value;
-        }
+        get => _signature;
+        init => _signature = ValidateString(value, nameof(Signature));
     }
 
-    public string? PreviousSignature
-    {
-        get => _previousSignature;
-        init
-        {
-            Validate(Kind, Contract, value, CurrentSignature);
-            _previousSignature = value;
-        }
-    }
-
-    public string? CurrentSignature
-    {
-        get => _currentSignature;
-        init
-        {
-            Validate(Kind, Contract, PreviousSignature, value);
-            _currentSignature = value;
-        }
-    }
-
-    public bool IsBreaking => Kind is RpcContractChangeKind.Removed or RpcContractChangeKind.SignatureChanged or RpcContractChangeKind.UnsupportedVersion;
-
-    private static void Validate(
-        RpcContractChangeKind kind,
-        string contract,
-        string? previousSignature,
-        string? currentSignature)
-    {
-        if (!IsKnownKind(kind))
-        {
-            throw new ArgumentOutOfRangeException(nameof(Kind), kind, "Unknown RPC contract change kind.");
-        }
-
-        if (string.IsNullOrWhiteSpace(contract))
-        {
-            throw new ArgumentException("RPC contract change rows require a contract name.", nameof(Contract));
-        }
-
-        switch (kind)
-        {
-            case RpcContractChangeKind.Added:
-                Require(currentSignature, nameof(CurrentSignature));
-                break;
-            case RpcContractChangeKind.Removed:
-                Require(previousSignature, nameof(PreviousSignature));
-                break;
-            case RpcContractChangeKind.SignatureChanged:
-            case RpcContractChangeKind.UnsupportedVersion:
-                Require(previousSignature, nameof(PreviousSignature));
-                Require(currentSignature, nameof(CurrentSignature));
-                break;
-        }
-    }
-
-    private static void Require(string? value, string paramName)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            throw new ArgumentException("RPC contract change rows require the signature for this change kind.", paramName);
-        }
-    }
-
-    private static bool IsKnownKind(RpcContractChangeKind kind)
-        => kind is RpcContractChangeKind.Added
-            or RpcContractChangeKind.Removed
-            or RpcContractChangeKind.SignatureChanged
-            or RpcContractChangeKind.UnsupportedVersion;
-
-    private static RpcContractChangeKind ValidateAndReturn(
-        RpcContractChangeKind kind,
-        string contract,
-        string? previousSignature,
-        string? currentSignature)
-    {
-        Validate(kind, contract, previousSignature, currentSignature);
-        return kind;
-    }
+    private static string ValidateString(string? value, string paramName)
+        => value ?? throw new ArgumentNullException(paramName);
 }

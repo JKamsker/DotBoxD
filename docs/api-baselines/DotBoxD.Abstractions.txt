@@ -101,7 +101,7 @@ public LiteralExpression Int32(int value)
 public LiteralExpression Int64(long value)
 public LiteralExpression Literal(SandboxValue value)
 public LiteralExpression String(string value)
-public LoweredIrMethodKind Kind { get; } = kind
+public LoweredIrMethodKind Kind { get; }
 public LoweredPipelineCompositionResult(SandboxModule module, KernelDebugInfo? debugInfo)
 public LoweredPipelineDebugInfo? DebugInfo { get; init; }
 public LoweredPipelineDebugInfo( IReadOnlyList<KernelDebugDocument> documents, string? inputSourceName = null, IReadOnlyList<SourceSpan>? sequenceSpans = null)
@@ -109,7 +109,9 @@ public LoweredPipelineStep Step { get; }
 public LoweredPipelineStepKind Kind { get; }
 public LoweredPipelineStepKind StepKind { get; }
 public LowerToIrAttribute(LoweredPipelineStepKind kind)
-public PipelineTransport Transport { get; } = transport
+public LowerToIrMethodAttribute(LoweredIrMethodKind kind)
+public PipelineSurfaceAttribute(PipelineTransport transport)
+public PipelineTransport Transport { get; }
 public PluginAttribute(string? id = null) => Id = id
 public PolymorphicHandleAttribute(string keyMember)
 public SandboxEffect Effects { get; }
@@ -137,9 +139,9 @@ public sealed class KernelMethodAttribute : Attribute
 public sealed class LiveSettingAttribute : Attribute
 public sealed class LoweredPipelineDebugInfo
 public sealed class LowerToIrAttribute : Attribute
-public sealed class LowerToIrMethodAttribute(LoweredIrMethodKind kind) : Attribute
+public sealed class LowerToIrMethodAttribute : Attribute
 public sealed class NativeOnlyAttribute : Attribute
-public sealed class PipelineSurfaceAttribute(PipelineTransport transport) : Attribute
+public sealed class PipelineSurfaceAttribute : Attribute
 public sealed class PluginAttribute : Attribute
 public sealed class PolymorphicHandleAttribute : Attribute
 public sealed class ServerExtensionAttribute : Attribute

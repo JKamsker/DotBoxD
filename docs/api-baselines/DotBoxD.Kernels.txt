@@ -7,7 +7,7 @@ public abstract record SandboxDebugValuePathSegment
 public abstract record SandboxValue
 public abstract record Statement(SourceSpan Span)
 public abstract SandboxType Type { get; }
-public BindingDescriptor GetDescriptor(string id) => _bindings[id]
+public BindingDescriptor GetDescriptor(string id)
 public BindingRegistry Bindings { get; }
 public BindingRegistry Build()
 public BindingRegistry(IEnumerable<BindingDescriptor> bindings)
@@ -16,7 +16,7 @@ public BindingRegistryBuilder AddRange(IEnumerable<BindingDescriptor> descriptor
 public BindingSignature Signature => new(
 public bool AllowFallbackToInterpreter { get; init; } = true
 public bool AsyncEnabled => Policy.GrantsCapability(RuntimeCapabilityIds.Async, EffectiveGrantClock)
-public bool Contains(string id) => _bindings.ContainsKey(id)
+public bool Contains(string id)
 public bool Deterministic { get => _deterministic; init { _deterministic = value; ResetHash(); } }
 public bool EnableDebugTrace { get; init; }
 public bool Equals(ExecutionPlanSeal? other)
@@ -170,28 +170,28 @@ public IReadOnlyDictionary<string, FunctionAnalysis> FunctionAnalysis { get; }
 public IReadOnlyDictionary<string, IReadOnlySet<string>> BindingReferences { get; }
 public IReadOnlyDictionary<string, SandboxFunction> FunctionLookup
 public IReadOnlyDictionary<string, string> BindingAuditFields( string resourceKind, DateTimeOffset startedAt, long? bytesRead = null, long? bytesWritten = null)
-public IReadOnlyDictionary<string, string> Metadata { get => _metadata; init => _metadata = ModelCopy.StringDictionary(value); }
+public IReadOnlyDictionary<string, string> Metadata { get => _metadata; init => _metadata = ModelCopy.StringDictionary(value, nameof(Metadata)); }
 public IReadOnlyDictionary<string, string> Parameters { get; init; }
 public IReadOnlyDictionary<string, string>? Fields { get => _fields; init => _fields = CopyFields(value); }
 public IReadOnlyList<BindingSignature> Signatures => _signatures
 public IReadOnlyList<CapabilityGrant> Grants { get; init; }
-public IReadOnlyList<CapabilityRequest> CapabilityRequests { get => _capabilityRequests; init => _capabilityRequests = ModelCopy.List(value); }
-public IReadOnlyList<Expression> Arguments { get => _arguments; init => _arguments = ModelCopy.List(value); }
+public IReadOnlyList<CapabilityRequest> CapabilityRequests { get => _capabilityRequests; init => _capabilityRequests = ModelCopy.List(value, nameof(CapabilityRequests)); }
+public IReadOnlyList<Expression> Arguments { get => _arguments; init => _arguments = ModelCopy.List(value, nameof(Arguments)); }
 public IReadOnlyList<KernelDebugDocument> Documents { get; }
 public IReadOnlyList<KernelDebugVariableBinding> VariableBindings { get; }
 public IReadOnlyList<KernelSequencePoint> SequencePoints { get; }
-public IReadOnlyList<Parameter> Parameters { get => _parameters; init => _parameters = ModelCopy.List(value); }
+public IReadOnlyList<Parameter> Parameters { get => _parameters; init => _parameters = ModelCopy.List(value, nameof(Parameters)); }
 public IReadOnlyList<SandboxAuditEvent> Events { get; }
 public IReadOnlyList<SandboxDiagnostic> Diagnostics { get; }
-public IReadOnlyList<SandboxFunction> Functions { get => _functions; init => _functions = ModelCopy.List(value); }
+public IReadOnlyList<SandboxFunction> Functions { get => _functions; init => _functions = ModelCopy.List(value, nameof(Functions)); }
 public IReadOnlyList<SandboxNodeDescriptor> Nodes { get; }
 public IReadOnlyList<SandboxType> Arguments { get; init; }
 public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = BindingParameterTypes.Copy(value, nameof(Parameters)); }
 public IReadOnlyList<SandboxValue> Fields { get => _fields; init => _fields = Snapshot(value); }
 public IReadOnlyList<SandboxValue> Values { get => this; init => _values = Snapshot(value); }
-public IReadOnlyList<Statement> Body { get => _body; init => _body = ModelCopy.List(value); }
-public IReadOnlyList<Statement> Else { get => _else; init => _else = ModelCopy.List(value); }
-public IReadOnlyList<Statement> Then { get => _then; init => _then = ModelCopy.List(value); }
+public IReadOnlyList<Statement> Body { get => _body; init => _body = ModelCopy.List(value, nameof(Body)); }
+public IReadOnlyList<Statement> Else { get => _else; init => _else = ModelCopy.List(value, nameof(Else)); }
+public IReadOnlyList<Statement> Then { get => _then; init => _then = ModelCopy.List(value, nameof(Then)); }
 public IReadOnlySet<string> DeclaredOpaqueIdTypes { get; init; }
 public ISandboxDebugFrame Frame { get; }
 public ISandboxExecutionDebugHook? DebugHook { get; init; }

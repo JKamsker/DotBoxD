@@ -17,7 +17,7 @@ public sealed class DapAdapterTranscriptTests
         {
             WaitForDebuggerBeforeInstall = false
         });
-        var control = new RecordingControl();
+        var control = new RecordingPluginDebugControl();
         bridge.AttachControl(control);
         await bridge.PublishAsync(Bootstrap(control.SessionToken));
         await using var client = await BridgeClient.ConnectAsync(
@@ -50,7 +50,7 @@ public sealed class DapAdapterTranscriptTests
         {
             WaitForDebuggerBeforeInstall = false
         });
-        var control = new RecordingControl();
+        var control = new RecordingPluginDebugControl();
         bridge.AttachControl(control);
         await bridge.PublishAsync(Bootstrap(control.SessionToken));
 
@@ -74,7 +74,7 @@ public sealed class DapAdapterTranscriptTests
             WaitForDebuggerBeforeInstall = false,
             SourceReader = _ => Encoding.UTF8.GetBytes("changed")
         });
-        var control = new RecordingControl();
+        var control = new RecordingPluginDebugControl();
         bridge.AttachControl(control);
         var package = FireDamagePluginPackage.Create();
         var node = SandboxNodeMap.Create(package.Module).Nodes[0];
@@ -114,7 +114,7 @@ public sealed class DapAdapterTranscriptTests
         {
             WaitForDebuggerBeforeInstall = false
         });
-        var control = new RecordingControl();
+        var control = new RecordingPluginDebugControl();
         bridge.AttachControl(control);
         await bridge.PublishAsync(Bootstrap(control.SessionToken));
         var client = await BridgeClient.ConnectAsync(
@@ -138,7 +138,7 @@ public sealed class DapAdapterTranscriptTests
         {
             WaitForDebuggerBeforeInstall = false
         });
-        var control = new RecordingControl();
+        var control = new RecordingPluginDebugControl();
         bridge.AttachControl(control);
         var package = FireDamagePluginPackage.Create() with { DebugInfo = null };
         bridge.RegisterPackage(package);
@@ -202,7 +202,7 @@ public sealed class DapAdapterTranscriptTests
             WaitForDebuggerBeforeInstall = false,
             SourceReader = _ => Encoding.UTF8.GetBytes(source)
         });
-        var control = new RecordingControl();
+        var control = new RecordingPluginDebugControl();
         bridge.AttachControl(control);
         var package = FireDamagePluginPackage.Create();
         var document = KernelDebugDocument.FromSource("shared", "/source/Shared.cs", source);
@@ -267,39 +267,4 @@ public sealed class DapAdapterTranscriptTests
         return messages.ToArray();
     }
 
-    private sealed class RecordingControl : IPluginDebugControlRpcService
-    {
-        public string SessionToken { get; } = Convert.ToHexStringLower(Guid.NewGuid().ToByteArray()) +
-            Convert.ToHexStringLower(Guid.NewGuid().ToByteArray());
-
-        public List<string> Commands { get; } = [];
-
-        public List<(string Command, JsonElement Payload)> Payloads { get; } = [];
-
-        public TaskCompletionSource DisconnectReceived { get; } =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public ValueTask<byte[]> ExchangeAsync(byte[] message, CancellationToken cancellationToken = default)
-        {
-            var request = PluginDebugProtocol.Decode(message, 1024 * 1024);
-            Commands.Add(request.Kind);
-            Payloads.Add((request.Kind, request.Payload.Clone()));
-            if (request.Kind == PluginDebugCommands.Disconnect)
-            {
-                DisconnectReceived.TrySetResult();
-            }
-            object body = request.Kind == PluginDebugCommands.Initialize
-                ? new { supported = true }
-                : request.Kind == PluginDebugCommands.SetBreakpoints
-                    ? new { breakpoints = Array.Empty<object>() }
-                    : new { };
-            var response = new PluginDebugEnvelope(
-                PluginDebugProtocol.Version,
-                request.Kind + "Response",
-                request.Id,
-                SessionToken,
-                JsonSerializer.SerializeToElement(new { success = true, body }));
-            return ValueTask.FromResult(PluginDebugProtocol.Encode(response, 1024 * 1024));
-        }
-    }
 }

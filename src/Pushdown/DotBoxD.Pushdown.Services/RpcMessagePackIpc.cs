@@ -162,6 +162,11 @@ public static class RpcMessagePackIpc
     private static void ValidatePipeName(string pipeName, NamedPipeTransportOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
+        if (pipeName is null)
+        {
+            throw new ArgumentNullException(nameof(pipeName));
+        }
+
         if (string.IsNullOrWhiteSpace(pipeName) || pipeName.Any(char.IsControl))
         {
             throw new ArgumentException("named pipe name must be non-empty and must not contain control characters", nameof(pipeName));
