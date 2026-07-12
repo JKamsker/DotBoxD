@@ -262,12 +262,10 @@ public sealed class NamedPipeServerTransport : IServerTransport
         {
             throw new ArgumentNullException(nameof(pipeName));
         }
-
         if (string.IsNullOrWhiteSpace(pipeName))
         {
             throw new ArgumentException("Pipe name cannot be null, empty, or whitespace.", nameof(pipeName));
         }
-
         return pipeName;
     }
 
@@ -277,7 +275,6 @@ public sealed class NamedPipeServerTransport : IServerTransport
         {
             return value;
         }
-
         if (value < 1 || value > MaxSpecificServerInstances)
         {
             throw new ArgumentOutOfRangeException(
@@ -298,7 +295,6 @@ public sealed class NamedPipeServerTransport : IServerTransport
                 value,
                 "Maximum message size must be at least the DotBoxD header size.");
         }
-
         return value;
     }
 }
