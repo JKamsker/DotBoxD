@@ -201,7 +201,14 @@ internal static partial class PluginServerFacadeEmitter
 
             builder.Append(method.ReturnType).Append(' ')
                 .Append(PluginServerIdentifier.Escape(method.Name))
-                .Append('(').Append(ParameterList(method)).Append(") => ");
+                .Append('(').Append(ParameterList(method)).Append(')');
+            if (PluginServerReturnWrapperCancellationEmitter.RequiresAsyncReturnWrapperBlock(method))
+            {
+                AppendWorldAsyncReturnWrapperBlock(builder, method);
+                continue;
+            }
+
+            builder.Append(" => ");
             AppendWorldMethodBody(builder, method);
         }
 
@@ -234,6 +241,21 @@ internal static partial class PluginServerFacadeEmitter
             .Append(method.ReceiverType).Append(")RequireWorld()).")
             .Append(PluginServerIdentifier.Escape(method.Name)).Append('(')
             .Append(ArgumentList(method)).AppendLine("));");
+    }
+
+    private static void AppendWorldAsyncReturnWrapperBlock(StringBuilder builder, PluginServerForwardedMethod method)
+    {
+        var localName = PluginServerReturnWrapperCancellationEmitter.UniqueLocalName("__dotboxdResult", method);
+        builder.AppendLine();
+        builder.AppendLine("    {");
+        builder.Append("        var ").Append(localName).Append(" = await ((")
+            .Append(method.ReceiverType).Append(")RequireWorld()).")
+            .Append(PluginServerIdentifier.Escape(method.Name)).Append('(')
+            .Append(ArgumentList(method)).AppendLine(").ConfigureAwait(false);");
+        PluginServerReturnWrapperCancellationEmitter.AppendCancellationChecks(builder, method, "        ");
+        builder.Append("        return new ").Append(method.ReturnWrapperName).Append("(this, ")
+            .Append(localName).AppendLine(");");
+        builder.AppendLine("    }");
     }
 
     private static string ParameterList(PluginServerForwardedMethod method)
