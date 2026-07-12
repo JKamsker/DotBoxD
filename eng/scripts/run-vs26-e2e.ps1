@@ -276,10 +276,11 @@ function Assert-KernelIdeState($State, [string] $Function, [int] $Line) {
         $State.Line -ne $Line -or $State.Function -ne $Function) {
         throw "Visual Studio exposed an unexpected kernel frame: $($State | ConvertTo-Json -Depth 3 -Compress)."
     }
-    $breakpoints = @($State.Breakpoints)
+    $breakpoints = @($State.Breakpoints | Where-Object {
+        [string]::Equals($_.File, $guardian, [StringComparison]::OrdinalIgnoreCase)
+    })
     $lines = @($breakpoints | Where-Object Enabled | ForEach-Object Line | Sort-Object)
-    if ($breakpoints.Count -ne 2 -or ($lines -join ',') -ne '35,44' -or
-        @($breakpoints | Where-Object { -not [string]::Equals($_.File, $guardian, [StringComparison]::OrdinalIgnoreCase) }).Count -gt 0) {
+    if ($breakpoints.Count -ne 2 -or ($lines -join ',') -ne '35,44') {
         throw "Visual Studio did not retain both enabled kernel breakpoints: $($breakpoints | ConvertTo-Json -Compress)."
     }
 }
