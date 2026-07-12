@@ -22,10 +22,11 @@ stabilizes.
 
 ## The trust boundary — what is and isn't a sandbox
 
-DotBoxD has three distinct execution modes with very different guarantees. Treat them as different
-security postures:
+DotBoxD has three distinct **trust postures** with very different guarantees (not to be confused
+with the three interaction modes, call/react/extend, or the `ExecutionMode` interpreter/compiler
+setting):
 
-| Mode | What runs | Boundary? |
+| Trust posture | What runs | Boundary? |
 |------|-----------|-----------|
 | **Safe mode (Kernels)** | Validated, capability-gated, fuel/quota-metered restricted **IR** (intermediate representation) — never C#, IL, reflection, CLR member names, or arbitrary host calls. Compiled kernels are additionally verified before execution. | **Yes** — this is the real in-process boundary DotBoxD is built to defend. |
 | **Trusted-plugin mode** | Normal .NET assemblies loaded via `AssemblyLoadContext`. | **No.** `AssemblyLoadContext` is *not* a security sandbox — loaded code runs with the full permissions of the process. Use only for code you already trust. |

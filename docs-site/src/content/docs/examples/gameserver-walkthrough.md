@@ -16,6 +16,12 @@ The sample lives under [`samples/GameServer`](https://github.com/JKamsker/DotBox
 
 One command builds and runs everything. The server launches the plugin child process for you (see [`Examples.GameServer.Server/Ipc/PluginLauncher.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Ipc/PluginLauncher.cs)), so you do not start the plugin separately:
 
+> **Trust note:** the sample launches the plugin as an ordinary child process with the same OS
+> privileges as the server - it demonstrates the IPC + kernel-sandbox architecture, not production
+> OS containment. To run plugin *binaries* you do not trust, put a real OS boundary around the
+> plugin process (a restricted user, container, or equivalent) - see
+> [Sandbox caveats](/security/sandbox-caveats/).
+
 ```bash
 dotnet run -c Release --project samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
 ```

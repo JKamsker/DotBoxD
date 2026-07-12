@@ -7,34 +7,39 @@ description: >-
 DotBoxD is a source-generated, contract-first **plugin system for .NET hosts**. Everything in it
 hangs off one mental model:
 
-> **One contract. Three modes. One sandbox.**
+> **Contract-first. Three interaction modes: call, react, extend. One sandbox.**
 
-You write one C# contract. DotBoxD can deliver it three ways — and the two modes that run
-plugin-authored logic inside the host both run it on the same engine, the
+Everything you author is plain, contract-first C# - interfaces, event records, attributes - that
+source generators turn into wiring. Every plugin interaction is one of three modes, and the two
+modes that run plugin-authored logic inside the host both run it on the same engine, the
 [kernel sandbox](/concepts/kernels/):
 
-- **[Services (RPC)](/concepts/services/)** — *call the host.* The host implements the contract;
-  clients call it remotely through a generated typed proxy.
-- **[Event pipelines](/concepts/event-pipelines/)** — *react to the host.* A plugin supplies a
-  `Where`/`Select` filter that runs safely inside the host, so only matching, projected data is
-  pushed out. (API surfaces and older pages also call this mode *Query (RunLocal)*.)
-- **[Pushdown](/concepts/pushdown/)** — *extend the host.* A plugin ships its own batch operation
-  that composes the host's existing bindings server-side, so many small remote calls collapse into
-  one validated round-trip.
+- **[Services (RPC)](/concepts/services/)** - *call the host.* The host implements an
+  `[RpcService]` contract; clients call it remotely through a generated typed proxy.
+- **[Event pipelines](/concepts/event-pipelines/)** - *react to the host.* A plugin supplies a
+  `Where`/`Select` filter over a host event that runs safely inside the host, so only matching,
+  projected data is pushed out. (API surfaces and older pages also call this mode
+  *Query (RunLocal)*.)
+- **[Pushdown](/concepts/pushdown/)** - *extend the host.* A plugin ships its own
+  `[ServerExtension]` batch operation that composes the host's existing bindings server-side, so
+  many small remote calls collapse into one validated round-trip.
 
-A **kernel** is the unit both sandboxed modes compile down to: restricted IR (an intermediate
-representation — never C#, IL, or reflection) that the host validates, capability-gates, and
-fuel-meters before running.
+The three modes are distinct authoring shapes, not one interface compiled three ways - what they
+share is the contract-first style and the trust model. A **kernel** is the unit the two sandboxed
+modes compile down to: restricted IR (an intermediate representation - never C#, IL, or
+reflection) that the host validates, capability-gates, and fuel-meters before running.
 
 ```mermaid
 flowchart LR
-    Client["Client / Plugin"] -->|"1 · call — remote call"| Services["Services (RPC)"]
-    Client -->|"2 · react — install filter"| Events["Event pipelines"]
-    Client -->|"3 · extend — submit batch"| Pushdown["Pushdown"]
-    Services --> Host["Host process"]
-    Events --> Sandbox["Kernel sandbox<br/>validated · capability-gated · fuel-metered"]
-    Pushdown --> Sandbox
-    Sandbox --> Host
+    Plugin["Plugin / client process<br/>native C#"]
+    subgraph HostProc["Host process"]
+        Services["Services (RPC)<br/>trusted, hand-written impl"]
+        Sandbox["Kernel sandbox<br/>validated · capability-gated · fuel-metered"]
+    end
+    Plugin -->|"1 · call: request/response"| Services
+    Plugin -->|"2 · react: install Where/Select filter (IR)"| Sandbox
+    Sandbox -->|"matching, projected events: one-way push"| Plugin
+    Plugin -->|"3 · extend: submit batch (IR), one result back"| Sandbox
 ```
 
 New here? Install via [Getting started](/getting-started/), then work through the
@@ -42,14 +47,13 @@ New here? Install via [Getting started](/getting-started/), then work through th
 
 ## Choosing a mode
 
-Same contract, three delivery strategies. What differs is *where the author's logic runs* and
-*what crosses the wire*:
+What differs between the modes is *where the author's logic runs* and *what crosses the wire*:
 
-| Mode | What it solves | Direction | Round-trips | Where the author's logic runs |
-|------|----------------|-----------|-------------|-------------------------------|
-| **[Services (RPC)](/concepts/services/)** | Typed request/response interop with generated proxies and dispatchers; AOT deployments require generated codec formatters and explicit registry rooting. | client → host, response back | **1 per call** | host runs the hand-written implementation; the client invokes the typed proxy |
-| **[Event pipelines](/concepts/event-pipelines/)** | Server-side filter + projection, so only the data you need is pushed to the plugin. | server → plugin, **one-way push** | **0** | `Where`/`Select` lower (compile down) to server-side sandboxed IR; only the `RunLocal` delegate is native plugin C# |
-| **[Pushdown](/concepts/pushdown/)** | Collapse N per-entity calls into one server-side batch, next to the host's data. | client → host, **one submission** | **1, replacing N** | the author's batch method lowers to server-side sandboxed IR, looping the host's existing bindings |
+| Mode | What it solves | Wire behavior | Where the author's logic runs |
+|------|----------------|---------------|-------------------------------|
+| **[Services (RPC)](/concepts/services/)** | Typed request/response interop with generated proxies and dispatchers; AOT deployments require generated codec formatters and explicit registry rooting. | Request → response; **1 round-trip per call**. | host runs the hand-written implementation; the client invokes the typed proxy |
+| **[Event pipelines](/concepts/event-pipelines/)** | Server-side filter + projection, so only the data you need is pushed to the plugin. | **One-way push** of matching, projected events (0 round-trips); a result terminal (`RegisterLocal`) additionally returns one reply per match. | `Where`/`Select` lower (compile down) to server-side sandboxed IR; only the `*Local` terminal delegate is native plugin C# |
+| **[Pushdown](/concepts/pushdown/)** | Collapse N per-entity calls into one server-side batch, next to the host's data. | **One submission replaces N calls** (1 round-trip). | the author's batch method lowers to server-side sandboxed IR, looping the host's existing bindings |
 
 Decision rules:
 
@@ -80,15 +84,17 @@ looking for.
 - **[Glossary](/reference/glossary/)** — plain-language definitions of the core terms (IR, kernel,
   pushdown, fuel, capabilities). Keep it open in a tab; every term links to its deep-dive page.
 
-### Learn by building (tutorials)
+### Learn by building (tutorials & walkthroughs)
 
-One tutorial per mode, in recommended order, plus an advanced path:
+One per mode, in recommended order - a from-scratch tutorial, then guided walkthroughs of the
+maintained GameServer sample:
 
-1. **[Your first Service (RPC)](/tutorials/first-service/)** — builds from an empty project.
-2. **[Event pipelines (RunLocal)](/tutorials/event-pipeline-runlocal/)** — filter server-side,
-   react in your plugin.
-3. **[Pushdown server extension](/tutorials/pushdown-server-extension/)** — ship a server-side
-   batch operation.
+1. **[Your first Service (RPC)](/tutorials/first-service/)** — a real tutorial; builds from an
+   empty project.
+2. **[Event pipelines (RunLocal)](/tutorials/event-pipeline-runlocal/)** — guided walkthrough
+   (clone the repo): filter server-side, react in your plugin.
+3. **[Pushdown server extension](/tutorials/pushdown-server-extension/)** — guided walkthrough
+   (clone the repo): ship a server-side batch operation.
 4. **[Hand-written IR hook pipeline](/tutorials/handwritten-ir-hook-pipeline/)** *(advanced)* —
    the same shapes with public primitives and no generator.
 

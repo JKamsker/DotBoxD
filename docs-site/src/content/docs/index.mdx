@@ -9,9 +9,9 @@ editUrl: false
 hero:
   title: DotBoxD
   tagline: >-
-    Let plugins extend your .NET host — safely. One C# interface becomes typed RPC, server-side
-    filtered events, and plugin-shipped batch operations, generated at compile time. Untrusted
-    plugin logic runs in a validated, fuel-metered sandbox — never loaded C#/IL.
+    Contract-first plugin development for .NET hosts. Three interaction modes - call (typed RPC),
+    react (server-filtered events), extend (plugin-shipped batches) - and one validated,
+    fuel-metered sandbox for plugin logic that runs inside the host. Never loaded C#/IL.
   actions:
     - text: Get started
       link: /getting-started/
@@ -30,19 +30,17 @@ import { Card, CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
 
 ## What is DotBoxD?
 
-**A complete plugin system for .NET hosts.** .NET can't safely isolate arbitrary code in-process,
-so plugins live in a sidecar process behind IPC — safe, but every interaction costs a round-trip,
-and the host vendor is forced to design event-filter APIs blind. DotBoxD ships that whole
-architecture from one C# contract (transports, typed RPC, event pipelines) and dissolves both
-costs: plugin-authored logic — filters, projections, batches — runs *inside the host* as a
-validated, fuel-metered sandbox. The sandbox executes restricted IR (an intermediate
-representation), never loaded C#/IL.
+**A complete plugin system for .NET hosts.** Untrusted plugins live in a sidecar process behind
+IPC (because `AssemblyLoadContext` is not a security boundary), while plugin-authored *logic* -
+filters, projections, batches - runs *inside the host* as a validated, fuel-metered sandbox that
+executes restricted IR, never loaded C#/IL. Everything you author is contract-first C# that source
+generators turn into wiring.
 
-[Why DotBoxD? The dilemma, in three diagrams ›](/why-dotboxd/)
+[Why DotBoxD? The isolation-vs-latency dilemma, in three diagrams ›](/why-dotboxd/)
 
-## One contract, three modes
+## Three interaction modes
 
-You write one C# interface. DotBoxD delivers it three ways — pick by call shape:
+Every plugin interaction is one of three shapes - pick per call site:
 
 <CardGrid stagger>
   <Card title="1 · Call the host — Services (RPC)" icon="rocket">
@@ -54,16 +52,17 @@ You write one C# interface. DotBoxD delivers it three ways — pick by call shap
   </Card>
   <Card title="2 · React to the host — event pipelines" icon="seti:shell">
     A plugin subscribes with an ordinary `Where`/`Select` chain. The filter runs *inside the host*
-    as sandboxed IR, so only matching, projected data ever crosses the wire — zero round-trips.
+    as sandboxed IR, so only matching, projected data ever crosses the wire, pushed one way
+    (result terminals can return a reply per match).
 
-    [Tutorial: event pipelines ›](/tutorials/event-pipeline-runlocal/)
+    [Walkthrough: event pipelines ›](/tutorials/event-pipeline-runlocal/)
   </Card>
   <Card title="3 · Extend the host — Pushdown" icon="seti:pipeline">
     A plugin ships its *own* batch operation that runs **server-side** over the host's existing
     bindings, collapsing N round-trips into one validated submission — without recompiling the
     host.
 
-    [Tutorial: pushdown server extension ›](/tutorials/pushdown-server-extension/)
+    [Walkthrough: pushdown server extension ›](/tutorials/pushdown-server-extension/)
   </Card>
 </CardGrid>
 
@@ -99,17 +98,17 @@ The Kernels and Pushdown stack targets `net10.0`.
   <LinkCard
     title="Getting started"
     href="/getting-started/"
-    description="Install, get a first end-to-end win, and pick your track — about 10 minutes."
+    description="Install, run a complete verified example in about five minutes, and pick your journey."
   />
   <LinkCard
     title="What is DotBoxD? (choosing a mode)"
     href="/overview/"
-    description="The mental model — one contract, three modes, one sandbox — and a decision table."
+    description="The mental model - three interaction modes, one sandbox - and a decision table."
   />
   <LinkCard
-    title="Tutorials"
+    title="Tutorials & walkthroughs"
     href="/tutorials/"
-    description="Three end-to-end tracks — call, react, extend — plus an advanced hand-written IR path."
+    description="A from-scratch tutorial plus guided walkthroughs of the maintained sample - call, react, extend."
   />
   <LinkCard
     title="Example: GameServer"

@@ -43,9 +43,9 @@ export default defineConfig({
           ],
         },
         {
-          label: 'Tutorials',
+          label: 'Tutorials & walkthroughs',
           items: [
-            { label: 'Pick your track', slug: 'tutorials' },
+            { label: 'Pick your journey', slug: 'tutorials' },
             { label: '1 · Call — first Service (RPC)', slug: 'tutorials/first-service' },
             { label: '2 · React — event pipelines', slug: 'tutorials/event-pipeline-runlocal' },
             { label: '3 · Extend — Pushdown', slug: 'tutorials/pushdown-server-extension' },

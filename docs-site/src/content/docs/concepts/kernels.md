@@ -62,8 +62,42 @@ Lifecycle (via `SandboxHost` in `DotBoxD.Hosting`):
      `DotBoxD.Kernels.Verifier` before it runs. Compiled async bindings run through a trusted runtime
      trampoline; generated kernel IL stays synchronous.
 
-For the smallest end-to-end host, see section 2 (Kernels) of the root README
-(https://github.com/JKamsker/DotBoxD/blob/main/README.md).
+The smallest end-to-end host - import, prepare, execute under a hard budget (given `kernelJson`,
+the module's JSON IR, and `subtotals`, a list of ints):
+
+```csharp
+using DotBoxD.Hosting;
+using DotBoxD.Kernels;
+
+// A sandbox host with only the safe, pure bindings enabled.
+var host = SandboxHost.Create(builder =>
+{
+    builder.AddDefaultPureBindings();
+    builder.UseInterpreter();
+});
+
+// A policy is a hard budget: fuel, loop iterations, list length, capability grants.
+var policy = SandboxPolicyBuilder.Create()
+    .WithFuel(1_000_000)
+    .WithMaxLoopIterations(10_000)
+    .WithMaxListLength(10_000)
+    .Build();
+
+var module = await host.ImportJsonAsync(kernelJson);
+var plan = await host.PrepareAsync(module, policy);
+
+var input = SandboxValue.FromList(
+    [.. subtotals.Select(SandboxValue.FromInt32)],
+    SandboxType.I32);
+
+var result = await host.ExecuteAsync(plan, "main", input);
+
+if (result.Succeeded && result.Value is I32Value total)
+{
+    // A buggy or hostile kernel cannot run away with host resources:
+    Console.WriteLine($"total={total.Value}, fuel burned={result.ResourceUsage.FuelUsed}");
+}
+```
 
 Beyond that metering, host capabilities (files, time,
 random, logging, HTTP via `DotBoxD.Hosting.Http`) are exposed

@@ -6,9 +6,11 @@ title: 'Sandbox caveats — what is and isn''t a boundary'
 > `AssemblyLoadContext` — gives that code the full permissions of the process. It is an *isolation*
 > mechanism for assembly versioning, **not** a security boundary.
 
-DotBoxD has three execution modes. They look superficially similar ("run some logic the caller
-supplied") but have completely different security guarantees. Choose the mode that matches how much you
-trust the code.
+DotBoxD has three **trust postures**. They look superficially similar ("run some logic the caller
+supplied") but have completely different security guarantees. Choose the posture that matches how
+much you trust the code. (These postures are about *trust* - they are not the three interaction
+modes call/react/extend, and not the `ExecutionMode` enum that picks the interpreter or compiler
+backend.)
 
 ## 1. Safe mode (Kernels) — the real boundary
 
