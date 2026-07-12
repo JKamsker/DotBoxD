@@ -190,6 +190,17 @@ if ([int]$dte.Debugger.CurrentMode -eq 2) {
     return $stop
 }
 
+function Wait-ForDebuggerRun {
+    $deadline = [DateTime]::UtcNow + $StopTimeout
+    do {
+        Start-Sleep -Milliseconds 100
+        $mode = Invoke-Dte '[int]$dte.Debugger.CurrentMode'
+    } until ($mode -eq 3 -or [DateTime]::UtcNow -ge $deadline)
+    if ($mode -ne 3) {
+        throw "Visual Studio did not resume the debugger within $StopTimeout. Current mode: $mode."
+    }
+}
+
 function Wait-ForStop([int] $ExpectedLine) {
     $deadline = [DateTime]::UtcNow + $StopTimeout
     do {
@@ -468,8 +479,11 @@ $dte.ExecuteCommand('Debug.Start')
     $env:DOTBOXD_E2E_RUNTIME_HOOKS = $runtimeHooks
     Invoke-DteWhenReady @'
 while ($dte.Debugger.Breakpoints.Count -gt 0) { $dte.Debugger.Breakpoints.Item(1).Delete() }
-$null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_RUNTIME_HOOKS, 117)
 $dte.Debugger.Go($false)
+'@ 'Visual Studio startup-pause resume' | Out-Null
+    Wait-ForDebuggerRun
+    Invoke-DteWhenReady @'
+$null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_RUNTIME_HOOKS, 117)
 '@ 'Visual Studio runtime-hook breakpoint setup' | Out-Null
 
     $runtimeHookStop = Wait-ForStop 117
