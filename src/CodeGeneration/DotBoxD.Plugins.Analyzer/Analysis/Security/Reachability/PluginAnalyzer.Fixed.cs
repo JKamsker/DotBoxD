@@ -39,6 +39,18 @@ public sealed partial class PluginAnalyzer
             var type = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken).Type;
             if (TryResolveGetPinnableReference(type, out var pinnableReference))
             {
+                if (TryGetForbiddenHostApi(pinnableReference.ContainingType, out var forbiddenType))
+                {
+                    helperGraph.RecordForbidden(method, forbiddenType);
+                    if (IsEventKernel(method.ContainingType))
+                    {
+                        context.ReportDiagnostic(Diagnostic.Create(
+                            ForbiddenHostApiRule,
+                            location,
+                            forbiddenType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
+                    }
+                }
+
                 helperGraph.RecordCall(method, pinnableReference, location);
             }
         }

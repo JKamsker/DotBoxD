@@ -16,7 +16,10 @@ public sealed partial class PluginAnalyzer
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, deconstruct.ContainingType);
+            RecordForbiddenInitializerReference(context, helperGraph, deconstruct.ContainingType);
+            RecordForbiddenDelegateInitializer(context, helperGraph, deconstruct.ContainingType);
             RecordStaticConstructorReachability(context, helperGraph, deconstruct);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, deconstruct.ContainingType);
             RecordInitializerRootCall(context, helperGraph, deconstruct);
             return;
         }

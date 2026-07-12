@@ -18,11 +18,13 @@ public sealed partial class PluginAnalyzer
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, cloneMethod.ContainingType);
+            RecordStaticConstructorReachability(context, helperGraph, target);
             RecordInitializerRootCall(context, helperGraph, target);
             return;
         }
 
         ReportAndRecordIfForbidden(context, helperGraph, method, cloneMethod.ContainingType);
+        RecordStaticConstructorReachability(context, helperGraph, target);
         helperGraph.RecordCall(method, target, context.Operation.Syntax.GetLocation());
         ReportLocalUseIfInvalid(context, target);
     }

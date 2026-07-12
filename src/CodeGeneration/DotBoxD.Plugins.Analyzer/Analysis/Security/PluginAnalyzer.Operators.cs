@@ -93,7 +93,11 @@ public sealed partial class PluginAnalyzer
             case IInterpolationOperation interpolation:
                 RecordImplicitToStringCall(context, helperGraph, interpolation.Expression);
                 break;
-            case IBinaryOperation { OperatorKind: BinaryOperatorKind.Add } binary
+            case IBinaryOperation
+            {
+                OperatorKind: BinaryOperatorKind.Add,
+                OperatorMethod: null
+            } binary
                 when IsString(binary.Type):
                 RecordImplicitToStringCall(context, helperGraph, binary.LeftOperand);
                 RecordImplicitToStringCall(context, helperGraph, binary.RightOperand);
