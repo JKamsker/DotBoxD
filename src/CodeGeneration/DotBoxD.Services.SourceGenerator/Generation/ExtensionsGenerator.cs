@@ -52,7 +52,15 @@ internal static class ExtensionsGenerator
             sb.AppendLine("        /// </summary>");
             ObsoleteAttributeEmitter.AppendIfPresent(sb, service.ObsoleteAttribute, "        ");
             sb.AppendLine($"        public static {fullInterfaceName} Get{extensionSuffix}(this {ServicesGeneratorTypeNames.GlobalRpcPeer} peer)");
-            sb.AppendLine($"            => peer.{ServicesGeneratorMemberNames.RpcPeer.Get}<{fullInterfaceName}>();");
+            sb.AppendLine("        {");
+            sb.AppendLine("            if (peer is null)");
+            sb.AppendLine("            {");
+            sb.AppendLine("                throw new global::System.ArgumentNullException(nameof(peer));");
+            sb.AppendLine("            }");
+
+            sb.AppendLine();
+            sb.AppendLine($"            return peer.{ServicesGeneratorMemberNames.RpcPeer.Get}<{fullInterfaceName}>();");
+            sb.AppendLine("        }");
         }
 
         sb.AppendLine("    }");
@@ -78,16 +86,26 @@ internal static class ExtensionsGenerator
         sb.AppendLine("        /// </summary>");
         ObsoleteAttributeEmitter.AppendIfPresent(sb, service.ObsoleteAttribute, "        ");
         sb.AppendLine($"        public static {ServicesGeneratorTypeNames.GlobalRpcPeer} Provide{extensionSuffix}(this {ServicesGeneratorTypeNames.GlobalRpcPeer} peer, {fullInterfaceName} implementation)");
-        if (!HasSubServiceProperties(service, ct) && service.MethodSubServices.Array.Length == 0)
+        sb.AppendLine("        {");
+        sb.AppendLine("            if (peer is null)");
+        sb.AppendLine("            {");
+        sb.AppendLine("                throw new global::System.ArgumentNullException(nameof(peer));");
+        sb.AppendLine("            }");
+
+        sb.AppendLine();
+        sb.AppendLine("            if (implementation is null)");
+        sb.AppendLine("            {");
+        sb.AppendLine("                throw new global::System.ArgumentNullException(nameof(implementation));");
+        sb.AppendLine("            }");
+
+        sb.AppendLine();
+        sb.AppendLine($"            peer.{ServicesGeneratorMemberNames.RpcPeer.Provide}(({ServicesGeneratorTypeNames.GlobalServiceDispatcher})new {fullDispatcherName}(implementation));");
+        if (HasSubServiceProperties(service, ct) || service.MethodSubServices.Array.Length != 0)
         {
-            sb.AppendLine($"            => peer.{ServicesGeneratorMemberNames.RpcPeer.Provide}(({ServicesGeneratorTypeNames.GlobalServiceDispatcher})new {fullDispatcherName}(implementation));");
-            return;
+            AppendPropertySubServices(sb, service, extensionSuffixes, servicesByType, ct);
+            AppendMethodSubServices(sb, service, servicesByType, ct);
         }
 
-        sb.AppendLine("        {");
-        sb.AppendLine($"            peer.{ServicesGeneratorMemberNames.RpcPeer.Provide}(({ServicesGeneratorTypeNames.GlobalServiceDispatcher})new {fullDispatcherName}(implementation));");
-        AppendPropertySubServices(sb, service, extensionSuffixes, servicesByType, ct);
-        AppendMethodSubServices(sb, service, servicesByType, ct);
         sb.AppendLine("            return peer;");
         sb.AppendLine("        }");
     }
