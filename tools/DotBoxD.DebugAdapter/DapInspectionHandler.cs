@@ -17,7 +17,7 @@ internal sealed class DapInspectionHandler(
 
     public bool Handles(string command) => command is
         "threads" or "stackTrace" or "scopes" or "variables" or "evaluate" or
-        "setVariable" or "setExpression" or "source";
+        "setVariable" or "setExpression" or "completions" or "source";
 
     public async ValueTask HandleAsync(JsonElement request, CancellationToken cancellationToken)
     {
@@ -31,6 +31,7 @@ internal sealed class DapInspectionHandler(
             "evaluate" => await EvaluateAsync(request, cancellationToken).ConfigureAwait(false),
             "setVariable" => await SetVariableAsync(request, cancellationToken).ConfigureAwait(false),
             "setExpression" => await SetExpressionAsync(request, cancellationToken).ConfigureAwait(false),
+            "completions" => await CompletionsAsync(request, cancellationToken).ConfigureAwait(false),
             "source" => await SourceAsync(request, cancellationToken).ConfigureAwait(false),
             _ => throw new DebugAdapterException("unsupported", $"Unsupported inspection command '{command}'.")
         };
@@ -156,17 +157,46 @@ internal sealed class DapInspectionHandler(
         return new { result = DapVariableStore.Display(value), type = value.GetProperty("type").GetString(), variablesReference = _variableStore.ValueReference(value, frameId) };
     }
 
+    private async ValueTask<object> CompletionsAsync(JsonElement request, CancellationToken cancellationToken)
+    {
+        var arguments = Arguments(request);
+        var frameId = Frame(arguments.GetProperty("frameId").GetInt32());
+        var body = await bridge.RemoteAsync(
+                PluginDebugCommands.Completions,
+                new { frameId },
+                cancellationToken)
+            .ConfigureAwait(false);
+        var prefix = CompletionPrefix(
+            arguments.GetProperty("text").GetString()!,
+            arguments.GetProperty("column").GetInt32());
+        var separator = prefix.LastIndexOf('.');
+        var parent = separator < 0 ? string.Empty : prefix[..(separator + 1)];
+        var typed = separator < 0 ? prefix : prefix[(separator + 1)..];
+        var targets = body.GetProperty("paths").EnumerateArray()
+            .Select(path => path.GetString()!)
+            .Where(path => path.StartsWith(parent, StringComparison.Ordinal))
+            .Select(path => path[parent.Length..])
+            .Where(path => !path.Contains('.') && path.StartsWith(typed, StringComparison.Ordinal))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .Select(path => new { label = path, type = parent.Length == 0 ? "variable" : "property" })
+            .ToArray();
+        return new { targets };
+    }
+
     private ValueTask<object> SetVariableAsync(JsonElement request, CancellationToken cancellationToken)
     {
         var arguments = Arguments(request);
         var handle = _variableStore.Get(arguments.GetProperty("variablesReference").GetInt32());
         var name = arguments.GetProperty("name").GetString()!;
+        var authoredContainer = handle.VariableName is not null &&
+            handle.Value.GetProperty("type").GetString() == "object";
         return SetExpressionCoreAsync(
             handle.FrameId,
-            handle.VariableName ?? name,
+            authoredContainer ? handle.VariableName + "." + name : handle.VariableName ?? name,
             arguments.GetProperty("value").GetString()!,
             cancellationToken,
-            handle.VariableName is null ? null : _variableStore.ChildPath(handle, name));
+            handle.VariableName is null || authoredContainer ? null : _variableStore.ChildPath(handle, name));
     }
 
     private ValueTask<object> SetExpressionAsync(JsonElement request, CancellationToken cancellationToken)
@@ -220,6 +250,18 @@ internal sealed class DapInspectionHandler(
     }
 
     private string Frame(int frameId) => _stopped.Frame(frameId);
+
+    private static string CompletionPrefix(string text, int column)
+    {
+        var end = Math.Clamp(column - 1, 0, text.Length);
+        var start = end;
+        while (start > 0 && (char.IsLetterOrDigit(text[start - 1]) || text[start - 1] is '_' or '.'))
+        {
+            start--;
+        }
+
+        return text[start..end];
+    }
 
     private async ValueTask EmitStoppedAsync(DapPendingStop stop)
     {

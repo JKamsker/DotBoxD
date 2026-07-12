@@ -170,6 +170,8 @@ public sealed class PluginDebugSession : IPluginDebugControlEndpoint, IDisposabl
     internal bool IsBreakpointVerified(string pluginId, SandboxNodeId nodeId)
         => _coordinator.IsBreakpointVerified(this, pluginId, nodeId);
 
+    internal KernelDebugInfo? DebugInfo(string pluginId) => _coordinator.DebugInfo(this, pluginId);
+
     internal async ValueTask PublishEventAsync(
         string kind,
         object payload,

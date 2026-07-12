@@ -14,6 +14,7 @@ public static class PluginDebugCommands
     public const string Threads = "threads";
     public const string StackTrace = "stackTrace";
     public const string Variables = "variables";
+    public const string Completions = "completions";
     public const string SetVariable = "setVariable";
     public const string Evaluate = "evaluate";
     public const string SetExpression = "setExpression";

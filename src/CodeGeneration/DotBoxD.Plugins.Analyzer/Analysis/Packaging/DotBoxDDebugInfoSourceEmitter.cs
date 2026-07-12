@@ -121,11 +121,15 @@ internal static class DotBoxDDebugInfoSourceEmitter
             builder,
             DotBoxDGenerationNames.Entrypoints.ShouldHandle,
             model.EventParameterName,
+            model.ContextParameterName,
+            projectedSlotName: null,
             model);
         EmitFunctionBindings(
             builder,
             DotBoxDGenerationNames.Entrypoints.Handle,
             model.HandleEventParameterName,
+            model.HandleContextParameterName,
+            model.HandleProjectedSlotName,
             model);
         builder.AppendLine("        };");
     }
@@ -134,21 +138,52 @@ internal static class DotBoxDDebugInfoSourceEmitter
         StringBuilder builder,
         string functionId,
         string eventParameter,
+        string contextParameter,
+        string? projectedSlotName,
         PluginKernelModel model)
     {
-        foreach (var property in model.EventProperties)
+        if (projectedSlotName is not null)
         {
-            EmitVariableBinding(
-                builder,
-                functionId,
-                DotBoxDExpressionModelFactory.EventVariable(property.Name),
-                eventParameter + "." + property.Name);
+            EmitVariableBinding(builder, functionId, projectedSlotName, eventParameter);
+        }
+        else
+        {
+            foreach (var property in model.EventProperties)
+            {
+                EmitVariableBinding(
+                    builder,
+                    functionId,
+                    DotBoxDExpressionModelFactory.EventVariable(property.Name),
+                    eventParameter + "." + property.Name);
+            }
         }
 
         foreach (var setting in model.LiveSettings)
         {
             EmitVariableBinding(builder, functionId, setting.Name, setting.Name);
         }
+
+        EmitSyntheticBinding(
+            builder,
+            functionId,
+            "$dotboxd.context",
+            contextParameter,
+            "DotBoxD.Abstractions.HookContext",
+            "{HookContext}");
+        EmitSyntheticBinding(
+            builder,
+            functionId,
+            "$dotboxd.context.messages",
+            contextParameter + ".Messages",
+            "DotBoxD.Abstractions.IPluginMessageSink",
+            "<host capability proxy>");
+        EmitSyntheticBinding(
+            builder,
+            functionId,
+            "$dotboxd.context.cancellationToken",
+            contextParameter + ".CancellationToken",
+            "System.Threading.CancellationToken",
+            "<execution cancellation token>");
     }
 
     private static void EmitVariableBinding(
@@ -160,6 +195,20 @@ internal static class DotBoxDDebugInfoSourceEmitter
             .Append(LiteralReader.StringLiteral(functionId)).Append(", ")
             .Append(LiteralReader.StringLiteral(slotName)).Append(", ")
             .Append(LiteralReader.StringLiteral(sourceName)).AppendLine("),");
+
+    private static void EmitSyntheticBinding(
+        StringBuilder builder,
+        string functionId,
+        string slotName,
+        string sourceName,
+        string typeName,
+        string displayValue)
+        => builder.Append("            new ").Append(TypeNames.GlobalKernelDebugVariableBinding).Append('(')
+            .Append(LiteralReader.StringLiteral(functionId)).Append(", ")
+            .Append(LiteralReader.StringLiteral(slotName)).Append(", ")
+            .Append(LiteralReader.StringLiteral(sourceName)).Append(", null, null, ")
+            .Append(LiteralReader.StringLiteral(typeName)).Append(", ")
+            .Append(LiteralReader.StringLiteral(displayValue)).AppendLine("),");
 
     private static IEnumerable<KernelSourceLocationModel> SequencePoints(KernelSourceLocationModel source)
         => source.SequencePoints.Count == 0 ? [source] : source.SequencePoints;

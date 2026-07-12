@@ -15,6 +15,7 @@ import com.intellij.xdebugger.evaluation.XDebuggerEvaluator
 import com.intellij.xdebugger.frame.XExecutionStack
 import com.intellij.xdebugger.frame.XSuspendContext
 import org.eclipse.lsp4j.debug.ContinueArguments
+import org.eclipse.lsp4j.debug.CompletionsArguments
 import org.eclipse.lsp4j.debug.DisconnectArguments
 import org.eclipse.lsp4j.debug.EvaluateArguments
 import org.eclipse.lsp4j.debug.EvaluateArgumentsContext
@@ -43,6 +44,7 @@ class DotBoxDDebugProcess(
     private val adapterAttached = AtomicBoolean()
     private val initializedEventPending = AtomicBoolean()
     private val stoppedExecution = StoppedExecutionState()
+    private val completionItems = AtomicReference<Map<String, List<String>>>(emptyMap())
     private val stoppedEvents = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "DotBoxD stopped-event resolver").apply { isDaemon = true }
     }
@@ -104,6 +106,7 @@ class DotBoxDDebugProcess(
     }
 
     override fun stop() {
+        completionItems.set(emptyMap())
         stoppedExecution.clear()
         stoppedEvents.shutdownNow()
         val server = remote.getAndSet(null)
@@ -172,6 +175,7 @@ class DotBoxDDebugProcess(
                 log.warn("DotBoxD stopped stack resolution failed", it)
                 DapExecutionStack(displayName, threadId, remote::get, values)
             }
+            stack.topFrameId?.let { loadCompletions(it) }
             stoppedExecution.stopped(threadId)
             session.positionReached(DapSuspendContext(threadId, stack))
         }
@@ -198,6 +202,7 @@ class DotBoxDDebugProcess(
     }
 
     private fun control(command: IDebugProtocolServer.(Int) -> CompletableFuture<*>) {
+        completionItems.set(emptyMap())
         val threadId = stoppedExecution.claim() ?: return
         val server = remote.get() ?: run {
             stoppedExecution.restore(threadId)
@@ -215,6 +220,26 @@ class DotBoxDDebugProcess(
             }
         }
     }
+
+    internal fun completions(parent: String): List<String> = completionItems.get()[parent].orEmpty()
+
+    private fun loadCompletions(frameId: Int) {
+        val server = remote.get() ?: return
+        runCatching {
+            val roots = requestCompletions(server, frameId, "")
+            val items = linkedMapOf("" to roots)
+            roots.forEach { root -> items["$root."] = requestCompletions(server, frameId, "$root.") }
+            completionItems.set(items)
+        }.onFailure { log.warn("DotBoxD completion loading failed", it) }
+    }
+
+    private fun requestCompletions(server: IDebugProtocolServer, frameId: Int, text: String): List<String> =
+        server.completions(CompletionsArguments().apply {
+            this.frameId = frameId
+            this.text = text
+            column = text.length + 1
+            line = 1
+        }).awaitDap().targets.orEmpty().mapNotNull { it.label }.distinct().sorted()
 
     private fun pause() {
         val server = remote.get() ?: return

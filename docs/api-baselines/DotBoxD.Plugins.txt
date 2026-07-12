@@ -51,6 +51,7 @@ public class SubscriptionStage<TEvent, TCurrent, TContext>
 public const int Version = 1
 public const string Attach = "attach"
 public const string CapabilityId = "host.message.write"
+public const string Completions = "completions"
 public const string Continue = "continue"
 public const string Disconnect = "disconnect"
 public const string Evaluate = "evaluate"

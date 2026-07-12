@@ -137,6 +137,11 @@ Debug metadata remains in `KernelDebugInfo` on the plugin side. It is excluded f
 canonical module hash. The bridge translates a C# location to deterministic structural node IDs and sends only
 those IDs to the server.
 
+Debugger scopes reconstruct authored C# values from that metadata: event parameters such as `e` are expandable,
+projected parameters such as `monsterId` use their source name, and `ctx` exposes its debugger-safe surface. Rider
+and other DAP clients can also request completions for these names and their properties. Synthetic context values
+are display-only proxies; sandbox evaluation never exposes a live host object or server internals.
+
 If the current source's SHA-256 checksum differs from the package document, the adapter leaves its breakpoint
 unverified. Handwritten or unmapped IR is still inspectable through a read-only `dotboxd-ir://` virtual source.
 For handwritten mappings, use `KernelDebugDocument`, `KernelDebugModuleMapper`, `KernelDebugInfo.Create`, and

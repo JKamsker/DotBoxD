@@ -112,10 +112,10 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
                     supportsHitConditionalBreakpoints = true,
                     supportsLogPoints = true,
                     supportsEvaluateForHovers = true,
+                    supportsCompletionsRequest = true,
                     supportsSetVariable = true,
                     supportsSetExpression = true,
                     supportsTerminateRequest = true,
-                    supportsLoadedSourcesRequest = false,
                     exceptionBreakpointFilters = Array.Empty<object>()
                 },
                 null,

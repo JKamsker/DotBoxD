@@ -12,6 +12,7 @@ internal object AdapterTranscript {
         "stackTrace",
         "scopes",
         "variables",
+        "completions",
         "next",
         "continue",
         "disconnect",

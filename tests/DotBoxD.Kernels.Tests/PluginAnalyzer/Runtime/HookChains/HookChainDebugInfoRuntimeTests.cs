@@ -43,6 +43,22 @@ public sealed class HookChainDebugInfoRuntimeTests
         }
         """;
 
+    private const string ProjectedRunSource = """
+        using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
+
+        namespace ChainSample;
+
+        public static class Usage
+        {
+            public static void Configure(HookRegistry hooks)
+                => hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent>()
+                    .Where(e => e.Distance <= 4)
+                    .Select(e => e.MonsterId)
+                    .Run((monsterId, ctx) => ctx.Messages.Send(monsterId, "calm:inline"));
+        }
+        """;
+
     [Fact]
     public void Send_chain_maps_filter_and_terminal_into_both_execution_functions()
     {
@@ -57,6 +73,18 @@ public sealed class HookChainDebugInfoRuntimeTests
         var package = PackageFrom(Compile(ResultChainSource, enableInterceptors: true));
 
         AssertMapped(package, ResultChainSource, "e.Damage");
+    }
+
+    [Fact]
+    public void Projected_run_maps_the_authored_event_projection_and_context_names()
+    {
+        var package = PackageFrom(Compile(ProjectedRunSource, enableInterceptors: true));
+        var bindings = Assert.IsType<KernelDebugInfo>(package.DebugInfo).VariableBindings;
+
+        Assert.Contains(bindings, binding => binding.FunctionId == "ShouldHandle" && binding.SourceName == "e.Distance");
+        Assert.Contains(bindings, binding => binding.FunctionId == "Handle" && binding.SourceName == "monsterId");
+        Assert.Contains(bindings, binding => binding.FunctionId == "Handle" && binding.SourceName == "ctx.Messages");
+        Assert.DoesNotContain(bindings, binding => binding.SourceName.StartsWith("monsterId.", StringComparison.Ordinal));
     }
 
     private static void AssertMapped(PluginPackage package, string source, params string[] variableNames)

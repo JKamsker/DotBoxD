@@ -25,6 +25,7 @@ class DapExecutionStack(
     private val remote: () -> IDebugProtocolServer?,
     private val values: DapValueFactory,
     private val topFrame: XStackFrame? = null,
+    internal val topFrameId: Int? = null,
 ) : XExecutionStack(displayName) {
     override fun getTopFrame(): XStackFrame? = topFrame
 
@@ -65,6 +66,7 @@ class DapExecutionStack(
                 remote,
                 values,
                 frame?.let { DapStackFrame(it, server, values) },
+                frame?.id,
             )
         }
     }

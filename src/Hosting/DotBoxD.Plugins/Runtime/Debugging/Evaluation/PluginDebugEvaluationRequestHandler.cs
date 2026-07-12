@@ -12,24 +12,35 @@ internal sealed class PluginDebugEvaluationRequestHandler(PluginDebugSession ses
         CancellationToken cancellationToken)
     {
         if (!TryReadString(request.Payload, "frameId", out var frameId) ||
-            !session.ExecutionState.TryGetFrame(frameId!, out var frame))
+            !session.ExecutionState.TryGetFrame(frameId!, out var frame, out var pluginId))
         {
             return PluginDebugHandlerResult.Error("staleFrame", "The requested frame is not stopped.");
         }
 
         return request.Kind == PluginDebugCommands.Evaluate
-            ? await EvaluateAsync(request.Payload, frame!, cancellationToken).ConfigureAwait(false)
-            : await SetExpressionAsync(request.Payload, frame!, cancellationToken).ConfigureAwait(false);
+            ? await EvaluateAsync(request.Payload, frame!, pluginId!, cancellationToken).ConfigureAwait(false)
+            : await SetExpressionAsync(request.Payload, frame!, pluginId!, cancellationToken).ConfigureAwait(false);
     }
 
     private async ValueTask<PluginDebugHandlerResult> EvaluateAsync(
         JsonElement payload,
         Kernels.Debugging.ISandboxDebugFrame frame,
+        string pluginId,
         CancellationToken cancellationToken)
     {
         if (!TryReadExpression(payload, "expression", out var expression, out var error))
         {
             return error!;
+        }
+
+        if (PluginDebugSourceVariables.TryEvaluate(
+                frame.Arguments.Concat(frame.Locals).ToArray(),
+                session.DebugInfo(pluginId),
+                frame.FunctionId,
+                expression!,
+                out var sourceValue))
+        {
+            return PluginDebugHandlerResult.Ok(new { value = sourceValue });
         }
 
         var allowAwait = payload.TryGetProperty("allowAwait", out var awaitValue) &&
@@ -43,6 +54,7 @@ internal sealed class PluginDebugEvaluationRequestHandler(PluginDebugSession ses
     private async ValueTask<PluginDebugHandlerResult> SetExpressionAsync(
         JsonElement payload,
         Kernels.Debugging.ISandboxDebugFrame frame,
+        string pluginId,
         CancellationToken cancellationToken)
     {
         if (!TryReadExpression(payload, "expression", out var target, out var targetError))
@@ -55,8 +67,12 @@ internal sealed class PluginDebugEvaluationRequestHandler(PluginDebugSession ses
             return valueError!;
         }
 
+        var binding = session.DebugInfo(pluginId)?.VariableBindings.FirstOrDefault(candidate =>
+            string.Equals(candidate.FunctionId, frame.FunctionId, StringComparison.Ordinal) &&
+            string.Equals(candidate.SourceName, target, StringComparison.Ordinal));
+        var slotName = binding?.DisplayValue is null ? binding?.SlotName ?? target : target;
         var variable = frame.Arguments.Concat(frame.Locals)
-            .FirstOrDefault(candidate => string.Equals(candidate.Name, target, StringComparison.Ordinal));
+            .FirstOrDefault(candidate => string.Equals(candidate.Name, slotName, StringComparison.Ordinal));
         if (variable is null)
         {
             return PluginDebugHandlerResult.Error(

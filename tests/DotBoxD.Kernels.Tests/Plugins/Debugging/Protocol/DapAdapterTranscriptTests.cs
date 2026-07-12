@@ -190,6 +190,10 @@ public sealed class DapAdapterTranscriptTests
 
         Assert.Contains(messages, item => item.GetProperty("type").GetString() == "event" && item.GetProperty("event").GetString() == "initialized");
         Assert.Contains(messages, item => item.GetProperty("type").GetString() == "event" && item.GetProperty("event").GetString() == "terminated");
+        var initialize = Assert.Single(messages, item =>
+            item.GetProperty("type").GetString() == "response" &&
+            item.GetProperty("command").GetString() == "initialize");
+        Assert.True(initialize.GetProperty("body").GetProperty("supportsCompletionsRequest").GetBoolean());
         Assert.Equal(5, messages.Count(item => item.GetProperty("type").GetString() == "response" && item.GetProperty("success").GetBoolean()));
     }
 

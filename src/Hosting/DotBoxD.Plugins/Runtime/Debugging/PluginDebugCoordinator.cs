@@ -205,6 +205,8 @@ internal sealed class PluginDebugCoordinator : IDisposable
         return kernel is not null && SandboxNodeMap.Create(kernel.Package.Module).Nodes.Any(node => node.Id == nodeId);
     }
 
+    public KernelDebugInfo? DebugInfo(PluginDebugSession session, string pluginId) => PluginDebugInfoResolver.Resolve(_gate, _kernels, session, pluginId);
+
     public void Detach(PluginDebugSession session)
     {
         InstalledKernel[] kernels;

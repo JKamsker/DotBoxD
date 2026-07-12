@@ -41,10 +41,13 @@ public sealed class PluginDebugInspectionTests
         var frameId = frame.GetProperty("frameId").GetString()!;
 
         var variables = await SuccessAsync(debug, PluginDebugCommands.Variables, new { frameId });
-        var amount = variables.GetProperty("arguments").EnumerateArray()
-            .Single(variable => variable.GetProperty("name").GetString() == "e_Amount");
-        Assert.Equal("I32", amount.GetProperty("value").GetProperty("type").GetString());
-        Assert.Equal(120, amount.GetProperty("value").GetProperty("value").GetInt32());
+        var eventArgument = variables.GetProperty("arguments").EnumerateArray()
+            .Single(variable => variable.GetProperty("name").GetString() == "e");
+        var amount = eventArgument.GetProperty("value").GetProperty("children").EnumerateArray()
+            .Single(variable => variable.GetProperty("name").GetString() == "Amount")
+            .GetProperty("value");
+        Assert.Equal("I32", amount.GetProperty("type").GetString());
+        Assert.Equal(120, amount.GetProperty("value").GetInt32());
 
         var rejected = await ExchangeAsync(
             debug,
@@ -53,10 +56,18 @@ public sealed class PluginDebugInspectionTests
         Assert.False(rejected.GetProperty("success").GetBoolean());
         Assert.Equal("invalidValue", rejected.GetProperty("error").GetProperty("code").GetString());
 
-        _ = await SuccessAsync(
+        var evaluated = await SuccessAsync(
             debug,
-            PluginDebugCommands.SetVariable,
-            new { frameId, name = "e_Amount", value = new { type = "I32", value = 50 } });
+            PluginDebugCommands.Evaluate,
+            new { frameId, expression = "e.Amount" });
+        Assert.Equal(120, evaluated.GetProperty("value").GetProperty("value").GetInt32());
+
+        _ = await SuccessAsync(debug, PluginDebugCommands.SetExpression, new
+        {
+            frameId,
+            expression = "e.Amount",
+            valueExpression = "50"
+        });
         _ = await SuccessAsync(debug, PluginDebugCommands.Continue, new { runId });
 
         Assert.False(await execution);

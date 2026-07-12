@@ -113,6 +113,9 @@ internal sealed class PluginDebugExecutionState
     }
 
     public bool TryGetFrame(string frameId, out ISandboxDebugFrame? frame)
+        => TryGetFrame(frameId, out frame, out _);
+
+    public bool TryGetFrame(string frameId, out ISandboxDebugFrame? frame, out string? pluginId)
     {
         var separator = frameId.LastIndexOf(':');
         if (separator <= 0 ||
@@ -123,6 +126,7 @@ internal sealed class PluginDebugExecutionState
                 out var depth))
         {
             frame = null;
+            pluginId = null;
             return false;
         }
 
@@ -132,9 +136,11 @@ internal sealed class PluginDebugExecutionState
             if (!_stopped.TryGetValue(runId, out var checkpoint))
             {
                 frame = null;
+                pluginId = null;
                 return false;
             }
 
+            pluginId = checkpoint.PluginId;
             frame = checkpoint.Checkpoint.Frame;
             while (frame is not null && frame.Depth != depth)
             {

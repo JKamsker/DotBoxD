@@ -24,6 +24,7 @@ internal sealed class PluginDebugExecutionRequestHandler(PluginDebugSession sess
             PluginDebugCommands.Threads => Threads(),
             PluginDebugCommands.StackTrace => StackTrace(request.Payload),
             PluginDebugCommands.Variables => Variables(request.Payload),
+            PluginDebugCommands.Completions => Completions(request.Payload),
             PluginDebugCommands.SetVariable => SetVariable(request.Payload),
             _ => ResumeCommand(request)
         };
@@ -137,17 +138,40 @@ internal sealed class PluginDebugExecutionRequestHandler(PluginDebugSession sess
     private PluginDebugHandlerResult Variables(JsonElement payload)
     {
         if (!TryReadString(payload, "frameId", out var frameId) ||
-            !session.ExecutionState.TryGetFrame(frameId!, out var frame))
+            !session.ExecutionState.TryGetFrame(frameId!, out var frame, out var pluginId))
         {
             return PluginDebugHandlerResult.Error("staleFrame", "The requested frame is not stopped.");
         }
 
         var stoppedFrame = frame!;
+        var debugInfo = session.DebugInfo(pluginId!);
         return PluginDebugHandlerResult.Ok(new
         {
-            arguments = stoppedFrame.Arguments.Select(SnapshotVariable).ToArray(),
-            locals = stoppedFrame.Locals.Select(SnapshotVariable).ToArray()
+            arguments = PluginDebugSourceVariables.Map(
+                stoppedFrame.Arguments,
+                debugInfo,
+                stoppedFrame.FunctionId,
+                SandboxDebugVariableKind.Argument),
+            locals = PluginDebugSourceVariables.Map(
+                stoppedFrame.Locals,
+                debugInfo,
+                stoppedFrame.FunctionId,
+                SandboxDebugVariableKind.Local)
         });
+    }
+
+    private PluginDebugHandlerResult Completions(JsonElement payload)
+    {
+        if (!TryReadString(payload, "frameId", out var frameId) ||
+            !session.ExecutionState.TryGetFrame(frameId!, out var frame, out var pluginId))
+        {
+            return PluginDebugHandlerResult.Error("staleFrame", "The requested frame is not stopped.");
+        }
+
+        var paths = PluginDebugSourceVariables.CompletionPaths(
+            session.DebugInfo(pluginId!),
+            frame!.FunctionId);
+        return PluginDebugHandlerResult.Ok(new { paths });
     }
 
     private PluginDebugHandlerResult SetVariable(JsonElement payload)

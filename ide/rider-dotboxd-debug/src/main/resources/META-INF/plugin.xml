@@ -10,6 +10,8 @@
     <programRunner implementation="dev.dotboxd.rider.run.DotBoxDDebugProgramRunner"
                    id="DotBoxDKernelDebugProgramRunner"/>
     <notificationGroup id="DotBoxD Kernel Debugger" displayType="BALLOON" toolWindowId="Debug"/>
+    <completion.contributor language="TEXT"
+                            implementationClass="dev.dotboxd.rider.run.DotBoxDExpressionCompletionContributor"/>
   </extensions>
   <actions>
     <action id="DotBoxD.AttachToKernels"
