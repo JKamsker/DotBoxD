@@ -202,7 +202,16 @@ public readonly struct KernelRpcValue
         return new KernelRpcValue(KernelRpcValueKind.Map, 0L, 0D, string.Empty, UseOwnedItems(entries));
     }
 
-    public KernelRpcValue GetItem(int index) => (_items ?? EmptyItems)[index];
+    public KernelRpcValue GetItem(int index)
+    {
+        var items = _items ?? EmptyItems;
+        if ((uint)index >= (uint)items.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index));
+        }
+
+        return items[index];
+    }
 
     private static KernelRpcValue[] CopyItems(KernelRpcValue[] items)
         => items.Length == 0
