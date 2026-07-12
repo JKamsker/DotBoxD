@@ -46,6 +46,52 @@ public sealed class RpcStreamingContextCancellationClaimRegressionTests
         }
     }
 
+    [Fact]
+    public void SetAsyncEnumerableResponseRejectsNullItems()
+    {
+        Assert.Throws<ArgumentNullException>(
+            () => RpcStreamingContext.Disabled.SetResponse<int>(null!));
+    }
+
+    [Fact]
+    public async Task SetResponseRejectsSecondResponse()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var streams = new RpcStreamManager(serializer, SendNoopAsync, exceptionTransformer: null);
+        var context = new RpcStreamingContext(streams, serializer, CancellationToken.None);
+
+        context.SetResponse(new MemoryStream());
+
+        try
+        {
+            var error = Assert.Throws<InvalidOperationException>(
+                () => context.SetResponse(new MemoryStream()));
+
+            Assert.Contains("Only one streamed response", error.Message);
+        }
+        finally
+        {
+            await context.AbandonResponseAsync();
+        }
+    }
+
+    [Fact]
+    public void InboundAccessorRejectsMismatchedStreamKindBeforeClaimingDeclaredStream()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var streams = new RpcStreamManager(serializer, SendNoopAsync, exceptionTransformer: null);
+        var handle = new RpcStreamHandle(24_002, RpcStreamKind.Items);
+        var context = new RpcStreamingContext(streams, serializer, CancellationToken.None, new[] { handle });
+
+        var error = Assert.Throws<ServiceProtocolException>(
+            () => context.GetStream(handle));
+
+        Assert.Contains("is 'Items', not 'Binary'", error.Message);
+        var unclaimed = Assert.Throws<ServiceProtocolException>(
+            context.EnsureAllDeclaredInboundStreamsClaimed);
+        Assert.Contains("was not claimed", unclaimed.Message);
+    }
+
     private static object GetInboundSurface(
         RpcStreamingContext context,
         string accessor,
