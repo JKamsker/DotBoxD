@@ -94,7 +94,7 @@ public sealed class WorkerTimeoutResultHardeningTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.Cancelled, result.Error!.Code);
-        Assert.True(worker.ObservedCancellation);
+        await worker.CancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     [Fact]
@@ -254,7 +254,7 @@ public sealed class WorkerTimeoutResultHardeningTests
     private sealed class CallerCancellationWorker : ISandboxWorkerClient
     {
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public bool ObservedCancellation { get; private set; }
+        public TaskCompletionSource CancellationObserved { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public async ValueTask<SandboxExecutionResult> ExecuteInWorkerAsync(
             ExecutionPlan plan,
@@ -270,7 +270,7 @@ public sealed class WorkerTimeoutResultHardeningTests
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                ObservedCancellation = true;
+                CancellationObserved.SetResult();
                 throw;
             }
 
