@@ -51,6 +51,11 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             startContext.RegisterOperationAction(c => AnalyzeFieldReference(c, helperGraph), OperationKind.FieldReference);
             startContext.RegisterOperationAction(c => AnalyzeTypeOf(c, helperGraph), OperationKind.TypeOf);
             startContext.RegisterOperationAction(c => AnalyzeMethodReference(c, helperGraph), OperationKind.MethodReference);
+            startContext.RegisterOperationAction(
+                c => AnalyzeOperator(c, helperGraph),
+                OperationKind.UnaryOperator,
+                OperationKind.BinaryOperator,
+                OperationKind.Conversion);
             startContext.RegisterCompilationEndAction(helperGraph.ReportDiagnostics);
         });
     }
