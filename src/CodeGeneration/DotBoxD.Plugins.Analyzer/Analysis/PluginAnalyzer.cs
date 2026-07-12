@@ -55,6 +55,8 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             startContext.RegisterOperationAction(c => AnalyzeAnonymousFunction(c, helperGraph), OperationKind.AnonymousFunction);
             startContext.RegisterOperationAction(c => AnalyzeEventReference(c, helperGraph), OperationKind.EventReference);
             startContext.RegisterOperationAction(c => AnalyzeVariableDeclaration(c, helperGraph), OperationKind.VariableDeclaration);
+            startContext.RegisterOperationAction(c => AnalyzeUsing(c, helperGraph), OperationKind.Using);
+            startContext.RegisterOperationAction(c => AnalyzeUsingDeclaration(c, helperGraph), OperationKind.UsingDeclaration);
             startContext.RegisterCompilationEndAction(helperGraph.ReportDiagnostics);
         });
     }
