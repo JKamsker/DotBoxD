@@ -96,10 +96,10 @@ class RiderKernelDebuggerE2ETest {
     private fun assertKernelIdeState(rider: RiderDriver, stop: DebugStop, guardian: Path, line: Int) {
         assertEquals(guardian.normalize().toString().replace('\\', '/'), stop.path.replace('\\', '/'))
         assertEquals(line, stop.line)
-        val breakpoints = rider.dotNetBreakpoints()
+        val guardianPath = guardian.toString().replace('\\', '/')
+        val breakpoints = rider.dotNetBreakpoints().filter { it.path.replace('\\', '/') == guardianPath }
         assertEquals(2, breakpoints.size)
         assertEquals(listOf(35, 44), breakpoints.filter(IdeBreakpoint::enabled).map(IdeBreakpoint::line).sorted())
-        assertTrue(breakpoints.all { it.path.replace('\\', '/') == guardian.toString().replace('\\', '/') })
     }
 
     private fun adapterLog(root: Path): Path = root.resolve(

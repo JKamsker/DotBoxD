@@ -157,8 +157,8 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
             const result = [];
             for (let i = 0; i < breakpoints.length; i++) {
                 const breakpoint = breakpoints[i];
-                if (String(breakpoint.getType().getId()) !== 'DotNet Breakpoints') continue;
-                const position = breakpoint.getSourcePosition();
+                let position = null;
+                try { position = breakpoint.getSourcePosition(); } catch (_) { continue; }
                 const path = position && position.getFile() ? position.getFile().getPath() : '';
                 const line = position ? position.getLine() + 1 : 0;
                 result.push((breakpoint.isEnabled() ? '1' : '0') + '|' + path + '|' + line);

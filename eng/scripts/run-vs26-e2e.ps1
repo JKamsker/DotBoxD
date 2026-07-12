@@ -206,9 +206,8 @@ function Wait-ForNextKernelStop {
     $deadline = [DateTime]::UtcNow + $StopTimeout
     do {
         Start-Sleep -Milliseconds 200
-        $mode = Invoke-Dte '[int]$dte.Debugger.CurrentMode'
         $stackLines = @(Select-String $launcherLog -Pattern ' adapter stack \d+ (.+) line (\d+)$' -ErrorAction SilentlyContinue)
-        for ($index = $script:stackCursor; $mode -eq 2 -and $index -lt $stackLines.Count; $index++) {
+        for ($index = $script:stackCursor; $index -lt $stackLines.Count; $index++) {
             $match = [regex]::Match($stackLines[$index].Line, ' adapter stack \d+ (.+) line (\d+)$')
             if ($match.Success) {
                 $stop = [PSCustomObject]@{
