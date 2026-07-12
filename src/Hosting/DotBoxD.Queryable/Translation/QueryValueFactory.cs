@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Linq.Expressions;
+using System.Reflection;
 using DotBoxD.Queryable.Ast;
 
 namespace DotBoxD.Queryable.Translation;
@@ -42,6 +43,11 @@ internal static class QueryValueFactory
         {
             throw new QueryTranslationException(
                 $"Could not evaluate the constant operand '{expression}'.", ex);
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is { } inner)
+        {
+            throw new QueryTranslationException(
+                $"Could not evaluate the constant operand '{expression}'.", inner);
         }
     }
 
