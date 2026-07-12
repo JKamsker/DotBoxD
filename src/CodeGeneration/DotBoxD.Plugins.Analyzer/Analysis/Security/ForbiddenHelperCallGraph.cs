@@ -7,8 +7,11 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 internal sealed class ForbiddenHelperCallGraph
 {
     private readonly ConcurrentDictionary<ISymbol, ITypeSymbol> _forbidden = new(SymbolEqualityComparer.Default);
+    private readonly ConcurrentDictionary<ILocalSymbol, ITypeSymbol> _dynamicLocalTypes =
+        new(SymbolEqualityComparer.Default);
     private readonly ConcurrentBag<HelperEdge> _helperEdges = [];
     private readonly ConcurrentBag<RootHelperCall> _rootCalls = [];
+    private readonly ConcurrentBag<DynamicHelperCall> _dynamicCalls = [];
 
     public void RecordForbidden(IMethodSymbol method, ITypeSymbol type)
         => _forbidden.TryAdd(Normalize(method), type);
@@ -26,6 +29,27 @@ internal sealed class ForbiddenHelperCallGraph
 
     public void RecordForbidden(IFieldSymbol field, ITypeSymbol type)
         => _forbidden.TryAdd(Normalize(field), type);
+
+    public void RecordDynamicLocalType(ILocalSymbol local, ITypeSymbol? type)
+    {
+        if (type is not null && type.TypeKind != TypeKind.Dynamic)
+        {
+            _dynamicLocalTypes.TryAdd(local, type);
+        }
+    }
+
+    public void RecordDynamicInvocation(
+        ISymbol? caller,
+        ILocalSymbol receiver,
+        string memberName,
+        int argumentCount,
+        Location location)
+    {
+        if (caller is IMethodSymbol or IFieldSymbol or IPropertySymbol)
+        {
+            _dynamicCalls.Add(new DynamicHelperCall(caller, receiver, memberName, argumentCount, location));
+        }
+    }
 
     public void RecordCall(IMethodSymbol caller, IMethodSymbol target, Location location)
     {
@@ -134,6 +158,7 @@ internal sealed class ForbiddenHelperCallGraph
 
     public void ReportDiagnostics(CompilationAnalysisContext context)
     {
+        ResolveDynamicCalls();
         if (_forbidden.IsEmpty ||
             _rootCalls.IsEmpty)
         {
@@ -193,6 +218,32 @@ internal sealed class ForbiddenHelperCallGraph
         return tainted;
     }
 
+    private void ResolveDynamicCalls()
+    {
+        foreach (var call in _dynamicCalls)
+        {
+            if (!_dynamicLocalTypes.TryGetValue(call.Receiver, out var receiverType))
+            {
+                continue;
+            }
+
+            foreach (var target in PluginAnalyzer.DynamicInvocationCandidates(
+                         receiverType,
+                         call.MemberName,
+                         call.ArgumentCount))
+            {
+                if (call.Caller is IMethodSymbol method)
+                {
+                    RecordCall(method, target, call.Location);
+                }
+                else
+                {
+                    RecordInitializerRootCall(call.Caller, target, call.Location);
+                }
+            }
+        }
+    }
+
     private static bool IsStaticSourceMember(ISymbol symbol)
         => symbol.DeclaringSyntaxReferences.Length != 0 &&
             symbol is IFieldSymbol { IsStatic: true } or IPropertySymbol { IsStatic: true };
@@ -209,6 +260,13 @@ internal sealed class ForbiddenHelperCallGraph
     private readonly record struct HelperEdge(ISymbol Caller, ISymbol Target);
 
     private readonly record struct RootHelperCall(ISymbol Target, Location Location);
+
+    private readonly record struct DynamicHelperCall(
+        ISymbol Caller,
+        ILocalSymbol Receiver,
+        string MemberName,
+        int ArgumentCount,
+        Location Location);
 
     private static ISymbol Normalize(IFieldSymbol field)
         => field.OriginalDefinition;
