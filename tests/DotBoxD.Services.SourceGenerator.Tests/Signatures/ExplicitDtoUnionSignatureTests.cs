@@ -160,15 +160,15 @@ public sealed class ExplicitDtoUnionSignatureTests
 
                 public abstract class AbstractWidgetCase : NonConcreteWidget;
 
-                public sealed class UnreconstructibleEnvelope
+                public sealed class PrivateInitEnvelope
                 {
-                    public UnreconstructibleWidget Widget { get; init; } = null!;
+                    public PrivateInitWidget Widget { get; init; } = null!;
                 }
 
-                [Union(0, typeof(UnreconstructibleTextWidget))]
-                public abstract class UnreconstructibleWidget;
+                [Union(0, typeof(PrivateInitTextWidget))]
+                public abstract class PrivateInitWidget;
 
-                public sealed class UnreconstructibleTextWidget : UnreconstructibleWidget
+                public sealed class PrivateInitTextWidget : PrivateInitWidget
                 {
                     public string Text { get; private init; } = "";
                 }
@@ -188,7 +188,7 @@ public sealed class ExplicitDtoUnionSignatureTests
                     Task SendMissingDiscriminatorAsync(MissingDiscriminatorEnvelope request);
                     Task SendStringNamedAsync(StringNamedEnvelope request);
                     Task SendNonConcreteAsync(NonConcreteEnvelope request);
-                    Task SendUnreconstructibleAsync(UnreconstructibleEnvelope request);
+                    Task SendPrivateInitAsync(PrivateInitEnvelope request);
                     Task SendIncompleteAsync(IncompleteEnvelope request);
                 }
             }
@@ -197,13 +197,12 @@ public sealed class ExplicitDtoUnionSignatureTests
         var runResult = Compile(source);
 
         var diagnostics = runResult.Diagnostics.Where(d => d.Id == "DBXS002").ToArray();
-        diagnostics.Should().HaveCount(6);
+        diagnostics.Should().HaveCount(5);
         diagnostics.Should().Contain(d => d.GetMessage().Contains("duplicate") &&
             d.GetMessage().Contains("discriminator"));
         diagnostics.Should().Contain(d => d.GetMessage().Contains("stable discriminator"));
         diagnostics.Should().Contain(d => d.GetMessage().Contains("Type-based overload"));
         diagnostics.Should().Contain(d => d.GetMessage().Contains("concrete"));
-        diagnostics.Should().Contain(d => d.GetMessage().Contains("public setter or init"));
         diagnostics.Should().Contain(d => d.GetMessage().Contains("at least one derived DTO type"));
 
         var dispatcher = Dispatcher(runResult, "IInvalidLayoutRpc");
@@ -211,7 +210,7 @@ public sealed class ExplicitDtoUnionSignatureTests
         dispatcher.Should().NotContain("case \"SendMissingDiscriminatorAsync\":");
         dispatcher.Should().NotContain("case \"SendStringNamedAsync\":");
         dispatcher.Should().NotContain("case \"SendNonConcreteAsync\":");
-        dispatcher.Should().NotContain("case \"SendUnreconstructibleAsync\":");
+        dispatcher.Should().Contain("case \"SendPrivateInitAsync\":");
         dispatcher.Should().NotContain("case \"SendIncompleteAsync\":");
     }
 

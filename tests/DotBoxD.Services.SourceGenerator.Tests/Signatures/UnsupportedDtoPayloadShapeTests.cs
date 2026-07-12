@@ -7,7 +7,7 @@ namespace DotBoxD.Services.SourceGenerator.Tests.Signatures;
 public sealed class UnsupportedDtoPayloadShapeTests
 {
     [Fact]
-    public void DtoMembersWithoutPublicSetters_ProduceDBXS002_AndSkipDispatch()
+    public void DtoMembersWithoutPublicSetters_AreDelegatedToConfiguredSerializer()
     {
         const string source = """
             using DotBoxD.Services.Attributes;
@@ -36,21 +36,19 @@ public sealed class UnsupportedDtoPayloadShapeTests
 
         var runResult = Compile(source);
 
-        var diagnostics = runResult.Diagnostics.Where(d => d.Id == "DBXS002").ToArray();
-        diagnostics.Should().HaveCount(2);
-        diagnostics.Should().OnlyContain(d => d.GetMessage().Contains("public setter or init"));
+        runResult.Diagnostics.Should().NotContain(d => d.Id == "DBXS002");
 
         var generated = runResult.Results.Single().GeneratedSources;
         var proxy = generated
             .Single(g => g.HintName.EndsWith("IDtoAccessors.DotBoxDRpcProxy.g.cs"))
             .SourceText.ToString();
-        proxy.Should().Contain("throw new global::System.NotSupportedException");
+        proxy.Should().NotContain("throw new global::System.NotSupportedException");
 
         var dispatcher = generated
             .Single(g => g.HintName.EndsWith("IDtoAccessors.DotBoxDRpcDispatcher.g.cs"))
             .SourceText.ToString();
-        dispatcher.Should().NotContain("case \"SendAsync\":");
-        dispatcher.Should().NotContain("case \"GetAsync\":");
+        dispatcher.Should().Contain("case \"SendAsync\":");
+        dispatcher.Should().Contain("case \"GetAsync\":");
     }
 
     [Fact]
@@ -116,7 +114,7 @@ public sealed class UnsupportedDtoPayloadShapeTests
     }
 
     [Fact]
-    public void DtoConstructorParametersWithDifferentMemberTypes_ProduceDBXS002_AndSkipDispatch()
+    public void DtoConstructorParametersWithDifferentMemberTypes_AreDelegatedToConfiguredSerializer()
     {
         const string source = """
             using DotBoxD.Services.Attributes;
@@ -144,21 +142,18 @@ public sealed class UnsupportedDtoPayloadShapeTests
 
         var runResult = Compile(source);
 
-        var diagnostic = runResult.Diagnostics.Should().ContainSingle(d => d.Id == "DBXS002").Subject;
-        diagnostic.GetMessage().Should().Contain("member 'Value'");
-        diagnostic.GetMessage().Should().Contain("constructor parameter");
-        diagnostic.GetMessage().Should().Contain("same type");
+        runResult.Diagnostics.Should().NotContain(d => d.Id == "DBXS002");
 
         var dispatcher = runResult.Results.Single()
             .GeneratedSources
             .Single(g => g.HintName.EndsWith("IMismatchedConstructorDto.DotBoxDRpcDispatcher.g.cs"))
             .SourceText
             .ToString();
-        dispatcher.Should().NotContain("case \"SendAsync\":");
+        dispatcher.Should().Contain("case \"SendAsync\":");
     }
 
     [Fact]
-    public void DtoMembersSplitAcrossConstructors_ProduceDBXS002_AndSkipDispatch()
+    public void DtoMembersSplitAcrossConstructors_AreDelegatedToConfiguredSerializer()
     {
         const string source = """
             using DotBoxD.Services.Attributes;
@@ -194,21 +189,18 @@ public sealed class UnsupportedDtoPayloadShapeTests
 
         var runResult = Compile(source);
 
-        var diagnostic = runResult.Diagnostics.Should().ContainSingle(d => d.Id == "DBXS002").Subject;
-        diagnostic.GetMessage().Should().Contain("single public constructor");
-        diagnostic.GetMessage().Should().Contain("Id");
-        diagnostic.GetMessage().Should().Contain("Name");
+        runResult.Diagnostics.Should().NotContain(d => d.Id == "DBXS002");
 
         var dispatcher = runResult.Results.Single()
             .GeneratedSources
             .Single(g => g.HintName.EndsWith("ISplitConstructorDto.DotBoxDRpcDispatcher.g.cs"))
             .SourceText
             .ToString();
-        dispatcher.Should().NotContain("case \"SendAsync\":");
+        dispatcher.Should().Contain("case \"SendAsync\":");
     }
 
     [Fact]
-    public void DtoInheritedMembersMissingFromDerivedConstructor_ProduceDBXS002_AndSkipDispatch()
+    public void DtoInheritedMembersMissingFromDerivedConstructor_AreDelegatedToConfiguredSerializer()
     {
         const string source = """
             using DotBoxD.Services.Attributes;
@@ -247,17 +239,14 @@ public sealed class UnsupportedDtoPayloadShapeTests
 
         var runResult = Compile(source);
 
-        var diagnostic = runResult.Diagnostics.Should().ContainSingle(d => d.Id == "DBXS002").Subject;
-        diagnostic.GetMessage().Should().Contain("single public constructor");
-        diagnostic.GetMessage().Should().Contain("Id");
-        diagnostic.GetMessage().Should().Contain("Name");
+        runResult.Diagnostics.Should().NotContain(d => d.Id == "DBXS002");
 
         var dispatcher = runResult.Results.Single()
             .GeneratedSources
             .Single(g => g.HintName.EndsWith("IInheritedConstructorDto.DotBoxDRpcDispatcher.g.cs"))
             .SourceText
             .ToString();
-        dispatcher.Should().NotContain("case \"SendAsync\":");
+        dispatcher.Should().Contain("case \"SendAsync\":");
     }
 
     private static GeneratorDriverRunResult Compile(string source)
