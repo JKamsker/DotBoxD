@@ -54,8 +54,15 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
         _cancelFrames = new RpcPeerCancelFrameSender(sendAsync);
     }
 
-    public RpcStreamHandle ReserveStream(RpcStreamKind kind) =>
-        _streams.ReserveOutbound(kind);
+    public RpcStreamHandle ReserveStream(RpcStreamKind kind)
+    {
+        if (!RpcStreamValidation.IsKnownKind(kind))
+        {
+            throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown stream kind.");
+        }
+
+        return _streams.ReserveOutbound(kind);
+    }
 
     public void ReleaseStream(RpcStreamHandle handle) =>
         _streams.ReleaseOutboundReservation(handle.StreamId);
