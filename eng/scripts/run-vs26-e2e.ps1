@@ -114,6 +114,22 @@ if ($dte.Solution.IsOpen -and
     }
 }
 
+function Invoke-DteWhenReady([string] $Script, [string] $Operation) {
+    $deadline = [DateTime]::UtcNow + $StartupTimeout
+    $lastError = $null
+    do {
+        try {
+            return Invoke-Dte $Script
+        }
+        catch {
+            $lastError = $_
+            Start-Sleep -Milliseconds 500
+        }
+    } until ([DateTime]::UtcNow -ge $deadline)
+
+    throw "$Operation did not become ready within $StartupTimeout. Last error: $lastError"
+}
+
 function Wait-ForKernelAttach {
     $deadline = [DateTime]::UtcNow + $StartupTimeout
     do {
@@ -241,16 +257,18 @@ try {
     $env:DOTBOXD_E2E_PLUGIN_PROGRAM = $pluginProgram
     $env:DOTBOXD_E2E_SERVER_PROJECT = $serverProject
     $env:DOTBOXD_E2E_PLUGIN_PROJECT = $pluginProject
-    Invoke-Dte @'
+    Invoke-DteWhenReady @'
 $solutionBuild = $dte.Solution.SolutionBuild
 if ($null -eq $solutionBuild) { throw 'Visual Studio did not expose SolutionBuild after startup.' }
+$breakpoints = $dte.Debugger.Breakpoints
+if ($null -eq $breakpoints) { throw 'Visual Studio did not expose the debugger breakpoint collection after startup.' }
 $solutionBuild.StartupProjects = [object[]]@(
     $env:DOTBOXD_E2E_SERVER_PROJECT,
     $env:DOTBOXD_E2E_PLUGIN_PROJECT)
-while ($dte.Debugger.Breakpoints.Count -gt 0) { $dte.Debugger.Breakpoints.Item(1).Delete() }
-$null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_PLUGIN_PROGRAM, 46)
+while ($breakpoints.Count -gt 0) { $breakpoints.Item(1).Delete() }
+$null = $breakpoints.Add('', $env:DOTBOXD_E2E_PLUGIN_PROGRAM, 46)
 $dte.ExecuteCommand('Debug.Start')
-'@ | Out-Null
+'@ 'Visual Studio debugger startup' | Out-Null
     $managedStop = Wait-ForManagedStop
     Invoke-Dte @'
 while ($dte.Debugger.Breakpoints.Count -gt 0) { $dte.Debugger.Breakpoints.Item(1).Delete() }
