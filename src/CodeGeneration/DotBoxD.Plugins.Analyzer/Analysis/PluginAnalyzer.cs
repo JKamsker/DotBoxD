@@ -46,6 +46,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         context.RegisterCompilationStartAction(startContext =>
         {
             var helperGraph = new ForbiddenHelperCallGraph();
+            startContext.RegisterSymbolAction(c => AnalyzeMethod(c, helperGraph), SymbolKind.Method);
             startContext.RegisterOperationAction(c => AnalyzeInvocation(c, helperGraph), OperationKind.Invocation);
             startContext.RegisterOperationAction(c => AnalyzeDynamicInvocation(c, helperGraph), OperationKind.DynamicInvocation);
             startContext.RegisterOperationAction(c => AnalyzeObjectCreation(c, helperGraph), OperationKind.ObjectCreation);
@@ -93,6 +94,12 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         }
 
         ValidateLocalMember(context, method, method);
+    }
+
+    private static void AnalyzeMethod(SymbolAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
+    {
+        var method = (IMethodSymbol)context.Symbol;
+        helperGraph.RecordDispatchImplementations(method);
     }
 
     private static void AnalyzeProperty(SymbolAnalysisContext context)
