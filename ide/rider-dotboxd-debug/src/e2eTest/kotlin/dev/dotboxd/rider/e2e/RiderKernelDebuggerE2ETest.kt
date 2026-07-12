@@ -94,12 +94,18 @@ class RiderKernelDebuggerE2ETest {
     }
 
     private fun assertKernelIdeState(rider: RiderDriver, stop: DebugStop, guardian: Path, line: Int) {
-        assertEquals(guardian.normalize().toString().replace('\\', '/'), stop.path.replace('\\', '/'))
+        assertEquals(normalizeIdePath(guardian.toString()), normalizeIdePath(stop.path))
         assertEquals(line, stop.line)
-        val guardianPath = guardian.toString().replace('\\', '/')
-        val breakpoints = rider.dotNetBreakpoints().filter { it.path.replace('\\', '/') == guardianPath }
-        assertEquals(2, breakpoints.size)
+        val guardianPath = normalizeIdePath(guardian.toString())
+        val allBreakpoints = rider.dotNetBreakpoints()
+        val breakpoints = allBreakpoints.filter { normalizeIdePath(it.path) == guardianPath }
+        assertEquals(2, breakpoints.size, "Rider line breakpoints: $allBreakpoints")
         assertEquals(listOf(35, 44), breakpoints.filter(IdeBreakpoint::enabled).map(IdeBreakpoint::line).sorted())
+    }
+
+    private fun normalizeIdePath(path: String): String {
+        val normalized = path.replace('\\', '/').removePrefix("file://")
+        return if (normalized.matches(Regex("^/[A-Za-z]:/.*"))) normalized.drop(1) else normalized
     }
 
     private fun adapterLog(root: Path): Path = root.resolve(
