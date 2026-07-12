@@ -22,8 +22,7 @@ public enum MarshalBigFlag : long
 /// <summary>
 /// Broader server-extension type support beyond the original record-DTO parameters (issue #41 follow-up):
 /// enums marshal through their underlying integer, DTOs reconstructed via settable properties when no matching
-/// constructor exists, and a DTO that inherits public properties is rejected with a direct diagnostic instead
-/// of silently dropping the inherited fields.
+/// constructor exists, and DTO inheritance preserves base members in the positional wire shape.
 /// </summary>
 public sealed class ServerExtensionDtoTypeSupportTests
 {
@@ -249,13 +248,14 @@ public sealed class ServerExtensionDtoTypeSupportTests
     }
 
     [Fact]
-    public void Server_extension_rejects_a_dto_that_inherits_public_properties()
+    public void Server_extension_supports_a_dto_that_inherits_public_properties()
     {
-        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(InheritedDtoSource);
+        var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator(InheritedDtoSource);
 
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
         Assert.Contains(
-            diagnostics,
-            d => d.Id == "DBXK100" && d.GetMessage().Contains("inherit", StringComparison.Ordinal));
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("\\\"arguments\\\":[\\\"I32\\\",\\\"I32\\\"]", StringComparison.Ordinal));
     }
 
     private static object CreateControl(Assembly assembly, byte[] response, out RecordingRegistry registry)

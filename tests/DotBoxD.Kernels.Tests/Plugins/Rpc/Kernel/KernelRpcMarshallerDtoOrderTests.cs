@@ -163,29 +163,6 @@ public sealed class KernelRpcMarshallerDtoOrderTests
         Assert.Equal("mage", dto.Name);
     }
 
-    [Fact]
-    public void ToSandboxValue_rejects_inherited_dto_properties()
-    {
-        var dto = new DerivedDto(10, true);
-
-        var ex = Assert.Throws<NotSupportedException>(
-            () => KernelRpcMarshaller.ToSandboxValue(dto, typeof(DerivedDto)));
-
-        Assert.Contains("inherits public", ex.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void FromSandboxValue_rejects_inherited_dto_properties()
-    {
-        var sandbox = SandboxValue.FromRecord(
-            [SandboxValue.FromInt32(11), SandboxValue.FromBool(false)]);
-
-        var ex = Assert.Throws<NotSupportedException>(
-            () => KernelRpcMarshaller.FromSandboxValue(sandbox, typeof(DerivedDto)));
-
-        Assert.Contains("inherits public", ex.Message, StringComparison.Ordinal);
-    }
-
     private sealed class ReorderedDto
     {
         public ReorderedDto(bool success, int monsterId)
@@ -223,18 +200,6 @@ public sealed class KernelRpcMarshallerDtoOrderTests
         public int MonsterId { get; } = monsterId;
 
         public string Name { get; set; } = string.Empty;
-    }
-
-    private abstract class BaseDto
-    {
-        public int BaseId => 99;
-    }
-
-    private sealed class DerivedDto(int monsterId, bool success) : BaseDto
-    {
-        public int MonsterId { get; } = monsterId;
-
-        public bool Success { get; } = success;
     }
 
     // A DTO whose field type is itself — SandboxTypeOf must fail the depth guard rather than recurse forever.

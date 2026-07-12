@@ -222,7 +222,8 @@ internal static partial class HookChainModelFactory
         var eventProperties = PluginSymbolReader.EventProperties(eventType);
         if (ContainsUnsupported(eventProperties))
         {
-            return false;
+            throw new NotSupportedException(
+                $"Hook event type '{eventType.ToDisplayString()}' contains a public property whose type is not wire-eligible.");
         }
 
         eventShape = new HookChainEventShape(eventType, eventProperties);
