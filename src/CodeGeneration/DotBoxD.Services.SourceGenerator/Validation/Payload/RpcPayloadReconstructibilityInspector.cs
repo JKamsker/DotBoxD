@@ -96,8 +96,10 @@ internal static class RpcPayloadReconstructibilityInspector
 
         try
         {
-            return RpcPayloadConstructorReconstructibility.GetUnsupportedReason(named, role) ??
-                   InspectDtoMembers(named, role, ct, visitedOriginalDefinitions) ??
+            // DTO construction belongs to the configured ISerializer. Only inspect the graph for
+            // RPC-specific payload restrictions and explicit union metadata here; setter and
+            // constructor requirements vary between serializers.
+            return InspectDtoMembers(named, role, ct, visitedOriginalDefinitions) ??
                    InspectBaseType(named, role, ct, visitedOriginalDefinitions);
         }
         finally
