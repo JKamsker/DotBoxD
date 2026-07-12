@@ -59,6 +59,7 @@ namespace Snap.RefOut
                 case "GoodAsync":
                 {
                     var arg = serializer.Deserialize<int>(payload);
+                    ct.ThrowIfCancellationRequested();
                     var __dotboxd_task = receiver.GoodAsync(arg);
                     var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result

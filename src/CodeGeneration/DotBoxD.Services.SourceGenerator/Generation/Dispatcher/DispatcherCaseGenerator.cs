@@ -77,6 +77,8 @@ internal static class DispatcherCaseGenerator
             AppendTupleArgumentReader(sb, requestParameters, ct);
         }
 
+        AppendCancellationCheckpoint(sb);
+
         var locals = new GeneratedLocalNames(method.Parameters, ct);
         var argumentExpressions = BuildArgumentExpressions(
             sb,

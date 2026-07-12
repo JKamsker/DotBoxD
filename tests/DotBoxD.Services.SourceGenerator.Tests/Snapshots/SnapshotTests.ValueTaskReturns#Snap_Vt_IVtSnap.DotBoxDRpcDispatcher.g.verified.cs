@@ -59,6 +59,7 @@ namespace Snap.Vt
                 case "AddAsync":
                 {
                     var args = serializer.Deserialize<(int, int)>(payload);
+                    ct.ThrowIfCancellationRequested();
                     var __dotboxd_task = receiver.AddAsync(args.Item1, args.Item2);
                     var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result
@@ -73,6 +74,7 @@ namespace Snap.Vt
                     {
                         throw new global::DotBoxD.Services.Exceptions.ServiceProtocolException("Request payload is not allowed for a parameterless RPC method.");
                     }
+                    ct.ThrowIfCancellationRequested();
                     var __dotboxd_task = receiver.PingAsync();
                     if (!__dotboxd_task.IsCompletedSuccessfully)
                     {

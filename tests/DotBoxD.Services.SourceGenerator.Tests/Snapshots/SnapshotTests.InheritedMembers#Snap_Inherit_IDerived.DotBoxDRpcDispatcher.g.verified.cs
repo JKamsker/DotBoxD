@@ -62,6 +62,7 @@ namespace Snap.Inherit
                     {
                         throw new global::DotBoxD.Services.Exceptions.ServiceProtocolException("Request payload is not allowed for a parameterless RPC method.");
                     }
+                    ct.ThrowIfCancellationRequested();
                     var __dotboxd_task = receiver.DerivedAsync();
                     var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result
@@ -73,6 +74,7 @@ namespace Snap.Inherit
                 case "BaseAsync":
                 {
                     var arg = serializer.Deserialize<int>(payload);
+                    ct.ThrowIfCancellationRequested();
                     var __dotboxd_task = receiver.BaseAsync(arg);
                     var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result

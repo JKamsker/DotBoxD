@@ -62,6 +62,7 @@ namespace Snap.Mixed
                     {
                         throw new global::DotBoxD.Services.Exceptions.ServiceProtocolException("Request payload is not allowed for a parameterless RPC method.");
                     }
+                    ct.ThrowIfCancellationRequested();
                     var __dotboxd_task = receiver.GetNameAsync();
                     var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result
@@ -73,6 +74,7 @@ namespace Snap.Mixed
                 case "SaveAsync":
                 {
                     var arg = serializer.Deserialize<string>(payload);
+                    ct.ThrowIfCancellationRequested();
                     var __dotboxd_task = receiver.SaveAsync(arg);
                     if (!__dotboxd_task.IsCompletedSuccessfully)
                     {
@@ -83,6 +85,7 @@ namespace Snap.Mixed
                 case "SyncAdd":
                 {
                     var args = serializer.Deserialize<(int, int)>(payload);
+                    ct.ThrowIfCancellationRequested();
                     var result = receiver.SyncAdd(args.Item1, args.Item2);
                     ct.ThrowIfCancellationRequested();
                     serializer.Serialize(output, result);
@@ -94,6 +97,7 @@ namespace Snap.Mixed
                     {
                         throw new global::DotBoxD.Services.Exceptions.ServiceProtocolException("Request payload is not allowed for a parameterless RPC method.");
                     }
+                    ct.ThrowIfCancellationRequested();
                     receiver.SyncPing();
                     return;
                 }
