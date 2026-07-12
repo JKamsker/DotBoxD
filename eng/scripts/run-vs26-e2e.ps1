@@ -307,27 +307,27 @@ while ($breakpoints.Count -gt 0) { $breakpoints.Item(1).Delete() }
 $dte.ExecuteCommand('Debug.Start')
 '@ 'Visual Studio debugger startup' | Out-Null
     Wait-ForKernelAttach
-    Invoke-Dte @'
+    Invoke-DteWhenReady @'
 while ($dte.Debugger.Breakpoints.Count -gt 0) { $dte.Debugger.Breakpoints.Item(1).Delete() }
 $null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_MANAGED_PROGRAM, 36)
-'@ | Out-Null
+'@ 'Visual Studio managed breakpoint setup' | Out-Null
     Set-Content $continuousStartGate 'ready'
     $managedStop = Wait-ForManagedStop
-    Invoke-Dte @'
+    Invoke-DteWhenReady @'
 while ($dte.Debugger.Breakpoints.Count -gt 0) { $dte.Debugger.Breakpoints.Item(1).Delete() }
 $null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_GUARDIAN, 35)
 $null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_GUARDIAN, 44)
 $dte.Debugger.Go($false)
-'@ | Out-Null
+'@ 'Visual Studio kernel breakpoint setup' | Out-Null
 
     $predicate1 = Wait-ForStop 35
-    Invoke-Dte '$dte.Debugger.StepOver($false)' | Out-Null
+    Invoke-DteWhenReady '$dte.Debugger.StepOver($false)' 'Visual Studio Step Over' | Out-Null
     $step = Wait-ForNextKernelStop
-    Invoke-Dte '$dte.Debugger.Go($false)' | Out-Null
+    Invoke-DteWhenReady '$dte.Debugger.Go($false)' 'Visual Studio Continue' | Out-Null
     $handle1 = Wait-ForStop 44
-    Invoke-Dte '$dte.Debugger.Go($false)' | Out-Null
+    Invoke-DteWhenReady '$dte.Debugger.Go($false)' 'Visual Studio Continue' | Out-Null
     $predicate2 = Wait-ForStop 35
-    Invoke-Dte '$dte.Debugger.Go($false)' | Out-Null
+    Invoke-DteWhenReady '$dte.Debugger.Go($false)' 'Visual Studio Continue' | Out-Null
     $handle2 = Wait-ForStop 44
 
     if ($predicate1.Function -eq $handle1.Function -or $predicate2.Function -eq $handle2.Function) {
