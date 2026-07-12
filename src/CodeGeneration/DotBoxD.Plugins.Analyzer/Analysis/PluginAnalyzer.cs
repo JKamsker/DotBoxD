@@ -48,6 +48,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             var helperGraph = new ForbiddenHelperCallGraph();
             startContext.RegisterOperationAction(c => AnalyzeInvocation(c, helperGraph), OperationKind.Invocation);
             startContext.RegisterOperationAction(c => AnalyzeObjectCreation(c, helperGraph), OperationKind.ObjectCreation);
+            startContext.RegisterOperationAction(c => AnalyzeWithExpression(c, helperGraph), OperationKind.With);
             startContext.RegisterOperationAction(c => AnalyzePropertyReference(c, helperGraph), OperationKind.PropertyReference);
             startContext.RegisterOperationAction(c => AnalyzeFieldReference(c, helperGraph), OperationKind.FieldReference);
             startContext.RegisterOperationAction(c => AnalyzeTypeOf(c, helperGraph), OperationKind.TypeOf);
