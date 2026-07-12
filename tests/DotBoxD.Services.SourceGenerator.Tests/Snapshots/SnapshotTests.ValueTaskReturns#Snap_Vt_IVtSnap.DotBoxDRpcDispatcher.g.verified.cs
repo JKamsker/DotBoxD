@@ -77,9 +77,11 @@ namespace Snap.Vt
                     if (!__dotboxd_task.IsCompletedSuccessfully)
                     {
                         await __dotboxd_task;
+                        ct.ThrowIfCancellationRequested();
                         return;
                     }
                     __dotboxd_task.GetAwaiter().GetResult();
+                    ct.ThrowIfCancellationRequested();
                     return;
                 }
                 default:
