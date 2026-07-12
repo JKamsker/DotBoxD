@@ -26,7 +26,49 @@ internal sealed class DynamicHelperCallResolver
     {
         if (caller is IMethodSymbol or IFieldSymbol or IPropertySymbol)
         {
-            _calls.Add(new DynamicHelperCall(caller, receiver, memberName, argumentCount, location));
+            _calls.Add(new DynamicHelperCall(
+                caller,
+                receiver,
+                DynamicHelperCallKind.Invocation,
+                memberName,
+                argumentCount,
+                location));
+        }
+    }
+
+    public void RecordPropertyReference(
+        ISymbol? caller,
+        ILocalSymbol receiver,
+        string memberName,
+        Location location)
+    {
+        if (caller is IMethodSymbol or IFieldSymbol or IPropertySymbol)
+        {
+            _calls.Add(new DynamicHelperCall(
+                caller,
+                receiver,
+                DynamicHelperCallKind.PropertyReference,
+                memberName,
+                ArgumentCount: 0,
+                location));
+        }
+    }
+
+    public void RecordIndexerAccess(
+        ISymbol? caller,
+        ILocalSymbol receiver,
+        int argumentCount,
+        Location location)
+    {
+        if (caller is IMethodSymbol or IFieldSymbol or IPropertySymbol)
+        {
+            _calls.Add(new DynamicHelperCall(
+                caller,
+                receiver,
+                DynamicHelperCallKind.IndexerAccess,
+                MemberName: string.Empty,
+                argumentCount,
+                location));
         }
     }
 
@@ -41,10 +83,7 @@ internal sealed class DynamicHelperCallResolver
                 continue;
             }
 
-            foreach (var target in PluginAnalyzer.DynamicInvocationCandidates(
-                         receiverType,
-                         call.MemberName,
-                         call.ArgumentCount))
+            foreach (var target in DynamicTargets(receiverType, call))
             {
                 if (call.Caller is IMethodSymbol method)
                 {
@@ -58,10 +97,34 @@ internal sealed class DynamicHelperCallResolver
         }
     }
 
+    private static IEnumerable<IMethodSymbol> DynamicTargets(ITypeSymbol receiverType, DynamicHelperCall call)
+        => call.Kind switch
+        {
+            DynamicHelperCallKind.Invocation => PluginAnalyzer.DynamicInvocationCandidates(
+                receiverType,
+                call.MemberName,
+                call.ArgumentCount),
+            DynamicHelperCallKind.PropertyReference => PluginAnalyzer.DynamicPropertyGetterCandidates(
+                receiverType,
+                call.MemberName),
+            DynamicHelperCallKind.IndexerAccess => PluginAnalyzer.DynamicIndexerGetterCandidates(
+                receiverType,
+                call.ArgumentCount),
+            _ => []
+        };
+
     private readonly record struct DynamicHelperCall(
         ISymbol Caller,
         ILocalSymbol Receiver,
+        DynamicHelperCallKind Kind,
         string MemberName,
         int ArgumentCount,
         Location Location);
+
+    private enum DynamicHelperCallKind
+    {
+        Invocation,
+        PropertyReference,
+        IndexerAccess
+    }
 }

@@ -49,6 +49,12 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             startContext.RegisterSymbolAction(c => AnalyzeMethod(c, helperGraph), SymbolKind.Method);
             startContext.RegisterOperationAction(c => AnalyzeInvocation(c, helperGraph), OperationKind.Invocation);
             startContext.RegisterOperationAction(c => AnalyzeDynamicInvocation(c, helperGraph), OperationKind.DynamicInvocation);
+            startContext.RegisterOperationAction(
+                c => AnalyzeDynamicMemberReference(c, helperGraph),
+                OperationKind.DynamicMemberReference);
+            startContext.RegisterOperationAction(
+                c => AnalyzeDynamicIndexerAccess(c, helperGraph),
+                OperationKind.DynamicIndexerAccess);
             startContext.RegisterOperationAction(c => AnalyzeObjectCreation(c, helperGraph), OperationKind.ObjectCreation);
             startContext.RegisterOperationAction(c => AnalyzeWithExpression(c, helperGraph), OperationKind.With);
             startContext.RegisterOperationAction(c => AnalyzePropertyReference(c, helperGraph), OperationKind.PropertyReference);
