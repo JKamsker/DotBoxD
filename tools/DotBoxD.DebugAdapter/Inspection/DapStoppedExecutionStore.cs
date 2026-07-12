@@ -7,6 +7,7 @@ internal sealed class DapStoppedExecutionStore
     private readonly Dictionary<int, string> _threadPlugins = [];
     private readonly Dictionary<string, int> _threadIds = new(StringComparer.Ordinal);
     private readonly Dictionary<int, string> _frames = [];
+    private readonly Dictionary<int, DapFrameContext> _frameContexts = [];
     private readonly Dictionary<int, int> _frameThreads = [];
     private int _nextThreadId;
     private int _nextFrameId;
@@ -49,12 +50,18 @@ internal sealed class DapStoppedExecutionStore
         }
     }
 
-    public int AddFrame(int threadId, string remoteFrameId)
+    public int AddFrame(
+        int threadId,
+        string remoteFrameId,
+        string pluginId,
+        string functionId,
+        IReadOnlyList<DapSourceVariableBinding> bindings)
     {
         lock (_gate)
         {
             var frameId = ++_nextFrameId;
             _frames[frameId] = remoteFrameId;
+            _frameContexts[frameId] = new DapFrameContext(remoteFrameId, pluginId, functionId, bindings);
             _frameThreads[frameId] = threadId;
             return frameId;
         }
@@ -67,6 +74,43 @@ internal sealed class DapStoppedExecutionStore
             return _frames.TryGetValue(frameId, out var frame)
                 ? frame
                 : throw new DebugAdapterException("staleFrame", "The selected stack frame is no longer stopped.");
+        }
+    }
+
+    public DapFrameContext FrameContext(int frameId)
+    {
+        lock (_gate)
+        {
+            return _frameContexts.TryGetValue(frameId, out var context)
+                ? context
+                : throw new DebugAdapterException("staleFrame", "The selected stack frame is no longer stopped.");
+        }
+    }
+
+    public int DapFrameId(string remoteFrameId)
+    {
+        lock (_gate)
+        {
+            foreach (var frame in _frames)
+            {
+                if (string.Equals(frame.Value, remoteFrameId, StringComparison.Ordinal))
+                {
+                    return frame.Key;
+                }
+            }
+
+            throw new DebugAdapterException("staleFrame", "The selected stack frame is no longer stopped.");
+        }
+    }
+
+    public IReadOnlyList<DapFrameContext> FrameContexts(int threadId)
+    {
+        lock (_gate)
+        {
+            return _frameThreads
+                .Where(frame => frame.Value == threadId)
+                .Select(frame => _frameContexts[frame.Key])
+                .ToArray();
         }
     }
 
@@ -88,6 +132,7 @@ internal sealed class DapStoppedExecutionStore
             foreach (var frameId in frameIds)
             {
                 _frames.Remove(frameId);
+                _frameContexts.Remove(frameId);
                 _frameThreads.Remove(frameId);
             }
 
@@ -103,7 +148,14 @@ internal sealed class DapStoppedExecutionStore
             _threadPlugins.Clear();
             _threadIds.Clear();
             _frames.Clear();
+            _frameContexts.Clear();
             _frameThreads.Clear();
         }
     }
 }
+
+internal sealed record DapFrameContext(
+    string RemoteFrameId,
+    string PluginId,
+    string FunctionId,
+    IReadOnlyList<DapSourceVariableBinding> Bindings);

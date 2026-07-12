@@ -11,6 +11,7 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
     private DapBreakpointHandler? _breakpoints;
     private string? _pluginId;
     private bool _finished;
+    private readonly DapInspectionDispatcher _inspectionDispatcher = new();
     public async Task RunAsync(CancellationToken cancellationToken)
     {
         while (!_finished && !cancellationToken.IsCancellationRequested)
@@ -18,11 +19,19 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
             using var request = await connection.ReadAsync(cancellationToken).ConfigureAwait(false);
             if (request is null)
             {
-                return;
+                break;
+            }
+
+            if (_inspection?.Handles(request.RootElement.GetProperty("command").GetString()!) == true)
+            {
+                _inspectionDispatcher.Dispatch(request.RootElement, cancellationToken, HandleSafelyAsync);
+                continue;
             }
 
             await HandleSafelyAsync(request.RootElement, cancellationToken).ConfigureAwait(false);
         }
+
+        await _inspectionDispatcher.CompleteAsync().ConfigureAwait(false);
     }
 
     public async ValueTask DisposeAsync()
@@ -39,7 +48,6 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
         try
         {
             await HandleAsync(request, cancellationToken).ConfigureAwait(false);
-            AdapterDiagnostics.Write("completed " + request.GetProperty("command").GetString());
         }
         catch (DebugAdapterException exception)
         {
@@ -57,6 +65,10 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
             AdapterDiagnostics.Write("unhandled error " + exception);
             await connection.RespondAsync(request, false, null, exception.Message, cancellationToken)
                 .ConfigureAwait(false);
+        }
+        finally
+        {
+            AdapterDiagnostics.Write("completed " + request.GetProperty("command").GetString());
         }
     }
 
@@ -279,22 +291,5 @@ internal sealed class DapSession(DapConnection connection) : IAsyncDisposable
         {
             throw new DebugAdapterException("bridgeError", response.GetProperty("error").GetString()!);
         }
-    }
-}
-
-internal static class Program
-{
-    public static async Task<int> Main(string[] args)
-    {
-        var diagnosticArgument = Array.IndexOf(args, "--diagnostic-log");
-        if (diagnosticArgument >= 0 && diagnosticArgument + 1 < args.Length)
-        {
-            AdapterDiagnostics.Configure(args[diagnosticArgument + 1]);
-        }
-
-        var connection = new DapConnection(System.Console.OpenStandardInput(), System.Console.OpenStandardOutput());
-        await using var session = new DapSession(connection);
-        await session.RunAsync(CancellationToken.None).ConfigureAwait(false);
-        return 0;
     }
 }

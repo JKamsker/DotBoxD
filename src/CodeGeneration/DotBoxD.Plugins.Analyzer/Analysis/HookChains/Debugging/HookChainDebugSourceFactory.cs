@@ -15,16 +15,18 @@ internal static class HookChainDebugSourceFactory
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        SyntaxNode shouldHandle = FirstFilter(stages) ?? (SyntaxNode)invocation;
+        var shouldHandle = FirstFilter(stages);
         SyntaxNode handle = HandleSource(stages, terminalLambda, isLocalCallback) ?? (SyntaxNode)invocation;
         return kernel with
         {
-            ShouldHandleSource = KernelSourceLocationModel.CreateCompositeWithKernelMethods(
-                kernel.PluginId + ":ShouldHandle",
-                shouldHandle,
-                stages.Where(stage => !stage.IsSelect).Select(stage => (SyntaxNode)stage.Lambda),
-                semanticModel,
-                cancellationToken),
+            ShouldHandleSource = shouldHandle is null
+                ? null
+                : KernelSourceLocationModel.CreateCompositeWithKernelMethods(
+                    kernel.PluginId + ":ShouldHandle",
+                    shouldHandle,
+                    stages.Where(stage => !stage.IsSelect).Select(stage => (SyntaxNode)stage.Lambda),
+                    semanticModel,
+                    cancellationToken),
             HandleSource = KernelSourceLocationModel.CreateCompositeWithKernelMethods(
                 kernel.PluginId + ":Handle",
                 handle,

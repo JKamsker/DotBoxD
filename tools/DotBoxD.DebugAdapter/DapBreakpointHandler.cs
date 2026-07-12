@@ -90,6 +90,16 @@ internal sealed class DapBreakpointHandler(
         EnsureBridgeSuccess(resolvedResponse);
         var resolved = Property(resolvedResponse.GetProperty("body"), "Breakpoints", "breakpoints")
             .EnumerateArray().Select(item => item.Clone()).ToArray();
+        foreach (var breakpoint in resolved)
+        {
+            var line = Property(breakpoint, "Line", "line").GetInt32();
+            var verified = Property(breakpoint, "Verified", "verified").GetBoolean();
+            var message = OptionalPropertyString(breakpoint, "Message", "message");
+            Diagnostics.AdapterDiagnostics.Write(
+                $"breakpoint {path} line {line} verified {verified}" +
+                (message is null ? string.Empty : ": " + message));
+        }
+
         _sourceBindings[path] = BuildBindings(requested, resolved);
         return resolved;
     }

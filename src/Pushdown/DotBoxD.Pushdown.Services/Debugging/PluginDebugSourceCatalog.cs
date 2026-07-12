@@ -75,7 +75,13 @@ internal sealed class PluginDebugSourceCatalog(Func<string, byte[]?> sourceReade
                 point.Span.Column,
                 point.Span.EndLine,
                 point.Span.EndColumn,
-                document.IsVirtual);
+                document.IsVirtual,
+                package.VariableBindings
+                    .Where(binding => string.Equals(
+                        binding.FunctionId,
+                        package.Functions.GetValueOrDefault(point.NodeId),
+                        StringComparison.Ordinal))
+                    .ToArray());
     }
 
     private bool MatchesChecksum(SourceDocument document)
@@ -96,8 +102,7 @@ internal sealed class PluginDebugSourceCatalog(Func<string, byte[]?> sourceReade
         IReadOnlyList<PackageSources> packages,
         string normalizedPath)
     {
-        var bindings = new List<ResolvedNodeBinding>();
-        var columns = new List<int>();
+        var candidates = new List<(ResolvedNodeBinding Binding, int Line, int Column)>();
         var hadStaleDocument = false;
         foreach (var package in packages)
         {
@@ -118,20 +123,30 @@ internal sealed class PluginDebugSourceCatalog(Func<string, byte[]?> sourceReade
                 var points = package.Points
                     .Where(point => string.Equals(point.Span.DocumentId, document.Id, StringComparison.Ordinal))
                     .Where(point => point.Span.SequencePointKind != SourceSequencePointKind.Hidden)
-                    .Where(point => point.Span.Line == line)
+                    .Where(point => point.Span.Line == line || point.Span.Line == line + 1)
                     .GroupBy(point => package.Functions.GetValueOrDefault(point.NodeId, point.NodeId.Value), StringComparer.Ordinal)
                     .Select(group => group.First());
                 foreach (var point in points)
                 {
-                    bindings.Add(new ResolvedNodeBinding(package.PluginId, point.NodeId.Value));
-                    columns.Add(point.Span.Column);
+                    candidates.Add((
+                        new ResolvedNodeBinding(package.PluginId, point.NodeId.Value),
+                        point.Span.Line,
+                        point.Span.Column));
                 }
             }
         }
 
-        var distinct = bindings.Distinct().ToArray();
+        var resolvedLine = candidates.Count == 0 ? line : candidates.Min(candidate => candidate.Line);
+        var selected = candidates.Where(candidate => candidate.Line == resolvedLine).ToArray();
+        var distinct = selected.Select(candidate => candidate.Binding).Distinct().ToArray();
         return distinct.Length > 0
-            ? new ResolvedBreakpoint(line, columns.Min(), distinct[0].NodeId, Verified: true, null, distinct)
+            ? new ResolvedBreakpoint(
+                resolvedLine,
+                selected.Min(candidate => candidate.Column),
+                distinct[0].NodeId,
+                Verified: true,
+                null,
+                distinct)
             : hadStaleDocument
                 ? new ResolvedBreakpoint(line, 0, null, Verified: false, "Source checksum differs from the built plugin package.", [])
                 : Unmapped(line);
@@ -144,7 +159,14 @@ internal sealed class PluginDebugSourceCatalog(Func<string, byte[]?> sourceReade
     {
         var documents = info.Documents.Select(document => new SourceDocument(document, IsVirtual: false)).ToArray();
         var functions = SandboxNodeMap.Create(package.Module).Nodes.ToDictionary(node => node.Id, node => node.FunctionId);
-        return new PackageSources(package.Manifest.PluginId, documents, info.SequencePoints, functions, null, null);
+        return new PackageSources(
+            package.Manifest.PluginId,
+            documents,
+            info.SequencePoints,
+            functions,
+            info.VariableBindings,
+            null,
+            null);
     }
 
     private static PackageSources VirtualSources(PluginPackage package)
@@ -171,6 +193,7 @@ internal sealed class PluginDebugSourceCatalog(Func<string, byte[]?> sourceReade
             [new SourceDocument(document, IsVirtual: true)],
             points,
             nodes.ToDictionary(node => node.Id, node => node.FunctionId),
+            [],
             path,
             source);
     }
@@ -205,6 +228,7 @@ internal sealed class PluginDebugSourceCatalog(Func<string, byte[]?> sourceReade
         IReadOnlyList<SourceDocument> Documents,
         IReadOnlyList<KernelSequencePoint> Points,
         IReadOnlyDictionary<SandboxNodeId, string> Functions,
+        IReadOnlyList<KernelDebugVariableBinding> VariableBindings,
         string? VirtualPath,
         string? VirtualSource);
 }
@@ -230,4 +254,5 @@ internal sealed record SourceLocation(
     int Column,
     int? EndLine,
     int? EndColumn,
-    bool IsVirtual);
+    bool IsVirtual,
+    IReadOnlyList<KernelDebugVariableBinding> VariableBindings);

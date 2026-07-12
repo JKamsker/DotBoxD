@@ -32,6 +32,18 @@ internal static class DapInspectionJson
            context.ValueKind == JsonValueKind.String &&
            string.Equals(context.GetString(), "repl", StringComparison.Ordinal);
 
+    public static string CompletionPrefix(string text, int column)
+    {
+        var end = Math.Clamp(column - 1, 0, text.Length);
+        var start = end;
+        while (start > 0 && (char.IsLetterOrDigit(text[start - 1]) || text[start - 1] is '_' or '.'))
+        {
+            start--;
+        }
+
+        return text[start..end];
+    }
+
     public static void EnsureBridgeSuccess(JsonElement response)
     {
         if (!response.GetProperty("success").GetBoolean())

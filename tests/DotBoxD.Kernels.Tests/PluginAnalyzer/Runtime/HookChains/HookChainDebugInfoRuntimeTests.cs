@@ -59,6 +59,20 @@ public sealed class HookChainDebugInfoRuntimeTests
         }
         """;
 
+    private const string WholeEventRunSource = """
+        using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
+
+        namespace ChainSample;
+
+        public static class Usage
+        {
+            public static void Configure(HookRegistry hooks)
+                => hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent>()
+                    .Run((e, ctx) => ctx.Messages.Send(e.MonsterId, "observe:inline"));
+        }
+        """;
+
     [Fact]
     public void Send_chain_maps_filter_and_terminal_into_both_execution_functions()
     {
@@ -85,6 +99,23 @@ public sealed class HookChainDebugInfoRuntimeTests
         Assert.Contains(bindings, binding => binding.FunctionId == "Handle" && binding.SourceName == "monsterId");
         Assert.Contains(bindings, binding => binding.FunctionId == "Handle" && binding.SourceName == "ctx.Messages");
         Assert.DoesNotContain(bindings, binding => binding.SourceName.StartsWith("monsterId.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Whole_event_run_maps_expandable_event_and_context_parameters()
+    {
+        var package = PackageFrom(Compile(WholeEventRunSource, enableInterceptors: true));
+        var debugInfo = Assert.IsType<KernelDebugInfo>(package.DebugInfo);
+        var bindings = debugInfo.VariableBindings;
+        var nodes = SandboxNodeMap.Create(package.Module).Nodes.ToDictionary(node => node.Id);
+
+        Assert.All(debugInfo.SequencePoints, point => Assert.Equal("Handle", nodes[point.NodeId].FunctionId));
+        Assert.Contains(bindings, binding => binding.FunctionId == "Handle" && binding.SourceName == "e.MonsterId");
+        Assert.Contains(bindings, binding => binding.FunctionId == "Handle" && binding.SourceName == "e.Distance");
+        Assert.Contains(bindings, binding => binding.FunctionId == "Handle" && binding.SourceName == "ctx");
+        Assert.Contains(bindings, binding => binding.FunctionId == "Handle" && binding.SourceName == "ctx.Messages");
+        Assert.Contains(bindings, binding =>
+            binding.FunctionId == "Handle" && binding.SourceName == "ctx.CancellationToken");
     }
 
     private static void AssertMapped(PluginPackage package, string source, params string[] variableNames)

@@ -118,6 +118,9 @@ internal static class Program
             .Select(e => e.MonsterId)
             .Run((monsterId, ctx) => ctx.Messages.Send(monsterId, "calm:inline"));
 
+        server.Hooks.On<MonsterAggroEvent>().Run(
+            (e, ctx) => ctx.Messages.Send(e.MonsterId, "observe:inline"));
+
         server.Subscriptions.On<AttackEvent>()
             .Where(e => e.Damage >= 5)
             .Select(e => e.AttackerId)

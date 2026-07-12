@@ -14,6 +14,7 @@ internal sealed class DapInspectionHandler(
     private readonly DapVariableStore _variableStore = new();
     private readonly DapStackTraceLoader _stackTraces = new(bridge);
     private readonly DapResumeStopBuffer _resumeStops = new();
+    private readonly DapVariableSnapshotStore _variableSnapshots = new();
 
     public bool Handles(string command) => command is
         "threads" or "stackTrace" or "scopes" or "variables" or "evaluate" or
@@ -32,7 +33,8 @@ internal sealed class DapInspectionHandler(
             "setVariable" => await SetVariableAsync(request, cancellationToken).ConfigureAwait(false),
             "setExpression" => await SetExpressionAsync(request, cancellationToken).ConfigureAwait(false),
             "completions" => await CompletionsAsync(request, cancellationToken).ConfigureAwait(false),
-            "source" => await SourceAsync(request, cancellationToken).ConfigureAwait(false),
+            "source" => await DapSourceLoader.LoadAsync(bridge, pluginId, request, cancellationToken)
+                .ConfigureAwait(false),
             _ => throw new DebugAdapterException("unsupported", $"Unsupported inspection command '{command}'.")
         };
         await connection.RespondAsync(request, success: true, body, message: null, cancellationToken)
@@ -82,7 +84,9 @@ internal sealed class DapInspectionHandler(
     public void InvalidateStoppedState(int threadId, bool preserveThreadIdentity = false)
     {
         _stackTraces.Invalidate(threadId);
-        _variableStore.RemoveFrames(_stopped.RemoveThread(threadId, preserveThreadIdentity));
+        var frames = _stopped.RemoveThread(threadId, preserveThreadIdentity);
+        _variableStore.RemoveFrames(frames);
+        _variableSnapshots.Remove(frames);
     }
 
     public void InvalidateAllStoppedState()
@@ -90,6 +94,7 @@ internal sealed class DapInspectionHandler(
         _stackTraces.Clear();
         _stopped.Clear();
         _variableStore.Clear();
+        _variableSnapshots.Clear();
     }
 
     private async ValueTask<object> ThreadsAsync(CancellationToken cancellationToken)
@@ -134,12 +139,14 @@ internal sealed class DapInspectionHandler(
             return new { variables = _variableStore.Expand(handle) };
         }
 
-        var body = await bridge.RemoteAsync(
-                PluginDebugCommands.Variables,
-                new { frameId = handle.FrameId },
-                cancellationToken)
-            .ConfigureAwait(false);
-        var variables = _variableStore.ScopeVariables(body.GetProperty(handle.Scope), handle);
+        var context = FrameContext(handle.FrameId);
+        var body = await _variableSnapshots.GetAsync(bridge, context, cancellationToken).ConfigureAwait(false);
+        var bindings = context.Bindings;
+        var projected = DapSourceVariableProjector.Map(
+            body.GetProperty(handle.Scope),
+            bindings,
+            includeSynthetic: handle.Scope == "arguments");
+        var variables = _variableStore.ScopeVariables(projected, handle);
         return new { variables };
     }
 
@@ -147,41 +154,49 @@ internal sealed class DapInspectionHandler(
     {
         var arguments = Arguments(request);
         var expression = arguments.GetProperty("expression").GetString()!;
-        var frameId = Frame(arguments.GetProperty("frameId").GetInt32());
+        var context = FrameContext(arguments.GetProperty("frameId").GetInt32());
+        var bindings = context.Bindings;
+        var variables = await _variableSnapshots.GetAsync(bridge, context, cancellationToken).ConfigureAwait(false);
+        if (DapSourceVariableProjector.TryEvaluate(
+                variables.GetProperty("arguments"),
+                variables.GetProperty("locals"),
+                bindings,
+                expression,
+                out var sourceValue))
+        {
+            return new
+            {
+                result = DapVariableStore.Display(sourceValue),
+                type = sourceValue.GetProperty("type").GetString(),
+                variablesReference = _variableStore.ValueReference(sourceValue, context.RemoteFrameId)
+            };
+        }
+
         var body = await bridge.RemoteAsync(
                 PluginDebugCommands.Evaluate,
-                new { frameId, expression, allowAwait = IsDebugConsole(arguments) },
+                new
+                {
+                    frameId = context.RemoteFrameId,
+                    expression = DapSourceVariableProjector.Translate(expression, bindings),
+                    allowAwait = IsDebugConsole(arguments)
+                },
                 cancellationToken)
             .ConfigureAwait(false);
         var value = body.GetProperty("value");
-        return new { result = DapVariableStore.Display(value), type = value.GetProperty("type").GetString(), variablesReference = _variableStore.ValueReference(value, frameId) };
+        return new { result = DapVariableStore.Display(value), type = value.GetProperty("type").GetString(), variablesReference = _variableStore.ValueReference(value, context.RemoteFrameId) };
     }
 
     private async ValueTask<object> CompletionsAsync(JsonElement request, CancellationToken cancellationToken)
     {
         var arguments = Arguments(request);
-        var frameId = Frame(arguments.GetProperty("frameId").GetInt32());
-        var body = await bridge.RemoteAsync(
-                PluginDebugCommands.Completions,
-                new { frameId },
-                cancellationToken)
-            .ConfigureAwait(false);
-        var prefix = CompletionPrefix(
-            arguments.GetProperty("text").GetString()!,
-            arguments.GetProperty("column").GetInt32());
-        var separator = prefix.LastIndexOf('.');
-        var parent = separator < 0 ? string.Empty : prefix[..(separator + 1)];
-        var typed = separator < 0 ? prefix : prefix[(separator + 1)..];
-        var targets = body.GetProperty("paths").EnumerateArray()
-            .Select(path => path.GetString()!)
-            .Where(path => path.StartsWith(parent, StringComparison.Ordinal))
-            .Select(path => path[parent.Length..])
-            .Where(path => !path.Contains('.') && path.StartsWith(typed, StringComparison.Ordinal))
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(path => path, StringComparer.Ordinal)
-            .Select(path => new { label = path, type = parent.Length == 0 ? "variable" : "property" })
-            .ToArray();
-        return new { targets };
+        var context = FrameContext(arguments.GetProperty("frameId").GetInt32());
+        return new
+        {
+            targets = DapCompletionBuilder.Build(
+                context.Bindings,
+                arguments.GetProperty("text").GetString()!,
+                arguments.GetProperty("column").GetInt32())
+        };
     }
 
     private ValueTask<object> SetVariableAsync(JsonElement request, CancellationToken cancellationToken)
@@ -218,24 +233,20 @@ internal sealed class DapInspectionHandler(
     {
         var body = await bridge.RemoteAsync(
                 PluginDebugCommands.SetExpression,
-                new { frameId, expression, valueExpression = value, path },
+                new
+                {
+                    frameId,
+                    expression = DapSourceVariableProjector.Translate(
+                        expression,
+                        FrameContext(frameId).Bindings),
+                    valueExpression = value,
+                    path
+                },
                 cancellationToken)
             .ConfigureAwait(false);
         var result = body.GetProperty("value");
+        _variableSnapshots.Remove(frameId);
         return new { value = DapVariableStore.Display(result), type = result.GetProperty("type").GetString(), variablesReference = _variableStore.ValueReference(result, frameId) };
-    }
-
-    private async ValueTask<object> SourceAsync(JsonElement request, CancellationToken cancellationToken)
-    {
-        var source = Arguments(request).GetProperty("source");
-        var path = source.GetProperty("path").GetString()!;
-        var response = await bridge.SendAsync(
-                "source",
-                new Dictionary<string, object?> { ["pluginId"] = pluginId, ["path"] = path },
-                cancellationToken)
-            .ConfigureAwait(false);
-        EnsureBridgeSuccess(response);
-        return new { content = response.GetProperty("content").GetString(), mimeType = "text/plain" };
     }
 
     private object DapThread(JsonElement thread)
@@ -251,17 +262,10 @@ internal sealed class DapInspectionHandler(
 
     private string Frame(int frameId) => _stopped.Frame(frameId);
 
-    private static string CompletionPrefix(string text, int column)
-    {
-        var end = Math.Clamp(column - 1, 0, text.Length);
-        var start = end;
-        while (start > 0 && (char.IsLetterOrDigit(text[start - 1]) || text[start - 1] is '_' or '.'))
-        {
-            start--;
-        }
+    private DapFrameContext FrameContext(int frameId) => _stopped.FrameContext(frameId);
 
-        return text[start..end];
-    }
+    private DapFrameContext FrameContext(string remoteFrameId)
+        => _stopped.FrameContext(_stopped.DapFrameId(remoteFrameId));
 
     private async ValueTask EmitStoppedAsync(DapPendingStop stop)
     {
@@ -275,6 +279,10 @@ internal sealed class DapInspectionHandler(
                     _stopped,
                     CancellationToken.None)
                 .ConfigureAwait(false);
+            foreach (var frame in _stopped.FrameContexts(threadId))
+            {
+                _ = await _variableSnapshots.GetAsync(bridge, frame, CancellationToken.None).ConfigureAwait(false);
+            }
         }
         catch (Exception exception) when (exception is DebugAdapterException or IOException or InvalidDataException)
         {

@@ -13,6 +13,7 @@ $launcherLog = Join-Path $artifacts 'launcher.log'
 $resultLog = Join-Path $artifacts 'result.txt'
 $continuousStartGate = Join-Path $artifacts 'continuous-start.gate'
 $guardian = Join-Path $root 'samples/GameServer/Examples.GameServer.Plugin/Kernels/GuardianKernel.cs'
+$runtimeHooks = Join-Path $root 'samples/GameServer/Examples.GameServer.Plugin/Program.cs'
 $managedProgram = Join-Path $root 'samples/GameServer/Examples.GameServer.Server/ContinuousSimulation.cs'
 $serverProject = 'samples\GameServer\Examples.GameServer.Server\Examples.GameServer.Server.csproj'
 $pluginProject = 'samples\GameServer\Examples.GameServer.Plugin\Examples.GameServer.Plugin.csproj'
@@ -320,7 +321,8 @@ function Assert-AdapterTranscript {
     })
     $requiredCommands = @(
         'initialize', 'attach', 'setBreakpoints', 'configurationDone',
-        'threads', 'stackTrace', 'next', 'continue', 'disconnect'
+        'threads', 'stackTrace', 'scopes', 'variables', 'evaluate',
+        'next', 'continue', 'disconnect'
     )
     $missing = @($requiredCommands | Where-Object { $_ -notin $requests })
     if ($missing.Count -gt 0) {
@@ -380,7 +382,18 @@ try {
             if (-not (Test-Path $vsixInstaller)) {
                 throw "VSIXInstaller was not found at $vsixInstaller."
             }
-            Invoke-Checked $vsixInstaller @('/quiet', '/force', $resolvedVsix)
+            Invoke-Checked dotnet @('build-server', 'shutdown')
+            Get-Process MSBuild -ErrorAction SilentlyContinue | Where-Object {
+                $_.Path -and $_.Path.StartsWith($installation, [StringComparison]::OrdinalIgnoreCase)
+            } | Stop-Process -Force
+            $installer = Start-Process $vsixInstaller `
+                -ArgumentList @('/quiet', '/force', "`"$resolvedVsix`"") `
+                -WindowStyle Hidden `
+                -Wait `
+                -PassThru
+            if ($installer.ExitCode -ne 0) {
+                throw "VSIXInstaller failed with exit code $($installer.ExitCode)."
+            }
         }
     }
 
@@ -433,6 +446,79 @@ $null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_MANAGED_PROGRAM, 36)
     Set-Content $continuousStartGate 'ready'
     $managedStop = Wait-ForManagedStop
     $companionProcesses = @(Wait-ForCompanionProcesses)
+    $env:DOTBOXD_E2E_RUNTIME_HOOKS = $runtimeHooks
+    Invoke-DteWhenReady @'
+while ($dte.Debugger.Breakpoints.Count -gt 0) { $dte.Debugger.Breakpoints.Item(1).Delete() }
+$null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_RUNTIME_HOOKS, 117)
+$dte.Debugger.Go($false)
+'@ 'Visual Studio runtime-hook breakpoint setup' | Out-Null
+
+    $runtimeHookStop = Wait-ForStop 117
+    $inspectionJson = Invoke-DteWhenReady @'
+$dte.ExecuteCommand('Debug.Autos')
+$dte.ExecuteCommand('Debug.Locals')
+$dte.ExecuteCommand('Debug.Watch1')
+$frame = $dte.Debugger.CurrentStackFrame
+if ($null -eq $frame) { throw 'Visual Studio did not expose the runtime-hook stack frame.' }
+$scopes = @($frame.Locals)
+$locals = @($scopes | ForEach-Object {
+    $scope = $_
+    @($scope.DataMembers) | ForEach-Object {
+    [PSCustomObject]@{ Name = $_.Name; Value = $_.Value; Type = $_.Type }
+    }
+})
+$expression = $dte.Debugger.GetExpression('e.Distance', $true, 5000)
+[PSCustomObject]@{
+    Locals = $locals
+    Scopes = @($scopes.Name)
+    ExpressionName = $expression.Name
+    ExpressionValue = $expression.Value
+    ExpressionType = $expression.Type
+    IsValidExpression = $expression.IsValidValue
+} | ConvertTo-Json -Depth 3 -Compress
+'@ 'Visual Studio kernel variables'
+    $inspection = ($inspectionJson | Where-Object { $_ } | Select-Object -Last 1) | ConvertFrom-Json
+    if (-not $inspection.IsValidExpression -or $inspection.ExpressionValue -notmatch '^\d+$') {
+        throw "Visual Studio did not evaluate e.Distance: $($inspection | ConvertTo-Json -Depth 3 -Compress)."
+    }
+    if ('e' -notin @($inspection.Locals.Name)) {
+        throw "Visual Studio Locals did not expose the authored event parameter: $($inspection | ConvertTo-Json -Depth 3 -Compress)."
+    }
+    Invoke-DteWhenReady @'
+while ($dte.Debugger.Breakpoints.Count -gt 0) { $dte.Debugger.Breakpoints.Item(1).Delete() }
+$null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_RUNTIME_HOOKS, 121)
+$dte.Debugger.Go($false)
+'@ 'Visual Studio runtime-hook Run breakpoint setup' | Out-Null
+
+    $runtimeRunStop = Wait-ForStop 122
+    $runInspectionJson = Invoke-DteWhenReady @'
+$frame = $dte.Debugger.CurrentStackFrame
+if ($null -eq $frame) { throw 'Visual Studio did not expose the runtime-hook Run stack frame.' }
+$roots = @($frame.Locals | ForEach-Object { @($_.DataMembers) })
+$event = $roots | Where-Object Name -EQ 'e' | Select-Object -First 1
+$context = $roots | Where-Object Name -EQ 'ctx' | Select-Object -First 1
+$distance = $dte.Debugger.GetExpression('e.Distance', $true, 5000)
+[PSCustomObject]@{
+    Function = $frame.FunctionName
+    Roots = @($roots.Name)
+    EventMembers = @($event.DataMembers | ForEach-Object Name)
+    ContextMembers = @($context.DataMembers | ForEach-Object Name)
+    DistanceValue = $distance.Value
+    IsValidDistance = $distance.IsValidValue
+} | ConvertTo-Json -Depth 3 -Compress
+'@ 'Visual Studio Run variables'
+    $runInspection = ($runInspectionJson | Where-Object { $_ } | Select-Object -Last 1) | ConvertFrom-Json
+    if ($runInspection.Function -ne 'Handle' -or
+        'e' -notin @($runInspection.Roots) -or
+        'ctx' -notin @($runInspection.Roots) -or
+        'MonsterId' -notin @($runInspection.EventMembers) -or
+        'Distance' -notin @($runInspection.EventMembers) -or
+        'Messages' -notin @($runInspection.ContextMembers) -or
+        'CancellationToken' -notin @($runInspection.ContextMembers) -or
+        -not $runInspection.IsValidDistance -or
+        $runInspection.DistanceValue -notmatch '^\d+$') {
+        throw "Visual Studio did not expose expandable e and ctx values in Run: $($runInspection | ConvertTo-Json -Depth 3 -Compress)."
+    }
     Invoke-DteWhenReady @'
 while ($dte.Debugger.Breakpoints.Count -gt 0) { $dte.Debugger.Breakpoints.Item(1).Delete() }
 $null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_GUARDIAN, 35)
@@ -460,8 +546,8 @@ $dte.Debugger.Go($false)
     Invoke-DteWhenReady '$dte.Debugger.Stop($true)' 'Visual Studio debugger stop' | Out-Null
     Wait-ForCompanionExit @($companionProcesses.ProcessId)
     Assert-AdapterTranscript
-    Set-Content $resultLog "PASS: managed Program.cs:$($managedStop.Line); processes server/plugin/adapter; DTE frames and breakpoints at kernel 35/44; kernel step to $($step.Line); complete error-free adapter lifecycle; clean debugger shutdown."
-    Write-Host "Visual Studio 2026 kernel debugger E2E passed: verified DTE state, adapter lifecycle, stepping, and clean companion shutdown."
+    Set-Content $resultLog "PASS: managed Program.cs:$($managedStop.Line); processes server/plugin/adapter; DTE frames and breakpoints at kernel 35/44 and runtime hook Where/Run $($runtimeHookStop.Line)/$($runtimeRunStop.Line); expandable e/ctx Watch/Locals/Autos inspection; kernel step to $($step.Line); complete error-free adapter lifecycle; clean debugger shutdown."
+    Write-Host "Visual Studio 2026 kernel debugger E2E passed: verified DTE state, variables, adapter lifecycle, stepping, and clean companion shutdown."
 }
 catch {
     Set-Content $resultLog ("FAIL: " + $_.Exception)
@@ -474,5 +560,6 @@ finally {
     Stop-ExamplesAndVisualStudio
     Restore-ProjectDebugProfiles
     Remove-Item Env:DOTBOXD_E2E_CONTINUOUS_START_GATE -ErrorAction SilentlyContinue
+    Remove-Item Env:DOTBOXD_E2E_RUNTIME_HOOKS -ErrorAction SilentlyContinue
     Remove-Item $continuousStartGate -Force -ErrorAction SilentlyContinue
 }

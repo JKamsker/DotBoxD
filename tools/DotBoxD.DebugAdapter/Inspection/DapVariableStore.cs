@@ -1,10 +1,11 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 
 namespace DotBoxD.DebugAdapter;
 
 internal sealed class DapVariableStore
 {
-    private readonly Dictionary<int, DapVariableHandle> _handles = [];
+    private readonly ConcurrentDictionary<int, DapVariableHandle> _handles = [];
     private int _nextReference;
 
     public void Clear() => _handles.Clear();
@@ -17,7 +18,7 @@ internal sealed class DapVariableStore
             .ToArray();
         foreach (var reference in references)
         {
-            _handles.Remove(reference);
+            _handles.TryRemove(reference, out _);
         }
     }
 

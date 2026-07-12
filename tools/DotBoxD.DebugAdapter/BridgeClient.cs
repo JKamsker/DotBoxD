@@ -10,6 +10,7 @@ namespace DotBoxD.DebugAdapter;
 
 internal sealed class BridgeClient : IAsyncDisposable
 {
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(10);
     private readonly NamedPipeClientStream _pipe;
     private readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> _pending = new();
     private readonly SemaphoreSlim _writeGate = new(1, 1);
@@ -115,6 +116,9 @@ internal sealed class BridgeClient : IAsyncDisposable
         IReadOnlyDictionary<string, object?>? arguments,
         CancellationToken cancellationToken)
     {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(RequestTimeout);
+        var requestToken = timeout.Token;
         var id = Interlocked.Increment(ref _requestId).ToString(System.Globalization.CultureInfo.InvariantCulture);
         var request = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
@@ -138,10 +142,14 @@ internal sealed class BridgeClient : IAsyncDisposable
         try
         {
             AdapterDiagnostics.Write($"bridge send {kind} {id}");
-            await WriteAsync(request, cancellationToken).ConfigureAwait(false);
-            var response = await completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            await WriteAsync(request, requestToken).ConfigureAwait(false);
+            var response = await completion.Task.WaitAsync(requestToken).ConfigureAwait(false);
             AdapterDiagnostics.Write($"bridge response {kind} {id}");
             return response;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new DebugAdapterException("bridgeTimeout", "The plugin debug bridge did not respond in time.");
         }
         finally
         {

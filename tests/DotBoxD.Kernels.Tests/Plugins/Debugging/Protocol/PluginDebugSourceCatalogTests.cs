@@ -14,7 +14,7 @@ public sealed class PluginDebugSourceCatalogTests
     public async Task Resolves_sequence_points_from_every_debug_document_for_the_same_source_path()
     {
         const string path = "/source/Kernel.cs";
-        const string source = "predicate();\nhandler();";
+        const string source = "// source\npredicate();\nhandler();";
         var package = FireDamagePluginPackage.Create();
         var nodes = SandboxNodeMap.Create(package.Module).Nodes;
         var sameFunctionNode = nodes.First(node =>
@@ -34,10 +34,11 @@ public sealed class PluginDebugSourceCatalogTests
             DebugInfo = new KernelDebugInfo(
                 [predicate, handler],
                 [
-                    new KernelSequencePoint(nodes[0].Id, new SourceSpan(1, 1, predicate.Id, 1, 12)),
-                    new KernelSequencePoint(sameFunctionNode.Id, new SourceSpan(1, 4, predicate.Id, 1, 12)),
-                    new KernelSequencePoint(otherFunctionNode.Id, new SourceSpan(2, 1, handler.Id, 2, 10))
-                ])
+                    new KernelSequencePoint(nodes[0].Id, new SourceSpan(2, 1, predicate.Id, 2, 12)),
+                    new KernelSequencePoint(sameFunctionNode.Id, new SourceSpan(2, 4, predicate.Id, 2, 12)),
+                    new KernelSequencePoint(otherFunctionNode.Id, new SourceSpan(3, 1, handler.Id, 3, 10))
+                ],
+                [new KernelDebugVariableBinding(nodes[0].FunctionId, "e_Damage", "e.Damage")])
         });
         const string token = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
         await bridge.PublishAsync(PluginDebugProtocol.Encode(
@@ -59,7 +60,7 @@ public sealed class PluginDebugSourceCatalogTests
             {
                 ["pluginId"] = package.Manifest.PluginId,
                 ["path"] = path,
-                ["lines"] = new[] { 1, 2 }
+                ["lines"] = new[] { 2, 3, 1 }
             },
             CancellationToken.None);
         var breakpoints = response.GetProperty("body").GetProperty("Breakpoints").EnumerateArray().ToArray();
@@ -68,5 +69,20 @@ public sealed class PluginDebugSourceCatalogTests
         Assert.Equal(nodes[0].Id.Value, breakpoints[0].GetProperty("NodeId").GetString());
         Assert.Single(breakpoints[0].GetProperty("Bindings").EnumerateArray());
         Assert.Equal(otherFunctionNode.Id.Value, breakpoints[1].GetProperty("NodeId").GetString());
+        Assert.True(breakpoints[2].GetProperty("Verified").GetBoolean());
+        Assert.Equal(2, breakpoints[2].GetProperty("Line").GetInt32());
+
+        var location = await client.SendAsync(
+            "location",
+            new Dictionary<string, object?>
+            {
+                ["pluginId"] = package.Manifest.PluginId,
+                ["nodeId"] = nodes[0].Id.Value
+            },
+            CancellationToken.None);
+        var binding = Assert.Single(
+            location.GetProperty("body").GetProperty("VariableBindings").EnumerateArray());
+        Assert.Equal("e_Damage", binding.GetProperty("SlotName").GetString());
+        Assert.Equal("e.Damage", binding.GetProperty("SourceName").GetString());
     }
 }
