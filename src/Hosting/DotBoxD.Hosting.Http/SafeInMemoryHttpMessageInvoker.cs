@@ -26,11 +26,28 @@ public sealed class SafeInMemoryHttpMessageInvoker : HttpMessageInvoker
         string? location = null,
         string? finalRequestUri = null,
         TimeSpan? responseDelay = null)
-        : base(new InMemoryHandler(responseBytes, statusCode, Parse(location), Parse(finalRequestUri), responseDelay), disposeHandler: true)
+        : base(
+            new InMemoryHandler(
+                responseBytes,
+                statusCode,
+                Parse(location, nameof(location)),
+                Parse(finalRequestUri, nameof(finalRequestUri)),
+                responseDelay),
+            disposeHandler: true)
     {
     }
 
-    private static Uri? Parse(string? value) => value is null ? null : new Uri(value, UriKind.Absolute);
+    private static Uri? Parse(string? value, string parameterName)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        return Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            ? uri
+            : throw new ArgumentException("URI must be absolute.", parameterName);
+    }
 
     private sealed class InMemoryHandler : HttpMessageHandler
     {
