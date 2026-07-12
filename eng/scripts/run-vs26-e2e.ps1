@@ -11,8 +11,9 @@ $artifacts = Join-Path $root 'artifacts/vs26-e2e'
 $activityLog = Join-Path $artifacts 'ActivityLog.xml'
 $launcherLog = Join-Path $artifacts 'launcher.log'
 $resultLog = Join-Path $artifacts 'result.txt'
+$continuousStartGate = Join-Path $artifacts 'continuous-start.gate'
 $guardian = Join-Path $root 'samples/GameServer/Examples.GameServer.Plugin/Kernels/GuardianKernel.cs'
-$pluginProgram = Join-Path $root 'samples/GameServer/Examples.GameServer.Plugin/Program.cs'
+$managedProgram = Join-Path $root 'samples/GameServer/Examples.GameServer.Server/ContinuousSimulation.cs'
 $serverProject = 'samples\GameServer\Examples.GameServer.Server\Examples.GameServer.Server.csproj'
 $pluginProject = 'samples\GameServer\Examples.GameServer.Plugin\Examples.GameServer.Plugin.csproj'
 $debugProfiles = @(
@@ -130,6 +131,18 @@ function Invoke-DteWhenReady([string] $Script, [string] $Operation) {
     throw "$Operation did not become ready within $StartupTimeout. Last error: $lastError"
 }
 
+function Wait-ForSolutionLoad {
+    $deadline = [DateTime]::UtcNow + $StartupTimeout
+    do {
+        Start-Sleep -Milliseconds 500
+        $loaded = (Test-Path $activityLog) -and
+            (Select-String $activityLog -Pattern 'End execution cost summary for SolutionLoad scenario' -SimpleMatch -Quiet)
+    } until ($loaded -or [DateTime]::UtcNow -ge $deadline)
+    if (-not $loaded) {
+        throw "Visual Studio did not finish loading DotBoxD within $StartupTimeout."
+    }
+}
+
 function Wait-ForKernelAttach {
     $deadline = [DateTime]::UtcNow + $StartupTimeout
     do {
@@ -156,10 +169,10 @@ if ([int]$dte.Debugger.CurrentMode -eq 2) {
 '@
         $stop = $json | Where-Object { $_ } | Select-Object -Last 1
         if ($stop) { $stop = $stop | ConvertFrom-Json }
-    } until (($stop -and $stop.File -like '*Examples.GameServer.Plugin*Program.cs') -or
+    } until (($stop -and [string]::Equals($stop.File, $managedProgram, [StringComparison]::OrdinalIgnoreCase)) -or
         [DateTime]::UtcNow -ge $deadline)
-    if (-not $stop -or $stop.File -notlike '*Examples.GameServer.Plugin*Program.cs') {
-        throw "Expected a managed plugin Program.cs stop. Last stop: $($stop | ConvertTo-Json -Compress)."
+    if (-not $stop -or -not [string]::Equals($stop.File, $managedProgram, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Expected a managed server Program.cs stop. Last stop: $($stop | ConvertTo-Json -Compress)."
     }
     return $stop
 }
@@ -215,7 +228,7 @@ function Wait-ForNextKernelStop {
 }
 
 New-Item -ItemType Directory -Path $artifacts -Force | Out-Null
-Remove-Item $activityLog, $launcherLog, $resultLog -Force -ErrorAction SilentlyContinue
+Remove-Item $activityLog, $launcherLog, $resultLog, $continuousStartGate -Force -ErrorAction SilentlyContinue
 Stop-ExamplesAndVisualStudio
 
 try {
@@ -251,10 +264,12 @@ try {
     Pop-Location
 
     $env:DOTBOXD_VSIX_DIAGNOSTIC_LOG = $launcherLog
+    $env:DOTBOXD_E2E_CONTINUOUS_START_GATE = $continuousStartGate
     Start-Process $devenv -ArgumentList @((Join-Path $root 'DotBoxD.slnx'), '/log', $activityLog) -WorkingDirectory $root | Out-Null
     Wait-ForDte
+    Wait-ForSolutionLoad
     $env:DOTBOXD_E2E_GUARDIAN = $guardian
-    $env:DOTBOXD_E2E_PLUGIN_PROGRAM = $pluginProgram
+    $env:DOTBOXD_E2E_MANAGED_PROGRAM = $managedProgram
     $env:DOTBOXD_E2E_SERVER_PROJECT = $serverProject
     $env:DOTBOXD_E2E_PLUGIN_PROJECT = $pluginProject
     Invoke-DteWhenReady @'
@@ -262,13 +277,32 @@ $solutionBuild = $dte.Solution.SolutionBuild
 if ($null -eq $solutionBuild) { throw 'Visual Studio did not expose SolutionBuild after startup.' }
 $breakpoints = $dte.Debugger.Breakpoints
 if ($null -eq $breakpoints) { throw 'Visual Studio did not expose the debugger breakpoint collection after startup.' }
+$contexts = @($solutionBuild.ActiveConfiguration.SolutionContexts)
+$serverContext = $contexts | Where-Object {
+    [string]::Equals($_.ProjectName, $env:DOTBOXD_E2E_SERVER_PROJECT, [StringComparison]::OrdinalIgnoreCase)
+} | Select-Object -First 1
+$pluginContext = $contexts | Where-Object {
+    [string]::Equals($_.ProjectName, $env:DOTBOXD_E2E_PLUGIN_PROJECT, [StringComparison]::OrdinalIgnoreCase)
+} | Select-Object -First 1
+if ($null -eq $serverContext -or $null -eq $pluginContext) {
+    throw 'Visual Studio has not configured both GameServer startup projects.'
+}
 $solutionBuild.StartupProjects = [object[]]@(
-    $env:DOTBOXD_E2E_SERVER_PROJECT,
-    $env:DOTBOXD_E2E_PLUGIN_PROJECT)
+    $serverContext.ProjectName,
+    $pluginContext.ProjectName)
+$startupProjects = @($solutionBuild.StartupProjects)
+if ($startupProjects.Count -ne 2) {
+    throw "Visual Studio accepted $($startupProjects.Count) GameServer startup projects instead of 2."
+}
 while ($breakpoints.Count -gt 0) { $breakpoints.Item(1).Delete() }
-$null = $breakpoints.Add('', $env:DOTBOXD_E2E_PLUGIN_PROGRAM, 46)
 $dte.ExecuteCommand('Debug.Start')
 '@ 'Visual Studio debugger startup' | Out-Null
+    Wait-ForKernelAttach
+    Invoke-Dte @'
+while ($dte.Debugger.Breakpoints.Count -gt 0) { $dte.Debugger.Breakpoints.Item(1).Delete() }
+$null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_MANAGED_PROGRAM, 36)
+'@ | Out-Null
+    Set-Content $continuousStartGate 'ready'
     $managedStop = Wait-ForManagedStop
     Invoke-Dte @'
 while ($dte.Debugger.Breakpoints.Count -gt 0) { $dte.Debugger.Breakpoints.Item(1).Delete() }
@@ -276,7 +310,6 @@ $null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_GUARDIAN, 35)
 $null = $dte.Debugger.Breakpoints.Add('', $env:DOTBOXD_E2E_GUARDIAN, 44)
 $dte.Debugger.Go($false)
 '@ | Out-Null
-    Wait-ForKernelAttach
 
     $predicate1 = Wait-ForStop 35
     Invoke-Dte '$dte.Debugger.StepOver($false)' | Out-Null
@@ -304,4 +337,6 @@ finally {
     }
     Stop-ExamplesAndVisualStudio
     Restore-ProjectDebugProfiles
+    Remove-Item Env:DOTBOXD_E2E_CONTINUOUS_START_GATE -ErrorAction SilentlyContinue
+    Remove-Item $continuousStartGate -Force -ErrorAction SilentlyContinue
 }
