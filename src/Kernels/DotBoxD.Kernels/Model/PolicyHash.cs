@@ -51,7 +51,15 @@ internal static class PolicyHash
         var grantRecords = new string[grants.Count];
         for (var i = 0; i < grants.Count; i++)
         {
-            grantRecords[i] = GrantRecord(grants[i]);
+            var grant = grants[i];
+            if (grant is null)
+            {
+                throw new ArgumentException(
+                    "Policy grants cannot contain null entries.",
+                    nameof(SandboxPolicy.Grants));
+            }
+
+            grantRecords[i] = GrantRecord(grant);
         }
 
         Array.Sort(grantRecords, StringComparer.Ordinal);
