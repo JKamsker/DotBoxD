@@ -132,6 +132,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             RecordForbiddenInitializerReference(context, helperGraph, creation.Type);
             RecordForbiddenDelegateInitializer(context, helperGraph, creation.Type);
             RecordStaticConstructorReachability(context, helperGraph, creation.Type);
+            RecordFinalizerReachability(context, helperGraph, creation.Type);
             RecordForbiddenHelperPropertyInitializer(context, helperGraph, creation.Type);
             if (creation.Constructor is { } initializerConstructor)
             {
@@ -143,6 +144,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
 
         ReportAndRecordIfForbidden(context, helperGraph, method, creation.Type);
         RecordStaticConstructorReachability(context, helperGraph, creation.Type);
+        RecordFinalizerReachability(context, helperGraph, creation.Type);
         if (creation.Constructor is { } constructor)
         {
             helperGraph.RecordCall(method, constructor, context.Operation.Syntax.GetLocation());
