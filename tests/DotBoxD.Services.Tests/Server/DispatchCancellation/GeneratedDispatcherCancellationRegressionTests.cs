@@ -82,6 +82,45 @@ public sealed class GeneratedDispatcherCancellationRegressionTests
         Assert.Equal(0, output.WrittenCount);
     }
 
+    [Theory]
+    [InlineData(nameof(IDispatchCancellationService.CancelVoid))]
+    [InlineData(nameof(IDispatchCancellationService.CancelTaskAsync))]
+    [InlineData(nameof(IDispatchCancellationService.CancelValueTaskAsync))]
+    public async Task Generated_dispatcher_observes_receiver_canceled_token_before_completing_no_result_dispatch(
+        string methodName)
+    {
+        using var source = new CancellationTokenSource();
+        var service = new ReceiverCancelingDispatchCancellationService(source);
+        var dispatcher = GeneratedServiceRegistry.CreateDispatcher<IDispatchCancellationService>(service);
+        var method = FindMethod(methodName);
+        var innerSerializer = new MessagePackRpcSerializer();
+        var serializer = new CountingSerializer(innerSerializer);
+        var registry = new InstanceRegistry();
+        var output = new ArrayBufferWriter<byte>();
+
+        var exception = await Record.ExceptionAsync(() =>
+            dispatcher.DispatchAsync(
+                method.WireName,
+                ReadOnlyMemory<byte>.Empty,
+                serializer,
+                registry,
+                output,
+                source.Token));
+
+        Assert.True(
+            exception is OperationCanceledException,
+            "Expected OperationCanceledException after receiver-canceled no-result dispatch token; actual " +
+            $"{exception?.GetType().Name ?? "no exception"}, " +
+            $"deserialize calls {serializer.DeserializeCalls}, " +
+            $"receiver calls {service.CallCount}, " +
+            $"serialize calls {serializer.SerializeCalls}, " +
+            $"bytes written {output.WrittenCount}.");
+        Assert.Equal(0, serializer.DeserializeCalls);
+        Assert.Equal(1, service.CallCount);
+        Assert.Equal(0, serializer.SerializeCalls);
+        Assert.Equal(0, output.WrittenCount);
+    }
+
     private static GeneratedMethod FindMethod(string name) =>
         Assert.Single(
             GeneratedServiceRegistry.GetService<IDispatchCancellationService>().Methods,
@@ -99,6 +138,16 @@ public sealed class GeneratedDispatcherCancellationRegressionTests
 
         public Task<int> RecordAfterCancelAsync(int value, CancellationToken ct = default) =>
             Task.FromResult(value + 1);
+
+        public void CancelVoid(CancellationToken ct = default)
+        {
+        }
+
+        public Task CancelTaskAsync(CancellationToken ct = default) =>
+            Task.CompletedTask;
+
+        public ValueTask CancelValueTaskAsync(CancellationToken ct = default) =>
+            ValueTask.CompletedTask;
     }
 
     private sealed class ReceiverCancelingDispatchCancellationService(
@@ -118,6 +167,26 @@ public sealed class GeneratedDispatcherCancellationRegressionTests
             CallCount++;
             source.Cancel();
             return Task.FromResult(value + 1);
+        }
+
+        public void CancelVoid(CancellationToken ct = default)
+        {
+            CallCount++;
+            source.Cancel();
+        }
+
+        public Task CancelTaskAsync(CancellationToken ct = default)
+        {
+            CallCount++;
+            source.Cancel();
+            return Task.CompletedTask;
+        }
+
+        public ValueTask CancelValueTaskAsync(CancellationToken ct = default)
+        {
+            CallCount++;
+            source.Cancel();
+            return ValueTask.CompletedTask;
         }
     }
 
