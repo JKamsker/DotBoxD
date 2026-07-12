@@ -231,6 +231,18 @@ internal class RiderDriver(private val remoteRobot: RemoteRobot) {
         "com.intellij.xdebugger.XDebuggerManager.getInstance(projectOf(component)).getCurrentSession() != null;",
     )
 
+    fun adapterProcessId(): Long? {
+        val processId = call<String>(
+            """
+            const session = com.intellij.xdebugger.XDebuggerManager.getInstance(projectOf(component))
+                .getCurrentSession();
+            const handler = session ? session.getDebugProcess().getProcessHandler() : null;
+            handler ? String(handler.process().pid()) : '';
+            """,
+        )
+        return processId.toLongOrNull()?.takeIf { it > 0 }
+    }
+
     private inline fun <reified T> call(script: String): T = frame.callJs(prologue + script.trimIndent(), true)
 
     private fun run(script: String) = frame.runJs(prologue + script.trimIndent(), true)

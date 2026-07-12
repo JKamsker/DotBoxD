@@ -32,7 +32,6 @@ class RiderKernelDebuggerE2ETest {
         val guardian = root.resolve("samples/GameServer/Examples.GameServer.Plugin/Kernels/GuardianKernel.cs")
         val existingBridges = liveBridgeProcessIds()
         val existingExamples = exampleProcessIds(root)
-        val existingAdapters = adapterProcessIds()
         var launchedExamples: ExternalExamples? = null
         try {
             rider.clearDotNetBreakpoints()
@@ -46,7 +45,7 @@ class RiderKernelDebuggerE2ETest {
                 pluginProcessId,
                 runRegisteredRunnerDirectly = System.getProperty("dotboxd.e2e.external-launch", "false").toBoolean(),
             )
-            val adapterProcessId = awaitAdapter(existingAdapters)
+            val adapterProcessId = awaitAdapter(rider)
             launchedExamples?.releaseAfterBreakpointsReady()
 
             val firstPredicate = awaitStop(rider, launchedExamples) {
@@ -152,10 +151,10 @@ class RiderKernelDebuggerE2ETest {
         return requireNotNull(result)
     }
 
-    private fun awaitAdapter(existing: Set<Long>): Long {
+    private fun awaitAdapter(rider: RiderDriver): Long {
         var result: Long? = null
         waitFor(Duration.ofSeconds(30), Duration.ofMillis(200)) {
-            adapterProcessIds().firstOrNull { it !in existing }?.also { result = it } != null
+            rider.adapterProcessId()?.also { result = it } != null
         }
         return requireNotNull(result)
     }
@@ -175,12 +174,6 @@ class RiderKernelDebuggerE2ETest {
 
     private fun exampleProcessIds(root: Path): Set<Long> = ProcessHandle.allProcesses().use { processes ->
         processes.filter { isExampleProcess(it, root) }.map(ProcessHandle::pid).toList().toSet()
-    }
-
-    private fun adapterProcessIds(): Set<Long> = ProcessHandle.allProcesses().use { processes ->
-        processes.filter {
-            it.info().commandLine().orElse("").contains("DotBoxD.DebugAdapter.dll", ignoreCase = true)
-        }.map(ProcessHandle::pid).toList().toSet()
     }
 
     private fun stopNewExampleProcesses(root: Path, existing: Set<Long>) {
