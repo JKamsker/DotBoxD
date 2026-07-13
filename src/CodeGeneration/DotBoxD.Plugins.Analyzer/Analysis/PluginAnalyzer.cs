@@ -101,6 +101,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         }
 
         ReportAndRecordIfForbidden(context, helperGraph, method, invocation.TargetMethod.ContainingType);
+        ReportForbiddenInvocationTypeArguments(context, helperGraph, method, invocation.TargetMethod);
         RecordStaticConstructorReachability(context, helperGraph, invocation.TargetMethod);
         ReportForbiddenReferencedMethodSignature(context, invocation.TargetMethod);
         helperGraph.RecordCall(method, invocation.TargetMethod, context.Operation.Syntax.GetLocation());
