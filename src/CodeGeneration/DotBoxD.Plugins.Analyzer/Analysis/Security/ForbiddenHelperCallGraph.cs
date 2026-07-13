@@ -75,7 +75,7 @@ internal sealed class ForbiddenHelperCallGraph
         }
 
         var normalizedTarget = Normalize(target);
-        if (PluginAnalyzer.IsEventKernel(caller.ContainingType))
+        if (PluginAnalyzer.IsEventKernel(caller.ContainingType) || PluginAnalyzer.IsModuleInitializer(caller))
         {
             _rootCalls.Add(new RootHelperCall(normalizedTarget, location));
             return;
@@ -200,7 +200,8 @@ internal sealed class ForbiddenHelperCallGraph
     {
         _dynamicHelperCalls.Resolve(RecordCall, RecordInitializerRootCall);
         if (_forbidden.IsEmpty ||
-            _rootCalls.IsEmpty)
+            _rootCalls.IsEmpty ||
+            !PluginAnalyzer.CompilationContainsEventKernel(context.Compilation))
         {
             return;
         }

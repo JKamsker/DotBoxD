@@ -219,7 +219,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         }
 
         helperGraph.RecordForbidden(method, type!);
-        if (!IsEventKernel(method.ContainingType))
+        if (!IsForbiddenApiRoot(context, method))
         {
             return;
         }
