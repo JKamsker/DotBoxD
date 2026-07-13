@@ -107,36 +107,6 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         ReportLocalUseIfInvalid(context, invocation.TargetMethod);
     }
 
-    private static void AnalyzeObjectCreation(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
-    {
-        var creation = (IObjectCreationOperation)context.Operation;
-        if (context.ContainingSymbol is not IMethodSymbol method)
-        {
-            ReportForbiddenInInitializer(context, creation.Type);
-            RecordForbiddenInitializerReference(context, helperGraph, creation.Type);
-            RecordForbiddenDelegateInitializer(context, helperGraph, creation.Type);
-            RecordStaticConstructorReachability(context, helperGraph, creation.Type);
-            RecordFinalizerReachability(context, helperGraph, creation.Type);
-            RecordForbiddenHelperPropertyInitializer(context, helperGraph, creation.Type);
-            if (creation.Constructor is { } initializerConstructor)
-            {
-                helperGraph.RecordConstructorInitializers(initializerConstructor);
-                RecordInitializerRootCall(context, helperGraph, initializerConstructor);
-            }
-
-            return;
-        }
-
-        ReportAndRecordIfForbidden(context, helperGraph, method, creation.Type);
-        RecordStaticConstructorReachability(context, helperGraph, creation.Type);
-        RecordFinalizerReachability(context, helperGraph, creation.Type);
-        if (creation.Constructor is { } constructor)
-        {
-            helperGraph.RecordConstructorInitializers(constructor);
-            helperGraph.RecordCall(method, constructor, context.Operation.Syntax.GetLocation());
-        }
-    }
-
     private static void AnalyzePropertyReference(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
         var property = ((IPropertyReferenceOperation)context.Operation).Property;
