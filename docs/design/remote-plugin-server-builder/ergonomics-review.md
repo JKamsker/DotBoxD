@@ -84,6 +84,12 @@ No test exercises it and the test double discards the payload, so it is fully un
 **Fix:** an expression setter builder - `Get<GuardianKernel>().Set(k => k.AggroRange, 6).Set(k => k.CalmStrength, 35).ApplyAsync(atomic: true)` -
 so "read k.X" is unrepresentable and only live keys compile.
 
+This builder must remain opt-in sugar over public primitives: each `Set(...)` is equivalent to
+`ILiveSettingsHandle<TKernel>.Set(member, value)`, and `ApplyAsync(...)` is the same public commit
+operation. A consumer can therefore hand-write the update without the convenience chain. Likewise, any
+future `Setup(...)` helper must record a public, replayable list of installation operations that a host
+can construct and submit directly; it must not be the only way to install or configure a plugin server.
+
 ### 2.2 - HIGH - Install verbs on the domain contract (the headline; doc tension B) **[3×]**
 
 `IGameWorldAccess : IServiceControl`, controls `: IExtensibleControl` put `Replace`/`Extend`/`Get`/
@@ -100,6 +106,8 @@ implement-and-throw (`GameWorldAccess.cs:35–42,98–107`). Two precisions past
 builder's build-time `Setup(...)` accumulator. `Build()` records `Replace`/`Extend` intents synchronously;
 `StartAsync()` ships them. The runtime `server.Monsters` property is exactly `IMonsterControl`, so
 `server.Monsters.Extend(...)` becomes a compile error and `s.Monsters.Extend(...)` is the only install shape.
+The accumulator must be a convenience wrapper over public installation-operation primitives so a host can
+construct, validate, and replay the same operations without `Setup(...)` or generated code.
 
 ### 2.3 - HIGH - `Replace`/`Extend` are less type-safe than they look **[codex, verified]**
 

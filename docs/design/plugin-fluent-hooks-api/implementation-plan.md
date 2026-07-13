@@ -32,16 +32,16 @@ Every shipped item above is committed with a green `dotnet build DotBoxD.slnx -c
   connection, and the server *builds the only package it installs*. The manifest cannot widen anything
   today (it has no limits field). → **Deferred to an appendix** behind a real trust-boundary story.
   Ownership uses **the session object itself as identity** - no `PluginIdentity`/authenticator needed.
-- **`peer.OnDisconnected` is fictional.** DotBoxD exposes no such hook in our transport. Revoke-on-disconnect
-  must bind to the **real** `RpcPeerSession`/host lifecycle (verify at implementation) or a
-  **session-owned heartbeat + absolute TTL** fallback - specified, not deferred.
+- **Disconnect lifecycle corrected.** The original `peer.OnDisconnected` sketch was fictional; the shipped
+  ownership path binds revocation to the real `RpcPeer.Disconnected` lifecycle.
 - **Generic wiring "by event-name string" cannot compile.** `HookRegistry.On` is generic-only and
   `TEvent` is erased through a string. → wire through a **new internal non-generic, shape-based path**.
-- **Four ownership concurrency defects** must be fixed (linked revoke token, install/dispose race,
-  same-owner hot-reload, `PluginServer.Dispose` revoke).
-- **Honest surfaces:** `InvokeKernel(lambda)` is `[Obsolete(error:true)]` today - it is **Phase C**, not
-  current. The awaitable struct builder silently drops installs → ship a **`Task`-returning**
-  `Register(where:)`. `[OpaqueId]` collides with an IR concept → **`[SandboxOpaqueId]`**.
+- **Four ownership concurrency defects** were fixed: linked revoke token, install/dispose race,
+  same-owner hot-reload, and `PluginServer.Dispose` revocation.
+- **Lowered terminal shipped:** `InvokeKernel(lambda)` now lowers through the generated interceptor for its
+  supported shapes; unsupported shapes fail closed. The `Task`-returning `Register(where:)` avoids the
+  silent-drop awaitable-struct design. `[OpaqueId]` still collides with an IR concept →
+  **`[SandboxOpaqueId]`**.
 - **Capability gating reuses the existing binding/capability model** (every host call already gates on a
   `RequiredCapability`); the new work is wildcard matching, gated event-properties, analyzer-derived
   manifest caps, and deny-or-disconnect.
@@ -106,13 +106,13 @@ No framework/API changes; keeps the current functional install path working.
 - **Verify:** `tests/DotBoxD.Kernels.Tests` green + new unit tests (owner fail-closed, revoke-unblocks-waiter,
   wildcard match, deny-on-missing-capability, settings owner-check); update `DotBoxD.Plugins` API baseline.
 
-### Phase C - analyzer lowering  *(large, highest risk; sub-phased C-0…C-3 per [plan.md](plan.md))*
-- Lower `Where`/`Select`/`InvokeKernel` chain lambdas to verified IR (un-obsolete a **lowered**
-  `InvokeKernel` terminal; keep `InvokeLocal` native).
-- Emit `ServiceContract` name + analyzer-derived `RequiredCapabilities` (incl. gated event-property
-  reads) into the manifest.
-- **Verify:** incrementality + golden-snapshot tests; an end-to-end chain that lowers, ships, runs
-  sandboxed, and is denied when a required capability is missing.
+### Phase C - analyzer lowering  *(completed; C-0…C-3)*
+- Lowered `Where`/`Select`/`InvokeKernel` chain lambdas to verified IR through the supported generated
+  interceptor path; `InvokeLocal` remains native.
+- Emitted the service-contract and analyzer-derived required-capability metadata, including gated
+  event-property reads.
+- Verified with incrementality and golden-snapshot tests plus an end-to-end chain that lowers, ships,
+  runs sandboxed, and is denied when a required capability is missing.
 
 ### Deferred appendix - auth, signing, per-plugin policy resolver
 Build only behind a real trust boundary (a TCP/mTLS transport, third-party package distribution, or
@@ -125,19 +125,19 @@ revocation on the grant, `RequireSignedGrant=true` default, per-field `ClampTo` 
 
 ## Corrections folded in from the reviews (checklist)
 
-- [ ] `peer.OnDisconnected` replaced by the real lifecycle API or heartbeat/TTL (R2-2.1).
-- [ ] `KernelRegistry.Add` owner fail-closed **and** same-owner hot-reload revoke (R2-2.2/2.3).
-- [ ] install/dispose atomic; no post-await leak (R2-2.4).
-- [ ] `_revocation.Token` linked into `_executionGate.WaitAsync` (R2-2.5).
-- [ ] `PluginServer.Dispose` revokes kernels before host teardown (R2-2.6).
-- [ ] stale COW handler removed on revoke/remove (R2-2.8).
-- [ ] owner-checked `UpdateSettingsAsync` (R2-4.9).
-- [ ] adapter deletion ships with the `WireHook`/`Program` rewrite, else build breaks (R2-3.1).
+- [x] `peer.OnDisconnected` replaced by the real lifecycle API or heartbeat/TTL (R2-2.1).
+- [x] `KernelRegistry.Add` owner fail-closed **and** same-owner hot-reload revoke (R2-2.2/2.3).
+- [x] install/dispose atomic; no post-await leak (R2-2.4).
+- [x] `_revocation.Token` linked into `_executionGate.WaitAsync` (R2-2.5).
+- [x] `PluginServer.Dispose` revokes kernels before host teardown (R2-2.6).
+- [x] stale COW handler removed on revoke/remove (R2-2.8).
+- [x] owner-checked `UpdateSettingsAsync` (R2-4.9).
+- [x] adapter deletion ships with the `WireHook`/`Program` rewrite, else build breaks (R2-3.1).
 - [ ] `[OpaqueId]` → `[SandboxOpaqueId]` (R2-3.2).
-- [ ] generic wiring → internal **shape-based** path; no `ResolveByEventName`/non-generic `On` (R3-C1).
-- [ ] `InvokeKernel(lambda)` documented as Phase-C (un-obsoletes the current `error:true` forwarder) (R3-H1).
-- [ ] `Register(where:)` is **`Task`-returning**; no silent-drop awaitable struct (R3-H2).
-- [ ] `ServiceContract` is a **new additive** manifest field needing analyzer emission (R3-H3).
+- [x] generic wiring → internal **shape-based** path; no `ResolveByEventName`/non-generic `On` (R3-C1).
+- [x] `InvokeKernel(lambda)` is lowered through the supported generated-interceptor path (R3-H1).
+- [x] `Register(where:)` is **`Task`-returning**; no silent-drop awaitable struct (R3-H2).
+- [x] `ServiceContract` is a **new additive** manifest field emitted by the analyzer (R3-H3).
 - [ ] drop `new()`; generated draft factory for `SetValuesAsync` (R3-H4).
 - [ ] shim/example code marked **design sketch** where it names Phase-B/C types (R3-H5).
 - [ ] `GetAll<TService>()` primary; `Get<TService>()` singleton-only (R3-M1).

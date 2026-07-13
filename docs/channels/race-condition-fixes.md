@@ -65,10 +65,11 @@ could be observed **before** `PeerConnected` for the same peer.
 and closes its peers. The peer is freshly created and not disposed at this point, so `peer.Start()`
 cannot throw `ObjectDisposedException`.
 
-**Why not deterministically testable.** The read loop's `Task.Run` scheduling latency is far larger than
+**Why the stress test cannot prove it.** The read loop's `Task.Run` scheduling latency is far larger than
 the lock-release-to-event-raise window, so `PeerConnected` wins the race essentially every time even on
 the unfixed code. A 150-iteration in-memory stress test (`BugFixStressTests`) did **not** reproduce the
-inversion. The fix makes the ordering a hard guarantee rather than a probabilistic one.
+inversion. The internal seam below supplies the deterministic red-to-green proof; the stress test is only
+a behavioural guard. The fix makes the ordering a hard guarantee rather than a probabilistic one.
 
 **Proven by:** `RaceConditionDeterministicTests.RpcHost_PeerConnected_FiresBeforeReadLoopStarts` - in the
 `PeerConnected` handler it asserts `args.Peer.HasStarted == false` (an internal seam). On the unfixed

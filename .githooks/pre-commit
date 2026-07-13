@@ -30,8 +30,13 @@ if [ -n "$md_files" ]; then
             if [ -n "$file" ] && [ -f "$file" ]; then
                 # Byte-level replace of the UTF-8 em-dash sequence (E2 80 94), so encoding and
                 # line endings stay untouched. Portable across GNU/BSD (no sed -i differences).
-                perl -i -pe 's/\xe2\x80\x94/-/g' "$file"
-                git add -- "$file"
+                if perl -i -pe 's/\xe2\x80\x94/-/g' "$file"; then
+                    if ! git add -- "$file"; then
+                        echo "pre-commit: could not re-stage normalized file '$file'; leaving it unchanged in the index." >&2
+                    fi
+                else
+                    echo "pre-commit: em-dash normalization failed for '$file'; leaving it unchanged in the index." >&2
+                fi
             fi
         done
     else

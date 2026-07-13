@@ -32,10 +32,12 @@ lowerings safe to accept from less-trusted plugin authors.
 **Grounded specifics:**
 
 - **One boundary, two lowerings.** An event pipeline's `Where`/`Select` and Pushdown's batch run as
-  the *same* validated, fuel-metered IR. Event pipelines keep the payoff on the wire - the filter
-  runs server-side so non-matching events never cross, and `Select` ships only the projected scalar
-  (fewer bytes, fewer wake-ups, one-way push, no round-trips). Pushdown keeps it in round-trips - N
-  fine-grained calls collapse into **one** server-side batch next to the host's data.
+  the *same* validated, fuel-metered IR. For plugin-side terminals such as `RunLocal` and
+  `RegisterLocal`, the filter runs server-side so non-matching events never cross, and `Select` ships
+  only the projected scalar (fewer bytes, fewer wake-ups, one-way push, no round-trips). Server-side
+  `Run` and `Register` use the same lowerings without transferring a value to the plugin. Pushdown
+  keeps it in round-trips - N fine-grained calls collapse into **one** server-side batch next to the
+  host's data.
 - **Capabilities are derived, not self-asserted, and fail closed.** The manifest's required
   capabilities are the union of what the IR actually touches; install is rejected unless the host
   policy grants them, so bad code never runs. Async is itself a gated capability
@@ -68,6 +70,7 @@ the module's JSON IR, and `subtotals`, a list of ints):
 ```csharp
 using DotBoxD.Hosting;
 using DotBoxD.Kernels;
+using DotBoxD.Kernels.Sandbox;
 
 // A sandbox host with only the safe, pure bindings enabled.
 var host = SandboxHost.Create(builder =>

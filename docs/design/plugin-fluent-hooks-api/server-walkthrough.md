@@ -74,7 +74,8 @@ reflects the record's readable properties in constructor order, names each sandb
 [plugin-walkthrough.md](plugin-walkthrough.md)) and the server registers nothing.
 
 Reach for an explicit adapter or the property attributes (`[OpaqueId]`, `[SandboxParam]`,
-`[SandboxIgnore]`) only when you need opaque-id branding or custom parameter names - see
+`[SandboxIgnore]`) only when you need opaque-id branding, custom parameter names, or to omit a property
+the kernel never reads - see
 [ownership-auth-and-policy.md](ownership-auth-and-policy.md) §3. The hand-written
 `MonsterAggroEventAdapter`/`AttackEventAdapter` from the old example are deleted.
 

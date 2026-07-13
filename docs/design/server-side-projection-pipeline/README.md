@@ -211,7 +211,7 @@ This requires threading the *current sandbox type* down the chain (the context a
 
 **Named DTOs** already work (`record.new` + `record.get` + generated `ReadProjected` that reconstructs via the positional ctor - `RpcKernelValueConversionEmitter.Dto.cs` `TryResolveConstructor`/`BuildDtoReconstruction`). The one rule authors must follow (G5):
 
-> **Every field carried over the wire must be an explicit constructor argument.** The constructor *body* does not run server-side; `Select(e => new MonsterAggroInfo(…, monsterName, …))` must pass `monsterName` in, not derive it inside the ctor. A field set only in the ctor body is absent from the IR record and unreadable by any downstream server-side `record.get`. (An analyzer **diagnostic** should flag a DTO field that is neither a ctor parameter nor otherwise populated - fail loud, not silent.)
+> **Every field carried over the wire must be an explicit constructor argument.** The constructor *body* does not run server-side; `Select(e => new MonsterAggroInfo(…, monsterName, …))` must pass `monsterName` in, not derive it inside the ctor. A field set only in the ctor body is absent from the IR record and unreadable by any downstream server-side `record.get`. The delivered generator fails safe by skipping that chain rather than adding a separate analyzer diagnostic.
 
 **Anonymous types** (`new { A = …, B = … }`) - implemented by `DotBoxDAnonymousObjectCreationExpressionLowerer`, **as intermediate server-side projections only**:
 
@@ -335,7 +335,7 @@ Both worked chains exercise the **collection aggregate** (`GetInRange(...).Count
 | **P2** | **Non-scalar host returns** (G2): allow wire-eligible list/DTO returns from host reads (e.g. `GetInRange` → `List<string>`), reusing the marshaller-eligibility predicate. Tests: a projected `List<string>` round-trips; a live-entity return still fails safe. | G2 | low–med |
 | **P3** | **Member-chain lowering** (G3): recursive `LowerMemberAccess` over any inner node - projected field **and host-call result**; `list.count` + record-field chains; thread intermediate sandbox type. Tests: `ctx.Players.GetInRange(...).Count > 3` and `x.PlayerIds.Count > 3` both filter server-side; handle-property chain reports a clear diagnostic. **Completes the §6.2 named-DTO chain end-to-end.** | G3 | med |
 | **P4** | **Anonymous-type projections** (G4): new lowerer + `new { }` reconstruction in the decoder; author-facing note on structural-only identity. **Completes the §6.1 anonymous chain.** Tests: anonymous projection round-trips over both decode paths; member name/type/order mismatch is rejected. | G4 | med |
-| **P5** | **Diagnostics & docs** (G5): analyzer warning for a DTO field that is not a ctor parameter (derived-in-ctor field would silently vanish); author guide + samples; spec/manifest updates. | G5 | low |
+| **P5** | **Fail-safe handling & docs** (G5): skip a chain whose DTO field is derived only in its ctor body rather than emitting a truncated record; document the constructor-argument rule and add regression coverage. No separate analyzer diagnostic is added. | G5 | low |
 
 Each phase is independently shippable and leaves the chain working for the shapes it covers; later phases are pure additions. The two **worked examples** (§6) light up incrementally: P1 proves the `ctx`-read mechanism on a scalar, P2+P3 complete §6.2, and P4 completes §6.1.
 
@@ -349,7 +349,7 @@ Mirror the existing `RemoteRunLocalChainRuntimeTests` matrix (server-side filter
 - **P2:** host read returning `List<string>` projects and round-trips; returning a non-wire-eligible entity type fails at lowering with a precise message.
 - **P3:** both `ctx.Players.GetInRange(...).Count > 3` (`.Count` on a **host-call result** - list counted server-side, never on the wire) and `x.PlayerIds.Count > 3` (`.Count` on a **projected list**) discriminate server-side; a collision-style fixture proves the count is read from the list, not a same-named event field; handle-property chain → diagnostic.
 - **P4:** anonymous `new { A, B, C }` projection round-trips field-for-field over both decode paths; reordered/renamed reconstruction fails to compile (guards the structural-unification contract).
-- **P5:** a DTO whose ctor derives a field triggers the analyzer warning; the worked §6 chains compile and run end-to-end as sample integration tests.
+- **P5:** a DTO whose ctor derives a field is skipped fail-safe without a separate analyzer warning; the worked §6 chains compile and run end-to-end as sample integration tests.
 
 API-baseline + spec-manifest updates per the usual gates (`docs/api-baselines`, `check-package-metadata.ps1`).
 

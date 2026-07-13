@@ -176,9 +176,10 @@ Layer 1 makes Layer 2 unreachable for honest plugins.
 
 - The server defines `IGameWorldAccess` with the gated monster operations (§2) and binds it into the
   sandbox as `game.world.*` bindings; it marks `MonsterAggroEvent.MonsterHealth` `[Capability(...)]`.
-- `ServerPolicy.CreateCeiling()` grants the guardian identity `game.world.monster.*` (read) but **not**
-  `game.world.monster.health.update` - so a guardian that only calms is fine, but a guardian that tries
-  to *write* health is denied at install.
+- `ServerPolicy.CreateCeiling()` grants the guardian only read-scoped capabilities (for example
+  `game.world.monster.read.*`) and never the broad `game.world.monster.*` wildcard. In particular, it
+  grants no `game.world.monster.write.*` capability, so a guardian that only calms is fine while a
+  kernel that tries to *write* health is denied at install.
 - `GuardianKernel` reads `e.MonsterHealth` and calls `ctx.World.GetHealth(id)`; the analyzer derives
   `RequiredCapabilities = [game.world.monster.health.get]`; install succeeds under the `…monster.*`
   grant.

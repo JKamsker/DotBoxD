@@ -9,7 +9,7 @@ in both client and server). On a hot RPC path this is constant GC pressure. The 
 `Span`/`Memory`/`IMemoryOwner` for fixed-size buffers. The user specifically asked that the
 payload returned from `MessageFramer.ReadMessageAsync` become a `Payload` class.
 
-**Scope decision (confirmed with user):** pragmatic pooling now - pool every frame, send
+**Historical scope decision (superseded below):** pragmatic pooling now - pool every frame, send
 buffer, and serializer output; eliminate both `MemoryStream(.ToArray())` copies. Accept the
 **one** small array MessagePack allocates per received message to back the nested
 `RpcRequest/RpcResponse.Payload` member. That nesting is what makes early buffer-return
@@ -22,14 +22,16 @@ MessagePack 2.5.187 has verified `Serialize(IBufferWriter<byte>,…)` / `Deseria
 overloads plus built-in formatters for `byte[]`, `ReadOnlyMemory<byte>`, `Memory<byte>` (identical
 wire bytes - so the DTO member type change is **not** a wire break).
 
-### Core safety invariant (must be preserved + commented in code)
+### Historical nested-payload safety invariant (superseded by the un-nested format below)
 The receive loop does `serializer.Deserialize<RpcResponse>(frameSlice)`. Under
 `MessagePackSecurity.UntrustedData` (already configured), MessagePack **always copies** a nested
 `ReadOnlyMemory<byte>` member into a fresh heap array - it never aliases the input. Therefore the
 rented frame `Payload` can be disposed immediately after deserialize, even though the awaiting
 caller deserializes `response.Payload` later on another thread. **Do not** "optimize" the inner
 payload into a zero-copy slice of the frame buffer without also extending the frame's lifetime -
-that would reintroduce a use-after-free.
+that would reintroduce a use-after-free. The shipped un-nested format below intentionally changed this
+contract: it transfers the rented frame to the response consumer and disposes it only after response
+handling completes.
 
 ---
 

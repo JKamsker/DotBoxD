@@ -59,8 +59,8 @@ guarantees are established *never*.
 assembly - hands it the full CLR (filesystem, sockets, P/Invoke, spawning processes) regardless of any
 DotBoxD API wrapped around it. The kernel replaces that with restricted IR the host inspects and rejects
 *before* execution, so a method reachable via normal RPC is **not** automatically reachable from a
-kernel (see [Kernels](/concepts/kernels/)). That substrate is what makes accepting untrusted author
-logic safe in-process.
+kernel (see [Kernels](/concepts/kernels/)). That substrate makes bounded in-process execution of this
+class of untrusted author logic possible under the documented threat model.
 
 **Why capabilities (least privilege).** A kernel starts with *no* ambient authority: every host
 operation it can reach - files, time, random, logging, HTTP - must be an explicit

@@ -721,8 +721,9 @@ emits no un-unloadable assemblies); compiler = the *hot* tier, tiered up to afte
 
 - **Hot/repeat code runs compiled, which is at target** (<=2x on every benchmark except f64 ~6x and the trivial
   diagnostic). This is the perf-critical path.
-- **The interpreted ratios on 1M-iteration loops measure the cold tier on a hot workload** - a scenario Auto mode
-  avoids by tiering up. The interpreter's job is fast startup + light/one-shot runs, not long-loop throughput.
+- **The interpreted ratios on 1M-iteration loops measure the cold tier on a hot workload.** Auto mode avoids those
+  measurements only after repeated calls cross `AutoCompileThreshold`; a one-shot 1M-iteration call can remain
+  interpreted throughout. The interpreter's job is fast startup + light/one-shot runs, not long-loop throughput.
 
 ### Re-architecture levers (and why they're not pursued)
 

@@ -101,7 +101,10 @@ if (descriptor.IsAsync && !context.AsyncEnabled)
 This is **separate from** the `RequiredCapability` path (security Gap A) - do not collapse them; they catch different failure modes (honest install vs tampered package vs sync-binding smuggle).
 
 - **Layer 3 (pre-execution revocation):** `SandboxHost.TryGetRevokedCapability` already enumerates `RequiredCapabilities(plan, entrypoint)`; because every async binding carries `RequiredCapability = "dotboxd.runtime.async"`, revocation fires before execution (security Gap B - verify the binding-`RequiredCapability` path, not a manifest-only `CapabilityRequest`).
-- **Routing gate (optimization, NOT the security gate):** the trampoline runner is selected in `SandboxHost.PreparedValue.cs` only when `plan.Policy.GrantsCapability("dotboxd.runtime.async") && allowedBindings.Count > 0`. Never the sole enforcement point (security Gap C).
+- **Routing gate (optimization, NOT the security gate):** the trampoline runner is selected only when
+  `plan.Policy.GrantsCapability("dotboxd.runtime.async") && plan.GetEntrypointMetadata(entrypoint).HasAsyncBinding`
+  (`SandboxHost.Capabilities.cs`). A non-empty binding set can still be sync-only, so it must not select
+  the worker. This is never the sole enforcement point (security Gap C).
 
 ### Revocation semantics
 

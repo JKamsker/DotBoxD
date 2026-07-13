@@ -214,7 +214,7 @@ await using var server = RemotePluginServerBuilder
 
 await server.StartAsync();                 // connect + flush registrations; typed surface now live
 
-// plugin work - generated extensions and InvokeAsync are usable here:
+// Plugin work starts here. Generated extensions are usable now; InvokeAsync joins this example in Phase 2.
 var killResults = await server.World.Monsters.KillMonstersAsync(["monster-3", "monster-4"]);
 
 await server.HoldUntilShutdownAsync();     // hold until the server completes; DisposeAsync disconnects

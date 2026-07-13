@@ -242,7 +242,8 @@ source shape, but binaries compiled against the old signature must rebuild.
    ProjectingResult, hook + subscription, indexed + broad).
 2. **Piece 4 (InstallAndWire)** - depends on Piece 1.
 3. **Piece 3 (invoker)** - independent, small.
-4. **Piece 2 (generated host)** - biggest codegen change; spike separately (same Roslyn constraints as #88).
+4. **Piece 2 (runtime connection host)** - shipped as `PluginConnectionHost<TConnection>` instead of a
+   generator; retain the generated-host proposal above only as a future design record.
 
 Each phase keeps the existing trust-boundary tests green.
 
