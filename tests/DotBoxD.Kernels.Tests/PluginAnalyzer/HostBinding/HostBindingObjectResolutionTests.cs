@@ -28,6 +28,7 @@ public sealed class HostBindingObjectResolutionTests
 
             public bool Measures(double value) => true;
 
+            [HostBinding("host.player.local-only", "player.read.local", SandboxEffect.Cpu)]
             [HostBindingIgnore]
             public bool LocalOnly() => true;
 

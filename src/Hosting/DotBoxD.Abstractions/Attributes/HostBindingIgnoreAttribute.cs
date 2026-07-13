@@ -1,5 +1,5 @@
 namespace DotBoxD.Abstractions;
 
-/// <summary>Excludes a public method from its containing type's <see cref="HostBindingObjectAttribute"/> surface.</summary>
+/// <summary>Excludes a method from explicit, automatic, and <see cref="HostBindingObjectAttribute"/> host binding resolution.</summary>
 [AttributeUsage(AttributeTargets.Method, Inherited = false)]
 public sealed class HostBindingIgnoreAttribute : Attribute;
