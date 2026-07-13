@@ -96,7 +96,16 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
     internal static (string BindingId, string? Capability, IReadOnlyList<string> Effects, bool IsAsync)? HostBinding(
         IMethodSymbol method,
         Compilation compilation)
-        => ExplicitHostBinding(method, compilation) ?? TryAutoHostBinding(method, compilation);
+    {
+        if (HasHostBindingIgnore(method, compilation))
+        {
+            return null;
+        }
+
+        return ExplicitHostBinding(method, compilation) ??
+               TryHostBindingObject(method, compilation) ??
+               TryAutoHostBinding(method, compilation);
+    }
 
     private static (string BindingId, string? Capability, IReadOnlyList<string> Effects, bool IsAsync)? ExplicitHostBinding(
         ISymbol symbol,

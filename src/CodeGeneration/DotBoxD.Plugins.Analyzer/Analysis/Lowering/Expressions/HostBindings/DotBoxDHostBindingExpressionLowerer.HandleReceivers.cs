@@ -57,6 +57,13 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
 
     private static bool IncludesValueReceiver(IMethodSymbol method, Compilation compilation)
     {
+        if (IsEligibleHostBindingObjectMethod(method) &&
+            !HasHostBindingIgnore(method, compilation) &&
+            HostBindingObject(method.ContainingType, compilation) is not null)
+        {
+            return true;
+        }
+
         foreach (var attribute in method.GetAttributes())
         {
             if (!IsDotBoxDAttribute(attribute, compilation, DotBoxDMetadataNames.HostBindingAttribute))
