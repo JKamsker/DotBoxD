@@ -40,6 +40,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.EnableConcurrentExecution();
+        context.RegisterSymbolAction(AnalyzeNamedType, SymbolKind.NamedType);
         context.RegisterSymbolAction(AnalyzeMethod, SymbolKind.Method);
         context.RegisterSymbolAction(AnalyzeProperty, SymbolKind.Property);
         context.RegisterSymbolAction(AnalyzeField, SymbolKind.Field);
