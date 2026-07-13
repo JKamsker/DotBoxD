@@ -1,7 +1,6 @@
 using System.Reflection;
 using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Sandbox;
-using DotBoxD.Plugins.Runtime.Rpc;
 
 namespace DotBoxD.Hosting.Execution;
 
@@ -49,10 +48,9 @@ internal static partial class HostServiceBindingFactory
         var startedAt = DateTimeOffset.UtcNow;
         var result = callTarget.Invoke(target, []);
         var payload = await callTarget.ReadReturnAsync(result, cancellationToken).ConfigureAwait(false);
+        var value = MarshalReturn(payload, payloadType);
         WriteAudit(context, binding.BindingId, binding.Capability, effects, startedAt, firstArgument: null);
-        return payloadType is null
-            ? SandboxValue.Unit
-            : KernelRpcMarshaller.ToSandboxValue(payload, payloadType);
+        return value;
     }
 
     private static SandboxEffect DeclaredEffects(

@@ -109,11 +109,13 @@ internal static partial class HostServiceBindingFactory
         var values = ConvertArguments(callTarget.ParameterTypes, args, startIndex: 0);
         var result = callTarget.Invoke(target, values);
         var payload = await callTarget.ReadReturnAsync(result, cancellationToken).ConfigureAwait(false);
+        var value = MarshalReturn(payload, payloadType);
         WriteAudit(context, bindingId, capability, effects, startedAt, values.Length > 0 ? values[0] : null);
-        return payloadType is null
-            ? SandboxValue.Unit
-            : KernelRpcMarshaller.ToSandboxValue(payload, payloadType);
+        return value;
     }
+
+    private static SandboxValue MarshalReturn(object? payload, Type? payloadType)
+        => payloadType is null ? SandboxValue.Unit : KernelRpcMarshaller.ToSandboxValue(payload, payloadType);
 
     private static object?[] ConvertArguments(
         Type[] parameterTypes,
