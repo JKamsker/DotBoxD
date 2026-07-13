@@ -48,7 +48,7 @@ public sealed partial class PluginAnalyzer
 
         ReportAndRecordForbiddenAwaiter(context, helperGraph, method, awaiterMethod.ContainingType, location);
         helperGraph.RecordCall(method, awaiterMethod, location);
-        ReportForbiddenReferencedMethodSignature(context, awaiterMethod, location);
+        ReportAndRecordForbiddenAwaiterResult(context, helperGraph, method, awaiterMethod, location);
         ReportLocalAwaiterUseIfInvalid(context, awaiterMethod, location);
     }
 
@@ -64,8 +64,33 @@ public sealed partial class PluginAnalyzer
             return;
         }
 
-        helperGraph.RecordForbidden(method, type!);
-        if (!IsEventKernel(method.ContainingType))
+        RecordAndReportForbiddenAwaiter(context, helperGraph, method, type!, location);
+    }
+
+    private static void ReportAndRecordForbiddenAwaiterResult(
+        SyntaxNodeAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol containingMethod,
+        IMethodSymbol awaiterMethod,
+        Location location)
+    {
+        if (!TryGetForbiddenHostApi(awaiterMethod.ReturnType, out var forbiddenType))
+        {
+            return;
+        }
+
+        RecordAndReportForbiddenAwaiter(context, helperGraph, containingMethod, forbiddenType, location);
+    }
+
+    private static void RecordAndReportForbiddenAwaiter(
+        SyntaxNodeAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol containingMethod,
+        ITypeSymbol forbiddenType,
+        Location location)
+    {
+        helperGraph.RecordForbidden(containingMethod, forbiddenType);
+        if (!IsEventKernel(containingMethod.ContainingType))
         {
             return;
         }
@@ -73,21 +98,7 @@ public sealed partial class PluginAnalyzer
         context.ReportDiagnostic(Diagnostic.Create(
             ForbiddenHostApiRule,
             location,
-            type!.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
-    }
-
-    private static void ReportForbiddenReferencedMethodSignature(
-        SyntaxNodeAnalysisContext context,
-        IMethodSymbol method,
-        Location location)
-    {
-        if (TryGetForbiddenHostApi(method.ReturnType, out var forbiddenType))
-        {
-            context.ReportDiagnostic(Diagnostic.Create(
-                ForbiddenHostApiRule,
-                location,
-                forbiddenType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
-        }
+            forbiddenType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
     }
 
     private static void ReportLocalAwaiterUseIfInvalid(
