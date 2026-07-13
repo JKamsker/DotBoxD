@@ -117,6 +117,7 @@ internal static partial class HostServiceBindingFactory
         var factoryResult = factoryCallTarget.Invoke(factoryTarget, factoryValues);
         var handle = await factoryCallTarget.ReadReturnAsync(factoryResult, cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException($"Host service factory '{factoryInterfaceMethod.Name}' returned null.");
+        cancellationToken.ThrowIfCancellationRequested();
         var handleValues = ConvertArguments(handleCallTarget.ParameterTypes, args, factoryCallTarget.ParameterTypes.Length);
         var result = handleCallTarget.Invoke(handle, handleValues);
         var payload = await handleCallTarget.ReadReturnAsync(result, cancellationToken).ConfigureAwait(false);
