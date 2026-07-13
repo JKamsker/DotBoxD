@@ -14,7 +14,14 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
     {
         if (TryResolveHandleReceiver(invocation, method, context) is not { } receiver)
         {
-            return LowerHostBindingArguments(invocation.ArgumentList.Arguments, method.Parameters, bindingId, lowerExpression);
+            var arguments = LowerHostBindingArguments(
+                invocation.ArgumentList.Arguments,
+                method.Parameters,
+                bindingId,
+                lowerExpression);
+            return IncludesValueReceiver(method, context.SemanticModel.Compilation)
+                ? PrependValueReceiver(invocation, method, bindingId, arguments, lowerExpression)
+                : arguments;
         }
 
         var factoryArguments = LowerHostBindingArguments(
@@ -28,6 +35,53 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
             bindingId,
             lowerExpression);
         return factoryArguments.Concat(handleArguments).ToArray();
+    }
+
+    private static IReadOnlyList<DotBoxDExpressionModel> PrependValueReceiver(
+        InvocationExpressionSyntax invocation,
+        IMethodSymbol method,
+        string bindingId,
+        IReadOnlyList<DotBoxDExpressionModel> arguments,
+        Func<ExpressionSyntax, DotBoxDExpressionModel> lowerExpression)
+    {
+        if (method.IsStatic ||
+            invocation.Expression is not MemberAccessExpressionSyntax memberAccess)
+        {
+            throw new NotSupportedException(
+                $"Host binding '{bindingId}' can include only an instance method receiver.");
+        }
+
+        var receiver = lowerExpression(memberAccess.Expression);
+        return new[] { receiver }.Concat(arguments).ToArray();
+    }
+
+    private static bool IncludesValueReceiver(IMethodSymbol method, Compilation compilation)
+    {
+        foreach (var attribute in method.GetAttributes())
+        {
+            if (!IsDotBoxDAttribute(attribute, compilation, DotBoxDMetadataNames.HostBindingAttribute))
+            {
+                continue;
+            }
+
+            if (attribute.ConstructorArguments.Length != 3 ||
+                attribute.ConstructorArguments[0].Value is not string bindingId ||
+                string.IsNullOrWhiteSpace(bindingId))
+            {
+                continue;
+            }
+
+            foreach (var argument in attribute.NamedArguments)
+            {
+                if (string.Equals(argument.Key, "IncludeReceiver", StringComparison.Ordinal) &&
+                    argument.Value.Value is true)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private static HostHandleReceiver? TryResolveHandleReceiver(

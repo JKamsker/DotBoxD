@@ -18,6 +18,7 @@ public BinaryExpression Or(Expression left, Expression right)
 public BinaryExpression Remainder(Expression left, Expression right)
 public BinaryExpression Subtract(Expression left, Expression right)
 public bool HasExplicitStepKind { get; }
+public bool IncludeReceiver { get; set; }
 public bool IsAsync { get; set; }
 public bool IsAutoBinding => BindingId.Length == 0
 public bool Success { get; }
