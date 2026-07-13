@@ -31,6 +31,7 @@ public sealed partial class PluginAnalyzer
     {
         var method = (IMethodSymbol)context.Symbol;
         helperGraph.RecordDispatchImplementations(method);
+        AnalyzeMethodAttributeTypes(helperGraph, method);
     }
 
     private static void AnalyzeProperty(SymbolAnalysisContext context)
@@ -199,4 +200,90 @@ public sealed partial class PluginAnalyzer
 
         return null;
     }
+
+    private static void AnalyzeMethodAttributeTypes(
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol method)
+    {
+        if (method.IsImplicitlyDeclared)
+        {
+            return;
+        }
+
+        foreach (var attribute in MethodAndParameterAttributes(method))
+        {
+            if (FirstForbiddenAttributeType(attribute) is not { } forbiddenType)
+            {
+                continue;
+            }
+
+            helperGraph.RecordForbidden(method, forbiddenType);
+        }
+    }
+
+    private static IEnumerable<AttributeData> MethodAndParameterAttributes(IMethodSymbol method)
+    {
+        foreach (var attribute in method.GetAttributes())
+        {
+            yield return attribute;
+        }
+
+        foreach (var attribute in method.GetReturnTypeAttributes())
+        {
+            yield return attribute;
+        }
+
+        foreach (var parameter in method.Parameters)
+        {
+            foreach (var attribute in parameter.GetAttributes())
+            {
+                yield return attribute;
+            }
+        }
+    }
+
+    private static ITypeSymbol? FirstForbiddenAttributeType(AttributeData attribute)
+    {
+        foreach (var argument in attribute.ConstructorArguments)
+        {
+            if (FirstForbiddenAttributeType(argument) is { } forbiddenType)
+            {
+                return forbiddenType;
+            }
+        }
+
+        foreach (var argument in attribute.NamedArguments)
+        {
+            if (FirstForbiddenAttributeType(argument.Value) is { } forbiddenType)
+            {
+                return forbiddenType;
+            }
+        }
+
+        return null;
+    }
+
+    private static ITypeSymbol? FirstForbiddenAttributeType(TypedConstant constant)
+    {
+        if (constant.Kind == TypedConstantKind.Type && constant.Value is ITypeSymbol type)
+        {
+            return FirstForbiddenHostApi(type);
+        }
+
+        if (constant.Kind == TypedConstantKind.Array)
+        {
+            foreach (var value in constant.Values)
+            {
+                if (FirstForbiddenAttributeType(value) is { } forbiddenType)
+                {
+                    return forbiddenType;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static Location? AttributeLocation(AttributeData attribute)
+        => attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation();
 }
