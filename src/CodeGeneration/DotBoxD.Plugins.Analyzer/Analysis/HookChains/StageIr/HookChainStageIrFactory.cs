@@ -133,6 +133,7 @@ internal static class HookChainStageIrFactory
             projectedElementName: elementParam,
             projectedElement: current,
             projectedElementType: inputType,
+            rootElementType: eventType,
             serverContextParameterName: contextParam,
             serverContextType: serverContextType,
             capabilities: capabilities,

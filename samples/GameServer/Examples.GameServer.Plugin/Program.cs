@@ -89,6 +89,13 @@ internal static class Program
             .Select(e => e.MonsterId)
             .Run((monsterId, ctx) => ctx.Messages.Send(monsterId, "calm:inline"));
 
+        // PlayerTargetContext opts all eligible public instance methods into host binding defaults. The plugin
+        // calls IsBelowLevel like an ordinary SDK helper; DotBoxD lowers the receiver plus argument into a
+        // capability-gated server call. LocalLabel is public too, but [HostBindingIgnore] keeps it local-only.
+        server.Hooks.On<PlayerTargetedEvent>()
+            .Where(e => e.Player.IsBelowLevel(3))
+            .Run((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm:" + e.PlayerId + ":10"));
+
         server.Subscriptions.On<AttackEvent>()
             .Where(e => e.Damage >= 5)
             .Select(e => e.AttackerId)

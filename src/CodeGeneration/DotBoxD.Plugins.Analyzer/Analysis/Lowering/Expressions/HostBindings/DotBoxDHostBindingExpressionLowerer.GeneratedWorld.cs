@@ -1,4 +1,6 @@
+using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
@@ -16,7 +18,103 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
             return new HostBindingInvocation(method, binding);
         }
 
-        return TryResolveGeneratedWorldBinding(invocation, context);
+        return TryResolveValueReceiverBinding(invocation, context) ??
+               TryResolveGeneratedWorldBinding(invocation, context);
+    }
+
+    private static HostBindingInvocation? TryResolveValueReceiverBinding(
+        InvocationExpressionSyntax invocation,
+        DotBoxDExpressionLoweringContext context)
+    {
+        if (invocation.Expression is not MemberAccessExpressionSyntax access ||
+            ResolveValueReceiverType(access.Expression, context) is not INamedTypeSymbol receiverType)
+        {
+            return null;
+        }
+
+        var candidates = Methods(receiverType, access.Name.Identifier.ValueText)
+            .Where(method => HostBinding(method, context.SemanticModel.Compilation) is not null)
+            .Where(method => ArgumentsMatch(invocation.ArgumentList.Arguments, method, context))
+            .ToArray();
+        if (candidates.Length == 0)
+        {
+            return null;
+        }
+
+        if (candidates.Length != 1)
+        {
+            throw new NotSupportedException(
+                $"Value receiver binding '{access.Name.Identifier.ValueText}' must resolve to one overload.");
+        }
+
+        return HostBinding(candidates[0], context.SemanticModel.Compilation) is { } binding
+            ? new HostBindingInvocation(candidates[0], binding)
+            : null;
+    }
+
+    private static bool ArgumentsMatch(
+        SeparatedSyntaxList<ArgumentSyntax> arguments,
+        IMethodSymbol method,
+        DotBoxDExpressionLoweringContext context)
+    {
+        if (!TryBindHostBindingArguments(arguments, method.Parameters, bindingId: null, out var bound))
+        {
+            return false;
+        }
+
+        foreach (var argument in bound.Assigned)
+        {
+            if (ResolveValueReceiverType(argument.Expression, context) is not { } argumentType ||
+                context.SemanticModel.Compilation is not CSharpCompilation compilation ||
+                !compilation.ClassifyConversion(
+                    argumentType,
+                    method.Parameters[argument.ParameterIndex].Type).IsImplicit)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static ITypeSymbol? ResolveValueReceiverType(
+        ExpressionSyntax expression,
+        DotBoxDExpressionLoweringContext context)
+    {
+        var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
+        if ((typeInfo.Type ?? typeInfo.ConvertedType) is { TypeKind: not TypeKind.Error } semanticType)
+        {
+            return semanticType;
+        }
+
+        if (expression is IdentifierNameSyntax identifier &&
+            string.Equals(identifier.Identifier.ValueText, context.ProjectedElementName, StringComparison.Ordinal))
+        {
+            return context.ProjectedElementType;
+        }
+
+        if (expression is IdentifierNameSyntax rootIdentifier &&
+            string.Equals(rootIdentifier.Identifier.ValueText, context.EventParameterName, StringComparison.Ordinal))
+        {
+            return context.RootElementType;
+        }
+
+        if (expression is not MemberAccessExpressionSyntax member ||
+            ResolveValueReceiverType(member.Expression, context) is not INamedTypeSymbol receiverType)
+        {
+            return null;
+        }
+
+        var memberName = member.Name.Identifier.ValueText;
+        foreach (var field in DotBoxDRpcTypeMapper.RecordFields(receiverType))
+        {
+            if (string.Equals(field.Name, memberName, StringComparison.Ordinal))
+            {
+                return field.Type;
+            }
+        }
+
+        return null;
     }
 
     private static HostBindingInvocation? TryResolveGeneratedWorldBinding(

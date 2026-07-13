@@ -1,4 +1,5 @@
 using System.Reflection;
+using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Runtime.Hooks;
 using DotBoxD.Plugins.Runtime.Rpc;
@@ -14,7 +15,17 @@ public enum GamePhase
 }
 
 /// <summary>A nested DTO field, exercised for record-in-record fidelity.</summary>
-public sealed record PlayerInfo(string Name, int Level);
+[HostBindingObject(
+    "host.player",
+    "probe.read.level",
+    SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+public sealed record PlayerInfo(string Name, int Level)
+{
+    public bool MeetsLevel(int minimum) => Level >= minimum;
+
+    [HostBindingIgnore]
+    public string LocalLabel() => Name + ":" + Level;
+}
 
 /// <summary>A DTO projected by a <c>new Dto(...)</c> Select, carrying a Guid alongside a scalar.</summary>
 public sealed record EncounterTicket(Guid EncounterId, string Zone);

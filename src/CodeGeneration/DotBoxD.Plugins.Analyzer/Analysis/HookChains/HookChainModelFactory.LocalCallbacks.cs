@@ -17,6 +17,7 @@ internal static partial class HookChainModelFactory
     {
         var projection = HookChainStageLowerer.CreateProjection(
             stages,
+            eventType,
             eventProperties,
             model,
             cancellationToken,

@@ -112,6 +112,21 @@ server.Hooks.On<MonsterAggroEvent>()
     .RunLocal(monsterId => calmedMonsters.Add(monsterId)); // native C#, runs in YOUR plugin process
 ```
 
+SDK value objects can expose eligible public instance methods with shared host-binding defaults. The
+receiver becomes argument zero, and ids derive from the prefix, method name, and parameter types:
+
+```csharp
+[HostBindingObject("host.player", "game.player.inventory.read",
+                   SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+public sealed record PlayerSnapshot(int Id, IReadOnlyList<int> ItemIds)
+{
+    public bool HasItem(int itemId) => ItemIds.Contains(itemId); // host.player.HasItem.i32
+
+    [HostBindingIgnore]
+    public string LocalLabel() => $"player:{Id}"; // remains local-only
+}
+```
+
 **Mode 3, abridged** (the host is frozen and exposes only a fine-grained `bool Kill(int id)`
 binding; the *plugin* ships the batch, and one round-trip replaces N):
 

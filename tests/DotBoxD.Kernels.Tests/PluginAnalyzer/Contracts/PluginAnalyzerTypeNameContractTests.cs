@@ -53,6 +53,8 @@ public sealed class PluginAnalyzerTypeNameContractTests
             [nameof(TypeNames.EventKernelInterface)] = OriginalTypeName(typeof(IEventKernel<>), "TEvent"),
             [nameof(TypeNames.RangeAttribute)] = TypeName(typeof(RangeAttribute)),
             [nameof(TypeNames.HostBindingAttribute)] = TypeName(typeof(HostBindingAttribute)),
+            [nameof(TypeNames.HostBindingObjectAttribute)] = TypeName(typeof(HostBindingObjectAttribute)),
+            [nameof(TypeNames.HostBindingIgnoreAttribute)] = TypeName(typeof(HostBindingIgnoreAttribute)),
             [nameof(TypeNames.CapabilityAttribute)] = TypeName(typeof(CapabilityAttribute)),
             [nameof(TypeNames.KernelMethodAttribute)] = TypeName(typeof(KernelMethodAttribute)),
             [nameof(TypeNames.LowerToIrAttribute)] = TypeName(typeof(LowerToIrAttribute)),

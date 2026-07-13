@@ -23,7 +23,10 @@ internal sealed class GameWorldHost
     public void Bind(GameWorld world) => _world = world;
 
     public void AddBindings(SandboxHostBuilder builder)
-        => builder.AddBindingsFrom<IGameWorldAccess>(new GameWorldAccess(RequireWorld));
+    {
+        builder.AddBindingsFrom<IGameWorldAccess>(new GameWorldAccess(RequireWorld));
+        builder.AddBindingsFrom<IPlayerTargetContextBindings>(new PlayerTargetContextBindings(RequireWorld));
+    }
 
     private GameWorld RequireWorld()
         => _world ?? throw new InvalidOperationException("Game world has not been bound.");
