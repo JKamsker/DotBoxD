@@ -33,6 +33,7 @@ internal static class DotBoxDMetadataNames
     public const string GameWorldAccessType = DotBoxDGenerationNames.TypeNames.GameWorldAccessType;
     public const string GameWorldMonsterSnapshotType = DotBoxDGenerationNames.TypeNames.GameWorldMonsterSnapshotType;
     public const string ExperimentalAttribute = "System.Diagnostics.CodeAnalysis.ExperimentalAttribute";
+    public const string UnsafeAccessorAttribute = DotBoxDGenerationNames.TypeNames.UnsafeAccessorAttribute;
 
     public static bool IsRpcServiceAttribute(string? typeName) =>
         typeName is RpcServiceAttribute;
