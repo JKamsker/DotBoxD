@@ -64,16 +64,7 @@ public sealed partial class PluginAnalyzer
             return;
         }
 
-        helperGraph.RecordForbidden(method, type!);
-        if (!IsEventKernel(method.ContainingType))
-        {
-            return;
-        }
-
-        context.ReportDiagnostic(Diagnostic.Create(
-            ForbiddenHostApiRule,
-            location,
-            type!.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
+        RecordAndReportForbiddenAwaiter(context, helperGraph, method, type!, location);
     }
 
     private static void ReportAndRecordForbiddenAwaiterResult(
@@ -88,6 +79,16 @@ public sealed partial class PluginAnalyzer
             return;
         }
 
+        RecordAndReportForbiddenAwaiter(context, helperGraph, containingMethod, forbiddenType, location);
+    }
+
+    private static void RecordAndReportForbiddenAwaiter(
+        SyntaxNodeAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol containingMethod,
+        ITypeSymbol forbiddenType,
+        Location location)
+    {
         helperGraph.RecordForbidden(containingMethod, forbiddenType);
         if (!IsEventKernel(containingMethod.ContainingType))
         {
