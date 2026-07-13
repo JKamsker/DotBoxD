@@ -254,7 +254,11 @@ internal static partial class HookChainModelFactory
         CancellationToken cancellationToken)
         => prepared.TerminalContextParam is null
             ? null
-            : LambdaParameterType(prepared.TerminalLambda, prepared.TerminalContextParam, model, cancellationToken);
+            : HookChainStageLambdaReader.ContextType(
+                prepared.TerminalLambda,
+                prepared.TerminalContextParam,
+                model,
+                cancellationToken);
 
     private static string BuildHandleReturnType(
         HookChainInterceptorInstallKind installKind,

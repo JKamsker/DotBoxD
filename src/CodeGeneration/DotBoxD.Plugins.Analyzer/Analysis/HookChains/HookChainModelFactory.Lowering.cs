@@ -190,7 +190,7 @@ internal static partial class HookChainModelFactory
                 continue;
             }
 
-            var (elementParam, contextParam) = LambdaParameters(stage.Lambda);
+            var (elementParam, contextParam) = HookChainStageLambdaReader.Parameters(stage.Lambda);
             if (elementParam is null || stage.Lambda.ExpressionBody is not { } body)
             {
                 throw new NotSupportedException();
@@ -203,7 +203,7 @@ internal static partial class HookChainModelFactory
                 Context(
                     elementParam,
                     contextParam,
-                    contextParam is null ? null : LambdaParameterType(stage.Lambda, contextParam, model, cancellationToken),
+                    HookChainStageLambdaReader.ContextType(stage.Lambda, contextParam, model, cancellationToken),
                     eventProperties,
                     projected,
                     projectedType,
@@ -254,26 +254,4 @@ internal static partial class HookChainModelFactory
                 capabilities: capabilities,
                 effects: effects);
 
-    private static ITypeSymbol? LambdaParameterType(
-        LambdaExpressionSyntax lambda,
-        string parameterName,
-        SemanticModel model,
-        CancellationToken cancellationToken)
-    {
-        if (lambda is ParenthesizedLambdaExpressionSyntax parenthesized)
-        {
-            foreach (var parameter in parenthesized.ParameterList.Parameters)
-            {
-                if (string.Equals(parameter.Identifier.ValueText, parameterName, StringComparison.Ordinal))
-                {
-                    var type = (model.GetDeclaredSymbol(parameter, cancellationToken) as IParameterSymbol)?.Type;
-                    return type is { TypeKind: not TypeKind.Error }
-                        ? type
-                        : GeneratedRemoteHookChainFallback.ServerContextTypeForLambda(lambda, model, cancellationToken);
-                }
-            }
-        }
-
-        return GeneratedRemoteHookChainFallback.ServerContextTypeForLambda(lambda, model, cancellationToken);
-    }
 }
