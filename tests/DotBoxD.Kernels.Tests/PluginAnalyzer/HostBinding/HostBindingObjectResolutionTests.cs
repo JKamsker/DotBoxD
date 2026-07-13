@@ -24,6 +24,10 @@ public sealed class HostBindingObjectResolutionTests
             [HostBinding("player.read.name", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
             public bool Matches(string value) => true;
 
+            public bool Measures(float value) => true;
+
+            public bool Measures(double value) => true;
+
             [HostBindingIgnore]
             public bool LocalOnly() => true;
 
@@ -47,6 +51,18 @@ public sealed class HostBindingObjectResolutionTests
         Assert.Equal("player.read.default", integer.Capability);
         Assert.Equal("host.player.Matches.string", text.BindingId);
         Assert.Equal("player.read.name", text.Capability);
+    }
+
+    [Fact]
+    public void Floating_point_overloads_get_distinct_routes()
+    {
+        var compilation = CreateCompilation();
+        var methods = PlayerContext(compilation).GetMembers("Measures").OfType<IMethodSymbol>().ToArray();
+        var single = Resolve(methods.Single(method => method.Parameters[0].Type.SpecialType == SpecialType.System_Single), compilation);
+        var doublePrecision = Resolve(methods.Single(method => method.Parameters[0].Type.SpecialType == SpecialType.System_Double), compilation);
+
+        Assert.Equal("host.player.Measures.f32", single.BindingId);
+        Assert.Equal("host.player.Measures.f64", doublePrecision.BindingId);
     }
 
     [Theory]

@@ -94,7 +94,8 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
             SpecialType.System_Boolean => "bool",
             SpecialType.System_Int32 => "i32",
             SpecialType.System_Int64 => "i64",
-            SpecialType.System_Double or SpecialType.System_Single => "f64",
+            SpecialType.System_Single => "f32",
+            SpecialType.System_Double => "f64",
             SpecialType.System_String => "string",
             _ => BindingIdentifierSegment(type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)),
         };
