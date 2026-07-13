@@ -56,40 +56,35 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
     }
 
     private static bool IncludesValueReceiver(IMethodSymbol method, Compilation compilation)
-    {
-        if (IsEligibleHostBindingObjectMethod(method) &&
-            !HasHostBindingIgnore(method, compilation) &&
-            HostBindingObject(method.ContainingType, compilation) is not null)
-        {
-            return true;
-        }
+        => IncludesObjectReceiver(method, compilation) || IncludesExplicitReceiver(method, compilation);
 
+    private static bool IncludesObjectReceiver(IMethodSymbol method, Compilation compilation)
+        => IsEligibleHostBindingObjectMethod(method) &&
+           !HasHostBindingIgnore(method, compilation) &&
+           HostBindingObject(method.ContainingType, compilation) is not null;
+
+    private static bool IncludesExplicitReceiver(IMethodSymbol method, Compilation compilation)
+    {
         foreach (var attribute in method.GetAttributes())
         {
-            if (!IsDotBoxDAttribute(attribute, compilation, DotBoxDMetadataNames.HostBindingAttribute))
+            if (!IsExplicitHostBinding(attribute, compilation))
             {
                 continue;
             }
 
-            if (attribute.ConstructorArguments.Length != 3 ||
-                attribute.ConstructorArguments[0].Value is not string bindingId ||
-                string.IsNullOrWhiteSpace(bindingId))
-            {
-                continue;
-            }
-
-            foreach (var argument in attribute.NamedArguments)
-            {
-                if (string.Equals(argument.Key, "IncludeReceiver", StringComparison.Ordinal) &&
-                    argument.Value.Value is true)
-                {
-                    return true;
-                }
-            }
+            return attribute.NamedArguments.Any(argument =>
+                string.Equals(argument.Key, "IncludeReceiver", StringComparison.Ordinal) &&
+                argument.Value.Value is true);
         }
 
         return false;
     }
+
+    private static bool IsExplicitHostBinding(AttributeData attribute, Compilation compilation)
+        => IsDotBoxDAttribute(attribute, compilation, DotBoxDMetadataNames.HostBindingAttribute) &&
+           attribute.ConstructorArguments.Length == 3 &&
+           attribute.ConstructorArguments[0].Value is string bindingId &&
+           !string.IsNullOrWhiteSpace(bindingId);
 
     private static HostHandleReceiver? TryResolveHandleReceiver(
         InvocationExpressionSyntax invocation,
