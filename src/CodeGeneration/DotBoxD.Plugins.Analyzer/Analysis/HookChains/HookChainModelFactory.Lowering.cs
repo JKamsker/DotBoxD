@@ -200,7 +200,7 @@ internal static partial class HookChainModelFactory
             var scratchEffects = new SortedSet<string>(StringComparer.Ordinal);
             projected = DotBoxDExpressionModelFactory.Create(
                 body,
-                Context(
+                HookChainExpressionLoweringContextFactory.Create(
                     elementParam,
                     contextParam,
                     HookChainStageLambdaReader.ContextType(stage.Lambda, contextParam, model, cancellationToken),
@@ -223,35 +223,5 @@ internal static partial class HookChainModelFactory
 
         return terminalElementTypeFullName;
     }
-
-    private static DotBoxDExpressionLoweringContext Context(
-        string elementParam,
-        string? contextParam,
-        ITypeSymbol? contextType,
-        EquatableArray<EventPropertyModel> eventProperties,
-        DotBoxDExpressionModel? projected,
-        ITypeSymbol? projectedType,
-        INamedTypeSymbol eventType,
-        SemanticModel model,
-        CancellationToken cancellationToken,
-        ICollection<string> capabilities,
-        ICollection<string> effects)
-        => projected is null
-            ? new DotBoxDExpressionLoweringContext(
-                elementParam, eventProperties, default, model, cancellationToken,
-                rootElementType: eventType,
-                serverContextParameterName: contextParam,
-                serverContextType: contextType,
-                capabilities: capabilities, effects: effects)
-            : new DotBoxDExpressionLoweringContext(
-                elementParam, eventProperties, default, model, cancellationToken,
-                projectedElementName: elementParam,
-                projectedElement: projected,
-                projectedElementType: projectedType,
-                rootElementType: eventType,
-                serverContextParameterName: contextParam,
-                serverContextType: contextType,
-                capabilities: capabilities,
-                effects: effects);
 
 }

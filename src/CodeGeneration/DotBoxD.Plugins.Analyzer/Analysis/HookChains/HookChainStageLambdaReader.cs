@@ -1,3 +1,4 @@
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -45,4 +46,34 @@ internal static class HookChainStageLambdaReader
 
         return GeneratedRemoteHookChainFallback.ServerContextTypeForLambda(lambda, model, cancellationToken);
     }
+}
+
+internal static class HookChainExpressionLoweringContextFactory
+{
+    public static DotBoxDExpressionLoweringContext Create(
+        string elementParameterName,
+        string? contextParameterName,
+        ITypeSymbol? contextType,
+        EquatableArray<EventPropertyModel> eventProperties,
+        DotBoxDExpressionModel? projectedElement,
+        ITypeSymbol? projectedElementType,
+        INamedTypeSymbol eventType,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        ICollection<string> capabilities,
+        ICollection<string> effects)
+        => new(
+            elementParameterName,
+            eventProperties,
+            default,
+            model,
+            cancellationToken,
+            projectedElementName: projectedElement is null ? null : elementParameterName,
+            projectedElement,
+            projectedElementType: projectedElement is null ? null : projectedElementType,
+            rootElementType: eventType,
+            serverContextParameterName: contextParameterName,
+            serverContextType: contextType,
+            capabilities: capabilities,
+            effects: effects);
 }

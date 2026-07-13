@@ -43,7 +43,7 @@ internal static class HookChainStageLowerer
         var projection = ApplySelects(
             stages, eventType, eventProperties, model, cancellationToken, capabilities, effects);
 
-        var context = Context(
+        var context = HookChainExpressionLoweringContextFactory.Create(
             terminalElementParam,
             terminalContextParam,
             terminalContextType,
@@ -155,7 +155,7 @@ internal static class HookChainStageLowerer
             throw new NotSupportedException();
         }
 
-        var context = Context(
+        var context = HookChainExpressionLoweringContextFactory.Create(
             elementParam,
             contextParam,
             HookChainStageLambdaReader.ContextType(stage.Lambda, contextParam, model, cancellationToken),
@@ -202,7 +202,7 @@ internal static class HookChainStageLowerer
             throw new NotSupportedException();
         }
 
-        var context = Context(
+        var context = HookChainExpressionLoweringContextFactory.Create(
             elementParam,
             contextParam,
             HookChainStageLambdaReader.ContextType(stage.Lambda, contextParam, model, cancellationToken),
@@ -226,33 +226,6 @@ internal static class HookChainStageLowerer
             DotBoxDStatementBodyModelFactory.Variable(name, value.Type),
             bodyType);
     }
-
-    private static DotBoxDExpressionLoweringContext Context(
-        string elementParam,
-        string? contextParam,
-        ITypeSymbol? contextType,
-        EquatableArray<EventPropertyModel> eventProperties,
-        DotBoxDExpressionModel? current,
-        ITypeSymbol? currentType,
-        INamedTypeSymbol eventType,
-        SemanticModel model,
-        CancellationToken cancellationToken,
-        ICollection<string> capabilities,
-        ICollection<string> effects)
-        => new(
-            elementParam,
-            eventProperties,
-            default,
-            model,
-            cancellationToken,
-            projectedElementName: current is null ? null : elementParam,
-            projectedElement: current,
-            projectedElementType: current is null ? null : currentType,
-            rootElementType: eventType,
-            serverContextParameterName: contextParam,
-            serverContextType: contextType,
-            capabilities: capabilities,
-            effects: effects);
 
     private static bool HasWhereAtOrAfter(IReadOnlyList<HookChainStage> stages, int index)
     {
