@@ -9,17 +9,17 @@ public sealed partial class PluginAnalyzer
     private static void AnalyzeListPattern(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
         var pattern = (IListPatternOperation)context.Operation;
-        RecordPatternMember(context, helperGraph, pattern.LengthSymbol);
-        RecordPatternMember(context, helperGraph, pattern.IndexerSymbol);
+        RecordReachableMember(context, helperGraph, pattern.LengthSymbol);
+        RecordReachableMember(context, helperGraph, pattern.IndexerSymbol);
     }
 
     private static void AnalyzeSlicePattern(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
         var pattern = (ISlicePatternOperation)context.Operation;
-        RecordPatternMember(context, helperGraph, pattern.SliceSymbol);
+        RecordReachableMember(context, helperGraph, pattern.SliceSymbol);
     }
 
-    private static void RecordPatternMember(
+    private static void RecordReachableMember(
         OperationAnalysisContext context,
         ForbiddenHelperCallGraph helperGraph,
         ISymbol? member)
@@ -27,15 +27,15 @@ public sealed partial class PluginAnalyzer
         switch (member)
         {
             case IMethodSymbol method:
-                RecordPatternMethod(context, helperGraph, method);
+                RecordReachableMethod(context, helperGraph, method);
                 break;
             case IPropertySymbol property:
-                RecordPatternProperty(context, helperGraph, property);
+                RecordReachableProperty(context, helperGraph, property);
                 break;
         }
     }
 
-    private static void RecordPatternMethod(
+    private static void RecordReachableMethod(
         OperationAnalysisContext context,
         ForbiddenHelperCallGraph helperGraph,
         IMethodSymbol target)
@@ -54,7 +54,7 @@ public sealed partial class PluginAnalyzer
         ReportLocalUseIfInvalid(context, target);
     }
 
-    private static void RecordPatternProperty(
+    private static void RecordReachableProperty(
         OperationAnalysisContext context,
         ForbiddenHelperCallGraph helperGraph,
         IPropertySymbol property)
