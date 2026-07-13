@@ -7,6 +7,8 @@ internal static class DotBoxDMetadataNames
     public const string EventKernelInterface = DotBoxDGenerationNames.TypeNames.EventKernelInterface;
     public const string RangeAttribute = DotBoxDGenerationNames.TypeNames.RangeAttribute;
     public const string HostBindingAttribute = DotBoxDGenerationNames.TypeNames.HostBindingAttribute;
+    public const string HostBindingObjectAttribute = DotBoxDGenerationNames.TypeNames.HostBindingObjectAttribute;
+    public const string HostBindingIgnoreAttribute = DotBoxDGenerationNames.TypeNames.HostBindingIgnoreAttribute;
     public const string CapabilityAttribute = DotBoxDGenerationNames.TypeNames.CapabilityAttribute;
     public const string KernelMethodAttribute = DotBoxDGenerationNames.TypeNames.KernelMethodAttribute;
     public const string LowerToIrAttribute = DotBoxDGenerationNames.TypeNames.LowerToIrAttribute;

@@ -16,6 +16,8 @@ internal sealed class RecordingGamePluginControlService : IGamePluginControlServ
 
     public List<string> Calls { get; } = [];
 
+    public List<PluginPackage> InstalledPackages { get; } = [];
+
     public byte[] RpcResponse { get; set; } = DefaultKillResultsResponse();
 
     public string? LastRpcPluginId { get; private set; }
@@ -30,6 +32,7 @@ internal sealed class RecordingGamePluginControlService : IGamePluginControlServ
     {
         ct.ThrowIfCancellationRequested();
         var package = PluginPackageJsonSerializer.Import(packageJson);
+        InstalledPackages.Add(package);
         var pluginId = package.Manifest.PluginId;
         Calls.Add("kernel:" + pluginId);
         return ValueTask.FromResult(RouteId(package));
@@ -39,6 +42,7 @@ internal sealed class RecordingGamePluginControlService : IGamePluginControlServ
     {
         ct.ThrowIfCancellationRequested();
         var package = PluginPackageJsonSerializer.Import(packageJson);
+        InstalledPackages.Add(package);
         var pluginId = package.Manifest.PluginId;
         Calls.Add("subscription:" + pluginId);
         return ValueTask.FromResult(RouteId(package));

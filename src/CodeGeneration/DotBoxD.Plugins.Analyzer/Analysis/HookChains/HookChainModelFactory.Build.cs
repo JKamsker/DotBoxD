@@ -76,6 +76,7 @@ internal static partial class HookChainModelFactory
         var terminalContextType = TerminalContextType(prepared, model, cancellationToken);
         var shouldHandle = HookChainStageLowerer.CreateShouldHandle(
             prepared.Stages,
+            eventShape.EventType,
             eventShape.EventProperties,
             model,
             cancellationToken,
@@ -118,6 +119,7 @@ internal static partial class HookChainModelFactory
                 prepared.TerminalElementParam,
                 prepared.TerminalContextParam,
                 terminalContextType,
+                eventShape.EventType,
                 eventShape.EventProperties,
                 model,
                 cancellationToken,
@@ -252,7 +254,11 @@ internal static partial class HookChainModelFactory
         CancellationToken cancellationToken)
         => prepared.TerminalContextParam is null
             ? null
-            : LambdaParameterType(prepared.TerminalLambda, prepared.TerminalContextParam, model, cancellationToken);
+            : HookChainStageLambdaReader.ContextType(
+                prepared.TerminalLambda,
+                prepared.TerminalContextParam,
+                model,
+                cancellationToken);
 
     private static string BuildHandleReturnType(
         HookChainInterceptorInstallKind installKind,

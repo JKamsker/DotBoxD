@@ -39,6 +39,7 @@ internal sealed class GamePluginKernelWiring
         // the host's explicit event surface, and exactly the set ValidateSupportedEvent allows below.
         server.Events.Resolve<MonsterAggroEvent>();
         server.Events.Resolve<AttackEvent>();
+        server.Events.Resolve<PlayerTargetedEvent>();
         server.Events.Resolve<RemoteDamageDecisionEvent>();
 
         RemoteLocalPush? push = eventCallback is null
@@ -62,6 +63,7 @@ internal sealed class GamePluginKernelWiring
         var subscription = SubscribedEvent(package.Manifest);
         if (MatchesEvent<MonsterAggroEvent>(subscription) ||
             MatchesEvent<AttackEvent>(subscription) ||
+            MatchesEvent<PlayerTargetedEvent>(subscription) ||
             MatchesEvent<RemoteDamageDecisionEvent>(subscription))
         {
             return;
