@@ -3,12 +3,12 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 
-namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Core.Security.Reachability.IndexRange;
 
 public sealed class PluginAnalyzerForbiddenApiIndexRangeReachabilityTests
 {
     private static readonly CSharpParseOptions ParseOptions =
-        CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+        CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.LatestMajor);
 
     [Fact]
     public async Task Reports_direct_forbidden_api_control()
