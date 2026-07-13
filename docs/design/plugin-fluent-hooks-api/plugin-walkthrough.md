@@ -1,9 +1,9 @@
-# Plugin process — what the code looks like after the plan
+# Plugin process - what the code looks like after the plan
 
 Companion to [plan.md](plan.md). Server side: [server-walkthrough.md](server-walkthrough.md).
 
 This shows the **end-state code** for the untrusted plugin process (`DotBoxD.Kernels.Game.Plugin`) once
-Phases A–C land. It is illustrative, not a diff — focus on *how the project reads*, not exact lines.
+Phases A–C land. It is illustrative, not a diff - focus on *how the project reads*, not exact lines.
 
 ## The mental model in one picture
 
@@ -34,7 +34,7 @@ Two key ideas this process is built around:
 ## The events it authors against (shared)
 
 These records live in `DotBoxD.Kernels.Game.Server.Abstractions`, referenced by both processes. The plugin
-writes kernels against them. **No event adapter is needed** — the framework infers the sandbox shape
+writes kernels against them. **No event adapter is needed** - the framework infers the sandbox shape
 from the record's properties via a convention adapter (`e_<PropertyName>`, CLR→sandbox type mapping).
 Optional property attributes (`[OpaqueId]`, `[SandboxParam]`, `[SandboxIgnore]`) cover the cases
 convention can't see. See ownership-auth-and-policy.md §3.
@@ -58,10 +58,10 @@ public sealed record AttackEvent(
 
 ---
 
-## 1. Kernels — plain C# implementing a server contract, lowered to verified IR
+## 1. Kernels - plain C# implementing a server contract, lowered to verified IR
 
 A kernel is authored as ordinary C# and implements one of the **server-published service contracts**
-(`IMonsterAggroService : IEventKernel<MonsterAggroEvent>`, defined in the shared abstractions — see
+(`IMonsterAggroService : IEventKernel<MonsterAggroEvent>`, defined in the shared abstractions - see
 [kernel-binding-model.md](kernel-binding-model.md) §2). The `[Plugin]` attribute + `partial` let the
 analyzer generate the `{X}PluginPackage` (the verified IR + a self-registration hook). **The author
 writes no IR**, and the analyzer detects the event transitively through the contract, so the IR
@@ -111,11 +111,11 @@ public sealed partial class RetaliationKernel : IAttackService   // : IEventKern
 }
 ```
 
-## 2. `Program` — registers kernels against the server's service contracts
+## 2. `Program` - registers kernels against the server's service contracts
 
 This is the headline change. **Before**, the plugin manually exported each kernel to JSON and called
 `InstallPluginAsync` with "opaque IR" narration. **After**, it *registers* each kernel as the
-implementation of a server service contract — the framework ships and installs the kernel IR
+implementation of a server service contract - the framework ships and installs the kernel IR
 automatically. See [kernel-binding-model.md](kernel-binding-model.md).
 
 ```csharp
@@ -135,7 +135,7 @@ internal static class Program
         }
 
         // (1) Record each kernel against the generated hook/subscription registries. StartAsync
-        //     ships + installs the verified IR for us — no Export, no InstallPluginAsync.
+        //     ships + installs the verified IR for us - no Export, no InstallPluginAsync.
         using var server = GamePluginServerBuilder
             .FromPipeName(args[0])
             .Setup(s =>
@@ -146,7 +146,7 @@ internal static class Program
             .Build();
         await server.StartAsync();
 
-        // (2) Tune live settings — strongly typed, one atomic IPC batch under the hood.
+        // (2) Tune live settings - strongly typed, one atomic IPC batch under the hood.
         await server.Get<GuardianKernel>()
             .Set(k => k.CalmStrength, 35)
             .Set(k => k.AggroRange, 6)
@@ -163,7 +163,7 @@ internal static class Program
 There are two complementary surfaces (full rationale in
 [kernel-binding-model.md](kernel-binding-model.md)):
 
-**(a) Registered kernels** — a kernel *class* recorded against a generated hook or subscription registry:
+**(a) Registered kernels** - a kernel *class* recorded against a generated hook or subscription registry:
 
 ```csharp
 using var server = GamePluginServerBuilder
@@ -172,7 +172,7 @@ using var server = GamePluginServerBuilder
     .Build();
 ```
 
-**(b) Hook chains** — inline lambda pipelines for ad-hoc logic (no kernel class). **Every
+**(b) Hook chains** - inline lambda pipelines for ad-hoc logic (no kernel class). **Every
 `Where`/`Select`/`Run` lambda is lowered to sandboxed IR**; only `RunLocal` stays native:
 
 ```csharp
@@ -189,7 +189,7 @@ server.Hooks.On<AttackEvent>()
 ```
 
 `server.Subscriptions` is the notification mirror of `server.Hooks`. Same `Where`/`Select`/`Run`/
-`RunLocal` chain surface — the difference is intent and dispatch:
+`RunLocal` chain surface - the difference is intent and dispatch:
 
 | | `server.Hooks` | `server.Subscriptions` |
 |---|---|---|
@@ -218,11 +218,11 @@ the same control plane. Plugin code never calls `IGamePluginControlService` dire
 
 ## 5. What the analyzer does (Phase C, behind the scenes)
 
-The author never sees this — but it's *why* the code above is safe. For each kernel and each
+The author never sees this - but it's *why* the code above is safe. For each kernel and each
 `Where`/`Select`/`Run` chain, the source generator emits a verified-IR package:
 
 ```csharp
-// GENERATED — illustrative. The author wrote GuardianKernel in plain C#.
+// GENERATED - illustrative. The author wrote GuardianKernel in plain C#.
 internal static class GuardianPluginPackage
 {
     public static PluginPackage Create() => /* verified DotBoxD.Kernels module: ShouldHandle + Handle */;
@@ -245,7 +245,7 @@ internal static class GuardianPluginPackage
 **Before (today):**
 
 ```csharp
-// plugin Program.cs — manual, narrates "opaque IR"
+// plugin Program.cs - manual, narrates "opaque IR"
 var guardianJson = PluginPackageJsonSerializer.Export(GuardianPluginPackage.Create());
 var guardianId   = await service.InstallPluginAsync(guardianJson);
 await service.UpdateSettingsAsync("guardian",
@@ -256,7 +256,7 @@ await service.UpdateSettingsAsync("guardian",
 **After (the plan):**
 
 ```csharp
-// plugin Program.cs — declarative; the framework ships the IR
+// plugin Program.cs - declarative; the framework ships the IR
 await server.StartAsync();
 await server.Get<GuardianKernel>()
     .Set(k => k.CalmStrength, 35)
@@ -264,6 +264,6 @@ await server.Get<GuardianKernel>()
     .ApplyAsync(atomic: true);
 ```
 
-Same two processes, same verified-IR safety guarantee, same IPC contract underneath — but the plugin
+Same two processes, same verified-IR safety guarantee, same IPC contract underneath - but the plugin
 now *registers a kernel against a server service contract*, and the framework handles shipping and
 installing the verified kernel IR.

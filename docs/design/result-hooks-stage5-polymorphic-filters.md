@@ -1,9 +1,9 @@
-# Follow-up: Stage 5 — polymorphic combatant filters for result hooks
+# Follow-up: Stage 5 - polymorphic combatant filters for result hooks
 
 > Status: **shipped / implemented**. Stages 0–4 of the
 > result-returning hooks plan (`Hooks.On<TContext>()` with `Register`/`RegisterLocal`, the `[HookResult]`
 > builder generator, object-initializer and fluent-builder lowering, runtime dispatch) and the game-server
-> combat sample shipped first; this document specced Stage 5 and the **v1 scope it describes is what landed** —
+> combat sample shipped first; this document specced Stage 5 and the **v1 scope it describes is what landed** -
 > the `[PolymorphicHandle]`/`[HandleSubtype]` attributes, the analyzer declaration-pattern lowering, the runtime
 > metadata readers, and end-to-end tests (`CombatPolymorphicSampleTests`) all exist. Follow-up issue #79 broadened
 > the original v1 subset to support declaration captures in `||` branches, conditional true branches, key-property
@@ -41,7 +41,7 @@ more declaration captures, declaration captures inside either branch of `||`, ke
 (`expr is T { Id: > 0 } local`), and a simple declaration-pattern condition whose `?:` true branch uses the capture.
 The captured local may be used only while the C# pattern scope is definitely guarded, and only as the receiver for
 instance `[HostBinding]` calls (`local.Method(args)`) or as the carried key. Capture escapes into later lambdas,
-unguarded branches, or unsupported pattern forms still fail safe — the chain does not lower and the existing
+unguarded branches, or unsupported pattern forms still fail safe - the chain does not lower and the existing
 un-lowered diagnostic (DBXK110/111/113) fires.
 
 ## Why this was a from-scratch subsystem
@@ -50,15 +50,15 @@ When this document was written there was **no** supporting infrastructure (all o
 stage shipped):
 
 - no `[PolymorphicHandle]` / `[HandleSubtype]` attributes;
-- no notion of an event property that is a **handle** (a host-resolved key) rather than a marshalled value —
+- no notion of an event property that is a **handle** (a host-resolved key) rather than a marshalled value -
   `ConventionEventAdapter` marshals every property through `KernelRpcMarshaller`, which rejects an abstract
   `Combatant`;
 - no declaration-pattern (`is T local`) handling in `DotBoxDPatternExpressionLowerer`;
 - no discriminator host-call lowering;
-- no scoped instance host-call (`local.Method(args)` threading the receiver key) — the `Get(key).Method()`
+- no scoped instance host-call (`local.Method(args)` threading the receiver key) - the `Get(key).Method()`
   mechanism referenced in older notes does not exist here.
 
-So Stage 5 is new code across the abstractions, the event adapter, the analyzer, and the sample — not wiring.
+So Stage 5 is new code across the abstractions, the event adapter, the analyzer, and the sample - not wiring.
 
 ## Design: the handle is a host-resolved scalar key
 
@@ -69,7 +69,7 @@ pipeline (capability collection, effect union, install-time gating) and avoids a
 
 | Authoring                                   | Lowers to (kernel IR)                                                            |
 |---------------------------------------------|---------------------------------------------------------------------------------|
-| `ctx.Attacker` (`[PolymorphicHandle]` prop) | `Var("e_Attacker")` — the key scalar the adapter produced                        |
+| `ctx.Attacker` (`[PolymorphicHandle]` prop) | `Var("e_Attacker")` - the key scalar the adapter produced                        |
 | `ctx.Attacker is PlayerCombatant a`         | `CallExpression("combatant.player.is", [e_Attacker]) -> bool`; binds `a = e_Attacker` |
 | `a.HasEquippedItem(itemRuntimeId)`          | `CallExpression("combatant.player.hasEquippedItem", [a, itemRuntimeId]) -> bool` |
 | `(x is T a) && rhs`                         | `And(discriminator, rhs[a := key])`                                             |
@@ -79,50 +79,50 @@ The `discriminator: "player"` + `bindingPrefix: "combatant.player"` give the bin
 
 ## Components and exact files
 
-1. **Attributes — `src/Hosting/DotBoxD.Abstractions/HookContracts.cs`**
+1. **Attributes - `src/Hosting/DotBoxD.Abstractions/HookContracts.cs`**
    - `PolymorphicHandleAttribute(string keyMember)` on `Class | Struct`.
    - `HandleSubtypeAttribute(Type subtype, string discriminator, string bindingPrefix, string capability)`,
      `AllowMultiple = true`.
    - Public API → refresh `docs/api-baselines/DotBoxD.Abstractions.txt`.
 
-2. **Generation-name constants — `…/Analysis/Lowering/DotBoxDGenerationNames.cs`**
+2. **Generation-name constants - `…/Analysis/Lowering/DotBoxDGenerationNames.cs`**
    - `TypeNames.PolymorphicHandleAttribute` / `HandleSubtypeAttribute` + `Metadata` aliases, and mirror them in
-     `tests/.../PluginAnalyzer/Contracts/PluginAnalyzerTypeNameContractTests.cs` (the set-based contract test —
+     `tests/.../PluginAnalyzer/Contracts/PluginAnalyzerTypeNameContractTests.cs` (the set-based contract test -
      this is the gate that already caught a missing mirror once).
 
-3. **Event-property-as-handle (analyzer) — `…/Analysis/PluginSymbolReader.cs` (`EventProperties`)**
+3. **Event-property-as-handle (analyzer) - `…/Analysis/PluginSymbolReader.cs` (`EventProperties`)**
    - When a property type carries `[PolymorphicHandle]`, emit its `EventPropertyModel` with the **key member's**
      scalar manifest tag + SandboxType (not the record's). The downstream lowering then reads `ctx.Attacker` as
-     that scalar via the existing `Var("e_Attacker")` path — no lowering change needed for the read itself.
+     that scalar via the existing `Var("e_Attacker")` path - no lowering change needed for the read itself.
 
-4. **Event-property-as-handle (runtime) — `…/Runtime/PluginEventAdapterRegistry.cs` (`ConventionEventAdapter`)**
+4. **Event-property-as-handle (runtime) - `…/Runtime/PluginEventAdapterRegistry.cs` (`ConventionEventAdapter`)**
    - For a `[PolymorphicHandle]` property, build the getter to return `value.<keyMember>` and the parameter
      `SandboxType` from the key member's type. (Reflect the `keyMember` once in the ctor.) A custom adapter can do
      the same; this only teaches the auto-adapter.
 
-5. **Declaration-pattern lowering — `…/Analysis/Lowering/DotBoxDPatternExpressionLowerer.cs`**
+5. **Declaration-pattern lowering - `…/Analysis/Lowering/DotBoxDPatternExpressionLowerer.cs`**
    - Add a `DeclarationPatternSyntax` arm: if the matched value is a handle and `T` is a `[HandleSubtype]` of its
      `[PolymorphicHandle]` base, emit the discriminator `CallExpression(prefix + ".is", [value])` and register the
      declared identifier (`a`) in the lowering context bound to the handle key IR + the subtype.
    - Collect the subtype `capability` into the manifest.
 
-6. **Binding the pattern variable — `…/Analysis/Lowering/Expressions/DotBoxDExpressionLoweringContext.cs`**
+6. **Binding the pattern variable - `…/Analysis/Lowering/Expressions/DotBoxDExpressionLoweringContext.cs`**
    - Add a small map `name -> (DotBoxDExpressionModel key, INamedTypeSymbol subtype)` for in-scope pattern
      captures. Captures are threaded only into branches where C# definite pattern scope keeps the discriminator
      guard in force: later operands in the same `&&` chain, the containing `||` branch, and a simple `?:` true
      branch. `LowerIdentifier(a)` returns the bound key IR.
 
-7. **Scoped instance host-call — `…/Analysis/Lowering/Expressions/DotBoxDHostBindingExpressionLowerer.cs`**
+7. **Scoped instance host-call - `…/Analysis/Lowering/Expressions/DotBoxDHostBindingExpressionLowerer.cs`**
    - Recognize `local.Method(args)` where `local` is a bound pattern capture and `Method` is an instance
-     `[HostBinding]` on the subtype: lower to `CallExpression(bindingId, [localKey, ...args])` — the receiver key
+     `[HostBinding]` on the subtype: lower to `CallExpression(bindingId, [localKey, ...args])` - the receiver key
      threaded as the leading argument. (Generalizes the current static-receiver host-call path.)
 
-8. **`&&` short-circuit shape — `DotBoxDExpressionModelFactory.LowerBinary`**
+8. **`&&` short-circuit shape - `DotBoxDExpressionModelFactory.LowerBinary`**
    - Ensure `(x is T a) && rhs` lowers `x is T a` first (introducing the capture), then `rhs` with `a` in scope.
      Multiple declaration captures in one `&&` chain are threaded left-to-right. Captures must not escape their
      guarded C# branch or lambda (fail safe if `a` is used elsewhere).
 
-9. **Runtime host bindings (sample/host) — sample or host registration**
+9. **Runtime host bindings (sample/host) - sample or host registration**
    - Register `combatant.player.is`, `combatant.player.hasEquippedItem`, `combatant.monster.is`,
      `combatant.monster.isBoss`, each taking the key (+ args) and resolving the entity from host world state. These
      are ordinary `HostServiceBindingFactory` bindings; no new runtime type.
@@ -163,4 +163,4 @@ TypeNames contract-test mirror. The lowering (items 5–8) is the subtle part; t
 
 A true opaque-handle value kind in the sandbox (a new `SandboxValue` subtype + VM/codec/marshaller switches) was
 rejected: per the "Sandbox value kind checklist," a new value kind is ~9 VM switches plus codec/converter/
-marshaller/emitter work — far larger than the key-scalar model, with no added capability for this use case.
+marshaller/emitter work - far larger than the key-scalar model, with no added capability for this use case.

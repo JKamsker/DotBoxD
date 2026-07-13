@@ -1,4 +1,4 @@
-# ADR 0003 — Host-Granted Bindings Only
+# ADR 0003 - Host-Granted Bindings Only
 
 ## Status
 

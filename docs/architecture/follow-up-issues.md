@@ -40,7 +40,7 @@ none of them block the current green build.
   The netstandard2.1 Services/Channels libraries themselves are cross-platform; this is a test-harness gap.
 
 - [ ] **Re-enable lock files + regenerate.** `RestorePackagesWithLockFile` is currently `false` and
-  `CentralPackageTransitivePinningEnabled` is off (disabled during the merge + rebrand churn — see
+  `CentralPackageTransitivePinningEnabled` is off (disabled during the merge + rebrand churn - see
   `Directory.Build.props` / `Directory.Packages.props`). Re-enable both and regenerate the lock files in
   the CI/release phase once project names are final.
 

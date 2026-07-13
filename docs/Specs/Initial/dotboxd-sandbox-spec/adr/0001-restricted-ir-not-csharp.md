@@ -1,4 +1,4 @@
-# ADR 0001 — Use Restricted IR, Not Arbitrary C#
+# ADR 0001 - Use Restricted IR, Not Arbitrary C#
 
 ## Status
 

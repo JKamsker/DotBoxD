@@ -1,4 +1,4 @@
-# 10 — Compiled Mode
+# 10 - Compiled Mode
 
 ## Purpose
 

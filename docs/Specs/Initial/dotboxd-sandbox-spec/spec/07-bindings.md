@@ -1,4 +1,4 @@
-# 07 — Bindings
+# 07 - Bindings
 
 ## Purpose
 

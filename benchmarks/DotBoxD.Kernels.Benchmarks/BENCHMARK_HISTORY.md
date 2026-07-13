@@ -353,16 +353,16 @@ local function call               0.2 ms     20.1 ms 100.0       23.0 ms  114.5
 ## Collection-build rogue fix (`--probe-rogue`)
 
 The micro-matrix above runs with `Fuel = long.MaxValue`. Under a realistic fuel cap, per-iteration metering
-already bounds wall-time — the verifier requires a `ChargeLoopIteration` on every loop back-edge, so the
+already bounds wall-time - the verifier requires a `ChargeLoopIteration` on every loop back-edge, so the
 compiled per-iteration metering "floor" is an intentional CPU-bound guarantee, not a removable cost. The
 genuine "rogue invocation" risk is algorithmic blow-up the fuel cap does not catch tightly.
 
 `--probe-rogue` builds a collection with repeated `list.add` / `map.set` at growing sizes (all quotas
 relaxed, so wall-time scaling is visible). It exposed an O(n^2) blow-up: each add/set had three independent
-O(n) costs — (a) re-walking the whole collection to measure its shape for `ChargeValue`, (b) copying the
+O(n) costs - (a) re-walking the whole collection to measure its shape for `ChargeValue`, (b) copying the
 whole backing store, and (c) deep-re-validating every element of the source via `AsList`/`AsMap`.
 
-Fix (charged fuel/shape are byte-identical to before — verified by the full 1591-test suite incl.
+Fix (charged fuel/shape are byte-identical to before - verified by the full 1591-test suite incl.
 differential/golden/fuel-accounting):
 
 - Incremental shape charging: compose the result shape and scan-fuel (`nodes / 64`) in O(1) from the
@@ -385,7 +385,7 @@ The micro-matrix is unchanged (no regression to `list.get` / `map.get` from the 
 
 ## Compiled per-execution floor was re-emit, not metering (in-memory artifact cache)
 
-Earlier notes blamed the ~17 ms compiled floor on the per-iteration metering call. That was **wrong** — a
+Earlier notes blamed the ~17 ms compiled floor on the per-iteration metering call. That was **wrong** - a
 strided-metering experiment removed the per-iteration `ChargeLoopIteration` and the `i32` loop did not move
 at all. A `trivial no-loop` probe (`return iterations`, zero work) then measured **~16-26 ms compiled vs
 0.2 ms interpreted (351x)** and did **not** amortize across back-to-back runs. The real floor: with no disk
@@ -394,7 +394,7 @@ the entire assembly on **every** `ExecuteAsync`.
 
 Fix: memoize the emitted+verified `CompiledArtifact` in-memory keyed by the deterministic cache key (only
 when no disk cache is configured; a disk cache must be consulted per call for invalidation/audit). Safety-
-preserving — the artifact is immutable and verified when first cached. Full 1591-test suite passes.
+preserving - the artifact is immutable and verified when first cached. Full 1591-test suite passes.
 
 ```text
 case                         compiled before   compiled after    x after
@@ -420,7 +420,7 @@ Two follow-ups closed the compiled gaps, then a baseline-fairness correction exp
 1. `ListCountLoopFastPathEmitter` wired to the closed-form `AccumulateLinearI32` → `list.count` compiled 5.6x -> 1.0x.
 2. `SandboxContext.EnterCall/ExitCall` marked `AggressiveInlining` (`eedb480`) → compiled `local function call`
    54x -> 6.7x. Depth enforcement byte-identical (full suite + `Fix_CMP_0023` green).
-3. Interpreter inline-call `try/finally` removed (`f4d3663`) — safety-preserving (throw aborts the run).
+3. Interpreter inline-call `try/finally` removed (`f4d3663`) - safety-preserving (throw aborts the run).
 4. **Baseline fairness:** the `local function call` handwritten baseline was `Increment(v) => v + 1`, which
    the JIT inlines and folds the whole loop to `total = iterations` (~0 ms). Every *other* baseline does real
    un-foldable per-iteration work. Replaced the body with `(value + 3) % 1000003` (same body on both sides,
@@ -450,26 +450,26 @@ trivial no-loop (diagnostic)      0.0 ms      0.6 ms  13.0        0.1 ms    1.9
 ## Final Status
 
 - **Compiled: <=2x on every loop benchmark.** Target met across the board.
-- **Interpreted: <=5x on every loop benchmark except `local function call` (7.2x)** — see below.
+- **Interpreted: <=5x on every loop benchmark except `local function call` (7.2x)** - see below.
 
-### `local function call` interpreted 7.2x — CLEARLY NOT POSSIBLE to reach <=5x within the project's safety constraints (marked and moved on, per goal directive)
+### `local function call` interpreted 7.2x - CLEARLY NOT POSSIBLE to reach <=5x within the project's safety constraints (marked and moved on, per goal directive)
 
 This is a *fair* number, not a benchmark artifact. The body's `% 1000003` is a **constant** modulo, which the
-JIT strength-reduces to a multiply-shift (~2 ns) in both the handwritten baseline and the compiled IL — that is
+JIT strength-reduces to a multiply-shift (~2 ns) in both the handwritten baseline and the compiled IL - that is
 why compiled is 1.1x. The interpreter holds the divisor as runtime data and executes a real `idiv` (~10 ns), so
 the body *alone* is ~5x before any call overhead; the unavoidable per-call depth-metering node (required by the
 `Fix_CMP_0023` safety guarantee) pushes it to 7.2x. Confirmed by the i32 case: the *same* fused modulo with no
 call is only ~3.7-4.9x.
 
 Why <=5x is not reachable here:
-- Any *fair* (non-foldable, non-overflowing) i32 benchmark body requires a modulo or division — affine bodies
-  either fold to a closed form or overflow the checked arithmetic — so this interpreter `idiv` cost is intrinsic
+- Any *fair* (non-foldable, non-overflowing) i32 benchmark body requires a modulo or division - affine bodies
+  either fold to a closed form or overflow the checked arithmetic - so this interpreter `idiv` cost is intrinsic
   to the whole class of code, not specific to this benchmark.
 - The only lever is constant-divisor strength reduction in the interpreter (magic-number multiply replacing
   `idiv`). That rewrites sandbox arithmetic where the interpreter and compiler must agree bit-for-bit; a subtle
   magic-number bug = wrong results for untrusted code. It was explicitly declined (deferred to a dedicated,
   sign-off-gated, separately-reviewed change). Cheaper call-overhead trims (inlining `EvaluateInlineCall`,
-  caching `MaxCallDepth`) were tried and had no measurable effect — the JIT already handles them.
+  caching `MaxCallDepth`) were tried and had no measurable effect - the JIT already handles them.
 - Absolute cost is ~18 ms / 1M calls, far under the wall-time guardrail.
 
 Decision (user-confirmed): accept 7.2x as the documented interpreter floor for constant-modulo call bodies.
@@ -551,7 +551,7 @@ documented, non-trivial-to-remove cause:
 1. **Interpreter constant-divisor `idiv`** (i32 4.9x, nested 6.8x, branch 12x, while 15x, local-call 9x): every
    *fair* non-foldable i32 body needs a `%`/`/`, which the JIT strength-reduces in handwritten/compiled code but
    the interpreter runs as a runtime `idiv` (~7-9 ns of a ~12 ns iteration). Removing it needs signed
-   magic-number division in sandbox arithmetic — declined (correctness-critical, sign-off-gated). A safe
+   magic-number division in sandbox arithmetic - declined (correctness-critical, sign-off-gated). A safe
    double-reciprocal variant would save only ~25%.
 2. **f64 per-op finiteness + no FMA** (f64 compiled 6x, interpreted 19x): the mandatory finiteness check and
    separate mul/add can't match the baseline's fused multiply-add. Structural.
@@ -564,7 +564,7 @@ Absolute times are all small (<= ~38 ms per 1M ops), far under the wall-time gua
 
 ## Reciprocal-modulo round (interpreter constant `idiv` removed)
 
-Implemented the previously-deferred interpreter constant-divisor strength reduction — but with a
+Implemented the previously-deferred interpreter constant-divisor strength reduction - but with a
 **provably-exact** method instead of fragile signed magic. For a positive constant divisor `d`, precompute
 `m = floor(2^32/d)`; for a non-negative dividend `a`, `q = (a*m)>>32` is `floor(a/d)` or one less, so one
 compare-subtract gives the exact remainder/quotient (no `idiv`; `a*m < 2^63`, no overflow). Negative dividends
@@ -577,12 +577,12 @@ several × (e.g. while ~15x->~9-15x depending on machine load; the remaining cos
 dispatch, not idiv). Caught and fixed a regression along the way: `RemainderByConst` broke the list-get
 cyclic-index detector (`i % 3`), restored by recognizing it in `TryGetRawVariableRemainderConstant`.
 
-### Proven floors (rigorously bounded — count as done)
+### Proven floors (rigorously bounded - count as done)
 
 - **f64 arithmetic (compiled ~6x, interpreted ~19x).** The f64 loop *is* bulk-charged (hits the fast path), so
-  this is not metering — it is the mandatory per-op finiteness check plus the lack of FMA. Proof that per-op
+  this is not metering - it is the mandatory per-op finiteness check plus the lack of FMA. Proof that per-op
   finiteness can't be deferred: `finite / (overflow→Inf)` yields a *finite* `0`, so an intermediate non-finite
-  must be caught at the op, not only at the end — checking only the final result would diverge. Floor.
+  must be caught at the op, not only at the end - checking only the final result would diverge. Floor.
 - **Compiled branch ~7x / while ~6x.** Data-dependent loops can't bulk-charge (per-iteration fuel depends on the
   taken path), so each iteration pays a mandatory metering charge the unmetered baseline doesn't. A branched/while
   fast-path with lump-per-iteration metering would cut this toward ~2-3x (next followup), but a per-iteration
@@ -599,8 +599,8 @@ cyclic-index detector (`i % 3`), restored by recognizing it in `TryGetRawVariabl
 
 - **i64 arithmetic boxes in both modes.** Confirmed by inspection: the interpreter `InterpreterFrame` has no raw
   i64 slots and the compiler has no `I64` `StackKind` (only I32/F64/Bool/Boxed). Unboxing i64 therefore needs a
-  new stack kind + raw frame slots across both modes — substantially larger than the f64 work (f64 already had
-  both) — for an uncommon type. Deferred as large + low-frequency.
+  new stack kind + raw frame slots across both modes - substantially larger than the f64 work (f64 already had
+  both) - for an uncommon type. Deferred as large + low-frequency.
 - **String building (concat/substring) loops.** Inherently allocation-bound (immutable strings allocate on both
   the handwritten and sandbox sides); also hard to benchmark fairly since constant-operand concats fold. Not a
   boxing/fast-path gap.
@@ -611,13 +611,13 @@ cyclic-index detector (`i % 3`), restored by recognizing it in `TryGetRawVariabl
 Extracted the unboxed i32 expression plan (`RawI32ExpressionPlan`) and added `BranchedI32LoopFastPathEmitter`
 and `WhileI32LoopFastPathEmitter`. These emit the condition + body as raw i32 with **bulk** per-iteration
 metering (loop base + if/condition in the loop meter; each branch/body charges its fuel once) instead of the
-general path's ~10 per-node metering calls — byte-identical total fuel, full suite + verifier green.
+general path's ~10 per-node metering calls - byte-identical total fuel, full suite + verifier green.
 
 - branch-in-loop compiled 7.2x -> **1.3x**
 - while-loop compiled 6.0x -> **1.3x**
 
-**Compiled now meets <=2x on every benchmark** except: `f64 arithmetic` (~6x — proven finiteness/FMA floor) and
-`trivial` (~15x — host-invocation diagnostic on a no-op). Both are documented floors, not open work.
+**Compiled now meets <=2x on every benchmark** except: `f64 arithmetic` (~6x - proven finiteness/FMA floor) and
+`trivial` (~15x - host-invocation diagnostic on a no-op). Both are documented floors, not open work.
 
 ### Closed-ledger state (clean run)
 
@@ -640,8 +640,8 @@ trivial (diagnostic)     14.8         1.7          host-overhead floor (compiled
 ### Interpreter tree-walking floor (the remaining interpreted over-5x cases)
 
 `local function call`, `branch`, `while` interpreted (~7-9x) and `f64` (~20x) are now boxing-free (unboxed i32/f64
-plans, reciprocal modulo). The residual is the interpreter's per-iteration **plan-tree dispatch** — recursively
-evaluating condition + body nodes each iteration — plus, for f64, the mandatory finiteness check. Eliminating
+plans, reciprocal modulo). The residual is the interpreter's per-iteration **plan-tree dispatch** - recursively
+evaluating condition + body nodes each iteration - plus, for f64, the mandatory finiteness check. Eliminating
 tree-walk overhead means compiling the body to a delegate/IL, which **is** the compiled mode; for every one of
 these shapes the compiled path is at target (<=1.3x). So the interpreter floor here is architectural: the
 compiled tier is the fast path, and it meets target. (i32/nested modulo loops stay <=5x because their single
@@ -649,7 +649,7 @@ fused body amortizes dispatch; structured loops with a condition + multiple node
 
 ### The one remaining open (non-floor) gap: i64
 
-i64 arithmetic still boxes in both modes — no `I64` `StackKind` (compiler) or raw i64 frame slots (interpreter).
+i64 arithmetic still boxes in both modes - no `I64` `StackKind` (compiler) or raw i64 frame slots (interpreter).
 Closing it needs that infrastructure across both tiers (larger than the entire f64 effort) for an uncommon type.
 This is the sole remaining *fixable* (not floor) corpus gap; deferred on cost/benefit, not on possibility.
 
@@ -657,28 +657,28 @@ This is the sole remaining *fixable* (not floor) corpus gap; deferred on cost/be
 
 Added an `i64 arithmetic loop` probe (`(total*5+7) % 1000003`) and found a real bug: `SandboxInt64Math`'s
 Add/Sub/Mul/Negate used `Checked(() => checked(...))`, allocating a capturing closure **per op**. Inlined the
-try/catch (identical overflow semantics) — broad win for all i64 work in both tiers. Then added compiled i64
+try/catch (identical overflow semantics) - broad win for all i64 work in both tiers. Then added compiled i64
 unboxing: `StackKind.I64`, `*I64Raw` helpers (checked), i64 raw arithmetic in `EmitBinary`, I64<->Boxed
 coercions, `Ldc_I8` literals, verifier allowlist.
 
 - i64 arithmetic compiled: 43.7ms/16.8x -> **15.6ms/5.6x** (lambda fix + unboxing).
-- i64 interpreted still boxes (~280x, GC-noisy) — needs unboxed interpreter frame slots.
+- i64 interpreted still boxes (~280x, GC-noisy) - needs unboxed interpreter frame slots.
 
 ### Remaining i64 parity (mirroring + frame work; the open continuation)
 
 - **Compiled i64 5.6x -> ~2x:** needs an i64 loop fast-path with bulk metering (mirror I32LoopFastPathEmitter +
   a RawI64ExpressionPlan). Currently i64 loops use the general per-node-metered path. Medium (mostly mirroring).
-- **Interpreted i64:** needs unboxed i64 in the interpreter — raw i64 frame slots in InterpreterFrame (the
+- **Interpreted i64:** needs unboxed i64 in the interpreter - raw i64 frame slots in InterpreterFrame (the
   delicate part), an I64ExpressionPlan, and an I64ForLoopRunner (mirror the f64 trio). Larger.
 
-## i64 fully unboxed (both tiers) — ledger closed
+## i64 fully unboxed (both tiers) - ledger closed
 
 Added unboxed i64 to the interpreter: raw i64 frame slots (`InterpreterFrame` + `SlotKind.I64`),
 `I64ExpressionPlan`, `I64ForLoopRunner`. With the earlier compiled i64 fast-path and the lambda-allocation fix,
 i64 is now unboxed in both tiers.
 
 - i64 arithmetic compiled: 16.8x -> **1.9x**; interpreted 133x -> **~10-12x** (boxing gone; residual is i64
-  idiv + tree-walk dispatch — the same floor class as the other structured interpreter loops).
+  idiv + tree-walk dispatch - the same floor class as the other structured interpreter loops).
 
 ### Final closed state
 
@@ -705,13 +705,13 @@ is at target or a documented, rigorously-argued floor:
   per-iteration dispatch (+ i64 idiv / f64 finiteness). Compiled is the fast path for every one of these shapes
   and meets target; matching it in a tree-walker means JIT-compiling, which *is* compiled mode.
 
-The only further lever is an i64 reciprocal modulo (interp i64 ~11x -> a few × lower) via 128-bit multiply —
+The only further lever is an i64 reciprocal modulo (interp i64 ~11x -> a few × lower) via 128-bit multiply -
 diminishing returns, still tree-walk bound. Documented for completeness; not pursued.
 
 ## i64 finished + re-architecture analysis (tiered execution understood)
 
 Completed i64: reciprocal modulo in the interpreter, and branchless i64 overflow detection in SandboxInt64Math
-(mirroring SandboxInt32Math — removed the try/catch inlining barrier). Compiled i64 5.2ms/1.8x -> 3.3ms/1.3x;
+(mirroring SandboxInt32Math - removed the try/catch inlining barrier). Compiled i64 5.2ms/1.8x -> 3.3ms/1.3x;
 interpreted i64 ~10x (tree-walk + checked-multiply floor). A 128-bit Int128 multiply check was tried and reverted
 (slow in the non-inlined interpreter: i64 interp 10x->26x).
 
@@ -721,13 +721,14 @@ emits no un-unloadable assemblies); compiler = the *hot* tier, tiered up to afte
 
 - **Hot/repeat code runs compiled, which is at target** (<=2x on every benchmark except f64 ~6x and the trivial
   diagnostic). This is the perf-critical path.
-- **The interpreted ratios on 1M-iteration loops measure the cold tier on a hot workload** — a scenario Auto mode
-  avoids by tiering up. The interpreter's job is fast startup + light/one-shot runs, not long-loop throughput.
+- **The interpreted ratios on 1M-iteration loops measure the cold tier on a hot workload.** Auto mode avoids those
+  measurements only after repeated calls cross `AutoCompileThreshold`; a one-shot 1M-iteration call can remain
+  interpreted throughout. The interpreter's job is fast startup + light/one-shot runs, not long-loop throughput.
 
 ### Re-architecture levers (and why they're not pursued)
 
 1. **Compiled f64 (~6x), the only hot-tier gap:** per-op finiteness checks serialize the FP pipeline vs a
-   JIT-tight baseline. Moving finiteness to store/observation points (security-equivalent — observed values stay
+   JIT-tight baseline. Moving finiteness to store/observation points (security-equivalent - observed values stay
    finite) only reaches ~5x (the FP ops + one remaining check + loop meter remain) and changes a tested spec
    (transient Inf->finite would stop throwing). Not worth a spec change for 6x->5x. Floor.
 2. **Interpreter tree-walk (cold tier, ~7-20x on long loops):** beating it without codegen means a bytecode-VM
@@ -740,13 +741,13 @@ tree-walk (by design, mooted by tier-up) and the f64 finiteness/pipeline floor. 
 gain reaches target; the only levers are a spec change (f64, doesn't reach target anyway) or a major cold-tier
 rewrite (OSR/bytecode-VM) whose payoff is mooted by tiering up.
 
-## f64 floor — PROVEN (upgraded from estimate)
+## f64 floor - PROVEN (upgraded from estimate)
 
 Investigated whether compiled f64 (~6x) could be improved by moving finiteness from per-op to store/observation
 points. It cannot, and this is now proven (not estimated):
 1. **Spec test:** `NumericOperatorTests` asserts f64 arithmetic overflow (`1e308 * 1e308`) throws *at the op*.
 2. **Cross-mode consistency:** the boxed path is `FromDouble(SandboxFloat64Math.Op(...))` per operation, and
-   `FromDouble` rejects non-finite — so the boxed path throws per-op. The unboxed path MUST match per-op or the
+   `FromDouble` rejects non-finite - so the boxed path throws per-op. The unboxed path MUST match per-op or the
    tiers diverge (e.g. `1.0/(huge*huge)`: per-op throws; deferred-check returns 0). The differential suite would
    catch the divergence.
 
@@ -766,15 +767,15 @@ ratio:
 
 - **f64 comparisons unboxed** (LtF64Raw/.../NeF64Raw): closed the last scalar-comparison boxing gap (analog of
   the i32 comparisons). Raw-scalar ABI extracted to CompiledRuntime.RawScalar.cs.
-- **`&&` / `||` short-circuit unboxing — attempted and reverted (proven floor).** Emitting compound boolean
+- **`&&` / `||` short-circuit unboxing - attempted and reverted (proven floor).** Emitting compound boolean
   conditions as unboxed bool (raw 0/1, no AsBool/Bool boxing) broke 13 verifier tests: the verifier *mandates*
   the boxed boolean short-circuit shape (AsBool + Bool) as a safety invariant. So unboxing `&&`/`||` is blocked
-  the same way f64 finiteness is — a verifier/security requirement, not an optimization gap. Reverted; 1591 green.
+  the same way f64 finiteness is - a verifier/security requirement, not an optimization gap. Reverted; 1591 green.
 
 ### Remaining edge cases (unbenchmarked + substantial; not pursued)
 
 `f64`/`i64`-bodied branched and while loops use the general per-node-metered path (the branched/while fast-paths
-are i32-only). A fast-path for them would mirror the i32 machinery for f64/i64 — substantial, with no benchmark
+are i32-only). A fast-path for them would mirror the i32 machinery for f64/i64 - substantial, with no benchmark
 showing the pattern is a real bottleneck, and (as the short-circuit attempt showed) edge-case codegen changes
 risk hidden verifier-invariant breakage. Mixed i32/i64 operands in one expression similarly fall back. These are
 speculative; left documented rather than implemented.
@@ -782,22 +783,22 @@ speculative; left documented rather than implemented.
 ## Branched-f64 + the combinatorial-fast-path signal
 
 Added i64 comparisons (all scalar comparisons i32/i64/f64 now unboxed) and a `branched f64 loop` probe
-(confirmed gap: compiled 21x, interpreted 251x). Built BranchedF64ForLoopRunner — interpreted 251x -> 34x
+(confirmed gap: compiled 21x, interpreted 251x). Built BranchedF64ForLoopRunner - interpreted 251x -> 34x
 (boxing gone; residual is per-op f64 finiteness + tree-walk). Compiled branched-f64 remains ~22x (the compiled
 branched fast-path is i32-only, so f64 bodies hit the general per-node-metered path).
 
 **Architectural signal:** the loop fast-paths are now indexed by (loop shape) x (scalar type): straight/branched/
-while x i32/i64/f64. Hand-mirroring each cell is combinatorial — branched-f64 compiled is one empty cell; while-
+while x i32/i64/f64. Hand-mirroring each cell is combinatorial - branched-f64 compiled is one empty cell; while-
 f64, branched-i64, while-i64, nested-non-i32 are others. The right fix is NOT N more emitters but a **general
 bulk-metered unboxed loop-body mechanism**: emit the body via the existing (already type-correct, unboxed)
 general ExpressionEmitter while charging the body's statically-known fuel once per branch/iteration instead of
 per node. That's a focused change to metering granularity (a "no-per-node-meter + bulk charge" mode) shared by
-all shapes/types — but it touches core emit + must keep cross-mode fuel identical and stay verifier-legal (the
+all shapes/types - but it touches core emit + must keep cross-mode fuel identical and stay verifier-legal (the
 short-circuit attempt showed core boolean/emit changes can break verifier invariants), so it warrants a careful
 dedicated pass rather than a context-tail hand-edit.
 
 Each remaining combinatorial cell is at worst the general path's per-node metering (compiled, ~20x for f64 due
-to the finiteness branches) or, where an interpreter runner is missing, boxing — both already characterized.
+to the finiteness branches) or, where an interpreter runner is missing, boxing - both already characterized.
 
 ## Anonymous RunLocal terminal decode
 

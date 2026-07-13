@@ -1,16 +1,19 @@
 ---
-title: 'DotBoxD Quick Start Guide'
+title: 'RPC channels quick start'
 ---
-> **New to DotBoxD?** Start with [Getting started](/getting-started/) and the [Tutorials](/tutorials/). This page is a deeper reference for the RPC channel layer (transports, codecs, generated registry).
+> **New to DotBoxD?** Start with [Getting started](/getting-started/) and the [Tutorials](/tutorials/).
+> This page and the rest of this section are the production deep dive for the RPC channel layer -
+> transports, codecs, and the generated registry. For choosing between transports, see
+> [Channels & transports](/concepts/channels-transports/).
 
-Get up and running with DotBoxD in 5 minutes.
+Get an RPC service running over TCP in 5 minutes.
 
 Reach for RPC channels when you want request/response host capabilities behind a shared contract:
 one C# interface compiles to a typed proxy plus dispatcher, so you get type-safe interop with no
 hand-written marshaling and no runtime reflection on the hot path. The interface is the single source
 of truth; AOT/IL2CPP deployments additionally require generated codec formatters, explicit registry
-rooting, and validation in the consumer build. Prefer a
-[query/event pipeline](/tutorials/event-pipeline-runlocal/) instead when the host should receive
+rooting, and validation in the consumer build. Prefer an
+[event pipeline](/tutorials/event-pipeline-runlocal/) instead when the host should receive
 only server-side filtered and projected data over a one-way push, or
 [pushdown](/concepts/pushdown/) when you need to collapse N round-trips into one server-side batch.
 
@@ -118,7 +121,7 @@ dotnet run --project Client
 
 Your shared project needs these references:
 
-> These `ProjectReference`s assume you are building inside the cloned DotBoxD repo; if you installed from NuGet ([getting started](/getting-started/)), reference the packages instead — the `DotBoxD.Services` package bundles `DotBoxD.Services.SourceGenerator` as an analyzer automatically, so you never add the generator as a standalone reference.
+> These `ProjectReference`s assume you are building inside the cloned DotBoxD repo; if you installed from NuGet ([getting started](/getting-started/)), reference the packages instead - the `DotBoxD.Services` package bundles `DotBoxD.Services.SourceGenerator` as an analyzer automatically, so you never add the generator as a standalone reference.
 
 ```xml
 <ItemGroup>
@@ -165,7 +168,7 @@ You can use the generated factory directly when building framework-style APIs:
 ```csharp
 using DotBoxD.Services.Generated;
 
-// CreateProxy takes an IRpcInvoker — pass an RpcPeer.
+// CreateProxy takes an IRpcInvoker - pass an RpcPeer.
 var proxy = DotBoxDGenerated.CreateProxy<IMyService>(peer);
 var dispatcher = DotBoxDGenerated.CreateDispatcher<IMyService>(new MyService());
 

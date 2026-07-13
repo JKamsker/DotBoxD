@@ -290,7 +290,7 @@ function Assert-CompletedItemEvidence {
     $docSpec = "docs/Specs/Initial/dotboxd-sandbox-spec"
     $documentationEvidence = @{
         "User-facing language docs." = @{ Path = "$docSpec/spec/04-ir-language.md"; Patterns = @("JSON IR", "IR design goals") }
-        "Host binding author guide." = @{ Path = "$docSpec/spec/07-bindings.md"; Patterns = @("# 07 — Bindings", "host-provided") }
+        "Host binding author guide." = @{ Path = "$docSpec/spec/07-bindings.md"; Patterns = @("# 07 - Bindings", "host-provided") }
         "Security model docs." = @{ Path = "$docSpec/spec/02-threat-model.md"; Patterns = @("Threat Model", "Assets to protect") }
         "Capability catalog." = @{ Path = "$docSpec/spec/08-runtime-safe-apis.md"; Patterns = @("Safe file API", "Safe network API") }
         "Error code reference." = @{ Path = "$docSpec/spec/09-interpreted-mode.md"; Patterns = @("E-POLICY-001", "E-RUNTIME-004") }

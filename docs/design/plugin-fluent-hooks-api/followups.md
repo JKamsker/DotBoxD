@@ -6,7 +6,7 @@ server never compiles plugin source.
 
 ---
 
-## 1. `[KernelMethod]` — call reusable kernel methods from hooks
+## 1. `[KernelMethod]` - call reusable kernel methods from hooks
 
 ### Goal
 
@@ -26,7 +26,7 @@ public static bool IsBullyingLowLevelPlayer(
 
 ### How it works (inlining, not calling)
 
-There is **no call** in the lowered IR — the method body is **inlined** at each call site. The generator:
+There is **no call** in the lowered IR - the method body is **inlined** at each call site. The generator:
 
 1. Resolves the invoked symbol and checks for `[KernelMethod]`
    ([DotBoxDKernelMethodInliner](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDKernelMethodInliner.cs)).
@@ -35,7 +35,7 @@ There is **no call** in the lowered IR — the method body is **inlined** at eac
 2. Lowers each call-site argument in the **calling** context (so a `[HostBinding]` call or
    `[Capability]`-gated read passed as an argument still contributes its capability to the kernel's
    manifest).
-3. Lowers the method's body with each parameter name bound to its already-lowered argument IR — the same
+3. Lowers the method's body with each parameter name bound to its already-lowered argument IR - the same
    compile-time substitution the `Select` projection uses (`ProjectedElement`), generalized to N
    parameters via `DotBoxDExpressionLoweringContext.InlinedBindings` and resolved first in
    `LowerIdentifier` (so a parameter correctly shadows a same-named live setting).
@@ -54,12 +54,12 @@ benefits from the same `catch (NotSupportedException)` fail-safe in `HookChainMo
 ### Constraints (verified at generation time; violation fails safe)
 
 - The method must be **`static`**.
-- Its body must be an **expression body** or a **single `return` statement** (no locals/loops — those are
+- Its body must be an **expression body** or a **single `return` statement** (no locals/loops - those are
   what the kernel-RPC statement lowerer in §2 adds for the batch-entrypoint shape).
-- Parameters and return must be **supported scalars** (`bool`, `int`, `long`, `double`, `string`) — the
+- Parameters and return must be **supported scalars** (`bool`, `int`, `long`, `double`, `string`) - the
   same scalar set the rest of the lowering pipeline uses. A host-service interface cannot be passed as a
   parameter; call the `[HostBinding]` directly and pass its scalar result.
-- **No recursion** — a `[KernelMethod]` inlining itself (directly or transitively) is rejected via an
+- **No recursion** - a `[KernelMethod]` inlining itself (directly or transitively) is rejected via an
   inline-stack guard.
 
 ### Incrementality note
@@ -91,7 +91,7 @@ under a wildcard grant), and the multi-statement-body fail-safe (no chain packag
 
 Let a plugin ship a **batch operation** that runs server-side in a single roundtrip, so a loop over many
 entities executes on the server (calling the host's existing bindings) instead of one network call per
-entity — and so it can take and return **complex objects and lists of objects**. The motivating shape:
+entity - and so it can take and return **complex objects and lists of objects**. The motivating shape:
 
 ```csharp
 await server.RegisterServerExtensionAsync<IMonsterKillerService, MonsterKillerKernel>();
@@ -116,11 +116,11 @@ public sealed partial class MonsterKillerKernel
 ### Why it is a sandboxed kernel (not trusted RPC)
 
 In the target deployment the **server is frozen at release**; only plugins change. So the batch logic
-must be shipped by the plugin and run on the server — and to be safe that means **verified, sandboxed
+must be shipped by the plugin and run on the server - and to be safe that means **verified, sandboxed
 IR** (the same trust model as event kernels), calling only the host bindings the server already exposes.
 A bespoke trusted RPC endpoint per plugin is impossible (the server cannot be recompiled).
 
-### The record type — complex objects in the sandbox
+### The record type - complex objects in the sandbox
 
 Complex objects required a new composite **`Record`** type in the IR (§ "IR record/object type" commit):
 `SandboxType.Record([fieldTypes])` + `RecordValue` + the `record.new`/`record.get` intrinsics, threaded
@@ -129,7 +129,7 @@ record is a **positional** tuple; field *names* live in the analyzer and the hos
 map a C# DTO's members to record fields by **declaration order**. `List<Record>` is a list of objects.
 
 Records run under both execution modes. The **interpreter** is the reference (validation, capabilities,
-resource limits); the **compiler** emits fast, verifier-checked IL for `record.new`/`record.get` —
+resource limits); the **compiler** emits fast, verifier-checked IL for `record.new`/`record.get` -
 `EmitSandboxType` builds the field-type array through the trusted `CompiledRuntime.CreateTypeArray`
 facade (like the value-array path), so the verifier's `newarr` restriction (SandboxValue only) is
 unchanged, and the allowlist simply gains `RecordNew`/`RecordGet`/`TypeRecord`/`CreateTypeArray`.
@@ -141,7 +141,7 @@ compile to IL like event kernels.
 | Layer | What it does |
 |---|---|
 | **Authoring** ([`[ServerExtension]`](../../../src/Hosting/DotBoxD.Abstractions/Contracts.cs)) | Marks the class; its one public batch method (trailing `HookContext` = host-binding marker) is the entrypoint. Supplying the service interface type lets the analyzer emit a source-generated client proxy for IPC/plugin-side calls. |
-| **Lowering** ([`RpcKernelModelFactory`](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Rpc/RpcKernelModelFactory.cs), [`DotBoxDRpcJsonLowerer`](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Rpc/DotBoxDRpcJsonLowerer.cs)) | Lowers the method body to verified IR **JSON** and emits a `<Name>PluginPackage` whose `Create()` imports it — so it ships exactly like an event kernel. Supports locals, a `foreach` over a list, `if`/`else`, host bindings, DTO construction (`new T(...)`/`new T{...}` → `record.new`), list accumulation (`list.Add` → `list.add`), indexing/`.Count`, and `return`. |
+| **Lowering** ([`RpcKernelModelFactory`](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Rpc/RpcKernelModelFactory.cs), [`DotBoxDRpcJsonLowerer`](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Rpc/DotBoxDRpcJsonLowerer.cs)) | Lowers the method body to verified IR **JSON** and emits a `<Name>PluginPackage` whose `Create()` imports it - so it ships exactly like an event kernel. Supports locals, a `foreach` over a list, `if`/`else`, host bindings, DTO construction (`new T(...)`/`new T{...}` → `record.new`), list accumulation (`list.Add` → `list.add`), indexing/`.Count`, and `return`. |
 | **Package + install** ([`PluginManifest.RpcEntrypoint`](../../../src/Hosting/DotBoxD.Plugins/PluginManifest.cs), [`RpcKernelPackageValidator`](../../../src/Hosting/DotBoxD.Plugins/Runtime/Rpc/RpcKernelPackageValidator.cs)) | A distinct package shape (no event subscription/contract) validated and installed via `InstallServerExtensionAsync` / `PluginSession.InstallServerExtensionAsync` (owned + revoked on disconnect, like event kernels). |
 | **Invoke** ([`InstalledKernel.InvokeServerExtensionAsync`](../../../src/Hosting/DotBoxD.Plugins/Kernel/InstalledKernel.Rpc.cs)) | Binds caller args to the entrypoint's leading parameters (live settings fill the trailing ones), runs the IR once under the execution gate, and **returns** the result value (not discarded). |
 | **Typed surface** ([`ServerExtensionProxy`](../../../src/Hosting/DotBoxD.Plugins/Runtime/Rpc/ServerExtensionProxy.cs), [`PluginServer.ServerExtension`](../../../src/Hosting/DotBoxD.Plugins/Runtime/Rpc/PluginServer.Rpc.cs)) | `RegisterServerExtensionAsync<TService, TKernel>()` installs the kernel and binds the contract; `ServerExtension<TService>()` keeps the in-process runtime proxy path. For IPC/plugin-side calls, the analyzer emits a concrete `<Kernel>ServerExtensionClient` that writes/reads supported C# shapes directly, without `DispatchProxy` reflection. |
@@ -155,7 +155,7 @@ builds lists/records) + the binding effects, matched against the verified entryp
 
 ### Constraints / current scope
 
-- Runs interpreted **or compiled** — record IR compiles to verified IL (the GameServer example installs
+- Runs interpreted **or compiled** - record IR compiles to verified IL (the GameServer example installs
   its kernels in `ExecutionMode.Compiled`).
 - One batch method per service; parameters/return/DTO fields use the supported scalars, lists, or nested
   DTOs. DTO fields map by **declaration order** (positional records → constructor-parameter order).
@@ -188,7 +188,7 @@ made that compiled IL **fast** without weakening any safety invariant.
 - **Per-op boxing.** Every scalar operation allocated a `SandboxValue` (a heap `record`). A tight integer
   loop allocated several objects per iteration.
 - **A hidden closure per arithmetic op.** `SandboxInt32Math.Add/Subtract/Multiply/Negate` were written as
-  `Checked(() => checked(...))` — each call allocated a `Func<int>` *and* the `try/catch` blocked JIT
+  `Checked(() => checked(...))` - each call allocated a `Func<int>` *and* the `try/catch` blocked JIT
   inlining. This penalized the interpreter too.
 - **A non-inlined metering call chain.** Each fuel charge went `CompiledRuntime.ChargeFuel` →
   `SandboxContext.ChargeFuel` → `ResourceMeter.ChargeFuel`, none inlined across assemblies.
@@ -199,7 +199,7 @@ made that compiled IL **fast** without weakening any safety invariant.
   and `+ - * / %`; values are boxed/unboxed only at boundaries (binding/function args, comparisons,
   return). Overflow/divide semantics are preserved by `*I32Raw` facades over the same `SandboxInt32Math`.
   Comparisons and all non-I32 types stay boxed so the stack-type verifier sees well-typed values.
-- **Branchless `SandboxInt32Math`.** Overflow is detected with bit tests — no closures, no `try/catch`,
+- **Branchless `SandboxInt32Math`.** Overflow is detected with bit tests - no closures, no `try/catch`,
   allocation-free and inlineable. Identical `InvalidInput` errors.
 - **`AggressiveInlining`** on the metering chain, the scalar box/unbox conversions, and the raw arithmetic
   so the JIT collapses them into the generated code.
@@ -208,7 +208,7 @@ made that compiled IL **fast** without weakening any safety invariant.
 
 Unboxing is **fuel-transparent**: compiled fuel is identical to the all-boxed path. Scalar box/unbox
 coercions are O(1) and verifier-classified as **non-metered work**
-(`GeneratedMethodShapeSignatures.IsScalarConversionCall`) — the same treatment literal construction already
+(`GeneratedMethodShapeSignatures.IsScalarConversionCall`) - the same treatment literal construction already
 gets. The per-op fuel/loop metering, the instruction-sparsity bound (<=32 instructions between meters), the
 stack-type checks, and the per-work-call meter-density rule all still hold; `Verifier*` and golden tests
 prove the shape and fuel are unchanged.
@@ -216,7 +216,7 @@ prove the shape and fuel are unchanged.
 ### Result and the floor
 
 Worst-case probe (`dotnet run -c Release -- --probe-compiled`, a 20M-iteration `total = (total + i) % N`
-loop): handwritten **1.0x**, compiled IL **~8x**, interpreted **~55x** — down from ~22x compiled before this
+loop): handwritten **1.0x**, compiled IL **~8x**, interpreted **~55x** - down from ~22x compiled before this
 pass. The residual gap is **mandatory per-operation safety metering** (fuel + loop-iteration + amortized
 deadline checks): a two-op loop body still carries ~6 fuel charges per iteration. That count is fixed by
 the interpreter/compiled fuel-parity contract and the sandbox safety model, so it cannot be reduced without

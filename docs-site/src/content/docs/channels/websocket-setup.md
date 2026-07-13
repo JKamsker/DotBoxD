@@ -522,7 +522,7 @@ app.Map("/rpc", async context =>
     var ws = await context.WebSockets.AcceptWebSocketAsync();
 
     // WebSocketConnection implements IRpcChannel, so it plugs
-    // straight into RpcPeer.Over — no builder or manual dispatch loop required.
+    // straight into RpcPeer.Over - no builder or manual dispatch loop required.
     await using var connection = new WebSocketConnection(
         ws, context.Connection.RemoteIpAddress?.ToString() ?? "unknown");
     await using var peer = RpcPeer

@@ -9,7 +9,7 @@ must pass, and commit conventions.
 ## Prerequisites
 
 - **.NET SDK 10.0** (the repo pins `10.0.204` with `latestFeature` roll-forward via `global.json`).
-- The build targets multiple runtimes — CI installs the **.NET 8, 9, and 10** SDKs. Projects target
+- The build targets multiple runtimes - CI installs the **.NET 8, 9, and 10** SDKs. Projects target
   `net10.0` (Kernels/Pushdown) and `netstandard2.1` (Services/channels, for Unity/IL2CPP).
 - PowerShell 7+ is needed to run the gate scripts under `eng/scripts/` locally.
 
@@ -39,14 +39,14 @@ The build runs the .NET analyzers (`AnalysisLevel` 10) plus **Roslynator** and *
 with every rule severity configured centrally in [`.editorconfig`](https://github.com/JKamsker/DotBoxD/blob/main/.editorconfig). Because warnings
 are errors in CI, a new analyzer finding fails the build. The `.editorconfig` documents, per rule,
 which rules are enforced and which are deliberately disabled (with the reason). Format your changes
-with `dotnet format` before pushing — CI verifies formatting with
+with `dotnet format` before pushing - CI verifies formatting with
 `dotnet format whitespace --verify-no-changes`.
 
 ## CI gates
 
 Every pull request runs the `ci` workflow (`.github/workflows/ci.yml`):
 
-**Build & test** — restore, build, and `dotnet test` on `ubuntu-latest` and `windows-latest` with
+**Build & test** - restore, build, and `dotnet test` on `ubuntu-latest` and `windows-latest` with
 the .NET 8/9/10 SDKs.
 
 **Security & quality gates** (`eng/scripts/`):
@@ -68,7 +68,7 @@ The `tests/DotBoxD.Architecture.Tests` project additionally enforces layer depen
 conventions, and that the analyzer configuration is not silently weakened; it runs as part of the
 test matrix.
 
-**Package validation** — after build/test and gates pass, CI packs every product package, runs
+**Package validation** - after build/test and gates pass, CI packs every product package, runs
 `check-package-metadata.ps1`, runs the package consumer smoke test, and uploads the package artifact.
 Pushes to `main` in `JKamsker/DotBoxD` then publish `0.1.0-ci.<run>` prerelease packages to NuGet.org.
 
