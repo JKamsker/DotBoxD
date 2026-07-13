@@ -215,6 +215,7 @@ internal static partial class ProxyGenerator
 
     private static void AppendProxyFooter(StringBuilder sb, ServiceModel service)
     {
+        AppendCallerCancellationHelpers(sb);
         sb.AppendLine("    }");
         if (!string.IsNullOrEmpty(service.Namespace))
         {
@@ -222,6 +223,36 @@ internal static partial class ProxyGenerator
         }
 
         GeneratedWarningPragmaEmitter.AppendRestore(sb, service.ExperimentalDiagnosticId);
+    }
+
+    private static void AppendCallerCancellationHelpers(StringBuilder sb)
+    {
+        sb.AppendLine();
+        sb.AppendLine($"        private static async {ServicesGeneratorTypeNames.GlobalTask} __dotboxd_observeCallerCancellationAsync({ServicesGeneratorTypeNames.GlobalTask} task, {ServicesGeneratorTypeNames.GlobalCancellationToken} ct)");
+        sb.AppendLine("        {");
+        sb.AppendLine("            await task.ConfigureAwait(false);");
+        sb.AppendLine("            ct.ThrowIfCancellationRequested();");
+        sb.AppendLine("        }");
+        sb.AppendLine();
+        sb.AppendLine($"        private static async {ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalTask, "T")} __dotboxd_observeCallerCancellationAsync<T>({ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalTask, "T")} task, {ServicesGeneratorTypeNames.GlobalCancellationToken} ct)");
+        sb.AppendLine("        {");
+        sb.AppendLine("            var result = await task.ConfigureAwait(false);");
+        sb.AppendLine("            ct.ThrowIfCancellationRequested();");
+        sb.AppendLine("            return result;");
+        sb.AppendLine("        }");
+        sb.AppendLine();
+        sb.AppendLine($"        private static async {ServicesGeneratorTypeNames.GlobalValueTask} __dotboxd_observeCallerCancellationAsync({ServicesGeneratorTypeNames.GlobalValueTask} task, {ServicesGeneratorTypeNames.GlobalCancellationToken} ct)");
+        sb.AppendLine("        {");
+        sb.AppendLine("            await task.ConfigureAwait(false);");
+        sb.AppendLine("            ct.ThrowIfCancellationRequested();");
+        sb.AppendLine("        }");
+        sb.AppendLine();
+        sb.AppendLine($"        private static async {ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalValueTask, "T")} __dotboxd_observeCallerCancellationAsync<T>({ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalValueTask, "T")} task, {ServicesGeneratorTypeNames.GlobalCancellationToken} ct)");
+        sb.AppendLine("        {");
+        sb.AppendLine("            var result = await task.ConfigureAwait(false);");
+        sb.AppendLine("            ct.ThrowIfCancellationRequested();");
+        sb.AppendLine("            return result;");
+        sb.AppendLine("        }");
     }
 
 }
