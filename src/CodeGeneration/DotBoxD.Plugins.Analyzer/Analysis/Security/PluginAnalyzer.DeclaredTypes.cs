@@ -6,6 +6,15 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 public sealed partial class PluginAnalyzer
 {
+    private static void AnalyzeNamedType(SymbolAnalysisContext context)
+    {
+        var type = (INamedTypeSymbol)context.Symbol;
+        if (type.TypeKind == TypeKind.Delegate && type.DelegateInvokeMethod is { } invoke)
+        {
+            ReportForbiddenDeclaredMethodSignature(context, invoke);
+        }
+    }
+
     private static void AnalyzeField(SymbolAnalysisContext context)
     {
         var field = (IFieldSymbol)context.Symbol;
@@ -36,7 +45,7 @@ public sealed partial class PluginAnalyzer
     private static void AnalyzeProperty(SymbolAnalysisContext context)
     {
         var property = (IPropertySymbol)context.Symbol;
-        ReportForbiddenDeclaredPropertyType(context, property);
+        ReportForbiddenDeclaredPropertySignature(context, property);
         if (HasAttribute(property, DotBoxDMetadataNames.NativeOnlyAttribute))
         {
             ValidateLocalMember(context, property, property);
@@ -56,8 +65,27 @@ public sealed partial class PluginAnalyzer
         }
     }
 
-    private static void ReportForbiddenDeclaredPropertyType(SymbolAnalysisContext context, IPropertySymbol property)
-        => ReportForbiddenDeclaredType(context, property.ContainingType, property.Type, property.Locations.FirstOrDefault());
+    private static void ReportForbiddenDeclaredPropertySignature(SymbolAnalysisContext context, IPropertySymbol property)
+    {
+        if (!IsDeclaredInEventKernelSurface(property.ContainingType))
+        {
+            return;
+        }
+
+        var location = property.Locations.FirstOrDefault();
+        if (ReportForbiddenDeclaredType(context, property.Type, location))
+        {
+            return;
+        }
+
+        foreach (var parameter in property.Parameters)
+        {
+            if (ReportForbiddenDeclaredType(context, parameter.Type, parameter.Locations.FirstOrDefault() ?? location))
+            {
+                return;
+            }
+        }
+    }
 
     private static void ReportForbiddenDeclaredMethodSignature(SymbolAnalysisContext context, IMethodSymbol method)
     {
@@ -66,7 +94,7 @@ public sealed partial class PluginAnalyzer
             return;
         }
 
-        if (!IsEventKernel(method.ContainingType))
+        if (!IsDeclaredInEventKernelSurface(method.ContainingType))
         {
             return;
         }
@@ -135,10 +163,23 @@ public sealed partial class PluginAnalyzer
         ITypeSymbol type,
         Location? location)
     {
-        if (IsEventKernel(containingType))
+        if (IsDeclaredInEventKernelSurface(containingType))
         {
             ReportForbiddenDeclaredType(context, type, location);
         }
+    }
+
+    private static bool IsDeclaredInEventKernelSurface(INamedTypeSymbol? type)
+    {
+        for (var current = type; current is not null; current = current.ContainingType)
+        {
+            if (IsEventKernel(current))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool ReportForbiddenDeclaredType(SymbolAnalysisContext context, ITypeSymbol type, Location? location)
