@@ -88,6 +88,72 @@ public sealed partial class PluginAnalyzer
         return false;
     }
 
+    private static bool TryGetForbiddenHostApi(
+        ISymbol? symbol,
+        out ITypeSymbol forbidden)
+    {
+        switch (symbol)
+        {
+            case IMethodSymbol method when TryGetForbiddenNondeterministicMethod(method, out forbidden):
+                return true;
+            case IMethodSymbol method:
+                return TryGetForbiddenHostApi(method.ContainingType, out forbidden);
+            case IPropertySymbol property when TryGetForbiddenNondeterministicProperty(property, out forbidden):
+                return true;
+            case IPropertySymbol property:
+                return TryGetForbiddenHostApi(property.ContainingType, out forbidden);
+            case ITypeSymbol type:
+                return TryGetForbiddenHostApi(type, out forbidden);
+            default:
+                forbidden = null!;
+                return false;
+        }
+    }
+
+    private static bool TryGetForbiddenNondeterministicMethod(
+        IMethodSymbol method,
+        out ITypeSymbol forbidden)
+    {
+        var containingType = method.ContainingType;
+        var containingTypeName = containingType?.OriginalDefinition.ToDisplayString(
+            SymbolDisplayFormat.CSharpErrorMessageFormat);
+        if (containingTypeName == "System.Random" &&
+            method.MethodKind == MethodKind.Constructor)
+        {
+            forbidden = containingType!;
+            return true;
+        }
+
+        if (containingTypeName == "System.Guid" &&
+            string.Equals(method.Name, "NewGuid", StringComparison.Ordinal))
+        {
+            forbidden = containingType!;
+            return true;
+        }
+
+        forbidden = null!;
+        return false;
+    }
+
+    private static bool TryGetForbiddenNondeterministicProperty(
+        IPropertySymbol property,
+        out ITypeSymbol forbidden)
+    {
+        var containingType = property.ContainingType;
+        var containingTypeName = containingType?.OriginalDefinition.ToDisplayString(
+            SymbolDisplayFormat.CSharpErrorMessageFormat);
+        if ((containingTypeName == "System.DateTime" && property.Name is "Now" or "UtcNow" or "Today") ||
+            (containingTypeName == "System.DateTimeOffset" && property.Name is "Now" or "UtcNow") ||
+            (containingTypeName == "System.Random" && property.Name == "Shared"))
+        {
+            forbidden = containingType!;
+            return true;
+        }
+
+        forbidden = null!;
+        return false;
+    }
+
     private static bool TryGetDirectForbiddenHostApi(
         ITypeSymbol? type,
         out ITypeSymbol forbidden)

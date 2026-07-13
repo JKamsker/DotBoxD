@@ -91,16 +91,16 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         var invocation = (IInvocationOperation)context.Operation;
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
-            ReportForbiddenInInitializer(context, invocation.TargetMethod.ContainingType);
-            RecordForbiddenInitializerReference(context, helperGraph, invocation.TargetMethod.ContainingType);
+            ReportForbiddenInInitializer(context, invocation.TargetMethod);
+            RecordForbiddenInitializerReference(context, helperGraph, invocation.TargetMethod);
             RecordForbiddenDelegateInitializer(context, helperGraph, invocation.TargetMethod.ContainingType);
             RecordStaticConstructorReachability(context, helperGraph, invocation.TargetMethod);
-            RecordForbiddenHelperPropertyInitializer(context, helperGraph, invocation.TargetMethod.ContainingType);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, invocation.TargetMethod);
             RecordInitializerRootCall(context, helperGraph, invocation.TargetMethod);
             return;
         }
 
-        ReportAndRecordIfForbidden(context, helperGraph, method, invocation.TargetMethod.ContainingType);
+        ReportAndRecordIfForbidden(context, helperGraph, method, invocation.TargetMethod);
         RecordStaticConstructorReachability(context, helperGraph, invocation.TargetMethod);
         ReportForbiddenReferencedMethodSignature(context, invocation.TargetMethod);
         helperGraph.RecordCall(method, invocation.TargetMethod, context.Operation.Syntax.GetLocation());
@@ -112,12 +112,13 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         var creation = (IObjectCreationOperation)context.Operation;
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
-            ReportForbiddenInInitializer(context, creation.Type);
-            RecordForbiddenInitializerReference(context, helperGraph, creation.Type);
+            var createdSymbol = creation.Constructor ?? (ISymbol?)creation.Type;
+            ReportForbiddenInInitializer(context, createdSymbol);
+            RecordForbiddenInitializerReference(context, helperGraph, createdSymbol);
             RecordForbiddenDelegateInitializer(context, helperGraph, creation.Type);
             RecordStaticConstructorReachability(context, helperGraph, creation.Type);
             RecordFinalizerReachability(context, helperGraph, creation.Type);
-            RecordForbiddenHelperPropertyInitializer(context, helperGraph, creation.Type);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, createdSymbol);
             if (creation.Constructor is { } initializerConstructor)
             {
                 helperGraph.RecordConstructorInitializers(initializerConstructor);
@@ -127,7 +128,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        ReportAndRecordIfForbidden(context, helperGraph, method, creation.Type);
+        ReportAndRecordIfForbidden(context, helperGraph, method, creation.Constructor ?? (ISymbol?)creation.Type);
         RecordStaticConstructorReachability(context, helperGraph, creation.Type);
         RecordFinalizerReachability(context, helperGraph, creation.Type);
         if (creation.Constructor is { } constructor)
@@ -142,17 +143,17 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         var property = ((IPropertyReferenceOperation)context.Operation).Property;
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
-            ReportForbiddenInInitializer(context, property.ContainingType);
-            RecordForbiddenInitializerReference(context, helperGraph, property.ContainingType);
+            ReportForbiddenInInitializer(context, property);
+            RecordForbiddenInitializerReference(context, helperGraph, property);
             RecordForbiddenDelegateInitializer(context, helperGraph, property.ContainingType);
             RecordStaticConstructorReachability(context, helperGraph, property);
-            RecordForbiddenHelperPropertyInitializer(context, helperGraph, property.ContainingType);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, property);
             RecordInitializerPropertyRootCall(context, helperGraph, property);
             RecordInitializerMemberReference(context, helperGraph, property);
             return;
         }
 
-        ReportAndRecordIfForbidden(context, helperGraph, method, property.ContainingType);
+        ReportAndRecordIfForbidden(context, helperGraph, method, property);
         RecordStaticConstructorReachability(context, helperGraph, property);
         ReportForbiddenReferencedType(context, property.ContainingType, property.Type);
         ReportLocalUseIfInvalid(context, property);

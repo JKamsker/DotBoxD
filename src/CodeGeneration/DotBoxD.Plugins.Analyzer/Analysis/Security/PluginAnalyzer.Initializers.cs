@@ -28,6 +28,21 @@ public sealed partial class PluginAnalyzer
             type!.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
     }
 
+    private static void ReportForbiddenInInitializer(OperationAnalysisContext context, ISymbol? target)
+    {
+        if (context.ContainingSymbol is not (IFieldSymbol or IPropertySymbol) ||
+            !TryGetForbiddenHostApi(target, out var forbidden) ||
+            !IsEventKernel(context.ContainingSymbol.ContainingType))
+        {
+            return;
+        }
+
+        context.ReportDiagnostic(Diagnostic.Create(
+            ForbiddenHostApiRule,
+            context.Operation.Syntax.GetLocation(),
+            forbidden.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
+    }
+
     // A helper auto-property initializer runs before the getter returns its value. When an event kernel reads
     // that property, the existing property-reference path records a root edge to the getter; mark the getter
     // tainted here so a forbidden host API in the initializer is not hidden behind the auto-property.
@@ -44,6 +59,21 @@ public sealed partial class PluginAnalyzer
         }
 
         helperGraph.RecordForbidden(getter, type!);
+    }
+
+    private static void RecordForbiddenHelperPropertyInitializer(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        ISymbol? target)
+    {
+        if (context.ContainingSymbol is not IPropertySymbol { GetMethod: { } getter } property ||
+            IsEventKernel(property.ContainingType) ||
+            !TryGetForbiddenHostApi(target, out var forbidden))
+        {
+            return;
+        }
+
+        helperGraph.RecordForbidden(getter, forbidden);
     }
 
     // A helper invoked (or referenced as a method group) from a field/property initializer in an event kernel is
@@ -77,6 +107,20 @@ public sealed partial class PluginAnalyzer
         }
 
         helperGraph.RecordForbiddenInitializer(context.ContainingSymbol, type!);
+    }
+
+    private static void RecordForbiddenInitializerReference(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        ISymbol? target)
+    {
+        if (context.ContainingSymbol is not (IFieldSymbol or IPropertySymbol) ||
+            !TryGetForbiddenHostApi(target, out var forbidden))
+        {
+            return;
+        }
+
+        helperGraph.RecordForbiddenInitializer(context.ContainingSymbol, forbidden);
     }
 
     private static void RecordInitializerMemberReference(
