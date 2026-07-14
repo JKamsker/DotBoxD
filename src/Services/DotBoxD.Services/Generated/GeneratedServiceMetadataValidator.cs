@@ -180,8 +180,16 @@ internal static class GeneratedServiceMetadataValidator
             {
                 throw new ArgumentException("Generated parameter metadata positions must be zero-based and ordered.", paramName);
             }
-
             ValidateParameterShape(parameter, paramName);
+            for (var j = 0; j < i; j++)
+            {
+                if (string.Equals(parameters[j].Name, parameter.Name, StringComparison.Ordinal))
+                {
+                    throw new ArgumentException(
+                        $"Generated method metadata contains duplicate parameter name '{parameter.Name}'.",
+                        paramName);
+                }
+            }
         }
     }
 
