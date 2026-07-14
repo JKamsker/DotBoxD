@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
@@ -6,6 +7,62 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 public sealed partial class PluginAnalyzer
 {
+    private static void AnalyzeDynamicMemberReference(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph)
+    {
+        var memberReference = (IDynamicMemberReferenceOperation)context.Operation;
+        if (memberReference.Parent is IDynamicInvocationOperation invocation &&
+            ReferenceEquals(invocation.Operation, memberReference))
+        {
+            return;
+        }
+
+        if (TryGetDynamicReceiverType(memberReference.Instance, out var receiverType))
+        {
+            foreach (var target in DynamicPropertyGetterCandidates(receiverType, memberReference.MemberName))
+            {
+                AnalyzeResolvedDynamicTarget(context, helperGraph, target);
+            }
+
+            return;
+        }
+
+        if (TryGetDynamicReceiverLocal(memberReference.Instance, out var local))
+        {
+            helperGraph.RecordDynamicPropertyReference(
+                context.ContainingSymbol,
+                local,
+                memberReference.MemberName,
+                context.Operation.Syntax.GetLocation());
+        }
+    }
+
+    private static void AnalyzeDynamicIndexerAccess(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph)
+    {
+        var indexer = (IDynamicIndexerAccessOperation)context.Operation;
+        if (TryGetDynamicReceiverType(indexer.Operation, out var receiverType))
+        {
+            foreach (var target in DynamicIndexerGetterCandidates(receiverType, indexer.Arguments.Length))
+            {
+                AnalyzeResolvedDynamicTarget(context, helperGraph, target);
+            }
+
+            return;
+        }
+
+        if (TryGetDynamicReceiverLocal(indexer.Operation, out var local))
+        {
+            helperGraph.RecordDynamicIndexerAccess(
+                context.ContainingSymbol,
+                local,
+                indexer.Arguments.Length,
+                context.Operation.Syntax.GetLocation());
+        }
+    }
+
     private static void AnalyzeDynamicInvocation(
         OperationAnalysisContext context,
         ForbiddenHelperCallGraph helperGraph)
@@ -26,11 +83,11 @@ public sealed partial class PluginAnalyzer
             return;
         }
 
-        if (memberReference.Instance is ILocalReferenceOperation localReference)
+        if (TryGetDynamicReceiverLocal(memberReference.Instance, out var local))
         {
             helperGraph.RecordDynamicInvocation(
                 context.ContainingSymbol,
-                localReference.Local,
+                local,
                 memberReference.MemberName,
                 invocation.Arguments.Length,
                 context.Operation.Syntax.GetLocation());
@@ -79,12 +136,42 @@ public sealed partial class PluginAnalyzer
             .Where(method => CanAcceptArgumentCount(method, argumentCount));
     }
 
-    private static bool CanAcceptArgumentCount(IMethodSymbol method, int argumentCount)
+    internal static IEnumerable<IMethodSymbol> DynamicPropertyGetterCandidates(
+        ITypeSymbol receiverType,
+        string memberName)
     {
-        var required = method.Parameters.Count(parameter => !parameter.IsOptional && !parameter.IsParams);
+        return receiverType
+            .GetMembers(memberName)
+            .OfType<IPropertySymbol>()
+            .Where(property => !property.IsIndexer)
+            .Select(property => property.GetMethod)
+            .Where(getter => getter is not null)!;
+    }
+
+    internal static IEnumerable<IMethodSymbol> DynamicIndexerGetterCandidates(
+        ITypeSymbol receiverType,
+        int argumentCount)
+    {
+        return receiverType
+            .GetMembers()
+            .OfType<IPropertySymbol>()
+            .Where(property => property.IsIndexer && CanAcceptArgumentCount(property, argumentCount))
+            .Select(property => property.GetMethod)
+            .Where(getter => getter is not null)!;
+    }
+
+    private static bool CanAcceptArgumentCount(IMethodSymbol method, int argumentCount)
+        => CanAcceptArgumentCount(method.Parameters, argumentCount);
+
+    private static bool CanAcceptArgumentCount(IPropertySymbol property, int argumentCount)
+        => CanAcceptArgumentCount(property.Parameters, argumentCount);
+
+    private static bool CanAcceptArgumentCount(ImmutableArray<IParameterSymbol> parameters, int argumentCount)
+    {
+        var required = parameters.Count(parameter => !parameter.IsOptional && !parameter.IsParams);
         return argumentCount >= required &&
-            (argumentCount <= method.Parameters.Length ||
-                method.Parameters.LastOrDefault()?.IsParams == true);
+            (argumentCount <= parameters.Length ||
+                parameters.LastOrDefault()?.IsParams == true);
     }
 
     private static bool TryGetDynamicReceiverType(
@@ -103,6 +190,25 @@ public sealed partial class PluginAnalyzer
         }
 
         type = null!;
+        return false;
+    }
+
+    private static bool TryGetDynamicReceiverLocal(
+        IOperation? receiver,
+        out ILocalSymbol local)
+    {
+        if (receiver is ILocalReferenceOperation localReference)
+        {
+            local = localReference.Local;
+            return true;
+        }
+
+        if (receiver is IConversionOperation conversion)
+        {
+            return TryGetDynamicReceiverLocal(conversion.Operand, out local);
+        }
+
+        local = null!;
         return false;
     }
 }

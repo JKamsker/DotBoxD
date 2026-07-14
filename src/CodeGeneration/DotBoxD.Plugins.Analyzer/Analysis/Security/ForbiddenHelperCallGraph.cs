@@ -39,6 +39,12 @@ internal sealed class ForbiddenHelperCallGraph
         Location location)
         => _dynamicHelperCalls.RecordInvocation(caller, receiver, memberName, argumentCount, location);
 
+    public void RecordDynamicPropertyReference(ISymbol? caller, ILocalSymbol receiver, string memberName, Location location)
+        => _dynamicHelperCalls.RecordPropertyReference(caller, receiver, memberName, location);
+
+    public void RecordDynamicIndexerAccess(ISymbol? caller, ILocalSymbol receiver, int argumentCount, Location location)
+        => _dynamicHelperCalls.RecordIndexerAccess(caller, receiver, argumentCount, location);
+
     public void RecordDispatchImplementations(IMethodSymbol method)
     {
         if (method.DeclaringSyntaxReferences.Length == 0 ||
