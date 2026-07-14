@@ -11,6 +11,11 @@ public sealed partial class PluginAnalyzer
         ForbiddenHelperCallGraph helperGraph,
         IMethodSymbol method)
     {
+        if (method.MethodKind is MethodKind.EventAdd or MethodKind.EventRemove)
+        {
+            return;
+        }
+
         if (FirstForbiddenMethodAttributeMetadata(method, context.CancellationToken) is not { } metadata)
         {
             return;

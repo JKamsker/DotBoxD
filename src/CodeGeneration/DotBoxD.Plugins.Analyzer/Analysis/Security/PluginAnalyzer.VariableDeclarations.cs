@@ -95,6 +95,14 @@ public sealed partial class PluginAnalyzer
     {
         switch (symbol)
         {
+            case IMethodSymbol
+            {
+                Name: "RegisterProvider",
+                ContainingType: { } containingType
+            } when containingType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
+                    == "System.Text.Encoding":
+                forbidden = containingType;
+                return true;
             case IMethodSymbol method when TryGetForbiddenNondeterministicMethod(method, out forbidden):
                 return true;
             case IMethodSymbol method:

@@ -20,10 +20,12 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         DotBoxDGenerationNames.TypeNames.SystemGcSettings,
         DotBoxDGenerationNames.TypeNames.SystemTimeZoneInfo,
         DotBoxDGenerationNames.TypeNames.SystemDelegate,
-        DotBoxDGenerationNames.TypeNames.SystemTextEncoding,
         DotBoxDGenerationNames.TypeNames.SystemServiceProvider,
         DotBoxDGenerationNames.TypeNames.SystemType,
-        DotBoxDGenerationNames.TypeNames.SystemUnsafe
+        DotBoxDGenerationNames.TypeNames.SystemUnsafe,
+        "Microsoft.Win32.Registry",
+        "System.Security.Principal.WindowsIdentity",
+        "System.Security.Cryptography.X509Certificates.X509Store"
     ];
     public static readonly DiagnosticDescriptor ForbiddenHostApiRule = new(
         "DBXK001",
@@ -271,7 +273,6 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             "System.Threading.",
             "System.Threading.Tasks.",
             "System.Linq.Expressions.",
-            "System.Security.Cryptography.X509Certificates.",
             "System.Security.Principal.",
             "System.Data.",
             "Microsoft.CSharp.",

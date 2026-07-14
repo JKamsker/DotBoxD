@@ -41,6 +41,11 @@ public sealed partial class PluginAnalyzer
     {
         foreach (var attribute in attributeLists.SelectMany(list => list.Attributes))
         {
+            if (attribute.Parent is AttributeListSyntax { Target.Identifier.ValueText: "method" })
+            {
+                continue;
+            }
+
             foreach (var argument in attribute.ArgumentList?.Arguments ?? [])
             {
                 if (FirstForbiddenHostApi(context.SemanticModel.GetOperation(argument.Expression, context.CancellationToken)) is { } forbiddenType)
