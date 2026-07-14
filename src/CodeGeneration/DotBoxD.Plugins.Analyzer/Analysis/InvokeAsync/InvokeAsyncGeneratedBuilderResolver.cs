@@ -217,7 +217,11 @@ internal static class InvokeAsyncGeneratedBuilderResolver
             return model.LookupNamespacesAndTypes(builderType.SpanStart, name: facadeName);
         }
 
-        return model.GetSymbolInfo(qualifier, cancellationToken).Symbol is INamespaceOrTypeSymbol container
+        var container = qualifier is IdentifierNameSyntax identifier &&
+                        model.GetAliasInfo(identifier, cancellationToken)?.Target is INamespaceOrTypeSymbol aliasTarget
+            ? aliasTarget
+            : model.GetSymbolInfo(qualifier, cancellationToken).Symbol as INamespaceOrTypeSymbol;
+        return container is not null
             ? model.LookupNamespacesAndTypes(builderType.SpanStart, container, facadeName)
             : Enumerable.Empty<ISymbol>();
     }
