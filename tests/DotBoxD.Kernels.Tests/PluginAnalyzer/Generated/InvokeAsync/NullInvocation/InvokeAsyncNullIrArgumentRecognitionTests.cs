@@ -106,4 +106,23 @@ public sealed class InvokeAsyncNullIrArgumentRecognitionTests
         Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
         Assert.Contains("AnonymousInvokeAsync", source, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Ir_invocation_capture_is_not_mistaken_for_the_manual_ir_argument()
+    {
+        var result = RunGenerator(GeneratedFacadeBodySource("""
+                public ValueTask<int> Probe(
+                    IRInvocation<Func<IGameWorldAccess, ValueTask<int>>, int> captures)
+                    => InvokeAsync(
+                        captures,
+                        async (
+                            IGameWorldAccess world,
+                            IRInvocation<Func<IGameWorldAccess, ValueTask<int>>, int> bag) =>
+                        {
+                            return world.GetHealth("monster-1");
+                        });
+            """));
+
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+    }
 }
