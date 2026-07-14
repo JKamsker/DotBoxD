@@ -16,6 +16,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-bindings
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-matrix
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-frame-layout
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-plugin-package-collision-discovery
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-examples
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-prepared-values
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-runtime-types
@@ -158,6 +159,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Owned collection construction arrays | this commit | `--probe-collection-construction` | Compiled and interpreter `list.of`/`record.new` now transfer the freshly allocated argument array through the existing internal owned-array path instead of taking a second defensive snapshot. Same-session before and repeated after samples for 500k constructions measured `list.of` arity 8 at 216.0 B/op to 128.0 B/op, `list.of` arity 32 at 600.0 B/op to 320.0 B/op, `record.new` arity 8 at 304.9 B/op to 227.4 B/op, and `record.new` arity 32 at 690.2 B/op to 405.0 B/op. Stopwatch movement was mixed, including a slower arity-8 record row, so this step claims allocation reduction only. |
 | Owned compiled literal collections | this commit | `--probe-literal-collection-construction` | Compiled list/map literal construction now transfers compiler/runtime-owned arrays and dictionaries through internal owned construction paths instead of defensively snapshotting them a second time. Same-session before and repeated after samples for 500k constructions measured list literal arity 8 at 352.0 to 240.0 B/op, list literal arity 32 at 736.0 to 432.0 B/op, map literal arity 8 at 1,362.2 to 931.4 B/op, map literal arity 32 at 3,197.0 to 2,034.2 B/op, and `map.empty` at 304.9 to 235.4 B/op. Public `FromList`/`FromMap` defensive-copy behavior remains unchanged; this step claims allocation reduction only. |
 | Prepared-plan interpreter frame-layout cache | this commit | `--probe-interpreter-frame-layout` | Reused immutable per-function slot layouts across executions of the same prepared plan. For 50k direct interpreted executions, a parameter-return entrypoint improved from 105.3 ms / 1,824.1 B/op to 73.0 ms / 1,016.0 B/op; an eight-local chain improved from 346.3 ms / 3,512.2 B/op to 188.6 ms / 1,120.1 B/op. Layouts remain lazy, weakly owned by the plan, isolated between plans, and safe under concurrent first use. |
+| Selective plugin-package collision discovery | this commit | `--probe-plugin-package-collision-discovery` | Limited the source-type semantic transform to declarations whose decoded identifier ends in the shared `PluginPackage` suffix. Across 1,000 warmed two-snapshot edits with 1,000 unrelated types and one real collision, allocation fell from 240,919.1 B/edit to 95,446.3 B/edit; synthetic full-generator time moved from 1,697.6 ms to 1,420.8 ms. Exact semantic namespace, nesting, generic-arity, escaped-identifier, and declaration-kind behavior remains covered. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -1069,3 +1071,35 @@ eight local chain         346.3 / 3512.2     188.6 / 1120.1
 ```
 
 The allocation delta is the stable signal: repeat runs reproduced each reported B/op value within 0.1 B/op.
+
+## Incremental plugin-package collision discovery
+
+`PluginPackageSourceTypeCollector` previously selected every class, struct, interface, record, enum, and delegate
+for a semantic symbol lookup even though every generated package identity considered by collision detection ends in
+`PluginPackage`. The syntax predicate now compares the declaration's decoded `Identifier.ValueText` with the shared
+suffix before entering the semantic transform. The semantic stage still resolves the exact namespace and metadata
+name and still excludes nested declarations, so generic arity and other identity distinctions are unchanged.
+
+The probe retains the returned `GeneratorDriver` while alternating two warmed, pre-parsed `SourceTypes.cs` snapshots that
+differ only in leading trivia. A stable kernel tree generates `CollisionDiscoveryPluginPackage`; each edited snapshot
+contains 1,000 unrelated top-level classes and a real source declaration with that package name. Every iteration still
+reports the expected source-collision diagnostic and blocks package emission.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-plugin-package-collision-discovery
+```
+
+Repeated local runs, 1,000 measured edits:
+
+```text
+case                         Before range              After range
+full generator time         1,697.6-1,721.6 ms        1,370.2-1,420.8 ms
+allocation per edit         240,639.9-240,919.1 B     95,263.0-95,446.3 B
+```
+
+The allocation reduction is the primary signal: about 145 KB/edit, or 60%. This is deliberately a warmed two-snapshot
+synthetic workload, so elapsed time is secondary rather than an IDE-latency claim. Pre-parsing keeps parsing and
+compilation construction outside the measurement; the remaining roughly 95 KB/edit belongs to the rest of the
+production generator pipeline and driver update.

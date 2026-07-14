@@ -38,6 +38,12 @@ if (args.Contains("--probe-interpreter-frame-layout", StringComparer.OrdinalIgno
     return;
 }
 
+if (args.Contains("--probe-plugin-package-collision-discovery", StringComparer.OrdinalIgnoreCase))
+{
+    DotBoxD.Kernels.Benchmarks.PluginAnalyzer.PluginPackageCollisionDiscoveryProbe.Run();
+    return;
+}
+
 if (args.Contains("--probe-rogue", StringComparer.OrdinalIgnoreCase))
 {
     await DotBoxD.Kernels.Benchmarks.Interpreter.RogueScalingProbe.RunAsync();
