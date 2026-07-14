@@ -66,13 +66,23 @@ internal static class InvokeAsyncGeneratedBuilderResolver
             expression = HookChainAliasResolver.UnwrapTransparentExpression(facadeExpression);
         }
 
-        return TryFacadeNameFromBuilderInitializer(expression, out var builderType, out var facadeName) &&
-               TryFindGeneratedFacade(
-                   model,
-                   builderType,
-                   facadeName,
-                   cancellationToken,
-                   out receiverType);
+        if (!TryFacadeNameFromBuilderInitializer(expression, out var builderType, out var facadeName) &&
+            (!InvokeAsyncGeneratedBuilderAliasResolver.TryBuilderType(
+                model,
+                expression,
+                cancellationToken,
+                out builderType) ||
+             !TryFacadeNameFromBuilderType(builderType, out facadeName)))
+        {
+            return false;
+        }
+
+        return TryFindGeneratedFacade(
+            model,
+            builderType,
+            facadeName,
+            cancellationToken,
+            out receiverType);
     }
 
     private static bool TryResolveGeneratedBuilderProjection(
