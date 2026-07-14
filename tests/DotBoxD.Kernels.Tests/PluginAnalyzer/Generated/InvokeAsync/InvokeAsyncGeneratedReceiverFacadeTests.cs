@@ -226,4 +226,43 @@ public sealed class InvokeAsyncGeneratedReceiverFacadeTests
         Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
         Assert.Contains("AnonymousInvokeAsync", source, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Handwritten_lookalike_builder_receivers_are_not_lowered()
+    {
+        var input = UsageSource("""
+            public static ValueTask<int> RunDirect()
+                => Other.RemotePluginServerBuilder.FromConnection().Build().InvokeAsync(
+                    async (IGameWorldAccess world) => world.GetHealth("monster-1"));
+
+            public static ValueTask<int> RunServices()
+                => Other.RemotePluginServerBuilder.FromConnection().Build().Services.InvokeAsync(
+                    async (IGameWorldAccess world) => world.GetHealth("monster-1"));
+            """) + """
+
+            namespace Other
+            {
+                public sealed class RemotePluginServer
+                {
+                    public RemotePluginServer Services => this;
+
+                    public ValueTask<int> InvokeAsync(
+                        Func<IGameWorldAccess, ValueTask<int>> lambda)
+                        => new(0);
+                }
+
+                public sealed class RemotePluginServerBuilder
+                {
+                    public static RemotePluginServerBuilder FromConnection() => new();
+
+                    public RemotePluginServer Build() => new();
+                }
+            }
+            """;
+        var result = RunGeneratorAndAssertCompiles(input);
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.DoesNotContain("AnonymousInvokeAsync", source, StringComparison.Ordinal);
+    }
 }
