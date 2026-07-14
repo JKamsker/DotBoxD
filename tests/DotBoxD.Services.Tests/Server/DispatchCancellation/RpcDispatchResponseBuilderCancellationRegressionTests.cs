@@ -89,6 +89,7 @@ public sealed class RpcDispatchResponseBuilderCancellationRegressionTests
         }
     }
 
+    [Fact]
     public async Task BuildAsync_observes_serializer_canceled_token_before_custom_dispatcher_work()
     {
         using var source = new CancellationTokenSource();
