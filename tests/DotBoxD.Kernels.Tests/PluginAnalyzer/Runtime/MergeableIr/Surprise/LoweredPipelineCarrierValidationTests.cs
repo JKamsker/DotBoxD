@@ -110,6 +110,28 @@ public sealed class LoweredPipelineCarrierValidationTests
     }
 
     [Fact]
+    public void Composer_rejects_terminal_projection_output_tag_mismatches()
+    {
+        var step = Step(LoweredPipelineStepKind.Projection, "i32", "string", SandboxType.I32);
+
+        var exception = Assert.Throws<ArgumentException>(() => LoweredPipelineComposer.Compose(
+            new LoweredPipelineComposition("projection-output-mismatch", [step], SandboxType.I32)));
+
+        Assert.Contains("OutputType", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Composer_accepts_terminal_projection_when_output_tag_matches_result_type()
+    {
+        var step = Step(LoweredPipelineStepKind.Projection, "i32", "i32", SandboxType.I32);
+
+        var module = LoweredPipelineComposer.Compose(
+            new LoweredPipelineComposition("projection-output-match", [step], SandboxType.I32));
+
+        Assert.Contains(module.Functions, function => function.Id == "Handle" && function.ReturnType == SandboxType.I32);
+    }
+
+    [Fact]
     public void Composer_rejects_steps_with_null_required_capability_entries()
     {
         var step = Step(LoweredPipelineStepKind.Filter, "i32", "bool", SandboxType.I32) with
