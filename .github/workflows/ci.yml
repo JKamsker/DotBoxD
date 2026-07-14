@@ -383,6 +383,7 @@ jobs:
               "InvokeAsyncGeneratedReceiverSurpriseTests",
               "InvokeAsyncGeneratedReceiverFacadeTests",
               "InvokeAsyncGeneratedCodeRegressionTests",
+              "InvokeAsyncNamedLambdaManualIrTests",
               "InvokeAsyncArrayRegressionTests",
               "InvokeAsyncCaptureAliasRegressionTests",
               "InvokeAsyncDtoConstructorSelectionRegressionTests",

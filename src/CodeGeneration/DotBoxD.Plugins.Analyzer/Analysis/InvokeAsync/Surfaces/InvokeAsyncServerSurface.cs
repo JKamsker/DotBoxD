@@ -202,7 +202,7 @@ internal static class InvokeAsyncServerSurface
         return false;
     }
 
-    private static bool IsIRInvocation(ITypeSymbol type)
+    internal static bool IsIRInvocation(ITypeSymbol type)
     {
         if (type is not INamedTypeSymbol named)
         {

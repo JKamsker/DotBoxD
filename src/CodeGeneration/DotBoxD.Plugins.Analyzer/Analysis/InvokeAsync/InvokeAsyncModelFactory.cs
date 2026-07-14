@@ -2,7 +2,6 @@ using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
@@ -74,7 +73,7 @@ internal static partial class InvokeAsyncModelFactory
             return null;
         }
 
-        if (HasExplicitInvocationIrArgument(invocation))
+        if (InvokeAsyncManualIrArgument.IsExplicit(invocation, model, cancellationToken))
         {
             return null;
         }
@@ -120,7 +119,7 @@ internal static partial class InvokeAsyncModelFactory
             return null;
         }
 
-        if (HasExplicitInvocationIrArgument(invocation))
+        if (InvokeAsyncManualIrArgument.IsExplicit(invocation, model, cancellationToken))
         {
             return null;
         }
@@ -164,7 +163,7 @@ internal static partial class InvokeAsyncModelFactory
             return null;
         }
 
-        if (HasExplicitInvocationIrArgument(invocation))
+        if (InvokeAsyncManualIrArgument.IsExplicit(invocation, model, cancellationToken))
         {
             return null;
         }
@@ -253,37 +252,5 @@ internal static partial class InvokeAsyncModelFactory
         var package = EmitPackage(ns, packageName, pluginId, shape, bodyJson, effects, capabilities);
         return new InvokeAsyncResult(package, interception, null);
     }
-
-    private static bool HasExplicitInvocationIrArgument(InvocationExpressionSyntax invocation)
-    {
-        var arguments = invocation.ArgumentList.Arguments;
-        var irArgumentIndex = FirstArgumentTargetsLambda(arguments) ? 1 : 2;
-        for (var index = 0; index < arguments.Count; index++)
-        {
-            var argument = arguments[index];
-            if (argument.NameColon is { Name.Identifier.ValueText: "irInvocation" })
-            {
-                return !IsNullLike(argument.Expression);
-            }
-
-            if (argument.NameColon is null &&
-                index == irArgumentIndex)
-            {
-                return !IsNullLike(argument.Expression);
-            }
-        }
-
-        return false;
-    }
-
-    private static bool FirstArgumentTargetsLambda(SeparatedSyntaxList<ArgumentSyntax> arguments)
-        => arguments.FirstOrDefault() is { } first &&
-           (first.NameColon is { Name.Identifier.ValueText: "lambda" } ||
-            first.NameColon is null && first.Expression is LambdaExpressionSyntax);
-
-    private static bool IsNullLike(ExpressionSyntax expression)
-        => expression.IsKind(SyntaxKind.NullLiteralExpression) ||
-            expression.IsKind(SyntaxKind.DefaultLiteralExpression) ||
-            expression.IsKind(SyntaxKind.DefaultExpression);
 
 }
