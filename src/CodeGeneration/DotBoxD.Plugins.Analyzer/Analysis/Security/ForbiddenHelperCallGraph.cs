@@ -7,12 +7,16 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 internal sealed class ForbiddenHelperCallGraph
 {
     private readonly ConcurrentDictionary<ISymbol, ITypeSymbol> _forbidden = new(SymbolEqualityComparer.Default);
+    private readonly ConcurrentDictionary<string, byte> _reportedDirect = new(StringComparer.Ordinal);
     private readonly DynamicHelperCallResolver _dynamicHelperCalls = new();
     private readonly ConcurrentBag<HelperEdge> _helperEdges = [];
     private readonly ConcurrentBag<RootHelperCall> _rootCalls = [];
 
     public void RecordForbidden(IMethodSymbol method, ITypeSymbol type)
         => _forbidden.TryAdd(Normalize(method), type);
+
+    public bool TryRecordDirectReport(IMethodSymbol method, ITypeSymbol type)
+        => _reportedDirect.TryAdd(DirectReportKey(method, type), 0);
 
     public void RecordForbiddenInitializer(ISymbol initializer, ITypeSymbol type)
     {
@@ -279,6 +283,10 @@ internal sealed class ForbiddenHelperCallGraph
             IFieldSymbol field => field.OriginalDefinition,
             _ => symbol
         };
+
+    private static string DirectReportKey(IMethodSymbol method, ITypeSymbol type)
+        => Normalize(method).ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + "|" +
+            type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
 
     private readonly record struct HelperEdge(ISymbol Caller, ISymbol Target);
 

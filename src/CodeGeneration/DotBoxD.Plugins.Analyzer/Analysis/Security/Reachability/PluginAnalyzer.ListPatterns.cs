@@ -73,7 +73,7 @@ public sealed partial class PluginAnalyzer
 
         ReportAndRecordIfForbidden(context, helperGraph, method, property.ContainingType);
         RecordStaticConstructorReachability(context, helperGraph, property);
-        ReportForbiddenReferencedType(context, property.ContainingType, property.Type);
+        ReportForbiddenReferencedType(context, helperGraph, method, property.ContainingType, property.Type);
         ReportLocalUseIfInvalid(context, property);
 
         if (property.GetMethod is { } getter)

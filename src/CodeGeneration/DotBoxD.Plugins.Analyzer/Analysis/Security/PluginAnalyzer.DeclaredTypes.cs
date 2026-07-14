@@ -111,6 +111,8 @@ public sealed partial class PluginAnalyzer
 
     private static bool ReportForbiddenReferencedType(
         OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol method,
         INamedTypeSymbol containingType,
         ITypeSymbol type)
     {
@@ -119,7 +121,7 @@ public sealed partial class PluginAnalyzer
             return false;
         }
 
-        return ReportForbiddenType(context, type, context.Operation.Syntax.GetLocation());
+        return ReportForbiddenType(context, helperGraph, method, type, context.Operation.Syntax.GetLocation());
     }
 
     private static bool IsReferencedFromEventKernel(OperationAnalysisContext context, INamedTypeSymbol containingType)
@@ -146,6 +148,29 @@ public sealed partial class PluginAnalyzer
 
     private static bool ReportForbiddenType(OperationAnalysisContext context, ITypeSymbol type, Location? location)
         => ReportForbiddenType(context.ReportDiagnostic, type, location);
+
+    private static bool ReportForbiddenType(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol method,
+        ITypeSymbol type,
+        Location? location)
+    {
+        if (FirstForbiddenHostApi(type) is not { } forbiddenType)
+        {
+            return false;
+        }
+
+        if (helperGraph.TryRecordDirectReport(method, forbiddenType))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                ForbiddenHostApiRule,
+                location,
+                forbiddenType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
+        }
+
+        return true;
+    }
 
     private static bool ReportForbiddenType(
         Action<Diagnostic> reportDiagnostic,

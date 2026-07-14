@@ -154,7 +154,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
 
         ReportAndRecordIfForbidden(context, helperGraph, method, property.ContainingType);
         RecordStaticConstructorReachability(context, helperGraph, property);
-        ReportForbiddenReferencedType(context, property.ContainingType, property.Type);
+        ReportForbiddenReferencedType(context, helperGraph, method, property.ContainingType, property.Type);
         ReportLocalUseIfInvalid(context, property);
 
         // A forbidden API reached through a helper property's accessor body is only linked to the kernel
@@ -189,7 +189,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         }
 
         ReportAndRecordIfForbidden(context, helperGraph, method, field.ContainingType);
-        ReportForbiddenReferencedType(context, field.ContainingType, field.Type);
+        ReportForbiddenReferencedType(context, helperGraph, method, field.ContainingType, field.Type);
         if (IsDelegateType(field.Type))
         {
             RecordDelegateFieldReference(context, helperGraph, method, field);
@@ -219,7 +219,8 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         }
 
         helperGraph.RecordForbidden(method, type!);
-        if (!IsEventKernel(method.ContainingType))
+        if (!IsEventKernel(method.ContainingType) ||
+            !helperGraph.TryRecordDirectReport(method, type!))
         {
             return;
         }
@@ -239,7 +240,8 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             or DotBoxDGenerationNames.TypeNames.SystemGc
             or DotBoxDGenerationNames.TypeNames.SystemDelegate
             or DotBoxDGenerationNames.TypeNames.SystemServiceProvider
-            or DotBoxDGenerationNames.TypeNames.SystemType;
+            or DotBoxDGenerationNames.TypeNames.SystemType
+            or DotBoxDGenerationNames.TypeNames.SystemArrayPoolOriginal;
 
     private static bool IsForbiddenNamespace(string typeName)
     {
