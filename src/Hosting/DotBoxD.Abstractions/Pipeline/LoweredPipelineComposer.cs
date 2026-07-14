@@ -91,6 +91,14 @@ public static class LoweredPipelineComposer
                     $"step {i} parameter type '{parameter.Type}' does not match input shape '{step.InputType}'.");
             }
 
+            if (step.Kind == LoweredPipelineStepKind.Filter &&
+                !string.Equals(step.OutputType, "bool", StringComparison.Ordinal))
+            {
+                throw new ArgumentException(
+                    $"step {i} filter output shape '{step.OutputType}' must be 'bool'.",
+                    nameof(LoweredPipelineStep.OutputType));
+            }
+
             if (step.Kind == LoweredPipelineStepKind.Projection)
             {
                 currentTag = step.OutputType;
