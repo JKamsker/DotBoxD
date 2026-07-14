@@ -75,16 +75,6 @@ internal sealed class RpcDispatchResponseBuilder
     {
         using var telemetry = RpcTelemetry.StartServerRequest();
 
-        // request.ServiceName is remote-supplied and can deserialize to null from a hostile/malformed
-        // envelope (MessagePack nil). Guard before the dictionary lookup so that malformed input is
-        // reported as ServiceNotFound instead of escaping as an internal lookup error.
-        if (dispatcher is null)
-        {
-            var error = RpcErrors.ServiceNotFound();
-            telemetry.MarkFailed(new ServiceNotFoundException(error.Message));
-            return new RpcDispatchResult(BuildErrorFrame(messageId, error), stream: null);
-        }
-
         try
         {
             ct.ThrowIfCancellationRequested();
@@ -94,6 +84,16 @@ internal sealed class RpcDispatchResponseBuilder
             telemetry.MarkFailed(ex);
             await streaming.AbandonResponseAsync().ConfigureAwait(false);
             throw;
+        }
+
+        // request.ServiceName is remote-supplied and can deserialize to null from a hostile/malformed
+        // envelope (MessagePack nil). Guard before the dictionary lookup so that malformed input is
+        // reported as ServiceNotFound instead of escaping as an internal lookup error.
+        if (dispatcher is null)
+        {
+            var error = RpcErrors.ServiceNotFound();
+            telemetry.MarkFailed(new ServiceNotFoundException(error.Message));
+            return new RpcDispatchResult(BuildErrorFrame(messageId, error), stream: null);
         }
 
         var writer = MessageFramer.RentFrameWriter();
