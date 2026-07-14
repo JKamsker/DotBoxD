@@ -39,8 +39,8 @@ public static class LoweredPipelineComposer
             throw new ArgumentException("A pipeline composition requires at least one step.", nameof(composition));
         }
 
-        var inputType = ValidateAndInputType(steps);
-        ValidateResultType(steps, composition.ResultType, inputType);
+        var inputType = ValidateAndInputType(steps, out var outputTag);
+        ValidateResultType(outputTag, composition.ResultType);
 
         var shouldHandle = BuildShouldHandle(steps, inputType, composition.ShouldHandleFunctionId);
         var handle = BuildHandle(steps, inputType, composition.ResultType, composition.HandleFunctionId);
@@ -54,7 +54,7 @@ public static class LoweredPipelineComposer
             BuildMetadata(steps));
     }
 
-    private static SandboxType ValidateAndInputType(IReadOnlyList<LoweredPipelineStep> steps)
+    private static SandboxType ValidateAndInputType(IReadOnlyList<LoweredPipelineStep> steps, out string outputTag)
     {
         var first = steps[0] ?? throw new ArgumentNullException(nameof(LoweredPipelineComposition.Steps));
         var inputType = CurrentParameter(first, 0).Type;
@@ -99,6 +99,7 @@ public static class LoweredPipelineComposer
             }
         }
 
+        outputTag = currentTag;
         return inputType;
     }
 
@@ -138,28 +139,27 @@ public static class LoweredPipelineComposer
         return tag is not "guid" || parameter.Type == SandboxType.Guid;
     }
 
-    private static void ValidateResultType(
-        IReadOnlyList<LoweredPipelineStep> steps,
-        SandboxType resultType,
-        SandboxType inputType)
+    private static void ValidateResultType(string outputTag, SandboxType resultType)
     {
         ArgumentNullException.ThrowIfNull(resultType);
-        var hasProjection = false;
-        foreach (var step in steps)
-        {
-            if (step.Kind == LoweredPipelineStepKind.Projection)
-            {
-                hasProjection = true;
-                break;
-            }
-        }
-
-        if (!hasProjection && resultType != inputType)
-        {
-            throw new ArgumentException(
-                "ResultType must equal the pipeline input type when the pipeline has no projection.");
-        }
+        if (!ResultTypeMatchesTag(resultType, outputTag))
+            throw new ArgumentException($"ResultType must match terminal OutputType '{outputTag}'.");
     }
+
+    private static bool ResultTypeMatchesTag(SandboxType type, string tag)
+        => tag switch
+        {
+            "bool" => type == SandboxType.Bool,
+            "int" or "i32" => type == SandboxType.I32,
+            "long" or "i64" => type == SandboxType.I64,
+            "double" or "f64" => type == SandboxType.F64,
+            "string" => type == SandboxType.String,
+            "guid" => type == SandboxType.Guid,
+            "list" => type.Name == "List",
+            "map" => type.Name == "Map",
+            "record" => type.IsRecord,
+            _ => true
+        };
 
     // Gating only needs the steps up to and including the LAST filter: a projection after the final filter can
     // never change whether the event is handled, so recomputing it here is pure waste (and would run an
