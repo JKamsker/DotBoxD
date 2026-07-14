@@ -16,20 +16,6 @@ public static class LoweredPipelineComposer
     private const string CurrentVariablePrefix = "current";
     private const string RequiredCapabilitiesMetadataKey = "dotboxd.requiredCapabilities";
     private const string EffectsMetadataKey = "dotboxd.effects";
-    private static readonly IReadOnlyDictionary<string, SandboxType> ResultTypesByTag =
-        new Dictionary<string, SandboxType>(StringComparer.Ordinal)
-        {
-            ["bool"] = SandboxType.Bool,
-            ["int"] = SandboxType.I32,
-            ["i32"] = SandboxType.I32,
-            ["long"] = SandboxType.I64,
-            ["i64"] = SandboxType.I64,
-            ["double"] = SandboxType.F64,
-            ["f64"] = SandboxType.F64,
-            ["string"] = SandboxType.String,
-            ["guid"] = SandboxType.Guid
-        };
-
     private static readonly SourceSpan Span = new(1, 1);
 
     public static SandboxModule Compose(LoweredPipelineComposition composition)
@@ -53,8 +39,7 @@ public static class LoweredPipelineComposer
             throw new ArgumentException("A pipeline composition requires at least one step.", nameof(composition));
         }
 
-        var inputType = ValidateAndInputType(steps, out var outputTag);
-        ValidateResultType(steps, composition.ResultType, inputType, outputTag);
+        var inputType = LoweredPipelineCompositionValidator.Validate(steps, composition.ResultType);
 
         var shouldHandle = BuildShouldHandle(steps, inputType, composition.ShouldHandleFunctionId);
         var handle = BuildHandle(steps, inputType, composition.ResultType, composition.HandleFunctionId);
@@ -68,137 +53,8 @@ public static class LoweredPipelineComposer
             BuildMetadata(steps));
     }
 
-    private static SandboxType ValidateAndInputType(IReadOnlyList<LoweredPipelineStep> steps, out string outputTag)
-    {
-        var first = steps[0] ?? throw new ArgumentNullException(nameof(LoweredPipelineComposition.Steps));
-        var inputType = CurrentParameter(first, 0).Type;
-        var currentTag = first.InputType ?? throw new ArgumentNullException(nameof(LoweredPipelineStep.InputType));
-        for (var i = 0; i < steps.Count; i++)
-        {
-            var step = steps[i] ?? throw new ArgumentNullException(nameof(LoweredPipelineComposition.Steps));
-            ArgumentNullException.ThrowIfNull(step.InputType, nameof(LoweredPipelineStep.InputType));
-            ArgumentNullException.ThrowIfNull(step.OutputType, nameof(LoweredPipelineStep.OutputType));
-            ArgumentNullException.ThrowIfNull(step.Value, nameof(LoweredPipelineStep.Value));
-            ArgumentNullException.ThrowIfNull(step.Prefix, nameof(LoweredPipelineStep.Prefix));
-            var parameter = CurrentParameter(step, i);
-            if (step.Kind is not (LoweredPipelineStepKind.Filter or LoweredPipelineStepKind.Projection))
-            {
-                throw new ArgumentException(
-                    $"step {i} has unsupported kind '{step.Kind}'; only Filter and Projection compose.");
-            }
-
-            if (step.Prefix.Count != 0)
-            {
-                throw new NotSupportedException(
-                    $"step {i} carries prefix statements, which the composer does not yet support.");
-            }
-
-            if (!string.Equals(step.InputType, currentTag, StringComparison.Ordinal))
-            {
-                throw new ArgumentException(
-                    $"step {i} input shape '{step.InputType}' does not match the running pipeline shape '{currentTag}'.");
-            }
-
-            if (!ParameterMatchesExactTag(parameter, step.InputType))
-            {
-                throw new ArgumentException(
-                    $"step {i} parameter type '{parameter.Type}' does not match input shape '{step.InputType}'.");
-            }
-
-            LoweredPipelineStepValidator.ValidateFilterOutput(step, i);
-
-            if (step.Kind == LoweredPipelineStepKind.Projection)
-            {
-                currentTag = step.OutputType;
-            }
-        }
-
-        outputTag = currentTag;
-        return inputType;
-    }
-
-    private static Parameter CurrentParameter(LoweredPipelineStep step, int index)
-    {
-        ArgumentNullException.ThrowIfNull(step.Parameters);
-        if (step.Parameters.Count != 1)
-        {
-            throw new ArgumentException(
-                $"step {index} must declare exactly one '{CurrentPlaceholder}' parameter.");
-        }
-
-        var parameter = step.Parameters[0] ?? throw new ArgumentNullException(nameof(LoweredPipelineStep.Parameters));
-        ArgumentNullException.ThrowIfNull(parameter.Name, nameof(Parameter.Name));
-        ArgumentNullException.ThrowIfNull(parameter.Type, nameof(Parameter.Type));
-        if (!string.Equals(parameter.Name, CurrentPlaceholder, StringComparison.Ordinal))
-        {
-            throw new ArgumentException(
-                $"step {index} must declare exactly one '{CurrentPlaceholder}' parameter.");
-        }
-
-        return parameter;
-    }
-
-    private static bool ParameterMatchesExactTag(Parameter parameter, string tag)
-    {
-        if (tag is "bool")
-            return parameter.Type == SandboxType.Bool;
-        if (tag is "int" or "i32")
-            return parameter.Type == SandboxType.I32;
-        if (tag is "long" or "i64")
-            return parameter.Type == SandboxType.I64;
-        if (tag is "double" or "f64")
-            return parameter.Type == SandboxType.F64;
-        if (tag is "string")
-            return parameter.Type == SandboxType.String;
-        return tag is not "guid" || parameter.Type == SandboxType.Guid;
-    }
-
-    private static void ValidateResultType(
-        IReadOnlyList<LoweredPipelineStep> steps,
-        SandboxType resultType,
-        SandboxType inputType,
-        string outputTag)
-    {
-        ArgumentNullException.ThrowIfNull(resultType);
-        if (!ResultTypeMatchesTag(resultType, outputTag))
-        {
-            throw new ArgumentException($"ResultType must match terminal OutputType '{outputTag}'.");
-        }
-
-        var hasProjection = false;
-        foreach (var step in steps)
-        {
-            if (step.Kind == LoweredPipelineStepKind.Projection)
-            {
-                hasProjection = true;
-                break;
-            }
-        }
-
-        if (!hasProjection && resultType != inputType)
-        {
-            throw new ArgumentException(
-                "ResultType must equal the pipeline input type when the pipeline has no projection.");
-        }
-    }
-
-    private static bool ResultTypeMatchesTag(SandboxType type, string tag)
-    {
-        if (ResultTypesByTag.TryGetValue(tag, out var expectedType))
-            return type == expectedType;
-
-        return tag is not ("list" or "map" or "record") || TagMatchesStructuralType(type, tag);
-    }
-
-    private static bool TagMatchesStructuralType(SandboxType type, string tag)
-        => (tag == "list" && type.Name == "List") ||
-           (tag == "map" && type.Name == "Map") ||
-           (tag == "record" && type.IsRecord);
-
-    // Gating only needs the steps up to and including the LAST filter: a projection after the final filter can
-    // never change whether the event is handled, so recomputing it here is pure waste (and would run an
-    // effectful projection twice, once here and once in Handle). Projections BEFORE the last filter are still
-    // emitted, because a later filter reads the value they produce.
+    // Gating only needs the steps through the last filter; later projections cannot affect whether the event is
+    // handled and may be effectful, while earlier projections still feed later filters.
     private static SandboxFunction BuildShouldHandle(
         IReadOnlyList<LoweredPipelineStep> steps,
         SandboxType inputType,

@@ -66,7 +66,6 @@ internal static partial class DotBoxDGenerationNames
         public const string RemoteSubscriptionPipelineWithContextOriginal = "DotBoxD.Plugins.Runtime.RemoteSubscriptionPipeline<TEvent, TContext>";
         public const string RemoteSubscriptionStageOriginal = "DotBoxD.Plugins.Runtime.Subscriptions.RemoteSubscriptionStage<TEvent, TCurrent>";
         public const string RemoteSubscriptionStageWithContextOriginal = "DotBoxD.Plugins.Runtime.Subscriptions.RemoteSubscriptionStage<TEvent, TCurrent, TContext>";
-
         public const string ListOriginal = "System.Collections.Generic.List<T>";
         public const string ReadOnlyListOriginal = "System.Collections.Generic.IReadOnlyList<T>";
         public const string ListInterfaceOriginal = "System.Collections.Generic.IList<T>";
