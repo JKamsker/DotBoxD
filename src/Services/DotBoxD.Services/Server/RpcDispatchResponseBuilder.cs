@@ -97,13 +97,16 @@ internal sealed class RpcDispatchResponseBuilder
         }
 
         var writer = MessageFramer.RentFrameWriter();
-        MessageFramer.WriteFramePrefix(writer, messageId, MessageType.Response);
-        var envelopeStart = writer.WrittenCount;
-        _serializer.Serialize(writer, new RpcResponse { MessageId = messageId, IsSuccess = true });
-        var envelopeLength = writer.WrittenCount - envelopeStart;
+        int envelopeLength;
 
         try
         {
+            MessageFramer.WriteFramePrefix(writer, messageId, MessageType.Response);
+            var envelopeStart = writer.WrittenCount;
+            _serializer.Serialize(writer, new RpcResponse { MessageId = messageId, IsSuccess = true });
+            envelopeLength = writer.WrittenCount - envelopeStart;
+            ct.ThrowIfCancellationRequested();
+
             await DispatchAsync(
                 dispatcher,
                 request,

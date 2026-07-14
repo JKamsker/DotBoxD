@@ -89,6 +89,32 @@ public sealed class RpcDispatchResponseBuilderCancellationRegressionTests
         }
     }
 
+    public async Task BuildAsync_observes_serializer_canceled_token_before_custom_dispatcher_work()
+    {
+        using var source = new CancellationTokenSource();
+        var serializer = new ResponseCancelingSerializer(new MessagePackRpcSerializer(), source);
+        var dispatcher = new CountingDispatcher();
+        var builder = CreateBuilder(serializer, dispatcher);
+        var request = new RpcRequest { MessageId = 42, ServiceName = dispatcher.ServiceName, MethodName = "Count" };
+
+        var exception = await Record.ExceptionAsync(async () =>
+        {
+            using var result = await builder.BuildAsync(
+                request,
+                messageId: 42,
+                ReadOnlyMemory<byte>.Empty,
+                new InstanceRegistry(),
+                RpcStreamingContext.Disabled,
+                source.Token);
+        });
+
+        Assert.IsType<OperationCanceledException>(exception);
+        Assert.True(source.IsCancellationRequested);
+        Assert.Equal(1, serializer.SerializeResponseCalls);
+        Assert.Equal(0, dispatcher.CallCount);
+        Assert.Equal(0, dispatcher.OutputBytes);
+    }
+
     private static RpcDispatchResponseBuilder CreateBuilder(
         ISerializer serializer,
         IServiceDispatcher dispatcher)
@@ -142,6 +168,26 @@ public sealed class RpcDispatchResponseBuilderCancellationRegressionTests
             serializer.Serialize(output, 123);
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class ResponseCancelingSerializer(ISerializer inner, CancellationTokenSource source) : ISerializer
+    {
+        public int SerializeResponseCalls { get; private set; }
+
+        public void Serialize<T>(IBufferWriter<byte> writer, T value)
+        {
+            if (value is RpcResponse { IsSuccess: true })
+            {
+                SerializeResponseCalls++;
+                source.Cancel();
+            }
+
+            inner.Serialize(writer, value);
+        }
+
+        public T Deserialize<T>(ReadOnlyMemory<byte> data) => inner.Deserialize<T>(data);
+
+        public object? Deserialize(ReadOnlyMemory<byte> data, Type type) => inner.Deserialize(data, type);
     }
 
     private sealed class CountingDispatcher : IServiceDispatcher, INonStreamingServiceDispatcher
