@@ -15,6 +15,7 @@ internal static class InvokeAsyncGeneratedBuilderResolver
         CancellationToken cancellationToken,
         out INamedTypeSymbol receiverType)
     {
+        receiver = HookChainAliasResolver.UnwrapTransparentExpression(receiver);
         receiverType = null!;
         if (TryResolveGeneratedBuilderExpression(model, receiver, cancellationToken, out receiverType))
         {
@@ -54,6 +55,7 @@ internal static class InvokeAsyncGeneratedBuilderResolver
         CancellationToken cancellationToken,
         out INamedTypeSymbol receiverType)
     {
+        expression = HookChainAliasResolver.UnwrapTransparentExpression(expression);
         receiverType = null!;
         if (expression is MemberAccessExpressionSyntax
             {
@@ -61,7 +63,7 @@ internal static class InvokeAsyncGeneratedBuilderResolver
                 Expression: { } facadeExpression
             })
         {
-            expression = facadeExpression;
+            expression = HookChainAliasResolver.UnwrapTransparentExpression(facadeExpression);
         }
 
         return TryFacadeNameFromBuilderInitializer(expression, out var builderType, out var facadeName) &&
