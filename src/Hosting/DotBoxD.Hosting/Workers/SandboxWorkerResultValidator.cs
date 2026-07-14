@@ -30,6 +30,25 @@ internal static class SandboxWorkerResultValidator
         SandboxExecutionOptions options,
         SandboxExecutionResult result,
         out SandboxError error)
+        => Validate(plan, entrypoint, options, result, validateDeterministicEvidence: true, out error);
+
+    internal static bool ValidateInterpreterEnvelope(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxExecutionOptions options,
+        SandboxExecutionResult result,
+        out SandboxError error)
+        // Interpreter-only audit evidence is validated and sanitized before this shared envelope check.
+        // Its deterministic binding evidence is checked against the sanitized publication result afterward.
+        => Validate(plan, entrypoint, options, result, validateDeterministicEvidence: false, out error);
+
+    private static bool Validate(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxExecutionOptions options,
+        SandboxExecutionResult result,
+        bool validateDeterministicEvidence,
+        out SandboxError error)
     {
         error = new SandboxError(SandboxErrorCode.HostFailure, "worker result identity did not match the requested plan");
         if (!string.Equals(result.ModuleHash, plan.ModuleHash, StringComparison.Ordinal) ||
@@ -64,7 +83,8 @@ internal static class SandboxWorkerResultValidator
         }
 
         error = new SandboxError(SandboxErrorCode.HostFailure, "worker deterministic binding result did not match audit evidence");
-        return SandboxWorkerDeterministicBindingValidator.Matches(plan, entrypoint, result);
+        return !validateDeterministicEvidence ||
+            SandboxWorkerDeterministicBindingValidator.Matches(plan, entrypoint, result);
     }
 
     private static bool WorkerModeMatches(SandboxExecutionOptions options, SandboxExecutionResult result)

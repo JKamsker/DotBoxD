@@ -8,7 +8,8 @@ internal static class WorkerBindingAuditResourceValidator
         ExecutionPlan plan,
         SandboxAuditEvent auditEvent,
         BindingSignature binding,
-        DateTimeOffset grantClock)
+        DateTimeOffset grantClock,
+        bool allowInProcessEvidence = false)
     {
         if (!auditEvent.Success ||
             auditEvent.Kind != BindingAuditKinds.BindingCall ||
@@ -20,7 +21,9 @@ internal static class WorkerBindingAuditResourceValidator
         var descriptor = plan.Bindings.GetDescriptor(auditEvent.BindingId!);
         if (descriptor.AuditResourceValidator is null)
         {
-            return !IsHostServiceAudit(auditEvent);
+            // Host-service descriptors execute in-process and construct this evidence locally.
+            // A worker must provide a grant-aware validator because its evidence crossed a process boundary.
+            return allowInProcessEvidence || !IsHostServiceAudit(auditEvent);
         }
 
         return plan.Policy.TryGetGrant(binding.RequiredCapability, grantClock, out var grant) &&

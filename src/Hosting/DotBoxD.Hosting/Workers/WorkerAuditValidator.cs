@@ -22,11 +22,11 @@ internal static class WorkerAuditValidator
             WorkerCacheInvalidationAuditValidator.Matches(plan, entrypoint, auditEvent),
         ["PolicyDenied"] = static (_, _, _, _, _) => false,
         [BindingAuditKinds.BindingCall] = static (plan, entrypoint, _, auditEvent, grantClock) =>
-            BindingAuditMatches(plan, entrypoint, auditEvent, grantClock),
+            BindingAuditMatches(plan, entrypoint, auditEvent, grantClock, allowInProcessEvidence: false),
         [BindingAuditKinds.SandboxLog] = static (plan, entrypoint, _, auditEvent, grantClock) =>
-            BindingAuditMatches(plan, entrypoint, auditEvent, grantClock),
+            BindingAuditMatches(plan, entrypoint, auditEvent, grantClock, allowInProcessEvidence: false),
         [BindingAuditKinds.PluginMessage] = static (plan, entrypoint, _, auditEvent, grantClock) =>
-            BindingAuditMatches(plan, entrypoint, auditEvent, grantClock),
+            BindingAuditMatches(plan, entrypoint, auditEvent, grantClock, allowInProcessEvidence: false),
     };
 
     private delegate bool AuditKindValidator(
@@ -52,7 +52,7 @@ internal static class WorkerAuditValidator
             validate(plan, entrypoint, options, auditEvent, grantClock);
     }
 
-    private static bool CommonEnvelopeMatches(ExecutionPlan plan, SandboxAuditEvent auditEvent)
+    internal static bool CommonEnvelopeMatches(ExecutionPlan plan, SandboxAuditEvent auditEvent)
     {
         if (string.IsNullOrWhiteSpace(auditEvent.Kind) ||
             !WorkerAuditTextSafety.TextIsSafe(auditEvent.Kind) ||
@@ -71,6 +71,19 @@ internal static class WorkerAuditValidator
         return ResultShapeMatches(auditEvent) &&
             TimestampMatches(plan, auditEvent.Timestamp);
     }
+
+    internal static bool InterpreterBindingMatches(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxAuditEvent auditEvent,
+        DateTimeOffset grantClock)
+        => CommonEnvelopeMatches(plan, auditEvent) &&
+           BindingAuditMatches(
+               plan,
+               entrypoint,
+               auditEvent,
+               grantClock,
+               allowInProcessEvidence: true);
 
     private static bool ResultShapeMatches(SandboxAuditEvent auditEvent)
         => auditEvent.Success
@@ -113,7 +126,8 @@ internal static class WorkerAuditValidator
         ExecutionPlan plan,
         string entrypoint,
         SandboxAuditEvent auditEvent,
-        DateTimeOffset grantClock)
+        DateTimeOffset grantClock,
+        bool allowInProcessEvidence)
     {
         if (!TryGetAuditedBinding(plan, entrypoint, auditEvent, out var binding))
         {
@@ -126,8 +140,17 @@ internal static class WorkerAuditValidator
             EffectMatches(auditEvent, binding) &&
             ResultMatches(auditEvent) &&
             LogAuditMatchesPolicy(plan, auditEvent) &&
-            WorkerBindingAuditResourceValidator.Matches(plan, auditEvent, binding, grantClock) &&
-            WorkerPluginMessageAuditPolicy.Matches(plan, auditEvent, grantClock) &&
+            WorkerBindingAuditResourceValidator.Matches(
+                plan,
+                auditEvent,
+                binding,
+                grantClock,
+                allowInProcessEvidence) &&
+            WorkerPluginMessageAuditPolicy.Matches(
+                plan,
+                auditEvent,
+                grantClock,
+                allowInProcessEvidence) &&
             RequiredBindingFieldsMatch(plan, auditEvent);
     }
 

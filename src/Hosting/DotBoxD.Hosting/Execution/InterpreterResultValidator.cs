@@ -10,25 +10,54 @@ internal static class InterpreterResultValidator
 {
     private const string RunSummaryKind = "RunSummary";
 
-    public static bool IsValid(
+    public static bool TryValidate(
         ExecutionPlan plan,
         string entrypoint,
         SandboxExecutionOptions options,
-        SandboxExecutionResult result)
+        SandboxExecutionResult result,
+        out SandboxExecutionResult validatedResult)
     {
-        if (!InterpreterEnvelopeMatches(result) ||
-            result.AuditEvents.Any(auditEvent => !InterpreterAuditKindIsAllowed(auditEvent.Kind)))
+        validatedResult = null!;
+        if (!InterpreterEnvelopeMatches(result))
         {
             return false;
         }
 
-        var validationResult = WithValidationSummaryWhenSuppressed(plan, options, result);
-        return SandboxWorkerResultValidator.Validate(
+        var validationCandidate = WithValidationSummaryWhenSuppressed(
             plan,
-            entrypoint,
             options,
-            validationResult,
-            out _);
+            result,
+            out var summaryWasSynthesized);
+        if (!InterpreterResultAuditValidator.TrySanitize(
+                plan,
+                entrypoint,
+                options,
+                validationCandidate,
+                out var workerValidationResult,
+                out var sanitizedAuditEvents) ||
+            !SandboxWorkerResultValidator.ValidateInterpreterEnvelope(
+                plan,
+                entrypoint,
+                options,
+                workerValidationResult,
+                out _) ||
+            !SandboxWorkerDeterministicBindingValidator.Matches(
+                plan,
+                entrypoint,
+                validationCandidate with { AuditEvents = sanitizedAuditEvents }))
+        {
+            return false;
+        }
+
+        if (summaryWasSynthesized)
+        {
+            sanitizedAuditEvents = sanitizedAuditEvents
+                .Where(auditEvent => auditEvent.Kind != RunSummaryKind)
+                .ToSequencedArray();
+        }
+
+        validatedResult = result with { AuditEvents = sanitizedAuditEvents };
+        return true;
     }
 
     private static bool InterpreterEnvelopeMatches(SandboxExecutionResult result)
@@ -36,25 +65,21 @@ internal static class InterpreterResultValidator
            result.ExecutionDispatched &&
            string.IsNullOrWhiteSpace(result.ArtifactHash);
 
-    private static bool InterpreterAuditKindIsAllowed(string kind)
-        => kind is RunSummaryKind or
-           "DebugTrace" or
-           BindingAuditKinds.BindingCall or
-           BindingAuditKinds.SandboxLog or
-           BindingAuditKinds.PluginMessage;
-
     private static SandboxExecutionResult WithValidationSummaryWhenSuppressed(
         ExecutionPlan plan,
         SandboxExecutionOptions options,
-        SandboxExecutionResult result)
+        SandboxExecutionResult result,
+        out bool summaryWasSynthesized)
     {
         if (!result.Succeeded ||
             !options.SuppressSuccessfulRunSummaryAudit ||
             result.AuditEvents.Any(auditEvent => auditEvent.Kind == RunSummaryKind))
         {
+            summaryWasSynthesized = false;
             return result;
         }
 
+        summaryWasSynthesized = true;
         var runId = options.RunId ??
             (result.AuditEvents.Count == 0 ? SandboxRunId.New() : result.AuditEvents[0].RunId);
         var events = new SandboxAuditEvent[result.AuditEvents.Count + 1];
