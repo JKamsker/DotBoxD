@@ -45,6 +45,56 @@ public sealed class InvokeAsyncReturnConversionBoundaryTests
     }
 
     [Theory]
+    [InlineData("sbyte")]
+    [InlineData("byte")]
+    [InlineData("short")]
+    [InlineData("ushort")]
+    public void Contextually_converted_narrow_constants_remain_on_the_i32_wire(string narrowType)
+    {
+        var result = RunGeneratorAndAssertCompiles(UsageSource($$"""
+            public static ValueTask<int> Run(RemotePluginServer kernels)
+                => kernels.InvokeAsync(async (IGameWorldAccess world) =>
+                {
+                    {{narrowType}} value = 1;
+                    return (int)value;
+                });
+            """));
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.Contains("\\\"returnType\\\":\\\"I32\\\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("numeric.toI64", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("numeric.toF64", source, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("sbyte", "short")]
+    [InlineData("byte", "short")]
+    [InlineData("byte", "ushort")]
+    [InlineData("char", "ushort")]
+    public void Implicit_narrow_integral_conversions_remain_on_the_i32_wire(
+        string sourceType,
+        string targetType)
+    {
+        var sourceValue = sourceType == "char" ? "'a'" : $"({sourceType})1";
+        var result = RunGeneratorAndAssertCompiles(UsageSource($$"""
+            public static ValueTask<int> Run(RemotePluginServer kernels)
+                => kernels.InvokeAsync(async (IGameWorldAccess world) =>
+                {
+                    {{sourceType}} source = {{sourceValue}};
+                    {{targetType}} value = source;
+                    return (int)value;
+                });
+            """));
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.Contains("\\\"returnType\\\":\\\"I32\\\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("numeric.toI64", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("numeric.toF64", source, StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData("long", "uint value = 1;", "2L")]
     [InlineData("double", "ulong value = 1;", "2D")]
     public void Unsupported_unsigned_return_widening_is_rejected(
