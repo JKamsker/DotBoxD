@@ -20,7 +20,7 @@ internal static class InvokeAsyncManualIrArgument
         {
             if (argument.NameColon is { Name.Identifier.ValueText: "irInvocation" })
             {
-                return !InvokeAsyncArgumentSyntax.IsNullLike(argument.Expression, model, cancellationToken);
+                return IsExplicitValue(argument.Expression, model, cancellationToken);
             }
         }
 
@@ -28,9 +28,36 @@ internal static class InvokeAsyncManualIrArgument
         {
             var type = model.GetTypeInfo(argument.Expression, cancellationToken);
             if ((type.Type is not null && InvokeAsyncServerSurface.IsIRInvocation(type.Type)) ||
-                (type.ConvertedType is not null && InvokeAsyncServerSurface.IsIRInvocation(type.ConvertedType)))
+                (type.ConvertedType is not null && InvokeAsyncServerSurface.IsIRInvocation(type.ConvertedType)) ||
+                HasImplicitIrConversion(type.Type))
             {
-                return !InvokeAsyncArgumentSyntax.IsNullLike(argument.Expression, model, cancellationToken);
+                return IsExplicitValue(argument.Expression, model, cancellationToken);
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsExplicitValue(
+        ExpressionSyntax expression,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+        => HasImplicitIrConversion(model.GetTypeInfo(expression, cancellationToken).Type) ||
+           !InvokeAsyncArgumentSyntax.IsNullLike(expression, model, cancellationToken);
+
+    private static bool HasImplicitIrConversion(ITypeSymbol? sourceType)
+    {
+        if (sourceType is not INamedTypeSymbol named)
+        {
+            return false;
+        }
+
+        foreach (var member in named.GetMembers(WellKnownMemberNames.ImplicitConversionName))
+        {
+            if (member is IMethodSymbol { MethodKind: MethodKind.Conversion } conversion &&
+                InvokeAsyncServerSurface.IsIRInvocation(conversion.ReturnType))
+            {
+                return true;
             }
         }
 
@@ -55,7 +82,7 @@ internal static class InvokeAsyncManualIrArgument
                 ? syntax.Expression
                 : argument.Value.Syntax as ExpressionSyntax;
             return expression is not null &&
-                   !InvokeAsyncArgumentSyntax.IsNullLike(expression, model, cancellationToken);
+                   IsExplicitValue(expression, model, cancellationToken);
         }
 
         return false;
