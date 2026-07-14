@@ -77,12 +77,15 @@ internal static class InvokeAsyncManualIrArgument
             return false;
         }
 
-        foreach (var member in named.GetMembers(WellKnownMemberNames.ImplicitConversionName))
+        for (var declaringType = named; declaringType is not null; declaringType = declaringType.BaseType)
         {
-            if (member is IMethodSymbol { MethodKind: MethodKind.Conversion } conversion &&
-                InvokeAsyncServerSurface.IsIRInvocation(conversion.ReturnType))
+            foreach (var member in declaringType.GetMembers(WellKnownMemberNames.ImplicitConversionName))
             {
-                return true;
+                if (member is IMethodSymbol { MethodKind: MethodKind.Conversion } conversion &&
+                    InvokeAsyncServerSurface.IsIRInvocation(conversion.ReturnType))
+                {
+                    return true;
+                }
             }
         }
 
