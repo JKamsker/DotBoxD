@@ -21,6 +21,10 @@ public sealed class RuntimeFuzzCoverageTests
             threads: 1);
 
     [Fact]
+    public async Task Generated_pure_module_ids_do_not_embed_compact_metadata_tokens()
+        => await RunPureCaseAsync(23_928_915);
+
+    [Fact]
     public async Task Generated_file_modules_require_policy_then_execute_with_grant()
     {
         using var temp = TempDirectory.Create();
@@ -160,7 +164,10 @@ public sealed class RuntimeFuzzCoverageTests
         """;
 
     private static string ModuleId(int index)
-        => $"runtime-fuzz-n{unchecked((uint)index)}";
+    {
+        var value = unchecked((uint)index);
+        return $"runtime-fuzz-n{value / 10_000}-n{value % 10_000}";
+    }
 
     private static string FileModuleJson(int index, string path)
         => $$"""
