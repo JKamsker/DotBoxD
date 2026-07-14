@@ -13,14 +13,24 @@ internal static class RuntimeTypeProbe
 
         _ = Measure(warmup, static () => SandboxType.Scalar("I32"));
         _ = Measure(warmup, static () => Kernels.Runtime.CompiledRuntime.TypeScalar("I32"));
+        _ = Measure(warmup, static () => Kernels.Runtime.CompiledRuntime.TypeScalar("Guid"));
         _ = Measure(warmup, static () => Kernels.Runtime.CompiledRuntime.TypeScalar("MonsterId"));
         var i32 = SandboxValue.FromInt32(42);
         var genericI32Type = SandboxType.Scalar("I32");
         _ = Measure(warmup, () => SandboxValueValidator.RequireType(i32, genericI32Type, "probe"));
         _ = Measure(warmup, () => SandboxValueValidator.RequireType(i32, SandboxType.I32, "probe"));
+        var guid = SandboxValue.FromGuid(Guid.ParseExact("00112233-4455-6677-8899-aabbccddeeff", "D"));
+        _ = Measure(
+            warmup,
+            () => SandboxValueValidator.RequireType(
+                guid,
+                Kernels.Runtime.CompiledRuntime.TypeScalar("Guid"),
+                "probe"));
+        _ = Measure(warmup, () => SandboxValueValidator.RequireType(guid, SandboxType.Guid, "probe"));
 
         var allocatedScalar = Measure(iterations, static () => SandboxType.Scalar("I32"));
         var runtimeBuiltIn = Measure(iterations, static () => Kernels.Runtime.CompiledRuntime.TypeScalar("I32"));
+        var runtimeGuid = Measure(iterations, static () => Kernels.Runtime.CompiledRuntime.TypeScalar("Guid"));
         var runtimeOpaque = Measure(iterations, static () => Kernels.Runtime.CompiledRuntime.TypeScalar("MonsterId"));
         var genericValidation = Measure(
             iterations,
@@ -28,13 +38,25 @@ internal static class RuntimeTypeProbe
         var builtInValidation = Measure(
             iterations,
             () => SandboxValueValidator.RequireType(i32, SandboxType.I32, "probe"));
+        var runtimeGuidValidation = Measure(
+            iterations,
+            () => SandboxValueValidator.RequireType(
+                guid,
+                Kernels.Runtime.CompiledRuntime.TypeScalar("Guid"),
+                "probe"));
+        var builtInGuidValidation = Measure(
+            iterations,
+            () => SandboxValueValidator.RequireType(guid, SandboxType.Guid, "probe"));
 
         Console.WriteLine($"iterations = {iterations:N0}");
         Write("SandboxType.Scalar(\"I32\")", allocatedScalar);
         Write("CompiledRuntime.TypeScalar(\"I32\")", runtimeBuiltIn);
+        Write("CompiledRuntime.TypeScalar(\"Guid\")", runtimeGuid);
         Write("CompiledRuntime.TypeScalar(\"MonsterId\")", runtimeOpaque);
         Write("RequireType(I32, Scalar(\"I32\"))", genericValidation);
         Write("RequireType(I32, SandboxType.I32)", builtInValidation);
+        Write("RequireType(Guid, TypeScalar(\"Guid\"))", runtimeGuidValidation);
+        Write("RequireType(Guid, SandboxType.Guid)", builtInGuidValidation);
     }
 
     private static Measurement Measure(int iterations, Func<SandboxType> action)

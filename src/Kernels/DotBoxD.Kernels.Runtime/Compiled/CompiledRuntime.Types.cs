@@ -13,6 +13,7 @@ public static partial class CompiledRuntime
             "I64" => SandboxType.I64,
             "F64" => SandboxType.F64,
             "String" => SandboxType.String,
+            "Guid" => SandboxType.Guid,
             "SandboxPath" => SandboxType.SandboxPath,
             "SandboxUri" => SandboxType.SandboxUri,
             _ => SandboxType.Scalar(name)
