@@ -109,7 +109,7 @@ public sealed class HandleSubtypeAttribute : Attribute
         string capability)
     {
         ArgumentNullException.ThrowIfNull(subtype);
-        ArgumentException.ThrowIfNullOrWhiteSpace(discriminator);
+        HookContractIdentifiers.ValidateIdentifier(discriminator, nameof(discriminator));
         HookContractIdentifiers.ValidateDottedIdentifier(bindingPrefix, nameof(bindingPrefix));
         HookContractIdentifiers.ValidateDottedIdentifier(capability, nameof(capability));
 
