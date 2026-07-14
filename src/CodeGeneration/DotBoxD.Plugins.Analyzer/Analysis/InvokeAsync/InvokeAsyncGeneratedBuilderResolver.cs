@@ -34,8 +34,8 @@ internal static class InvokeAsyncGeneratedBuilderResolver
                 {
                     Initializer.Value: { } initializer
                 } &&
-                TryFacadeNameFromBuilderInitializer(initializer, out var facadeName) &&
-                TryFindGeneratedFacade(model.Compilation, facadeName, cancellationToken, out receiverType))
+                TryFacadeNameFromBuilderInitializer(initializer, out var facadeName, out var facadeMetadataName) &&
+                TryFindGeneratedFacade(model.Compilation, facadeName, facadeMetadataName, cancellationToken, out receiverType))
             {
                 return true;
             }
@@ -54,19 +54,21 @@ internal static class InvokeAsyncGeneratedBuilderResolver
         if (receiver is not MemberAccessExpressionSyntax access ||
             !TryTupleElementIndex(access, model, cancellationToken, out var index) ||
             TupleElementInitializer(access.Expression, index, model, cancellationToken) is not { } initializer ||
-            !TryFacadeNameFromBuilderInitializer(initializer, out var facadeName))
+            !TryFacadeNameFromBuilderInitializer(initializer, out var facadeName, out var facadeMetadataName))
         {
             return false;
         }
 
-        return TryFindGeneratedFacade(model.Compilation, facadeName, cancellationToken, out receiverType);
+        return TryFindGeneratedFacade(model.Compilation, facadeName, facadeMetadataName, cancellationToken, out receiverType);
     }
 
     private static bool TryFacadeNameFromBuilderInitializer(
         ExpressionSyntax initializer,
-        out string facadeName)
+        out string facadeName,
+        out string? facadeMetadataName)
     {
         facadeName = string.Empty;
+        facadeMetadataName = null;
         return initializer is InvocationExpressionSyntax
         {
             Expression: MemberAccessExpressionSyntax
@@ -74,21 +76,23 @@ internal static class InvokeAsyncGeneratedBuilderResolver
                 Name.Identifier.ValueText: "Build",
                 Expression: { } buildReceiver
             }
-        } && TryFacadeNameFromBuilderFactory(buildReceiver, out facadeName);
+        } && TryFacadeNameFromBuilderFactory(buildReceiver, out facadeName, out facadeMetadataName);
     }
 
     private static bool TryFacadeNameFromBuilderFactory(
         ExpressionSyntax buildReceiver,
-        out string facadeName)
+        out string facadeName,
+        out string? facadeMetadataName)
     {
         facadeName = string.Empty;
+        facadeMetadataName = null;
         var current = buildReceiver;
         while (current is InvocationExpressionSyntax
             {
                 Expression: MemberAccessExpressionSyntax { Expression: { } next }
             })
         {
-            if (TryFacadeNameFromBuilderType(next, out facadeName))
+            if (TryFacadeNameFromBuilderType(next, out facadeName, out facadeMetadataName))
             {
                 return true;
             }
@@ -96,14 +100,31 @@ internal static class InvokeAsyncGeneratedBuilderResolver
             current = next;
         }
 
-        return TryFacadeNameFromBuilderType(current, out facadeName);
+        return TryFacadeNameFromBuilderType(current, out facadeName, out facadeMetadataName);
     }
 
     private static bool TryFacadeNameFromBuilderType(
         ExpressionSyntax builderType,
-        out string facadeName)
+        out string facadeName,
+        out string? facadeMetadataName)
     {
-        var builderName = builderType switch
+        var builderName = BuilderTypeName(builderType);
+        if (!builderName.EndsWith(BuilderSuffix, StringComparison.Ordinal) ||
+            builderName.Length == BuilderSuffix.Length)
+        {
+            facadeName = string.Empty;
+            facadeMetadataName = null;
+            return false;
+        }
+
+        facadeName = builderName.Substring(0, builderName.Length - BuilderSuffix.Length);
+        var qualifier = BuilderTypeQualifier(builderType);
+        facadeMetadataName = string.IsNullOrEmpty(qualifier) ? null : qualifier + "." + facadeName;
+        return true;
+    }
+
+    private static string BuilderTypeName(ExpressionSyntax builderType)
+        => builderType switch
         {
             IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
             QualifiedNameSyntax qualified => qualified.Right.Identifier.ValueText,
@@ -111,24 +132,55 @@ internal static class InvokeAsyncGeneratedBuilderResolver
             _ => string.Empty
         };
 
-        if (!builderName.EndsWith(BuilderSuffix, StringComparison.Ordinal) ||
-            builderName.Length == BuilderSuffix.Length)
+    private static string? BuilderTypeQualifier(ExpressionSyntax builderType)
+        => builderType switch
         {
-            facadeName = string.Empty;
-            return false;
-        }
+            QualifiedNameSyntax qualified => NameText(qualified.Left),
+            MemberAccessExpressionSyntax member => ExpressionText(member.Expression),
+            _ => null
+        };
 
-        facadeName = builderName.Substring(0, builderName.Length - BuilderSuffix.Length);
-        return true;
-    }
+    private static string NameText(NameSyntax name)
+        => name switch
+        {
+            IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
+            QualifiedNameSyntax qualified => NameText(qualified.Left) + "." + qualified.Right.Identifier.ValueText,
+            AliasQualifiedNameSyntax { Alias.Identifier.ValueText: "global" } alias => alias.Name.Identifier.ValueText,
+            AliasQualifiedNameSyntax alias => alias.Alias.Identifier.ValueText + "." + alias.Name.Identifier.ValueText,
+            _ => string.Empty
+        };
+
+    private static string? ExpressionText(ExpressionSyntax expression)
+        => expression switch
+        {
+            IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
+            QualifiedNameSyntax qualified => NameText(qualified),
+            MemberAccessExpressionSyntax member => ExpressionText(member.Expression) + "." + member.Name.Identifier.ValueText,
+            AliasQualifiedNameSyntax alias => NameText(alias),
+            _ => null
+        };
 
     private static bool TryFindGeneratedFacade(
         Compilation compilation,
         string facadeName,
+        string? facadeMetadataName,
         CancellationToken cancellationToken,
         out INamedTypeSymbol receiverType)
     {
         receiverType = null!;
+        if (facadeMetadataName is not null &&
+            compilation.GetTypeByMetadataName(facadeMetadataName) is { } qualifiedCandidate &&
+            InvokeAsyncAttributeMatcher.HasGeneratePluginServerAttribute(qualifiedCandidate))
+        {
+            receiverType = qualifiedCandidate;
+            return true;
+        }
+
+        if (facadeMetadataName is not null)
+        {
+            return false;
+        }
+
         foreach (var symbol in compilation.GetSymbolsWithName(
                      name => string.Equals(name, facadeName, StringComparison.Ordinal),
                      SymbolFilter.Type,
