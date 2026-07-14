@@ -115,10 +115,16 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         usage.GetMethod("Configure", BindingFlags.Public | BindingFlags.Static)!.Invoke(null, [registry]);
 
         Assert.NotNull(subscriptionId);
-        await Assert.ThrowsAsync<TException>(async () =>
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await localHandlers.DispatchAsync(
                 subscriptionId!,
                 payload,
                 new HookContext(new InMemoryPluginMessageSink(), CancellationToken.None)));
+
+        Assert.Contains("remote-local", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("projected", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("payload", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(subscriptionId!, exception.Message, StringComparison.Ordinal);
+        Assert.IsType<TException>(exception.InnerException);
     }
 }
