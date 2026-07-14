@@ -66,7 +66,7 @@ public sealed class InvokeAsyncReturnConversionBoundaryTests
                 });
             """));
 
-        AssertUnsupportedReturnConversion(result);
+        AssertUnsupportedConversion(result);
     }
 
     [Theory]
@@ -159,6 +159,42 @@ public sealed class InvokeAsyncReturnConversionBoundaryTests
                               StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public void Implicit_world_var_local_uses_the_resolved_host_binding_type()
+    {
+        var result = RunGeneratorAndAssertCompiles(UsageSource("""
+            public static ValueTask<int> Run(RemotePluginServer kernels)
+                => kernels.InvokeAsync(async world =>
+                {
+                    var health = world.GetHealth("monster-1");
+                    return health;
+                });
+            """));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+    }
+
+    [Fact]
+    public void Unsupported_contextual_assignment_conversion_is_rejected()
+    {
+        var result = RunGenerator(UsageSource("""
+            public static ValueTask<decimal> Run(RemotePluginServer kernels)
+                => kernels.InvokeAsync(async (IGameWorldAccess world) =>
+                {
+                    decimal converted = 1m;
+                    converted = 1;
+                    return converted;
+                });
+            """));
+
+        Assert.Contains(
+            result.Diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                          diagnostic.GetMessage().Contains(
+                              "assignment to 'converted'",
+                              StringComparison.OrdinalIgnoreCase));
+    }
+
     private static void AssertUnsupportedReturnConversion(
         Microsoft.CodeAnalysis.GeneratorDriverRunResult result)
         => Assert.Contains(
@@ -166,5 +202,14 @@ public sealed class InvokeAsyncReturnConversionBoundaryTests
             diagnostic => diagnostic.Id == "DBXK100" &&
                           diagnostic.GetMessage().Contains(
                               "return expression",
+                              StringComparison.OrdinalIgnoreCase));
+
+    private static void AssertUnsupportedConversion(
+        Microsoft.CodeAnalysis.GeneratorDriverRunResult result)
+        => Assert.Contains(
+            result.Diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                          diagnostic.GetMessage().Contains(
+                              "numeric widening conversion",
                               StringComparison.OrdinalIgnoreCase));
 }
