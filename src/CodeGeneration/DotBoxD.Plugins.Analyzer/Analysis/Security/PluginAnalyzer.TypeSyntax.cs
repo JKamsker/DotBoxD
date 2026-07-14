@@ -48,6 +48,9 @@ public sealed partial class PluginAnalyzer
         context.RegisterSyntaxNodeAction(
             AnalyzeTypeParameterConstraintType,
             SyntaxKind.TypeConstraint);
+        context.RegisterSyntaxNodeAction(
+            c => AnalyzeNameOfArgumentType(c, helperGraph),
+            SyntaxKind.InvocationExpression);
     }
 
     private static void AnalyzeDeclarationPatternType(
@@ -192,6 +195,27 @@ public sealed partial class PluginAnalyzer
         }
 
         ReportForbiddenType(context.ReportDiagnostic, type, typeSyntax.GetLocation());
+    }
+
+    private static void AnalyzeNameOfArgumentType(
+        SyntaxNodeAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph)
+    {
+        if (context.Node is not InvocationExpressionSyntax
+            {
+                Expression: IdentifierNameSyntax { Identifier.ValueText: "nameof" },
+                ArgumentList.Arguments.Count: 1
+            } invocation)
+        {
+            return;
+        }
+
+        var expression = invocation.ArgumentList.Arguments[0].Expression;
+        var symbol = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol;
+        if (symbol is ITypeSymbol type)
+        {
+            AnalyzeForbiddenTypeSymbol(context, helperGraph, expression, type);
+        }
     }
 
     private static void AnalyzeForbiddenTypeSyntax(
