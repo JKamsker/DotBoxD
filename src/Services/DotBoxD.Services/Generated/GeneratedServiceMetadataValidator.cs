@@ -107,9 +107,56 @@ internal static class GeneratedServiceMetadataValidator
         {
             throw new ArgumentException("Generated method metadata has an unsupported return kind.", paramName);
         }
+        ValidateReturnMetadata(method, paramName);
 
         ValidateParameters(method.Parameters, paramName);
     }
+
+    private static void ValidateReturnMetadata(GeneratedMethod method, string paramName)
+    {
+        if (RequiresResultType(method.ReturnKind) && method.ResultType is null)
+        {
+            throw new ArgumentException(
+                $"Generated method metadata for '{method.Name}' must include a result type for {method.ReturnKind}.",
+                paramName);
+        }
+
+        if (RequiresNestedServiceFlag(method.ReturnKind))
+        {
+            if (!method.ReturnsNestedService)
+            {
+                throw new ArgumentException(
+                    $"Generated method metadata for '{method.Name}' must mark {method.ReturnKind} as a nested service return.",
+                    paramName);
+            }
+
+            return;
+        }
+
+        if (method.ReturnsNestedService)
+        {
+            throw new ArgumentException(
+                $"Generated method metadata for '{method.Name}' marks non-nested return kind {method.ReturnKind} as nested.",
+                paramName);
+        }
+    }
+
+    private static bool RequiresResultType(GeneratedReturnKind kind) =>
+        kind is GeneratedReturnKind.TaskOfT or
+            GeneratedReturnKind.ValueTaskOfT or
+            GeneratedReturnKind.TaskOfNestedService or
+            GeneratedReturnKind.ValueTaskOfNestedService or
+            GeneratedReturnKind.TaskOfAsyncEnumerable or
+            GeneratedReturnKind.ValueTaskOfAsyncEnumerable or
+            GeneratedReturnKind.TaskOfStream or
+            GeneratedReturnKind.ValueTaskOfStream or
+            GeneratedReturnKind.TaskOfPipe or
+            GeneratedReturnKind.ValueTaskOfPipe;
+
+    private static bool RequiresNestedServiceFlag(GeneratedReturnKind kind) =>
+        kind is GeneratedReturnKind.SyncNestedService or
+            GeneratedReturnKind.TaskOfNestedService or
+            GeneratedReturnKind.ValueTaskOfNestedService;
 
     private static void ValidateParameters(IReadOnlyList<GeneratedParameter>? parameters, string paramName)
     {
