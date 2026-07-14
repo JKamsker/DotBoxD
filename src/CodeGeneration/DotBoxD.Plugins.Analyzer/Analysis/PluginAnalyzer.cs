@@ -90,6 +90,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
                 OperationKind.Interpolation);
             RegisterAwaitReachabilityAnalysis(startContext, helperGraph);
             RegisterForbiddenTypeSyntaxAnalysis(startContext, helperGraph);
+            RegisterEventAccessorAttributeMetadataAnalysis(startContext, helperGraph);
             RegisterEnumerationSyntaxAnalysis(startContext, helperGraph);
             RegisterFixedReachabilityAnalysis(startContext, helperGraph);
             RegisterUnsafeCodeAnalysis(startContext);
