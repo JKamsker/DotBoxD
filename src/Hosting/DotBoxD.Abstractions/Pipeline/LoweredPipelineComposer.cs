@@ -91,13 +91,7 @@ public static class LoweredPipelineComposer
                     $"step {i} parameter type '{parameter.Type}' does not match input shape '{step.InputType}'.");
             }
 
-            if (step.Kind == LoweredPipelineStepKind.Filter &&
-                !string.Equals(step.OutputType, "bool", StringComparison.Ordinal))
-            {
-                throw new ArgumentException(
-                    $"step {i} filter output shape '{step.OutputType}' must be 'bool'.",
-                    nameof(LoweredPipelineStep.OutputType));
-            }
+            LoweredPipelineStepValidator.ValidateFilterOutput(step, i);
 
             if (step.Kind == LoweredPipelineStepKind.Projection)
             {
@@ -240,9 +234,7 @@ public static class LoweredPipelineComposer
     }
 
     private static Parameter InputParameter(SandboxType type) => new(InitialVariable(), type);
-
     private static string InitialVariable() => CurrentVariablePrefix + "0";
-
     private static string NextVariable(string current)
         => CurrentVariablePrefix + (int.Parse(current[CurrentVariablePrefix.Length..], System.Globalization.CultureInfo.InvariantCulture) + 1);
 
