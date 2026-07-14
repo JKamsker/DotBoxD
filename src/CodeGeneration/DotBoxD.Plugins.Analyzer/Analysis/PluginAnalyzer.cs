@@ -93,6 +93,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             RegisterEnumerationSyntaxAnalysis(startContext, helperGraph);
             RegisterFixedReachabilityAnalysis(startContext, helperGraph);
             RegisterUnsafeCodeAnalysis(startContext);
+            RegisterLocalFunctionAttributeAnalysis(startContext, helperGraph);
             startContext.RegisterCompilationEndAction(helperGraph.ReportDiagnostics);
         });
     }
