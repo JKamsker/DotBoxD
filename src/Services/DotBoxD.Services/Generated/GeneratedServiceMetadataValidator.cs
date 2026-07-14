@@ -180,6 +180,33 @@ internal static class GeneratedServiceMetadataValidator
             {
                 throw new ArgumentException("Generated parameter metadata positions must be zero-based and ordered.", paramName);
             }
+
+            ValidateParameterShape(parameter, paramName);
+        }
+    }
+
+    private static void ValidateParameterShape(GeneratedParameter parameter, string paramName)
+    {
+        var isCancellationTokenType = parameter.Type == typeof(CancellationToken);
+        if (parameter.IsCancellationToken != isCancellationTokenType)
+        {
+            throw new ArgumentException(
+                "Generated parameter metadata cancellation-token flag must match its parameter type.",
+                paramName);
+        }
+
+        if (parameter.IsCancellationToken && parameter.DefaultValue is not null)
+        {
+            throw new ArgumentException(
+                "Generated cancellation-token parameter metadata must not carry a default value object.",
+                paramName);
+        }
+
+        if (!parameter.HasDefaultValue && parameter.DefaultValue is not null)
+        {
+            throw new ArgumentException(
+                "Generated parameter metadata must not carry a default value when HasDefaultValue is false.",
+                paramName);
         }
     }
 
