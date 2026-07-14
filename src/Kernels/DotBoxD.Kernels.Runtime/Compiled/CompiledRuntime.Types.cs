@@ -14,6 +14,12 @@ public static partial class CompiledRuntime
             "F64" => SandboxType.F64,
             "String" => SandboxType.String,
             "Guid" => SandboxType.Guid,
+            _ => TypePathOrOpaqueScalar(name)
+        };
+
+    private static SandboxType TypePathOrOpaqueScalar(string name)
+        => name switch
+        {
             "SandboxPath" => SandboxType.SandboxPath,
             "SandboxUri" => SandboxType.SandboxUri,
             _ => SandboxType.Scalar(name)
