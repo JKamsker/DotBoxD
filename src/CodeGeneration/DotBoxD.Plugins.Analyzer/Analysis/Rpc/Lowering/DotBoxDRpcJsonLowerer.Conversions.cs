@@ -1,3 +1,4 @@
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -39,6 +40,49 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     internal string ApplyNumericConversion(ITypeSymbol sourceType, ITypeSymbol targetType, string lowered)
         => TryApplyNumericConversion(sourceType, targetType, lowered, out var converted) ? converted : lowered;
 
+    internal string ApplyRequiredReturnConversion(
+        ExpressionSyntax expression,
+        ITypeSymbol targetType,
+        string lowered)
+        => ApplyRequiredNumericConversion(
+            expression,
+            targetType,
+            lowered,
+            $"InvokeAsync return expression '{expression}'");
+
+    internal string ApplyRequiredLocalConversion(
+        ExpressionSyntax expression,
+        ILocalSymbol local,
+        string lowered,
+        bool isInferred)
+    {
+        var targetType = local.Type;
+        if (isInferred && targetType.TypeKind == TypeKind.Error)
+        {
+            var typeInfo = _model.GetTypeInfo(expression, _cancellationToken);
+            targetType = EffectiveSourceType(expression, typeInfo)
+                         ?? throw UnsupportedConversion($"Server extension local '{local.Name}' initializer");
+            _fallbackLocalTypes[local] = targetType;
+        }
+
+        return ApplyRequiredNumericConversion(
+            expression,
+            targetType,
+            lowered,
+            $"Server extension local '{local.Name}' initializer");
+    }
+
+    internal string ApplyRequiredAssignmentConversion(
+        ExpressionSyntax expression,
+        ITypeSymbol targetType,
+        string lowered,
+        string targetName)
+        => ApplyRequiredNumericConversion(
+            expression,
+            targetType,
+            lowered,
+            $"Server extension assignment to '{targetName}'");
+
     private string ApplyRequiredNumericConversion(
         ExpressionSyntax expression,
         ITypeSymbol targetType,
@@ -46,27 +90,105 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         string description)
     {
         var typeInfo = _model.GetTypeInfo(expression, _cancellationToken);
-        var sourceType = typeInfo.Type;
-        if (sourceType is null ||
-            SymbolEqualityComparer.Default.Equals(sourceType, targetType))
+        if (EffectiveSourceType(expression, typeInfo) is not { } sourceType)
         {
-            return lowered;
+            throw UnsupportedConversion(description);
         }
 
-        if (typeInfo.ConvertedType is not null &&
-            SymbolEqualityComparer.Default.Equals(typeInfo.ConvertedType, targetType))
+        var contextualType = typeInfo.ConvertedType is { TypeKind: not TypeKind.Error } convertedType
+            ? convertedType
+            : sourceType;
+        if (!TryEffectiveLoweredType(expression, sourceType, contextualType, out var effectiveType))
         {
-            return lowered;
+            throw UnsupportedConversion(description);
         }
 
-        if (TryApplyNumericConversion(sourceType, targetType, lowered, out var converted))
+        if (TryApplyNumericConversion(effectiveType, targetType, lowered, out var converted))
         {
             return converted;
         }
 
-        throw new NotSupportedException(
-            $"{description} is not supported because it is not a supported numeric widening conversion.");
+        throw UnsupportedConversion(description);
     }
+
+    private ITypeSymbol? EffectiveSourceType(ExpressionSyntax expression, TypeInfo typeInfo)
+    {
+        if (FallbackLocalType(expression) is { } fallbackLocalType)
+        {
+            return fallbackLocalType;
+        }
+
+        if (typeInfo.Type is { TypeKind: not TypeKind.Error } sourceType)
+        {
+            return sourceType;
+        }
+
+        if (TryServerContextInvocationReturnType(expression) is { } hostReturnType)
+        {
+            return hostReturnType;
+        }
+
+        return typeInfo.ConvertedType is { TypeKind: not TypeKind.Error } convertedType
+            ? convertedType
+            : null;
+    }
+
+    private ITypeSymbol? FallbackLocalType(ExpressionSyntax expression)
+    {
+        if (expression is not IdentifierNameSyntax identifier ||
+            _model.GetSymbolInfo(identifier, _cancellationToken).Symbol is not { } symbol)
+        {
+            return null;
+        }
+
+        return _fallbackLocalTypes.TryGetValue(symbol, out var type) ? type : null;
+    }
+
+    private ITypeSymbol? TryServerContextInvocationReturnType(ExpressionSyntax expression)
+    {
+        if (expression is not InvocationExpressionSyntax invocation ||
+            invocation.Expression is not MemberAccessExpressionSyntax member ||
+            !IsServerContextExpression(member.Expression))
+        {
+            return null;
+        }
+
+        var candidates = ServerContextHostBindingCandidates(
+            member.Name.Identifier.ValueText,
+            invocation.ArgumentList.Arguments);
+        return candidates.Count == 1
+            ? DotBoxDTypeNameReader.UnwrapTaskLike(candidates[0].Method.ReturnType)
+            : null;
+    }
+
+    private bool TryEffectiveLoweredType(
+        ExpressionSyntax expression,
+        ITypeSymbol sourceType,
+        ITypeSymbol? convertedType,
+        out ITypeSymbol effectiveType)
+    {
+        effectiveType = sourceType;
+        if (convertedType is null || SymbolEqualityComparer.Default.Equals(sourceType, convertedType))
+        {
+            return true;
+        }
+
+        if (IsLoweredEnumConstant(expression, convertedType) ||
+            NumericConversion(sourceType, convertedType) is not NumericConversionKind.Unsupported)
+        {
+            effectiveType = convertedType;
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool IsLoweredEnumConstant(ExpressionSyntax expression, ITypeSymbol convertedType)
+        => convertedType.TypeKind == TypeKind.Enum &&
+           _model.GetConstantValue(expression, _cancellationToken).HasValue;
+
+    private static NotSupportedException UnsupportedConversion(string description)
+        => new($"{description} is not supported because it is not a supported numeric widening conversion.");
 
     private static bool TryApplyNumericConversion(
         ITypeSymbol sourceType,
@@ -74,27 +196,45 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         string lowered,
         out string converted)
     {
+        switch (NumericConversion(sourceType, targetType))
+        {
+            case NumericConversionKind.Identity:
+            case NumericConversionKind.SameWire:
+                converted = lowered;
+                return true;
+            case NumericConversionKind.ToI64:
+                converted = Call("numeric.toI64", null, lowered);
+                return true;
+            case NumericConversionKind.ToF64:
+                converted = Call("numeric.toF64", null, lowered);
+                return true;
+            default:
+                converted = lowered;
+                return false;
+        }
+    }
+
+    private static NumericConversionKind NumericConversion(ITypeSymbol sourceType, ITypeSymbol targetType)
+    {
         if (SymbolEqualityComparer.Default.Equals(sourceType, targetType))
         {
-            converted = lowered;
-            return true;
+            return NumericConversionKind.Identity;
         }
 
-        if (IsI32WireIntegral(sourceType) &&
-            targetType.SpecialType == SpecialType.System_Int64)
+        if ((IsNarrowI32Integral(sourceType) && targetType.SpecialType == SpecialType.System_Int32) ||
+            (sourceType.SpecialType == SpecialType.System_Single && targetType.SpecialType == SpecialType.System_Double))
         {
-            converted = Call("numeric.toI64", null, lowered);
-            return true;
+            return NumericConversionKind.SameWire;
         }
 
-        if (CanWidenToF64(sourceType) && IsFloatingPoint(targetType))
+        if (IsI32WireIntegral(sourceType) && targetType.SpecialType == SpecialType.System_Int64)
         {
-            converted = Call("numeric.toF64", null, lowered);
-            return true;
+            return NumericConversionKind.ToI64;
         }
 
-        converted = lowered;
-        return false;
+        return CanWidenToF64(sourceType) && IsFloatingPoint(targetType)
+            ? NumericConversionKind.ToF64
+            : NumericConversionKind.Unsupported;
     }
 
     private static bool IsI32WireIntegral(ITypeSymbol type)
@@ -105,9 +245,21 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             SpecialType.System_SByte or
             SpecialType.System_UInt16;
 
+    private static bool IsNarrowI32Integral(ITypeSymbol type)
+        => IsI32WireIntegral(type) && type.SpecialType != SpecialType.System_Int32;
+
     private static bool CanWidenToF64(ITypeSymbol type)
         => IsI32WireIntegral(type) || type.SpecialType == SpecialType.System_Int64;
 
     private static bool IsFloatingPoint(ITypeSymbol type)
         => type.SpecialType is SpecialType.System_Double or SpecialType.System_Single;
+
+    private enum NumericConversionKind
+    {
+        Unsupported,
+        Identity,
+        SameWire,
+        ToI64,
+        ToF64
+    }
 }

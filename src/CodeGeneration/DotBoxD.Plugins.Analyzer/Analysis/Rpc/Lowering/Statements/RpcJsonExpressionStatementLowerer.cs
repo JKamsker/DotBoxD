@@ -34,7 +34,11 @@ internal static class RpcJsonExpressionStatementLowerer
         if (assignment.Left is IdentifierNameSyntax target)
         {
             var value = assignment.Kind() == SyntaxKind.SimpleAssignmentExpression
-                ? lowerer.LowerExpressionWithPrelude(assignment.Right, output)
+                ? lowerer.ApplyRequiredAssignmentConversion(
+                    assignment.Right,
+                    lowerer.TypeOf(target),
+                    lowerer.LowerExpressionWithPrelude(assignment.Right, output),
+                    target.Identifier.ValueText)
                 : LowerCompound(lowerer, assignment, target, output);
             output.Add(DotBoxDRpcJsonLowerer.SetStatement(target.Identifier.ValueText, value));
             return true;

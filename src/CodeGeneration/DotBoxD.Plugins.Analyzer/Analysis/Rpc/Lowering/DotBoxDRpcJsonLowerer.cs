@@ -27,6 +27,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     private readonly ITypeSymbol? _serverContextType;
     private readonly Dictionary<string, string> _serviceHandleLocals = new(StringComparer.Ordinal);
     private readonly Dictionary<ISymbol, string> _serviceHandleMembers = new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<ISymbol, ITypeSymbol> _fallbackLocalTypes = new(SymbolEqualityComparer.Default);
     private readonly HashSet<string> _reservedNames = new(StringComparer.Ordinal);
     private Func<AssignmentExpressionSyntax, Func<ExpressionSyntax, string>, string?>? _assignmentOverride;
     private Func<ExpressionSyntax, string?>? _expressionOverride;
@@ -70,6 +71,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         _returnValueType = returnValueType;
         try
         {
+            _fallbackLocalTypes.Clear();
             ReserveUserNames(block);
             var parts = new List<string>();
             for (var i = 0; i < leadingLocals.Count; i++)
@@ -88,6 +90,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             _returnRecordFields = [];
             _returnRecordType = null;
             _returnValueType = null;
+            _fallbackLocalTypes.Clear();
         }
     }
     internal static string SetGeneratedLocal(string name, string value) => SetStatement(name, value);

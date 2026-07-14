@@ -1,4 +1,3 @@
-using System.Globalization;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 using Microsoft.CodeAnalysis;
@@ -20,7 +19,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
         if (TryLowerConstantExpression(expression, out var constant))
         {
-            return constant;
+            return ApplyNumericConversion(expression, constant);
         }
 
         var lowered = TryLowerSimpleExpression(expression) ??
@@ -111,16 +110,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             return EnumLiteralJson(enumType, value);
         }
 
-        if (converted?.SpecialType == SpecialType.System_Int64 && value is int i)
-        {
-            return LiteralJson((long)i);
-        }
-        if (converted?.SpecialType is SpecialType.System_Double or SpecialType.System_Single &&
-            value is IConvertible convertible)
-        {
-            return LiteralJson(convertible.ToDouble(CultureInfo.InvariantCulture));
-        }
-        if (converted?.SpecialType == SpecialType.System_Decimal && value is decimal decimalValue)
+        if (value is decimal decimalValue)
         {
             return DecimalLiteralJson(decimalValue);
         }
@@ -282,6 +272,11 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     }
     internal ITypeSymbol TypeOf(ExpressionSyntax expression)
     {
+        if (FallbackLocalType(expression) is { } fallbackLocalType)
+        {
+            return fallbackLocalType;
+        }
+
         if (IsServerContextExpression(expression) && _serverContextType is { } serverContextType)
         {
             return serverContextType;

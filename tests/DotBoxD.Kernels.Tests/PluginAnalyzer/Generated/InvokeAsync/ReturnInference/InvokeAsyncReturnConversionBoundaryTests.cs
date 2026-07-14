@@ -41,7 +41,7 @@ public sealed class InvokeAsyncReturnConversionBoundaryTests
         var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
 
         Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
-        Assert.Contains("numeric.toI64", source, StringComparison.Ordinal);
+        Assert.Equal(1, source.Split("numeric.toI64", StringSplitOptions.None).Length - 1);
     }
 
     [Theory]
