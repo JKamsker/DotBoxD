@@ -8,7 +8,7 @@ public sealed partial class PluginAnalyzer
 {
     private static void AnalyzeTypeOf(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
-        var type = ((ITypeOfOperation)context.Operation).Type;
+        var type = ((ITypeOfOperation)context.Operation).TypeOperand;
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, type);
