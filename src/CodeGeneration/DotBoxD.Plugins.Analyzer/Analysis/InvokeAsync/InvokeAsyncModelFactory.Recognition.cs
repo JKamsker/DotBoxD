@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
 
@@ -15,7 +16,10 @@ internal static partial class InvokeAsyncModelFactory
 
 internal static class InvokeAsyncArgumentSyntax
 {
-    public static bool IsNullLike(ExpressionSyntax expression)
+    public static bool IsNullLike(
+        ExpressionSyntax expression,
+        SemanticModel model,
+        CancellationToken cancellationToken)
     {
         while (true)
         {
@@ -24,7 +28,7 @@ internal static class InvokeAsyncArgumentSyntax
                 case ParenthesizedExpressionSyntax parenthesized:
                     expression = parenthesized.Expression;
                     break;
-                case CastExpressionSyntax cast:
+                case CastExpressionSyntax cast when IsBuiltInConversion(cast, model, cancellationToken):
                     expression = cast.Expression;
                     break;
                 case PostfixUnaryExpressionSyntax postfix
@@ -38,4 +42,10 @@ internal static class InvokeAsyncArgumentSyntax
             }
         }
     }
+
+    private static bool IsBuiltInConversion(
+        CastExpressionSyntax cast,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+        => model.GetOperation(cast, cancellationToken) is IConversionOperation { OperatorMethod: null };
 }
