@@ -94,14 +94,22 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         if (element.Expression is not IdentifierNameSyntax mapLocal ||
             element.ArgumentList.Arguments.Count != 1 ||
             receiverType is null ||
-            DotBoxDRpcTypeMapper.MapTypes(receiverType) is null)
+            DotBoxDRpcTypeMapper.MapTypes(receiverType) is not { } mapTypes)
         {
             return null;
         }
 
         var name = mapLocal.Identifier.ValueText;
-        var keyJson = LowerExpressionWithPrelude(element.ArgumentList.Arguments[0].Expression, output);
-        var valueJson = LowerExpressionWithPrelude(valueExpression, output);
+        var keyJson = LowerRequiredExpressionWithPrelude(
+            element.ArgumentList.Arguments[0].Expression,
+            mapTypes.Key,
+            "Server extension map key",
+            output);
+        var valueJson = LowerRequiredExpressionWithPrelude(
+            valueExpression,
+            mapTypes.Value,
+            "Server extension map value",
+            output);
         Allocates = true;
         return SetStatement(name, Call("map.set", null, Var(name), keyJson, valueJson));
     }
