@@ -297,5 +297,4 @@ internal static partial class DotBoxDGenerationNames
         public const string PluginId = "pluginId", Kernel = "kernel";
         public const string RequiredCapabilities = "requiredCapabilities";
     }
-
 }
