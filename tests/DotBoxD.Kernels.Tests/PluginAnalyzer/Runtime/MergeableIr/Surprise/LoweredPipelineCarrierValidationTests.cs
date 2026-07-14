@@ -96,6 +96,33 @@ public sealed class LoweredPipelineCarrierValidationTests
     }
 
     [Fact]
+    public void Composer_rejects_non_scalar_input_tag_parameter_type_mismatches()
+    {
+        var step = Step(LoweredPipelineStepKind.Filter, "record", "bool", SandboxType.I32);
+
+        var exception = Assert.Throws<ArgumentException>(() => LoweredPipelineComposer.Compose(
+            new LoweredPipelineComposition("record-input-type-mismatch", [step], SandboxType.I32)));
+
+        Assert.Contains("InputType", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("parameter type", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Composer_accepts_non_scalar_input_tag_when_parameter_type_matches()
+    {
+        var recordType = SandboxType.Record([SandboxType.I32, SandboxType.String]);
+        var step = Step(LoweredPipelineStepKind.Filter, "record", "bool", recordType);
+
+        var module = LoweredPipelineComposer.Compose(
+            new LoweredPipelineComposition("record-input-type-match", [step], recordType));
+
+        Assert.Contains(module.Functions, function => function.Id == "ShouldHandle" &&
+            function.Parameters.Single().Type == recordType);
+        Assert.Contains(module.Functions, function => function.Id == "Handle" &&
+            function.ReturnType == recordType);
+    }
+
+    [Fact]
     public void Composer_rejects_projection_steps_with_null_output_type()
     {
         var step = Step(LoweredPipelineStepKind.Projection, "i32", "string", SandboxType.I32) with
