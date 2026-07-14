@@ -112,9 +112,18 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         }
 
         ReportAndRecordIfForbidden(context, helperGraph, method, invocation.TargetMethod.ContainingType);
+        var reportedUnsafeAccessor = ReportAndRecordIfUnsafeAccessor(
+            context,
+            helperGraph,
+            method,
+            invocation.TargetMethod);
         RecordStaticConstructorReachability(context, helperGraph, invocation.TargetMethod);
         ReportForbiddenReferencedMethodSignature(context, invocation.TargetMethod);
-        helperGraph.RecordCall(method, invocation.TargetMethod, context.Operation.Syntax.GetLocation());
+        if (!reportedUnsafeAccessor)
+        {
+            helperGraph.RecordCall(method, invocation.TargetMethod, context.Operation.Syntax.GetLocation());
+        }
+
         ReportLocalUseIfInvalid(context, invocation.TargetMethod);
     }
 

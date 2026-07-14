@@ -40,6 +40,10 @@ public sealed partial class PluginAnalyzer
     {
         var method = (IMethodSymbol)context.Symbol;
         helperGraph.RecordDispatchImplementations(method);
+        if (TryGetUnsafeAccessorAttribute(method, out var attribute))
+        {
+            helperGraph.RecordForbidden(method, attribute);
+        }
     }
 
     private static void AnalyzeProperty(SymbolAnalysisContext context)
@@ -239,5 +243,24 @@ public sealed partial class PluginAnalyzer
         }
 
         return null;
+    }
+
+    private static bool TryGetUnsafeAccessorAttribute(IMethodSymbol method, out INamedTypeSymbol attributeType)
+    {
+        foreach (var attribute in method.GetAttributes())
+        {
+            if (attribute.AttributeClass is { } attributeClass &&
+                string.Equals(
+                    attributeClass.ToDisplayString(),
+                    DotBoxDMetadataNames.UnsafeAccessorAttribute,
+                    StringComparison.Ordinal))
+            {
+                attributeType = attributeClass;
+                return true;
+            }
+        }
+
+        attributeType = null!;
+        return false;
     }
 }
