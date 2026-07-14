@@ -156,6 +156,7 @@ internal sealed class RpcDispatchResponseBuilder
                 writer.Rewind(MessageFramer.HeaderSize + MessageFramer.EnvelopeLengthSize);
                 var responseEnvelopeStart = writer.WrittenCount;
                 _serializer.Serialize(writer, response);
+                ct.ThrowIfCancellationRequested();
                 var responseEnvelopeLength = writer.WrittenCount - responseEnvelopeStart;
                 MessageFramer.CompleteFrame(writer, responseEnvelopeLength);
                 return new RpcDispatchResult(writer, stream);
