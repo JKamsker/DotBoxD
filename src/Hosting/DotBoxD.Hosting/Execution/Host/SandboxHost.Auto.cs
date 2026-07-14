@@ -84,6 +84,12 @@ public sealed partial class SandboxHost
                 hotness,
                 DotBoxD.Kernels.Compiler.CompiledCacheStatus.None);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            selectedMode = default;
+            result = PreDispatchCancelledResult(plan, options);
+            return false;
+        }
         catch (Exception)
         {
             selectedMode = default;
