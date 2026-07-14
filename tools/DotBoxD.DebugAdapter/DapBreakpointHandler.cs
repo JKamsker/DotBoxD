@@ -219,7 +219,25 @@ internal sealed class DapBreakpointHandler(
             : null;
 
     private static int? ParseHitCount(string? value)
-        => int.TryParse(value, out var parsed) && parsed > 0 ? parsed : null;
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        if (!int.TryParse(
+                value,
+                System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var parsed) || parsed <= 0)
+        {
+            throw new DebugAdapterException(
+                "invalidBreakpoint",
+                "Breakpoint hit conditions must be positive integers.");
+        }
+
+        return parsed;
+    }
 
     private static JsonElement Property(JsonElement value, string first, string second)
         => value.TryGetProperty(first, out var property) ? property : value.GetProperty(second);

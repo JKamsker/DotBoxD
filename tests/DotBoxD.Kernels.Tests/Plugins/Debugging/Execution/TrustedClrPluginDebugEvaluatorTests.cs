@@ -42,6 +42,27 @@ public sealed class TrustedClrPluginDebugEvaluatorTests
     }
 
     [Fact]
+    public async Task In_process_provider_can_read_map_frame_values()
+    {
+        var evaluator = ClrPluginDebugEvaluators.CreateTrustedInProcess(
+            new TrustedInProcessDebugEvaluatorOptions());
+        var map = SandboxValue.FromMap(
+            new Dictionary<SandboxValue, SandboxValue>
+            {
+                [SandboxValue.FromString("first")] = SandboxValue.FromInt32(1),
+                [SandboxValue.FromString("second")] = SandboxValue.FromInt32(2)
+            },
+            SandboxType.String,
+            SandboxType.I32);
+
+        var result = await evaluator.EvaluateAsync(
+            new PluginDebugEvaluationRequest(new TestFrame(map), "amount.Count"));
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Equal(SandboxValue.FromInt32(2), result.Value);
+    }
+
+    [Fact]
     public async Task Trusted_provider_compiles_against_lazily_supplied_assembly_image()
     {
         var evaluator = ClrPluginDebugEvaluators.CreateTrustedInProcess(
@@ -137,7 +158,7 @@ public sealed class TrustedClrPluginDebugEvaluatorTests
         [
             new SandboxDebugVariable(
                 "amount",
-                SandboxType.I32,
+                amount.Type,
                 SandboxDebugVariableKind.Argument,
                 isAssigned: true,
                 amount)

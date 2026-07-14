@@ -104,7 +104,8 @@ internal sealed class PluginDebugAssemblyStore(int maxBytes)
     private static void ValidateFileName(string fileName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
-        if (!string.Equals(fileName, Path.GetFileName(fileName), StringComparison.Ordinal) ||
+        if (fileName.IndexOfAny('/', '\\') >= 0 ||
+            !string.Equals(fileName, Path.GetFileName(fileName), StringComparison.Ordinal) ||
             !fileName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
         {
             throw new ArgumentException("Assembly names must be leaf .dll file names.", nameof(fileName));

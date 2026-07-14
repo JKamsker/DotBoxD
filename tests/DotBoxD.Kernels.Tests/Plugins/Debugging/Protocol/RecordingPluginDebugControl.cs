@@ -16,6 +16,8 @@ internal sealed class RecordingPluginDebugControl : IPluginDebugControlRpcServic
     public TaskCompletionSource DisconnectReceived { get; } =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    public Func<string, JsonElement, object>? ResponseBody { get; init; }
+
     public ValueTask<byte[]> ExchangeAsync(byte[] message, CancellationToken cancellationToken = default)
     {
         var request = PluginDebugProtocol.Decode(message, 1024 * 1024);
@@ -26,11 +28,7 @@ internal sealed class RecordingPluginDebugControl : IPluginDebugControlRpcServic
             DisconnectReceived.TrySetResult();
         }
 
-        object body = request.Kind == PluginDebugCommands.Initialize
-            ? new { supported = true }
-            : request.Kind == PluginDebugCommands.SetBreakpoints
-                ? new { breakpoints = Array.Empty<object>() }
-                : new { };
+        var body = ResponseBody?.Invoke(request.Kind, request.Payload) ?? DefaultBody(request.Kind);
         var response = new PluginDebugEnvelope(
             PluginDebugProtocol.Version,
             request.Kind + "Response",
@@ -39,4 +37,11 @@ internal sealed class RecordingPluginDebugControl : IPluginDebugControlRpcServic
             JsonSerializer.SerializeToElement(new { success = true, body }));
         return ValueTask.FromResult(PluginDebugProtocol.Encode(response, 1024 * 1024));
     }
+
+    private static object DefaultBody(string command)
+        => command == PluginDebugCommands.Initialize
+            ? new { supported = true }
+            : command == PluginDebugCommands.SetBreakpoints
+                ? new { breakpoints = Array.Empty<object>() }
+                : new { };
 }

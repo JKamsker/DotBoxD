@@ -19,6 +19,8 @@ internal sealed record ClrDebugValue
 
     public ClrDebugValue[]? Items { get; init; }
 
+    public ClrDebugMapEntry[]? Entries { get; init; }
+
     public static ClrDebugValue FromSandbox(SandboxValue value) => value switch
     {
         UnitValue => new ClrDebugValue { Kind = "unit" },
@@ -46,6 +48,15 @@ internal sealed record ClrDebugValue
             Kind = "record",
             Items = item.Fields.Select(FromSandbox).ToArray()
         },
+        MapValue item => new ClrDebugValue
+        {
+            Kind = "map",
+            Entries = item.Values
+                .Select(entry => new ClrDebugMapEntry(
+                    FromSandbox(entry.Key),
+                    FromSandbox(entry.Value)))
+                .ToArray()
+        },
         _ => throw new NotSupportedException(
             $"Trusted CLR evaluation cannot serialize sandbox value '{value.GetType().Name}'.")
     };
@@ -65,6 +76,10 @@ internal sealed record ClrDebugValue
     {
         "guid" => Guid.Parse(Text!),
         "list" or "record" => (Items ?? []).Select(item => item.ToClr()).ToArray(),
+        "map" => (Entries ?? []).ToDictionary(
+            entry => entry.Key.ToClr()
+                ?? throw new InvalidOperationException("CLR evaluation cannot represent a null map key."),
+            entry => entry.Value.ToClr()),
         _ => throw new InvalidOperationException($"Unsupported serialized debug value kind '{Kind}'.")
     };
 
@@ -119,3 +134,5 @@ internal sealed record ClrDebugValue
             ? new ClrDebugValue { Kind = "f64", F64 = value }
             : throw new InvalidOperationException("CLR evaluation returned a non-finite floating-point value.");
 }
+
+internal sealed record ClrDebugMapEntry(ClrDebugValue Key, ClrDebugValue Value);

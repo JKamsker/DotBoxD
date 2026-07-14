@@ -30,8 +30,13 @@ public sealed class KernelDebugInfoTests
     public void Documents_normalize_paths_and_verify_exact_source_checksums()
     {
         var document = KernelDebugDocument.FromSource("plugin", @"C:\src\Plugin.cs", "class Plugin { }\n");
+        var uncDocument = KernelDebugDocument.FromSource(
+            "unc-plugin",
+            @"\\server\share\Plugin.cs",
+            "class Plugin { }\n");
 
         Assert.Equal("C:/src/Plugin.cs", document.Path);
+        Assert.Equal("//server/share/Plugin.cs", uncDocument.Path);
         Assert.Equal(64, document.Sha256Checksum.Length);
         Assert.True(document.MatchesSource("class Plugin { }\n"));
         Assert.False(document.MatchesSource("class Plugin { }\r\n"));

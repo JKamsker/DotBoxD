@@ -23,12 +23,18 @@ internal static class PluginDebugBridgeDiscovery
             Share = FileShare.None,
             Options = FileOptions.WriteThrough
         };
+        var unixMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
         if (!OperatingSystem.IsWindows())
         {
-            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+            options.UnixCreateMode = unixMode;
         }
 
         using var stream = new FileStream(path, options);
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(path, unixMode);
+        }
+
         stream.Write(content);
         return published;
     }

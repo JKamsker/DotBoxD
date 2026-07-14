@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace DotBoxD.DebugAdapter;
 
@@ -85,20 +84,7 @@ internal static class DapSourceVariableProjector
     }
 
     public static string Translate(string expression, IReadOnlyList<DapSourceVariableBinding> bindings)
-    {
-        foreach (var binding in bindings
-                     .Where(binding => binding.DisplayValue is null)
-                     .OrderByDescending(binding => binding.SourceName.Length))
-        {
-            expression = Regex.Replace(
-                expression,
-                $@"(?<![\w.]){Regex.Escape(binding.SourceName)}(?![\w.])",
-                binding.SlotName,
-                RegexOptions.CultureInvariant);
-        }
-
-        return expression;
-    }
+        => DapSourceExpressionTranslator.Translate(expression, bindings);
 
     private static object Snapshot(SourceNode node, IReadOnlyDictionary<string, JsonElement> raw)
     {

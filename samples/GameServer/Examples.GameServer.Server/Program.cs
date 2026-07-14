@@ -270,8 +270,7 @@ internal static class Program
         return total;
     }
 
-    private static void PrintWorld(GameWorld world)
-        => Console.WriteLine(world.Render());
+    private static void PrintWorld(GameWorld world) => Console.WriteLine(world.Render());
 
     private static void PrintEffects(IReadOnlyList<string> effects)
     {

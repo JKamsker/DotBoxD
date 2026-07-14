@@ -204,14 +204,14 @@ internal sealed class DapInspectionHandler(
         var arguments = Arguments(request);
         var handle = _variableStore.Get(arguments.GetProperty("variablesReference").GetInt32());
         var name = arguments.GetProperty("name").GetString()!;
-        var authoredContainer = handle.VariableName is not null &&
-            handle.Value.GetProperty("type").GetString() == "object";
+        var target = DapVariableTargetResolver.Resolve(
+            handle, name, FrameContext(handle.FrameId).Bindings, _variableStore);
         return SetExpressionCoreAsync(
             handle.FrameId,
-            authoredContainer ? handle.VariableName + "." + name : handle.VariableName ?? name,
+            target.Expression,
             arguments.GetProperty("value").GetString()!,
             cancellationToken,
-            handle.VariableName is null || authoredContainer ? null : _variableStore.ChildPath(handle, name));
+            target.Path);
     }
 
     private ValueTask<object> SetExpressionAsync(JsonElement request, CancellationToken cancellationToken)
@@ -239,7 +239,7 @@ internal sealed class DapInspectionHandler(
                     expression = DapSourceVariableProjector.Translate(
                         expression,
                         FrameContext(frameId).Bindings),
-                    valueExpression = value,
+                    valueExpression = DapSourceVariableProjector.Translate(value, FrameContext(frameId).Bindings),
                     path
                 },
                 cancellationToken)

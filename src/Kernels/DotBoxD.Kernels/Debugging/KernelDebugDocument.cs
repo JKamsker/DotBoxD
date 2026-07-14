@@ -46,9 +46,12 @@ public sealed record KernelDebugDocument
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         var normalized = path.Replace('\\', '/');
         var schemeSeparator = normalized.IndexOf("://", StringComparison.Ordinal);
-        var prefixLength = schemeSeparator < 0 ? 0 : schemeSeparator + 3;
+        var isUncPath = schemeSeparator < 0 && normalized.StartsWith("//", StringComparison.Ordinal);
+        var prefixLength = isUncPath ? 2 : schemeSeparator < 0 ? 0 : schemeSeparator + 3;
         var prefix = normalized[..prefixLength];
-        var remainder = normalized[prefixLength..];
+        var remainder = isUncPath
+            ? normalized[prefixLength..].TrimStart('/')
+            : normalized[prefixLength..];
         while (remainder.Contains("//", StringComparison.Ordinal))
         {
             remainder = remainder.Replace("//", "/", StringComparison.Ordinal);

@@ -86,6 +86,24 @@ public sealed class PluginDebugAssemblyUploadTests
         Assert.Equal("assemblyUploadRejected", oversized.GetProperty("error").GetProperty("code").GetString());
     }
 
+    [Theory]
+    [InlineData("../Plugin.dll")]
+    [InlineData("..\\Plugin.dll")]
+    public async Task Upload_rejects_non_leaf_assembly_names_on_every_platform(string fileName)
+    {
+        using var server = PluginServer.Create(remoteDebugOptions: Options(new TrustedEvaluator()));
+        using var owner = server.CreateSession();
+        await using var session = owner.CreateDebugSession(new NoopEvents());
+        _ = await SuccessAsync(session, PluginDebugCommands.Attach);
+
+        var rejected = await ExchangeAsync(
+            session,
+            PluginDebugCommands.UploadAssembly,
+            Chunk(fileName, offset: 0, [1], complete: true));
+
+        Assert.Equal("assemblyUploadRejected", rejected.GetProperty("error").GetProperty("code").GetString());
+    }
+
     private static PluginRemoteDebugOptions Options(
         IPluginDebugEvaluatorProvider evaluator,
         int maxUploadBytes = 1024) =>

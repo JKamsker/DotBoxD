@@ -20,6 +20,14 @@ internal sealed class PluginDebugSourceRefreshTracker
         TaskCompletionSource[] completed;
         lock (_gate)
         {
+            if (version <= 0 || version > _registeredVersion)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(version),
+                    version,
+                    "Source refresh acknowledgements must identify a registered version.");
+            }
+
             if (version <= _acknowledgedVersion)
             {
                 return;

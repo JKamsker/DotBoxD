@@ -5,17 +5,29 @@ namespace DotBoxD.DebugAdapter;
 
 internal static class BridgeProtocolIO
 {
-    private const int RemoteEnvelopeLimit = 1024 * 1024;
     private const int JsonHeadroom = 4096;
-    private const int MaxFrameLength = ((RemoteEnvelopeLimit + 2) / 3 * 4) + JsonHeadroom;
+    public const int DefaultEnvelopeLimit = 1024 * 1024;
+
+    public static int WrappedEnvelopeLimit(int envelopeLimit)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(envelopeLimit);
+        var frameLimit = (((long)envelopeLimit + 2) / 3 * 4) + JsonHeadroom;
+        return frameLimit <= int.MaxValue
+            ? (int)frameLimit
+            : throw new ArgumentOutOfRangeException(
+                nameof(envelopeLimit),
+                envelopeLimit,
+                "The bridge envelope limit is too large to wrap in a local frame.");
+    }
 
     public static async ValueTask WriteAsync(
         Stream stream,
         object message,
+        int maxBytes,
         CancellationToken cancellationToken)
     {
         var payload = JsonSerializer.SerializeToUtf8Bytes(message, DapJson.Options);
-        if (payload.Length > MaxFrameLength)
+        if (payload.Length > maxBytes)
         {
             throw new InvalidDataException("Bridge frame is outside the adapter limit.");
         }
@@ -29,6 +41,7 @@ internal static class BridgeProtocolIO
 
     public static async ValueTask<JsonDocument?> ReadAsync(
         Stream stream,
+        int maxBytes,
         CancellationToken cancellationToken)
     {
         var header = new byte[sizeof(int)];
@@ -40,7 +53,7 @@ internal static class BridgeProtocolIO
 
         await stream.ReadExactlyAsync(header.AsMemory(first), cancellationToken).ConfigureAwait(false);
         var length = BinaryPrimitives.ReadInt32LittleEndian(header);
-        if (length <= 0 || length > MaxFrameLength)
+        if (length <= 0 || length > maxBytes)
         {
             throw new InvalidDataException("Bridge frame is outside the adapter limit.");
         }

@@ -83,6 +83,21 @@ public sealed class PluginDebugSessionTests
     }
 
     [Fact]
+    public async Task Attached_session_rejects_a_second_attach_request()
+    {
+        using var server = EnabledServer();
+        using var owner = server.CreateSession();
+        await using var debug = owner.CreateDebugSession(new RecordingEvents());
+
+        Assert.True((await ExchangeAsync(debug, PluginDebugCommands.Attach)).GetProperty("success").GetBoolean());
+
+        var duplicate = await ExchangeAsync(debug, PluginDebugCommands.Attach);
+
+        Assert.Equal("debuggerAlreadyAttached", ErrorCode(duplicate));
+        Assert.True(debug.IsAttached);
+    }
+
+    [Fact]
     public async Task Host_restricted_pause_scope_is_rejected()
     {
         using var server = EnabledServer();

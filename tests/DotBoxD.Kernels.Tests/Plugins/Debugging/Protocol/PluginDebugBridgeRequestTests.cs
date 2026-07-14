@@ -10,14 +10,72 @@ namespace DotBoxD.Kernels.Tests.Plugins.Debugging.Protocol;
 public sealed class PluginDebugBridgeRequestTests
 {
     [Fact]
+    public void Republishing_discovery_descriptor_tightens_existing_unix_permissions()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var descriptor = new PluginDebugBridgeDescriptor(
+            int.MaxValue - Environment.ProcessId,
+            "permission-test-pipe",
+            new string('a', 64));
+        var published = PublishDescriptor(descriptor);
+        try
+        {
+            File.SetUnixFileMode(
+                published.DiscoveryFile!,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead);
+
+            published = PublishDescriptor(descriptor);
+
+            var mode = File.GetUnixFileMode(published.DiscoveryFile!);
+            Assert.Equal(
+                UnixFileMode.UserRead | UnixFileMode.UserWrite,
+                mode & (UnixFileMode.UserRead | UnixFileMode.UserWrite |
+                    UnixFileMode.GroupRead | UnixFileMode.GroupWrite |
+                    UnixFileMode.OtherRead | UnixFileMode.OtherWrite));
+        }
+        finally
+        {
+            File.Delete(published.DiscoveryFile!);
+        }
+    }
+
+    [Fact]
     public async Task Bridge_preserves_headroom_for_base64_wrapped_remote_envelopes()
     {
         const int payloadLength = 800_000;
+        const int maxFrameBytes = 1024 * 1024;
         await using var bridge = PluginDebugBridge.Start(new PluginDebugBridgeOptions
         {
             WaitForDebuggerBeforeInstall = false
         });
-        var control = new LargeResponseControl(payloadLength);
+        var control = new LargeResponseControl(payloadLength, maxFrameBytes);
+        bridge.AttachControl(control);
+        await bridge.PublishAsync(Bootstrap(control.SessionToken));
+        await using var client = await BridgeClient.ConnectAsync(
+            bridge.Descriptor.PipeName,
+            bridge.Descriptor.DiscoveryToken,
+            CancellationToken.None);
+
+        var response = await client.RemoteAsync("largeResponse", null, CancellationToken.None);
+
+        Assert.Equal(payloadLength, response.GetProperty("data").GetString()!.Length);
+    }
+
+    [Fact]
+    public async Task Bridge_and_adapter_honor_a_configured_frame_limit_above_the_default()
+    {
+        const int payloadLength = 1_200_000;
+        const int maxFrameBytes = 2 * 1024 * 1024;
+        await using var bridge = PluginDebugBridge.Start(new PluginDebugBridgeOptions
+        {
+            WaitForDebuggerBeforeInstall = false,
+            MaxFrameBytes = maxFrameBytes
+        });
+        var control = new LargeResponseControl(payloadLength, maxFrameBytes);
         bridge.AttachControl(control);
         await bridge.PublishAsync(Bootstrap(control.SessionToken));
         await using var client = await BridgeClient.ConnectAsync(
@@ -52,6 +110,28 @@ public sealed class PluginDebugBridgeRequestTests
             bridge.Descriptor.DiscoveryToken,
             timeout.Token);
         Assert.Equal(token, client.SessionToken);
+    }
+
+    [Fact]
+    public async Task Bridge_rejects_source_refresh_acknowledgements_for_unregistered_versions()
+    {
+        await using var bridge = PluginDebugBridge.Start(new PluginDebugBridgeOptions
+        {
+            WaitForDebuggerBeforeInstall = false
+        });
+        var token = Convert.ToHexStringLower(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        await bridge.PublishAsync(Bootstrap(token));
+        await using var client = await BridgeClient.ConnectAsync(
+            bridge.Descriptor.PipeName,
+            bridge.Descriptor.DiscoveryToken,
+            CancellationToken.None);
+
+        var response = await client.SendAsync(
+            "sourcesChangedDone",
+            Arguments(("version", 1L)),
+            CancellationToken.None);
+
+        Assert.False(response.GetProperty("success").GetBoolean());
     }
 
     [Fact]
@@ -158,6 +238,17 @@ public sealed class PluginDebugBridgeRequestTests
     private static Dictionary<string, object?> Arguments(params (string Name, object? Value)[] values)
         => values.ToDictionary(item => item.Name, item => item.Value, StringComparer.Ordinal);
 
+    private static PluginDebugBridgeDescriptor PublishDescriptor(PluginDebugBridgeDescriptor descriptor)
+    {
+        var discovery = typeof(PluginDebugBridge).Assembly.GetType(
+            "DotBoxD.Pushdown.Services.PluginDebugBridgeDiscovery",
+            throwOnError: true)!;
+        var publish = discovery.GetMethod(
+            "Publish",
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)!;
+        return Assert.IsType<PluginDebugBridgeDescriptor>(publish.Invoke(null, [descriptor]));
+    }
+
     private static byte[] Bootstrap(string sessionToken)
         => PluginDebugProtocol.Encode(
             new PluginDebugEnvelope(
@@ -179,14 +270,14 @@ public sealed class PluginDebugBridgeRequestTests
             template.Entrypoints);
     }
 
-    private sealed class LargeResponseControl(int payloadLength) : IPluginDebugControlRpcService
+    private sealed class LargeResponseControl(int payloadLength, int maxMessageBytes) : IPluginDebugControlRpcService
     {
         public string SessionToken { get; } = Convert.ToHexStringLower(Guid.NewGuid().ToByteArray()) +
             Convert.ToHexStringLower(Guid.NewGuid().ToByteArray());
 
         public ValueTask<byte[]> ExchangeAsync(byte[] message, CancellationToken cancellationToken = default)
         {
-            var request = PluginDebugProtocol.Decode(message, 1024 * 1024);
+            var request = PluginDebugProtocol.Decode(message, maxMessageBytes);
             var response = new PluginDebugEnvelope(
                 PluginDebugProtocol.Version,
                 request.Kind + "Response",
@@ -197,7 +288,7 @@ public sealed class PluginDebugBridgeRequestTests
                     success = true,
                     body = new { data = new string('x', payloadLength) }
                 }));
-            return ValueTask.FromResult(PluginDebugProtocol.Encode(response, 1024 * 1024));
+            return ValueTask.FromResult(PluginDebugProtocol.Encode(response, maxMessageBytes));
         }
     }
 }

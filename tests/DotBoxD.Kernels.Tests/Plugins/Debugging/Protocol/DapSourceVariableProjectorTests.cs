@@ -60,6 +60,38 @@ public sealed class DapSourceVariableProjectorTests
     }
 
     [Fact]
+    public void Translation_preserves_authored_names_inside_string_literals()
+    {
+        DapSourceVariableBinding[] bindings = [new("e_Name", "e.Name", null, null)];
+
+        var translated = DapSourceVariableProjector.Translate("e.Name == \"e.Name\"", bindings);
+
+        Assert.Equal("e_Name == \"e.Name\"", translated);
+    }
+
+    [Fact]
+    public void Translation_preserves_authored_names_inside_character_literals()
+    {
+        DapSourceVariableBinding[] bindings = [new("e_Initial", "x", null, null)];
+
+        var translated = DapSourceVariableProjector.Translate("x == 'x'", bindings);
+
+        Assert.Equal("e_Initial == 'x'", translated);
+    }
+
+    [Fact]
+    public void Translation_rewrites_expressions_but_not_text_inside_interpolated_strings()
+    {
+        DapSourceVariableBinding[] bindings = [new("e_Name", "e.Name", null, null)];
+
+        var translated = DapSourceVariableProjector.Translate(
+            "$\"{e.Name}: e.Name\"",
+            bindings);
+
+        Assert.Equal("$\"{e_Name}: e.Name\"", translated);
+    }
+
+    [Fact]
     public void Direct_projection_uses_its_assigned_source_argument()
     {
         var arguments = Variables(

@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Threading.Channels;
 using DotBoxD.Kernels.Debugging;
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
+using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Debugging;
@@ -84,6 +85,34 @@ public sealed class PluginDebugEvaluationTests
         Assert.Throws<ArgumentNullException>(() => PluginDebugEvaluationResult.Failure(null!));
     }
 
+    [Fact]
+    public async Task Sandbox_only_evaluation_promotes_integer_literals_for_i64_expressions()
+    {
+        var frame = new ReadOnlyFrame("amount", SandboxValue.FromInt64(42));
+
+        var result = await SandboxOnlyPluginDebugEvaluator.Instance.EvaluateAsync(
+            new PluginDebugEvaluationRequest(frame, "amount + 1 > 42"));
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Equal(SandboxValue.FromBool(true), result.Value);
+    }
+
+    [Theory]
+    [InlineData("true || missing", true)]
+    [InlineData("false && missing", false)]
+    public async Task Sandbox_only_evaluation_short_circuits_logical_operators(
+        string expression,
+        bool expected)
+    {
+        var frame = new ReadOnlyFrame("amount", SandboxValue.FromInt32(42));
+
+        var result = await SandboxOnlyPluginDebugEvaluator.Instance.EvaluateAsync(
+            new PluginDebugEvaluationRequest(frame, expression));
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Equal(SandboxValue.FromBool(expected), result.Value);
+    }
+
     private static async Task<JsonElement> SuccessAsync(
         PluginDebugSession session,
         string command,
@@ -121,6 +150,43 @@ public sealed class PluginDebugEvaluationTests
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             var message = await _events.Reader.ReadAsync(timeout.Token);
             return PluginDebugProtocol.Decode(message, 1024 * 1024).Payload;
+        }
+    }
+
+    private sealed class ReadOnlyFrame(string name, SandboxValue value) : ISandboxDebugFrame
+    {
+        public string FunctionId => "test";
+
+        public int Depth => 0;
+
+        public ISandboxDebugFrame? Caller => null;
+
+        public IReadOnlyList<SandboxDebugVariable> Arguments { get; } =
+        [
+            new SandboxDebugVariable(
+                name,
+                value.Type,
+                SandboxDebugVariableKind.Argument,
+                isAssigned: true,
+                value)
+        ];
+
+        public IReadOnlyList<SandboxDebugVariable> Locals => [];
+
+        public bool TrySetVariable(string variableName, SandboxValue replacement, out SandboxError? error)
+        {
+            error = new SandboxError(SandboxErrorCode.InvalidInput, "read only");
+            return false;
+        }
+
+        public bool TrySetMember(
+            string variableName,
+            IReadOnlyList<SandboxDebugValuePathSegment> path,
+            SandboxValue replacement,
+            out SandboxError? error)
+        {
+            error = new SandboxError(SandboxErrorCode.InvalidInput, "read only");
+            return false;
         }
     }
 }

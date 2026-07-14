@@ -184,7 +184,7 @@ public sealed class PluginDebugBridge : IPluginDebugEventRpcService, IAsyncDispo
             .ConfigureAwait(false);
         await WriteAsync(
                 stream,
-                new { kind = "authentication", success = true, sessionToken, protocolVersion = PluginDebugProtocol.Version },
+                new { kind = "authentication", success = true, sessionToken, protocolVersion = PluginDebugProtocol.Version, maxFrameBytes = _options.MaxFrameBytes },
                 cancellationToken)
             .ConfigureAwait(false);
         using var connection = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

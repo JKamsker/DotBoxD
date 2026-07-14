@@ -118,7 +118,7 @@ public sealed class PluginDebugSession : IPluginDebugControlEndpoint, IDisposabl
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            if (!_coordinator.TryAttach(this, pauseScope))
+            if (_attached || !_coordinator.TryAttach(this, pauseScope))
             {
                 return false;
             }
