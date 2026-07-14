@@ -27,6 +27,11 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         _reserveGeneratedName = reserveGeneratedName;
         _serverContextParameterName = serverContextParameterName;
         _serverContextType = serverContextType;
+        _serverContextHostBindings = new ServerContextHostBindingResolver(
+            model,
+            serverContextParameterName,
+            serverContextType,
+            cancellationToken);
     }
 
     private string LowerRecordCreation(BaseObjectCreationExpressionSyntax creation)

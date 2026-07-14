@@ -1,4 +1,3 @@
-using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -123,7 +122,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             return sourceType;
         }
 
-        if (TryServerContextInvocationReturnType(expression) is { } hostReturnType)
+        if (_serverContextHostBindings.TryGetInvocationReturnType(expression) is { } hostReturnType)
         {
             return hostReturnType;
         }
@@ -142,23 +141,6 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         }
 
         return _fallbackLocalTypes.TryGetValue(symbol, out var type) ? type : null;
-    }
-
-    private ITypeSymbol? TryServerContextInvocationReturnType(ExpressionSyntax expression)
-    {
-        if (expression is not InvocationExpressionSyntax invocation ||
-            invocation.Expression is not MemberAccessExpressionSyntax member ||
-            !IsServerContextExpression(member.Expression))
-        {
-            return null;
-        }
-
-        var candidates = ServerContextHostBindingCandidates(
-            member.Name.Identifier.ValueText,
-            invocation.ArgumentList.Arguments);
-        return candidates.Count == 1
-            ? DotBoxDTypeNameReader.UnwrapTaskLike(candidates[0].Method.ReturnType)
-            : null;
     }
 
     private bool TryEffectiveLoweredType(
