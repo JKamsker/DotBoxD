@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using DotBoxD.Codecs.MessagePack;
+using DotBoxD.Services.Diagnostics;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Serialization;
 using DotBoxD.Services.Server;
@@ -61,6 +62,33 @@ public sealed class RpcDispatchResponseBuilderCancellationRegressionTests
         Assert.Equal(0, dispatcher.OutputBytes);
     }
 
+    [Fact]
+    public async Task BuildAsync_observes_pre_canceled_token_before_missing_dispatcher_error()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var builder = new RpcDispatchResponseBuilder(
+            serializer,
+            new ConcurrentDictionary<string, IServiceDispatcher>());
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+
+        try
+        {
+            using var result = await builder.BuildAsync(
+                new RpcRequest { MessageId = 43, ServiceName = "Missing", MethodName = "Count" },
+                messageId: 43,
+                ReadOnlyMemory<byte>.Empty,
+                new InstanceRegistry(),
+                RpcStreamingContext.Disabled,
+                canceled.Token);
+
+            Assert.Fail(DescribeUnexpectedDispatchResult(serializer, result));
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
     private static RpcDispatchResponseBuilder CreateBuilder(
         ISerializer serializer,
         IServiceDispatcher dispatcher)
@@ -68,6 +96,29 @@ public sealed class RpcDispatchResponseBuilderCancellationRegressionTests
         var dispatchers = new ConcurrentDictionary<string, IServiceDispatcher>();
         Assert.True(dispatchers.TryAdd(dispatcher.ServiceName, dispatcher));
         return new RpcDispatchResponseBuilder(serializer, dispatchers);
+    }
+
+    private static string DescribeUnexpectedDispatchResult(
+        ISerializer serializer,
+        RpcDispatchResult result)
+    {
+        if (!MessageFramer.TryReadFrame(
+            result.FrameMemory,
+            out _,
+            out var messageType,
+            out var envelope,
+            out _))
+        {
+            return "Expected OperationCanceledException before missing-dispatcher response, " +
+                $"but BuildAsync returned an unreadable frame with {result.FrameMemory.Length} bytes.";
+        }
+
+        var response = serializer.Deserialize<RpcResponse>(envelope);
+        return "Expected OperationCanceledException before missing-dispatcher response, " +
+            $"but BuildAsync returned MessageType={messageType}, " +
+            $"IsSuccess={response.IsSuccess}, " +
+            $"ErrorType={response.ErrorType ?? "<null>"}. " +
+            $"ServiceNotFound={RpcErrorTypes.ServiceNotFound}.";
     }
 
     private sealed class CancelingSuccessDispatcher(CancellationTokenSource source) :
