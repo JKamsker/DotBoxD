@@ -91,7 +91,7 @@ public static class SafeHttpPolicyBuilderExtensions
             throw new ArgumentOutOfRangeException(nameof(timeout));
         }
 
-        return (long)effective.TotalMilliseconds;
+        return (long)Math.Ceiling(effective.TotalMilliseconds);
     }
 
     private static void ThrowIfNegative(long value, string paramName)
