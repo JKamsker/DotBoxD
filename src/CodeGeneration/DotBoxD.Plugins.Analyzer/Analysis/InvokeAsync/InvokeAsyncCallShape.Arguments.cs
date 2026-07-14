@@ -1,5 +1,4 @@
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
@@ -110,7 +109,7 @@ internal sealed partial class InvokeAsyncCallShape
 
         private bool TryAssignIr(ExpressionSyntax expression)
         {
-            if (_assignedIr || !IsNullLike(expression))
+            if (_assignedIr || !InvokeAsyncArgumentSyntax.IsNullLike(expression))
             {
                 return false;
             }
@@ -154,7 +153,7 @@ internal sealed partial class InvokeAsyncCallShape
 
         private bool TryAssignIr(ExpressionSyntax expression)
         {
-            if (_assignedIr || !IsNullLike(expression))
+            if (_assignedIr || !InvokeAsyncArgumentSyntax.IsNullLike(expression))
             {
                 return false;
             }
@@ -174,9 +173,4 @@ internal sealed partial class InvokeAsyncCallShape
         target = expression;
         return true;
     }
-
-    private static bool IsNullLike(ExpressionSyntax expression)
-        => expression.IsKind(SyntaxKind.NullLiteralExpression) ||
-            expression.IsKind(SyntaxKind.DefaultLiteralExpression) ||
-            expression.IsKind(SyntaxKind.DefaultExpression);
 }
