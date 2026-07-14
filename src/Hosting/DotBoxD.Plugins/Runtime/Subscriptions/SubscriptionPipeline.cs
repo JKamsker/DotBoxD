@@ -241,6 +241,7 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
         ArgumentNullException.ThrowIfNull(kernel);
         ArgumentException.ThrowIfNullOrEmpty(subscriptionId);
         ArgumentNullException.ThrowIfNull(push);
+        ThrowIfDisposed();
         kernel.ValidateFor(_adapter);
         var wholeEvent = Hooks.LocalCallbackProjection.IsWholeEvent(kernel.Manifest);
         if (wholeEvent)
@@ -248,6 +249,7 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
             Hooks.LocalCallbackProjection.EnsureWholeEventSupported(_adapter);
         }
 
+        ThrowIfDisposed();
         _handlerSet.Add(kernel, (e, rawContext, _) =>
             Hooks.LocalCallbackProjection.PushAsync(kernel, _adapter, e, rawContext, wholeEvent, subscriptionId, push));
 
