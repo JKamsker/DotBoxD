@@ -88,7 +88,7 @@ public static class LoweredPipelineComposer
             if (!ParameterMatchesExactTag(parameter, step.InputType))
             {
                 throw new ArgumentException(
-                    $"step {i} parameter type '{parameter.Type}' does not match input shape '{step.InputType}'.");
+                    $"step {i} parameter type '{parameter.Type}' does not match InputType shape '{step.InputType}'.");
             }
 
             if (step.Kind == LoweredPipelineStepKind.Projection)
@@ -121,20 +121,22 @@ public static class LoweredPipelineComposer
         return parameter;
     }
 
-    private static bool ParameterMatchesExactTag(Parameter parameter, string tag)
+    private static bool ParameterMatchesExactTag(Parameter parameter, string tag) => tag switch
     {
-        if (tag is "bool")
-            return parameter.Type == SandboxType.Bool;
-        if (tag is "int" or "i32")
-            return parameter.Type == SandboxType.I32;
-        if (tag is "long" or "i64")
-            return parameter.Type == SandboxType.I64;
-        if (tag is "double" or "f64")
-            return parameter.Type == SandboxType.F64;
-        if (tag is "string")
-            return parameter.Type == SandboxType.String;
-        return tag is not "guid" || parameter.Type == SandboxType.Guid;
-    }
+        "unit" => parameter.Type == SandboxType.Unit,
+        "bool" => parameter.Type == SandboxType.Bool,
+        "int" or "i32" => parameter.Type == SandboxType.I32,
+        "long" or "i64" => parameter.Type == SandboxType.I64,
+        "double" or "f64" => parameter.Type == SandboxType.F64,
+        "string" => parameter.Type == SandboxType.String,
+        "guid" => parameter.Type == SandboxType.Guid,
+        "list" => parameter.Type.Arguments.Count == 1 && string.Equals(parameter.Type.Name, "List", StringComparison.Ordinal),
+        "map" => parameter.Type.Arguments.Count == 2 && string.Equals(parameter.Type.Name, "Map", StringComparison.Ordinal),
+        "record" => parameter.Type.IsRecord,
+        _ => string.Equals(parameter.Type.Name, tag, StringComparison.Ordinal) &&
+            parameter.Type.Arguments.Count == 0 &&
+            SandboxType.IsKnownOpaqueId(tag),
+    };
 
     private static void ValidateResultType(
         IReadOnlyList<LoweredPipelineStep> steps,
@@ -159,10 +161,8 @@ public static class LoweredPipelineComposer
         }
     }
 
-    // Gating only needs the steps up to and including the LAST filter: a projection after the final filter can
-    // never change whether the event is handled, so recomputing it here is pure waste (and would run an
-    // effectful projection twice, once here and once in Handle). Projections BEFORE the last filter are still
-    // emitted, because a later filter reads the value they produce.
+    // Gating only needs the steps through the last filter; later projections cannot affect whether the event is
+    // handled and may be effectful, while earlier projections still feed later filters.
     private static SandboxFunction BuildShouldHandle(
         IReadOnlyList<LoweredPipelineStep> steps,
         SandboxType inputType,
