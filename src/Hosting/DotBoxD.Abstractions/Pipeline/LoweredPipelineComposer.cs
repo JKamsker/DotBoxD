@@ -16,6 +16,20 @@ public static class LoweredPipelineComposer
     private const string CurrentVariablePrefix = "current";
     private const string RequiredCapabilitiesMetadataKey = "dotboxd.requiredCapabilities";
     private const string EffectsMetadataKey = "dotboxd.effects";
+    private static readonly IReadOnlyDictionary<string, SandboxType> ResultTypesByTag =
+        new Dictionary<string, SandboxType>(StringComparer.Ordinal)
+        {
+            ["bool"] = SandboxType.Bool,
+            ["int"] = SandboxType.I32,
+            ["i32"] = SandboxType.I32,
+            ["long"] = SandboxType.I64,
+            ["i64"] = SandboxType.I64,
+            ["double"] = SandboxType.F64,
+            ["f64"] = SandboxType.F64,
+            ["string"] = SandboxType.String,
+            ["guid"] = SandboxType.Guid
+        };
+
     private static readonly SourceSpan Span = new(1, 1);
 
     public static SandboxModule Compose(LoweredPipelineComposition composition)
@@ -145,19 +159,17 @@ public static class LoweredPipelineComposer
     }
 
     private static bool ResultTypeMatchesTag(SandboxType type, string tag)
-        => tag switch
-        {
-            "bool" => type == SandboxType.Bool,
-            "int" or "i32" => type == SandboxType.I32,
-            "long" or "i64" => type == SandboxType.I64,
-            "double" or "f64" => type == SandboxType.F64,
-            "string" => type == SandboxType.String,
-            "guid" => type == SandboxType.Guid,
-            "list" => type.Name == "List",
-            "map" => type.Name == "Map",
-            "record" => type.IsRecord,
-            _ => true
-        };
+    {
+        if (ResultTypesByTag.TryGetValue(tag, out var expectedType))
+            return type == expectedType;
+
+        return tag is not ("list" or "map" or "record") || TagMatchesStructuralType(type, tag);
+    }
+
+    private static bool TagMatchesStructuralType(SandboxType type, string tag)
+        => (tag == "list" && type.Name == "List") ||
+           (tag == "map" && type.Name == "Map") ||
+           (tag == "record" && type.IsRecord);
 
     // Gating only needs the steps up to and including the LAST filter: a projection after the final filter can
     // never change whether the event is handled, so recomputing it here is pure waste (and would run an
