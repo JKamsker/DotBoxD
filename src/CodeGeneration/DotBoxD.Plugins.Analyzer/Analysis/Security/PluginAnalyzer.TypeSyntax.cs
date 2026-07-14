@@ -41,6 +41,13 @@ public sealed partial class PluginAnalyzer
         context.RegisterSyntaxNodeAction(
             c => AnalyzeConstantPatternType(c, helperGraph),
             SyntaxKind.ConstantPattern);
+        context.RegisterSyntaxNodeAction(
+            AnalyzeBaseListType,
+            SyntaxKind.SimpleBaseType,
+            SyntaxKind.PrimaryConstructorBaseType);
+        context.RegisterSyntaxNodeAction(
+            AnalyzeTypeParameterConstraintType,
+            SyntaxKind.TypeConstraint);
     }
 
     private static void AnalyzeDeclarationPatternType(
@@ -147,6 +154,44 @@ public sealed partial class PluginAnalyzer
         {
             AnalyzeForbiddenTypeSymbol(context, helperGraph, expression, type);
         }
+    }
+
+    private static void AnalyzeBaseListType(SyntaxNodeAnalysisContext context)
+    {
+        if (context.Node is BaseTypeSyntax { Type: { } typeSyntax })
+        {
+            AnalyzeForbiddenDeclarationTypeSyntax(context, typeSyntax);
+        }
+    }
+
+    private static void AnalyzeTypeParameterConstraintType(SyntaxNodeAnalysisContext context)
+    {
+        if (context.Node is TypeConstraintSyntax { Type: { } typeSyntax })
+        {
+            AnalyzeForbiddenDeclarationTypeSyntax(context, typeSyntax);
+        }
+    }
+
+    private static void AnalyzeForbiddenDeclarationTypeSyntax(
+        SyntaxNodeAnalysisContext context,
+        TypeSyntax typeSyntax)
+    {
+        var typeDeclaration = typeSyntax.FirstAncestorOrSelf<BaseTypeDeclarationSyntax>();
+        if (typeDeclaration is null ||
+            context.SemanticModel.GetDeclaredSymbol(
+                typeDeclaration,
+                context.CancellationToken) is not INamedTypeSymbol declaredType ||
+            !IsEventKernel(declaredType))
+        {
+            return;
+        }
+
+        if (context.SemanticModel.GetTypeInfo(typeSyntax, context.CancellationToken).Type is not { } type)
+        {
+            return;
+        }
+
+        ReportForbiddenType(context.ReportDiagnostic, type, typeSyntax.GetLocation());
     }
 
     private static void AnalyzeForbiddenTypeSyntax(
