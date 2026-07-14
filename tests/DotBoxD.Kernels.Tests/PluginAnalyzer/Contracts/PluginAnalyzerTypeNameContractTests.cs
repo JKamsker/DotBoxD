@@ -107,6 +107,8 @@ public sealed class PluginAnalyzerTypeNameContractTests
             [nameof(TypeNames.DictionaryInterfaceOriginal)] = OriginalTypeName(typeof(IDictionary<,>), "TKey", "TValue"),
             [nameof(TypeNames.SystemActionPrefix)] = TypeName(typeof(Action)),
             [nameof(TypeNames.SystemActivator)] = TypeName(typeof(Activator)),
+            [nameof(TypeNames.SystemAppContext)] = TypeName(typeof(AppContext)),
+            [nameof(TypeNames.SystemAppDomain)] = TypeName(typeof(AppDomain)),
             [nameof(TypeNames.SystemEnvironment)] = TypeName(typeof(Environment)),
             [nameof(TypeNames.SystemGc)] = TypeName(typeof(GC)),
             [nameof(TypeNames.SystemDelegate)] = TypeName(typeof(Delegate)),

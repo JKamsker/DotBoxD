@@ -103,4 +103,11 @@ public sealed partial class PluginAnalyzer
         forbidden = null!;
         return false;
     }
+
+    private static bool IsForbiddenInvocationReceiver(IOperation operation, ITypeSymbol? containingType)
+        => IsForbiddenHostApi(containingType) &&
+           operation.Parent is IInvocationOperation { TargetMethod.ContainingType: { } targetType } &&
+           SymbolEqualityComparer.Default.Equals(
+               containingType!.OriginalDefinition,
+               targetType.OriginalDefinition);
 }
