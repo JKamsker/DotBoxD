@@ -28,6 +28,7 @@ internal sealed partial class RpcStreamManager
         {
             RpcRawFrame.WritePrefix(frame, streamId, MessageType.StreamItem);
             serializer.Serialize(frame, item);
+            ct.ThrowIfCancellationRequested();
             RpcRawFrame.Complete(frame);
             await _frameSender.SendAsync(frame, ct).ConfigureAwait(false);
         }
