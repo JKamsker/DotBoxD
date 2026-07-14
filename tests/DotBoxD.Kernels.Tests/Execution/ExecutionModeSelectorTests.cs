@@ -129,6 +129,39 @@ public sealed class ExecutionModeSelectorTests
     }
 
     [Fact]
+    public async Task Auto_mode_allows_compiled_selector_decision()
+    {
+        var selector = new RecordingSelector(ExecutionModeDecision.Compiled);
+        var host = SandboxHost.Create(builder =>
+        {
+            builder.AddDefaultPureBindings();
+            builder.UseInterpreter();
+            builder.UseCompilerIfAvailable();
+            builder.UseExecutionModeSelector(selector);
+        });
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+        var input = SandboxValue.FromList([SandboxValue.FromInt32(1), SandboxValue.FromInt32(1)]);
+        var options = new SandboxExecutionOptions
+        {
+            Mode = ExecutionMode.Auto,
+            AutoCompileThreshold = 1,
+            AllowFallbackToInterpreter = false
+        };
+
+        var first = await host.ExecuteAsync(plan, "main", input, options);
+        var second = await host.ExecuteAsync(plan, "main", input, options);
+
+        Assert.True(first.Succeeded, first.Error?.SafeMessage);
+        Assert.True(second.Succeeded, second.Error?.SafeMessage);
+        Assert.Equal(ExecutionMode.Interpreted, first.ActualMode);
+        Assert.Equal(ExecutionMode.Compiled, second.ActualMode);
+        Assert.True(second.ExecutionDispatched);
+        Assert.Equal(35, ((I32Value)second.Value!).Value);
+        Assert.Equal(1, selector.Calls);
+    }
+
+    [Fact]
     public async Task Auto_mode_hotness_tracks_prior_compile_failures()
     {
         var selector = new RecordingSelector(ExecutionModeDecision.Compiled);
