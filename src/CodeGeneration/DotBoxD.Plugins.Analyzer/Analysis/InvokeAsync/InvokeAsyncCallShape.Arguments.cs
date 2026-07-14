@@ -7,6 +7,8 @@ internal sealed partial class InvokeAsyncCallShape
 {
     private static bool TrySingleLambdaArgument(
         SeparatedSyntaxList<ArgumentSyntax> arguments,
+        SemanticModel model,
+        CancellationToken cancellationToken,
         out ExpressionSyntax lambda)
     {
         lambda = null!;
@@ -15,7 +17,7 @@ internal sealed partial class InvokeAsyncCallShape
             return false;
         }
 
-        var state = new LambdaArgumentState();
+        var state = new LambdaArgumentState(model, cancellationToken);
         for (var i = 0; i < arguments.Count; i++)
         {
             var argument = arguments[i];
@@ -39,6 +41,8 @@ internal sealed partial class InvokeAsyncCallShape
 
     private static bool TryCaptureArguments(
         SeparatedSyntaxList<ArgumentSyntax> arguments,
+        SemanticModel model,
+        CancellationToken cancellationToken,
         out ExpressionSyntax captures,
         out ExpressionSyntax lambda)
     {
@@ -49,7 +53,7 @@ internal sealed partial class InvokeAsyncCallShape
             return false;
         }
 
-        var state = new CaptureArgumentState();
+        var state = new CaptureArgumentState(model, cancellationToken);
         for (var i = 0; i < arguments.Count; i++)
         {
             var argument = arguments[i];
@@ -74,10 +78,18 @@ internal sealed partial class InvokeAsyncCallShape
 
     private sealed class CaptureArgumentState
     {
+        private readonly SemanticModel _model;
+        private readonly CancellationToken _cancellationToken;
         private ExpressionSyntax? _captures;
         private ExpressionSyntax? _lambda;
         private bool _assignedIr;
         private bool _assignedCancellation;
+
+        public CaptureArgumentState(SemanticModel model, CancellationToken cancellationToken)
+        {
+            _model = model;
+            _cancellationToken = cancellationToken;
+        }
 
         public bool TryAssign(string name, ExpressionSyntax expression)
             => name switch
@@ -109,7 +121,7 @@ internal sealed partial class InvokeAsyncCallShape
 
         private bool TryAssignIr(ExpressionSyntax expression)
         {
-            if (_assignedIr || !InvokeAsyncArgumentSyntax.IsNullLike(expression))
+            if (_assignedIr || !InvokeAsyncArgumentSyntax.IsNullLike(expression, _model, _cancellationToken))
             {
                 return false;
             }
@@ -121,9 +133,17 @@ internal sealed partial class InvokeAsyncCallShape
 
     private sealed class LambdaArgumentState
     {
+        private readonly SemanticModel _model;
+        private readonly CancellationToken _cancellationToken;
         private ExpressionSyntax? _lambda;
         private bool _assignedIr;
         private bool _assignedCancellation;
+
+        public LambdaArgumentState(SemanticModel model, CancellationToken cancellationToken)
+        {
+            _model = model;
+            _cancellationToken = cancellationToken;
+        }
 
         public bool TryAssign(string name, ExpressionSyntax expression)
             => name switch
@@ -153,7 +173,7 @@ internal sealed partial class InvokeAsyncCallShape
 
         private bool TryAssignIr(ExpressionSyntax expression)
         {
-            if (_assignedIr || !InvokeAsyncArgumentSyntax.IsNullLike(expression))
+            if (_assignedIr || !InvokeAsyncArgumentSyntax.IsNullLike(expression, _model, _cancellationToken))
             {
                 return false;
             }

@@ -13,14 +13,14 @@ internal static class InvokeAsyncManualIrArgument
     {
         if (model.GetOperation(invocation, cancellationToken) is IInvocationOperation operation)
         {
-            return HasExplicitBoundArgument(operation);
+            return HasExplicitBoundArgument(operation, model, cancellationToken);
         }
 
         foreach (var argument in invocation.ArgumentList.Arguments)
         {
             if (argument.NameColon is { Name.Identifier.ValueText: "irInvocation" })
             {
-                return !InvokeAsyncArgumentSyntax.IsNullLike(argument.Expression);
+                return !InvokeAsyncArgumentSyntax.IsNullLike(argument.Expression, model, cancellationToken);
             }
         }
 
@@ -30,14 +30,17 @@ internal static class InvokeAsyncManualIrArgument
             if ((type.Type is not null && InvokeAsyncServerSurface.IsIRInvocation(type.Type)) ||
                 (type.ConvertedType is not null && InvokeAsyncServerSurface.IsIRInvocation(type.ConvertedType)))
             {
-                return !InvokeAsyncArgumentSyntax.IsNullLike(argument.Expression);
+                return !InvokeAsyncArgumentSyntax.IsNullLike(argument.Expression, model, cancellationToken);
             }
         }
 
         return false;
     }
 
-    private static bool HasExplicitBoundArgument(IInvocationOperation operation)
+    private static bool HasExplicitBoundArgument(
+        IInvocationOperation operation,
+        SemanticModel model,
+        CancellationToken cancellationToken)
     {
         foreach (var argument in operation.Arguments)
         {
@@ -51,7 +54,8 @@ internal static class InvokeAsyncManualIrArgument
             var expression = argument.Syntax is ArgumentSyntax syntax
                 ? syntax.Expression
                 : argument.Value.Syntax as ExpressionSyntax;
-            return expression is not null && !InvokeAsyncArgumentSyntax.IsNullLike(expression);
+            return expression is not null &&
+                   !InvokeAsyncArgumentSyntax.IsNullLike(expression, model, cancellationToken);
         }
 
         return false;
