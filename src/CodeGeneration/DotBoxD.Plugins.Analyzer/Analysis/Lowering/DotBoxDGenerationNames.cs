@@ -89,6 +89,7 @@ internal static partial class DotBoxDGenerationNames
         public const string SystemServiceProvider = "System.IServiceProvider";
         public const string SystemType = "System.Type";
         public const string SystemUnsafe = "System.Runtime.CompilerServices.Unsafe";
+        public const string SystemComponentModelTypeDescriptor = "System.ComponentModel.TypeDescriptor";
 
         public const string GlobalArray = GlobalPrefix + "System.Array";
         public const string GlobalAttribute = GlobalPrefix + "System.Attribute";
