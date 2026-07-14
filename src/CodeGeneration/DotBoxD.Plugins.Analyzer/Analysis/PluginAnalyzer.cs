@@ -102,7 +102,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
 
         ReportAndRecordIfForbidden(context, helperGraph, method, invocation.TargetMethod.ContainingType);
         RecordStaticConstructorReachability(context, helperGraph, invocation.TargetMethod);
-        ReportForbiddenReferencedMethodSignature(context, invocation.TargetMethod);
+        ReportForbiddenReferencedMethodSignature(context, helperGraph, invocation.TargetMethod);
         helperGraph.RecordCall(method, invocation.TargetMethod, context.Operation.Syntax.GetLocation());
         ReportLocalUseIfInvalid(context, invocation.TargetMethod);
     }
@@ -154,7 +154,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
 
         ReportAndRecordIfForbidden(context, helperGraph, method, property.ContainingType);
         RecordStaticConstructorReachability(context, helperGraph, property);
-        ReportForbiddenReferencedType(context, property.ContainingType, property.Type);
+        ReportForbiddenReferencedType(context, helperGraph, property.ContainingType, property.Type);
         ReportLocalUseIfInvalid(context, property);
 
         // A forbidden API reached through a helper property's accessor body is only linked to the kernel
@@ -189,7 +189,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         }
 
         ReportAndRecordIfForbidden(context, helperGraph, method, field.ContainingType);
-        ReportForbiddenReferencedType(context, field.ContainingType, field.Type);
+        ReportForbiddenReferencedType(context, helperGraph, field.ContainingType, field.Type);
         if (IsDelegateType(field.Type))
         {
             RecordDelegateFieldReference(context, helperGraph, method, field);
@@ -219,7 +219,8 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         }
 
         helperGraph.RecordForbidden(method, type!);
-        if (!IsEventKernel(method.ContainingType))
+        if (!IsEventKernel(method.ContainingType) ||
+            !helperGraph.TryRecordDirectDiagnostic(method))
         {
             return;
         }
@@ -253,9 +254,12 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             "System.Threading.",
             "System.Threading.Tasks.",
             "System.Linq.Expressions.",
+            "System.Security.Cryptography.X509Certificates.",
+            "System.Security.Principal.",
             "System.Data.",
             "Microsoft.CSharp.",
-            "Microsoft.EntityFrameworkCore."
+            "Microsoft.EntityFrameworkCore.",
+            "Microsoft.Win32."
         ];
         foreach (var prefix in prefixes)
         {

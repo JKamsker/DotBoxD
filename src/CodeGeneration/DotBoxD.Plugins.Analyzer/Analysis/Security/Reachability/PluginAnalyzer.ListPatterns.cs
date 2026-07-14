@@ -49,7 +49,7 @@ public sealed partial class PluginAnalyzer
 
         ReportAndRecordIfForbidden(context, helperGraph, method, target.ContainingType);
         RecordStaticConstructorReachability(context, helperGraph, target);
-        ReportForbiddenReferencedMethodSignature(context, target);
+        ReportForbiddenReferencedMethodSignature(context, helperGraph, target);
         helperGraph.RecordCall(method, target, context.Operation.Syntax.GetLocation());
         ReportLocalUseIfInvalid(context, target);
     }
@@ -73,7 +73,7 @@ public sealed partial class PluginAnalyzer
 
         ReportAndRecordIfForbidden(context, helperGraph, method, property.ContainingType);
         RecordStaticConstructorReachability(context, helperGraph, property);
-        ReportForbiddenReferencedType(context, property.ContainingType, property.Type);
+        ReportForbiddenReferencedType(context, helperGraph, property.ContainingType, property.Type);
         ReportLocalUseIfInvalid(context, property);
 
         if (property.GetMethod is { } getter)

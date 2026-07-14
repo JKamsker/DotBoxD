@@ -7,6 +7,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 internal sealed class ForbiddenHelperCallGraph
 {
     private readonly ConcurrentDictionary<ISymbol, ITypeSymbol> _forbidden = new(SymbolEqualityComparer.Default);
+    private readonly ConcurrentDictionary<ISymbol, byte> _directDiagnostics = new(SymbolEqualityComparer.Default);
     private readonly DynamicHelperCallResolver _dynamicHelperCalls = new();
     private readonly ConcurrentBag<HelperEdge> _helperEdges = [];
     private readonly ConcurrentBag<RootHelperCall> _rootCalls = [];
@@ -27,6 +28,9 @@ internal sealed class ForbiddenHelperCallGraph
 
     public void RecordForbidden(IFieldSymbol field, ITypeSymbol type)
         => _forbidden.TryAdd(Normalize(field), type);
+
+    public bool TryRecordDirectDiagnostic(IMethodSymbol method)
+        => _directDiagnostics.TryAdd(Normalize(method), 0);
 
     public void RecordDynamicLocalType(ILocalSymbol local, ITypeSymbol? type)
         => _dynamicHelperCalls.RecordLocalType(local, type);
