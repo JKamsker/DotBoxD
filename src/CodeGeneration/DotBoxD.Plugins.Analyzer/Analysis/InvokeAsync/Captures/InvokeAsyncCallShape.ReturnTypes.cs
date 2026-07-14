@@ -27,7 +27,25 @@ internal sealed partial class InvokeAsyncCallShape
         }
 
         return InvokeAsyncLambdaShape.TryReturnType(block, model, cancellationToken, out returnType) ||
+               HasUnresolvedReturnType(block, model, cancellationToken) &&
                TryContextReturnType(invocation, model, cancellationToken, out returnType);
+    }
+
+    private static bool HasUnresolvedReturnType(
+        BlockSyntax block,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        foreach (var statement in block.DescendantNodes().OfType<ReturnStatementSyntax>())
+        {
+            if (statement.Expression is not null &&
+                model.GetTypeInfo(statement.Expression, cancellationToken).Type is null or { TypeKind: TypeKind.Error })
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool TryContextReturnType(
@@ -37,16 +55,44 @@ internal sealed partial class InvokeAsyncCallShape
         out ITypeSymbol returnType)
     {
         returnType = null!;
-        if (invocation.Parent is not ArrowExpressionClauseSyntax arrow ||
-            arrow.Parent is not MethodDeclarationSyntax method ||
-            model.GetTypeInfo(method.ReturnType, cancellationToken).Type is not { } methodReturn ||
-            DotBoxDRpcReturnType.PayloadType(methodReturn, model.Compilation) is not { } payload)
+        if (!IsReturnedInvocation(invocation) ||
+            model.GetEnclosingSymbol(invocation.SpanStart, cancellationToken) is not IMethodSymbol method ||
+            DotBoxDRpcReturnType.PayloadType(method.ReturnType, model.Compilation) is not { } payload)
         {
             return false;
         }
 
         returnType = payload;
         return true;
+    }
+
+    private static bool IsReturnedInvocation(InvocationExpressionSyntax invocation)
+    {
+        SyntaxNode expression = invocation;
+        while (true)
+        {
+            if (expression.Parent is ParenthesizedExpressionSyntax parenthesized &&
+                parenthesized.Expression == expression)
+            {
+                expression = parenthesized;
+                continue;
+            }
+
+            if (expression.Parent is AwaitExpressionSyntax awaitExpression &&
+                awaitExpression.Expression == expression)
+            {
+                expression = awaitExpression;
+                continue;
+            }
+
+            if (expression.Parent is ArrowExpressionClauseSyntax { Expression: var arrowValue })
+            {
+                return arrowValue == expression;
+            }
+
+            return expression.Parent is ReturnStatementSyntax { Expression: var returnValue } &&
+                   returnValue == expression;
+        }
     }
 
     private static bool TryExplicitGenericTypeArgument(
