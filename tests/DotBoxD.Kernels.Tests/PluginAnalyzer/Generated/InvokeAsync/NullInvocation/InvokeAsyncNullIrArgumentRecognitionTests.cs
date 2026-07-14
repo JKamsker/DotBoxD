@@ -24,10 +24,40 @@ public sealed class InvokeAsyncNullIrArgumentRecognitionTests
         Assert.DoesNotContain("AnonymousInvokeAsync", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Converted_default_carrier_preserves_manual_ir_path()
+    {
+        var result = RunGeneratorAndAssertCompiles(GeneratedFacadeBodySource("""
+                public readonly struct ManualIrCarrier
+                {
+                    public static explicit operator IRInvocation<Func<IGameWorldAccess, ValueTask<int>>, int>(
+                        ManualIrCarrier _)
+                        => IRInvocation<Func<IGameWorldAccess, ValueTask<int>>, int>.FromGenerated(
+                            "manual",
+                            static () => new object(),
+                            static _ => Array.Empty<byte>(),
+                            static (_, _) => 0);
+                }
+
+                public ValueTask<int> Probe()
+                    => InvokeAsync(
+                        async (IGameWorldAccess world) =>
+                        {
+                            return world.GetHealth("monster-1");
+                        },
+                        irInvocation: (IRInvocation<Func<IGameWorldAccess, ValueTask<int>>, int>)default(ManualIrCarrier));
+            """));
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.DoesNotContain("AnonymousInvokeAsync", source, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("(null)")]
     [InlineData("null!")]
     [InlineData("(IRInvocation<Func<IGameWorldAccess, ValueTask<int>>, int>?)null")]
+    [InlineData("(IRInvocation<Func<IGameWorldAccess, ValueTask<int>>, int>?)default")]
     public void Null_like_ir_argument_still_generates_InvokeAsync_interceptor(string irExpression)
     {
         var result = RunGeneratorAndAssertCompiles(GeneratedFacadeBodySource($$"""
