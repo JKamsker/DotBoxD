@@ -5,10 +5,18 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 
 internal static class PluginServerReturnWrapperCancellationEmitter
 {
-    public static bool RequiresAsyncReturnWrapperBlock(PluginServerForwardedMethod method)
-        => method.ReturnWrapperName is not null &&
-           method.ReturnWrapperKind is PluginServerReturnWrapperKind.Task or PluginServerReturnWrapperKind.ValueTask &&
-           method.Parameters.Any(IsCancellationToken);
+    private const string GlobalTask = "global::System.Threading.Tasks.Task";
+    private const string GlobalValueTask = "global::System.Threading.Tasks.ValueTask";
+
+    public static bool RequiresAsyncModifier(PluginServerForwardedMethod method)
+        => method.ReturnWrapperKind is PluginServerReturnWrapperKind.Task or PluginServerReturnWrapperKind.ValueTask ||
+           RequiresAsyncCancellationBlock(method);
+
+    public static bool RequiresAsyncCancellationBlock(PluginServerForwardedMethod method)
+        => IsTaskLike(method) && method.Parameters.Any(IsCancellationToken);
+
+    public static bool HasAwaitedResult(PluginServerForwardedMethod method)
+        => method.ReturnWrapperName is not null || IsGenericTaskLike(method.ReturnType);
 
     public static void AppendCancellationChecks(
         StringBuilder builder,
@@ -44,4 +52,14 @@ internal static class PluginServerReturnWrapperCancellationEmitter
             parameter.Type,
             DotBoxDGenerationNames.TypeNames.GlobalCancellationToken,
             StringComparison.Ordinal);
+
+    private static bool IsTaskLike(PluginServerForwardedMethod method)
+        => method.ReturnWrapperKind is PluginServerReturnWrapperKind.Task or PluginServerReturnWrapperKind.ValueTask ||
+           string.Equals(method.ReturnType, GlobalTask, StringComparison.Ordinal) ||
+           string.Equals(method.ReturnType, GlobalValueTask, StringComparison.Ordinal) ||
+           IsGenericTaskLike(method.ReturnType);
+
+    private static bool IsGenericTaskLike(string type)
+        => type.StartsWith(GlobalTask + "<", StringComparison.Ordinal) ||
+           type.StartsWith(GlobalValueTask + "<", StringComparison.Ordinal);
 }
