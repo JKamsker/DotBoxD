@@ -4,6 +4,33 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
 public sealed class InvokeAsyncCommonReturnInferenceTests
 {
+    [Theory]
+    [InlineData("return (byte)1;", "return 2;")]
+    [InlineData("return 2;", "return (byte)1;")]
+    public void Byte_and_int_returns_infer_int_regardless_of_order(
+        string firstReturn,
+        string secondReturn)
+    {
+        var result = RunGeneratorAndAssertCompiles(UsageSource($$"""
+            public static async ValueTask<int> Run(RemotePluginServer kernels)
+            {
+                return await kernels.InvokeAsync(async (IGameWorldAccess world) =>
+                {
+                    if (world.GetHealth("monster-1") > 0)
+                    {
+                        {{firstReturn}}
+                    }
+
+                    {{secondReturn}}
+                });
+            }
+            """));
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.Contains("\\\"returnType\\\":\\\"I32\\\"", source, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Incompatible_returns_remain_rejected()
     {

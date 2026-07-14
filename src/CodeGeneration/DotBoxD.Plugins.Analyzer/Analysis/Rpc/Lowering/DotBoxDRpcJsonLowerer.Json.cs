@@ -28,6 +28,10 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         => value switch
         {
             bool b => Obj(("bool", b ? "true" : "false")),
+            byte b => I32(b),
+            sbyte b => I32(b),
+            short s => I32(s),
+            ushort s => I32(s),
             int i => Obj(("i32", i.ToString(CultureInfo.InvariantCulture))),
             long l => Obj(("i64", l.ToString(CultureInfo.InvariantCulture))),
             float f => FiniteDoubleLiteralJson(f),

@@ -150,7 +150,12 @@ internal static class InvokeAsyncLambdaShape
         out ITypeSymbol returnType)
     {
         returnType = null!;
-        var returns = new List<(ExpressionSyntax Expression, ITypeSymbol Type)>();
+        if (model.Compilation is not CSharpCompilation compilation)
+        {
+            return false;
+        }
+
+        var returns = new List<ITypeSymbol>();
         foreach (var statement in block.DescendantNodes().OfType<ReturnStatementSyntax>())
         {
             if (statement.Expression is null ||
@@ -159,14 +164,14 @@ internal static class InvokeAsyncLambdaShape
                 return false;
             }
 
-            returns.Add((statement.Expression, current));
+            returns.Add(current);
         }
 
         foreach (var candidate in returns)
         {
-            if (AllReturnsConvertTo(returns, candidate.Type, model))
+            if (AllReturnsConvertTo(returns, candidate, compilation))
             {
-                returnType = candidate.Type;
+                returnType = candidate;
                 return true;
             }
         }
@@ -175,13 +180,13 @@ internal static class InvokeAsyncLambdaShape
     }
 
     private static bool AllReturnsConvertTo(
-        IReadOnlyList<(ExpressionSyntax Expression, ITypeSymbol Type)> returns,
+        IReadOnlyList<ITypeSymbol> returns,
         ITypeSymbol candidate,
-        SemanticModel model)
+        CSharpCompilation compilation)
     {
         foreach (var item in returns)
         {
-            if (!model.ClassifyConversion(item.Expression, candidate).IsImplicit)
+            if (!compilation.ClassifyConversion(item, candidate).IsImplicit)
             {
                 return false;
             }

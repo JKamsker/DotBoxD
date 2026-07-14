@@ -384,6 +384,7 @@ jobs:
               "InvokeAsyncGeneratedReceiverSurpriseTests",
               "InvokeAsyncGeneratedReceiverFacadeTests",
               "InvokeAsyncGeneratedCodeRegressionTests",
+              "InvokeAsyncCommonReturnInferenceTests",
               "InvokeAsyncArrayRegressionTests",
               "InvokeAsyncCaptureAliasRegressionTests",
               "InvokeAsyncDtoConstructorSelectionRegressionTests",
