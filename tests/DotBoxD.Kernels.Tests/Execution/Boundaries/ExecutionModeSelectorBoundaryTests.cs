@@ -58,6 +58,31 @@ public sealed class ExecutionModeSelectorBoundaryTests
         Assert.Equal(2, selector.HotnessSnapshots[1].CompletedRunCount);
     }
 
+    [Fact]
+    public async Task Auto_mode_selector_cancellation_exception_is_classified_as_cancelled()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var selector = new CancelThenThrowSelector(cancellation);
+        var compiler = new CountingCompiler();
+        var scenario = await SelectorScenario.CreateAsync(selector, compiler);
+
+        var warmup = await scenario.ExecuteAsync();
+        var cancelled = await scenario.ExecuteAsync(cancellation.Token);
+        var next = await scenario.ExecuteAsync();
+
+        Assert.True(warmup.Succeeded, warmup.Error?.SafeMessage);
+        Assert.False(cancelled.Succeeded);
+        Assert.Equal(SandboxErrorCode.Cancelled, cancelled.Error!.Code);
+        Assert.Equal(ExecutionMode.Auto, cancelled.ActualMode);
+        Assert.False(cancelled.ExecutionDispatched);
+        Assert.Equal(0, compiler.Calls);
+        Assert.True(next.Succeeded, next.Error?.SafeMessage);
+        Assert.Equal(ExecutionMode.Interpreted, next.ActualMode);
+        Assert.Equal(2, selector.HotnessSnapshots.Count);
+        Assert.Equal(3, selector.HotnessSnapshots[1].RunCount);
+        Assert.Equal(2, selector.HotnessSnapshots[1].CompletedRunCount);
+    }
+
     private static void AssertSelectorFailure(SandboxExecutionResult result)
     {
         Assert.False(result.Succeeded);
@@ -103,6 +128,27 @@ public sealed class ExecutionModeSelectorBoundaryTests
             {
                 cancellation.Cancel();
                 return ExecutionModeDecision.Compiled;
+            }
+
+            return ExecutionModeDecision.Interpreted;
+        }
+    }
+
+    private sealed class CancelThenThrowSelector(CancellationTokenSource cancellation) : IExecutionModeSelector
+    {
+        public List<ModuleHotnessStats> HotnessSnapshots { get; } = [];
+
+        public ExecutionModeDecision Choose(
+            ExecutionPlan plan,
+            SandboxExecutionOptions options,
+            ModuleHotnessStats hotness,
+            CompiledCacheStatus cacheStatus)
+        {
+            HotnessSnapshots.Add(hotness);
+            if (HotnessSnapshots.Count == 1)
+            {
+                cancellation.Cancel();
+                throw new OperationCanceledException(cancellation.Token);
             }
 
             return ExecutionModeDecision.Interpreted;
