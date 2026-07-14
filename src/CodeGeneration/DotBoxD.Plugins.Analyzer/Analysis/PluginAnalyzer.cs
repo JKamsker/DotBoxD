@@ -228,6 +228,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
 
     private static bool IsForbiddenExactType(string typeName)
         => typeName is DotBoxDGenerationNames.TypeNames.SystemActivator
+            or DotBoxDGenerationNames.TypeNames.SystemConsole
             or DotBoxDGenerationNames.TypeNames.SystemEnvironment
             or DotBoxDGenerationNames.TypeNames.SystemGc
             or DotBoxDGenerationNames.TypeNames.SystemDelegate
