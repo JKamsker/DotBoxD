@@ -20,9 +20,21 @@ public sealed partial class PluginAnalyzer
 
         if (TryGetDynamicReceiverType(memberReference.Instance, out var receiverType))
         {
-            foreach (var target in DynamicPropertyGetterCandidates(receiverType, memberReference.MemberName))
+            var (usesGetter, usesSetter) = AccessorUsage(memberReference);
+            if (usesGetter)
             {
-                AnalyzeResolvedDynamicTarget(context, helperGraph, target);
+                foreach (var target in DynamicPropertyGetterCandidates(receiverType, memberReference.MemberName))
+                {
+                    AnalyzeResolvedDynamicTarget(context, helperGraph, target);
+                }
+            }
+
+            if (usesSetter)
+            {
+                foreach (var target in DynamicPropertySetterCandidates(receiverType, memberReference.MemberName))
+                {
+                    AnalyzeResolvedDynamicTarget(context, helperGraph, target);
+                }
             }
 
             return;
@@ -30,10 +42,13 @@ public sealed partial class PluginAnalyzer
 
         if (TryGetDynamicReceiverLocal(memberReference.Instance, out var local))
         {
+            var (usesGetter, usesSetter) = AccessorUsage(memberReference);
             helperGraph.RecordDynamicPropertyReference(
                 context.ContainingSymbol,
                 local,
                 memberReference.MemberName,
+                usesGetter,
+                usesSetter,
                 context.Operation.Syntax.GetLocation());
         }
     }
@@ -45,9 +60,21 @@ public sealed partial class PluginAnalyzer
         var indexer = (IDynamicIndexerAccessOperation)context.Operation;
         if (TryGetDynamicReceiverType(indexer.Operation, out var receiverType))
         {
-            foreach (var target in DynamicIndexerGetterCandidates(receiverType, indexer.Arguments.Length))
+            var (usesGetter, usesSetter) = AccessorUsage(indexer);
+            if (usesGetter)
             {
-                AnalyzeResolvedDynamicTarget(context, helperGraph, target);
+                foreach (var target in DynamicIndexerGetterCandidates(receiverType, indexer.Arguments.Length))
+                {
+                    AnalyzeResolvedDynamicTarget(context, helperGraph, target);
+                }
+            }
+
+            if (usesSetter)
+            {
+                foreach (var target in DynamicIndexerSetterCandidates(receiverType, indexer.Arguments.Length))
+                {
+                    AnalyzeResolvedDynamicTarget(context, helperGraph, target);
+                }
             }
 
             return;
@@ -55,10 +82,13 @@ public sealed partial class PluginAnalyzer
 
         if (TryGetDynamicReceiverLocal(indexer.Operation, out var local))
         {
+            var (usesGetter, usesSetter) = AccessorUsage(indexer);
             helperGraph.RecordDynamicIndexerAccess(
                 context.ContainingSymbol,
                 local,
                 indexer.Arguments.Length,
+                usesGetter,
+                usesSetter,
                 context.Operation.Syntax.GetLocation());
         }
     }
@@ -146,6 +176,17 @@ public sealed partial class PluginAnalyzer
             .Where(getter => getter is not null)!;
     }
 
+    internal static IEnumerable<IMethodSymbol> DynamicPropertySetterCandidates(
+        ITypeSymbol receiverType,
+        string memberName)
+    {
+        return DynamicCandidateMembers(receiverType, memberName)
+            .OfType<IPropertySymbol>()
+            .Where(property => !property.IsIndexer)
+            .Select(property => property.SetMethod)
+            .Where(setter => setter is not null)!;
+    }
+
     internal static IEnumerable<IMethodSymbol> DynamicIndexerGetterCandidates(
         ITypeSymbol receiverType,
         int argumentCount)
@@ -155,6 +196,17 @@ public sealed partial class PluginAnalyzer
             .Where(property => property.IsIndexer && CanAcceptArgumentCount(property, argumentCount))
             .Select(property => property.GetMethod)
             .Where(getter => getter is not null)!;
+    }
+
+    internal static IEnumerable<IMethodSymbol> DynamicIndexerSetterCandidates(
+        ITypeSymbol receiverType,
+        int argumentCount)
+    {
+        return DynamicCandidateMembers(receiverType)
+            .OfType<IPropertySymbol>()
+            .Where(property => property.IsIndexer && CanAcceptArgumentCount(property, argumentCount))
+            .Select(property => property.SetMethod)
+            .Where(setter => setter is not null)!;
     }
 
     private static IEnumerable<ISymbol> DynamicCandidateMembers(ITypeSymbol receiverType, string? memberName = null)

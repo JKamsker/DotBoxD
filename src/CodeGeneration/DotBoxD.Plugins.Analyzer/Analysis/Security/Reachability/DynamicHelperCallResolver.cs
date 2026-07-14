@@ -40,14 +40,32 @@ internal sealed class DynamicHelperCallResolver
         ISymbol? caller,
         ILocalSymbol receiver,
         string memberName,
+        bool usesGetter,
+        bool usesSetter,
         Location location)
     {
-        if (caller is IMethodSymbol or IFieldSymbol or IPropertySymbol)
+        if (caller is not (IMethodSymbol or IFieldSymbol or IPropertySymbol))
+        {
+            return;
+        }
+
+        if (usesGetter)
         {
             _calls.Add(new DynamicHelperCall(
                 caller,
                 receiver,
-                DynamicHelperCallKind.PropertyReference,
+                DynamicHelperCallKind.PropertyGet,
+                memberName,
+                ArgumentCount: 0,
+                location));
+        }
+
+        if (usesSetter)
+        {
+            _calls.Add(new DynamicHelperCall(
+                caller,
+                receiver,
+                DynamicHelperCallKind.PropertySet,
                 memberName,
                 ArgumentCount: 0,
                 location));
@@ -58,14 +76,32 @@ internal sealed class DynamicHelperCallResolver
         ISymbol? caller,
         ILocalSymbol receiver,
         int argumentCount,
+        bool usesGetter,
+        bool usesSetter,
         Location location)
     {
-        if (caller is IMethodSymbol or IFieldSymbol or IPropertySymbol)
+        if (caller is not (IMethodSymbol or IFieldSymbol or IPropertySymbol))
+        {
+            return;
+        }
+
+        if (usesGetter)
         {
             _calls.Add(new DynamicHelperCall(
                 caller,
                 receiver,
-                DynamicHelperCallKind.IndexerAccess,
+                DynamicHelperCallKind.IndexerGet,
+                MemberName: string.Empty,
+                argumentCount,
+                location));
+        }
+
+        if (usesSetter)
+        {
+            _calls.Add(new DynamicHelperCall(
+                caller,
+                receiver,
+                DynamicHelperCallKind.IndexerSet,
                 MemberName: string.Empty,
                 argumentCount,
                 location));
@@ -74,7 +110,8 @@ internal sealed class DynamicHelperCallResolver
 
     public void Resolve(
         Action<IMethodSymbol, IMethodSymbol, Location> recordCall,
-        Action<ISymbol, IMethodSymbol, Location> recordInitializerRootCall)
+        Action<ISymbol, IMethodSymbol, Location> recordInitializerRootCall,
+        Action<ISymbol, IMethodSymbol, Location> recordTargetSignature)
     {
         foreach (var call in _calls)
         {
@@ -85,6 +122,7 @@ internal sealed class DynamicHelperCallResolver
 
             foreach (var target in DynamicTargets(receiverType, call))
             {
+                recordTargetSignature(call.Caller, target, call.Location);
                 if (call.Caller is IMethodSymbol method)
                 {
                     recordCall(method, target, call.Location);
@@ -104,10 +142,16 @@ internal sealed class DynamicHelperCallResolver
                 receiverType,
                 call.MemberName,
                 call.ArgumentCount),
-            DynamicHelperCallKind.PropertyReference => PluginAnalyzer.DynamicPropertyGetterCandidates(
+            DynamicHelperCallKind.PropertyGet => PluginAnalyzer.DynamicPropertyGetterCandidates(
                 receiverType,
                 call.MemberName),
-            DynamicHelperCallKind.IndexerAccess => PluginAnalyzer.DynamicIndexerGetterCandidates(
+            DynamicHelperCallKind.PropertySet => PluginAnalyzer.DynamicPropertySetterCandidates(
+                receiverType,
+                call.MemberName),
+            DynamicHelperCallKind.IndexerGet => PluginAnalyzer.DynamicIndexerGetterCandidates(
+                receiverType,
+                call.ArgumentCount),
+            DynamicHelperCallKind.IndexerSet => PluginAnalyzer.DynamicIndexerSetterCandidates(
                 receiverType,
                 call.ArgumentCount),
             _ => []
@@ -124,7 +168,9 @@ internal sealed class DynamicHelperCallResolver
     private enum DynamicHelperCallKind
     {
         Invocation,
-        PropertyReference,
-        IndexerAccess
+        PropertyGet,
+        PropertySet,
+        IndexerGet,
+        IndexerSet
     }
 }

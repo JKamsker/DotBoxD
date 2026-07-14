@@ -19,7 +19,7 @@ public sealed partial class PluginAnalyzer
             }
 
             helperGraph.RecordForbidden(containingMethod, forbiddenType);
-            if (IsEventKernel(containingMethod.ContainingType))
+            if (IsForbiddenApiRoot(context, containingMethod))
             {
                 context.ReportDiagnostic(Diagnostic.Create(
                     ForbiddenHostApiRule,

@@ -199,7 +199,7 @@ public sealed partial class PluginAnalyzer
         return true;
     }
 
-    private static ITypeSymbol? FirstForbiddenHostApi(ITypeSymbol? type)
+    internal static ITypeSymbol? FirstForbiddenHostApi(ITypeSymbol? type)
     {
         if (type is null)
             return null;

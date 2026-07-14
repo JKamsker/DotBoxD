@@ -24,7 +24,7 @@ public sealed partial class PluginAnalyzer
         {
             case IMethodSymbol method:
                 helperGraph.RecordForbidden(method, type);
-                if (IsEventKernel(method.ContainingType))
+                if (IsForbiddenApiRoot(context, method))
                 {
                     ReportForbiddenAmbientCultureMutation(context, type);
                 }

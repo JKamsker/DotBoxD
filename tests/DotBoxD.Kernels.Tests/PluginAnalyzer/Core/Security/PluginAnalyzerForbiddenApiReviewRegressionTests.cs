@@ -69,6 +69,45 @@ public sealed class PluginAnalyzerForbiddenApiReviewRegressionTests
     }
 
     [Theory]
+    [InlineData("_ = default(System.IO.FileInfo);")]
+    [InlineData("Use<System.IO.FileInfo>();")]
+    [InlineData("System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo(\"en-US\");")]
+    public async Task Reports_forbidden_module_initializer_syntax_and_mutation(string statement)
+    {
+        var source = """
+            namespace Sample
+            {
+                using System.Runtime.CompilerServices;
+                using DotBoxD.Abstractions;
+                using DotBoxD.Plugins;
+
+                [Plugin("module-root")]
+                public sealed class ModuleRootKernel : IEventKernel<string>
+                {
+                    public bool ShouldHandle(string e, HookContext context) => true;
+
+                    public void Handle(string e, HookContext context) { }
+                }
+
+                public static class Initializer
+                {
+                    [ModuleInitializer]
+                    public static void Initialize()
+                    {
+                        STATEMENT
+                    }
+
+                    private static void Use<T>() { }
+                }
+            }
+            """.Replace("STATEMENT", statement, StringComparison.Ordinal);
+
+        var diagnostics = await AnalyzeAsync(source);
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == "DBXK001");
+    }
+
+    [Theory]
     [InlineData("((dynamic)new Derived()).DangerMethod()")]
     [InlineData("((dynamic)new Derived()).DangerProperty")]
     [InlineData("((dynamic)new Derived())[0]")]
@@ -102,6 +141,72 @@ public sealed class PluginAnalyzerForbiddenApiReviewRegressionTests
             """.Replace("ACCESS", access, StringComparison.Ordinal);
 
         var diagnostics = await AnalyzeAsync(source);
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == "DBXK001");
+    }
+
+    [Fact]
+    public async Task Reports_forbidden_dynamic_property_setter()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            namespace Sample
+            {
+                using DotBoxD.Abstractions;
+                using DotBoxD.Plugins;
+
+                public sealed class Helper
+                {
+                    public int Danger
+                    {
+                        get => 0;
+                        set => System.IO.File.WriteAllText("/tmp/value", value.ToString());
+                    }
+                }
+
+                [Plugin("dynamic-setter")]
+                public sealed class DynamicSetterKernel : IEventKernel<string>
+                {
+                    public bool ShouldHandle(string e, HookContext context)
+                    {
+                        ((dynamic)new Helper()).Danger = 1;
+                        return true;
+                    }
+
+                    public void Handle(string e, HookContext context) { }
+                }
+            }
+            """);
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == "DBXK001");
+    }
+
+    [Fact]
+    public async Task Reports_forbidden_signature_on_delayed_dynamic_property_target()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            namespace Sample
+            {
+                using DotBoxD.Abstractions;
+                using DotBoxD.Plugins;
+
+                public sealed class Helper
+                {
+                    public System.IO.FileInfo Info => null!;
+                }
+
+                [Plugin("dynamic-signature")]
+                public sealed class DynamicSignatureKernel : IEventKernel<string>
+                {
+                    public bool ShouldHandle(string e, HookContext context)
+                    {
+                        dynamic helper = new Helper();
+                        return helper.Info is not null;
+                    }
+
+                    public void Handle(string e, HookContext context) { }
+                }
+            }
+            """);
 
         Assert.Contains(diagnostics, diagnostic => diagnostic.Id == "DBXK001");
     }

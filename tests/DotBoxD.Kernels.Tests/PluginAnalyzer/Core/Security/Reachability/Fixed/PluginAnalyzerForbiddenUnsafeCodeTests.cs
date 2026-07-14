@@ -66,6 +66,39 @@ public sealed class PluginAnalyzerForbiddenUnsafeCodeTests
         Assert.Contains("unsafe", diagnostic.GetMessage(), StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task Reports_unsafe_pointer_stackalloc_in_reachable_helper()
+    {
+        const string source = """
+            namespace Sample
+            {
+                using DotBoxD.Abstractions;
+                using DotBoxD.Plugins;
+
+                public static class Helper
+                {
+                    public static unsafe int Read()
+                    {
+                        int* values = stackalloc int[1];
+                        return values[0];
+                    }
+                }
+
+                [Plugin("unsafe-helper")]
+                public sealed class UnsafeHelperKernel : IEventKernel<string>
+                {
+                    public bool ShouldHandle(string e, HookContext context) => Helper.Read() >= 0;
+
+                    public void Handle(string e, HookContext context) { }
+                }
+            }
+            """;
+
+        var diagnostics = await AnalyzeAsync(source);
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == "DBXK001");
+    }
+
     private static Diagnostic AssertSingleDiagnosticAt(
         string source,
         ImmutableArray<Diagnostic> diagnostics,

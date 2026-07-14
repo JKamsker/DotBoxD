@@ -191,7 +191,7 @@ internal static class ProxyInvocationEmitter
         }
 
         var callerToken = ProxyGenerationHelpers.GetCancellationTokenArgument(method.Parameters, ct);
-        return $"__dotboxd_observeCallerCancellationAsync({returnExpression}, {callerToken})";
+        return $"{ProxyGenerationHelpers.CallerCancellationHelperName}({returnExpression}, {callerToken})";
     }
 
     private static void EmitSubServiceReturn(

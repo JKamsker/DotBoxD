@@ -8,8 +8,11 @@ public sealed partial class PluginAnalyzer
     private const string ModuleInitializerAttribute = "System.Runtime.CompilerServices.ModuleInitializerAttribute";
 
     private static bool IsForbiddenApiRoot(OperationAnalysisContext context, IMethodSymbol method)
+        => IsForbiddenApiRoot(context.Compilation, method);
+
+    private static bool IsForbiddenApiRoot(Compilation compilation, IMethodSymbol method)
         => IsEventKernel(method.ContainingType) ||
-           (IsModuleInitializer(method) && CompilationContainsEventKernel(context.Compilation));
+           (IsModuleInitializer(method) && CompilationContainsEventKernel(compilation));
 
     internal static bool IsModuleInitializer(IMethodSymbol method)
         => HasAttribute(method, ModuleInitializerAttribute);

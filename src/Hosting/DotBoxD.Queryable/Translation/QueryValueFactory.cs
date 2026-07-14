@@ -91,7 +91,7 @@ internal static class QueryValueFactory
         {
             throw;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             throw new QueryTranslationException(
                 $"Could not enumerate the constant collection operand for Contains/in in '{expression}'.",
