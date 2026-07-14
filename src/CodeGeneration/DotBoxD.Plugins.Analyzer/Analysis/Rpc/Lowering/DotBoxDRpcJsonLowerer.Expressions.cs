@@ -154,80 +154,17 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         InvocationExpressionSyntax invocation,
         IMethodSymbol? resolvedMethod)
     {
-        if (resolvedMethod is not null)
+        if (_serverContextHostBindings.Resolve(invocation, resolvedMethod) is not { } resolved)
         {
             return null;
         }
 
-        if (invocation.Expression is not MemberAccessExpressionSyntax member ||
-            !IsServerContextExpression(member.Expression) ||
-            ServerContextHostBindingCandidates(member.Name.Identifier.ValueText, invocation.ArgumentList.Arguments) is not { Count: > 0 } candidates)
-        {
-            return null;
-        }
-
-        if (candidates.Count != 1)
-        {
-            throw new NotSupportedException(
-                $"Server extension call '{invocation}' is ambiguous on server context type '{_serverContextType}'.");
-        }
-
-        var (method, binding) = candidates[0];
-        AddBindingMetadata(binding);
+        AddBindingMetadata(resolved.Binding);
         var args = LowerArgumentsInParameterOrder(
             invocation.ArgumentList.Arguments,
-            method.Parameters,
-            $"Host binding '{binding.BindingId}'");
-        return Call(binding.BindingId, null, args);
-    }
-
-    private List<(IMethodSymbol Method, (string BindingId, string? Capability, IReadOnlyList<string> Effects, bool IsAsync) Binding)>
-        ServerContextHostBindingCandidates(string methodName, SeparatedSyntaxList<ArgumentSyntax> arguments)
-    {
-        var candidates = new List<(IMethodSymbol Method, (string BindingId, string? Capability, IReadOnlyList<string> Effects, bool IsAsync) Binding)>();
-        if (_serverContextType is null)
-        {
-            return candidates;
-        }
-
-        foreach (var method in ServerContextMethods(methodName))
-        {
-            if (!CanBindArgumentsInParameterOrder(arguments, method.Parameters))
-            {
-                continue;
-            }
-
-            if (DotBoxDHostBindingExpressionLowerer.HostBinding(method, _model.Compilation) is { } binding)
-            {
-                candidates.Add((method, binding));
-            }
-        }
-
-        return candidates;
-    }
-
-    private IEnumerable<IMethodSymbol> ServerContextMethods(string methodName)
-    {
-        if (_serverContextType is not INamedTypeSymbol named)
-        {
-            yield break;
-        }
-
-        for (INamedTypeSymbol? current = named; current is not null; current = current.BaseType)
-        {
-            foreach (var method in current.GetMembers(methodName).OfType<IMethodSymbol>())
-            {
-                yield return method;
-            }
-        }
-
-        foreach (var @interface in named.AllInterfaces)
-        {
-            foreach (var method in @interface.GetMembers(methodName).OfType<IMethodSymbol>())
-            {
-                yield return method;
-            }
-        }
+            resolved.Method.Parameters,
+            $"Host binding '{resolved.Binding.BindingId}'");
+        return Call(resolved.Binding.BindingId, null, args);
     }
     private string LowerMemberAccess(MemberAccessExpressionSyntax member)
     {
@@ -277,7 +214,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             return fallbackLocalType;
         }
 
-        if (IsServerContextExpression(expression) && _serverContextType is { } serverContextType)
+        if (_serverContextHostBindings.TryGetContextType(expression) is { } serverContextType)
         {
             return serverContextType;
         }
@@ -290,18 +227,6 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
     internal bool IsStringExpression(ExpressionSyntax expression)
         => TypeOf(expression).SpecialType == SpecialType.System_String;
-
-    private bool IsServerContextExpression(ExpressionSyntax expression)
-        => expression switch
-        {
-            ParenthesizedExpressionSyntax parenthesized => IsServerContextExpression(parenthesized.Expression),
-            ThisExpressionSyntax => _serverContextType is not null && string.IsNullOrEmpty(_serverContextParameterName),
-            IdentifierNameSyntax identifier => string.Equals(
-                identifier.Identifier.ValueText,
-                _serverContextParameterName,
-                StringComparison.Ordinal),
-            _ => false
-        };
 
     private static bool HasRpcServiceAttribute(ITypeSymbol type)
     {

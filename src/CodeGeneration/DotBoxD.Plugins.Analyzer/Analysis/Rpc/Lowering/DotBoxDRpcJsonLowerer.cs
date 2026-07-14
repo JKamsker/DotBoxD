@@ -25,6 +25,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     private readonly Func<string, string>? _reserveGeneratedName;
     private readonly string? _serverContextParameterName;
     private readonly ITypeSymbol? _serverContextType;
+    private readonly ServerContextHostBindingResolver _serverContextHostBindings;
     private readonly Dictionary<string, string> _serviceHandleLocals = new(StringComparer.Ordinal);
     private readonly Dictionary<ISymbol, string> _serviceHandleMembers = new(SymbolEqualityComparer.Default);
     private readonly Dictionary<ISymbol, ITypeSymbol> _fallbackLocalTypes = new(SymbolEqualityComparer.Default);
