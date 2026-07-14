@@ -75,20 +75,13 @@ internal static partial class DotBoxDGenerationNames
         public const string DictionaryOriginal = "System.Collections.Generic.Dictionary<TKey, TValue>";
         public const string ReadOnlyDictionaryOriginal = "System.Collections.Generic.IReadOnlyDictionary<TKey, TValue>";
         public const string DictionaryInterfaceOriginal = "System.Collections.Generic.IDictionary<TKey, TValue>";
-        public const string SystemActionPrefix = "System.Action";
-        public const string SystemActivator = "System.Activator";
-        public const string SystemConsole = "System.Console";
-        public const string SystemAppContext = "System.AppContext";
-        public const string SystemAppDomain = "System.AppDomain";
-        public const string SystemEnvironment = "System.Environment";
-        public const string SystemGc = "System.GC";
-        public const string SystemGcSettings = "System.Runtime.GCSettings";
-        public const string SystemTimeZoneInfo = "System.TimeZoneInfo";
-        public const string SystemDelegate = "System.Delegate";
-        public const string SystemTextEncoding = "System.Text.Encoding";
-        public const string SystemServiceProvider = "System.IServiceProvider";
-        public const string SystemType = "System.Type";
-        public const string SystemUnsafe = "System.Runtime.CompilerServices.Unsafe";
+        public const string SystemActionPrefix = "System.Action", SystemActivator = "System.Activator";
+        public const string SystemConsole = "System.Console", SystemEnvironment = "System.Environment";
+        public const string SystemAppContext = "System.AppContext", SystemAppDomain = "System.AppDomain";
+        public const string SystemGc = "System.GC", SystemGcSettings = "System.Runtime.GCSettings";
+        public const string SystemTimeZoneInfo = "System.TimeZoneInfo", SystemDelegate = "System.Delegate";
+        public const string SystemTextEncoding = "System.Text.Encoding", SystemServiceProvider = "System.IServiceProvider";
+        public const string SystemType = "System.Type", SystemUnsafe = "System.Runtime.CompilerServices.Unsafe";
         public const string SystemComponentModelTypeDescriptor = "System.ComponentModel.TypeDescriptor";
 
         public const string GlobalArray = GlobalPrefix + "System.Array";
