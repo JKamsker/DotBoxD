@@ -44,6 +44,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         context.RegisterSymbolAction(AnalyzeMethod, SymbolKind.Method);
         context.RegisterSymbolAction(AnalyzeProperty, SymbolKind.Property);
         context.RegisterSymbolAction(AnalyzeField, SymbolKind.Field);
+        RegisterAttributeMetadataAnalysis(context);
         context.RegisterCompilationStartAction(startContext =>
         {
             var helperGraph = new ForbiddenHelperCallGraph();
