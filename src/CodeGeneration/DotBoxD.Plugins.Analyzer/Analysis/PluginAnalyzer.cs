@@ -231,6 +231,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             or DotBoxDGenerationNames.TypeNames.SystemConsole
             or DotBoxDGenerationNames.TypeNames.SystemEnvironment
             or DotBoxDGenerationNames.TypeNames.SystemGc
+            or DotBoxDGenerationNames.TypeNames.SystemGcSettings
             or DotBoxDGenerationNames.TypeNames.SystemDelegate
             or DotBoxDGenerationNames.TypeNames.SystemServiceProvider
             or DotBoxDGenerationNames.TypeNames.SystemType;
