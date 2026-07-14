@@ -11,7 +11,7 @@ public sealed partial class PluginAnalyzer
         var creation = (IObjectCreationOperation)context.Operation;
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
-            if (IsValueTaskObjectCreation(creation.Type, context.Compilation))
+            if (ReportAndRecordValueTaskPayloadInInitializer(context, helperGraph, creation.Type))
             {
                 return;
             }
@@ -69,6 +69,29 @@ public sealed partial class PluginAnalyzer
             foreach (var argument in named.TypeArguments)
             {
                 ReportAndRecordIfForbidden(context, helperGraph, method, argument);
+            }
+        }
+
+        return true;
+    }
+
+    private static bool ReportAndRecordValueTaskPayloadInInitializer(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        ITypeSymbol? type)
+    {
+        if (!IsValueTaskObjectCreation(type, context.Compilation))
+        {
+            return false;
+        }
+
+        if (type is INamedTypeSymbol named)
+        {
+            foreach (var argument in named.TypeArguments)
+            {
+                ReportForbiddenInInitializer(context, argument);
+                RecordForbiddenInitializerReference(context, helperGraph, argument);
+                RecordForbiddenHelperPropertyInitializer(context, helperGraph, argument);
             }
         }
 

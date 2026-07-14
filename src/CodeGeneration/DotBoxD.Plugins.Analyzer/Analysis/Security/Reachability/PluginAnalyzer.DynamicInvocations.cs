@@ -128,8 +128,7 @@ public sealed partial class PluginAnalyzer
         string memberName,
         int argumentCount)
     {
-        return receiverType
-            .GetMembers(memberName)
+        return DynamicCandidateMembers(receiverType, memberName)
             .OfType<IMethodSymbol>()
             .Where(method => method.MethodKind == MethodKind.Ordinary)
             .Where(method => method.TypeParameters.Length == 0)
@@ -140,8 +139,7 @@ public sealed partial class PluginAnalyzer
         ITypeSymbol receiverType,
         string memberName)
     {
-        return receiverType
-            .GetMembers(memberName)
+        return DynamicCandidateMembers(receiverType, memberName)
             .OfType<IPropertySymbol>()
             .Where(property => !property.IsIndexer)
             .Select(property => property.GetMethod)
@@ -152,12 +150,48 @@ public sealed partial class PluginAnalyzer
         ITypeSymbol receiverType,
         int argumentCount)
     {
-        return receiverType
-            .GetMembers()
+        return DynamicCandidateMembers(receiverType)
             .OfType<IPropertySymbol>()
             .Where(property => property.IsIndexer && CanAcceptArgumentCount(property, argumentCount))
             .Select(property => property.GetMethod)
             .Where(getter => getter is not null)!;
+    }
+
+    private static IEnumerable<ISymbol> DynamicCandidateMembers(ITypeSymbol receiverType, string? memberName = null)
+    {
+        var seenMembers = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+        foreach (var type in DynamicCandidateTypes(receiverType))
+        {
+            var members = memberName is null ? type.GetMembers() : type.GetMembers(memberName);
+            foreach (var member in members)
+            {
+                if (seenMembers.Add(member))
+                {
+                    yield return member;
+                }
+            }
+        }
+    }
+
+    private static IEnumerable<INamedTypeSymbol> DynamicCandidateTypes(ITypeSymbol receiverType)
+    {
+        if (receiverType is not INamedTypeSymbol namedType)
+        {
+            yield break;
+        }
+
+        for (var current = namedType; current is not null; current = current.BaseType)
+        {
+            yield return current;
+        }
+
+        if (namedType.TypeKind == TypeKind.Interface)
+        {
+            foreach (var implementedInterface in namedType.AllInterfaces)
+            {
+                yield return implementedInterface;
+            }
+        }
     }
 
     private static bool CanAcceptArgumentCount(IMethodSymbol method, int argumentCount)

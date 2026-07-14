@@ -16,14 +16,34 @@ public sealed partial class PluginAnalyzer
 
     internal static bool CompilationContainsEventKernel(Compilation compilation)
     {
-        foreach (var symbol in compilation.GetSymbolsWithName(static _ => true, SymbolFilter.Type))
+        return NamespaceContainsEventKernel(compilation.Assembly.GlobalNamespace);
+    }
+
+    private static bool NamespaceContainsEventKernel(INamespaceSymbol @namespace)
+    {
+        foreach (var member in @namespace.GetMembers())
         {
-            if (symbol is INamedTypeSymbol type && IsEventKernel(type))
+            if (member is INamespaceSymbol nestedNamespace && NamespaceContainsEventKernel(nestedNamespace))
+            {
+                return true;
+            }
+
+            if (member is INamedTypeSymbol type && TypeContainsEventKernel(type))
             {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private static bool TypeContainsEventKernel(INamedTypeSymbol type)
+    {
+        if (IsEventKernel(type))
+        {
+            return true;
+        }
+
+        return type.GetTypeMembers().Any(TypeContainsEventKernel);
     }
 }
