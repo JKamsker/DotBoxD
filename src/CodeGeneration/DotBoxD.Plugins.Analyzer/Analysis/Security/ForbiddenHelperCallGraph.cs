@@ -36,7 +36,7 @@ internal sealed class ForbiddenHelperCallGraph
         => _directDiagnostics.TryAdd(Normalize(method), string.Empty);
 
     public bool TryRecordDirectDiagnostic(IMethodSymbol method, ITypeSymbol type)
-        => _directDiagnostics.TryAdd(Normalize(method), DisplayName(type));
+        => _directDiagnostics.TryAdd(Normalize(method), DirectDiagnosticKey(type));
 
     public void RecordDynamicLocalType(ILocalSymbol local, ITypeSymbol? type)
         => _dynamicHelperCalls.RecordLocalType(local, type);
@@ -280,6 +280,10 @@ internal sealed class ForbiddenHelperCallGraph
 
     private static string DisplayName(ITypeSymbol type)
         => type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+
+    private static string DirectDiagnosticKey(ITypeSymbol type)
+        => type.WithNullableAnnotation(NullableAnnotation.NotAnnotated)
+            .ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
 
     private static ISymbol Normalize(ISymbol symbol)
         => symbol switch
