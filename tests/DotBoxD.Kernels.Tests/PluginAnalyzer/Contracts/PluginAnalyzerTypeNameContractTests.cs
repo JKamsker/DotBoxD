@@ -110,6 +110,7 @@ public sealed class PluginAnalyzerTypeNameContractTests
             [nameof(TypeNames.SystemEnvironment)] = TypeName(typeof(Environment)),
             [nameof(TypeNames.SystemGc)] = TypeName(typeof(GC)),
             [nameof(TypeNames.SystemDelegate)] = TypeName(typeof(Delegate)),
+            [nameof(TypeNames.SystemTextEncoding)] = TypeName(typeof(System.Text.Encoding)),
             [nameof(TypeNames.SystemServiceProvider)] = TypeName(typeof(IServiceProvider)),
             [nameof(TypeNames.SystemType)] = TypeName(typeof(Type)),
 
