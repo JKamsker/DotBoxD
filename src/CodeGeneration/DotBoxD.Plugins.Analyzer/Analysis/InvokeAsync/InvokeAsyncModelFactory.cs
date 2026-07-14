@@ -74,7 +74,7 @@ internal static partial class InvokeAsyncModelFactory
             return null;
         }
 
-        if (HasExplicitInvocationIrArgument(invocation))
+        if (HasExplicitInvocationIrArgument(invocation, model, cancellationToken))
         {
             return null;
         }
@@ -120,7 +120,7 @@ internal static partial class InvokeAsyncModelFactory
             return null;
         }
 
-        if (HasExplicitInvocationIrArgument(invocation))
+        if (HasExplicitInvocationIrArgument(invocation, model, cancellationToken))
         {
             return null;
         }
@@ -164,7 +164,7 @@ internal static partial class InvokeAsyncModelFactory
             return null;
         }
 
-        if (HasExplicitInvocationIrArgument(invocation))
+        if (HasExplicitInvocationIrArgument(invocation, model, cancellationToken))
         {
             return null;
         }
@@ -254,10 +254,11 @@ internal static partial class InvokeAsyncModelFactory
         return new InvokeAsyncResult(package, interception, null);
     }
 
-    private static bool HasExplicitInvocationIrArgument(InvocationExpressionSyntax invocation)
+    private static bool HasExplicitInvocationIrArgument(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        CancellationToken cancellationToken)
     {
-        var positionalIndex = 0;
-        var irPositionalIndex = FirstPositionalArgumentIsLambda(invocation) ? 1 : 2;
         foreach (var argument in invocation.ArgumentList.Arguments)
         {
             if (argument.NameColon is { Name.Identifier.ValueText: "irInvocation" })
@@ -266,23 +267,15 @@ internal static partial class InvokeAsyncModelFactory
             }
 
             if (argument.NameColon is null &&
-                positionalIndex == irPositionalIndex)
+                !IsNullLike(argument.Expression) &&
+                InvokeAsyncServerSurface.IsIRInvocation(model.GetTypeInfo(argument.Expression, cancellationToken).Type))
             {
-                return !IsNullLike(argument.Expression);
-            }
-
-            if (argument.NameColon is null)
-            {
-                positionalIndex++;
+                return true;
             }
         }
 
         return false;
     }
-
-    private static bool FirstPositionalArgumentIsLambda(InvocationExpressionSyntax invocation)
-        => invocation.ArgumentList.Arguments.FirstOrDefault(argument => argument.NameColon is null)?.Expression
-            is LambdaExpressionSyntax;
 
     private static bool IsNullLike(ExpressionSyntax expression)
         => expression.IsKind(SyntaxKind.NullLiteralExpression) ||
