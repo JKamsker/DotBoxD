@@ -272,7 +272,13 @@ public sealed partial class SandboxHost : IDisposable
         SandboxValue input,
         SandboxExecutionOptions options,
         CancellationToken cancellationToken)
-        => await _interpreter.ExecuteAsync(plan, entrypoint, input, options, cancellationToken).ConfigureAwait(false);
+    {
+        var result = await _interpreter.ExecuteAsync(plan, entrypoint, input, options, cancellationToken)
+            .ConfigureAwait(false);
+        return cancellationToken.IsCancellationRequested
+            ? InterpreterCancellationBoundary.CancelledResult(plan, options, result)
+            : result;
+    }
 
     public void Dispose()
     {

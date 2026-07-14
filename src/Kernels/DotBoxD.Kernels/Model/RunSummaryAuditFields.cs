@@ -1,3 +1,5 @@
+using DotBoxD.Kernels.Sandbox;
+
 namespace DotBoxD.Kernels.Model;
 
 public static class RunSummaryAuditFields
@@ -45,6 +47,59 @@ public static class RunSummaryAuditFields
     {
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentNullException.ThrowIfNull(budget);
+        return Create(
+            plan,
+            SummaryUsage.From(budget),
+            budget.Limits,
+            mode,
+            cacheStatus,
+            runtimeForm,
+            cacheKey,
+            artifactHash,
+            materializationStatus,
+            executionDispatched);
+    }
+
+    internal static IReadOnlyDictionary<string, string> Create(
+        ExecutionPlan plan,
+        SandboxResourceUsage usage,
+        ResourceLimits limits,
+        ExecutionMode mode,
+        string cacheStatus,
+        string? runtimeForm = null,
+        string? cacheKey = null,
+        string? artifactHash = null,
+        string? materializationStatus = null,
+        bool executionDispatched = true)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(usage);
+        ArgumentNullException.ThrowIfNull(limits);
+        return Create(
+            plan,
+            SummaryUsage.From(usage),
+            limits,
+            mode,
+            cacheStatus,
+            runtimeForm,
+            cacheKey,
+            artifactHash,
+            materializationStatus,
+            executionDispatched);
+    }
+
+    private static IReadOnlyDictionary<string, string> Create(
+        ExecutionPlan plan,
+        SummaryUsage usage,
+        ResourceLimits limits,
+        ExecutionMode mode,
+        string cacheStatus,
+        string? runtimeForm,
+        string? cacheKey,
+        string? artifactHash,
+        string? materializationStatus,
+        bool executionDispatched)
+    {
         RequireDefinedMode(mode);
         ArgumentException.ThrowIfNullOrWhiteSpace(cacheStatus);
 
@@ -59,29 +114,29 @@ public static class RunSummaryAuditFields
             ["policyId"] = SafePolicyId(plan.Policy.PolicyId),
             ["policyHash"] = plan.PolicyHash,
             ["bindingManifestHash"] = plan.BindingManifestHash,
-            ["fuelUsed"] = budget.FuelUsed.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["maxFuel"] = budget.Limits.MaxFuel.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["loopIterations"] = budget.LoopIterations.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["maxLoopIterations"] = budget.Limits.MaxLoopIterations.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["allocatedBytes"] = budget.AllocatedBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["allocationCharged"] = budget.AllocatedBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["maxAllocatedBytes"] = budget.Limits.MaxAllocatedBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["hostCalls"] = budget.HostCalls.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["maxHostCalls"] = budget.Limits.MaxHostCalls.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["fileBytesRead"] = budget.FileBytesRead.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["maxFileBytesRead"] = budget.Limits.MaxFileBytesRead.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["fileBytesWritten"] = budget.FileBytesWritten.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["maxFileBytesWritten"] = budget.Limits.MaxFileBytesWritten.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["networkBytesRead"] = budget.NetworkBytesRead.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["maxNetworkBytesRead"] = budget.Limits.MaxNetworkBytesRead.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["networkBytesWritten"] = budget.NetworkBytesWritten.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["maxNetworkBytesWritten"] = budget.Limits.MaxNetworkBytesWritten.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["logEvents"] = budget.LogEvents.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["maxLogEvents"] = budget.Limits.MaxLogEvents.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["collectionElements"] = budget.CollectionElements.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["maxCollectionElements"] = budget.Limits.MaxTotalCollectionElements.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["stringBytes"] = budget.StringBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["maxStringBytes"] = budget.Limits.MaxTotalStringBytes.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            ["fuelUsed"] = usage.FuelUsed.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["maxFuel"] = limits.MaxFuel.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["loopIterations"] = usage.LoopIterations.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["maxLoopIterations"] = limits.MaxLoopIterations.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["allocatedBytes"] = usage.AllocatedBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["allocationCharged"] = usage.AllocatedBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["maxAllocatedBytes"] = limits.MaxAllocatedBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["hostCalls"] = usage.HostCalls.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["maxHostCalls"] = limits.MaxHostCalls.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["fileBytesRead"] = usage.FileBytesRead.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["maxFileBytesRead"] = limits.MaxFileBytesRead.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["fileBytesWritten"] = usage.FileBytesWritten.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["maxFileBytesWritten"] = limits.MaxFileBytesWritten.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["networkBytesRead"] = usage.NetworkBytesRead.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["maxNetworkBytesRead"] = limits.MaxNetworkBytesRead.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["networkBytesWritten"] = usage.NetworkBytesWritten.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["maxNetworkBytesWritten"] = limits.MaxNetworkBytesWritten.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["logEvents"] = usage.LogEvents.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["maxLogEvents"] = limits.MaxLogEvents.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["collectionElements"] = usage.CollectionElements.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["maxCollectionElements"] = limits.MaxTotalCollectionElements.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["stringBytes"] = usage.StringBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["maxStringBytes"] = limits.MaxTotalStringBytes.ToString(System.Globalization.CultureInfo.InvariantCulture)
         };
 
         AddIfPresent(fields, "runtimeForm", runtimeForm);
@@ -105,6 +160,48 @@ public static class RunSummaryAuditFields
         {
             fields[key] = value;
         }
+    }
+
+    private readonly record struct SummaryUsage(
+        long FuelUsed,
+        long LoopIterations,
+        long AllocatedBytes,
+        int HostCalls,
+        long FileBytesRead,
+        long FileBytesWritten,
+        long NetworkBytesRead,
+        long NetworkBytesWritten,
+        int LogEvents,
+        long CollectionElements,
+        long StringBytes)
+    {
+        public static SummaryUsage From(ResourceMeter budget)
+            => new(
+                budget.FuelUsed,
+                budget.LoopIterations,
+                budget.AllocatedBytes,
+                budget.HostCalls,
+                budget.FileBytesRead,
+                budget.FileBytesWritten,
+                budget.NetworkBytesRead,
+                budget.NetworkBytesWritten,
+                budget.LogEvents,
+                budget.CollectionElements,
+                budget.StringBytes);
+
+        public static SummaryUsage From(SandboxResourceUsage usage)
+            => new(
+                usage.FuelUsed,
+                usage.LoopIterations,
+                usage.AllocatedBytes,
+                usage.HostCalls,
+                usage.FileBytesRead,
+                usage.FileBytesWritten,
+                usage.NetworkBytesRead,
+                usage.NetworkBytesWritten,
+                usage.LogEvents,
+                usage.CollectionElements,
+                usage.StringBytes);
     }
 
     internal static string SafePolicyId(string? policyId)
