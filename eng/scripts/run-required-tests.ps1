@@ -54,6 +54,7 @@ $defaultMinimums = @{
     VerifierMemberSignatureTests = 5
     BindingRegistryHardeningTests = 12
     InterpreterFailureBoundaryTests = 4
+    InterpreterPostCancellationBoundaryTests = 2
     WorkerIsolationTests = 11
     WorkerResultHardeningTests = 11
     JsonApiSurfaceTests = 1

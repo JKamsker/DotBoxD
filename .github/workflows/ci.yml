@@ -343,6 +343,7 @@ jobs:
               "VerifierMemberSignatureTests",
               "BindingRegistryHardeningTests",
               "InterpreterFailureBoundaryTests",
+              "InterpreterPostCancellationBoundaryTests",
               "WorkerIsolationTests",
               "WorkerResultHardeningTests",
               "JsonApiSurfaceTests",

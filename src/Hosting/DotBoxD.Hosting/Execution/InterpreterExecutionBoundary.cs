@@ -19,17 +19,24 @@ internal static class InterpreterExecutionBoundary
     {
         try
         {
-            return await interpreter.ExecuteAsync(
+            var result = await interpreter.ExecuteAsync(
                     plan,
                     entrypoint,
                     input,
                     options,
                     cancellationToken)
-                .ConfigureAwait(false)
-                ?? FailureResult(
+                .ConfigureAwait(false);
+            if (result is null)
+            {
+                return FailureResult(
                     plan,
                     options,
                     new SandboxError(SandboxErrorCode.HostFailure, FailureMessage));
+            }
+
+            return cancellationToken.IsCancellationRequested
+                ? InterpreterCancellationBoundary.CancelledResult(plan, options, result)
+                : result;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
