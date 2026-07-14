@@ -256,33 +256,30 @@ internal static partial class InvokeAsyncModelFactory
 
     private static bool HasExplicitInvocationIrArgument(InvocationExpressionSyntax invocation)
     {
-        var positionalIndex = 0;
-        var irPositionalIndex = FirstPositionalArgumentIsLambda(invocation) ? 1 : 2;
-        foreach (var argument in invocation.ArgumentList.Arguments)
+        var arguments = invocation.ArgumentList.Arguments;
+        var irArgumentIndex = FirstArgumentTargetsLambda(arguments) ? 1 : 2;
+        for (var index = 0; index < arguments.Count; index++)
         {
+            var argument = arguments[index];
             if (argument.NameColon is { Name.Identifier.ValueText: "irInvocation" })
             {
                 return !IsNullLike(argument.Expression);
             }
 
             if (argument.NameColon is null &&
-                positionalIndex == irPositionalIndex)
+                index == irArgumentIndex)
             {
                 return !IsNullLike(argument.Expression);
-            }
-
-            if (argument.NameColon is null)
-            {
-                positionalIndex++;
             }
         }
 
         return false;
     }
 
-    private static bool FirstPositionalArgumentIsLambda(InvocationExpressionSyntax invocation)
-        => invocation.ArgumentList.Arguments.FirstOrDefault(argument => argument.NameColon is null)?.Expression
-            is LambdaExpressionSyntax;
+    private static bool FirstArgumentTargetsLambda(SeparatedSyntaxList<ArgumentSyntax> arguments)
+        => arguments.FirstOrDefault() is { } first &&
+           (first.NameColon is { Name.Identifier.ValueText: "lambda" } ||
+            first.NameColon is null && first.Expression is LambdaExpressionSyntax);
 
     private static bool IsNullLike(ExpressionSyntax expression)
         => expression.IsKind(SyntaxKind.NullLiteralExpression) ||
