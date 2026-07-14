@@ -16,7 +16,15 @@ internal static class InvokeAsyncManualIrArgument
             return HasExplicitBoundArgument(operation, model, cancellationToken);
         }
 
-        foreach (var argument in invocation.ArgumentList.Arguments)
+        return HasExplicitUnboundArgument(invocation.ArgumentList.Arguments, model, cancellationToken);
+    }
+
+    private static bool HasExplicitUnboundArgument(
+        SeparatedSyntaxList<ArgumentSyntax> arguments,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        foreach (var argument in arguments)
         {
             if (argument.NameColon is { Name.Identifier.ValueText: "irInvocation" })
             {
@@ -24,12 +32,24 @@ internal static class InvokeAsyncManualIrArgument
             }
         }
 
-        foreach (var argument in invocation.ArgumentList.Arguments)
+        return HasExplicitPositionalArgument(arguments, model, cancellationToken);
+    }
+
+    private static bool HasExplicitPositionalArgument(
+        SeparatedSyntaxList<ArgumentSyntax> arguments,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        for (var index = 1; index <= 2 && index < arguments.Count; index++)
         {
+            var argument = arguments[index];
+            if (argument.NameColon is not null)
+            {
+                continue;
+            }
+
             var type = model.GetTypeInfo(argument.Expression, cancellationToken);
-            if ((type.Type is not null && InvokeAsyncServerSurface.IsIRInvocation(type.Type)) ||
-                (type.ConvertedType is not null && InvokeAsyncServerSurface.IsIRInvocation(type.ConvertedType)) ||
-                HasImplicitIrConversion(type.Type))
+            if (HasIrTarget(type))
             {
                 return IsExplicitValue(argument.Expression, model, cancellationToken);
             }
@@ -37,6 +57,11 @@ internal static class InvokeAsyncManualIrArgument
 
         return false;
     }
+
+    private static bool HasIrTarget(TypeInfo type)
+        => (type.Type is not null && InvokeAsyncServerSurface.IsIRInvocation(type.Type)) ||
+           (type.ConvertedType is not null && InvokeAsyncServerSurface.IsIRInvocation(type.ConvertedType)) ||
+           HasImplicitIrConversion(type.Type);
 
     private static bool IsExplicitValue(
         ExpressionSyntax expression,
