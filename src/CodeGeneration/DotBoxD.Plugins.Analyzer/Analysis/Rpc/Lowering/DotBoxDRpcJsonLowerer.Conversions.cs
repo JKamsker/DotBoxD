@@ -174,7 +174,12 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         }
 
         if (IsLoweredEnumConstant(expression, convertedType) ||
-            IsRepresentableNarrowI32Constant(expression, sourceType, convertedType) ||
+            RpcNumericConversionClassifier.IsRepresentableNarrowI32Constant(
+                _model,
+                expression,
+                sourceType,
+                convertedType,
+                _cancellationToken) ||
             NumericConversion(sourceType, convertedType) is not NumericConversionKind.Unsupported)
         {
             effectiveType = convertedType;
@@ -187,27 +192,6 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     private bool IsLoweredEnumConstant(ExpressionSyntax expression, ITypeSymbol convertedType)
         => convertedType.TypeKind == TypeKind.Enum &&
            _model.GetConstantValue(expression, _cancellationToken).HasValue;
-
-    private bool IsRepresentableNarrowI32Constant(
-        ExpressionSyntax expression,
-        ITypeSymbol sourceType,
-        ITypeSymbol convertedType)
-    {
-        if (sourceType.SpecialType != SpecialType.System_Int32 ||
-            _model.GetConstantValue(expression, _cancellationToken).Value is not int value)
-        {
-            return false;
-        }
-
-        return convertedType.SpecialType switch
-        {
-            SpecialType.System_SByte => value is >= sbyte.MinValue and <= sbyte.MaxValue,
-            SpecialType.System_Byte => value is >= byte.MinValue and <= byte.MaxValue,
-            SpecialType.System_Int16 => value is >= short.MinValue and <= short.MaxValue,
-            SpecialType.System_UInt16 => value is >= ushort.MinValue and <= ushort.MaxValue,
-            _ => false
-        };
-    }
 
     private static NotSupportedException UnsupportedConversion(string description)
         => new($"{description} is not supported because it is not a supported numeric widening conversion.");
@@ -243,7 +227,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             return NumericConversionKind.Identity;
         }
 
-        if (IsImplicitI32WireConversion(sourceType, targetType) ||
+        if (RpcNumericConversionClassifier.IsImplicitI32WireConversion(sourceType, targetType) ||
             (sourceType.SpecialType == SpecialType.System_Single && targetType.SpecialType == SpecialType.System_Double))
         {
             return NumericConversionKind.SameWire;
@@ -266,20 +250,6 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             SpecialType.System_Int32 or
             SpecialType.System_SByte or
             SpecialType.System_UInt16;
-
-    private static bool IsImplicitI32WireConversion(ITypeSymbol sourceType, ITypeSymbol targetType)
-        => sourceType.SpecialType switch
-        {
-            SpecialType.System_SByte => targetType.SpecialType is
-                SpecialType.System_Int16 or SpecialType.System_Int32,
-            SpecialType.System_Byte => targetType.SpecialType is
-                SpecialType.System_Int16 or SpecialType.System_UInt16 or SpecialType.System_Int32,
-            SpecialType.System_Int16 or SpecialType.System_UInt16 =>
-                targetType.SpecialType == SpecialType.System_Int32,
-            SpecialType.System_Char => targetType.SpecialType is
-                SpecialType.System_UInt16 or SpecialType.System_Int32,
-            _ => false
-        };
 
     private static bool CanWidenToF64(ITypeSymbol type)
         => IsI32WireIntegral(type) || type.SpecialType == SpecialType.System_Int64;
