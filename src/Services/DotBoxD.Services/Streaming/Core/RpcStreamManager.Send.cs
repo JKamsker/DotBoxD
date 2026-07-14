@@ -71,6 +71,7 @@ internal sealed partial class RpcStreamManager
 
     private async Task SendControlAsync(int streamId, MessageType type, CancellationToken ct)
     {
+        ct.ThrowIfCancellationRequested();
         var frame = RpcRawFrame.RentFrame(streamId, type, ReadOnlySpan<byte>.Empty);
         await _frameSender.SendAsync(frame, ct).ConfigureAwait(false);
     }
