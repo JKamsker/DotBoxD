@@ -103,8 +103,21 @@ public sealed partial class PluginAnalyzer
         }
     }
 
+    private static void ReportForbiddenReferencedMethodSignature(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol method)
+        => ReportForbiddenReferencedMethodSignature(context, method);
+
     private static bool ReportForbiddenReferencedType(OperationAnalysisContext context, INamedTypeSymbol containingType, ITypeSymbol type)
         => IsReferencedFromEventKernel(context, containingType) && ReportForbiddenType(context, type, context.Operation.Syntax.GetLocation());
+
+    private static bool ReportForbiddenReferencedType(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        INamedTypeSymbol containingType,
+        ITypeSymbol type)
+        => ReportForbiddenReferencedType(context, containingType, type);
 
     private static bool IsReferencedFromEventKernel(OperationAnalysisContext context, INamedTypeSymbol containingType)
     {
