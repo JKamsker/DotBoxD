@@ -4,6 +4,29 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
 public sealed class InvokeAsyncCommonReturnInferenceTests
 {
+    [Fact]
+    public void Char_and_int_returns_emit_the_common_i32_wire_type()
+    {
+        var result = RunGeneratorAndAssertCompiles(UsageSource("""
+            public static async ValueTask<int> Run(RemotePluginServer kernels)
+            {
+                return await kernels.InvokeAsync(async (IGameWorldAccess world) =>
+                {
+                    if (world.GetHealth("monster-1") > 0)
+                    {
+                        return (char)1;
+                    }
+
+                    return 2;
+                });
+            }
+            """));
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.Contains("\\\"returnType\\\":\\\"I32\\\"", source, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("byte", "long", "2L", "I64", "numeric.toI64")]
     [InlineData("short", "double", "2D", "F64", "numeric.toF64")]
