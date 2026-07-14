@@ -16,7 +16,8 @@ internal static class InvokeAsyncGeneratedBuilderResolver
         out INamedTypeSymbol receiverType)
     {
         receiverType = null!;
-        if (TryResolveGeneratedBuilderProjection(model, receiver, cancellationToken, out receiverType))
+        if (TryResolveGeneratedBuilderExpression(model, receiver, cancellationToken, out receiverType) ||
+            TryResolveGeneratedBuilderProjection(model, receiver, cancellationToken, out receiverType))
         {
             return true;
         }
@@ -44,6 +45,17 @@ internal static class InvokeAsyncGeneratedBuilderResolver
         return false;
     }
 
+    private static bool TryResolveGeneratedBuilderExpression(
+        SemanticModel model,
+        ExpressionSyntax receiver,
+        CancellationToken cancellationToken,
+        out INamedTypeSymbol receiverType)
+    {
+        receiverType = null!;
+        return TryFacadeNameFromBuilderInitializer(receiver, out var facadeName) &&
+            TryFindGeneratedFacade(model.Compilation, facadeName, cancellationToken, out receiverType);
+    }
+
     private static bool TryResolveGeneratedBuilderProjection(
         SemanticModel model,
         ExpressionSyntax receiver,
@@ -67,6 +79,7 @@ internal static class InvokeAsyncGeneratedBuilderResolver
         out string facadeName)
     {
         facadeName = string.Empty;
+        initializer = HookChainAliasResolver.UnwrapTransparentExpression(initializer);
         return initializer is InvocationExpressionSyntax
         {
             Expression: MemberAccessExpressionSyntax
