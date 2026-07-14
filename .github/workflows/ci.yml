@@ -387,6 +387,7 @@ jobs:
               "InvokeAsyncGeneratedReceiverSurpriseTests",
               "InvokeAsyncGeneratedReceiverFacadeTests",
               "InvokeAsyncGeneratedCodeRegressionTests",
+              "InvokeAsyncGeneratedFallbackTypeInferenceTests",
               "InvokeAsyncCommonReturnInferenceTests",
               "InvokeAsyncReturnConversionBoundaryTests",
               "InvokeAsyncNamedLambdaManualIrTests",
