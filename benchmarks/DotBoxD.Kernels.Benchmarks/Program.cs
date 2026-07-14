@@ -239,21 +239,8 @@ if (args.Contains("--probe-runlocal-push", StringComparer.OrdinalIgnoreCase))
     return;
 }
 
-if (args.Contains("--probe-remote-result-hook", StringComparer.OrdinalIgnoreCase))
+if (DotBoxD.Kernels.Benchmarks.Plugins.PluginProbeDispatcher.TryRun(args))
 {
-    DotBoxD.Kernels.Benchmarks.Plugins.RemoteResultHookProbe.Run();
-    return;
-}
-
-if (args.Contains("--probe-subscription-dispatch", StringComparer.OrdinalIgnoreCase))
-{
-    DotBoxD.Kernels.Benchmarks.Plugins.SubscriptionDispatchProbe.Run();
-    return;
-}
-
-if (args.Contains("--probe-hook-dispatch", StringComparer.OrdinalIgnoreCase))
-{
-    DotBoxD.Kernels.Benchmarks.Plugins.HookDispatchProbe.Run();
     return;
 }
 

@@ -84,7 +84,9 @@ public sealed record VerificationPolicy(
                 RuntimeMember("Bool", BooleanName, SandboxValueName),
                 RuntimeMember("TypeScalar", StringName, SandboxTypeName),
                 RuntimeMember("TypeList", SandboxTypeName, SandboxTypeName),
+                RuntimeMember("TypeListCached", SandboxTypeName, SandboxTypeName),
                 RuntimeMember("TypeMap", $"{SandboxTypeName},{SandboxTypeName}", SandboxTypeName),
+                RuntimeMember("TypeMapCached", $"{SandboxTypeName},{SandboxTypeName}", SandboxTypeName),
                 RuntimeMember("TypeRecord", SandboxTypeArrayName, SandboxTypeName),
                 RuntimeMember("CreateMeteredTypeArray", $"{SandboxContextName},{Int32Name}", SandboxTypeArrayName),
                 RuntimeMember("StringConst", $"{SandboxContextName},{StringName}", SandboxValueName),
@@ -295,5 +297,4 @@ public sealed record VerificationPolicy(
         ArgumentException.ThrowIfNullOrWhiteSpace(value, parameterName);
         return value;
     }
-
 }

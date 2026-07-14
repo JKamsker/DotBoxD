@@ -91,6 +91,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Synchronous hook and message dispatch fast paths | this commit | `--probe-examples` | Kept hook publish and `host.message.send` binding dispatch on completed `ValueTask` fast paths, falling back to awaited helpers only when a filter, handler, or sink actually suspends. Three local samples measured `mixed fire/ice` native hook 7.1-7.2 ms, compiled 480.9-518.2 ms, interpreted 489.9-536.9 ms; `predicate miss` native hook 1.2-1.3 ms, compiled 64.5-70.9 ms, interpreted 177.9-190.6 ms; `predicate hit` native hook 2.3-2.4 ms, compiled 193.9-213.4 ms, interpreted 400.4-486.4 ms. Compared with the previous row, native hook dispatch moved down consistently; compiled/interpreted plugin dispatch remains noisy and still far from native. |
 | Compiled runtime scalar type singleton reuse | this commit | `--probe-runtime-types` | `CompiledRuntime.TypeScalar("I32")` now returns the built-in scalar singleton used by generated entrypoint type checks instead of rebuilding `SandboxType.Scalar("I32")`. Two local samples for 2M calls measured the allocating scalar baseline at 115.8-123.9 ms and 112,000,040 B, while the compiled-runtime built-in path measured 21.5-25.7 ms and 40 B. The non-built-in fallback stayed allocating as expected: `CompiledRuntime.TypeScalar("MonsterId")` measured 105.6-115.4 ms and 112,000,040 B. |
 | Compiled Guid type singleton reuse | this commit | `--probe-runtime-types` | Added the `Guid` singleton omitted when built-in scalar reuse was introduced before `SandboxType.Guid` existed. Two million `TypeScalar("Guid")` calls improved from 123.7 ms and 64,000,040 B to 17.1 ms and 40 B; generated-shaped `RequireType(Guid, TypeScalar("Guid"))` calls improved from 166.3 ms and 64,000,040 B to 28.3 ms and 40 B by reaching the existing reference-equality validator fast path. The opaque-id fallback remained at 64,000,040 B. |
+| Compiled built-in structural type cache | this commit | `--probe-runtime-types` | Added bounded generated-ABI factories for the nine built-in list types and 81 built-in map pairs. Two million generated-return-shaped `List<I32>` / `Map<String,I32>` checks dropped from 224,000,040 B / 320,000,040 B to 40 B total per row. Nested, opaque, and record-derived descriptors stay on the legacy factories to avoid lookup overhead or attacker-controlled retention. |
 | Built-in scalar validation fast path | this commit | `--probe-runtime-types`, `--probe-examples` | Short-circuited `SandboxValueValidator.RequireType` when the value is a built-in scalar and the expected type is the matching singleton, preserving the existing generic path for non-singleton and opaque-id scalar types. Two local runtime-type samples for 2M calls measured forced generic validation with `RequireType(I32, Scalar("I32"))` at 313.4-319.4 ms and 40 B, while the singleton fast path `RequireType(I32, SandboxType.I32)` measured 19.7-27.5 ms and 40 B. One example workflow sanity sample was still noisy (`mixed fire/ice` compiled 400.2 ms, `predicate miss` compiled 160.6 ms, `predicate hit` compiled 222.9 ms), so this step claims only the direct scalar validation improvement. |
 | Flat scalar value metering fast path | this commit | `--probe-resource-meter`, `--probe-examples` | Added a direct `ResourceMeter.ChargeValue` path for scalar values and small flat scalar lists, matching the generic shape-walker's resource usage while leaving larger lists on the existing fuel-charged scanner. The plugin-shaped flat input probe for 1M charges measured the generic walker baseline at 248.0 ms and 448,000,040 B with the fast path temporarily disabled; with the fast path enabled it measured 204.7-205.0 ms and 40 B, with identical `collectionElements=5,000,000` and `stringBytes=32,000,000`. One example workflow sanity sample measured `mixed fire/ice` compiled 373.4 ms, `predicate miss` compiled 83.4 ms, and `predicate hit` compiled 182.3 ms; the direct resource-meter probe is the primary evidence because the workflow baselines remain noisy. |
 | Compiled prepared no-audit value result | this commit | `--probe-prepared-values`, `--probe-examples` | Routed installed-kernel compiled entrypoints with no binding references and suppressed successful audit through an internal prepared-value result, avoiding public `SandboxExecutionResult`, resource-usage snapshot, and audit-list construction on successful no-audit runs while preserving the full result path for failures and audited entrypoints. The focused compiled `ShouldHandle` miss probe for 200k calls measured the full-result path at 527.7 ms and 276,043,008 B with the new branch temporarily disabled; enabled samples measured 388.3-428.9 ms and 227,155,008-230,065,792 B. One full workflow sanity sample measured `mixed fire/ice` compiled 376.6 ms, `predicate miss` compiled 79.2 ms, and `predicate hit` compiled 233.7 ms; the focused prepared-value probe is the primary evidence. |
@@ -1103,3 +1104,40 @@ The allocation reduction is the primary signal: about 145 KB/edit, or 60%. This 
 synthetic workload, so elapsed time is secondary rather than an IDE-latency claim. Pre-parsing keeps parsing and
 compilation construction outside the measurement; the remaining roughly 95 KB/edit belongs to the rest of the
 production generator pipeline and driver update.
+
+## Compiled structural type descriptor reuse
+
+Generated compiled methods reconstruct their declared return type before every `RequireValueType` call. Built-in
+scalars already return canonical instances, but `TypeList` and `TypeMap` previously created a new `SandboxType`,
+argument array, and read-only wrapper on every invocation. Helper calls inside a compiled loop therefore allocated a
+descriptor graph every iteration even though the emitted fuel charges and the structural type were unchanged.
+
+The compiler now calls dedicated generated-ABI factories only when the complete descriptor is a direct list of one
+built-in scalar or a direct map of two built-in scalars. Those factories lazily fill a fixed nine-slot list cache and
+an 81-slot map cache. The cache is therefore process-bounded and cannot retain attacker-controlled opaque names or
+nested graphs. Existing `TypeList` / `TypeMap` remain the public primitives for hand-written and non-cacheable shapes;
+the generated-code ABI additions are public only because generated assemblies must bind to them. Nested, opaque, and
+record-derived descriptors deliberately stay on their original construction path.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-runtime-types
+```
+
+Representative local runs, 2,000,000 calls per row:
+
+```text
+case                                      Before ms / allocated       After ms / allocated
+TypeList / TypeListCached(I32)             138.6 / 224,000,040 B        47.5 / 40 B
+TypeMap / TypeMapCached(String,I32)        117.4 / 320,000,040 B       104.4 / 40 B
+RequireValueType(List<I32>, TypeList)      326.6 / 224,000,040 B       310.6 / 40 B
+RequireValueType(Map<String,I32>, TypeMap) 406.2 / 320,000,040 B       343.7 / 40 B
+```
+
+Allocation is the claim: direct built-in list/map descriptor construction moves from 112/160 B per call to zero after
+the bounded cache is initialized; the 40-byte probe totals are its `Stopwatch`. Control rows keep the legacy allocation
+exactly: 448,000,040 B for nested `List<List<I32>>`, 288,000,040 B for `List<MonsterId>`, 464,000,040 B for
+`List<Record<I32>>`, and 384,000,040 B for `Map<String,MonsterId>` across two million calls. Stopwatch results are
+secondary because sequential allocation rows perturb the GC heap budget. Fuel emission, sandbox allocation charges,
+and `RequireValueType` validation are unchanged.
