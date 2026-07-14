@@ -31,6 +31,7 @@ public sealed partial class PluginAnalyzer
     {
         var method = (IMethodSymbol)context.Symbol;
         helperGraph.RecordDispatchImplementations(method);
+        RecordForbiddenAttributeMetadata(context, helperGraph, method);
     }
 
     private static void AnalyzeProperty(SymbolAnalysisContext context)
