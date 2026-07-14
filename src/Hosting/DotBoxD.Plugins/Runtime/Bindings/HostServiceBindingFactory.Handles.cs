@@ -1,7 +1,6 @@
 using System.Reflection;
 using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Sandbox;
-using DotBoxD.Plugins.Runtime.Rpc;
 
 namespace DotBoxD.Hosting.Execution;
 
@@ -117,14 +116,14 @@ internal static partial class HostServiceBindingFactory
         var factoryResult = factoryCallTarget.Invoke(factoryTarget, factoryValues);
         var handle = await factoryCallTarget.ReadReturnAsync(factoryResult, cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException($"Host service factory '{factoryInterfaceMethod.Name}' returned null.");
+        cancellationToken.ThrowIfCancellationRequested();
         var handleValues = ConvertArguments(handleCallTarget.ParameterTypes, args, factoryCallTarget.ParameterTypes.Length);
         var result = handleCallTarget.Invoke(handle, handleValues);
         var payload = await handleCallTarget.ReadReturnAsync(result, cancellationToken).ConfigureAwait(false);
+        var value = MarshalReturn(payload, payloadType);
         var auditValue = factoryValues.Length > 0 ? factoryValues[0] : handleValues.Length > 0 ? handleValues[0] : null;
         WriteAudit(context, metadata.Id, metadata.Capability, metadata.Effects, startedAt, auditValue);
-        return payloadType is null
-            ? SandboxValue.Unit
-            : KernelRpcMarshaller.ToSandboxValue(payload, payloadType);
+        return value;
     }
 
     private readonly record struct HandleBindingMetadata(

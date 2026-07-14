@@ -129,20 +129,18 @@ internal sealed class ConstructorReplayGuard
 
     private void ThrowIfConstructorReplayChangesValues<T>(T value)
     {
-        object replayed;
         try
         {
-            replayed = InvokeConstructor(value);
+            var replayed = InvokeConstructor(value);
+            if (_boundProperties.Any(property => !Equals(property.GetValue(value), property.GetValue(replayed))))
+            {
+                ThrowChangingValues(value!.GetType());
+            }
         }
         catch (TargetInvocationException ex)
         {
-            ThrowChangingValues(value!.GetType(), ex);
+            ThrowChangingValues(value!.GetType(), ex.InnerException ?? ex);
             throw;
-        }
-
-        if (_boundProperties.Any(property => !Equals(property.GetValue(value), property.GetValue(replayed))))
-        {
-            ThrowChangingValues(value!.GetType());
         }
     }
 

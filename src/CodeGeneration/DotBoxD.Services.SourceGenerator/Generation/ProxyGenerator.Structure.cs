@@ -172,7 +172,7 @@ internal static partial class ProxyGenerator
     {
         sb.AppendLine();
         GenerateProxyMethod(sb, service, method, proxyName, ct);
-        if (!ProxyGenerationHelpers.MethodNameRequiresExplicitImplementation(method.Name, proxyName))
+        if (!MethodRequiresExplicitImplementation(method.Name, proxyName))
         {
             return;
         }
@@ -211,10 +211,18 @@ internal static partial class ProxyGenerator
 
     private static bool ShouldEmitAsyncSiblingMethod(AsyncSiblingMethod sibling, string proxyName)
         => sibling.RequiresExtraProxyMethod ||
-           ProxyGenerationHelpers.MethodNameRequiresExplicitImplementation(sibling.Name, proxyName);
+           MethodRequiresExplicitImplementation(sibling.Name, proxyName);
+
+    private static bool MethodRequiresExplicitImplementation(string methodName, string proxyName)
+        => ProxyGenerationHelpers.MethodNameRequiresExplicitImplementation(methodName, proxyName) ||
+           string.Equals(
+               IdentifierHelpers.UnescapeIdentifier(methodName),
+               ProxyGenerationHelpers.CallerCancellationHelperName,
+               System.StringComparison.Ordinal);
 
     private static void AppendProxyFooter(StringBuilder sb, ServiceModel service)
     {
+        AppendCallerCancellationHelpers(sb);
         sb.AppendLine("    }");
         if (!string.IsNullOrEmpty(service.Namespace))
         {
@@ -222,6 +230,36 @@ internal static partial class ProxyGenerator
         }
 
         GeneratedWarningPragmaEmitter.AppendRestore(sb, service.ExperimentalDiagnosticId);
+    }
+
+    private static void AppendCallerCancellationHelpers(StringBuilder sb)
+    {
+        sb.AppendLine();
+        sb.AppendLine($"        private static async {ServicesGeneratorTypeNames.GlobalTask} {ProxyGenerationHelpers.CallerCancellationHelperName}({ServicesGeneratorTypeNames.GlobalTask} task, {ServicesGeneratorTypeNames.GlobalCancellationToken} ct)");
+        sb.AppendLine("        {");
+        sb.AppendLine("            await task.ConfigureAwait(false);");
+        sb.AppendLine("            ct.ThrowIfCancellationRequested();");
+        sb.AppendLine("        }");
+        sb.AppendLine();
+        sb.AppendLine($"        private static async {ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalTask, "T")} {ProxyGenerationHelpers.CallerCancellationHelperName}<T>({ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalTask, "T")} task, {ServicesGeneratorTypeNames.GlobalCancellationToken} ct)");
+        sb.AppendLine("        {");
+        sb.AppendLine("            var result = await task.ConfigureAwait(false);");
+        sb.AppendLine("            ct.ThrowIfCancellationRequested();");
+        sb.AppendLine("            return result;");
+        sb.AppendLine("        }");
+        sb.AppendLine();
+        sb.AppendLine($"        private static async {ServicesGeneratorTypeNames.GlobalValueTask} {ProxyGenerationHelpers.CallerCancellationHelperName}({ServicesGeneratorTypeNames.GlobalValueTask} task, {ServicesGeneratorTypeNames.GlobalCancellationToken} ct)");
+        sb.AppendLine("        {");
+        sb.AppendLine("            await task.ConfigureAwait(false);");
+        sb.AppendLine("            ct.ThrowIfCancellationRequested();");
+        sb.AppendLine("        }");
+        sb.AppendLine();
+        sb.AppendLine($"        private static async {ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalValueTask, "T")} {ProxyGenerationHelpers.CallerCancellationHelperName}<T>({ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalValueTask, "T")} task, {ServicesGeneratorTypeNames.GlobalCancellationToken} ct)");
+        sb.AppendLine("        {");
+        sb.AppendLine("            var result = await task.ConfigureAwait(false);");
+        sb.AppendLine("            ct.ThrowIfCancellationRequested();");
+        sb.AppendLine("            return result;");
+        sb.AppendLine("        }");
     }
 
 }

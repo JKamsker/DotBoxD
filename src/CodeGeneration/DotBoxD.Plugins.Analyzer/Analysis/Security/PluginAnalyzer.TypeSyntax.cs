@@ -41,6 +41,23 @@ public sealed partial class PluginAnalyzer
         context.RegisterSyntaxNodeAction(
             c => AnalyzeConstantPatternType(c, helperGraph),
             SyntaxKind.ConstantPattern);
+        context.RegisterSyntaxNodeAction(
+            AnalyzeBaseListType,
+            SyntaxKind.SimpleBaseType,
+            SyntaxKind.PrimaryConstructorBaseType);
+        context.RegisterSyntaxNodeAction(
+            AnalyzeTypeParameterConstraintType,
+            SyntaxKind.TypeConstraint);
+        context.RegisterSyntaxNodeAction(
+            c => AnalyzeNameOfArgumentType(c, helperGraph),
+            SyntaxKind.InvocationExpression);
+        context.RegisterSyntaxNodeAction(
+            c => AnalyzeLocalFunctionSignature(c, helperGraph),
+            SyntaxKind.LocalFunctionStatement);
+        context.RegisterSyntaxNodeAction(
+            c => AnalyzeAnonymousFunctionAttributeTypeReferences(c, helperGraph),
+            SyntaxKind.ParenthesizedLambdaExpression,
+            SyntaxKind.SimpleLambdaExpression);
     }
 
     private static void AnalyzeDeclarationPatternType(
@@ -149,6 +166,89 @@ public sealed partial class PluginAnalyzer
         }
     }
 
+    private static void AnalyzeBaseListType(SyntaxNodeAnalysisContext context)
+    {
+        if (context.Node is BaseTypeSyntax { Type: { } typeSyntax })
+        {
+            AnalyzeForbiddenDeclarationTypeSyntax(context, typeSyntax);
+        }
+    }
+
+    private static void AnalyzeTypeParameterConstraintType(SyntaxNodeAnalysisContext context)
+    {
+        if (context.Node is TypeConstraintSyntax { Type: { } typeSyntax })
+        {
+            AnalyzeForbiddenDeclarationTypeSyntax(context, typeSyntax);
+        }
+    }
+
+    private static void AnalyzeForbiddenDeclarationTypeSyntax(
+        SyntaxNodeAnalysisContext context,
+        TypeSyntax typeSyntax)
+    {
+        var typeDeclaration = typeSyntax.FirstAncestorOrSelf<BaseTypeDeclarationSyntax>();
+        if (typeDeclaration is null ||
+            context.SemanticModel.GetDeclaredSymbol(
+                typeDeclaration,
+                context.CancellationToken) is not INamedTypeSymbol declaredType ||
+            !IsEventKernel(declaredType))
+        {
+            return;
+        }
+
+        if (context.SemanticModel.GetTypeInfo(typeSyntax, context.CancellationToken).Type is not { } type)
+        {
+            return;
+        }
+
+        ReportForbiddenType(context.ReportDiagnostic, type, typeSyntax.GetLocation());
+    }
+
+    private static void AnalyzeNameOfArgumentType(
+        SyntaxNodeAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph)
+    {
+        if (context.Node is not InvocationExpressionSyntax
+            {
+                Expression: IdentifierNameSyntax { Identifier.ValueText: "nameof" },
+                ArgumentList.Arguments.Count: 1
+            } invocation)
+        {
+            return;
+        }
+
+        var expression = invocation.ArgumentList.Arguments[0].Expression;
+        var symbol = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol;
+        if (symbol is ITypeSymbol type)
+        {
+            AnalyzeForbiddenTypeSymbol(context, helperGraph, expression, type);
+        }
+    }
+
+    private static void AnalyzeLocalFunctionSignature(
+        SyntaxNodeAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph)
+    {
+        if (context.Node is not LocalFunctionStatementSyntax localFunction)
+        {
+            return;
+        }
+
+        AnalyzeForbiddenTypeSyntax(context, helperGraph, localFunction.ReturnType);
+        foreach (var parameter in localFunction.ParameterList.Parameters)
+        {
+            if (parameter.Type is { } parameterType)
+            {
+                AnalyzeForbiddenTypeSyntax(context, helperGraph, parameterType);
+            }
+        }
+    }
+
+    private static void AnalyzeAnonymousFunctionAttributeTypeReferences(
+        SyntaxNodeAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph)
+        => AnonymousFunctionAttributeAnalyzer.Analyze(context, helperGraph, AnalyzeForbiddenTypeSyntax);
+
     private static void AnalyzeForbiddenTypeSyntax(
         SyntaxNodeAnalysisContext context,
         ForbiddenHelperCallGraph helperGraph,
@@ -177,7 +277,8 @@ public sealed partial class PluginAnalyzer
         }
 
         helperGraph.RecordForbidden(method, forbidden);
-        if (!IsEventKernel(method.ContainingType))
+        if (!IsForbiddenApiRoot(context.SemanticModel.Compilation, method) ||
+            !helperGraph.TryRecordDirectDiagnostic(method))
         {
             return;
         }

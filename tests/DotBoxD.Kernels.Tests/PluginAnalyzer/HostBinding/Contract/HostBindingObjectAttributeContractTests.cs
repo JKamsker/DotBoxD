@@ -4,16 +4,30 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.HostBinding.Contract;
 
 public sealed class HostBindingObjectAttributeContractTests
 {
-    [Fact]
-    public void Constructor_exposes_binding_defaults()
+    [Theory]
+    [InlineData(SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+    [InlineData(SandboxEffect.Cpu | SandboxEffect.HostStateWrite)]
+    public void Constructor_exposes_binding_defaults(SandboxEffect effects)
     {
-        const SandboxEffect effects = SandboxEffect.Cpu | SandboxEffect.HostStateRead;
-
         var attribute = new HostBindingObjectAttribute("host.player", "player.read", effects);
 
         Assert.Equal("host.player", attribute.BindingPrefix);
         Assert.Equal("player.read", attribute.DefaultCapability);
         Assert.Equal(effects, attribute.DefaultEffects);
+    }
+
+    [Fact]
+    public void Constructor_rejects_default_effects_with_unknown_bits()
+    {
+        const SandboxEffect effects =
+            SandboxEffect.Cpu | SandboxEffect.HostStateRead | (SandboxEffect)(1 << 30);
+
+        var exception = Record.Exception(() => new HostBindingObjectAttribute(
+            "host.target",
+            "target.read.level",
+            effects));
+
+        Assert.Equal("defaultEffects", Assert.IsAssignableFrom<ArgumentException>(exception).ParamName);
     }
 
     [Theory]

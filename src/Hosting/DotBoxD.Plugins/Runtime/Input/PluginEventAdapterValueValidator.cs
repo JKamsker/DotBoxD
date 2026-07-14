@@ -5,6 +5,18 @@ namespace DotBoxD.Plugins.Runtime.Input;
 
 internal static class PluginEventAdapterValueValidator
 {
+    public static IReadOnlyList<SandboxValue> ReadValues<TEvent>(IPluginEventAdapter<TEvent> adapter, TEvent e)
+    {
+        try
+        {
+            return adapter.ToSandboxValues(e);
+        }
+        catch (Exception ex) when (PluginEventAdapterShapeValidator.IsAdapterCallbackFailure(ex))
+        {
+            throw CreateException("Plugin event adapter callback '" + nameof(IPluginEventAdapter<TEvent>.ToSandboxValues) + "' failed.");
+        }
+    }
+
     public static void ValidateValues(
         IReadOnlyList<Parameter> parameters,
         IReadOnlyList<SandboxValue> values)

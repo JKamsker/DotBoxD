@@ -107,9 +107,56 @@ internal static class GeneratedServiceMetadataValidator
         {
             throw new ArgumentException("Generated method metadata has an unsupported return kind.", paramName);
         }
+        ValidateReturnMetadata(method, paramName);
 
         ValidateParameters(method.Parameters, paramName);
     }
+
+    private static void ValidateReturnMetadata(GeneratedMethod method, string paramName)
+    {
+        if (RequiresResultType(method.ReturnKind) && method.ResultType is null)
+        {
+            throw new ArgumentException(
+                $"Generated method metadata for '{method.Name}' must include a result type for {method.ReturnKind}.",
+                paramName);
+        }
+
+        if (RequiresNestedServiceFlag(method.ReturnKind))
+        {
+            if (!method.ReturnsNestedService)
+            {
+                throw new ArgumentException(
+                    $"Generated method metadata for '{method.Name}' must mark {method.ReturnKind} as a nested service return.",
+                    paramName);
+            }
+
+            return;
+        }
+
+        if (method.ReturnsNestedService)
+        {
+            throw new ArgumentException(
+                $"Generated method metadata for '{method.Name}' marks non-nested return kind {method.ReturnKind} as nested.",
+                paramName);
+        }
+    }
+
+    private static bool RequiresResultType(GeneratedReturnKind kind) =>
+        kind is GeneratedReturnKind.TaskOfT or
+            GeneratedReturnKind.ValueTaskOfT or
+            GeneratedReturnKind.TaskOfNestedService or
+            GeneratedReturnKind.ValueTaskOfNestedService or
+            GeneratedReturnKind.TaskOfAsyncEnumerable or
+            GeneratedReturnKind.ValueTaskOfAsyncEnumerable or
+            GeneratedReturnKind.TaskOfStream or
+            GeneratedReturnKind.ValueTaskOfStream or
+            GeneratedReturnKind.TaskOfPipe or
+            GeneratedReturnKind.ValueTaskOfPipe;
+
+    private static bool RequiresNestedServiceFlag(GeneratedReturnKind kind) =>
+        kind is GeneratedReturnKind.SyncNestedService or
+            GeneratedReturnKind.TaskOfNestedService or
+            GeneratedReturnKind.ValueTaskOfNestedService;
 
     private static void ValidateParameters(IReadOnlyList<GeneratedParameter>? parameters, string paramName)
     {
@@ -133,6 +180,41 @@ internal static class GeneratedServiceMetadataValidator
             {
                 throw new ArgumentException("Generated parameter metadata positions must be zero-based and ordered.", paramName);
             }
+            ValidateParameterShape(parameter, paramName);
+            for (var j = 0; j < i; j++)
+            {
+                if (string.Equals(parameters[j].Name, parameter.Name, StringComparison.Ordinal))
+                {
+                    throw new ArgumentException(
+                        $"Generated method metadata contains duplicate parameter name '{parameter.Name}'.",
+                        paramName);
+                }
+            }
+        }
+    }
+
+    private static void ValidateParameterShape(GeneratedParameter parameter, string paramName)
+    {
+        var isCancellationTokenType = parameter.Type == typeof(CancellationToken);
+        if (parameter.IsCancellationToken != isCancellationTokenType)
+        {
+            throw new ArgumentException(
+                "Generated parameter metadata cancellation-token flag must match its parameter type.",
+                paramName);
+        }
+
+        if (parameter.IsCancellationToken && parameter.DefaultValue is not null)
+        {
+            throw new ArgumentException(
+                "Generated cancellation-token parameter metadata must not carry a default value object.",
+                paramName);
+        }
+
+        if (!parameter.HasDefaultValue && parameter.DefaultValue is not null)
+        {
+            throw new ArgumentException(
+                "Generated parameter metadata must not carry a default value when HasDefaultValue is false.",
+                paramName);
         }
     }
 

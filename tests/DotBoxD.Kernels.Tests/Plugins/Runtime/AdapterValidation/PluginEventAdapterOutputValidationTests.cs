@@ -55,6 +55,54 @@ public sealed class PluginEventAdapterOutputValidationTests
     }
 
     [Fact]
+    public async Task HandleAsync_rejects_adapter_callback_exceptions_as_validation()
+    {
+        var messages = new InMemoryPluginMessageSink();
+        var kernel = await InstallKernelAsync(messages);
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
+            async () => await kernel.HandleAsync(
+                new ThrowingCallbackEventAdapter(),
+                new ThrowingValueEvent("player-1")).AsTask());
+
+        Assert.Contains(ex.Diagnostics, diagnostic => diagnostic.Code == PluginEventAdapterShapeValidator.DiagnosticCode);
+        Assert.Empty(messages.Messages);
+        Assert.Empty(kernel.ExecutionObservations);
+    }
+
+    [Fact]
+    public async Task ShouldHandleAsync_rejects_adapter_callback_exceptions_as_validation()
+    {
+        var messages = new InMemoryPluginMessageSink();
+        var kernel = await InstallKernelAsync(messages);
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
+            async () => await kernel.ShouldHandleAsync(
+                new ThrowingCallbackEventAdapter(),
+                new ThrowingValueEvent("player-1")).AsTask());
+
+        Assert.Contains(ex.Diagnostics, diagnostic => diagnostic.Code == PluginEventAdapterShapeValidator.DiagnosticCode);
+        Assert.Empty(messages.Messages);
+        Assert.Empty(kernel.ExecutionObservations);
+    }
+
+    [Fact]
+    public async Task InstalledKernel_preserves_adapter_callback_cancellation()
+    {
+        var messages = new InMemoryPluginMessageSink();
+        var kernel = await InstallKernelAsync(messages);
+        var adapter = new CancellingCallbackEventAdapter();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await kernel.HandleAsync(adapter, new ThrowingValueEvent("player-1")).AsTask());
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await kernel.ShouldHandleAsync(adapter, new ThrowingValueEvent("player-1")).AsTask());
+
+        Assert.Empty(messages.Messages);
+        Assert.Empty(kernel.ExecutionObservations);
+    }
+
+    [Fact]
     public void CopyValidatedValues_rejects_null_adapter_value_list_as_validation()
     {
         var ex = Assert.Throws<SandboxValidationException>(
@@ -189,6 +237,26 @@ public sealed class PluginEventAdapterOutputValidationTests
 
         public IReadOnlyList<SandboxValue> ToSandboxValues(ThrowingValueEvent e)
             => new ThrowingValueList();
+    }
+
+    private sealed class ThrowingCallbackEventAdapter : IPluginEventAdapter<ThrowingValueEvent>
+    {
+        public string EventName => nameof(ThrowingValueEvent);
+
+        public IReadOnlyList<Parameter> Parameters { get; } = [new("e_TargetId", SandboxType.String)];
+
+        public IReadOnlyList<SandboxValue> ToSandboxValues(ThrowingValueEvent e)
+            => throw new InvalidOperationException("Adapter callback failed.");
+    }
+
+    private sealed class CancellingCallbackEventAdapter : IPluginEventAdapter<ThrowingValueEvent>
+    {
+        public string EventName => nameof(ThrowingValueEvent);
+
+        public IReadOnlyList<Parameter> Parameters { get; } = [new("e_TargetId", SandboxType.String)];
+
+        public IReadOnlyList<SandboxValue> ToSandboxValues(ThrowingValueEvent e)
+            => throw new OperationCanceledException();
     }
 
     private sealed class ThrowingValueList : IReadOnlyList<SandboxValue>

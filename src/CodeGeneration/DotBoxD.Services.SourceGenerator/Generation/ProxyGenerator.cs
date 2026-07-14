@@ -59,7 +59,7 @@ internal static partial class ProxyGenerator
             : string.Empty;
         var unsafeKeyword = method.RequiresUnsafeSignature ? "unsafe " : string.Empty;
         var ctArg = ProxyGenerationHelpers.GetCancellationTokenArgument(method.Parameters, ct);
-        var explicitInterface = ProxyGenerationHelpers.MethodNameRequiresExplicitImplementation(method.Name, proxyName);
+        var explicitInterface = MethodRequiresExplicitImplementation(method.Name, proxyName);
         var access = explicitInterface ? string.Empty : "public ";
         var target = explicitInterface ? method.ExplicitImplementationType + "." + method.Name : method.Name;
 
@@ -114,7 +114,7 @@ internal static partial class ProxyGenerator
 
         var declaredReturn = NamingHelpers.GetDeclaredReturnTypeText(
             s.SiblingReturnKind, s.Source.UnwrappedReturnType);
-        var explicitInterface = ProxyGenerationHelpers.MethodNameRequiresExplicitImplementation(s.Name, proxyName);
+        var explicitInterface = MethodRequiresExplicitImplementation(s.Name, proxyName);
         var access = explicitInterface ? string.Empty : "public ";
         var target = explicitInterface ? qualifiedAsyncSibling + "." + s.Name : s.Name;
 

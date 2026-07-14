@@ -105,19 +105,75 @@ internal sealed record PolymorphicHandleMetadata(
     }
 
     private static bool IsValidSubtypeMetadata(string discriminator, string bindingPrefix, string capability)
+        => HasIdentifierGrammar(discriminator) &&
+           HasDottedIdentifierGrammar(bindingPrefix) &&
+           HasDottedIdentifierGrammar(capability);
+
+    private static bool HasDottedIdentifierGrammar(string value)
     {
-        if (string.IsNullOrWhiteSpace(discriminator))
+        if (value.Length == 0)
         {
             return false;
         }
 
-        if (string.IsNullOrWhiteSpace(bindingPrefix))
+        var expectingSegmentStart = true;
+        for (var i = 0; i < value.Length; i++)
         {
-            return false;
+            var ch = value[i];
+            if (ch == '.')
+            {
+                if (expectingSegmentStart)
+                {
+                    return false;
+                }
+
+                expectingSegmentStart = true;
+                continue;
+            }
+
+            if (expectingSegmentStart)
+            {
+                if (!IsIdentifierStart(ch))
+                {
+                    return false;
+                }
+
+                expectingSegmentStart = false;
+                continue;
+            }
+
+            if (!IsIdentifierPart(ch))
+            {
+                return false;
+            }
         }
 
-        return !string.IsNullOrWhiteSpace(capability);
+        return !expectingSegmentStart;
     }
+
+    private static bool HasIdentifierGrammar(string value)
+    {
+        if (value.Length == 0 || !IsIdentifierStart(value[0]))
+        {
+            return false;
+        }
+
+        for (var i = 1; i < value.Length; i++)
+        {
+            if (!IsIdentifierPart(value[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsIdentifierStart(char ch)
+        => ch is (>= 'A' and <= 'Z') or (>= 'a' and <= 'z') or '_';
+
+    private static bool IsIdentifierPart(char ch)
+        => IsIdentifierStart(ch) || ch is >= '0' and <= '9';
 
     internal static bool IsAttribute(AttributeData attribute, string metadataName)
         => string.Equals(attribute.AttributeClass?.ToDisplayString(), metadataName, StringComparison.Ordinal);

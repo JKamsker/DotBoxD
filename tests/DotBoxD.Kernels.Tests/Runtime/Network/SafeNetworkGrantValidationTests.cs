@@ -36,6 +36,21 @@ public sealed class SafeNetworkGrantValidationTests
     }
 
     [Fact]
+    public void Http_grant_builder_does_not_serialize_fractional_timeout_below_requested_duration()
+    {
+        var policy = SandboxPolicyBuilder.Create()
+            .GrantHttpGet(
+                ["api.example.com"],
+                maxResponseBytes: 1024,
+                timeout: TimeSpan.FromTicks(15_000))
+            .Build();
+
+        var grant = policy.GetGrant("net.http.get");
+
+        Assert.Equal("2", grant.Parameters["timeoutMs"]);
+    }
+
+    [Fact]
     public async Task Http_get_allows_configured_host_case_insensitively()
     {
         var result = await ExecuteNetworkAsync(

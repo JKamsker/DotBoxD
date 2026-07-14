@@ -26,7 +26,7 @@ public sealed partial class PluginAnalyzer
 
         ReportAndRecordIfForbidden(context, helperGraph, method, deconstruct.ContainingType);
         RecordStaticConstructorReachability(context, helperGraph, deconstruct);
-        ReportForbiddenReferencedMethodSignature(context, deconstruct);
+        ReportForbiddenReferencedMethodSignature(context, helperGraph, deconstruct);
         helperGraph.RecordCall(method, deconstruct, context.Operation.Syntax.GetLocation());
         ReportLocalUseIfInvalid(context, deconstruct);
     }

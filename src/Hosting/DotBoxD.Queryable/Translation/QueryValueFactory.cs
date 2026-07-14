@@ -80,9 +80,22 @@ internal static class QueryValueFactory
         }
 
         var values = new List<QueryValue>();
-        foreach (var item in enumerable)
+        try
         {
-            values.Add(ToValue(item, expression));
+            foreach (var item in enumerable)
+            {
+                values.Add(ToValue(item, expression));
+            }
+        }
+        catch (QueryTranslationException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new QueryTranslationException(
+                $"Could not enumerate the constant collection operand for Contains/in in '{expression}'.",
+                ex);
         }
 
         return values;

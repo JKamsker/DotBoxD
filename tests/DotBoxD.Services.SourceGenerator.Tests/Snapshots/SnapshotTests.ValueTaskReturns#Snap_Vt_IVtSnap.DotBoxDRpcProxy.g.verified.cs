@@ -62,7 +62,7 @@ namespace Snap.Vt
         {
             try
             {
-                return (this._instanceId is null ? this._invoker.InvokeValueAsync<(int, int), int>("IVtSnap", "AddAsync", (a, b), ct) : this._invoker.InvokeValueOnInstanceAsync<(int, int), int>("IVtSnap", this._instanceId!, "AddAsync", (a, b), ct));
+                return __dotboxd_observeCallerCancellationAsync((this._instanceId is null ? this._invoker.InvokeValueAsync<(int, int), int>("IVtSnap", "AddAsync", (a, b), ct) : this._invoker.InvokeValueOnInstanceAsync<(int, int), int>("IVtSnap", this._instanceId!, "AddAsync", (a, b), ct)), ct);
             }
             catch (global::System.OperationCanceledException __dotboxd_canceled) when (__dotboxd_canceled.CancellationToken.IsCancellationRequested || ct.IsCancellationRequested)
             {
@@ -78,7 +78,7 @@ namespace Snap.Vt
         {
             try
             {
-                return (this._instanceId is null ? this._invoker.InvokeValueAsync("IVtSnap", "PingAsync", ct) : this._invoker.InvokeValueOnInstanceAsync("IVtSnap", this._instanceId!, "PingAsync", ct));
+                return __dotboxd_observeCallerCancellationAsync((this._instanceId is null ? this._invoker.InvokeValueAsync("IVtSnap", "PingAsync", ct) : this._invoker.InvokeValueOnInstanceAsync("IVtSnap", this._instanceId!, "PingAsync", ct)), ct);
             }
             catch (global::System.OperationCanceledException __dotboxd_canceled) when (__dotboxd_canceled.CancellationToken.IsCancellationRequested || ct.IsCancellationRequested)
             {
@@ -88,6 +88,32 @@ namespace Snap.Vt
             {
                 return new global::System.Threading.Tasks.ValueTask(global::System.Threading.Tasks.Task.FromException(__dotboxd_ex));
             }
+        }
+
+        private static async global::System.Threading.Tasks.Task __dotboxd_observeCallerCancellationAsync(global::System.Threading.Tasks.Task task, global::System.Threading.CancellationToken ct)
+        {
+            await task.ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
+        }
+
+        private static async global::System.Threading.Tasks.Task<T> __dotboxd_observeCallerCancellationAsync<T>(global::System.Threading.Tasks.Task<T> task, global::System.Threading.CancellationToken ct)
+        {
+            var result = await task.ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
+            return result;
+        }
+
+        private static async global::System.Threading.Tasks.ValueTask __dotboxd_observeCallerCancellationAsync(global::System.Threading.Tasks.ValueTask task, global::System.Threading.CancellationToken ct)
+        {
+            await task.ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
+        }
+
+        private static async global::System.Threading.Tasks.ValueTask<T> __dotboxd_observeCallerCancellationAsync<T>(global::System.Threading.Tasks.ValueTask<T> task, global::System.Threading.CancellationToken ct)
+        {
+            var result = await task.ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
+            return result;
         }
     }
 }

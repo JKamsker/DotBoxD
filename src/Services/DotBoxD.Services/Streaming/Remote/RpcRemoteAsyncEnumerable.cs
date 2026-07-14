@@ -53,10 +53,27 @@ internal sealed class RpcRemoteAsyncEnumerable<T> : IAsyncEnumerable<T>
                 return false;
             }
 
-            using (chunk)
+            try
             {
-                Current = _serializer.Deserialize<T>(chunk.Payload);
+                _ct.ThrowIfCancellationRequested();
+                var current = _serializer.Deserialize<T>(chunk.Payload);
+                _ct.ThrowIfCancellationRequested();
+
+                Current = current;
+                chunk.Dispose();
                 return true;
+            }
+            catch (OperationCanceledException) when (_ct.IsCancellationRequested)
+            {
+                _completed = true;
+                _receiver.Cancel();
+                chunk.DisposeWithoutCredit();
+                throw;
+            }
+            catch
+            {
+                chunk.Dispose();
+                throw;
             }
         }
 

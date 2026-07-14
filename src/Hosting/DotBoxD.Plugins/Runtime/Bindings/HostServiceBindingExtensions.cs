@@ -282,13 +282,19 @@ public static class HostServiceBindingExtensions
         throw new InvalidOperationException(
             $"Host service implementation '{implementationType.FullName}' does not implement '{interfaceType.FullName}.{method.Name}'.");
     }
-
     private static object? ReadPropertyValue(Type interfaceType, object implementation, PropertyInfo property)
     {
         var getter = property.GetMethod
             ?? throw new InvalidOperationException($"Host service property '{property.Name}' must have a getter.");
         var getterDeclaringType = getter.DeclaringType ?? interfaceType;
         var targetGetter = ResolveTargetMethod(getterDeclaringType, implementation.GetType(), getter);
-        return targetGetter.Invoke(implementation, null);
+        try
+        {
+            return targetGetter.Invoke(implementation, null);
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            throw new InvalidOperationException($"Host service property '{interfaceType.FullName}.{property.Name}' getter failed.", ex.InnerException);
+        }
     }
 }

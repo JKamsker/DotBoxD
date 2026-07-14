@@ -101,8 +101,8 @@ public sealed class StreamingGeneratorTests
                 GeneratorTestHelper.GeneratedKind.Proxy));
         proxy.Should().Contain("InvokeAsyncEnumerableAsync<int>");
         proxy.Should().Contain("InvokeAsyncEnumerableAsync<string>");
-        proxy.Should().Contain("return (this._instanceId is null ? this._invoker.InvokeAsyncEnumerableAsync<int>");
-        proxy.Should().Contain("return new global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.IAsyncEnumerable<string>>((this._instanceId is null ? this._invoker.InvokeAsyncEnumerableAsync<string>");
+        proxy.Should().Contain("return __dotboxd_observeCallerCancellationAsync((this._instanceId is null ? this._invoker.InvokeAsyncEnumerableAsync<int>");
+        proxy.Should().Contain("return __dotboxd_observeCallerCancellationAsync(new global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.IAsyncEnumerable<string>>((this._instanceId is null ? this._invoker.InvokeAsyncEnumerableAsync<string>");
         proxy.Should().NotContain("return (this._instanceId is null ? this._invoker.InvokeAsyncEnumerable<int>");
         proxy.Should().NotContain("return (this._instanceId is null ? this._invoker.InvokeAsyncEnumerable<string>");
     }

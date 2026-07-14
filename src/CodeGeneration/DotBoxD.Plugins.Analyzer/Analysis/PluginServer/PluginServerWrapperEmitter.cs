@@ -127,7 +127,7 @@ internal static class PluginServerWrapperEmitter
         PluginServerFlowAttributeSource.Append(builder, indent, method.Attributes);
         PluginServerFlowAttributeSource.Append(builder, indent, method.ReturnAttributes);
         builder.Append(indent).Append("public ");
-        if (method.ReturnWrapperKind is PluginServerReturnWrapperKind.Task or PluginServerReturnWrapperKind.ValueTask)
+        if (PluginServerReturnWrapperCancellationEmitter.RequiresAsyncModifier(method))
         {
             builder.Append("async ");
         }
@@ -136,9 +136,9 @@ internal static class PluginServerWrapperEmitter
             .Append('(').Append(ParameterList(method)).AppendLine(")");
         builder.Append(indent).AppendLine("{");
         builder.Append(indent).Append("    ").Append(ownerFieldName).AppendLine(".RequireFacade();");
-        if (PluginServerReturnWrapperCancellationEmitter.RequiresAsyncReturnWrapperBlock(method))
+        if (PluginServerReturnWrapperCancellationEmitter.RequiresAsyncCancellationBlock(method))
         {
-            AppendAsyncReturnWrapperBlock(builder, method, indent, ownerFieldName, innerFieldName);
+            AppendAsyncCancellationBlock(builder, method, indent, ownerFieldName, innerFieldName);
             builder.Append(indent).AppendLine("}");
             return;
         }
@@ -174,7 +174,7 @@ internal static class PluginServerWrapperEmitter
         builder.Append(indent).AppendLine("}");
     }
 
-    private static void AppendAsyncReturnWrapperBlock(
+    private static void AppendAsyncCancellationBlock(
         StringBuilder builder,
         PluginServerForwardedMethod method,
         string indent,
@@ -182,15 +182,30 @@ internal static class PluginServerWrapperEmitter
         string innerFieldName)
     {
         var localName = PluginServerReturnWrapperCancellationEmitter.UniqueLocalName("__dotboxdResult", method);
+        var hasResult = PluginServerReturnWrapperCancellationEmitter.HasAwaitedResult(method);
         builder.AppendLine();
         builder.Append(indent).AppendLine("{");
-        builder.Append(indent).Append("    var ").Append(localName).Append(" = await ((")
+        builder.Append(indent).Append("    ");
+        if (hasResult)
+        {
+            builder.Append("var ").Append(localName).Append(" = ");
+        }
+
+        builder.Append("await ((")
             .Append(method.ReceiverType).Append(')').Append(innerFieldName).Append(").")
             .Append(PluginServerIdentifier.Escape(method.Name)).Append('(').Append(ArgumentList(method))
             .AppendLine(").ConfigureAwait(false);");
         PluginServerReturnWrapperCancellationEmitter.AppendCancellationChecks(builder, method, indent + "    ");
-        builder.Append(indent).Append("    return new ").Append(method.ReturnWrapperName).Append('(')
-            .Append(ownerFieldName).Append(", ").Append(localName).AppendLine(");");
+        if (method.ReturnWrapperName is not null)
+        {
+            builder.Append(indent).Append("    return new ").Append(method.ReturnWrapperName).Append('(')
+                .Append(ownerFieldName).Append(", ").Append(localName).AppendLine(");");
+        }
+        else if (hasResult)
+        {
+            builder.Append(indent).Append("    return ").Append(localName).AppendLine(";");
+        }
+
         builder.Append(indent).AppendLine("}");
     }
 

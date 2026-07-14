@@ -132,11 +132,25 @@ internal static class ContainsMethodFilterTranslator
         // semantics even when written as static Enumerable.Contains(source, item).
         if (QueryValueFactory.TryEvaluateObject(collection, parameter, out var collectionObject) &&
             collectionObject is not null &&
-            CollectionComparerSupport.HasUnsupportedComparer(collectionObject))
+            HasUnsupportedComparer(call, collectionObject))
         {
             throw QueryTranslationException.Unsupported(
                 call,
                 "Contains over a collection with a custom, case-insensitive, or culture-sensitive comparer is not supported; use a default/ordinal collection.");
+        }
+    }
+
+    private static bool HasUnsupportedComparer(MethodCallExpression call, object collection)
+    {
+        try
+        {
+            return CollectionComparerSupport.HasUnsupportedComparer(collection);
+        }
+        catch (Exception ex) when (ex is not QueryTranslationException and not OperationCanceledException)
+        {
+            throw new QueryTranslationException(
+                $"Unsupported query expression '{call}' (node '{call.NodeType}'). Contains comparer probing failed; use a default/ordinal collection.",
+                ex);
         }
     }
 

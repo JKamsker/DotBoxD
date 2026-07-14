@@ -155,6 +155,7 @@ internal static class ProxyInvocationEmitter
         string indent,
         bool captureSynchronousExceptions)
     {
+        returnExpression = BuildCallerCancellationObservedReturnExpression(method, returnExpression, ct);
         if (!captureSynchronousExceptions)
         {
             sb.AppendLine($"{indent}return {returnExpression};");
@@ -177,6 +178,20 @@ internal static class ProxyInvocationEmitter
         sb.AppendLine($"{indent}{{");
         sb.AppendLine($"{indent}    return {ProxyFaultedReturnEmitter.Build(method, exceptionName)};");
         sb.AppendLine($"{indent}}}");
+    }
+
+    private static string BuildCallerCancellationObservedReturnExpression(
+        MethodModel method,
+        string returnExpression,
+        CancellationToken ct)
+    {
+        if (!method.HasCancellationToken)
+        {
+            return returnExpression;
+        }
+
+        var callerToken = ProxyGenerationHelpers.GetCancellationTokenArgument(method.Parameters, ct);
+        return $"{ProxyGenerationHelpers.CallerCancellationHelperName}({returnExpression}, {callerToken})";
     }
 
     private static void EmitSubServiceReturn(
