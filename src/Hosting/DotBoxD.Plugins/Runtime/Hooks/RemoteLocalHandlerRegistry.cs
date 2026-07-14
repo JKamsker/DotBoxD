@@ -133,6 +133,7 @@ public sealed class RemoteLocalHandlerRegistry
             var wireValue = KernelRpcBinaryCodec.DecodeValue(payload);
             var context = (TContext)KernelRpcMarshaller.FromKernelRpcValue(wireValue, typeof(TContext))!;
             var result = await handler(context, hookContext, cancellationToken).ConfigureAwait(false);
+            ThrowIfDispatchCanceled(hookContext, cancellationToken);
             return RemoteLocalResultEncoder.Encode(result);
         });
         _resultHandlers[subscriptionId] = entry;
