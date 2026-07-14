@@ -91,6 +91,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Synchronous hook and message dispatch fast paths | this commit | `--probe-examples` | Kept hook publish and `host.message.send` binding dispatch on completed `ValueTask` fast paths, falling back to awaited helpers only when a filter, handler, or sink actually suspends. Three local samples measured `mixed fire/ice` native hook 7.1-7.2 ms, compiled 480.9-518.2 ms, interpreted 489.9-536.9 ms; `predicate miss` native hook 1.2-1.3 ms, compiled 64.5-70.9 ms, interpreted 177.9-190.6 ms; `predicate hit` native hook 2.3-2.4 ms, compiled 193.9-213.4 ms, interpreted 400.4-486.4 ms. Compared with the previous row, native hook dispatch moved down consistently; compiled/interpreted plugin dispatch remains noisy and still far from native. |
 | Compiled runtime scalar type singleton reuse | this commit | `--probe-runtime-types` | `CompiledRuntime.TypeScalar("I32")` now returns the built-in scalar singleton used by generated entrypoint type checks instead of rebuilding `SandboxType.Scalar("I32")`. Two local samples for 2M calls measured the allocating scalar baseline at 115.8-123.9 ms and 112,000,040 B, while the compiled-runtime built-in path measured 21.5-25.7 ms and 40 B. The non-built-in fallback stayed allocating as expected: `CompiledRuntime.TypeScalar("MonsterId")` measured 105.6-115.4 ms and 112,000,040 B. |
 | Compiled Guid type singleton reuse | this commit | `--probe-runtime-types` | Added the `Guid` singleton omitted when built-in scalar reuse was introduced before `SandboxType.Guid` existed. Two million `TypeScalar("Guid")` calls improved from 123.7 ms and 64,000,040 B to 17.1 ms and 40 B; generated-shaped `RequireType(Guid, TypeScalar("Guid"))` calls improved from 166.3 ms and 64,000,040 B to 28.3 ms and 40 B by reaching the existing reference-equality validator fast path. The opaque-id fallback remained at 64,000,040 B. |
+| Interpreter single-parameter inline substitution | this commit | `--probe-interpreter-plan-setup` | Replaced the one-entry dictionary created for every inlineable one-parameter I32 helper plan with a two-reference value. Across 50,000 one-iteration interpreted executions, the helper lane fell from 79,206,040 B (1,584.1 B/op) to 68,406,040 B (1,368.1 B/op), while zero-iteration and equivalent direct-expression controls were unchanged. |
 | Compiled built-in structural type cache | this commit | `--probe-runtime-types` | Added bounded generated-ABI factories for the nine built-in list types and 81 built-in map pairs. Two million generated-return-shaped `List<I32>` / `Map<String,I32>` checks dropped from 224,000,040 B / 320,000,040 B to 40 B total per row. Nested, opaque, and record-derived descriptors stay on the legacy factories to avoid lookup overhead or attacker-controlled retention. |
 | Built-in scalar validation fast path | this commit | `--probe-runtime-types`, `--probe-examples` | Short-circuited `SandboxValueValidator.RequireType` when the value is a built-in scalar and the expected type is the matching singleton, preserving the existing generic path for non-singleton and opaque-id scalar types. Two local runtime-type samples for 2M calls measured forced generic validation with `RequireType(I32, Scalar("I32"))` at 313.4-319.4 ms and 40 B, while the singleton fast path `RequireType(I32, SandboxType.I32)` measured 19.7-27.5 ms and 40 B. One example workflow sanity sample was still noisy (`mixed fire/ice` compiled 400.2 ms, `predicate miss` compiled 160.6 ms, `predicate hit` compiled 222.9 ms), so this step claims only the direct scalar validation improvement. |
 | Flat scalar value metering fast path | this commit | `--probe-resource-meter`, `--probe-examples` | Added a direct `ResourceMeter.ChargeValue` path for scalar values and small flat scalar lists, matching the generic shape-walker's resource usage while leaving larger lists on the existing fuel-charged scanner. The plugin-shaped flat input probe for 1M charges measured the generic walker baseline at 248.0 ms and 448,000,040 B with the fast path temporarily disabled; with the fast path enabled it measured 204.7-205.0 ms and 40 B, with identical `collectionElements=5,000,000` and `stringBytes=32,000,000`. One example workflow sanity sample measured `mixed fire/ice` compiled 373.4 ms, `predicate miss` compiled 83.4 ms, and `predicate hit` compiled 182.3 ms; the direct resource-meter probe is the primary evidence because the workflow baselines remain noisy. |
@@ -1141,3 +1142,37 @@ exactly: 448,000,040 B for nested `List<List<I32>>`, 288,000,040 B for `List<Mon
 `List<Record<I32>>`, and 384,000,040 B for `Map<String,MonsterId>` across two million calls. Stopwatch results are
 secondary because sequential allocation rows perturb the GC heap budget. Fuel emission, sandbox allocation charges,
 and `RequireValueType` validation are unchanged.
+
+## Interpreter inline-helper plan substitution
+
+The I32 loop planner can inline a private helper only when it has exactly one I32 parameter and one simple argument.
+Despite that bounded contract, every plan build previously created a `Dictionary<string, I32ExpressionPlan>`, inserted the
+single parameter-to-argument mapping, and then discarded the dictionary after building the helper body. Short interpreted
+executions rebuild loop plans on every run, so the dictionary object plus its bucket and entry arrays were visible setup cost.
+
+The planner now passes an internal readonly two-reference substitution value through recursive expression planning. Its
+default value means no substitution; an active value preserves ordinal name matching, wins over same-named caller locals,
+and still disables fused recognizers that are not substitution-aware. If inline eligibility ever expands beyond one
+parameter, this representation must expand with it rather than silently dropping mappings.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -- --probe-interpreter-plan-setup
+```
+
+Representative local runs, 50,000 executions per row:
+
+```text
+case                          Before ms / allocated / B/op       After ms / allocated / B/op
+helper call, one iteration     178.7 / 79,206,040 B / 1,584.1     176.0 / 68,406,040 B / 1,368.1
+helper call, zero control       84.7 / 52,003,752 B / 1,040.1      87.1 / 52,003,752 B / 1,040.1
+direct expression control     110.8 / 56,804,840 B / 1,136.1     115.4 / 56,804,840 B / 1,136.1
+```
+
+Allocation is the claim: the helper lane removes exactly 10,800,000 B across the sample, or 216 B per execution (13.6%),
+while both controls remain byte-for-byte unchanged. The remaining 232 B/op gap versus the direct expression is legitimate
+helper planning: the argument, body, and `InlineCall` plan nodes still exist. Each helper execution returned the same
+checksum and retained 23 fuel, one loop iteration, zero sandbox allocation, and zero host calls; the direct control retained
+19 fuel. Stopwatch differences are secondary. Regression coverage also pins the subtle shadowing case where a literal
+substitution must not fall through to a same-named caller slot, plus the commuted raw-variable fused path.

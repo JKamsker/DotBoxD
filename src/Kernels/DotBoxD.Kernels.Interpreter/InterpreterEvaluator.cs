@@ -96,16 +96,13 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
             return false;
         }
 
-        var substitutions = new Dictionary<string, I32ExpressionPlan>(StringComparer.Ordinal)
-        {
-            [parameter.Name] = argument
-        };
+        var substitution = new I32ExpressionSubstitution(parameter.Name, argument);
         if (!I32ExpressionPlan.TryCreate(
             expression,
             frame,
             assumedInt32Local,
             calls: null,
-            substitutions,
+            substitution,
             out var body))
         {
             return false;

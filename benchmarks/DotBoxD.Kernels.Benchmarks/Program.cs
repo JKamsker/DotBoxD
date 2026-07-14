@@ -8,33 +8,8 @@ if (args.Contains("--smoke", StringComparer.OrdinalIgnoreCase))
     return;
 }
 
-if (args.Contains("--probe-compiled", StringComparer.OrdinalIgnoreCase))
+if (await DotBoxD.Kernels.Benchmarks.Interpreter.InterpreterProbeDispatcher.TryRunAsync(args))
 {
-    await DotBoxD.Kernels.Benchmarks.Interpreter.CompiledSpeedProbe.RunAsync();
-    return;
-}
-
-if (args.Contains("--probe-bindings", StringComparer.OrdinalIgnoreCase))
-{
-    await DotBoxD.Kernels.Benchmarks.Interpreter.BindingCrossingProbe.RunAsync();
-    return;
-}
-
-if (args.Contains("--probe-matrix", StringComparer.OrdinalIgnoreCase))
-{
-    await DotBoxD.Kernels.Benchmarks.Interpreter.PerformanceMatrixProbe.RunAsync();
-    return;
-}
-
-if (args.Contains("--probe-branched-f64-loop", StringComparer.OrdinalIgnoreCase))
-{
-    await DotBoxD.Kernels.Benchmarks.Interpreter.BranchedF64LoopProbe.RunAsync();
-    return;
-}
-
-if (args.Contains("--probe-interpreter-frame-layout", StringComparer.OrdinalIgnoreCase))
-{
-    await DotBoxD.Kernels.Benchmarks.Interpreter.InterpreterFrameLayoutProbe.RunAsync();
     return;
 }
 
