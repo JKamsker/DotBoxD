@@ -92,11 +92,6 @@ public sealed partial class PluginAnalyzer
 
     private static void ReportForbiddenReferencedMethodSignature(OperationAnalysisContext context, IMethodSymbol method)
     {
-        if (IsEventKernel(context.ContainingSymbol?.ContainingType))
-        {
-            return;
-        }
-
         if (!IsReferencedFromEventKernel(context, method.ContainingType))
             return;
         var location = context.Operation.Syntax.GetLocation();
@@ -113,7 +108,50 @@ public sealed partial class PluginAnalyzer
         OperationAnalysisContext context,
         ForbiddenHelperCallGraph helperGraph,
         IMethodSymbol method)
-        => ReportForbiddenReferencedMethodSignature(context, method);
+    {
+        if (!IsReferencedFromEventKernel(context, method.ContainingType) ||
+            context.ContainingSymbol is not IMethodSymbol caller)
+        {
+            return;
+        }
+
+        var location = context.Operation.Syntax.GetLocation();
+        if (ReportForbiddenType(context, helperGraph, caller, method.ReturnType, location))
+        {
+            return;
+        }
+
+        foreach (var parameter in method.Parameters)
+        {
+            if (ReportForbiddenType(context, helperGraph, caller, parameter.Type, location))
+            {
+                return;
+            }
+        }
+    }
+
+    private static bool ReportForbiddenType(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol caller,
+        ITypeSymbol type,
+        Location location)
+    {
+        if (FirstForbiddenHostApi(type) is not { } forbiddenType)
+        {
+            return false;
+        }
+
+        if (helperGraph.TryRecordDirectDiagnostic(caller))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                ForbiddenHostApiRule,
+                location,
+                forbiddenType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
+        }
+
+        return true;
+    }
 
     private static bool ReportForbiddenReferencedType(OperationAnalysisContext context, INamedTypeSymbol containingType, ITypeSymbol type)
         => IsReferencedFromEventKernel(context, containingType) && ReportForbiddenType(context, type, context.Operation.Syntax.GetLocation());
