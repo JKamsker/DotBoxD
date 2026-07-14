@@ -16,6 +16,20 @@ public static class LoweredPipelineComposer
     private const string CurrentVariablePrefix = "current";
     private const string RequiredCapabilitiesMetadataKey = "dotboxd.requiredCapabilities";
     private const string EffectsMetadataKey = "dotboxd.effects";
+    private static readonly IReadOnlyDictionary<string, SandboxType> ResultTypesByTag =
+        new Dictionary<string, SandboxType>(StringComparer.Ordinal)
+        {
+            ["bool"] = SandboxType.Bool,
+            ["int"] = SandboxType.I32,
+            ["i32"] = SandboxType.I32,
+            ["long"] = SandboxType.I64,
+            ["i64"] = SandboxType.I64,
+            ["double"] = SandboxType.F64,
+            ["f64"] = SandboxType.F64,
+            ["string"] = SandboxType.String,
+            ["guid"] = SandboxType.Guid
+        };
+
     private static readonly SourceSpan Span = new(1, 1);
 
     public static SandboxModule Compose(LoweredPipelineComposition composition)
@@ -39,8 +53,8 @@ public static class LoweredPipelineComposer
             throw new ArgumentException("A pipeline composition requires at least one step.", nameof(composition));
         }
 
-        var inputType = ValidateAndInputType(steps);
-        ValidateResultType(steps, composition.ResultType, inputType);
+        var inputType = ValidateAndInputType(steps, out var outputTag);
+        ValidateResultType(steps, composition.ResultType, inputType, outputTag);
 
         var shouldHandle = BuildShouldHandle(steps, inputType, composition.ShouldHandleFunctionId);
         var handle = BuildHandle(steps, inputType, composition.ResultType, composition.HandleFunctionId);
@@ -54,7 +68,7 @@ public static class LoweredPipelineComposer
             BuildMetadata(steps));
     }
 
-    private static SandboxType ValidateAndInputType(IReadOnlyList<LoweredPipelineStep> steps)
+    private static SandboxType ValidateAndInputType(IReadOnlyList<LoweredPipelineStep> steps, out string outputTag)
     {
         var first = steps[0] ?? throw new ArgumentNullException(nameof(LoweredPipelineComposition.Steps));
         var inputType = CurrentParameter(first, 0).Type;
@@ -99,6 +113,7 @@ public static class LoweredPipelineComposer
             }
         }
 
+        outputTag = currentTag;
         return inputType;
     }
 
@@ -141,9 +156,15 @@ public static class LoweredPipelineComposer
     private static void ValidateResultType(
         IReadOnlyList<LoweredPipelineStep> steps,
         SandboxType resultType,
-        SandboxType inputType)
+        SandboxType inputType,
+        string outputTag)
     {
         ArgumentNullException.ThrowIfNull(resultType);
+        if (!ResultTypeMatchesTag(resultType, outputTag))
+        {
+            throw new ArgumentException($"ResultType must match terminal OutputType '{outputTag}'.");
+        }
+
         var hasProjection = false;
         foreach (var step in steps)
         {
@@ -160,6 +181,19 @@ public static class LoweredPipelineComposer
                 "ResultType must equal the pipeline input type when the pipeline has no projection.");
         }
     }
+
+    private static bool ResultTypeMatchesTag(SandboxType type, string tag)
+    {
+        if (ResultTypesByTag.TryGetValue(tag, out var expectedType))
+            return type == expectedType;
+
+        return tag is not ("list" or "map" or "record") || TagMatchesStructuralType(type, tag);
+    }
+
+    private static bool TagMatchesStructuralType(SandboxType type, string tag)
+        => (tag == "list" && type.Name == "List") ||
+           (tag == "map" && type.Name == "Map") ||
+           (tag == "record" && type.IsRecord);
 
     // Gating only needs the steps up to and including the LAST filter: a projection after the final filter can
     // never change whether the event is handled, so recomputing it here is pure waste (and would run an
