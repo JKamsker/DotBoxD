@@ -2,7 +2,7 @@ using static DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.InvokeAsyncGeneratio
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
-public sealed class InvokeAsyncCommonReturnInferenceTests
+public sealed class InvokeAsyncGenerationTestsCommonReturnInference
 {
     [Fact]
     public void Incompatible_returns_remain_rejected()
