@@ -79,6 +79,7 @@ internal static partial class DotBoxDGenerationNames
         public const string SystemActivator = "System.Activator";
         public const string SystemEnvironment = "System.Environment";
         public const string SystemGc = "System.GC";
+        public const string SystemGcSettings = "System.Runtime.GCSettings";
         public const string SystemDelegate = "System.Delegate";
         public const string SystemServiceProvider = "System.IServiceProvider";
         public const string SystemType = "System.Type";
