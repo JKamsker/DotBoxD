@@ -34,9 +34,10 @@ public sealed class PluginAnalyzerForbiddenApiUnsafeHelperReachabilityTests
             }
             """;
 
-        var diagnostics = await AnalyzeAsync(source);
+        var compilation = CreateCompilation(source);
+        AssertNoCompilerErrors(compilation);
+        var diagnostics = await AnalyzeAsync(compilation);
 
-        AssertNoCompilerErrors(source);
         var diagnostic = Assert.Single(diagnostics.Where(d => d.Id == "DBXK001"));
         var message = diagnostic.GetMessage();
         Assert.True(
@@ -68,24 +69,23 @@ public sealed class PluginAnalyzerForbiddenApiUnsafeHelperReachabilityTests
             }
             """;
 
-        var diagnostics = await AnalyzeAsync(source);
+        var compilation = CreateCompilation(source);
+        AssertNoCompilerErrors(compilation);
+        var diagnostics = await AnalyzeAsync(compilation);
 
-        AssertNoCompilerErrors(source);
         var diagnostic = Assert.Single(diagnostics.Where(d => d.Id == "DBXK001"));
         Assert.Contains("System.IO.File", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
-    private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string source)
+    private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(CSharpCompilation compilation)
     {
-        var compilation = CreateCompilation(source);
         var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(new DotBoxD.Plugins.Analyzer.Analysis.PluginAnalyzer());
         return await compilation.WithAnalyzers(analyzers).GetAnalyzerDiagnosticsAsync();
     }
 
-    private static void AssertNoCompilerErrors(string source)
+    private static void AssertNoCompilerErrors(CSharpCompilation compilation)
     {
-        var errors = CreateCompilation(source)
-            .GetDiagnostics()
+        var errors = compilation.GetDiagnostics()
             .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
             .ToArray();
 

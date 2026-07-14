@@ -112,6 +112,7 @@ public sealed class PluginAnalyzerTypeNameContractTests
             [nameof(TypeNames.SystemDelegate)] = TypeName(typeof(Delegate)),
             [nameof(TypeNames.SystemServiceProvider)] = TypeName(typeof(IServiceProvider)),
             [nameof(TypeNames.SystemType)] = TypeName(typeof(Type)),
+            [nameof(TypeNames.SystemUnsafe)] = TypeName(typeof(System.Runtime.CompilerServices.Unsafe)),
 
             [nameof(TypeNames.GlobalArray)] = GlobalTypeName(typeof(Array)),
             [nameof(TypeNames.GlobalAttribute)] = GlobalTypeName(typeof(Attribute)),
