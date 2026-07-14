@@ -46,16 +46,15 @@ public sealed partial class SandboxHost
             options,
             hotness.Stats,
             DotBoxD.Kernels.Compiler.CompiledCacheStatus.None);
-        if (decision.Mode != ExecutionMode.Interpreted &&
-            decision.Mode != ExecutionMode.Compiled)
+        if (!TryGetAutoDecisionMode(decision, out var selectedMode, out var validationError))
         {
             return CompleteAutoResult(hotness, InvalidExecutionOptionsResult(
                 plan,
                 options,
-                $"execution mode selector returned unsupported mode '{(int)decision.Mode}'"));
+                validationError));
         }
 
-        if (decision.Mode == ExecutionMode.Interpreted ||
+        if (selectedMode == ExecutionMode.Interpreted ||
             !CompiledEntrypointSupport.CanCompile(plan, entrypoint))
         {
             return await ExecuteTrackedAutoAsync(
@@ -68,6 +67,29 @@ public sealed partial class SandboxHost
                 hotness,
                 () => ExecuteCompiledAsync(plan, entrypoint, input, options, cancellationToken))
             .ConfigureAwait(false);
+    }
+
+    private static bool TryGetAutoDecisionMode(
+        ExecutionModeDecision? decision,
+        out ExecutionMode selectedMode,
+        out string validationError)
+    {
+        if (decision is null)
+        {
+            selectedMode = default;
+            validationError = "execution mode selector returned no decision";
+            return false;
+        }
+
+        selectedMode = decision.Mode;
+        if (selectedMode is ExecutionMode.Interpreted or ExecutionMode.Compiled)
+        {
+            validationError = string.Empty;
+            return true;
+        }
+
+        validationError = $"execution mode selector returned unsupported mode '{(int)selectedMode}'";
+        return false;
     }
 
     private static async ValueTask<SandboxExecutionResult> ExecuteTrackedAutoAsync(
