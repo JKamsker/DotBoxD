@@ -99,6 +99,66 @@ public sealed class InvokeAsyncReturnConversionBoundaryTests
         AssertUnsupportedReturnConversion(result);
     }
 
+    [Theory]
+    [InlineData("float value = 1F;", false)]
+    [InlineData("long value = 1L;", true)]
+    public void Supported_f64_return_widenings_remain_valid(
+        string declaration,
+        bool requiresConversionCall)
+    {
+        var result = RunGeneratorAndAssertCompiles(UsageSource($$"""
+            public static ValueTask<double> Run(RemotePluginServer kernels)
+                => kernels.InvokeAsync(async (IGameWorldAccess world) =>
+                {
+                    {{declaration}}
+                    if (world.GetHealth("monster-1") > 0)
+                    {
+                        return value;
+                    }
+
+                    return 2D;
+                });
+            """));
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.Contains("\\\"returnType\\\":\\\"F64\\\"", source, StringComparison.Ordinal);
+        Assert.Equal(
+            requiresConversionCall,
+            source.Contains("numeric.toF64", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("decimal", "decimal converted = 1;")]
+    [InlineData("Target", "Target converted = new Source(1);")]
+    public void Unsupported_contextual_local_conversion_is_rejected(
+        string methodReturnType,
+        string declaration)
+    {
+        var result = RunGenerator(UsageSource($$"""
+            public sealed record Source(int Value);
+
+            public sealed record Target(long Value)
+            {
+                public static implicit operator Target(Source value) => new(value.Value);
+            }
+
+            public static ValueTask<{{methodReturnType}}> Run(RemotePluginServer kernels)
+                => kernels.InvokeAsync(async (IGameWorldAccess world) =>
+                {
+                    {{declaration}}
+                    return converted;
+                });
+            """));
+
+        Assert.Contains(
+            result.Diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                          diagnostic.GetMessage().Contains(
+                              "local 'converted'",
+                              StringComparison.OrdinalIgnoreCase));
+    }
+
     private static void AssertUnsupportedReturnConversion(
         Microsoft.CodeAnalysis.GeneratorDriverRunResult result)
         => Assert.Contains(
