@@ -32,6 +32,12 @@ if (args.Contains("--probe-branched-f64-loop", StringComparer.OrdinalIgnoreCase)
     return;
 }
 
+if (args.Contains("--probe-interpreter-frame-layout", StringComparer.OrdinalIgnoreCase))
+{
+    await DotBoxD.Kernels.Benchmarks.Interpreter.InterpreterFrameLayoutProbe.RunAsync();
+    return;
+}
+
 if (args.Contains("--probe-rogue", StringComparer.OrdinalIgnoreCase))
 {
     await DotBoxD.Kernels.Benchmarks.Interpreter.RogueScalingProbe.RunAsync();

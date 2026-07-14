@@ -82,11 +82,13 @@ as targeted before/after evidence, not BenchmarkDotNet statistical reports.
 | Interpreted `map.empty` copied a freshly allocated empty dictionary. | `--probe-literal-collection-construction` | 500,000 interpreted `map.empty` helper calls | 238.8 ms | 477.6 | 153,107,760 B | 306.2 | 226.7 ms | 453.4 | 115,729,304 B | 231.5 | Allocation claim: interpreter empty maps now use the same owned-map internal path as compiled empty maps. |
 | Compiled executable materialized-cache hits allocated a string key and unused miss `Lazy` before lookup. | `CompiledExecutableCacheHitAllocationTests` | 100,000 same-key `GetAsync` cache hits | n/a | n/a | 96,001,440 B | 960.0 | n/a | n/a | 54,400,960 B | 544.0 | Allocation-only claim: hit validation and current-metadata preservation remain in place; only pre-lookup key and miss-candidate allocation moved off the hit path. |
 | Same-artifact compiled executable cache hits revalidated bytes and cloned unchanged metadata. | `CompiledExecutableCacheHitAllocationTests` | 100,000 same-artifact `GetAsync` cache hits | n/a | n/a | 55,989,496 B | 559.9 | n/a | n/a | 0 B | 0.0 | Same-reference validated artifact hits skip repeat SHA256 validation and reuse the materialized artifact when cache metadata is already current; different artifact instances with the same key still validate. |
+| Interpreted executions rebuilt immutable function frame layouts for every run. | `--probe-interpreter-frame-layout` | 50,000 prepared-plan executions: parameter return / eight-local chain | 105.3 ms / 346.3 ms | 2,106.0 / 6,926.0 | ~91.2 MB / ~175.6 MB | 1,824.1 / 3,512.2 | 73.0 ms / 188.6 ms | 1,460.0 / 3,772.0 | ~50.8 MB / ~56.0 MB | 1,016.0 / 1,120.1 | A weak per-plan cache stays lazy for unused functions and isolates same-named functions in different plans; repeat runs reproduced the allocation result within 0.1 B/op. |
 
 ## Probe Commands
 
 ```powershell
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-value-shape-cache
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-frame-layout
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-json-schema-resources
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-json-import-source-map
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-http-metadata

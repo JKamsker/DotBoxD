@@ -15,6 +15,7 @@ they are not BenchmarkDotNet statistical reports.
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-bindings
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-matrix
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-frame-layout
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-examples
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-prepared-values
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-runtime-types
@@ -154,6 +155,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Kernel RPC anonymous DTO shape factory | this commit | `--probe-kernel-rpc-marshaller-dto` | Cached compiled DTO field getters and constructor factories for `KernelRpcMarshaller` record shapes, and used a single cached DTO-shape lookup for record-valued `FromSandboxValue` calls. The 500k anonymous `{ Guid Id, string Zone }` reconstruction probe improved from a cached-reflection constructor baseline at 90.0 ms and 56,000,040 B to the compiled shape path at 71.5 ms and 20,000,040 B. |
 | Owned collection construction arrays | this commit | `--probe-collection-construction` | Compiled and interpreter `list.of`/`record.new` now transfer the freshly allocated argument array through the existing internal owned-array path instead of taking a second defensive snapshot. Same-session before and repeated after samples for 500k constructions measured `list.of` arity 8 at 216.0 B/op to 128.0 B/op, `list.of` arity 32 at 600.0 B/op to 320.0 B/op, `record.new` arity 8 at 304.9 B/op to 227.4 B/op, and `record.new` arity 32 at 690.2 B/op to 405.0 B/op. Stopwatch movement was mixed, including a slower arity-8 record row, so this step claims allocation reduction only. |
 | Owned compiled literal collections | this commit | `--probe-literal-collection-construction` | Compiled list/map literal construction now transfers compiler/runtime-owned arrays and dictionaries through internal owned construction paths instead of defensively snapshotting them a second time. Same-session before and repeated after samples for 500k constructions measured list literal arity 8 at 352.0 to 240.0 B/op, list literal arity 32 at 736.0 to 432.0 B/op, map literal arity 8 at 1,362.2 to 931.4 B/op, map literal arity 32 at 3,197.0 to 2,034.2 B/op, and `map.empty` at 304.9 to 235.4 B/op. Public `FromList`/`FromMap` defensive-copy behavior remains unchanged; this step claims allocation reduction only. |
+| Prepared-plan interpreter frame-layout cache | this commit | `--probe-interpreter-frame-layout` | Reused immutable per-function slot layouts across executions of the same prepared plan. For 50k direct interpreted executions, a parameter-return entrypoint improved from 105.3 ms / 1,824.1 B/op to 73.0 ms / 1,016.0 B/op; an eight-local chain improved from 346.3 ms / 3,512.2 B/op to 188.6 ms / 1,120.1 B/op. Layouts remain lazy, weakly owned by the plan, isolated between plans, and safe under concurrent first use. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -1041,3 +1043,27 @@ branched f64 loop                 1.5 ms      6.6 ms   4.5       39.2 ms   26.7
 
 The `while loop` row is the new guarded modulo-index closed form. The `branch in loop` row now has an O(1)
 success path for same-direction modulo-branch deltas and an exact per-iteration fallback for unsafe cases.
+
+## Prepared-plan interpreter frame layouts
+
+`InterpreterEvaluator` previously owned the only frame-layout cache, but a new evaluator is created for every
+execution. Every short interpreted run therefore rescanned each invoked function twice and rebuilt two dictionaries,
+the slot-kind array, and the layout object from immutable prepared-plan data. `SandboxInterpreter` now weakly owns a
+lazy cache per `ExecutionPlan`; concurrent first use publishes exactly one layout, while each evaluator keeps its most
+recent layout as the hot helper-call fast path. Unused functions are not prebuilt.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-frame-layout
+```
+
+Representative repeated local runs, 50,000 executions per case:
+
+```text
+case                    Before ms/Bop      After ms/Bop
+parameter return          105.3 / 1824.1      73.0 / 1016.0
+eight local chain         346.3 / 3512.2     188.6 / 1120.1
+```
+
+The allocation delta is the stable signal: repeat runs reproduced each reported B/op value within 0.1 B/op.

@@ -16,15 +16,22 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
     private readonly string _moduleHash;
     private readonly ExpressionEvaluator _expressions;
     private readonly StatementExecutor _statements;
-    private readonly Dictionary<string, FunctionFrameLayout> _frameLayouts = new(StringComparer.Ordinal);
+    private readonly FunctionFrameLayoutCache _frameLayouts;
+    private SandboxFunction? _lastFrameLayoutFunction;
+    private FunctionFrameLayout? _lastFrameLayout;
 
-    public InterpreterEvaluator(ExecutionPlan plan, SandboxContext context, SandboxExecutionOptions options)
+    public InterpreterEvaluator(
+        ExecutionPlan plan,
+        SandboxContext context,
+        SandboxExecutionOptions options,
+        FunctionFrameLayoutCache frameLayouts)
     {
         _context = context;
         _options = options;
         _moduleHash = plan.ModuleHash;
         _functions = plan.FunctionLookup;
         _functionAnalysis = plan.FunctionAnalysis;
+        _frameLayouts = frameLayouts;
         _expressions = new ExpressionEvaluator(_context, this, _functionAnalysis, _options, _moduleHash);
         _statements = new StatementExecutor(_context, _expressions, this, _options, _moduleHash);
     }
@@ -182,17 +189,19 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
         }
     }
 
-    // The function set is fixed for the lifetime of an evaluator, so each function's
-    // local slot layout is resolved once and reused across every invocation instead
-    // of rebuilding a string-keyed local map per call.
+    // The function set is fixed for the prepared plan. Keep the most recently used
+    // layout on the evaluator for tight helper-call loops, while the shared cache
+    // preserves layouts across separate executions of the same plan.
     private FunctionFrameLayout GetFrameLayout(SandboxFunction function)
     {
-        if (!_frameLayouts.TryGetValue(function.Id, out var layout))
+        if (ReferenceEquals(function, _lastFrameLayoutFunction))
         {
-            layout = FunctionFrameLayout.Build(function, _functionAnalysis, _context.Bindings);
-            _frameLayouts[function.Id] = layout;
+            return _lastFrameLayout!;
         }
 
+        var layout = _frameLayouts.Get(function);
+        _lastFrameLayoutFunction = function;
+        _lastFrameLayout = layout;
         return layout;
     }
 

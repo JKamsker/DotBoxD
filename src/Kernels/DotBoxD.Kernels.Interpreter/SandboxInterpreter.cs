@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
@@ -8,6 +9,8 @@ using DotBoxD.Kernels;
 
 public sealed class SandboxInterpreter : ISandboxInterpreter
 {
+    private readonly ConditionalWeakTable<ExecutionPlan, FunctionFrameLayoutCache> _frameLayouts = new();
+
     public async ValueTask<SandboxExecutionResult> ExecuteAsync(
         ExecutionPlan plan,
         string entrypoint,
@@ -40,7 +43,8 @@ public sealed class SandboxInterpreter : ISandboxInterpreter
         {
             budget.CheckDeadline();
             InterpreterNestingGuard.ThrowIfExceeded(plan);
-            var evaluator = new InterpreterEvaluator(plan, context, options);
+            var frameLayouts = _frameLayouts.GetValue(plan, static value => new FunctionFrameLayoutCache(value));
+            var evaluator = new InterpreterEvaluator(plan, context, options, frameLayouts);
             var value = await evaluator.ExecuteEntrypointAsync(entrypoint, input).ConfigureAwait(false);
             if (!options.SuppressSuccessfulRunSummaryAudit)
             {
