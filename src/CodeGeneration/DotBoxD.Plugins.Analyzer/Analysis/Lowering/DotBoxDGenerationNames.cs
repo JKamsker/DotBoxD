@@ -88,6 +88,7 @@ internal static partial class DotBoxDGenerationNames
         public const string SystemTextEncoding = "System.Text.Encoding";
         public const string SystemServiceProvider = "System.IServiceProvider";
         public const string SystemType = "System.Type";
+        public const string SystemArrayPoolOriginal = "System.Buffers.ArrayPool<T>";
         public const string SystemUnsafe = "System.Runtime.CompilerServices.Unsafe";
         public const string SystemComponentModelTypeDescriptor = "System.ComponentModel.TypeDescriptor";
 
