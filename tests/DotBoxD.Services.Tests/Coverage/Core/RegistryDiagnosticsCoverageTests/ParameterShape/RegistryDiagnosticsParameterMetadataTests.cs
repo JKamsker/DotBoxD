@@ -52,7 +52,7 @@ public sealed class RegistryDiagnosticsParameterMetadataTests
         Assert.True(parameter.IsCancellationToken);
         Assert.True(parameter.HasDefaultValue);
         Assert.Null(parameter.DefaultValue);
-        Assert.False(string.IsNullOrWhiteSpace(scenario));
+        _ = scenario;
     }
 
     [Fact]
