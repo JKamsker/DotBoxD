@@ -146,9 +146,20 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        ReportAndRecordIfForbidden(context, helperGraph, method, property);
+        if (IsForbiddenInvocationReceiver(context.Operation, property.ContainingType))
+        {
+            helperGraph.RecordForbidden(method, property.ContainingType);
+        }
+        else
+        {
+            ReportAndRecordIfForbidden(context, helperGraph, method, property);
+        }
         RecordStaticConstructorReachability(context, helperGraph, property);
-        ReportForbiddenReferencedType(context, property.ContainingType, property.Type);
+        if (!IsForbiddenHostApi(property.ContainingType))
+        {
+            ReportForbiddenReferencedType(context, property.ContainingType, property.Type);
+        }
+
         ReportLocalUseIfInvalid(context, property);
 
         // A forbidden API reached through a helper property's accessor body is only linked to the kernel
@@ -230,6 +241,8 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
     private static bool IsForbiddenExactType(string typeName)
         => typeName is DotBoxDGenerationNames.TypeNames.SystemActivator
             or DotBoxDGenerationNames.TypeNames.SystemConsole
+            or DotBoxDGenerationNames.TypeNames.SystemAppContext
+            or DotBoxDGenerationNames.TypeNames.SystemAppDomain
             or DotBoxDGenerationNames.TypeNames.SystemEnvironment
             or DotBoxDGenerationNames.TypeNames.SystemGc
             or DotBoxDGenerationNames.TypeNames.SystemGcSettings
