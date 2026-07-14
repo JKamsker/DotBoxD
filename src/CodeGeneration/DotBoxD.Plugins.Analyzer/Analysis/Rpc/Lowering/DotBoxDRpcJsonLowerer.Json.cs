@@ -40,6 +40,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         => value switch
         {
             byte b => I32(b),
+            char c => I32(c),
             sbyte b => I32(b),
             short s => I32(s),
             ushort s => I32(s),

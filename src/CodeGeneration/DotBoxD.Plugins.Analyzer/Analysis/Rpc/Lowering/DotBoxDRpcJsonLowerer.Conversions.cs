@@ -80,15 +80,14 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             return true;
         }
 
-        if (sourceType.SpecialType == SpecialType.System_Int32 &&
+        if (IsI32WireIntegral(sourceType) &&
             targetType.SpecialType == SpecialType.System_Int64)
         {
             converted = Call("numeric.toI64", null, lowered);
             return true;
         }
 
-        if (sourceType.SpecialType is SpecialType.System_Int32 or SpecialType.System_Int64 &&
-            targetType.SpecialType is SpecialType.System_Double or SpecialType.System_Single)
+        if (CanWidenToF64(sourceType) && IsFloatingPoint(targetType))
         {
             converted = Call("numeric.toF64", null, lowered);
             return true;
@@ -97,4 +96,18 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         converted = lowered;
         return false;
     }
+
+    private static bool IsI32WireIntegral(ITypeSymbol type)
+        => type.SpecialType is SpecialType.System_Byte or
+            SpecialType.System_Char or
+            SpecialType.System_Int16 or
+            SpecialType.System_Int32 or
+            SpecialType.System_SByte or
+            SpecialType.System_UInt16;
+
+    private static bool CanWidenToF64(ITypeSymbol type)
+        => IsI32WireIntegral(type) || type.SpecialType == SpecialType.System_Int64;
+
+    private static bool IsFloatingPoint(ITypeSymbol type)
+        => type.SpecialType is SpecialType.System_Double or SpecialType.System_Single;
 }
