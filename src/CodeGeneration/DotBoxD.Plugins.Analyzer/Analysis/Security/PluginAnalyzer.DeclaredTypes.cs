@@ -8,6 +8,8 @@ public sealed partial class PluginAnalyzer
 {
     private static void AnalyzeNamedType(SymbolAnalysisContext context)
     {
+        AnalyzeNamedTypeAttributes(context);
+
         var type = (INamedTypeSymbol)context.Symbol;
         if (type.TypeKind == TypeKind.Delegate && type.DelegateInvokeMethod is { } invoke)
         {

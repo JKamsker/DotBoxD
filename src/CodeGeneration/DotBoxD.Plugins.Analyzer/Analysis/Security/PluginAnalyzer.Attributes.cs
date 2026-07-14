@@ -5,7 +5,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 public sealed partial class PluginAnalyzer
 {
-    private static void AnalyzeNamedType(SymbolAnalysisContext context)
+    private static void AnalyzeNamedTypeAttributes(SymbolAnalysisContext context)
     {
         var type = (INamedTypeSymbol)context.Symbol;
         if (!IsEventKernel(type))
