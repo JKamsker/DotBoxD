@@ -78,6 +78,36 @@ public sealed class InterpreterResultValidationCompatibilityTests
         Assert.DoesNotContain(observed, auditEvent => auditEvent.Message == RejectedAuditMarker);
     }
 
+    [Fact]
+    public async Task Successful_result_with_failed_binding_evidence_is_rejected()
+    {
+        var observed = new List<SandboxAuditEvent>();
+        using var host = SandboxHost.Create(builder =>
+        {
+            builder.AddDefaultPureBindings();
+            builder.AddLogBindings();
+            builder.UseInterpreter(new FailedBindingEvidenceInterpreter());
+            builder.ForwardAuditEventsTo(observed.Add);
+        });
+        var module = await host.ImportJsonAsync(LogJson());
+        var plan = await host.PrepareAsync(
+            module,
+            SandboxPolicyBuilder.Create().GrantLogging().WithFuel(1_000).Build());
+
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.Unit,
+            new SandboxExecutionOptions { Mode = ExecutionMode.Interpreted });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.HostFailure, result.Error!.Code);
+        Assert.Equal("interpreter execution failed", result.Error.SafeMessage);
+        Assert.Single(result.AuditEvents);
+        Assert.Equal("RunSummary", result.AuditEvents[0].Kind);
+        Assert.Equal(result.AuditEvents, observed);
+    }
+
     private static async ValueTask<SandboxExecutionResult> ExecuteAsync(bool relabelQuotaFailure)
     {
         using var host = SandboxHost.Create(builder =>
@@ -171,4 +201,60 @@ public sealed class InterpreterResultValidationCompatibilityTests
             });
         }
     }
+
+    private sealed class FailedBindingEvidenceInterpreter : ISandboxInterpreter
+    {
+        private readonly SandboxInterpreter _inner = new();
+
+        public async ValueTask<SandboxExecutionResult> ExecuteAsync(
+            ExecutionPlan plan,
+            string entrypoint,
+            SandboxValue input,
+            SandboxExecutionOptions options,
+            CancellationToken cancellationToken)
+        {
+            var result = await _inner.ExecuteAsync(plan, entrypoint, input, options, cancellationToken)
+                .ConfigureAwait(false);
+            var audit = result.AuditEvents.Select(auditEvent => auditEvent.Kind == BindingAuditKinds.SandboxLog
+                ? FailedBindingAudit(auditEvent)
+                : auditEvent).ToArray();
+            return result with { AuditEvents = audit };
+        }
+
+        private static SandboxAuditEvent FailedBindingAudit(SandboxAuditEvent auditEvent)
+            => new(
+                auditEvent.RunId,
+                auditEvent.Kind,
+                auditEvent.Timestamp,
+                false,
+                auditEvent.BindingId,
+                auditEvent.CapabilityId,
+                auditEvent.Effect,
+                auditEvent.ResourceId,
+                SandboxErrorCode.BindingFailure,
+                auditEvent.Message,
+                auditEvent.Bytes,
+                auditEvent.Fields,
+                auditEvent.SequenceNumber);
+    }
+
+    private static string LogJson()
+        => """
+        {
+          "id": "interpreter-failed-binding-evidence",
+          "version": "1.0.0",
+          "capabilityRequests": [{ "id": "log.write", "reason": "test logs" }],
+          "functions": [
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [],
+              "returnType": "Unit",
+              "body": [
+                { "op": "return", "value": { "call": "log.info", "args": [{ "string": "ok" }] } }
+              ]
+            }
+          ]
+        }
+        """;
 }
