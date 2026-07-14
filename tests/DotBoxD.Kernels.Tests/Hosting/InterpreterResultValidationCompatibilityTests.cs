@@ -78,15 +78,18 @@ public sealed class InterpreterResultValidationCompatibilityTests
         Assert.DoesNotContain(observed, auditEvent => auditEvent.Message == RejectedAuditMarker);
     }
 
-    [Fact]
-    public async Task Successful_result_with_failed_binding_evidence_is_rejected()
+    [Theory]
+    [InlineData(MalformedBindingEvidenceKind.Failed)]
+    [InlineData(MalformedBindingEvidenceKind.UnexpectedBytes)]
+    public async Task Successful_result_with_malformed_binding_evidence_is_rejected(
+        MalformedBindingEvidenceKind malformedKind)
     {
         var observed = new List<SandboxAuditEvent>();
         using var host = SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddLogBindings();
-            builder.UseInterpreter(new FailedBindingEvidenceInterpreter());
+            builder.UseInterpreter(new MalformedBindingEvidenceInterpreter(malformedKind));
             builder.ForwardAuditEventsTo(observed.Add);
         });
         var module = await host.ImportJsonAsync(LogJson());
@@ -202,7 +205,14 @@ public sealed class InterpreterResultValidationCompatibilityTests
         }
     }
 
-    private sealed class FailedBindingEvidenceInterpreter : ISandboxInterpreter
+    public enum MalformedBindingEvidenceKind
+    {
+        Failed,
+        UnexpectedBytes
+    }
+
+    private sealed class MalformedBindingEvidenceInterpreter(MalformedBindingEvidenceKind malformedKind)
+        : ISandboxInterpreter
     {
         private readonly SandboxInterpreter _inner = new();
 
@@ -216,10 +226,18 @@ public sealed class InterpreterResultValidationCompatibilityTests
             var result = await _inner.ExecuteAsync(plan, entrypoint, input, options, cancellationToken)
                 .ConfigureAwait(false);
             var audit = result.AuditEvents.Select(auditEvent => auditEvent.Kind == BindingAuditKinds.SandboxLog
-                ? FailedBindingAudit(auditEvent)
+                ? MalformBindingAudit(auditEvent)
                 : auditEvent).ToArray();
             return result with { AuditEvents = audit };
         }
+
+        private SandboxAuditEvent MalformBindingAudit(SandboxAuditEvent auditEvent)
+            => malformedKind switch
+            {
+                MalformedBindingEvidenceKind.Failed => FailedBindingAudit(auditEvent),
+                MalformedBindingEvidenceKind.UnexpectedBytes => auditEvent with { Bytes = 1 },
+                _ => throw new ArgumentOutOfRangeException(nameof(malformedKind), malformedKind, null)
+            };
 
         private static SandboxAuditEvent FailedBindingAudit(SandboxAuditEvent auditEvent)
             => new(
