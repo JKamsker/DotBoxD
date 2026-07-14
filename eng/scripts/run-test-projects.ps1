@@ -97,12 +97,20 @@ function Join-TestFilters([string] $BaseFilter, [string] $BatchFilter) {
     return "($BaseFilter)&($BatchFilter)"
 }
 
+function Join-AnyTestFilter([string[]] $Filters) {
+    return ($Filters | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join "|"
+}
+
+function New-TestBatch([string] $Name, [string] $Filter) {
+    return [pscustomobject] @{
+        Name = $Name
+        Filter = $Filter
+    }
+}
+
 function Get-TestBatches([string] $ProjectName, [string] $SuiteName, [string] $Filter) {
     if ($ProjectName -ne "DotBoxD.Kernels.Tests" -or $SuiteName -ne "kernels-remainder") {
-        return @([pscustomobject] @{
-            Name = ""
-            Filter = $Filter
-        })
+        return @(New-TestBatch "" $Filter)
     }
 
     # Keep each kernels-remainder testhost below hosted-runner memory limits.
@@ -117,7 +125,6 @@ function Get-TestBatches([string] $ProjectName, [string] $SuiteName, [string] $F
         "Hosting",
         "Interpreter",
         "Model",
-        "PluginAnalyzer",
         "Plugins",
         "Policy",
         "Queryable",
@@ -133,13 +140,121 @@ function Get-TestBatches([string] $ProjectName, [string] $SuiteName, [string] $F
         "Workers"
     )
 
-    return @($prefixes | ForEach-Object {
+    $batches = @($prefixes | ForEach-Object {
         $batchFilter = "FullyQualifiedName~DotBoxD.Kernels.Tests.$_"
-        [pscustomobject] @{
-            Name = $_
-            Filter = Join-TestFilters $Filter $batchFilter
-        }
+        New-TestBatch $_ (Join-TestFilters $Filter $batchFilter)
     })
+
+    $pluginAnalyzerBatches = @(
+        [pscustomobject] @{
+            Name = "PluginAnalyzer-Contracts"
+            Filter = "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Contracts"
+        },
+        [pscustomobject] @{
+            Name = "PluginAnalyzer-Core"
+            Filter = "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Core"
+        },
+        [pscustomobject] @{
+            Name = "PluginAnalyzer-Defaults"
+            Filter = "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Defaults"
+        },
+        [pscustomobject] @{
+            Name = "PluginAnalyzer-Detection"
+            Filter = "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Detection"
+        },
+        [pscustomobject] @{
+            Name = "PluginAnalyzer-Generation"
+            Filter = "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generation"
+        },
+        [pscustomobject] @{
+            Name = "PluginAnalyzer-HostBinding"
+            Filter = "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.HostBinding"
+        },
+        [pscustomobject] @{
+            Name = "PluginAnalyzer-KernelMethod"
+            Filter = "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.KernelMethod"
+        },
+        [pscustomobject] @{
+            Name = "PluginAnalyzer-Runtime"
+            Filter = "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime"
+        },
+        [pscustomobject] @{
+            Name = "PluginAnalyzer-Weaving"
+            Filter = "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Weaving"
+        },
+        [pscustomobject] @{
+            Name = "PluginAnalyzer-Generated-HookChains"
+            Filter = Join-AnyTestFilter @(
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerHookChain",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.HookChain")
+        },
+        [pscustomobject] @{
+            Name = "PluginAnalyzer-Generated-PluginServer"
+            Filter = "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginServer"
+        },
+        [pscustomobject] @{
+            Name = "PluginAnalyzer-Generated-HookResults"
+            Filter = Join-AnyTestFilter @(
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.HookResult",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.HookFireAsync")
+        },
+        [pscustomobject] @{
+            Name = "PluginAnalyzer-Generated-InvokeAsync"
+            Filter = Join-AnyTestFilter @(
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.InvokeAsync",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.LowerToIr")
+        },
+        [pscustomobject] @{
+            Name = "PluginAnalyzer-Generated-MergeableIr"
+            Filter = "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.MergeableIr"
+        },
+        [pscustomobject] @{
+            Name = "PluginAnalyzer-Generated-Polymorphic"
+            Filter = "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerPolymorphic"
+        },
+        [pscustomobject] @{
+            Name = "PluginAnalyzer-Generated-Expressions"
+            Filter = Join-AnyTestFilter @(
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerString",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerProperty",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerConstant",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerConditional",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerNumeric",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerPattern",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerRange",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerShortCircuit",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerBlockBody",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerValueReceiver")
+        },
+        [pscustomobject] @{
+            Name = "PluginAnalyzer-Generated-Misc"
+            Filter = Join-AnyTestFilter @(
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerTests",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerDatabase",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerEventProperty",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerClosedGeneric",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerEnumerable",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerIncrementality",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerInherited",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerLiveSetting",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerNullable",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerPluginId",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginPackage",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.EventPropertyCapability",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.GeneratedPackagePluginId",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.KernelClassIndexMetadata",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerInvocation",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerNegativeLiteral",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.PluginAnalyzerResultLocalHandlerValidator",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.ServerExtensionPackage")
+        }
+    )
+
+    $batches += @($pluginAnalyzerBatches | ForEach-Object {
+        New-TestBatch $_.Name (Join-TestFilters $Filter $_.Filter)
+    })
+
+    return $batches
 }
 
 $projectPaths = @($Projects | ForEach-Object { Resolve-ProjectPath $_ } | Where-Object {
