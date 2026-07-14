@@ -40,6 +40,8 @@ namespace Snap.Kw
 
         public global::System.Threading.Tasks.Task DispatchOnInstanceAsync(string instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::DotBoxD.Services.Streaming.Remote.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct = default)
         {
+            ct.ThrowIfCancellationRequested();
+
             if (!registry.TryGet("IKwSnap", instanceId, out var __obj) || __obj is not global::Snap.Kw.IKwSnap __inst)
             {
                 throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException("Instance '" + instanceId + "' not found for service 'IKwSnap'.", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Instance);
@@ -59,6 +61,7 @@ namespace Snap.Kw
                 case "DoAsync":
                 {
                     var args = serializer.Deserialize<(int, int)>(payload);
+                    ct.ThrowIfCancellationRequested();
                     var __dotboxd_task = receiver.DoAsync(args.Item1, args.Item2);
                     var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result

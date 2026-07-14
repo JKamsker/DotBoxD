@@ -200,7 +200,6 @@ internal static class RpcJsonTypeResolver
 
     private static string RecordDtoJsonTypeCore(INamedTypeSymbol named, JsonTypeContext context)
     {
-        DotBoxDRpcTypeMapper.RejectInheritedDtoProperties(named);
         var fields = DotBoxDRpcTypeMapper.RecordFields(named);
         var fieldTypes = new List<string>(fields.Count);
         foreach (var field in fields)

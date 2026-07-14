@@ -2,19 +2,49 @@
 #
 # DotBoxD pre-commit hook.
 #
-# Auto-formats the staged C# files with `dotnet format` (whitespace, per .editorconfig) and
-# re-stages the result, so commits land already formatted and pass the CI
-# `dotnet format whitespace --verify-no-changes` gate. CodeEnforcer is intentionally NOT run here.
+# 1. Normalizes em dashes (U+2014) to plain hyphens in staged Markdown files and re-stages them.
+# 2. Auto-formats the staged C# files with `dotnet format` (whitespace, per .editorconfig) and
+#    re-stages the result, so commits land already formatted and pass the CI
+#    `dotnet format whitespace --verify-no-changes` gate. CodeEnforcer is intentionally NOT run here.
 #
 # Active via core.hooksPath=.githooks, which is auto-configured on build (see Directory.Build.props).
 # That setting lives in the shared git config, so it also covers every git worktree with no
 # per-worktree step. Set DOTBOXD_SKIP_FORMAT_HOOK=1 to bypass for a single commit.
+#
+# Note for docs/Specs edits: normalization changes spec bytes, so refresh the integrity manifest
+# in the same commit: ./eng/scripts/check-spec-manifest.ps1 -Update
 set -eu
 
 if [ "${DOTBOXD_SKIP_FORMAT_HOOK:-}" = "1" ]; then
     exit 0
 fi
 
+cd "$(git rev-parse --show-toplevel)"
+
+# --- Markdown: normalize em dashes to hyphens ---------------------------------------------------
+# Staged, non-deleted Markdown files (Added / Copied / Modified / Renamed).
+md_files=$(git diff --cached --name-only --diff-filter=ACMR -- '*.md' '*.mdx')
+if [ -n "$md_files" ]; then
+    if command -v perl >/dev/null 2>&1; then
+        printf '%s\n' "$md_files" | while IFS= read -r file; do
+            if [ -n "$file" ] && [ -f "$file" ]; then
+                # Byte-level replace of the UTF-8 em-dash sequence (E2 80 94), so encoding and
+                # line endings stay untouched. Portable across GNU/BSD (no sed -i differences).
+                if perl -i -pe 's/\xe2\x80\x94/-/g' "$file"; then
+                    if ! git add -- "$file"; then
+                        echo "pre-commit: could not re-stage normalized file '$file'; leaving it unchanged in the index." >&2
+                    fi
+                else
+                    echo "pre-commit: em-dash normalization failed for '$file'; leaving it unchanged in the index." >&2
+                fi
+            fi
+        done
+    else
+        echo "pre-commit: 'perl' not found on PATH; skipping em-dash normalization." >&2
+    fi
+fi
+
+# --- C#: dotnet format whitespace ----------------------------------------------------------------
 # Staged, non-deleted C# files (Added / Copied / Modified / Renamed).
 files=$(git diff --cached --name-only --diff-filter=ACMR -- '*.cs')
 [ -n "$files" ] || exit 0
@@ -23,8 +53,6 @@ if ! command -v dotnet >/dev/null 2>&1; then
     echo "pre-commit: 'dotnet' not found on PATH; skipping C# auto-format (CI still verifies)." >&2
     exit 0
 fi
-
-cd "$(git rev-parse --show-toplevel)"
 
 # Format only the staged files (scoped + --no-restore keeps it fast). A formatter failure must not
 # block the commit; the CI format gate is the backstop.

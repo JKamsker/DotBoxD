@@ -23,8 +23,19 @@ public sealed class TcpServerTransport : IServerTransport
     }
     public TcpServerTransport(string address, int port)
     {
-        _address = IPAddress.Parse(address ?? throw new ArgumentNullException(nameof(address)));
+        _address = ParseAddress(address);
         _port = EnsurePort(port);
+    }
+    private static IPAddress ParseAddress(string address)
+    {
+        if (address == null)
+        {
+            throw new ArgumentNullException(nameof(address));
+        }
+
+        return IPAddress.TryParse(address, out var parsed)
+            ? parsed
+            : throw new ArgumentException("Address must be a valid IP address.", nameof(address));
     }
     private static int EnsurePort(int port) => (uint)port <= 65535 ? port : throw new ArgumentOutOfRangeException(nameof(port));
     /// <summary>

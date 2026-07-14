@@ -7,6 +7,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 internal sealed class ForbiddenHelperCallGraph
 {
     private readonly ConcurrentDictionary<ISymbol, ITypeSymbol> _forbidden = new(SymbolEqualityComparer.Default);
+    private readonly DynamicHelperCallResolver _dynamicHelperCalls = new();
     private readonly ConcurrentBag<HelperEdge> _helperEdges = [];
     private readonly ConcurrentBag<RootHelperCall> _rootCalls = [];
 
@@ -27,9 +28,47 @@ internal sealed class ForbiddenHelperCallGraph
     public void RecordForbidden(IFieldSymbol field, ITypeSymbol type)
         => _forbidden.TryAdd(Normalize(field), type);
 
+    public void RecordDynamicLocalType(ILocalSymbol local, ITypeSymbol? type)
+        => _dynamicHelperCalls.RecordLocalType(local, type);
+
+    public void RecordDynamicInvocation(
+        ISymbol? caller,
+        ILocalSymbol receiver,
+        string memberName,
+        int argumentCount,
+        Location location)
+        => _dynamicHelperCalls.RecordInvocation(caller, receiver, memberName, argumentCount, location);
+
+    public void RecordDispatchImplementations(IMethodSymbol method)
+    {
+        if (method.DeclaringSyntaxReferences.Length == 0 ||
+            PluginAnalyzer.IsEventKernel(method.ContainingType))
+        {
+            return;
+        }
+
+        if (method.OverriddenMethod is { } overridden)
+        {
+            _helperEdges.Add(new HelperEdge(Normalize(overridden), Normalize(method)));
+        }
+
+        foreach (var @interface in method.ContainingType.AllInterfaces)
+        {
+            foreach (var member in @interface.GetMembers(method.Name).OfType<IMethodSymbol>())
+            {
+                if (SymbolEqualityComparer.Default.Equals(
+                    method.ContainingType.FindImplementationForInterfaceMember(member),
+                    method))
+                {
+                    _helperEdges.Add(new HelperEdge(Normalize(member), Normalize(method)));
+                }
+            }
+        }
+    }
+
     public void RecordCall(IMethodSymbol caller, IMethodSymbol target, Location location)
     {
-        if (target.DeclaringSyntaxReferences.Length == 0 ||
+        if (!IsReachableSourceMethod(target) ||
             PluginAnalyzer.IsEventKernel(target.ContainingType))
         {
             return;
@@ -48,6 +87,31 @@ internal sealed class ForbiddenHelperCallGraph
         }
 
         _helperEdges.Add(new HelperEdge(Normalize(caller), normalizedTarget));
+    }
+
+    public void RecordConstructorInitializers(IMethodSymbol constructor)
+    {
+        if (constructor.MethodKind != MethodKind.Constructor ||
+            constructor.IsStatic ||
+            constructor.ContainingType.DeclaringSyntaxReferences.Length == 0 ||
+            PluginAnalyzer.IsEventKernel(constructor.ContainingType))
+        {
+            return;
+        }
+
+        var normalizedConstructor = Normalize(constructor);
+        foreach (var member in constructor.ContainingType.GetMembers())
+        {
+            switch (member)
+            {
+                case IFieldSymbol { IsStatic: false, IsImplicitlyDeclared: false, DeclaringSyntaxReferences.Length: > 0 } field:
+                    _helperEdges.Add(new HelperEdge(normalizedConstructor, Normalize(field)));
+                    break;
+                case IPropertySymbol { IsStatic: false, IsImplicitlyDeclared: false, DeclaringSyntaxReferences.Length: > 0 } property:
+                    _helperEdges.Add(new HelperEdge(normalizedConstructor, Normalize(property)));
+                    break;
+            }
+        }
     }
 
     public void RecordDelegateFieldTarget(IFieldSymbol field, IMethodSymbol target)
@@ -134,6 +198,7 @@ internal sealed class ForbiddenHelperCallGraph
 
     public void ReportDiagnostics(CompilationAnalysisContext context)
     {
+        _dynamicHelperCalls.Resolve(RecordCall, RecordInitializerRootCall);
         if (_forbidden.IsEmpty ||
             _rootCalls.IsEmpty)
         {
@@ -196,6 +261,15 @@ internal sealed class ForbiddenHelperCallGraph
     private static bool IsStaticSourceMember(ISymbol symbol)
         => symbol.DeclaringSyntaxReferences.Length != 0 &&
             symbol is IFieldSymbol { IsStatic: true } or IPropertySymbol { IsStatic: true };
+
+    private static bool IsReachableSourceMethod(IMethodSymbol method)
+        => method.DeclaringSyntaxReferences.Length != 0 ||
+            method is
+            {
+                MethodKind: MethodKind.Constructor,
+                IsStatic: false,
+                ContainingType.DeclaringSyntaxReferences.Length: > 0
+            };
 
     private static ISymbol Normalize(ISymbol symbol)
         => symbol switch

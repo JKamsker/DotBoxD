@@ -34,31 +34,51 @@ export default defineConfig({
       lastUpdated: true,
       customCss: ['./src/styles/custom.css'],
       sidebar: [
-        { label: 'Overview', slug: 'overview' },
-        { label: 'Why DotBoxD?', slug: 'why-dotboxd' },
-        { label: 'Getting started', slug: 'getting-started' },
         {
-          label: 'Tutorials',
+          label: 'Start here',
           items: [
-            { label: 'All tutorials', slug: 'tutorials' },
-            { label: '1 · First service (RPC)', slug: 'tutorials/first-service' },
-            { label: '2 · Event pipelines (RunLocal)', slug: 'tutorials/event-pipeline-runlocal' },
-            { label: '3 · Pushdown server extension', slug: 'tutorials/pushdown-server-extension' },
-            { label: '4 · Hand-written IR hook pipeline', slug: 'tutorials/handwritten-ir-hook-pipeline' },
+            { label: 'What is DotBoxD?', slug: 'overview' },
+            { label: 'Why DotBoxD?', slug: 'why-dotboxd' },
+            { label: 'Getting started', slug: 'getting-started' },
+          ],
+        },
+        {
+          label: 'Tutorials & walkthroughs',
+          items: [
+            { label: 'Pick your journey', slug: 'tutorials' },
+            { label: '1 · Call — first Service (RPC)', slug: 'tutorials/first-service' },
+            { label: '2 · React — event pipelines', slug: 'tutorials/event-pipeline-runlocal' },
+            { label: '3 · Extend — Pushdown', slug: 'tutorials/pushdown-server-extension' },
+            { label: 'Advanced · Hand-written IR', slug: 'tutorials/handwritten-ir-hook-pipeline' },
           ],
         },
         {
           label: 'Concepts',
           items: [
-            { label: 'Services (RPC)', slug: 'concepts/services' },
-            { label: 'Kernels (sandbox)', slug: 'concepts/kernels' },
-            { label: 'Pushdown', slug: 'concepts/pushdown' },
-            { label: 'Event pipelines', slug: 'concepts/event-pipelines' },
-            { label: 'Host bindings', slug: 'concepts/host-bindings' },
-            { label: 'Kernel runtime', slug: 'concepts/runtime' },
-            { label: 'Remote kernel debugging', slug: 'concepts/remote-kernel-debugging' },
-            { label: 'Determinism contract', slug: 'concepts/determinism' },
-            { label: 'Channels & transports', slug: 'concepts/channels-transports' },
+            {
+              label: 'The three modes',
+              items: [
+                { label: 'Services (RPC)', slug: 'concepts/services' },
+                { label: 'Event pipelines', slug: 'concepts/event-pipelines' },
+                { label: 'Pushdown', slug: 'concepts/pushdown' },
+              ],
+            },
+            {
+              label: 'The sandbox',
+              items: [
+                { label: 'Kernels', slug: 'concepts/kernels' },
+                { label: 'Host bindings', slug: 'concepts/host-bindings' },
+                { label: 'Kernel runtime (advanced)', slug: 'concepts/runtime' },
+                { label: 'Remote kernel debugging', slug: 'concepts/remote-kernel-debugging' },
+                { label: 'Determinism (advanced)', slug: 'concepts/determinism' },
+              ],
+            },
+            {
+              label: 'The wire',
+              items: [
+                { label: 'Channels & transports', slug: 'concepts/channels-transports' },
+              ],
+            },
           ],
         },
         {
@@ -74,6 +94,18 @@ export default defineConfig({
           ],
         },
         {
+          label: 'RPC & transports (deep dive)',
+          collapsed: true,
+          items: [
+            { label: 'RPC quick start', slug: 'channels/quick-start' },
+            { label: 'API reference', slug: 'channels/api-reference' },
+            { label: 'Named-pipe transport', slug: 'channels/named-pipe-transport' },
+            { label: 'WebSocket setup', slug: 'channels/websocket-setup' },
+            { label: 'Unity integration', slug: 'channels/unity-integration' },
+            { label: 'Performance', slug: 'channels/performance' },
+          ],
+        },
+        {
           label: 'Security',
           items: [
             { label: 'Sandbox caveats', slug: 'security/sandbox-caveats' },
@@ -86,27 +118,15 @@ export default defineConfig({
         {
           label: 'Reference',
           items: [
+            { label: 'Glossary', slug: 'reference/glossary' },
             { label: 'Diagnostics (DBXS / DBXK)', slug: 'reference/diagnostics' },
             { label: 'Consumer testing kit', slug: 'reference/testing' },
             { label: 'Schemas', slug: 'reference/schemas' },
             { label: 'Remote debug protocol v1', slug: 'reference/remote-debug-protocol' },
-            { label: 'Glossary', slug: 'reference/glossary' },
             {
               label: 'Specifications',
               link: 'https://github.com/JKamsker/DotBoxD/tree/main/docs/Specs',
             },
-          ],
-        },
-        {
-          label: 'Channels (RPC) guide',
-          collapsed: true,
-          items: [
-            { label: 'Quick start', slug: 'channels/quick-start' },
-            { label: 'API reference', slug: 'channels/api-reference' },
-            { label: 'Named-pipe transport', slug: 'channels/named-pipe-transport' },
-            { label: 'WebSocket setup', slug: 'channels/websocket-setup' },
-            { label: 'Unity integration', slug: 'channels/unity-integration' },
-            { label: 'Performance', slug: 'channels/performance' },
           ],
         },
         {

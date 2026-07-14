@@ -4,6 +4,21 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.HostBinding.Contract;
 
 public sealed class HostBindingAttributeContractTests
 {
+    [Fact]
+    public void Explicit_HostBindingAttribute_opts_into_receiver_forwarding()
+    {
+        var attribute = new HostBindingAttribute(
+            "host.probe.read",
+            "probe.read.value",
+            SandboxEffect.Cpu | SandboxEffect.HostStateRead);
+
+        Assert.False(attribute.IncludeReceiver);
+
+        attribute.IncludeReceiver = true;
+
+        Assert.True(attribute.IncludeReceiver);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]

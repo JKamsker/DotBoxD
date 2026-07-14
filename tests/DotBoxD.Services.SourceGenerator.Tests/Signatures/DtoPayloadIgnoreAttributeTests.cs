@@ -190,7 +190,7 @@ public sealed class DtoPayloadIgnoreAttributeTests
     }
 
     [Fact]
-    public void UnignoredDerivedGetter_RemainsRejectedByDtoReconstructibilityValidation()
+    public async Task UnignoredDerivedGetter_RoundTripsThroughSerializerOwnedMaterialization()
     {
         const string source = """
             using DotBoxD.Services.Attributes;
@@ -204,25 +204,32 @@ public sealed class DtoPayloadIgnoreAttributeTests
                 }
 
                 [RpcService]
-                public interface IRejectedResourceRpc
+                public interface IResourceRpc
                 {
-                    Task<int> SendAsync(ResourceHandle handle);
+                    Task<ResourceHandle> EchoAsync(ResourceHandle handle);
+                }
+
+                public sealed class ResourceRpc : IResourceRpc
+                {
+                    public Task<ResourceHandle> EchoAsync(ResourceHandle handle) => Task.FromResult(handle);
                 }
             }
             """;
 
-        var runResult = Compile(source);
+        var h = GeneratedRoundTripTestSupport.Harness.Build(
+            source,
+            "Regress.DtoPayloadIgnore.IResourceRpc",
+            "Regress.DtoPayloadIgnore.ResourceRpc");
+        var handleType = h.LoadType("Regress.DtoPayloadIgnore.ResourceHandle");
+        var handle = Activator.CreateInstance(handleType, 0UL)!;
 
-        var diagnostic = runResult.Diagnostics.Should().ContainSingle(d => d.Id == "DBXS002").Subject;
-        diagnostic.GetMessage().Should().Contain("member 'IsEmpty'");
-        diagnostic.GetMessage().Should().Contain("public setter or init");
+        var json = JsonSerializer.Serialize(handle, handleType);
+        json.Should().Contain("Value");
+        json.Should().Contain("IsEmpty");
 
-        var dispatcher = runResult.Results.Single()
-            .GeneratedSources
-            .Single(g => g.HintName.EndsWith("IRejectedResourceRpc.DotBoxDRpcDispatcher.g.cs"))
-            .SourceText
-            .ToString();
-        dispatcher.Should().NotContain("case \"SendAsync\":");
+        var echoed = (await h.CallAsync("EchoAsync", handle))!;
+        echoed.GetType().GetProperty("Value")!.GetValue(echoed).Should().Be(0UL);
+        echoed.GetType().GetProperty("IsEmpty")!.GetValue(echoed).Should().Be(true);
     }
 
     private static GeneratorDriverRunResult Compile(string source)

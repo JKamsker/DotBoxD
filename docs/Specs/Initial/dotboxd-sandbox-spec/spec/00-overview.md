@@ -1,4 +1,4 @@
-# 00 — Overview
+# 00 - Overview
 
 ## Summary
 

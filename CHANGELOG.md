@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased] — DotBoxD
+## [Unreleased] - DotBoxD
 
 This release establishes **DotBoxD**, a single contract-first .NET extension runtime spanning
 Services, Kernels, and Pushdown.
@@ -20,12 +20,16 @@ Services, Kernels, and Pushdown.
   release pipeline with provenance attestation.
 - **Meta-packages:** `DotBoxD` (net10.0, full stack) and `DotBoxD.Services.All` (netstandard2.1,
   Unity/IL2CPP service bundle).
+- **Serializer-owned Services DTO materialization:** the Services source generator no longer rejects
+  getter-only properties, private setters, or DTO constructor layouts before the configured
+  `ISerializer` can handle them. RPC-specific payload restrictions and explicit-union validation remain
+  enforced by the generator.
 - **GameServer example:** `samples/GameServer/Examples.GameServer.Server` is the maintained
   runnable example for service IPC, event kernels, live settings, host bindings, policies, and
   kernel RPC. Removed sample coverage is tracked in
   [the examples coverage-gaps page](https://dotboxd.kamsker.at/examples/coverage-gaps/).
 - **Server-extension DTO parameters & broader type support:** `[ServerExtensionMethod]` entrypoints now
-  accept record/value-object parameters — including nested DTOs and plain `class` DTOs — on the grafted
+  accept record/value-object parameters - including nested DTOs and plain `class` DTOs - on the grafted
   client path, matching the typed-proxy path (issue #41). The proxy and grafted clients now share one
   marshaller, which also fixes invalid generated C# for a record return whose field is a `List<T>`.
   Additionally: **enums** marshal through their underlying integer (params, returns, and DTO fields); DTOs
@@ -46,7 +50,7 @@ Services, Kernels, and Pushdown.
 - **Documentation & repo polish:** new top-level README, `docs/` information architecture
   (getting-started, concepts, security, reference, contributing), `SECURITY.md`, `CONTRIBUTING.md`,
   `CODE_OF_CONDUCT.md`, and GitHub repo metadata files.
-- **BREAKING — public de-brand:** over-branded public types had the redundant `DotBoxD` prefix
+- **BREAKING - public de-brand:** over-branded public types had the redundant `DotBoxD` prefix
   stripped now that their namespace already conveys the brand. The wire format is unchanged; only
   the .NET type names changed. Renames:
   `DotBoxDDotBoxDRpcMessagePackIpc` → `RpcMessagePackIpc` (also fixes a double-brand bug);
@@ -79,7 +83,7 @@ retained verbatim as historical record (CHANGELOG is excluded from the rebrand-c
 - **BREAKING:** Removed the legacy `ShaRpcClient`, `ShaRpcServer` (and their builders /
   `IShaRpcClient` / `IShaRpcServer`), `ShaRpcPeer`, and `DuplexConnectionSplitter`. `RpcPeer`
   and `RpcHost` are now the only surface. The wire format is unchanged, so peers remain
-  interoperable across versions — only the .NET API changed. Migrate
+  interoperable across versions - only the .NET API changed. Migrate
   `client.CreateXProxy()` → `peer.GetX()`, `serverBuilder.AddX(impl)` →
   `host.ForEachPeer(p => p.ProvideX(impl))`, and `ShaRpcPeer` → `RpcPeer`.
 - **BREAKING:** The generated `Create…Proxy(IShaRpcClient)` and `Add…(ShaRpcServerBuilder)`
@@ -103,7 +107,7 @@ retained verbatim as historical record (CHANGELOG is excluded from the rebrand-c
   `Timeout.InfiniteTimeSpan` disables), configurable via `TcpServerTransport.FrameReadIdleTimeout`
   and `TcpTransport.FrameReadIdleTimeout`. It tears down a connection whose in-progress frame read
   stalls (a slow-loris peer that declares a large frame then trickles or sends nothing), while
-  leaving legitimately idle connections — those awaiting the next frame — untouched.
+  leaving legitimately idle connections - those awaiting the next frame - untouched.
 - **Fixed:** disposing an idle `RpcPeer`/`RpcHost` could deadlock on netstandard2.1 runtimes
   (.NET Framework, Unity/Mono) where an in-progress socket read ignores the cancellation token.
   `DisposeAsync` now closes the channel before awaiting the read loop.

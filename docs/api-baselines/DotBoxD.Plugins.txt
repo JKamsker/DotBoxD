@@ -244,7 +244,7 @@ public KernelDebugInfo? DebugInfo => Package.DebugInfo
 public KernelDebugPauseScope DefaultPauseScope { get; init; } = KernelDebugPauseScope.Server
 public KernelRegistry Kernels { get; }
 public KernelRpcPayloadReader(ReadOnlySpan<byte> payload)
-public KernelRpcValue GetItem(int index) => (_items ?? EmptyItems)[index]
+public KernelRpcValue GetItem(int index)
 public KernelRpcValue[] Items => CopyItems(_items ?? EmptyItems)
 public KernelRpcValueKind Kind { get; }
 public LiveContext<T> BindContext<T>(string name, Action<T>? initialize = null) where T : class

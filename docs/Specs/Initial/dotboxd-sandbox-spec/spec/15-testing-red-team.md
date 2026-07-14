@@ -1,4 +1,4 @@
-# 15 — Testing and Red-Team Plan
+# 15 - Testing and Red-Team Plan
 
 ## Test strategy
 

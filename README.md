@@ -1,6 +1,8 @@
 # DotBoxD
 
-> A source-generated, contract-first **plugin system for .NET hosts** — Services (RPC), Kernels (sandboxed logic), Pushdown (server-side batching).
+> Contract-first plugin development for .NET hosts. Three interaction modes - **call** (typed RPC),
+> **react** (server-filtered events), **extend** (plugin-shipped batch operations) - and one
+> validated, fuel-metered **sandbox** for plugin-authored logic that runs inside the host.
 
 [![CI](https://github.com/JKamsker/DotBoxD/actions/workflows/ci.yml/badge.svg)](https://github.com/JKamsker/DotBoxD/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/JKamsker/DotBoxD/actions/workflows/codeql.yml/badge.svg)](https://github.com/JKamsker/DotBoxD/actions/workflows/codeql.yml)
@@ -9,81 +11,45 @@
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4.svg)](https://dotnet.microsoft.com/)
 [![Docs](https://img.shields.io/badge/docs-online-2ea44f.svg)](https://dotboxd.kamsker.at/)
 
-**For .NET hosts — game servers, desktop apps, backend services — that must run untrusted
-third-party plugins safely.** The Services stack targets `netstandard2.1`; Unity/IL2CPP deployments
-must use generated MessagePack DTO formatters and validate their own IL2CPP build. The Kernels and
-Pushdown stack targets `net10.0`.
+DotBoxD is a complete **plugin system for .NET hosts** - game servers, desktop apps, backend
+services - that must run **untrusted third-party plugins** safely. Everything you author is plain,
+contract-first C# (interfaces, records, attributes) that source generators turn into wiring, and
+it ships the whole architecture: process isolation over IPC, transports, codecs, generated
+proxies, event pipelines, plugin lifecycle, and the piece .NET itself doesn't give you - a safe
+way to run plugin *logic* inside the host process.
 
-## The problem
+**Why that last piece matters:** `AssemblyLoadContext` is not a security boundary, so untrusted
+plugins must live in a sidecar process behind IPC. That is safe but costly: every interaction pays
+a round-trip, and the host vendor has to design event-filter APIs blind. DotBoxD keeps the process
+boundary and moves the plugin's *logic* (never its code) into the host: filters, projections, and
+batches compile to restricted **kernel IR** (never C#/IL) that the host validates, capability-gates,
+and fuel-meters before running next to its data. Full story in three diagrams:
+[**Why DotBoxD?**](https://dotboxd.kamsker.at/why-dotboxd/)
 
-.NET cannot safely isolate arbitrary code **in-process**: AppDomains are gone, and
-`AssemblyLoadContext` is a loading feature, **not** a security boundary. The only thing the OS can
-truly isolate is a whole *process*, so the safe way to run untrusted plugins is an unprivileged
-**sidecar** behind IPC. That safe design imposes two costs: **round-trips** — every interaction
-crosses the process boundary, so an N-item loop pays latency × N — and the **filter-API dilemma** —
-the host vendor (who is *not* the plugin author) has to design an event-filter API blind, and it is
-always either too coarse (oversharing plus overhead) or too exhaustive (endless unused options, still
-not expressive enough). If your .NET host must accept third-party plugins safely, you pay both costs.
+📖 **Docs, tutorials, and API reference:** <https://dotboxd.kamsker.at/>
 
-## The answer
+## Quick start
 
-DotBoxD is a **complete plugin system for .NET hosts** that keeps the process boundary but gives
-plugin *logic* a safe way back into the host: a validated, capability-gated, fuel-metered in-process
-sandbox that runs restricted IR (intermediate representation) — never loaded C#/IL. Author-written
-filters, projections, and batches are compiled down to that IR at build time and run next to the
-host's data, so:
-
-- **Event pipelines push only server-side filtered/projected data** — 0 round-trips.
-- **Pushdown collapses N calls into 1.**
-- **The plugin author — not the vendor — writes the filter.**
-
-It also ships the rest of the plugin-system ceremony (transports, codecs, generated
-proxies/dispatchers, registries, lifecycle such as unload-on-disconnect), all driven by Roslyn source
-generators with no runtime reflection on the hot path.
-
-📖 **Start here:** [**Why DotBoxD?** — the isolation-vs-latency dilemma in three diagrams](https://dotboxd.kamsker.at/why-dotboxd/).
-Full guide, tutorials, examples, and the generated API reference live at <https://dotboxd.kamsker.at/>.
 The opt-in tooling for pausing real server-executed kernels is covered in
 [Remote kernel debugging](docs-site/src/content/docs/concepts/remote-kernel-debugging.md).
 
-**How:** one C# contract, delivered three ways.
-
-- **Services** — the host implements a contract; clients call it remotely over RPC. A typed proxy and
-  dispatcher are generated from the same interface, so they cannot drift; AOT deployments also need a
-  generated/static codec resolver.
-- **Kernels** — a client supplies validated logic the host runs safely inside a fuel-metered sandbox.
-  Downstream, this event-pipeline flavor is called *Query (RunLocal)*.
-- **Pushdown** — a plugin ships its *own* sandboxed batch operation that runs *server-side*, looping
-  over the host's existing fine-grained bindings so many small remote calls collapse into one
-  round-trip.
-
----
-
-## The three ways to use one contract
-
-The snippets below use the real, compiling API. The maintained runnable example is the GameServer
-sample at [`samples/GameServer/Examples.GameServer.Server`](samples/GameServer/Examples.GameServer.Server),
-which combines service IPC, event kernels, live settings, host bindings, policies, and server extensions.
-Features that used to be split across removed samples are tracked in
-[the examples coverage-gaps page](https://dotboxd.kamsker.at/examples/coverage-gaps/).
-
-### 1. Services — define a contract, host it, call it remotely
-
-```csharp
-using DotBoxD.Services.Attributes;
-
-// One contract, shared by host and client.
-[RpcService]
-public interface ICatalogService
-{
-    ValueTask<int> GetUnitPriceAsync(string itemId, CancellationToken cancellationToken = default);
-    ValueTask<CartTotal> ComputeCartTotalAsync(Cart cart, CancellationToken cancellationToken = default);
-}
+```bash
+dotnet new console -n CatalogQuickstart
+cd CatalogQuickstart
+dotnet add package DotBoxD --prerelease   # full net10.0 stack; DotBoxD.Services.All = netstandard2.1/Unity bundle
 ```
 
+Replace `Program.cs` with this complete file - it defines a contract, hosts it on a named pipe,
+and calls it through the generated typed proxy:
+
 ```csharp
-using DotBoxD.Pushdown.Services;       // IPC helper
+using DotBoxD.Pushdown.Services;        // RpcMessagePackIpc helper
+using DotBoxD.Services.Attributes;      // [RpcService]
 using DotBoxD.Services.Generated;       // generated ProvideCatalogService / Get<T>
+
+// A unique pipe name, so parallel runs never collide.
+var pipeName = $"dotboxd-quickstart-{Guid.NewGuid():N}";
+var prices = new Dictionary<string, int> { ["sword"] = 120, ["shield"] = 80 };
 
 // Host: turn every accepted connection into a peer that serves the contract.
 await using var host = RpcMessagePackIpc.ListenNamedPipe(
@@ -91,81 +57,83 @@ await using var host = RpcMessagePackIpc.ListenNamedPipe(
     peer => peer.ProvideCatalogService(new CatalogService(prices)));
 await host.StartAsync();
 
-// Client: connect and get a strongly typed proxy — calls go over the wire.
+// Client: connect and call the generated typed proxy. The client lives in the
+// same process here to keep the demo to one file; the call still crosses the
+// named pipe exactly like an out-of-process client would.
 await using var connection = await RpcMessagePackIpc.ConnectNamedPipeAsync(pipeName);
 var catalog = connection.Get<ICatalogService>();
 
-var unitPrice = await catalog.GetUnitPriceAsync("sword"); // one remote round-trip
-```
+var price = await catalog.GetUnitPriceAsync("sword");
+Console.WriteLine($"sword costs {price}");
 
-The `[RpcService]` attribute drives the `DotBoxD.Services.SourceGenerator`, which emits a typed
-proxy, a dispatcher, and the `ProvideCatalogService(...)` / `Get<ICatalogService>()` extensions at
-compile time.
-
-### 2. Kernels — run validated logic under a policy
-
-A kernel is restricted JSON IR (never C#, IL, or arbitrary host calls). The host imports it,
-validates it against a capability/resource policy, and executes it inside a fuel-metered sandbox.
-Hosts can still expose their own APIs deliberately through policy-gated host bindings; see
-[Host bindings](https://dotboxd.kamsker.at/concepts/host-bindings/).
-
-```csharp
-using DotBoxD.Hosting;
-using DotBoxD.Kernels;
-
-// A sandbox host with only the safe, pure bindings enabled.
-var host = SandboxHost.Create(builder =>
+// The contract: one attribute, no base classes, no marshaling code.
+[RpcService]
+public interface ICatalogService
 {
-    builder.AddDefaultPureBindings();
-    builder.UseInterpreter();
-});
+    ValueTask<int> GetUnitPriceAsync(string itemId, CancellationToken cancellationToken = default);
+}
 
-// A policy is a hard budget: fuel, loop iterations, list length, capability grants.
-var policy = SandboxPolicyBuilder.Create()
-    .WithFuel(1_000_000)
-    .WithMaxLoopIterations(10_000)
-    .WithMaxListLength(10_000)
-    .Build();
-
-var module = await host.ImportJsonAsync(kernelJson);
-var plan = await host.PrepareAsync(module, policy);
-
-var input = SandboxValue.FromList(
-    [.. subtotals.Select(SandboxValue.FromInt32)],
-    SandboxType.I32);
-
-var result = await host.ExecuteAsync(plan, "main", input);
-
-if (result.Succeeded && result.Value is I32Value total)
+// The host-side implementation is plain C#.
+public sealed class CatalogService(Dictionary<string, int> prices) : ICatalogService
 {
-    // A buggy or hostile kernel cannot run away with host resources:
-    Console.WriteLine($"total={total.Value}, fuel burned={result.ResourceUsage.FuelUsed}");
+    public ValueTask<int> GetUnitPriceAsync(string itemId, CancellationToken cancellationToken = default)
+        => ValueTask.FromResult(prices[itemId]);
 }
 ```
 
-### 3. Pushdown — plugins ship server-side batch operations
+`dotnet run` prints `sword costs 120`. The same steps, with expected output at every checkpoint,
+are in [Getting started](https://dotboxd.kamsker.at/getting-started/). To see every feature
+working together, clone the repo and run the maintained end-to-end sample:
 
-This is the payoff. The host is typically **frozen at release** and exposes only fine-grained
-bindings (e.g. "kill *one* monster"); it ships no batch operations. A client that needs to act on
-many entities would otherwise make one remote call per entity. With pushdown, a plugin supplies its
-own server-side aggregate as a sandboxed server extension: the analyzer lowers its C# batch method
-to verified IR that runs server-side, looping over the host's *existing* bindings. The server is
-never recompiled — only the plugin changes — and **N round-trips collapse into one**.
+```bash
+dotnet run -c Release --project samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
+```
+
+## Three interaction modes
+
+Every plugin interaction is one of three shapes. What differs is where the author's logic runs and
+what crosses the wire:
+
+| Mode | You author | Wire behavior | Typical use |
+|------|-----------|---------------|-------------|
+| **1 · Services (RPC)** - *call the host* | An `[RpcService]` interface; the host implements it, clients get a generated typed proxy. | Request → response; 1 round-trip per call. | Fetch a price, compute a total. |
+| **2 · Event pipelines** - *react to the host* | A `Where`/`Select` chain over a host event; the filter runs **inside the host** as sandboxed IR. | One-way push of matching, projected events; 0 round-trips (a result terminal such as `RegisterLocal` returns one reply per match). | High-frequency event streams you need a slice of. |
+| **3 · Pushdown** - *extend the host* | A `[ServerExtension]` batch method; it runs **inside the host** as sandboxed IR, looping the host's existing bindings. | One submission replaces N per-entity calls. | Chatty loops against a host that is frozen at release. |
+
+Modes 2 and 3 compile to the same engine, the
+[kernel sandbox](https://dotboxd.kamsker.at/concepts/kernels/) - validated, capability-gated,
+fuel-metered IR, never loaded C#/IL. Mode 1 is a trusted, hand-written host implementation with no
+sandbox involved.
+
+**Mode 2 in five lines** (from the [GameServer sample](samples/GameServer); built end to end in
+[the event-pipelines walkthrough](https://dotboxd.kamsker.at/tutorials/event-pipeline-runlocal/)):
 
 ```csharp
-// The host (frozen at release) exposes only a fine-grained binding — there is NO batch method here.
-public interface IGameWorld
+server.Hooks.On<MonsterAggroEvent>()
+    .Where(e => e.Distance <= 4)                    // lowered: runs on the SERVER as verified IR
+    .Select(e => e.MonsterId)                       // lowered: runs on the SERVER; projects one field
+    .RunLocal(monsterId => calmedMonsters.Add(monsterId)); // native C#, runs in YOUR plugin process
+```
+
+SDK value objects can expose eligible public instance methods with shared host-binding defaults. The
+receiver becomes argument zero, and ids derive from the prefix, method name, and parameter types:
+
+```csharp
+[HostBindingObject("host.player", "game.player.inventory.read",
+                   SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+public sealed record PlayerSnapshot(int Id, IReadOnlyList<int> ItemIds)
 {
-    [HostBinding("host.world.kill", "game.world.monster.write.kill",
-                 SandboxEffect.Cpu | SandboxEffect.HostStateWrite)]
-    bool Kill(int id);
+    public bool HasItem(int itemId) => ItemIds.Contains(itemId); // host.player.HasItem.i32
+
+    [HostBindingIgnore]
+    public string LocalLabel() => $"player:{Id}"; // remains local-only
 }
+```
 
-// A PLUGIN adds its own batch aggregate. `KillMonsters` does not exist on the host — the plugin ships it.
-// The analyzer lowers this method to verified, capability-gated, fuel-metered IR (a sandboxed kernel).
-public interface IMonsterKillerService { List<KillResult> KillMonsters(List<int> monsterIds); }
-public readonly record struct KillResult(int MonsterId, bool Success);
+**Mode 3, abridged** (the host is frozen and exposes only a fine-grained `bool Kill(int id)`
+binding; the *plugin* ships the batch, and one round-trip replaces N):
 
+```csharp
 [ServerExtension("monster-killer", typeof(IMonsterKillerService))]
 public sealed partial class MonsterKillerKernel
 {
@@ -173,157 +141,143 @@ public sealed partial class MonsterKillerKernel
     {
         var results = new List<KillResult>();
         foreach (var id in monsterIds)
-            results.Add(new KillResult(id, ctx.Host<IGameWorld>().Kill(id))); // calls the host's existing binding
+            results.Add(new KillResult(id, ctx.Host<IGameWorld>().Kill(id))); // the host's EXISTING binding
         return results;
     }
 }
 
-// Server installs the plugin's kernel; the caller invokes it in ONE round-trip:
+// The host installs the plugin's generated kernel once under its service contract.
 await server.RegisterServerExtensionAsync<IMonsterKillerService, MonsterKillerKernel>();
+
 List<KillResult> killed = server.ServerExtension<IMonsterKillerService>().KillMonsters(ids); // 1 round-trip, not N
 ```
 
-The batch logic is **author-supplied**, so it runs as a validated sandboxed kernel under the same trust
-model as event kernels: it can reach only the host bindings the server already exposes, gated by
-capabilities and fuel/quota limits, and it can take and return complex objects and lists of objects
-(via the IR `Record` type). The GameServer sample demonstrates server extensions over the plugin IPC
-control plane; see
-[`docs/design/plugin-fluent-hooks-api/followups.md`](docs/design/plugin-fluent-hooks-api/followups.md)
-for the full design.
+The full version - the host-side `[HostBinding]` declaration, capability gating, registration, and
+how complex objects ride the IR `Record` type - is
+[the Pushdown walkthrough](https://dotboxd.kamsker.at/tutorials/pushdown-server-extension/) and the
+[Pushdown concept](https://dotboxd.kamsker.at/concepts/pushdown/); the design record lives in
+[`docs/design/plugin-fluent-hooks-api/followups.md`](docs/design/plugin-fluent-hooks-api/followups.md).
+The raw sandbox API underneath both modes (import → validate → execute under a fuel policy) is
+public too - see [Kernels](https://dotboxd.kamsker.at/concepts/kernels/) for the smallest
+end-to-end `SandboxHost`.
 
----
+## Security: what is and isn't a boundary
 
-## Quick start
+DotBoxD distinguishes three **trust postures** - read this before deploying:
 
-```bash
-# Full net10.0 stack (Services + Kernels + Pushdown):
-dotnet add package DotBoxD --prerelease
+- **Safe mode is the real boundary.** A kernel is restricted IR that is validated,
+  capability-gated, fuel/quota-metered, and (for compiled mode) verified before it runs. Users
+  never supply C#, raw IL, CLR member names, assemblies, or arbitrary host calls.
+- **Trusted-plugin mode is NOT a security boundary.** It loads normal .NET assemblies via
+  `AssemblyLoadContext`, and **`AssemblyLoadContext` is not a sandbox** - loaded code has full CLR
+  capabilities. Only use it for code you already trust.
+- **Untrusted arbitrary .NET code must be out-of-process / OS-isolated.** In-process restrictions
+  defend against accidental and many malicious-author attacks, but hard multi-tenant isolation
+  requires a worker process, container, or OS-level boundary.
 
-# Unity / netstandard2.1 service bundle:
-dotnet add package DotBoxD.Services.All --prerelease
-```
+See [`SECURITY.md`](SECURITY.md) and
+[Sandbox caveats](https://dotboxd.kamsker.at/security/sandbox-caveats/) for the threat model, the
+three trust postures, and the capabilities/bindings model.
 
-Then read [Getting started](https://dotboxd.kamsker.at/getting-started/) for first-service, first-kernel, and
-pushdown walkthroughs, or run the GameServer sample:
+## Where to go next
 
-```bash
-dotnet run -c Release --project samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
-```
+| Your journey | Start here |
+|--------------|------------|
+| Get a verified end-to-end win | [Getting started](https://dotboxd.kamsker.at/getting-started/) |
+| Understand the why and pick a mode | [Why DotBoxD?](https://dotboxd.kamsker.at/why-dotboxd/) · [Choosing a mode](https://dotboxd.kamsker.at/overview/) |
+| RPC & Unity: typed calls between processes | [Tutorial 1: your first Service](https://dotboxd.kamsker.at/tutorials/first-service/) |
+| Plugin author: react to events, ship batches | [Event pipelines walkthrough](https://dotboxd.kamsker.at/tutorials/event-pipeline-runlocal/) · [Pushdown walkthrough](https://dotboxd.kamsker.at/tutorials/pushdown-server-extension/) |
+| Host integrator: expose bindings, set policy | [Host bindings](https://dotboxd.kamsker.at/concepts/host-bindings/) · [Kernel runtime](https://dotboxd.kamsker.at/concepts/runtime/) |
+| See everything working together | [GameServer walkthrough](https://dotboxd.kamsker.at/examples/gameserver-walkthrough/) |
+| Review the security model | [Sandbox caveats](https://dotboxd.kamsker.at/security/sandbox-caveats/) |
 
----
-
-## Installing from NuGet
-
-To pull individual packages instead of a meta-package, add only the pieces you need. Main-branch CI
-packages are published as `0.1.0-ci.*` prereleases; omit `--prerelease` once you target a stable tag
-release.
-
-```bash
-# Host orchestration (SandboxHost: import, prepare, execute kernels under policy):
-dotnet add package DotBoxD.Hosting --prerelease
-
-# Safe host runtime bindings (files, time, random, logging, strings, math):
-dotnet add package DotBoxD.Kernels.Runtime --prerelease
-
-# JSON IR import/export round trip (JsonImporter / JsonExporter):
-dotnet add package DotBoxD.Kernels.Serialization.Json --prerelease
-
-# HTTP GET binding, grant helpers, and pinned-transport policy validation:
-dotnet add package DotBoxD.Hosting.Http --prerelease
-
-# Plugin authoring contracts ([Plugin], IEventKernel<TEvent>, HookContext):
-dotnet add package DotBoxD.Abstractions --prerelease
-
-# Host runtime that loads, validates, and dispatches plugins:
-dotnet add package DotBoxD.Plugins --prerelease
-
-# Source generator + analyzer that turns [Plugin] kernels into package-backed plugins:
-dotnet add package DotBoxD.Plugins.Analyzer --prerelease
-
-# Preview pushdown IPC addon:
-dotnet add package DotBoxD.Pushdown.Services --prerelease
-```
-
-After installing `DotBoxD.Plugins`, load a built plugin package with `PluginPackageJsonSerializer`,
-which deserializes the plugin-package JSON envelope (manifest + module) so the host can install it.
-
----
+Features that older, removed samples used to demonstrate are tracked in
+[the examples coverage-gaps page](https://dotboxd.kamsker.at/examples/coverage-gaps/).
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    Client["Client / Plugin"]
-    Host["Host process"]
-
-    subgraph Modes["One contract, three modes"]
-        Services["Services<br/>RPC dispatch"]
-        Kernels["Kernels<br/>metered IR sandbox"]
-        Pushdown["Pushdown<br/>server-side composition"]
+    subgraph PluginProc["Plugin / client process (unprivileged)"]
+        Plugin["Plugin code<br/>native C#"]
     end
 
-    Client -->|"remote call"| Services
-    Client -->|"submit validated IR"| Kernels
-    Client -->|"one submission"| Pushdown
-
-    Services --> Host
-    Kernels --> Host
-    Pushdown --> Kernels
-    Pushdown --> Services
-
-    subgraph Channels["Transports + Codecs"]
-        Tcp["DotBoxD.Transports.Tcp"]
-        Pipes["DotBoxD.Transports.NamedPipes"]
-        MsgPack["DotBoxD.Codecs.MessagePack"]
+    subgraph HostProc["Host process (privileged)"]
+        Services["Services<br/>generated dispatch, trusted impl"]
+        Sandbox["Kernel sandbox<br/>validated · capability-gated · fuel-metered IR"]
+        HostState["Host bindings · events · state"]
+        Services --- HostState
+        Sandbox --- HostState
     end
 
-    Services --- Channels
-    Pushdown --- Channels
-
-    subgraph Runtime["Kernel runtime"]
-        Validation["Validation"]
-        Interp["Interpreter"]
-        Compiler["Compiler + Verifier"]
-    end
-
-    Kernels --> Runtime
+    Plugin -->|"1 · call: typed RPC request/response"| Services
+    Plugin -->|"2 · react: install Where/Select filter (IR)"| Sandbox
+    Sandbox -->|"matching, projected events: one-way push"| Plugin
+    Plugin -->|"3 · extend: submit batch (IR), one result back"| Sandbox
 ```
 
-The generators (`DotBoxD.Services.SourceGenerator`, `DotBoxD.Plugins.Analyzer`) emit proxies,
-dispatchers, and plugin factories at compile time. Diagnostics are namespaced `DBXS###` (services)
-and `DBXK###` (kernels/plugins). See [the docs overview](https://dotboxd.kamsker.at/overview/) for the full picture.
+Every arrow crossing the process boundary rides the channel layer
+(`DotBoxD.Transports.Tcp` / `DotBoxD.Transports.NamedPipes` + `DotBoxD.Codecs.MessagePack` - all
+standalone packages), and the sandbox executes IR on an interpreted backend or a verified compiled
+backend. The generators (`DotBoxD.Services.SourceGenerator`, `DotBoxD.Plugins.Analyzer`) emit
+proxies, dispatchers, and plugin factories at compile time. Diagnostics are namespaced `DBXS###`
+(services) and `DBXK###` (kernels/plugins). See
+[the docs overview](https://dotboxd.kamsker.at/overview/) for the full picture.
 
----
+## Installing from NuGet
 
-## Packages
+DotBoxD ships as two stacks. Install a meta-package, or any individual package with
+`dotnet add package <PackageId> --prerelease`. Main-branch CI packages are published as
+`0.1.0-ci.*` prereleases; omit `--prerelease` once you target a stable tag release.
 
-| Package | Purpose | TFM | Stability |
-|---------|---------|-----|-----------|
-| [`DotBoxD`](https://www.nuget.org/packages/DotBoxD) | Meta-package: the full net10.0 stack (Services + Kernels + Pushdown) | net10.0 | Preview |
-| [`DotBoxD.Services.All`](https://www.nuget.org/packages/DotBoxD.Services.All) | Meta-package: service + channel bundle | netstandard2.1 | Stable API · AOT configuration required |
-| [`DotBoxD.Services`](https://www.nuget.org/packages/DotBoxD.Services) | Contract attributes, `RpcPeer`/`RpcHost`, dispatch, and bundled source generator | netstandard2.1 | Stable API |
-| [`DotBoxD.Codecs.MessagePack`](https://www.nuget.org/packages/DotBoxD.Codecs.MessagePack) | MessagePack serializer for the wire format | netstandard2.1 | Stable API · generated resolver required for AOT |
-| [`DotBoxD.Transports.Tcp`](https://www.nuget.org/packages/DotBoxD.Transports.Tcp) | TCP transport | netstandard2.1 | Stable API |
-| [`DotBoxD.Transports.NamedPipes`](https://www.nuget.org/packages/DotBoxD.Transports.NamedPipes) | Named-pipe transport (local IPC) | netstandard2.1 | Stable API |
-| [`DotBoxD.Abstractions`](https://www.nuget.org/packages/DotBoxD.Abstractions) | Plugin-to-host authoring contracts (`[Plugin]`, `IEventKernel<TEvent>`) | net10.0 | Preview |
-| [`DotBoxD.Kernels`](https://www.nuget.org/packages/DotBoxD.Kernels) | IR model, policy model, resource metering, canonical hashing | net10.0 | Preview |
-| [`DotBoxD.Kernels.Validation`](https://www.nuget.org/packages/DotBoxD.Kernels.Validation) | Structural, type, effect, policy, binding validation | net10.0 | Preview |
-| [`DotBoxD.Kernels.Runtime`](https://www.nuget.org/packages/DotBoxD.Kernels.Runtime) | Safe host bindings (files, time, random, logging, strings, math) | net10.0 | Preview |
-| [`DotBoxD.Kernels.Interpreter`](https://www.nuget.org/packages/DotBoxD.Kernels.Interpreter) | Direct IR execution backend | net10.0 | Preview |
-| [`DotBoxD.Kernels.Compiler`](https://www.nuget.org/packages/DotBoxD.Kernels.Compiler) | Generated-runtime backend + persistent artifact cache | net10.0 | Preview |
-| [`DotBoxD.Kernels.Verifier`](https://www.nuget.org/packages/DotBoxD.Kernels.Verifier) | Generated-assembly verifier | net10.0 | Preview |
-| [`DotBoxD.Kernels.Serialization.Json`](https://www.nuget.org/packages/DotBoxD.Kernels.Serialization.Json) | JSON IR importer/exporter + schema | net10.0 | Preview |
-| `DotBoxD.Kernels.Debugging.Clr` | Opt-in trusted Roslyn debug evaluators | net10.0 | Preview · unsafe by design |
-| [`DotBoxD.Hosting`](https://www.nuget.org/packages/DotBoxD.Hosting) | Host-facing orchestration API (`SandboxHost`) | net10.0 | Preview |
-| [`DotBoxD.Hosting.Http`](https://www.nuget.org/packages/DotBoxD.Hosting.Http) | HTTP GET binding, grant helpers, pinned transport | net10.0 | Preview |
-| [`DotBoxD.Plugins`](https://www.nuget.org/packages/DotBoxD.Plugins) | Host runtime that loads/validates/dispatches plugins | net10.0 | Preview |
-| [`DotBoxD.Plugins.Analyzer`](https://www.nuget.org/packages/DotBoxD.Plugins.Analyzer) | Generator + analyzer for local plugin packages | netstandard2.0 | Preview |
-| [`DotBoxD.Pushdown.Services`](https://www.nuget.org/packages/DotBoxD.Pushdown.Services) | MessagePack IPC addon that composes kernels with services | net10.0 | **Preview / prerelease** |
+For a focused host or plugin setup, install only the components you use:
+
+```bash
+dotnet add package DotBoxD.Hosting --prerelease
+dotnet add package DotBoxD.Kernels.Serialization.Json --prerelease
+dotnet add package DotBoxD.Hosting.Http --prerelease
+dotnet add package DotBoxD.Plugins.Analyzer --prerelease
+dotnet add package DotBoxD.Pushdown.Services --prerelease
+```
+
+### Services & channels stack - `netstandard2.1`, stable API
+
+Runs on .NET 8/9/10 and Unity. Unity/IL2CPP deployments must use generated/static MessagePack DTO
+formatters, root the generated registry, and validate their own IL2CPP build.
+
+| Package | Purpose |
+|---------|---------|
+| [`DotBoxD.Services.All`](https://www.nuget.org/packages/DotBoxD.Services.All) | Meta-package: the service + channel bundle (AOT configuration required) |
+| [`DotBoxD.Services`](https://www.nuget.org/packages/DotBoxD.Services) | Contract attributes, `RpcPeer`/`RpcHost`, dispatch, and the bundled source generator |
+| [`DotBoxD.Codecs.MessagePack`](https://www.nuget.org/packages/DotBoxD.Codecs.MessagePack) | MessagePack serializer for the wire format (generated resolver required for AOT) |
+| [`DotBoxD.Transports.Tcp`](https://www.nuget.org/packages/DotBoxD.Transports.Tcp) | TCP transport |
+| [`DotBoxD.Transports.NamedPipes`](https://www.nuget.org/packages/DotBoxD.Transports.NamedPipes) | Named-pipe transport (local IPC) |
+
+`DotBoxD.Services.SourceGenerator` is bundled inside `DotBoxD.Services` as an analyzer asset, not
+published as a standalone package.
+
+### Kernels & plugins stack - `net10.0`, preview
+
+| Package | Purpose |
+|---------|---------|
+| [`DotBoxD`](https://www.nuget.org/packages/DotBoxD) | Meta-package: the full net10.0 stack (Services + Kernels + Pushdown) |
+| [`DotBoxD.Abstractions`](https://www.nuget.org/packages/DotBoxD.Abstractions) | Plugin authoring contracts (`[Plugin]`, `IEventKernel<TEvent>`, `HookContext`) |
+| [`DotBoxD.Kernels`](https://www.nuget.org/packages/DotBoxD.Kernels) | IR model, policy model, resource metering, canonical hashing |
+| [`DotBoxD.Kernels.Validation`](https://www.nuget.org/packages/DotBoxD.Kernels.Validation) | Structural, type, effect, policy, binding validation |
+| [`DotBoxD.Kernels.Runtime`](https://www.nuget.org/packages/DotBoxD.Kernels.Runtime) | Safe host bindings (files, time, random, logging, strings, math) |
+| [`DotBoxD.Kernels.Interpreter`](https://www.nuget.org/packages/DotBoxD.Kernels.Interpreter) | Direct IR execution backend |
+| [`DotBoxD.Kernels.Compiler`](https://www.nuget.org/packages/DotBoxD.Kernels.Compiler) | Generated-runtime backend + persistent artifact cache |
+| [`DotBoxD.Kernels.Verifier`](https://www.nuget.org/packages/DotBoxD.Kernels.Verifier) | Generated-assembly verifier |
+| [`DotBoxD.Kernels.Serialization.Json`](https://www.nuget.org/packages/DotBoxD.Kernels.Serialization.Json) | JSON IR importer/exporter (`JsonImporter`/`JsonExporter`) + schema |
+| `DotBoxD.Kernels.Debugging.Clr` | Opt-in trusted Roslyn debug evaluators (unsafe by design) |
+| [`DotBoxD.Hosting`](https://www.nuget.org/packages/DotBoxD.Hosting) | Host-facing orchestration API (`SandboxHost`: import, prepare, execute under policy) |
+| [`DotBoxD.Hosting.Http`](https://www.nuget.org/packages/DotBoxD.Hosting.Http) | HTTP GET binding, grant helpers, pinned-transport policy validation |
+| [`DotBoxD.Plugins`](https://www.nuget.org/packages/DotBoxD.Plugins) | Host runtime that loads, validates, and dispatches plugins (`PluginPackageJsonSerializer` reads the plugin-package JSON envelope) |
+| [`DotBoxD.Plugins.Analyzer`](https://www.nuget.org/packages/DotBoxD.Plugins.Analyzer) | Generator + analyzer that turns `[Plugin]` kernels into package-backed plugins (`netstandard2.0`) |
+| [`DotBoxD.Pushdown.Services`](https://www.nuget.org/packages/DotBoxD.Pushdown.Services) | MessagePack IPC addon that composes kernels with services (**prerelease**) |
 
 `DotBoxD.Pushdown.Services` is published on a **prerelease** channel while its upstream net10.0
 dependencies are prerelease; stable release gates fail if it is included in a stable package set.
-`DotBoxD.Services.SourceGenerator` is bundled inside `DotBoxD.Services` as an analyzer asset, not
-published as a standalone package.
 
 ### Common namespaces & key types
 
@@ -335,32 +289,11 @@ After installing, these are the entry points you'll reach for:
 - `DotBoxD.Kernels.Serialization.Json`: `JsonImporter` / `JsonExporter`.
 - `DotBoxD.Pushdown.Services`: the MessagePack IPC bridge that runs kernels next to host services.
 
----
-
-## Security: what is and isn't a boundary
-
-DotBoxD is precise about its trust boundary — read this before deploying:
-
-- **Safe mode is the real boundary.** A kernel is restricted IR that is validated, capability-gated,
-  fuel/quota-metered, and (for compiled mode) verified before it runs. Users never supply C#, raw IL,
-  CLR member names, assemblies, or arbitrary host calls.
-- **Trusted-plugin mode is NOT a security boundary.** It loads normal .NET assemblies via
-  `AssemblyLoadContext`, and **`AssemblyLoadContext` is not a sandbox** — loaded code has full CLR
-  capabilities. Only use it for code you already trust.
-- **Untrusted arbitrary .NET code must be out-of-process / OS-isolated.** In-process restrictions
-  defend against accidental and many malicious-author attacks, but hard multi-tenant isolation
-  requires a worker process, container, or OS-level boundary.
-
-See [`SECURITY.md`](SECURITY.md) and [Sandbox caveats](https://dotboxd.kamsker.at/security/sandbox-caveats/) for the threat model,
-the three execution modes, and the capabilities/bindings model.
-
----
-
 ## Status & roadmap
 
-DotBoxD merges the former standalone ShaRPC (RPC) and Safe-IR (kernel sandbox) repositories into one
-contract-first runtime. The net10.0 Kernels/Pushdown stack is **preview**; the netstandard2.1
-Services/channel stack is the more mature surface. Deferred work and known gaps are tracked in
+DotBoxD merges the former standalone ShaRPC (RPC) and Safe-IR (kernel sandbox) repositories into
+one contract-first runtime. The netstandard2.1 Services/channels stack is the more mature surface;
+the net10.0 Kernels/Pushdown stack is **preview**. Deferred work and known gaps are tracked in
 [`docs/architecture/follow-up-issues.md`](docs/architecture/follow-up-issues.md).
 
 ## Contributing

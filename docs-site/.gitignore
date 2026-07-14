@@ -5,8 +5,11 @@ dist/
 # Dependencies
 node_modules/
 
-# Generated API reference (produced by `dotnet docfx metadata` + scripts/postprocess-api.mjs)
-src/content/docs/api/
+# Generated API reference (produced by `dotnet docfx metadata` + scripts/postprocess-api.mjs).
+# index.md is a committed fallback so the /api/ route exists in content-only builds;
+# postprocess-api.mjs overwrites it with the full namespace listing during CI deploys.
+src/content/docs/api/*
+!src/content/docs/api/index.md
 src/generated/
 
 # Logs

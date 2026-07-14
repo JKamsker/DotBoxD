@@ -50,6 +50,7 @@ internal static class Program
 
         _ = server.Events.Resolve<MonsterAggroEvent>();
         _ = server.Events.Resolve<AttackEvent>();
+        _ = server.Events.Resolve<PlayerTargetedEvent>();
 
         var world = GameWorld.CreateDefault(server.Hooks, server.Subscriptions);
         sink.Bind(world);

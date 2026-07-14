@@ -161,82 +161,21 @@ public static partial class KernelRpcMarshaller
     private static RecordShape GetRecordShape(Type type)
         => RecordShapeCache.GetOrAdd(type, static candidate =>
         {
-            RejectInheritedDtoMembers(candidate);
-
-            var members = new List<RecordMember>();
-            const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly;
-            var properties = candidate.GetProperties(flags);
-            Array.Sort(properties, static (left, right) => left.MetadataToken.CompareTo(right.MetadataToken));
-            foreach (var property in properties)
+            var discovered = RecordMemberDiscovery.Discover(candidate);
+            var members = new RecordMember[discovered.Count];
+            for (var i = 0; i < discovered.Count; i++)
             {
-                if (property.GetMethod is { IsPublic: true } &&
-                    property.GetIndexParameters().Length == 0 &&
-                    !string.Equals(property.Name, "EqualityContract", StringComparison.Ordinal) &&
-                    !IsIgnoredMember(property))
+                members[i] = discovered[i] switch
                 {
-                    members.Add(RecordMember.FromProperty(property));
-                }
+                    PropertyInfo property => RecordMember.FromProperty(property),
+                    FieldInfo field => RecordMember.FromField(field),
+                    _ => throw new NotSupportedException(
+                        $"Unsupported record member '{discovered[i].Name}'."),
+                };
             }
 
-            // Reflection reports declared properties and fields separately, so the wire shape is readable
-            // properties first, then public fields. That keeps existing property-only DTOs stable while mixed
-            // DTOs still marshal every public data member.
-            var fields = candidate.GetFields(flags);
-            Array.Sort(fields, static (left, right) => left.MetadataToken.CompareTo(right.MetadataToken));
-            foreach (var field in fields)
-            {
-                if (!IsIgnoredMember(field))
-                {
-                    members.Add(RecordMember.FromField(field));
-                }
-            }
-
-            return new RecordShape(candidate, members.ToArray());
+            return new RecordShape(candidate, members);
         });
-
-    private static void RejectInheritedDtoMembers(Type type)
-    {
-        for (var baseType = type.BaseType; baseType is not null; baseType = baseType.BaseType)
-        {
-            if (baseType == typeof(object) || baseType == typeof(ValueType))
-            {
-                continue;
-            }
-
-            const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly;
-            RejectInheritedDtoProperties(type, baseType, flags);
-            RejectInheritedDtoFields(type, baseType, flags);
-        }
-    }
-
-    private static void RejectInheritedDtoProperties(Type type, Type baseType, BindingFlags flags)
-    {
-        foreach (var property in baseType.GetProperties(flags))
-        {
-            if (property.GetMethod is not null &&
-                property.GetIndexParameters().Length == 0 &&
-                !string.Equals(property.Name, "EqualityContract", StringComparison.Ordinal) &&
-                !IsIgnoredMember(property))
-            {
-                throw new NotSupportedException(
-                    $"Server extension DTO '{type}' inherits public properties from base type " +
-                    $"'{baseType}'; flatten the DTO into a single type.");
-            }
-        }
-    }
-
-    private static void RejectInheritedDtoFields(Type type, Type baseType, BindingFlags flags)
-    {
-        foreach (var field in baseType.GetFields(flags))
-        {
-            if (!field.IsLiteral && !IsIgnoredMember(field))
-            {
-                throw new NotSupportedException(
-                    $"Server extension DTO '{type}' inherits public fields from base type " +
-                    $"'{baseType}'; flatten the DTO into a single type.");
-            }
-        }
-    }
 
     // A member marked with a known serializer ignore attribute is non-wire: lazily-resolved or computed
     // state, not serialized data. Exclude it from the marshalled record shape so the analyzer, convention

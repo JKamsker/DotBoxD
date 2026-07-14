@@ -66,6 +66,7 @@ internal static partial class HookChainModelFactory
         string terminalElementParam,
         string? terminalContextParam,
         ITypeSymbol? terminalContextType,
+        INamedTypeSymbol eventType,
         EquatableArray<EventPropertyModel> eventProperties,
         SemanticModel model,
         CancellationToken cancellationToken,
@@ -85,6 +86,7 @@ internal static partial class HookChainModelFactory
             terminalContextParam,
             terminalContextType,
             sendInvocation,
+            eventType,
             eventProperties,
             model,
             cancellationToken,
@@ -99,6 +101,7 @@ internal static partial class HookChainModelFactory
         string terminalElementParam,
         string? terminalContextParam,
         ITypeSymbol? terminalContextType,
+        INamedTypeSymbol eventType,
         EquatableArray<EventPropertyModel> eventProperties,
         SemanticModel model,
         CancellationToken cancellationToken,
@@ -115,6 +118,7 @@ internal static partial class HookChainModelFactory
                 terminalElementParam,
                 terminalContextParam,
                 terminalContextType,
+                eventType,
                 eventProperties,
                 model,
                 cancellationToken,
@@ -129,6 +133,7 @@ internal static partial class HookChainModelFactory
 
         var projection = HookChainStageLowerer.CreateProjection(
             stages,
+            eventType,
             eventProperties,
             model,
             cancellationToken,
@@ -143,6 +148,7 @@ internal static partial class HookChainModelFactory
             projectedElementName: projection is null ? null : terminalElementParam,
             projectedElement: projection?.Value,
             projectedElementType: projection?.ValueType,
+            rootElementType: eventType,
             serverContextParameterName: terminalContextParam,
             serverContextType: terminalContextType,
             capabilities: capabilities,
@@ -184,7 +190,7 @@ internal static partial class HookChainModelFactory
                 continue;
             }
 
-            var (elementParam, contextParam) = LambdaParameters(stage.Lambda);
+            var (elementParam, contextParam) = HookChainStageLambdaReader.Parameters(stage.Lambda);
             if (elementParam is null || stage.Lambda.ExpressionBody is not { } body)
             {
                 throw new NotSupportedException();
@@ -194,13 +200,14 @@ internal static partial class HookChainModelFactory
             var scratchEffects = new SortedSet<string>(StringComparer.Ordinal);
             projected = DotBoxDExpressionModelFactory.Create(
                 body,
-                Context(
+                HookChainExpressionLoweringContextFactory.Create(
                     elementParam,
                     contextParam,
-                    contextParam is null ? null : LambdaParameterType(stage.Lambda, contextParam, model, cancellationToken),
+                    HookChainStageLambdaReader.ContextType(stage.Lambda, contextParam, model, cancellationToken),
                     eventProperties,
                     projected,
                     projectedType,
+                    eventType,
                     model,
                     cancellationToken,
                     scratchCapabilities,
@@ -217,53 +224,4 @@ internal static partial class HookChainModelFactory
         return terminalElementTypeFullName;
     }
 
-    private static DotBoxDExpressionLoweringContext Context(
-        string elementParam,
-        string? contextParam,
-        ITypeSymbol? contextType,
-        EquatableArray<EventPropertyModel> eventProperties,
-        DotBoxDExpressionModel? projected,
-        ITypeSymbol? projectedType,
-        SemanticModel model,
-        CancellationToken cancellationToken,
-        ICollection<string> capabilities,
-        ICollection<string> effects)
-        => projected is null
-            ? new DotBoxDExpressionLoweringContext(
-                elementParam, eventProperties, default, model, cancellationToken,
-                serverContextParameterName: contextParam,
-                serverContextType: contextType,
-                capabilities: capabilities, effects: effects)
-            : new DotBoxDExpressionLoweringContext(
-                elementParam, eventProperties, default, model, cancellationToken,
-                projectedElementName: elementParam,
-                projectedElement: projected,
-                projectedElementType: projectedType,
-                serverContextParameterName: contextParam,
-                serverContextType: contextType,
-                capabilities: capabilities,
-                effects: effects);
-
-    private static ITypeSymbol? LambdaParameterType(
-        LambdaExpressionSyntax lambda,
-        string parameterName,
-        SemanticModel model,
-        CancellationToken cancellationToken)
-    {
-        if (lambda is ParenthesizedLambdaExpressionSyntax parenthesized)
-        {
-            foreach (var parameter in parenthesized.ParameterList.Parameters)
-            {
-                if (string.Equals(parameter.Identifier.ValueText, parameterName, StringComparison.Ordinal))
-                {
-                    var type = (model.GetDeclaredSymbol(parameter, cancellationToken) as IParameterSymbol)?.Type;
-                    return type is { TypeKind: not TypeKind.Error }
-                        ? type
-                        : GeneratedRemoteHookChainFallback.ServerContextTypeForLambda(lambda, model, cancellationToken);
-                }
-            }
-        }
-
-        return GeneratedRemoteHookChainFallback.ServerContextTypeForLambda(lambda, model, cancellationToken);
-    }
 }

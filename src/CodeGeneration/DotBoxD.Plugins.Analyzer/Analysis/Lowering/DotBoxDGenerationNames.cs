@@ -25,6 +25,8 @@ internal static partial class DotBoxDGenerationNames
         public const string EventKernelInterface = "DotBoxD.Abstractions.IEventKernel<TEvent>";
         public const string RangeAttribute = "System.ComponentModel.DataAnnotations.RangeAttribute";
         public const string HostBindingAttribute = "DotBoxD.Abstractions.HostBindingAttribute";
+        public const string HostBindingObjectAttribute = "DotBoxD.Abstractions.HostBindingObjectAttribute";
+        public const string HostBindingIgnoreAttribute = "DotBoxD.Abstractions.HostBindingIgnoreAttribute";
         public const string CapabilityAttribute = "DotBoxD.Abstractions.CapabilityAttribute";
         public const string KernelMethodAttribute = "DotBoxD.Abstractions.KernelMethodAttribute";
         public const string LowerToIrAttribute = "DotBoxD.Abstractions.LowerToIrAttribute";

@@ -79,14 +79,21 @@ public sealed class RemotePluginServerHookTests
 
         Program.ConfigureRuntimeHooks(server);
 
-        // Two inline hook chains (filtered calm and whole-event observe) using the generated plugin-owned
-        // GamePluginContext, then two inline subscription chains on AttackEvent:
+        // Three inline hooks: the filtered calm and whole-event observe chains plus PlayerTargetedEvent,
+        // whose Where calls an unannotated public method inherited from [HostBindingObject] defaults.
+        // Then two AttackEvent subscription chains:
         // the original taunt and the indexed taunt that ships index metadata (issue #47).
         Assert.Collection(
             control.Calls,
             call => Assert.StartsWith("kernel:chain-", call, StringComparison.Ordinal),
             call => Assert.StartsWith("kernel:chain-", call, StringComparison.Ordinal),
+            call => Assert.StartsWith("kernel:chain-", call, StringComparison.Ordinal),
             call => Assert.StartsWith("subscription:chain-", call, StringComparison.Ordinal),
             call => Assert.StartsWith("subscription:chain-", call, StringComparison.Ordinal));
+        Assert.Contains(
+            control.InstalledPackages,
+            package => package.Manifest.RequiredCapabilities.Contains(
+                "game.world.entity.read.level",
+                StringComparer.Ordinal));
     }
 }

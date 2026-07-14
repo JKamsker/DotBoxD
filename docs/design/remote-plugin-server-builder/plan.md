@@ -1,4 +1,4 @@
-# RemotePluginServerBuilder + InvokeAsync inline-kernel — Phased Implementation Plan
+# RemotePluginServerBuilder + InvokeAsync inline-kernel - Phased Implementation Plan
 
 > **Historical design note:** this plan is superseded by
 > [interface-driven-plugin-server.md](interface-driven-plugin-server.md) for the current generated server
@@ -49,7 +49,7 @@ go through the identical install + capability-gating + session-ownership path as
   are fully functional `async ValueTask<string>` IPC round-trips
   (`Client/RemotePluginServer.cs:50-56, 74-82`). The latter stores `typeof(TService) → pluginId` in
   `_services`, enabling `PluginId<TService>()` (lines 84-89).
-- `server.World.Monsters.KillMonstersAsync(...)` and `server.World.Monsters.MonsterKiller` already exist —
+- `server.World.Monsters.KillMonstersAsync(...)` and `server.World.Monsters.MonsterKiller` already exist -
   generated purely from `[KernelRpcClientProperty]`/`[KernelRpcClientMethod]` on `MonsterKillerKernel`,
   **independent of how Register is called**. The builder does not change extension generation.
 - `KernelRpcBinaryCodec` (encode/decode `KernelRpcValue` ↔ `byte[]`), `KernelRpcValueConverter`
@@ -66,7 +66,7 @@ wire-protocol change**. `InvokeAsync` is a substantially larger investment that 
 server-extension IPC contract. It is split across Phases 2–4 so each is independently shippable with
 green build + tests. The richer flat snapshot surface `world.GetMonster(id).Name` is its own **Phase 4**.
 
-> **Decided (user):** The builder follows the ASP.NET Core `HostBuilder` lifecycle — a **synchronous
+> **Decided (user):** The builder follows the ASP.NET Core `HostBuilder` lifecycle - a **synchronous
 > `Build()`** that constructs the server, then an **async `StartAsync()` / `RunAsync()`** that performs the
 > connect + registration I/O. This is the `var app = builder.Build(); await app.RunAsync();` shape, and it
 > resolves the "sync `.Build()` over async IPC" tension cleanly: `Build()` does no I/O, so it cannot deadlock;
@@ -74,7 +74,7 @@ green build + tests. The richer flat snapshot surface `world.GetMonster(id).Name
 
 ---
 
-## Phase 1 — `RemotePluginServerBuilder` (fluent registration sugar)
+## Phase 1 - `RemotePluginServerBuilder` (fluent registration sugar)
 
 **Goal.** Add a fluent builder that delegates to the existing `Register` methods. No generator change, no
 wire change, no new attribute. The imperative `Program.cs` block keeps compiling and running unchanged.
@@ -82,7 +82,7 @@ wire change, no new attribute. The imperative `Program.cs` block keeps compiling
 ### Decisions folded in from review
 
 - **`Build()` is synchronous; `StartAsync()` / `RunAsync()` do the I/O (ASP.NET Core `HostBuilder` shape).**
-  `Build()` does **no** I/O — it validates the queued setup and returns an **unstarted** `RemotePluginServer`,
+  `Build()` does **no** I/O - it validates the queued setup and returns an **unstarted** `RemotePluginServer`,
   so it cannot deadlock. The connect (for `FromPipeName`) and all kernel/RPC `Register` round-trips run inside
   `StartAsync(CancellationToken)`. `RunAsync(CancellationToken)` is the convenience that does
   `StartAsync()` **then** `HoldUntilShutdownAsync()` (start → hold-until-server-completes → disconnect), exactly
@@ -91,18 +91,18 @@ wire change, no new attribute. The imperative `Program.cs` block keeps compiling
   between `Build()` and `StartAsync()`. Accessing `Kernels` / `KernelRpc` / `World` (or calling a generated
   extension such as `server.World.Monsters.KillMonstersAsync(...)`) before `StartAsync()` completes throws
   `InvalidOperationException("Call StartAsync() before using the server.")`. After `StartAsync()` returns, the
-  full typed surface is live — `PluginId<TService>()` resolves because registration already populated
+  full typed surface is live - `PluginId<TService>()` resolves because registration already populated
   `_services`. (With `FromConnection`, where the control is already in hand, `StartAsync` only flushes
   registrations; the controls may be constructed eagerly in `Build()` and the gate is a simple started-flag.)
 - **Two-step vs `RunAsync`.** A plugin that does **interleaved imperative work** (the GameServer sample:
-  `KillMonstersAsync`, `InvokeAsync`) between registration and shutdown uses the two-step form —
+  `KillMonstersAsync`, `InvokeAsync`) between registration and shutdown uses the two-step form -
   `Build()` → `await StartAsync()` → work → `await HoldUntilShutdownAsync()`. A plugin whose only behavior is
   event kernels (no interleaved work) can collapse to `await Build().RunAsync()`. Both are supported; the
   sample demonstrates the two-step.
 - **Connection ownership + `IAsyncDisposable`.** When built via `FromPipeName`, the server **owns** the
   connection it opened in `StartAsync` and disposes it on `DisposeAsync` (the canonical `await using` pattern).
   When built via `FromConnection`, the caller still owns the passed-in control and the server does **not**
-  dispose it (it only wraps it) — preserving today's `RemotePluginServer` semantics.
+  dispose it (it only wraps it) - preserving today's `RemotePluginServer` semantics.
 - **Eager, in-order registration inside `StartAsync`.** All `SetupKernels` registrations flush, then all
   `SetupKernelRpc` registrations flush, **before** `StartAsync` returns. This is the correctness guarantee that
   makes post-start calls safe: `server.World.Monsters.KillMonstersAsync(...)` resolves its plugin id via
@@ -120,7 +120,7 @@ wire change, no new attribute. The imperative `Program.cs` block keeps compiling
   - **Option A (recommended): new shared library `src/Hosting/DotBoxD.Plugins.Client/`** holding
     `RemotePluginServerBuilder` + accumulators. The test project references it; the builder is reusable
     beyond the GameServer sample. The accumulators wrap `RemoteKernelControl`/`RemoteKernelRpcControl`,
-    which are `internal sealed` in the sample — so the builder needs the controls exposed. The cleanest
+    which are `internal sealed` in the sample - so the builder needs the controls exposed. The cleanest
     way: keep the builder in the **sample** but add a **sample-side test project**
     `samples/GameServer/Examples.GameServer.Plugin.Tests` with `InternalsVisibleTo`.
   - **Option B: builder stays sample-local (`Client/`), tests live in a new sample-side test project.**
@@ -133,13 +133,13 @@ wire change, no new attribute. The imperative `Program.cs` block keeps compiling
 
 | File | Action |
 |---|---|
-| `samples/GameServer/Examples.GameServer.Plugin/Client/RemotePluginServerBuilder.cs` | **Create.** `RemotePluginServerBuilder` (private ctor; `FromConnection(IGamePluginControlService)` and `FromPipeName(string)` sync factories — both return the builder synchronously, `FromPipeName` deferring `RpcMessagePackIpc.ConnectNamedPipeAsync` to `StartAsync`); `SetupKernels(Action<KernelRegistrationAccumulator>)`; `SetupKernelRpc(Action<KernelRpcRegistrationAccumulator>)`; **`Build() : RemotePluginServer` (sync, no I/O)**. Plus the two accumulators (each collects `Func<ValueTask>` and flushes sequentially in order). |
+| `samples/GameServer/Examples.GameServer.Plugin/Client/RemotePluginServerBuilder.cs` | **Create.** `RemotePluginServerBuilder` (private ctor; `FromConnection(IGamePluginControlService)` and `FromPipeName(string)` sync factories - both return the builder synchronously, `FromPipeName` deferring `RpcMessagePackIpc.ConnectNamedPipeAsync` to `StartAsync`); `SetupKernels(Action<KernelRegistrationAccumulator>)`; `SetupKernelRpc(Action<KernelRpcRegistrationAccumulator>)`; **`Build() : RemotePluginServer` (sync, no I/O)**. Plus the two accumulators (each collects `Func<ValueTask>` and flushes sequentially in order). |
 | `samples/GameServer/Examples.GameServer.Plugin/Client/RemotePluginServer.cs` | **Modify.** Add the lifecycle: a started-flag gate on `Kernels`/`KernelRpc`/`World`; `StartAsync(CancellationToken)` (connect-if-deferred → flush kernel then RPC registrations → mark started); `RunAsync(CancellationToken)` (= `StartAsync` + `HoldUntilShutdownAsync`); implement `IAsyncDisposable` (disposes the owned connection only when opened via `FromPipeName`). The existing public `Register`/`Get`/`World` surface is unchanged; this only adds members. |
 | `samples/GameServer/Examples.GameServer.Plugin/Program.cs` | **Modify.** Keep the imperative block intact (compiles + runs). Add the builder block as a sibling demonstration (or a second `RunWithBuilderAsync` entry selected by a `--use-builder` arg), using `Build()` → `await StartAsync()` → work → `await HoldUntilShutdownAsync()`. |
 | `samples/GameServer/Examples.GameServer.Plugin.Tests/Examples.GameServer.Plugin.Tests.csproj` | **Create.** xUnit project, `ProjectReference` to `Examples.GameServer.Plugin`; add `[assembly: InternalsVisibleTo("Examples.GameServer.Plugin.Tests")]` to the plugin (e.g. in a new `AssemblyInfo.cs` or csproj `<InternalsVisibleTo>`). |
 | `DotBoxD.slnx` | **Modify.** Add the new test project under the GameServer solution folder. |
 
-### Builder shape (sketch — single, reconciled form)
+### Builder shape (sketch - single, reconciled form)
 
 ```csharp
 internal sealed class RemotePluginServerBuilder
@@ -175,7 +175,7 @@ internal sealed class RemotePluginServerBuilder
 
     public RemotePluginServerBuilder SetupKernelRpc(Action<KernelRpcRegistrationAccumulator> configure) { /* symmetric */ }
 
-    /// <summary>Synchronously constructs the server. Does NO I/O — the connect and all Register round-trips
+    /// <summary>Synchronously constructs the server. Does NO I/O - the connect and all Register round-trips
     /// run in <see cref="RemotePluginServer.StartAsync"/>. The returned server is UNSTARTED; its typed
     /// surface (Kernels/KernelRpc/World) throws until StartAsync completes.</summary>
     public RemotePluginServer Build()
@@ -200,7 +200,7 @@ internal sealed class RemotePluginServerBuilder
 ```
 
 Both factories return the builder synchronously, so construction is a single expression and the async
-lifecycle is explicit — the ASP.NET Core `var app = builder.Build(); await app.RunAsync();` shape:
+lifecycle is explicit - the ASP.NET Core `var app = builder.Build(); await app.RunAsync();` shape:
 
 ```csharp
 await using var server = RemotePluginServerBuilder
@@ -214,7 +214,7 @@ await using var server = RemotePluginServerBuilder
 
 await server.StartAsync();                 // connect + flush registrations; typed surface now live
 
-// plugin work — generated extensions and InvokeAsync are usable here:
+// Plugin work starts here. Generated extensions are usable now; InvokeAsync joins this example in Phase 2.
 var killResults = await server.World.Monsters.KillMonstersAsync(["monster-3", "monster-4"]);
 
 await server.HoldUntilShutdownAsync();     // hold until the server completes; DisposeAsync disconnects
@@ -230,7 +230,7 @@ A pure event-kernel plugin with no interleaved imperative work collapses the las
   on the kernel class regardless of call site (`RpcKernelModelFactory` drives extension emission off the
   kernel type, not the registration site). A `[SetupKernelRpc]` attribute + a fourth
   `ForAttributeWithMetadataName` pipeline would fire on the **builder method declaration body** (which
-  contains no `Register<>()` calls), never the caller's lambda — it would validate nothing. **No fourth
+  contains no `Register<>()` calls), never the caller's lambda - it would validate nothing. **No fourth
   pipeline in Phase 1.** Any generator work belongs to `InvokeAsync` (Phase 2).
 - **Runtime: none beyond the new builder/accumulator types.** They delegate to existing `Register`.
 - **Wire: none.**
@@ -239,25 +239,25 @@ A pure event-kernel plugin with no interleaved imperative work collapses the las
 
 New project `Examples.GameServer.Plugin.Tests` with a recording fake `IGamePluginControlService`:
 
-- `Build_performs_no_io` — after `Build()` (before `StartAsync`), the recording fake has observed **zero**
+- `Build_performs_no_io` - after `Build()` (before `StartAsync`), the recording fake has observed **zero**
   connect/install calls.
-- `Surface_throws_before_StartAsync` — touching `server.Kernels`/`World`/`KernelRpc` before `StartAsync`
+- `Surface_throws_before_StartAsync` - touching `server.Kernels`/`World`/`KernelRpc` before `StartAsync`
   throws `InvalidOperationException`.
-- `StartAsync_registers_all_kernels_before_returning` — both kernel installs are made when `StartAsync`
+- `StartAsync_registers_all_kernels_before_returning` - both kernel installs are made when `StartAsync`
   returns.
-- `StartAsync_registers_rpc_service_and_populates_PluginId` — after `StartAsync`,
+- `StartAsync_registers_rpc_service_and_populates_PluginId` - after `StartAsync`,
   `server.KernelRpc.PluginId<IMonsterKillerService>()` returns the fake-reported id.
-- `Registrations_flush_in_declaration_order_and_complete_before_StartAsync_returns` —
+- `Registrations_flush_in_declaration_order_and_complete_before_StartAsync_returns` -
   `server.World.Monsters.KillMonstersAsync(...)` is callable immediately after `StartAsync` against the fake.
 - `FromConnection_wraps_existing_control_without_opening_pipe`.
-- `FromPipeName_defers_connection_until_StartAsync` — no connect call until `StartAsync` is awaited.
-- `RunAsync_starts_then_holds_until_shutdown` — `RunAsync` flushes registrations then awaits
+- `FromPipeName_defers_connection_until_StartAsync` - no connect call until `StartAsync` is awaited.
+- `RunAsync_starts_then_holds_until_shutdown` - `RunAsync` flushes registrations then awaits
   `HoldUntilShutdownAsync`; returns when the fake signals shutdown.
-- `DisposeAsync_disconnects_owned_FromPipeName_connection_only` — `FromConnection` does not dispose the
+- `DisposeAsync_disconnects_owned_FromPipeName_connection_only` - `FromConnection` does not dispose the
   caller-owned control.
-- `Original_imperative_path_and_builder_path_produce_equivalent_calls` — both paths drive the same
+- `Original_imperative_path_and_builder_path_produce_equivalent_calls` - both paths drive the same
   recording fake to the same observed install sequence.
-- `KernelRpc_accumulator_accepts_kernel_not_implementing_service` — compile-time proof that
+- `KernelRpc_accumulator_accepts_kernel_not_implementing_service` - compile-time proof that
   `Register<IMonsterKillerService, MonsterKillerKernel>()` binds (constraint is `class` only).
 
 ### Exit criteria (Phase 1)
@@ -269,7 +269,7 @@ the imperative and `--use-builder` paths with identical output; existing
 
 ---
 
-## Phase 2 — `InvokeAsync`: detection, lambda lowering, and implicit capture convenience
+## Phase 2 - `InvokeAsync`: detection, lambda lowering, and implicit capture convenience
 
 **Goal.** Detect `server.InvokeAsync(lambda)` on the generated plugin server facade at compile time, lower the **block-body** lambda to
 verified IR via the existing RPC lowerer, ship it as an anonymous RPC kernel, run it server-side, and
@@ -340,7 +340,7 @@ capture-bag overload because generated C# interceptors cannot directly access ca
 
 - **Generator:** new pipeline + two new emitters + shared attribute emitter. Reuses `DotBoxDRpcJsonLowerer`,
   `DotBoxDHostBindingExpressionLowerer` (capability sink), `DotBoxDRpcTypeMapper`, `HookChainIdentity`.
-- **Runtime:** new generated facade members only. **No new IPC method this phase** — no-capture and
+- **Runtime:** new generated facade members only. **No new IPC method this phase** - no-capture and
   implicit-capture calls use the existing `InstallServerExtensionAsync` + `InvokeServerExtensionAsync(pluginId, byte[]) →
   byte[]` path.
 - **Wire:** unchanged. `EncodeArguments(captures-or-empty)` → existing `InvokeServerExtensionAsync` →
@@ -356,19 +356,19 @@ self-contained string fixtures with inline generated-server facade/`IGameWorldAc
 - `Implicit_capture_generates_reflection_arguments_and_sync_out`.
 - `InvokeAsync_expression_body_lambda_is_ignored` (use `InvokeKernel` instead).
 - `InvokeAsync_null_interceptable_location_emits_diagnostic`.
-- `InterceptsLocationAttribute_emitted_once_when_both_hookchain_and_invokeasync_present` — the dedup guard.
+- `InterceptsLocationAttribute_emitted_once_when_both_hookchain_and_invokeasync_present` - the dedup guard.
 
 Runtime/round-trip tests (the anonymous package validated + executed via `PluginServer.Create` +
 `InstalledKernel.InvokeServerExtensionAsync` with hand-built IR matching `BuildRpcInput`'s 0/1/N-param shapes):
 
-- `Anonymous_kernel_install_validates_and_prepares` — `RpcKernelPackageValidator.Validate` /
+- `Anonymous_kernel_install_validates_and_prepares` - `RpcKernelPackageValidator.Validate` /
   `ValidatePrepared` accept the `$anon:` package (rpcEntrypoint set, return type known).
-- `Anonymous_kernel_capability_gating_derived_from_lambda_body` — required capabilities equal exactly the
+- `Anonymous_kernel_capability_gating_derived_from_lambda_body` - required capabilities equal exactly the
   host-binding set; install fails when a grant is missing.
-- `No_capture_invoke_uses_empty_argument_frame` — exercises the zero-argument `BuildRpcInput` path.
+- `No_capture_invoke_uses_empty_argument_frame` - exercises the zero-argument `BuildRpcInput` path.
 - `Implicit_capture_reflection_round_trips_sync_in_and_sync_out`.
 - `Implicit_capture_fody_weaver_rewrites_safe_display_class_to_direct_field_access`.
-- `Concurrent_first_invokes_install_once` — `EnsureAnonymousKernelAsync` does not double-install.
+- `Concurrent_first_invokes_install_once` - `EnsureAnonymousKernelAsync` does not double-install.
 
 ### Exit criteria (Phase 2)
 
@@ -378,7 +378,7 @@ touches an ungranted binding.
 
 ---
 
-## Phase 3 — `InvokeAsync` explicit capture-bag sync-in/out
+## Phase 3 - `InvokeAsync` explicit capture-bag sync-in/out
 
 **Goal.** Support sync-in/out without relying on compiler closure internals. The caller passes a mutable
 capture object explicitly, and the lambda takes that object as its second parameter:
@@ -413,7 +413,7 @@ await server.InvokeAsync(capture, async (IGameWorldAccess world, MonsterProbeCap
 
 ---
 
-## Phase 4 — richer object-returning world surface
+## Phase 4 - richer object-returning world surface
 
 **Goal.** Support `world.GetMonster(id)` returning an object snapshot whose
 `.Name/.Id/.Health/.Level` the lambda reads, instead of forcing the kernel to assemble values from separate
@@ -433,7 +433,7 @@ server-side `MonsterSnapshot` binding descriptor and uses that existing member-a
 - **`Get` returns a value snapshot, not a live handle.** The binding returns an immutable record captured at
   call time (no aliasing into live world state from inside the sandbox), consistent with the read-only,
   fuel-metered execution model. Mutating bindings (e.g. `KillMonster`) stay separate scalar bindings.
-- **Member access only — no method calls on the snapshot.** `monster.Name` lowers to `record.get`;
+- **Member access only - no method calls on the snapshot.** `monster.Name` lowers to `record.get`;
   `monster.DoSomething()` is rejected (fail-safe), keeping the lowerer surface bounded.
 - **Capability identity unchanged.** `GetMonster` carries its own `[HostBinding]` capability
   (e.g. `game.world.monster.read.snapshot`); reading the snapshot contributes exactly that capability, gated
@@ -444,7 +444,7 @@ server-side `MonsterSnapshot` binding descriptor and uses that existing member-a
 | File | Action |
 |---|---|
 | `samples/.../Server.Abstractions/IGameWorldAccess.cs` | **Modify.** Add `MonsterSnapshot GetMonster(string entityId)` (positional record `MonsterSnapshot(string Id, string Name, int Health, int Level, int Position)`) with `[HostBinding("host.world.getMonster", "game.world.monster.read.snapshot", SandboxEffect.Cpu \| SandboxEffect.Alloc \| SandboxEffect.HostStateRead)]`. |
-| `samples/.../Server/Simulation/GameWorldHost.cs` (binding registration) | **Modify.** Register the matching binding with `ReturnType = SandboxType.Record([String,String,Int,Int,Int])` backed by the live `GameWorld`/`GameEntity` lookup. `BindingRegistryValidator` already accepts Records recursively — not a blocker. |
+| `samples/.../Server/Simulation/GameWorldHost.cs` (binding registration) | **Modify.** Register the matching binding with `ReturnType = SandboxType.Record([String,String,Int,Int,Int])` backed by the live `GameWorld`/`GameEntity` lookup. `BindingRegistryValidator` already accepts Records recursively - not a blocker. |
 | `src/CodeGeneration/.../Rpc/DotBoxDRpcJsonLowerer.Expressions.cs` | **Reuse.** Record DTO member access already lowers via `record.get(fieldIndex)` by declaration order. |
 | `samples/.../Plugin/Client/RemotePluginServer.cs` (`RemoteMonsterControl`) | **Modify (optional).** Add an ordinary IPC `GetMonsterAsync(id)` only if non-sandbox plugin code (outside `InvokeAsync`) also needs the snapshot. Not required for the `InvokeAsync` lambda path. |
 | `samples/.../Plugin/Program.cs` | **Modify.** Add `InvokeAsync` examples using `world.GetMonster(id).Health` and the capture-bag path using `world.GetMonster(id).Name`. |
@@ -463,8 +463,8 @@ binding is flat and matches the rest of `IGameWorldAccess`.
 
 ### Exit criteria (Phase 4)
 
-The flat snapshot example — `world.GetMonster(id)` with `.Name/.Id/.Health/.Level` reads inside the
-`InvokeAsync` lambda — compiles, lowers (Record binding + `record.get` member access), installs under the
+The flat snapshot example - `world.GetMonster(id)` with `.Name/.Id/.Health/.Level` reads inside the
+`InvokeAsync` lambda - compiles, lowers (Record binding + `record.get` member access), installs under the
 snapshot capability, runs sandboxed, and returns the correct value. The scalar binding path still works
 unchanged.
 
@@ -478,18 +478,18 @@ unchanged.
   `server.Kernels.Register<…>()` + `server.KernelRpc.Register<…>()` compile and run exactly as today
   (`Client/RemotePluginServer.cs` is unchanged in Phase 1; Phase 2 only **adds** generated facade/service
   members). The existing `Program.cs` block is preserved as the imperative demonstration.
-- **`server.World.Monsters.KillMonstersAsync(...)` and `.MonsterKiller`** keep working — they are generated
+- **`server.World.Monsters.KillMonstersAsync(...)` and `.MonsterKiller`** keep working - they are generated
   from kernel-class attributes, independent of the builder. The builder does not change extension
   generation, and Phase 2 does not touch the RPC extension pipeline.
 - **`Build()` is synchronous (ASP.NET Core `HostBuilder` shape).** The literal `.Build()` from the spec is
   honored: `Build()` is a pure, I/O-free construction step returning the server. The async work it cannot do
-  synchronously — connect + install round-trips — lives in `StartAsync()` / `RunAsync()`, mirroring
+  synchronously - connect + install round-trips - lives in `StartAsync()` / `RunAsync()`, mirroring
   `var app = builder.Build(); await app.RunAsync();`. There is no blocking `.GetAwaiter().GetResult()` and
   therefore no deadlock risk. The only behavioral note: the typed surface is gated until `StartAsync()`
   completes (documented above).
 - **`HoldUntilShutdownAsync` lifetime model is preserved.** With `FromPipeName`, kernels stay owned only
   while the session is alive. The canonical sequence is unchanged in meaning: construct → start (connect +
-  register) → use → `await server.HoldUntilShutdownAsync()` → disconnect — now spelled `Build()` →
+  register) → use → `await server.HoldUntilShutdownAsync()` → disconnect - now spelled `Build()` →
   `StartAsync()` → … → `HoldUntilShutdownAsync()`, or collapsed to `RunAsync()`. `DisposeAsync` only closes a
   connection the server itself opened (`FromPipeName`); a `FromConnection` caller-owned control is never
   disposed by the server, so it cannot close the session before `HoldUntilShutdownAsync` returns.
@@ -561,8 +561,8 @@ unchanged.
 
 Following `docs/design/plugin-fluent-hooks-api/`, new docs live under
 `docs/design/remote-plugin-server-builder/`:
-- `plan.md` — this document.
-- `invoke-async.md` — the InvokeAsync inline-kernel deep dive (detection, lowering, explicit capture-bag
+- `plan.md` - this document.
+- `invoke-async.md` - the InvokeAsync inline-kernel deep dive (detection, lowering, explicit capture-bag
   marshalling, wire envelope, capability gating, identity).
 
 ## Suggested delivery

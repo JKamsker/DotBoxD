@@ -71,7 +71,7 @@ internal static partial class ResultHookChain
         var capabilities = new SortedSet<string>(StringComparer.Ordinal);
         var effects = new SortedSet<string>(StringComparer.Ordinal);
         var shouldHandle = HookChainStageLowerer.CreateShouldHandle(
-            stages, eventProperties, model, cancellationToken, capabilities, effects);
+            stages, contextType, eventProperties, model, cancellationToken, capabilities, effects);
 
         DotBoxDStatementBodyModel handleBody;
         string handleReturnType;
@@ -99,6 +99,7 @@ internal static partial class ResultHookChain
                 terminalContextParam,
                 terminalServerContextType,
                 resultType,
+                contextType,
                 eventProperties,
                 model,
                 cancellationToken,
@@ -182,6 +183,7 @@ internal static partial class ResultHookChain
         string? terminalContextParam,
         ITypeSymbol? terminalContextType,
         INamedTypeSymbol resultType,
+        INamedTypeSymbol eventType,
         EquatableArray<EventPropertyModel> eventProperties,
         SemanticModel model,
         CancellationToken cancellationToken,
@@ -216,6 +218,7 @@ internal static partial class ResultHookChain
 
         var context = new DotBoxDExpressionLoweringContext(
             terminalElementParam, eventProperties, default, model, cancellationToken,
+            rootElementType: eventType,
             serverContextParameterName: terminalContextParam,
             serverContextType: terminalContextType,
             capabilities: capabilities, effects: effects);

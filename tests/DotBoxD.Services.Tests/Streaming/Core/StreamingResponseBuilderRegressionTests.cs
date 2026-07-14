@@ -18,11 +18,10 @@ public sealed class StreamingResponseBuilderRegressionTests
     {
         var serializer = new MessagePackRpcSerializer();
         var streams = CreateStreamManager(serializer);
-        var dispatcher = new CancelAfterSetResponseDispatcher();
+        using var cts = new CancellationTokenSource();
+        var dispatcher = new CancelAfterSetResponseDispatcher(cts);
         var builder = CreateBuilder(serializer, dispatcher);
         var context = new RpcStreamingContext(streams, serializer, CancellationToken.None);
-        using var cts = new CancellationTokenSource();
-        cts.Cancel();
 
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
             builder.BuildAsync(
@@ -126,6 +125,11 @@ public sealed class StreamingResponseBuilderRegressionTests
 
     private sealed class CancelAfterSetResponseDispatcher : IServiceDispatcher
     {
+        private readonly CancellationTokenSource _cancellation;
+
+        public CancelAfterSetResponseDispatcher(CancellationTokenSource cancellation) =>
+            _cancellation = cancellation;
+
         public string ServiceName => "CancelAfterSetResponse";
 
         public TrackingStream ResponseStream { get; } = new();
@@ -140,6 +144,7 @@ public sealed class StreamingResponseBuilderRegressionTests
             CancellationToken ct = default)
         {
             streaming.SetResponse(ResponseStream);
+            _cancellation.Cancel();
             ct.ThrowIfCancellationRequested();
             return Task.CompletedTask;
         }

@@ -106,7 +106,8 @@ internal static class RpcGeneratedAssemblyCatalog
         }
 
         var property = generatedType.GetProperty("Services", BindingFlags.Public | BindingFlags.Static);
-        if (property?.GetValue(null) is IReadOnlyList<GeneratedService> legacyServices)
+        if (property is not null &&
+            ReadLegacyServicesProperty(assembly, generatedType, property) is IReadOnlyList<GeneratedService> legacyServices)
         {
             var snapshot = GeneratedServiceCatalogSnapshot.Snapshot(legacyServices, validateImplementationTypes: false);
             s_serviceCatalogs[assembly] = snapshot;
@@ -116,6 +117,21 @@ internal static class RpcGeneratedAssemblyCatalog
         throw new InvalidOperationException(
             $"DotBoxD generated factory type '{GeneratedFactoryTypeName}' in assembly '{assembly.FullName}' " +
             "did not publish a compatible Services catalog.");
+    }
+
+    private static object? ReadLegacyServicesProperty(Assembly assembly, Type generatedType, PropertyInfo property)
+    {
+        try
+        {
+            return property.GetValue(null);
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            throw new InvalidOperationException(
+                $"DotBoxD generated factory type '{generatedType.FullName}' in assembly '{assembly.FullName}' " +
+                $"failed while reading legacy {property.Name} catalog.",
+                ex.InnerException);
+        }
     }
 
     private static SinkRegistrar<TSink> CreateSinkRegistrar<TSink>(Assembly assembly, string methodName)

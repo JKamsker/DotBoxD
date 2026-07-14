@@ -139,8 +139,7 @@ internal static class PluginKernelModelFactory
             handle,
             DotBoxDGenerationNames.KernelMethodParameters.ContextIndex,
             DotBoxDGenerationNames.DefaultContextParameterName);
-        // Collectors for the whole kernel: ShouldHandle + Handle lowering deposit every capability the
-        // verified IR needs (Send, [HostBinding] calls, gated event-property reads) and every extra
+        // ShouldHandle + Handle lowering deposit every capability the verified IR needs and every extra
         // sandbox effect a [HostBinding] declares. Sorted for deterministic, incrementality-stable output.
         var capabilities = new SortedSet<string>(StringComparer.Ordinal);
         var effects = new SortedSet<string>(StringComparer.Ordinal);
@@ -150,11 +149,12 @@ internal static class PluginKernelModelFactory
             liveSettings,
             context.SemanticModel,
             cancellationToken,
+            rootElementType: eventType,
             capabilities: capabilities,
             effects: effects);
         var shouldHandleBody = DotBoxDShouldHandleBodyModelFactory.Create(shouldHandle, shouldHandleContext);
 
-        // Issue #51: mine host-readable index metadata from the kernel's ShouldHandle the same way inline
+        // Issue #51: mine host-readable index metadata from ShouldHandle the same way inline
         // chains mine it from .Where(...). Live-setting and other non-constant comparisons resolve to no
         // constant, so they stay non-indexed (default, false) exactly as before.
         var (indexPredicates, indexCoversPredicate) = HookChainIndexPredicateExtractor.ExtractFromShouldHandle(

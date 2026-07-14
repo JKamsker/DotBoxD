@@ -25,17 +25,17 @@ startup) so trimming cannot remove a registry that would otherwise only be found
 ## Why Services (RPC)?
 
 **The problem it solves: interop without hand-written marshaling.** Classic RPC makes you build a
-request envelope, serialize args, match each response back to its call, deserialize, and cast —
+request envelope, serialize args, match each response back to its call, deserialize, and cast -
 repetitive and easy to get subtly wrong. Schema-first or hand-rolled stubs have a worse failure mode:
 the client stub and the server handler drift apart (a renamed param, a changed return type) and you
 only find out at runtime.
 
 **The payoff: one C# interface is the single source of truth.** Both the proxy and the dispatcher are
-generated from that one interface, so they cannot drift — a contract-shape mismatch is a compile error
+generated from that one interface, so they cannot drift - a contract-shape mismatch is a compile error
 (`DBXS###`), not a wire fault. The implementation is just your logic: nothing DotBoxD-specific leaks
 into `class CatalogService : ICatalogService`; the client calls
 `connection.Get<ICatalogService>().GetUnitPriceAsync("sword")` and the generated proxy does all the
-marshaling — one method, one remote round-trip.
+marshaling - one method, one remote round-trip.
 
 Grounded aspects:
 
@@ -45,7 +45,7 @@ Grounded aspects:
   real IL2CPP/NativeAOT build for their DTO set. They must also root the generated registry explicitly;
   the repository's NativeAOT smoke demonstrates that startup step.
 - **Peer-based, bidirectional.** Direction is configuration, not type: the same connection can both
-  `Provide` and `Get`, so the host can call back into a connected plugin over one demuxed read loop —
+  `Provide` and `Get`, so the host can call back into a connected plugin over one demuxed read loop -
   there is no separate client/server class on the hot path.
 - **Transport- and codec-neutral.** The same contract runs over named-pipe, TCP, WebSocket, or an
   in-process channel with a swappable codec; the generated proxy, dispatcher, and `Provide`/`Get`
@@ -59,13 +59,13 @@ Grounded aspects:
 reach (Services is the most-mature netstandard2.1 surface).
 
 **When to prefer another mode:** to react to a high-frequency server event but only need a filtered
-subset, prefer the [event pipeline (RunLocal)](/tutorials/event-pipeline-runlocal/) — `Where` /
+subset, prefer the [event pipeline (RunLocal)](/tutorials/event-pipeline-runlocal/) - `Where` /
 `Select` lower to server-side restricted IR (intermediate representation) so only matching, projected values cross the pipe (one-way push, no
 round-trips). To collapse a chatty N-call loop over the host's fine-grained bindings into one
-server-side batch, prefer [Pushdown](/concepts/pushdown/) — the batch runs as verified, capability-gated,
+server-side batch, prefer [Pushdown](/concepts/pushdown/) - the batch runs as verified, capability-gated,
 fuel-metered IR.
 
-Diagnostics from the generator use the `DBXS###` prefix — see
+Diagnostics from the generator use the `DBXS###` prefix - see
 [reference/diagnostics.md](/reference/diagnostics/).
 
 **See also:** the annotated [GameServer walkthrough](/examples/gameserver-walkthrough/) for a

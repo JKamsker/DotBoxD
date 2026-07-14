@@ -18,6 +18,7 @@ public BinaryExpression Or(Expression left, Expression right)
 public BinaryExpression Remainder(Expression left, Expression right)
 public BinaryExpression Subtract(Expression left, Expression right)
 public bool HasExplicitStepKind { get; }
+public bool IncludeReceiver { get; set; }
 public bool IsAsync { get; set; }
 public bool IsAutoBinding => BindingId.Length == 0
 public bool Success { get; }
@@ -64,6 +65,7 @@ public HookContext(IPluginMessageSink messages, CancellationToken cancellationTo
 public HostBindingAttribute(string bindingId, string capability, SandboxEffect effects)
 public HostBindingAttribute(string capability, SandboxEffect effects)
 public HostBindingEffect Effects { get; }
+public HostBindingObjectAttribute( string bindingPrefix, string defaultCapability, SandboxEffect defaultEffects)
 public HostCapabilityAttribute(string capability, HostBindingEffect effects)
 public InMemoryPluginMessageSink()
 public InMemoryPluginMessageSink(int maxMessages)
@@ -112,8 +114,9 @@ public LowerToIrAttribute(LoweredPipelineStepKind kind)
 public LowerToIrMethodAttribute(LoweredIrMethodKind kind)
 public PipelineSurfaceAttribute(PipelineTransport transport)
 public PipelineTransport Transport { get; }
-public PluginAttribute(string? id = null) => Id = id
+public PluginAttribute(string? id = null) => Id = PluginIdentityAttributeValidation.ValidateOptionalId(id)
 public PolymorphicHandleAttribute(string keyMember)
+public SandboxEffect DefaultEffects { get; }
 public SandboxEffect Effects { get; }
 public SandboxModule Module { get; }
 public sealed class CapabilityAttribute : Attribute
@@ -127,6 +130,8 @@ public sealed class HookAttribute : Attribute
 public sealed class HookContext
 public sealed class HookResultAttribute : Attribute
 public sealed class HostBindingAttribute : Attribute
+public sealed class HostBindingIgnoreAttribute : Attribute
+public sealed class HostBindingObjectAttribute : Attribute
 public sealed class HostCapabilityAttribute : Attribute
 public sealed class InMemoryPluginMessageSink : IPluginMessageSink
 public sealed class IRBodyOfAttribute : Attribute
@@ -154,7 +159,7 @@ public sealed record PluginMessage(string TargetId, string Message)
 public SemVersion TargetSandboxVersion { get; init; } = new(1, 0, 0)
 public SemVersion Version { get; init; } = new(1, 0, 0)
 public ServerExtensionAttribute(string id, Type serviceType)
-public ServerExtensionAttribute(string id) => Id = id ?? throw new ArgumentNullException(nameof(id))
+public ServerExtensionAttribute(string id) => Id = PluginIdentityAttributeValidation.ValidateRequiredId(id)
 public ServerExtensionAttribute(Type grafts, string? id = null)
 public SourceSpan Span { get; }
 public static class LoweredPipelineComposer
@@ -169,6 +174,7 @@ public string AccumulatorName { get; }
 public string BindingId { get; }
 public string BindingPrefix { get; }
 public string Capability { get; }
+public string DefaultCapability { get; }
 public string DescriptorHash { get; } = RequireMetadata(descriptorHash, nameof(descriptorHash))
 public string DescriptorPayload { get; } = RequireMetadata(descriptorPayload, nameof(descriptorPayload))
 public string Discriminator { get; }

@@ -40,6 +40,8 @@ namespace Snap.Mixed
 
         public global::System.Threading.Tasks.Task DispatchOnInstanceAsync(string instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::DotBoxD.Services.Streaming.Remote.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct = default)
         {
+            ct.ThrowIfCancellationRequested();
+
             if (!registry.TryGet("IMix", instanceId, out var __obj) || __obj is not global::Snap.Mixed.IMix __inst)
             {
                 throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException("Instance '" + instanceId + "' not found for service 'IMix'.", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Instance);
@@ -62,6 +64,7 @@ namespace Snap.Mixed
                     {
                         throw new global::DotBoxD.Services.Exceptions.ServiceProtocolException("Request payload is not allowed for a parameterless RPC method.");
                     }
+                    ct.ThrowIfCancellationRequested();
                     var __dotboxd_task = receiver.GetNameAsync();
                     var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result
@@ -73,16 +76,19 @@ namespace Snap.Mixed
                 case "SaveAsync":
                 {
                     var arg = serializer.Deserialize<string>(payload);
+                    ct.ThrowIfCancellationRequested();
                     var __dotboxd_task = receiver.SaveAsync(arg);
                     if (!__dotboxd_task.IsCompletedSuccessfully)
                     {
                         await __dotboxd_task;
                     }
+                    ct.ThrowIfCancellationRequested();
                     return;
                 }
                 case "SyncAdd":
                 {
                     var args = serializer.Deserialize<(int, int)>(payload);
+                    ct.ThrowIfCancellationRequested();
                     var result = receiver.SyncAdd(args.Item1, args.Item2);
                     ct.ThrowIfCancellationRequested();
                     serializer.Serialize(output, result);
@@ -94,7 +100,9 @@ namespace Snap.Mixed
                     {
                         throw new global::DotBoxD.Services.Exceptions.ServiceProtocolException("Request payload is not allowed for a parameterless RPC method.");
                     }
+                    ct.ThrowIfCancellationRequested();
                     receiver.SyncPing();
+                    ct.ThrowIfCancellationRequested();
                     return;
                 }
                 default:

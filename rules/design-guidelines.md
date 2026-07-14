@@ -12,7 +12,7 @@ surface.
 
 ## Primary rule: abstractions are opt-in sugar, never lock-in
 
-The library must be usable **any way the consumer wants — including ways we did not foresee.** Every
+The library must be usable **any way the consumer wants - including ways we did not foresee.** Every
 high-level convenience (a helper, a builder, an attribute-driven source generator) is **opt-in sugar
 layered over public primitives.** It must never be the *only* way to do something, and it must never
 prevent a usage we didn't anticipate. If a convenience does get in someone's way, they must be free to
@@ -23,7 +23,7 @@ hand-write the boilerplate themselves, and we must not disallow it.
 > *Can the consumer delete the attribute / stop calling the helper and hand-write the exact same thing
 > using only public API?*
 
-If the answer is ever **no**, it is lock-in — redesign it.
+If the answer is ever **no**, it is lock-in - redesign it.
 
 ### What this requires
 
@@ -44,13 +44,13 @@ If the answer is ever **no**, it is lock-in — redesign it.
 3. **Generators implement a public contract the consumer could implement by hand.** No
    generated-only interface or type that can be satisfied *only* by the generator.
 
-4. **Granular opt-out — never one all-or-nothing switch.** The convenience attribute (e.g.
+4. **Granular opt-out - never one all-or-nothing switch.** The convenience attribute (e.g.
    `[GeneratePluginServer(Context = typeof(GameContext))]`) is an *all-on* default: it generates the
    full set of required code, as it does today. But every facet it produces must be **independently
-   disable-able**, so a consumer can keep the default *minus* the one part they want to own — without
+   disable-able**, so a consumer can keep the default *minus* the one part they want to own - without
    giving up the rest.
    - **Explicit per-facet opt-out / opt-in.** The attribute exposes a way to turn off (and back on) any
-     individual output it enables — e.g. a `Generate{Facet} = false` flag or an `Exclude` set — not a
+     individual output it enables - e.g. a `Generate{Facet} = false` flag or an `Exclude` set - not a
      single on/off switch for the whole thing.
    - **Implicit, user-wins opt-out.** The marker sits on a `partial` type; if the consumer hand-wrote a
      member or type the generator would emit, the generator detects it and skips *just that one*.
@@ -59,17 +59,17 @@ If the answer is ever **no**, it is lock-in — redesign it.
 5. **Common case only.** A generator handles the common shape; the moment a consumer is outside it (a
    different transport, an extra service, a custom install ordering, multiple connections, …) they
    drop to the helpers for that part. The helpers stay directly callable, so an unforeseen pattern is
-   never *blocked* — it simply doesn't get the sugar.
+   never *blocked* - it simply doesn't get the sugar.
 
 ### Guarding it
 
 If a generator is built, add a test that **generates one path and hand-writes the equivalent the
-other way, then asserts identical behavior** — so "delete-the-attribute-and-hand-write-it" stays
+other way, then asserts identical behavior** - so "delete-the-attribute-and-hand-write-it" stays
 provably true and cannot silently rot.
 
 ### Anti-patterns (do not ship)
 
-- All-or-nothing buy-in — the consumer must adopt the whole abstraction or none of it.
+- All-or-nothing buy-in - the consumer must adopt the whole abstraction or none of it.
 - A generator or helper that calls `internal` members the consumer cannot reach.
 - Baked-in assumptions (a fixed service set, a single connection, one transport, a method-naming
   convention) that preclude a shape the consumer might reasonably want.

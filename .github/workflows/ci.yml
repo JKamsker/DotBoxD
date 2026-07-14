@@ -546,6 +546,7 @@ jobs:
               "HostServiceBindingContractTests",
               "PluginAnalyzerForbiddenApiReachabilityTests",
               "PluginAnalyzerForbiddenApiConstructorReachabilityTests",
+              "PluginAnalyzerForbiddenApiScopeTests",
               "PluginAnalyzerKernelMethodTests",
               "PluginAnalyzerKernelMethodProjectionRegressionTests",
               "PluginAnalyzerKernelMethodSurpriseRegressionTests",

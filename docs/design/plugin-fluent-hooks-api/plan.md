@@ -14,7 +14,7 @@ even though they are nested in category folders on disk.
 The user wants:
 - The plugin to *declare* hooks with the same fluent API the server uses
   (`server.Hooks.On<MonsterAggroEvent>().UseKernel<GuardianKernel>()`), with the framework
-  shipping/installing the kernel IR automatically — no manual `Export`/`InstallAsync`, no
+  shipping/installing the kernel IR automatically - no manual `Export`/`InstallAsync`, no
   "opaque IR" narration in the example (the shipping APIs stay, they're just hidden).
 - `PluginHost` renamed to `Plugin` (it *is* the plugin); policy ownership on the server.
 - A richer pipeline: `On<TEvent>().Where(..).Select(..).Where(..).InvokeKernel|InvokeLocal(..)`
@@ -30,7 +30,7 @@ Phases A–B deliver the visible request and the fluent API; Phase C is the heav
 
 ---
 
-## Phase A — Example cleanup, rename, slnx (low risk, no framework changes)
+## Phase A - Example cleanup, rename, slnx (low risk, no framework changes)
 
 Delivers the rename, `Program` class, policy-on-server, and slnx nesting. Uses a small
 example-local client shim so the plugin reads `server.Hooks.On<>().UseKernel<>()`.
@@ -55,7 +55,7 @@ empty `Local/` folder. Rationale: `PluginHostPolicy` duplicates `ServerPolicy` (
 server's job); `LocalPreview` is the only consumer and the only in-process `PluginServer` in the
 plugin; `RecordingMessageSink` is dead once preview is gone. Keep all csproj references
 (`DotBoxD.Plugins`, `DotBoxD.Kernels.Serialization.Json`, `DotBoxD.Pushdown.Services`, the
-`DotBoxD.Plugins.Analyzer` analyzer ref, `DotBoxD.Kernels.Game.Server.Abstractions`) — the analyzer still
+`DotBoxD.Plugins.Analyzer` analyzer ref, `DotBoxD.Kernels.Game.Server.Abstractions`) - the analyzer still
 generates the packages the shim ships.
 
 ### A3. `Program` becomes a full class
@@ -87,9 +87,9 @@ renamed plugin; exit 0, baseline + with-plugin phases print); `./scripts/check-d
 
 ---
 
-## Phase B — Server-side fluent API: Select, InvokeLocal/InvokeKernel, UseKernel filter, auto-install, server.Events
+## Phase B - Server-side fluent API: Select, InvokeLocal/InvokeKernel, UseKernel filter, auto-install, server.Events
 
-Framework work in `DotBoxD.Plugins`. No lambda lowering yet — `InvokeKernel(lambda)` is defined but
+Framework work in `DotBoxD.Plugins`. No lambda lowering yet - `InvokeKernel(lambda)` is defined but
 throws at runtime until Phase C rewrites it (the analyzer turns it into `UseKernel<T>()`).
 
 Primary file: `src/DotBoxD.Plugins/Runtime/HookRegistry.cs`. Also `PluginServer.cs`, plus new
@@ -120,13 +120,13 @@ sandbox; the kernel's own `ShouldHandle` still runs inside. Expose `UseKernel` o
 ### B4. Auto-install on `UseKernel<TKernel>()`
 New static `KernelPackageRegistry` mapping `Type` → `Func<PluginPackage>`. The analyzer emits a
 `[ModuleInitializer]` in each generated `{X}PluginPackage` that self-registers
-(`typeof(GuardianKernel)` → `Create`) — see C/B-bridge. `UseKernel<TKernel>()` changes from
+(`typeof(GuardianKernel)` → `Create`) - see C/B-bridge. `UseKernel<TKernel>()` changes from
 "throw if missing" to: `KernelRegistry.TryGetByKernelType<T>` → else
 `KernelPackageRegistry.TryGetFactory` → `InstallAsync` → wire. Thread a
 `Func<PluginPackage, ValueTask<InstalledKernel>>` (bound to `PluginServer.InstallAsync`) into
 `HookRegistry`/`EventRegistry`. Add sync (`UseKernel<T>()`, blocks on install at setup time) and
 `UseKernelAsync<T>()`. Add `KernelRegistry.TryGetByKernelType<T>(out InstalledKernel)`.
-This emit is small and zero-lowering — land it here so Phase A's `KernelPackageCatalog` can be deleted.
+This emit is small and zero-lowering - land it here so Phase A's `KernelPackageCatalog` can be deleted.
 
 ### B5. `server.Events` fire-and-forget mirror + name-collision fix
 Rename the current `PluginServer.Events` (the adapter registry) to `EventAdapters`; repoint
@@ -144,17 +144,17 @@ add unit tests for `Select` re-typing, `UseKernel` filter, auto-install resoluti
 
 ---
 
-## Phase C — Analyzer lambda lowering (large, multi-phase, highest risk)
+## Phase C - Analyzer lambda lowering (large, multi-phase, highest risk)
 
 Lower `Where`/`Select`/`InvokeKernel` inline lambdas in `server.Hooks`/`server.Events` chains to
 verified DotBoxD.Kernels; leave `InvokeLocal` native. Primary project: `src/DotBoxD.Plugins.Analyzer`.
 Key reuse: the existing lowerer (`DotBoxDExpressionModelFactory`, `DotBoxDConditionBodyModelFactory`,
 `DotBoxDHandleModelFactory`) and emitter (`DotBoxDPackageSourceEmitter`) already lower
-`ShouldHandle`/`Handle` method bodies — reuse them unchanged.
+`ShouldHandle`/`Handle` method bodies - reuse them unchanged.
 
 **Key design decision:** treat `Select` projection as **compile-time substitution** into downstream
 lambda lowering, not a new runtime value-passing protocol. This keeps the existing two-entrypoint
-(`ShouldHandle`/`Handle`) module contract, helpers, verifier, and validator unchanged — all new
+(`ShouldHandle`/`Handle`) module contract, helpers, verifier, and validator unchanged - all new
 complexity stays in the analyzer.
 
 ### C1. Detection (new second generator branch)
@@ -225,7 +225,7 @@ delete the Phase-A `KernelPackageCatalog`). Then **C** in sub-phases C-0 → C-3
 separate commit/PR with its own green build + tests.
 
 ## Round-2 design (review feedback)
-A second review round added five requirements on top of this plan — fluent `Where`/`Select` gating
+A second review round added five requirements on top of this plan - fluent `Where`/`Select` gating
 instead of a `UseKernel(filter:)` parameter, kernel **ownership/lifecycle** (sessions, revoke on
 disconnect), **inferred** event adapters, **per-plugin authentication + signing + policy**, and a
 server `Program` class. Their design lives in

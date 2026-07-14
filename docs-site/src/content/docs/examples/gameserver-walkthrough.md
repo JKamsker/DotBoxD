@@ -1,14 +1,14 @@
 ---
 title: 'Example: the GameServer sample, end to end'
-description: 'The GameServer sample is the maintained, runnable example that ties Services, Kernels, and Pushdown together in one program. It is the canonical reference…'
+description: 'The GameServer sample is the maintained, runnable example that ties Services, event pipelines, and Pushdown together in one program. It is the canonical reference…'
 ---
-The GameServer sample is the maintained, runnable example that ties **Services**, **Kernels**, and **Pushdown** together in one program. It is the canonical reference because it exercises all three modes end to end in a single process pair:
+The GameServer sample is the maintained, runnable example that ties **Services**, **event pipelines**, and **Pushdown** together in one program. It is the canonical reference because it exercises all three modes end to end in a single process pair:
 
-- **Services (RPC)** — typed interop from one C# contract.
-- **Query (RunLocal)** — the event pipeline: server-side filtering and projection so the host receives only the data it needs.
-- **Pushdown** — server extensions that batch work next to the data instead of round-tripping.
+- **Services (RPC)** - typed interop from one C# contract.
+- **Event pipelines** (*Query (RunLocal)* in API surfaces) - server-side filtering and projection so the plugin receives only the data it needs.
+- **Pushdown** - server extensions that batch work next to the data instead of round-tripping.
 
-The patterns you see here map straight onto your own host and plugins. A parent *server* process runs a small deterministic simulation; a child *plugin* process ships untrusted, sandboxed kernels to the server over a bidirectional named-pipe control plane. This page walks the sample feature by feature and maps each one to the concrete file that implements it, so you can jump straight into the real code.
+The patterns you see here map straight onto your own host and plugins. A parent *server* process runs a small deterministic simulation; a child *plugin* process ships untrusted, sandboxed kernels to the server over a bidirectional named-pipe control plane. This page walks the sample feature by feature and maps each one to the concrete file that implements it, so you can jump straight into the real code - read it after (or alongside) the [tutorials](/tutorials/) to see the pieces working together.
 
 The sample lives under [`samples/GameServer`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer) and is the example the root [`README.md`](https://github.com/JKamsker/DotBoxD/blob/main/README.md) points at for "service IPC, event kernels, live settings, host bindings, policies, and server extensions."
 
@@ -16,14 +16,20 @@ The sample lives under [`samples/GameServer`](https://github.com/JKamsker/DotBox
 
 One command builds and runs everything. The server launches the plugin child process for you (see [`Examples.GameServer.Server/Ipc/PluginLauncher.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Ipc/PluginLauncher.cs)), so you do not start the plugin separately:
 
+> **Trust note:** the sample launches the plugin as an ordinary child process with the same OS
+> privileges as the server - it demonstrates the IPC + kernel-sandbox architecture, not production
+> OS containment. To run plugin *binaries* you do not trust, put a real OS boundary around the
+> plugin process (a restricted user, container, or equivalent) - see
+> [Sandbox caveats](/security/sandbox-caveats/).
+
 ```bash
 dotnet run -c Release --project samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
 ```
 
 The server accepts `--use-builder`, which selects the fluent builder entrypoint on the plugin side, and
 `--continuous`, which resets the deterministic world after each short round and keeps exercising the installed
-kernels until Ctrl+C or the run configuration is stopped. The checked-in launch profiles—including the default
-profile used by the command above—enable it. Use `dotnet run --no-launch-profile ...` for the finite default, or
+kernels until Ctrl+C or the run configuration is stopped. The checked-in launch profiles-including the default
+profile used by the command above-enable it. Use `dotnet run --no-launch-profile ...` for the finite default, or
 pass `--continuous` directly to the built executable. The arguments are parsed by
 [`GameServerLaunchOptions.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/GameServerLaunchOptions.cs):
 
@@ -36,9 +42,9 @@ Usage: Examples.GameServer.Server [--use-builder] [--continuous]
 
 Without `--continuous`, `Program.Main` runs three phases so the effect of the plugin is visible:
 
-1. **Baseline** — no plugins; lvl-8 monsters bully the low-level players for a few ticks.
-2. **With plugins** — the plugin connects, installs its kernels, and the same simulation now shows guardian/retaliation effects.
-3. **Summary** — per-tick damage before vs. after, plus proof that disconnect unloaded the plugin's kernels.
+1. **Baseline** - no plugins; lvl-8 monsters bully the low-level players for a few ticks.
+2. **With plugins** - the plugin connects, installs its kernels, and the same simulation now shows guardian/retaliation effects.
+3. **Summary** - per-tick damage before vs. after, plus proof that disconnect unloaded the plugin's kernels.
 
 The phase structure is driven by `BaselineTicks` / `PluginTicks` and the `world.TickAsync()` loop in `Program.cs`.
 Continuous mode keeps the baseline and installation phases, then runs six-tick debug rounds at a 500 ms cadence.
@@ -82,14 +88,14 @@ Each method carries the capability and host-state effect it needs as metadata, s
 ValueTask<bool> KillAsync();
 ```
 
-`[HostBinding]` here is the *auto-binding* form (the source calls these "analyzer-visible auto bindings"): on a `[RpcService]` domain-interface method you declare only the capability and its `SandboxEffect`, and the framework derives the binding from the interface method — whereas the explicit [`[HostBinding("id", "cap", SandboxEffect)]`](/tutorials/pushdown-server-extension/) you met in Pushdown Step 2 (the [glossary](/reference/glossary/)'s *Host binding*) makes you pin the binding id yourself.
+`[HostBinding]` here is the *auto-binding* form (the source calls these "analyzer-visible auto bindings"): on a `[RpcService]` domain-interface method you declare only the capability and its `SandboxEffect`, and the framework derives the binding from the interface method - whereas the explicit [`[HostBinding("id", "cap", SandboxEffect)]`](/tutorials/pushdown-server-extension/) you met in Pushdown Step 2 (the [glossary](/reference/glossary/)'s *Host binding*) makes you pin the binding id yourself.
 
 Supporting contracts in this project:
 
-- **Events** — [`Events/MonsterAggroEvent.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server.Abstractions/Events/MonsterAggroEvent.cs) and [`Events/AttackEvent.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server.Abstractions/Events/AttackEvent.cs). Both are plain records; the framework infers the sandbox event shape from their properties. `AttackEvent` marks `AttackerId`, `TargetId`, and `Damage` with `[EventIndexKey]` so lowered `.Where(...)` predicates can be prefiltered through host dispatch indexes.
-- **Named service contracts** — [`ServiceContracts.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server.Abstractions/ServiceContracts.cs) exposes `IMonsterAggroService : IEventKernel<MonsterAggroEvent>` and `IAttackService : IEventKernel<AttackEvent>`, letting a kernel declare its behavior as a named domain service.
-- **The IPC control plane** — [`Ipc/IGamePluginControlService.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server.Abstractions/Ipc/IGamePluginControlService.cs) (install IR, update settings, hold the connection) and the reverse-direction [`Ipc/IPluginEventCallback.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server.Abstractions/Ipc/IPluginEventCallback.cs) (server → plugin push for remote `RunLocal` chains). Both are `[RpcService]`.
-- **The command DSL** — [`GameCommands.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server.Abstractions/GameCommands.cs) defines what a kernel's `host.message.write` messages *mean* (`calm:<player>:<strength>`, `taunt:<target>`); this meaning is defined in the example, never in the DotBoxD core.
+- **Events** - [`Events/MonsterAggroEvent.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server.Abstractions/Events/MonsterAggroEvent.cs) and [`Events/AttackEvent.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server.Abstractions/Events/AttackEvent.cs). Both are plain records; the framework infers the sandbox event shape from their properties. `AttackEvent` marks `AttackerId`, `TargetId`, and `Damage` with `[EventIndexKey]` so lowered `.Where(...)` predicates can be prefiltered through host dispatch indexes.
+- **Named service contracts** - [`ServiceContracts.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server.Abstractions/ServiceContracts.cs) exposes `IMonsterAggroService : IEventKernel<MonsterAggroEvent>` and `IAttackService : IEventKernel<AttackEvent>`, letting a kernel declare its behavior as a named domain service.
+- **The IPC control plane** - [`Ipc/IGamePluginControlService.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server.Abstractions/Ipc/IGamePluginControlService.cs) (install IR, update settings, hold the connection) and the reverse-direction [`Ipc/IPluginEventCallback.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server.Abstractions/Ipc/IPluginEventCallback.cs) (server → plugin push for remote `RunLocal` chains). Both are `[RpcService]`.
+- **The command DSL** - [`GameCommands.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server.Abstractions/GameCommands.cs) defines what a kernel's `host.message.write` messages *mean* (`calm:<player>:<strength>`, `taunt:<target>`); this meaning is defined in the example, never in the DotBoxD core.
 
 ## The server (parent process)
 
@@ -109,7 +115,7 @@ Three things are wired here: the **command sink** (the host capability that turn
 
 The simulation itself is a deterministic 1D line of players and monsters ([`Simulation/GameWorld.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Simulation/GameWorld.cs)). Each tick it publishes `MonsterAggroEvent` through hooks and `AttackEvent` through subscriptions (and the index registry), so plugin kernels get a chance to react before damage lands.
 
-The `host.message.write` capability is realized by [`Simulation/GameCommandSink.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Simulation/GameCommandSink.cs), which parses the DSL, validates it (known verb, real monster/player ids, clamped strength), and applies it — invalid commands are ignored safely and never throw back into the sandbox.
+The `host.message.write` capability is realized by [`Simulation/GameCommandSink.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Simulation/GameCommandSink.cs), which parses the DSL, validates it (known verb, real monster/player ids, clamped strength), and applies it - invalid commands are ignored safely and never throw back into the sandbox.
 
 ## The plugin control-plane service IPC
 
@@ -129,7 +135,7 @@ public static Task<PluginConnectionHost<GamePluginControlService>> StartAsync(
 
 Two `[RpcService]` implementations are provided per connection (the control plane and the world surface), and the reverse `IPluginEventCallback` proxy is fetched from the peer.
 
-The control-plane implementation is [`Ipc/GamePluginControlService.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Ipc/GamePluginControlService.cs). It never sees kernel *source* — the plugin ships opaque verified IR as `packageJson`, and the service installs and wires it through its owning `PluginSession`:
+The control-plane implementation is [`Ipc/GamePluginControlService.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Ipc/GamePluginControlService.cs). It never sees kernel *source* - the plugin ships opaque verified IR as `packageJson`, and the service installs and wires it through its owning `PluginSession`:
 
 ```csharp
 var package = PluginPackageJsonSerializer.Import(packageJson);
@@ -142,7 +148,7 @@ var kernel = await _session.InstallAndWireAsync(
     ct).ConfigureAwait(false);
 ```
 
-The host's wiring *policy* — which events this server supports, how terminals route, and which callbacks/index to attach — lives in [`Ipc/GamePluginKernelWiring.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Ipc/GamePluginKernelWiring.cs). It registers the supported event adapters so the framework router can resolve a kernel's subscribed event *by name*.
+The host's wiring *policy* - which events this server supports, how terminals route, and which callbacks/index to attach - lives in [`Ipc/GamePluginKernelWiring.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Ipc/GamePluginKernelWiring.cs). It registers the supported event adapters so the framework router can resolve a kernel's subscribed event *by name*.
 
 On the plugin side, the whole facade is one partial class ([`GamePluginServer.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/GamePluginServer.cs)):
 
@@ -151,7 +157,7 @@ On the plugin side, the whole facade is one partial class ([`GamePluginServer.cs
 public partial class GamePluginServer : IGameWorldAccess;
 ```
 
-The generator emits the RPC proxy, the `StartAsync`/`HoldUntilShutdownAsync` lifecycle, the `Setup` install accumulator, live settings, and the `GamePluginServerBuilder` — all from `: IGameWorldAccess`.
+The generator emits the RPC proxy, the `StartAsync`/`HoldUntilShutdownAsync` lifecycle, the `Setup` install accumulator, live settings, and the `GamePluginServerBuilder` - all from `: IGameWorldAccess`.
 
 ## Event kernels
 
@@ -165,7 +171,7 @@ Kernels are authored as ordinary C# and lowered to verified IR by the analyzer. 
     s.Subscriptions.On<AttackEvent>().Use<RetaliationKernel>();
 ```
 
-- **`GuardianKernel`** ([`Kernels/GuardianKernel.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Kernels/GuardianKernel.cs)) is a *hook* (awaited decision) on `MonsterAggroEvent`. It calms a monster that is about to bully a low-level player. Its `[Plugin]` install id derives from the type name (`"guardian"`) — nothing is hand-typed.
+- **`GuardianKernel`** ([`Kernels/GuardianKernel.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Kernels/GuardianKernel.cs)) is a *hook* (awaited decision) on `MonsterAggroEvent`. It calms a monster that is about to bully a low-level player. Its `[Plugin]` install id derives from the type name (`"guardian"`) - nothing is hand-typed.
 - **`RetaliationKernel`** ([`Kernels/RetaliationKernel.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Kernels/RetaliationKernel.cs)) is a fire-and-forget *subscription* on `AttackEvent` that taunts a strong attacker away.
 
 `GuardianKernel` also factors its gate into a reusable, unit-testable `[KernelMethod]` that the generator inlines:
@@ -175,7 +181,7 @@ public void Handle(MonsterAggroEvent e, HookContext ctx)
     => ctx.Messages.Send(e.MonsterId, $"calm:{e.PlayerId}:{CalmStrength}");
 ```
 
-After `StartAsync()`, the plugin also installs **inline remote chains** (`ConfigureRuntimeHooks` in `Program.cs`), whose `Where`/`Select`/`Run` are lowered to verified IR — including an indexed subscription whose two `.Where` leaves compare `[EventIndexKey]` fields to constants:
+After `StartAsync()`, the plugin also installs **inline remote chains** (`ConfigureRuntimeHooks` in `Program.cs`), whose `Where`/`Select`/`Run` are lowered to verified IR - including an indexed subscription whose two `.Where` leaves compare `[EventIndexKey]` fields to constants:
 
 ```csharp
 server.Subscriptions.On<AttackEvent>()
@@ -199,7 +205,7 @@ The setters are strongly typed member expressions; only `[LiveSetting]` members 
 
 ## Host bindings
 
-The server's real implementation of the domain surface is [`Ipc/GameWorldAccess.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Ipc/GameWorldAccess.cs). Its calls are synchronous against the in-process world, returned as completed `ValueTask`s — the async shape exists only so the remote proxy and in-sandbox kernels share one contract. `Get(id)` returns a scoped handle that captures the id, and each method carries the same `[HostBinding]` metadata as the SDK contract:
+The server's real implementation of the domain surface is [`Ipc/GameWorldAccess.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Ipc/GameWorldAccess.cs). Its calls are synchronous against the in-process world, returned as completed `ValueTask`s - the async shape exists only so the remote proxy and in-sandbox kernels share one contract. `Get(id)` returns a scoped handle that captures the id, and each method carries the same `[HostBinding]` metadata as the SDK contract:
 
 ```csharp
 [HostBinding("game.world.monster.write.kill", SandboxEffect.Cpu | SandboxEffect.HostStateWrite)]
@@ -230,7 +236,7 @@ The control service feeds this with `_server.GetRequiredCapabilities(pkg)` at in
 
 ## The server extension (pushdown)
 
-A **server extension** is a kernel that runs on the *server* but is authored, shipped, and owned by the plugin — the pushdown story. Instead of round-tripping many small RPC reads, the plugin grafts a method onto the domain surface and the server executes it locally against the world. The plugin records extensions in `Setup`:
+A **server extension** is a kernel that runs on the *server* but is authored, shipped, and owned by the plugin - the pushdown story. Instead of round-tripping many small RPC reads, the plugin grafts a method onto the domain surface and the server executes it locally against the world. The plugin records extensions in `Setup`:
 
 ```csharp
 s.Monsters.Extend<MonsterKillerKernel>();        // grafts onto IMonsterControl (batch)
@@ -238,7 +244,7 @@ s.Monsters.Extend<RangeMonsterKillerKernel>();   // batch with a value-object qu
 s.Monsters.Extend<BlinkKernel>();                // grafts onto IMonster handles (per-instance)
 ```
 
-- **`MonsterKillerKernel`** ([`Kernels/MonsterKillerKernel.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Kernels/MonsterKillerKernel.cs)) is a `[ServerExtension(typeof(IMonsterControl))]` **batch** grafted onto the collection. It is injected the same `IGameWorldAccess` the plugin uses remotely — but because it runs on the server, the awaited reads/writes are local (no real IPC hop):
+- **`MonsterKillerKernel`** ([`Kernels/MonsterKillerKernel.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Kernels/MonsterKillerKernel.cs)) is a `[ServerExtension(typeof(IMonsterControl))]` **batch** grafted onto the collection. It is injected the same `IGameWorldAccess` the plugin uses remotely - but because it runs on the server, the awaited reads/writes are local (no real IPC hop):
 
   ```csharp
   [ServerExtensionMethod]   // grafted as IMonsterControl.KillMonstersAsync (name = the method's name)
@@ -247,7 +253,7 @@ s.Monsters.Extend<BlinkKernel>();                // grafts onto IMonster handles
       var results = new List<MonsterKillResult>();
       foreach (var id in monsterIds)
       {
-          var monster = _world.Monsters.Get(id);            // scoped handle — id captured once
+          var monster = _world.Monsters.Get(id);            // scoped handle - id captured once
           var healthBefore = await monster.GetHealthAsync();
   ```
 
@@ -303,9 +309,9 @@ The connect/ready/shutdown handshake is fail-fast: [`Ipc/PluginReadinessGate.cs`
 
 [`Examples.GameServer.Plugin.Tests`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin.Tests) is an xUnit project that drives the plugin surface in-process, without spawning the two executables:
 
-- **Server-extension RPC** — `Regression/MonsterKillerServerExtensionRegressionTests.cs` installs `MonsterKillerKernel` into a real `PluginServer`, encodes arguments with `KernelRpcBinaryCodec`, calls `InvokeServerExtensionRpcAsync`, and asserts the returned list of record-structs.
-- **IPC round-trips** — `Regression/GamePluginControlServiceIpcRegressionTests.cs` stands up the generated named-pipe service (`RpcMessagePackIpc.ListenNamedPipe`) and proves the inherited `InvokeServerExtensionAsync` wire method round-trips.
-- **Builder, routing, RunLocal, and server context** — `RemotePluginServerBuilder*Tests.cs`, `Routing/RouterParityTests.cs`, `RunLocal/RemoteRunLocalFacadeIpcTests.cs`, and `ServerContext/RemoteServerContextTests.cs` cover the generated builder, router parity, remote `RunLocal` chains, and the server context surface.
+- **Server-extension RPC** - `Regression/MonsterKillerServerExtensionRegressionTests.cs` installs `MonsterKillerKernel` into a real `PluginServer`, encodes arguments with `KernelRpcBinaryCodec`, calls `InvokeServerExtensionRpcAsync`, and asserts the returned list of record-structs.
+- **IPC round-trips** - `Regression/GamePluginControlServiceIpcRegressionTests.cs` stands up the generated named-pipe service (`RpcMessagePackIpc.ListenNamedPipe`) and proves the inherited `InvokeServerExtensionAsync` wire method round-trips.
+- **Builder, routing, RunLocal, and server context** - `RemotePluginServerBuilder*Tests.cs`, `Routing/RouterParityTests.cs`, `RunLocal/RemoteRunLocalFacadeIpcTests.cs`, and `ServerContext/RemoteServerContextTests.cs` cover the generated builder, router parity, remote `RunLocal` chains, and the server context surface.
 
 Run them with:
 

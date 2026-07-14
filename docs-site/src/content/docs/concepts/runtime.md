@@ -2,17 +2,22 @@
 title: 'Kernel runtime'
 description: 'The kernel runtime executes validated IR under hard budgets. Key pieces:'
 ---
-The kernel runtime executes validated IR (intermediate representation) under hard budgets. Key pieces:
+The kernel runtime executes validated IR (intermediate representation) under hard budgets.
+
+> **Who this page is for:** people operating or security-reviewing a host - how the sandbox enforces
+> its budgets, why there are two execution backends, and which to pick. If you just want to *use*
+> kernels through event pipelines or Pushdown, the [kernels concept](/concepts/kernels/) is enough;
+> come back when you care about throughput, quotas, or audit.
 
 ## Why two backends, and why everything is metered
 
 A kernel is untrusted, author-supplied logic (restricted IR, never C#/IL/reflection) that the host runs
-**in-process** — there is no OS process boundary by default, so the runtime *is* the boundary (see
+**in-process** - there is no OS process boundary by default, so the runtime *is* the boundary (see
 [kernels.md](/concepts/kernels/)). That single fact drives every design choice on this page:
 
-- **Resource containment** — a buggy or hostile kernel must not be able to exhaust host CPU, memory,
+- **Resource containment** - a buggy or hostile kernel must not be able to exhaust host CPU, memory,
   I/O, or output size. This is why everything is metered.
-- **Effect containment** — a kernel can only touch the outside world through host-granted capabilities.
+- **Effect containment** - a kernel can only touch the outside world through host-granted capabilities.
   This is why bindings and capability grants exist.
 
 Backend selection is therefore a **performance decision, never a safety decision**: both backends must
@@ -23,13 +28,13 @@ enforce identical guarantees, and the interpreter defines what "correct" means.
 - The **interpreter** is the default and the safety baseline. It walks verified IR directly, emits no
   code, and so adds no new attack surface. Metering is just method calls the evaluator makes as it walks
   nodes, so quotas and diagnostics are trivial, and it is a normal managed method that can `await` a
-  pending host binding mid-execution — which is why async bindings always run interpreted.
+  pending host binding mid-execution - which is why async bindings always run interpreted.
 - The **compiler** exists purely for throughput: interpretation pays per-node dispatch overhead on
   every run, so a hot kernel executed thousands of times amortizes compilation into near-native speed.
   It emits real IL (via `PersistedAssemblyBuilder`) and caches the artifact, content-addressed by
   module hash + entrypoint + policy hash + compiler version.
 
-But emitting IL reintroduces exactly the attack surface the interpreter avoids — arbitrary IL could
+But emitting IL reintroduces exactly the attack surface the interpreter avoids - arbitrary IL could
 box/unbox, reach static state, forge references, call forbidden members, throw, or skip metering. That
 is why the compiled path is only safe because of the **Verifier** (`DotBoxD.Kernels.Verifier`):
 
@@ -38,9 +43,9 @@ is why the compiled path is only safe because of the **Verifier** (`DotBoxD.Kern
   ([`ReflectionEmitSandboxCompiler.cs`](https://github.com/JKamsker/DotBoxD/blob/main/src/Kernels/DotBoxD.Kernels.Compiler/Emitters/ReflectionEmitSandboxCompiler.cs)).
   **Cache reads are re-verified too**, so a tampered on-disk artifact cannot smuggle unverified IL into
   the process.
-- Verification enforces an **opcode allowlist** with an explicit forbidden set — `Calli`, `Jmp`,
+- Verification enforces an **opcode allowlist** with an explicit forbidden set - `Calli`, `Jmp`,
   `Localloc`, `Cpblk/Initblk`, `Ldftn/Ldvirtftn`, `Ldtoken`, `Box/Unbox`, `Castclass/Isinst`,
-  `Ldsfld/Stsfld`, `Throw/Rethrow`, `Starg`, `Arglist` — i.e. every primitive that could break type
+  `Ldsfld/Stsfld`, `Throw/Rethrow`, `Starg`, `Arglist` - i.e. every primitive that could break type
   safety, forge references, reach static state, or escape the ABI; exception handlers are rejected
   outright
   ([`OpCodeVerifier.cs`](https://github.com/JKamsker/DotBoxD/blob/main/src/Kernels/DotBoxD.Kernels.Verifier/OpCodeVerifier.cs)).
@@ -55,7 +60,7 @@ do what the interpreter would.
 
 ### Why compiled code is still metered
 
-Metering is not skipped just because the code is native IL — the compiler **emits the charge calls into
+Metering is not skipped just because the code is native IL - the compiler **emits the charge calls into
 the IL itself**. The verifier's member allowlist includes exactly the metering ABI (`ChargeFuel`,
 `ChargeLoopIteration`, `ChargeBindingCall`, `EnterCall`/`ExitCall`, …) on
 [`CompiledRuntime`](https://github.com/JKamsker/DotBoxD/blob/main/src/Kernels/DotBoxD.Kernels.Runtime/CompiledRuntime.cs),
@@ -71,9 +76,9 @@ All limits live in one immutable
 [`ResourceLimits`](https://github.com/JKamsker/DotBoxD/blob/main/src/Kernels/DotBoxD.Kernels/Model/ResourceLimits.cs)
 record with fail-safe defaults: an instruction (`MaxFuel`) budget, loop-iteration and call-depth
 budgets, `MaxHostCalls` plus per-capability quotas, collection-cardinality caps, `MaxAllocatedBytes`,
-file/network byte caps (write default `0` — fail-closed), log/output caps, and a wall-time deadline.
-Fuel is charged because it is **deterministic and reproducible** — independent of machine speed or GC
-pauses — so quota exhaustion is testable and identical across runs; the wall-clock deadline is a cheap
+file/network byte caps (write default `0` - fail-closed), log/output caps, and a wall-time deadline.
+Fuel is charged because it is **deterministic and reproducible** - independent of machine speed or GC
+pauses - so quota exhaustion is testable and identical across runs; the wall-clock deadline is a cheap
 secondary backstop, checked only every N charges to keep the hot path fast
 ([`ResourceMeter.HostCalls.cs`](https://github.com/JKamsker/DotBoxD/blob/main/src/Kernels/DotBoxD.Kernels/Model/ResourceMeter.HostCalls.cs)).
 Every charge is overflow-checked and throws `QuotaExceeded` on breach, and the meter is created fresh
@@ -86,12 +91,12 @@ host opts into compilation with `UseCompilerIfAvailable(...)` + `UseCompilerCach
 always-available `UseInterpreter(...)`
 ([`SandboxHostBuilder.cs`](https://github.com/JKamsker/DotBoxD/blob/main/src/Hosting/DotBoxD.Hosting/Execution/Host/SandboxHostBuilder.cs)).
 
-- **Interpreter** — the default. Reach for it for the correctness baseline, debugging (`EnableDebugTrace`
+- **Interpreter** - the default. Reach for it for the correctness baseline, debugging (`EnableDebugTrace`
   forces it), one-shot/cold kernels, AOT targets, and **anything with async host bindings** (generated
   kernel IL stays synchronous, so async bindings always fall back to the interpreter).
-- **Compiler** — hot paths where the same plan runs repeatedly and compile cost amortizes; requires a
+- **Compiler** - hot paths where the same plan runs repeatedly and compile cost amortizes; requires a
   verifiable artifact and a compilable entrypoint.
-- **Auto** (recommended) — starts interpreted and promotes to compiled by *hotness*: the first run is
+- **Auto** (recommended) - starts interpreted and promotes to compiled by *hotness*: the first run is
   always interpreted, and the selector promotes once `RunCount` crosses `max(2, AutoCompileThreshold)`,
   falling back to the interpreter whenever the compiler is unavailable, debug tracing is on, or the
   entrypoint is async/uncompilable
@@ -103,7 +108,7 @@ always-available `UseInterpreter(...)`
 ## Reference: backends & metering
 
 The two sections above explain the *why*; this is the canonical quick reference. Both backends enforce
-identical guarantees — pick by performance, not safety.
+identical guarantees - pick by performance, not safety.
 
 | Backend | Assembly | Role |
 | --- | --- | --- |

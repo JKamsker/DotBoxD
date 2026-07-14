@@ -1,4 +1,4 @@
-# 08 — Runtime Safe APIs
+# 08 - Runtime Safe APIs
 
 ## Purpose
 

@@ -141,6 +141,10 @@ internal sealed class GameWorld
             return;
         }
 
+        await _hooks.PublishAsync(
+            new PlayerTargetedEvent(monster.Id, target.Id, new PlayerTargetContext(target.Id)),
+            cancellationToken).ConfigureAwait(false);
+
         var distance = Math.Abs(monster.Position - target.Position);
         if (distance <= AggroRange)
         {

@@ -28,10 +28,14 @@ public sealed class TcpServerTransportConstructorCoverageTests
         Assert.Equal(IPAddress.Loopback, server.LocalEndpoint!.Address);
     }
 
-    [Fact]
-    public void Constructor_InvalidStringAddress_Throws()
+    [Theory]
+    [InlineData("not-an-ip")]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Constructor_InvalidStringAddress_ThrowsArgumentExceptionForPublicParameter(string address)
     {
-        Assert.ThrowsAny<Exception>(() => new TcpServerTransport("not-an-ip", 0));
+        var ex = Assert.Throws<ArgumentException>(() => new TcpServerTransport(address, 0));
+        Assert.Equal("address", ex.ParamName);
     }
 
     [Fact]

@@ -35,7 +35,7 @@ Make the library's public surface honest. If a reasonable user can infer that a 
 6. Guard the fix.
    Add regression coverage for both the happy path and the rejection path when applicable. If the repo has required-test gates, add the new regression class or group with an accurate minimum count and update CI wiring. Run the relevant local build, format, tests, file/folder gates, and any project-specific required-test scripts before handoff.
 
-   Keep folders under CodeEnforcer's 15-file cap (CE0004): drop new tests into a themed subfolder rather than piling them into an already-full directory. Broad generated-test roots (e.g. `tests/DotBoxD.Kernels.Tests/PluginAnalyzer/Generated/PluginServer/`) are split into per-theme subfolders — reuse the matching one or add a new subfolder. Test namespaces here are folder-independent (`...Generated`), so this move is free and never changes a class's namespace. Never add a file to a folder that already holds 15 `.cs` files.
+   Keep folders under CodeEnforcer's 15-file cap (CE0004): drop new tests into a themed subfolder rather than piling them into an already-full directory. Broad generated-test roots (e.g. `tests/DotBoxD.Kernels.Tests/PluginAnalyzer/Generated/PluginServer/`) are split into per-theme subfolders - reuse the matching one or add a new subfolder. Test namespaces here are folder-independent (`...Generated`), so this move is free and never changes a class's namespace. Never add a file to a folder that already holds 15 `.cs` files.
 
 ## Acceptance Criteria
 

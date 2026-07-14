@@ -15,6 +15,7 @@ internal sealed class DotBoxDExpressionLoweringContext
         string? projectedElementName = null,
         DotBoxDExpressionModel? projectedElement = null,
         ITypeSymbol? projectedElementType = null,
+        ITypeSymbol? rootElementType = null,
         string? serverContextParameterName = null,
         ITypeSymbol? serverContextType = null,
         ITypeSymbol? contextWorldType = null,
@@ -32,6 +33,7 @@ internal sealed class DotBoxDExpressionLoweringContext
         ProjectedElementName = projectedElementName;
         ProjectedElement = projectedElement;
         ProjectedElementType = projectedElementType;
+        RootElementType = rootElementType;
         ServerContextParameterName = serverContextParameterName;
         ServerContextType = serverContextType;
         ContextWorldType = contextWorldType ?? ResolveGeneratedContextWorldType(serverContextType, semanticModel.Compilation);
@@ -61,12 +63,10 @@ internal sealed class DotBoxDExpressionLoweringContext
 
     public DotBoxDExpressionModel? ProjectedElement { get; }
 
-    /// <summary>
-    /// The CLR type of <see cref="ProjectedElement"/> (the <c>Select</c> body's type). When it is a DTO record,
-    /// a downstream member access <c>dto.Field</c> resolves to a <c>record.get</c> on the projected value rather
-    /// than being misread as a same-named event property. Null in event mode or for a non-record projection.
-    /// </summary>
+    /// <summary>The CLR type of <see cref="ProjectedElement"/>, used for typed downstream member reads.</summary>
     public ITypeSymbol? ProjectedElementType { get; }
+    /// <summary>The CLR type represented by <see cref="EventParameterName"/> before projection.</summary>
+    public ITypeSymbol? RootElementType { get; }
 
     public string? ServerContextParameterName { get; }
 
@@ -286,6 +286,7 @@ internal sealed class DotBoxDExpressionLoweringContext
             ProjectedElementName,
             ProjectedElement,
             ProjectedElementType,
+            RootElementType,
             ServerContextParameterName,
             ServerContextType,
             ContextWorldType,

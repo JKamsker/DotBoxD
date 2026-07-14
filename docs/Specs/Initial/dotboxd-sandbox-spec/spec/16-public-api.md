@@ -1,4 +1,4 @@
-# 16 — Public C# API
+# 16 - Public C# API
 
 ## High-level usage
 

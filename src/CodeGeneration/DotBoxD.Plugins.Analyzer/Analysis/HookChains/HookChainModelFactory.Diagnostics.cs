@@ -31,7 +31,8 @@ internal static partial class HookChainModelFactory
                 new HookChainNotLoweredDiagnostic(
                     resultLocation,
                     HookChainNotLoweredKind.ResultChain,
-                    LocalResultTerminal: isLocalTerminal));
+                    LocalResultTerminal: isLocalTerminal,
+                    Detail: detail ?? string.Empty));
         }
 
         if (TryRunChainLocation(invocation, model, cancellationToken, out var runLocation))

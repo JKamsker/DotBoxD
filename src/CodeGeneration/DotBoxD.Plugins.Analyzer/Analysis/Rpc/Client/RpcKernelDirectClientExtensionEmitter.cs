@@ -97,6 +97,7 @@ internal static class RpcKernelDirectClientExtensionEmitter
             builder.Append("        var ").Append(request)
                 .Append($" = {DotBoxDRpcValueNames.GlobalKernelRpcBinaryCodec}.EncodeArguments(")
                 .Append(arguments).AppendLine(");");
+            builder.Append("        ").Append(cancellationToken).AppendLine(".ThrowIfCancellationRequested();");
             if (payloadReturnType is null)
             {
                 AppendInvoke(builder, isAsyncReturn, accessor, request, response, cancellationToken, assignResponse: true);

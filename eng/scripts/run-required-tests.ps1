@@ -107,6 +107,7 @@ $defaultMinimums = @{
     HostServiceBindingContractTests = 6
     PluginAnalyzerForbiddenApiReachabilityTests = 7
     PluginAnalyzerForbiddenApiConstructorReachabilityTests = 3
+    PluginAnalyzerForbiddenApiScopeTests = 2
     PluginAnalyzerKernelMethodTests = 10
     PluginAnalyzerKernelMethodProjectionRegressionTests = 1
     PluginAnalyzerKernelMethodSurpriseRegressionTests = 8
