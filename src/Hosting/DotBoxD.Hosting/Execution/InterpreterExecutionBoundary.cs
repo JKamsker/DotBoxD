@@ -26,7 +26,13 @@ internal static class InterpreterExecutionBoundary
                     options,
                     cancellationToken)
                 .ConfigureAwait(false);
-            if (result is null)
+            if (result is null ||
+                !InterpreterResultValidator.TryValidate(
+                    plan,
+                    entrypoint,
+                    options,
+                    result,
+                    out var validatedResult))
             {
                 return FailureResult(
                     plan,
@@ -35,8 +41,8 @@ internal static class InterpreterExecutionBoundary
             }
 
             return cancellationToken.IsCancellationRequested
-                ? InterpreterCancellationBoundary.CancelledResult(plan, options, result)
-                : result;
+                ? InterpreterCancellationBoundary.CancelledResult(plan, options, validatedResult)
+                : validatedResult;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

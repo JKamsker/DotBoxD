@@ -30,6 +30,25 @@ internal static class SandboxWorkerResultValidator
         SandboxExecutionOptions options,
         SandboxExecutionResult result,
         out SandboxError error)
+        => Validate(plan, entrypoint, options, result, validateDeterministicEvidence: true, out error);
+
+    internal static bool ValidateInterpreterEnvelope(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxExecutionOptions options,
+        SandboxExecutionResult result,
+        out SandboxError error)
+        // Interpreter-only audit evidence is validated and sanitized before this shared envelope check.
+        // Its deterministic binding evidence is checked against the sanitized publication result afterward.
+        => Validate(plan, entrypoint, options, result, validateDeterministicEvidence: false, out error);
+
+    private static bool Validate(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxExecutionOptions options,
+        SandboxExecutionResult result,
+        bool validateDeterministicEvidence,
+        out SandboxError error)
     {
         error = new SandboxError(SandboxErrorCode.HostFailure, "worker result identity did not match the requested plan");
         if (!string.Equals(result.ModuleHash, plan.ModuleHash, StringComparison.Ordinal) ||
@@ -64,7 +83,8 @@ internal static class SandboxWorkerResultValidator
         }
 
         error = new SandboxError(SandboxErrorCode.HostFailure, "worker deterministic binding result did not match audit evidence");
-        return SandboxWorkerDeterministicBindingValidator.Matches(plan, entrypoint, result);
+        return !validateDeterministicEvidence ||
+            SandboxWorkerDeterministicBindingValidator.Matches(plan, entrypoint, result);
     }
 
     private static bool WorkerModeMatches(SandboxExecutionOptions options, SandboxExecutionResult result)
@@ -152,17 +172,29 @@ internal static class SandboxWorkerResultValidator
         SandboxResourceUsage? resultShapeUsage)
     {
         var usage = result.ResourceUsage;
+        var allowOverLimitCounter = !result.Succeeded &&
+            result.Error?.Code == SandboxErrorCode.QuotaExceeded;
         return usage.MaxFuel == plan.Budget.MaxFuel &&
-            ResourceUsageWithinLimits(usage, plan.Budget) &&
+            ResourceUsageWithinLimits(usage, plan.Budget, allowOverLimitCounter) &&
             WorkerResultShapeUsageMatches(usage, resultShapeUsage);
     }
 
-    private static bool ResourceUsageWithinLimits(SandboxResourceUsage usage, ResourceLimits budget)
+    private static bool ResourceUsageWithinLimits(
+        SandboxResourceUsage usage,
+        ResourceLimits budget,
+        bool allowOverLimitCounter)
     {
+        var overLimitCounterCount = 0;
         foreach (var limit in WorkerResourceUsageLimits)
         {
             var value = limit.Value(usage);
-            if (value < 0 || value > limit.Maximum(budget))
+            if (value < 0)
+            {
+                return false;
+            }
+
+            if (value > limit.Maximum(budget) &&
+                (!allowOverLimitCounter || ++overLimitCounterCount > 1))
             {
                 return false;
             }
