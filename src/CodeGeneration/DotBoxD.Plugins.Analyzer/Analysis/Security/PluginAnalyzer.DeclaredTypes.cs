@@ -92,6 +92,11 @@ public sealed partial class PluginAnalyzer
 
     private static void ReportForbiddenReferencedMethodSignature(OperationAnalysisContext context, IMethodSymbol method)
     {
+        if (IsEventKernel(context.ContainingSymbol?.ContainingType))
+        {
+            return;
+        }
+
         if (!IsReferencedFromEventKernel(context, method.ContainingType))
             return;
         var location = context.Operation.Syntax.GetLocation();

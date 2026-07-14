@@ -18,7 +18,8 @@ public sealed partial class PluginAnalyzer
         }
 
         helperGraph.RecordForbidden(method, forbidden);
-        if (!IsEventKernel(method.ContainingType))
+        if (!IsForbiddenApiRoot(context, method) ||
+            !helperGraph.TryRecordDirectDiagnostic(method))
         {
             return;
         }

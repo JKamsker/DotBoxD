@@ -36,7 +36,11 @@ public sealed partial class PluginAnalyzer
             return;
         }
 
-        ReportAndRecordIfForbidden(context, helperGraph, method, creation.Type);
+        ReportAndRecordIfForbidden(
+            context,
+            helperGraph,
+            method,
+            creation.Constructor ?? (ISymbol?)creation.Type);
         RecordStaticConstructorReachability(context, helperGraph, creation.Type);
         RecordFinalizerReachability(context, helperGraph, creation.Type);
         if (creation.Constructor is { } constructor)

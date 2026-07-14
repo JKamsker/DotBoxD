@@ -9,6 +9,22 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
 {
+    private static readonly string[] ForbiddenExactTypeNames =
+    [
+        DotBoxDGenerationNames.TypeNames.SystemActivator,
+        DotBoxDGenerationNames.TypeNames.SystemConsole,
+        DotBoxDGenerationNames.TypeNames.SystemAppContext,
+        DotBoxDGenerationNames.TypeNames.SystemAppDomain,
+        DotBoxDGenerationNames.TypeNames.SystemEnvironment,
+        DotBoxDGenerationNames.TypeNames.SystemGc,
+        DotBoxDGenerationNames.TypeNames.SystemGcSettings,
+        DotBoxDGenerationNames.TypeNames.SystemTimeZoneInfo,
+        DotBoxDGenerationNames.TypeNames.SystemDelegate,
+        DotBoxDGenerationNames.TypeNames.SystemTextEncoding,
+        DotBoxDGenerationNames.TypeNames.SystemServiceProvider,
+        DotBoxDGenerationNames.TypeNames.SystemType,
+        DotBoxDGenerationNames.TypeNames.SystemUnsafe
+    ];
     public static readonly DiagnosticDescriptor ForbiddenHostApiRule = new(
         "DBXK001",
         "Forbidden host API is not allowed in plugin kernels",
@@ -225,7 +241,8 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         }
 
         helperGraph.RecordForbidden(method, type!);
-        if (!IsForbiddenApiRoot(context, method))
+        if (!IsForbiddenApiRoot(context, method) ||
+            !helperGraph.TryRecordDirectDiagnostic(method))
         {
             return;
         }
@@ -240,20 +257,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         => TryGetForbiddenHostApi(type, out _);
 
     private static bool IsForbiddenExactType(string typeName)
-        => typeName is DotBoxDGenerationNames.TypeNames.SystemActivator
-            or DotBoxDGenerationNames.TypeNames.SystemConsole
-            or DotBoxDGenerationNames.TypeNames.SystemAppContext
-            or DotBoxDGenerationNames.TypeNames.SystemAppDomain
-            or DotBoxDGenerationNames.TypeNames.SystemEnvironment
-            or DotBoxDGenerationNames.TypeNames.SystemGc
-            or DotBoxDGenerationNames.TypeNames.SystemGcSettings
-            or DotBoxDGenerationNames.TypeNames.SystemGcSettings
-            or DotBoxDGenerationNames.TypeNames.SystemTimeZoneInfo
-            or DotBoxDGenerationNames.TypeNames.SystemDelegate
-            or DotBoxDGenerationNames.TypeNames.SystemTextEncoding
-            or DotBoxDGenerationNames.TypeNames.SystemServiceProvider
-            or DotBoxDGenerationNames.TypeNames.SystemType
-            or DotBoxDGenerationNames.TypeNames.SystemUnsafe;
+        => Array.IndexOf(ForbiddenExactTypeNames, typeName) >= 0;
 
     private static bool IsForbiddenNamespace(string typeName)
     {
@@ -267,9 +271,12 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             "System.Threading.",
             "System.Threading.Tasks.",
             "System.Linq.Expressions.",
+            "System.Security.Cryptography.X509Certificates.",
+            "System.Security.Principal.",
             "System.Data.",
             "Microsoft.CSharp.",
-            "Microsoft.EntityFrameworkCore."
+            "Microsoft.EntityFrameworkCore.",
+            "Microsoft.Win32."
         ];
         foreach (var prefix in prefixes)
         {
