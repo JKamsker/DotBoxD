@@ -26,7 +26,8 @@ internal static class InterpreterExecutionBoundary
                     options,
                     cancellationToken)
                 .ConfigureAwait(false);
-            if (result is null)
+            if (result is null ||
+                !InterpreterResultValidator.IsValid(plan, entrypoint, options, result))
             {
                 return FailureResult(
                     plan,

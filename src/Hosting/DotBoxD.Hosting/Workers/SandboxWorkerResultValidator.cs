@@ -152,17 +152,29 @@ internal static class SandboxWorkerResultValidator
         SandboxResourceUsage? resultShapeUsage)
     {
         var usage = result.ResourceUsage;
+        var allowOverLimitCounter = !result.Succeeded &&
+            result.Error?.Code == SandboxErrorCode.QuotaExceeded;
         return usage.MaxFuel == plan.Budget.MaxFuel &&
-            ResourceUsageWithinLimits(usage, plan.Budget) &&
+            ResourceUsageWithinLimits(usage, plan.Budget, allowOverLimitCounter) &&
             WorkerResultShapeUsageMatches(usage, resultShapeUsage);
     }
 
-    private static bool ResourceUsageWithinLimits(SandboxResourceUsage usage, ResourceLimits budget)
+    private static bool ResourceUsageWithinLimits(
+        SandboxResourceUsage usage,
+        ResourceLimits budget,
+        bool allowOverLimitCounter)
     {
+        var overLimitCounterCount = 0;
         foreach (var limit in WorkerResourceUsageLimits)
         {
             var value = limit.Value(usage);
-            if (value < 0 || value > limit.Maximum(budget))
+            if (value < 0)
+            {
+                return false;
+            }
+
+            if (value > limit.Maximum(budget) &&
+                (!allowOverLimitCounter || ++overLimitCounterCount > 1))
             {
                 return false;
             }
