@@ -342,6 +342,7 @@ jobs:
               "VerifierManifestIdentityTests",
               "VerifierMemberSignatureTests",
               "BindingRegistryHardeningTests",
+              "ExecutionModeSelectorBoundaryTests",
               "ExecutionModeSelectorTests",
               "InterpreterFailureBoundaryTests",
               "InterpreterPostCancellationBoundaryTests",

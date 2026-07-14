@@ -53,6 +53,7 @@ $defaultMinimums = @{
     VerifierManifestIdentityTests = 16
     VerifierMemberSignatureTests = 5
     BindingRegistryHardeningTests = 12
+    ExecutionModeSelectorBoundaryTests = 2
     ExecutionModeSelectorTests = 7
     InterpreterFailureBoundaryTests = 4
     InterpreterPostCancellationBoundaryTests = 2
