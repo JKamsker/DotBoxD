@@ -252,6 +252,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             "System.Diagnostics.",
             "System.Threading.",
             "System.Threading.Tasks.",
+            "System.Timers.",
             "System.Linq.Expressions.",
             "System.Data.",
             "Microsoft.CSharp.",
