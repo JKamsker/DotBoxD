@@ -72,7 +72,7 @@ internal static class RpcNumericConversion
             return NumericConversionKind.ToI64;
         }
 
-        return CanWidenToF64(sourceType) && IsFloatingPoint(targetType)
+        return CanWidenToDouble(sourceType) && targetType.SpecialType == SpecialType.System_Double
             ? NumericConversionKind.ToF64
             : NumericConversionKind.Unsupported;
     }
@@ -88,11 +88,8 @@ internal static class RpcNumericConversion
             SpecialType.System_SByte or
             SpecialType.System_UInt16;
 
-    private static bool CanWidenToF64(ITypeSymbol type)
+    private static bool CanWidenToDouble(ITypeSymbol type)
         => IsI32WireIntegral(type) || type.SpecialType == SpecialType.System_Int64;
-
-    private static bool IsFloatingPoint(ITypeSymbol type)
-        => type.SpecialType is SpecialType.System_Double or SpecialType.System_Single;
 
     private enum NumericConversionKind
     {

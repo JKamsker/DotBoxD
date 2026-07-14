@@ -137,7 +137,11 @@ internal static class RpcJsonStatementLowerer
             null,
             DotBoxDRpcJsonLowerer.Var(source),
             DotBoxDRpcJsonLowerer.Var(index));
-        return lowerer.ApplyNumericConversion(elementType, local.Type, item);
+        return DotBoxDRpcJsonLowerer.ApplyRequiredTypeConversion(
+            elementType,
+            local.Type,
+            item,
+            $"Server extension foreach iteration variable '{loop.Identifier.ValueText}'");
     }
 
     private static void LowerIf(
@@ -155,7 +159,11 @@ internal static class RpcJsonStatementLowerer
 
         output.Add(DotBoxDRpcJsonLowerer.Obj(
             ("op", DotBoxDRpcJsonLowerer.Str("if")),
-            ("condition", lowerer.LowerExpressionWithPrelude(branch.Condition, output)),
+            ("condition", lowerer.LowerRequiredExpressionWithPrelude(
+                branch.Condition,
+                lowerer.Model.Compilation.GetSpecialType(SpecialType.System_Boolean),
+                "Server extension if condition",
+                output)),
             ("then", "[" + string.Join(",", then) + "]"),
             ("else", "[" + string.Join(",", @else) + "]")));
     }
