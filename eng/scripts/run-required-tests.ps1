@@ -99,6 +99,7 @@ $defaultMinimums = @{
     InvokeAsyncGeneratedReceiverFacadeTests = 12
     InvokeAsyncGeneratedCodeRegressionTests = 12
     InvokeAsyncCommonReturnInferenceTests = 7
+    InvokeAsyncReturnConversionBoundaryTests = 7
     InvokeAsyncNamedLambdaManualIrTests = 6
     InvokeAsyncNullIrArgumentRecognitionTests = 6
     InvokeAsyncArrayRegressionTests = 1
