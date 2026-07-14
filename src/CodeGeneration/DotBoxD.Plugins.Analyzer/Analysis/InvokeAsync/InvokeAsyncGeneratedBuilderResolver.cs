@@ -34,8 +34,11 @@ internal static class InvokeAsyncGeneratedBuilderResolver
                 {
                     Initializer.Value: { } initializer
                 } &&
-                TryFacadeNameFromBuilderInitializer(initializer, out var facadeName) &&
-                TryFindGeneratedFacade(model.Compilation, facadeName, cancellationToken, out receiverType))
+                TryResolveFacadeFromBuilderInitializer(
+                    model,
+                    initializer,
+                    cancellationToken,
+                    out receiverType))
             {
                 return true;
             }
@@ -53,20 +56,21 @@ internal static class InvokeAsyncGeneratedBuilderResolver
         receiverType = null!;
         if (receiver is not MemberAccessExpressionSyntax access ||
             !TryTupleElementIndex(access, model, cancellationToken, out var index) ||
-            TupleElementInitializer(access.Expression, index, model, cancellationToken) is not { } initializer ||
-            !TryFacadeNameFromBuilderInitializer(initializer, out var facadeName))
+            TupleElementInitializer(access.Expression, index, model, cancellationToken) is not { } initializer)
         {
             return false;
         }
 
-        return TryFindGeneratedFacade(model.Compilation, facadeName, cancellationToken, out receiverType);
+        return TryResolveFacadeFromBuilderInitializer(model, initializer, cancellationToken, out receiverType);
     }
 
-    private static bool TryFacadeNameFromBuilderInitializer(
+    private static bool TryResolveFacadeFromBuilderInitializer(
+        SemanticModel model,
         ExpressionSyntax initializer,
-        out string facadeName)
+        CancellationToken cancellationToken,
+        out INamedTypeSymbol receiverType)
     {
-        facadeName = string.Empty;
+        receiverType = null!;
         return initializer is InvocationExpressionSyntax
         {
             Expression: MemberAccessExpressionSyntax
@@ -74,21 +78,31 @@ internal static class InvokeAsyncGeneratedBuilderResolver
                 Name.Identifier.ValueText: "Build",
                 Expression: { } buildReceiver
             }
-        } && TryFacadeNameFromBuilderFactory(buildReceiver, out facadeName);
+        } && TryResolveFacadeFromBuilderFactory(
+            model,
+            buildReceiver,
+            cancellationToken,
+            out receiverType);
     }
 
-    private static bool TryFacadeNameFromBuilderFactory(
+    private static bool TryResolveFacadeFromBuilderFactory(
+        SemanticModel model,
         ExpressionSyntax buildReceiver,
-        out string facadeName)
+        CancellationToken cancellationToken,
+        out INamedTypeSymbol receiverType)
     {
-        facadeName = string.Empty;
+        receiverType = null!;
         var current = buildReceiver;
         while (current is InvocationExpressionSyntax
             {
                 Expression: MemberAccessExpressionSyntax { Expression: { } next }
             })
         {
-            if (TryFacadeNameFromBuilderType(next, out facadeName))
+            if (TryResolveFacadeFromBuilderType(
+                    model,
+                    next,
+                    cancellationToken,
+                    out receiverType))
             {
                 return true;
             }
@@ -96,7 +110,27 @@ internal static class InvokeAsyncGeneratedBuilderResolver
             current = next;
         }
 
-        return TryFacadeNameFromBuilderType(current, out facadeName);
+        return TryResolveFacadeFromBuilderType(
+            model,
+            current,
+            cancellationToken,
+            out receiverType);
+    }
+
+    private static bool TryResolveFacadeFromBuilderType(
+        SemanticModel model,
+        ExpressionSyntax builderType,
+        CancellationToken cancellationToken,
+        out INamedTypeSymbol receiverType)
+    {
+        receiverType = null!;
+        return TryFacadeNameFromBuilderType(builderType, out var facadeName) &&
+               TryFindGeneratedFacade(
+                   model,
+                   builderType,
+                   facadeName,
+                   cancellationToken,
+                   out receiverType);
     }
 
     private static bool TryFacadeNameFromBuilderType(
@@ -123,27 +157,79 @@ internal static class InvokeAsyncGeneratedBuilderResolver
     }
 
     private static bool TryFindGeneratedFacade(
-        Compilation compilation,
+        SemanticModel model,
+        ExpressionSyntax builderType,
         string facadeName,
         CancellationToken cancellationToken,
         out INamedTypeSymbol receiverType)
     {
-        receiverType = null!;
-        foreach (var symbol in compilation.GetSymbolsWithName(
-                     name => string.Equals(name, facadeName, StringComparison.Ordinal),
-                     SymbolFilter.Type,
-                     cancellationToken))
+        var qualifier = BuilderQualifier(builderType);
+        if (qualifier is null)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (symbol is INamedTypeSymbol candidate &&
-                InvokeAsyncAttributeMatcher.HasGeneratePluginServerAttribute(candidate))
-            {
-                receiverType = candidate;
-                return true;
-            }
+            return TrySelectGeneratedFacade(
+                model.LookupNamespacesAndTypes(builderType.SpanStart, name: facadeName)
+                    .OfType<INamedTypeSymbol>(),
+                cancellationToken,
+                out receiverType);
         }
 
-        return false;
+        var container = QualifierSymbol(model, qualifier, cancellationToken);
+        var candidates = container switch
+        {
+            INamespaceSymbol @namespace => @namespace.GetTypeMembers(facadeName),
+            INamedTypeSymbol type => type.GetTypeMembers(facadeName),
+            _ => []
+        };
+        return TrySelectGeneratedFacade(candidates, cancellationToken, out receiverType);
+    }
+
+    private static SyntaxNode? BuilderQualifier(ExpressionSyntax builderType)
+        => builderType switch
+        {
+            QualifiedNameSyntax qualified => qualified.Left,
+            MemberAccessExpressionSyntax member => member.Expression,
+            _ => null
+        };
+
+    private static ISymbol? QualifierSymbol(
+        SemanticModel model,
+        SyntaxNode qualifier,
+        CancellationToken cancellationToken)
+    {
+        if (qualifier is IdentifierNameSyntax identifier &&
+            model.GetAliasInfo(identifier, cancellationToken) is { } alias)
+        {
+            return alias.Target;
+        }
+
+        return model.GetSymbolInfo(qualifier, cancellationToken).Symbol;
+    }
+
+    private static bool TrySelectGeneratedFacade(
+        IEnumerable<INamedTypeSymbol> candidates,
+        CancellationToken cancellationToken,
+        out INamedTypeSymbol receiverType)
+    {
+        receiverType = null!;
+        foreach (var candidate in candidates)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!InvokeAsyncAttributeMatcher.HasGeneratePluginServerAttribute(candidate))
+            {
+                continue;
+            }
+
+            if (receiverType is not null &&
+                !SymbolEqualityComparer.Default.Equals(receiverType, candidate))
+            {
+                receiverType = null!;
+                return false;
+            }
+
+            receiverType = candidate;
+        }
+
+        return receiverType is not null;
     }
 
     private static bool TryTupleElementIndex(
