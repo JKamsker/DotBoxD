@@ -248,7 +248,8 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             or DotBoxDGenerationNames.TypeNames.SystemGcSettings
             or DotBoxDGenerationNames.TypeNames.SystemDelegate
             or DotBoxDGenerationNames.TypeNames.SystemServiceProvider
-            or DotBoxDGenerationNames.TypeNames.SystemType;
+            or DotBoxDGenerationNames.TypeNames.SystemType
+            or DotBoxDGenerationNames.TypeNames.SystemUnsafe;
 
     private static bool IsForbiddenNamespace(string typeName)
     {
