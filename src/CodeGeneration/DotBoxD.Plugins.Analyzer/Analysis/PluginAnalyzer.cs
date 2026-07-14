@@ -9,24 +9,6 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
 {
-    private static readonly string[] ForbiddenExactTypeNames =
-    [
-        DotBoxDGenerationNames.TypeNames.SystemActivator,
-        DotBoxDGenerationNames.TypeNames.SystemConsole,
-        DotBoxDGenerationNames.TypeNames.SystemAppContext,
-        DotBoxDGenerationNames.TypeNames.SystemAppDomain,
-        DotBoxDGenerationNames.TypeNames.SystemEnvironment,
-        DotBoxDGenerationNames.TypeNames.SystemGc,
-        DotBoxDGenerationNames.TypeNames.SystemGcSettings,
-        DotBoxDGenerationNames.TypeNames.SystemTimeZoneInfo,
-        DotBoxDGenerationNames.TypeNames.SystemDelegate,
-        DotBoxDGenerationNames.TypeNames.SystemServiceProvider,
-        DotBoxDGenerationNames.TypeNames.SystemType,
-        DotBoxDGenerationNames.TypeNames.SystemUnsafe,
-        "Microsoft.Win32.Registry",
-        "System.Security.Principal.WindowsIdentity",
-        "System.Security.Cryptography.X509Certificates.X509Store"
-    ];
     public static readonly DiagnosticDescriptor ForbiddenHostApiRule = new(
         "DBXK001",
         "Forbidden host API is not allowed in plugin kernels",
@@ -259,36 +241,10 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         => TryGetForbiddenHostApi(type, out _);
 
     private static bool IsForbiddenExactType(string typeName)
-        => Array.IndexOf(ForbiddenExactTypeNames, typeName) >= 0;
+        => ForbiddenApiNamePolicy.IsForbiddenExactType(typeName);
 
     private static bool IsForbiddenNamespace(string typeName)
-    {
-        ReadOnlySpan<string> prefixes = [
-            "System.IO.",
-            "System.Net.",
-            "System.Reflection.",
-            "System.Runtime.InteropServices.",
-            "System.Runtime.Loader.",
-            "System.Diagnostics.",
-            "System.Threading.",
-            "System.Threading.Tasks.",
-            "System.Linq.Expressions.",
-            "System.Security.Principal.",
-            "System.Data.",
-            "Microsoft.CSharp.",
-            "Microsoft.EntityFrameworkCore.",
-            "Microsoft.Win32."
-        ];
-        foreach (var prefix in prefixes)
-        {
-            if (typeName.StartsWith(prefix, StringComparison.Ordinal))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
+        => ForbiddenApiNamePolicy.IsForbiddenNamespace(typeName);
 
     internal static bool IsEventKernel(INamedTypeSymbol? type)
         => type?.AllInterfaces.Any(i => string.Equals(
