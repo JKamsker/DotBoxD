@@ -76,9 +76,17 @@ internal static class RpcJsonStatementLowerer
                 continue;
             }
 
+            var localSymbol = lowerer.Model.GetDeclaredSymbol(declarator, lowerer.CancellationToken) as ILocalSymbol
+                ?? throw new NotSupportedException(
+                    $"Server extension local '{localName}' could not be resolved.");
+            var value = lowerer.LowerExpressionWithPrelude(initializer.Value, output);
             output.Add(DotBoxDRpcJsonLowerer.SetStatement(
                 localName,
-                lowerer.LowerExpressionWithPrelude(initializer.Value, output)));
+                lowerer.ApplyRequiredLocalConversion(
+                    initializer.Value,
+                    localSymbol,
+                    value,
+                    local.Declaration.Type is IdentifierNameSyntax { Identifier.ValueText: "var" })));
         }
     }
 
@@ -168,7 +176,7 @@ internal static class RpcJsonStatementLowerer
         var value = lowerer.LowerExpressionWithPrelude(returned.Expression, output);
         if (lowerer.ReturnValueType is not null)
         {
-            value = lowerer.ApplyNumericConversion(returned.Expression, lowerer.ReturnValueType, value);
+            value = lowerer.ApplyRequiredReturnConversion(returned.Expression, lowerer.ReturnValueType, value);
         }
 
         output.Add(DotBoxDRpcJsonLowerer.Obj(
