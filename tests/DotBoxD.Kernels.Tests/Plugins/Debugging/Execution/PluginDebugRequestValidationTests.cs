@@ -101,6 +101,28 @@ public sealed class PluginDebugRequestValidationTests
         await AssertErrorAsync(debug, PluginDebugCommands.Threads, new { }, "snapshotTooLarge");
     }
 
+    [Fact]
+    public async Task Response_envelope_overflow_returns_a_bounded_protocol_error()
+    {
+        const int messageLimit = 512;
+        using var limitedServer = PluginServer.Create(
+            remoteDebugOptions: new PluginRemoteDebugOptions
+            {
+                Enabled = true,
+                MaxSnapshotBytes = 4096,
+                MaxMessageBytes = messageLimit
+            },
+            defaultPolicy: PluginAddendumTestPolicies.LongWall());
+        using var limitedOwner = limitedServer.CreateSession();
+        await using var limitedDebug = limitedOwner.CreateDebugSession(NullEvents.Instance);
+
+        var response = await ExchangeBytesAsync(limitedDebug, PluginDebugCommands.Initialize, messageLimit);
+        var payload = PluginDebugProtocol.Decode(response, messageLimit).Payload;
+
+        Assert.False(payload.GetProperty("success").GetBoolean());
+        Assert.Equal("snapshotTooLarge", payload.GetProperty("error").GetProperty("code").GetString());
+    }
+
     private static PluginServer DebugServer()
         => PluginServer.Create(
             defaultPolicy: PluginAddendumTestPolicies.LongWall(),
@@ -134,6 +156,20 @@ public sealed class PluginDebugRequestValidationTests
             payload);
         var response = await session.ExchangeAsync(PluginDebugProtocol.Encode(request, 1024 * 1024));
         return PluginDebugProtocol.Decode(response, 1024 * 1024).Payload;
+    }
+
+    private static async Task<byte[]> ExchangeBytesAsync(
+        PluginDebugSession session,
+        string command,
+        int maxMessageBytes)
+    {
+        var request = new PluginDebugEnvelope(
+            PluginDebugProtocol.Version,
+            command,
+            Guid.NewGuid().ToString("N"),
+            session.SessionToken,
+            JsonSerializer.SerializeToElement(new { }));
+        return await session.ExchangeAsync(PluginDebugProtocol.Encode(request, maxMessageBytes));
     }
 
     private sealed class NullEvents : IPluginDebugEventEndpoint

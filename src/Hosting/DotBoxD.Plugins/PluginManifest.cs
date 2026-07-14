@@ -157,8 +157,14 @@ public sealed record PluginPackage(
     public static PluginPackage Create(
         PluginManifest manifest,
         SandboxModule module,
-        KernelEntrypoints? entrypoints = null,
-        KernelDebugInfo? debugInfo = null)
+        KernelEntrypoints? entrypoints = null)
+        => Create(manifest, module, entrypoints, debugInfo: null);
+
+    public static PluginPackage Create(
+        PluginManifest manifest,
+        SandboxModule module,
+        KernelEntrypoints? entrypoints,
+        KernelDebugInfo? debugInfo)
         => new(
             PluginModelCopy.Manifest(manifest),
             PluginModelCopy.Module(module),

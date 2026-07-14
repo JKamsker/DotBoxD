@@ -36,7 +36,7 @@ internal static class DotBoxDDebugInfoSourceEmitter
         builder.Append("        var debugInfo = ").Append(TypeNames.GlobalKernelDebugInfo)
             .AppendLine(".Create(module, documents, variableBindings);");
         builder.Append("        return ").Append(TypeNames.GlobalPluginPackage)
-            .AppendLine(".Create(manifest, module, debugInfo: debugInfo);");
+            .AppendLine(".Create(manifest, module, entrypoints: null, debugInfo: debugInfo);");
     }
 
     private static IReadOnlyList<KernelSourceLocationModel> Sources(PluginKernelModel model)

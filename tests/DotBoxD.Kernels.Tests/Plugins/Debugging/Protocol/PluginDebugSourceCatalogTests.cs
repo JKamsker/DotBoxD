@@ -40,7 +40,9 @@ public sealed class PluginDebugSourceCatalogTests
                 ],
                 [new KernelDebugVariableBinding(nodes[0].FunctionId, "e_Damage", "e.Damage")])
         });
-        const string token = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        var control = new RecordingPluginDebugControl();
+        bridge.AttachControl(control);
+        var token = control.SessionToken;
         await bridge.PublishAsync(PluginDebugProtocol.Encode(
             new PluginDebugEnvelope(
                 PluginDebugProtocol.Version,

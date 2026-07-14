@@ -47,6 +47,6 @@ internal static class GamePluginHost
             },
             new PluginConnectionDebugOptions(enableKernelDebugging),
             allowIdleConnection
-                ? new NamedPipeTransportOptions(FrameReadIdleTimeout: Timeout.InfiniteTimeSpan)
+                ? new NamedPipeTransportOptions { FrameReadIdleTimeout = Timeout.InfiniteTimeSpan }
                 : NamedPipeTransportOptions.Default);
 }

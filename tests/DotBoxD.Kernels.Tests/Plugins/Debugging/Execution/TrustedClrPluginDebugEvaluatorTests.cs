@@ -63,6 +63,28 @@ public sealed class TrustedClrPluginDebugEvaluatorTests
     }
 
     [Fact]
+    public async Task In_process_provider_can_return_empty_sandbox_maps()
+    {
+        var map = SandboxValue.FromMap(
+            new Dictionary<SandboxValue, SandboxValue>(),
+            SandboxType.String,
+            SandboxType.I32);
+        var evaluator = ClrPluginDebugEvaluators.CreateTrustedInProcess(
+            new TrustedInProcessDebugEvaluatorOptions
+            {
+                Context = new Dictionary<string, object?> { ["map"] = map }
+            });
+
+        var result = await evaluator.EvaluateAsync(
+            new PluginDebugEvaluationRequest(
+                new TestFrame(SandboxValue.FromInt32(1)),
+                "(DotBoxD.Kernels.Sandbox.SandboxValue)Context[\"map\"]!"));
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Equal(map, result.Value);
+    }
+
+    [Fact]
     public async Task Trusted_provider_compiles_against_lazily_supplied_assembly_image()
     {
         var evaluator = ClrPluginDebugEvaluators.CreateTrustedInProcess(

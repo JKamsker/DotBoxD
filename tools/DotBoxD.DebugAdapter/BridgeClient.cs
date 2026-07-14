@@ -9,8 +9,9 @@ namespace DotBoxD.DebugAdapter;
 
 internal sealed class BridgeClient : IAsyncDisposable
 {
-    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromSeconds(10);
     private readonly NamedPipeClientStream _pipe;
+    private readonly TimeSpan _requestTimeout;
     private readonly int _maxMessageBytes;
     private readonly int _maxFrameBytes;
     private readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> _pending = new();
@@ -24,9 +25,14 @@ internal sealed class BridgeClient : IAsyncDisposable
     private readonly Task _sourceChangeLoop;
     private int _requestId;
 
-    private BridgeClient(NamedPipeClientStream pipe, string sessionToken, int maxMessageBytes)
+    private BridgeClient(
+        NamedPipeClientStream pipe,
+        string sessionToken,
+        int maxMessageBytes,
+        TimeSpan requestTimeout)
     {
         _pipe = pipe;
+        _requestTimeout = requestTimeout;
         _maxMessageBytes = maxMessageBytes;
         _maxFrameBytes = BridgeProtocolIO.WrappedEnvelopeLimit(maxMessageBytes);
         SessionToken = sessionToken;
@@ -45,7 +51,8 @@ internal sealed class BridgeClient : IAsyncDisposable
     public static async Task<BridgeClient> ConnectAsync(
         string pipeName,
         string discoveryToken,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        TimeSpan? requestTimeout = null)
     {
         var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
         try
@@ -72,7 +79,8 @@ internal sealed class BridgeClient : IAsyncDisposable
             return new BridgeClient(
                 pipe,
                 root.GetProperty("sessionToken").GetString()!,
-                root.GetProperty("maxFrameBytes").GetInt32());
+                root.GetProperty("maxFrameBytes").GetInt32(),
+                requestTimeout ?? DefaultRequestTimeout);
         }
         catch
         {
@@ -93,7 +101,7 @@ internal sealed class BridgeClient : IAsyncDisposable
         CancellationToken cancellationToken)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(RequestTimeout);
+        timeout.CancelAfter(_requestTimeout);
         var requestToken = timeout.Token;
         var id = Interlocked.Increment(ref _requestId).ToString(System.Globalization.CultureInfo.InvariantCulture);
         var request = new Dictionary<string, object?>(StringComparer.Ordinal)
@@ -198,9 +206,13 @@ internal sealed class BridgeClient : IAsyncDisposable
                 }
 
                 var root = frame.RootElement;
-                if (root.TryGetProperty("id", out var id) && _pending.TryGetValue(id.GetString()!, out var completion))
+                if (root.TryGetProperty("id", out var id))
                 {
-                    completion.TrySetResult(root.Clone());
+                    if (_pending.TryGetValue(id.GetString()!, out var completion))
+                    {
+                        completion.TrySetResult(root.Clone());
+                    }
+
                     continue;
                 }
 
@@ -209,7 +221,7 @@ internal sealed class BridgeClient : IAsyncDisposable
                 {
                     var envelope = PluginDebugProtocol.Decode(
                         Convert.FromBase64String(root.GetProperty("payload").GetString()!),
-                        1024 * 1024);
+                        _maxMessageBytes);
                     await _events.Writer.WriteAsync(envelope, cancellationToken).ConfigureAwait(false);
                 }
                 else if (kind == "sourcesChanged")

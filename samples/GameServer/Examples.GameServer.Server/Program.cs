@@ -37,7 +37,7 @@ internal static class Program
         var worldHost = new GameWorldHost();
         var kernelDebugging = KernelDebuggingRequested();
         using var server = PluginServer.Create(
-            sink,
+            messages: sink,
             configureHost: worldHost.AddBindings,
             defaultPolicy: ServerPolicy.Create(),
             executionMode: ExecutionMode.Compiled,

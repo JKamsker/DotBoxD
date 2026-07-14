@@ -102,14 +102,15 @@ public sealed class PluginDebugBridgeRequestTests
             bridge.Descriptor.DiscoveryToken,
             CancellationToken.None));
 
-        var token = Convert.ToHexStringLower(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
-        await bridge.PublishAsync(Bootstrap(token));
+        var control = new RecordingPluginDebugControl();
+        bridge.AttachControl(control);
+        await bridge.PublishAsync(Bootstrap(control.SessionToken));
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         await using var client = await BridgeClient.ConnectAsync(
             bridge.Descriptor.PipeName,
             bridge.Descriptor.DiscoveryToken,
             timeout.Token);
-        Assert.Equal(token, client.SessionToken);
+        Assert.Equal(control.SessionToken, client.SessionToken);
     }
 
     [Fact]
@@ -119,8 +120,9 @@ public sealed class PluginDebugBridgeRequestTests
         {
             WaitForDebuggerBeforeInstall = false
         });
-        var token = Convert.ToHexStringLower(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
-        await bridge.PublishAsync(Bootstrap(token));
+        var control = new RecordingPluginDebugControl();
+        bridge.AttachControl(control);
+        await bridge.PublishAsync(Bootstrap(control.SessionToken));
         await using var client = await BridgeClient.ConnectAsync(
             bridge.Descriptor.PipeName,
             bridge.Descriptor.DiscoveryToken,
@@ -145,9 +147,9 @@ public sealed class PluginDebugBridgeRequestTests
         bridge.RegisterPackage(mapped);
         var virtualPackage = VirtualPackage(mapped);
         bridge.RegisterPackage(virtualPackage);
-        var sessionToken = Convert.ToHexStringLower(Guid.NewGuid().ToByteArray()) +
-            Convert.ToHexStringLower(Guid.NewGuid().ToByteArray());
-        await bridge.PublishAsync(Bootstrap(sessionToken));
+        var control = new RecordingPluginDebugControl();
+        bridge.AttachControl(control);
+        await bridge.PublishAsync(Bootstrap(control.SessionToken));
         await using var client = await BridgeClient.ConnectAsync(
             bridge.Descriptor.PipeName,
             bridge.Descriptor.DiscoveryToken,

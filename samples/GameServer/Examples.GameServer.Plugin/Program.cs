@@ -57,7 +57,7 @@ internal static class Program
             Console.WriteLine($"[plugin] kernel debug bridge ready for PID {debugBridge.Descriptor.ProcessId}.");
         }
 
-        var transportOptions = new NamedPipeTransportOptions(FrameReadIdleTimeout: Timeout.InfiniteTimeSpan);
+        var transportOptions = new NamedPipeTransportOptions { FrameReadIdleTimeout = Timeout.InfiniteTimeSpan };
         var connectionOptions = new RpcPeerOptions { RequestTimeout = Timeout.InfiniteTimeSpan };
         var builder = debugBridge is null
             ? GamePluginServerBuilder.FromPipeName(pipeName, transportOptions, connectionOptions)

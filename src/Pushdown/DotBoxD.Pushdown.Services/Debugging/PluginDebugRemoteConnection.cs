@@ -6,8 +6,12 @@ namespace DotBoxD.Pushdown.Services;
 internal sealed class PluginDebugRemoteConnection(int maxMessageBytes)
 {
     private readonly int _maxMessageBytes = maxMessageBytes;
+    private readonly TaskCompletionSource _controlAttached =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
     private IPluginDebugControlRpcService? _control;
     private int _attached;
+
+    public Task ControlAttached => _controlAttached.Task;
 
     public void Attach(IPluginDebugControlRpcService control)
     {
@@ -16,6 +20,8 @@ internal sealed class PluginDebugRemoteConnection(int maxMessageBytes)
         {
             throw new InvalidOperationException("A remote debug control endpoint is already attached.");
         }
+
+        _controlAttached.TrySetResult();
     }
 
     public async ValueTask<byte[]> ExchangeAsync(byte[] payload, CancellationToken cancellationToken)

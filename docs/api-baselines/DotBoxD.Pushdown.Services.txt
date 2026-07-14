@@ -24,7 +24,7 @@ public sealed class PluginDebugControlRpcDispatcher : IServiceDispatcher, INonSt
 public sealed class PluginDebugControlRpcProxy : IPluginDebugControlRpcService
 public sealed class PluginDebugEventRpcDispatcher : IServiceDispatcher, INonStreamingServiceDispatcher
 public sealed class PluginDebugEventRpcProxy : IPluginDebugEventRpcService
-public sealed record NamedPipeTransportOptions( bool AllowUnsafeLowEntropyName = false, TimeSpan? FrameReadIdleTimeout = null)
+public sealed record NamedPipeTransportOptions(bool AllowUnsafeLowEntropyName = false)
 public sealed record PluginConnectionDebugOptions(bool Enabled = true)
 public sealed record PluginDebugBridgeDescriptor(int ProcessId, string PipeName, string DiscoveryToken)
 public sealed record PluginDebugBridgeOptions
@@ -59,6 +59,7 @@ public string? DiscoveryFile { get; init; }
 public Task Disconnected => _disconnected.Task
 public Task<TConnection> Connected => _connected.Task
 public TimeSpan DebuggerWaitTimeout { get; init; } = TimeSpan.FromSeconds(30)
+public TimeSpan? FrameReadIdleTimeout { get; init; }
 public ValueTask PublishAsync(byte[] message, CancellationToken cancellationToken = default)
 public ValueTask<byte[]> ExchangeAsync(byte[] message, CancellationToken cancellationToken = default)
 public void AttachControl(IPluginDebugControlRpcService control)

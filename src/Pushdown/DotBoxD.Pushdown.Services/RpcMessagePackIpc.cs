@@ -187,10 +187,10 @@ public static class RpcMessagePackIpc
     }
 }
 
-public sealed record NamedPipeTransportOptions(
-    bool AllowUnsafeLowEntropyName = false,
-    TimeSpan? FrameReadIdleTimeout = null)
+public sealed record NamedPipeTransportOptions(bool AllowUnsafeLowEntropyName = false)
 {
+    public TimeSpan? FrameReadIdleTimeout { get; init; }
+
     public static NamedPipeTransportOptions Default { get; } = new();
     public static NamedPipeTransportOptions UnsafeDevelopment { get; } = new(AllowUnsafeLowEntropyName: true);
 }

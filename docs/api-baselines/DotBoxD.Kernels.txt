@@ -403,6 +403,7 @@ public sealed record WhileStatement(Expression Condition, IReadOnlyList<Statemen
 public SourceSequencePointKind SequencePointKind { get; init; }
 public SourceSpan Span { get; }
 public SourceSpan? SourceSpan { get; }
+public SourceSpan(int line, int column)
 public static BindingCostModel Fixed(long baseFuel) => new(baseFuel)
 public static BindingCostModel PerByte(long baseFuel, long perByteFuel)
 public static BindingCostModel PerReturnedByte(long baseFuel, long perByteFuel)

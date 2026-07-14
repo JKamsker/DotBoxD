@@ -21,6 +21,10 @@ internal sealed record ClrDebugValue
 
     public ClrDebugMapEntry[]? Entries { get; init; }
 
+    public SandboxType? MapKeyType { get; init; }
+
+    public SandboxType? MapValueType { get; init; }
+
     public static ClrDebugValue FromSandbox(SandboxValue value) => value switch
     {
         UnitValue => new ClrDebugValue { Kind = "unit" },
@@ -51,6 +55,8 @@ internal sealed record ClrDebugValue
         MapValue item => new ClrDebugValue
         {
             Kind = "map",
+            MapKeyType = item.KeyType,
+            MapValueType = item.ValueType,
             Entries = item.Values
                 .Select(entry => new ClrDebugMapEntry(
                     FromSandbox(entry.Key),
@@ -99,6 +105,10 @@ internal sealed record ClrDebugValue
         "guid" => SandboxValue.FromGuid(Guid.Parse(Text!)),
         "list" => SandboxValue.FromList((Items ?? []).Select(item => item.ToSandbox()).ToArray()),
         "record" => SandboxValue.FromRecord((Items ?? []).Select(item => item.ToSandbox()).ToArray()),
+        "map" => SandboxValue.FromMap(
+            (Entries ?? []).ToDictionary(entry => entry.Key.ToSandbox(), entry => entry.Value.ToSandbox()),
+            MapKeyType ?? throw new InvalidOperationException("Serialized debug map key type is missing."),
+            MapValueType ?? throw new InvalidOperationException("Serialized debug map value type is missing.")),
         _ => throw new InvalidOperationException($"Unsupported serialized debug value kind '{Kind}'.")
     };
 

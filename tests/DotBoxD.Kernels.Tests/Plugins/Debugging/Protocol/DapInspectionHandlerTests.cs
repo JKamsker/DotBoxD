@@ -30,7 +30,14 @@ public sealed class DapInspectionHandlerTests
         {
             WaitForDebuggerBeforeInstall = false
         });
-        const string sessionToken = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        var control = new RecordingPluginDebugControl
+        {
+            ResponseBody = (command, _) => command == PluginDebugCommands.StackTrace
+                ? new { frames = Array.Empty<object>() }
+                : new { }
+        };
+        bridge.AttachControl(control);
+        var sessionToken = control.SessionToken;
         await bridge.PublishAsync(Envelope("session", "bootstrap", sessionToken, new { sessionToken }));
         await using var client = await BridgeClient.ConnectAsync(
             bridge.Descriptor.PipeName,

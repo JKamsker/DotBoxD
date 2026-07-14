@@ -54,6 +54,11 @@ public sealed record SourceSpan(
     int? EndColumn = null,
     SourceSequencePointKind SequencePointKind = SourceSequencePointKind.Normal)
 {
+    public SourceSpan(int line, int column)
+        : this(line, column, null, null, null, SourceSequencePointKind.Normal)
+    {
+    }
+
     private int _line = ValidateCoordinate(Line, nameof(Line));
     private int _column = ValidateCoordinate(Column, nameof(Column));
     private string? _documentId = ValidateDocumentId(DocumentId);

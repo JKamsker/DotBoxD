@@ -157,7 +157,14 @@ internal sealed class PluginDebugRequestHandler(PluginDebugSession session)
             return Error(request, "snapshotTooLarge", "The debug response exceeds the host snapshot limit.");
         }
 
-        return Response(request, request.Kind + "Response", new { success = true, body });
+        try
+        {
+            return Response(request, request.Kind + "Response", new { success = true, body });
+        }
+        catch (PluginDebugProtocolException exception) when (exception.Code == "messageTooLarge")
+        {
+            return Error(request, "snapshotTooLarge", "The debug response exceeds the host message limit.");
+        }
     }
 
     private byte[] Error(PluginDebugEnvelope request, string code, string message)
