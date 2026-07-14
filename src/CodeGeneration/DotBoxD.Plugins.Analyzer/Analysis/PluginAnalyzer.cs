@@ -40,15 +40,23 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.EnableConcurrentExecution();
+        context.RegisterSymbolAction(AnalyzeNamedType, SymbolKind.NamedType);
         context.RegisterSymbolAction(AnalyzeMethod, SymbolKind.Method);
         context.RegisterSymbolAction(AnalyzeProperty, SymbolKind.Property);
         context.RegisterSymbolAction(AnalyzeField, SymbolKind.Field);
+        RegisterAttributeMetadataAnalysis(context);
         context.RegisterCompilationStartAction(startContext =>
         {
             var helperGraph = new ForbiddenHelperCallGraph();
             startContext.RegisterSymbolAction(c => AnalyzeMethod(c, helperGraph), SymbolKind.Method);
             startContext.RegisterOperationAction(c => AnalyzeInvocation(c, helperGraph), OperationKind.Invocation);
             startContext.RegisterOperationAction(c => AnalyzeDynamicInvocation(c, helperGraph), OperationKind.DynamicInvocation);
+            startContext.RegisterOperationAction(
+                c => AnalyzeDynamicMemberReference(c, helperGraph),
+                OperationKind.DynamicMemberReference);
+            startContext.RegisterOperationAction(
+                c => AnalyzeDynamicIndexerAccess(c, helperGraph),
+                OperationKind.DynamicIndexerAccess);
             startContext.RegisterOperationAction(c => AnalyzeObjectCreation(c, helperGraph), OperationKind.ObjectCreation);
             startContext.RegisterOperationAction(c => AnalyzeWithExpression(c, helperGraph), OperationKind.With);
             startContext.RegisterOperationAction(c => AnalyzePropertyReference(c, helperGraph), OperationKind.PropertyReference);
@@ -67,6 +75,9 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
                 OperationKind.CollectionExpression);
             startContext.RegisterOperationAction(c => AnalyzeListPattern(c, helperGraph), OperationKind.ListPattern);
             startContext.RegisterOperationAction(c => AnalyzeSlicePattern(c, helperGraph), OperationKind.SlicePattern);
+            startContext.RegisterOperationAction(
+                c => AnalyzeImplicitIndexerReference(c, helperGraph),
+                OperationKind.ImplicitIndexerReference);
             startContext.RegisterOperationAction(c => AnalyzeRecursivePattern(c, helperGraph), OperationKind.RecursivePattern);
             startContext.RegisterOperationAction(c => AnalyzeSpread(c, helperGraph), OperationKind.Spread);
             startContext.RegisterOperationAction(
@@ -80,8 +91,11 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
                 OperationKind.Interpolation);
             RegisterAwaitReachabilityAnalysis(startContext, helperGraph);
             RegisterForbiddenTypeSyntaxAnalysis(startContext, helperGraph);
+            RegisterEventAccessorAttributeMetadataAnalysis(startContext, helperGraph);
             RegisterEnumerationSyntaxAnalysis(startContext, helperGraph);
             RegisterFixedReachabilityAnalysis(startContext, helperGraph);
+            RegisterUnsafeCodeAnalysis(startContext, helperGraph);
+            RegisterLocalFunctionAttributeAnalysis(startContext, helperGraph);
             startContext.RegisterCompilationEndAction(helperGraph.ReportDiagnostics);
         });
     }
@@ -91,76 +105,69 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         var invocation = (IInvocationOperation)context.Operation;
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
-            ReportForbiddenInInitializer(context, invocation.TargetMethod.ContainingType);
-            RecordForbiddenInitializerReference(context, helperGraph, invocation.TargetMethod.ContainingType);
+            ReportForbiddenInInitializer(context, invocation.TargetMethod);
+            RecordForbiddenInitializerReference(context, helperGraph, invocation.TargetMethod);
             RecordForbiddenDelegateInitializer(context, helperGraph, invocation.TargetMethod.ContainingType);
             RecordStaticConstructorReachability(context, helperGraph, invocation.TargetMethod);
-            RecordForbiddenHelperPropertyInitializer(context, helperGraph, invocation.TargetMethod.ContainingType);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, invocation.TargetMethod);
             RecordInitializerRootCall(context, helperGraph, invocation.TargetMethod);
             return;
         }
 
-        ReportAndRecordIfForbidden(context, helperGraph, method, invocation.TargetMethod.ContainingType);
+        ReportAndRecordIfForbidden(context, helperGraph, method, invocation.TargetMethod);
+        var reportedUnsafeAccessor = ReportAndRecordIfUnsafeAccessor(
+            context,
+            helperGraph,
+            method,
+            invocation.TargetMethod);
+        ReportForbiddenInvocationTypeArguments(context, helperGraph, method, invocation.TargetMethod);
         RecordStaticConstructorReachability(context, helperGraph, invocation.TargetMethod);
-        ReportForbiddenReferencedMethodSignature(context, invocation.TargetMethod);
-        helperGraph.RecordCall(method, invocation.TargetMethod, context.Operation.Syntax.GetLocation());
+        ReportForbiddenReferencedMethodSignature(context, helperGraph, invocation.TargetMethod);
+        if (!reportedUnsafeAccessor)
+        {
+            helperGraph.RecordCall(method, invocation.TargetMethod, context.Operation.Syntax.GetLocation());
+        }
+
         ReportLocalUseIfInvalid(context, invocation.TargetMethod);
-    }
-
-    private static void AnalyzeObjectCreation(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
-    {
-        var creation = (IObjectCreationOperation)context.Operation;
-        if (context.ContainingSymbol is not IMethodSymbol method)
-        {
-            ReportForbiddenInInitializer(context, creation.Type);
-            RecordForbiddenInitializerReference(context, helperGraph, creation.Type);
-            RecordForbiddenDelegateInitializer(context, helperGraph, creation.Type);
-            RecordStaticConstructorReachability(context, helperGraph, creation.Type);
-            RecordFinalizerReachability(context, helperGraph, creation.Type);
-            RecordForbiddenHelperPropertyInitializer(context, helperGraph, creation.Type);
-            if (creation.Constructor is { } initializerConstructor)
-            {
-                helperGraph.RecordConstructorInitializers(initializerConstructor);
-                RecordInitializerRootCall(context, helperGraph, initializerConstructor);
-            }
-
-            return;
-        }
-
-        ReportAndRecordIfForbidden(context, helperGraph, method, creation.Type);
-        RecordStaticConstructorReachability(context, helperGraph, creation.Type);
-        RecordFinalizerReachability(context, helperGraph, creation.Type);
-        if (creation.Constructor is { } constructor)
-        {
-            helperGraph.RecordConstructorInitializers(constructor);
-            helperGraph.RecordCall(method, constructor, context.Operation.Syntax.GetLocation());
-        }
     }
 
     private static void AnalyzePropertyReference(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
         var property = ((IPropertyReferenceOperation)context.Operation).Property;
+        var (usesGetter, usesSetter) = AccessorUsage(context.Operation);
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
-            ReportForbiddenInInitializer(context, property.ContainingType);
-            RecordForbiddenInitializerReference(context, helperGraph, property.ContainingType);
+            ReportForbiddenInInitializer(context, property);
+            RecordForbiddenInitializerReference(context, helperGraph, property);
             RecordForbiddenDelegateInitializer(context, helperGraph, property.ContainingType);
             RecordStaticConstructorReachability(context, helperGraph, property);
-            RecordForbiddenHelperPropertyInitializer(context, helperGraph, property.ContainingType);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, property);
             RecordInitializerPropertyRootCall(context, helperGraph, property);
             RecordInitializerMemberReference(context, helperGraph, property);
+            ReportAndRecordAmbientCultureMutation(context, helperGraph, property, usesSetter);
             return;
         }
 
-        ReportAndRecordIfForbidden(context, helperGraph, method, property.ContainingType);
+        if (IsForbiddenInvocationReceiver(context.Operation, property.ContainingType))
+        {
+            helperGraph.RecordForbidden(method, property.ContainingType);
+        }
+        else
+        {
+            ReportAndRecordIfForbidden(context, helperGraph, method, property);
+        }
+        ReportAndRecordAmbientCultureMutation(context, helperGraph, property, usesSetter);
         RecordStaticConstructorReachability(context, helperGraph, property);
-        ReportForbiddenReferencedType(context, property.ContainingType, property.Type);
+        if (!IsForbiddenHostApi(property.ContainingType))
+        {
+            ReportForbiddenReferencedType(context, property.ContainingType, property.Type);
+        }
+
         ReportLocalUseIfInvalid(context, property);
 
         // A forbidden API reached through a helper property's accessor body is only linked to the kernel
         // if we record an edge to the accessor it actually uses: the getter for a read, the setter for a
         // write, both for a compound/increment. Without this the accessor taints but never reaches a root.
-        var (usesGetter, usesSetter) = AccessorUsage(context.Operation);
         var location = context.Operation.Syntax.GetLocation();
         if (usesGetter && property.GetMethod is { } getter)
         {
@@ -171,7 +178,6 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         {
             helperGraph.RecordCall(method, setter, location);
         }
-
     }
 
     private static void AnalyzeFieldReference(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
@@ -219,7 +225,8 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         }
 
         helperGraph.RecordForbidden(method, type!);
-        if (!IsEventKernel(method.ContainingType))
+        if (!IsForbiddenApiRoot(context, method) ||
+            !helperGraph.TryRecordDirectDiagnostic(method))
         {
             return;
         }
@@ -234,39 +241,10 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         => TryGetForbiddenHostApi(type, out _);
 
     private static bool IsForbiddenExactType(string typeName)
-        => typeName is DotBoxDGenerationNames.TypeNames.SystemActivator
-            or DotBoxDGenerationNames.TypeNames.SystemEnvironment
-            or DotBoxDGenerationNames.TypeNames.SystemGc
-            or DotBoxDGenerationNames.TypeNames.SystemDelegate
-            or DotBoxDGenerationNames.TypeNames.SystemServiceProvider
-            or DotBoxDGenerationNames.TypeNames.SystemType;
+        => ForbiddenApiNamePolicy.IsForbiddenExactType(typeName);
 
     private static bool IsForbiddenNamespace(string typeName)
-    {
-        ReadOnlySpan<string> prefixes = [
-            "System.IO.",
-            "System.Net.",
-            "System.Reflection.",
-            "System.Runtime.InteropServices.",
-            "System.Runtime.Loader.",
-            "System.Diagnostics.",
-            "System.Threading.",
-            "System.Threading.Tasks.",
-            "System.Linq.Expressions.",
-            "System.Data.",
-            "Microsoft.CSharp.",
-            "Microsoft.EntityFrameworkCore."
-        ];
-        foreach (var prefix in prefixes)
-        {
-            if (typeName.StartsWith(prefix, StringComparison.Ordinal))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
+        => ForbiddenApiNamePolicy.IsForbiddenNamespace(typeName);
 
     internal static bool IsEventKernel(INamedTypeSymbol? type)
         => type?.AllInterfaces.Any(i => string.Equals(

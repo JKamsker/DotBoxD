@@ -96,6 +96,30 @@ public sealed class LoweredPipelineCarrierValidationTests
     }
 
     [Fact]
+    public void Composer_rejects_filter_steps_with_non_boolean_output_tags()
+    {
+        var validFilter = Step(LoweredPipelineStepKind.Filter, "i32", "bool", SandboxType.I32);
+
+        var validModule = LoweredPipelineComposer.Compose(
+            new LoweredPipelineComposition("valid-filter-output", [validFilter], SandboxType.I32));
+
+        Assert.Contains(validModule.Functions, function => function.Id == "ShouldHandle" &&
+            function.ReturnType == SandboxType.Bool);
+        Assert.Contains(validModule.Functions, function => function.Id == "Handle" &&
+            function.ReturnType == SandboxType.I32);
+
+        var malformedFilter = Step(LoweredPipelineStepKind.Filter, "i32", "string", SandboxType.I32);
+
+        var exception = Assert.Throws<ArgumentException>(() => LoweredPipelineComposer.Compose(
+            new LoweredPipelineComposition("bad-filter-output", [malformedFilter], SandboxType.I32)));
+
+        Assert.True(
+            string.Equals(exception.ParamName, "OutputType", StringComparison.Ordinal) ||
+            exception.Message.Contains("bool", StringComparison.Ordinal),
+            $"Expected the exception to identify OutputType or require bool output tags, but got: {exception}");
+    }
+
+    [Fact]
     public void Composer_rejects_projection_steps_with_null_output_type()
     {
         var step = Step(LoweredPipelineStepKind.Projection, "i32", "string", SandboxType.I32) with

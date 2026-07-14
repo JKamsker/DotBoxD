@@ -75,16 +75,6 @@ internal sealed class RpcDispatchResponseBuilder
     {
         using var telemetry = RpcTelemetry.StartServerRequest();
 
-        // request.ServiceName is remote-supplied and can deserialize to null from a hostile/malformed
-        // envelope (MessagePack nil). Guard before the dictionary lookup so that malformed input is
-        // reported as ServiceNotFound instead of escaping as an internal lookup error.
-        if (dispatcher is null)
-        {
-            var error = RpcErrors.ServiceNotFound();
-            telemetry.MarkFailed(new ServiceNotFoundException(error.Message));
-            return new RpcDispatchResult(BuildErrorFrame(messageId, error), stream: null);
-        }
-
         try
         {
             ct.ThrowIfCancellationRequested();
@@ -96,14 +86,27 @@ internal sealed class RpcDispatchResponseBuilder
             throw;
         }
 
+        // request.ServiceName is remote-supplied and can deserialize to null from a hostile/malformed
+        // envelope (MessagePack nil). Guard before the dictionary lookup so that malformed input is
+        // reported as ServiceNotFound instead of escaping as an internal lookup error.
+        if (dispatcher is null)
+        {
+            var error = RpcErrors.ServiceNotFound();
+            telemetry.MarkFailed(new ServiceNotFoundException(error.Message));
+            return new RpcDispatchResult(BuildErrorFrame(messageId, error), stream: null);
+        }
+
         var writer = MessageFramer.RentFrameWriter();
-        MessageFramer.WriteFramePrefix(writer, messageId, MessageType.Response);
-        var envelopeStart = writer.WrittenCount;
-        _serializer.Serialize(writer, new RpcResponse { MessageId = messageId, IsSuccess = true });
-        var envelopeLength = writer.WrittenCount - envelopeStart;
+        int envelopeLength;
 
         try
         {
+            MessageFramer.WriteFramePrefix(writer, messageId, MessageType.Response);
+            var envelopeStart = writer.WrittenCount;
+            _serializer.Serialize(writer, new RpcResponse { MessageId = messageId, IsSuccess = true });
+            envelopeLength = writer.WrittenCount - envelopeStart;
+            ct.ThrowIfCancellationRequested();
+
             await DispatchAsync(
                 dispatcher,
                 request,

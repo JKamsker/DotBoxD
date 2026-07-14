@@ -1,0 +1,79 @@
+name: Library Surprise Explore Continuation
+
+# gh-aw intentionally forbids an agentic workflow from dispatching itself. Explore therefore hands
+# non-exhausted lenses to this deterministic workflow, which re-checks the live graph before queuing
+# one successor. The explore workflow's per-lens concurrency group prevents overlap. The scheduled
+# dispatcher remains the recovery path if either half of this handoff fails.
+
+on:
+  workflow_dispatch:
+    inputs:
+      lens_issue:
+        description: Lens issue number to continue mining.
+        required: true
+        type: string
+      vein:
+        description: The vein:* tag of the lens (informational).
+        required: false
+        type: string
+
+permissions:
+  actions: write
+  issues: read
+
+concurrency:
+  group: explore-continuation-${{ inputs.lens_issue }}
+  cancel-in-progress: false
+
+jobs:
+  rearm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Re-check lens and queue its next explore
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          LENS_ISSUE: ${{ inputs.lens_issue }}
+          VEIN: ${{ inputs.vein }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+
+          repo = os.environ["GH_REPO"]
+          lens_issue = os.environ["LENS_ISSUE"]
+          vein = os.environ.get("VEIN", "")
+
+          if not re.fullmatch(r"[1-9][0-9]*", lens_issue):
+              raise SystemExit(f"invalid lens issue number: {lens_issue!r}")
+          if vein and not re.fullmatch(r"vein:[a-z0-9-]+", vein):
+              raise SystemExit(f"invalid vein label: {vein!r}")
+
+          result = subprocess.run(
+              ["gh", "issue", "view", lens_issue, "--repo", repo,
+               "--json", "state,labels"],
+              check=True,
+              text=True,
+              stdout=subprocess.PIPE,
+          )
+          issue = json.loads(result.stdout)
+          labels = {label["name"] for label in issue.get("labels", [])}
+          if (issue.get("state") != "OPEN"
+                  or "sweep:active" not in labels
+                  or "sweep:exhausted" in labels):
+              print(f"lens #{lens_issue} is not active and mineable; no successor queued")
+              raise SystemExit(0)
+
+          subprocess.run(
+              ["gh", "workflow", "run", "library-surprise-explore.lock.yml",
+               "--repo", repo,
+               "-f", f"lens_issue={lens_issue}",
+               "-f", f"vein={vein}"],
+              check=True,
+          )
+          print(f"queued successor explore for lens #{lens_issue} ({vein})")
+          PY

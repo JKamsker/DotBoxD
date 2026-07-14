@@ -102,49 +102,77 @@ internal static class RemoteLocalResultEncoder
         if (type == typeof(bool))
         {
             var getter = CreateGetter<TResult, bool>(member);
-            return (result, writer) => KernelRpcBinaryCodec.EncodeBoolValue(getter(result), writer);
+            return (result, writer) => KernelRpcBinaryCodec.EncodeBoolValue(
+                ReadMemberValue(getter, result, name),
+                writer);
         }
 
         if (type == typeof(int))
         {
             var getter = CreateGetter<TResult, int>(member);
-            return (result, writer) => KernelRpcBinaryCodec.EncodeInt32Value(getter(result), writer);
+            return (result, writer) => KernelRpcBinaryCodec.EncodeInt32Value(
+                ReadMemberValue(getter, result, name),
+                writer);
         }
 
         if (type == typeof(long))
         {
             var getter = CreateGetter<TResult, long>(member);
-            return (result, writer) => KernelRpcBinaryCodec.EncodeInt64Value(getter(result), writer);
+            return (result, writer) => KernelRpcBinaryCodec.EncodeInt64Value(
+                ReadMemberValue(getter, result, name),
+                writer);
         }
 
         if (type == typeof(float))
         {
             var getter = CreateGetter<TResult, float>(member);
-            return (result, writer) => KernelRpcBinaryCodec.EncodeDoubleValue(getter(result), writer);
+            return (result, writer) => KernelRpcBinaryCodec.EncodeDoubleValue(
+                ReadMemberValue(getter, result, name),
+                writer);
         }
 
         if (type == typeof(double))
         {
             var getter = CreateGetter<TResult, double>(member);
-            return (result, writer) => KernelRpcBinaryCodec.EncodeDoubleValue(getter(result), writer);
+            return (result, writer) => KernelRpcBinaryCodec.EncodeDoubleValue(
+                ReadMemberValue(getter, result, name),
+                writer);
         }
 
         if (type == typeof(string))
         {
             var getter = CreateGetter<TResult, string?>(member);
-            return (result, writer) => EncodeStringMember(getter(result), name, writer);
+            return (result, writer) => EncodeStringMember(ReadMemberValue(getter, result, name), name, writer);
         }
 
         if (type == typeof(Guid))
         {
             var getter = CreateGetter<TResult, Guid>(member);
-            return (result, writer) => KernelRpcBinaryCodec.EncodeGuidValue(getter(result), writer);
+            return (result, writer) => KernelRpcBinaryCodec.EncodeGuidValue(
+                ReadMemberValue(getter, result, name),
+                writer);
         }
 
         var objectGetter = CreateGetter<TResult, object?>(member);
         return (result, writer) => KernelRpcBinaryCodec.EncodeRecordField(
-            EncodeMember(objectGetter(result), type, name),
+            EncodeMember(ReadMemberValue(objectGetter, result, name), type, name),
             writer);
+    }
+
+    private static TValue ReadMemberValue<TResult, TValue>(
+        Func<TResult, TValue> getter,
+        TResult result,
+        string name)
+        where TResult : struct, IHookResult
+    {
+        try
+        {
+            return getter(result);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new InvalidOperationException($"Failed to read hook result member '{name}'.", ex);
+        }
     }
 
     private static void EncodeStringMember(string? value, string name, IBufferWriter<byte> writer)

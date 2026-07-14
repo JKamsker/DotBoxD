@@ -57,11 +57,12 @@ public sealed class RemoteLocalHandlerRegistry
             return RegisterKernelHandler(subscriptionId, scalarHandler);
         }
 
-        return RegisterKernelHandler(subscriptionId, (wireValue, context) =>
-        {
-            var projected = (TProjected)KernelRpcMarshaller.FromKernelRpcValue(wireValue, typeof(TProjected))!;
-            return handler(projected, context);
-        });
+        return RegisterKernelHandler(
+            subscriptionId,
+            DecodeAndInvoke<KernelRpcValue, TProjected>(
+                subscriptionId,
+                handler,
+                static wireValue => (TProjected)KernelRpcMarshaller.FromKernelRpcValue(wireValue, typeof(TProjected))!));
     }
 
     /// <summary>
@@ -80,11 +81,7 @@ public sealed class RemoteLocalHandlerRegistry
         ArgumentNullException.ThrowIfNull(handler);
         ArgumentNullException.ThrowIfNull(decoder);
 
-        return RegisterKernelHandler(subscriptionId, (wireValue, context) =>
-        {
-            var projected = decoder(wireValue);
-            return handler(projected, context);
-        });
+        return RegisterKernelHandler(subscriptionId, DecodeAndInvoke(subscriptionId, handler, decoder));
     }
 
     /// <summary>
@@ -100,11 +97,7 @@ public sealed class RemoteLocalHandlerRegistry
         ArgumentNullException.ThrowIfNull(handler);
         ArgumentNullException.ThrowIfNull(decoder);
 
-        return RegisterRawHandler(subscriptionId, (payload, context) =>
-        {
-            var projected = decoder(payload);
-            return handler(projected, context);
-        });
+        return RegisterRawHandler(subscriptionId, DecodeAndInvoke(subscriptionId, handler, decoder));
     }
 
     public IDisposable RegisterResult<TContext, TResult>(
@@ -133,6 +126,7 @@ public sealed class RemoteLocalHandlerRegistry
             var wireValue = KernelRpcBinaryCodec.DecodeValue(payload);
             var context = (TContext)KernelRpcMarshaller.FromKernelRpcValue(wireValue, typeof(TContext))!;
             var result = await handler(context, hookContext, cancellationToken).ConfigureAwait(false);
+            ThrowIfDispatchCanceled(hookContext, cancellationToken);
             return RemoteLocalResultEncoder.Encode(result);
         });
         _resultHandlers[subscriptionId] = entry;
@@ -201,6 +195,33 @@ public sealed class RemoteLocalHandlerRegistry
         cancellationToken.ThrowIfCancellationRequested();
         context.CancellationToken.ThrowIfCancellationRequested();
     }
+
+    private static Func<TInput, HookContext, ValueTask> DecodeAndInvoke<TInput, TProjected>(
+        string subscriptionId,
+        Func<TProjected, HookContext, ValueTask> handler,
+        Func<TInput, TProjected> decoder)
+        => (input, context) =>
+        {
+            TProjected projected;
+            try
+            {
+                projected = decoder(input);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                throw ProjectedPayloadDecoderFailed(subscriptionId, typeof(TProjected), ex);
+            }
+
+            return handler(projected, context);
+        };
+
+    private static InvalidOperationException ProjectedPayloadDecoderFailed(
+        string subscriptionId,
+        Type projectedType,
+        Exception innerException)
+        => new(
+            $"Remote-local projected payload decoder failed for subscription '{subscriptionId}' and projected type '{projectedType.FullName ?? projectedType.Name}'.",
+            innerException);
 
     /// <summary>Removes the handler for <paramref name="subscriptionId"/>. Returns <c>true</c> if one was present.</summary>
     public bool Unregister(string subscriptionId)

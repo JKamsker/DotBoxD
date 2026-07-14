@@ -140,6 +140,11 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
         }
         catch (Exception ex)
         {
+            if (state.IsCancellationRequested)
+            {
+                return;
+            }
+
             RpcDiagnostics.Report("Outbound stream pump failed", ex);
             try
             {

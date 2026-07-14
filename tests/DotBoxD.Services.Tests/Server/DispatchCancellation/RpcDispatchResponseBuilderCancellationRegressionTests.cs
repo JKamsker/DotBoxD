@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using DotBoxD.Codecs.MessagePack;
+using DotBoxD.Services.Diagnostics;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Serialization;
 using DotBoxD.Services.Server;
@@ -61,6 +62,60 @@ public sealed class RpcDispatchResponseBuilderCancellationRegressionTests
         Assert.Equal(0, dispatcher.OutputBytes);
     }
 
+    [Fact]
+    public async Task BuildAsync_observes_pre_canceled_token_before_missing_dispatcher_error()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var builder = new RpcDispatchResponseBuilder(
+            serializer,
+            new ConcurrentDictionary<string, IServiceDispatcher>());
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+
+        try
+        {
+            using var result = await builder.BuildAsync(
+                new RpcRequest { MessageId = 43, ServiceName = "Missing", MethodName = "Count" },
+                messageId: 43,
+                ReadOnlyMemory<byte>.Empty,
+                new InstanceRegistry(),
+                RpcStreamingContext.Disabled,
+                canceled.Token);
+
+            Assert.Fail(DescribeUnexpectedDispatchResult(serializer, result));
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    [Fact]
+    public async Task BuildAsync_observes_serializer_canceled_token_before_custom_dispatcher_work()
+    {
+        using var source = new CancellationTokenSource();
+        var serializer = new ResponseCancelingSerializer(new MessagePackRpcSerializer(), source);
+        var dispatcher = new CountingDispatcher();
+        var builder = CreateBuilder(serializer, dispatcher);
+        var request = new RpcRequest { MessageId = 42, ServiceName = dispatcher.ServiceName, MethodName = "Count" };
+
+        var exception = await Record.ExceptionAsync(async () =>
+        {
+            using var result = await builder.BuildAsync(
+                request,
+                messageId: 42,
+                ReadOnlyMemory<byte>.Empty,
+                new InstanceRegistry(),
+                RpcStreamingContext.Disabled,
+                source.Token);
+        });
+
+        Assert.IsType<OperationCanceledException>(exception);
+        Assert.True(source.IsCancellationRequested);
+        Assert.Equal(1, serializer.SerializeResponseCalls);
+        Assert.Equal(0, dispatcher.CallCount);
+        Assert.Equal(0, dispatcher.OutputBytes);
+    }
+
     private static RpcDispatchResponseBuilder CreateBuilder(
         ISerializer serializer,
         IServiceDispatcher dispatcher)
@@ -68,6 +123,29 @@ public sealed class RpcDispatchResponseBuilderCancellationRegressionTests
         var dispatchers = new ConcurrentDictionary<string, IServiceDispatcher>();
         Assert.True(dispatchers.TryAdd(dispatcher.ServiceName, dispatcher));
         return new RpcDispatchResponseBuilder(serializer, dispatchers);
+    }
+
+    private static string DescribeUnexpectedDispatchResult(
+        ISerializer serializer,
+        RpcDispatchResult result)
+    {
+        if (!MessageFramer.TryReadFrame(
+            result.FrameMemory,
+            out _,
+            out var messageType,
+            out var envelope,
+            out _))
+        {
+            return "Expected OperationCanceledException before missing-dispatcher response, " +
+                $"but BuildAsync returned an unreadable frame with {result.FrameMemory.Length} bytes.";
+        }
+
+        var response = serializer.Deserialize<RpcResponse>(envelope);
+        return "Expected OperationCanceledException before missing-dispatcher response, " +
+            $"but BuildAsync returned MessageType={messageType}, " +
+            $"IsSuccess={response.IsSuccess}, " +
+            $"ErrorType={response.ErrorType ?? "<null>"}. " +
+            $"ServiceNotFound={RpcErrorTypes.ServiceNotFound}.";
     }
 
     private sealed class CancelingSuccessDispatcher(CancellationTokenSource source) :
@@ -91,6 +169,26 @@ public sealed class RpcDispatchResponseBuilderCancellationRegressionTests
             serializer.Serialize(output, 123);
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class ResponseCancelingSerializer(ISerializer inner, CancellationTokenSource source) : ISerializer
+    {
+        public int SerializeResponseCalls { get; private set; }
+
+        public void Serialize<T>(IBufferWriter<byte> writer, T value)
+        {
+            if (value is RpcResponse { IsSuccess: true })
+            {
+                SerializeResponseCalls++;
+                source.Cancel();
+            }
+
+            inner.Serialize(writer, value);
+        }
+
+        public T Deserialize<T>(ReadOnlyMemory<byte> data) => inner.Deserialize<T>(data);
+
+        public object? Deserialize(ReadOnlyMemory<byte> data, Type type) => inner.Deserialize(data, type);
     }
 
     private sealed class CountingDispatcher : IServiceDispatcher, INonStreamingServiceDispatcher

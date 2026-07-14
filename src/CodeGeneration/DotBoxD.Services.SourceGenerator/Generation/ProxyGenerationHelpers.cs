@@ -8,6 +8,8 @@ namespace DotBoxD.Services.SourceGenerator.Generation;
 
 internal static class ProxyGenerationHelpers
 {
+    public const string CallerCancellationHelperName = "__dotboxd_observeCallerCancellationAsync";
+
     public static void AppendParameterList(
         StringBuilder sb,
         EquatableArray<ParameterModel> parameters,

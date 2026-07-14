@@ -47,6 +47,84 @@ public sealed class PluginAnalyzerForbiddenApiDynamicReachabilityTests
     }
 
     [Fact]
+    public async Task Reports_forbidden_helper_property_reached_through_dynamic_member_access()
+    {
+        const string source = """
+            namespace Sample
+            {
+                using DotBoxD.Abstractions;
+                using DotBoxD.Plugins;
+
+                public sealed class Helper
+                {
+                    public bool Danger
+                    {
+                        get
+                        {
+                            _ = System.IO.File.ReadAllText("/x");
+                            return true;
+                        }
+                    }
+                }
+
+                [Plugin("dynamic-property-leak")]
+                public sealed class DynamicPropertyKernel : IEventKernel<string>
+                {
+                    public bool ShouldHandle(string e, HookContext context)
+                    {
+                        dynamic helper = new Helper();
+                        return helper.Danger;
+                    }
+
+                    public void Handle(string e, HookContext context) { }
+                }
+            }
+            """;
+
+        var diagnostics = await AnalyzeAsync(source);
+        AssertSingleForbiddenDiagnosticAt(source, diagnostics, "return helper.Danger;");
+    }
+
+    [Fact]
+    public async Task Reports_forbidden_helper_indexer_reached_through_dynamic_indexer_access()
+    {
+        const string source = """
+            namespace Sample
+            {
+                using DotBoxD.Abstractions;
+                using DotBoxD.Plugins;
+
+                public sealed class Helper
+                {
+                    public bool this[int index]
+                    {
+                        get
+                        {
+                            _ = System.IO.File.ReadAllText("/x");
+                            return index == 0;
+                        }
+                    }
+                }
+
+                [Plugin("dynamic-indexer-leak")]
+                public sealed class DynamicIndexerKernel : IEventKernel<string>
+                {
+                    public bool ShouldHandle(string e, HookContext context)
+                    {
+                        dynamic helper = new Helper();
+                        return helper[0];
+                    }
+
+                    public void Handle(string e, HookContext context) { }
+                }
+            }
+            """;
+
+        var diagnostics = await AnalyzeAsync(source);
+        AssertSingleForbiddenDiagnosticAt(source, diagnostics, "return helper[0];");
+    }
+
+    [Fact]
     public async Task Reports_direct_forbidden_call_control()
     {
         const string source = """

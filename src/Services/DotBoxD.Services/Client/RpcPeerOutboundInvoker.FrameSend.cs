@@ -9,6 +9,16 @@ internal sealed partial class RpcPeerOutboundInvoker
 {
     private ValueTask SendOwnedFrameAsync(PooledBufferWriter frame, CancellationToken ct)
     {
+        try
+        {
+            ct.ThrowIfCancellationRequested();
+        }
+        catch
+        {
+            frame.Dispose();
+            throw;
+        }
+
         if (_sendFrameAsync is { } sendFrameAsync)
         {
             try

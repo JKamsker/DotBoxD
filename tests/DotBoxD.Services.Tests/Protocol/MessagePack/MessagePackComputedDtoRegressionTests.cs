@@ -67,6 +67,22 @@ public sealed class MessagePackComputedDtoRegressionTests
             exception.Message);
     }
 
+    [Fact]
+    public void Constructor_replay_getter_failures_are_wrapped_with_dto_context()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var value = new ReplayComparisonThrowingDto(5);
+
+        var exception = Assert.Throws<MessagePackSerializationException>(
+            () => serializer.SerializeToPayload(value));
+
+        Assert.Contains(nameof(ReplayComparisonThrowingDto), exception.Message);
+        Assert.Contains("constructor-bound get-only values", exception.Message);
+
+        var inner = Assert.IsType<InvalidOperationException>(exception.InnerException);
+        Assert.Equal("replay getter failed", inner.Message);
+    }
+
     private static BufferPayload? TrySerializeOrNull(
         MessagePackRpcSerializer serializer,
         ComputedGetOnlyDto value)
@@ -89,6 +105,31 @@ public sealed class MessagePackComputedDtoRegressionTests
         }
 
         public int Id { get; }
+    }
+
+    public sealed class ReplayComparisonThrowingDto
+    {
+        private readonly int _id;
+        private int _remainingSuccessfulReads = 1;
+
+        public ReplayComparisonThrowingDto(int id)
+        {
+            _id = id;
+        }
+
+        public int Id
+        {
+            get
+            {
+                if (_remainingSuccessfulReads > 0)
+                {
+                    _remainingSuccessfulReads--;
+                    return _id;
+                }
+
+                throw new InvalidOperationException("replay getter failed");
+            }
+        }
     }
 
     private interface IComputedDto

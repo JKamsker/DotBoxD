@@ -20,6 +20,8 @@ OpenAI-compatible endpoint support DotBoxD needs for Codex workflows.
 The currently compiled agentic workflows are:
 
 - `.github/workflows/gh-aw-smoke-test.md`
+- `.github/workflows/library-surprise-dispatcher.md`
+- `.github/workflows/library-surprise-explore.md`
 - `.github/workflows/library-surprise-sweep.md`
 - `.github/workflows/library-surprise-red-test.md`
 - `.github/workflows/library-surprise-fix.md`
@@ -56,19 +58,25 @@ uses: JKamsker/gh-aw/actions/setup@<commit-sha> # v0.82.0-jk.1
 
 It should not emit `github/gh-aw-actions/setup` for these workflows.
 
-## Codex Model
+## Codex Models
 
-DotBoxD's Codex workflows pin `gpt-5.5` in source and run with high reasoning
-effort:
+The active graph explorer and the legacy manual discovery workflow pin `gpt-5.6-sol`, run with high
+reasoning effort, and have a 60-minute / 3000-AI-credit research budget:
 
 ```yaml
+timeout-minutes: 60
+max-ai-credits: 3000
+
 engine:
   id: codex
-  model: gpt-5.5
+  model: gpt-5.6-sol
   args:
     - " -c"
     - model_reasoning_effort="high"
 ```
+
+The mechanical dispatcher, proof/fix workers, and smoke test remain pinned to `gpt-5.5` with high
+reasoning effort. Models are explicit in every source workflow; do not rely on a moving default.
 
 The leading space in the first `engine.args` entry is intentional for
 `JKamsker/gh-aw@v0.82.0-jk.1`. That compiler appends custom Codex args directly
@@ -120,22 +128,29 @@ gh-aw token secret names:
 
 ## Library Surprise Automation
 
-The library-surprise automation is intentionally split across specialized
-agent runs:
+The library-surprise automation is intentionally split across specialized runs:
 
-1. `.github/workflows/library-surprise-sweep.md` is the discovery agent. It
-   finds one candidate surprise, performs duplicate checks, and dispatches the
-   red-test worker with a compact handoff. It does not edit files.
-2. `.github/workflows/library-surprise-red-test.md` is the proof agent. It adds
+1. `.github/workflows/library-surprise-dispatcher.md` seeds active lenses and periodically recovers
+   any lens whose continuous chain was broken by a failed or incomplete run.
+2. `.github/workflows/library-surprise-explore.md` is the active per-lens discovery agent. It mines
+   one coherent seam for up to five independent surprises, performs graph-wide duplicate checks,
+   dispatches one red-test worker per concrete finding, and hands non-exhausted lenses to the
+   deterministic continuation workflow. It does not edit files.
+3. `.github/workflows/library-surprise-sweep.md` is the superseded single-candidate discovery agent,
+   retained for manual/backward-compatible runs only.
+4. `.github/workflows/library-surprise-red-test.md` is the proof agent. It adds
    only red regression tests, verifies the branch builds and the tests fail
    locally, then creates a `[surprise-red-test]` PR.
-3. Repository CI runs on that PR and proves the bug exists by failing on the red
+5. Repository CI runs on that PR and proves the bug exists by failing on the red
    tests.
-4. `.github/workflows/library-surprise-fix.md` reacts to the failed `ci` run for
-   an eligible `[surprise-red-test]` PR, checks out the same PR branch, fixes the
-   production issue, addresses actionable CodeRabbit feedback, validates the
-   full build/test suite, and pushes the fix back to the PR branch.
-5. The configured `GH_AW_CI_TRIGGER_TOKEN` path causes CI to run again after the
+6. `.github/workflows/library-surprise-explore-continuation.yml` re-checks lens status and queues one
+   serialized successor explore without spending another model call.
+7. `.github/workflows/library-surprise-fix-dispatcher.yml` continuously drains new red-test PRs and
+   polish work into the bounded fix-worker pool.
+8. `.github/workflows/library-surprise-fix.md` checks out the same PR branch, fixes the production
+   issue, addresses actionable CodeRabbit feedback, validates the full build/test suite, and pushes
+   the fix back to the PR branch.
+9. The configured `GH_AW_CI_TRIGGER_TOKEN` path causes CI to run again after the
    fix push.
 
 ## Validation

@@ -70,7 +70,7 @@ internal static class PluginKernelInputBuilder
         IReadOnlyList<LiveSettingDefinition> liveSettings,
         LiveSettingStore value)
     {
-        var rawEventValues = adapter.ToSandboxValues(e);
+        var rawEventValues = PluginEventAdapterValueValidator.ReadValues(adapter, e);
         PluginEventAdapterValueValidator.ValidateValues(parameters, rawEventValues);
         var eventValues = PluginEventAdapterValueValidator.CopyValidatedValues(parameters, rawEventValues);
         return Build(eventValues, liveSettings, value);
@@ -160,7 +160,7 @@ internal static class PluginKernelInputBuilder
         ref SandboxValue[]? buffer,
         ref ListValue? list)
     {
-        var rawEventValues = adapter.ToSandboxValues(e);
+        var rawEventValues = PluginEventAdapterValueValidator.ReadValues(adapter, e);
         PluginEventAdapterValueValidator.ValidateValues(parameters, rawEventValues);
         var eventValues = PluginEventAdapterValueValidator.CopyValidatedValues(parameters, rawEventValues);
         return BuildWithReusableBuffer(eventValues, liveSettings, value, ref buffer, ref list);

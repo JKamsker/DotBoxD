@@ -212,7 +212,7 @@ internal static partial class PluginServerFacadeEmitter
             PluginServerFlowAttributeSource.Append(builder, "    ", method.Attributes);
             PluginServerFlowAttributeSource.Append(builder, "    ", method.ReturnAttributes);
             builder.Append("    public ");
-            if (method.ReturnWrapperKind is PluginServerReturnWrapperKind.Task or PluginServerReturnWrapperKind.ValueTask)
+            if (PluginServerReturnWrapperCancellationEmitter.RequiresAsyncModifier(method))
             {
                 builder.Append("async ");
             }
@@ -220,9 +220,9 @@ internal static partial class PluginServerFacadeEmitter
             builder.Append(method.ReturnType).Append(' ')
                 .Append(PluginServerIdentifier.Escape(method.Name))
                 .Append('(').Append(ParameterList(method)).Append(')');
-            if (PluginServerReturnWrapperCancellationEmitter.RequiresAsyncReturnWrapperBlock(method))
+            if (PluginServerReturnWrapperCancellationEmitter.RequiresAsyncCancellationBlock(method))
             {
-                AppendWorldAsyncReturnWrapperBlock(builder, method);
+                AppendWorldAsyncCancellationBlock(builder, method);
                 continue;
             }
 
@@ -261,18 +261,33 @@ internal static partial class PluginServerFacadeEmitter
             .Append(ArgumentList(method)).AppendLine("));");
     }
 
-    private static void AppendWorldAsyncReturnWrapperBlock(StringBuilder builder, PluginServerForwardedMethod method)
+    private static void AppendWorldAsyncCancellationBlock(StringBuilder builder, PluginServerForwardedMethod method)
     {
         var localName = PluginServerReturnWrapperCancellationEmitter.UniqueLocalName("__dotboxdResult", method);
+        var hasResult = PluginServerReturnWrapperCancellationEmitter.HasAwaitedResult(method);
         builder.AppendLine();
         builder.AppendLine("    {");
-        builder.Append("        var ").Append(localName).Append(" = await ((")
+        builder.Append("        ");
+        if (hasResult)
+        {
+            builder.Append("var ").Append(localName).Append(" = ");
+        }
+
+        builder.Append("await ((")
             .Append(method.ReceiverType).Append(")RequireWorld()).")
             .Append(PluginServerIdentifier.Escape(method.Name)).Append('(')
             .Append(ArgumentList(method)).AppendLine(").ConfigureAwait(false);");
         PluginServerReturnWrapperCancellationEmitter.AppendCancellationChecks(builder, method, "        ");
-        builder.Append("        return new ").Append(method.ReturnWrapperName).Append("(this, ")
-            .Append(localName).AppendLine(");");
+        if (method.ReturnWrapperName is not null)
+        {
+            builder.Append("        return new ").Append(method.ReturnWrapperName).Append("(this, ")
+                .Append(localName).AppendLine(");");
+        }
+        else if (hasResult)
+        {
+            builder.Append("        return ").Append(localName).AppendLine(";");
+        }
+
         builder.AppendLine("    }");
     }
 

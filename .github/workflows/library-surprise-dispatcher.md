@@ -1,17 +1,24 @@
 ---
 description: |
-  Orchestrator for the surprise-hunt graph. On a schedule it reads the live lens frontier
+  Recovery orchestrator for the surprise-hunt graph. On a schedule it reads the live lens frontier
   (open `sweep:lens` + `sweep:active` issues), drops any lens that already has an explore run in
   flight, severity-orders the rest, and dispatches one `library-surprise-explore` run per eligible
-  lens (capped). Read-only against the repo; it never edits files or opens issues/PRs itself.
+  lens (capped). Healthy explore runs self-chain continuously; this workflow seeds and repairs the
+  loop after failures or incomplete runs. Read-only against the repo; it never edits files or opens
+  issues/PRs itself.
   See docs/Task/BugHunting/README.md.
 
 on:
   workflow_dispatch:
   schedule:
-    # UTC. Every 30 min at :09/:39 — off-peak minutes; GitHub drops fewer schedule
-    # slots away from :00/:05-multiples, and this stays staggered off other crons.
-    - cron: "9,39 * * * *"
+    # UTC. Four recovery opportunities per hour at off-peak minutes. GitHub can drop
+    # short-interval schedules, so continuous throughput comes from explore self-chaining;
+    # this cron only has to revive lenses whose previous run did not schedule a successor.
+    - cron: "9,24,39,54 * * * *"
+
+concurrency:
+  group: surprise-hunt-dispatcher
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -133,10 +140,10 @@ pre-agent-steps:
 Read `/tmp/gh-aw/frontier.json`. It is the list of active lenses, highest-severity first, with any
 lens that already has an `explore` run in flight removed.
 
-Your only job is to fan out — do **not** read source, edit files, or open issues/PRs.
+Your only job is to fan out - do **not** read source, edit files, or open issues/PRs.
 
 For each entry in `frontier.json`, in the given order and up to the cap (8), call the **dedicated**
-`library_surprise_explore` safe-output tool **once per entry** — one call per lens. Do **not** use the
+`library_surprise_explore` safe-output tool **once per entry** - one call per lens. Do **not** use the
 generic `dispatch_workflow` tool: in this runtime it is a no-op (it returns success but produces no
 collectable safe output, so nothing is dispatched). Pass:
 

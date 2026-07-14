@@ -91,6 +91,8 @@ public static class LoweredPipelineComposer
                     $"step {i} parameter type '{parameter.Type}' does not match input shape '{step.InputType}'.");
             }
 
+            LoweredPipelineStepValidator.ValidateFilterOutput(step, i);
+
             if (step.Kind == LoweredPipelineStepKind.Projection)
             {
                 currentTag = step.OutputType;
@@ -232,9 +234,7 @@ public static class LoweredPipelineComposer
     }
 
     private static Parameter InputParameter(SandboxType type) => new(InitialVariable(), type);
-
     private static string InitialVariable() => CurrentVariablePrefix + "0";
-
     private static string NextVariable(string current)
         => CurrentVariablePrefix + (int.Parse(current[CurrentVariablePrefix.Length..], System.Globalization.CultureInfo.InvariantCulture) + 1);
 

@@ -158,12 +158,34 @@ internal static class RpcGeneratedAssemblyCatalog
                 $"did not publish a compatible {methodName} method.");
         }
 
-        return new SinkRegistrar<TSink>(
-            (Action<TSink>)Delegate.CreateDelegate(typeof(Action<TSink>), method));
+        if (method.ReturnType != typeof(void))
+        {
+            throw IncompatibleSinkMethod(assembly, generatedType, methodName);
+        }
+
+        try
+        {
+            return new SinkRegistrar<TSink>(
+                (Action<TSink>)Delegate.CreateDelegate(typeof(Action<TSink>), method));
+        }
+        catch (ArgumentException ex)
+        {
+            throw IncompatibleSinkMethod(assembly, generatedType, methodName, ex);
+        }
     }
 
     private static Type? FindGeneratedType(Assembly assembly) =>
         assembly.GetType(GeneratedFactoryTypeName, throwOnError: false);
+
+    private static InvalidOperationException IncompatibleSinkMethod(
+        Assembly assembly,
+        Type generatedType,
+        string methodName,
+        Exception? innerException = null) =>
+        new(
+            $"DotBoxD generated factory type '{generatedType.FullName}' in assembly '{assembly.FullName}' " +
+            $"published an incompatible {methodName} method.",
+            innerException);
 
     private readonly struct SinkRegistrar<TSink>
         where TSink : class
