@@ -77,6 +77,7 @@ internal static partial class DotBoxDGenerationNames
         public const string DictionaryInterfaceOriginal = "System.Collections.Generic.IDictionary<TKey, TValue>";
         public const string SystemActionPrefix = "System.Action";
         public const string SystemActivator = "System.Activator";
+        public const string SystemConsole = "System.Console";
         public const string SystemEnvironment = "System.Environment";
         public const string SystemGc = "System.GC";
         public const string SystemDelegate = "System.Delegate";
