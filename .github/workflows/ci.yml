@@ -392,6 +392,8 @@ jobs:
               "InvokeAsyncGeneratedFallbackHostBindingOverloadTests",
               "InvokeAsyncCommonReturnInferenceTests",
               "InvokeAsyncReturnConversionBoundaryTests",
+              "InvokeAsyncCollectionSinkConversionBoundaryTests",
+              "InvokeAsyncObjectSinkConversionBoundaryTests",
               "InvokeAsyncNamedLambdaManualIrTests",
               "InvokeAsyncNullIrArgumentRecognitionTests",
               "InvokeAsyncArrayRegressionTests",

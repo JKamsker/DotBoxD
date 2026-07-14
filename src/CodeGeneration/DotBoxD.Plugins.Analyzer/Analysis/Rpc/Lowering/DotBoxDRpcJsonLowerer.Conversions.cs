@@ -38,7 +38,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     }
 
     internal string ApplyNumericConversion(ITypeSymbol sourceType, ITypeSymbol targetType, string lowered)
-        => TryApplyNumericConversion(sourceType, targetType, lowered, out var converted) ? converted : lowered;
+        => RpcNumericConversion.TryApply(sourceType, targetType, lowered, out var converted) ? converted : lowered;
 
     internal string ApplyRequiredReturnConversion(
         ExpressionSyntax expression,
@@ -103,7 +103,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             throw UnsupportedConversion(description);
         }
 
-        if (TryApplyNumericConversion(effectiveType, targetType, lowered, out var converted))
+        if (RpcNumericConversion.TryApply(effectiveType, targetType, lowered, out var converted))
         {
             return converted;
         }
@@ -174,13 +174,8 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         }
 
         if (IsLoweredEnumConstant(expression, convertedType) ||
-            RpcNumericConversionClassifier.IsRepresentableNarrowI32Constant(
-                _model,
-                expression,
-                sourceType,
-                convertedType,
-                _cancellationToken) ||
-            NumericConversion(sourceType, convertedType) is not NumericConversionKind.Unsupported)
+            IsRepresentableNarrowI32Constant(expression, sourceType, convertedType) ||
+            RpcNumericConversion.IsSupported(sourceType, convertedType))
         {
             effectiveType = convertedType;
             return true;
@@ -193,76 +188,20 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         => convertedType.TypeKind == TypeKind.Enum &&
            _model.GetConstantValue(expression, _cancellationToken).HasValue;
 
+    private bool IsRepresentableNarrowI32Constant(
+        ExpressionSyntax expression,
+        ITypeSymbol sourceType,
+        ITypeSymbol convertedType)
+    {
+        if (sourceType.SpecialType != SpecialType.System_Int32 ||
+            _model.GetConstantValue(expression, _cancellationToken).Value is not int value)
+        {
+            return false;
+        }
+
+        return RpcNumericConversion.IsRepresentableNarrowI32Constant(value, convertedType);
+    }
+
     private static NotSupportedException UnsupportedConversion(string description)
         => new($"{description} is not supported because it is not a supported numeric widening conversion.");
-
-    private static bool TryApplyNumericConversion(
-        ITypeSymbol sourceType,
-        ITypeSymbol targetType,
-        string lowered,
-        out string converted)
-    {
-        switch (NumericConversion(sourceType, targetType))
-        {
-            case NumericConversionKind.Identity:
-            case NumericConversionKind.SameWire:
-                converted = lowered;
-                return true;
-            case NumericConversionKind.ToI64:
-                converted = Call("numeric.toI64", null, lowered);
-                return true;
-            case NumericConversionKind.ToF64:
-                converted = Call("numeric.toF64", null, lowered);
-                return true;
-            default:
-                converted = lowered;
-                return false;
-        }
-    }
-
-    private static NumericConversionKind NumericConversion(ITypeSymbol sourceType, ITypeSymbol targetType)
-    {
-        if (SymbolEqualityComparer.Default.Equals(sourceType, targetType))
-        {
-            return NumericConversionKind.Identity;
-        }
-
-        if (RpcNumericConversionClassifier.IsImplicitI32WireConversion(sourceType, targetType) ||
-            (sourceType.SpecialType == SpecialType.System_Single && targetType.SpecialType == SpecialType.System_Double))
-        {
-            return NumericConversionKind.SameWire;
-        }
-
-        if (IsI32WireIntegral(sourceType) && targetType.SpecialType == SpecialType.System_Int64)
-        {
-            return NumericConversionKind.ToI64;
-        }
-
-        return CanWidenToF64(sourceType) && IsFloatingPoint(targetType)
-            ? NumericConversionKind.ToF64
-            : NumericConversionKind.Unsupported;
-    }
-
-    private static bool IsI32WireIntegral(ITypeSymbol type)
-        => type.SpecialType is SpecialType.System_Byte or
-            SpecialType.System_Char or
-            SpecialType.System_Int16 or
-            SpecialType.System_Int32 or
-            SpecialType.System_SByte or
-            SpecialType.System_UInt16;
-
-    private static bool CanWidenToF64(ITypeSymbol type)
-        => IsI32WireIntegral(type) || type.SpecialType == SpecialType.System_Int64;
-
-    private static bool IsFloatingPoint(ITypeSymbol type)
-        => type.SpecialType is SpecialType.System_Double or SpecialType.System_Single;
-
-    private enum NumericConversionKind
-    {
-        Unsupported,
-        Identity,
-        SameWire,
-        ToI64,
-        ToF64
-    }
 }

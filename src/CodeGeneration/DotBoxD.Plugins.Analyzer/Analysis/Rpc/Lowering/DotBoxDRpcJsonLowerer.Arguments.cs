@@ -15,7 +15,11 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         var lowered = new string?[parameters.Count];
         foreach (var argument in bound.EvaluationOrder)
         {
-            var value = LowerExpression(argument.Expression);
+            var parameter = parameters[argument.ParameterIndex];
+            var value = LowerRequiredExpression(
+                argument.Expression,
+                parameter.Type,
+                $"{description} parameter '{parameter.Name}'");
             if (_expressionPrelude is null)
             {
                 lowered[argument.ParameterIndex] = value;

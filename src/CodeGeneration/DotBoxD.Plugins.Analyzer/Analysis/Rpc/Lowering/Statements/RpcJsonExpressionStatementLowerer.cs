@@ -54,7 +54,11 @@ internal static class RpcJsonExpressionStatementLowerer
 
         if (lowerer.AssignmentOverride?.Invoke(
                 assignment,
-                expression => lowerer.LowerExpressionWithPrelude(expression, output)) is { } lowered)
+                (expression, targetType, description) => lowerer.LowerRequiredExpressionWithPrelude(
+                    expression,
+                    targetType,
+                    description,
+                    output)) is { } lowered)
         {
             output.Add(lowered);
             return true;
@@ -164,12 +168,16 @@ internal static class RpcJsonExpressionStatementLowerer
         if (invocation.Expression is not MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Add" } member ||
             member.Expression is not IdentifierNameSyntax list ||
             invocation.ArgumentList.Arguments.Count != 1 ||
-            DotBoxDRpcTypeMapper.ListElementType(lowerer.TypeOf(member.Expression)) is null)
+            DotBoxDRpcTypeMapper.ListElementType(lowerer.TypeOf(member.Expression)) is not { } elementType)
         {
             return null;
         }
 
-        var item = lowerer.LowerExpressionWithPrelude(invocation.ArgumentList.Arguments[0].Expression, output);
+        var item = lowerer.LowerRequiredExpressionWithPrelude(
+            invocation.ArgumentList.Arguments[0].Expression,
+            elementType,
+            "Server extension list item",
+            output);
         var listName = list.Identifier.ValueText;
         lowerer.MarkAllocates();
         return DotBoxDRpcJsonLowerer.SetStatement(
