@@ -18,6 +18,11 @@ public sealed class HostBindingObjectAttribute : Attribute
         ArgumentException.ThrowIfNullOrWhiteSpace(bindingPrefix);
         ArgumentException.ThrowIfNullOrWhiteSpace(defaultCapability);
 
+        if (!defaultEffects.ContainsOnlyKnownBits())
+        {
+            throw new ArgumentException("Undefined effect bits are not allowed.", nameof(defaultEffects));
+        }
+
         BindingPrefix = bindingPrefix;
         DefaultCapability = defaultCapability;
         DefaultEffects = defaultEffects;
