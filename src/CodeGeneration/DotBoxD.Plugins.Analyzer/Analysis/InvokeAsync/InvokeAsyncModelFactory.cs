@@ -2,7 +2,6 @@ using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
@@ -262,13 +261,13 @@ internal static partial class InvokeAsyncModelFactory
         {
             if (argument.NameColon is { Name.Identifier.ValueText: "irInvocation" })
             {
-                return !IsNullLike(argument.Expression);
+                return !InvokeAsyncArgumentSyntax.IsNullLike(argument.Expression);
             }
 
             if (argument.NameColon is null &&
                 positionalIndex == irPositionalIndex)
             {
-                return !IsNullLike(argument.Expression);
+                return !InvokeAsyncArgumentSyntax.IsNullLike(argument.Expression);
             }
 
             if (argument.NameColon is null)
@@ -283,10 +282,4 @@ internal static partial class InvokeAsyncModelFactory
     private static bool FirstPositionalArgumentIsLambda(InvocationExpressionSyntax invocation)
         => invocation.ArgumentList.Arguments.FirstOrDefault(argument => argument.NameColon is null)?.Expression
             is LambdaExpressionSyntax;
-
-    private static bool IsNullLike(ExpressionSyntax expression)
-        => expression.IsKind(SyntaxKind.NullLiteralExpression) ||
-            expression.IsKind(SyntaxKind.DefaultLiteralExpression) ||
-            expression.IsKind(SyntaxKind.DefaultExpression);
-
 }

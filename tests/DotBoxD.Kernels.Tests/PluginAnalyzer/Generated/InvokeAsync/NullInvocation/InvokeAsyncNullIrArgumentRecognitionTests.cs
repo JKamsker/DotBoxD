@@ -5,6 +5,25 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
 public sealed class InvokeAsyncNullIrArgumentRecognitionTests
 {
+    [Fact]
+    public void Non_null_ir_argument_preserves_manual_ir_path()
+    {
+        var result = RunGeneratorAndAssertCompiles(GeneratedFacadeBodySource("""
+                public ValueTask<int> Probe(
+                    IRInvocation<Func<IGameWorldAccess, ValueTask<int>>, int> irInvocation)
+                    => InvokeAsync(
+                        async (IGameWorldAccess world) =>
+                        {
+                            return world.GetHealth("monster-1");
+                        },
+                        irInvocation: irInvocation);
+            """));
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.DoesNotContain("AnonymousInvokeAsync", source, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("(null)")]
     [InlineData("null!")]
