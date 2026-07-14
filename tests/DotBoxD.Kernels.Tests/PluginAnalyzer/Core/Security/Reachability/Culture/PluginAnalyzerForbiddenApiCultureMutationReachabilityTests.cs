@@ -59,6 +59,69 @@ public sealed class PluginAnalyzerForbiddenApiCultureMutationReachabilityTests
         Assert.Contains("System.IO.File", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Reports_helper_ambient_culture_mutation_in_event_kernel()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            namespace Sample
+            {
+                using System.Globalization;
+                using DotBoxD.Abstractions;
+                using DotBoxD.Plugins;
+
+                [Plugin("helper-culture-mutation")]
+                public sealed class HelperCultureKernel : IEventKernel<string>
+                {
+                    public bool ShouldHandle(string e, HookContext context)
+                    {
+                        CultureHelper.MutateCulture();
+                        return true;
+                    }
+
+                    public void Handle(string e, HookContext context) { }
+                }
+
+                internal static class CultureHelper
+                {
+                    public static void MutateCulture()
+                    {
+                        CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+                    }
+                }
+            }
+            """);
+
+        var diagnostic = Assert.Single(diagnostics.Where(IsForbiddenHostApi));
+        Assert.Contains("System.Globalization.CultureInfo", diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains("MutateCulture", SourceLine(diagnostic), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Allows_ambient_culture_read_in_event_kernel()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            namespace Sample
+            {
+                using System.Globalization;
+                using DotBoxD.Abstractions;
+                using DotBoxD.Plugins;
+
+                [Plugin("culture-read")]
+                public sealed class CultureReadKernel : IEventKernel<string>
+                {
+                    public bool ShouldHandle(string e, HookContext context)
+                    {
+                        return CultureInfo.CurrentCulture.Name.Length >= 0;
+                    }
+
+                    public void Handle(string e, HookContext context) { }
+                }
+            }
+            """);
+
+        Assert.Empty(diagnostics.Where(IsForbiddenHostApi));
+    }
+
     private static string CreateCultureMutationSource(string statement)
     {
         return $$"""
