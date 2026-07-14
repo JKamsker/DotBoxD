@@ -134,6 +134,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
     private static void AnalyzePropertyReference(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
         var property = ((IPropertyReferenceOperation)context.Operation).Property;
+        var (usesGetter, usesSetter) = AccessorUsage(context.Operation);
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, property);
@@ -143,6 +144,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             RecordForbiddenHelperPropertyInitializer(context, helperGraph, property);
             RecordInitializerPropertyRootCall(context, helperGraph, property);
             RecordInitializerMemberReference(context, helperGraph, property);
+            ReportAndRecordAmbientCultureMutation(context, helperGraph, property, usesSetter);
             return;
         }
 
@@ -154,6 +156,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         {
             ReportAndRecordIfForbidden(context, helperGraph, method, property);
         }
+        ReportAndRecordAmbientCultureMutation(context, helperGraph, property, usesSetter);
         RecordStaticConstructorReachability(context, helperGraph, property);
         if (!IsForbiddenHostApi(property.ContainingType))
         {
@@ -165,7 +168,6 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         // A forbidden API reached through a helper property's accessor body is only linked to the kernel
         // if we record an edge to the accessor it actually uses: the getter for a read, the setter for a
         // write, both for a compound/increment. Without this the accessor taints but never reaches a root.
-        var (usesGetter, usesSetter) = AccessorUsage(context.Operation);
         var location = context.Operation.Syntax.GetLocation();
         if (usesGetter && property.GetMethod is { } getter)
         {
@@ -176,7 +178,6 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         {
             helperGraph.RecordCall(method, setter, location);
         }
-
     }
 
     private static void AnalyzeFieldReference(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
