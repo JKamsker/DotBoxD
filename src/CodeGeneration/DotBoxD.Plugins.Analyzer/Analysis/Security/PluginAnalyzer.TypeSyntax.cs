@@ -51,6 +51,9 @@ public sealed partial class PluginAnalyzer
         context.RegisterSyntaxNodeAction(
             c => AnalyzeNameOfArgumentType(c, helperGraph),
             SyntaxKind.InvocationExpression);
+        context.RegisterSyntaxNodeAction(
+            c => AnalyzeLocalFunctionSignature(c, helperGraph),
+            SyntaxKind.LocalFunctionStatement);
     }
 
     private static void AnalyzeDeclarationPatternType(
@@ -215,6 +218,25 @@ public sealed partial class PluginAnalyzer
         if (symbol is ITypeSymbol type)
         {
             AnalyzeForbiddenTypeSymbol(context, helperGraph, expression, type);
+        }
+    }
+
+    private static void AnalyzeLocalFunctionSignature(
+        SyntaxNodeAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph)
+    {
+        if (context.Node is not LocalFunctionStatementSyntax localFunction)
+        {
+            return;
+        }
+
+        AnalyzeForbiddenTypeSyntax(context, helperGraph, localFunction.ReturnType);
+        foreach (var parameter in localFunction.ParameterList.Parameters)
+        {
+            if (parameter.Type is { } parameterType)
+            {
+                AnalyzeForbiddenTypeSyntax(context, helperGraph, parameterType);
+            }
         }
     }
 
