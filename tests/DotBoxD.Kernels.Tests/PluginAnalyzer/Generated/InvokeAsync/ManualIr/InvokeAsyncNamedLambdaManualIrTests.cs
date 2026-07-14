@@ -5,6 +5,22 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 public sealed class InvokeAsyncNamedLambdaManualIrTests
 {
     [Fact]
+    public void Delegate_variable_followed_by_positional_manual_ir_is_not_intercepted()
+    {
+        var result = RunGeneratorAndAssertCompiles(UsageSource("""
+            public static ValueTask<int> Run(
+                RemotePluginServer kernels,
+                Func<IGameWorldAccess, ValueTask<int>> lambda,
+                IRInvocation<Func<IGameWorldAccess, ValueTask<int>>, int> irInvocation)
+                => kernels.InvokeAsync(lambda, irInvocation);
+            """));
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.DoesNotContain("AnonymousInvokeAsync", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Named_capture_arguments_followed_by_positional_manual_ir_are_not_intercepted()
     {
         var result = RunGeneratorAndAssertCompiles(UsageSource("""
