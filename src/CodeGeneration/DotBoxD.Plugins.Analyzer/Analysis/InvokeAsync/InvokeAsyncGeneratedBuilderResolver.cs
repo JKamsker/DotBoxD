@@ -16,6 +16,11 @@ internal static class InvokeAsyncGeneratedBuilderResolver
         out INamedTypeSymbol receiverType)
     {
         receiverType = null!;
+        if (TryResolveGeneratedBuilderExpression(model, receiver, cancellationToken, out receiverType))
+        {
+            return true;
+        }
+
         if (TryResolveGeneratedBuilderProjection(model, receiver, cancellationToken, out receiverType))
         {
             return true;
@@ -34,14 +39,38 @@ internal static class InvokeAsyncGeneratedBuilderResolver
                 {
                     Initializer.Value: { } initializer
                 } &&
-                TryFacadeNameFromBuilderInitializer(initializer, out var facadeName) &&
-                TryFindGeneratedFacade(model.Compilation, facadeName, cancellationToken, out receiverType))
+                TryResolveGeneratedBuilderExpression(model, initializer, cancellationToken, out receiverType))
             {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private static bool TryResolveGeneratedBuilderExpression(
+        SemanticModel model,
+        ExpressionSyntax expression,
+        CancellationToken cancellationToken,
+        out INamedTypeSymbol receiverType)
+    {
+        receiverType = null!;
+        if (expression is MemberAccessExpressionSyntax
+            {
+                Name.Identifier.ValueText: "Services",
+                Expression: { } facadeExpression
+            })
+        {
+            expression = facadeExpression;
+        }
+
+        return TryFacadeNameFromBuilderInitializer(expression, out var builderType, out var facadeName) &&
+               TryFindGeneratedFacade(
+                   model,
+                   builderType,
+                   facadeName,
+                   cancellationToken,
+                   out receiverType);
     }
 
     private static bool TryResolveGeneratedBuilderProjection(
@@ -53,19 +82,20 @@ internal static class InvokeAsyncGeneratedBuilderResolver
         receiverType = null!;
         if (receiver is not MemberAccessExpressionSyntax access ||
             !TryTupleElementIndex(access, model, cancellationToken, out var index) ||
-            TupleElementInitializer(access.Expression, index, model, cancellationToken) is not { } initializer ||
-            !TryFacadeNameFromBuilderInitializer(initializer, out var facadeName))
+            TupleElementInitializer(access.Expression, index, model, cancellationToken) is not { } initializer)
         {
             return false;
         }
 
-        return TryFindGeneratedFacade(model.Compilation, facadeName, cancellationToken, out receiverType);
+        return TryResolveGeneratedBuilderExpression(model, initializer, cancellationToken, out receiverType);
     }
 
     private static bool TryFacadeNameFromBuilderInitializer(
         ExpressionSyntax initializer,
+        out ExpressionSyntax builderType,
         out string facadeName)
     {
+        builderType = null!;
         facadeName = string.Empty;
         return initializer is InvocationExpressionSyntax
         {
@@ -74,13 +104,15 @@ internal static class InvokeAsyncGeneratedBuilderResolver
                 Name.Identifier.ValueText: "Build",
                 Expression: { } buildReceiver
             }
-        } && TryFacadeNameFromBuilderFactory(buildReceiver, out facadeName);
+        } && TryFacadeNameFromBuilderFactory(buildReceiver, out builderType, out facadeName);
     }
 
     private static bool TryFacadeNameFromBuilderFactory(
         ExpressionSyntax buildReceiver,
+        out ExpressionSyntax builderType,
         out string facadeName)
     {
+        builderType = null!;
         facadeName = string.Empty;
         var current = buildReceiver;
         while (current is InvocationExpressionSyntax
@@ -90,13 +122,20 @@ internal static class InvokeAsyncGeneratedBuilderResolver
         {
             if (TryFacadeNameFromBuilderType(next, out facadeName))
             {
+                builderType = next;
                 return true;
             }
 
             current = next;
         }
 
-        return TryFacadeNameFromBuilderType(current, out facadeName);
+        if (!TryFacadeNameFromBuilderType(current, out facadeName))
+        {
+            return false;
+        }
+
+        builderType = current;
+        return true;
     }
 
     private static bool TryFacadeNameFromBuilderType(
@@ -123,27 +162,64 @@ internal static class InvokeAsyncGeneratedBuilderResolver
     }
 
     private static bool TryFindGeneratedFacade(
-        Compilation compilation,
+        SemanticModel model,
+        ExpressionSyntax builderType,
         string facadeName,
         CancellationToken cancellationToken,
         out INamedTypeSymbol receiverType)
     {
         receiverType = null!;
-        foreach (var symbol in compilation.GetSymbolsWithName(
-                     name => string.Equals(name, facadeName, StringComparison.Ordinal),
-                     SymbolFilter.Type,
-                     cancellationToken))
+        var builderSymbol = model.GetSymbolInfo(builderType, cancellationToken);
+        // A builder emitted by this generator run is unresolved in the input compilation. A bound
+        // symbol belongs to user or referenced code and must never be inferred from its name.
+        if (builderSymbol.Symbol is not null ||
+            builderSymbol.CandidateSymbols.Length != 0 ||
+            model.GetTypeInfo(builderType, cancellationToken).Type is { TypeKind: not TypeKind.Error })
+        {
+            return false;
+        }
+
+        INamedTypeSymbol? found = null;
+        foreach (var symbol in LookupFacadeSymbols(model, builderType, facadeName, cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (symbol is INamedTypeSymbol candidate &&
                 InvokeAsyncAttributeMatcher.HasGeneratePluginServerAttribute(candidate))
             {
-                receiverType = candidate;
-                return true;
+                if (found is not null &&
+                    !SymbolEqualityComparer.Default.Equals(found, candidate))
+                {
+                    return false;
+                }
+
+                found = candidate;
             }
         }
 
-        return false;
+        receiverType = found!;
+        return found is not null;
+    }
+
+    private static IEnumerable<ISymbol> LookupFacadeSymbols(
+        SemanticModel model,
+        ExpressionSyntax builderType,
+        string facadeName,
+        CancellationToken cancellationToken)
+    {
+        ExpressionSyntax? qualifier = builderType switch
+        {
+            MemberAccessExpressionSyntax member => member.Expression,
+            QualifiedNameSyntax qualified => qualified.Left,
+            _ => null
+        };
+        if (qualifier is null)
+        {
+            return model.LookupNamespacesAndTypes(builderType.SpanStart, name: facadeName);
+        }
+
+        return model.GetSymbolInfo(qualifier, cancellationToken).Symbol is INamespaceOrTypeSymbol container
+            ? model.LookupNamespacesAndTypes(builderType.SpanStart, container, facadeName)
+            : Enumerable.Empty<ISymbol>();
     }
 
     private static bool TryTupleElementIndex(
