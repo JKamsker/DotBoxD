@@ -73,7 +73,7 @@ internal static partial class InvokeAsyncModelFactory
             return null;
         }
 
-        if (HasExplicitInvocationIrArgument(invocation))
+        if (InvokeAsyncManualIrArgument.IsExplicit(invocation, model, cancellationToken))
         {
             return null;
         }
@@ -119,7 +119,7 @@ internal static partial class InvokeAsyncModelFactory
             return null;
         }
 
-        if (HasExplicitInvocationIrArgument(invocation))
+        if (InvokeAsyncManualIrArgument.IsExplicit(invocation, model, cancellationToken))
         {
             return null;
         }
@@ -163,7 +163,7 @@ internal static partial class InvokeAsyncModelFactory
             return null;
         }
 
-        if (HasExplicitInvocationIrArgument(invocation))
+        if (InvokeAsyncManualIrArgument.IsExplicit(invocation, model, cancellationToken))
         {
             return null;
         }
@@ -253,30 +253,4 @@ internal static partial class InvokeAsyncModelFactory
         return new InvokeAsyncResult(package, interception, null);
     }
 
-    private static bool HasExplicitInvocationIrArgument(InvocationExpressionSyntax invocation)
-    {
-        var arguments = invocation.ArgumentList.Arguments;
-        var irArgumentIndex = FirstArgumentTargetsLambda(arguments) ? 1 : 2;
-        for (var index = 0; index < arguments.Count; index++)
-        {
-            var argument = arguments[index];
-            if (argument.NameColon is { Name.Identifier.ValueText: "irInvocation" })
-            {
-                return !InvokeAsyncArgumentSyntax.IsNullLike(argument.Expression);
-            }
-
-            if (argument.NameColon is null &&
-                index == irArgumentIndex)
-            {
-                return !InvokeAsyncArgumentSyntax.IsNullLike(argument.Expression);
-            }
-        }
-
-        return false;
-    }
-
-    private static bool FirstArgumentTargetsLambda(SeparatedSyntaxList<ArgumentSyntax> arguments)
-        => arguments.FirstOrDefault() is { } first &&
-           (first.NameColon is { Name.Identifier.ValueText: "lambda" } ||
-            first.NameColon is null && first.Expression is LambdaExpressionSyntax);
 }
