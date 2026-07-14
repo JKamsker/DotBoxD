@@ -11,6 +11,9 @@ on:
   # worker alongside the graph-based dispatcher. Kept for manual/back-compat runs.
   workflow_dispatch:
 
+timeout-minutes: 60
+max-ai-credits: 3000
+
 permissions:
   contents: read
   issues: read
@@ -34,6 +37,7 @@ sandbox:
         base-url-secret: CODEX_LB_BASE_URL
 
 tools:
+  timeout: 900
   github:
     lockdown: false
     min-integrity: none
@@ -53,7 +57,7 @@ safe-outputs:
 
 engine:
   id: codex
-  model: gpt-5.5
+  model: gpt-5.6-sol
   args:
     - " -c"
     - model_reasoning_effort="high"

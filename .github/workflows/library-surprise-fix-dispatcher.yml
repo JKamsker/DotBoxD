@@ -60,7 +60,7 @@ on:
       max:
         description: Max fix workers to dispatch this tick.
         required: false
-        default: "4"
+        default: "6"
         type: string
 
 permissions:
@@ -83,9 +83,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          MAX_DISPATCH: ${{ inputs.max || '4' }}
+          MAX_DISPATCH: ${{ inputs.max || '6' }}
           MAX_ATTEMPTS: "4"
-          MAX_INFLIGHT: "8"
+          MAX_INFLIGHT: "12"
           # PAT (Contents + Pull requests R/W). Used ONLY to server-side merge main
           # into a PR branch as the PAT's user, so the resulting pull_request CI runs
           # ungated (a bot-authored commit would sit at action_required). Never printed.
@@ -103,9 +103,9 @@ jobs:
           repo = os.environ["GH_REPO"]
           owner, _, name = repo.partition("/")
           try:
-              max_dispatch = int(os.environ.get("MAX_DISPATCH") or "4")
+              max_dispatch = int(os.environ.get("MAX_DISPATCH") or "6")
           except ValueError:
-              max_dispatch = 4
+              max_dispatch = 6
           try:
               coderabbit_pending_timeout_minutes = int(
                   os.environ.get("CODERABBIT_PENDING_TIMEOUT_MINUTES") or "60")
@@ -441,9 +441,9 @@ jobs:
           # MAX_INFLIGHT. This is what makes the higher cadence + per-tick max safe —
           # raising throughput can't runaway on cost; it fills to the cap and holds.
           try:
-              max_inflight = int(os.environ.get("MAX_INFLIGHT") or "8")
+              max_inflight = int(os.environ.get("MAX_INFLIGHT") or "12")
           except ValueError:
-              max_inflight = 8
+              max_inflight = 12
           slots = max(0, max_inflight - len(busy))
           budget = min(max_dispatch, slots)
           if budget <= 0:
