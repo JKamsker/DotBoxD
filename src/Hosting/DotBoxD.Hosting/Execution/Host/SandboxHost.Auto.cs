@@ -46,22 +46,22 @@ public sealed partial class SandboxHost
             options,
             hotness.Stats,
             DotBoxD.Kernels.Compiler.CompiledCacheStatus.None);
+        if (decision.Mode != ExecutionMode.Interpreted &&
+            decision.Mode != ExecutionMode.Compiled)
+        {
+            return CompleteAutoResult(hotness, InvalidExecutionOptionsResult(
+                plan,
+                options,
+                $"execution mode selector returned unsupported mode '{(int)decision.Mode}'"));
+        }
+
         if (decision.Mode == ExecutionMode.Interpreted ||
-            decision.Mode == ExecutionMode.Auto ||
             !CompiledEntrypointSupport.CanCompile(plan, entrypoint))
         {
             return await ExecuteTrackedAutoAsync(
                     hotness,
                     () => ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken))
                 .ConfigureAwait(false);
-        }
-
-        if (decision.Mode != ExecutionMode.Compiled)
-        {
-            return CompleteAutoResult(hotness, InvalidExecutionOptionsResult(
-                plan,
-                options,
-                $"execution mode selector returned unsupported mode '{(int)decision.Mode}'"));
         }
 
         return await ExecuteTrackedAutoAsync(
