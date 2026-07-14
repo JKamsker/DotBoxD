@@ -150,6 +150,7 @@ internal static class InvokeAsyncLambdaShape
         out ITypeSymbol returnType)
     {
         returnType = null!;
+        var returns = new List<(ExpressionSyntax Expression, ITypeSymbol Type)>();
         foreach (var statement in block.DescendantNodes().OfType<ReturnStatementSyntax>())
         {
             if (statement.Expression is null ||
@@ -158,19 +159,35 @@ internal static class InvokeAsyncLambdaShape
                 return false;
             }
 
-            if (returnType is null)
-            {
-                returnType = current;
-                continue;
-            }
+            returns.Add((statement.Expression, current));
+        }
 
-            if (!SymbolEqualityComparer.Default.Equals(returnType, current))
+        foreach (var candidate in returns)
+        {
+            if (AllReturnsConvertTo(returns, candidate.Type, model))
+            {
+                returnType = candidate.Type;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool AllReturnsConvertTo(
+        IReadOnlyList<(ExpressionSyntax Expression, ITypeSymbol Type)> returns,
+        ITypeSymbol candidate,
+        SemanticModel model)
+    {
+        foreach (var item in returns)
+        {
+            if (!model.ClassifyConversion(item.Expression, candidate).IsImplicit)
             {
                 return false;
             }
         }
 
-        return returnType is not null;
+        return returns.Count > 0;
     }
 
     private static IReadOnlyList<ITypeSymbol>? LambdaParameterTypes(
