@@ -45,6 +45,7 @@ public sealed partial class PluginAnalyzer
         }
 
         AnalyzeMethodAttributeTypes(helperGraph, method);
+        RecordForbiddenAttributeMetadata(context, helperGraph, method);
     }
 
     private static void AnalyzeProperty(SymbolAnalysisContext context)
