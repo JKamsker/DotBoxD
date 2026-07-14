@@ -54,6 +54,10 @@ public sealed partial class PluginAnalyzer
         context.RegisterSyntaxNodeAction(
             c => AnalyzeLocalFunctionSignature(c, helperGraph),
             SyntaxKind.LocalFunctionStatement);
+        context.RegisterSyntaxNodeAction(
+            c => AnalyzeAnonymousFunctionAttributeTypeReferences(c, helperGraph),
+            SyntaxKind.ParenthesizedLambdaExpression,
+            SyntaxKind.SimpleLambdaExpression);
     }
 
     private static void AnalyzeDeclarationPatternType(
@@ -236,6 +240,56 @@ public sealed partial class PluginAnalyzer
             if (parameter.Type is { } parameterType)
             {
                 AnalyzeForbiddenTypeSyntax(context, helperGraph, parameterType);
+            }
+        }
+    }
+
+    private static void AnalyzeAnonymousFunctionAttributeTypeReferences(
+        SyntaxNodeAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph)
+    {
+        if (context.Node is not LambdaExpressionSyntax lambda)
+        {
+            return;
+        }
+
+        AnalyzeAttributeListTypeReferences(context, helperGraph, lambda.AttributeLists);
+        AnalyzeAnonymousFunctionParameterAttributeTypeReferences(context, helperGraph, lambda);
+    }
+
+    private static void AnalyzeAnonymousFunctionParameterAttributeTypeReferences(
+        SyntaxNodeAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        LambdaExpressionSyntax lambda)
+    {
+        switch (lambda)
+        {
+            case ParenthesizedLambdaExpressionSyntax { ParameterList.Parameters: var parameters }:
+                foreach (var parameter in parameters)
+                {
+                    AnalyzeAttributeListTypeReferences(context, helperGraph, parameter.AttributeLists);
+                }
+
+                break;
+            case SimpleLambdaExpressionSyntax { Parameter: var parameter }:
+                AnalyzeAttributeListTypeReferences(context, helperGraph, parameter.AttributeLists);
+                break;
+        }
+    }
+
+    private static void AnalyzeAttributeListTypeReferences(
+        SyntaxNodeAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        SyntaxList<AttributeListSyntax> attributeLists)
+    {
+        foreach (var attributeList in attributeLists)
+        {
+            foreach (var attribute in attributeList.Attributes)
+            {
+                foreach (var typeOf in attribute.DescendantNodes().OfType<TypeOfExpressionSyntax>())
+                {
+                    AnalyzeForbiddenTypeSyntax(context, helperGraph, typeOf.Type);
+                }
             }
         }
     }
