@@ -40,6 +40,34 @@ public sealed class RpcKernelRuntimeTests
     }
 
     [Fact]
+    public async Task Rpc_response_bytes_match_the_legacy_value_tree_route()
+    {
+        using var server = DotBoxD.Plugins.PluginServer.Create(
+            configureHost: RpcKernelTestPackages.AddKillBinding,
+            defaultPolicy: RpcKernelTestPackages.KillPolicy());
+        var kernel = await server.InstallServerExtensionAsync(RpcKernelTestPackages.MonsterKiller());
+        var ids = SandboxValue.FromList(
+            [SandboxValue.FromInt32(1), SandboxValue.FromInt32(2), SandboxValue.FromInt32(3)],
+            SandboxType.I32);
+        var arguments = KernelRpcBinaryCodec.EncodeArguments(
+            [KernelRpcValueConverter.FromSandboxValue(ids)]);
+        var recordType = SandboxType.Record([SandboxType.I32, SandboxType.Bool]);
+        var expectedResult = SandboxValue.FromList(
+            [
+                SandboxValue.FromRecord([SandboxValue.FromInt32(1), SandboxValue.FromBool(false)]),
+                SandboxValue.FromRecord([SandboxValue.FromInt32(2), SandboxValue.FromBool(true)]),
+                SandboxValue.FromRecord([SandboxValue.FromInt32(3), SandboxValue.FromBool(false)])
+            ],
+            recordType);
+        var expectedBytes = KernelRpcBinaryCodec.EncodeValue(
+            KernelRpcValueConverter.FromSandboxValue(expectedResult));
+
+        var actualBytes = await kernel.InvokeServerExtensionRpcAsync(arguments);
+
+        Assert.Equal(expectedBytes, actualBytes);
+    }
+
+    [Fact]
     public async Task A_batch_kernel_compiles_to_valid_il_and_returns_the_same_result()
     {
         // Compiled execution runs the IL compiler + verifier over the batch IR (forRange, list.empty

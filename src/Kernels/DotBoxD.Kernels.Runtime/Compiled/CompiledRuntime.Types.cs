@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Kernels.Runtime;
@@ -13,6 +14,13 @@ public static partial class CompiledRuntime
             "I64" => SandboxType.I64,
             "F64" => SandboxType.F64,
             "String" => SandboxType.String,
+            "Guid" => SandboxType.Guid,
+            _ => TypePathOrOpaqueScalar(name)
+        };
+
+    private static SandboxType TypePathOrOpaqueScalar(string name)
+        => name switch
+        {
             "SandboxPath" => SandboxType.SandboxPath,
             "SandboxUri" => SandboxType.SandboxUri,
             _ => SandboxType.Scalar(name)
@@ -21,6 +29,14 @@ public static partial class CompiledRuntime
     public static SandboxType TypeList(SandboxType itemType) => SandboxType.List(itemType);
 
     public static SandboxType TypeMap(SandboxType keyType, SandboxType valueType) => SandboxType.Map(keyType, valueType);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static SandboxType TypeListCached(SandboxType itemType)
+        => CompiledStructuralTypeCache.List(itemType);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static SandboxType TypeMapCached(SandboxType keyType, SandboxType valueType)
+        => CompiledStructuralTypeCache.Map(keyType, valueType);
 
     public static SandboxType TypeRecord(SandboxType[] fieldTypes) => SandboxType.Record(fieldTypes);
 

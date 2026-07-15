@@ -1,3 +1,5 @@
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
+
 namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal sealed record GeneratedPluginPackage(
@@ -11,7 +13,16 @@ internal readonly record struct GeneratedPluginPackageIdentity(
     string PackageName)
 {
     public static GeneratedPluginPackageIdentity From(GeneratedPluginPackage package)
-        => new(package.Namespace, package.PackageName);
+    {
+        if (!package.PackageName.EndsWith(DotBoxDGenerationNames.PluginPackageSuffix, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Collision-tracked package name '{package.PackageName}' must end with " +
+                $"'{DotBoxDGenerationNames.PluginPackageSuffix}'.");
+        }
+
+        return new GeneratedPluginPackageIdentity(package.Namespace, package.PackageName);
+    }
 
     public string NamespaceDisplay
         => string.IsNullOrWhiteSpace(Namespace) ? "<global>" : Namespace;
