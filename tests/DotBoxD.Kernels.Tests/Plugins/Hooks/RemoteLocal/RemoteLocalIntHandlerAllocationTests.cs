@@ -5,6 +5,7 @@ using DotBoxD.Plugins.Runtime.Rpc;
 namespace DotBoxD.Kernels.Tests.Plugins.Hooks;
 
 [Collection(AllocationMeasurementCollection.Name)]
+[Trait(AllocationMeasurementCollection.TraitName, AllocationMeasurementCollection.TraitValue)]
 public sealed class RemoteLocalIntHandlerAllocationTests
 {
     private const int WarmupIterations = 1_000;
