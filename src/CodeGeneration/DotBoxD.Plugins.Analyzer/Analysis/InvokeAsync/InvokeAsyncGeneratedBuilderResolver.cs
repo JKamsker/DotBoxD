@@ -1,6 +1,7 @@
 using System.Globalization;
 using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
@@ -14,13 +15,117 @@ internal static class InvokeAsyncGeneratedBuilderResolver
         ExpressionSyntax receiver,
         CancellationToken cancellationToken,
         out INamedTypeSymbol receiverType)
+        => TryResolve(model, receiver, cancellationToken, depth: 0, out receiverType);
+
+    private static bool TryResolve(
+        SemanticModel model,
+        ExpressionSyntax receiver,
+        CancellationToken cancellationToken,
+        int depth,
+        out INamedTypeSymbol receiverType)
     {
         receiverType = null!;
-        if (TryResolveGeneratedBuilderProjection(model, receiver, cancellationToken, out receiverType))
+        if (depth > 8)
+        {
+            return false;
+        }
+
+        receiver = HookChainAliasResolver.UnwrapTransparentExpression(receiver);
+        if (TryResolveGeneratedBuilderCall(model, receiver, cancellationToken, out receiverType) ||
+            TryResolveGeneratedBuilderComposition(model, receiver, cancellationToken, depth, out receiverType) ||
+            TryResolveGeneratedBuilderProjection(model, receiver, cancellationToken, out receiverType) ||
+            TryResolveGeneratedFacadeExpression(model, receiver, cancellationToken, out receiverType))
         {
             return true;
         }
 
+        return TryResolveGeneratedBuilderLocal(model, receiver, cancellationToken, depth, out receiverType);
+    }
+
+    private static bool TryResolveGeneratedBuilderComposition(
+        SemanticModel model,
+        ExpressionSyntax receiver,
+        CancellationToken cancellationToken,
+        int depth,
+        out INamedTypeSymbol receiverType)
+    {
+        receiverType = null!;
+        if (receiver is ConditionalExpressionSyntax conditional)
+        {
+            return TryResolveMatchingTypes(
+                model, conditional.WhenTrue, conditional.WhenFalse, cancellationToken, depth, out receiverType);
+        }
+
+        return receiver is BinaryExpressionSyntax binary &&
+            binary.IsKind(SyntaxKind.CoalesceExpression) &&
+            TryResolveMatchingTypes(model, binary.Left, binary.Right, cancellationToken, depth, out receiverType);
+    }
+
+    private static bool TryResolveMatchingTypes(
+        SemanticModel model,
+        ExpressionSyntax left,
+        ExpressionSyntax right,
+        CancellationToken cancellationToken,
+        int depth,
+        out INamedTypeSymbol receiverType)
+    {
+        receiverType = null!;
+        if (!TryResolve(model, left, cancellationToken, depth + 1, out var leftType) ||
+            !TryResolve(model, right, cancellationToken, depth + 1, out var rightType) ||
+            !SymbolEqualityComparer.Default.Equals(leftType, rightType))
+        {
+            return false;
+        }
+
+        receiverType = leftType;
+        return true;
+    }
+
+    private static bool TryResolveGeneratedBuilderCall(
+        SemanticModel model,
+        ExpressionSyntax receiver,
+        CancellationToken cancellationToken,
+        out INamedTypeSymbol receiverType)
+    {
+        receiverType = null!;
+        return TryFacadeNameFromBuilderCall(receiver, out var facadeName) &&
+            TryFindGeneratedFacade(model.Compilation, facadeName, cancellationToken, out receiverType);
+    }
+
+    private static bool TryResolveGeneratedBuilderProjection(
+        SemanticModel model,
+        ExpressionSyntax receiver,
+        CancellationToken cancellationToken,
+        out INamedTypeSymbol receiverType)
+    {
+        receiverType = null!;
+        return receiver is MemberAccessExpressionSyntax access &&
+            TryTupleElementIndex(access, model, cancellationToken, out var index) &&
+            TupleElementInitializer(access.Expression, index, model, cancellationToken) is { } initializer &&
+            TryResolve(model, initializer, cancellationToken, depth: 0, out receiverType);
+    }
+
+    private static bool TryResolveGeneratedFacadeExpression(
+        SemanticModel model,
+        ExpressionSyntax receiver,
+        CancellationToken cancellationToken,
+        out INamedTypeSymbol receiverType)
+    {
+        receiverType = null!;
+        var semanticType = model.GetTypeInfo(receiver, cancellationToken).Type as INamedTypeSymbol;
+        receiverType = semanticType!;
+        return semanticType is not null &&
+            InvokeAsyncAttributeMatcher.HasGeneratePluginServerAttribute(semanticType);
+    }
+
+    private static bool TryResolveGeneratedBuilderLocal(
+        SemanticModel model,
+        ExpressionSyntax receiver,
+        CancellationToken cancellationToken,
+        int depth,
+        out INamedTypeSymbol receiverType)
+    {
+        receiverType = null!;
         if (receiver is not IdentifierNameSyntax identifier ||
             model.GetSymbolInfo(identifier, cancellationToken).Symbol is not ILocalSymbol local)
         {
@@ -34,8 +139,7 @@ internal static class InvokeAsyncGeneratedBuilderResolver
                 {
                     Initializer.Value: { } initializer
                 } &&
-                TryFacadeNameFromBuilderInitializer(initializer, out var facadeName) &&
-                TryFindGeneratedFacade(model.Compilation, facadeName, cancellationToken, out receiverType))
+                TryResolve(model, initializer, cancellationToken, depth + 1, out receiverType))
             {
                 return true;
             }
@@ -44,25 +148,7 @@ internal static class InvokeAsyncGeneratedBuilderResolver
         return false;
     }
 
-    private static bool TryResolveGeneratedBuilderProjection(
-        SemanticModel model,
-        ExpressionSyntax receiver,
-        CancellationToken cancellationToken,
-        out INamedTypeSymbol receiverType)
-    {
-        receiverType = null!;
-        if (receiver is not MemberAccessExpressionSyntax access ||
-            !TryTupleElementIndex(access, model, cancellationToken, out var index) ||
-            TupleElementInitializer(access.Expression, index, model, cancellationToken) is not { } initializer ||
-            !TryFacadeNameFromBuilderInitializer(initializer, out var facadeName))
-        {
-            return false;
-        }
-
-        return TryFindGeneratedFacade(model.Compilation, facadeName, cancellationToken, out receiverType);
-    }
-
-    private static bool TryFacadeNameFromBuilderInitializer(
+    private static bool TryFacadeNameFromBuilderCall(
         ExpressionSyntax initializer,
         out string facadeName)
     {
