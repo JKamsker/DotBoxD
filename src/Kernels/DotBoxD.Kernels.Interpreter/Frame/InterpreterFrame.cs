@@ -33,19 +33,19 @@ internal sealed partial class InterpreterFrame
         var slot = _layout.GetSlot(name);
         if (_layout.IsI32Slot(slot))
         {
-            return _assigned[slot]
+            return RawSlotAssignmentState.IsAssigned(_assigned, slot)
                 ? SandboxValue.FromInt32(_i32Slots[slot])
                 : throw Unassigned(name);
         }
         if (_layout.IsF64Slot(slot))
         {
-            return _assigned[slot]
+            return RawSlotAssignmentState.IsAssigned(_assigned, slot)
                 ? SandboxValue.FromDouble(_f64Slots[slot])
                 : throw Unassigned(name);
         }
         if (_layout.IsI64Slot(slot))
         {
-            return _assigned[slot]
+            return RawSlotAssignmentState.IsAssigned(_assigned, slot)
                 ? SandboxValue.FromInt64(_i64Slots[slot])
                 : throw Unassigned(name);
         }
@@ -74,14 +74,14 @@ internal sealed partial class InterpreterFrame
         }
         if (_layout.HasRawSlots)
         {
-            _assigned[slot] = true;
+            RawSlotAssignmentState.MarkAssigned(_assigned, slot);
         }
     }
     public bool CanReadInt32(string name)
     {
         var slot = _layout.GetSlot(name);
         return _layout.IsI32Slot(slot)
-            ? _assigned[slot]
+            ? RawSlotAssignmentState.IsAssigned(_assigned, slot)
             : TryGetBoxedValue<I32Value>(slot, out _);
     }
     public bool IsInt32Local(string name) => _layout.IsI32Slot(name);
@@ -89,19 +89,19 @@ internal sealed partial class InterpreterFrame
     public bool IsF64Slot(int slot) => _layout.IsF64Slot(slot);
     public bool IsF64Slot(string name) => _layout.IsF64Slot(name);
     public bool IsSlotAssigned(int slot)
-        => _layout.HasRawSlots ? _assigned[slot] : _slots[slot] is not null;
+        => _layout.HasRawSlots ? RawSlotAssignmentState.IsAssigned(_assigned, slot) : _slots[slot] is not null;
     public int ReadInt32(string name)
     {
         var slot = _layout.GetSlot(name);
         if (_layout.IsI32Slot(slot))
         {
-            return _assigned[slot] ? _i32Slots[slot] : throw Unassigned(name);
+            return RawSlotAssignmentState.IsAssigned(_assigned, slot) ? _i32Slots[slot] : throw Unassigned(name);
         }
         return TryGetBoxedValue<I32Value>(slot, out var value) ? value.Value : throw Unassigned(name);
     }
     public int ReadInt32Slot(int slot)
         => _layout.IsI32Slot(slot)
-            ? _assigned[slot] ? _i32Slots[slot] : throw UnassignedSlot()
+            ? RawSlotAssignmentState.IsAssigned(_assigned, slot) ? _i32Slots[slot] : throw UnassignedSlot()
             : TryGetBoxedValue<I32Value>(slot, out var value) ? value.Value : throw UnassignedSlot();
     public int ReadRawInt32Slot(int slot) => _i32Slots[slot];
     public bool TryGetStringSlot(string name, out int slot)
@@ -182,8 +182,8 @@ internal sealed partial class InterpreterFrame
         var slot = _layout.GetSlot(name);
         if (_layout.IsF64Slot(slot))
         {
-            value = _assigned[slot] ? _f64Slots[slot] : 0;
-            return _assigned[slot];
+            value = RawSlotAssignmentState.IsAssigned(_assigned, slot) ? _f64Slots[slot] : 0;
+            return RawSlotAssignmentState.IsAssigned(_assigned, slot);
         }
         if (TryGetBoxedValue<F64Value>(slot, out var f64))
         {
@@ -195,7 +195,7 @@ internal sealed partial class InterpreterFrame
     }
     public double ReadDoubleSlot(int slot)
         => _layout.IsF64Slot(slot)
-            ? _assigned[slot] ? _f64Slots[slot] : throw UnassignedSlot()
+            ? RawSlotAssignmentState.IsAssigned(_assigned, slot) ? _f64Slots[slot] : throw UnassignedSlot()
             : TryGetBoxedValue<F64Value>(slot, out var value) ? value.Value : throw UnassignedSlot();
     public double ReadRawDoubleSlot(int slot) => _f64Slots[slot];
     public void WriteInt32(string name, int value)
@@ -207,7 +207,7 @@ internal sealed partial class InterpreterFrame
             return;
         }
         _i32Slots[slot] = value;
-        _assigned[slot] = true;
+        RawSlotAssignmentState.MarkAssigned(_assigned, slot);
     }
     public void WriteInt32Slot(int slot, int value)
     {
@@ -217,13 +217,13 @@ internal sealed partial class InterpreterFrame
             return;
         }
         _i32Slots[slot] = value;
-        _assigned[slot] = true;
+        RawSlotAssignmentState.MarkAssigned(_assigned, slot);
     }
 
     public void WriteRawInt32Slot(int slot, int value)
     {
         _i32Slots[slot] = value;
-        _assigned[slot] = true;
+        RawSlotAssignmentState.MarkAssigned(_assigned, slot);
     }
 
     public void WriteDoubleSlot(int slot, double value)
@@ -235,13 +235,13 @@ internal sealed partial class InterpreterFrame
         }
 
         _f64Slots[slot] = value;
-        _assigned[slot] = true;
+        RawSlotAssignmentState.MarkAssigned(_assigned, slot);
     }
 
     public void WriteRawDoubleSlot(int slot, double value)
     {
         _f64Slots[slot] = value;
-        _assigned[slot] = true;
+        RawSlotAssignmentState.MarkAssigned(_assigned, slot);
     }
 
     public static InterpreterFrame Create(

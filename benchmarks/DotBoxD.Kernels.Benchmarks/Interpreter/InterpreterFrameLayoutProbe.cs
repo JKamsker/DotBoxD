@@ -33,7 +33,7 @@ internal static class InterpreterFrameLayoutProbe
         };
 
         Console.WriteLine($"interpreter frame-layout executions = {Iterations:N0}");
-        Console.WriteLine("case                   total ms      allocated B       B/op     F/L/A/H   checksum");
+        Console.WriteLine("case                     total ms      allocated B       B/op     F/L/A/H   checksum");
         await RunCaseAsync(
             host,
             interpreter,
@@ -47,8 +47,8 @@ internal static class InterpreterFrameLayoutProbe
             interpreter,
             options,
             policy,
-            "parameter return",
-            ParameterReturnJson(),
+            "one raw parameter only",
+            OneRawParameterOnlyJson(),
             SandboxValue.FromInt32(1));
         await RunCaseAsync(
             host,
@@ -71,8 +71,8 @@ internal static class InterpreterFrameLayoutProbe
             interpreter,
             options,
             policy,
-            "two parameter control",
-            TwoParameterJson(),
+            "two raw parameters only",
+            TwoRawParametersOnlyJson(),
             SandboxValue.FromList([SandboxValue.FromInt32(1), SandboxValue.FromInt32(2)], SandboxType.I32));
     }
 
@@ -88,18 +88,18 @@ internal static class InterpreterFrameLayoutProbe
         var module = await host.ImportJsonAsync(moduleJson);
         var plan = await host.PrepareAsync(module, policy);
 
-        _ = await MeasureAsync(interpreter, plan, input, options, WarmupIterations);
+        _ = Measure(interpreter, plan, input, options, WarmupIterations);
         ForceGc();
-        var measurement = await MeasureAsync(interpreter, plan, input, options, Iterations);
+        var measurement = Measure(interpreter, plan, input, options, Iterations);
         Console.WriteLine(
-            $"{name,-22} {measurement.ElapsedMilliseconds,8:N1} {measurement.Bytes,16:N0} "
+            $"{name,-24} {measurement.ElapsedMilliseconds,8:N1} {measurement.Bytes,16:N0} "
             + $"{measurement.Bytes / (double)Iterations,10:N1} "
             + $"{measurement.FuelUsed:N0}/{measurement.LoopIterations:N0}/"
             + $"{measurement.SandboxAllocatedBytes:N0}/{measurement.HostCalls:N0} "
             + $"{measurement.Checksum,10:N0}");
     }
 
-    private static async Task<Measurement> MeasureAsync(
+    private static Measurement Measure(
         SandboxInterpreter interpreter,
         ExecutionPlan plan,
         SandboxValue input,
@@ -112,7 +112,14 @@ internal static class InterpreterFrameLayoutProbe
         var watch = Stopwatch.StartNew();
         for (var i = 0; i < iterations; i++)
         {
-            var result = await interpreter.ExecuteAsync(plan, "main", input, options, CancellationToken.None);
+            var pending = interpreter.ExecuteAsync(plan, "main", input, options, CancellationToken.None);
+            if (!pending.IsCompletedSuccessfully)
+            {
+                throw new InvalidOperationException(
+                    "frame-layout probe unexpectedly left the synchronous interpreter path");
+            }
+
+            var result = pending.Result;
             if (!result.Succeeded)
             {
                 throw new InvalidOperationException(result.Error?.SafeMessage ?? "execution failed");
@@ -144,7 +151,7 @@ internal static class InterpreterFrameLayoutProbe
         GC.Collect();
     }
 
-    private static string ParameterReturnJson()
+    private static string OneRawParameterOnlyJson()
         => """
         {
           "id": "frame-layout-parameter",
@@ -217,7 +224,7 @@ internal static class InterpreterFrameLayoutProbe
         }
         """;
 
-    private static string TwoParameterJson()
+    private static string TwoRawParametersOnlyJson()
         => """
         {
           "id": "frame-layout-two-parameter",

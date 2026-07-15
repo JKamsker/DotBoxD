@@ -12,7 +12,7 @@ internal sealed partial class InterpreterFrame
     public void WriteRawInt64Slot(int slot, long value)
     {
         _i64Slots[slot] = value;
-        _assigned[slot] = true;
+        RawSlotAssignmentState.MarkAssigned(_assigned, slot);
     }
 
     public bool TryReadInt64(string name, out long value)
@@ -20,8 +20,8 @@ internal sealed partial class InterpreterFrame
         var slot = _layout.GetSlot(name);
         if (_layout.IsI64Slot(slot))
         {
-            value = _assigned[slot] ? _i64Slots[slot] : 0;
-            return _assigned[slot];
+            value = RawSlotAssignmentState.IsAssigned(_assigned, slot) ? _i64Slots[slot] : 0;
+            return RawSlotAssignmentState.IsAssigned(_assigned, slot);
         }
 
         if (TryGetBoxedValue<I64Value>(slot, out var i64))

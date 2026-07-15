@@ -62,6 +62,9 @@ Services, Kernels, and Pushdown.
   branches without short-lived plan arrays while retaining ordered arrays for multi-assignment branches.
   Branch-dependent fuel, cancellation/deadline checks, debug fallback, and sandbox resource accounting remain
   unchanged.
+- **Lean parameter-only interpreter frames:** raw I32/I64/F64 frames whose slots are all initialized parameters
+  now reuse an empty assignment-state sentinel instead of allocating a redundant `bool[]` per invocation. Frames
+  with distinct locals retain per-slot tracking and read-before-assignment behavior.
 - **Documentation & repo polish:** new top-level README, `docs/` information architecture
   (getting-started, concepts, security, reference, contributing), `SECURITY.md`, `CONTRIBUTING.md`,
   `CODE_OF_CONDUCT.md`, and GitHub repo metadata files.

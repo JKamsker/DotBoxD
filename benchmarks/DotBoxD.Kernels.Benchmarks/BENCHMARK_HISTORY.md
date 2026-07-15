@@ -185,6 +185,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Direct generated-client RPC response decoding | this commit | `--probe-kernel-rpc-client-response-decode` | Generated service proxies and direct graft clients now validate response bytes without allocation and project the declared CLR return type directly from the payload instead of first materializing a `KernelRpcValue` tree. Across 100,000 decodes, `List<I32>` fell from 264 to 72 B/op, `Map<String,I32>` from 5,976 to 2,368 B/op, and an eight-item `List<Record<I32,String>>` from 2,000 to 440 B/op; I32 stayed allocation-free. Four process runs, each using four internally alternating rounds, moved timing medians from 5.9/26.2/200.3/85.3 ms to 5.1/21.2/125.4/45.1 ms. Full structural validation remains ahead of DTO construction, and the emitted ref-struct reader is isolated in synchronous helpers so C# 12 async clients still compile. |
 | Lazy collision-safe server-extension request helpers | this commit | `--probe-server-extension-request-helpers` | Request conversion now evaluates a framework-type resolver only after its type predicate matches and skips the generated outer method name when allocating numbered or fixed helpers. A `List<int>` proxy falls from seven request helpers, 6,143 UTF-8 bytes, and 121 lines to one helper, 3,698 bytes, and 67 lines. Across ten cold generations of 100 proxies, allocation falls from 106,581,552 B to 70,499,272 B (33.9%, or 3,608,228 B/run). Generated-compilation tests pin the former `WriteKernelRpcValue5` and `DateTimeToWireOffset` collisions, the post-cleanup `WriteKernelRpcValue0` boundary, and the direct-graft form. |
 | Scalar empty/single branched interpreter plans | this commit | `--probe-interpreter-branched-plan-setup`, `--probe-branched-f64-loop` | Branched I32/F64 loop planners now store empty branches without a plan and one-assignment branches inline, retaining arrays only for two or more ordered assignments. Across 50,000 executions, I32 one-one / empty-one branches remove exactly 80 / 64 B/op; F64 removes about 120 / exactly 128 B/op because the tentative I32 planner also stops allocating before F64 fallback. Zero/no-branch/two-two controls are byte-identical. Four long-F64 process medians moved from 90.4 to 82.8 ms (an observed -8.4%), with non-overlapping ranges and unchanged results/resources. |
+| Parameter-only raw frame assignment state | this commit | `--probe-interpreter-frame-layout` | Reused an empty assignment-state sentinel when every frame slot is a parameter initialized before execution. One- and two-raw-parameter rows each fell from 912.0 to 880.0 B/op, removing exactly one 32-byte array per invocation. Zero-parameter, eight-local, and mixed raw/boxed controls remained byte-identical, and genuine locals retain read-before-assignment tracking. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -1765,3 +1766,42 @@ case takes both branches and proves each second assignment observes the first as
 an empty taken branch remains in its original position, preserving cancellation/deadline cadence. Debug and unsupported
 shapes still fall back before frame or resource mutation. Public API, compiler/verifier identity, persisted artifacts,
 and sandbox accounting are unchanged.
+
+## Parameter-only raw frame assignment state
+
+Every interpreter frame with at least one raw I32, I64, or F64 slot previously allocated a `bool[SlotCount]` to track
+whether a raw local had been assigned. That state is necessary for genuine locals, but it cannot report an unassigned
+slot when the layout contains only parameters: the frame builder populates every parameter before publishing the frame.
+
+`FunctionFrameLayout` now records the immutable fact that collecting the function body introduced no distinct slots.
+Those layouts reuse `Array.Empty<bool>()`; centralized raw-slot state access treats the empty array as all assigned and
+makes reassignment writes no-ops for tracking purposes. Any distinct assignment target or loop local still creates the
+original per-frame state array. The cached layout shares only immutable metadata; raw values remain invocation-local.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -- --probe-interpreter-frame-layout
+```
+
+Representative allocation results over 50,000 prepared executions:
+
+```text
+case                     before B / B/op       after B / B/op        delta/op
+one raw parameter only   45,601,456 / 912.0    44,001,456 / 880.0       -32 B
+two raw parameters only  45,601,456 / 912.0    44,001,456 / 880.0       -32 B
+zero parameter control   42,401,456 / 848.0    42,401,456 / 848.0         0 B
+eight local chain        47,602,152 / 952.0    47,602,152 / 952.0         0 B
+mixed raw and boxed      47,602,824 / 952.1    47,602,824 / 952.1         0 B
+```
+
+One- and two-element Boolean arrays have the same 32-byte aligned size on this x64 runtime. A repeated after-run
+reproduced every allocation total exactly. The permanent probe now rejects an unexpected asynchronous completion before
+using thread-local allocation counters, and pins each row's checksum plus fuel/loop/sandbox-allocation/host-call tuple.
+The allocation result is the claim; the representative stopwatch samples moved from 66.2/91.9 ms to 62.3/85.1 ms for
+the one/two-parameter rows but are not treated as statistical timing evidence.
+
+Focused regressions cover I32/I64/F64 parameter reassignment, parameter-only local-function frames, concurrent reuse of
+one prepared plan, exact managed-allocation bands, and a genuine conditional raw local that must still fail with the
+same read-before-assignment sandbox error. Public API, compiler/verifier identity, persisted artifacts, and sandbox
+resource accounting are unchanged.
