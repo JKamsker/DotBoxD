@@ -162,8 +162,10 @@ public sealed class VerifierMeterShapeTests
         Assert.True(result.Succeeded, string.Join(Environment.NewLine, result.Diagnostics.Select(d => d.Message)));
     }
 
-    [Fact]
-    public async Task Verifier_accepts_metered_type_array_allocation()
+    [Theory]
+    [InlineData(nameof(CompiledRuntime.TypeRecord))]
+    [InlineData(nameof(CompiledRuntime.TypeRecordCached))]
+    public async Task Verifier_accepts_metered_type_array_allocation(string recordFactory)
     {
         var result = await VerifierTestHelpers.VerifyAsync(VerifierTestHelpers.BuildGeneratedAssembly(type =>
         {
@@ -178,7 +180,7 @@ public sealed class VerifierMeterShapeTests
             fnIl.Emit(OpCodes.Ldc_I4_0);
             EmitTypeScalar(fnIl);
             fnIl.Emit(OpCodes.Stelem_Ref);
-            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.TypeRecord))!);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(recordFactory)!);
             fnIl.Emit(OpCodes.Pop);
             EmitExitCall(fnIl);
             fnIl.Emit(OpCodes.Ldarg_1);

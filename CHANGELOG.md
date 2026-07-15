@@ -97,6 +97,10 @@ Services, Kernels, and Pushdown.
   materialization factories only on cache misses, while preserving atomic same-key coalescing and LRU updates. Inline-await
   closure state is likewise created only when that pump is selected; cancellation, custom/persistent compilers, audit, and
   fallback behavior are unchanged.
+- **Cached direct compiled record types:** generated input and return validation now uses bounded generated-code ABI sugar
+  for direct one- and two-field records of built-in scalars, removing the immutable descriptor graph while retaining the
+  metered field array. The existing public `TypeRecord` primitive, nested/opaque/noncanonical records, and records with
+  three or more fields keep their legacy paths; compiler and verifier identities advance to version 11.
 - **Reusable Auto compiled no-audit state:** serialized installed kernels now reuse their resource meter and sandbox context
   after Auto mode has completed a successful binding-free compiled run. Auto still interprets its mandatory first run,
   re-evaluates selector and hotness decisions, returns full execution results, and uses the host provider caches; failures,

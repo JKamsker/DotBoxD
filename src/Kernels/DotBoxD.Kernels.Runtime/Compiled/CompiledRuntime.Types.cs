@@ -40,6 +40,10 @@ public static partial class CompiledRuntime
 
     public static SandboxType TypeRecord(SandboxType[] fieldTypes) => SandboxType.Record(fieldTypes);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static SandboxType TypeRecordCached(SandboxType[] fieldTypes)
+        => CompiledStructuralTypeCache.Record(fieldTypes);
+
     public static SandboxType[] CreateMeteredTypeArray(SandboxContext context, int count)
     {
         ChargeTypeArray(context, count);

@@ -2397,3 +2397,45 @@ regressions cover all I64/F64 operators, overflow, division by zero, non-finite 
 failure fuel, exact debug trace order, unsupported comparisons, pure intrinsics, top-level and nested pending bindings, and
 literal identity. Timing varied by process and is not claimed. No public API, generated ABI, verifier identity, persisted
 artifact, or sandbox contract changes.
+
+## Cached direct compiled record types
+
+Generated entrypoint and return validation materialized a metered `SandboxType[]` for every record type, then copied that
+array into a new immutable `SandboxType` descriptor. Direct one- and two-field records of built-in scalars have only 9 and
+81 possible ordered shapes, so rebuilding their descriptor graphs added 88 or 96 managed bytes after the required caller
+array had already been allocated and charged.
+
+The compiler now selects a dedicated `CompiledRuntime.TypeRecordCached` facade only for those direct roots. Its bounded,
+lazy caches accept exact canonical scalar singletons, snapshot the mutable caller array before indexing or publication, and
+construct the descriptor from those snapshots. Null, empty, null-element, arity-three-or-larger, nested, opaque, and
+structurally equal but noncanonical inputs delegate to `SandboxType.Record` with the same result or exception. The record
+cache arrays live in a nested holder so first use of the existing List/Map caches does not initialize them.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-record-types
+```
+
+Two fresh baseline processes were byte-identical, and repeated optimized processes reproduced the displayed direct totals.
+Managed allocation was:
+
+```text
+case                                      baseline / legacy          optimized / cached       exact saving
+TypeRecord(I32), 1,000,000 calls          120,000,040 / 120.0 B/op   32,000,040 / 32.0 B/op            88 B
+TypeRecord(I32,String), 1,000,000 calls   136,000,040 / 136.0 B/op   40,000,040 / 40.0 B/op            96 B
+arity-three cached-factory fallback       152,000,040 / 152.0 B/op  152,000,040 / 152.0 B/op             0 B
+compiled identity, 50,000 executions       39,204,920 / 784.1 B/op   29,603,944 / 592.1 B/op           192 B
+```
+
+The direct lanes isolate the exact mechanism: compiled `Record<I32,String>` identity validates the same type at input and
+return, removing two 96-byte graphs while retaining two 40-byte metered arrays. The compiled raw-total difference includes
+another 976 fixed bytes across the process, so the claim remains the exact 192-byte mechanism, not 192.02 B/op. Value
+identity, compiled dispatch, empty audit, and resource usage remain pinned; fuel/loops/sandbox allocation/collection
+elements/string bytes are `10/0/34/2/2` before and after. Elapsed samples are not claimed.
+
+`TypeRecordCached` is public solely as opt-in generated-code ABI sugar over the unchanged public `TypeRecord` primitive.
+Both entrypoint and function emitters retain legacy factories for unsupported shapes, and verifier coverage pins the new
+metered call shape plus null-field rejection. Compiler and verifier identities advance from 10 to 11; API baselines and the
+spec manifest record the additive runtime facade. No type-system, effect-analysis, language, artifact-format, or sandbox
+resource-accounting contract changes.

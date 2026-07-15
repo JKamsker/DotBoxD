@@ -61,6 +61,12 @@ if (args.Contains("--probe-compiled-input-types", StringComparer.OrdinalIgnoreCa
     return;
 }
 
+if (args.Contains("--probe-compiled-record-types", StringComparer.OrdinalIgnoreCase))
+{
+    await DotBoxD.Kernels.Benchmarks.Runtime.Types.CompiledRecordTypeProbe.RunAsync();
+    return;
+}
+
 if (args.Contains("--probe-resource-meter", StringComparer.OrdinalIgnoreCase))
 {
     DotBoxD.Kernels.Benchmarks.Runtime.ResourceMeterProbe.Run();
