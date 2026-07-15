@@ -6,6 +6,31 @@ namespace DotBoxD.Services.SourceGenerator.Generation;
 
 internal static class DispatcherInstanceDisposeGenerator
 {
+    public static bool IsDisposableDispose(MethodModel method)
+    {
+        if (method.Name != "Dispose" ||
+            method.ReturnKind != MethodReturnKind.Void ||
+            method.Parameters.Count != 0)
+        {
+            return false;
+        }
+
+        if (method.ExplicitImplementationType == ServicesGeneratorTypeNames.GlobalIDisposable)
+        {
+            return true;
+        }
+
+        foreach (var implementationType in method.AdditionalExplicitImplementationTypes)
+        {
+            if (implementationType == ServicesGeneratorTypeNames.GlobalIDisposable)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static bool IsAsyncDisposableDispose(MethodModel method)
     {
         if (method.Name != "DisposeAsync" ||
@@ -50,6 +75,22 @@ internal static class DispatcherInstanceDisposeGenerator
         sb.AppendLine("                        return;");
         sb.AppendLine("                    }");
         sb.AppendLine("                    __dotboxd_task.GetAwaiter().GetResult();");
+        sb.AppendLine("                    return;");
+    }
+
+    public static void GenerateSyncReturn(
+        StringBuilder sb,
+        ServiceModel service,
+        string call,
+        string instanceId)
+    {
+        sb.AppendLine($"                    if ({instanceId} is not null)");
+        sb.AppendLine("                    {");
+        sb.AppendLine($"                        registry.{ServicesGeneratorMemberNames.InstanceRegistry.Release}(\"{service.ServiceName}\", {instanceId});");
+        sb.AppendLine("                        return;");
+        sb.AppendLine("                    }");
+        sb.AppendLine();
+        sb.AppendLine($"                    {call};");
         sb.AppendLine("                    return;");
     }
 }
