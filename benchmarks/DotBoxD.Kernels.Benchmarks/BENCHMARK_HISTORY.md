@@ -165,6 +165,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Selective plugin-package collision discovery | this commit | `--probe-plugin-package-collision-discovery` | Limited the source-type semantic transform to declarations whose decoded identifier ends in the shared `PluginPackage` suffix. Across 1,000 warmed two-snapshot edits with 1,000 unrelated types and one real collision, allocation fell from 240,919.1 B/edit to 95,446.3 B/edit; synthetic full-generator time moved from 1,697.6 ms to 1,420.8 ms. Exact semantic namespace, nesting, generic-arity, escaped-identifier, and declaration-kind behavior remains covered. |
 | Raw-only interpreter frame storage | this commit | `--probe-interpreter-frame-layout` | Reused the shared empty boxed-slot array when a prepared frame layout contains only raw I32/I64/F64 slots. Across 50,000 executions, parameter return fell from 976.0 to 944.0 B/op (-32 B/op) and an eight-local chain fell from 1,080.1 to 984.0 B/op (-96 B/op); the mixed raw/boxed control remained 984.1 B/op. Boxed fallback probes now check the layout kind before indexing, preserving sandbox errors for wrong-kind plans. |
 | Direct interpreter entrypoint frame population | this commit | `--probe-interpreter-frame-layout` | Populated entrypoint frame slots directly from the validated input instead of allocating a temporary argument array and immediately copying it. Three one-parameter rows each fell by exactly 32 B/op, and the two-parameter control fell by 40 B/op; the zero-parameter control remained byte-identical at 848.0 B/op. Public `EntrypointBinder.BindArguments` and local-function argument handling are unchanged. |
+| Cached compiled literal validation types | this commit | `--probe-literal-collection-construction` | Reused the bounded compiled structural-type cache when validating list/map literals with direct built-in scalar operands. `ListLiteralValue` arity 8 fell from 240.0 to 128.0 B/op (-112 B/op), and `MapLiteralValue` arity 8 fell from 840.0 to 680.0 B/op (-160 B/op). Prebuilt nested, opaque, and record list controls remained byte-identical at 152.0 B/op. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -1284,3 +1285,41 @@ I64 and mixed single-parameter frames, direct two-parameter frame population, ze
 and invalid later-parameter type handling before function fuel. The probe also requires resource usage to stay identical
 within each lane; fuel/loop/sandbox-allocation/host-call values are `3/0/0/0`, `3/0/0/0`, `35/0/0/0`, `5/0/20/0`, and
 `5/0/0/0`. Stopwatch movement is secondary.
+
+## Cached compiled literal validation types
+
+`CompiledLiteralRuntime` constructs each list or map with its declared item/key/value types and then recursively validates
+the result. The expected type for that validation previously came from `list.Type` or `map.Type`, which rebuilt a new outer
+`SandboxType.List` or `SandboxType.Map` descriptor even when all operands were canonical built-in scalar singletons.
+
+Literal validation now asks the existing bounded compiled structural-type cache for that equivalent expected descriptor.
+Only the nine canonical built-in scalar singleton operands are cached; nested, opaque, record, malformed, and noncanonical
+operands retain the exact legacy factory path. Literal construction, recursive value validation, exception ordering,
+generated-code ABI, verifier allowlists, and sandbox resource charging are unchanged.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -- --probe-literal-collection-construction
+```
+
+Representative local runs, 500,000 constructions per row:
+
+```text
+case                      Before ms / allocated / B/op        After ms / allocated / B/op        delta
+list literal arity 8       308.0 /   120,000,040 B / 240.0     245.7 /  64,000,040 B / 128.0     -112 B/op
+list literal arity 32      311.5 /   216,001,600 B / 432.0     348.0 / 160,001,600 B / 320.0     -112 B/op
+list value arity 8         110.3 /   120,000,040 B / 240.0     104.0 /  64,000,040 B / 128.0     -112 B/op
+map value arity 8          253.1 /   420,000,040 B / 840.0     210.4 / 340,000,040 B / 680.0     -160 B/op
+nested list control         43.4 /    76,000,040 B / 152.0      46.8 /  76,000,040 B / 152.0        0 B/op
+opaque list control         65.7 /    76,000,040 B / 152.0      45.7 /  76,000,040 B / 152.0        0 B/op
+record list control         80.7 /    76,000,040 B / 152.0      52.2 /  76,000,040 B / 152.0        0 B/op
+```
+
+Allocation is the claim: each direct built-in list call removes exactly 56,000,000 B across the sample, and the uncharged
+map row removes exactly 80,000,000 B. Charged map rows corroborated the reduction (933.5 to 767.4 B/op at arity 8 and
+2,034.2 to 1,872.9 B/op at arity 32), but their weak-table shape-cache growth makes exact whole-row totals GC-sensitive;
+the uncharged map row isolates the fixed 160-byte descriptor. Checksums remained 4,000,000 or 16,000,000 for nonempty rows
+and 500,000 for each fallback control. Fuel/sandbox-allocation/collection-element totals remained `0/0/4,000,000` for
+the charged arity-8 list/map rows, `0/0/16,000,000` for the arity-32 list, and `500,000/0/16,000,000` for the arity-32 map; uncharged and
+fallback controls remained `0/0/0`. Stopwatch movement is secondary.
