@@ -39,17 +39,14 @@ on:
   # red-tests 28523484435 / 28523516570 / 28523545465 (which opened PRs #170-172)
   # did NOT fire it; only a JKamsker-dispatched red-test did. The schedule closes
   # the loop regardless of who opened the red PR. The per-PR busy-check, retry cap,
-  # and a GLOBAL in-flight cap (MAX_INFLIGHT) below keep the higher cadence + per-tick
-  # max from bursting the backlog or running away on cost.
+  # and a GLOBAL in-flight cap (MAX_INFLIGHT) below keep the worker pool from
+  # bursting the backlog or running away on capacity/cost.
   schedule:
-    # Off-peak minutes on purpose: GitHub throttles/drops short-interval schedule
-    # slots, and drops disproportionately at :00/:05-multiples (observed 2026-07-01:
-    # `*/10` fired 1 of 6 slots in its first hour). Ticks are cheap and self-healing
-    # (each re-scans the full frontier), so dropped slots degrade latency, not
-    # correctness — and the red-test worker now ALSO kicks this dispatcher directly
-    # via safe-outputs dispatch on every PR it opens, so the cron is the fallback
-    # path, not the primary latency path.
-    - cron: "7,17,27,37,47,57 * * * *"
+    # Hourly at an off-peak minute. Each tick re-scans the full frontier, and the
+    # red-test worker also kicks this dispatcher directly when it opens a PR, so a
+    # dropped schedule slot delays work without losing it. The low cadence plus the
+    # in-flight cap intentionally reserves Actions capacity for product CI.
+    - cron: "47 * * * *"
   # Kept for immediacy: fires instantly when a human/PAT dispatches a red-test
   # (those DO emit workflow_run). Harmless for bot-dispatched ones (never fires).
   workflow_run:
@@ -60,7 +57,7 @@ on:
       max:
         description: Max fix workers to dispatch this tick.
         required: false
-        default: "6"
+        default: "1"
         type: string
 
 permissions:
@@ -83,9 +80,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          MAX_DISPATCH: ${{ inputs.max || '6' }}
+          MAX_DISPATCH: ${{ inputs.max || '1' }}
           MAX_ATTEMPTS: "4"
-          MAX_INFLIGHT: "12"
+          MAX_INFLIGHT: "2"
           # PAT (Contents + Pull requests R/W). Used ONLY to server-side merge main
           # into a PR branch as the PAT's user, so the resulting pull_request CI runs
           # ungated (a bot-authored commit would sit at action_required). Never printed.
@@ -103,9 +100,9 @@ jobs:
           repo = os.environ["GH_REPO"]
           owner, _, name = repo.partition("/")
           try:
-              max_dispatch = int(os.environ.get("MAX_DISPATCH") or "6")
+              max_dispatch = int(os.environ.get("MAX_DISPATCH") or "1")
           except ValueError:
-              max_dispatch = 6
+              max_dispatch = 1
           try:
               coderabbit_pending_timeout_minutes = int(
                   os.environ.get("CODERABBIT_PENDING_TIMEOUT_MINUTES") or "60")
@@ -438,12 +435,12 @@ jobs:
               max_attempts = 4
 
           # Global concurrency cap: never let total in-flight fix runs exceed
-          # MAX_INFLIGHT. This is what makes the higher cadence + per-tick max safe —
-          # raising throughput can't runaway on cost; it fills to the cap and holds.
+          # MAX_INFLIGHT. New work fills only the small reserved worker pool and
+          # cannot consume the runner capacity needed by product CI.
           try:
-              max_inflight = int(os.environ.get("MAX_INFLIGHT") or "12")
+              max_inflight = int(os.environ.get("MAX_INFLIGHT") or "2")
           except ValueError:
-              max_inflight = 12
+              max_inflight = 2
           slots = max(0, max_inflight - len(busy))
           budget = min(max_dispatch, slots)
           if budget <= 0:

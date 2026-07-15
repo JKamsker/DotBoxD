@@ -223,9 +223,12 @@ internal static partial class RpcKernelModelFactory
         var effects = new SortedSet<string>(StringComparer.Ordinal);
         var lowerer = CreateLowerer(context, cancellationToken, method, capabilities, effects);
         var hasReceiverId = RpcKernelReceiverHandleSeeder.TrySeed(lowerer, type, graft);
+        var returnValueType = DotBoxDRpcReturnType.PayloadType(
+            method.ReturnType,
+            context.SemanticModel.Compilation);
         var bodyJson = body.Block is { } block
-            ? lowerer.LowerBody(block)
-            : lowerer.LowerExpressionBody(body.Expression!, method.ReturnsVoid);
+            ? lowerer.LowerBody(block, returnValueType)
+            : lowerer.LowerExpressionBody(body.Expression!, method.ReturnsVoid, returnValueType);
         AddBodyEffects(lowerer, effects);
         return new RpcBodyLowering(bodyJson, effects, capabilities, hasReceiverId);
     }

@@ -73,8 +73,7 @@ public sealed partial class SandboxHost : IDisposable
         return ValueTask.FromResult(plan);
     }
 
-    internal IReadOnlyList<string> GetRequiredCapabilities(SandboxModule module)
-        => GetRequiredCapabilities(module, policy: null);
+    internal IReadOnlyList<string> GetRequiredCapabilities(SandboxModule module) => GetRequiredCapabilities(module, policy: null);
 
     internal IReadOnlyList<string> GetRequiredCapabilities(
         SandboxModule module,
@@ -114,10 +113,9 @@ public sealed partial class SandboxHost : IDisposable
         }
 
         var result = options.Isolation == SandboxIsolation.WorkerProcess
-            ? await _workerExecutor.ExecuteAsync(plan, entrypoint, input, options, cancellationToken)
-                .ConfigureAwait(false)
-            : await ExecuteSelectedModeAsync(plan, entrypoint, input, options, cancellationToken)
-                .ConfigureAwait(false);
+            ? await _workerExecutor.ExecuteAsync(plan, entrypoint, input, options, cancellationToken).ConfigureAwait(false)
+            : await ExecuteSelectedModeAsync(plan, entrypoint, input, options, cancellationToken).ConfigureAwait(false);
+        ThrowIfDisposed();
         return Publish(result);
     }
 
@@ -199,9 +197,7 @@ public sealed partial class SandboxHost : IDisposable
         return false;
     }
 
-    private static SandboxExecutionResult PreDispatchCancelledResult(
-        ExecutionPlan plan,
-        SandboxExecutionOptions options)
+    private static SandboxExecutionResult PreDispatchCancelledResult(ExecutionPlan plan, SandboxExecutionOptions options)
     {
         var runId = options.RunId ?? SandboxRunId.New();
         var budget = new ResourceMeter(plan.Budget);
@@ -281,7 +277,14 @@ public sealed partial class SandboxHost : IDisposable
         SandboxValue input,
         SandboxExecutionOptions options,
         CancellationToken cancellationToken)
-        => await _interpreter.ExecuteAsync(plan, entrypoint, input, options, cancellationToken).ConfigureAwait(false);
+        => await InterpreterExecutionBoundary.ExecuteAsync(
+                _interpreter,
+                plan,
+                entrypoint,
+                input,
+                options,
+                cancellationToken)
+            .ConfigureAwait(false);
 
     public void Dispose()
     {
@@ -291,6 +294,6 @@ public sealed partial class SandboxHost : IDisposable
         }
     }
 
-    private void ThrowIfDisposed()
+    internal void ThrowIfDisposed()
         => ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
 }

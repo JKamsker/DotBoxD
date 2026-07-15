@@ -35,6 +35,7 @@ internal static partial class PluginServerFacadeEmitter
         }
 
         builder.AppendLine("                    cancellationToken.ThrowIfCancellationRequested();");
+        builder.AppendLine("                    ThrowIfDisposed();");
         builder.AppendLine("                    var control = session.Get<" + model.ControlServiceType + ">();");
         builder.AppendLine("                    var world = global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.Get" + model.WorldExtensionSuffix + "(session.Peer);");
         if (model.EmitPipeBuilder)
@@ -43,12 +44,24 @@ internal static partial class PluginServerFacadeEmitter
         }
         builder.AppendLine("                    Initialize(control, world);");
         builder.AppendLine("                    _session = session;");
+        builder.AppendLine("                    ThrowIfDisposed();");
         builder.AppendLine("                    session = null;");
         builder.AppendLine("                    _started = true;");
         builder.AppendLine("                }");
-        builder.AppendLine("                catch");
+        builder.AppendLine("                catch (global::System.Exception startEx)");
         builder.AppendLine("                {");
-        builder.AppendLine("                    if (session is not null) { await session.DisposeAsync().ConfigureAwait(false); }");
+        builder.AppendLine("                    if (global::System.Object.ReferenceEquals(_session, session)) { _session = null; }");
+        builder.AppendLine("                    if (session is not null)");
+        builder.AppendLine("                    {");
+        builder.AppendLine("                        try");
+        builder.AppendLine("                        {");
+        builder.AppendLine("                            await session.DisposeAsync().ConfigureAwait(false);");
+        builder.AppendLine("                        }");
+        builder.AppendLine("                        catch (global::System.Exception disposeEx)");
+        builder.AppendLine("                        {");
+        builder.AppendLine("                            startEx.Data[\"PluginServer.StartCleanupException\"] = disposeEx;");
+        builder.AppendLine("                        }");
+        builder.AppendLine("                    }");
         builder.AppendLine("                    throw;");
         builder.AppendLine("                }");
         builder.AppendLine("            }");

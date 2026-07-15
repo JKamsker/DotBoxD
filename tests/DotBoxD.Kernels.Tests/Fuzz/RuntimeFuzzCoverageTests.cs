@@ -20,6 +20,12 @@ public sealed class RuntimeFuzzCoverageTests
             iter: 30,
             threads: 1);
 
+    [Theory]
+    [InlineData(67_951_041)]
+    [InlineData(71_537_141)]
+    public void Pure_module_ids_cannot_form_clr_metadata_tokens(int seed)
+        => Assert.False(SandboxDescriptorGuards.ContainsForbiddenDescriptor(ModuleId(seed)));
+
     [Fact]
     public async Task Numeric_seed_does_not_look_like_a_compact_metadata_reference()
         => await RunPureCaseAsync(23757449);
@@ -162,6 +168,12 @@ public sealed class RuntimeFuzzCoverageTests
           ]
         }
         """;
+
+    private static string ModuleId(int index)
+    {
+        var value = unchecked((uint)index);
+        return $"runtime-fuzz-case-{value >> 16:x4}g{value & 0xffff:x4}";
+    }
 
     private static string FileModuleJson(int index, string path)
         => $$"""

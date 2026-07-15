@@ -1,20 +1,18 @@
 ---
 description: |
-  Recovery orchestrator for the surprise-hunt graph. On a schedule it reads the live lens frontier
+  Capacity-bounded orchestrator for the surprise-hunt graph. On a schedule it reads the live lens frontier
   (open `sweep:lens` + `sweep:active` issues), drops any lens that already has an explore run in
-  flight, severity-orders the rest, and dispatches one `library-surprise-explore` run per eligible
-  lens (capped). Healthy explore runs self-chain continuously; this workflow seeds and repairs the
-  loop after failures or incomplete runs. Read-only against the repo; it never edits files or opens
-  issues/PRs itself.
+  flight, least-recently-dispatched orders the rest (severity as a tie-breaker), and dispatches at
+  most one `library-surprise-explore` run.
+  Explore runs do not self-chain; this schedule is the only autonomous discovery source. Read-only
+  against the repo; it never edits files or opens issues/PRs itself.
   See docs/Task/BugHunting/README.md.
 
 on:
   workflow_dispatch:
-  schedule:
-    # UTC. Four recovery opportunities per hour at off-peak minutes. GitHub can drop
-    # short-interval schedules, so continuous throughput comes from explore self-chaining;
-    # this cron only has to revive lenses whose previous run did not schedule a successor.
-    - cron: "9,24,39,54 * * * *"
+  # One lens every four hours is the hard discovery-rate governor. gh-aw scatters the
+  # minute deterministically to avoid a shared schedule boundary.
+  schedule: every 4h
 
 concurrency:
   group: surprise-hunt-dispatcher
@@ -48,7 +46,7 @@ safe-outputs:
   allowed-github-references: []
   dispatch-workflow:
     workflows: [library-surprise-explore]
-    max: 8
+    max: 1
   noop:
     report-as-issue: false
   missing-tool: false
@@ -105,14 +103,20 @@ pre-agent-steps:
       # (a substring test would let #14 match "#140").
       runs = gh_json(["run", "list", "--repo", repo,
                       "--workflow", "library-surprise-explore.lock.yml",
-                      "--json", "status,displayTitle", "--limit", "60"], tolerant=True)
+                      "--json", "status,displayTitle,createdAt", "--limit", "60"], tolerant=True)
       IN_FLIGHT = ("in_progress", "queued", "requested", "waiting", "pending")
       busy_numbers = set()
+      last_seen = {}
       for run in runs:
+          m = re.search(r"explore #(\d+)", run.get("displayTitle", ""))
+          if not m:
+              continue
+          lens_number = int(m.group(1))
           if run.get("status") in IN_FLIGHT:
-              m = re.search(r"explore #(\d+)", run.get("displayTitle", ""))
-              if m:
-                  busy_numbers.add(int(m.group(1)))
+              busy_numbers.add(lens_number)
+          created_at = run.get("createdAt", "")
+          if created_at > last_seen.get(lens_number, ""):
+              last_seen[lens_number] = created_at
 
       # Severity order: security first, codegen last.
       SEV = ["vein:security", "vein:concurrency", "vein:wire", "vein:error-path",
@@ -121,8 +125,10 @@ pre-agent-steps:
           names = {l["name"] for l in issue.get("labels", [])}
           return next((n for n, v in enumerate(SEV) if v in names), len(SEV))
 
+      # With a dispatch cap of one, pure severity ordering would starve every lens behind security.
+      # Mine the least-recently-dispatched lens first; severity only breaks equal/never-run ties.
       eligible = []
-      for issue in sorted(lenses, key=rank):
+      for issue in sorted(lenses, key=lambda i: (last_seen.get(i["number"], ""), rank(i))):
           if issue["number"] in busy_numbers:
               continue
           vein = next((l["name"] for l in issue.get("labels", [])
@@ -142,8 +148,8 @@ lens that already has an `explore` run in flight removed.
 
 Your only job is to fan out - do **not** read source, edit files, or open issues/PRs.
 
-For each entry in `frontier.json`, in the given order and up to the cap (8), call the **dedicated**
-`library_surprise_explore` safe-output tool **once per entry** - one call per lens. Do **not** use the
+For the first entry in `frontier.json` only (the cap is 1), call the **dedicated**
+`library_surprise_explore` safe-output tool once. Do **not** use the
 generic `dispatch_workflow` tool: in this runtime it is a no-op (it returns success but produces no
 collectable safe output, so nothing is dispatched). Pass:
 

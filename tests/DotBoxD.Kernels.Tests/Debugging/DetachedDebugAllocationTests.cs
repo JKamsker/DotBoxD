@@ -44,7 +44,7 @@ public sealed class DetachedDebugAllocationTests
             new Dictionary<string, string>());
         return await host.PrepareAsync(
             module,
-            SandboxPolicyBuilder.Create().WithFuel(statementCount * 10L + 100).Build());
+            SandboxPolicyBuilder.Create().WithFuel(20_000).Build());
     }
 
     private static long MeasurePerExecution(global::DotBoxD.Hosting.Execution.SandboxHost host, ExecutionPlan plan)

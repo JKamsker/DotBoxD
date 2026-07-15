@@ -20,7 +20,7 @@ internal sealed partial class InvokeAsyncCallShape
         IReadOnlyList<string> debugParameterNames,
         EquatableArray<InvokeAsyncSyncOut> syncOuts,
         IReadOnlyList<(string Name, string Value)> leadingLocals,
-        Func<AssignmentExpressionSyntax, Func<ExpressionSyntax, string>, string?>? assignmentOverride,
+        RpcAssignmentOverride? assignmentOverride,
         Func<ExpressionSyntax, string?>? expressionOverride)
     {
         Block = block;
@@ -66,7 +66,7 @@ internal sealed partial class InvokeAsyncCallShape
 
     private IReadOnlyList<(string Name, string Value)> LeadingLocals { get; }
 
-    private Func<AssignmentExpressionSyntax, Func<ExpressionSyntax, string>, string?>? AssignmentOverride { get; }
+    private RpcAssignmentOverride? AssignmentOverride { get; }
 
     private Func<ExpressionSyntax, string?>? ExpressionOverride { get; }
 

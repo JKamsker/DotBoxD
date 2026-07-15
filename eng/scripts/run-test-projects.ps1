@@ -125,7 +125,6 @@ function Get-TestBatches([string] $ProjectName, [string] $SuiteName, [string] $F
         "Hosting",
         "Interpreter",
         "Model",
-        "Plugins",
         "Policy",
         "Queryable",
         "Resources",
@@ -143,6 +142,65 @@ function Get-TestBatches([string] $ProjectName, [string] $SuiteName, [string] $F
     $batches = @($prefixes | ForEach-Object {
         $batchFilter = "FullyQualifiedName~DotBoxD.Kernels.Tests.$_"
         New-TestBatch $_ (Join-TestFilters $Filter $batchFilter)
+    })
+
+    $pluginCoreFilter = @(
+        "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins",
+        "FullyQualifiedName!~DotBoxD.Kernels.Tests.Plugins.Capability",
+        "FullyQualifiedName!~DotBoxD.Kernels.Tests.Plugins.Documentation",
+        "FullyQualifiedName!~DotBoxD.Kernels.Tests.Plugins.Hooks",
+        "FullyQualifiedName!~DotBoxD.Kernels.Tests.Plugins.Indexing",
+        "FullyQualifiedName!~DotBoxD.Kernels.Tests.Plugins.LiveSettings",
+        "FullyQualifiedName!~DotBoxD.Kernels.Tests.Plugins.Messaging",
+        "FullyQualifiedName!~DotBoxD.Kernels.Tests.Plugins.Policy",
+        "FullyQualifiedName!~DotBoxD.Kernels.Tests.Plugins.Regression",
+        "FullyQualifiedName!~DotBoxD.Kernels.Tests.Plugins.Rpc",
+        "FullyQualifiedName!~DotBoxD.Kernels.Tests.Plugins.Runtime",
+        "FullyQualifiedName!~DotBoxD.Kernels.Tests.Plugins.Server",
+        "FullyQualifiedName!~DotBoxD.Kernels.Tests.Plugins.Validation"
+    ) -join "&"
+
+    $pluginBatches = @(
+        [pscustomobject] @{
+            Name = "Plugins-Core"
+            Filter = $pluginCoreFilter
+        },
+        [pscustomobject] @{
+            Name = "Plugins-Capability-Validation"
+            Filter = Join-AnyTestFilter @(
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Capability",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Documentation",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Indexing",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Messaging",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Policy",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Validation")
+        },
+        [pscustomobject] @{
+            Name = "Plugins-Hooks"
+            Filter = "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Hooks"
+        },
+        [pscustomobject] @{
+            Name = "Plugins-LiveSettings"
+            Filter = "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.LiveSettings"
+        },
+        [pscustomobject] @{
+            Name = "Plugins-Regression"
+            Filter = "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Regression"
+        },
+        [pscustomobject] @{
+            Name = "Plugins-Rpc"
+            Filter = "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc"
+        },
+        [pscustomobject] @{
+            Name = "Plugins-Runtime-Server"
+            Filter = Join-AnyTestFilter @(
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Runtime",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Server")
+        }
+    )
+
+    $batches += @($pluginBatches | ForEach-Object {
+        New-TestBatch $_.Name (Join-TestFilters $Filter $_.Filter)
     })
 
     $pluginAnalyzerBatches = @(

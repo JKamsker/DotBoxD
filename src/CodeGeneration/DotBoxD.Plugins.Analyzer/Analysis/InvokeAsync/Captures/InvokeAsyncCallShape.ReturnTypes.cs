@@ -1,5 +1,6 @@
 using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
@@ -27,7 +28,25 @@ internal sealed partial class InvokeAsyncCallShape
         }
 
         return InvokeAsyncLambdaShape.TryReturnType(block, model, cancellationToken, out returnType) ||
+               HasUnresolvedReturnType(block, model, cancellationToken) &&
                TryContextReturnType(invocation, model, cancellationToken, out returnType);
+    }
+
+    private static bool HasUnresolvedReturnType(
+        BlockSyntax block,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        foreach (var statement in block.DescendantNodes().OfType<ReturnStatementSyntax>())
+        {
+            if (statement.Expression is not null &&
+                model.GetTypeInfo(statement.Expression, cancellationToken).Type is null or { TypeKind: TypeKind.Error })
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool TryContextReturnType(
@@ -37,10 +56,20 @@ internal sealed partial class InvokeAsyncCallShape
         out ITypeSymbol returnType)
     {
         returnType = null!;
-        if (invocation.Parent is not ArrowExpressionClauseSyntax arrow ||
-            arrow.Parent is not MethodDeclarationSyntax method ||
-            model.GetTypeInfo(method.ReturnType, cancellationToken).Type is not { } methodReturn ||
-            DotBoxDRpcReturnType.PayloadType(methodReturn, model.Compilation) is not { } payload)
+        var contextualExpression = ContextualExpression(invocation, out var isAwaited);
+        if (TryTypedContextReturnType(
+                contextualExpression,
+                isAwaited,
+                model,
+                cancellationToken,
+                out returnType))
+        {
+            return true;
+        }
+
+        if (!IsReturnedExpression(contextualExpression) ||
+            model.GetEnclosingSymbol(invocation.SpanStart, cancellationToken) is not IMethodSymbol method ||
+            DotBoxDRpcReturnType.PayloadType(method.ReturnType, model.Compilation) is not { } payload)
         {
             return false;
         }
@@ -48,6 +77,87 @@ internal sealed partial class InvokeAsyncCallShape
         returnType = payload;
         return true;
     }
+
+    private static ExpressionSyntax ContextualExpression(ExpressionSyntax expression, out bool isAwaited)
+    {
+        isAwaited = false;
+        while (true)
+        {
+            if (expression.Parent is ParenthesizedExpressionSyntax parenthesized &&
+                parenthesized.Expression == expression)
+            {
+                expression = parenthesized;
+                continue;
+            }
+
+            if (expression.Parent is PostfixUnaryExpressionSyntax postfix &&
+                postfix.IsKind(SyntaxKind.SuppressNullableWarningExpression) &&
+                postfix.Operand == expression)
+            {
+                expression = postfix;
+                continue;
+            }
+
+            if (expression.Parent is AwaitExpressionSyntax awaitExpression &&
+                awaitExpression.Expression == expression)
+            {
+                isAwaited = true;
+                expression = awaitExpression;
+                continue;
+            }
+
+            return expression;
+        }
+    }
+
+    private static bool TryTypedContextReturnType(
+        ExpressionSyntax expression,
+        bool isAwaited,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        out ITypeSymbol returnType)
+    {
+        returnType = null!;
+        var targetType = expression.Parent switch
+        {
+            EqualsValueClauseSyntax
+            {
+                Value: var value,
+                Parent: VariableDeclaratorSyntax
+                {
+                    Parent: VariableDeclarationSyntax declaration,
+                },
+            } when value == expression => model.GetTypeInfo(declaration.Type, cancellationToken).Type,
+            AssignmentExpressionSyntax
+            {
+                RawKind: (int)SyntaxKind.SimpleAssignmentExpression,
+                Left: var left,
+                Right: var right,
+            } when right == expression => model.GetTypeInfo(left, cancellationToken).Type,
+            _ => null,
+        };
+        if (targetType is null or { TypeKind: TypeKind.Error })
+        {
+            return false;
+        }
+
+        if (isAwaited)
+        {
+            returnType = targetType;
+            return true;
+        }
+
+        return DotBoxDWellKnownTaskTypes.IsGenericValueTask(
+            targetType,
+            model.Compilation,
+            out returnType);
+    }
+
+    private static bool IsReturnedExpression(ExpressionSyntax expression)
+        => expression.Parent is ArrowExpressionClauseSyntax { Expression: var arrowValue } &&
+           arrowValue == expression ||
+           expression.Parent is ReturnStatementSyntax { Expression: var returnValue } &&
+           returnValue == expression;
 
     private static bool TryExplicitGenericTypeArgument(
         InvocationExpressionSyntax invocation,

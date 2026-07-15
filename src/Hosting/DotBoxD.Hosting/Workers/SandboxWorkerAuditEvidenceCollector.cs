@@ -25,6 +25,7 @@ internal static class SandboxWorkerAuditEvidenceCollector
         var expectedSequenceNumber = 1L;
         var grantClock = plan.Policy.GrantClock;
         var deterministicRandom = SandboxWorkerBindingEvidence.DeterministicRandomAuditSequence.Create(plan);
+        var bindingEvidenceSequence = SandboxWorkerBindingEvidenceSequence.Create(result);
 
         foreach (var auditEvent in result.AuditEvents)
         {
@@ -41,23 +42,29 @@ internal static class SandboxWorkerAuditEvidenceCollector
                     return false;
                 }
 
-                observedHostCalls++;
                 observedBindingCalls ??= new Dictionary<string, int>(StringComparer.Ordinal);
                 if (!SandboxWorkerBindingEvidence.TryRecordBindingEvidence(
                     plan,
                     auditEvent,
+                    bindingEvidenceSequence.Next(auditEvent),
                     observedBindingCalls,
                     ref observedBindingBaseFuel,
                     ref observedBytes,
                     ref deterministicRandom,
-                    grantClock))
+                    grantClock,
+                    out var representsCall))
                 {
                     return false;
+                }
+
+                if (representsCall)
+                {
+                    observedHostCalls++;
+                    observedLogEvents += auditEvent.Kind == BindingAuditKinds.SandboxLog ? 1 : 0;
                 }
             }
 
             CountAuditSummary(auditEvent, ref summaryCount, ref evidence);
-            observedLogEvents += auditEvent.Kind == BindingAuditKinds.SandboxLog ? 1 : 0;
         }
 
         evidence = evidence with

@@ -54,7 +54,11 @@ public sealed partial class SandboxHost
         CancellationToken cancellationToken)
     {
         var runId = options.RunId ?? SandboxRunId.New();
-        var fallbackOptions = options with { RunId = runId };
+        var fallbackOptions = options with
+        {
+            Mode = ExecutionMode.Interpreted,
+            RunId = runId
+        };
         var result = await ExecuteInterpretedAsync(plan, entrypoint, input, fallbackOptions, cancellationToken)
             .ConfigureAwait(false);
         var audit = new InMemoryAuditSink();
