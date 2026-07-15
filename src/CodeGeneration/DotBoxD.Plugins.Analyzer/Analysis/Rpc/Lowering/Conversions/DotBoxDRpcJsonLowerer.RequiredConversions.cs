@@ -18,7 +18,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         ExpressionSyntax expression,
         ITypeSymbol targetType,
         string description)
-        => ApplyRequiredNumericConversion(
+        => ApplyRequiredConversion(
             expression,
             targetType,
             LowerExpression(expression),
@@ -29,7 +29,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         ITypeSymbol targetType,
         string description,
         List<string> output)
-        => ApplyRequiredNumericConversion(
+        => ApplyRequiredConversion(
             expression,
             targetType,
             LowerExpressionWithPrelude(expression, output),

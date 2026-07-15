@@ -140,6 +140,7 @@ internal static class RpcJsonStatementLowerer
         return DotBoxDRpcJsonLowerer.ApplyRequiredTypeConversion(
             elementType,
             local.Type,
+            lowerer.Model.Compilation,
             item,
             $"Server extension foreach iteration variable '{loop.Identifier.ValueText}'");
     }
