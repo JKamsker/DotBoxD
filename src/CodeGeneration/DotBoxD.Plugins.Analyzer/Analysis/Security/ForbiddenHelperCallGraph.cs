@@ -7,7 +7,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 internal sealed class ForbiddenHelperCallGraph
 {
     private readonly ConcurrentDictionary<ISymbol, string> _forbidden = new(SymbolEqualityComparer.Default);
-    private readonly ConcurrentDictionary<ISymbol, byte> _directDiagnostics = new(SymbolEqualityComparer.Default);
+    private readonly ForbiddenDirectDiagnosticSet _directDiagnostics = new();
     private readonly DynamicHelperCallResolver _dynamicHelperCalls = new();
     private readonly ConcurrentBag<HelperEdge> _helperEdges = [];
     private readonly ConcurrentBag<RootHelperCall> _rootCalls = [];
@@ -33,7 +33,10 @@ internal sealed class ForbiddenHelperCallGraph
         => _forbidden.TryAdd(Normalize(field), DisplayName(type));
 
     public bool TryRecordDirectDiagnostic(IMethodSymbol method)
-        => _directDiagnostics.TryAdd(Normalize(method), 0);
+        => _directDiagnostics.TryAdd(Normalize(method), string.Empty);
+
+    public bool TryRecordDirectDiagnostic(IMethodSymbol method, ITypeSymbol type)
+        => _directDiagnostics.TryAdd(Normalize(method), DirectDiagnosticKey(type));
 
     public void RecordDynamicLocalType(ILocalSymbol local, ITypeSymbol? type)
         => _dynamicHelperCalls.RecordLocalType(local, type);
@@ -278,6 +281,10 @@ internal sealed class ForbiddenHelperCallGraph
     private static string DisplayName(ITypeSymbol type)
         => type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
 
+    private static string DirectDiagnosticKey(ITypeSymbol type)
+        => type.WithNullableAnnotation(NullableAnnotation.NotAnnotated)
+            .ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+
     private static ISymbol Normalize(ISymbol symbol)
         => symbol switch
         {
@@ -290,7 +297,4 @@ internal sealed class ForbiddenHelperCallGraph
     private readonly record struct HelperEdge(ISymbol Caller, ISymbol Target);
 
     private readonly record struct RootHelperCall(ISymbol Target, Location Location);
-
-    private static ISymbol Normalize(IFieldSymbol field)
-        => field.OriginalDefinition;
 }

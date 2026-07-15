@@ -26,7 +26,7 @@ public sealed partial class PluginAnalyzer
 
             helperGraph.RecordForbidden(method, forbidden);
             if (!IsEventKernel(method.ContainingType) ||
-                !helperGraph.TryRecordDirectDiagnostic(method))
+                !helperGraph.TryRecordDirectDiagnostic(method, forbidden))
             {
                 continue;
             }
