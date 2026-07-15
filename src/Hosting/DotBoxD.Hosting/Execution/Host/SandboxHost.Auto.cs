@@ -46,6 +46,7 @@ public sealed partial class SandboxHost
             options,
             hotness.Stats,
             DotBoxD.Kernels.Compiler.CompiledCacheStatus.None);
+        ThrowIfDisposed();
         if (decision.Mode != ExecutionMode.Interpreted &&
             decision.Mode != ExecutionMode.Compiled)
         {
