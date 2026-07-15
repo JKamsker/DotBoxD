@@ -22,7 +22,7 @@ internal static class ForbiddenApiNamePolicy
         "System.IO.", "System.Net.", "System.Reflection.", "System.Runtime.InteropServices.",
         "System.Runtime.Loader.", "System.Diagnostics.", "System.Threading.", "System.Threading.Tasks.",
         "System.Linq.Expressions.", "System.Security.Principal.", "System.Data.", "Microsoft.CSharp.",
-        "Microsoft.EntityFrameworkCore.", "Microsoft.Win32."
+        "Microsoft.VisualBasic.", "Microsoft.EntityFrameworkCore.", "Microsoft.Win32."
     ];
 
     public static bool IsForbiddenExactType(string name) => Array.IndexOf(ExactTypeNames, name) >= 0;
