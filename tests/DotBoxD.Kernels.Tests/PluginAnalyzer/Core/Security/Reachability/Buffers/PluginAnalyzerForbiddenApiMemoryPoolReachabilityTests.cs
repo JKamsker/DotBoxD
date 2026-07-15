@@ -12,18 +12,15 @@ public sealed class PluginAnalyzerForbiddenApiMemoryPoolReachabilityTests
 
     [Theory]
     [InlineData(
-        "shared memory pool",
         """
         using var owner = System.Buffers.MemoryPool<byte>.Shared.Rent(int.MaxValue);
         return owner.Memory.Length >= 0;
         """,
         "System.Buffers.MemoryPool")]
     [InlineData(
-        "direct System.IO control",
         "return System.IO.File.Exists(e);",
         "System.IO.File")]
     public async Task Reports_forbidden_shared_memory_pool_access_in_event_kernel(
-        string testCase,
         string shouldHandleBody,
         string expectedApi)
     {
@@ -33,7 +30,7 @@ public sealed class PluginAnalyzerForbiddenApiMemoryPoolReachabilityTests
 
         var diagnostic = Assert.Single(diagnostics.Where(d => d.Id == "DBXK001"));
         var message = diagnostic.GetMessage();
-        Assert.True(message.Contains(expectedApi, StringComparison.Ordinal), $"{testCase}: {message}");
+        Assert.Contains(expectedApi, message, StringComparison.Ordinal);
     }
 
     private static string Source(string shouldHandleBody)
