@@ -17,7 +17,7 @@ public sealed partial class SandboxHost
     {
         if (cancellationToken.IsCancellationRequested)
         {
-            return PreCanceledAutoResult(plan, options);
+            return PreDispatchCancelledResult(plan, options);
         }
 
         if (!_compiled.IsAvailable || options.EnableDebugTrace)
@@ -41,21 +41,18 @@ public sealed partial class SandboxHost
                 .ConfigureAwait(false);
         }
 
-        var decision = _modeSelector.Choose(
-            plan,
-            options,
-            hotness.Stats,
-            DotBoxD.Kernels.Compiler.CompiledCacheStatus.None);
-        if (decision.Mode != ExecutionMode.Interpreted &&
-            decision.Mode != ExecutionMode.Compiled)
-        {
-            return CompleteAutoResult(hotness, InvalidExecutionOptionsResult(
+        if (!TrySelectAutoMode(
                 plan,
                 options,
-                $"execution mode selector returned unsupported mode '{(int)decision.Mode}'"));
+                hotness.Stats,
+                cancellationToken,
+                out var selectedMode,
+                out var selectionResult))
+        {
+            return CompleteAutoResult(hotness, selectionResult);
         }
 
-        if (decision.Mode == ExecutionMode.Interpreted ||
+        if (selectedMode == ExecutionMode.Interpreted ||
             !CompiledEntrypointSupport.CanCompile(plan, entrypoint))
         {
             return await ExecuteTrackedAutoAsync(
@@ -68,6 +65,75 @@ public sealed partial class SandboxHost
                 hotness,
                 () => ExecuteCompiledAsync(plan, entrypoint, input, options, cancellationToken))
             .ConfigureAwait(false);
+    }
+
+    private bool TrySelectAutoMode(
+        ExecutionPlan plan,
+        SandboxExecutionOptions options,
+        ModuleHotnessStats hotness,
+        CancellationToken cancellationToken,
+        out ExecutionMode selectedMode,
+        out SandboxExecutionResult result)
+    {
+        ExecutionModeDecision? decision;
+        try
+        {
+            decision = _modeSelector.Choose(
+                plan,
+                options,
+                hotness,
+                DotBoxD.Kernels.Compiler.CompiledCacheStatus.None);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            selectedMode = default;
+            result = PreDispatchCancelledResult(plan, options);
+            return false;
+        }
+        catch (Exception)
+        {
+            selectedMode = default;
+            result = ExecutionModeSelectionFailureResult(plan, options);
+            return false;
+        }
+
+        if (!TryGetAutoDecisionMode(decision, out selectedMode, out var validationError))
+        {
+            result = InvalidExecutionOptionsResult(plan, options, validationError);
+            return false;
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            result = PreDispatchCancelledResult(plan, options);
+            return false;
+        }
+
+        result = null!;
+        return true;
+    }
+
+    private static bool TryGetAutoDecisionMode(
+        ExecutionModeDecision? decision,
+        out ExecutionMode selectedMode,
+        out string validationError)
+    {
+        if (decision is null)
+        {
+            selectedMode = default;
+            validationError = "execution mode selector returned no decision";
+            return false;
+        }
+
+        selectedMode = decision.Mode;
+        if (selectedMode is ExecutionMode.Interpreted or ExecutionMode.Compiled)
+        {
+            validationError = string.Empty;
+            return true;
+        }
+
+        validationError = $"execution mode selector returned unsupported mode '{(int)selectedMode}'";
+        return false;
     }
 
     private static async ValueTask<SandboxExecutionResult> ExecuteTrackedAutoAsync(
@@ -89,15 +155,23 @@ public sealed partial class SandboxHost
         return result;
     }
 
-    private static SandboxExecutionResult PreCanceledAutoResult(
+    private static SandboxExecutionResult ExecutionModeSelectionFailureResult(
         ExecutionPlan plan,
         SandboxExecutionOptions options)
     {
         var runId = options.RunId ?? SandboxRunId.New();
         var budget = new ResourceMeter(plan.Budget);
         var startedAt = AuditTime(plan);
-        var error = new SandboxError(SandboxErrorCode.Cancelled, "execution cancelled");
+        var error = new SandboxError(SandboxErrorCode.HostFailure, "execution mode selector failed");
         var audit = new InMemoryAuditSink();
+        audit.Write(new SandboxAuditEvent(
+            runId,
+            "ExecutionModeSelectionFailed",
+            startedAt,
+            false,
+            ResourceId: $"module:{plan.ModuleHash}",
+            ErrorCode: error.Code,
+            Message: error.SafeMessage));
         WriteFailedRunSummary(audit, runId, startedAt, plan, budget, ExecutionMode.Auto, error, false);
         return new SandboxExecutionResult
         {

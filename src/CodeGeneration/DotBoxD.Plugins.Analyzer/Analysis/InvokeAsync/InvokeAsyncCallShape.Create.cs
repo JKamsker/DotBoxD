@@ -38,7 +38,7 @@ internal sealed partial class InvokeAsyncCallShape
             return null;
         }
 
-        if (!TrySingleLambdaArgument(arguments, out var lambdaExpression))
+        if (!TrySingleLambdaArgument(arguments, model, cancellationToken, out var lambdaExpression))
         {
             return null;
         }
@@ -72,7 +72,7 @@ internal sealed partial class InvokeAsyncCallShape
             return null;
         }
 
-        if (!TryCaptureArguments(arguments, out var capturesExpression, out var lambdaExpression))
+        if (!TryCaptureArguments(arguments, model, cancellationToken, out var capturesExpression, out var lambdaExpression))
         {
             return null;
         }
@@ -121,7 +121,7 @@ internal sealed partial class InvokeAsyncCallShape
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        if (!TrySingleLambdaArgument(arguments, out var lambdaExpression))
+        if (!TrySingleLambdaArgument(arguments, model, cancellationToken, out var lambdaExpression))
         {
             return null;
         }
@@ -163,7 +163,7 @@ internal sealed partial class InvokeAsyncCallShape
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        if (!TryCaptureArguments(arguments, out var capturesExpression, out var lambdaExpression))
+        if (!TryCaptureArguments(arguments, model, cancellationToken, out var capturesExpression, out var lambdaExpression))
         {
             return null;
         }

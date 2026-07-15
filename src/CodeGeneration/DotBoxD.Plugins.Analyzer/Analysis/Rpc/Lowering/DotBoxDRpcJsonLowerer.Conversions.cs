@@ -11,7 +11,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                          ?? _model.GetTypeInfo(cast, _cancellationToken).ConvertedType
                          ?? throw new NotSupportedException(
                              $"Server extension cast '{cast}' could not resolve its target type.");
-        return ApplyRequiredNumericConversion(
+        return ApplyRequiredConversion(
             cast.Expression,
             targetType,
             LowerExpression(cast.Expression),
@@ -37,64 +37,175 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     }
 
     internal string ApplyNumericConversion(ITypeSymbol sourceType, ITypeSymbol targetType, string lowered)
-        => TryApplyNumericConversion(sourceType, targetType, lowered, out var converted) ? converted : lowered;
+        => RpcNumericConversion.TryApply(sourceType, targetType, lowered, out var converted) ? converted : lowered;
 
-    private string ApplyRequiredNumericConversion(
+    internal string ApplyRequiredReturnConversion(
+        ExpressionSyntax expression,
+        ITypeSymbol targetType,
+        string lowered)
+        => ApplyRequiredConversion(
+            expression,
+            targetType,
+            lowered,
+            $"Server extension return expression '{expression}'");
+
+    internal string ApplyRequiredLocalConversion(
+        ExpressionSyntax expression,
+        ILocalSymbol local,
+        string lowered,
+        bool isInferred)
+    {
+        var targetType = local.Type;
+        if (isInferred && targetType.TypeKind == TypeKind.Error)
+        {
+            var typeInfo = _model.GetTypeInfo(expression, _cancellationToken);
+            targetType = EffectiveSourceType(expression, typeInfo)
+                         ?? throw UnsupportedConversion($"Server extension local '{local.Name}' initializer");
+            _fallbackLocalTypes[local] = targetType;
+        }
+
+        return ApplyRequiredConversion(
+            expression,
+            targetType,
+            lowered,
+            $"Server extension local '{local.Name}' initializer");
+    }
+
+    internal string ApplyRequiredAssignmentConversion(
+        ExpressionSyntax expression,
+        ITypeSymbol targetType,
+        string lowered,
+        string targetName)
+        => ApplyRequiredConversion(
+            expression,
+            targetType,
+            lowered,
+            $"Server extension assignment to '{targetName}'");
+
+    private string ApplyRequiredConversion(
         ExpressionSyntax expression,
         ITypeSymbol targetType,
         string lowered,
         string description)
     {
         var typeInfo = _model.GetTypeInfo(expression, _cancellationToken);
-        var sourceType = typeInfo.Type;
-        if (sourceType is null ||
-            SymbolEqualityComparer.Default.Equals(sourceType, targetType))
+        if (EffectiveSourceType(expression, typeInfo) is not { } sourceType)
         {
-            return lowered;
+            throw UnsupportedConversion(description);
         }
 
-        if (typeInfo.ConvertedType is not null &&
-            SymbolEqualityComparer.Default.Equals(typeInfo.ConvertedType, targetType))
+        var contextualType = typeInfo.ConvertedType is { TypeKind: not TypeKind.Error } convertedType
+            ? convertedType
+            : sourceType;
+        if (!TryEffectiveLoweredType(expression, sourceType, contextualType, out var effectiveType))
         {
-            return lowered;
+            throw UnsupportedConversion(description);
         }
 
-        if (TryApplyNumericConversion(sourceType, targetType, lowered, out var converted))
+        return ApplyRequiredTypeConversion(
+            effectiveType,
+            targetType,
+            _model.Compilation,
+            lowered,
+            description);
+    }
+
+    internal static string ApplyRequiredTypeConversion(
+        ITypeSymbol sourceType,
+        ITypeSymbol targetType,
+        Compilation compilation,
+        string lowered,
+        string description)
+    {
+        if (RpcRequiredConversion.TryApply(
+                sourceType,
+                targetType,
+                compilation,
+                lowered,
+                out var converted))
         {
             return converted;
         }
 
-        throw new NotSupportedException(
-            $"{description} is not supported because it is not a supported numeric widening conversion.");
+        throw UnsupportedConversion(description);
     }
 
-    private static bool TryApplyNumericConversion(
-        ITypeSymbol sourceType,
-        ITypeSymbol targetType,
-        string lowered,
-        out string converted)
+    private ITypeSymbol? EffectiveSourceType(ExpressionSyntax expression, TypeInfo typeInfo)
     {
-        if (SymbolEqualityComparer.Default.Equals(sourceType, targetType))
+        if (FallbackLocalType(expression) is { } fallbackLocalType)
         {
-            converted = lowered;
+            return fallbackLocalType;
+        }
+
+        if (typeInfo.Type is { TypeKind: not TypeKind.Error } sourceType)
+        {
+            return sourceType;
+        }
+
+        if (_serverContextHostBindings.TryGetInvocationReturnType(expression) is { } hostReturnType)
+        {
+            return hostReturnType;
+        }
+
+        return typeInfo.ConvertedType is { TypeKind: not TypeKind.Error } convertedType
+            ? convertedType
+            : null;
+    }
+
+    private ITypeSymbol? FallbackLocalType(ExpressionSyntax expression)
+    {
+        if (expression is not IdentifierNameSyntax identifier ||
+            _model.GetSymbolInfo(identifier, _cancellationToken).Symbol is not { } symbol)
+        {
+            return null;
+        }
+
+        return _fallbackLocalTypes.TryGetValue(symbol, out var type) ? type : null;
+    }
+
+    private bool TryEffectiveLoweredType(
+        ExpressionSyntax expression,
+        ITypeSymbol sourceType,
+        ITypeSymbol? convertedType,
+        out ITypeSymbol effectiveType)
+    {
+        effectiveType = sourceType;
+        if (convertedType is null || SymbolEqualityComparer.Default.Equals(sourceType, convertedType))
+        {
             return true;
         }
 
-        if (sourceType.SpecialType == SpecialType.System_Int32 &&
-            targetType.SpecialType == SpecialType.System_Int64)
+        if (IsLoweredEnumConstant(expression, convertedType) ||
+            IsRepresentableNarrowI32Constant(expression, sourceType, convertedType) ||
+            RpcRequiredConversion.IsSupported(sourceType, convertedType, _model.Compilation))
         {
-            converted = Call("numeric.toI64", null, lowered);
+            effectiveType = convertedType;
             return true;
         }
 
-        if (sourceType.SpecialType is SpecialType.System_Int32 or SpecialType.System_Int64 &&
-            targetType.SpecialType is SpecialType.System_Double or SpecialType.System_Single)
-        {
-            converted = Call("numeric.toF64", null, lowered);
-            return true;
-        }
-
-        converted = lowered;
         return false;
     }
+
+    private bool IsLoweredEnumConstant(ExpressionSyntax expression, ITypeSymbol convertedType)
+        => convertedType.TypeKind == TypeKind.Enum &&
+           _model.GetConstantValue(expression, _cancellationToken).HasValue;
+
+    private bool IsRepresentableNarrowI32Constant(
+        ExpressionSyntax expression,
+        ITypeSymbol sourceType,
+        ITypeSymbol convertedType)
+    {
+        if (sourceType.SpecialType != SpecialType.System_Int32 ||
+            _model.GetConstantValue(expression, _cancellationToken).Value is not int value)
+        {
+            return false;
+        }
+
+        return RpcNumericConversion.IsRepresentableNarrowI32Constant(value, convertedType);
+    }
+
+    private static NotSupportedException UnsupportedConversion(string description)
+        => new(
+            $"{description} is not supported because it is not an identity conversion, supported numeric widening " +
+            "conversion, or representation-preserving collection conversion.");
 }
