@@ -118,6 +118,7 @@ public sealed partial class SandboxHost : IDisposable
                 .ConfigureAwait(false)
             : await ExecuteSelectedModeAsync(plan, entrypoint, input, options, cancellationToken)
                 .ConfigureAwait(false);
+        ThrowIfDisposed();
         return Publish(result);
     }
 
@@ -272,7 +273,14 @@ public sealed partial class SandboxHost : IDisposable
         SandboxValue input,
         SandboxExecutionOptions options,
         CancellationToken cancellationToken)
-        => await _interpreter.ExecuteAsync(plan, entrypoint, input, options, cancellationToken).ConfigureAwait(false);
+        => await InterpreterExecutionBoundary.ExecuteAsync(
+                _interpreter,
+                plan,
+                entrypoint,
+                input,
+                options,
+                cancellationToken)
+            .ConfigureAwait(false);
 
     public void Dispose()
     {
@@ -282,6 +290,6 @@ public sealed partial class SandboxHost : IDisposable
         }
     }
 
-    private void ThrowIfDisposed()
+    internal void ThrowIfDisposed()
         => ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
 }

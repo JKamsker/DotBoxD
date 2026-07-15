@@ -9,6 +9,8 @@ internal static class ResourceMeterProbe
 {
     public static void Run()
     {
+        const int constructionIterations = 1_000_000;
+        const int limitedConstructionIterations = 250_000;
         const int flatIterations = 1_000_000;
         const int nestedIterations = 200_000;
         const int warmup = 20_000;
@@ -36,15 +38,32 @@ internal static class ResourceMeterProbe
             ]);
         var nestedInput = CreateNestedValue();
 
+        _ = MeasureFreshMeters(warmup, limits, FreshMeterScenario.NoCalls);
+        _ = MeasureFreshMeters(warmup, limits, FreshMeterScenario.OneLimitedCall);
+        _ = MeasureFreshMeters(warmup, limits, FreshMeterScenario.AlternatingLimitedCalls);
         _ = Measure(warmup, limits, pluginInput);
         _ = Measure(warmup, limits, flatRecord);
         _ = MeasureFreshFlatRecord(warmup, limits);
         _ = Measure(warmup, limits, nestedInput);
 
+        var construction = MeasureFreshMeters(constructionIterations, limits, FreshMeterScenario.NoCalls);
+        var oneLimitedCall = MeasureFreshMeters(
+            limitedConstructionIterations,
+            limits,
+            FreshMeterScenario.OneLimitedCall);
+        var alternatingLimitedCalls = MeasureFreshMeters(
+            limitedConstructionIterations,
+            limits,
+            FreshMeterScenario.AlternatingLimitedCalls);
         var flat = Measure(flatIterations, limits, pluginInput);
         var record = Measure(flatIterations, limits, flatRecord);
         var freshRecord = MeasureFreshFlatRecord(flatIterations, limits);
         var nested = Measure(nestedIterations, limits, nestedInput);
+        Console.WriteLine($"meter constructions = {constructionIterations:N0}");
+        WriteFreshMeter("new ResourceMeter(limits)", construction, constructionIterations);
+        Console.WriteLine($"limited-call meter constructions = {limitedConstructionIterations:N0}");
+        WriteFreshMeter("fresh meter + one limited call", oneLimitedCall, limitedConstructionIterations);
+        WriteFreshMeter("fresh meter + A/B/A limited calls", alternatingLimitedCalls, limitedConstructionIterations);
         Console.WriteLine($"flat iterations = {flatIterations:N0}");
         Write("ChargeValue(plugin flat scalar input)", flat, flatIterations);
         Write("ChargeValue(flat scalar record)", record, flatIterations);
@@ -83,6 +102,72 @@ internal static class ResourceMeterProbe
                     SandboxType.Map(SandboxType.String, SandboxType.I64)
                 ]))
         ]);
+
+    private static FreshMeterMeasurement MeasureFreshMeters(
+        int iterations,
+        ResourceLimits limits,
+        FreshMeterScenario scenario)
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        long checksum = 0;
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var sw = Stopwatch.StartNew();
+        for (var i = 0; i < iterations; i++)
+        {
+            var meter = new ResourceMeter(limits);
+            var expectedHostCalls = scenario switch
+            {
+                FreshMeterScenario.NoCalls => 0,
+                FreshMeterScenario.OneLimitedCall => ChargeOneLimitedCall(meter),
+                FreshMeterScenario.AlternatingLimitedCalls => ChargeAlternatingLimitedCalls(meter),
+                _ => throw new InvalidOperationException("unknown fresh-meter scenario")
+            };
+            checksum += RequireOnlyHostCalls(meter, expectedHostCalls);
+        }
+
+        sw.Stop();
+        return new FreshMeterMeasurement(
+            sw.Elapsed.TotalMilliseconds,
+            GC.GetAllocatedBytesForCurrentThread() - allocatedBefore,
+            checksum);
+    }
+
+    private static int ChargeOneLimitedCall(ResourceMeter meter)
+    {
+        meter.ChargeHostCall("probe.a", maxCallsPerRun: 1);
+        return 1;
+    }
+
+    private static int ChargeAlternatingLimitedCalls(ResourceMeter meter)
+    {
+        meter.ChargeHostCall("probe.a", maxCallsPerRun: 2);
+        meter.ChargeHostCall("probe.b", maxCallsPerRun: 1);
+        meter.ChargeHostCall("probe.a", maxCallsPerRun: 2);
+        return 3;
+    }
+
+    private static int RequireOnlyHostCalls(ResourceMeter meter, int expectedHostCalls)
+    {
+        if (meter.HostCalls != expectedHostCalls ||
+            meter.FuelUsed != 0 ||
+            meter.LoopIterations != 0 ||
+            meter.AllocatedBytes != 0 ||
+            meter.FileBytesRead != 0 ||
+            meter.FileBytesWritten != 0 ||
+            meter.NetworkBytesRead != 0 ||
+            meter.NetworkBytesWritten != 0 ||
+            meter.LogEvents != 0 ||
+            meter.CollectionElements != 0 ||
+            meter.StringBytes != 0)
+        {
+            throw new InvalidOperationException("fresh resource meter usage changed unexpectedly");
+        }
+
+        return meter.HostCalls;
+    }
 
     private static Measurement Measure(int iterations, ResourceLimits limits, SandboxValue value)
     {
@@ -144,6 +229,26 @@ internal static class ResourceMeterProbe
             $"{measurement.AllocatedBytes,14:N0} B " +
             $"{(double)measurement.AllocatedBytes / iterations,8:N1} B/op " +
             $"collectionElements={measurement.CollectionElements:N0}, stringBytes={measurement.StringBytes:N0}");
+
+    private static void WriteFreshMeter(string name, FreshMeterMeasurement measurement, int iterations)
+        => Console.WriteLine(
+            $"{name,-39} {measurement.Milliseconds,8:N1} ms " +
+            $"{measurement.Milliseconds * 1_000_000 / iterations,8:N1} ns/op " +
+            $"{measurement.AllocatedBytes,14:N0} B " +
+            $"{(double)measurement.AllocatedBytes / iterations,8:N1} B/op " +
+            $"hostCalls={measurement.HostCalls:N0}");
+
+    private enum FreshMeterScenario
+    {
+        NoCalls,
+        OneLimitedCall,
+        AlternatingLimitedCalls
+    }
+
+    private readonly record struct FreshMeterMeasurement(
+        double Milliseconds,
+        long AllocatedBytes,
+        long HostCalls);
 
     private readonly record struct Measurement(
         double Milliseconds,

@@ -201,7 +201,7 @@ public sealed class ReflectionEmitSandboxCompiler : ISandboxCompiler
             il.Emit(OpCodes.Ldarg_1);
             EmitInt32(il, i);
             EmitInt32(il, entrypoint.Parameters.Count);
-            EmitSandboxType(il, entrypoint.Parameters[i].Type);
+            EmitEntrypointSandboxType(il, entrypoint.Parameters[i].Type);
             il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.GetInputArgument)));
         }
 

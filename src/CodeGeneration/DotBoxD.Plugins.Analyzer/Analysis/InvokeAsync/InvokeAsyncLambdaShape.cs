@@ -150,6 +150,12 @@ internal static class InvokeAsyncLambdaShape
         out ITypeSymbol returnType)
     {
         returnType = null!;
+        if (model.Compilation is not CSharpCompilation compilation)
+        {
+            return false;
+        }
+
+        var returns = new List<ITypeSymbol>();
         foreach (var statement in block.DescendantNodes().OfType<ReturnStatementSyntax>())
         {
             if (statement.Expression is null ||
@@ -158,19 +164,35 @@ internal static class InvokeAsyncLambdaShape
                 return false;
             }
 
-            if (returnType is null)
-            {
-                returnType = current;
-                continue;
-            }
+            returns.Add(current);
+        }
 
-            if (!SymbolEqualityComparer.Default.Equals(returnType, current))
+        foreach (var candidate in returns)
+        {
+            if (AllReturnsConvertTo(returns, candidate, compilation))
+            {
+                returnType = candidate;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool AllReturnsConvertTo(
+        IReadOnlyList<ITypeSymbol> returns,
+        ITypeSymbol candidate,
+        CSharpCompilation compilation)
+    {
+        foreach (var item in returns)
+        {
+            if (!compilation.ClassifyConversion(item, candidate).IsImplicit)
             {
                 return false;
             }
         }
 
-        return returnType is not null;
+        return returns.Count > 0;
     }
 
     private static IReadOnlyList<ITypeSymbol>? LambdaParameterTypes(

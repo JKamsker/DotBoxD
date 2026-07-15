@@ -12,14 +12,20 @@ public sealed partial class PluginAnalyzer
         IMethodSymbol method,
         ISymbol? target)
     {
-        if (!TryGetForbiddenHostApi(target, out var forbidden))
+        if (TryGetForbiddenMemberDisplayName(target, out var forbiddenMember))
+        {
+            ReportAndRecordForbiddenMember(context, helperGraph, method, forbiddenMember);
+            return;
+        }
+
+        if (!TryGetForbiddenHostApi(target, out var forbiddenType))
         {
             return;
         }
 
-        helperGraph.RecordForbidden(method, forbidden);
+        helperGraph.RecordForbidden(method, forbiddenType);
         if (!IsForbiddenApiRoot(context, method) ||
-            !helperGraph.TryRecordDirectDiagnostic(method))
+            !helperGraph.TryRecordDirectDiagnostic(method, forbiddenType))
         {
             return;
         }
@@ -27,7 +33,24 @@ public sealed partial class PluginAnalyzer
         context.ReportDiagnostic(Diagnostic.Create(
             ForbiddenHostApiRule,
             context.Operation.Syntax.GetLocation(),
-            forbidden.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
+            forbiddenType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
+    }
+
+    private static void ReportAndRecordForbiddenMember(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol method,
+        string forbiddenMember)
+    {
+        helperGraph.RecordForbidden(method, forbiddenMember);
+        if (IsForbiddenApiRoot(context, method) &&
+            helperGraph.TryRecordDirectDiagnostic(method, forbiddenMember))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                ForbiddenHostApiRule,
+                context.Operation.Syntax.GetLocation(),
+                forbiddenMember));
+        }
     }
 
     private static void AnalyzeTypeOf(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)

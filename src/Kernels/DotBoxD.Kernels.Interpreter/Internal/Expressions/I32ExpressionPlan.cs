@@ -115,19 +115,19 @@ internal sealed partial class I32ExpressionPlan
         BinaryExpression binary,
         InterpreterFrame frame,
         string assumedInt32Local,
-        IReadOnlyDictionary<string, I32ExpressionPlan>? substitutions,
+        I32ExpressionSubstitution substitution,
         out I32ExpressionPlan plan)
     {
-        // (raw + const) % const — resolves the slot through inline-call substitutions, so inline bodies of this
+        // (raw + const) % const — resolves the slot through the inline-call substitution, so inline bodies of this
         // common modular-accumulator shape collapse to a single fused dispatch + one idiv instead of a 4-node
         // tree. Fuel is identical to the generic Remainder(Add(Raw, Lit), Lit) plan (5), so metering is unchanged.
-        if (TryCreateRemainderAddRawConstConst(binary, frame, assumedInt32Local, substitutions, out plan))
+        if (TryCreateRemainderAddRawConstConst(binary, frame, assumedInt32Local, substitution, out plan))
         {
             return true;
         }
 
         // The remaining fused shapes read two frame slots directly and are not substitution-aware.
-        if (substitutions is not null)
+        if (substitution.IsPresent)
         {
             plan = null!;
             return false;
@@ -183,11 +183,11 @@ internal sealed partial class I32ExpressionPlan
         InterpreterFrame frame,
         string assumedInt32Local,
         I32CallEvaluator? calls,
-        IReadOnlyDictionary<string, I32ExpressionPlan>? substitutions,
+        I32ExpressionSubstitution substitution,
         out I32ExpressionPlan plan)
     {
-        if (!TryCreate(binary.Left, frame, assumedInt32Local, calls, substitutions, out var left) ||
-            !TryCreate(binary.Right, frame, assumedInt32Local, calls, substitutions, out var right))
+        if (!TryCreate(binary.Left, frame, assumedInt32Local, calls, substitution, out var left) ||
+            !TryCreate(binary.Right, frame, assumedInt32Local, calls, substitution, out var right))
         {
             plan = null!;
             return false;

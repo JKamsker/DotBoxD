@@ -10,36 +10,59 @@ internal static class SandboxWorkerBindingEvidence
     internal static bool TryRecordBindingEvidence(
         ExecutionPlan plan,
         SandboxAuditEvent auditEvent,
+        SandboxWorkerBindingEvidenceRelationship relationship,
         Dictionary<string, int> observedBindingCalls,
         ref long observedBindingBaseFuel,
         ref ObservedBindingBytes observedBytes,
         ref DeterministicRandomAuditSequence deterministicRandom,
-        DateTimeOffset grantClock)
+        DateTimeOffset grantClock,
+        out bool representsCall)
     {
+        representsCall = relationship !=
+            SandboxWorkerBindingEvidenceRelationship.TerminalQuotaFailureAfterSuccess;
         if (auditEvent.BindingId is null ||
             !plan.Bindings.TryGet(auditEvent.BindingId, out var binding))
         {
             return false;
         }
 
-        try
+        if (!representsCall)
         {
-            observedBindingBaseFuel = checked(observedBindingBaseFuel + binding.CostModel.BaseFuel);
+            return AdditionalEvidenceMatches(
+                plan,
+                auditEvent,
+                ref observedBytes,
+                ref deterministicRandom,
+                grantClock);
         }
-        catch (OverflowException)
+
+        if (!SandboxWorkerBindingCallEvidence.TryRecord(
+                binding,
+                auditEvent.BindingId,
+                relationship,
+                observedBindingCalls,
+                ref observedBindingBaseFuel))
         {
             return false;
         }
 
-        var calls = observedBindingCalls.TryGetValue(auditEvent.BindingId, out var existing)
-            ? existing + 1
-            : 1;
-        observedBindingCalls[auditEvent.BindingId] = calls;
-        return (binding.CostModel.MaxCallsPerRun is not { } maxCalls || calls <= maxCalls) &&
-            TryRecordBindingByteEvidence(auditEvent, ref observedBytes) &&
+        return AdditionalEvidenceMatches(
+            plan,
+            auditEvent,
+            ref observedBytes,
+            ref deterministicRandom,
+            grantClock);
+    }
+
+    private static bool AdditionalEvidenceMatches(
+        ExecutionPlan plan,
+        SandboxAuditEvent auditEvent,
+        ref ObservedBindingBytes observedBytes,
+        ref DeterministicRandomAuditSequence deterministicRandom,
+        DateTimeOffset grantClock)
+        => TryRecordBindingByteEvidence(auditEvent, ref observedBytes) &&
             deterministicRandom.Matches(auditEvent) &&
             WorkerFileAuditGrantValidator.Matches(plan, auditEvent, grantClock);
-    }
 
     private static bool TryRecordBindingByteEvidence(
         SandboxAuditEvent auditEvent,
