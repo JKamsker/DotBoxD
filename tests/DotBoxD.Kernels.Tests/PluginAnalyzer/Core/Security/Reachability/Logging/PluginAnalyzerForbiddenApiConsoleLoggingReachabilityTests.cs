@@ -103,7 +103,7 @@ public sealed class PluginAnalyzerForbiddenApiConsoleLoggingReachabilityTests
         var aspNetCoreDirectory = Path.Combine(dotnetRoot, "Microsoft.AspNetCore.App");
         var currentMajorVersion = Environment.Version.Major + ".";
         var sharedFrameworkDirectory = Directory.EnumerateDirectories(aspNetCoreDirectory, currentMajorVersion + "*")
-            .OrderByDescending(Path.GetFileName, StringComparer.Ordinal)
+            .OrderByDescending(SharedFrameworkVersion)
             .First();
 
         return
@@ -124,5 +124,12 @@ public sealed class PluginAnalyzerForbiddenApiConsoleLoggingReachabilityTests
                 sharedFrameworkDirectory,
                 "Microsoft.Extensions.Options.dll")),
         ];
+    }
+
+    private static Version SharedFrameworkVersion(string directory)
+    {
+        var name = Path.GetFileName(directory) ?? string.Empty;
+        var versionPart = name.Split('-', 2)[0];
+        return Version.TryParse(versionPart, out var version) ? version : new Version(0, 0);
     }
 }
