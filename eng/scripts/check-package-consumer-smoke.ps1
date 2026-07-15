@@ -437,6 +437,8 @@ public sealed partial class SmokeKernel : IEventKernel<SmokeEvent>
         exit $LASTEXITCODE
     }
 
+    Assert-DotBoxDFodyTargetsImported -ProjectRoot $projectRoot
+
     dotnet build $projectRoot --configuration $Configuration --no-restore
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
@@ -453,6 +455,10 @@ public sealed partial class SmokeKernel : IEventKernel<SmokeEvent>
     }
 
     Assert-DotBoxDFodyConfigurationFailure `
+        -ProjectRoot $projectRoot `
+        -Configuration $Configuration
+
+    Assert-DotBoxDFodyImportFailure `
         -ProjectRoot $projectRoot `
         -Configuration $Configuration
 }

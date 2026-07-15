@@ -304,6 +304,20 @@ function AssertPackageMetadata($metadata, [string] $id, [string] $packageName) {
     }
 }
 
+function AssertDotBoxDFodyDependency($metadata, [string] $packageName) {
+    $fodyDependency = $metadata.SelectSingleNode(".//*[local-name()='dependency' and @id='Fody']")
+    if ($null -eq $fodyDependency) {
+        throw "Package $packageName must depend on Fody so its build target reaches DotBoxD-only consumers."
+    }
+
+    $includedAssets = [string] $fodyDependency.include
+    $includesAll = [regex]::Split($includedAssets, '[,;\s]+') |
+        Where-Object { $_.Equals("all", [StringComparison]::OrdinalIgnoreCase) }
+    if (-not $includesAll) {
+        throw "Package $packageName must explicitly propagate all Fody assets so build/Fody.targets reaches DotBoxD-only consumers. Found include='$includedAssets'."
+    }
+}
+
 function AssertReadmeGuidance($zip, [string] $readme, [string] $packageName) {
     $entry = $zip.Entries | Where-Object {
         $_.FullName.Equals($readme, [StringComparison]::Ordinal)
@@ -495,6 +509,7 @@ foreach ($package in $packages) {
             if ($id -eq "DotBoxD") {
                 AssertZipEntry $zip "buildTransitive/DotBoxD.targets" $package.Name
                 AssertZipEntry $zip "weaver/DotBoxD.Plugins.Fody.dll" $package.Name
+                AssertDotBoxDFodyDependency $metadata $package.Name
             }
         }
 

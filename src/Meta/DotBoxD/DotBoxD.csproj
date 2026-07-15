@@ -27,7 +27,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Fody" PrivateAssets="none" />
+    <!-- Fody is a developmentDependency whose target lives under build rather than buildTransitive.
+         Explicitly propagating all assets makes NuGet retain build/Fody.targets for a DotBoxD-only
+         consumer; narrowing this to build causes restore to substitute build/_._ instead. -->
+    <PackageReference Include="Fody" IncludeAssets="all" PrivateAssets="none" />
   </ItemGroup>
 
   <ItemGroup>

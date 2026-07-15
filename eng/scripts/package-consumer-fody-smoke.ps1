@@ -123,6 +123,67 @@ function Assert-DotBoxDFodySmokeAssembly {
     }
 }
 
+function Assert-DotBoxDFodyTargetsImported {
+    param([Parameter(Mandatory = $true)][string] $ProjectRoot)
+
+    $generatedTargets = Get-DotBoxDNuGetTargetsPath -ProjectRoot $ProjectRoot
+    [xml] $targetsDocument = Get-Content -LiteralPath $generatedTargets -Raw
+    $imports = @($targetsDocument.SelectNodes("//*[local-name()='Import']") |
+        ForEach-Object { ([string] $_.Project).Replace('\', '/') })
+    foreach ($expectedImport in @("fody/", "build/Fody.targets", "dotboxd/", "buildTransitive/DotBoxD.targets")) {
+        if (-not ($imports | Where-Object { $_.IndexOf($expectedImport, [StringComparison]::OrdinalIgnoreCase) -ge 0 })) {
+            throw "DotBoxD-only package restore did not generate the expected '$expectedImport' MSBuild import."
+        }
+    }
+
+    $projectFiles = @(Get-ChildItem -LiteralPath $ProjectRoot -Filter "*.csproj" -File)
+    if ($projectFiles.Count -ne 1) {
+        throw "Expected exactly one project file for the DotBoxD package consumer, found $($projectFiles.Count)."
+    }
+
+    $fodyAssembly = dotnet msbuild $projectFiles[0].FullName -getProperty:FodyAssembly -nologo
+    if ($LASTEXITCODE -ne 0) {
+        throw "DotBoxD package consumer smoke could not evaluate FodyAssembly."
+    }
+
+    $resolvedFodyAssembly = ([string] ($fodyAssembly | Select-Object -Last 1)).Trim()
+    if ([string]::IsNullOrWhiteSpace($resolvedFodyAssembly) -or
+        -not (Test-Path -LiteralPath $resolvedFodyAssembly -PathType Leaf)) {
+        throw "DotBoxD-only package restore did not import a usable Fody target. Evaluated FodyAssembly: '$resolvedFodyAssembly'."
+    }
+}
+
+function Assert-DotBoxDFodyImportFailure {
+    param(
+        [Parameter(Mandatory = $true)][string] $ProjectRoot,
+        [Parameter(Mandatory = $true)][string] $Configuration)
+
+    $generatedTargets = Get-DotBoxDNuGetTargetsPath -ProjectRoot $ProjectRoot
+    $originalContent = Get-Content -LiteralPath $generatedTargets -Raw
+    $withoutFodyImport = [regex]::Replace(
+        $originalContent,
+        '(?im)^\s*<Import\s+Project="[^"]*[\\/]fody[\\/][^"]*[\\/]build[\\/]Fody\.targets"[^>]*/>\s*',
+        "")
+    if ($withoutFodyImport -eq $originalContent) {
+        throw "DotBoxD package consumer smoke could not remove the generated Fody import for its fail-closed test."
+    }
+
+    Set-Content -LiteralPath $generatedTargets -Value $withoutFodyImport
+    try {
+        $validationOutput = dotnet build $ProjectRoot --configuration $Configuration --no-restore --target Rebuild 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            throw "DotBoxD package build silently accepted a missing Fody target import."
+        }
+
+        $expectedText = "requires Fody, but Fody.targets was not imported"
+        if (-not (($validationOutput | Out-String).Contains($expectedText, [StringComparison]::Ordinal))) {
+            throw "DotBoxD package build did not report the actionable missing-Fody-import error."
+        }
+    } finally {
+        Set-Content -LiteralPath $generatedTargets -Value $originalContent
+    }
+}
+
 function Assert-DotBoxDFodyConfigurationFailure {
     param(
         [Parameter(Mandatory = $true)][string] $ProjectRoot,
@@ -164,6 +225,18 @@ function Assert-NoDotBoxDFodyFiles {
     if (Get-ChildItem -LiteralPath $ProjectRoot -Filter "FodyWeavers.*" -File -Recurse) {
         throw "DotBoxD $Phase must not require or generate a visible FodyWeavers file."
     }
+}
+
+function Get-DotBoxDNuGetTargetsPath {
+    param([Parameter(Mandatory = $true)][string] $ProjectRoot)
+
+    $generatedTargets = @(Get-ChildItem -LiteralPath (Join-Path $ProjectRoot "obj") `
+        -Filter "*.csproj.nuget.g.targets" -File)
+    if ($generatedTargets.Count -ne 1) {
+        throw "Expected exactly one generated NuGet targets file for the DotBoxD package consumer, found $($generatedTargets.Count)."
+    }
+
+    return $generatedTargets[0].FullName
 }
 
 function Get-DotBoxDGeneratedMethods {
