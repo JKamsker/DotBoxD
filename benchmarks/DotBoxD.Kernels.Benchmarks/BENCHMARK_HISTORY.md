@@ -17,6 +17,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-matrix
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-frame-layout
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-i64-plan-setup
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-while-plan-setup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-numeric-conversion
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-hook-chain-discovery
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-plugin-package-collision-discovery
@@ -177,6 +178,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Scalar single-assignment I64 loop plans | this commit | `--probe-interpreter-i64-plan-setup` | Kept one-statement I64 loop planning out of the multi-statement array/`HashSet`/closure path. A fully warmed execution removed exactly 240 B, while 50,000 one-iteration executions fell from 74,406,960 B to 62,405,576 B (~240 B/op). Zero-iteration and dependent two-assignment controls were byte-identical. Alternating 20-million-iteration samples improved from a 126.3 ms median to 106.9 ms (-15.4%) with identical result and sandbox resource usage. |
 | Syntax-filtered hook-chain discovery | this commit | `--probe-hook-chain-discovery` | Limited the hook-chain semantic transform to member calls named `Run`, `RunLocal`, `Register`, or `RegisterLocal`, while retaining method-group terminals. Across 1,000 retained-driver edits of a tree with 1,000 unrelated `Touch` calls, allocation fell from 1,809,295,360 B to 1,664,179,784 B (-145.1 KB/edit) and time fell from 7.312 to 4.899 ms/edit (-33.0%). An unrelated `Run` control retained semantic validation and stayed allocation-equivalent; generated sources and diagnostics were byte-identical. |
 | Direct server-extension RPC response encoding | this commit | `--probe-kernel-rpc-response-encoding` | Routed the already-validated `SandboxValue` result from `InvokeServerExtensionRpcAsync` through the existing direct binary codec instead of materializing a parallel `KernelRpcValue` tree, and matched declared collection types without rebuilding structural `SandboxType` descriptors. Across 200,000 encodes, `List<I32>` fell from 272 to 80 B/op, `Map<String,I32>` from 4,072 to 464 B/op, and an eight-item `List<Record<I32,String>>` from 2,808 to 160 B/op; the scalar control remained 64 B/op. The nested 2,648 B/op saving decomposes into 1,088 B of record-type materialization and 1,560 B from the intermediate wire tree, with byte-identical payloads and unchanged malformed-collection rejection. |
+| Scalar single-assignment I32 while plans | this commit | `--probe-interpreter-while-plan-setup` | Kept one-statement I32 `while` planning in a scalar local instead of allocating and indexing an `AssignmentPlan[1]`. Across 50,000 executions, both one- and zero-iteration rows fell by exactly 2,000,000 B (40 B/op); the no-while and dependent two-assignment controls were byte-identical. Six alternating published-binary samples per variant moved the 20-million-iteration median from 192.9 ms to 182.1 ms (-5.6%), with non-overlapping 191.7-195.3 ms and 181.1-184.1 ms ranges and identical results/resources. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -1553,3 +1555,48 @@ the declared-type check instead of at the later converter switch or type factory
 focused tests pin the fail-closed behavior. Stopwatch output is deliberately unclaimed because no reliable paired timing
 baseline was retained. No public API, wire format, compiler/verifier identity, persisted artifact version, or sandbox
 resource accounting changes; the encoder accepts no `SandboxContext`.
+
+## Scalar single-assignment I32 while plans
+
+`WhileI32ForLoopRunner` previously represented every eligible body as an `AssignmentPlan[]`. Unlike a `forRange`, a
+`while` body must be planned before its first condition check, so even a zero-iteration one-statement loop allocated a
+40-byte one-element array. Executed loops also indexed that array inside every iteration. One-statement I32 bodies now
+retain their validated target slot and expression plan in a scalar local. Multi-assignment bodies keep the existing array
+planner and sequential execution, while empty bodies retain the general interpreter fallback.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -- --probe-interpreter-while-plan-setup
+```
+
+Permanent-probe allocation results, 50,000 prepared interpreted executions per short row:
+
+```text
+case                         Before allocated / B/op     After allocated / B/op        delta
+one assignment, one loop       63,603,752 B / 1,272.1      61,603,752 B / 1,232.1      -40 B/op
+one assignment, zero loop      63,603,752 B / 1,272.1      61,603,752 B / 1,232.1      -40 B/op
+no-while zero control          45,602,152 B /   912.0      45,602,152 B /   912.0        0 B/op
+two-assignment control         73,204,680 B / 1,464.1      73,204,680 B / 1,464.1        0 B/op
+one assignment, 20M loop            2,264 B                   2,224 B                  -40 B
+```
+
+Both eligible short rows remove exactly 2,000,000 B. The zero-iteration row proves the saving is body-plan setup rather
+than loop work. The dependent two-assignment body updates `counter` and then reads that new value into `doubled`; its
+byte-identical allocation and checksum pin the existing sequential multi-statement path. A one-statement `break` body
+also remains on the general interpreter fallback.
+
+For CPU evidence, the same published benchmark assembly was run with array-plan and scalar-plan interpreter binaries.
+After two warmup runs per binary, an alternating A/B/B/A sequence produced six samples per variant for one 20-million-
+iteration execution:
+
+```text
+array plan ms   195.3  192.9  192.8  193.0  191.9  191.7   median 192.9
+scalar plan ms  181.4  181.1  181.2  184.1  182.7  183.0   median 182.1
+```
+
+The non-overlapping ranges and 5.6% median reduction show the benefit of removing the indexed one-element inner loop.
+Checksums remain `50,000`, `0`, `0`, `100,000`, and `20,000,000`. Per-execution fuel/loop/sandbox-allocation/host-call
+usage remains `21/1/0/0`, `9/0/0/0`, `5/0/0/0`, `27/1/0/0`, and `240,000,009/20,000,000/0/0` respectively. Condition
+and body charge order, the 4,096-iteration checkpoint, public API, compiler/verifier identity, persisted artifacts, and
+sandbox resource accounting are unchanged.

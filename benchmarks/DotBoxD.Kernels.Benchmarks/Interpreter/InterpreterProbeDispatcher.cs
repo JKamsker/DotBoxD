@@ -46,6 +46,12 @@ internal static class InterpreterProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-interpreter-while-plan-setup", StringComparer.OrdinalIgnoreCase))
+        {
+            await InterpreterWhilePlanSetupProbe.RunAsync();
+            return true;
+        }
+
         if (args.Contains("--probe-interpreter-numeric-conversion", StringComparer.OrdinalIgnoreCase))
         {
             await InterpreterNumericConversionProbe.RunAsync();
