@@ -96,8 +96,9 @@ internal static class InvokeAsyncGeneratedBuilderResolver
         CancellationToken cancellationToken,
         out INamedTypeSymbol receiverType)
     {
-        receiverType = model.GetTypeInfo(receiver, cancellationToken).Type as INamedTypeSymbol;
-        return receiverType is not null && InvokeAsyncAttributeMatcher.HasGeneratePluginServerAttribute(receiverType);
+        var semanticType = model.GetTypeInfo(receiver, cancellationToken).Type as INamedTypeSymbol;
+        receiverType = semanticType!;
+        return semanticType is not null && InvokeAsyncAttributeMatcher.HasGeneratePluginServerAttribute(semanticType);
     }
 
     private static bool TryResolveMatchingTypes(
