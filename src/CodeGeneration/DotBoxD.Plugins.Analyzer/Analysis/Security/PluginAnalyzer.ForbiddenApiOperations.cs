@@ -12,7 +12,7 @@ public sealed partial class PluginAnalyzer
         IMethodSymbol method,
         ISymbol? target)
     {
-        if (!TryGetForbiddenHostApi(target, out var forbidden))
+        if (!TryGetForbiddenHostApiDisplayName(target, out var forbidden))
         {
             return;
         }
@@ -27,7 +27,7 @@ public sealed partial class PluginAnalyzer
         context.ReportDiagnostic(Diagnostic.Create(
             ForbiddenHostApiRule,
             context.Operation.Syntax.GetLocation(),
-            forbidden.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
+            forbidden));
     }
 
     private static void AnalyzeTypeOf(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
