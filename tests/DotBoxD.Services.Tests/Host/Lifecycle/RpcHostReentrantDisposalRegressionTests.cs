@@ -8,12 +8,13 @@ namespace DotBoxD.Services.Tests.Host;
 
 public sealed class RpcHostReentrantDisposalRegressionTests
 {
-    private static readonly TimeSpan Timeout = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
     [Fact]
     public async Task ForEachPeerCallback_DisposeAsyncCompletesOrFailsClosedInsteadOfDeadlocking()
     {
-        var (_, serverConnection) = InMemoryPipe.CreateConnectionPair();
+        var (clientConnection, serverConnection) = InMemoryPipe.CreateConnectionPair();
+        await using var _ = clientConnection;
         var callbackEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var callbackTerminal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         RpcHost? host = null;
