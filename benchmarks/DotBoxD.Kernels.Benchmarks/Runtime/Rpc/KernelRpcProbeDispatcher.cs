@@ -52,6 +52,12 @@ internal static class KernelRpcProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-kernel-rpc-client-response-decode", StringComparer.OrdinalIgnoreCase))
+        {
+            KernelRpcClientResponseDecodeProbe.Run();
+            return true;
+        }
+
         return false;
     }
 }

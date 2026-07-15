@@ -47,6 +47,13 @@ Services, Kernels, and Pushdown.
   `map.get`/`map.containsKey`/`map.empty`/`map.set` kernel intrinsics. Map keys must be scalar
   (`bool`/`int`/`long`/`string`/enum); a non-scalar key is rejected at generation time. Not yet supported
   (no runtime intrinsic): `dict.Count`, iterating a map, and `dict.Add`/`dict.Remove`.
+- **Allocation-free generated-client response validation:** generated server-extension proxies and grafted
+  clients now validate response bytes with the editor-hidden public `KernelRpcPayloadReader.SkipValue()`
+  primitive and project typed results directly from the payload, avoiding a temporary `KernelRpcValue` tree.
+  New analyzers detect older runtimes that lack this primitive and retain the legacy generated path. Unit
+  responses keep their existing exception behavior; a known-but-wrong wire kind for a payload-bearing return
+  now fails with `FormatException` from the payload reader instead of `NotSupportedException` from the former
+  value-tree projection.
 - **Documentation & repo polish:** new top-level README, `docs/` information architecture
   (getting-started, concepts, security, reference, contributing), `SECURITY.md`, `CONTRIBUTING.md`,
   `CODE_OF_CONDUCT.md`, and GitHub repo metadata files.

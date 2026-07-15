@@ -21,6 +21,9 @@ internal static class RpcKernelDirectClientExtensionEmitter
         Compilation compilation)
     {
         private readonly RpcKernelValueConversionEmitter _conv = new(compilation);
+        private readonly RpcKernelClientResponseReadEmitter _responseReader = new(
+            compilation,
+            reservedMemberName: methodExtension.Name);
 
         public string Emit()
         {
@@ -29,6 +32,7 @@ internal static class RpcKernelDirectClientExtensionEmitter
             builder.AppendLine("{");
             AppendMethod(builder);
             builder.Append(_conv.Helpers);
+            builder.Append(_responseReader.Helpers);
             builder.AppendLine("}");
             return builder.ToString();
         }
@@ -110,10 +114,19 @@ internal static class RpcKernelDirectClientExtensionEmitter
             {
                 AppendInvoke(builder, isAsyncReturn, accessor, request, response, cancellationToken, assignResponse: true);
                 builder.Append("        ").Append(cancellationToken).AppendLine(".ThrowIfCancellationRequested();");
-                builder.Append("        var ").Append(result)
-                    .Append($" = {DotBoxDRpcValueNames.GlobalKernelRpcBinaryCodec}.DecodeValue(")
-                    .Append(response).AppendLine(");");
-                builder.Append("        return ").Append(_conv.ReadExpression(payloadReturnType, result)).AppendLine(";");
+                if (_responseReader.TryReadExpression(payloadReturnType, response, out var readResponse))
+                {
+                    builder.Append("        var ").Append(result)
+                        .Append(" = ").Append(readResponse).AppendLine(";");
+                    builder.Append("        return ").Append(result).AppendLine(";");
+                }
+                else
+                {
+                    builder.Append("        var ").Append(result)
+                        .Append($" = {DotBoxDRpcValueNames.GlobalKernelRpcBinaryCodec}.DecodeValue(")
+                        .Append(response).AppendLine(");");
+                    builder.Append("        return ").Append(_conv.ReadExpression(payloadReturnType, result)).AppendLine(";");
+                }
             }
 
             builder.AppendLine("    }");

@@ -5,11 +5,10 @@ using Microsoft.CodeAnalysis;
 
 /// <summary>
 /// Emits the reflection-free, box-free reader a lowered remote <c>RunLocal</c> chain uses to turn the pushed
-/// <c>KernelRpcValue</c> back into its projected CLR type — the decode-side counterpart to the runtime's
-/// <c>LocalCallbackProjection</c> encode. It reuses <see cref="RpcKernelValueConversionEmitter"/>,
-/// the same proven reader the server-extension client proxy emits, so RunLocal decode rides the same
-/// generated path: scalars/enums from typed <c>KernelRpcValue</c> fields, lists/arrays via <c>GetItem(i)</c>,
-/// and DTOs through the real constructor with field-count guards — no <c>SandboxValue</c> graph, no reflection.
+/// <c>KernelRpcValue</c> or its binary payload back into the projected CLR type — the decode-side counterpart
+/// to the runtime's <c>LocalCallbackProjection</c> encode. The binary path shares
+/// <see cref="RpcKernelPayloadReadEmitter"/> with generated server-extension clients; both reconstruct
+/// scalars, collections, and DTOs without a <c>SandboxValue</c> or intermediate wire-value graph.
 /// </summary>
 internal static class RpcLocalDecoderEmitter
 {

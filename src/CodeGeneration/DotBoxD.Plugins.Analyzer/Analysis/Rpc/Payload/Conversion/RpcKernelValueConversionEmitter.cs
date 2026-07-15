@@ -9,9 +9,9 @@ using Microsoft.CodeAnalysis;
 /// <c>KernelRpcValue</c> wire values: scalars inline, <c>List&lt;T&gt;</c>/arrays as <c>List</c>, and DTOs
 /// (records/structs/classes with public instance properties) as positional <c>Record</c>s. Field
 /// expressions are computed before the owning helper is appended so a nested helper is never spliced into
-/// the middle of another helper's body. Shared by the proxy and direct (graft) client emitters so both
-/// support the same parameter and return shapes — DTO parameters and returns, nested DTOs, and
-/// list-typed DTO fields — without divergence.
+/// the middle of another helper's body. Generated clients use this for request encoding and compatibility
+/// projections that still start from a materialized value; their typed responses use
+/// <see cref="RpcKernelPayloadReadEmitter"/> to decode directly from bytes.
 /// </summary>
 internal sealed partial class RpcKernelValueConversionEmitter
 {

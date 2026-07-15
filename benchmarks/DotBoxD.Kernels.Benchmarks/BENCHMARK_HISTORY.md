@@ -58,6 +58,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-kernel-rpc-value-items
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-kernel-rpc-value-list-writer
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-kernel-rpc-response-encoding
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-kernel-rpc-client-response-decode
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-kernel-rpc-binary-codec-empty-decode
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-invokeasync-capture-argument-writer
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-kernel-rpc-marshaller-dto
@@ -179,6 +180,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Syntax-filtered hook-chain discovery | this commit | `--probe-hook-chain-discovery` | Limited the hook-chain semantic transform to member calls named `Run`, `RunLocal`, `Register`, or `RegisterLocal`, while retaining method-group terminals. Across 1,000 retained-driver edits of a tree with 1,000 unrelated `Touch` calls, allocation fell from 1,809,295,360 B to 1,664,179,784 B (-145.1 KB/edit) and time fell from 7.312 to 4.899 ms/edit (-33.0%). An unrelated `Run` control retained semantic validation and stayed allocation-equivalent; generated sources and diagnostics were byte-identical. |
 | Direct server-extension RPC response encoding | this commit | `--probe-kernel-rpc-response-encoding` | Routed the already-validated `SandboxValue` result from `InvokeServerExtensionRpcAsync` through the existing direct binary codec instead of materializing a parallel `KernelRpcValue` tree, and matched declared collection types without rebuilding structural `SandboxType` descriptors. Across 200,000 encodes, `List<I32>` fell from 272 to 80 B/op, `Map<String,I32>` from 4,072 to 464 B/op, and an eight-item `List<Record<I32,String>>` from 2,808 to 160 B/op; the scalar control remained 64 B/op. The nested 2,648 B/op saving decomposes into 1,088 B of record-type materialization and 1,560 B from the intermediate wire tree, with byte-identical payloads and unchanged malformed-collection rejection. |
 | Scalar single-assignment I32 while plans | this commit | `--probe-interpreter-while-plan-setup` | Kept one-statement I32 `while` planning in a scalar local instead of allocating and indexing an `AssignmentPlan[1]`. Across 50,000 executions, both one- and zero-iteration rows fell by exactly 2,000,000 B (40 B/op); the no-while and dependent two-assignment controls were byte-identical. Six alternating published-binary samples per variant moved the 20-million-iteration median from 192.9 ms to 182.1 ms (-5.6%), with non-overlapping 191.7-195.3 ms and 181.1-184.1 ms ranges and identical results/resources. |
+| Direct generated-client RPC response decoding | this commit | `--probe-kernel-rpc-client-response-decode` | Generated service proxies and direct graft clients now validate response bytes without allocation and project the declared CLR return type directly from the payload instead of first materializing a `KernelRpcValue` tree. Across 100,000 decodes, `List<I32>` fell from 264 to 72 B/op, `Map<String,I32>` from 5,976 to 2,368 B/op, and an eight-item `List<Record<I32,String>>` from 2,000 to 440 B/op; I32 stayed allocation-free. Four process runs, each using four internally alternating rounds, moved timing medians from 5.9/26.2/200.3/85.3 ms to 5.1/21.2/125.4/45.1 ms. Full structural validation remains ahead of DTO construction, and the emitted ref-struct reader is isolated in synchronous helpers so C# 12 async clients still compile. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -1600,3 +1602,66 @@ Checksums remain `50,000`, `0`, `0`, `100,000`, and `20,000,000`. Per-execution 
 usage remains `21/1/0/0`, `9/0/0/0`, `5/0/0/0`, `27/1/0/0`, and `240,000,009/20,000,000/0/0` respectively. Condition
 and body charge order, the 4,096-iteration checkpoint, public API, compiler/verifier identity, persisted artifacts, and
 sandbox resource accounting are unchanged.
+
+## Direct generated-client RPC response decoding
+
+Generated server-extension clients previously decoded every typed response into a complete `KernelRpcValue` graph and
+then walked that graph again to construct the declared CLR result. Aggregate responses therefore allocated both the
+consumer's list/map/DTO objects and a short-lived parallel array-backed wire tree.
+
+Both generated client forms now call a shared synchronous response helper. Its first pass uses the public generated-code
+primitive `KernelRpcPayloadReader.SkipValue()` to validate the complete wire value without materializing it; this retains
+the previous guarantee that trailing bytes, invalid UTF-8, non-finite F64 values, invalid booleans, depth/item-limit
+violations, and malformed aggregate structure fail before a user DTO constructor runs. A second reader projects the
+known CLR shape directly. Keeping both ref-struct readers inside the synchronous helper also avoids imposing C# 13 on
+async proxy or direct-graft methods. Unit responses retain the legacy `DecodeValue(...).RequireKind(Unit)` path because
+they have no aggregate tree to remove and existing tests pin its exception contract.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -- --probe-kernel-rpc-client-response-decode
+```
+
+Allocation results, 100,000 response projections per row:
+
+```text
+case                              Before allocated / B/op       After allocated / B/op        delta
+I32 control                                   0 B /     0.0                 0 B /     0.0          0 B/op
+List<I32>, 3 items                   26,400,000 B /   264.0         7,200,000 B /    72.0       -192 B/op
+Map<String,I32>, 32 entries         597,600,000 B / 5,976.0       236,800,000 B / 2,368.0     -3,608 B/op
+List<Record<I32,String>>, 8         200,000,000 B / 2,000.0        44,000,000 B /   440.0     -1,560 B/op
+```
+
+The three aggregate deltas exactly match the intermediate wire-tree costs isolated by the response-encoding lane. A
+permanent allocation regression binds and executes the actual generated list response helper, pinning its 192 B/op
+reduction; `SkipValue` itself remains allocation-free for a nested map/list/record payload. Checksums stay `42`, `9`,
+`710`, and `60` per operation.
+
+Each displayed probe time is the median of four internally warmed rounds in balanced legacy/direct/direct/legacy order.
+Four separately launched probe processes produced these ranges and cross-process medians; allocation remains the primary
+claim because process-level stopwatch results are noisier:
+
+```text
+case                              Before range / median ms       After range / median ms       median delta
+I32 control                            5.7-6.2 /   5.9               5.1-5.2 /   5.1              -12.8%
+List<I32>, 3 items                    25.5-27.4 /  26.2              20.7-21.7 /  21.2              -19.1%
+Map<String,I32>, 32 entries         191.0-205.1 / 200.3             122.8-127.2 / 125.4              -37.4%
+List<Record<I32,String>>, 8          84.2-89.1 /  85.3              43.6-47.0 /  45.1              -47.2%
+```
+
+The validator preserves the old absent-nullable contract by structurally consuming, but not declared-type projecting,
+the ignored placeholder slot. That mode is limited to generated client responses; existing RunLocal payload readers keep
+their stricter typed placeholder behavior. Known-but-wrong kinds for payload-bearing returns now fail with
+`FormatException` from the direct reader rather than `NotSupportedException` from `KernelRpcValue.RequireKind`, and a
+focused regression pins that fail-closed boundary. Generated-source tests cover proxy and direct forms, complete
+prevalidation before side-effecting DTO construction, nullable placeholders, C# 12 compilation, and removal of typed
+`DecodeValue` calls. Response helpers live in a collision-safe nested generated class, and payload resolver helpers are
+emitted lazily only for matched framework types. A rebuilt sample plugin's emitted `.g.cs` files were also inspected for
+the synchronous helper shape.
+
+`SkipValue` is intentionally public, editor-hidden generated-code infrastructure so consumers can hand-write the same
+validation/projection workflow as the generator; the public API baseline advances accordingly. When the standalone
+analyzer runs against an older runtime that lacks `SkipValue`, symbol capability detection retains the legacy
+value-tree projection instead of emitting an uncompilable call. The wire format,
+compiler/verifier identity, persisted artifacts, sandbox accounting, and service contracts do not change.
