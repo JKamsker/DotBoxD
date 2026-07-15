@@ -58,10 +58,20 @@ internal sealed partial class ExpressionEvaluator
             return mathValue;
         }
 
+        if (IsNumericConversion(call.Name) && call.Arguments.Count == 1)
+        {
+            return EvaluateNumericConversion(call.Name, call.Arguments[0], frame);
+        }
+
         var fixedArity = CollectionIntrinsicDispatcher.FixedArity(call.Name);
         if (fixedArity >= 0 && fixedArity == call.Arguments.Count)
         {
             return EvaluateFixedArityCollectionCall(call, fixedArity, frame);
+        }
+
+        if (TryGetScalarLocalFunction(call, out var function))
+        {
+            return EvaluateScalarLocalFunctionCall(call, function, frame);
         }
 
         return EvaluateCallViaArray(call, frame);
@@ -142,6 +152,50 @@ internal sealed partial class ExpressionEvaluator
         return CollectionIntrinsicDispatcher.Dispatch(call, arg0, arg1, arg2, _context);
     }
 
+    private bool TryGetScalarLocalFunction(CallExpression call, out SandboxFunction function)
+    {
+        function = null!;
+        return call.Arguments.Count is 1 or 2 &&
+               !CollectionCalls.ContainsKey(call.Name) &&
+               _interpreter.TryGetFunction(call.Name, out function) &&
+               function.Parameters.Count == call.Arguments.Count;
+    }
+
+    private ValueTask<SandboxValue> EvaluateScalarLocalFunctionCall(
+        CallExpression call,
+        SandboxFunction function,
+        InterpreterFrame frame)
+    {
+        var argumentCount = call.Arguments.Count;
+        var firstTask = EvaluateAsync(call.Arguments[0], frame);
+        if (!firstTask.IsCompletedSuccessfully)
+        {
+            return AwaitCallArguments(
+                call,
+                new SandboxValue[argumentCount],
+                pending: 0,
+                firstTask,
+                frame);
+        }
+
+        var first = firstTask.Result;
+        if (argumentCount == 1)
+        {
+            return _interpreter.InvokeFunctionAsync(function, LocalFunctionArguments.FromSingle(first));
+        }
+
+        var secondTask = EvaluateAsync(call.Arguments[1], frame);
+        if (!secondTask.IsCompletedSuccessfully)
+        {
+            var arguments = new SandboxValue[2];
+            arguments[0] = first;
+            return AwaitCallArguments(call, arguments, pending: 1, secondTask, frame);
+        }
+
+        return _interpreter.InvokeFunctionAsync(
+            function, LocalFunctionArguments.FromPair(first, secondTask.Result));
+    }
+
     private ValueTask<SandboxValue> EvaluateCallViaArray(CallExpression call, InterpreterFrame frame)
     {
         var arguments = call.Arguments;
@@ -186,7 +240,7 @@ internal sealed partial class ExpressionEvaluator
 
         if (_interpreter.TryGetFunction(call.Name, out var function))
         {
-            return _interpreter.InvokeFunctionAsync(function, args);
+            return _interpreter.InvokeFunctionAsync(function, LocalFunctionArguments.FromArray(args));
         }
 
         if (_context.Bindings.TryGetDescriptor(call.Name, out var descriptor))
@@ -218,18 +272,4 @@ internal sealed partial class ExpressionEvaluator
             ? args[index]
             : throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "call arity mismatch"));
 
-    private static SandboxValue NumericToInt64(SandboxValue value)
-        => value switch
-        {
-            I32Value number => SandboxValue.FromInt64(number.Value),
-            _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "expected I32 value"))
-        };
-
-    private static SandboxValue NumericToDouble(SandboxValue value)
-        => value switch
-        {
-            I32Value number => SandboxValue.FromDouble(number.Value),
-            I64Value number => SandboxValue.FromDouble(number.Value),
-            _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "expected I32 or I64 value"))
-        };
 }

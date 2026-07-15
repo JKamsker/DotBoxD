@@ -11,7 +11,7 @@ public sealed class ResourceMeter
     private const int FuelDeadlineCheckInterval = 64;
     private const int LoopDeadlineCheckInterval = 4096;
 
-    private readonly ResourceHostCallTracker _hostCallTracker = new();
+    private ResourceHostCallTracker? _hostCallTracker;
     private long _allocatedBytes;
     private long _fileBytesRead;
     private long _fileBytesWritten;
@@ -45,7 +45,7 @@ public sealed class ResourceMeter
 
     internal void ResetForReuse()
     {
-        _hostCallTracker.Reset();
+        _hostCallTracker?.Reset();
         _deadline = ResourceMeterDeadline.Create(Limits);
         _chargesSinceDeadlineCheck = 0;
         FuelUsed = 0;
@@ -195,7 +195,8 @@ public sealed class ResourceMeter
 
         if (maxCallsPerRun is not null)
         {
-            _hostCallTracker.ChargeLimitedBindingCall(bindingId, maxCallsPerRun.Value);
+            (_hostCallTracker ??= new ResourceHostCallTracker())
+                .ChargeLimitedBindingCall(bindingId, maxCallsPerRun.Value);
         }
     }
 

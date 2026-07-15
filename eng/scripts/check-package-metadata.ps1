@@ -246,6 +246,8 @@ function AssertPackageEntryAllowlist($zip, [string] $id, [string] $readme, [stri
         if ($id -eq "DotBoxD") {
             [void] $allowedExact.Add("analyzers/dotnet/cs/DotBoxD.Plugins.Analyzer.dll")
             [void] $allowedExact.Add("analyzers/dotnet/cs/DotBoxD.Plugins.Analyzer.xml")
+            [void] $allowedExact.Add("buildTransitive/DotBoxD.targets")
+            [void] $allowedExact.Add("weaver/DotBoxD.Plugins.Fody.dll")
         }
     }
 
@@ -307,6 +309,20 @@ function AssertPackageMetadata($metadata, [string] $id, [string] $packageName) {
         if (-not $tags.Contains($requiredTag)) {
             throw "Package $packageName tags must include '$requiredTag'. Found '$tagsValue'."
         }
+    }
+}
+
+function AssertDotBoxDFodyDependency($metadata, [string] $packageName) {
+    $fodyDependency = $metadata.SelectSingleNode(".//*[local-name()='dependency' and @id='Fody']")
+    if ($null -eq $fodyDependency) {
+        throw "Package $packageName must depend on Fody so its build target reaches DotBoxD-only consumers."
+    }
+
+    $includedAssets = [string] $fodyDependency.include
+    $includesAll = [regex]::Split($includedAssets, '[,;\s]+') |
+        Where-Object { $_.Equals("all", [StringComparison]::OrdinalIgnoreCase) }
+    if (-not $includesAll) {
+        throw "Package $packageName must explicitly propagate all Fody assets so build/Fody.targets reaches DotBoxD-only consumers. Found include='$includedAssets'."
     }
 }
 
@@ -499,6 +515,11 @@ foreach ($package in $packages) {
         } else {
             AssertZipEntry $zip "lib/$packageTfm/$id.dll" $package.Name
             AssertZipEntry $zip "lib/$packageTfm/$id.xml" $package.Name
+            if ($id -eq "DotBoxD") {
+                AssertZipEntry $zip "buildTransitive/DotBoxD.targets" $package.Name
+                AssertZipEntry $zip "weaver/DotBoxD.Plugins.Fody.dll" $package.Name
+                AssertDotBoxDFodyDependency $metadata $package.Name
+            }
         }
 
         AssertPackageEntryAllowlist $zip $id $readme $packageTfm $extraEntries $package.Name

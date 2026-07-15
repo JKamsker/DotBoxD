@@ -42,11 +42,31 @@ internal static class BranchedF64ForLoopRunner
             frame.WriteRawInt32Slot(loopSlot, i);
             var taken = plan.Condition.Evaluate(frame, context) ? plan.Then : plan.Else;
             context.ChargeFuel(taken.Fuel);
-            var assignments = taken.Assignments;
-            for (var statementIndex = 0; statementIndex < assignments.Length; statementIndex++)
+            switch (taken.Kind)
             {
-                var assignment = assignments[statementIndex];
-                frame.WriteRawDoubleSlot(assignment.TargetSlot, assignment.Expression.Evaluate(frame));
+                case BranchKind.Empty:
+                    break;
+                case BranchKind.Single:
+                {
+                    var assignment = taken.SingleAssignment;
+                    frame.WriteRawDoubleSlot(
+                        assignment.TargetSlot,
+                        assignment.Expression.Evaluate(frame));
+                    break;
+                }
+                case BranchKind.Many:
+                {
+                    var assignments = taken.MultipleAssignments!;
+                    for (var statementIndex = 0; statementIndex < assignments.Length; statementIndex++)
+                    {
+                        var assignment = assignments[statementIndex];
+                        frame.WriteRawDoubleSlot(
+                            assignment.TargetSlot,
+                            assignment.Expression.Evaluate(frame));
+                    }
+
+                    break;
+                }
             }
 
             if (--checkpoint == 0)
@@ -105,34 +125,96 @@ internal static class BranchedF64ForLoopRunner
         out Branch branch)
     {
         branch = default;
+        if (statements.Count == 0)
+        {
+            branch = new Branch(BranchKind.Empty, default, null, 0);
+            return true;
+        }
+
+        if (statements.Count == 1)
+        {
+            if (!TryCreateAssignmentPlan(
+                    statements[0],
+                    frame,
+                    bindings,
+                    out var assignment,
+                    out var singleFuel))
+            {
+                return false;
+            }
+
+            branch = new Branch(BranchKind.Single, assignment, null, singleFuel);
+            return true;
+        }
+
         var assignments = new AssignmentPlan[statements.Count];
         long fuel = 0;
         for (var i = 0; i < statements.Count; i++)
         {
-            if (statements[i] is not AssignmentStatement assignment ||
-                !F64ExpressionPlan.TryCreate(assignment.Value, frame, assignment.Name, bindings, out var expression, out var binding) ||
-                binding is not null)
+            if (!TryCreateAssignmentPlan(
+                    statements[i],
+                    frame,
+                    bindings,
+                    out assignments[i],
+                    out var assignmentFuel))
             {
                 return false;
             }
 
-            var targetSlot = frame.GetSlot(assignment.Name);
-            if (!frame.IsF64Slot(targetSlot))
-            {
-                return false;
-            }
-
-            assignments[i] = new AssignmentPlan(targetSlot, expression);
-            fuel += 1 + expression.FuelCost;
+            fuel += assignmentFuel;
         }
 
-        branch = new Branch(assignments, fuel);
+        branch = new Branch(BranchKind.Many, default, assignments, fuel);
+        return true;
+    }
+
+    private static bool TryCreateAssignmentPlan(
+        Statement statement,
+        InterpreterFrame frame,
+        IBindingCatalog bindings,
+        out AssignmentPlan plan,
+        out long fuel)
+    {
+        plan = default;
+        fuel = 0;
+        if (statement is not AssignmentStatement assignment ||
+            !F64ExpressionPlan.TryCreate(
+                assignment.Value,
+                frame,
+                assignment.Name,
+                bindings,
+                out var expression,
+                out var binding) ||
+            binding is not null)
+        {
+            return false;
+        }
+
+        var targetSlot = frame.GetSlot(assignment.Name);
+        if (!frame.IsF64Slot(targetSlot))
+        {
+            return false;
+        }
+
+        plan = new AssignmentPlan(targetSlot, expression);
+        fuel = 1 + expression.FuelCost;
         return true;
     }
 
     private readonly record struct AssignmentPlan(int TargetSlot, F64ExpressionPlan Expression);
 
-    private readonly record struct Branch(AssignmentPlan[] Assignments, long Fuel);
+    private readonly record struct Branch(
+        BranchKind Kind,
+        AssignmentPlan SingleAssignment,
+        AssignmentPlan[]? MultipleAssignments,
+        long Fuel);
+
+    private enum BranchKind
+    {
+        Empty,
+        Single,
+        Many
+    }
 
     private readonly record struct BranchedLoopPlan(
         I32ComparisonPlan Condition,

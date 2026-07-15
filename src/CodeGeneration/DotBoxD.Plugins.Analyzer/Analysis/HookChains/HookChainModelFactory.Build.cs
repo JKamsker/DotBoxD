@@ -173,7 +173,7 @@ internal static partial class HookChainModelFactory
             PluginId: "chain-" + chainId,
             Namespace: HookChainIdentity.Namespace(invocation),
             KernelName: kernelName,
-            PackageName: kernelName + "PluginPackage",
+            PackageName: kernelName + DotBoxDGenerationNames.PluginPackageSuffix,
             GeneratedPackageAttributes: default,
             GeneratedAttributeSource: ExperimentalAttributeSource.FromTypes(
                 eventShape.EventType,

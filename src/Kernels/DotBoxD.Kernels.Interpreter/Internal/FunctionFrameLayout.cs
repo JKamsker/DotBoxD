@@ -32,6 +32,11 @@ internal sealed class FunctionFrameLayout
         _slotTypes = slotTypes;
         _slotKinds = slotTypes.Select(KindOf).ToArray();
         SlotCount = slots.Count;
+        RequiresRawAssignmentState =
+            Array.IndexOf(_slotKinds, SlotKind.I32, parameterCount) >= 0 ||
+            Array.IndexOf(_slotKinds, SlotKind.I64, parameterCount) >= 0 ||
+            Array.IndexOf(_slotKinds, SlotKind.F64, parameterCount) >= 0;
+        HasBoxedSlots = Array.IndexOf(_slotKinds, SlotKind.Boxed) >= 0;
         HasI32Slots = Array.IndexOf(_slotKinds, SlotKind.I32) >= 0;
         HasI64Slots = Array.IndexOf(_slotKinds, SlotKind.I64) >= 0;
         HasF64Slots = Array.IndexOf(_slotKinds, SlotKind.F64) >= 0;
@@ -42,6 +47,10 @@ internal sealed class FunctionFrameLayout
     public int SlotCount { get; }
 
     public int ParameterCount { get; }
+
+    public bool RequiresRawAssignmentState { get; }
+
+    public bool HasBoxedSlots { get; }
 
     public bool HasI32Slots { get; }
 
@@ -92,6 +101,8 @@ internal sealed class FunctionFrameLayout
     public bool IsF64Slot(string name) => IsF64Slot(GetSlot(name));
 
     public bool IsI64Slot(int slot) => _slotKinds[slot] == SlotKind.I64;
+
+    public bool IsBoxedSlot(int slot) => _slotKinds[slot] == SlotKind.Boxed;
 
     private static void CollectStatements(IReadOnlyList<Statement> statements, Dictionary<string, int> slots)
     {

@@ -132,5 +132,5 @@ public sealed partial class SandboxHost
             ? new SandboxError(SandboxErrorCode.ValidationError, "compiled execution is disabled while interpreter debugging is attached")
             : new SandboxError(SandboxErrorCode.ValidationError, "compiled execution is disabled while debug tracing is enabled");
 
-    private sealed record CompiledAttempt(SandboxExecutionResult? Result, SandboxError? FallbackReason);
+    private readonly record struct CompiledAttempt(SandboxExecutionResult? Result, SandboxError? FallbackReason);
 }

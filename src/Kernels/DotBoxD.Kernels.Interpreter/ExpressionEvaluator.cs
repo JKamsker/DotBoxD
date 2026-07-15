@@ -106,7 +106,7 @@ internal sealed partial class ExpressionEvaluator
         return false;
     }
 
-    public ValueTask<SandboxValue> InvokeFunctionAsync(SandboxFunction function, IReadOnlyList<SandboxValue> args)
+    public ValueTask<SandboxValue> InvokeFunctionAsync(SandboxFunction function, LocalFunctionArguments args)
         => _interpreter.InvokeFunctionAsync(function, args);
 
     private SandboxValue ChargeLiteral(SandboxValue value)

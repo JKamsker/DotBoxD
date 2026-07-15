@@ -85,13 +85,13 @@ public sealed class KernelRpcValueTests
     }
 
     [Fact]
-    public void Generated_ipc_client_reads_rpc_items_without_cloning_array()
-        => AssertGeneratedReaderUsesIndexedItems(
+    public void Generated_ipc_client_reads_rpc_items_directly_from_the_payload()
+        => AssertGeneratedReaderUsesPayloadReader(
             ServerExtensionProxyTests.MonsterKillerWithGeneratedClientSource);
 
     [Fact]
-    public void Generated_direct_extensions_read_rpc_items_without_cloning_array()
-        => AssertGeneratedReaderUsesIndexedItems(
+    public void Generated_direct_extensions_read_rpc_items_directly_from_the_payload()
+        => AssertGeneratedReaderUsesPayloadReader(
             ServerExtensionClientExtensionTests.DirectSyncExtensionSource);
 
     [Fact]
@@ -181,16 +181,17 @@ public sealed class KernelRpcValueTests
         Assert.Contains("duplicate", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static void AssertGeneratedReaderUsesIndexedItems(string testSource)
+    private static void AssertGeneratedReaderUsesPayloadReader(string testSource)
     {
         var source = string.Join(
             "\n",
             PluginAnalyzerGeneratedPackageFactory.GeneratedSources(testSource));
 
-        Assert.Contains("value.ItemCount", source, StringComparison.Ordinal);
-        Assert.Contains("value.GetItem(i)", source, StringComparison.Ordinal);
-        Assert.Contains("value.GetItem(0)", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("value.Items", source, StringComparison.Ordinal);
+        Assert.Contains("validator.SkipValue();", source, StringComparison.Ordinal);
+        Assert.Contains("reader.ReadListHeader()", source, StringComparison.Ordinal);
+        Assert.Contains("reader.ReadRecordHeader()", source, StringComparison.Ordinal);
+        Assert.Contains("reader.ReadInt32()", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("KernelRpcBinaryCodec.DecodeValue(__response)", source, StringComparison.Ordinal);
     }
 
     private const string EnumerableServerExtensionSource = """

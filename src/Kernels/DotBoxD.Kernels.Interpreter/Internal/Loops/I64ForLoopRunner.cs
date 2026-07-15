@@ -9,6 +9,7 @@ namespace DotBoxD.Kernels.Interpreter.Internal.Loops;
 // iteration, matching the i32/f64 runners (loop base 5 + per assignment 1 + expression node fuel).
 internal static class I64ForLoopRunner
 {
+    private const int CheckpointInterval = 4096;
     private const long LoopFuel = 5;
 
     public static bool TryRun(
@@ -19,9 +20,28 @@ internal static class I64ForLoopRunner
         SandboxContext context,
         SandboxExecutionOptions options)
     {
-        if (options.RequiresInterpreter ||
-            start >= end ||
-            !TryCreateBody(statement, frame, out var body, out var fuelPerIteration))
+        if (options.RequiresInterpreter || start >= end)
+        {
+            return false;
+        }
+
+        return statement.Body.Count == 1
+            ? TryRunSingleAssignment(statement, start, end, frame, context)
+            : TryRunMultipleAssignments(statement, start, end, frame, context);
+    }
+
+    private static bool TryRunSingleAssignment(
+        ForRangeStatement statement,
+        int start,
+        int end,
+        InterpreterFrame frame,
+        SandboxContext context)
+    {
+        if (!TryCreateSingleAssignmentPlan(
+                statement.Body[0],
+                frame,
+                out var assignment,
+                out var fuelPerIteration))
         {
             return false;
         }
@@ -34,7 +54,45 @@ internal static class I64ForLoopRunner
 
         context.ChargeLoopIterations(iterations, fuelPerIteration);
         var loopSlot = frame.GetSlot(statement.LocalName);
-        var checkpoint = 4096;
+        var checkpoint = CheckpointInterval;
+        for (var i = start; i < end; i++)
+        {
+            frame.WriteRawInt32Slot(loopSlot, i);
+            frame.WriteRawInt64Slot(
+                assignment.TargetSlot,
+                assignment.Expression.Evaluate(frame));
+
+            if (--checkpoint == 0)
+            {
+                context.Checkpoint();
+                checkpoint = CheckpointInterval;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryRunMultipleAssignments(
+        ForRangeStatement statement,
+        int start,
+        int end,
+        InterpreterFrame frame,
+        SandboxContext context)
+    {
+        if (!TryCreateBody(statement, frame, out var body, out var fuelPerIteration))
+        {
+            return false;
+        }
+
+        var iterations = (long)end - start;
+        if (!context.CanBulkChargeLoopIterations(iterations, fuelPerIteration))
+        {
+            return false;
+        }
+
+        context.ChargeLoopIterations(iterations, fuelPerIteration);
+        var loopSlot = frame.GetSlot(statement.LocalName);
+        var checkpoint = CheckpointInterval;
         for (var i = start; i < end; i++)
         {
             frame.WriteRawInt32Slot(loopSlot, i);
@@ -47,10 +105,35 @@ internal static class I64ForLoopRunner
             if (--checkpoint == 0)
             {
                 context.Checkpoint();
-                checkpoint = 4096;
+                checkpoint = CheckpointInterval;
             }
         }
 
+        return true;
+    }
+
+    private static bool TryCreateSingleAssignmentPlan(
+        Statement statement,
+        InterpreterFrame frame,
+        out AssignmentPlan plan,
+        out long fuelPerIteration)
+    {
+        plan = default;
+        fuelPerIteration = LoopFuel;
+        if (statement is not AssignmentStatement assignment ||
+            !I64ExpressionPlan.TryCreate(assignment.Value, frame, out var expression))
+        {
+            return false;
+        }
+
+        var targetSlot = frame.GetSlot(assignment.Name);
+        if (!frame.IsI64Slot(targetSlot))
+        {
+            return false;
+        }
+
+        plan = new AssignmentPlan(targetSlot, expression);
+        fuelPerIteration += 1 + expression.FuelCost;
         return true;
     }
 

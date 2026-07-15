@@ -31,6 +31,10 @@ public sealed class RuntimeFuzzCoverageTests
         => await RunPureCaseAsync(23757449);
 
     [Fact]
+    public async Task Generated_pure_module_ids_do_not_embed_compact_metadata_tokens()
+        => await RunPureCaseAsync(23_928_915);
+
+    [Fact]
     public async Task Generated_file_modules_require_policy_then_execute_with_grant()
     {
         using var temp = TempDirectory.Create();

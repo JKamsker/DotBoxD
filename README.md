@@ -276,6 +276,11 @@ published as a standalone package.
 | [`DotBoxD.Plugins.Analyzer`](https://www.nuget.org/packages/DotBoxD.Plugins.Analyzer) | Generator + analyzer that turns `[Plugin]` kernels into package-backed plugins (`netstandard2.0`) |
 | [`DotBoxD.Pushdown.Services`](https://www.nuget.org/packages/DotBoxD.Pushdown.Services) | MessagePack IPC addon that composes kernels with services (**prerelease**) |
 
+The `DotBoxD` meta-package also activates its compile-time `InvokeAsync` capture weaver automatically.
+Consumers do not install Fody or add a `FodyWeavers.xml` file. Projects that already define the inline
+MSBuild `WeaverConfiguration` property must include `<DotBoxD.Plugins />`; otherwise the build fails with
+an actionable configuration error instead of silently skipping the optimization.
+
 `DotBoxD.Pushdown.Services` is published on a **prerelease** channel while its upstream net10.0
 dependencies are prerelease; stable release gates fail if it is included in a stable package set.
 

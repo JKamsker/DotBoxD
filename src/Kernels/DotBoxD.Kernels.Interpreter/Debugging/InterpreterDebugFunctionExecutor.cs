@@ -28,7 +28,8 @@ internal sealed class InterpreterDebugFunctionExecutor
 
     public async ValueTask<SandboxValue> InvokeAsync(
         SandboxFunction function,
-        IReadOnlyList<SandboxValue> arguments)
+        LocalFunctionArguments arguments,
+        SandboxValue? entrypointInput)
     {
         _context.EnterCall();
         InterpreterFrame? frame = null;
@@ -36,7 +37,9 @@ internal sealed class InterpreterDebugFunctionExecutor
         {
             _context.ChargeFuel(1);
             var layout = _getLayout(function);
-            frame = InterpreterFrame.Create(layout, function, arguments);
+            frame = entrypointInput is null
+                ? InterpreterFrame.Create(layout, function, arguments)
+                : InterpreterFrame.CreateValidatedEntrypoint(layout, function, entrypointInput);
             _debug.PushFrame(frame, layout);
             await _debug.CheckpointAsync(
                     SandboxDebugCheckpointKind.FunctionEntry,
