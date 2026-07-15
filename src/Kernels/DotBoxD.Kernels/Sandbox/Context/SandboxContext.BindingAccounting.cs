@@ -105,7 +105,7 @@ public sealed partial class SandboxContext
         var timestamp = AuditTimestamp();
         return new SandboxAuditEvent(
             RunId,
-            descriptor.AuditKind,
+            BindingAuditKinds.BindingCall,
             timestamp,
             Success: false,
             BindingId: descriptor.Id,

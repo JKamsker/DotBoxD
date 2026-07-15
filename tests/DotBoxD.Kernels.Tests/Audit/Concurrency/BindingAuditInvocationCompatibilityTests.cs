@@ -80,7 +80,7 @@ public sealed class BindingAuditInvocationCompatibilityTests
     }
 
     [Fact]
-    public void In_memory_fallback_uses_custom_descriptor_audit_kind()
+    public void In_memory_fallback_keeps_sanitized_binding_call_kind()
     {
         var descriptor = Descriptor() with { AuditKind = BindingAuditKinds.SandboxLog };
         var audit = new InMemoryAuditSink();
@@ -90,11 +90,11 @@ public sealed class BindingAuditInvocationCompatibilityTests
         context.EnsureRequiredBindingFailureAudit(descriptor, invocation, SandboxErrorCode.Timeout);
         context.EnsureRequiredBindingFailureAudit(descriptor, invocation, SandboxErrorCode.Timeout);
 
-        Assert.Equal(BindingAuditKinds.SandboxLog, Assert.Single(audit.Events).Kind);
+        Assert.Equal(BindingAuditKinds.BindingCall, Assert.Single(audit.Events).Kind);
     }
 
     [Fact]
-    public void Custom_sink_fallback_uses_custom_audit_kind_and_remains_idempotent()
+    public void Custom_sink_fallback_keeps_sanitized_binding_call_kind()
     {
         var descriptor = Descriptor() with { AuditKind = BindingAuditKinds.SandboxLog };
         var audit = new ForwardingAuditSink();
@@ -102,10 +102,65 @@ public sealed class BindingAuditInvocationCompatibilityTests
         using var invocation = context.BeginBindingAuditInvocation(descriptor, context.AuditCheckpoint());
 
         context.EnsureRequiredBindingFailureAudit(descriptor, invocation, SandboxErrorCode.Timeout);
+
+        Assert.Equal(BindingAuditKinds.BindingCall, Assert.Single(audit.Events).Kind);
+    }
+
+    [Theory]
+    [MemberData(nameof(CustomAuditKinds))]
+    public void In_memory_custom_detailed_failure_prevents_generic_fallback(string auditKind)
+    {
+        var descriptor = Descriptor() with { AuditKind = auditKind };
+        var audit = new InMemoryAuditSink();
+        var context = CreateContext(descriptor, audit);
+        using var invocation = context.BeginBindingAuditInvocation(descriptor, context.AuditCheckpoint());
+
+        WriteAudit(context, success: false, SandboxErrorCode.Timeout, "detailed failure", auditKind);
         context.EnsureRequiredBindingFailureAudit(descriptor, invocation, SandboxErrorCode.Timeout);
 
-        Assert.Equal(BindingAuditKinds.SandboxLog, Assert.Single(audit.Events).Kind);
+        var detailed = Assert.Single(audit.Events);
+        Assert.Equal(auditKind, detailed.Kind);
+        Assert.Equal("detailed failure", detailed.Message);
     }
+
+    [Theory]
+    [MemberData(nameof(CustomAuditKinds))]
+    public void In_memory_generic_fallback_suppresses_late_custom_detailed_failure(string auditKind)
+    {
+        var descriptor = Descriptor() with { AuditKind = auditKind };
+        var audit = new InMemoryAuditSink();
+        var context = CreateContext(descriptor, audit);
+        using var invocation = context.BeginBindingAuditInvocation(descriptor, context.AuditCheckpoint());
+
+        context.EnsureRequiredBindingFailureAudit(descriptor, invocation, SandboxErrorCode.Timeout);
+        WriteAudit(context, success: false, SandboxErrorCode.Timeout, "late detailed failure", auditKind);
+
+        var fallback = Assert.Single(audit.Events);
+        Assert.Equal(BindingAuditKinds.BindingCall, fallback.Kind);
+        Assert.Equal("binding failed before emitting audit", fallback.Message);
+    }
+
+    [Theory]
+    [MemberData(nameof(CustomAuditKinds))]
+    public void Custom_sink_custom_detailed_failure_prevents_generic_fallback(string auditKind)
+    {
+        var descriptor = Descriptor() with { AuditKind = auditKind };
+        var audit = new ForwardingAuditSink();
+        var context = CreateContext(descriptor, audit);
+        using var invocation = context.BeginBindingAuditInvocation(descriptor, context.AuditCheckpoint());
+
+        WriteAudit(context, success: false, SandboxErrorCode.Timeout, "detailed failure", auditKind);
+        context.EnsureRequiredBindingFailureAudit(descriptor, invocation, SandboxErrorCode.Timeout);
+
+        Assert.Equal(auditKind, Assert.Single(audit.Events).Kind);
+    }
+
+    public static TheoryData<string> CustomAuditKinds()
+        => new()
+        {
+            BindingAuditKinds.SandboxLog,
+            BindingAuditKinds.PluginMessage
+        };
 
     private static async Task WriteSuccessAfterAsync(
         SandboxContext context,
@@ -159,12 +214,13 @@ public sealed class BindingAuditInvocationCompatibilityTests
         SandboxContext context,
         bool success,
         SandboxErrorCode? errorCode,
-        string message)
+        string message,
+        string kind = BindingAuditKinds.BindingCall)
     {
         var timestamp = DateTimeOffset.UtcNow;
         context.Audit.Write(new SandboxAuditEvent(
             context.RunId,
-            BindingAuditKinds.BindingCall,
+            kind,
             timestamp,
             success,
             BindingId: BindingId,
