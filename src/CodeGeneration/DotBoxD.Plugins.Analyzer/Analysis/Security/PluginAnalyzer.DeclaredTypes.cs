@@ -142,7 +142,7 @@ public sealed partial class PluginAnalyzer
             return false;
         }
 
-        if (helperGraph.TryRecordDirectDiagnostic(caller))
+        if (helperGraph.TryRecordDirectDiagnostic(caller, forbiddenType))
         {
             context.ReportDiagnostic(Diagnostic.Create(
                 ForbiddenHostApiRule,

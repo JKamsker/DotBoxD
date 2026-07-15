@@ -68,6 +68,7 @@ public partial class HookPipeline<TEvent, TContext>
         ArgumentNullException.ThrowIfNull(kernel);
         ArgumentException.ThrowIfNullOrEmpty(subscriptionId);
         ArgumentNullException.ThrowIfNull(push);
+        ThrowIfDisposed();
         kernel.ValidateFor(_adapter);
         var wholeEvent = LocalCallbackProjection.IsWholeEvent(kernel.Manifest);
         if (wholeEvent)
@@ -75,6 +76,7 @@ public partial class HookPipeline<TEvent, TContext>
             LocalCallbackProjection.EnsureWholeEventSupported(_adapter);
         }
 
+        ThrowIfDisposed();
         _handlerSet.Add(kernel, (e, rawContext, _) =>
             LocalCallbackProjection.PushAsync(kernel, _adapter, e, rawContext, wholeEvent, subscriptionId, push));
 
