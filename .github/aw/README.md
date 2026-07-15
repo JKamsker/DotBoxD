@@ -143,7 +143,7 @@ The library-surprise automation is intentionally split across specialized runs:
 5. Repository CI runs on that PR and proves the bug exists by failing on the red
    tests.
 6. `.github/workflows/library-surprise-fix-dispatcher.yml` drains new red-test PRs and polish work
-   with six fallback scans per hour, at most four dispatches per tick, and a hard pool limit of eight
+   with six fallback scans per hour, at most four dispatches per tick, and a hard pool limit of four
    fix workers. Discovery remains separately bounded to one candidate every four hours.
 7. `.github/workflows/library-surprise-fix.md` checks out the same PR branch, fixes the production
    issue, addresses actionable CodeRabbit feedback, validates the full build/test suite, and pushes
