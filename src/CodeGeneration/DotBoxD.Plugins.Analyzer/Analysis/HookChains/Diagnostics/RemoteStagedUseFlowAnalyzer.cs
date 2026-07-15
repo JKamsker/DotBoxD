@@ -5,12 +5,8 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
 internal static class RemoteStagedUseFlowAnalyzer
 {
-    private static readonly HashSet<string> TerminalOrUseNames = new(StringComparer.Ordinal)
+    private static readonly HashSet<string> UseNames = new(StringComparer.Ordinal)
     {
-        "Run",
-        "RunLocal",
-        "Register",
-        "RegisterLocal",
         "Use",
         "UseGeneratedChain",
         "UseGeneratedLocalChain",
@@ -69,7 +65,7 @@ internal static class RemoteStagedUseFlowAnalyzer
                 continue;
             }
 
-            if (!TrySupportedTerminalReceiver(terminal, out var terminalReceiver))
+            if (!TrySupportedTerminalReceiver(terminal, model, cancellationToken, out var terminalReceiver))
             {
                 continue;
             }
@@ -122,16 +118,32 @@ internal static class RemoteStagedUseFlowAnalyzer
 
     private static bool TrySupportedTerminalReceiver(
         InvocationExpressionSyntax terminal,
+        SemanticModel model,
+        CancellationToken cancellationToken,
         out ExpressionSyntax terminalReceiver)
     {
         if (TryTerminalReceiver(terminal, out var terminalName, out terminalReceiver) &&
-            TerminalOrUseNames.Contains(terminalName))
+            (IsPipelineTerminal(terminal, model, cancellationToken) || UseNames.Contains(terminalName)))
         {
             return true;
         }
 
         terminalReceiver = null!;
         return false;
+    }
+
+    private static bool IsPipelineTerminal(
+        InvocationExpressionSyntax terminal,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        var info = model.GetSymbolInfo(terminal, cancellationToken);
+        var symbol = info.Symbol ?? (info.CandidateSymbols.Length > 0 ? info.CandidateSymbols[0] : null);
+        return PipelineRoleReader.RoleOf(symbol as IMethodSymbol, model.Compilation) is
+            PipelineCallRole.Run or
+            PipelineCallRole.RunLocal or
+            PipelineCallRole.Register or
+            PipelineCallRole.RegisterLocal;
     }
 
     private static bool TryTerminalReceiver(
