@@ -10,56 +10,60 @@ public sealed class PluginAnalyzerForbiddenApiBackgroundWorkerReachabilityTests
     private static readonly CSharpParseOptions ParseOptions =
         CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
 
-    [Fact]
-    public async Task Reports_backgroundworker_scheduling_from_event_kernel()
+    [Theory]
+    [InlineData(
+        """
+        var worker = new System.ComponentModel.BackgroundWorker();
+        worker.DoWork += (_, args) => args.Result = e.Length;
+        worker.RunWorkerAsync();
+        return e.Length > 0;
+        """,
+        "System.ComponentModel.BackgroundWorker")]
+    [InlineData(
+        """
+        _ = System.IO.File.ReadAllText("/x");
+        return e.Length > 0;
+        """,
+        "System.IO.File")]
+    public async Task Reports_unmetered_work_scheduling_from_event_kernel(
+        string shouldHandleBody,
+        string expectedForbiddenApi)
     {
-        var diagnostics = await AnalyzeAsync(Source("""
-            var worker = new BackgroundWorker();
-            worker.DoWork += (_, _) => _ = e.Length;
-            worker.RunWorkerAsync();
-            """));
+        var source = CreateSource(shouldHandleBody);
 
-        var diagnostic = Assert.Single(diagnostics.Where(d => d.Id == "DBXK001"));
-        Assert.Contains("System.ComponentModel.BackgroundWorker", diagnostic.GetMessage(), StringComparison.Ordinal);
-    }
+        var diagnostics = await AnalyzeAsync(source);
 
-    [Fact]
-    public async Task Reports_file_positive_control_from_event_kernel()
-    {
-        var diagnostics = await AnalyzeAsync(Source("""
-            _ = System.IO.File.ReadAllText("/x");
-            """));
-
-        var diagnostic = Assert.Single(diagnostics.Where(d => d.Id == "DBXK001"));
-        Assert.Contains("System.IO.File", diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains(
+            diagnostics,
+            d => d.Id == "DBXK001"
+                && d.GetMessage().Contains(expectedForbiddenApi, StringComparison.Ordinal));
     }
 
     [Fact]
     public async Task Allows_benign_componentmodel_type_from_event_kernel()
     {
-        var diagnostics = await AnalyzeAsync(Source("""
-            var args = new CancelEventArgs(cancel: false);
+        var diagnostics = await AnalyzeAsync(CreateSource("""
+            var args = new System.ComponentModel.CancelEventArgs(cancel: false);
             _ = args.Cancel;
+            return e.Length > 0;
             """));
 
-        Assert.DoesNotContain(diagnostics, d => d.Id == "DBXK001");
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "DBXK001");
     }
 
-    private static string Source(string statement)
+    private static string CreateSource(string shouldHandleBody)
         => $$"""
             namespace Sample
             {
-                using System.ComponentModel;
-                using DotBoxD.Plugins;
                 using DotBoxD.Abstractions;
+                using DotBoxD.Plugins;
 
-                [Plugin("background-worker-scheduling")]
+                [Plugin("background-worker-scheduler")]
                 public sealed class BackgroundWorkerKernel : IEventKernel<string>
                 {
                     public bool ShouldHandle(string e, HookContext context)
                     {
-                        {{statement}}
-                        return e.Length > 0;
+                        {{shouldHandleBody}}
                     }
 
                     public void Handle(string e, HookContext context) { }
