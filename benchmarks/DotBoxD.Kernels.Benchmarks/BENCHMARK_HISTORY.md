@@ -203,6 +203,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Copy-on-write live-state synchronizer snapshots | this commit | `--probe-live-state-sync` | Published a new immutable synchronizer array only when class-shaped live state registers, removing the hot per-input/per-flush clone. Across 1,000,000 input synchronizations, Sync x1/x8 fell from 32/88 to 0/0 B/call and AsyncSet x1/x8 from 120/264 to 88/176 B/call. The exact snapshot savings are 32 B with one synchronizer and 88 B with eight; concurrent visibility, callback lock boundaries, deferred-list ownership, and flush semantics remain pinned. |
 | Value-type I64 plan slot-read state | this commit | `--probe-interpreter-i64-plan-setup` | Replaced captured slot-read predicates with a readonly frame/earlier-target state threaded through recursive I64 planning. Across 50,000 executions, a single plan fell from 1,184.3 to 1,120.3 B/op (-64 B) and a two-assignment plan from 1,760.5 to 1,600.5 B/op (-160 B). Same-plan zero-loop and source-ordered earlier-target controls isolate setup and preserve the fast path; values and resource usage are unchanged, and elapsed time is not claimed. |
 | Invocation-owned binding audit arbitration | this commit | `--probe-binding-dispatch-scope` | Reused the in-memory destination's event-list gate and removed global checkpoint ownership from the committed async audit wrapper. Across four fresh 500,000-call processes, the async-completed median fell from 320.8 to 280.8 B/call (-40.0 B), while no-audit stayed at 144 total bytes. Sound identity now also covers supported sync-declared pending calls, intentionally moving declared-sync audited calls from 144.8 to 280.8 B/call (+136.0 B). No timing claim is made. |
+| Primitive I64/F64 return trees | this commit | `--probe-interpreter-scalar-return` | Evaluated eligible non-debug unary/binary return trees through the existing primitive evaluators and boxed only the final public result. Across 100,000 executions, one/eight literal increments remove exactly 24/192 B per call and one/eight raw-variable increments remove 48/384 B. I64 and F64 rows are byte-identical; x0 literal/plain-variable controls, checksums, and all resource counters are unchanged. Elapsed time is not claimed. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -2357,3 +2358,42 @@ runs passed 260/260 race/deadline cases, and the broader audit/async/network fil
 implementations retain their public checkpoint contract and own cross-invocation concurrency/atomic persistence because the
 current interface has no invocation token; bindings must resolve `SandboxContext.Audit` for each call. No public API,
 generated ABI, verifier identity, persisted artifact, sandbox resource accounting, or wall-time limit changes.
+
+## Primitive I64/F64 return trees
+
+The boxed expression path materialized a 24-byte `I64Value` or `F64Value` for each raw-slot read and another for every
+arithmetic result. A direct `return value + literal` therefore allocated the intermediate result plus the unavoidable final
+public value; `return left + right` also boxed both raw operands. Nested trees multiplied that cost even though the existing
+primitive evaluators already preserve checked I64 arithmetic, finite F64 results, preorder fuel, and left-to-right failure.
+
+Return execution now selects those evaluators only for non-debug unary and binary trees and creates one final
+`SandboxValue`. Literal leaves and plain variables deliberately retain the generic path: literal returns reuse the prepared
+object identity, while a variable already needs only the final public box. Unsupported trees, intrinsic/host calls, pending
+continuations, and debug traces fall back before evaluation, so side effects are never evaluated twice.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-scalar-return
+```
+
+Two fresh detached-baseline processes and two fresh optimized processes were byte-identical within each state. Managed
+allocation over 100,000 executions (I64 and F64 produced identical totals):
+
+```text
+case                   baseline total / B/op       final total / B/op       exact boxes removed
+literal x0             84,014,784 /   840.1        84,014,784 / 840.1                         0 B
+literal x1             86,424,192 /   864.2        84,009,912 / 840.1                        24 B
+literal x8            103,228,800 / 1,032.3        84,009,912 / 840.1                       192 B
+raw variable x0        84,814,784 /   848.1        84,814,784 / 848.1                         0 B
+raw variable x1        89,620,416 /   896.2        84,809,912 / 848.1                        48 B
+raw variable x8       123,227,840 / 1,232.3        84,809,912 / 848.1                       384 B
+```
+
+The optimized candidate rows sit a stable 4,872 total bytes (0.04872 B/op) below their x0 control because of fixed
+process/probe effects; the claimed 24/48-byte per-node mechanisms are separated from those raw-total differences. Fuel is
+3/5/19 for x0/x1/x8, with unchanged results, zero loops/sandbox bytes/host calls, and all twelve counters pinned. Focused
+regressions cover all I64/F64 operators, overflow, division by zero, non-finite intermediates, signed zero, left-first
+failure fuel, exact debug trace order, unsupported comparisons, pure intrinsics, top-level and nested pending bindings, and
+literal identity. Timing varied by process and is not claimed. No public API, generated ABI, verifier identity, persisted
+artifact, or sandbox contract changes.

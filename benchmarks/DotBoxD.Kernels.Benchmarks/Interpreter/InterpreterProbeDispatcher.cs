@@ -40,6 +40,12 @@ internal static class InterpreterProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-interpreter-scalar-return", StringComparer.OrdinalIgnoreCase))
+        {
+            await InterpreterScalarReturnProbe.RunAsync();
+            return true;
+        }
+
         if (args.Contains("--probe-interpreter-plan-setup", StringComparer.OrdinalIgnoreCase))
         {
             await InterpreterPlanSetupProbe.RunAsync();

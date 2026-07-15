@@ -76,6 +76,9 @@ Services, Kernels, and Pushdown.
   raw locals now evaluate checked arithmetic directly into primitive target slots. Direct `numeric.toI64`/`numeric.toF64`
   assignments use the same primitive handoff; unsupported calls, pending operands, and debug tracing retain the generic
   evaluator.
+- **Allocation-free I64/F64 return intermediates:** eligible non-debug unary and arithmetic return trees now remain
+  primitive until the one `SandboxValue` required by the public result. Prepared literal identity, plain-variable returns,
+  calls and pending continuations, trace order, checked/finite math, and resource accounting retain their existing paths.
 - **Allocation-free MessagePack envelope read state:** request and response formatters now keep their synchronous,
   formatter-private field-tracking state on the stack. Field ordering, duplicate and required-field validation, unknown
   field depth limits, stream decoding, and trailing-byte rejection are unchanged.
