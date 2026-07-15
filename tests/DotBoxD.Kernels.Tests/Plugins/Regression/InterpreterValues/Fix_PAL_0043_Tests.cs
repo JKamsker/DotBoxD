@@ -17,6 +17,8 @@ namespace DotBoxD.Kernels.Tests.Plugins.Regression.InterpreterValues;
 // rebuilt per run, the large plan's per-run allocation scales with the helper
 // count and dwarfs the small plan's; when the lookup is built once and reused,
 // the two per-run figures stay close.
+[Collection(AllocationMeasurementCollection.Name)]
+[Trait(AllocationMeasurementCollection.TraitName, AllocationMeasurementCollection.TraitValue)]
 public sealed class Fix_PAL_0043_Tests
 {
     private const int HelperFunctionCount = 4_000;
