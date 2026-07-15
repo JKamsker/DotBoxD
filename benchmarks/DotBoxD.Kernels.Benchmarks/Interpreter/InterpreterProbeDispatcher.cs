@@ -40,6 +40,12 @@ internal static class InterpreterProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-interpreter-i64-plan-setup", StringComparer.OrdinalIgnoreCase))
+        {
+            await InterpreterI64PlanSetupProbe.RunAsync();
+            return true;
+        }
+
         if (args.Contains("--probe-interpreter-numeric-conversion", StringComparer.OrdinalIgnoreCase))
         {
             await InterpreterNumericConversionProbe.RunAsync();

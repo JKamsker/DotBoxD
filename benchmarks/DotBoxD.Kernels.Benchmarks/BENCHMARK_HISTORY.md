@@ -16,6 +16,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-bindings
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-matrix
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-frame-layout
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-i64-plan-setup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-numeric-conversion
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-plugin-package-collision-discovery
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-examples
@@ -171,6 +172,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Array-free interpreted numeric conversions | this commit | `--probe-interpreter-numeric-conversion` | Evaluated exact-arity `numeric.toI64`/`numeric.toF64` operands directly instead of routing them through a one-element argument array. All three legal conversions removed 32.0 B/conversion: one-conversion rows fell by exactly 3,200,000 B across 100,000 executions, and eight-conversion rows fell by about 25.6 MB. After-runs matched paired unary controls byte-for-byte with identical checksums and per-execution sandbox resource usage. |
 | Scalar single-assignment I32 loop plans | this commit | `--probe-interpreter-plan-setup` | Kept the common one-assignment I32 loop plan in a scalar local instead of allocating a one-element `AssignmentPlan[]`, and executed it without an inner array loop. Across 50,000 executions, helper and direct rows fell by about 40 B/op while zero-iteration and two-assignment controls remained byte-identical. A 20-million-iteration lane improved from 47.1-48.9 ms to 35.4-36.7 ms with identical result and resource usage. |
 | Cached compiled entrypoint input types | this commit | `--probe-compiled-input-types` | Generated `Execute` methods now use the existing bounded structural-type cache for direct built-in List/Map parameter validation. Two million generated-input-shaped validations fell from 112.0 B/op to ~0 for `List<I32>` and from 160.0 B/op to ~0 for `Map<String,I32>`. Nested and opaque fallback controls remained byte-identical at 224.0 and 144.0 B/op; compiler and verifier identities advanced to v10. |
+| Scalar single-assignment I64 loop plans | this commit | `--probe-interpreter-i64-plan-setup` | Kept one-statement I64 loop planning out of the multi-statement array/`HashSet`/closure path. A fully warmed execution removed exactly 240 B, while 50,000 one-iteration executions fell from 74,406,960 B to 62,405,576 B (~240 B/op). Zero-iteration and dependent two-assignment controls were byte-identical. Alternating 20-million-iteration samples improved from a 126.3 ms median to 106.9 ms (-15.4%) with identical result and sandbox resource usage. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -1432,3 +1434,38 @@ sample. The permanent probe executes explicit legacy/cached direct lanes; fallba
 both sides and are byte-identical. Every checksum remains `2,000,000`. The changed type factories and input accessor accept
 no `SandboxContext`, so sandbox resource accounting is unchanged by construction. Stopwatch results are secondary and
 varied between repeated runs.
+
+## Scalar single-assignment I64 loop plans
+
+`I64ForLoopRunner` previously sent every non-empty body through its multi-assignment planner. Even a one-statement body
+allocated an `AssignmentPlan[1]`, a dependency-tracking `HashSet<int>`, and the closure/delegate used to make assignments
+later in the same body visible to subsequent expressions. A single statement has no earlier body assignment to depend on,
+so it now uses `I64ExpressionPlan`'s existing assigned-frame-slot check and keeps its plan in a scalar local. The
+multi-assignment planner remains unchanged, including sequential dependency handling.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -- --probe-interpreter-i64-plan-setup
+```
+
+Permanent-probe allocation results, 50,000 prepared interpreted executions per short row:
+
+```text
+case                         Before allocated / B/op     After allocated / B/op        delta
+one assignment, one loop       74,406,960 B / 1,488.1      62,405,576 B / 1,248.1     ~-240 B/op
+one assignment, zero control   49,604,192 B /   992.1      49,604,192 B /   992.1          0 B/op
+two-assignment control         91,208,344 B / 1,824.2      91,208,344 B / 1,824.2          0 B/op
+one assignment, 20M loop            2,912 B                  2,672 B                   -240 B
+```
+
+The short one-assignment delta is 12,001,384 B across 50,000 executions; the small fixed component rounds to 240.0 B/op.
+A fully warmed single execution proves the exact 240 B planner saving. The zero-iteration control bypasses planning, and
+the dependent two-assignment control (`doubled` reads the newly written `total`) proves that the multi-statement planner is
+byte-identical. Checksums remain `200,000`, `50,000`, `400,000`, and `60,000,001`. Per-execution fuel/loop/sandbox-
+allocation/host-call usage remains `17/1/0/0`, `8/0/0/0`, `23/1/0/0`, and `180,000,008/20,000,000/0/0` respectively.
+
+For CPU evidence, alternating published-binary 20-million-iteration samples moved from a 126.3 ms baseline median
+(120.5-143.1 ms range) to a 106.9 ms scalar median (105.2-120.2 ms range), a 15.4% reduction and about 1.18x throughput.
+Timing is secondary to the exact allocation and control evidence. No public API, compiler/verifier identity, persisted
+artifact, or sandbox resource-accounting behavior changes.
