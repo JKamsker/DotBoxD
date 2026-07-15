@@ -145,6 +145,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             RecordInitializerPropertyRootCall(context, helperGraph, property);
             RecordInitializerMemberReference(context, helperGraph, property);
             ReportAndRecordAmbientCultureMutation(context, helperGraph, property, usesSetter);
+            ReportAndRecordRegexCacheSizeMutation(context, helperGraph, property, usesSetter);
             return;
         }
 
@@ -157,6 +158,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             ReportAndRecordIfForbidden(context, helperGraph, method, property);
         }
         ReportAndRecordAmbientCultureMutation(context, helperGraph, property, usesSetter);
+        ReportAndRecordRegexCacheSizeMutation(context, helperGraph, property, usesSetter);
         RecordStaticConstructorReachability(context, helperGraph, property);
         if (!IsForbiddenHostApi(property.ContainingType))
         {
