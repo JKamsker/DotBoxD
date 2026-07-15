@@ -98,6 +98,9 @@ Services, Kernels, and Pushdown.
   comparison plan instead of allocating a separate object per execution. F64 branched planning removes both the rejected
   tentative I32 comparison and the selected F64 comparison allocation; evaluation order, fuel, loop accounting, and
   unsupported/debug fallback behavior are unchanged.
+- **Allocation-free I64 plan slot predicates:** eligible I64 loop planners now carry frame assignment state and
+  source-ordered earlier targets in a readonly value instead of allocating captured slot-read predicates. Single- and
+  multi-assignment planning retain checked arithmetic, read-before-assignment validation, fuel, and whole-body fallback.
 - **Allocation-free live-state snapshots:** installed kernels now publish an immutable copy-on-write synchronizer snapshot
   when class-shaped live state is registered instead of cloning the registry on every input build or flush. Registrations
   made during a synchronization become visible on the next pass, callbacks remain outside the registration lock, and

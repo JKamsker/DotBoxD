@@ -201,6 +201,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Reusable Auto compiled no-audit state | this commit | `--probe-prepared-values` | Reused the installed kernel's existing no-audit meter/context state after a successful binding-free Auto-compiled run, while retaining Auto selection, hotness tracking, full results, and provider cache lookup. The warmed Auto miss lane fell from 2,216.3 to 1,896.2 B/op; subtracting the one-decimal displays gives 320.1 B/op, while the exact mechanism removes a 128-byte `ResourceMeter` plus a 192-byte `SandboxContext`, or 320 B/run. Repeated after processes reproduced 1,896.2 B/op. Elapsed samples are not claimed. |
 | Value-type I32 comparison plans | this commit | `--probe-interpreter-while-plan-setup`, `--probe-interpreter-branched-plan-setup` | Embedded the immutable two-operand comparison plan in its owning loop plan. Across 50,000 executions, I32 `while` and branched rows fell exactly from 1,168.3 to 1,128.3 B/op and 1,456.3 to 1,416.3 B/op. F64 branched planning fell from 1,840.5 to 1,760.5 B/op because both its rejected I32 attempt and selected F64 plan stop allocating a 40-byte comparison object. Checksums and resource usage are unchanged; elapsed samples are not claimed. |
 | Copy-on-write live-state synchronizer snapshots | this commit | `--probe-live-state-sync` | Published a new immutable synchronizer array only when class-shaped live state registers, removing the hot per-input/per-flush clone. Across 1,000,000 input synchronizations, Sync x1/x8 fell from 32/88 to 0/0 B/call and AsyncSet x1/x8 from 120/264 to 88/176 B/call. The exact snapshot savings are 32 B with one synchronizer and 88 B with eight; concurrent visibility, callback lock boundaries, deferred-list ownership, and flush semantics remain pinned. |
+| Value-type I64 plan slot-read state | this commit | `--probe-interpreter-i64-plan-setup` | Replaced captured slot-read predicates with a readonly frame/earlier-target state threaded through recursive I64 planning. Across 50,000 executions, a single plan fell from 1,184.3 to 1,120.3 B/op (-64 B) and a two-assignment plan from 1,760.5 to 1,600.5 B/op (-160 B). Same-plan zero-loop and source-ordered earlier-target controls isolate setup and preserve the fast path; values and resource usage are unchanged, and elapsed time is not claimed. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -2274,3 +2275,39 @@ The intentional tradeoff is an O(n) array copy when each class-shaped state type
 across a hypothetical bulk setup) in exchange for zero snapshot allocation on every hot synchronization. Installed-kernel
 typed values register once per state type and entries are never removed or replaced, so this moves work to the bounded cold
 path without changing public API, plugin state semantics, or update ordering.
+
+## Value-type I64 plan slot-read state
+
+`I64ExpressionPlan` previously accepted a `Func<int, bool>` that decided whether a raw I64 slot was readable while a loop
+body was planned. A single-assignment plan allocated one 64-byte method-group delegate. Multi-assignment planning captured
+the frame and its earlier-target set in a 32-byte display object, then allocated one 64-byte delegate per assignment.
+
+The recursive planner now receives a readonly two-reference state containing the frame and, only for multi-assignment
+bodies, the existing earlier-target `HashSet`. The target is added only after that statement's expression and target type
+validate, so a statement can read targets established by earlier statements but cannot read a later target. The state does
+not escape planning; the multi-body plan array and dependency set intentionally remain.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-i64-plan-setup
+```
+
+Fresh Release allocation results over 50,000 prepared executions:
+
+```text
+case                            before total / B/op       after total / B/op       state removed
+single assignment              59,217,440 / 1,184.3      56,016,280 / 1,120.3            64 B
+two ordered assignments        88,025,560 / 1,760.5      80,023,240 / 1,600.5           160 B
+```
+
+Repeated after processes reproduced the displayed totals. Same-plan zero-loop rows stay at 928.3 B/op for the single plan
+and 936.3 B/op for the two-assignment plan, separating setup from loop work. A second multi-assignment control begins with
+an unassigned target and has its later statement read the value written by the earlier statement; its one/zero-loop delta
+is 664.2 B/op, matching the retained fast plan. A one-shot 20-million-iteration single plan independently fell from 2,384
+to 2,320 allocated bytes, isolating the exact 64-byte setup object without per-iteration noise.
+
+Checksums, preorder fuel, loop iterations, sandbox allocation, and host calls are unchanged. Regression coverage pins
+source ordering, a forged later-target read-before-assignment failure, checked overflow, and all-or-nothing fallback when
+one multi-body expression is unsupported. Elapsed samples varied by process, so this step makes no timing claim and changes
+no public API, generated ABI, verifier identity, persisted artifact, or sandbox contract.
