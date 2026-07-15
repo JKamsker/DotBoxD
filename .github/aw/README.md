@@ -61,11 +61,11 @@ It should not emit `github/gh-aw-actions/setup` for these workflows.
 ## Codex Models
 
 The active graph explorer and the legacy manual discovery workflow pin `gpt-5.6-sol`, run with high
-reasoning effort, and have a 60-minute / 3000-AI-credit research budget:
+reasoning effort, and have a 45-minute / 2000-AI-credit research budget:
 
 ```yaml
-timeout-minutes: 60
-max-ai-credits: 3000
+timeout-minutes: 45
+max-ai-credits: 2000
 
 engine:
   id: codex
@@ -130,12 +130,11 @@ gh-aw token secret names:
 
 The library-surprise automation is intentionally split across specialized runs:
 
-1. `.github/workflows/library-surprise-dispatcher.md` seeds active lenses and periodically recovers
-   any lens whose continuous chain was broken by a failed or incomplete run.
+1. `.github/workflows/library-surprise-dispatcher.md` selects one eligible lens every four hours.
+   This schedule is the only autonomous discovery source and the hard discovery-rate governor.
 2. `.github/workflows/library-surprise-explore.md` is the active per-lens discovery agent. It mines
-   one coherent seam for up to five independent surprises, performs graph-wide duplicate checks,
-   dispatches one red-test worker per concrete finding, and hands non-exhausted lenses to the
-   deterministic continuation workflow. It does not edit files.
+   one coherent seam, performs graph-wide duplicate checks, and dispatches at most one strongest
+   concrete finding to the red-test worker. It does not self-chain or edit files.
 3. `.github/workflows/library-surprise-sweep.md` is the superseded single-candidate discovery agent,
    retained for manual/backward-compatible runs only.
 4. `.github/workflows/library-surprise-red-test.md` is the proof agent. It adds
@@ -143,14 +142,13 @@ The library-surprise automation is intentionally split across specialized runs:
    locally, then creates a `[surprise-red-test]` PR.
 5. Repository CI runs on that PR and proves the bug exists by failing on the red
    tests.
-6. `.github/workflows/library-surprise-explore-continuation.yml` re-checks lens status and queues one
-   serialized successor explore without spending another model call.
-7. `.github/workflows/library-surprise-fix-dispatcher.yml` continuously drains new red-test PRs and
-   polish work into the bounded fix-worker pool.
-8. `.github/workflows/library-surprise-fix.md` checks out the same PR branch, fixes the production
+6. `.github/workflows/library-surprise-fix-dispatcher.yml` drains new red-test PRs and polish work
+   with six fallback scans per hour, at most four dispatches per tick, and a hard pool limit of eight
+   fix workers. Discovery remains separately bounded to one candidate every four hours.
+7. `.github/workflows/library-surprise-fix.md` checks out the same PR branch, fixes the production
    issue, addresses actionable CodeRabbit feedback, validates the full build/test suite, and pushes
    the fix back to the PR branch.
-9. The configured `GH_AW_CI_TRIGGER_TOKEN` path causes CI to run again after the
+8. The configured `GH_AW_CI_TRIGGER_TOKEN` path causes CI to run again after the
    fix push.
 
 ## Validation

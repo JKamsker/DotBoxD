@@ -20,6 +20,9 @@ public sealed class CompiledCacheOriginTests
     };
 
     [Fact]
+    // This test deliberately rewrites a compiled cache DLL before loading it again. Keep it
+    // out of Coverlet's Kernels coverage run; the normal Kernels test matrix still runs it.
+    [Trait(AllocationMeasurementCollection.TraitName, AllocationMeasurementCollection.TraitValue)]
     public async Task Verifier_safe_cache_entry_with_stale_origin_proof_is_quarantined_and_recompiled()
     {
         using var temp = TempDirectory.Create();

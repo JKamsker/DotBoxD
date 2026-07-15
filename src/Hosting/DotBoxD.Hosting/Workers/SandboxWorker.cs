@@ -107,7 +107,14 @@ public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
     private SandboxHost WorkerHost()
     {
         ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
-        return _workerHost.Value;
+        var workerHost = _workerHost.Value;
+        if (Volatile.Read(ref _disposed) == 0)
+        {
+            return workerHost;
+        }
+
+        workerHost.Dispose();
+        throw new ObjectDisposedException(GetType().FullName);
     }
 }
 

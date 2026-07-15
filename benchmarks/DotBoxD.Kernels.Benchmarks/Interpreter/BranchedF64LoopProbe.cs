@@ -60,6 +60,21 @@ internal static class BranchedF64LoopProbe
             throw new InvalidOperationException(result.Error?.SafeMessage ?? "execution failed");
         }
 
+        var expectedFuel = checked(8L + (17L * iterations));
+        if (result.Value is not F64Value { Value: 1.0 } ||
+            result.ResourceUsage is not
+            {
+                FuelUsed: var fuel,
+                LoopIterations: var loopIterations,
+                AllocatedBytes: 0,
+                HostCalls: 0
+            } ||
+            fuel != expectedFuel ||
+            loopIterations != iterations)
+        {
+            throw new InvalidOperationException("branched F64 result or resource usage changed");
+        }
+
         return result.Value;
     }
 

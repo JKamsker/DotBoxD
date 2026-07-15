@@ -65,7 +65,7 @@ public static class KernelRpcValueConverter
     {
         ArgumentNullException.ThrowIfNull(value);
         ArgumentNullException.ThrowIfNull(expectedType);
-        if (!value.Type.Equals(expectedType))
+        if (!SandboxValueTypeMatcher.MatchesExactType(value, expectedType))
         {
             throw new ArgumentException(
                 "Server extension IPC cannot marshal a sandbox collection whose declared type does not match its contents.",
