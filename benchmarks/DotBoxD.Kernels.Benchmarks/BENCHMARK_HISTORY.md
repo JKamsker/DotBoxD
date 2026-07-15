@@ -163,6 +163,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Owned compiled literal collections | this commit | `--probe-literal-collection-construction` | Compiled list/map literal construction now transfers compiler/runtime-owned arrays and dictionaries through internal owned construction paths instead of defensively snapshotting them a second time. Same-session before and repeated after samples for 500k constructions measured list literal arity 8 at 352.0 to 240.0 B/op, list literal arity 32 at 736.0 to 432.0 B/op, map literal arity 8 at 1,362.2 to 931.4 B/op, map literal arity 32 at 3,197.0 to 2,034.2 B/op, and `map.empty` at 304.9 to 235.4 B/op. Public `FromList`/`FromMap` defensive-copy behavior remains unchanged; this step claims allocation reduction only. |
 | Prepared-plan interpreter frame-layout cache | this commit | `--probe-interpreter-frame-layout` | Reused immutable per-function slot layouts across executions of the same prepared plan. For 50k direct interpreted executions, a parameter-return entrypoint improved from 105.3 ms / 1,824.1 B/op to 73.0 ms / 1,016.0 B/op; an eight-local chain improved from 346.3 ms / 3,512.2 B/op to 188.6 ms / 1,120.1 B/op. Layouts remain lazy, weakly owned by the plan, isolated between plans, and safe under concurrent first use. |
 | Selective plugin-package collision discovery | this commit | `--probe-plugin-package-collision-discovery` | Limited the source-type semantic transform to declarations whose decoded identifier ends in the shared `PluginPackage` suffix. Across 1,000 warmed two-snapshot edits with 1,000 unrelated types and one real collision, allocation fell from 240,919.1 B/edit to 95,446.3 B/edit; synthetic full-generator time moved from 1,697.6 ms to 1,420.8 ms. Exact semantic namespace, nesting, generic-arity, escaped-identifier, and declaration-kind behavior remains covered. |
+| Raw-only interpreter frame storage | this commit | `--probe-interpreter-frame-layout` | Reused the shared empty boxed-slot array when a prepared frame layout contains only raw I32/I64/F64 slots. Across 50,000 executions, parameter return fell from 976.0 to 944.0 B/op (-32 B/op) and an eight-local chain fell from 1,080.1 to 984.0 B/op (-96 B/op); the mixed raw/boxed control remained 984.1 B/op. Boxed fallback probes now check the layout kind before indexing, preserving sandbox errors for wrong-kind plans. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -1213,3 +1214,35 @@ the alternating A/B/A lane that materializes the ordinal dictionary. Checksums a
 changes in those lanes; fuel, loops, sandbox allocation, file/network bytes, logs, collection elements, and string bytes
 remain zero. Focused tests cover the null reset path, dictionary-backed reset, same-binding quota, binding switches, and
 the 128 B fresh-meter allocation guard. Stopwatch movement is secondary.
+
+## Raw-only interpreter frame storage
+
+`InterpreterFrameBuilder` previously allocated a slot-indexed `SandboxValue?[]` for every invocation, even when the
+prepared frame layout stored every parameter and local in its raw I32, I64, or F64 arrays. The boxed array was therefore
+never read on common scalar-only entrypoints, but its size still grew with the total slot count.
+
+The prepared layout now records whether it contains any boxed slots. All-raw frames reuse `Array.Empty<SandboxValue?>()`;
+mixed layouts keep the full slot-indexed array because their boxed values still use layout slot numbers. Boxed readers,
+writers, and fast-path probes first verify the slot kind before indexing. This both protects the empty-array representation
+and makes wrong-kind or tampered plans fall back to a sandbox error instead of leaking an index exception as `HostFailure`.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -- --probe-interpreter-frame-layout
+```
+
+Representative local runs, 50,000 executions per row:
+
+```text
+case                  Before ms / B/op       After ms / allocated / B/op       delta
+parameter return         69.0 /   976.0        70.8 / 47,201,456 B / 944.0     -32 B/op
+eight local chain       184.7 / 1,080.1       188.1 / 49,202,152 B / 984.0     -96 B/op
+mixed raw and boxed     127.6 /   984.1        87.9 / 49,202,824 B / 984.1       0 B/op
+```
+
+Allocation is the claim: the one-slot row removes a 32-byte array, or 1,600,000 B across the sample; the nine-slot row
+removes a 96-byte array, or 4,800,000 B. The mixed control retains its required storage and unchanged 984.1 B/op. Checksums
+remained 50,000, 1,850,000, and 50,000 respectively. Focused regressions cover an all-raw I64 frame, mixed raw/boxed value
+access, and a wrong-kind `list.count` fast-path probe that must return `InvalidInput` rather than `HostFailure`. Stopwatch
+movement is secondary.

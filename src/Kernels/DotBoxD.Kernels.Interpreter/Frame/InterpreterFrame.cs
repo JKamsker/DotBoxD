@@ -49,8 +49,9 @@ internal sealed partial class InterpreterFrame
                 ? SandboxValue.FromInt64(_i64Slots[slot])
                 : throw Unassigned(name);
         }
-        return _slots[slot]
-            ?? throw Unassigned(name);
+        return TryGetBoxedValue<SandboxValue>(slot, out var value)
+            ? value
+            : throw Unassigned(name);
     }
     public void Write(string name, SandboxValue value)
     {
@@ -69,7 +70,7 @@ internal sealed partial class InterpreterFrame
         }
         else
         {
-            _slots[slot] = value;
+            WriteBoxedValue(slot, value);
         }
         if (_layout.HasRawSlots)
         {
@@ -81,7 +82,7 @@ internal sealed partial class InterpreterFrame
         var slot = _layout.GetSlot(name);
         return _layout.IsI32Slot(slot)
             ? _assigned[slot]
-            : _slots[slot] is I32Value;
+            : TryGetBoxedValue<I32Value>(slot, out _);
     }
     public bool IsInt32Local(string name) => _layout.IsI32Slot(name);
     public bool IsInt32Slot(int slot) => _layout.IsI32Slot(slot);
@@ -96,33 +97,30 @@ internal sealed partial class InterpreterFrame
         {
             return _assigned[slot] ? _i32Slots[slot] : throw Unassigned(name);
         }
-        return _slots[slot] is I32Value value ? value.Value : throw Unassigned(name);
+        return TryGetBoxedValue<I32Value>(slot, out var value) ? value.Value : throw Unassigned(name);
     }
     public int ReadInt32Slot(int slot)
         => _layout.IsI32Slot(slot)
             ? _assigned[slot] ? _i32Slots[slot] : throw UnassignedSlot()
-            : _slots[slot] is I32Value value ? value.Value : throw UnassignedSlot();
+            : TryGetBoxedValue<I32Value>(slot, out var value) ? value.Value : throw UnassignedSlot();
     public int ReadRawInt32Slot(int slot) => _i32Slots[slot];
     public bool TryGetStringSlot(string name, out int slot)
     {
         slot = _layout.GetSlot(name);
-        return _slots[slot] is StringValue;
+        return TryGetBoxedValue<StringValue>(slot, out _);
     }
     public int ReadStringLengthSlot(int slot)
-        => _slots[slot] is StringValue value ? value.Value.Length : throw UnassignedSlot();
+        => ReadBoxedValue<StringValue>(slot).Value.Length;
     public bool TryGetListSlot(string name, out int slot)
     {
         slot = _layout.GetSlot(name);
-        return _slots[slot] is ListValue;
+        return TryGetBoxedValue<ListValue>(slot, out _);
     }
     public int ReadListCountSlot(int slot)
-        => _slots[slot] is ListValue value ? value.Values.Count : throw UnassignedSlot();
+        => ReadBoxedValue<ListValue>(slot).Values.Count;
     public int ReadListInt32ItemSlot(int slot, int index)
     {
-        if (_slots[slot] is not ListValue list)
-        {
-            throw UnassignedSlot();
-        }
+        var list = ReadBoxedValue<ListValue>(slot);
         var values = list.Values;
         if (index < 0 || index >= values.Count)
         {
@@ -138,7 +136,7 @@ internal sealed partial class InterpreterFrame
     }
     public bool TryReadListInt32ItemsSlot(int slot, out int[] items)
     {
-        if (_slots[slot] is not ListValue list)
+        if (!TryGetBoxedValue<ListValue>(slot, out var list))
         {
             items = [];
             return false;
@@ -159,16 +157,13 @@ internal sealed partial class InterpreterFrame
     public bool TryGetMapSlot(string name, out int slot)
     {
         slot = _layout.GetSlot(name);
-        return _slots[slot] is MapValue;
+        return TryGetBoxedValue<MapValue>(slot, out _);
     }
     public int ReadMapCountSlot(int slot)
-        => _slots[slot] is MapValue value ? value.Values.Count : throw UnassignedSlot();
+        => ReadBoxedValue<MapValue>(slot).Values.Count;
     public int ReadMapInt32ValueSlot(int slot, SandboxValue key)
     {
-        if (_slots[slot] is not MapValue map)
-        {
-            throw UnassignedSlot();
-        }
+        var map = ReadBoxedValue<MapValue>(slot);
         SandboxValueValidator.RequireType(key, map.KeyType, "map key type mismatch");
         if (!map.Values.TryGetValue(key, out var value))
         {
@@ -190,7 +185,7 @@ internal sealed partial class InterpreterFrame
             value = _assigned[slot] ? _f64Slots[slot] : 0;
             return _assigned[slot];
         }
-        if (_slots[slot] is F64Value f64)
+        if (TryGetBoxedValue<F64Value>(slot, out var f64))
         {
             value = f64.Value;
             return true;
@@ -201,7 +196,7 @@ internal sealed partial class InterpreterFrame
     public double ReadDoubleSlot(int slot)
         => _layout.IsF64Slot(slot)
             ? _assigned[slot] ? _f64Slots[slot] : throw UnassignedSlot()
-            : _slots[slot] is F64Value value ? value.Value : throw UnassignedSlot();
+            : TryGetBoxedValue<F64Value>(slot, out var value) ? value.Value : throw UnassignedSlot();
     public double ReadRawDoubleSlot(int slot) => _f64Slots[slot];
     public void WriteInt32(string name, int value)
     {
@@ -218,7 +213,7 @@ internal sealed partial class InterpreterFrame
     {
         if (!_layout.IsI32Slot(slot))
         {
-            _slots[slot] = SandboxValue.FromInt32(value);
+            WriteBoxedValue(slot, SandboxValue.FromInt32(value));
             return;
         }
         _i32Slots[slot] = value;
@@ -235,7 +230,7 @@ internal sealed partial class InterpreterFrame
     {
         if (!_layout.IsF64Slot(slot))
         {
-            _slots[slot] = SandboxValue.FromDouble(value);
+            WriteBoxedValue(slot, SandboxValue.FromDouble(value));
             return;
         }
 
@@ -255,9 +250,39 @@ internal sealed partial class InterpreterFrame
         IReadOnlyList<SandboxValue> args)
         => InterpreterFrameBuilder.Create(layout, function, args);
 
+    private bool TryGetBoxedValue<T>(int slot, out T value)
+        where T : SandboxValue
+    {
+        if (_layout.IsBoxedSlot(slot) && _slots[slot] is T typed)
+        {
+            value = typed;
+            return true;
+        }
+
+        value = null!;
+        return false;
+    }
+
+    private T ReadBoxedValue<T>(int slot)
+        where T : SandboxValue
+        => TryGetBoxedValue<T>(slot, out var value) ? value : throw UnassignedSlot();
+
+    private void WriteBoxedValue(int slot, SandboxValue value)
+    {
+        if (!_layout.IsBoxedSlot(slot))
+        {
+            throw WrongSlotKind();
+        }
+
+        _slots[slot] = value;
+    }
+
     private static SandboxRuntimeException Unassigned(string name)
         => new(new SandboxError(SandboxErrorCode.ValidationError, $"local '{name}' read before assignment"));
 
     private static SandboxRuntimeException UnassignedSlot()
         => new(new SandboxError(SandboxErrorCode.ValidationError, "local read before assignment"));
+
+    private static SandboxRuntimeException WrongSlotKind()
+        => new(new SandboxError(SandboxErrorCode.ValidationError, "local slot kind mismatch"));
 }

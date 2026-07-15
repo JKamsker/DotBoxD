@@ -9,9 +9,7 @@ internal static class InterpreterFrameBuilder
         SandboxFunction function,
         IReadOnlyList<SandboxValue> args)
     {
-        var slots = layout.SlotCount == 0
-            ? Array.Empty<SandboxValue?>()
-            : new SandboxValue?[layout.SlotCount];
+        var slots = layout.HasBoxedSlots ? new SandboxValue?[layout.SlotCount] : Array.Empty<SandboxValue?>();
         var i32Slots = layout.HasI32Slots ? new int[layout.SlotCount] : Array.Empty<int>();
         var i64Slots = layout.HasI64Slots ? new long[layout.SlotCount] : Array.Empty<long>();
         var f64Slots = layout.HasF64Slots ? new double[layout.SlotCount] : Array.Empty<double>();

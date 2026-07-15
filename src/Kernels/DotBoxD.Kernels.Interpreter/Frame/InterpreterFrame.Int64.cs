@@ -24,7 +24,7 @@ internal sealed partial class InterpreterFrame
             return _assigned[slot];
         }
 
-        if (_slots[slot] is I64Value i64)
+        if (TryGetBoxedValue<I64Value>(slot, out var i64))
         {
             value = i64.Value;
             return true;

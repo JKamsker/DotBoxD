@@ -33,9 +33,10 @@ internal static class InterpreterFrameLayoutProbe
         };
 
         Console.WriteLine($"interpreter frame-layout executions = {Iterations:N0}");
-        Console.WriteLine("case                 total ms       B/op   checksum");
+        Console.WriteLine("case                 total ms      allocated B       B/op   checksum");
         await RunCaseAsync(host, interpreter, options, policy, "parameter return", ParameterReturnJson());
         await RunCaseAsync(host, interpreter, options, policy, "eight local chain", EightLocalChainJson());
+        await RunCaseAsync(host, interpreter, options, policy, "mixed raw and boxed", MixedRawAndBoxedJson());
     }
 
     private static async Task RunCaseAsync(
@@ -54,7 +55,8 @@ internal static class InterpreterFrameLayoutProbe
         ForceGc();
         var measurement = await MeasureAsync(interpreter, plan, input, options, Iterations);
         Console.WriteLine(
-            $"{name,-20} {measurement.ElapsedMilliseconds,8:N1} {measurement.Bytes / (double)Iterations,10:N1} {measurement.Checksum,10:N0}");
+            $"{name,-20} {measurement.ElapsedMilliseconds,8:N1} {measurement.Bytes,16:N0} "
+            + $"{measurement.Bytes / (double)Iterations,10:N1} {measurement.Checksum,10:N0}");
     }
 
     private static async Task<Measurement> MeasureAsync(
@@ -127,6 +129,24 @@ internal static class InterpreterFrameLayoutProbe
               { "op": "set", "name": "g", "value": { "op": "add", "left": { "var": "f" }, "right": { "i32": 7 } } },
               { "op": "set", "name": "h", "value": { "op": "add", "left": { "var": "g" }, "right": { "i32": 8 } } },
               { "op": "return", "value": { "var": "h" } }
+            ]
+          }]
+        }
+        """;
+
+    private static string MixedRawAndBoxedJson()
+        => """
+        {
+          "id": "frame-layout-mixed",
+          "version": "1.0.0",
+          "functions": [{
+            "id": "main",
+            "visibility": "entrypoint",
+            "parameters": [{ "name": "value", "type": "I32" }],
+            "returnType": "I32",
+            "body": [
+              { "op": "set", "name": "label", "value": { "string": "kept boxed" } },
+              { "op": "return", "value": { "var": "value" } }
             ]
           }]
         }
