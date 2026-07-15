@@ -57,7 +57,7 @@ internal sealed partial class InvokeAsyncCallShape
     {
         returnType = null!;
         var contextualExpression = ContextualExpression(invocation);
-        if (TryTypedLocalReturnType(contextualExpression, model, cancellationToken, out returnType))
+        if (TryContextualValueTaskReturnType(contextualExpression, model, cancellationToken, out returnType))
         {
             return true;
         }
@@ -103,23 +103,32 @@ internal sealed partial class InvokeAsyncCallShape
         }
     }
 
-    private static bool TryTypedLocalReturnType(
+    private static bool TryContextualValueTaskReturnType(
         ExpressionSyntax expression,
         SemanticModel model,
         CancellationToken cancellationToken,
         out ITypeSymbol returnType)
     {
         returnType = null!;
-        if (expression.Parent is not EqualsValueClauseSyntax
+        var targetType = expression.Parent switch
+        {
+            EqualsValueClauseSyntax
             {
                 Value: var value,
                 Parent: VariableDeclaratorSyntax
                 {
                     Parent: VariableDeclarationSyntax declaration,
                 },
-            } ||
-            value != expression ||
-            model.GetTypeInfo(declaration.Type, cancellationToken).Type is not { } targetType)
+            } when value == expression => model.GetTypeInfo(declaration.Type, cancellationToken).Type,
+            AssignmentExpressionSyntax
+            {
+                RawKind: (int)SyntaxKind.SimpleAssignmentExpression,
+                Left: var left,
+                Right: var right,
+            } when right == expression => model.GetTypeInfo(left, cancellationToken).Type,
+            _ => null,
+        };
+        if (targetType is null)
         {
             return false;
         }
