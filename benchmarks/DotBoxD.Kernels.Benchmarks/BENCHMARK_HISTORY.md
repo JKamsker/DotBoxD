@@ -200,6 +200,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Allocation-free warmed compiled cache hits | this commit | `--probe-compiled-execution-envelope` | Moved non-persistent reflection compilation/materialization factories into miss-only cache helpers and the inline-await capture into its selected worker boundary. Across 50,000 warmed public compiled suppressed successes, allocation fell from 40,404,920 B (808.1 B/op) to 25,602,968 B (512.1 B/op), removing 296.0 B/execution. Provider and both execution-cache completed hits independently measure 0 B/hit; checksums, identity, resource usage, cancellation/coalescing, custom compilers, failures, and fallback remain pinned. |
 | Reusable Auto compiled no-audit state | this commit | `--probe-prepared-values` | Reused the installed kernel's existing no-audit meter/context state after a successful binding-free Auto-compiled run, while retaining Auto selection, hotness tracking, full results, and provider cache lookup. The warmed Auto miss lane fell from 2,216.3 to 1,896.2 B/op; subtracting the one-decimal displays gives 320.1 B/op, while the exact mechanism removes a 128-byte `ResourceMeter` plus a 192-byte `SandboxContext`, or 320 B/run. Repeated after processes reproduced 1,896.2 B/op. Elapsed samples are not claimed. |
 | Value-type I32 comparison plans | this commit | `--probe-interpreter-while-plan-setup`, `--probe-interpreter-branched-plan-setup` | Embedded the immutable two-operand comparison plan in its owning loop plan. Across 50,000 executions, I32 `while` and branched rows fell exactly from 1,168.3 to 1,128.3 B/op and 1,456.3 to 1,416.3 B/op. F64 branched planning fell from 1,840.5 to 1,760.5 B/op because both its rejected I32 attempt and selected F64 plan stop allocating a 40-byte comparison object. Checksums and resource usage are unchanged; elapsed samples are not claimed. |
+| Copy-on-write live-state synchronizer snapshots | this commit | `--probe-live-state-sync` | Published a new immutable synchronizer array only when class-shaped live state registers, removing the hot per-input/per-flush clone. Across 1,000,000 input synchronizations, Sync x1/x8 fell from 32/88 to 0/0 B/call and AsyncSet x1/x8 from 120/264 to 88/176 B/call. The exact snapshot savings are 32 B with one synchronizer and 88 B with eight; concurrent visibility, callback lock boundaries, deferred-list ownership, and flush semantics remain pinned. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -2236,3 +2237,40 @@ The 40/40/80-byte reductions reproduced exactly across three fresh processes. Th
 empty-branch, and two-assignment controls retain their expected relative bands. Results, fuel, loop iterations, sandbox
 allocation, and host-call usage are unchanged. This setup-only representation change has no isolated timing evidence, so
 it makes only the allocation claim and changes no public API, verifier identity, persisted artifact, or sandbox contract.
+
+## Copy-on-write live-state synchronizer snapshots
+
+Each installed kernel owns a live-state synchronizer registry. Class-shaped state registers one immutable synchronizer when
+its typed live value is first created, but every later input build and flush previously locked the registry and cloned the
+entire reference list before invoking callbacks. Registration is rare and append-only; synchronization is the hot path.
+
+The registry now copies and appends under the existing registration lock, then publishes the immutable array with a
+volatile write. Readers take one volatile snapshot and iterate it without a lock or copy. A registration that races an
+active synchronization is excluded from that stable pass and visible on the next pass, matching the prior snapshot
+contract. Callbacks still run outside the lock. `AsyncSet` continues to return a fresh caller-owned deferred-action list;
+that list is intentionally neither cached nor pooled.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-live-state-sync
+```
+
+Warmed results over 1,000,000 input synchronizations:
+
+```text
+case             before B/call    after B/call    saved/call
+Sync x1                    32.0             0.0          32 B
+Sync x8                    88.0             0.0          88 B
+AsyncSet x1               120.0            88.0          32 B
+AsyncSet x8               264.0           176.0          88 B
+```
+
+All four after totals reproduced exactly in four fresh Release processes. Timing samples were affected by tiering, so this
+step makes only the byte-exact allocation claim. Exact callback/deferred counts, concurrent registration during input and
+flush, concurrent append publication, mode filtering, and caller-owned list identity are permanent controls.
+
+The intentional tradeoff is an O(n) array copy when each class-shaped state type first registers (and therefore O(n²)
+across a hypothetical bulk setup) in exchange for zero snapshot allocation on every hot synchronization. Installed-kernel
+typed values register once per state type and entries are never removed or replaced, so this moves work to the bounded cold
+path without changing public API, plugin state semantics, or update ordering.
