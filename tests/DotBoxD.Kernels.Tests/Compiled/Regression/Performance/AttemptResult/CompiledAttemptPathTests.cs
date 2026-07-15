@@ -1,4 +1,5 @@
 using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Compiler;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Tests._TestSupport;
 
@@ -122,9 +123,9 @@ public sealed class CompiledAttemptPathTests
         string failureKind,
         SandboxErrorCode expectedErrorCode)
     {
-        var compiler = failureKind == "cancelled"
+        ISandboxCompiler compiler = failureKind == "cancelled"
             ? new CancelledCompiler()
-            : (DotBoxD.Kernels.Compiler.ISandboxCompiler)new HostFailureCompiler();
+            : new HostFailureCompiler();
         using var host = CompiledAttemptPathTestSupport.HostWithCompiler(compiler);
         var plan = await CompiledAttemptPathTestSupport.PreparePurePlanAsync(host);
         var runId = SandboxRunId.New();

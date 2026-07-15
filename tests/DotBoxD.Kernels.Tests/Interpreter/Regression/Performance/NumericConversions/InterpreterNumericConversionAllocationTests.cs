@@ -38,10 +38,10 @@ public sealed class InterpreterNumericConversionAllocationTests
             SuppressSuccessfulRunSummaryAudit = true
         };
 
-        _ = await MeasureAsync(interpreter, controlPlan, scenario, options, WarmupIterations);
-        _ = await MeasureAsync(interpreter, numericPlan, scenario, options, WarmupIterations);
-        var control = await MeasureAsync(interpreter, controlPlan, scenario, options, MeasurementIterations);
-        var numeric = await MeasureAsync(interpreter, numericPlan, scenario, options, MeasurementIterations);
+        _ = Measure(interpreter, controlPlan, scenario, options, WarmupIterations);
+        _ = Measure(interpreter, numericPlan, scenario, options, WarmupIterations);
+        var control = Measure(interpreter, controlPlan, scenario, options, MeasurementIterations);
+        var numeric = Measure(interpreter, numericPlan, scenario, options, MeasurementIterations);
 
         Assert.Equal(control.Checksum, numeric.Checksum);
         Assert.Equal(control.Usage, numeric.Usage);
@@ -68,7 +68,7 @@ public sealed class InterpreterNumericConversionAllocationTests
                 .Build());
     }
 
-    private static async Task<Measurement> MeasureAsync(
+    private static Measurement Measure(
         SandboxInterpreter interpreter,
         ExecutionPlan plan,
         Scenario scenario,
@@ -84,12 +84,19 @@ public sealed class InterpreterNumericConversionAllocationTests
         var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
         for (var i = 0; i < iterations; i++)
         {
-            var result = await interpreter.ExecuteAsync(
+            var pending = interpreter.ExecuteAsync(
                 plan,
                 "main",
                 input,
                 options,
                 CancellationToken.None);
+            if (!pending.IsCompletedSuccessfully)
+            {
+                throw new InvalidOperationException(
+                    "numeric-conversion allocation test unexpectedly became asynchronous");
+            }
+
+            var result = pending.Result;
             Assert.True(result.Succeeded, result.Error?.SafeMessage);
             checksum += result.Value switch
             {

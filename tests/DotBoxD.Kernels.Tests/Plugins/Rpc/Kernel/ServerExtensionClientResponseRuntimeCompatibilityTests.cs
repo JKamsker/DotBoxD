@@ -57,6 +57,37 @@ public sealed class ServerExtensionClientResponseRuntimeCompatibilityTests
     }
 
     [Fact]
+    public void Response_emitter_keeps_distinct_nullable_reference_readers()
+    {
+        var compilation = RuntimeCompilation("""
+            public ref struct KernelRpcPayloadReader
+            {
+                public void SkipValue() { }
+                public string ReadString() => string.Empty;
+                public void EnsureConsumed() { }
+            }
+
+            public static class ResponseShapes
+            {
+                public static string Required() => string.Empty;
+                public static string? Optional() => null;
+            }
+            """);
+        var responseShapes = compilation.GetTypeByMetadataName("DotBoxD.Plugins.ResponseShapes")!;
+        var required = Assert.IsAssignableFrom<IMethodSymbol>(responseShapes.GetMembers("Required").Single()).ReturnType;
+        var optional = Assert.IsAssignableFrom<IMethodSymbol>(responseShapes.GetMembers("Optional").Single()).ReturnType;
+        var emitter = new RpcKernelClientResponseReadEmitter(compilation);
+
+        Assert.True(emitter.TryReadExpression(required, "requiredResponse", out var requiredExpression));
+        Assert.True(emitter.TryReadExpression(optional, "optionalResponse", out var optionalExpression));
+        Assert.Equal("KernelRpcResponseReader.Read0(requiredResponse)", requiredExpression);
+        Assert.Equal("KernelRpcResponseReader.Read1(optionalResponse)", optionalExpression);
+        Assert.Contains(" Read0(byte[] payload)", emitter.Helpers, StringComparison.Ordinal);
+        Assert.DoesNotContain("? Read0(byte[] payload)", emitter.Helpers, StringComparison.Ordinal);
+        Assert.Contains("? Read1(byte[] payload)", emitter.Helpers, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Legacy_conversion_reader_avoids_reserved_fixed_helper_name()
     {
         var compilation = RuntimeCompilation(
@@ -105,5 +136,6 @@ public sealed class ServerExtensionClientResponseRuntimeCompatibilityTests
                     CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp12))
             ],
             [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)],
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+                .WithNullableContextOptions(NullableContextOptions.Enable));
 }

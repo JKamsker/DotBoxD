@@ -120,8 +120,9 @@ internal static class InterpreterBranchedPlanSetupProbe
         int iterations)
     {
         long checksum = 0;
+        var watch = new Stopwatch();
         var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-        var watch = Stopwatch.StartNew();
+        watch.Start();
         for (var i = 0; i < iterations; i++)
         {
             var pending = interpreter.ExecuteAsync(plan, "main", input, options, CancellationToken.None);

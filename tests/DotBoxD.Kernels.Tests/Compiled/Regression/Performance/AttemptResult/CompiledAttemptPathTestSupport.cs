@@ -73,7 +73,8 @@ internal sealed class SandboxErrorCompiler(SandboxErrorCode code) : ISandboxComp
         ExecutionPlan plan,
         CompileOptions options,
         CancellationToken cancellationToken)
-        => throw new SandboxRuntimeException(new SandboxError(code, "compiler rejected the plan"));
+        => ValueTask.FromException<CompiledArtifact>(
+            new SandboxRuntimeException(new SandboxError(code, "compiler rejected the plan")));
 }
 
 internal sealed class CancelledCompiler : ISandboxCompiler
@@ -82,7 +83,7 @@ internal sealed class CancelledCompiler : ISandboxCompiler
         ExecutionPlan plan,
         CompileOptions options,
         CancellationToken cancellationToken)
-        => throw new OperationCanceledException("compiler cancelled");
+        => ValueTask.FromException<CompiledArtifact>(new OperationCanceledException("compiler cancelled"));
 }
 
 internal sealed class HostFailureCompiler : ISandboxCompiler
@@ -91,7 +92,8 @@ internal sealed class HostFailureCompiler : ISandboxCompiler
         ExecutionPlan plan,
         CompileOptions options,
         CancellationToken cancellationToken)
-        => throw new InvalidOperationException("compiler failed unexpectedly");
+        => ValueTask.FromException<CompiledArtifact>(
+            new InvalidOperationException("compiler failed unexpectedly"));
 }
 
 internal sealed class CompilerGate

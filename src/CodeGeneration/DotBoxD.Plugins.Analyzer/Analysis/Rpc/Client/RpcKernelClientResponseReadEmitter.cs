@@ -11,6 +11,11 @@ using Microsoft.CodeAnalysis;
 /// </summary>
 internal sealed class RpcKernelClientResponseReadEmitter
 {
+    private static readonly SymbolDisplayFormat TypeFormat = SymbolDisplayFormat.FullyQualifiedFormat
+        .WithMiscellaneousOptions(
+            SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions |
+            SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
+
     private readonly StringBuilder _helpers = new();
     private readonly Dictionary<string, string> _readers = new(StringComparer.Ordinal);
     private readonly RpcKernelPayloadReadEmitter _payload;
@@ -87,7 +92,7 @@ internal sealed class RpcKernelClientResponseReadEmitter
     }
 
     private static string TypeName(ITypeSymbol type)
-        => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        => type.ToDisplayString(TypeFormat);
 
     private static bool HasSkipValue(Compilation compilation)
     {

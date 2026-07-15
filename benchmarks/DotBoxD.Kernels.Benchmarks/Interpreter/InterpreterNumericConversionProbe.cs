@@ -43,18 +43,18 @@ internal static class InterpreterNumericConversionProbe
             {
                 var controlPlan = await PrepareAsync(host, policy, scenario, count, numeric: false);
                 var numericPlan = await PrepareAsync(host, policy, scenario, count, numeric: true);
-                _ = await MeasureAsync(interpreter, controlPlan, scenario.Input, options, WarmupIterations);
-                _ = await MeasureAsync(interpreter, numericPlan, scenario.Input, options, WarmupIterations);
+                _ = Measure(interpreter, controlPlan, scenario.Input, options, WarmupIterations);
+                _ = Measure(interpreter, numericPlan, scenario.Input, options, WarmupIterations);
 
                 ForceGc();
-                var control = await MeasureAsync(
+                var control = Measure(
                     interpreter,
                     controlPlan,
                     scenario.Input,
                     options,
                     MeasurementIterations);
                 ForceGc();
-                var numeric = await MeasureAsync(
+                var numeric = Measure(
                     interpreter,
                     numericPlan,
                     scenario.Input,
@@ -129,7 +129,7 @@ internal static class InterpreterNumericConversionProbe
             """;
     }
 
-    private static async Task<Measurement> MeasureAsync(
+    private static Measurement Measure(
         SandboxInterpreter interpreter,
         ExecutionPlan plan,
         SandboxValue input,
@@ -138,11 +138,19 @@ internal static class InterpreterNumericConversionProbe
     {
         double checksum = 0;
         SandboxResourceUsage? expectedUsage = null;
+        var watch = new Stopwatch();
         var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-        var watch = Stopwatch.StartNew();
+        watch.Start();
         for (var i = 0; i < iterations; i++)
         {
-            var result = await interpreter.ExecuteAsync(plan, "main", input, options, CancellationToken.None);
+            var pending = interpreter.ExecuteAsync(plan, "main", input, options, CancellationToken.None);
+            if (!pending.IsCompletedSuccessfully)
+            {
+                throw new InvalidOperationException(
+                    "numeric-conversion probe unexpectedly left the synchronous path");
+            }
+
+            var result = pending.Result;
             if (!result.Succeeded)
             {
                 throw new InvalidOperationException(result.Error?.SafeMessage ?? "execution failed");
