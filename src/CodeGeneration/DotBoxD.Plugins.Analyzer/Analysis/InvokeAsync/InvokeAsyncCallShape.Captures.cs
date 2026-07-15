@@ -177,7 +177,7 @@ internal sealed partial class InvokeAsyncCallShape
         IReadOnlyList<InvokeAsyncSyncOut> syncOuts,
         ISet<ISymbol> captureAliases,
         SemanticModel model,
-        Func<ExpressionSyntax, string> lower)
+        RequiredRpcExpressionLowerer lower)
     {
         if (!TryCaptureMember(
                 assignment.Left,
@@ -197,7 +197,12 @@ internal sealed partial class InvokeAsyncCallShape
                 $"InvokeAsync capture member '{propertyName}' must be a writable marshalled field or property.");
         }
 
-        return DotBoxDRpcJsonLowerer.SetGeneratedLocal(syncOut.LocalName, lower(assignment.Right));
+        return DotBoxDRpcJsonLowerer.SetGeneratedLocal(
+            syncOut.LocalName,
+            lower(
+                assignment.Right,
+                syncOut.Type,
+                $"InvokeAsync capture member '{syncOut.TargetName}' assignment"));
     }
 
     private static string? LowerCaptureRead(

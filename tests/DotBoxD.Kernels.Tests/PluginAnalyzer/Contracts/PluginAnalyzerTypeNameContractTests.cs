@@ -120,6 +120,7 @@ public sealed class PluginAnalyzerTypeNameContractTests
             [nameof(TypeNames.SystemTextEncoding)] = TypeName(typeof(System.Text.Encoding)),
             [nameof(TypeNames.SystemServiceProvider)] = TypeName(typeof(IServiceProvider)),
             [nameof(TypeNames.SystemType)] = TypeName(typeof(Type)),
+            [nameof(TypeNames.SystemArrayPoolOriginal)] = "System.Buffers.ArrayPool<T>",
             [nameof(TypeNames.SystemUnsafe)] = TypeName(typeof(System.Runtime.CompilerServices.Unsafe)),
 
             [nameof(TypeNames.GlobalArray)] = GlobalTypeName(typeof(Array)),

@@ -34,7 +34,9 @@ internal static class WorkerRunSummaryValidator
         SandboxExecutionResult result,
         SandboxAuditEvent summary)
     {
-        if (summary.Fields is null || !RequiredFieldsMatch(plan, result, summary) || !HasNonEmptyField(summary, "cacheStatus"))
+        if (summary.Fields is null ||
+            !RequiredFieldsMatch(plan, result, summary) ||
+            !CacheStatusMatches(result, summary))
         {
             return false;
         }
@@ -67,7 +69,7 @@ internal static class WorkerRunSummaryValidator
     {
         if (result.ActualMode != ExecutionMode.Compiled)
         {
-            return CompiledEnvelopeFieldsAbsent(summary);
+            return InterpretedEnvelopeFieldsAbsent(summary);
         }
 
         return result.Succeeded
@@ -99,6 +101,15 @@ internal static class WorkerRunSummaryValidator
         => !summary.Fields!.ContainsKey("artifactHash") &&
            !summary.Fields.ContainsKey("runtimeForm") &&
            !summary.Fields.ContainsKey("cacheKey");
+
+    private static bool InterpretedEnvelopeFieldsAbsent(SandboxAuditEvent summary)
+        => CompiledEnvelopeFieldsAbsent(summary) &&
+           !summary.Fields!.ContainsKey("materializationStatus");
+
+    private static bool CacheStatusMatches(SandboxExecutionResult result, SandboxAuditEvent summary)
+        => result.ActualMode == ExecutionMode.Interpreted
+            ? FieldEquals(summary, "cacheStatus", "None")
+            : HasNonEmptyField(summary, "cacheStatus");
 
     private static bool FieldEquals(SandboxAuditEvent summary, string key, string value)
         => summary.Fields!.TryGetValue(key, out var actual) &&
