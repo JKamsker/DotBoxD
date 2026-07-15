@@ -28,6 +28,18 @@ public sealed class RemoteProjectingPipelineDisposalTests
     }
 
     [Fact]
+    public async Task Hook_UseProjecting_registers_before_owner_server_disposal()
+    {
+        using var server = PluginAddendumTestPolicies.CreateServer();
+        var kernel = await server.InstallAsync(FireDamagePluginPackage.Create());
+        var pipeline = server.Hooks.On<DamageEvent>();
+
+        pipeline.UseProjecting(kernel, "remote-hook", NoopPush);
+
+        Assert.Equal(1, HandlerCount(pipeline));
+    }
+
+    [Fact]
     public async Task Subscription_UseProjecting_rejects_registration_after_owner_server_disposal()
     {
         using var server = PluginAddendumTestPolicies.CreateServer();
@@ -40,6 +52,18 @@ public sealed class RemoteProjectingPipelineDisposalTests
         var handlerCount = HandlerCount(pipeline);
 
         AssertDisposedWithoutRegistration(exception, handlerCount);
+    }
+
+    [Fact]
+    public async Task Subscription_UseProjecting_registers_before_owner_server_disposal()
+    {
+        using var server = PluginAddendumTestPolicies.CreateServer();
+        var kernel = await server.InstallAsync(FireDamagePluginPackage.Create());
+        var pipeline = server.Subscriptions.On<DamageEvent>();
+
+        pipeline.UseProjecting(kernel, "remote-subscription", NoopPush);
+
+        Assert.Equal(1, HandlerCount(pipeline));
     }
 
     [Fact]
@@ -63,6 +87,21 @@ public sealed class RemoteProjectingPipelineDisposalTests
             "Expected ObjectDisposedException after the server disposed the pipeline owner, " +
             $"but got {exception?.GetType().Name ?? "no exception"}; result handlers installed: {hasResultHandlers}.");
         Assert.False(hasResultHandlers);
+    }
+
+    [Fact]
+    public async Task Hook_UseProjectingResult_registers_before_owner_server_disposal()
+    {
+        using var server = PluginAddendumTestPolicies.CreateServer();
+        var package = ResultLocalTerminalPackage();
+        var kernel = await server.InstallAsync(package);
+        var eventName = Assert.Single(package.Manifest.Subscriptions).Event;
+        var pipeline = server.Hooks.On(new ResultDamageEventAdapter(eventName));
+        RemoteLocalResultRequest request = (_, _, _) => new ValueTask<byte[]>([]);
+
+        pipeline.UseProjectingResult(kernel, "remote-result", typeof(ResultDamageResult), request);
+
+        Assert.True(HasResultHandlers(pipeline));
     }
 
     private static ValueTask NoopPush(
