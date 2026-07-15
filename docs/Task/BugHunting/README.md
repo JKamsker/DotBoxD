@@ -23,8 +23,10 @@ Every candidate still goes through the dedicated red-test proof before a PR can 
 The fix dispatcher gets six fallback opportunities per hour (plus the existing event kick),
 dispatches at most four workers per tick, and permits at most four fix workers globally. This wider
 pool drains proven-red work promptly while the separately bounded discovery side can add at most one
-candidate every four hours. Canceled/failed red-test handoffs remain safe to rediscover because the
-lens ledger is not considered authoritative coverage until a matching PR or `sweep:bug` issue exists.
+candidate every four hours. A tick fails closed when the repository already has four queued/pending
+runs, then automatically retries on later schedule opportunities. Canceled/failed red-test handoffs
+remain safe to rediscover because the lens ledger is not considered authoritative coverage until a
+matching PR or `sweep:bug` issue exists.
 
 ---
 
@@ -575,11 +577,13 @@ gh-aw scheduled/dispatch workflows execute from the default branch. The
 `library-surprise-fix-dispatcher` gets six fallback schedule opportunities per hour and is also
 kicked by every red-test PR delivery. It drains open fix/polish work on its own (`max=4` per tick,
 `MAX_INFLIGHT=4`, retry-capped). The in-flight cap is the hard fix-side capacity boundary; additional
-ticks become no-ops while the pool is full. The discovery `library-surprise-dispatcher` adds at most
-one new explore every four hours, so the faster fixer cannot recreate an unbounded arrival loop.
-Disable discovery to stop new bug discovery while leaving the fix dispatcher to drain the existing
-backlog. Either workflow is paused with `gh workflow disable`. `GH_AW_CI_TRIGGER_TOKEN` alone does
-**not** bypass the CI approval gate - see "CI approval gate" below.
+ticks become no-ops while the pool is full. `MAX_REPO_WAITING=4` also makes a tick fail closed when
+four or more repository runs are queued/pending, so fixer refill cannot deepen an existing product-CI
+backlog. The discovery `library-surprise-dispatcher` adds at most one new explore every four hours, so
+the faster fixer cannot recreate an unbounded arrival loop. Disable discovery to stop new bug
+discovery while leaving the fix dispatcher to drain the existing backlog. Either workflow is paused
+with `gh workflow disable`. `GH_AW_CI_TRIGGER_TOKEN` alone does **not** bypass the CI approval gate -
+see "CI approval gate" below.
 
 ### Runtime gotcha found by live testing (fixed)
 The generic `dispatch_workflow` safe-output tool is a **no-op** in this fork: the agent's call
@@ -681,9 +685,9 @@ per-PR `surprise-fix-<pr>` lock (so a fix and a polish never edit one PR concurr
   per PR that has something to do, then quiet. CI-`pending` PRs are skipped to avoid racing a run,
   except a CodeRabbit status that has been pending longer than
   `CODERABBIT_PENDING_TIMEOUT_MINUTES` (60 minutes by default) is treated as stale and ignored so it
-  cannot mask red PR CI forever. The shared `MAX_INFLIGHT=4`, per-tick `max`, and `MAX_ATTEMPTS=4`
-  retry cap bound cost identically to the fix half; a PR the worker cannot make green hands off to a
-  human at the cap.
+  cannot mask red PR CI forever. The shared `MAX_INFLIGHT=4`, `MAX_REPO_WAITING=4`, per-tick `max`,
+  and `MAX_ATTEMPTS=4` retry cap bound cost identically to the fix half; a PR the worker cannot make
+  green hands off to a human at the cap.
 - **Stale-branch drift is fixed structurally.** Before each dispatch the dispatcher **server-side
   merges `main` into the PR branch** (`POST /repos/{repo}/merges`, authored by the PAT so the resulting
   CI runs ungated - no clone, no secret in the agent job). The entire current red backlog (#404 #409
