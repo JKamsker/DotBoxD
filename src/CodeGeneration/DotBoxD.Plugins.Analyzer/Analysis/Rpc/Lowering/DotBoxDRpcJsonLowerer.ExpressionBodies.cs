@@ -1,10 +1,14 @@
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 internal sealed partial class DotBoxDRpcJsonLowerer
 {
-    public string LowerExpressionBody(ExpressionSyntax expression, bool returnsVoid)
+    public string LowerExpressionBody(
+        ExpressionSyntax expression,
+        bool returnsVoid,
+        ITypeSymbol? returnValueType)
     {
         _assignmentOverride = null;
         _expressionOverride = null;
@@ -20,9 +24,15 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             }
             else
             {
+                var value = LowerExpressionWithPrelude(expression, parts);
+                if (returnValueType is not null)
+                {
+                    value = ApplyRequiredReturnConversion(expression, returnValueType, value);
+                }
+
                 parts.Add(Obj(
                     ("op", Str("return")),
-                    ("value", LowerExpressionWithPrelude(expression, parts))));
+                    ("value", value)));
             }
 
             return "[" + string.Join(",", parts) + "]";

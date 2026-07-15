@@ -25,7 +25,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     };
 
     private static string LiteralJson(object? value)
-        => value switch
+        => TryNarrowIntegralLiteralJson(value) ?? value switch
         {
             bool b => Obj(("bool", b ? "true" : "false")),
             int i => Obj(("i32", i.ToString(CultureInfo.InvariantCulture))),
@@ -34,6 +34,17 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             double d => FiniteDoubleLiteralJson(d),
             string s => Obj(("string", Str(s))),
             _ => throw new NotSupportedException($"Kernel RPC service literal '{value}' is not supported.")
+        };
+
+    private static string? TryNarrowIntegralLiteralJson(object? value)
+        => value switch
+        {
+            byte b => I32(b),
+            char c => I32(c),
+            sbyte b => I32(b),
+            short s => I32(s),
+            ushort s => I32(s),
+            _ => null
         };
 
     private static string FiniteDoubleLiteralJson(double value)

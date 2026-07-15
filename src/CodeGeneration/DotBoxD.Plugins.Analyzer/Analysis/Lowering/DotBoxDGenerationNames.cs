@@ -66,7 +66,6 @@ internal static partial class DotBoxDGenerationNames
         public const string RemoteSubscriptionPipelineWithContextOriginal = "DotBoxD.Plugins.Runtime.RemoteSubscriptionPipeline<TEvent, TContext>";
         public const string RemoteSubscriptionStageOriginal = "DotBoxD.Plugins.Runtime.Subscriptions.RemoteSubscriptionStage<TEvent, TCurrent>";
         public const string RemoteSubscriptionStageWithContextOriginal = "DotBoxD.Plugins.Runtime.Subscriptions.RemoteSubscriptionStage<TEvent, TCurrent, TContext>";
-
         public const string ListOriginal = "System.Collections.Generic.List<T>";
         public const string ReadOnlyListOriginal = "System.Collections.Generic.IReadOnlyList<T>";
         public const string ListInterfaceOriginal = "System.Collections.Generic.IList<T>";
@@ -88,9 +87,10 @@ internal static partial class DotBoxDGenerationNames
         public const string SystemTextEncoding = "System.Text.Encoding";
         public const string SystemServiceProvider = "System.IServiceProvider";
         public const string SystemType = "System.Type";
+        public const string SystemArrayPoolOriginal = "System.Buffers.ArrayPool<T>";
         public const string SystemUnsafe = "System.Runtime.CompilerServices.Unsafe";
+        public const string SystemComponentModelBackgroundWorker = "System.ComponentModel.BackgroundWorker";
         public const string SystemComponentModelTypeDescriptor = "System.ComponentModel.TypeDescriptor";
-
         public const string GlobalArray = GlobalPrefix + "System.Array";
         public const string GlobalAttribute = GlobalPrefix + "System.Attribute";
         public const string GlobalAttributeTargets = GlobalPrefix + "System.AttributeTargets";

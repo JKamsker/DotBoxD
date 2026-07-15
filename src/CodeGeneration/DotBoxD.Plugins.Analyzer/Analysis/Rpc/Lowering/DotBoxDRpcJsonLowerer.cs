@@ -25,10 +25,12 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     private readonly Func<string, string>? _reserveGeneratedName;
     private readonly string? _serverContextParameterName;
     private readonly ITypeSymbol? _serverContextType;
+    private readonly ServerContextHostBindingResolver _serverContextHostBindings;
     private readonly Dictionary<string, string> _serviceHandleLocals = new(StringComparer.Ordinal);
     private readonly Dictionary<ISymbol, string> _serviceHandleMembers = new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<ISymbol, ITypeSymbol> _fallbackLocalTypes = new(SymbolEqualityComparer.Default);
     private readonly HashSet<string> _reservedNames = new(StringComparer.Ordinal);
-    private Func<AssignmentExpressionSyntax, Func<ExpressionSyntax, string>, string?>? _assignmentOverride;
+    private RpcAssignmentOverride? _assignmentOverride;
     private Func<ExpressionSyntax, string?>? _expressionOverride;
     private List<string>? _expressionPrelude;
     private IReadOnlyList<string> _returnRecordFields = [];
@@ -43,9 +45,18 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     internal ITypeSymbol? ReturnValueType => _returnValueType;
     internal IReadOnlyList<string> ReturnRecordFields => _returnRecordFields;
     internal string? ReturnRecordType => _returnRecordType;
-    internal Func<AssignmentExpressionSyntax, Func<ExpressionSyntax, string>, string?>? AssignmentOverride => _assignmentOverride;
+    internal RpcAssignmentOverride? AssignmentOverride => _assignmentOverride;
 
     public string LowerBody(BlockSyntax block) => LowerBody(block, [], [], returnRecordType: null, assignmentOverride: null);
+    internal string LowerBody(BlockSyntax block, ITypeSymbol? returnValueType)
+        => LowerBody(
+            block,
+            [],
+            [],
+            returnRecordType: null,
+            assignmentOverride: null,
+            returnValueType: returnValueType);
+
     internal void AddServiceHandleLocal(string name, string handleIdJson)
         => _serviceHandleLocals[name] = handleIdJson;
     internal void AddServiceHandleMember(ISymbol member, string handleIdJson)
@@ -59,7 +70,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         IReadOnlyList<(string Name, string Value)> leadingLocals,
         IReadOnlyList<string> returnRecordFields,
         string? returnRecordType,
-        Func<AssignmentExpressionSyntax, Func<ExpressionSyntax, string>, string?>? assignmentOverride,
+        RpcAssignmentOverride? assignmentOverride,
         Func<ExpressionSyntax, string?>? expressionOverride = null,
         ITypeSymbol? returnValueType = null)
     {
@@ -70,6 +81,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         _returnValueType = returnValueType;
         try
         {
+            _fallbackLocalTypes.Clear();
             ReserveUserNames(block);
             var parts = new List<string>();
             for (var i = 0; i < leadingLocals.Count; i++)
@@ -88,6 +100,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             _returnRecordFields = [];
             _returnRecordType = null;
             _returnValueType = null;
+            _fallbackLocalTypes.Clear();
         }
     }
     internal static string SetGeneratedLocal(string name, string value) => SetStatement(name, value);

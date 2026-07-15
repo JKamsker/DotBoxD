@@ -221,7 +221,7 @@ public sealed record VerificationPolicy(
             new HashSet<string>(StringComparer.Ordinal) {
                 "System.IO.", "System.Net.", "System.Reflection.", "System.Runtime.Loader.",
                 "System.Runtime.InteropServices.", "System.Diagnostics.", "System.Threading.",
-                "System.Threading.Tasks.", "System.Activator", "System.Environment",
+                "System.Threading.Tasks.", "Microsoft.VisualBasic.", "System.Activator", "System.Environment",
                 "System.GC", "System.Delegate", "System.IServiceProvider",
                 "System.Linq.Expressions.", "Microsoft.CSharp."
             },

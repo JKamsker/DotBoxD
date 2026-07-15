@@ -188,7 +188,7 @@ public sealed class BindingAuditEnforcementTests
 
                 if (behavior == TestBindingBehavior.WritesSuccessAudit)
                 {
-                    WriteAudit(context, "BindingCall", "test.cap", SandboxEffect.Cpu, "test:audit");
+                    WriteAudit(context, "BindingCall", null, SandboxEffect.Cpu, "test:audit");
                 }
 
                 if (behavior == TestBindingBehavior.WrongAuditKind)
