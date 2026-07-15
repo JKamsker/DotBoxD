@@ -65,6 +65,9 @@ Services, Kernels, and Pushdown.
 - **Lean parameter-only interpreter frames:** raw I32/I64/F64 frames whose slots are all initialized parameters
   now reuse an empty assignment-state sentinel instead of allocating a redundant `bool[]` per invocation. Frames
   with distinct locals retain per-slot tracking and read-before-assignment behavior.
+- **Array-free scalar interpreted local calls:** synchronous one- and two-argument calls to module-local functions
+  now carry evaluated values directly into the callee frame. Pending operands, host bindings, collection constructors,
+  and calls with three or more arguments retain their existing array-backed paths and ordering.
 - **Documentation & repo polish:** new top-level README, `docs/` information architecture
   (getting-started, concepts, security, reference, contributing), `SECURITY.md`, `CONTRIBUTING.md`,
   `CODE_OF_CONDUCT.md`, and GitHub repo metadata files.

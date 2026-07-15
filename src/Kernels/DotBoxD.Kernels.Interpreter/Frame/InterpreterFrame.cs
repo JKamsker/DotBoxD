@@ -247,7 +247,7 @@ internal sealed partial class InterpreterFrame
     public static InterpreterFrame Create(
         FunctionFrameLayout layout,
         SandboxFunction function,
-        IReadOnlyList<SandboxValue> args)
+        LocalFunctionArguments args)
         => InterpreterFrameBuilder.Create(layout, function, args);
 
     public static InterpreterFrame CreateValidatedEntrypoint(

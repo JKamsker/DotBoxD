@@ -58,6 +58,12 @@ internal static class InterpreterProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-interpreter-local-call-arguments", StringComparer.OrdinalIgnoreCase))
+        {
+            await InterpreterLocalCallArgumentProbe.RunAsync();
+            return true;
+        }
+
         if (args.Contains("--probe-interpreter-numeric-conversion", StringComparer.OrdinalIgnoreCase))
         {
             await InterpreterNumericConversionProbe.RunAsync();

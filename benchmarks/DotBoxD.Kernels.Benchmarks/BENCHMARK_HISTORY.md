@@ -16,6 +16,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-bindings
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-matrix
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-frame-layout
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-local-call-arguments
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-i64-plan-setup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-while-plan-setup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-branched-plan-setup
@@ -186,6 +187,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Lazy collision-safe server-extension request helpers | this commit | `--probe-server-extension-request-helpers` | Request conversion now evaluates a framework-type resolver only after its type predicate matches and skips the generated outer method name when allocating numbered or fixed helpers. A `List<int>` proxy falls from seven request helpers, 6,143 UTF-8 bytes, and 121 lines to one helper, 3,698 bytes, and 67 lines. Across ten cold generations of 100 proxies, allocation falls from 106,581,552 B to 70,499,272 B (33.9%, or 3,608,228 B/run). Generated-compilation tests pin the former `WriteKernelRpcValue5` and `DateTimeToWireOffset` collisions, the post-cleanup `WriteKernelRpcValue0` boundary, and the direct-graft form. |
 | Scalar empty/single branched interpreter plans | this commit | `--probe-interpreter-branched-plan-setup`, `--probe-branched-f64-loop` | Branched I32/F64 loop planners now store empty branches without a plan and one-assignment branches inline, retaining arrays only for two or more ordered assignments. Across 50,000 executions, I32 one-one / empty-one branches remove exactly 80 / 64 B/op; F64 removes about 120 / exactly 128 B/op because the tentative I32 planner also stops allocating before F64 fallback. Zero/no-branch/two-two controls are byte-identical. Four long-F64 process medians moved from 90.4 to 82.8 ms (an observed -8.4%), with non-overlapping ranges and unchanged results/resources. |
 | Parameter-only raw frame assignment state | this commit | `--probe-interpreter-frame-layout` | Reused an empty assignment-state sentinel when every frame slot is a parameter initialized before execution. One- and two-raw-parameter rows each fell from 912.0 to 880.0 B/op, removing exactly one 32-byte array per invocation. Zero-parameter, eight-local, and mixed raw/boxed controls remained byte-identical, and genuine locals retain read-before-assignment tracking. |
+| Scalar interpreted local-function arguments | this commit | `--probe-interpreter-local-call-arguments` | Passed synchronously evaluated one- and two-argument local calls to the callee frame through an internal scalar carrier instead of a temporary array. Across 100,000 executions, arity one fell from 1,024.1 to 992.1 B/op and arity two from 1,040.1 to 1,000.1 B/op. Arity-zero and direct controls are byte-identical; pending operands and arity three retain the original array path. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -1805,3 +1807,45 @@ Focused regressions cover I32/I64/F64 parameter reassignment, parameter-only loc
 one prepared plan, exact managed-allocation bands, and a genuine conditional raw local that must still fail with the
 same read-before-assignment sandbox error. Public API, compiler/verifier identity, persisted artifacts, and sandbox
 resource accounting are unchanged.
+
+## Scalar interpreted local-function arguments
+
+The general interpreted call path evaluated every operand into a fresh `SandboxValue[]`. Local functions immediately
+copied those values into an invocation-local frame, so common synchronous calls paid for a caller array that no component
+retained. On this x64 runtime, the array costs 32 B at arity one and 40 B at arity two.
+
+After the existing intrinsic and fixed-arity collection dispatch, exact one- and two-argument local functions now
+evaluate left-to-right into scalar locals and pass them through an internal value-type carrier to the same frame builder.
+The builder still copies every value into the same typed slot. A pending operand allocates the original array and resumes
+through the existing continuation. Arity zero, arity three or more, host bindings, `list.of`, and `record.new` retain
+their prior paths; collection intrinsics keep precedence over a same-named module function.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -- --probe-interpreter-local-call-arguments
+```
+
+The probe pads every helper to the same three boxed slots and pairs each call with a direct entrypoint in the same plan,
+so subtracting the arity-zero call/direct delta isolates caller argument storage. Results over 100,000 executions:
+
+```text
+case                    before B / B/op          after B / B/op          delta/op
+arity 0 direct          84,802,872 /   848.0     84,802,872 /   848.0         0 B
+arity 0 local call      96,006,856 /   960.1     96,006,856 /   960.1         0 B
+arity 1 direct          88,002,872 /   880.0     88,002,872 /   880.0         0 B
+arity 1 local call     102,409,616 / 1,024.1     99,208,248 /   992.1       -32 B
+arity 2 direct          88,802,872 /   888.0     88,802,872 /   888.0         0 B
+arity 2 local call     104,009,616 / 1,040.1    100,008,248 / 1,000.1       -40 B
+```
+
+Before the change, the call/direct deltas decomposed into a fixed 112.0 B/op for dispatch plus the padded callee frame,
+then 32.0/40.0 B/op for arity-one/two caller arrays. Afterward the fixed component remains 112.0 B/op and both residuals
+round to 0.0 B/op. Two post-change processes reproduced every managed-allocation total exactly. All checksums remain
+`700,000`; direct/call fuel/loop/sandbox-allocation/host-call tuples remain `3/0/0/0` and `8/0/0/0` at arity zero,
+`3/0/2/0` and `9/0/2/0` at arity one, and `3/0/4/0` and `10/0/4/0` at arity two.
+
+Elapsed samples moved in mixed directions (arity-one call 96.1 to 94.1 ms; arity-two call 124.8 to 126.3 ms), so the
+allocation reduction is the claim. Focused regressions pin arity-zero-through-three allocation and resource behavior,
+left-to-right exactly-once synchronous evaluation, pending first/second operands, same-plan concurrency, and collection
+name precedence. Public API, compiler/verifier identity, persisted artifacts, and sandbox accounting are unchanged.

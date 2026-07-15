@@ -8,7 +8,7 @@ internal static class InterpreterFrameBuilder
     public static InterpreterFrame Create(
         FunctionFrameLayout layout,
         SandboxFunction function,
-        IReadOnlyList<SandboxValue> args)
+        LocalFunctionArguments args)
         => CreateCore(layout, function, args, entrypointInput: null);
 
     // The evaluator validates the shape and every parameter before entering
@@ -17,12 +17,12 @@ internal static class InterpreterFrameBuilder
         FunctionFrameLayout layout,
         SandboxFunction function,
         SandboxValue input)
-        => CreateCore(layout, function, arguments: null, entrypointInput: input);
+        => CreateCore(layout, function, arguments: default, entrypointInput: input);
 
     private static InterpreterFrame CreateCore(
         FunctionFrameLayout layout,
         SandboxFunction function,
-        IReadOnlyList<SandboxValue>? arguments,
+        LocalFunctionArguments arguments,
         SandboxValue? entrypointInput)
     {
         var slots = layout.HasBoxedSlots ? new SandboxValue?[layout.SlotCount] : Array.Empty<SandboxValue?>();
@@ -37,9 +37,9 @@ internal static class InterpreterFrameBuilder
         // FunctionFrameLayout.Build), so positional arguments map directly.
         for (var i = 0; i < function.Parameters.Count; i++)
         {
-            var argument = arguments is not null
+            var argument = entrypointInput is null
                 ? arguments[i]
-                : GetValidatedEntrypointArgument(entrypointInput!, i, function.Parameters.Count);
+                : GetValidatedEntrypointArgument(entrypointInput, i, function.Parameters.Count);
             AssignArgumentSlot(layout, argument, i, slots, i32Slots, i64Slots, f64Slots, assigned);
         }
 

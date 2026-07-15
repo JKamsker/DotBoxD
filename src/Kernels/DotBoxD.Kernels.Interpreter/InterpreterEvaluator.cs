@@ -45,7 +45,7 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
 
         _context.ChargeValue(input);
         ValidateEntrypointArguments(function, input);
-        return InvokeFunctionCoreAsync(function, arguments: null, entrypointInput: input);
+        return InvokeFunctionCoreAsync(function, arguments: default, entrypointInput: input);
     }
 
     public bool TryGetFunction(string id, out SandboxFunction function) => _functions.TryGetValue(id, out function!);
@@ -116,12 +116,12 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
     // Non-async invocation: a function whose body is fully synchronous (no pending
     // host binding) completes without ever allocating an async state machine, so a
     // helper called inside a loop costs only its indexed frame object per call.
-    public ValueTask<SandboxValue> InvokeFunctionAsync(SandboxFunction function, IReadOnlyList<SandboxValue> args)
+    public ValueTask<SandboxValue> InvokeFunctionAsync(SandboxFunction function, LocalFunctionArguments args)
         => InvokeFunctionCoreAsync(function, args, entrypointInput: null);
 
     private ValueTask<SandboxValue> InvokeFunctionCoreAsync(
         SandboxFunction function,
-        IReadOnlyList<SandboxValue>? arguments,
+        LocalFunctionArguments arguments,
         SandboxValue? entrypointInput)
     {
         _context.EnterCall();
@@ -131,7 +131,7 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
             _context.ChargeFuel(1);
             var layout = GetFrameLayout(function);
             var frame = entrypointInput is null
-                ? InterpreterFrame.Create(layout, function, arguments!)
+                ? InterpreterFrame.Create(layout, function, arguments)
                 : InterpreterFrame.CreateValidatedEntrypoint(layout, function, entrypointInput);
             var body = function.Body;
             for (var i = 0; i < body.Count; i++)
