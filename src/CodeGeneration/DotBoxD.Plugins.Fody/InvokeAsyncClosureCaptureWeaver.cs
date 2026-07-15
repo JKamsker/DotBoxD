@@ -1,6 +1,4 @@
 using Mono.Cecil;
-using Mono.Cecil.Cil;
-using Mono.Collections.Generic;
 
 namespace DotBoxD.Plugins.Fody;
 
@@ -25,7 +23,13 @@ internal static class InvokeAsyncClosureCaptureWeaver
 
         foreach (var interceptor in generatedType.Methods.Where(IsInvokeAsyncInterceptor))
         {
-            var rewritten = RewriteInterceptor(interceptor, closureMap, targetGetter, info, warning);
+            var rewritten = RewriteInterceptor(
+                generatedType,
+                interceptor,
+                closureMap,
+                targetGetter,
+                info,
+                warning);
             if (rewritten == 0)
             {
                 continue;
@@ -39,19 +43,15 @@ internal static class InvokeAsyncClosureCaptureWeaver
     }
 
     private static int RewriteInterceptor(
+        TypeDefinition generatedType,
         MethodDefinition interceptor,
         InvokeAsyncClosureMap closureMap,
         MethodReference targetGetter,
         Action<string> info,
         Action<string> warning)
     {
-        var moveNext = interceptor.GetAsyncStateMachineType()
-            ?.Methods
-            .FirstOrDefault(static method => method.Name == DotBoxDInvokeAsyncWeaverNames.MoveNextMethodName);
-
-        if (moveNext is null ||
-            !moveNext.HasBody ||
-            !ContainsCaptureHelperCall(moveNext))
+        var captureMethods = FindCaptureMethods(generatedType, interceptor).ToArray();
+        if (captureMethods.Length == 0)
         {
             return 0;
         }
@@ -69,155 +69,66 @@ internal static class InvokeAsyncClosureCaptureWeaver
         }
 
         MakeClosureAssemblyVisible(closure);
-        return RewriteMoveNext(moveNext, closure, targetGetter, warning);
+        return captureMethods.Sum(method =>
+            InvokeAsyncCaptureAccessRewriter.Rewrite(method, closure, targetGetter, warning));
     }
 
-    private static int RewriteMoveNext(
-        MethodDefinition moveNext,
-        TypeDefinition closure,
-        MethodReference targetGetter,
-        Action<string> warning)
+    private static IEnumerable<MethodDefinition> FindCaptureMethods(
+        TypeDefinition generatedType,
+        MethodDefinition interceptor)
     {
-        var rewritten = 0;
-        var instructions = moveNext.Body.Instructions;
-        for (var i = 0; i < instructions.Count; i++)
+        var generatedNameMarker = "<" + interceptor.Name + ">";
+        foreach (var type in SelfAndNestedTypes(generatedType))
         {
-            var instruction = instructions[i];
-            if (IsCaptureHelperCall(instruction, DotBoxDInvokeAsyncWeaverNames.ReadCaptureMethodName) &&
-                TryRewriteRead(instructions, i, moveNext.Module, closure, targetGetter, warning))
+            foreach (var method in type.Methods)
             {
-                rewritten++;
-                continue;
-            }
-
-            if (IsCaptureHelperCall(instruction, DotBoxDInvokeAsyncWeaverNames.WriteCaptureMethodName) &&
-                TryRewriteWrite(instructions, i, moveNext.Module, closure, targetGetter, warning))
-            {
-                rewritten++;
+                if (method.HasBody &&
+                    BelongsToInterceptor(method, generatedType, generatedNameMarker) &&
+                    InvokeAsyncCaptureAccessRewriter.ContainsCaptureHelperCall(method))
+                {
+                    yield return method;
+                }
             }
         }
-
-        return rewritten;
     }
 
-    private static bool TryRewriteRead(
-        Collection<Instruction> instructions,
-        int callIndex,
-        ModuleDefinition module,
-        TypeDefinition closure,
-        MethodReference targetGetter,
-        Action<string> warning)
+    private static bool BelongsToInterceptor(
+        MethodDefinition method,
+        TypeDefinition generatedType,
+        string generatedNameMarker)
     {
-        var fieldNameIndex = callIndex - 1;
-        if (!TryGetCaptureField(instructions, fieldNameIndex, closure, out var field))
+        if (method.Name.StartsWith(generatedNameMarker, StringComparison.Ordinal))
         {
-            return false;
+            return true;
         }
 
-        if (!FieldMatchesCaptureType(instructions[callIndex], field))
+        for (var type = method.DeclaringType; type != generatedType; type = type.DeclaringType)
         {
-            warning($"DotBoxD InvokeAsync weaver kept reflection fallback for capture '{field.Name}': field type changed.");
-            return false;
-        }
-
-        instructions[callIndex - 1] = Instruction.Create(OpCodes.Callvirt, targetGetter);
-        instructions[callIndex] = Instruction.Create(OpCodes.Castclass, module.ImportReference(closure));
-        instructions.Insert(callIndex + 1, Instruction.Create(OpCodes.Ldfld, module.ImportReference(field)));
-        return true;
-    }
-
-    private static bool TryRewriteWrite(
-        Collection<Instruction> instructions,
-        int callIndex,
-        ModuleDefinition module,
-        TypeDefinition closure,
-        MethodReference targetGetter,
-        Action<string> warning)
-    {
-        if (!TryFindWriteFieldName(instructions, callIndex, closure, out var fieldNameIndex, out var field))
-        {
-            return false;
-        }
-
-        if (!FieldMatchesCaptureType(instructions[callIndex], field))
-        {
-            warning($"DotBoxD InvokeAsync weaver kept reflection fallback for capture '{field.Name}': field type changed.");
-            return false;
-        }
-
-        instructions[fieldNameIndex] = Instruction.Create(OpCodes.Callvirt, targetGetter);
-        instructions.Insert(fieldNameIndex + 1, Instruction.Create(OpCodes.Castclass, module.ImportReference(closure)));
-        instructions[callIndex + 1] = Instruction.Create(OpCodes.Stfld, module.ImportReference(field));
-        return true;
-    }
-
-    private static bool TryGetCaptureField(
-        Collection<Instruction> instructions,
-        int fieldNameIndex,
-        TypeDefinition closure,
-        out FieldDefinition field)
-    {
-        if (fieldNameIndex < 2 ||
-            instructions[fieldNameIndex - 2].OpCode.Code != Code.Ldarg_0 ||
-            instructions[fieldNameIndex - 1].OpCode.Code != Code.Ldfld ||
-            instructions[fieldNameIndex - 1].Operand is not FieldReference lambdaField ||
-            !string.Equals(lambdaField.Name, DotBoxDInvokeAsyncWeaverNames.LambdaParameterName, StringComparison.Ordinal) ||
-            instructions[fieldNameIndex] is not { OpCode.Code: Code.Ldstr, Operand: string fieldName })
-        {
-            field = null!;
-            return false;
-        }
-
-        field = closure.Fields.FirstOrDefault(candidate =>
-            string.Equals(candidate.Name, fieldName, StringComparison.Ordinal))!;
-        return field is not null && IsFieldAccessible(field);
-    }
-
-    private static bool TryFindWriteFieldName(
-        Collection<Instruction> instructions,
-        int callIndex,
-        TypeDefinition closure,
-        out int fieldNameIndex,
-        out FieldDefinition field)
-    {
-        for (var i = callIndex - 1; i >= 2; i--)
-        {
-            if (TryGetCaptureField(instructions, i, closure, out field))
+            if (type is null)
             {
-                fieldNameIndex = i;
+                return false;
+            }
+
+            if (type.Name.StartsWith(generatedNameMarker, StringComparison.Ordinal))
+            {
                 return true;
             }
         }
 
-        fieldNameIndex = -1;
-        field = null!;
         return false;
+    }
+
+    private static IEnumerable<TypeDefinition> SelfAndNestedTypes(TypeDefinition type)
+    {
+        yield return type;
+        foreach (var nested in type.NestedTypes.SelectMany(SelfAndNestedTypes))
+        {
+            yield return nested;
+        }
     }
 
     private static bool IsInvokeAsyncInterceptor(MethodDefinition method)
         => method.Name.StartsWith(DotBoxDInvokeAsyncWeaverNames.InvokeAsyncMethodPrefix, StringComparison.Ordinal);
-
-    private static bool ContainsCaptureHelperCall(MethodDefinition method)
-        => method.Body.Instructions.Any(static instruction =>
-            IsCaptureHelperCall(instruction, DotBoxDInvokeAsyncWeaverNames.ReadCaptureMethodName) ||
-            IsCaptureHelperCall(instruction, DotBoxDInvokeAsyncWeaverNames.WriteCaptureMethodName));
-
-    private static bool IsCaptureHelperCall(Instruction instruction, string name)
-        => instruction.OpCode.Code == Code.Call &&
-           instruction.Operand is MethodReference method &&
-           string.Equals(method.Name, name, StringComparison.Ordinal) &&
-           string.Equals(
-               method.DeclaringType.FullName,
-               DotBoxDInvokeAsyncWeaverNames.GeneratedInterceptorsFullName,
-               StringComparison.Ordinal);
-
-    private static bool FieldMatchesCaptureType(Instruction call, FieldDefinition field)
-        => call.Operand is not GenericInstanceMethod generic ||
-           generic.GenericArguments.Count != 1 ||
-           string.Equals(generic.GenericArguments[0].FullName, field.FieldType.FullName, StringComparison.Ordinal);
-
-    private static bool IsFieldAccessible(FieldDefinition field)
-        => field.IsPublic || field.IsAssembly || field.IsFamilyOrAssembly;
 
     private static bool CanExposeClosure(TypeDefinition closure)
         => IsCompilerGenerated(closure) && IsParentChainAccessibleFromSameAssembly(closure.DeclaringType);

@@ -58,6 +58,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
                 c => AnalyzeDynamicIndexerAccess(c, helperGraph),
                 OperationKind.DynamicIndexerAccess);
             startContext.RegisterOperationAction(c => AnalyzeObjectCreation(c, helperGraph), OperationKind.ObjectCreation);
+            startContext.RegisterOperationAction(c => AnalyzeArrayCreation(c, helperGraph), OperationKind.ArrayCreation);
             startContext.RegisterOperationAction(c => AnalyzeWithExpression(c, helperGraph), OperationKind.With);
             startContext.RegisterOperationAction(c => AnalyzePropertyReference(c, helperGraph), OperationKind.PropertyReference);
             startContext.RegisterOperationAction(c => AnalyzeFieldReference(c, helperGraph), OperationKind.FieldReference);
@@ -145,6 +146,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             RecordInitializerPropertyRootCall(context, helperGraph, property);
             RecordInitializerMemberReference(context, helperGraph, property);
             ReportAndRecordAmbientCultureMutation(context, helperGraph, property, usesSetter);
+            ReportAndRecordRegexCacheSizeMutation(context, helperGraph, property, usesSetter);
             return;
         }
 
@@ -157,6 +159,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             ReportAndRecordIfForbidden(context, helperGraph, method, property);
         }
         ReportAndRecordAmbientCultureMutation(context, helperGraph, property, usesSetter);
+        ReportAndRecordRegexCacheSizeMutation(context, helperGraph, property, usesSetter);
         RecordStaticConstructorReachability(context, helperGraph, property);
         if (!IsForbiddenHostApi(property.ContainingType))
         {
@@ -226,7 +229,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
 
         helperGraph.RecordForbidden(method, type!);
         if (!IsForbiddenApiRoot(context, method) ||
-            !helperGraph.TryRecordDirectDiagnostic(method))
+            !helperGraph.TryRecordDirectDiagnostic(method, type!))
         {
             return;
         }

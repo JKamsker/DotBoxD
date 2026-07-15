@@ -5,6 +5,19 @@ namespace DotBoxD.Plugins.Runtime;
 
 internal static class SubscriptionDelivery
 {
+    // Keep the capture in this post-validation helper. If the Task.Run lambda lives in SubscriptionPipeline.Publish,
+    // C# creates its display class before that method's cancellation and empty-pipeline returns.
+    internal static void Queue<TEvent, TContext>(
+        Func<TEvent, TContext, ValueTask<bool>>[] filters,
+        Func<TEvent, HookContext, TContext, ValueTask>[] handlers,
+        TEvent e,
+        HookContext rawContext,
+        TContext context,
+        Action<SubscriptionDeliveryFault>? onFault)
+    {
+        _ = Task.Run(() => PublishSafelyAsync(filters, handlers, e, rawContext, context, onFault).AsTask());
+    }
+
     // Delivery runs on a background task (it must not block the publishing game loop), so a throwing filter or
     // handler cannot propagate to a caller and is caught here. Swallowing it silently is what makes a broken
     // RunLocal subscription look like "it just does nothing", so every caught fault is reported to the optional

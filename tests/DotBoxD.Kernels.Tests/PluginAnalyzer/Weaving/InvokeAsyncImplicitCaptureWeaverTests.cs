@@ -31,10 +31,6 @@ public sealed class InvokeAsyncImplicitCaptureWeaverTests
 
         Assert.Contains(generatedType.Methods, method =>
             method.Name.StartsWith(DotBoxDInvokeAsyncWeaverNames.InvokeAsyncMethodPrefix, StringComparison.Ordinal));
-        Assert.DoesNotContain(generatedType.Methods, method =>
-            method.Name == DotBoxDInvokeAsyncWeaverNames.ReadCaptureMethodName ||
-            method.Name == DotBoxDInvokeAsyncWeaverNames.WriteCaptureMethodName);
-
         var moveNextMethods = generatedType.NestedTypes
             .SelectMany(static type => type.Methods)
             .Where(static method =>
@@ -43,7 +39,12 @@ public sealed class InvokeAsyncImplicitCaptureWeaverTests
             .ToArray();
         Assert.NotEmpty(moveNextMethods);
 
-        Assert.Empty(moveNextMethods.SelectMany(CaptureHelperCalls));
+        var generatedMethods = GeneratedMethods(generatedType).ToArray();
+        Assert.Empty(generatedMethods.SelectMany(CaptureHelperCalls));
+        Assert.Contains(generatedMethods.SelectMany(ClosureFieldAccesses), static field =>
+            field.Name.Contains("healthOffset", StringComparison.Ordinal));
+        Assert.Contains(generatedMethods.SelectMany(ClosureFieldAccesses), static field =>
+            field.Name.Contains("observedHealth", StringComparison.Ordinal));
     }
 
     private static IEnumerable<MethodReference> CaptureHelperCalls(MethodDefinition method)
@@ -61,4 +62,28 @@ public sealed class InvokeAsyncImplicitCaptureWeaverTests
     private static bool IsCaptureHelper(MethodReference method)
         => string.Equals(method.Name, DotBoxDInvokeAsyncWeaverNames.ReadCaptureMethodName, StringComparison.Ordinal) ||
            string.Equals(method.Name, DotBoxDInvokeAsyncWeaverNames.WriteCaptureMethodName, StringComparison.Ordinal);
+
+    private static IEnumerable<FieldReference> ClosureFieldAccesses(MethodDefinition method)
+    {
+        foreach (var instruction in method.Body.Instructions)
+        {
+            if (instruction.Operand is FieldReference field)
+            {
+                yield return field;
+            }
+        }
+    }
+
+    private static IEnumerable<MethodDefinition> GeneratedMethods(TypeDefinition type)
+    {
+        foreach (var method in type.Methods.Where(static method => method.HasBody))
+        {
+            yield return method;
+        }
+
+        foreach (var method in type.NestedTypes.SelectMany(GeneratedMethods))
+        {
+            yield return method;
+        }
+    }
 }
