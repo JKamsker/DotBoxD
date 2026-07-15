@@ -94,6 +94,10 @@ Services, Kernels, and Pushdown.
   after Auto mode has completed a successful binding-free compiled run. Auto still interprets its mandatory first run,
   re-evaluates selector and hotness decisions, returns full execution results, and uses the host provider caches; failures,
   fallback, cancellation-token changes, revocation, audited runs, and binding entrypoints retain their prior paths.
+- **Value-type interpreter loop comparisons:** eligible I32 `while` and branched-loop plans now embed their immutable
+  comparison plan instead of allocating a separate object per execution. F64 branched planning removes both the rejected
+  tentative I32 comparison and the selected F64 comparison allocation; evaluation order, fuel, loop accounting, and
+  unsupported/debug fallback behavior are unchanged.
 - **Documentation & repo polish:** new top-level README, `docs/` information architecture
   (getting-started, concepts, security, reference, contributing), `SECURITY.md`, `CONTRIBUTING.md`,
   `CODE_OF_CONDUCT.md`, and GitHub repo metadata files.

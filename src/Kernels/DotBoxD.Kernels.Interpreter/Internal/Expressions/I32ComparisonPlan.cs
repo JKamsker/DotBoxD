@@ -6,7 +6,7 @@ namespace DotBoxD.Kernels.Interpreter.Internal.Expressions;
 // Unboxed i32 comparison (two i32 expression plans -> bool), used as the condition of a branched i32 loop body
 // so the comparison avoids boxing its operands and result. FuelCost counts nodes identically to the compiler's
 // per-subexpression metering (1 + left + right).
-internal sealed class I32ComparisonPlan
+internal readonly struct I32ComparisonPlan
 {
     private static readonly Dictionary<string, Comparison> Comparisons = new(StringComparer.Ordinal)
     {
@@ -54,7 +54,7 @@ internal sealed class I32ComparisonPlan
         I32CallEvaluator calls,
         out I32ComparisonPlan plan)
     {
-        plan = null!;
+        plan = default;
         if (expression is not BinaryExpression binary ||
             !Comparisons.TryGetValue(binary.Operator, out var op) ||
             !I32ExpressionPlan.TryCreate(binary.Left, frame, assumedInt32Local, calls, out var left) ||

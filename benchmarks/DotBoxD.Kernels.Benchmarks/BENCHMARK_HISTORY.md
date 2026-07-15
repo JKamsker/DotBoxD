@@ -199,6 +199,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Value-type compiled attempt envelope | this commit | `--probe-compiled-execution-envelope` | Changed the host's private result-or-fallback `CompiledAttempt` from a reference record to a readonly record struct. Across 50,000 warmed public compiled suppressed successes, allocation fell exactly from 42,001,504 B (840.0 B/op) to 40,401,504 B (808.0 B/op), or 32 B/execution. The timing ranges overlap, so this step makes no timing claim. |
 | Allocation-free warmed compiled cache hits | this commit | `--probe-compiled-execution-envelope` | Moved non-persistent reflection compilation/materialization factories into miss-only cache helpers and the inline-await capture into its selected worker boundary. Across 50,000 warmed public compiled suppressed successes, allocation fell from 40,404,920 B (808.1 B/op) to 25,602,968 B (512.1 B/op), removing 296.0 B/execution. Provider and both execution-cache completed hits independently measure 0 B/hit; checksums, identity, resource usage, cancellation/coalescing, custom compilers, failures, and fallback remain pinned. |
 | Reusable Auto compiled no-audit state | this commit | `--probe-prepared-values` | Reused the installed kernel's existing no-audit meter/context state after a successful binding-free Auto-compiled run, while retaining Auto selection, hotness tracking, full results, and provider cache lookup. The warmed Auto miss lane fell from 2,216.3 to 1,896.2 B/op; subtracting the one-decimal displays gives 320.1 B/op, while the exact mechanism removes a 128-byte `ResourceMeter` plus a 192-byte `SandboxContext`, or 320 B/run. Repeated after processes reproduced 1,896.2 B/op. Elapsed samples are not claimed. |
+| Value-type I32 comparison plans | this commit | `--probe-interpreter-while-plan-setup`, `--probe-interpreter-branched-plan-setup` | Embedded the immutable two-operand comparison plan in its owning loop plan. Across 50,000 executions, I32 `while` and branched rows fell exactly from 1,168.3 to 1,128.3 B/op and 1,456.3 to 1,416.3 B/op. F64 branched planning fell from 1,840.5 to 1,760.5 B/op because both its rejected I32 attempt and selected F64 plan stop allocating a 40-byte comparison object. Checksums and resource usage are unchanged; elapsed samples are not claimed. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -2203,3 +2204,35 @@ Regression coverage additionally pins mandatory-first interpretation, Compiled-t
 non-stickiness, full-result and hotness accounting, provider lookup despite a poisoned state executable, meter reset,
 cancelled-token recovery, failed audit evidence, and terminal revocation handling. No public API, generated ABI, verifier
 identity, persisted artifact, sandbox policy, audit/security boundary, or resource-accounting contract changes.
+
+## Value-type I32 comparison plans
+
+The scalar I32 `while` and branched-loop planners stored an immutable comparison in a separate reference object even though
+its lifetime and ownership exactly match the enclosing execution plan. Each object is 40 bytes on x64 (two plan references,
+two integers, and the object header). F64 branched planning paid twice: the interpreter first builds and rejects a tentative
+I32 runner, then builds the selected F64 runner with another comparison.
+
+`I32ComparisonPlan` is now a private readonly value embedded in its owner. `TryCreate` still publishes a plan only after the
+operator and both operands validate, and callers observe `default` only on its false path. Planning and evaluation remain
+left-to-right, preorder fuel is unchanged, and unsupported or debug-traced shapes retain the general evaluator.
+
+Commands:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-while-plan-setup
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-branched-plan-setup
+```
+
+Repeated Release allocation results over 50,000 executions:
+
+```text
+case                         before B/op    after B/op    delta/op
+I32 while                         1,168.3       1,128.3       -40 B
+I32 branched                      1,456.3       1,416.3       -40 B
+F64 branched                      1,840.5       1,760.5       -80 B
+```
+
+The 40/40/80-byte reductions reproduced exactly across three fresh processes. The zero-iteration, no-branch,
+empty-branch, and two-assignment controls retain their expected relative bands. Results, fuel, loop iterations, sandbox
+allocation, and host-call usage are unchanged. This setup-only representation change has no isolated timing evidence, so
+it makes only the allocation claim and changes no public API, verifier identity, persisted artifact, or sandbox contract.

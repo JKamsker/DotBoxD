@@ -15,8 +15,8 @@ public sealed class BranchedSingleAssignmentLoopAllocationTests
     private const int MeasurementIterations = 20_000;
 
     [Theory]
-    [InlineData("i32", 432, 264, 880)]
-    [InlineData("f64", 720, 528, 1_280)]
+    [InlineData("i32", 392, 224, 840)]
+    [InlineData("f64", 640, 448, 1_200)]
     public async Task Branch_plan_shapes_preserve_expected_managed_allocation(
         string type,
         double expectedSingleOverhead,
