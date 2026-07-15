@@ -97,6 +97,8 @@ public sealed partial class SandboxHost
             return false;
         }
 
+        ThrowIfDisposed();
+
         if (!TryGetAutoDecisionMode(decision, out selectedMode, out var validationError))
         {
             result = InvalidExecutionOptionsResult(plan, options, validationError);

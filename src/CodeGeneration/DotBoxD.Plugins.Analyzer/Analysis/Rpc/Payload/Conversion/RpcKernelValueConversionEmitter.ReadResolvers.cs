@@ -49,87 +49,144 @@ internal sealed partial class RpcKernelValueConversionEmitter
         ITypeSymbol type,
         string expression,
         out string result)
-        => TryWriteWhen(DotBoxDRpcTypeMapper.IsGuid(type), $"{expression}.GuidValue", out result);
+    {
+        if (DotBoxDRpcTypeMapper.IsGuid(type))
+        {
+            result = $"{expression}.GuidValue";
+            return true;
+        }
+
+        result = string.Empty;
+        return false;
+    }
 
     private static bool TryReadDateTime(
         RpcKernelValueConversionEmitter emitter,
         ITypeSymbol type,
         string expression,
         out string result)
-        => TryWriteWhen(
-            DotBoxDRpcTypeMapper.IsDateTimeWireType(type),
-            $"{emitter.EnsureDateTimeValueReader(type)}({expression})",
-            out result);
+    {
+        if (DotBoxDRpcTypeMapper.IsDateTimeWireType(type))
+        {
+            result = $"{emitter.EnsureDateTimeValueReader(type)}({expression})";
+            return true;
+        }
+
+        result = string.Empty;
+        return false;
+    }
 
     private static bool TryReadDecimal(
         RpcKernelValueConversionEmitter emitter,
         ITypeSymbol type,
         string expression,
         out string result)
-        => TryWriteWhen(
-            DotBoxDRpcTypeMapper.IsDecimalWireType(type),
-            $"{emitter.EnsureDecimalValueReader()}({expression})",
-            out result);
+    {
+        if (DotBoxDRpcTypeMapper.IsDecimalWireType(type))
+        {
+            result = $"{emitter.EnsureDecimalValueReader()}({expression})";
+            return true;
+        }
+
+        result = string.Empty;
+        return false;
+    }
 
     private static bool TryReadDateOnly(
         RpcKernelValueConversionEmitter emitter,
         ITypeSymbol type,
         string expression,
         out string result)
-        => TryWriteWhen(
-            DotBoxDRpcTypeMapper.IsDateOnlyWireType(type),
-            $"{emitter.EnsureDateOnlyValueReader()}({expression}.Int32Value)",
-            out result);
+    {
+        if (DotBoxDRpcTypeMapper.IsDateOnlyWireType(type))
+        {
+            result = $"{emitter.EnsureDateOnlyValueReader()}({expression}.Int32Value)";
+            return true;
+        }
+
+        result = string.Empty;
+        return false;
+    }
 
     private static bool TryReadTimeOnly(
         RpcKernelValueConversionEmitter emitter,
         ITypeSymbol type,
         string expression,
         out string result)
-        => TryWriteWhen(
-            DotBoxDRpcTypeMapper.IsTimeOnlyWireType(type),
-            $"{emitter.EnsureTimeOnlyValueReader()}({expression}.Int64Value)",
-            out result);
+    {
+        if (DotBoxDRpcTypeMapper.IsTimeOnlyWireType(type))
+        {
+            result = $"{emitter.EnsureTimeOnlyValueReader()}({expression}.Int64Value)";
+            return true;
+        }
+
+        result = string.Empty;
+        return false;
+    }
 
     private static bool TryReadTimeSpan(
         RpcKernelValueConversionEmitter emitter,
         ITypeSymbol type,
         string expression,
         out string result)
-        => TryWriteWhen(
-            DotBoxDRpcTypeMapper.IsTimeSpanWireType(type),
-            $"new global::System.TimeSpan({expression}.Int64Value)",
-            out result);
+    {
+        if (DotBoxDRpcTypeMapper.IsTimeSpanWireType(type))
+        {
+            result = $"new global::System.TimeSpan({expression}.Int64Value)";
+            return true;
+        }
+
+        result = string.Empty;
+        return false;
+    }
 
     private static bool TryReadCancellationToken(
         RpcKernelValueConversionEmitter emitter,
         ITypeSymbol type,
         string expression,
         out string result)
-        => TryWriteWhen(
-            DotBoxDRpcTypeMapper.IsCancellationTokenWireType(type),
-            $"new global::System.Threading.CancellationToken({expression}.BoolValue)",
-            out result);
+    {
+        if (DotBoxDRpcTypeMapper.IsCancellationTokenWireType(type))
+        {
+            result = $"new global::System.Threading.CancellationToken({expression}.BoolValue)";
+            return true;
+        }
+
+        result = string.Empty;
+        return false;
+    }
 
     private static bool TryReadIndex(
         RpcKernelValueConversionEmitter emitter,
         ITypeSymbol type,
         string expression,
         out string result)
-        => TryWriteWhen(
-            DotBoxDRpcTypeMapper.IsIndexWireType(type),
-            $"{emitter.EnsureIndexValueReader()}({expression})",
-            out result);
+    {
+        if (DotBoxDRpcTypeMapper.IsIndexWireType(type))
+        {
+            result = $"{emitter.EnsureIndexValueReader()}({expression})";
+            return true;
+        }
+
+        result = string.Empty;
+        return false;
+    }
 
     private static bool TryReadRange(
         RpcKernelValueConversionEmitter emitter,
         ITypeSymbol type,
         string expression,
         out string result)
-        => TryWriteWhen(
-            DotBoxDRpcTypeMapper.IsRangeWireType(type),
-            $"{emitter.EnsureRangeValueReader()}({expression})",
-            out result);
+    {
+        if (DotBoxDRpcTypeMapper.IsRangeWireType(type))
+        {
+            result = $"{emitter.EnsureRangeValueReader()}({expression})";
+            return true;
+        }
+
+        result = string.Empty;
+        return false;
+    }
 
     private static bool TryReadEnum(
         RpcKernelValueConversionEmitter emitter,

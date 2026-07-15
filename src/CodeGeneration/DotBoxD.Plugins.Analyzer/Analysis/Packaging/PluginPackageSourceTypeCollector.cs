@@ -1,3 +1,4 @@
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -8,11 +9,23 @@ internal static class PluginPackageSourceTypeCollector
     public static IncrementalValueProvider<System.Collections.Immutable.ImmutableArray<GeneratedPluginPackageIdentity>> Collect(
         IncrementalGeneratorInitializationContext context)
         => context.SyntaxProvider.CreateSyntaxProvider(
-                static (node, _) => node is BaseTypeDeclarationSyntax or DelegateDeclarationSyntax,
+                static (node, _) => CouldCollide(node),
                 static (ctx, ct) => Identity(ctx, ct))
             .Where(static identity => identity.HasValue)
             .Select(static (identity, _) => identity!.Value)
             .Collect();
+
+    private static bool CouldCollide(SyntaxNode node)
+        => node switch
+        {
+            BaseTypeDeclarationSyntax declaration => HasPluginPackageSuffix(declaration.Identifier),
+            DelegateDeclarationSyntax declaration => HasPluginPackageSuffix(declaration.Identifier),
+            _ => false
+        };
+
+    // GeneratedPluginPackageIdentity.From enforces this suffix for every collision-tracked package.
+    private static bool HasPluginPackageSuffix(SyntaxToken identifier)
+        => identifier.ValueText.EndsWith(DotBoxDGenerationNames.PluginPackageSuffix, StringComparison.Ordinal);
 
     private static GeneratedPluginPackageIdentity? Identity(GeneratorSyntaxContext context, CancellationToken cancellationToken)
     {
