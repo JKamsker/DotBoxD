@@ -14,6 +14,7 @@ internal static class ForbiddenApiNamePolicy
         DotBoxDGenerationNames.TypeNames.SystemType, DotBoxDGenerationNames.TypeNames.SystemUnsafe,
         DotBoxDGenerationNames.TypeNames.SystemComponentModelTypeDescriptor,
         "Microsoft.Win32.Registry", "System.Security.Principal.WindowsIdentity",
+        "System.Security.Cryptography.Rfc2898DeriveBytes",
         "System.Security.Cryptography.X509Certificates.X509Store"
     ];
 
