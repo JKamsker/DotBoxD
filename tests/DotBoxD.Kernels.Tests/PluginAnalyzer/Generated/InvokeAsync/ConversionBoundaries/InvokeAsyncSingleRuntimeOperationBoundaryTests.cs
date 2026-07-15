@@ -169,6 +169,29 @@ public sealed class InvokeAsyncSingleRuntimeOperationBoundaryTests
     }
 
     [Fact]
+    public void Compile_time_single_derived_member_arithmetic_is_folded_before_lowering()
+    {
+        var result = RunGeneratorAndAssertCompiles(UsageSource("""
+            public sealed record Scores(int Seed)
+            {
+                public float Total => 16_777_216F + 1F;
+            }
+
+            public static ValueTask<double> Run(RemotePluginServer kernels)
+                => kernels.InvokeAsync(async (IGameWorldAccess world) =>
+                {
+                    var scores = new Scores(world.GetHealth("monster-1"));
+                    return (double)scores.Total;
+                });
+            """));
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.Contains("16777216", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("\\\"binary\\\":\\\"add\\\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Explicit_compile_time_single_conversion_remains_supported()
     {
         var result = RunGeneratorAndAssertCompiles(UsageSource("""
