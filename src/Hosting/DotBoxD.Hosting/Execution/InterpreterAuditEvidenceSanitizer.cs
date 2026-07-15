@@ -1,6 +1,4 @@
-using System.Globalization;
 using DotBoxD.Kernels.Bindings;
-using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Hosting.Execution;
 
@@ -16,6 +14,7 @@ internal sealed class InterpreterAuditEvidenceSanitizer
     private readonly SandboxExecutionResult _result;
     private readonly SandboxAuditEvent _summary;
     private readonly SandboxRunId _runId;
+    private readonly InterpreterDebugTraceValidator _debugTraceValidator;
     private readonly InMemoryAuditSink _validationAudit = new();
     private readonly InMemoryAuditSink _publicationAudit = new();
     private readonly Dictionary<string, int> _observedBindingCalls = new(StringComparer.Ordinal);
@@ -25,6 +24,7 @@ internal sealed class InterpreterAuditEvidenceSanitizer
     private int _observedLogEvents;
     private SandboxWorkerBindingEvidence.ObservedBindingBytes _observedBytes;
     private SandboxWorkerBindingEvidence.DeterministicRandomAuditSequence _deterministicRandom;
+    private SandboxWorkerBindingEvidenceSequence _bindingEvidenceSequence;
 
     public InterpreterAuditEvidenceSanitizer(
         ExecutionPlan plan,
@@ -39,7 +39,9 @@ internal sealed class InterpreterAuditEvidenceSanitizer
         _result = result;
         _summary = summary;
         _runId = options.RunId ?? summary.RunId;
+        _debugTraceValidator = new InterpreterDebugTraceValidator(plan, options, _runId);
         _deterministicRandom = SandboxWorkerBindingEvidence.DeterministicRandomAuditSequence.Create(plan);
+        _bindingEvidenceSequence = SandboxWorkerBindingEvidenceSequence.Create(result);
     }
 
     public bool TrySanitize(
@@ -108,7 +110,7 @@ internal sealed class InterpreterAuditEvidenceSanitizer
 
     private bool TryAcceptDebugTrace(SandboxAuditEvent auditEvent)
     {
-        if (!DebugTraceMatches(auditEvent))
+        if (!_debugTraceValidator.Matches(auditEvent))
         {
             return !_result.Succeeded;
         }
@@ -139,78 +141,6 @@ internal sealed class InterpreterAuditEvidenceSanitizer
         return true;
     }
 
-    private bool DebugTraceMatches(SandboxAuditEvent auditEvent)
-    {
-        if (!DebugTraceEnvelopeMatches(auditEvent, out var category, out var nodeKind))
-        {
-            return false;
-        }
-
-        return category == "binding"
-            ? BindingDebugTraceMatches(auditEvent, nodeKind)
-            : NodeDebugTraceMatches(auditEvent, category);
-    }
-
-    private bool DebugTraceEnvelopeMatches(
-        SandboxAuditEvent auditEvent,
-        out string category,
-        out string nodeKind)
-    {
-        category = string.Empty;
-        nodeKind = string.Empty;
-        return _options.EnableDebugTrace &&
-            auditEvent.RunId == _runId &&
-            auditEvent.Success &&
-            auditEvent.ResourceId is null &&
-            WorkerAuditValidator.CommonEnvelopeMatches(_plan, auditEvent) &&
-            DebugFieldsMatch(auditEvent, out category, out nodeKind);
-    }
-
-    private bool BindingDebugTraceMatches(SandboxAuditEvent auditEvent, string nodeKind)
-        => auditEvent.BindingId == nodeKind &&
-           _plan.Bindings.TryGet(nodeKind, out var binding) &&
-           auditEvent.CapabilityId == binding.RequiredCapability &&
-           auditEvent.Effect == binding.Effects;
-
-    private static bool NodeDebugTraceMatches(SandboxAuditEvent auditEvent, string category)
-        => category is "statement" or "expression" &&
-           auditEvent.BindingId is null &&
-           auditEvent.CapabilityId is null &&
-           auditEvent.Effect == SandboxEffect.None;
-
-    private bool DebugFieldsMatch(
-        SandboxAuditEvent auditEvent,
-        out string category,
-        out string nodeKind)
-    {
-        category = string.Empty;
-        nodeKind = string.Empty;
-        return auditEvent.Fields is { Count: 7 } fields &&
-            DebugIdentityFieldsMatch(fields, out category, out nodeKind) &&
-            DebugSourceFieldsMatch(fields);
-    }
-
-    private bool DebugIdentityFieldsMatch(
-        IReadOnlyDictionary<string, string> fields,
-        out string category,
-        out string nodeKind)
-    {
-        category = string.Empty;
-        nodeKind = string.Empty;
-        return FieldEquals(fields, "moduleHash", _plan.ModuleHash) &&
-            RequiredSafeField(fields, "functionId", out var functionId) &&
-            _plan.FunctionLookup.ContainsKey(functionId) &&
-            RequiredSafeField(fields, "category", out category) &&
-            RequiredSafeField(fields, "nodeKind", out nodeKind);
-    }
-
-    private static bool DebugSourceFieldsMatch(IReadOnlyDictionary<string, string> fields)
-        => RequiredInteger(fields, "sourceLine", out var sourceLine) &&
-           sourceLine >= 0 &&
-           RequiredInteger(fields, "sourceColumn", out var sourceColumn) &&
-           sourceColumn >= 0 &&
-           RequiredLong(fields, "fuelRemaining");
-
     private bool BindingAuditMatchesResult(SandboxAuditEvent auditEvent)
         => auditEvent.Success ||
            (!_result.Succeeded && auditEvent.ErrorCode == _result.Error!.Code);
@@ -220,13 +150,20 @@ internal sealed class InterpreterAuditEvidenceSanitizer
         if (!SandboxWorkerBindingEvidence.TryRecordBindingEvidence(
                 _plan,
                 auditEvent,
+                _bindingEvidenceSequence.Next(auditEvent),
                 _observedBindingCalls,
                 ref _observedBindingBaseFuel,
                 ref _observedBytes,
                 ref _deterministicRandom,
-                _plan.Policy.GrantClock))
+                _plan.Policy.GrantClock,
+                out var representsCall))
         {
             return false;
+        }
+
+        if (!representsCall)
+        {
+            return true;
         }
 
         try
@@ -241,46 +178,6 @@ internal sealed class InterpreterAuditEvidenceSanitizer
             return false;
         }
     }
-
-    private static bool RequiredSafeField(
-        IReadOnlyDictionary<string, string> fields,
-        string name,
-        out string value)
-    {
-        if (fields.TryGetValue(name, out var candidate) &&
-            !string.IsNullOrWhiteSpace(candidate) &&
-            WorkerAuditTextSafety.TextIsSafe(candidate))
-        {
-            value = candidate;
-            return true;
-        }
-
-        value = string.Empty;
-        return false;
-    }
-
-    private static bool RequiredInteger(
-        IReadOnlyDictionary<string, string> fields,
-        string name,
-        out int value)
-    {
-        value = 0;
-        return fields.TryGetValue(name, out var raw) &&
-            int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
-    }
-
-    private static bool RequiredLong(
-        IReadOnlyDictionary<string, string> fields,
-        string name)
-        => fields.TryGetValue(name, out var raw) &&
-           long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out _);
-
-    private static bool FieldEquals(
-        IReadOnlyDictionary<string, string> fields,
-        string name,
-        string expected)
-        => fields.TryGetValue(name, out var value) &&
-           string.Equals(value, expected, StringComparison.Ordinal);
 
     private static bool IsBindingAudit(string kind)
         => kind is BindingAuditKinds.BindingCall or
