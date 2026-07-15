@@ -17,19 +17,24 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         "keep the stage in the fluent chain or initialize a new local with the staged expression.";
 
     public static bool IsCandidate(SyntaxNode node)
-        => node is InvocationExpressionSyntax
+    {
+        if (node is not InvocationExpressionSyntax invocation)
         {
-            Expression: MemberAccessExpressionSyntax
-            {
-                Name.Identifier.ValueText: "Use"
+            return false;
+        }
+
+        return invocation.Expression is MemberAccessExpressionSyntax
+        {
+            Name.Identifier.ValueText: "Use"
                     or "UseGeneratedChain"
                     or "UseGeneratedLocalChain"
                     or "UseGeneratedResultChain"
                     or "UseGeneratedLocalResultChain"
                     or "Where"
                     or "Select"
-            }
-        };
+        } ||
+            IsStoredInvocation(invocation);
+    }
 
     public static PluginKernelDiagnostic? Create(
         GeneratorSyntaxContext context,
@@ -38,12 +43,17 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         var invocation = (InvocationExpressionSyntax)context.Node;
         if (invocation.Expression is not MemberAccessExpressionSyntax access)
         {
-            return null;
+            return CreateStoredReturnedStageDiagnostic(invocation, context.SemanticModel, cancellationToken);
         }
 
         if (access.Name.Identifier.ValueText is "Where" or "Select")
         {
             return CreateDiscardedStageDiagnostic(invocation, access, context.SemanticModel, cancellationToken);
+        }
+
+        if (CreateStoredReturnedStageDiagnostic(invocation, context.SemanticModel, cancellationToken) is { } stored)
+        {
+            return stored;
         }
 
         var receiverType = context.SemanticModel.GetTypeInfo(access.Expression, cancellationToken).Type;
@@ -66,6 +76,70 @@ internal static partial class RemoteStagedUseDiagnosticFactory
 
     private static string UnsupportedTerminalMessage(string terminal)
         => TerminalMessagePrefix + terminal + " after Where/Select would ignore those stages.";
+
+    private static bool IsStoredInvocation(InvocationExpressionSyntax invocation)
+    {
+        var transparentExpression = UnwrapTransparentParent(invocation);
+        return transparentExpression.Parent is EqualsValueClauseSyntax
+        {
+            Parent: VariableDeclaratorSyntax
+        } ||
+            transparentExpression.Parent is AssignmentExpressionSyntax
+            {
+                Right: var right
+            } &&
+            right == transparentExpression;
+    }
+
+    private static PluginKernelDiagnostic? CreateStoredReturnedStageDiagnostic(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        var transparentExpression = UnwrapTransparentParent(invocation);
+        if (!TryStoredLocal(transparentExpression, model, cancellationToken, out var local) ||
+            !ContainsStageInvocationOrAlias(invocation, model, cancellationToken) ||
+            !IsRemoteChainOrStageType(model.GetTypeInfo(invocation, cancellationToken).Type))
+        {
+            return null;
+        }
+
+        if (local is not null &&
+            RemoteStagedUseFlowAnalyzer.LocalFlowsIntoTerminalOrUse(invocation, local, model, cancellationToken))
+        {
+            return null;
+        }
+
+        return new PluginKernelDiagnostic(
+            DiscardedStageMessage,
+            PluginDiagnosticLocation.From(invocation.Expression.GetLocation()));
+    }
+
+    private static bool TryStoredLocal(
+        ExpressionSyntax expression,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        out ILocalSymbol? local)
+    {
+        local = null;
+        if (expression.Parent is EqualsValueClauseSyntax
+            {
+                Parent: VariableDeclaratorSyntax declarator
+            })
+        {
+            local = model.GetDeclaredSymbol(declarator, cancellationToken) as ILocalSymbol;
+            return true;
+        }
+
+        if (expression.Parent is not AssignmentExpressionSyntax assignment ||
+            assignment.Right != expression)
+        {
+            return false;
+        }
+
+        local = model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol as ILocalSymbol;
+        return true;
+    }
 
     private static PluginKernelDiagnostic? CreateDiscardedStageDiagnostic(
         InvocationExpressionSyntax invocation,

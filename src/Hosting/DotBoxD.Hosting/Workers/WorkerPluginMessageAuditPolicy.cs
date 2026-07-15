@@ -11,7 +11,11 @@ internal static class WorkerPluginMessageAuditPolicy
     private const string CapabilityId = "host.message.write";
     private const string TargetPrefix = "target:";
 
-    public static bool Matches(ExecutionPlan plan, SandboxAuditEvent auditEvent, DateTimeOffset grantClock)
+    public static bool Matches(
+        ExecutionPlan plan,
+        SandboxAuditEvent auditEvent,
+        DateTimeOffset grantClock,
+        bool allowInProcessEvidence = false)
     {
         if (auditEvent.Kind != PluginMessageKind)
         {
@@ -20,13 +24,16 @@ internal static class WorkerPluginMessageAuditPolicy
 
         if (!string.Equals(auditEvent.BindingId, SendBindingId, StringComparison.Ordinal) ||
             !string.Equals(auditEvent.CapabilityId, CapabilityId, StringComparison.Ordinal) ||
-            !TryReadTargetId(auditEvent.ResourceId, out var targetId) ||
             !plan.Policy.TryGetGrant(CapabilityId, grantClock, out var grant))
         {
             return false;
         }
 
-        return TargetMatches(grant, targetId) &&
+        // In-process message dispatch already authorized the real target before audit redaction.
+        // Worker evidence must retain a policy-checkable opaque target because the host did not dispatch it.
+        var targetMatches = (allowInProcessEvidence && auditEvent.ResourceId == "target:[redacted]") ||
+            (TryReadTargetId(auditEvent.ResourceId, out var targetId) && TargetMatches(grant, targetId));
+        return targetMatches &&
             MessageLengthMatches(grant, auditEvent);
     }
 

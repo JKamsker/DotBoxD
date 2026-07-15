@@ -79,6 +79,21 @@ public sealed class RpcKernelNumericConversionGenerationTests
         }
         """;
 
+    private const string FloatExpressionParameterSource = """
+        using DotBoxD.Kernels;
+        using DotBoxD.Kernels.Sandbox;
+        using DotBoxD.Plugins;
+        using DotBoxD.Abstractions;
+
+        namespace Sample;
+
+        [ServerExtension("float-expression-parameter")]
+        public sealed partial class FloatExpressionParameterKernel
+        {
+            public float Echo(int value, HookContext ctx) => value;
+        }
+        """;
+
     [Fact]
     public async Task Generated_rpc_kernel_preserves_implicit_numeric_literal_conversions()
     {
@@ -125,18 +140,24 @@ public sealed class RpcKernelNumericConversionGenerationTests
     }
 
     [Fact]
-    public async Task Generated_rpc_kernel_preserves_int_to_float_variable_conversions()
+    public void Generated_rpc_kernel_rejects_block_body_int_to_float_variable_conversions()
     {
-        var package = PluginAnalyzerGeneratedPackageFactory.Create(
-            FloatParameterSource,
-            "Sample.FloatParameterPluginPackage");
+        AssertUnsupportedSingleReturnConversion(FloatParameterSource);
+    }
 
-        using var server = PluginServer.Create(defaultPolicy: PurePolicy());
-        var kernel = await server.InstallServerExtensionAsync(package);
+    [Fact]
+    public void Generated_rpc_kernel_rejects_expression_body_int_to_float_variable_conversions()
+    {
+        AssertUnsupportedSingleReturnConversion(FloatExpressionParameterSource);
+    }
 
-        var result = await kernel.InvokeServerExtensionAsync([SandboxValue.FromInt32(42)]);
-
-        Assert.Equal(42.0, Assert.IsType<F64Value>(result).Value);
+    private static void AssertUnsupportedSingleReturnConversion(string source)
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(source);
+        Assert.Contains(
+            diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                          diagnostic.GetMessage().Contains("return expression", StringComparison.OrdinalIgnoreCase));
     }
 
     private static SandboxPolicy PurePolicy()

@@ -15,7 +15,11 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         var lowered = new string?[parameters.Count];
         foreach (var argument in bound.EvaluationOrder)
         {
-            var value = LowerExpression(argument.Expression);
+            var parameter = parameters[argument.ParameterIndex];
+            var value = LowerRequiredExpression(
+                argument.Expression,
+                parameter.Type,
+                $"{description} parameter '{parameter.Name}'");
             if (_expressionPrelude is null)
             {
                 lowered[argument.ParameterIndex] = value;
@@ -47,11 +51,6 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return lowered!;
     }
 
-    private static bool CanBindArgumentsInParameterOrder(
-        SeparatedSyntaxList<ArgumentSyntax> arguments,
-        IReadOnlyList<IParameterSymbol> parameters)
-        => TryBindArgumentsInParameterOrder(arguments, parameters, description: null, out _);
-
     private static BoundRpcArguments BindArgumentsInParameterOrder(
         SeparatedSyntaxList<ArgumentSyntax> arguments,
         IReadOnlyList<IParameterSymbol> parameters,
@@ -65,7 +64,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         throw new NotSupportedException($"{description} call has duplicate or misplaced arguments.");
     }
 
-    private static bool TryBindArgumentsInParameterOrder(
+    internal static bool TryBindArgumentsInParameterOrder(
         SeparatedSyntaxList<ArgumentSyntax> arguments,
         IReadOnlyList<IParameterSymbol> parameters,
         string? description,
@@ -224,7 +223,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         throw new NotSupportedException($"{description} has no parameter '{name}'.");
     }
 
-    private readonly record struct BoundRpcArguments(
+    internal readonly record struct BoundRpcArguments(
         bool[] Assigned,
         IReadOnlyList<(int ParameterIndex, ExpressionSyntax Expression)> EvaluationOrder);
 }

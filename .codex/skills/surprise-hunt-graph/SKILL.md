@@ -41,32 +41,27 @@ companion to `library-surprise-sweep` (the technique for finding + proving one s
    failed red-test), re-dispatching it is correct. Never re-mine a refuted lead.
 4. Pick ONE cohesive target seam inside the lens's scope: a charter sub-area not yet swept, or
    continue an open thread from the comments.
-5. Investigate read-only and sustain the pass across adjacent promise surfaces in that seam. After
-   finding one concrete candidate, keep going while useful research time remains, up to five
-   independently concrete candidates. You may restore/build to confirm a lead. Never edit files and
-   never open a PR in this run - discovery and handoff only.
+5. Investigate read-only across adjacent promise surfaces in that seam, then select at most one
+   strongest concrete candidate. Record other promising leads for later scheduled runs. You may
+   restore/build to confirm a lead. Never edit files and never open a PR in this run - discovery and
+   handoff only.
 6. **Log a concise progress comment on the lens issue** (`add-comment` → the lens number): what you
    checked, promising leads, dead ends, any **refuted** lead (so it is not re-mined), and - for every
    red-test dispatched - the exact `candidate_title` and failing shape. This comment is the durable
    dedup ledger: a red-test PR may be merged and closed later, so every candidate MUST be recorded
    here or a future run will re-dispatch it.
 7. Outcome:
-   - **Concrete, non-duplicate surprise(s)** → produce one red-test handoff per independent
-     candidate (up to five) and `dispatch-workflow` `library-surprise-red-test`. Put `lens_issue` in
-     every handoff payload. If a finding warrants standalone tracking, also `create-issue`
+   - **Concrete, non-duplicate surprise** → produce one red-test handoff and `dispatch-workflow`
+     `library-surprise-red-test`. Put `lens_issue` in the handoff payload. If the finding warrants
+     standalone tracking, also `create-issue`
      (`sweep:bug`) with a repro and a `Lens: #<lens_issue>` line (the lens carries the `vein:*` tag).
    - **Sub-area swept dry** → say so in the comment. If the WHOLE lens is exhausted, `add-labels`
      `sweep:exhausted` on the lens.
    - **Nothing actionable** → still leave the progress comment, then `noop` with the reason.
-8. If the lens is not exhausted, dispatch exactly one `library-surprise-explore-continuation` handoff
-   for the same lens. The deterministic continuation re-checks lens status and queues the successor;
-   per-lens concurrency serializes the chain, and the scheduled dispatcher recovers a chain broken
-   by failure or an incomplete run.
-
 ## Rules
 
-- One cohesive target seam per run; up to five handoffs are allowed only for independent defects
-  proven while mining that seam. Never split one defect or pad the batch.
+- One cohesive target seam and at most one red-test handoff per run. Never split one defect or pad
+  the result; record other leads for later scheduled runs.
 - Coarse granularity: the lens comment log is the investigation trail; branch a standalone issue
   only when a sub-thread is independently mineable by a different agent.
 - Never weaken a guardrail to force a finding - prefer `noop` over a speculative dispatch.

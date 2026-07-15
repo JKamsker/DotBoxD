@@ -109,6 +109,8 @@ public sealed class PluginAnalyzerTypeNameContractTests
             [nameof(TypeNames.SystemActivator)] = TypeName(typeof(Activator)),
             [nameof(TypeNames.SystemAppContext)] = TypeName(typeof(AppContext)),
             [nameof(TypeNames.SystemAppDomain)] = TypeName(typeof(AppDomain)),
+            [nameof(TypeNames.SystemComponentModelBackgroundWorker)] =
+                TypeName(typeof(System.ComponentModel.BackgroundWorker)),
             [nameof(TypeNames.SystemComponentModelTypeDescriptor)] =
                 TypeName(typeof(System.ComponentModel.TypeDescriptor)),
             [nameof(TypeNames.SystemConsole)] = TypeName(typeof(Console)),
@@ -120,6 +122,7 @@ public sealed class PluginAnalyzerTypeNameContractTests
             [nameof(TypeNames.SystemTextEncoding)] = TypeName(typeof(System.Text.Encoding)),
             [nameof(TypeNames.SystemServiceProvider)] = TypeName(typeof(IServiceProvider)),
             [nameof(TypeNames.SystemType)] = TypeName(typeof(Type)),
+            [nameof(TypeNames.SystemArrayPoolOriginal)] = "System.Buffers.ArrayPool<T>",
             [nameof(TypeNames.SystemUnsafe)] = TypeName(typeof(System.Runtime.CompilerServices.Unsafe)),
 
             [nameof(TypeNames.GlobalArray)] = GlobalTypeName(typeof(Array)),

@@ -8,6 +8,7 @@ using Xunit;
 
 namespace DotBoxD.Services.Tests.Diagnostics;
 
+[Collection(RpcTelemetryCollection.Name)]
 public sealed class RpcTelemetryTests
 {
     [Fact]

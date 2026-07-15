@@ -210,7 +210,10 @@ internal static partial class InvokeAsyncGenerationTestSources
         }
         """;
 
-    internal static string UsageSource(string usage, string serverMembers = "")
+    internal static string UsageSource(
+        string usage,
+        string serverMembers = "",
+        string worldMembers = "")
         => """
         using System;
         using System.Threading;
@@ -229,6 +232,7 @@ internal static partial class InvokeAsyncGenerationTestSources
             {
                 [HostBinding("host.world.getHealth", "game.world.monster.read.health", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
                 int GetHealth(string entityId);
+        """ + worldMembers + """
             }
         }
 

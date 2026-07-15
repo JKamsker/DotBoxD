@@ -115,8 +115,8 @@ var flow = semanticModel.AnalyzeDataFlow(lambdaBlock);
 - Lambda-only calls with no ambient captures lower to a zero-argument anonymous kernel.
 - Lambda-only calls with ambient local/parameter captures lower those captured symbols to IR parameters named
   after the source symbols. The generated interceptor reads and writes the compiler closure fields by source
-  symbol name via `lambda.Target` reflection, and the optional Fody weaver rewrites those helper calls to
-  static field access when the compiled call site exposes a safe compiler-generated display class.
+  symbol name via `lambda.Target` reflection, and the package-installed Fody weaver rewrites those helper
+  calls to static field access when the compiled call site exposes a safe compiler-generated display class.
 - Capture-bag calls also reject ambient `DataFlowsIn` / `DataFlowsOut`; only the explicit bag parameter can
   carry values across the boundary.
 - **Capture-bag sync-in** = the capture-bag object encoded as a server-extension wire record.
@@ -226,14 +226,16 @@ that read/write fields with those names from `lambda.Target`. If the compiler do
 closure field, the interceptor throws a clear `NotSupportedException` and the caller should switch to the
 explicit capture bag.
 
-When `DotBoxD.Plugins.Fody` is enabled, it post-processes the compiled assembly after C# lowering:
+The `DotBoxD` package enables `DotBoxD.Plugins.Fody` through hidden transitive MSBuild configuration. No
+consumer `FodyWeavers.xml` file is required. It post-processes the compiled assembly after C# lowering:
 
 1. Find calls into the generated `DotBoxD.Plugins.Generated.InvokeAsyncInterceptors.InvokeAsync_*` methods.
 2. Read the delegate construction IL feeding each interceptor call to discover the compiler display-class
    type for that source location.
-3. Find the generated async state machine for that interceptor.
-4. Replace `__ReadCapture(lambda, "field")` and `__WriteCapture(lambda, "field", value)` calls in
-   `MoveNext` with `lambda.Target`, a cast to the display class, and direct `ldfld` / `stfld` instructions.
+3. Find the compiler-generated interceptor methods that serialize captured inputs and apply captured
+   write-backs. Depending on compiler lowering, these may be cached nested delegates or state-machine methods.
+4. Replace `__ReadCapture(lambda, "field")` and `__WriteCapture(lambda, "field", value)` calls in those
+   methods with `lambda.Target`, a cast to the display class, and direct `ldfld` / `stfld` instructions.
 
 The weaver widens only the compiler-generated display class from private nested visibility to assembly
 visibility when needed. If any proof step fails, or if a field/type shape is not safely accessible, it leaves

@@ -277,22 +277,11 @@ public sealed partial class RpcHost
             return;
         }
 
-        try
-        {
-            await StopAsync().ConfigureAwait(false);
-        }
-        finally
-        {
-            try
-            {
-                await _peers.CloseAllAsync().ConfigureAwait(false);
-                await _peers.AwaitCleanupAsync().ConfigureAwait(false);
-            }
-            finally
-            {
-                await _listener.DisposeAsync().ConfigureAwait(false);
-            }
-        }
+        await RpcHostDisposeCoordinator.DisposeAsync(
+            () => StopAsync(),
+            _peers.CloseAllAsync,
+            _peers.AwaitCleanupAsync,
+            () => _listener.DisposeAsync().AsTask()).ConfigureAwait(false);
     }
 
     private readonly record struct StartRecovery(CancellationTokenSource Cts, bool DisposeCts, Exception? Failure);
