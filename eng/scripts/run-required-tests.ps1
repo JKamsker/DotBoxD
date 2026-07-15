@@ -222,6 +222,7 @@ $defaultMinimums = @{
     GeneratedFactoryRegistryImmutabilityTests = 3
     GeneratedDispatcherSurfaceTests = 1
     GeneratedReadonlyCollectionReaderTests = 2
+    RpcKernelCollectionReturnConversionTests = 20
     ServerExtensionMapTypeSupportTests = 8
     ServerExtensionMapBodyLoweringTests = 4
     HookResultBuilderHintNameRegressionTests = 1
