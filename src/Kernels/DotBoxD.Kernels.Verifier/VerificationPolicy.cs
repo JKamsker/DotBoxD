@@ -84,7 +84,9 @@ public sealed record VerificationPolicy(
                 RuntimeMember("Bool", BooleanName, SandboxValueName),
                 RuntimeMember("TypeScalar", StringName, SandboxTypeName),
                 RuntimeMember("TypeList", SandboxTypeName, SandboxTypeName),
+                RuntimeMember("TypeListCached", SandboxTypeName, SandboxTypeName),
                 RuntimeMember("TypeMap", $"{SandboxTypeName},{SandboxTypeName}", SandboxTypeName),
+                RuntimeMember("TypeMapCached", $"{SandboxTypeName},{SandboxTypeName}", SandboxTypeName),
                 RuntimeMember("TypeRecord", SandboxTypeArrayName, SandboxTypeName),
                 RuntimeMember("CreateMeteredTypeArray", $"{SandboxContextName},{Int32Name}", SandboxTypeArrayName),
                 RuntimeMember("StringConst", $"{SandboxContextName},{StringName}", SandboxValueName),
@@ -219,12 +221,12 @@ public sealed record VerificationPolicy(
             new HashSet<string>(StringComparer.Ordinal) {
                 "System.IO.", "System.Net.", "System.Reflection.", "System.Runtime.Loader.",
                 "System.Runtime.InteropServices.", "System.Diagnostics.", "System.Threading.",
-                "System.Threading.Tasks.", "System.Activator", "System.Environment",
+                "System.Threading.Tasks.", "Microsoft.VisualBasic.", "System.Activator", "System.Environment",
                 "System.GC", "System.Delegate", "System.IServiceProvider",
                 "System.Linq.Expressions.", "Microsoft.CSharp."
             },
             RuntimeFacadeIdentityDefaults(),
-            "dotboxd-verifier-9");
+            "dotboxd-verifier-10");
 
     public bool IsMemberAllowed(string memberSignature)
     {
@@ -295,5 +297,4 @@ public sealed record VerificationPolicy(
         ArgumentException.ThrowIfNullOrWhiteSpace(value, parameterName);
         return value;
     }
-
 }

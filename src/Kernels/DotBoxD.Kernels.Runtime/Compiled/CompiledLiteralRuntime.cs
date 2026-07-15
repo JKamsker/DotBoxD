@@ -16,7 +16,10 @@ internal static class CompiledLiteralRuntime
     internal static SandboxValue ListLiteralValue(SandboxType itemType, SandboxValue[] values)
     {
         var list = SandboxValue.FromOwnedList(values, itemType);
-        SandboxValueValidator.RequireType(list, list.Type, "list literal item type mismatch");
+        SandboxValueValidator.RequireType(
+            list,
+            CompiledStructuralTypeCache.List(itemType),
+            "list literal item type mismatch");
         return list;
     }
 
@@ -50,7 +53,10 @@ internal static class CompiledLiteralRuntime
         }
 
         var map = SandboxValue.FromOwnedMap(entries, keyType, valueType);
-        SandboxValueValidator.RequireType(map, map.Type, "map literal entry type mismatch");
+        SandboxValueValidator.RequireType(
+            map,
+            CompiledStructuralTypeCache.Map(keyType, valueType),
+            "map literal entry type mismatch");
         return map;
     }
 
