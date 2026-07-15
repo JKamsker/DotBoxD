@@ -43,8 +43,15 @@ internal static class ForbiddenApiNamePolicy
         "System.Data.", "Microsoft.CSharp.", "Microsoft.EntityFrameworkCore.", "Microsoft.Win32."
     ];
 
+    private static readonly string[] ExactMemberNames =
+    [
+        "System.String.Create"
+    ];
+
     public static bool IsForbiddenExactType(string name) => Array.IndexOf(ExactTypeNames, name) >= 0;
 
     public static bool IsForbiddenNamespace(string name)
         => NamespacePrefixes.Any(prefix => name.StartsWith(prefix, StringComparison.Ordinal));
+
+    public static bool IsForbiddenExactMember(string name) => Array.IndexOf(ExactMemberNames, name) >= 0;
 }

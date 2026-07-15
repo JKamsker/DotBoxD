@@ -26,7 +26,7 @@ public sealed partial class PluginAnalyzer
 
             helperGraph.RecordForbidden(method, forbidden);
             if (!IsEventKernel(method.ContainingType) ||
-                !helperGraph.TryRecordDirectDiagnostic(method, forbidden))
+                !helperGraph.TryRecordDirectDiagnostic(method))
             {
                 continue;
             }
@@ -154,6 +154,49 @@ public sealed partial class PluginAnalyzer
         string? containingTypeName)
         => containingTypeName == "System.Security.Cryptography.X509Certificates.X509Chain" &&
            string.Equals(method.Name, "Build", StringComparison.Ordinal);
+
+    private static bool TryGetForbiddenHostApiDisplayName(
+        ISymbol? symbol,
+        out string forbidden)
+    {
+        if (TryGetForbiddenMemberDisplayName(symbol, out forbidden))
+        {
+            return true;
+        }
+
+        if (TryGetForbiddenHostApi(symbol, out var forbiddenType))
+        {
+            forbidden = forbiddenType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+            return true;
+        }
+
+        forbidden = null!;
+        return false;
+    }
+
+    private static bool TryGetForbiddenMemberDisplayName(
+        ISymbol? symbol,
+        out string forbidden)
+    {
+        if (symbol is IMethodSymbol method &&
+            method.ContainingType is { } containingType)
+        {
+            var displayName = ForbiddenMemberContainingTypeName(containingType) + "." + method.Name;
+            if (ForbiddenApiNamePolicy.IsForbiddenExactMember(displayName))
+            {
+                forbidden = displayName;
+                return true;
+            }
+        }
+
+        forbidden = null!;
+        return false;
+    }
+
+    private static string ForbiddenMemberContainingTypeName(INamedTypeSymbol containingType)
+        => containingType.SpecialType == SpecialType.System_String
+            ? "System.String"
+            : containingType.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
 
     private static bool TryGetForbiddenNondeterministicMethod(
         IMethodSymbol method,
