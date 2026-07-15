@@ -47,7 +47,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             expression,
             targetType,
             lowered,
-            $"InvokeAsync return expression '{expression}'");
+            $"Server extension return expression '{expression}'");
 
     internal string ApplyRequiredLocalConversion(
         ExpressionSyntax expression,

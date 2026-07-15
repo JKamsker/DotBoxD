@@ -48,6 +48,15 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     internal RpcAssignmentOverride? AssignmentOverride => _assignmentOverride;
 
     public string LowerBody(BlockSyntax block) => LowerBody(block, [], [], returnRecordType: null, assignmentOverride: null);
+    internal string LowerBody(BlockSyntax block, ITypeSymbol? returnValueType)
+        => LowerBody(
+            block,
+            [],
+            [],
+            returnRecordType: null,
+            assignmentOverride: null,
+            returnValueType: returnValueType);
+
     internal void AddServiceHandleLocal(string name, string handleIdJson)
         => _serviceHandleLocals[name] = handleIdJson;
     internal void AddServiceHandleMember(ISymbol member, string handleIdJson)
