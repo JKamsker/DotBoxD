@@ -29,6 +29,7 @@ internal static class ForbiddenApiNamePolicy
         "System.Security.Cryptography.CspParameters",
         "System.Security.Cryptography.DSACryptoServiceProvider",
         "System.Security.Cryptography.RSACryptoServiceProvider",
+        "System.Security.Cryptography.Rfc2898DeriveBytes",
         "System.Security.Cryptography.CryptoConfig"
     ];
 
