@@ -36,6 +36,26 @@ public sealed class PluginAnalyzerForbiddenApiConfigurationProviderReachabilityT
         Assert.True(message.Contains(expectedApi, StringComparison.Ordinal), $"{testCase}: {message}");
     }
 
+    [Theory]
+    [InlineData("9.0.0-rc.2.24474.3", "9.0.0")]
+    [InlineData("10.0.1", "10.0.1")]
+    public void RuntimeVersionPrefix_extracts_numeric_prefix(string directoryName, string expectedVersion)
+    {
+        var version = RuntimeVersionPrefix(Path.Combine("root", directoryName));
+
+        Assert.Equal(Version.Parse(expectedVersion), version);
+    }
+
+    [Theory]
+    [InlineData("not-a-version")]
+    [InlineData("")]
+    public void RuntimeVersionPrefix_ignores_unparseable_names(string directoryName)
+    {
+        var version = RuntimeVersionPrefix(Path.Combine("root", directoryName));
+
+        Assert.Null(version);
+    }
+
     private static string Source(string shouldHandleBody)
         => $$"""
             #nullable enable
@@ -89,10 +109,8 @@ public sealed class PluginAnalyzerForbiddenApiConfigurationProviderReachabilityT
         var sharedRoot = Directory.GetParent(runtimeDirectory)?.Parent?.FullName;
         Assert.NotNull(sharedRoot);
 
-        var aspNetCoreDirectory = Directory
-            .EnumerateDirectories(Path.Combine(sharedRoot, "Microsoft.AspNetCore.App"))
-            .OrderByDescending(path => Version.Parse(Path.GetFileName(path)))
-            .First();
+        var aspNetCoreDirectory = HighestVersionedRuntimeDirectory(
+            Path.Combine(sharedRoot, "Microsoft.AspNetCore.App"));
 
         string[] assemblies =
         [
@@ -103,6 +121,36 @@ public sealed class PluginAnalyzerForbiddenApiConfigurationProviderReachabilityT
         ];
 
         return assemblies.Select(assembly => MetadataReference.CreateFromFile(Path.Combine(aspNetCoreDirectory, assembly)));
+    }
+
+    private static string HighestVersionedRuntimeDirectory(string runtimeRoot)
+    {
+        var runtimeDirectory = Directory
+            .EnumerateDirectories(runtimeRoot)
+            .Select(path => (Path: path, Version: RuntimeVersionPrefix(path)))
+            .Where(candidate => candidate.Version is not null)
+            .OrderByDescending(candidate => candidate.Version)
+            .Select(candidate => candidate.Path)
+            .FirstOrDefault();
+
+        Assert.NotNull(runtimeDirectory);
+        return runtimeDirectory;
+    }
+
+    private static Version? RuntimeVersionPrefix(string path)
+    {
+        var directoryName = Path.GetFileName(path);
+        if (string.IsNullOrEmpty(directoryName))
+        {
+            return null;
+        }
+
+        var prereleaseSeparator = directoryName.IndexOf('-', StringComparison.Ordinal);
+        var versionText = prereleaseSeparator < 0
+            ? directoryName
+            : directoryName[..prereleaseSeparator];
+
+        return Version.TryParse(versionText, out var version) ? version : null;
     }
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()
