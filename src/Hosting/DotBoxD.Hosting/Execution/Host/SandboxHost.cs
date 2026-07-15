@@ -118,6 +118,7 @@ public sealed partial class SandboxHost : IDisposable
                 .ConfigureAwait(false)
             : await ExecuteSelectedModeAsync(plan, entrypoint, input, options, cancellationToken)
                 .ConfigureAwait(false);
+        ThrowIfDisposed();
         return Publish(result);
     }
 
@@ -289,6 +290,6 @@ public sealed partial class SandboxHost : IDisposable
         }
     }
 
-    private void ThrowIfDisposed()
+    internal void ThrowIfDisposed()
         => ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
 }

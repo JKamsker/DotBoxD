@@ -31,7 +31,7 @@ public sealed partial class PluginAnalyzer
     private static void ReportForbiddenInInitializer(OperationAnalysisContext context, ISymbol? target)
     {
         if (context.ContainingSymbol is not (IFieldSymbol or IPropertySymbol) ||
-            !TryGetForbiddenHostApi(target, out var forbidden) ||
+            !TryGetForbiddenInitializerDisplayName(target, out var forbidden) ||
             !IsEventKernel(context.ContainingSymbol.ContainingType))
         {
             return;
@@ -40,7 +40,7 @@ public sealed partial class PluginAnalyzer
         context.ReportDiagnostic(Diagnostic.Create(
             ForbiddenHostApiRule,
             context.Operation.Syntax.GetLocation(),
-            forbidden.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
+            forbidden));
     }
 
     // A helper auto-property initializer runs before the getter returns its value. When an event kernel reads
@@ -68,7 +68,7 @@ public sealed partial class PluginAnalyzer
     {
         if (context.ContainingSymbol is not IPropertySymbol { GetMethod: { } getter } property ||
             IsEventKernel(property.ContainingType) ||
-            !TryGetForbiddenHostApi(target, out var forbidden))
+            !TryGetForbiddenInitializerDisplayName(target, out var forbidden))
         {
             return;
         }
@@ -115,12 +115,29 @@ public sealed partial class PluginAnalyzer
         ISymbol? target)
     {
         if (context.ContainingSymbol is not (IFieldSymbol or IPropertySymbol) ||
-            !TryGetForbiddenHostApi(target, out var forbidden))
+            !TryGetForbiddenInitializerDisplayName(target, out var forbidden))
         {
             return;
         }
 
         helperGraph.RecordForbiddenInitializer(context.ContainingSymbol, forbidden);
+    }
+
+    private static bool TryGetForbiddenInitializerDisplayName(ISymbol? target, out string forbidden)
+    {
+        if (TryGetForbiddenMemberDisplayName(target, out forbidden))
+        {
+            return true;
+        }
+
+        if (TryGetForbiddenHostApi(target, out var forbiddenType))
+        {
+            forbidden = forbiddenType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+            return true;
+        }
+
+        forbidden = null!;
+        return false;
     }
 
     private static void RecordInitializerMemberReference(

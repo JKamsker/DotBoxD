@@ -3,14 +3,14 @@ using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Kernels.Interpreter.Internal.Expressions;
 
-// Recognition for fused i32 plan kinds whose operands may be supplied through inline-call substitutions.
+// Recognition for fused i32 plan kinds whose operands may be supplied through an inline-call substitution.
 internal sealed partial class I32ExpressionPlan
 {
     private static bool TryCreateRemainderAddRawConstConst(
         BinaryExpression binary,
         InterpreterFrame frame,
         string assumedInt32Local,
-        IReadOnlyDictionary<string, I32ExpressionPlan>? substitutions,
+        I32ExpressionSubstitution substitution,
         out I32ExpressionPlan plan)
     {
         plan = null!;
@@ -25,9 +25,9 @@ internal sealed partial class I32ExpressionPlan
         }
 
         // Accept either operand order: (raw + const) or (const + raw).
-        if ((TryResolveRawSlot(add.Left, frame, assumedInt32Local, substitutions, out var slot) &&
+        if ((TryResolveRawSlot(add.Left, frame, assumedInt32Local, substitution, out var slot) &&
              TryConstI32(add.Right, out var addend)) ||
-            (TryResolveRawSlot(add.Right, frame, assumedInt32Local, substitutions, out slot) &&
+            (TryResolveRawSlot(add.Right, frame, assumedInt32Local, substitution, out slot) &&
              TryConstI32(add.Left, out addend)))
         {
             plan = new I32ExpressionPlan(
@@ -46,7 +46,7 @@ internal sealed partial class I32ExpressionPlan
         Expression expression,
         InterpreterFrame frame,
         string assumedInt32Local,
-        IReadOnlyDictionary<string, I32ExpressionPlan>? substitutions,
+        I32ExpressionSubstitution substitution,
         out int slot)
     {
         slot = 0;
@@ -55,11 +55,11 @@ internal sealed partial class I32ExpressionPlan
             return false;
         }
 
-        if (substitutions is not null && substitutions.TryGetValue(variable.Name, out var substitution))
+        if (substitution.TryGetValue(variable.Name, out var replacement))
         {
-            if (substitution._kind == ExpressionKind.RawVariable)
+            if (replacement._kind == ExpressionKind.RawVariable)
             {
-                slot = substitution._value;
+                slot = replacement._value;
                 return true;
             }
 

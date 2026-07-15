@@ -49,87 +49,144 @@ internal sealed partial class RpcKernelPayloadReadEmitter
         ITypeSymbol type,
         string reader,
         out string result)
-        => TryReadWhen(DotBoxDRpcTypeMapper.IsGuid(type), $"{reader}.ReadGuid()", out result);
+    {
+        if (DotBoxDRpcTypeMapper.IsGuid(type))
+        {
+            result = $"{reader}.ReadGuid()";
+            return true;
+        }
+
+        result = string.Empty;
+        return false;
+    }
 
     private static bool TryReadDateTime(
         RpcKernelPayloadReadEmitter emitter,
         ITypeSymbol type,
         string reader,
         out string result)
-        => TryReadWhen(
-            DotBoxDRpcTypeMapper.IsDateTimeWireType(type),
-            $"{emitter.EnsureDateTimePayloadReader(type)}(ref {reader})",
-            out result);
+    {
+        if (DotBoxDRpcTypeMapper.IsDateTimeWireType(type))
+        {
+            result = $"{emitter.EnsureDateTimePayloadReader(type)}(ref {reader})";
+            return true;
+        }
+
+        result = string.Empty;
+        return false;
+    }
 
     private static bool TryReadDecimal(
         RpcKernelPayloadReadEmitter emitter,
         ITypeSymbol type,
         string reader,
         out string result)
-        => TryReadWhen(
-            DotBoxDRpcTypeMapper.IsDecimalWireType(type),
-            $"{emitter.EnsureDecimalPayloadReader()}(ref {reader})",
-            out result);
+    {
+        if (DotBoxDRpcTypeMapper.IsDecimalWireType(type))
+        {
+            result = $"{emitter.EnsureDecimalPayloadReader()}(ref {reader})";
+            return true;
+        }
+
+        result = string.Empty;
+        return false;
+    }
 
     private static bool TryReadDateOnly(
         RpcKernelPayloadReadEmitter emitter,
         ITypeSymbol type,
         string reader,
         out string result)
-        => TryReadWhen(
-            DotBoxDRpcTypeMapper.IsDateOnlyWireType(type),
-            $"{emitter.EnsureDateOnlyPayloadReader()}({reader}.ReadInt32())",
-            out result);
+    {
+        if (DotBoxDRpcTypeMapper.IsDateOnlyWireType(type))
+        {
+            result = $"{emitter.EnsureDateOnlyPayloadReader()}({reader}.ReadInt32())";
+            return true;
+        }
+
+        result = string.Empty;
+        return false;
+    }
 
     private static bool TryReadTimeOnly(
         RpcKernelPayloadReadEmitter emitter,
         ITypeSymbol type,
         string reader,
         out string result)
-        => TryReadWhen(
-            DotBoxDRpcTypeMapper.IsTimeOnlyWireType(type),
-            $"{emitter.EnsureTimeOnlyPayloadReader()}({reader}.ReadInt64())",
-            out result);
+    {
+        if (DotBoxDRpcTypeMapper.IsTimeOnlyWireType(type))
+        {
+            result = $"{emitter.EnsureTimeOnlyPayloadReader()}({reader}.ReadInt64())";
+            return true;
+        }
+
+        result = string.Empty;
+        return false;
+    }
 
     private static bool TryReadTimeSpan(
         RpcKernelPayloadReadEmitter emitter,
         ITypeSymbol type,
         string reader,
         out string result)
-        => TryReadWhen(
-            DotBoxDRpcTypeMapper.IsTimeSpanWireType(type),
-            $"new global::System.TimeSpan({reader}.ReadInt64())",
-            out result);
+    {
+        if (DotBoxDRpcTypeMapper.IsTimeSpanWireType(type))
+        {
+            result = $"new global::System.TimeSpan({reader}.ReadInt64())";
+            return true;
+        }
+
+        result = string.Empty;
+        return false;
+    }
 
     private static bool TryReadCancellationToken(
         RpcKernelPayloadReadEmitter emitter,
         ITypeSymbol type,
         string reader,
         out string result)
-        => TryReadWhen(
-            DotBoxDRpcTypeMapper.IsCancellationTokenWireType(type),
-            $"new global::System.Threading.CancellationToken({reader}.ReadBool())",
-            out result);
+    {
+        if (DotBoxDRpcTypeMapper.IsCancellationTokenWireType(type))
+        {
+            result = $"new global::System.Threading.CancellationToken({reader}.ReadBool())";
+            return true;
+        }
+
+        result = string.Empty;
+        return false;
+    }
 
     private static bool TryReadIndex(
         RpcKernelPayloadReadEmitter emitter,
         ITypeSymbol type,
         string reader,
         out string result)
-        => TryReadWhen(
-            DotBoxDRpcTypeMapper.IsIndexWireType(type),
-            $"{emitter.EnsureIndexPayloadReader()}(ref {reader})",
-            out result);
+    {
+        if (DotBoxDRpcTypeMapper.IsIndexWireType(type))
+        {
+            result = $"{emitter.EnsureIndexPayloadReader()}(ref {reader})";
+            return true;
+        }
+
+        result = string.Empty;
+        return false;
+    }
 
     private static bool TryReadRange(
         RpcKernelPayloadReadEmitter emitter,
         ITypeSymbol type,
         string reader,
         out string result)
-        => TryReadWhen(
-            DotBoxDRpcTypeMapper.IsRangeWireType(type),
-            $"{emitter.EnsureRangePayloadReader()}(ref {reader})",
-            out result);
+    {
+        if (DotBoxDRpcTypeMapper.IsRangeWireType(type))
+        {
+            result = $"{emitter.EnsureRangePayloadReader()}(ref {reader})";
+            return true;
+        }
+
+        result = string.Empty;
+        return false;
+    }
 
     private static bool TryReadEnum(
         RpcKernelPayloadReadEmitter emitter,
@@ -195,9 +252,4 @@ internal sealed partial class RpcKernelPayloadReadEmitter
         return false;
     }
 
-    private static bool TryReadWhen(bool condition, string value, out string result)
-    {
-        result = condition ? value : string.Empty;
-        return condition;
-    }
 }

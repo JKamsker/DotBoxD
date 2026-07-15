@@ -4,27 +4,27 @@ Design for a continuous, parallel bug-hunting system that uses **GitHub issues a
 database**. The issue graph is the dedup ledger, branching is explicit, and a red-test PR
 with red CI is machine-checkable proof that a bug is real.
 
-Status: **implemented and operating continuously**. Historical design decisions and launch notes
-remain below because they explain the safety constraints.
+Status: **implemented in capacity-safe scheduled mode**. Historical design decisions and launch
+notes remain below because they explain the safety constraints.
 
-## Current operating mode (2026-07-14)
+## Current operating mode (2026-07-15)
 
-The production loop is event-driven per lens. Each successful, non-exhausting
-`library-surprise-explore` run hands off to a deterministic continuation workflow, which re-checks
-the live lens labels and queues exactly one successor for the same lens; the per-lens concurrency
-group serializes the chain. The dispatcher is now a seed/recovery mechanism with four off-peak
-schedule opportunities per hour, not the primary throughput clock. This avoids the observed 1-3
-hour gaps caused by GitHub dropping nominal 30-minute schedule slots.
+The production loop is deliberately rate-limited to protect product CI. The dispatcher selects at
+most one eligible lens on a fuzzy four-hour schedule; explore runs never self-chain. Per-lens concurrency still
+prevents overlap, while the dispatcher selects the least-recently-dispatched active lens and uses
+severity only as a tie-breaker. A missed GitHub schedule delays discovery safely instead of
+triggering catch-up fanout.
 
-Explores use `gpt-5.6-sol` with high reasoning, a 60-minute job timeout, a 3000-AI-credit budget,
-and a 15-minute per-tool ceiling. One run mines a coherent seam until it is dry or has produced up
-to five independently concrete candidates; it does not stop merely because it found the first one.
-Every candidate still goes through the dedicated red-test proof before a PR can exist. The fix
-dispatcher drains those PRs at up to 6 new workers per tick and 12 workers in flight globally.
+Explores use `gpt-5.6-sol` with high reasoning, a 45-minute job timeout, a 2000-AI-credit budget,
+and a 10-minute per-tool ceiling. A run investigates one coherent seam and dispatches at most one
+strongest concrete candidate; additional leads are recorded in the lens ledger for later runs.
+Every candidate still goes through the dedicated red-test proof before a PR can exist.
 
-The scheduled dispatcher remains essential as a self-healing path: failed, timed-out, or incomplete
-explores cannot emit their successor, so a later frontier scan restarts that lens. Exhausted lenses
-do not self-chain and remain filtered out by the dispatcher.
+The fix dispatcher gets six fallback opportunities per hour (plus the existing event kick),
+dispatches at most four workers per tick, and permits at most eight fix workers globally. This wider
+pool drains proven-red work promptly while the separately bounded discovery side can add at most one
+candidate every four hours. Canceled/failed red-test handoffs remain safe to rediscover because the
+lens ledger is not considered authoritative coverage until a matching PR or `sweep:bug` issue exists.
 
 ---
 
@@ -541,15 +541,12 @@ plan above:
 - **Labels** - full `sweep:*` + `vein:*` taxonomy created on the repo.
 - **Lens issues** - #145 security, #146 concurrency, #147 wire, #148 error-path, #149 codegen
   (each `sweep:lens` + `sweep:active` + `vein:*`, with a charter body).
-- **`library-surprise-dispatcher.md`** - seed/recovery orchestrator (§13 sketch, realized). Computes
-  the eligible-lens frontier in a pre-agent step and dispatches `explore` per lens (cap 8). Its
-  quarter-hour schedule repairs broken chains; successful explores provide continuous throughput.
+- **`library-surprise-dispatcher.md`** - capacity-bounded orchestrator (§13 sketch, realized).
+  Computes the eligible-lens frontier and dispatches one explore every four hours (cap 1).
 - **`library-surprise-explore.md`** - per-lens discovery agent. `run-name` + per-lens
   `concurrency` lock; safe-outputs `add-comment`/`add-labels` (`target: "*"`), `create-issue`
-  (`sweep:bug`), `dispatch-workflow` (up to five red-tests + one continuation). Reuses the
+  (`sweep:bug`), `dispatch-workflow` (at most one red-test). Reuses the
   `library-surprise-sweep` technique skill + the new `surprise-hunt-graph` skill.
-- **`library-surprise-explore-continuation.yml`** - deterministic, per-lens rearm step. It verifies
-  the lens is still open, active, and not exhausted before dispatching the next explore lock.
 - **`.codex/skills/surprise-hunt-graph/`** - the graph protocol skill.
 - **`library-surprise-sweep.md`** - schedule disabled (superseded); kept for manual runs.
 - **`library-surprise-red-test.md` / `library-surprise-fix.md`** - unchanged; `explore` emits the
@@ -575,14 +572,14 @@ bug record**; **lens-issue comment logs are the durable memory / dedup ledger**;
 
 ### Activation
 gh-aw scheduled/dispatch workflows execute from the default branch. The
-`library-surprise-fix-dispatcher` runs on a six-times-hourly fallback schedule and is also kicked by
-every red-test PR delivery. It drains open fix/polish work on its own (`max=6` per tick,
-`MAX_INFLIGHT=12`, retry-capped) - this is what closes the autonomous loop (see "the autonomous
-handoff was also a confound" below). The discovery `library-surprise-dispatcher` seeds active lenses
-and recovers broken self-chains: enable it to run the full find→fix loop hands-off, or leave it
-disabled and let the scheduled fix-dispatcher drain the existing backlog.
-Either is paused with `gh workflow disable`. `GH_AW_CI_TRIGGER_TOKEN` alone does **not** bypass the CI
-approval gate - see "CI approval gate" below.
+`library-surprise-fix-dispatcher` gets six fallback schedule opportunities per hour and is also
+kicked by every red-test PR delivery. It drains open fix/polish work on its own (`max=4` per tick,
+`MAX_INFLIGHT=8`, retry-capped). The in-flight cap is the hard fix-side capacity boundary; additional
+ticks become no-ops while the pool is full. The discovery `library-surprise-dispatcher` adds at most
+one new explore every four hours, so the faster fixer cannot recreate an unbounded arrival loop.
+Disable discovery to stop new bug discovery while leaving the fix dispatcher to drain the existing
+backlog. Either workflow is paused with `gh workflow disable`. `GH_AW_CI_TRIGGER_TOKEN` alone does
+**not** bypass the CI approval gate - see "CI approval gate" below.
 
 ### Runtime gotcha found by live testing (fixed)
 The generic `dispatch_workflow` safe-output tool is a **no-op** in this fork: the agent's call
@@ -684,7 +681,7 @@ per-PR `surprise-fix-<pr>` lock (so a fix and a polish never edit one PR concurr
   per PR that has something to do, then quiet. CI-`pending` PRs are skipped to avoid racing a run,
   except a CodeRabbit status that has been pending longer than
   `CODERABBIT_PENDING_TIMEOUT_MINUTES` (60 minutes by default) is treated as stale and ignored so it
-  cannot mask red PR CI forever. The shared `MAX_INFLIGHT=12`, per-tick `max`, and `MAX_ATTEMPTS=4`
+  cannot mask red PR CI forever. The shared `MAX_INFLIGHT=8`, per-tick `max`, and `MAX_ATTEMPTS=4`
   retry cap bound cost identically to the fix half; a PR the worker cannot make green hands off to a
   human at the cap.
 - **Stale-branch drift is fixed structurally.** Before each dispatch the dispatcher **server-side

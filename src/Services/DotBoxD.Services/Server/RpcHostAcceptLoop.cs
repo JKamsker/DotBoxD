@@ -6,11 +6,12 @@ namespace DotBoxD.Services.Server;
 internal sealed class RpcHostAcceptLoop
 {
     private static readonly TimeSpan AcceptErrorBackoff = TimeSpan.FromMilliseconds(50);
+    private static readonly AsyncLocal<InFlightHandoff?> CurrentHandoff = new();
 
     private readonly IServerTransport _listener;
     private readonly Func<IRpcChannel, Task> _addPeerAsync;
     private readonly Action<Exception> _acceptError;
-    private readonly ConcurrentDictionary<Task, byte> _inFlight = new();
+    private readonly ConcurrentDictionary<InFlightHandoff, byte> _inFlight = new();
 
     public RpcHostAcceptLoop(
         IServerTransport listener,
@@ -57,7 +58,11 @@ internal sealed class RpcHostAcceptLoop
     /// </summary>
     public async Task DrainInFlightAsync()
     {
-        var tasks = _inFlight.Keys.ToArray();
+        var current = CurrentHandoff.Value;
+        var tasks = _inFlight.Keys
+            .Where(handoff => !ReferenceEquals(handoff, current))
+            .Select(handoff => handoff.Task)
+            .ToArray();
         if (tasks.Length == 0)
         {
             return;
@@ -75,32 +80,46 @@ internal sealed class RpcHostAcceptLoop
 
     private void TrackHandoff(IRpcChannel connection)
     {
-        var handoff = Task.Run(async () =>
-        {
-            try
-            {
-                await _addPeerAsync(connection).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                await connection.DisposeAsync().ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                _acceptError(ex);
-                await connection.DisposeAsync().ConfigureAwait(false);
-            }
-        });
+        var handoff = new InFlightHandoff();
+        handoff.Task = Task.Run(() => RunHandoffAsync(handoff, connection));
 
         // Register before attaching the self-removal continuation so a hand-off that finishes
         // before TryAdd still gets removed by the continuation firing on the completed task.
         _inFlight.TryAdd(handoff, 0);
-        _ = handoff.ContinueWith(
-            static (task, state) => ((ConcurrentDictionary<Task, byte>)state!).TryRemove(task, out _),
-            _inFlight,
+        _ = handoff.Task.ContinueWith(
+            static (task, state) =>
+            {
+                var (inFlight, completed) =
+                    ((ConcurrentDictionary<InFlightHandoff, byte>, InFlightHandoff))state!;
+                inFlight.TryRemove(completed, out _);
+            },
+            (_inFlight, handoff),
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
+    }
+
+    private async Task RunHandoffAsync(InFlightHandoff handoff, IRpcChannel connection)
+    {
+        var previous = CurrentHandoff.Value;
+        CurrentHandoff.Value = handoff;
+        try
+        {
+            await _addPeerAsync(connection).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _acceptError(ex);
+            await connection.DisposeAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            CurrentHandoff.Value = previous;
+        }
     }
 
     private static async Task<bool> DelayAfterErrorAsync(CancellationToken ct)
@@ -114,5 +133,10 @@ internal sealed class RpcHostAcceptLoop
         {
             return false;
         }
+    }
+
+    private sealed class InFlightHandoff
+    {
+        public Task Task { get; set; } = Task.CompletedTask;
     }
 }

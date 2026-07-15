@@ -20,15 +20,15 @@ internal sealed partial class RpcKernelValueConversionEmitter
         }
 
         var offsetWriter = EnsureDateTimeOffsetValueWriter();
+        var toWireOffset = EnsureDateTimeToWireOffsetHelper();
         var dateTimeMethod = NextHelperName("Write");
         _writers[key] = dateTimeMethod;
         _helpers.Append($"    private static {DotBoxDRpcValueNames.GlobalKernelRpcValue} ").Append(dateTimeMethod)
             .AppendLine("(global::System.DateTime value)");
         _helpers.AppendLine("    {");
-        _helpers.AppendLine("        return " + offsetWriter + "(DateTimeToWireOffset(value));");
+        _helpers.AppendLine("        return " + offsetWriter + "(" + toWireOffset + "(value));");
         _helpers.AppendLine("    }");
         _helpers.AppendLine();
-        AppendDateTimeToWireOffsetHelper();
         return dateTimeMethod;
     }
 
@@ -119,16 +119,18 @@ internal sealed partial class RpcKernelValueConversionEmitter
         _helpers.AppendLine();
     }
 
-    private void AppendDateTimeToWireOffsetHelper()
+    private string EnsureDateTimeToWireOffsetHelper()
     {
         const string key = "datetime-helper:to-offset";
-        if (_writers.ContainsKey(key))
+        if (_writers.TryGetValue(key, out var existing))
         {
-            return;
+            return existing;
         }
 
-        _writers[key] = key;
-        _helpers.AppendLine("    private static global::System.DateTimeOffset DateTimeToWireOffset(global::System.DateTime value)");
+        var method = NextMemberName("DateTimeToWireOffset");
+        _writers[key] = method;
+        _helpers.Append("    private static global::System.DateTimeOffset ").Append(method)
+            .AppendLine("(global::System.DateTime value)");
         _helpers.AppendLine("    {");
         _helpers.AppendLine("        if (value.Kind != global::System.DateTimeKind.Unspecified)");
         _helpers.AppendLine("        {");
@@ -138,6 +140,7 @@ internal sealed partial class RpcKernelValueConversionEmitter
         _helpers.AppendLine("        return new global::System.DateTimeOffset(value, global::System.TimeSpan.Zero);");
         _helpers.AppendLine("    }");
         _helpers.AppendLine();
+        return method;
     }
 
     private string EnsureDateTimeValueFromWireHelper()
@@ -148,9 +151,10 @@ internal sealed partial class RpcKernelValueConversionEmitter
             return existing;
         }
 
-        const string method = "DateTimeFromWireOffset";
+        var method = NextMemberName("DateTimeFromWireOffset");
         _readers[key] = method;
-        _helpers.AppendLine("    private static global::System.DateTime DateTimeFromWireOffset(global::System.DateTimeOffset value)");
+        _helpers.Append("    private static global::System.DateTime ").Append(method)
+            .AppendLine("(global::System.DateTimeOffset value)");
         _helpers.AppendLine("    {");
         _helpers.AppendLine("        if (value.Offset != global::System.TimeSpan.Zero)");
         _helpers.AppendLine("        {");

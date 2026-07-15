@@ -24,8 +24,7 @@ internal static class BranchedI32ForLoopRunner
         SandboxExecutionOptions options,
         I32CallEvaluator calls)
     {
-        if (options.EnableDebugTrace ||
-            start >= end ||
+        if (!CanUseFastPath(options, start, end) ||
             !TryCreatePlan(statement, frame, calls, out var plan))
         {
             return false;
@@ -41,11 +40,31 @@ internal static class BranchedI32ForLoopRunner
             frame.WriteRawInt32Slot(loopSlot, i);
             var taken = plan.Condition.Evaluate(frame, context) ? plan.Then : plan.Else;
             context.ChargeFuel(taken.Fuel);
-            var assignments = taken.Assignments;
-            for (var statementIndex = 0; statementIndex < assignments.Length; statementIndex++)
+            switch (taken.Kind)
             {
-                var assignment = assignments[statementIndex];
-                frame.WriteRawInt32Slot(assignment.TargetSlot, assignment.Expression.Evaluate(frame, context));
+                case BranchKind.Empty:
+                    break;
+                case BranchKind.Single:
+                {
+                    var assignment = taken.SingleAssignment;
+                    frame.WriteRawInt32Slot(
+                        assignment.TargetSlot,
+                        assignment.Expression.Evaluate(frame, context));
+                    break;
+                }
+                case BranchKind.Many:
+                {
+                    var assignments = taken.MultipleAssignments!;
+                    for (var statementIndex = 0; statementIndex < assignments.Length; statementIndex++)
+                    {
+                        var assignment = assignments[statementIndex];
+                        frame.WriteRawInt32Slot(
+                            assignment.TargetSlot,
+                            assignment.Expression.Evaluate(frame, context));
+                    }
+
+                    break;
+                }
             }
 
             if (--checkpoint == 0)
@@ -57,6 +76,12 @@ internal static class BranchedI32ForLoopRunner
 
         return true;
     }
+
+    private static bool CanUseFastPath(
+        SandboxExecutionOptions options,
+        int start,
+        int end)
+        => !options.EnableDebugTrace && start < end;
 
     private static bool TryCreatePlan(
         ForRangeStatement statement,
@@ -86,33 +111,92 @@ internal static class BranchedI32ForLoopRunner
         out Branch branch)
     {
         branch = default;
+        if (statements.Count == 0)
+        {
+            branch = new Branch(BranchKind.Empty, default, null, 0);
+            return true;
+        }
+
+        if (statements.Count == 1)
+        {
+            if (!TryCreateAssignmentPlan(
+                    statements[0],
+                    frame,
+                    loopLocal,
+                    calls,
+                    out var assignment,
+                    out var singleFuel))
+            {
+                return false;
+            }
+
+            branch = new Branch(BranchKind.Single, assignment, null, singleFuel);
+            return true;
+        }
+
         var assignments = new AssignmentPlan[statements.Count];
         long fuel = 0;
         for (var i = 0; i < statements.Count; i++)
         {
-            if (statements[i] is not AssignmentStatement assignment ||
-                !I32ExpressionPlan.TryCreate(assignment.Value, frame, loopLocal, calls, out var expression))
+            if (!TryCreateAssignmentPlan(
+                    statements[i],
+                    frame,
+                    loopLocal,
+                    calls,
+                    out assignments[i],
+                    out var assignmentFuel))
             {
                 return false;
             }
 
-            var targetSlot = frame.GetSlot(assignment.Name);
-            if (!frame.IsInt32Slot(targetSlot))
-            {
-                return false;
-            }
-
-            assignments[i] = new AssignmentPlan(targetSlot, expression);
-            fuel += 1 + expression.FuelCost;
+            fuel += assignmentFuel;
         }
 
-        branch = new Branch(assignments, fuel);
+        branch = new Branch(BranchKind.Many, default, assignments, fuel);
+        return true;
+    }
+
+    private static bool TryCreateAssignmentPlan(
+        Statement statement,
+        InterpreterFrame frame,
+        string loopLocal,
+        I32CallEvaluator calls,
+        out AssignmentPlan plan,
+        out long fuel)
+    {
+        plan = default;
+        fuel = 0;
+        if (statement is not AssignmentStatement assignment ||
+            !I32ExpressionPlan.TryCreate(assignment.Value, frame, loopLocal, calls, out var expression))
+        {
+            return false;
+        }
+
+        var targetSlot = frame.GetSlot(assignment.Name);
+        if (!frame.IsInt32Slot(targetSlot))
+        {
+            return false;
+        }
+
+        plan = new AssignmentPlan(targetSlot, expression);
+        fuel = 1 + expression.FuelCost;
         return true;
     }
 
     private readonly record struct AssignmentPlan(int TargetSlot, I32ExpressionPlan Expression);
 
-    private readonly record struct Branch(AssignmentPlan[] Assignments, long Fuel);
+    private readonly record struct Branch(
+        BranchKind Kind,
+        AssignmentPlan SingleAssignment,
+        AssignmentPlan[]? MultipleAssignments,
+        long Fuel);
+
+    private enum BranchKind
+    {
+        Empty,
+        Single,
+        Many
+    }
 
     private readonly record struct BranchPlan(I32ComparisonPlan Condition, Branch Then, Branch Else);
 }
