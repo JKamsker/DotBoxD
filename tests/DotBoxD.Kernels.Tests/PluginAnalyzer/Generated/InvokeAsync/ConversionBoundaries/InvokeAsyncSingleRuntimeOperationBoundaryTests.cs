@@ -74,6 +74,48 @@ public sealed class InvokeAsyncSingleRuntimeOperationBoundaryTests
     }
 
     [Theory]
+    [InlineData("==")]
+    [InlineData("!=")]
+    [InlineData("<")]
+    [InlineData("<=")]
+    [InlineData(">")]
+    [InlineData(">=")]
+    public void Runtime_integral_to_single_binary_operand_conversion_fails_closed(string @operator)
+    {
+        var result = RunGenerator(UsageSource($$"""
+            public static ValueTask<bool> Run(RemotePluginServer kernels)
+                => kernels.InvokeAsync(async (IGameWorldAccess world) =>
+                {
+                    float single = world.GetScore("value");
+                    int integral = world.GetHealth("monster-1");
+                    return single {{@operator}} integral;
+                });
+            """, worldMembers: FloatWorldMember));
+
+        AssertSingleRoundingDiagnostic(result);
+    }
+
+    [Fact]
+    public void Runtime_single_derived_member_arithmetic_fails_closed()
+    {
+        var result = RunGenerator(UsageSource("""
+            public sealed record Scores(float Left, float Right)
+            {
+                public float Total => Left + Right;
+            }
+
+            public static ValueTask<double> Run(RemotePluginServer kernels)
+                => kernels.InvokeAsync(async (IGameWorldAccess world) =>
+                {
+                    var scores = new Scores(world.GetScore("left"), world.GetScore("right"));
+                    return (double)scores.Total;
+                });
+            """, worldMembers: FloatWorldMember));
+
+        AssertSingleRoundingDiagnostic(result);
+    }
+
+    [Theory]
     [InlineData("+")]
     [InlineData("-")]
     public void Exact_runtime_single_unary_operations_remain_supported(string @operator)
@@ -85,6 +127,24 @@ public sealed class InvokeAsyncSingleRuntimeOperationBoundaryTests
                     float value = world.GetScore("value");
                     float result = {{@operator}}value;
                     return (double)result;
+                });
+            """, worldMembers: FloatWorldMember));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+    }
+
+    [Theory]
+    [InlineData("==")]
+    [InlineData("<")]
+    public void Exact_runtime_single_comparisons_remain_supported(string @operator)
+    {
+        var result = RunGeneratorAndAssertCompiles(UsageSource($$"""
+            public static ValueTask<bool> Run(RemotePluginServer kernels)
+                => kernels.InvokeAsync(async (IGameWorldAccess world) =>
+                {
+                    float left = world.GetScore("left");
+                    float right = world.GetScore("right");
+                    return left {{@operator}} right;
                 });
             """, worldMembers: FloatWorldMember));
 
