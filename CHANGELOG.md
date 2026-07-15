@@ -68,6 +68,10 @@ Services, Kernels, and Pushdown.
 - **Array-free scalar interpreted local calls:** synchronous one- and two-argument calls to module-local functions
   now carry evaluated values directly into the callee frame. Pending operands, host bindings, collection constructors,
   and calls with three or more arguments retain their existing array-backed paths and ordering.
+- **Lazy interpreter audit envelopes:** strictly eligible in-process interpreter runs that suppress successful summaries,
+  disable debug tracing, and declare no binding references now defer their normal run identity and in-memory audit sink
+  until audit evidence is actually needed. Failures and unexpected audited access materialize the full envelope, preserving
+  event ordering, identity, and resource accounting instead of discarding evidence through a shared no-op sink.
 - **Documentation & repo polish:** new top-level README, `docs/` information architecture
   (getting-started, concepts, security, reference, contributing), `SECURITY.md`, `CONTRIBUTING.md`,
   `CODE_OF_CONDUCT.md`, and GitHub repo metadata files.

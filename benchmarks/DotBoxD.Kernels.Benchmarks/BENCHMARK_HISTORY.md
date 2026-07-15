@@ -17,6 +17,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-matrix
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-frame-layout
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-local-call-arguments
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-audit-envelope
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-i64-plan-setup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-while-plan-setup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-branched-plan-setup
@@ -188,6 +189,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Scalar empty/single branched interpreter plans | this commit | `--probe-interpreter-branched-plan-setup`, `--probe-branched-f64-loop` | Branched I32/F64 loop planners now store empty branches without a plan and one-assignment branches inline, retaining arrays only for two or more ordered assignments. Across 50,000 executions, I32 one-one / empty-one branches remove exactly 80 / 64 B/op; F64 removes about 120 / exactly 128 B/op because the tentative I32 planner also stops allocating before F64 fallback. Zero/no-branch/two-two controls are byte-identical. Four long-F64 process medians moved from 90.4 to 82.8 ms (an observed -8.4%), with non-overlapping ranges and unchanged results/resources. |
 | Parameter-only raw frame assignment state | this commit | `--probe-interpreter-frame-layout` | Reused an empty assignment-state sentinel when every frame slot is a parameter initialized before execution. One- and two-raw-parameter rows each fell from 912.0 to 880.0 B/op, removing exactly one 32-byte array per invocation. Zero-parameter, eight-local, and mixed raw/boxed controls remained byte-identical, and genuine locals retain read-before-assignment tracking. |
 | Scalar interpreted local-function arguments | this commit | `--probe-interpreter-local-call-arguments` | Passed synchronously evaluated one- and two-argument local calls to the callee frame through an internal scalar carrier instead of a temporary array. Across 100,000 executions, arity one fell from 1,024.1 to 992.1 B/op and arity two from 1,040.1 to 1,000.1 B/op. Arity-zero and direct controls are byte-identical; pending operands and arity three retain the original array path. |
+| Lazy interpreter audit envelope | this commit | `--probe-interpreter-audit-envelope` | Deferred the normal run identity and in-memory audit sink for strictly eligible suppressed pure successes. Across 50,000 executions, generated-RunId allocation fell from 848.0 to 784.0 B/op (-64 B/op), while an explicit RunId fell from 816.0 to 784.0 B/op (-32 B/op). Failures and unexpected audit access materialize a real per-run envelope; debug and audited-binding controls remain byte-identical. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -1849,3 +1851,47 @@ Elapsed samples moved in mixed directions (arity-one call 96.1 to 94.1 ms; arity
 allocation reduction is the claim. Focused regressions pin arity-zero-through-three allocation and resource behavior,
 left-to-right exactly-once synchronous evaluation, pending first/second operands, same-plan concurrency, and collection
 name precedence. Public API, compiler/verifier identity, persisted artifacts, and sandbox accounting are unchanged.
+
+## Lazy interpreter audit envelope
+
+Every public interpreter execution previously constructed both a fresh `SandboxRunId` and an `InMemoryAuditSink` before
+evaluating the entrypoint. That is necessary whenever audit evidence can be produced, but a successful in-process run with
+successful-summary suppression, debug tracing disabled, and empty binding-reference metadata returns an empty audit
+snapshot without observing either object.
+
+The narrow suppressed-success path now leaves those two normal `SandboxContext` fields uninitialized. Accessing
+`SandboxContext.RunId` or `SandboxContext.Audit` materializes and atomically publishes the same per-run objects used by the
+full path. An explicit options `RunId` remains available without allocating a replacement. Unsuppressed, debug, worker,
+binding-bearing, and missing-binding-metadata executions keep the full path.
+
+A shared `NoopAuditSink` would be unsafe at the public interpreter boundary. A caller can construct an `ExecutionPlan`
+whose public `BindingReferences` metadata claims no bindings while the function body still reaches one. The runtime must
+retain the resulting binding evidence and failure summary. Lazy materialization is lossless in that case: the first
+unexpected audit or run-identity access creates a real sink and identity, so no event is discarded.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-audit-envelope
+```
+
+Allocation results over 50,000 prepared executions:
+
+```text
+case                              before B / B/op       after B / B/op        delta/op
+suppressed pure, generated RunId   42,401,456 / 848.0    39,201,456 / 784.0       -64 B
+suppressed pure, explicit RunId    40,801,456 / 816.0    39,201,456 / 784.0       -32 B
+suppressed debug control          198,808,392 / 3,976.2 198,808,392 / 3,976.2         0 B
+audited SandboxLog binding        109,606,480 / 2,192.1 109,606,480 / 2,192.1         0 B
+```
+
+The generated-identity row removes both 32-byte objects; the explicit-identity row removes only the unused sink. Repeated
+post-change processes reproduced both optimized totals exactly. Warming stopwatch ranges were 59.6-66.3 ms before and
+56.6-62.7 ms after for the generated identity, versus 53.4-55.3 ms before and 50.4-57.5 ms after for the explicit identity.
+The wall-clock samples are process-variable and support no timing claim; the byte-exact allocation delta is the result.
+
+The permanent probe also covers ordinary audited success, explicit-identity audited success, suppressed failure, debug
+trace, and an audited `SandboxLog` binding. It pins value/failure outcomes, audit kinds and ordering, sequence numbers,
+shared per-execution identities, module and binding metadata, and all twelve resource counters. Focused regressions add a
+forged-binding-metadata case, failure/debug/binding semantics, exact allocation bands, and same-plan concurrency. Public
+API, compiler/verifier identity, persisted artifacts, sandbox policy, and resource accounting are unchanged.

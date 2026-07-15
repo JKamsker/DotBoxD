@@ -44,10 +44,11 @@ public sealed class WhileI32SingleAssignmentLoopAllocationTests
         var twoAssignmentBytesPerExecution = two.AllocatedBytes /
                                              (double)MeasurementIterations;
         // The isolated scalar-plan overhead is about 320 B/op; the legacy 40-byte plan array raises it
-        // to about 360 B/op. Leave room for full-suite runtime bookkeeping while keeping those bands separate.
+        // to about 360 B/op. The lazy audit envelope lowers both absolute totals by 64 B/op. Leave room
+        // for full-suite runtime bookkeeping while keeping the scalar-plan bands separate.
         Assert.InRange(singleWhileOverhead, 300, 340);
         Assert.InRange(zeroWhileOverhead, 300, 340);
-        Assert.InRange(twoAssignmentBytesPerExecution, 1_440, 1_490);
+        Assert.InRange(twoAssignmentBytesPerExecution, 1_375, 1_425);
     }
 
     [Fact]

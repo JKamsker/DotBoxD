@@ -23,20 +23,28 @@ public sealed class SandboxInterpreter : ISandboxInterpreter
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(options);
 
-        var runId = options.RunId ?? SandboxRunId.New();
-        var audit = new InMemoryAuditSink();
         var budget = new ResourceMeter(plan.Budget);
         plan.BindingReferences.TryGetValue(entrypoint, out var allowedBindings);
-        var context = new SandboxContext(
-            runId,
-            plan.Policy,
-            budget,
-            plan.Bindings,
-            audit,
-            cancellationToken,
-            allowedBindings,
-            plan.ModuleHash,
-            plan.PolicyHash);
+        var context = CanInitializeAuditEnvelopeLazily(options, allowedBindings)
+            ? SandboxContext.CreateWithLazyAuditEnvelope(
+                options.RunId,
+                plan.Policy,
+                budget,
+                plan.Bindings,
+                cancellationToken,
+                allowedBindings,
+                plan.ModuleHash,
+                plan.PolicyHash)
+            : new SandboxContext(
+                options.RunId ?? SandboxRunId.New(),
+                plan.Policy,
+                budget,
+                plan.Bindings,
+                new InMemoryAuditSink(),
+                cancellationToken,
+                allowedBindings,
+                plan.ModuleHash,
+                plan.PolicyHash);
         var startedAt = AuditTime(plan);
 
         try
@@ -48,34 +56,34 @@ public sealed class SandboxInterpreter : ISandboxInterpreter
             var value = await evaluator.ExecuteEntrypointAsync(entrypoint, input).ConfigureAwait(false);
             if (!options.SuppressSuccessfulRunSummaryAudit)
             {
-                WriteSummary(audit, runId, startedAt, plan, budget, true, null);
+                WriteSummary(context, startedAt, plan, budget, true, null);
             }
 
-            return Result(plan, budget, audit, true, value, null);
+            return Result(plan, budget, context, true, value, null);
         }
         catch (OperationCanceledException)
         {
             var error = new SandboxError(SandboxErrorCode.Cancelled, "execution cancelled");
-            WriteSummary(audit, runId, startedAt, plan, budget, false, error);
-            return Result(plan, budget, audit, false, null, error);
+            WriteSummary(context, startedAt, plan, budget, false, error);
+            return Result(plan, budget, context, false, null, error);
         }
         catch (SandboxRuntimeException ex)
         {
-            WriteSummary(audit, runId, startedAt, plan, budget, false, ex.Error);
-            return Result(plan, budget, audit, false, null, ex.Error);
+            WriteSummary(context, startedAt, plan, budget, false, ex.Error);
+            return Result(plan, budget, context, false, null, ex.Error);
         }
         catch (Exception)
         {
             var error = new SandboxError(SandboxErrorCode.HostFailure, "sandbox execution failed");
-            WriteSummary(audit, runId, startedAt, plan, budget, false, error);
-            return Result(plan, budget, audit, false, null, error);
+            WriteSummary(context, startedAt, plan, budget, false, error);
+            return Result(plan, budget, context, false, null, error);
         }
     }
 
     private static SandboxExecutionResult Result(
         ExecutionPlan plan,
         ResourceMeter budget,
-        InMemoryAuditSink audit,
+        SandboxContext context,
         bool succeeded,
         SandboxValue? value,
         SandboxError? error)
@@ -85,7 +93,9 @@ public sealed class SandboxInterpreter : ISandboxInterpreter
             Value = value,
             Error = error,
             ResourceUsage = budget.Snapshot(),
-            AuditEvents = audit.SnapshotEvents(),
+            AuditEvents = context.AuditIfCreated is InMemoryAuditSink audit
+                ? audit.SnapshotEvents()
+                : InMemoryAuditSink.EmptyEventSnapshot,
             ActualMode = ExecutionMode.Interpreted,
             ExecutionDispatched = true,
             ModuleHash = plan.ModuleHash,
@@ -94,8 +104,7 @@ public sealed class SandboxInterpreter : ISandboxInterpreter
         };
 
     private static void WriteSummary(
-        InMemoryAuditSink audit,
-        SandboxRunId runId,
+        SandboxContext context,
         DateTimeOffset startedAt,
         ExecutionPlan plan,
         ResourceMeter budget,
@@ -103,8 +112,8 @@ public sealed class SandboxInterpreter : ISandboxInterpreter
         SandboxError? error)
     {
         var fields = RunSummaryAuditFields.Create(plan, budget, ExecutionMode.Interpreted, "None");
-        audit.Write(new SandboxAuditEvent(
-            runId,
+        context.Audit.Write(new SandboxAuditEvent(
+            context.RunId,
             "RunSummary",
             startedAt,
             success,
@@ -115,6 +124,14 @@ public sealed class SandboxInterpreter : ISandboxInterpreter
                      $"fuel={budget.FuelUsed}/{budget.Limits.MaxFuel}",
             Fields: fields));
     }
+
+    private static bool CanInitializeAuditEnvelopeLazily(
+        SandboxExecutionOptions options,
+        IReadOnlySet<string>? allowedBindings)
+        => options.SuppressSuccessfulRunSummaryAudit &&
+           !options.EnableDebugTrace &&
+           options.Isolation == SandboxIsolation.InProcess &&
+           allowedBindings is { Count: 0 };
 
     private static DateTimeOffset AuditTime(ExecutionPlan plan)
         => plan.Policy.Deterministic
