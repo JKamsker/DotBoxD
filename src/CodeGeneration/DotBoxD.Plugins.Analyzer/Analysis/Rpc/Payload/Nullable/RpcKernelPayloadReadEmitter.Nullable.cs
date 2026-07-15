@@ -25,8 +25,22 @@ internal sealed partial class RpcKernelPayloadReadEmitter
         _helpers.AppendLine("        }");
         _helpers.AppendLine();
         _helpers.AppendLine("        var __hasValue = reader.ReadBool();");
-        _helpers.Append("        var __value = ").Append(valueExpression).AppendLine(";");
-        _helpers.AppendLine("        return __hasValue ? __value : default;");
+        if (_skipAbsentNullablePayload)
+        {
+            _helpers.AppendLine("        if (!__hasValue)");
+            _helpers.AppendLine("        {");
+            _helpers.AppendLine("            reader.SkipValue();");
+            _helpers.AppendLine("            return default;");
+            _helpers.AppendLine("        }");
+            _helpers.AppendLine();
+            _helpers.Append("        return ").Append(valueExpression).AppendLine(";");
+        }
+        else
+        {
+            _helpers.Append("        var __value = ").Append(valueExpression).AppendLine(";");
+            _helpers.AppendLine("        return __hasValue ? __value : default;");
+        }
+
         _helpers.AppendLine("    }");
         _helpers.AppendLine();
         return method;

@@ -109,6 +109,8 @@ public sealed class PluginAnalyzerTypeNameContractTests
             [nameof(TypeNames.SystemActivator)] = TypeName(typeof(Activator)),
             [nameof(TypeNames.SystemAppContext)] = TypeName(typeof(AppContext)),
             [nameof(TypeNames.SystemAppDomain)] = TypeName(typeof(AppDomain)),
+            [nameof(TypeNames.SystemComponentModelBackgroundWorker)] =
+                TypeName(typeof(System.ComponentModel.BackgroundWorker)),
             [nameof(TypeNames.SystemComponentModelTypeDescriptor)] =
                 TypeName(typeof(System.ComponentModel.TypeDescriptor)),
             [nameof(TypeNames.SystemConsole)] = TypeName(typeof(Console)),

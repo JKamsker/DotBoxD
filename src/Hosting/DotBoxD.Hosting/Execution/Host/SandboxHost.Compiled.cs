@@ -126,5 +126,5 @@ public sealed partial class SandboxHost
     private static SandboxError DebugTraceFallbackError()
         => new(SandboxErrorCode.ValidationError, "compiled execution is disabled while debug tracing is enabled");
 
-    private sealed record CompiledAttempt(SandboxExecutionResult? Result, SandboxError? FallbackReason);
+    private readonly record struct CompiledAttempt(SandboxExecutionResult? Result, SandboxError? FallbackReason);
 }

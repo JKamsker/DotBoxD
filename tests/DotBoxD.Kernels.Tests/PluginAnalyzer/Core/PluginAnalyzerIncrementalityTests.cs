@@ -62,6 +62,32 @@ public sealed class PluginAnalyzerIncrementalityTests
         AssertTrackedStep(first, second, DiagnosticResult);
     }
 
+    [Fact]
+    public void Hook_chain_package_outputs_are_cacheable_and_do_not_capture_roslyn_objects()
+    {
+        var (first, second) = RunGeneratorTwice("""
+            using DotBoxD.Abstractions;
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+
+            namespace Sample;
+
+            public sealed record DamageEvent(string TargetId);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DamageEvent>().Run(
+                        (damage, context) => context.Messages.Send(damage.TargetId, "damage"));
+            }
+            """);
+
+        Assert.Contains(
+            first.GeneratedTrees,
+            tree => tree.ToString().Contains("HookChain_", StringComparison.Ordinal));
+        AssertTrackedStep(first, second, PackageResult);
+    }
+
     private static (GeneratorDriverRunResult First, GeneratorDriverRunResult Second) RunGeneratorTwice(string source)
     {
         var compilation = CreateCompilation(source);
@@ -85,7 +111,8 @@ public sealed class PluginAnalyzerIncrementalityTests
             [CSharpSyntaxTree.ParseText(source, ParseOptions)],
             TrustedPlatformReferences()
                 .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
-                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location)),
+                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Plugins.PluginServer).Assembly.Location)),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
     private static void AssertTrackedStep(

@@ -1,0 +1,25 @@
+<Project>
+  <PropertyGroup>
+    <WeaverConfiguration Condition="'$(WeaverConfiguration)' == ''">
+      <Weavers>
+        <DotBoxD.Plugins />
+      </Weavers>
+    </WeaverConfiguration>
+    <DotBoxDGeneratedInterceptorsNamespace Condition="'$(DotBoxDGeneratedInterceptorsNamespace)' == ''">DotBoxD.Plugins.Generated</DotBoxDGeneratedInterceptorsNamespace>
+    <InterceptorsNamespaces Condition="!$([System.String]::Copy(';$(InterceptorsNamespaces);').Contains(';$(DotBoxDGeneratedInterceptorsNamespace);'))">$(InterceptorsNamespaces);$(DotBoxDGeneratedInterceptorsNamespace)</InterceptorsNamespaces>
+    <DotBoxDPluginWeaverAssembly Condition="'$(DotBoxDPluginWeaverAssembly)' == ''">$(MSBuildThisFileDirectory)..\weaver\DotBoxD.Plugins.Fody.dll</DotBoxDPluginWeaverAssembly>
+  </PropertyGroup>
+
+  <ItemGroup Condition="Exists('$(DotBoxDPluginWeaverAssembly)')">
+    <WeaverFiles Include="$(DotBoxDPluginWeaverAssembly)" />
+  </ItemGroup>
+
+  <Target Name="DotBoxDValidatePluginWeaverConfiguration"
+          BeforeTargets="CoreCompile;FodyTarget"
+          Condition="'$(DisableFody)' != 'true' And ('$(DesignTimeBuild)' != 'true' Or '$(BuildingForLiveUnitTesting)' == 'true')">
+    <Error Condition="'$(FodyAssembly)' == '' Or !Exists('$(FodyAssembly)')"
+           Text="DotBoxD's plugin weaver requires Fody, but Fody.targets was not imported. Restore the project and ensure the DotBoxD package's transitive build assets are not excluded; no direct Fody PackageReference should be necessary." />
+    <Error Condition="!$([System.String]::Copy('$(WeaverConfiguration)').Contains('&lt;DotBoxD.Plugins'))"
+           Text="DotBoxD's plugin weaver is installed, but the existing WeaverConfiguration does not contain &lt;DotBoxD.Plugins /&gt;. Add that entry or remove the custom WeaverConfiguration so DotBoxD can configure it automatically." />
+  </Target>
+</Project>

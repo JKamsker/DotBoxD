@@ -39,7 +39,7 @@ internal sealed class InvokeAsyncClosureMap
                     continue;
                 }
 
-                map.Add(interceptor, TryGetClosureType(instructions, i));
+                map.Add(interceptor, TryGetClosureType(instructions, i, interceptor));
             }
         }
 
@@ -85,16 +85,36 @@ internal sealed class InvokeAsyncClosureMap
 
     private static TypeDefinition? TryGetClosureType(
         Collection<Instruction> instructions,
-        int callIndex)
+        int callIndex,
+        MethodReference interceptor)
     {
-        if (callIndex < 2 ||
-            instructions[callIndex - 1].OpCode.Code != Code.Newobj ||
-            instructions[callIndex - 2].OpCode.Code is not (Code.Ldftn or Code.Ldvirtftn) ||
-            instructions[callIndex - 2].Operand is not MethodReference closureMethod)
+        var lambdaType = interceptor.Resolve()
+            ?.Parameters
+            .FirstOrDefault(static parameter =>
+                string.Equals(
+                    parameter.Name,
+                    DotBoxDInvokeAsyncWeaverNames.LambdaParameterName,
+                    StringComparison.Ordinal))
+            ?.ParameterType;
+        if (lambdaType is null)
         {
             return null;
         }
 
-        return closureMethod.DeclaringType.Resolve();
+        const int maximumArgumentInstructionCount = 64;
+        var firstCandidate = Math.Max(1, callIndex - maximumArgumentInstructionCount);
+        for (var i = callIndex - 1; i >= firstCandidate; i--)
+        {
+            if (instructions[i].OpCode.Code == Code.Newobj &&
+                instructions[i].Operand is MethodReference constructor &&
+                string.Equals(constructor.DeclaringType.FullName, lambdaType.FullName, StringComparison.Ordinal) &&
+                instructions[i - 1].OpCode.Code is Code.Ldftn or Code.Ldvirtftn &&
+                instructions[i - 1].Operand is MethodReference closureMethod)
+            {
+                return closureMethod.DeclaringType.Resolve();
+            }
+        }
+
+        return null;
     }
 }

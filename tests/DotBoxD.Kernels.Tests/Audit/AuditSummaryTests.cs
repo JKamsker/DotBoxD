@@ -152,6 +152,7 @@ public sealed class AuditSummaryTests
         => Assert.Equal("[redacted]", RunSummaryAuditFields.SafePolicyId(policyId));
 
     [Fact]
+    [Trait(AllocationMeasurementCollection.TraitName, AllocationMeasurementCollection.TraitValue)]
     public void SafePolicyId_returns_original_safe_id_without_steady_state_allocation()
     {
         const string policyId = "summary-policy";
