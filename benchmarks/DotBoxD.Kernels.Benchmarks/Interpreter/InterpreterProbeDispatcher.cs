@@ -70,6 +70,12 @@ internal static class InterpreterProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-compiled-execution-envelope", StringComparer.OrdinalIgnoreCase))
+        {
+            await CompiledExecutionEnvelopeProbe.RunAsync();
+            return true;
+        }
+
         if (args.Contains("--probe-interpreter-numeric-conversion", StringComparer.OrdinalIgnoreCase))
         {
             await InterpreterNumericConversionProbe.RunAsync();

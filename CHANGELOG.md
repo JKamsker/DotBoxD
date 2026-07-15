@@ -76,6 +76,9 @@ Services, Kernels, and Pushdown.
   disable debug tracing, and declare no binding references now defer their normal run identity and in-memory audit sink
   until audit evidence is actually needed. Failures and unexpected audited access materialize the full envelope, preserving
   event ordering, identity, and resource accounting instead of discarding evidence through a shared no-op sink.
+- **Value-type compiled attempt handoff:** public compiled host executions now carry the private result-or-fallback attempt
+  between host helpers in a readonly value envelope, removing one 32-byte object from each successful dispatch. Audited
+  successes, compiled failures, verifier fallback, and the public and generated-code ABI remain unchanged.
 - **Documentation & repo polish:** new top-level README, `docs/` information architecture
   (getting-started, concepts, security, reference, contributing), `SECURITY.md`, `CONTRIBUTING.md`,
   `CODE_OF_CONDUCT.md`, and GitHub repo metadata files.

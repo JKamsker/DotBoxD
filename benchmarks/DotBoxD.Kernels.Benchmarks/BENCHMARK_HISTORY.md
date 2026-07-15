@@ -18,6 +18,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-frame-layout
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-local-call-arguments
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-audit-envelope
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-execution-envelope
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-i64-plan-setup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-while-plan-setup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-branched-plan-setup
@@ -191,6 +192,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Scalar interpreted local-function arguments | this commit | `--probe-interpreter-local-call-arguments` | Passed synchronously evaluated one- and two-argument local calls to the callee frame through an internal scalar carrier instead of a temporary array. Across 100,000 executions, arity one fell from 1,024.1 to 992.1 B/op and arity two from 1,040.1 to 1,000.1 B/op. Arity-zero and direct controls are byte-identical; pending operands and arity three retain the original array path. |
 | Lazy interpreter audit envelope | this commit | `--probe-interpreter-audit-envelope` | Deferred the normal run identity and in-memory audit sink for strictly eligible suppressed pure successes. Across 50,000 executions, generated-RunId allocation fell from 848.0 to 784.0 B/op (-64 B/op), while an explicit RunId fell from 816.0 to 784.0 B/op (-32 B/op). Failures and unexpected audit access materialize a real per-run envelope; debug and audited-binding controls remain byte-identical. |
 | Mixed-frame raw assignment state | this commit | `--probe-interpreter-frame-layout` | Allocate assignment state only when a raw slot exists after the leading parameter region; boxed locals retain null/non-null assignment tracking. Across 50,000 raw-parameter-plus-boxed-local executions, allocation fell from 44,402,824 B (888.1 B/op) to 42,802,824 B (856.1 B/op), exactly 32 B/frame. Parameter-only and eight-raw-local controls remain byte-identical, while genuine raw locals preserve `ValidationError` for reads before assignment. |
+| Value-type compiled attempt envelope | this commit | `--probe-compiled-execution-envelope` | Changed the host's private result-or-fallback `CompiledAttempt` from a reference record to a readonly record struct. Across 50,000 warmed public compiled suppressed successes, allocation fell exactly from 42,001,504 B (840.0 B/op) to 40,401,504 B (808.0 B/op), or 32 B/execution. The timing ranges overlap, so this step makes no timing claim. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -1925,3 +1927,38 @@ The permanent probe pins returned values, checksums, and all twelve resource cou
 branch reads an unassigned raw local and verifies that the execution still fails with `ValidationError`, proving that the
 narrower allocation predicate does not weaken read-before-assignment behavior. Public API, compiler/verifier identity,
 persisted artifacts, and sandbox accounting are unchanged.
+
+## Value-type compiled attempt envelope
+
+The compiled host path returns a private `CompiledAttempt` from its compiled-execution helper so the caller can receive
+either a completed `SandboxExecutionResult` or a reason to fall back. That envelope was a sealed reference record, so
+each successful compiled dispatch allocated an object even though the host neither observes its reference identity nor
+retains it beyond the handoff.
+
+`CompiledAttempt` is now a private readonly record struct carrying the same two nullable values. The synchronous and
+asynchronous `ValueTask` paths still return the same result or fallback reason; only the private envelope's storage
+representation changes.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-execution-envelope
+```
+
+Repeated allocation results over 50,000 warmed public `SandboxHost.ExecuteAsync` compiled suppressed successes:
+
+```text
+case                       before B / B/op       after B / B/op        delta/op
+suppressed pure compiled    42,001,504 / 840.0    40,401,504 / 808.0       -32 B
+```
+
+Both baseline processes reproduced 42,001,504 B exactly, and both post-change processes reproduced 40,401,504 B
+exactly. The 1,600,000-byte reduction is one 32-byte attempt object per public compiled execution. Baseline elapsed
+samples were 116.4 and 121.6 ms; post-change samples were 117.6 and 120.3 ms. Those ranges overlap, so allocation is the
+only performance claim.
+
+The permanent probe pins value `7`, compiled mode and dispatch, plan/module/policy/artifact identity, an empty suppressed
+audit snapshot, and all twelve resource counters (`fuel = 4`, `max fuel = long.MaxValue`, all remaining counters zero).
+Audited success, a compiled `InvalidInput` failure, and verifier fallback remain semantic controls. This private
+representation change does not alter public API, generated-code ABI, compiler or verifier identity, persisted artifacts,
+sandbox policy, audit/security boundaries, or resource accounting.
