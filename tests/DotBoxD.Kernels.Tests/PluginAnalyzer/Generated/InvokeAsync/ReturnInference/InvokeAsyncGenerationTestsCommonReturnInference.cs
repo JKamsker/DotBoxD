@@ -2,7 +2,7 @@ using static DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.InvokeAsyncGeneratio
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
-public sealed class InvokeAsyncCommonReturnInferenceTests
+public sealed class InvokeAsyncGenerationTestsCommonReturnInference
 {
     [Fact]
     public void Char_and_int_returns_emit_the_common_i32_wire_type()
