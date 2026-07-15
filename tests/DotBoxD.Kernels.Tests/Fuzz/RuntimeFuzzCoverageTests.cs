@@ -160,7 +160,7 @@ public sealed class RuntimeFuzzCoverageTests
         """;
 
     private static string ModuleId(int index)
-        => $"runtime-fuzz-n{unchecked((uint)index)}";
+        => $"runtime-fuzz-case-{unchecked((uint)index):x8}";
 
     private static string FileModuleJson(int index, string path)
         => $$"""
