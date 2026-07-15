@@ -10,6 +10,61 @@ namespace DotBoxD.Kernels.Tests.Compiled.Regression.Performance.NoAuditState;
 public sealed class CompiledNoAuditRunStateRecoveryTests
 {
     [Fact]
+    public async Task Reusable_state_resets_same_token_context_after_quota_failure()
+    {
+        using var host = SandboxTestHost.Create();
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
+        var plan = await host.PrepareAsync(
+            module,
+            SandboxPolicyBuilder.Create().WithFuel(10).Build());
+        SandboxContext? failedContext = null;
+        var contextWasReused = false;
+        var invocation = 0;
+        var executable = new CompiledExecutable(
+            CompiledArtifactTestFactory.DynamicMethod(
+                plan,
+                (context, _) =>
+                {
+                    if (invocation++ == 0)
+                    {
+                        failedContext = context;
+                        context.ChargeFuel(11);
+                    }
+
+                    contextWasReused = ReferenceEquals(failedContext, context);
+                    context.ChargeFuel(1);
+                    return SandboxValue.FromInt32(35);
+                }),
+            "Miss");
+        var input = SandboxValue.FromList([SandboxValue.FromInt32(1), SandboxValue.FromInt32(1)]);
+        var allowedBindings = AssertNoAuditBindings(plan);
+        var state = new CompiledNoAuditRunState(plan);
+
+        var failed = await ExecuteAsync();
+        var recovered = await ExecuteAsync();
+
+        Assert.False(failed.Succeeded);
+        Assert.Equal(SandboxErrorCode.QuotaExceeded, failed.Error!.Code);
+        Assert.Equal(11, failed.ResourceUsage.FuelUsed);
+        var summary = Assert.Single(failed.AuditEvents, e => e.Kind == "RunSummary");
+        Assert.False(summary.Success);
+        Assert.Equal(SandboxErrorCode.QuotaExceeded, summary.ErrorCode);
+        Assert.True(contextWasReused);
+        AssertSuccess(recovered);
+
+        ValueTask<SandboxExecutionResult> ExecuteAsync()
+            => CompiledNoAuditResultRunner.Execute(
+                executable,
+                plan,
+                "main",
+                input,
+                Options(),
+                allowedBindings,
+                CancellationToken.None,
+                state);
+    }
+
+    [Fact]
     public async Task Reusable_state_recovers_after_a_run_with_a_different_cancelled_token()
     {
         using var host = SandboxTestHost.Create();
