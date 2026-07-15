@@ -103,6 +103,8 @@ public sealed partial class PluginAnalyzer
                     == "System.Text.Encoding":
                 forbidden = containingType;
                 return true;
+            case IMethodSymbol method when TryGetForbiddenX509HostIoMethod(method, out forbidden):
+                return true;
             case IMethodSymbol method when TryGetForbiddenNondeterministicMethod(method, out forbidden):
                 return true;
             case IMethodSymbol method:
@@ -118,6 +120,40 @@ public sealed partial class PluginAnalyzer
                 return false;
         }
     }
+
+    private static bool TryGetForbiddenX509HostIoMethod(
+        IMethodSymbol method,
+        out ITypeSymbol forbidden)
+    {
+        var containingType = method.ContainingType;
+        var containingTypeName = containingType?.OriginalDefinition.ToDisplayString(
+            SymbolDisplayFormat.CSharpErrorMessageFormat);
+        if (IsPathBasedX509CertificateConstructor(method, containingTypeName) ||
+            IsX509ChainBuild(method, containingTypeName))
+        {
+            forbidden = containingType!;
+            return true;
+        }
+
+        forbidden = null!;
+        return false;
+    }
+
+    private static bool IsPathBasedX509CertificateConstructor(
+        IMethodSymbol method,
+        string? containingTypeName)
+        => method.MethodKind == MethodKind.Constructor &&
+           containingTypeName is
+               "System.Security.Cryptography.X509Certificates.X509Certificate" or
+               "System.Security.Cryptography.X509Certificates.X509Certificate2" &&
+           method.Parameters.Any(static parameter =>
+               parameter.Type.SpecialType == SpecialType.System_String);
+
+    private static bool IsX509ChainBuild(
+        IMethodSymbol method,
+        string? containingTypeName)
+        => containingTypeName == "System.Security.Cryptography.X509Certificates.X509Chain" &&
+           string.Equals(method.Name, "Build", StringComparison.Ordinal);
 
     private static bool TryGetForbiddenNondeterministicMethod(
         IMethodSymbol method,
