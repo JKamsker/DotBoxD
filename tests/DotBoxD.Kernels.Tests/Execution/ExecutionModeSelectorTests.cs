@@ -162,7 +162,7 @@ public sealed class ExecutionModeSelectorTests
     [Fact]
     public async Task Auto_mode_selector_disposing_host_fails_before_dispatch()
     {
-        var selector = new DisposingSelector();
+        var selector = new DisposingExecutionModeSelector();
         var host = SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
@@ -272,23 +272,6 @@ public sealed class ExecutionModeSelectorTests
             HotnessSnapshots.Add(hotness);
             Assert.Equal(CompiledCacheStatus.None, cacheStatus);
             return decision;
-        }
-    }
-
-    private sealed class DisposingSelector : IExecutionModeSelector
-    {
-        public SandboxHost Host { get; set; } = null!;
-        public int Calls { get; private set; }
-
-        public ExecutionModeDecision Choose(
-            ExecutionPlan plan,
-            SandboxExecutionOptions options,
-            ModuleHotnessStats hotness,
-            CompiledCacheStatus cacheStatus)
-        {
-            Calls++;
-            Host.Dispose();
-            return ExecutionModeDecision.Interpreted;
         }
     }
 
