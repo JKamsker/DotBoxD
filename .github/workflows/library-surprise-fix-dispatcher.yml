@@ -39,16 +39,13 @@ on:
   # red-tests 28523484435 / 28523516570 / 28523545465 (which opened PRs #170-172)
   # did NOT fire it; only a JKamsker-dispatched red-test did. The schedule closes
   # the loop regardless of who opened the red PR. The per-PR busy-check, retry cap,
-  # and a GLOBAL in-flight cap (MAX_INFLIGHT) below keep the higher cadence + per-tick
-  # max from bursting the backlog or running away on cost.
+  # and a GLOBAL in-flight cap (MAX_INFLIGHT) below keep the worker pool from
+  # bursting the backlog or running away on capacity/cost.
   schedule:
-    # Off-peak minutes on purpose: GitHub throttles/drops short-interval schedule
-    # slots, and drops disproportionately at :00/:05-multiples (observed 2026-07-01:
-    # `*/10` fired 1 of 6 slots in its first hour). Ticks are cheap and self-healing
-    # (each re-scans the full frontier), so dropped slots degrade latency, not
-    # correctness — and the red-test worker now ALSO kicks this dispatcher directly
-    # via safe-outputs dispatch on every PR it opens, so the cron is the fallback
-    # path, not the primary latency path.
+    # Six off-peak chances per hour. GitHub can drop or delay individual schedule
+    # slots, so the denser fallback keeps a proven-red backlog moving even when the
+    # red-test event kick is missed. The global in-flight cap remains the hard
+    # capacity boundary; extra ticks become cheap no-ops while the pool is full.
     - cron: "7,17,27,37,47,57 * * * *"
   # Kept for immediacy: fires instantly when a human/PAT dispatches a red-test
   # (those DO emit workflow_run). Harmless for bot-dispatched ones (never fires).
@@ -60,7 +57,7 @@ on:
       max:
         description: Max fix workers to dispatch this tick.
         required: false
-        default: "6"
+        default: "4"
         type: string
 
 permissions:
@@ -83,9 +80,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          MAX_DISPATCH: ${{ inputs.max || '6' }}
+          MAX_DISPATCH: ${{ inputs.max || '4' }}
           MAX_ATTEMPTS: "4"
-          MAX_INFLIGHT: "12"
+          MAX_INFLIGHT: "4"
+          # Do not add fix work when the repository already has a meaningful
+          # Actions backlog. Frequent ticks resume automatically as it drains.
+          MAX_REPO_WAITING: "4"
           # PAT (Contents + Pull requests R/W). Used ONLY to server-side merge main
           # into a PR branch as the PAT's user, so the resulting pull_request CI runs
           # ungated (a bot-authored commit would sit at action_required). Never printed.
@@ -103,9 +103,9 @@ jobs:
           repo = os.environ["GH_REPO"]
           owner, _, name = repo.partition("/")
           try:
-              max_dispatch = int(os.environ.get("MAX_DISPATCH") or "6")
+              max_dispatch = int(os.environ.get("MAX_DISPATCH") or "4")
           except ValueError:
-              max_dispatch = 6
+              max_dispatch = 4
           try:
               coderabbit_pending_timeout_minutes = int(
                   os.environ.get("CODERABBIT_PENDING_TIMEOUT_MINUTES") or "60")
@@ -438,16 +438,44 @@ jobs:
               max_attempts = 4
 
           # Global concurrency cap: never let total in-flight fix runs exceed
-          # MAX_INFLIGHT. This is what makes the higher cadence + per-tick max safe —
-          # raising throughput can't runaway on cost; it fills to the cap and holds.
+          # MAX_INFLIGHT. Discovery is separately limited to one candidate every
+          # four hours, so this wider pool drains bursts without creating a
+          # self-sustaining queue.
           try:
-              max_inflight = int(os.environ.get("MAX_INFLIGHT") or "12")
+              max_inflight = int(os.environ.get("MAX_INFLIGHT") or "4")
           except ValueError:
-              max_inflight = 12
+              max_inflight = 4
+          try:
+              max_repo_waiting = int(os.environ.get("MAX_REPO_WAITING") or "4")
+          except ValueError:
+              max_repo_waiting = 4
+
+          def repo_run_count(status):
+              out = gh(["api", f"repos/{repo}/actions/runs?status={status}&per_page=1"],
+                       tolerant=True)
+              if out is None:
+                  return None
+              try:
+                  return int(json.loads(out).get("total_count") or 0)
+              except (TypeError, ValueError, json.JSONDecodeError):
+                  print(f"::warning::could not read repository {status} run count")
+                  return None
+
+          queued_count = repo_run_count("queued")
+          pending_count = repo_run_count("pending")
+          repo_waiting = (None if queued_count is None or pending_count is None
+                          else queued_count + pending_count)
           slots = max(0, max_inflight - len(busy))
           budget = min(max_dispatch, slots)
+          if repo_waiting is None:
+              budget = 0
+              print("repository queue pressure is unknown; fail closed and dispatch no workers")
+          elif repo_waiting >= max_repo_waiting:
+              budget = 0
+              print(f"repository has {repo_waiting} queued/pending run(s) >= guard "
+                    f"{max_repo_waiting}; dispatch no workers this tick")
           if budget <= 0:
-              print(f"{len(busy)} fix run(s) in flight >= cap {max_inflight}; no dispatch this tick")
+              print(f"{len(busy)} fix run(s) in flight; cap {max_inflight}; no dispatch this tick")
 
           dispatched = 0
           for number, reason in candidates:

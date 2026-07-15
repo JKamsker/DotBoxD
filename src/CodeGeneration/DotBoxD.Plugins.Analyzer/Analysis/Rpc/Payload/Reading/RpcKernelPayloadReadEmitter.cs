@@ -6,19 +6,23 @@ using Microsoft.CodeAnalysis;
 
 /// <summary>
 /// Emits readers that decode a known pushed <c>KernelRpcValue</c> binary payload directly into CLR values.
-/// Generated <c>RunLocal</c> handlers use this to avoid materializing a full <c>KernelRpcValue</c> tree before
-/// invoking the native delegate.
+/// Generated <c>RunLocal</c> handlers and server-extension clients use this to avoid materializing a full
+/// <c>KernelRpcValue</c> tree before invoking native code or returning a response.
 /// </summary>
 internal sealed partial class RpcKernelPayloadReadEmitter
 {
     private readonly StringBuilder _helpers = new();
     private readonly Dictionary<string, string> _readers = new(StringComparer.Ordinal);
     private readonly Compilation? _compilation;
+    private readonly bool _skipAbsentNullablePayload;
     private int _nextHelper;
 
-    public RpcKernelPayloadReadEmitter(Compilation? compilation = null)
+    public RpcKernelPayloadReadEmitter(
+        Compilation? compilation = null,
+        bool skipAbsentNullablePayload = false)
     {
         _compilation = compilation;
+        _skipAbsentNullablePayload = skipAbsentNullablePayload;
     }
 
     public string Helpers => _helpers.ToString();

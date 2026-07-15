@@ -45,13 +45,16 @@ internal static class AdvancedUsage
         Console.WriteLine($"[plugin] Monsters.Get(monster-4).BlinkBehindAsync(player-1) => landed at {landed}.");
 
         // ── InvokeAsync (a) plain probe — read-only, returns a value.
+        var healthOffset = 0;
+        var observedHealth = 0;
         var monsterHealth = await server.InvokeAsync(async (IGameWorldAccess world) =>
         {
             var monster = world.Monsters.Get("monster-2");
             var snapshot = await monster.SnapshotAsync();
-            return snapshot.Health;
+            observedHealth = snapshot.Health;
+            return snapshot.Health + healthOffset;
         });
-        Console.WriteLine($"[plugin] InvokeAsync Get(monster-2).Snapshot.Health => {monsterHealth}.");
+        Console.WriteLine($"[plugin] InvokeAsync Get(monster-2).Snapshot.Health => {monsterHealth} (observed {observedHealth}).");
 
         // ── InvokeAsync (b) explicit capture-bag — RECOMMENDED when you need values back across the boundary.
         // Sync in, sync out: the assigned fields are written back onto `probe` after the await.

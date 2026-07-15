@@ -278,7 +278,7 @@ public sealed partial class PluginAnalyzer
 
         helperGraph.RecordForbidden(method, forbidden);
         if (!IsForbiddenApiRoot(context.SemanticModel.Compilation, method) ||
-            !helperGraph.TryRecordDirectDiagnostic(method))
+            !helperGraph.TryRecordDirectDiagnostic(method, forbidden))
         {
             return;
         }

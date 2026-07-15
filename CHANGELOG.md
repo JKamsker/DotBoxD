@@ -47,6 +47,38 @@ Services, Kernels, and Pushdown.
   `map.get`/`map.containsKey`/`map.empty`/`map.set` kernel intrinsics. Map keys must be scalar
   (`bool`/`int`/`long`/`string`/enum); a non-scalar key is rejected at generation time. Not yet supported
   (no runtime intrinsic): `dict.Count`, iterating a map, and `dict.Add`/`dict.Remove`.
+- **Allocation-free generated-client response validation:** generated server-extension proxies and grafted
+  clients now validate response bytes with the editor-hidden public `KernelRpcPayloadReader.SkipValue()`
+  primitive and project typed results directly from the payload, avoiding a temporary `KernelRpcValue` tree.
+  New analyzers detect older runtimes that lack this primitive and retain the legacy generated path. Unit
+  responses keep their existing exception behavior; a known-but-wrong wire kind for a payload-bearing return
+  now fails with `FormatException` from the payload reader instead of `NotSupportedException` from the former
+  value-tree projection.
+- **Lean, collision-safe server-extension request helpers:** generated clients now emit conversion helpers only
+  for framework types that actually match a request or legacy response shape. Helper names also avoid the
+  generated service/extension method, so valid methods such as `WriteKernelRpcValue0` or
+  `DateTimeToWireOffset` no longer produce raw C# name-collision errors.
+- **Lean branched interpreter plans:** interpreted branched I32/F64 loops now store empty and single-assignment
+  branches without short-lived plan arrays while retaining ordered arrays for multi-assignment branches.
+  Branch-dependent fuel, cancellation/deadline checks, debug fallback, and sandbox resource accounting remain
+  unchanged.
+- **Lean parameter-only interpreter frames:** raw I32/I64/F64 frames whose slots are all initialized parameters
+  now reuse an empty assignment-state sentinel instead of allocating a redundant `bool[]` per invocation. Frames
+  with distinct locals retain per-slot tracking and read-before-assignment behavior.
+- **Lean mixed interpreter frames:** mixed frames now allocate raw assignment state only when a raw local exists
+  after the leading parameter region. Boxed locals continue to track assignment through their null/non-null slot,
+  so a frame with raw parameters and boxed locals can reuse the empty sentinel while genuine raw locals retain
+  read-before-assignment validation.
+- **Array-free scalar interpreted local calls:** synchronous one- and two-argument calls to module-local functions
+  now carry evaluated values directly into the callee frame. Pending operands, host bindings, collection constructors,
+  and calls with three or more arguments retain their existing array-backed paths and ordering.
+- **Lazy interpreter audit envelopes:** strictly eligible in-process interpreter runs that suppress successful summaries,
+  disable debug tracing, and declare no binding references now defer their normal run identity and in-memory audit sink
+  until audit evidence is actually needed. Failures and unexpected audited access materialize the full envelope, preserving
+  event ordering, identity, and resource accounting instead of discarding evidence through a shared no-op sink.
+- **Value-type compiled attempt handoff:** public compiled host executions now carry the private result-or-fallback attempt
+  between host helpers in a readonly value envelope, removing one 32-byte object from each successful dispatch. Audited
+  successes, compiled failures, verifier fallback, and the public and generated-code ABI remain unchanged.
 - **Documentation & repo polish:** new top-level README, `docs/` information architecture
   (getting-started, concepts, security, reference, contributing), `SECURITY.md`, `CONTRIBUTING.md`,
   `CODE_OF_CONDUCT.md`, and GitHub repo metadata files.
