@@ -297,7 +297,4 @@ internal sealed class ForbiddenHelperCallGraph
     private readonly record struct HelperEdge(ISymbol Caller, ISymbol Target);
 
     private readonly record struct RootHelperCall(ISymbol Target, Location Location);
-
-    private static ISymbol Normalize(IFieldSymbol field)
-        => field.OriginalDefinition;
 }
