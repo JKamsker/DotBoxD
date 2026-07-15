@@ -8,10 +8,14 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 {
     internal string IncrementStatement(IdentifierNameSyntax target, SyntaxKind kind)
     {
+        var targetType = TypeOf(target);
+        RejectRuntimeSingleResult(
+            targetType,
+            $"Server extension increment or decrement of '{target.Identifier.ValueText}'");
         var op = kind is SyntaxKind.PostIncrementExpression or SyntaxKind.PreIncrementExpression ? "add" : "sub";
         return SetStatement(
             target.Identifier.ValueText,
-            BinaryJson(op, Var(target.Identifier.ValueText), NumericOne(TypeOf(target))));
+            BinaryJson(op, Var(target.Identifier.ValueText), NumericOne(targetType)));
     }
 
     private static string NumericOne(ITypeSymbol type)

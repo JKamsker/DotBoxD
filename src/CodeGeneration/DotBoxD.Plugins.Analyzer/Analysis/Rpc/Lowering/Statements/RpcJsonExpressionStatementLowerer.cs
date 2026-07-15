@@ -125,6 +125,10 @@ internal static class RpcJsonExpressionStatementLowerer
             return LowerStringConcatAssignment(lowerer, assignment, target, output);
         }
 
+        DotBoxDRpcJsonLowerer.RejectRuntimeSingleResult(
+            lowerer.TypeOf(target),
+            $"Server extension compound assignment '{assignment.OperatorToken.Text}'");
+
         var op = assignment.Kind() switch
         {
             SyntaxKind.AddAssignmentExpression => "add",

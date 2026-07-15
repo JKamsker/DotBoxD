@@ -56,8 +56,13 @@ internal sealed partial class InvokeAsyncCallShape
         out ITypeSymbol returnType)
     {
         returnType = null!;
-        var contextualExpression = ContextualExpression(invocation);
-        if (TryTypedLocalReturnType(contextualExpression, model, cancellationToken, out returnType))
+        var contextualExpression = ContextualExpression(invocation, out var isAwaited);
+        if (TryTypedContextReturnType(
+                contextualExpression,
+                isAwaited,
+                model,
+                cancellationToken,
+                out returnType))
         {
             return true;
         }
@@ -73,8 +78,9 @@ internal sealed partial class InvokeAsyncCallShape
         return true;
     }
 
-    private static ExpressionSyntax ContextualExpression(ExpressionSyntax expression)
+    private static ExpressionSyntax ContextualExpression(ExpressionSyntax expression, out bool isAwaited)
     {
+        isAwaited = false;
         while (true)
         {
             if (expression.Parent is ParenthesizedExpressionSyntax parenthesized &&
@@ -95,6 +101,7 @@ internal sealed partial class InvokeAsyncCallShape
             if (expression.Parent is AwaitExpressionSyntax awaitExpression &&
                 awaitExpression.Expression == expression)
             {
+                isAwaited = true;
                 expression = awaitExpression;
                 continue;
             }
@@ -103,25 +110,41 @@ internal sealed partial class InvokeAsyncCallShape
         }
     }
 
-    private static bool TryTypedLocalReturnType(
+    private static bool TryTypedContextReturnType(
         ExpressionSyntax expression,
+        bool isAwaited,
         SemanticModel model,
         CancellationToken cancellationToken,
         out ITypeSymbol returnType)
     {
         returnType = null!;
-        if (expression.Parent is not EqualsValueClauseSyntax
+        var targetType = expression.Parent switch
+        {
+            EqualsValueClauseSyntax
             {
                 Value: var value,
                 Parent: VariableDeclaratorSyntax
                 {
                     Parent: VariableDeclarationSyntax declaration,
                 },
-            } ||
-            value != expression ||
-            model.GetTypeInfo(declaration.Type, cancellationToken).Type is not { } targetType)
+            } when value == expression => model.GetTypeInfo(declaration.Type, cancellationToken).Type,
+            AssignmentExpressionSyntax
+            {
+                RawKind: (int)SyntaxKind.SimpleAssignmentExpression,
+                Left: var left,
+                Right: var right,
+            } when right == expression => model.GetTypeInfo(left, cancellationToken).Type,
+            _ => null,
+        };
+        if (targetType is null or { TypeKind: TypeKind.Error })
         {
             return false;
+        }
+
+        if (isAwaited)
+        {
+            returnType = targetType;
+            return true;
         }
 
         return DotBoxDWellKnownTaskTypes.IsGenericValueTask(

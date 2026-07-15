@@ -403,6 +403,7 @@ jobs:
               "InvokeAsyncObjectSinkConversionBoundaryTests",
               "InvokeAsyncRemainingSinkConversionBoundaryTests",
               "InvokeAsyncFloatConversionBoundaryTests",
+              "InvokeAsyncSingleRuntimeOperationBoundaryTests",
               "InvokeAsyncGeneratedFacadeContextualReturnTests",
               "InvokeAsyncNamedLambdaManualIrTests",
               "InvokeAsyncInheritedManualIrConversionTests",
