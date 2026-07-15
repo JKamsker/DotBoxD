@@ -202,7 +202,14 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         if (element.ArgumentList.Arguments.Count == 1 &&
             DotBoxDRpcTypeMapper.ListElementType(receiverType) is not null)
         {
-            return Call("list.get", null, LowerExpression(element.Expression), LowerExpression(element.ArgumentList.Arguments[0].Expression));
+            return Call(
+                "list.get",
+                null,
+                LowerExpression(element.Expression),
+                LowerRequiredExpression(
+                    element.ArgumentList.Arguments[0].Expression,
+                    _model.Compilation.GetSpecialType(SpecialType.System_Int32),
+                    "Server extension list index"));
         }
         return TryLowerMapElementGet(element, receiverType)
             ?? throw new NotSupportedException($"Server extension indexing '{element}' is not supported.");

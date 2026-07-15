@@ -41,7 +41,10 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         _expressionPrelude = prelude;
         try
         {
-            var lowered = LowerExpression(condition);
+            var lowered = LowerRequiredExpression(
+                condition,
+                _model.Compilation.GetSpecialType(SpecialType.System_Boolean),
+                "Server extension while condition");
             if (prelude.Count > 0)
             {
                 throw new NotSupportedException(

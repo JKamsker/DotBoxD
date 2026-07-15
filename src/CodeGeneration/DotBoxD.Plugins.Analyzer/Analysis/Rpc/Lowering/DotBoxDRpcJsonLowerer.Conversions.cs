@@ -102,7 +102,16 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             throw UnsupportedConversion(description);
         }
 
-        if (RpcNumericConversion.TryApply(effectiveType, targetType, lowered, out var converted))
+        return ApplyRequiredTypeConversion(effectiveType, targetType, lowered, description);
+    }
+
+    internal static string ApplyRequiredTypeConversion(
+        ITypeSymbol sourceType,
+        ITypeSymbol targetType,
+        string lowered,
+        string description)
+    {
+        if (RpcNumericConversion.TryApply(sourceType, targetType, lowered, out var converted))
         {
             return converted;
         }

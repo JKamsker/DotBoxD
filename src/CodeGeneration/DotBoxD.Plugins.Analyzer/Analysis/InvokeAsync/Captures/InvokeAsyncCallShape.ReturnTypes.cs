@@ -1,5 +1,6 @@
 using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
@@ -55,7 +56,13 @@ internal sealed partial class InvokeAsyncCallShape
         out ITypeSymbol returnType)
     {
         returnType = null!;
-        if (!IsReturnedInvocation(invocation) ||
+        var contextualExpression = ContextualExpression(invocation);
+        if (TryTypedLocalReturnType(contextualExpression, model, cancellationToken, out returnType))
+        {
+            return true;
+        }
+
+        if (!IsReturnedExpression(contextualExpression) ||
             model.GetEnclosingSymbol(invocation.SpanStart, cancellationToken) is not IMethodSymbol method ||
             DotBoxDRpcReturnType.PayloadType(method.ReturnType, model.Compilation) is not { } payload)
         {
@@ -66,15 +73,22 @@ internal sealed partial class InvokeAsyncCallShape
         return true;
     }
 
-    private static bool IsReturnedInvocation(InvocationExpressionSyntax invocation)
+    private static ExpressionSyntax ContextualExpression(ExpressionSyntax expression)
     {
-        SyntaxNode expression = invocation;
         while (true)
         {
             if (expression.Parent is ParenthesizedExpressionSyntax parenthesized &&
                 parenthesized.Expression == expression)
             {
                 expression = parenthesized;
+                continue;
+            }
+
+            if (expression.Parent is PostfixUnaryExpressionSyntax postfix &&
+                postfix.IsKind(SyntaxKind.SuppressNullableWarningExpression) &&
+                postfix.Operand == expression)
+            {
+                expression = postfix;
                 continue;
             }
 
@@ -85,15 +99,42 @@ internal sealed partial class InvokeAsyncCallShape
                 continue;
             }
 
-            if (expression.Parent is ArrowExpressionClauseSyntax { Expression: var arrowValue })
-            {
-                return arrowValue == expression;
-            }
-
-            return expression.Parent is ReturnStatementSyntax { Expression: var returnValue } &&
-                   returnValue == expression;
+            return expression;
         }
     }
+
+    private static bool TryTypedLocalReturnType(
+        ExpressionSyntax expression,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        out ITypeSymbol returnType)
+    {
+        returnType = null!;
+        if (expression.Parent is not EqualsValueClauseSyntax
+            {
+                Value: var value,
+                Parent: VariableDeclaratorSyntax
+                {
+                    Parent: VariableDeclarationSyntax declaration,
+                },
+            } ||
+            value != expression ||
+            model.GetTypeInfo(declaration.Type, cancellationToken).Type is not { } targetType)
+        {
+            return false;
+        }
+
+        return DotBoxDWellKnownTaskTypes.IsGenericValueTask(
+            targetType,
+            model.Compilation,
+            out returnType);
+    }
+
+    private static bool IsReturnedExpression(ExpressionSyntax expression)
+        => expression.Parent is ArrowExpressionClauseSyntax { Expression: var arrowValue } &&
+           arrowValue == expression ||
+           expression.Parent is ReturnStatementSyntax { Expression: var returnValue } &&
+           returnValue == expression;
 
     private static bool TryExplicitGenericTypeArgument(
         InvocationExpressionSyntax invocation,
