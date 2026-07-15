@@ -40,7 +40,8 @@ internal static class ForbiddenApiNamePolicy
         "System.IO.", "System.Net.", "System.Reflection.", "System.Resources.", "System.Runtime.InteropServices.",
         "System.Runtime.Intrinsics.", "System.Runtime.Loader.", "System.Diagnostics.", "System.Threading.",
         "System.Threading.Tasks.",
-        "System.Timers.", "System.Linq.Expressions.", "System.Security.Principal.", "System.Transactions.",
+        "System.Timers.", "System.Linq.Expressions.", "System.Security.Cryptography.",
+        "System.Security.Principal.", "System.Transactions.",
         "System.Data.", "Microsoft.CSharp.", "Microsoft.EntityFrameworkCore.", "Microsoft.Win32."
     ];
 
