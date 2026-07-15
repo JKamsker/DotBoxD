@@ -72,6 +72,10 @@ Services, Kernels, and Pushdown.
 - **Array-free scalar interpreted local calls:** synchronous one-, two-, and three-argument calls to module-local
   functions now carry evaluated values directly into the callee frame. Pending operands, host bindings, collection
   constructors, and calls with four or more arguments retain their existing array-backed paths and ordering.
+- **Allocation-free straight I64/F64 assignments:** interpreted non-debug assignments over I64/F64 literals and assigned
+  raw locals now evaluate checked arithmetic directly into primitive target slots. Direct `numeric.toI64`/`numeric.toF64`
+  assignments use the same primitive handoff; unsupported calls, pending operands, and debug tracing retain the generic
+  evaluator.
 - **Lazy interpreter audit envelopes:** strictly eligible in-process interpreter runs that suppress successful summaries,
   disable debug tracing, and declare no binding references now defer their normal run identity and in-memory audit sink
   until audit evidence is actually needed. Failures and unexpected audited access materialize the full envelope, preserving

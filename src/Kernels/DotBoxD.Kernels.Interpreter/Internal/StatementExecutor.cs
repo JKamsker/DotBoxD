@@ -88,21 +88,8 @@ internal sealed partial class StatementExecutor
             frame.WriteInt32(assignment.Name, i32Value);
             return default;
         }
-        var valueTask = EvaluateAsync(assignment.Value, frame);
-        if (valueTask.IsCompletedSuccessfully)
-        {
-            frame.Write(assignment.Name, valueTask.Result);
-            return default;
-        }
-        return AwaitAssignment(assignment, valueTask, frame);
-    }
-    private async ValueTask<SandboxValue?> AwaitAssignment(
-        AssignmentStatement assignment,
-        ValueTask<SandboxValue> valueTask,
-        InterpreterFrame frame)
-    {
-        frame.Write(assignment.Name, await valueTask.ConfigureAwait(false));
-        return null;
+
+        return PrimitiveAssignmentExecutor.ExecuteNonInt32(assignment, frame, _expressions);
     }
     private static ValueTask<SandboxValue?> AsNullable(ValueTask<SandboxValue> task)
         => task.IsCompletedSuccessfully

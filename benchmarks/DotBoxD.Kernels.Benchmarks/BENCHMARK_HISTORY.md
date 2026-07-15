@@ -191,6 +191,8 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Parameter-only raw frame assignment state | this commit | `--probe-interpreter-frame-layout` | Reused an empty assignment-state sentinel when every frame slot is a parameter initialized before execution. One- and two-raw-parameter rows each fell from 912.0 to 880.0 B/op, removing exactly one 32-byte array per invocation. Zero-parameter, eight-local, and mixed raw/boxed controls remained byte-identical, and genuine locals retain read-before-assignment tracking. |
 | Scalar interpreted local-function arguments | this commit | `--probe-interpreter-local-call-arguments` | Passed synchronously evaluated one- and two-argument local calls to the callee frame through an internal scalar carrier instead of a temporary array. Across 100,000 executions, arity one fell from 1,024.1 to 992.1 B/op and arity two from 1,040.1 to 1,000.1 B/op. Arity-zero and direct controls are byte-identical; pending operands retain the original array path. |
 | Triple interpreted local-function arguments | this commit | `--probe-interpreter-local-call-arguments` | Extended the synchronous scalar path with a dedicated three-value carrier and explicit overloads that do not grow or genericize the established one/two carrier and frame-invocation path. Across 100,000 calls, the arity-three row fell from 99,232,832 B (992.3 B/op) to 94,431,464 B (944.3 B/op), while arity zero/one/two and all paired direct controls remained byte-identical. Elapsed samples were process-variable, so this is allocation-only. |
+| Allocation-free straight I64/F64 assignments | this commit | `--probe-interpreter-scalar-assignment` | Evaluated eligible non-debug I64/F64 literal, variable, unary, and arithmetic assignment trees directly in primitive slots. Eight literal recurrences fell from 1,224.4 to 840.2 B/op (-384 B/execution); two-variable recurrences fell from 1,424.4 to 848.2 B/op (-576 B/execution). I64/F64 controls, values, and resource usage are byte-identical; elapsed samples are not claimed. |
+| Allocation-free interpreted numeric-conversion assignments | this commit | `--probe-interpreter-numeric-conversion` | Passed eligible I32->I64, I32->F64, and I64->F64 assignment operands/results through primitive evaluators. Eight-conversion rows remove about 384 B/execution (48 B/conversion) and now match the unary controls byte-for-byte. Debug, async, malformed, and unsupported shapes retain generic behavior. |
 | Lazy interpreter audit envelope | this commit | `--probe-interpreter-audit-envelope` | Deferred the normal run identity and in-memory audit sink for strictly eligible suppressed pure successes. Across 50,000 executions, generated-RunId allocation fell from 848.0 to 784.0 B/op (-64 B/op), while an explicit RunId fell from 816.0 to 784.0 B/op (-32 B/op). Failures and unexpected audit access materialize a real per-run envelope; debug and audited-binding controls remain byte-identical. |
 | Mixed-frame raw assignment state | this commit | `--probe-interpreter-frame-layout` | Allocate assignment state only when a raw slot exists after the leading parameter region; boxed locals retain null/non-null assignment tracking. Across 50,000 raw-parameter-plus-boxed-local executions, allocation fell from 44,402,824 B (888.1 B/op) to 42,802,824 B (856.1 B/op), exactly 32 B/frame. Parameter-only and eight-raw-local controls remain byte-identical, while genuine raw locals preserve `ValidationError` for reads before assignment. |
 | Value-type compiled attempt envelope | this commit | `--probe-compiled-execution-envelope` | Changed the host's private result-or-fallback `CompiledAttempt` from a reference record to a readonly record struct. Across 50,000 warmed public compiled suppressed successes, allocation fell exactly from 42,001,504 B (840.0 B/op) to 40,401,504 B (808.0 B/op), or 32 B/execution. The timing ranges overlap, so this step makes no timing claim. |
@@ -1897,6 +1899,77 @@ operands at all three positions, ensure a failure stops later operands and the c
 body before reading all three retained frame values in a later statement. The extraction of the I32 local-function shape
 analyzer keeps every changed non-generated C# file below 300 lines without adding public API. Compiler/verifier identity,
 persisted artifacts, call-depth cleanup, tracing, and sandbox accounting are unchanged.
+
+## Allocation-free straight I64/F64 assignments
+
+Outside loop-specific plans, an interpreted assignment such as `value = value + 1` used the generic boxed expression
+evaluator. Reading one raw I64/F64 variable created a 24-byte `SandboxValue`, the arithmetic result created another, and
+the frame immediately unboxed that result into its primitive target slot. A second raw-variable operand added a third
+box. Eight literal recurrences therefore added about 384 B/execution; eight two-variable recurrences added about 576 B.
+
+Two non-mutating shape checks now recognize I64/F64 literals and assigned raw variables combined through unary negation
+or `+`, `-`, `*`, `/`, and `%`. The recursive evaluators charge one fuel at each node in preorder, evaluate left before
+right, and use `SandboxInt64Math` / `SandboxFloat64Math` at every intermediate. Only a fully successful RHS is committed
+to the target primitive slot. Debug tracing, unsupported calls, wrong shapes, and unassigned variables fall back before
+evaluation; the established I32 assignment fast path remains inline in `StatementExecutor`.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-scalar-assignment
+```
+
+The permanent probe prepares and warms its full matrix before measurement, reuses inputs, requires synchronous
+completion, excludes `Stopwatch` construction from thread-local allocation totals, and pins checksums plus all twelve
+resource fields. Representative 100,000-execution rows:
+
+```text
+case                    before B / B/op          after B / B/op          delta/op
+I64 literal x0           84,014,784 /   840.1     84,014,784 / 840.1          0 B
+I64 literal x8          122,441,520 / 1,224.4     84,019,656 / 840.2       -384 B
+I64 raw variable x0      84,814,784 /   848.1     84,814,784 / 848.1          0 B
+I64 raw variable x8     142,440,600 / 1,424.4     84,819,656 / 848.2       -576 B
+F64 literal x0           84,014,784 /   840.1     84,014,784 / 840.1          0 B
+F64 literal x8          122,441,520 / 1,224.4     84,019,656 / 840.2       -384 B
+F64 raw variable x0      84,814,784 /   848.1     84,814,784 / 848.1          0 B
+F64 raw variable x8     142,440,600 / 1,424.4     84,819,656 / 848.2       -576 B
+```
+
+The x1/x4 rows establish linear baselines of 48.0 B per literal recurrence and 72.0 B per two-variable recurrence; every
+optimized recurrence row reports 0.0 B incremental allocation. The two-variable lane uses two raw parameters rather
+than initializing a second local, keeping its control at fuel `3` while pinning `CollectionElements = 2`. Literal and
+two-variable x8 fuel remains `35`; loop, sandbox allocation, host-call, file/network, log, and string counters are zero.
+
+Unloaded samples moved the four x8 lanes from 72.2/85.8/81.4/105.1 ms to ranges of
+54.3-55.3/68.5-70.0/64.9-66.1/76.7-78.1 ms. Later loaded samples were slower, so this step deliberately claims only the
+exact allocation reduction. Focused regressions cover both allocation shapes, every supported operator, I64 overflow
+and zero-division behavior, F64 non-finite intermediates and signed zero, left-first failure/fuel order,
+read-before-assignment, exact debug traces, and unsupported-call fallback. No public API or generated ABI changes.
+
+## Allocation-free interpreted numeric-conversion assignments
+
+The earlier exact-arity conversion optimization removed a one-element argument array, but a straight assignment still
+boxed the raw source operand and converted result. Once unary I64/F64 assignments became allocation-free, the permanent
+numeric-conversion probe exposed that remaining cost cleanly at 48 B/conversion. Eligible `numeric.toI64` and
+`numeric.toF64` assignment calls now charge the call node, evaluate the operand through the matching primitive evaluator,
+convert the primitive value directly, and commit it through the same primitive target handoff.
+
+This baseline was captured after the straight-assignment evaluator landed but before direct conversion was enabled, so
+it records a distinct improvement without rewriting the earlier argument-array evidence. Eight-conversion rows over
+100,000 executions:
+
+```text
+case        before B / B/op          after B / B/op          delta/op
+I32->I64    140,039,440 / 1,400.4    101,623,400 / 1,016.2      -384 B
+I32->F64    140,039,440 / 1,400.4    101,623,400 / 1,016.2      -384 B
+I64->F64    144,040,600 / 1,440.4    105,624,336 / 1,056.2      -384 B
+```
+
+Every optimized row is byte-identical to its unary control, including checksum and fuel/loop/sandbox-allocation/host-call
+usage; x1/x4 rows likewise report 0.0 B/conversion. Timings moved in mixed directions across scenarios and runs, so no
+latency claim is made. Direct value/resource tests cover all three legal conversions; debug tests require the original
+call/operand trace sequence, and asynchronous operands, operand failures, wrong types, and malformed arity retain their
+generic validation or continuation paths. Public API, compiler/verifier identity, and persisted artifacts are unchanged.
 
 ## Lazy interpreter audit envelope
 
