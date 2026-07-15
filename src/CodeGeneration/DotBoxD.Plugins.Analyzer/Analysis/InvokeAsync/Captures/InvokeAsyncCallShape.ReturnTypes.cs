@@ -56,8 +56,13 @@ internal sealed partial class InvokeAsyncCallShape
         out ITypeSymbol returnType)
     {
         returnType = null!;
-        var contextualExpression = ContextualExpression(invocation);
-        if (TryContextualValueTaskReturnType(contextualExpression, model, cancellationToken, out returnType))
+        var contextualExpression = ContextualExpression(invocation, out var isAwaited);
+        if (TryTypedContextReturnType(
+                contextualExpression,
+                isAwaited,
+                model,
+                cancellationToken,
+                out returnType))
         {
             return true;
         }
@@ -73,8 +78,9 @@ internal sealed partial class InvokeAsyncCallShape
         return true;
     }
 
-    private static ExpressionSyntax ContextualExpression(ExpressionSyntax expression)
+    private static ExpressionSyntax ContextualExpression(ExpressionSyntax expression, out bool isAwaited)
     {
+        isAwaited = false;
         while (true)
         {
             if (expression.Parent is ParenthesizedExpressionSyntax parenthesized &&
@@ -95,6 +101,7 @@ internal sealed partial class InvokeAsyncCallShape
             if (expression.Parent is AwaitExpressionSyntax awaitExpression &&
                 awaitExpression.Expression == expression)
             {
+                isAwaited = true;
                 expression = awaitExpression;
                 continue;
             }
@@ -103,8 +110,9 @@ internal sealed partial class InvokeAsyncCallShape
         }
     }
 
-    private static bool TryContextualValueTaskReturnType(
+    private static bool TryTypedContextReturnType(
         ExpressionSyntax expression,
+        bool isAwaited,
         SemanticModel model,
         CancellationToken cancellationToken,
         out ITypeSymbol returnType)
@@ -128,9 +136,15 @@ internal sealed partial class InvokeAsyncCallShape
             } when right == expression => model.GetTypeInfo(left, cancellationToken).Type,
             _ => null,
         };
-        if (targetType is null)
+        if (targetType is null or { TypeKind: TypeKind.Error })
         {
             return false;
+        }
+
+        if (isAwaited)
+        {
+            returnType = targetType;
+            return true;
         }
 
         return DotBoxDWellKnownTaskTypes.IsGenericValueTask(
