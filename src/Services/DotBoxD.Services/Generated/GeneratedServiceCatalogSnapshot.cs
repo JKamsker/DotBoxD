@@ -10,9 +10,16 @@ internal static class GeneratedServiceCatalogSnapshot
         bool validateImplementationTypes)
     {
         var snapshot = new GeneratedService[services.Count];
+        var serviceNames = new HashSet<string>(StringComparer.Ordinal);
         for (var i = 0; i < services.Count; i++)
         {
             GeneratedServiceMetadataValidator.Validate(services[i], nameof(services), validateImplementationTypes);
+            if (!serviceNames.Add(services[i].ServiceName))
+            {
+                throw new ArgumentException(
+                    $"Generated service catalog contains duplicate service name '{services[i].ServiceName}'.",
+                    nameof(services));
+            }
             snapshot[i] = SnapshotCore(services[i]);
         }
 
