@@ -31,7 +31,9 @@ internal static class GeneratedMethodShapeSignatures
         $"{CompiledRuntimeName}.GetInputArgument({SandboxValueName},{Int32Name},{Int32Name},{SandboxTypeName}):{SandboxValueName}",
         TypeScalarSignature,
         $"{CompiledRuntimeName}.TypeList({SandboxTypeName}):{SandboxTypeName}",
+        $"{CompiledRuntimeName}.TypeListCached({SandboxTypeName}):{SandboxTypeName}",
         $"{CompiledRuntimeName}.TypeMap({SandboxTypeName},{SandboxTypeName}):{SandboxTypeName}",
+        $"{CompiledRuntimeName}.TypeMapCached({SandboxTypeName},{SandboxTypeName}):{SandboxTypeName}",
         $"{CompiledRuntimeName}.TypeRecord({SandboxTypeArrayName}):{SandboxTypeName}",
         $"{CompiledRuntimeName}.CreateMeteredTypeArray({SandboxContextName},{Int32Name}):{SandboxTypeArrayName}"
     };

@@ -16,6 +16,7 @@ public sealed class CompiledRuntimeQuotaTests
     [InlineData("I64")]
     [InlineData("F64")]
     [InlineData("String")]
+    [InlineData("Guid")]
     [InlineData("SandboxPath")]
     [InlineData("SandboxUri")]
     public void Type_scalar_reuses_builtin_scalar_singletons(string name)
@@ -81,6 +82,7 @@ public sealed class CompiledRuntimeQuotaTests
             "I64" => SandboxType.I64,
             "F64" => SandboxType.F64,
             "String" => SandboxType.String,
+            "Guid" => SandboxType.Guid,
             "SandboxPath" => SandboxType.SandboxPath,
             "SandboxUri" => SandboxType.SandboxUri,
             _ => throw new ArgumentOutOfRangeException(nameof(name), name, "unexpected built-in scalar")

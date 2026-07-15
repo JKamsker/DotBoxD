@@ -9,9 +9,9 @@ using Microsoft.CodeAnalysis;
 /// <c>KernelRpcValue</c> wire values: scalars inline, <c>List&lt;T&gt;</c>/arrays as <c>List</c>, and DTOs
 /// (records/structs/classes with public instance properties) as positional <c>Record</c>s. Field
 /// expressions are computed before the owning helper is appended so a nested helper is never spliced into
-/// the middle of another helper's body. Shared by the proxy and direct (graft) client emitters so both
-/// support the same parameter and return shapes — DTO parameters and returns, nested DTOs, and
-/// list-typed DTO fields — without divergence.
+/// the middle of another helper's body. Generated clients use this for request encoding and compatibility
+/// projections that still start from a materialized value; their typed responses use
+/// <see cref="RpcKernelPayloadReadEmitter"/> to decode directly from bytes.
 /// </summary>
 internal sealed partial class RpcKernelValueConversionEmitter
 {
@@ -19,11 +19,15 @@ internal sealed partial class RpcKernelValueConversionEmitter
     private readonly Dictionary<string, string> _readers = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _writers = new(StringComparer.Ordinal);
     private readonly Compilation? _compilation;
+    private readonly string? _reservedMemberName;
     private int _nextHelper;
 
-    public RpcKernelValueConversionEmitter(Compilation? compilation = null)
+    public RpcKernelValueConversionEmitter(
+        Compilation? compilation = null,
+        string? reservedMemberName = null)
     {
         _compilation = compilation;
+        _reservedMemberName = reservedMemberName;
     }
 
     /// <summary>The accumulated helper method definitions, appended after the emitter's own members.</summary>
@@ -82,7 +86,34 @@ internal sealed partial class RpcKernelValueConversionEmitter
         throw new NotSupportedException($"Server extension type '{type.ToDisplayString()}' is not supported.");
     }
 
-    private string NextHelperName(string prefix) => prefix + "KernelRpcValue" + _nextHelper++;
+    private string NextHelperName(string prefix)
+    {
+        string candidate;
+        do
+        {
+            candidate = prefix + "KernelRpcValue" + _nextHelper++;
+        }
+        while (string.Equals(candidate, _reservedMemberName, StringComparison.Ordinal));
+
+        return candidate;
+    }
+
+    private string NextMemberName(string preferredName)
+    {
+        if (!string.Equals(preferredName, _reservedMemberName, StringComparison.Ordinal))
+        {
+            return preferredName;
+        }
+
+        for (var suffix = 0; ; suffix++)
+        {
+            var candidate = preferredName + suffix.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (!string.Equals(candidate, _reservedMemberName, StringComparison.Ordinal))
+            {
+                return candidate;
+            }
+        }
+    }
 
     private static string TypeName(ITypeSymbol type)
         => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
