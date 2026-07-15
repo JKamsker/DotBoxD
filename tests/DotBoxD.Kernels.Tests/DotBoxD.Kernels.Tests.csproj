@@ -33,6 +33,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\DotBoxD.Kernels.TestFixtures.PluginAbstractions\DotBoxD.Kernels.TestFixtures.PluginAbstractions.csproj" />
     <ProjectReference Include="..\DotBoxD.Kernels.TestFixtures.MergeableIr\DotBoxD.Kernels.TestFixtures.MergeableIr.csproj" />
     <ProjectReference Include="..\DotBoxD.Kernels.TestFixtures.PluginLocal\DotBoxD.Kernels.TestFixtures.PluginLocal.csproj" />
