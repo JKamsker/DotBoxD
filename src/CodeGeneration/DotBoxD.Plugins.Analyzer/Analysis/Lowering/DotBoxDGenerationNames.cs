@@ -89,8 +89,8 @@ internal static partial class DotBoxDGenerationNames
         public const string SystemType = "System.Type";
         public const string SystemArrayPoolOriginal = "System.Buffers.ArrayPool<T>";
         public const string SystemUnsafe = "System.Runtime.CompilerServices.Unsafe";
+        public const string SystemComponentModelBackgroundWorker = "System.ComponentModel.BackgroundWorker";
         public const string SystemComponentModelTypeDescriptor = "System.ComponentModel.TypeDescriptor";
-
         public const string GlobalArray = GlobalPrefix + "System.Array";
         public const string GlobalAttribute = GlobalPrefix + "System.Attribute";
         public const string GlobalAttributeTargets = GlobalPrefix + "System.AttributeTargets";

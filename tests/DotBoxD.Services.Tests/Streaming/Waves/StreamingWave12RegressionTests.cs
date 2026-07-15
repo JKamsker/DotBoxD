@@ -283,8 +283,7 @@ public sealed class StreamingWave12RegressionTests
             (id, type, message, _) => protocolErrors.Add($"{id}:{type}:{message}"));
     }
 
-    private static Task SendNoopAsync(ReadOnlyMemory<byte> frame, CancellationToken ct) =>
-        Task.CompletedTask;
+    private static Task SendNoopAsync(ReadOnlyMemory<byte> frame, CancellationToken ct) => Task.CompletedTask;
 
     private static async IAsyncEnumerable<int> BlockingItems(
         TaskCompletionSource started,
