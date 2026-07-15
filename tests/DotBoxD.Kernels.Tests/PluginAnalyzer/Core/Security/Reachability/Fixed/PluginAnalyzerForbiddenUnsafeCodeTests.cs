@@ -67,6 +67,36 @@ public sealed class PluginAnalyzerForbiddenUnsafeCodeTests
     }
 
     [Fact]
+    public async Task Reports_array_allocation_and_unsafe_code_independently()
+    {
+        const string source = """
+            namespace Sample
+            {
+                using DotBoxD.Abstractions;
+                using DotBoxD.Plugins;
+
+                [Plugin("unsafe-array-diagnostics")]
+                public sealed class UnsafeArrayKernel : IEventKernel<string>
+                {
+                    public unsafe bool ShouldHandle(string e, HookContext context)
+                    {
+                        var managed = new int[e.Length];
+                        int* values = stackalloc int[1];
+                        return managed.Length + values[0] >= 0;
+                    }
+
+                    public void Handle(string e, HookContext context) { }
+                }
+            }
+            """;
+
+        var diagnostics = await AnalyzeAsync(source);
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.GetMessage().Contains("array allocation", StringComparison.Ordinal));
+        Assert.Contains(diagnostics, diagnostic => diagnostic.GetMessage().Contains("unsafe", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task Reports_unsafe_pointer_stackalloc_in_reachable_helper()
     {
         const string source = """

@@ -277,6 +277,7 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
         HookFireAsyncGenerator.Register(context);
     }
 
-    private static bool IsHookChainTerminal(SyntaxNode node)
-        => node is InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax };
+    internal static bool IsHookChainTerminal(SyntaxNode node)
+        => node is InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax access } &&
+           PipelineRoleReader.IsTerminalName(access.Name.Identifier.ValueText);
 }

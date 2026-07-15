@@ -51,8 +51,8 @@ public sealed partial class InstalledKernel
     /// parameter types, runs <see cref="InvokeServerExtensionAsync(IReadOnlyList{SandboxValue}, CancellationToken)"/>,
     /// and encodes the result back to bytes. This is the marshalling ceremony every host used to hand-write; the
     /// host keeps only the ownership/authz check (e.g. <see cref="PluginSession.Owns"/>) before calling it. The
-    /// result is encoded through the same <see cref="KernelRpcValue"/> path the wire uses, so the bytes are
-    /// identical to a hand-rolled invoker.
+    /// result is encoded directly from its sandbox value through the byte-identical wire codec, avoiding an
+    /// intermediate <see cref="KernelRpcValue"/> tree.
     /// </summary>
     public async ValueTask<byte[]> InvokeServerExtensionRpcAsync(
         byte[] arguments,
@@ -86,7 +86,7 @@ public sealed partial class InstalledKernel
         }
 
         var result = await InvokeServerExtensionAsync(sandboxArguments, cancellationToken).ConfigureAwait(false);
-        return KernelRpcBinaryCodec.EncodeValue(KernelRpcValueConverter.FromSandboxValue(result));
+        return KernelRpcBinaryCodec.EncodeValue(result);
     }
 
     private SandboxValue BuildRpcInput(string entrypoint, IReadOnlyList<SandboxValue> arguments)

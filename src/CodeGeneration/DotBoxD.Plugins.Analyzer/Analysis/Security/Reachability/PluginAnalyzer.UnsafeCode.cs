@@ -31,7 +31,7 @@ public sealed partial class PluginAnalyzer
 
         helperGraph.RecordForbidden(method, UnsafeCodeDisplayName);
         if (!IsForbiddenApiRoot(context.SemanticModel.Compilation, method) ||
-            !helperGraph.TryRecordDirectDiagnostic(method))
+            !helperGraph.TryRecordDirectDiagnostic(method, UnsafeCodeDisplayName))
         {
             return;
         }

@@ -24,6 +24,9 @@ internal enum PipelineCallRole
 /// </summary>
 internal static class PipelineRoleReader
 {
+    public static bool IsTerminalName(string methodName)
+        => RoleFromName(methodName) is { } role && IsTerminalRole(role);
+
     /// <summary>The inferred role of <paramref name="method"/>, or <c>null</c> when it is not a pipeline call.</summary>
     public static PipelineCallRole? RoleOf(IMethodSymbol? method, Compilation compilation)
     {

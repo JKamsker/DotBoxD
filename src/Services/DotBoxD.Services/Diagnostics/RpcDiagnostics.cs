@@ -15,7 +15,14 @@ public static class RpcDiagnostics
 
     internal static void Report(string operation, Exception error)
     {
-        RpcTelemetry.ReportDiagnosticError(operation, error);
+        try
+        {
+            RpcTelemetry.ReportDiagnosticError(operation, error);
+        }
+        catch (Exception telemetryError)
+        {
+            SafeTrace("DotBoxD diagnostic telemetry failed", telemetryError);
+        }
 
         try
         {

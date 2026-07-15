@@ -1,5 +1,6 @@
 using System.Reflection;
 using DotBoxD.Plugins;
+using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using DotBoxD.Plugins.Runtime;
 using DotBoxD.Plugins.Runtime.Hooks;
 using DotBoxD.Plugins.Runtime.Subscriptions;
@@ -83,6 +84,23 @@ public sealed class PipelineExplicitIrContractTests
             Assert.True(parameters[1].HasDefaultValue, $"{Display(method)} IR companion should be optional.");
             AssertIrBodyOf(method, parameters[1], parameters[0].Name);
         }
+    }
+
+    [Fact]
+    public void Lowered_terminal_names_match_the_generator_syntax_filter()
+    {
+        var terminalNames = Surfaces
+            .SelectMany(surface => LoweredTerminalMethods(surface.Type, surface.Transport))
+            .Select(static method => method.Name)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(["Register", "RegisterLocal", "Run", "RunLocal"], terminalNames);
+        Assert.All(terminalNames, name => Assert.True(PipelineRoleReader.IsTerminalName(name), name));
+        Assert.All(
+            new[] { "On", "Where", "Select", "run" },
+            name => Assert.False(PipelineRoleReader.IsTerminalName(name), name));
     }
 
     [Fact]

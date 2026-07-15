@@ -3,10 +3,8 @@ description: |
   Per-lens discovery agent for the surprise-hunt graph. Dispatched by
   library-surprise-dispatcher with one `lens_issue`. Reads the lens charter + its full comment
   trail, dedups against the graph and open PRs, investigates candidates inside that lens
-  (read-only), logs the trail as a lens comment, and - per concrete surprise found, up to 5 -
-  dispatches the red-test worker. A non-exhausted lens schedules one serialized successor so
-  discovery stays continuous without relying on GitHub's lossy cron. It does not edit files or
-  open PRs.
+  (read-only), logs the trail as a lens comment, and dispatches at most one strongest concrete
+  surprise to the red-test worker. It does not self-chain, edit files, or open PRs.
   See docs/Task/BugHunting/README.md.
 
 on:
@@ -27,11 +25,9 @@ concurrency:
   group: explore-${{ inputs.lens_issue }}
   cancel-in-progress: false
 
-# Discovery needs enough wall-clock and model budget to map several adjacent seams instead of
-# returning immediately after the first candidate. Per-lens concurrency still bounds this to one
-# active explore per lens.
-timeout-minutes: 60
-max-ai-credits: 3000
+# Preserve a deep high-reasoning pass while bounding how long it can occupy a runner.
+timeout-minutes: 45
+max-ai-credits: 2000
 
 permissions:
   contents: read
@@ -57,7 +53,7 @@ sandbox:
 
 tools:
   # Builds used to confirm a lead can legitimately exceed Codex's 120-second default.
-  timeout: 900
+  timeout: 600
   github:
     lockdown: false
     min-integrity: none
@@ -72,12 +68,11 @@ safe-outputs:
     target: "*"
     max: 3
   create-issue:
-    max: 5
+    max: 1
     labels: [sweep:bug]
   dispatch-workflow:
-    workflows: [library-surprise-red-test, library-surprise-explore-continuation]
-    # Up to five red-test handoffs plus exactly one continuation handoff.
-    max: 6
+    workflows: [library-surprise-red-test]
+    max: 1
   noop:
     report-as-issue: false
   missing-tool: false
@@ -127,33 +122,26 @@ shows a candidate was **dispatched but no matching PR exists** (its red-test run
 failed), re-dispatching it is correct - do not treat the bare "dispatched" log line as coverage.
 Never re-mine a lead already **refuted** in the trail.
 
-## 3. Investigate a sustained batch (up to five candidates)
+## 3. Investigate one target seam
 
 Pick one cohesive **target seam** within this lens: a charter sub-area not yet swept, or the
 continuation of an open thread from the comments. Map its focused promise surface and build a small
 surprise inventory per the technique skill. You may run restore/build to confirm a lead; you must
 not edit files.
 
-Do **not** stop merely because you found the first candidate. After recording a concrete candidate,
-continue through the seam's next unexamined promise surface while you still have useful research
-time. Repeat until you have five independently concrete candidates, the chosen seam is genuinely
-dry, or the remaining time is needed to log and dispatch the work safely. Use the longer run to
-inspect multiple adjacent types/methods/shapes, not to repeatedly restate one defect.
-
-Each candidate needs its own distinct failing shape. A concrete candidate parked under "promising
-next leads" costs another explore run to re-derive, so harvest everything that already meets the bar
-while you hold the context. Never pad toward the cap, split one defect into several candidates, or
-lower the concreteness bar: a speculative dispatch is worse than none, but stopping after the first
-finding while proven independent findings remain is a wasted run.
+Use the research window to inspect adjacent types/methods/shapes in the chosen seam, but dispatch
+**at most one** candidate: the strongest concrete, non-duplicate surprise with a distinct failing
+shape. Record any additional promising leads in the lens comment for later scheduled runs instead
+of spawning more red-test work now. Never split one defect or lower the concreteness bar.
 
 ## 4. Log the trail on the lens (always)
 
 Post one concise progress comment on lens issue **#${{ inputs.lens_issue }}**
-(`add-comment`, target = ${{ inputs.lens_issue }}) recording: what you checked this run, promising
-leads for next time, dead ends, any lead you **refuted** (so it is not re-mined), and - for **each**
-red-test you dispatch below - its exact `candidate_title` and failing shape. This comment is the
-durable dedup ledger: a red-test PR may later be merged and closed, so every dispatched candidate
-MUST be recorded here or a future run will re-dispatch it. It is also what lets a concurrently
+  (`add-comment`, target = ${{ inputs.lens_issue }}) recording: what you checked this run, promising
+  leads for next time, dead ends, any lead you **refuted** (so it is not re-mined), and - if you
+  dispatch a red-test below - its exact `candidate_title` and failing shape. This comment is the
+  durable dedup ledger: a red-test PR may later be merged and closed, so the dispatched candidate
+  MUST be recorded here or a future run will re-dispatch it. It is also what lets a concurrently
 running red-test from another lens detect an in-flight duplicate before its PR exists. Keep it
 short and specific.
 
@@ -161,16 +149,13 @@ short and specific.
 
 Exactly one of:
 
-- **Concrete, non-duplicate surprise(s) found** - for each candidate (up to 5), dispatch the
-  red-test worker by calling the **dedicated** `library_surprise_red_test` safe-output tool once
-  per candidate (NOT the generic `dispatch_workflow` tool, which is a no-op in this runtime) with:
+- **One concrete, non-duplicate surprise found** - dispatch the red-test worker by calling the
+  **dedicated** `library_surprise_red_test` safe-output tool once (NOT the generic
+  `dispatch_workflow` tool, which is a no-op in this runtime) with:
   - `candidate_title`: concise, PR-title-ready, without the `[surprise-red-test] ` prefix.
   - `candidate_payload`: compact JSON with `bug`, `expected_red_test`, `expected_failure`,
     `suggested_test_area`, `suggested_source_area`, `duplicate_check`, and
     `lens_issue`: "${{ inputs.lens_issue }}".
-
-  Multiple candidates must be mutually distinct defects - if two would be fixed by the same
-  production change, dispatch only the stronger one.
 
   If (and only if) the finding needs tracking beyond a single PR - it is not yet reducible to one
   red test, or it is a cluster of related surprises - also `create-issue` (`sweep:bug`) with a repro
@@ -184,19 +169,6 @@ Exactly one of:
   call `noop` with the reason.
 
 Never weaken a guardrail or dispatch a speculative candidate to appear productive; prefer `noop`.
-
-## 6. Continue non-exhausted lenses
-
-After completing the outcome above, schedule exactly one successor when this lens remains active:
-call the dedicated `library_surprise_explore_continuation` safe-output tool with the same
-`lens_issue: "${{ inputs.lens_issue }}"` and `vein: "${{ inputs.vein }}"`. Do this after a candidate
-batch **and** after a non-exhausting `noop`. The continuation re-checks the live lens labels and
-queues the next explore behind this run's per-lens concurrency lock, creating continuous scanning
-without overlap.
-
-Do not schedule a successor when you mark the whole lens `sweep:exhausted`. Do not call the generic
-`dispatch_workflow` tool. If this run fails before emitting its successor, the scheduled dispatcher
-is the recovery path.
 
 Do not print, inspect, or summarize secrets, API keys, virtual tokens, endpoint hosts, or full
 endpoint URLs.

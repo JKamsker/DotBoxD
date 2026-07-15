@@ -11,8 +11,8 @@ on:
   # worker alongside the graph-based dispatcher. Kept for manual/back-compat runs.
   workflow_dispatch:
 
-timeout-minutes: 60
-max-ai-credits: 3000
+timeout-minutes: 45
+max-ai-credits: 2000
 
 permissions:
   contents: read
@@ -37,7 +37,7 @@ sandbox:
         base-url-secret: CODEX_LB_BASE_URL
 
 tools:
-  timeout: 900
+  timeout: 600
   github:
     lockdown: false
     min-integrity: none
