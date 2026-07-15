@@ -1,0 +1,22 @@
+<Project>
+  <PropertyGroup>
+    <WeaverConfiguration Condition="'$(WeaverConfiguration)' == ''">
+      <Weavers>
+        <DotBoxD.Plugins />
+      </Weavers>
+    </WeaverConfiguration>
+    <DotBoxDGeneratedInterceptorsNamespace Condition="'$(DotBoxDGeneratedInterceptorsNamespace)' == ''">DotBoxD.Plugins.Generated</DotBoxDGeneratedInterceptorsNamespace>
+    <InterceptorsNamespaces Condition="!$([System.String]::Copy(';$(InterceptorsNamespaces);').Contains(';$(DotBoxDGeneratedInterceptorsNamespace);'))">$(InterceptorsNamespaces);$(DotBoxDGeneratedInterceptorsNamespace)</InterceptorsNamespaces>
+    <DotBoxDPluginWeaverAssembly Condition="'$(DotBoxDPluginWeaverAssembly)' == ''">$(MSBuildThisFileDirectory)..\weaver\DotBoxD.Plugins.Fody.dll</DotBoxDPluginWeaverAssembly>
+  </PropertyGroup>
+
+  <ItemGroup Condition="Exists('$(DotBoxDPluginWeaverAssembly)')">
+    <WeaverFiles Include="$(DotBoxDPluginWeaverAssembly)" />
+  </ItemGroup>
+
+  <Target Name="DotBoxDValidatePluginWeaverConfiguration"
+          BeforeTargets="FodyTarget">
+    <Error Condition="!$([System.String]::Copy('$(WeaverConfiguration)').Contains('&lt;DotBoxD.Plugins'))"
+           Text="DotBoxD's plugin weaver is installed, but the existing WeaverConfiguration does not contain &lt;DotBoxD.Plugins /&gt;. Add that entry or remove the custom WeaverConfiguration so DotBoxD can configure it automatically." />
+  </Target>
+</Project>

@@ -238,6 +238,8 @@ function AssertPackageEntryAllowlist($zip, [string] $id, [string] $readme, [stri
         if ($id -eq "DotBoxD") {
             [void] $allowedExact.Add("analyzers/dotnet/cs/DotBoxD.Plugins.Analyzer.dll")
             [void] $allowedExact.Add("analyzers/dotnet/cs/DotBoxD.Plugins.Analyzer.xml")
+            [void] $allowedExact.Add("buildTransitive/DotBoxD.targets")
+            [void] $allowedExact.Add("weaver/DotBoxD.Plugins.Fody.dll")
         }
     }
 
@@ -490,6 +492,10 @@ foreach ($package in $packages) {
         } else {
             AssertZipEntry $zip "lib/$packageTfm/$id.dll" $package.Name
             AssertZipEntry $zip "lib/$packageTfm/$id.xml" $package.Name
+            if ($id -eq "DotBoxD") {
+                AssertZipEntry $zip "buildTransitive/DotBoxD.targets" $package.Name
+                AssertZipEntry $zip "weaver/DotBoxD.Plugins.Fody.dll" $package.Name
+            }
         }
 
         AssertPackageEntryAllowlist $zip $id $readme $packageTfm $extraEntries $package.Name
