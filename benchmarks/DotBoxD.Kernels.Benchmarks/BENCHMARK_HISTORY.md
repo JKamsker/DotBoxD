@@ -197,6 +197,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Lazy interpreter audit envelope | this commit | `--probe-interpreter-audit-envelope` | Deferred the normal run identity and in-memory audit sink for strictly eligible suppressed pure successes. Across 50,000 executions, generated-RunId allocation fell from 848.0 to 784.0 B/op (-64 B/op), while an explicit RunId fell from 816.0 to 784.0 B/op (-32 B/op). Failures and unexpected audit access materialize a real per-run envelope; debug and audited-binding controls remain byte-identical. |
 | Mixed-frame raw assignment state | this commit | `--probe-interpreter-frame-layout` | Allocate assignment state only when a raw slot exists after the leading parameter region; boxed locals retain null/non-null assignment tracking. Across 50,000 raw-parameter-plus-boxed-local executions, allocation fell from 44,402,824 B (888.1 B/op) to 42,802,824 B (856.1 B/op), exactly 32 B/frame. Parameter-only and eight-raw-local controls remain byte-identical, while genuine raw locals preserve `ValidationError` for reads before assignment. |
 | Value-type compiled attempt envelope | this commit | `--probe-compiled-execution-envelope` | Changed the host's private result-or-fallback `CompiledAttempt` from a reference record to a readonly record struct. Across 50,000 warmed public compiled suppressed successes, allocation fell exactly from 42,001,504 B (840.0 B/op) to 40,401,504 B (808.0 B/op), or 32 B/execution. The timing ranges overlap, so this step makes no timing claim. |
+| Allocation-free warmed compiled cache hits | this commit | `--probe-compiled-execution-envelope` | Moved non-persistent reflection compilation/materialization factories into miss-only cache helpers and the inline-await capture into its selected worker boundary. Across 50,000 warmed public compiled suppressed successes, allocation fell from 40,404,920 B (808.1 B/op) to 25,602,968 B (512.1 B/op), removing 296.0 B/execution. Provider and both execution-cache completed hits independently measure 0 B/hit; checksums, identity, resource usage, cancellation/coalescing, custom compilers, failures, and fallback remain pinned. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -2112,3 +2113,45 @@ audit snapshot, and all twelve resource counters (`fuel = 4`, `max fuel = long.M
 Audited success, a compiled `InvalidInput` failure, and verifier fallback remain semantic controls. This private
 representation change does not alter public API, generated-code ABI, compiler or verifier identity, persisted artifacts,
 sandbox policy, audit/security boundaries, or resource accounting.
+
+## Allocation-free warmed compiled cache hits
+
+The default non-persistent reflection compiler keeps two host-local execution caches: one for completed artifacts and one
+for their materialized executables. Their warmed path returned synchronously, but the provider still constructed a shared
+48-byte display class and two 64-byte delegates for factories needed only on a miss. Each cache also eagerly allocated a
+24-byte display class for its miss-only `Lazy<Task<T>>` candidate. The provider layer therefore cost exactly 224 B/hit.
+
+Both caches now expose a typed internal path for their concrete compiler/materializer dependency. Lookup, LRU touch, and
+capture of either the completed value or the existing shared `Lazy` remain atomic under the original lock; only a genuine
+miss enters a helper that creates factory closure state. The existing delegate-based path remains for focused tests and
+uses the same lookup, completion, cancellation, failure-removal, and coalescing logic. Custom and persistent compilers
+continue through their prior path so current-artifact validation is never bypassed.
+
+The public runner had a second dormant cost: its optional inline-await-pump lambda captured six values in a 72-byte
+display class at method entry, even when the earlier binding-free no-audit branch returned. A parameterized helper on the
+async worker now owns that lambda, so the capture is created only when the inline pump is actually selected.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-execution-envelope
+```
+
+Repeated warmed public results over 50,000 executions:
+
+```text
+case                       before B / B/op       after B / B/op        delta/op
+public compiled cache hit   40,404,920 / 808.1    25,602,968 / 512.1      -296 B
+```
+
+The 296 B/execution reduction decomposes into the exact 224-byte provider/cache cost and 72-byte inactive runner capture.
+Independent 100,000-hit allocation guards measure the combined typed provider path, delegate-based artifact cache, and
+delegate-based executable cache at 0 B/hit after warmup. The remaining 512 B/run is accounted for by the per-run resource
+meter, sandbox context, resource snapshot, and result envelope; those are separate follow-up candidates.
+
+Post-change elapsed samples of 90.9, 101.2, and 102.6 ms straddled the 97.1 ms baseline, so this step makes only the
+byte-exact allocation claim. The probe pins result `7`, checksum, compiled mode/dispatch,
+module/plan/policy/artifact identity, empty audit output, and all twelve resource counters. Regression coverage preserves
+pre-cancelled and independently cancelled waiters, same-key in-flight coalescing, LRU recency, miss/hit status, custom and
+persistent compiler behavior, audited failure, inline-await execution, and interpreter fallback. No public API, generated
+ABI, verifier identity, persisted artifact, security boundary, or resource-accounting behavior changes.

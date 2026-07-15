@@ -27,10 +27,9 @@ internal static class CompiledExecutionRunner
                 noAuditBindings,
                 cancellationToken);
         }
-        var result = useInlineAwaitPump
-            ? CompiledAsyncWorker.RunInline(() => ExecuteCore(executable, plan, entrypoint, input, options, cancellationToken))
-            : ExecuteCore(executable, plan, entrypoint, input, options, cancellationToken);
-        return ValueTask.FromResult(result);
+        return ValueTask.FromResult(useInlineAwaitPump
+            ? CompiledAsyncWorker.RunInline(executable, plan, entrypoint, input, options, cancellationToken)
+            : ExecuteCore(executable, plan, entrypoint, input, options, cancellationToken));
     }
     public static ValueTask<SandboxExecutionResult> ExecuteOnWorkerAsync(
         CompiledExecutable executable,
@@ -41,7 +40,7 @@ internal static class CompiledExecutionRunner
         CancellationToken cancellationToken)
         => CompiledAsyncWorker.RunAsync(
             () => ExecuteCore(executable, plan, entrypoint, input, options, cancellationToken));
-    private static SandboxExecutionResult ExecuteCore(
+    internal static SandboxExecutionResult ExecuteCore(
         CompiledExecutable executable,
         ExecutionPlan plan,
         string entrypoint,

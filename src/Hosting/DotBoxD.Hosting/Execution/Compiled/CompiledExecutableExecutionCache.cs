@@ -1,3 +1,5 @@
+using DotBoxD.Kernels.Compiler;
+
 namespace DotBoxD.Hosting.Execution.Compiled;
 
 internal sealed class CompiledExecutableExecutionCache
@@ -22,11 +24,40 @@ internal sealed class CompiledExecutableExecutionCache
             lookup = TouchOrAdd(key, materialize);
         }
 
-        if (lookup.Completed is { } completed)
+        return await CompleteAsync(key, lookup, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async ValueTask<CompiledExecutable> GetAsync(
+        ExecutionPlan plan,
+        string entrypoint,
+        CompiledExecutableCache materialized,
+        CompiledArtifact artifact,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var key = new CacheKey(plan.PlanHash, entrypoint);
+        CacheLookup lookup;
+        lock (_gate)
         {
-            return completed with { MaterializationStatus = "Hit" };
+            lookup = TouchOrAdd(key, materialized, artifact, plan, entrypoint);
         }
 
+        return await CompleteAsync(key, lookup, cancellationToken).ConfigureAwait(false);
+    }
+
+    private ValueTask<CompiledExecutable> CompleteAsync(
+        CacheKey key,
+        CacheLookup lookup,
+        CancellationToken cancellationToken)
+        => lookup.Completed is { } completed
+            ? ValueTask.FromResult(completed with { MaterializationStatus = "Hit" })
+            : AwaitAndMarkAsync(key, lookup, cancellationToken);
+
+    private async ValueTask<CompiledExecutable> AwaitAndMarkAsync(
+        CacheKey key,
+        CacheLookup lookup,
+        CancellationToken cancellationToken)
+    {
         var lazy = lookup.Lazy!;
         try
         {
@@ -49,18 +80,54 @@ internal sealed class CompiledExecutableExecutionCache
         CacheKey key,
         Func<CancellationToken, ValueTask<CompiledExecutable>> materialize)
     {
-        if (_entries.TryGetValue(key, out var existing))
-        {
-            _recency.Remove(existing);
-            _recency.AddLast(existing);
-            return existing.Value.Completed is { } completed
-                ? new CacheLookup(completed, null, false)
-                : new CacheLookup(null, existing.Value.Executable, false);
-        }
+        return TryTouchExisting(key, out var existing)
+            ? existing
+            : AddEntry(key, materialize);
+    }
 
+    private CacheLookup TouchOrAdd(
+        CacheKey key,
+        CompiledExecutableCache materialized,
+        CompiledArtifact artifact,
+        ExecutionPlan plan,
+        string entrypoint)
+    {
+        return TryTouchExisting(key, out var existing)
+            ? existing
+            : AddEntry(key, materialized, artifact, plan, entrypoint);
+    }
+
+    private CacheLookup AddEntry(
+        CacheKey key,
+        Func<CancellationToken, ValueTask<CompiledExecutable>> materialize)
+    {
         var candidate = new Lazy<Task<CompiledExecutable>>(
             () => materialize(CancellationToken.None).AsTask(),
             LazyThreadSafetyMode.ExecutionAndPublication);
+        return AddCandidate(key, candidate);
+    }
+
+    private CacheLookup AddEntry(
+        CacheKey key,
+        CompiledExecutableCache materialized,
+        CompiledArtifact artifact,
+        ExecutionPlan plan,
+        string entrypoint)
+    {
+        var candidate = new Lazy<Task<CompiledExecutable>>(
+            () => materialized.GetAsync(
+                artifact,
+                plan,
+                entrypoint,
+                CancellationToken.None).AsTask(),
+            LazyThreadSafetyMode.ExecutionAndPublication);
+        return AddCandidate(key, candidate);
+    }
+
+    private CacheLookup AddCandidate(
+        CacheKey key,
+        Lazy<Task<CompiledExecutable>> candidate)
+    {
         var node = _recency.AddLast(new Entry(key, candidate));
         _entries[key] = node;
         if (_entries.Count > Capacity)
@@ -71,6 +138,27 @@ internal sealed class CompiledExecutableExecutionCache
         }
 
         return new CacheLookup(null, candidate, true);
+    }
+
+    private bool TryTouchExisting(CacheKey key, out CacheLookup lookup)
+    {
+        if (_entries.TryGetValue(key, out var existing))
+        {
+            Touch(existing);
+            lookup = existing.Value.Completed is { } completed
+                ? new CacheLookup(completed, null, false)
+                : new CacheLookup(null, existing.Value.Executable, false);
+            return true;
+        }
+
+        lookup = default;
+        return false;
+    }
+
+    private void Touch(LinkedListNode<Entry> entry)
+    {
+        _recency.Remove(entry);
+        _recency.AddLast(entry);
     }
 
     private void MarkCompleted(CacheKey key, Lazy<Task<CompiledExecutable>> lazy, CompiledExecutable executable)
