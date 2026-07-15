@@ -10,6 +10,7 @@ internal static class ForbiddenApiNamePolicy
         DotBoxDGenerationNames.TypeNames.SystemAppContext, DotBoxDGenerationNames.TypeNames.SystemAppDomain,
         DotBoxDGenerationNames.TypeNames.SystemEnvironment, DotBoxDGenerationNames.TypeNames.SystemGc,
         DotBoxDGenerationNames.TypeNames.SystemGcSettings, DotBoxDGenerationNames.TypeNames.SystemTimeZoneInfo,
+        "System.Progress<T>",
         DotBoxDGenerationNames.TypeNames.SystemDelegate, DotBoxDGenerationNames.TypeNames.SystemServiceProvider,
         DotBoxDGenerationNames.TypeNames.SystemType, DotBoxDGenerationNames.TypeNames.SystemUnsafe,
         DotBoxDGenerationNames.TypeNames.SystemArrayPoolOriginal,
