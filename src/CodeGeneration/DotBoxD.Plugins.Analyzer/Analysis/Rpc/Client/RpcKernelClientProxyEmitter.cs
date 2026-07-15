@@ -59,6 +59,7 @@ internal static partial class RpcKernelClientProxyEmitter
         private readonly ITypeSymbol? _payloadReturnType;
         private readonly ReturnShape _returnShape;
         private readonly RpcKernelValueConversionEmitter _conv;
+        private readonly RpcKernelClientResponseReadEmitter _responseReader;
 
         public ProxySourceWriter(
             INamedTypeSymbol kernelType,
@@ -69,7 +70,13 @@ internal static partial class RpcKernelClientProxyEmitter
             _kernelType = kernelType;
             _serviceType = serviceType;
             _serviceMethod = serviceMethod;
-            _conv = new RpcKernelValueConversionEmitter(compilation);
+            _conv = new RpcKernelValueConversionEmitter(
+                compilation,
+                reservedMemberName: serviceMethod.Name);
+            _responseReader = new RpcKernelClientResponseReadEmitter(
+                compilation,
+                serviceType,
+                reservedMemberName: serviceMethod.Name);
             _returnShape = Shape(serviceMethod.ReturnType, compilation, out _payloadReturnType);
         }
 
@@ -97,6 +104,7 @@ internal static partial class RpcKernelClientProxyEmitter
             builder.AppendLine();
             AppendServiceMethod(builder);
             builder.Append(_conv.Helpers);
+            builder.Append(_responseReader.Helpers);
             builder.AppendLine("}");
             return builder.ToString();
         }
@@ -184,10 +192,19 @@ internal static partial class RpcKernelClientProxyEmitter
             }
             else
             {
-                builder.Append("        var ").Append(result)
-                    .Append($" = {DotBoxDRpcValueNames.GlobalKernelRpcBinaryCodec}.DecodeValue(")
-                    .Append(response).AppendLine(");");
-                builder.Append("        return ").Append(_conv.ReadExpression(_payloadReturnType, result)).AppendLine(";");
+                if (_responseReader.TryReadExpression(_payloadReturnType, response, out var readResponse))
+                {
+                    builder.Append("        var ").Append(result)
+                        .Append(" = ").Append(readResponse).AppendLine(";");
+                    builder.Append("        return ").Append(result).AppendLine(";");
+                }
+                else
+                {
+                    builder.Append("        var ").Append(result)
+                        .Append($" = {DotBoxDRpcValueNames.GlobalKernelRpcBinaryCodec}.DecodeValue(")
+                        .Append(response).AppendLine(");");
+                    builder.Append("        return ").Append(_conv.ReadExpression(_payloadReturnType, result)).AppendLine(";");
+                }
             }
 
             builder.AppendLine("    }");

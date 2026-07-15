@@ -11,6 +11,7 @@ using System.Text;
 [EditorBrowsable(EditorBrowsableState.Never)]
 public ref struct KernelRpcPayloadReader
 {
+    private const int MaxDecodeDepth = 64;
     private const int MaxDecodeItems = 10_000;
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
@@ -28,12 +29,7 @@ public ref struct KernelRpcPayloadReader
     public bool ReadBool()
     {
         ReadKind(KernelRpcValueKind.Bool);
-        return ReadByte() switch
-        {
-            0 => false,
-            1 => true,
-            _ => throw new FormatException("Server extension payload contains an invalid bool value.")
-        };
+        return ReadBoolPayload();
     }
 
     public int ReadInt32()
@@ -51,13 +47,7 @@ public ref struct KernelRpcPayloadReader
     public double ReadDouble()
     {
         ReadKind(KernelRpcValueKind.F64);
-        var value = BitConverter.Int64BitsToDouble(BinaryPrimitives.ReadInt64LittleEndian(Read(sizeof(long))));
-        if (!double.IsFinite(value))
-        {
-            throw new FormatException("Server extension payload contains a non-finite F64 value.");
-        }
-
-        return value;
+        return ReadDoublePayload();
     }
 
     public string ReadString()
@@ -104,6 +94,12 @@ public ref struct KernelRpcPayloadReader
         return count;
     }
 
+    /// <summary>
+    /// Consumes one structurally valid wire value without materializing it. Generated clients use this as an
+    /// allocation-free validation pass before invoking user-defined DTO constructors during typed projection.
+    /// </summary>
+    public void SkipValue() => SkipValue(depth: 0);
+
     public void EnsureConsumed()
     {
         if (!_remaining.IsEmpty)
@@ -122,6 +118,107 @@ public ref struct KernelRpcPayloadReader
 
         _items += count;
         return count;
+    }
+
+    private void SkipValue(int depth)
+    {
+        var kind = (KernelRpcValueKind)ReadByte();
+        if (TrySkipScalarValue(kind))
+        {
+            return;
+        }
+
+        switch (kind)
+        {
+            case KernelRpcValueKind.List:
+            case KernelRpcValueKind.Record:
+            case KernelRpcValueKind.Map:
+                SkipItems(kind, depth);
+                return;
+            default:
+                throw new FormatException($"Server extension payload contains unknown value kind '{kind}'.");
+        }
+    }
+
+    private bool TrySkipScalarValue(KernelRpcValueKind kind)
+    {
+        switch (kind)
+        {
+            case KernelRpcValueKind.Unit:
+                return true;
+            case KernelRpcValueKind.Bool:
+                _ = ReadBoolPayload();
+                return true;
+            case KernelRpcValueKind.I32:
+                _ = Read(sizeof(int));
+                return true;
+            case KernelRpcValueKind.I64:
+                _ = Read(sizeof(long));
+                return true;
+            case KernelRpcValueKind.F64:
+                _ = ReadDoublePayload();
+                return true;
+            case KernelRpcValueKind.String:
+                SkipStringPayload();
+                return true;
+            case KernelRpcValueKind.Guid:
+                _ = Read(16);
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private void SkipItems(KernelRpcValueKind kind, int depth)
+    {
+        var nextDepth = depth + 1;
+        if (nextDepth > MaxDecodeDepth)
+        {
+            throw new FormatException("Server extension payload exceeds the maximum nesting depth.");
+        }
+
+        var count = ReadCount();
+        for (var i = 0; i < count; i++)
+        {
+            SkipValue(nextDepth);
+        }
+
+        if (kind == KernelRpcValueKind.Map && (count & 1) != 0)
+        {
+            throw new FormatException("Server extension map payload has an odd key/value entry count.");
+        }
+    }
+
+    private bool ReadBoolPayload()
+        => ReadByte() switch
+        {
+            0 => false,
+            1 => true,
+            _ => throw new FormatException("Server extension payload contains an invalid bool value.")
+        };
+
+    private double ReadDoublePayload()
+    {
+        var value = BitConverter.Int64BitsToDouble(BinaryPrimitives.ReadInt64LittleEndian(Read(sizeof(long))));
+        if (!double.IsFinite(value))
+        {
+            throw new FormatException("Server extension payload contains a non-finite F64 value.");
+        }
+
+        return value;
+    }
+
+    private void SkipStringPayload()
+    {
+        var length = ReadLength();
+        try
+        {
+            _ = StrictUtf8.GetCharCount(Read(length));
+        }
+        catch (DecoderFallbackException ex)
+        {
+            throw new FormatException("Server extension payload contains invalid UTF-8.", ex);
+        }
     }
 
     private void ReadKind(KernelRpcValueKind expected)

@@ -16,15 +16,22 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
     private readonly string _moduleHash;
     private readonly ExpressionEvaluator _expressions;
     private readonly StatementExecutor _statements;
-    private readonly Dictionary<string, FunctionFrameLayout> _frameLayouts = new(StringComparer.Ordinal);
+    private readonly FunctionFrameLayoutCache _frameLayouts;
+    private SandboxFunction? _lastFrameLayoutFunction;
+    private FunctionFrameLayout? _lastFrameLayout;
 
-    public InterpreterEvaluator(ExecutionPlan plan, SandboxContext context, SandboxExecutionOptions options)
+    public InterpreterEvaluator(
+        ExecutionPlan plan,
+        SandboxContext context,
+        SandboxExecutionOptions options,
+        FunctionFrameLayoutCache frameLayouts)
     {
         _context = context;
         _options = options;
         _moduleHash = plan.ModuleHash;
         _functions = plan.FunctionLookup;
         _functionAnalysis = plan.FunctionAnalysis;
+        _frameLayouts = frameLayouts;
         _expressions = new ExpressionEvaluator(_context, this, _functionAnalysis, _options, _moduleHash);
         _statements = new StatementExecutor(_context, _expressions, this, _options, _moduleHash);
     }
@@ -37,7 +44,8 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
         }
 
         _context.ChargeValue(input);
-        return InvokeFunctionAsync(function, EntrypointBinder.BindArguments(function, input));
+        ValidateEntrypointArguments(function, input);
+        return InvokeFunctionCoreAsync(function, arguments: default, entrypointInput: input);
     }
 
     public bool TryGetFunction(string id, out SandboxFunction function) => _functions.TryGetValue(id, out function!);
@@ -89,16 +97,13 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
             return false;
         }
 
-        var substitutions = new Dictionary<string, I32ExpressionPlan>(StringComparer.Ordinal)
-        {
-            [parameter.Name] = argument
-        };
+        var substitution = new I32ExpressionSubstitution(parameter.Name, argument);
         if (!I32ExpressionPlan.TryCreate(
             expression,
             frame,
             assumedInt32Local,
             calls: null,
-            substitutions,
+            substitution,
             out var body))
         {
             return false;
@@ -111,14 +116,23 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
     // Non-async invocation: a function whose body is fully synchronous (no pending
     // host binding) completes without ever allocating an async state machine, so a
     // helper called inside a loop costs only its indexed frame object per call.
-    public ValueTask<SandboxValue> InvokeFunctionAsync(SandboxFunction function, IReadOnlyList<SandboxValue> args)
+    public ValueTask<SandboxValue> InvokeFunctionAsync(SandboxFunction function, LocalFunctionArguments args)
+        => InvokeFunctionCoreAsync(function, args, entrypointInput: null);
+
+    private ValueTask<SandboxValue> InvokeFunctionCoreAsync(
+        SandboxFunction function,
+        LocalFunctionArguments arguments,
+        SandboxValue? entrypointInput)
     {
         _context.EnterCall();
         var exited = false;
         try
         {
             _context.ChargeFuel(1);
-            var frame = InterpreterFrame.Create(GetFrameLayout(function), function, args);
+            var layout = GetFrameLayout(function);
+            var frame = entrypointInput is null
+                ? InterpreterFrame.Create(layout, function, arguments)
+                : InterpreterFrame.CreateValidatedEntrypoint(layout, function, entrypointInput);
             var body = function.Body;
             for (var i = 0; i < body.Count; i++)
             {
@@ -145,6 +159,16 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
             {
                 _context.ExitCall();
             }
+        }
+    }
+
+    private static void ValidateEntrypointArguments(SandboxFunction function, SandboxValue input)
+    {
+        var parameterCount = function.Parameters.Count;
+        EntrypointBinder.ValidateInputShape(input, parameterCount);
+        for (var i = 0; i < parameterCount; i++)
+        {
+            _ = EntrypointBinder.GetArgument(input, i, parameterCount, function.Parameters[i].Type);
         }
     }
 
@@ -182,17 +206,19 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
         }
     }
 
-    // The function set is fixed for the lifetime of an evaluator, so each function's
-    // local slot layout is resolved once and reused across every invocation instead
-    // of rebuilding a string-keyed local map per call.
+    // The function set is fixed for the prepared plan. Keep the most recently used
+    // layout on the evaluator for tight helper-call loops, while the shared cache
+    // preserves layouts across separate executions of the same plan.
     private FunctionFrameLayout GetFrameLayout(SandboxFunction function)
     {
-        if (!_frameLayouts.TryGetValue(function.Id, out var layout))
+        if (ReferenceEquals(function, _lastFrameLayoutFunction))
         {
-            layout = FunctionFrameLayout.Build(function, _functionAnalysis, _context.Bindings);
-            _frameLayouts[function.Id] = layout;
+            return _lastFrameLayout!;
         }
 
+        var layout = _frameLayouts.Get(function);
+        _lastFrameLayoutFunction = function;
+        _lastFrameLayout = layout;
         return layout;
     }
 

@@ -49,7 +49,15 @@ internal static class IlEmitterPrimitives
                 .GetMethods(BindingFlags.Public | BindingFlags.Static)
                 .Single(m => m.Name == key));
 
+    // Execute rebuilds each expected input type on every invocation. Cache only a direct
+    // built-in structural root; recursive shapes retain the legacy construction sequence.
+    public static void EmitEntrypointSandboxType(ILGenerator il, SandboxType type)
+        => EmitSandboxType(il, type, allowCachedFactory: true);
+
     public static void EmitSandboxType(ILGenerator il, SandboxType type)
+        => EmitSandboxType(il, type, allowCachedFactory: false);
+
+    private static void EmitSandboxType(ILGenerator il, SandboxType type, bool allowCachedFactory)
     {
         if (type.Arguments.Count == 0)
         {
@@ -60,16 +68,16 @@ internal static class IlEmitterPrimitives
 
         if (type is { Name: "List", Arguments.Count: 1 })
         {
-            EmitSandboxType(il, type.Arguments[0]);
-            il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.TypeList)));
+            EmitSandboxType(il, type.Arguments[0], allowCachedFactory: false);
+            il.Emit(OpCodes.Call, Runtime(GetListFactory(type, allowCachedFactory)));
             return;
         }
 
         if (type is { Name: "Map", Arguments.Count: 2 })
         {
-            EmitSandboxType(il, type.Arguments[0]);
-            EmitSandboxType(il, type.Arguments[1]);
-            il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.TypeMap)));
+            EmitSandboxType(il, type.Arguments[0], allowCachedFactory: false);
+            EmitSandboxType(il, type.Arguments[1], allowCachedFactory: false);
+            il.Emit(OpCodes.Call, Runtime(GetMapFactory(type, allowCachedFactory)));
             return;
         }
 
@@ -84,7 +92,7 @@ internal static class IlEmitterPrimitives
             {
                 il.Emit(OpCodes.Dup);
                 EmitInt32(il, i);
-                EmitSandboxType(il, type.Arguments[i]);
+                EmitSandboxType(il, type.Arguments[i], allowCachedFactory: false);
                 il.Emit(OpCodes.Stelem_Ref);
             }
 
@@ -96,4 +104,19 @@ internal static class IlEmitterPrimitives
             SandboxErrorCode.ValidationError,
             $"type '{type}' is not supported by compiler"));
     }
+
+    private static string GetListFactory(SandboxType type, bool allowCachedFactory)
+        => allowCachedFactory && IsBuiltinScalar(type.Arguments[0])
+            ? nameof(Kernels.Runtime.CompiledRuntime.TypeListCached)
+            : nameof(Kernels.Runtime.CompiledRuntime.TypeList);
+
+    private static string GetMapFactory(SandboxType type, bool allowCachedFactory)
+        => allowCachedFactory &&
+           IsBuiltinScalar(type.Arguments[0]) &&
+           IsBuiltinScalar(type.Arguments[1])
+            ? nameof(Kernels.Runtime.CompiledRuntime.TypeMapCached)
+            : nameof(Kernels.Runtime.CompiledRuntime.TypeMap);
+
+    public static bool IsBuiltinScalar(SandboxType type)
+        => type.Arguments.Count == 0 && type.IsKnownBuiltIn();
 }

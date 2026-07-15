@@ -90,6 +90,94 @@ public sealed class PluginAnalyzerHintNameTests
     }
 
     [Fact]
+    public void Collision_identity_rejects_package_names_without_shared_suffix()
+    {
+        var package = new GeneratedPluginPackage(
+            "Unexpected.g.cs",
+            string.Empty,
+            "Sample",
+            "UnexpectedPackage");
+
+        var exception = Assert.Throws<InvalidOperationException>(() => GeneratedPluginPackageIdentity.From(package));
+
+        Assert.Equal(
+            "Collision-tracked package name 'UnexpectedPackage' must end with 'PluginPackage'.",
+            exception.Message);
+    }
+
+    [Theory]
+    [InlineData("public sealed class @DamagePluginPackage { }")]
+    [InlineData("public readonly struct @DamagePluginPackage { }")]
+    [InlineData("public interface @DamagePluginPackage { }")]
+    [InlineData("public sealed record @DamagePluginPackage;")]
+    [InlineData("public readonly record struct @DamagePluginPackage;")]
+    [InlineData("public enum @DamagePluginPackage { Value }")]
+    [InlineData("public delegate void @DamagePluginPackage();")]
+    [InlineData("public sealed class DamagePluginPackag\\u0065 { }")]
+    public void Generator_reports_existing_package_type_collision_for_each_declaration(string declaration)
+    {
+        var result = RunGenerator($$"""
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public sealed record DamageEvent(string TargetId);
+
+            {{declaration}}
+
+            [Plugin("source-collision")]
+            public sealed partial class DamageKernel : IEventKernel<DamageEvent>
+            {
+                public bool ShouldHandle(DamageEvent e, HookContext ctx) => true;
+
+                public void Handle(DamageEvent e, HookContext ctx)
+                    => ctx.Messages.Send(e.TargetId, "message");
+            }
+            """, expectGeneratorErrors: true);
+
+        Assert.Contains(
+            result.Diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                          diagnostic.GetMessage() ==
+                          "Plugin package name 'DamagePluginPackage' collides with an existing type in namespace 'Sample'.");
+        Assert.Empty(result.GeneratedTrees);
+    }
+
+    [Theory]
+    [InlineData("namespace Other { public sealed class DamagePluginPackage { } }")]
+    [InlineData("namespace Sample { public sealed class Outer { public sealed class DamagePluginPackage { } } }")]
+    [InlineData("namespace Sample { public sealed class DamagePluginPackage<T> { } }")]
+    public void Generator_emits_package_for_package_shaped_type_with_distinct_identity(string declaration)
+    {
+        var result = RunGenerator($$"""
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample
+            {
+                public sealed record DamageEvent(string TargetId);
+
+                [Plugin("non-collision")]
+                public sealed partial class DamageKernel : IEventKernel<DamageEvent>
+                {
+                    public bool ShouldHandle(DamageEvent e, HookContext ctx) => true;
+
+                    public void Handle(DamageEvent e, HookContext ctx)
+                        => ctx.Messages.Send(e.TargetId, "message");
+                }
+            }
+
+            {{declaration}}
+            """);
+
+        Assert.DoesNotContain(
+            result.Diagnostics,
+            diagnostic => diagnostic.GetMessage().Contains("collides with an existing type", StringComparison.Ordinal));
+        Assert.Equal("Sample.DamagePluginPackage.g.cs", Path.GetFileName(Assert.Single(result.GeneratedTrees).FilePath));
+    }
+
+    [Fact]
     public void Generator_escapes_keyword_namespace_identifiers()
     {
         var result = RunGenerator("""
