@@ -250,6 +250,12 @@ internal sealed partial class InterpreterFrame
         IReadOnlyList<SandboxValue> args)
         => InterpreterFrameBuilder.Create(layout, function, args);
 
+    public static InterpreterFrame CreateValidatedEntrypoint(
+        FunctionFrameLayout layout,
+        SandboxFunction function,
+        SandboxValue input)
+        => InterpreterFrameBuilder.CreateValidatedEntrypoint(layout, function, input);
+
     private bool TryGetBoxedValue<T>(int slot, out T value)
         where T : SandboxValue
     {

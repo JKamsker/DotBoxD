@@ -33,10 +33,47 @@ internal static class InterpreterFrameLayoutProbe
         };
 
         Console.WriteLine($"interpreter frame-layout executions = {Iterations:N0}");
-        Console.WriteLine("case                 total ms      allocated B       B/op   checksum");
-        await RunCaseAsync(host, interpreter, options, policy, "parameter return", ParameterReturnJson());
-        await RunCaseAsync(host, interpreter, options, policy, "eight local chain", EightLocalChainJson());
-        await RunCaseAsync(host, interpreter, options, policy, "mixed raw and boxed", MixedRawAndBoxedJson());
+        Console.WriteLine("case                   total ms      allocated B       B/op     F/L/A/H   checksum");
+        await RunCaseAsync(
+            host,
+            interpreter,
+            options,
+            policy,
+            "zero parameter control",
+            ZeroParameterJson(),
+            SandboxValue.Unit);
+        await RunCaseAsync(
+            host,
+            interpreter,
+            options,
+            policy,
+            "parameter return",
+            ParameterReturnJson(),
+            SandboxValue.FromInt32(1));
+        await RunCaseAsync(
+            host,
+            interpreter,
+            options,
+            policy,
+            "eight local chain",
+            EightLocalChainJson(),
+            SandboxValue.FromInt32(1));
+        await RunCaseAsync(
+            host,
+            interpreter,
+            options,
+            policy,
+            "mixed raw and boxed",
+            MixedRawAndBoxedJson(),
+            SandboxValue.FromInt32(1));
+        await RunCaseAsync(
+            host,
+            interpreter,
+            options,
+            policy,
+            "two parameter control",
+            TwoParameterJson(),
+            SandboxValue.FromList([SandboxValue.FromInt32(1), SandboxValue.FromInt32(2)], SandboxType.I32));
     }
 
     private static async Task RunCaseAsync(
@@ -45,18 +82,21 @@ internal static class InterpreterFrameLayoutProbe
         SandboxExecutionOptions options,
         SandboxPolicy policy,
         string name,
-        string moduleJson)
+        string moduleJson,
+        SandboxValue input)
     {
         var module = await host.ImportJsonAsync(moduleJson);
         var plan = await host.PrepareAsync(module, policy);
-        var input = SandboxValue.FromInt32(1);
 
         _ = await MeasureAsync(interpreter, plan, input, options, WarmupIterations);
         ForceGc();
         var measurement = await MeasureAsync(interpreter, plan, input, options, Iterations);
         Console.WriteLine(
-            $"{name,-20} {measurement.ElapsedMilliseconds,8:N1} {measurement.Bytes,16:N0} "
-            + $"{measurement.Bytes / (double)Iterations,10:N1} {measurement.Checksum,10:N0}");
+            $"{name,-22} {measurement.ElapsedMilliseconds,8:N1} {measurement.Bytes,16:N0} "
+            + $"{measurement.Bytes / (double)Iterations,10:N1} "
+            + $"{measurement.FuelUsed:N0}/{measurement.LoopIterations:N0}/"
+            + $"{measurement.SandboxAllocatedBytes:N0}/{measurement.HostCalls:N0} "
+            + $"{measurement.Checksum,10:N0}");
     }
 
     private static async Task<Measurement> MeasureAsync(
@@ -67,6 +107,7 @@ internal static class InterpreterFrameLayoutProbe
         int iterations)
     {
         long checksum = 0;
+        SandboxResourceUsage? expectedUsage = null;
         var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
         var watch = Stopwatch.StartNew();
         for (var i = 0; i < iterations; i++)
@@ -78,13 +119,22 @@ internal static class InterpreterFrameLayoutProbe
             }
 
             checksum += ((I32Value)result.Value!).Value;
+            expectedUsage ??= result.ResourceUsage;
+            if (result.ResourceUsage != expectedUsage)
+            {
+                throw new InvalidOperationException("resource usage changed within the measurement");
+            }
         }
 
         watch.Stop();
         return new Measurement(
             watch.Elapsed.TotalMilliseconds,
             GC.GetAllocatedBytesForCurrentThread() - allocatedBefore,
-            checksum);
+            checksum,
+            expectedUsage!.FuelUsed,
+            expectedUsage.LoopIterations,
+            expectedUsage.AllocatedBytes,
+            expectedUsage.HostCalls);
     }
 
     private static void ForceGc()
@@ -105,6 +155,21 @@ internal static class InterpreterFrameLayoutProbe
             "parameters": [{ "name": "value", "type": "I32" }],
             "returnType": "I32",
             "body": [{ "op": "return", "value": { "var": "value" } }]
+          }]
+        }
+        """;
+
+    private static string ZeroParameterJson()
+        => """
+        {
+          "id": "frame-layout-zero-parameter",
+          "version": "1.0.0",
+          "functions": [{
+            "id": "main",
+            "visibility": "entrypoint",
+            "parameters": [],
+            "returnType": "I32",
+            "body": [{ "op": "return", "value": { "i32": 1 } }]
           }]
         }
         """;
@@ -152,5 +217,33 @@ internal static class InterpreterFrameLayoutProbe
         }
         """;
 
-    private readonly record struct Measurement(double ElapsedMilliseconds, long Bytes, long Checksum);
+    private static string TwoParameterJson()
+        => """
+        {
+          "id": "frame-layout-two-parameter",
+          "version": "1.0.0",
+          "functions": [{
+            "id": "main",
+            "visibility": "entrypoint",
+            "parameters": [
+              { "name": "left", "type": "I32" },
+              { "name": "right", "type": "I32" }
+            ],
+            "returnType": "I32",
+            "body": [{
+              "op": "return",
+              "value": { "op": "add", "left": { "var": "left" }, "right": { "var": "right" } }
+            }]
+          }]
+        }
+        """;
+
+    private readonly record struct Measurement(
+        double ElapsedMilliseconds,
+        long Bytes,
+        long Checksum,
+        long FuelUsed,
+        long LoopIterations,
+        long SandboxAllocatedBytes,
+        int HostCalls);
 }

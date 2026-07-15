@@ -164,6 +164,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Prepared-plan interpreter frame-layout cache | this commit | `--probe-interpreter-frame-layout` | Reused immutable per-function slot layouts across executions of the same prepared plan. For 50k direct interpreted executions, a parameter-return entrypoint improved from 105.3 ms / 1,824.1 B/op to 73.0 ms / 1,016.0 B/op; an eight-local chain improved from 346.3 ms / 3,512.2 B/op to 188.6 ms / 1,120.1 B/op. Layouts remain lazy, weakly owned by the plan, isolated between plans, and safe under concurrent first use. |
 | Selective plugin-package collision discovery | this commit | `--probe-plugin-package-collision-discovery` | Limited the source-type semantic transform to declarations whose decoded identifier ends in the shared `PluginPackage` suffix. Across 1,000 warmed two-snapshot edits with 1,000 unrelated types and one real collision, allocation fell from 240,919.1 B/edit to 95,446.3 B/edit; synthetic full-generator time moved from 1,697.6 ms to 1,420.8 ms. Exact semantic namespace, nesting, generic-arity, escaped-identifier, and declaration-kind behavior remains covered. |
 | Raw-only interpreter frame storage | this commit | `--probe-interpreter-frame-layout` | Reused the shared empty boxed-slot array when a prepared frame layout contains only raw I32/I64/F64 slots. Across 50,000 executions, parameter return fell from 976.0 to 944.0 B/op (-32 B/op) and an eight-local chain fell from 1,080.1 to 984.0 B/op (-96 B/op); the mixed raw/boxed control remained 984.1 B/op. Boxed fallback probes now check the layout kind before indexing, preserving sandbox errors for wrong-kind plans. |
+| Direct interpreter entrypoint frame population | this commit | `--probe-interpreter-frame-layout` | Populated entrypoint frame slots directly from the validated input instead of allocating a temporary argument array and immediately copying it. Three one-parameter rows each fell by exactly 32 B/op, and the two-parameter control fell by 40 B/op; the zero-parameter control remained byte-identical at 848.0 B/op. Public `EntrypointBinder.BindArguments` and local-function argument handling are unchanged. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -1246,3 +1247,40 @@ removes a 96-byte array, or 4,800,000 B. The mixed control retains its required 
 remained 50,000, 1,850,000, and 50,000 respectively. Focused regressions cover an all-raw I64 frame, mixed raw/boxed value
 access, and a wrong-kind `list.count` fast-path probe that must return `InvalidInput` rather than `HostFailure`. Stopwatch
 movement is secondary.
+
+## Direct interpreter entrypoint frame population
+
+`InterpreterEvaluator` previously called public `EntrypointBinder.BindArguments` for every entrypoint. Non-empty
+entrypoints therefore allocated a `SandboxValue[]`, validated and copied each input value into it, and immediately copied
+the same references or raw scalar values again when building the interpreter frame. The temporary array survived only for
+the duration of frame construction.
+
+The interpreter now builds entrypoint frames directly from the input. It still uses the public binder primitives to
+validate the input shape and each declared parameter type in declaration order before entering the function call. The
+existing list-based frame builder remains in place for local function calls, and public `BindArguments` behavior is
+unchanged for hosts that use that primitive themselves.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -- --probe-interpreter-frame-layout
+```
+
+Representative local runs, 50,000 executions per row:
+
+```text
+case                    Before ms / allocated / B/op       After ms / allocated / B/op       delta
+zero parameter control     61.5 / 42,401,456 B / 848.0        64.1 / 42,401,456 B / 848.0       0 B/op
+parameter return           67.4 / 47,201,456 B / 944.0        65.9 / 45,601,456 B / 912.0     -32 B/op
+eight local chain         181.6 / 49,202,152 B / 984.0       181.8 / 47,602,152 B / 952.0     -32 B/op
+mixed raw and boxed        82.6 / 49,202,824 B / 984.1        84.3 / 47,602,824 B / 952.1     -32 B/op
+two parameter control      92.1 / 47,601,456 B / 952.0        92.8 / 45,601,456 B / 912.0     -40 B/op
+```
+
+Allocation is the claim: each one-parameter row removes exactly 1,600,000 B across the sample, and the two-parameter row
+removes exactly 2,000,000 B. The zero-parameter path already reused `Array.Empty<SandboxValue>()` and is byte-for-byte
+unchanged. Checksums remained 50,000, 50,000, 1,850,000, 50,000, and 150,000 respectively. Focused regressions cover raw
+I64 and mixed single-parameter frames, direct two-parameter frame population, zero-parameter shape checks, count mismatch,
+and invalid later-parameter type handling before function fuel. The probe also requires resource usage to stay identical
+within each lane; fuel/loop/sandbox-allocation/host-call values are `3/0/0/0`, `3/0/0/0`, `35/0/0/0`, `5/0/20/0`, and
+`5/0/0/0`. Stopwatch movement is secondary.

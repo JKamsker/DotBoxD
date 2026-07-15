@@ -44,7 +44,8 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
         }
 
         _context.ChargeValue(input);
-        return InvokeFunctionAsync(function, EntrypointBinder.BindArguments(function, input));
+        ValidateEntrypointArguments(function, input);
+        return InvokeFunctionCoreAsync(function, arguments: null, entrypointInput: input);
     }
 
     public bool TryGetFunction(string id, out SandboxFunction function) => _functions.TryGetValue(id, out function!);
@@ -116,13 +117,22 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
     // host binding) completes without ever allocating an async state machine, so a
     // helper called inside a loop costs only its indexed frame object per call.
     public ValueTask<SandboxValue> InvokeFunctionAsync(SandboxFunction function, IReadOnlyList<SandboxValue> args)
+        => InvokeFunctionCoreAsync(function, args, entrypointInput: null);
+
+    private ValueTask<SandboxValue> InvokeFunctionCoreAsync(
+        SandboxFunction function,
+        IReadOnlyList<SandboxValue>? arguments,
+        SandboxValue? entrypointInput)
     {
         _context.EnterCall();
         var exited = false;
         try
         {
             _context.ChargeFuel(1);
-            var frame = InterpreterFrame.Create(GetFrameLayout(function), function, args);
+            var layout = GetFrameLayout(function);
+            var frame = entrypointInput is null
+                ? InterpreterFrame.Create(layout, function, arguments!)
+                : InterpreterFrame.CreateValidatedEntrypoint(layout, function, entrypointInput);
             var body = function.Body;
             for (var i = 0; i < body.Count; i++)
             {
@@ -149,6 +159,16 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
             {
                 _context.ExitCall();
             }
+        }
+    }
+
+    private static void ValidateEntrypointArguments(SandboxFunction function, SandboxValue input)
+    {
+        var parameterCount = function.Parameters.Count;
+        EntrypointBinder.ValidateInputShape(input, parameterCount);
+        for (var i = 0; i < parameterCount; i++)
+        {
+            _ = EntrypointBinder.GetArgument(input, i, parameterCount, function.Parameters[i].Type);
         }
     }
 
