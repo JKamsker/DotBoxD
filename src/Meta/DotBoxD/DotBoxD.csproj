@@ -6,6 +6,9 @@
     <IsPackable>true</IsPackable>
     <Description>DotBoxD meta-package: pulls in the full stack across all three usage modes — Services (source-generated RPC), Kernels (validated sandboxed logic hosted via DotBoxD.Hosting), and Pushdown (running kernels next to host services). Reference this single package to get the complete DotBoxD surface for a net10.0 host.</Description>
     <PackageTags>dotboxd;rpc;sandbox;kernels;pushdown;meta</PackageTags>
+    <NoWarn>$(NoWarn);NU5100</NoWarn>
+    <!-- Fody is a consumer build dependency. This project only packages the DotBoxD weaver. -->
+    <DisableFody>true</DisableFody>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,7 +20,17 @@
     <ProjectReference Include="..\..\CodeGeneration\DotBoxD.Plugins.Analyzer\DotBoxD.Plugins.Analyzer.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\CodeGeneration\DotBoxD.Plugins.Fody\DotBoxD.Plugins.Fody.csproj"
+                      ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
     <ProjectReference Include="..\..\Pushdown\DotBoxD.Pushdown.Services\DotBoxD.Pushdown.Services.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Fody is a developmentDependency whose target lives under build rather than buildTransitive.
+         Explicitly propagating all assets makes NuGet retain build/Fody.targets for a DotBoxD-only
+         consumer; narrowing this to build causes restore to substitute build/_._ instead. -->
+    <PackageReference Include="Fody" IncludeAssets="all" PrivateAssets="none" />
   </ItemGroup>
 
   <ItemGroup>
@@ -32,6 +45,14 @@
           PackagePath="analyzers/dotnet/cs"
           Visible="false"
           Condition="Exists('..\..\CodeGeneration\DotBoxD.Plugins.Analyzer\bin\$(Configuration)\netstandard2.0\DotBoxD.Plugins.Analyzer.xml')" />
+    <None Include="..\..\CodeGeneration\DotBoxD.Plugins.Fody\bin\$(Configuration)\netstandard2.0\DotBoxD.Plugins.Fody.dll"
+          Pack="true"
+          PackagePath="weaver"
+          Visible="false" />
+    <None Include="..\..\CodeGeneration\DotBoxD.Plugins.Fody\buildTransitive\DotBoxD.targets"
+          Pack="true"
+          PackagePath="buildTransitive"
+          Visible="false" />
   </ItemGroup>
 
 </Project>
