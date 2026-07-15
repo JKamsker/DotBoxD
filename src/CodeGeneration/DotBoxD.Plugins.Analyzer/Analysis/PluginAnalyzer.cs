@@ -58,6 +58,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
                 c => AnalyzeDynamicIndexerAccess(c, helperGraph),
                 OperationKind.DynamicIndexerAccess);
             startContext.RegisterOperationAction(c => AnalyzeObjectCreation(c, helperGraph), OperationKind.ObjectCreation);
+            startContext.RegisterOperationAction(c => AnalyzeArrayCreation(c, helperGraph), OperationKind.ArrayCreation);
             startContext.RegisterOperationAction(c => AnalyzeWithExpression(c, helperGraph), OperationKind.With);
             startContext.RegisterOperationAction(c => AnalyzePropertyReference(c, helperGraph), OperationKind.PropertyReference);
             startContext.RegisterOperationAction(c => AnalyzeFieldReference(c, helperGraph), OperationKind.FieldReference);

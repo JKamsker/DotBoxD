@@ -19,6 +19,9 @@ internal sealed class ForbiddenHelperCallGraph
         => _forbidden.TryAdd(Normalize(method), displayName);
 
     public void RecordForbiddenInitializer(ISymbol initializer, ITypeSymbol type)
+        => RecordForbiddenInitializer(initializer, DisplayName(type));
+
+    public void RecordForbiddenInitializer(ISymbol initializer, string displayName)
     {
         if (initializer is not (IFieldSymbol or IPropertySymbol) ||
             initializer.DeclaringSyntaxReferences.Length == 0)
@@ -26,7 +29,7 @@ internal sealed class ForbiddenHelperCallGraph
             return;
         }
 
-        _forbidden.TryAdd(Normalize(initializer), DisplayName(type));
+        _forbidden.TryAdd(Normalize(initializer), displayName);
     }
 
     public void RecordForbidden(IFieldSymbol field, ITypeSymbol type)
