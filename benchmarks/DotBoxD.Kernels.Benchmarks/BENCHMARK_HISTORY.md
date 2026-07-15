@@ -168,6 +168,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Direct interpreter entrypoint frame population | this commit | `--probe-interpreter-frame-layout` | Populated entrypoint frame slots directly from the validated input instead of allocating a temporary argument array and immediately copying it. Three one-parameter rows each fell by exactly 32 B/op, and the two-parameter control fell by 40 B/op; the zero-parameter control remained byte-identical at 848.0 B/op. Public `EntrypointBinder.BindArguments` and local-function argument handling are unchanged. |
 | Cached compiled literal validation types | this commit | `--probe-literal-collection-construction` | Reused the bounded compiled structural-type cache when validating list/map literals with direct built-in scalar operands. `ListLiteralValue` arity 8 fell from 240.0 to 128.0 B/op (-112 B/op), and `MapLiteralValue` arity 8 fell from 840.0 to 680.0 B/op (-160 B/op). Prebuilt nested, opaque, and record list controls remained byte-identical at 152.0 B/op. |
 | Array-free interpreted numeric conversions | this commit | `--probe-interpreter-numeric-conversion` | Evaluated exact-arity `numeric.toI64`/`numeric.toF64` operands directly instead of routing them through a one-element argument array. All three legal conversions removed 32.0 B/conversion: one-conversion rows fell by exactly 3,200,000 B across 100,000 executions, and eight-conversion rows fell by about 25.6 MB. After-runs matched paired unary controls byte-for-byte with identical checksums and per-execution sandbox resource usage. |
+| Scalar single-assignment I32 loop plans | this commit | `--probe-interpreter-plan-setup` | Kept the common one-assignment I32 loop plan in a scalar local instead of allocating a one-element `AssignmentPlan[]`, and executed it without an inner array loop. Across 50,000 executions, helper and direct rows fell by about 40 B/op while zero-iteration and two-assignment controls remained byte-identical. A 20-million-iteration lane improved from 47.1-48.9 ms to 35.4-36.7 ms with identical result and resource usage. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -1357,3 +1358,39 @@ Allocation is the claim. Each one-conversion row removes exactly 3,200,000 B, or
 rows scale to 128.0 and 256.0 B/execution within small runtime bookkeeping noise. Every after row is byte-identical to its
 matched array-free unary control. Checksums remain `-100,000,000`; per-execution fuel/loop/sandbox-allocation/host-call usage remains
 `8/0/0/0`, `17/0/0/0`, and `29/0/0/0` for x1, x4, and x8 respectively. Stopwatch movement is secondary.
+
+## Scalar single-assignment I32 loop plans
+
+`I32ForLoopRunner` previously represented every eligible loop body as an `AssignmentPlan[]`, including the overwhelmingly
+common one-assignment body. That allocated a 40-byte one-element array for every eligible non-empty single-assignment I32
+loop execution and kept an indexed inner loop inside every iteration. Single-assignment bodies now retain their validated
+target slot and expression plan in a scalar local, while zero-body and multi-assignment bodies keep the existing array
+planner and execution loop.
+
+The scalar planner preserves the legacy sequence: debug/empty-range guards, expression planning, target-slot validation,
+bulk loop/fuel charging, loop-slot lookup, loop-local write, expression evaluation, target write, and the 4,096-iteration
+checkpoint. Unsupported and non-I32 bodies still fall through to later fast paths or general statement execution.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -- --probe-interpreter-plan-setup
+```
+
+Representative same-probe runs:
+
+```text
+case                         Before ms / allocated / B/op       After ms / allocated / B/op        delta
+helper call, one iteration     162.7 / 62,404,840 B / 1,248.1     152.1 / 60,404,840 B / 1,208.1     -40.0 B/op
+helper call, zero control       89.3 / 46,002,824 B /   920.1      85.4 / 46,002,824 B /   920.1       0.0 B/op
+direct expression control     118.1 / 50,804,840 B / 1,016.1     119.2 / 48,803,640 B /   976.1     ~-40.0 B/op
+two-assignment control        103.0 / 60,003,752 B / 1,200.1     123.4 / 60,003,752 B / 1,200.1       0.0 B/op
+direct expression, 20M loop    48.9 /      2,280 B / 2,280.0      36.7 /      2,240 B / 2,240.0      -40.0 B/op
+```
+
+Allocation is the primary short-execution claim: the helper row removes exactly 2,000,000 B across 50,000 executions,
+the direct row removes 2,001,200 B including small one-time runtime bookkeeping noise, and the zero/two-assignment controls
+are byte-identical. Short-row stopwatch results are noisy. The long-loop timing signal repeated at 47.1-48.9 ms before and
+35.4-36.7 ms after, a 22-28% improvement from removing the inner one-element array walk. Checksums remain 150,000, 0,
+150,000, 300,000, and 999,823. Per-execution fuel/loop/sandbox-allocation/host-call usage remains `23/1/0/0`, `8/0/0/0`,
+`19/1/0/0`, `25/1/0/0`, and `220,000,008/20,000,000/0/0` respectively.
