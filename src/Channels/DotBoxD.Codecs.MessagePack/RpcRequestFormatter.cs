@@ -68,7 +68,9 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
         return state.Request;
     }
 
-    private sealed class RpcRequestReadState(MessagePackSerializerOptions options)
+    // This state is local to synchronous deserialization, so keeping it as a mutable value type
+    // avoids a fixed heap allocation without introducing shared state or lifetime concerns.
+    private struct RpcRequestReadState(MessagePackSerializerOptions options)
     {
         private bool _seenMessageId;
         private bool _seenServiceName;

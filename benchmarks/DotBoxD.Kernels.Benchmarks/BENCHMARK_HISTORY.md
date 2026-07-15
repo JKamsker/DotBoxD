@@ -193,6 +193,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Triple interpreted local-function arguments | this commit | `--probe-interpreter-local-call-arguments` | Extended the synchronous scalar path with a dedicated three-value carrier and explicit overloads that do not grow or genericize the established one/two carrier and frame-invocation path. Across 100,000 calls, the arity-three row fell from 99,232,832 B (992.3 B/op) to 94,431,464 B (944.3 B/op), while arity zero/one/two and all paired direct controls remained byte-identical. Elapsed samples were process-variable, so this is allocation-only. |
 | Allocation-free straight I64/F64 assignments | this commit | `--probe-interpreter-scalar-assignment` | Evaluated eligible non-debug I64/F64 literal, variable, unary, and arithmetic assignment trees directly in primitive slots. Eight literal recurrences fell from 1,224.4 to 840.2 B/op (-384 B/execution); two-variable recurrences fell from 1,424.4 to 848.2 B/op (-576 B/execution). I64/F64 controls, values, and resource usage are byte-identical; elapsed samples are not claimed. |
 | Allocation-free interpreted numeric-conversion assignments | this commit | `--probe-interpreter-numeric-conversion` | Passed eligible I32->I64, I32->F64, and I64->F64 assignment operands/results through primitive evaluators. Eight-conversion rows remove about 384 B/execution (48 B/conversion) and now match the unary controls byte-for-byte. Debug, async, malformed, and unsupported shapes retain generic behavior. |
+| Allocation-free MessagePack envelope read state | this commit | `--probe-messagepack-envelope-read-state` | Changed the formatter-private synchronous request/response field trackers from heap objects to mutable stack values. Across 1,000,000 warmed decodes, each lane fell exactly from 72,000,000 B (72.0 B/decode) to 0 B. Reverse-order fields, streams, interleaved unknown values, duplicate/missing fields, depth limits, validation, and trailing-byte rejection remain covered; elapsed samples are not claimed. |
 | Lazy interpreter audit envelope | this commit | `--probe-interpreter-audit-envelope` | Deferred the normal run identity and in-memory audit sink for strictly eligible suppressed pure successes. Across 50,000 executions, generated-RunId allocation fell from 848.0 to 784.0 B/op (-64 B/op), while an explicit RunId fell from 816.0 to 784.0 B/op (-32 B/op). Failures and unexpected audit access materialize a real per-run envelope; debug and audited-binding controls remain byte-identical. |
 | Mixed-frame raw assignment state | this commit | `--probe-interpreter-frame-layout` | Allocate assignment state only when a raw slot exists after the leading parameter region; boxed locals retain null/non-null assignment tracking. Across 50,000 raw-parameter-plus-boxed-local executions, allocation fell from 44,402,824 B (888.1 B/op) to 42,802,824 B (856.1 B/op), exactly 32 B/frame. Parameter-only and eight-raw-local controls remain byte-identical, while genuine raw locals preserve `ValidationError` for reads before assignment. |
 | Value-type compiled attempt envelope | this commit | `--probe-compiled-execution-envelope` | Changed the host's private result-or-fallback `CompiledAttempt` from a reference record to a readonly record struct. Across 50,000 warmed public compiled suppressed successes, allocation fell exactly from 42,001,504 B (840.0 B/op) to 40,401,504 B (808.0 B/op), or 32 B/execution. The timing ranges overlap, so this step makes no timing claim. |
@@ -1970,6 +1971,39 @@ usage; x1/x4 rows likewise report 0.0 B/conversion. Timings moved in mixed direc
 latency claim is made. Direct value/resource tests cover all three legal conversions; debug tests require the original
 call/operand trace sequence, and asynchronous operands, operand failures, wrong types, and malformed arity retain their
 generic validation or continuation paths. Public API, compiler/verifier identity, and persisted artifacts are unchanged.
+
+## Allocation-free MessagePack envelope read state
+
+Every MessagePack `RpcRequest` and `RpcResponse` decode previously allocated a private 72-byte field-tracking object.
+The tracker exists only for one synchronous formatter call: it records seen fields, owns or accumulates the result, and
+passes the reader by reference while decoding nested stream values. Making that private state a mutable struct keeps the
+same mutation and validation sequence on the stack; it does not escape, cross an await, implement an interface, or box.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Services.Benchmarks -p:UseSharedCompilation=false -- --probe-messagepack-envelope-read-state
+```
+
+The probe serializes a cached-name request without streams and a successful response without error details, warms both
+lanes for 100,000 decodes, then measures 1,000,000 generic deserializations per lane on the current thread. It folds every
+envelope member into stable checksums and excludes `Stopwatch` construction from allocation totals:
+
+```text
+case                 before B / B/decode       after B / B/decode       checksum
+request envelope     72,000,000 / 72.0                 0 / 0.0         68,000,000
+response envelope    72,000,000 / 72.0                 0 / 0.0         43,000,000
+```
+
+Representative elapsed samples were 224.2/229.9 ms before and 212.1/226.2 ms after for request/response, which is too
+small and process-sensitive for a latency claim. The exact allocation result applies to the fixed formatter state;
+uncached strings, error details, and stream collections may still allocate. A typical unary request/response exchange
+removes 144 B of decode state.
+
+Regressions exercise reverse-ordered fields, stream values, and an interleaved nested unknown field so mutable state,
+reader advancement, and formatter options are all observed together. Existing coverage continues to pin duplicate and
+missing fields, invalid response combinations, malformed names, and unknown-field depth limits; generic and runtime-typed
+controls reject trailing bytes. The wire format and public API are unchanged.
 
 ## Lazy interpreter audit envelope
 
