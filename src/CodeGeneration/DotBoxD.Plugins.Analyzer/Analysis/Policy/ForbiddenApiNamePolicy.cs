@@ -21,7 +21,8 @@ internal static class ForbiddenApiNamePolicy
         "System.Security.Cryptography.CspKeyContainerInfo",
         "System.Security.Cryptography.CspParameters",
         "System.Security.Cryptography.DSACryptoServiceProvider",
-        "System.Security.Cryptography.RSACryptoServiceProvider"
+        "System.Security.Cryptography.RSACryptoServiceProvider",
+        "System.Security.Cryptography.CryptoConfig"
     ];
 
     private static readonly string[] NamespacePrefixes =
