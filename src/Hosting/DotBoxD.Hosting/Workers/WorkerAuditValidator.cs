@@ -170,15 +170,14 @@ internal static class WorkerAuditValidator
         }
 
         binding = resolved;
-        return binding.AuditLevel is not (AuditLevel.None or AuditLevel.Summary);
+        return binding.AuditLevel != AuditLevel.None;
     }
 
     private static bool AuditKindMatchesBinding(string kind, BindingSignature binding)
         => string.Equals(kind, binding.AuditKind, StringComparison.Ordinal);
 
     private static bool CapabilityMatches(SandboxAuditEvent auditEvent, BindingSignature binding)
-        => binding.RequiredCapability is null ||
-           string.Equals(auditEvent.CapabilityId, binding.RequiredCapability, StringComparison.Ordinal);
+        => string.Equals(auditEvent.CapabilityId, binding.RequiredCapability, StringComparison.Ordinal);
 
     private static bool EffectMatches(SandboxAuditEvent auditEvent, BindingSignature binding)
     {
@@ -210,7 +209,7 @@ internal static class WorkerAuditValidator
 
         return DeterministicTimeBindingFieldsMatch(plan, auditEvent) &&
             FieldsAreSafe(auditEvent.Fields!) &&
-            NonNegativeDuration(durationMs);
+            DurationMatchesPlan(plan, durationMs);
     }
 
     private static bool RequiredBindingFieldValuesMatch(
@@ -280,11 +279,19 @@ internal static class WorkerAuditValidator
                value == logicalNow.ToUnixTimeMilliseconds();
     }
 
-    private static bool NonNegativeDuration(string durationMs)
-        => double.TryParse(
+    private static bool DurationMatchesPlan(ExecutionPlan plan, string durationMs)
+    {
+        if (!double.TryParse(
             durationMs,
             NumberStyles.Float,
             CultureInfo.InvariantCulture,
-            out var parsedDuration) &&
-            parsedDuration >= 0;
+            out var parsedDuration) ||
+            !double.IsFinite(parsedDuration) ||
+            parsedDuration < 0)
+        {
+            return false;
+        }
+
+        return !plan.Policy.Deterministic || parsedDuration == 0;
+    }
 }
