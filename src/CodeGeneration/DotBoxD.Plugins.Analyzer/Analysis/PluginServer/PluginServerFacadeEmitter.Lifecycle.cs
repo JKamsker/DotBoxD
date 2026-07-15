@@ -52,7 +52,7 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("                        }");
         builder.AppendLine("                        catch (global::System.Exception disposeEx)");
         builder.AppendLine("                        {");
-        builder.AppendLine("                            startEx.Data[\"DotBoxD.PluginServer.StartCleanupException\"] = disposeEx;");
+        builder.AppendLine("                            startEx.Data[\"PluginServer.StartCleanupException\"] = disposeEx;");
         builder.AppendLine("                        }");
         builder.AppendLine("                    }");
         builder.AppendLine("                    throw;");
