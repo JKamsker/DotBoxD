@@ -36,7 +36,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     private string? TryLowerMapElementGet(ElementAccessExpressionSyntax element, ITypeSymbol receiverType)
     {
         if (element.ArgumentList.Arguments.Count != 1 ||
-            DotBoxDRpcTypeMapper.MapTypes(receiverType) is null)
+            DotBoxDRpcTypeMapper.MapTypes(receiverType) is not { } mapTypes)
         {
             return null;
         }
@@ -45,7 +45,10 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             "map.get",
             null,
             LowerExpression(element.Expression),
-            LowerExpression(element.ArgumentList.Arguments[0].Expression));
+            LowerRequiredExpression(
+                element.ArgumentList.Arguments[0].Expression,
+                mapTypes.Key,
+                "Server extension map key"));
     }
 
     /// <summary>
@@ -61,7 +64,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         }
 
         var receiverType = _model.GetTypeInfo(member.Expression, _cancellationToken).Type;
-        if (receiverType is null || DotBoxDRpcTypeMapper.MapTypes(receiverType) is null)
+        if (receiverType is null || DotBoxDRpcTypeMapper.MapTypes(receiverType) is not { } mapTypes)
         {
             return null;
         }
@@ -73,7 +76,10 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 "map.containsKey",
                 null,
                 LowerExpression(member.Expression),
-                LowerExpression(invocation.ArgumentList.Arguments[0].Expression));
+                LowerRequiredExpression(
+                    invocation.ArgumentList.Arguments[0].Expression,
+                    mapTypes.Key,
+                    "Server extension map key"));
         }
 
         throw new NotSupportedException(
@@ -94,14 +100,22 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         if (element.Expression is not IdentifierNameSyntax mapLocal ||
             element.ArgumentList.Arguments.Count != 1 ||
             receiverType is null ||
-            DotBoxDRpcTypeMapper.MapTypes(receiverType) is null)
+            DotBoxDRpcTypeMapper.MapTypes(receiverType) is not { } mapTypes)
         {
             return null;
         }
 
         var name = mapLocal.Identifier.ValueText;
-        var keyJson = LowerExpressionWithPrelude(element.ArgumentList.Arguments[0].Expression, output);
-        var valueJson = LowerExpressionWithPrelude(valueExpression, output);
+        var keyJson = LowerRequiredExpressionWithPrelude(
+            element.ArgumentList.Arguments[0].Expression,
+            mapTypes.Key,
+            "Server extension map key",
+            output);
+        var valueJson = LowerRequiredExpressionWithPrelude(
+            valueExpression,
+            mapTypes.Value,
+            "Server extension map value",
+            output);
         Allocates = true;
         return SetStatement(name, Call("map.set", null, Var(name), keyJson, valueJson));
     }
