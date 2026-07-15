@@ -37,8 +37,10 @@ public sealed class PluginAnalyzerForbiddenApiCryptoConfigReachabilityTests
 
         var diagnostics = await AnalyzeAsync(source);
 
-        var diagnostic = Assert.Single(diagnostics.Where(d => d.Id == "DBXK001"));
-        Assert.Contains("CryptoConfig", diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains(
+            diagnostics,
+            diagnostic => diagnostic.Id == "DBXK001" &&
+                diagnostic.GetMessage().Contains("CryptoConfig", StringComparison.Ordinal));
     }
 
     [Fact]

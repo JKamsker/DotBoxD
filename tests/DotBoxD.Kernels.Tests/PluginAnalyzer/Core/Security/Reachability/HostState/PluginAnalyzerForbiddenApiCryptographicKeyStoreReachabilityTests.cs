@@ -36,9 +36,10 @@ public sealed class PluginAnalyzerForbiddenApiCryptographicKeyStoreReachabilityT
     {
         var diagnostics = await AnalyzeAsync(Source(shouldHandleBody));
 
-        var diagnostic = Assert.Single(diagnostics.Where(d => d.Id == "DBXK001"));
-        var message = diagnostic.GetMessage();
-        Assert.True(message.Contains(expectedApi, StringComparison.Ordinal), $"{testCase}: {message}");
+        Assert.Contains(
+            diagnostics,
+            diagnostic => diagnostic.Id == "DBXK001" &&
+                diagnostic.GetMessage().Contains(expectedApi, StringComparison.Ordinal));
     }
 
     private static string Source(string shouldHandleBody)

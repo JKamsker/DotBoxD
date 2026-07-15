@@ -155,25 +155,6 @@ public sealed partial class PluginAnalyzer
         => containingTypeName == "System.Security.Cryptography.X509Certificates.X509Chain" &&
            string.Equals(method.Name, "Build", StringComparison.Ordinal);
 
-    private static bool TryGetForbiddenHostApiDisplayName(
-        ISymbol? symbol,
-        out string forbidden)
-    {
-        if (TryGetForbiddenMemberDisplayName(symbol, out forbidden))
-        {
-            return true;
-        }
-
-        if (TryGetForbiddenHostApi(symbol, out var forbiddenType))
-        {
-            forbidden = forbiddenType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-            return true;
-        }
-
-        forbidden = null!;
-        return false;
-    }
-
     private static bool TryGetForbiddenMemberDisplayName(
         ISymbol? symbol,
         out string forbidden)
