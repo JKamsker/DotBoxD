@@ -13,6 +13,7 @@ internal static class ForbiddenApiNamePolicy
         DotBoxDGenerationNames.TypeNames.SystemDelegate, DotBoxDGenerationNames.TypeNames.SystemServiceProvider,
         DotBoxDGenerationNames.TypeNames.SystemType, DotBoxDGenerationNames.TypeNames.SystemUnsafe,
         DotBoxDGenerationNames.TypeNames.SystemArrayPoolOriginal,
+        DotBoxDGenerationNames.TypeNames.SystemComponentModelBackgroundWorker,
         DotBoxDGenerationNames.TypeNames.SystemComponentModelTypeDescriptor,
         "System.ComponentModel.LicenseManager",
         "Microsoft.Win32.Registry", "System.OperatingSystem", "System.Runtime.ProfileOptimization",
