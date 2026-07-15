@@ -10,7 +10,7 @@ namespace DotBoxD.Kernels.Tests.Interpreter.Regression.Performance.LazyAudit;
 public sealed class InterpreterLazyAuditAllocationTests
 {
     private const int WarmupIterations = 2_000;
-    private const int MeasurementIterations = 20_000;
+    private const int MeasurementIterations = 100_000;
 
     [Fact]
     public async Task Pure_suppressed_success_omits_exact_run_id_and_audit_sink_allocations()
