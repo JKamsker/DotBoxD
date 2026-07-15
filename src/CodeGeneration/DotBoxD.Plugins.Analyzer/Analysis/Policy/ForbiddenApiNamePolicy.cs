@@ -42,7 +42,8 @@ internal static class ForbiddenApiNamePolicy
         "System.Threading.Tasks.",
         "System.Timers.", "System.Linq.Expressions.", "System.Security.Cryptography.",
         "System.Security.Principal.", "System.Transactions.",
-        "System.Data.", "Microsoft.CSharp.", "Microsoft.EntityFrameworkCore.", "Microsoft.Win32."
+        "System.Data.", "Microsoft.CSharp.", "Microsoft.VisualBasic.", "Microsoft.EntityFrameworkCore.",
+        "Microsoft.Win32."
     ];
 
     private static readonly string[] ExactMemberNames =
