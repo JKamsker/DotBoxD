@@ -288,7 +288,8 @@ internal sealed class ForbiddenHelperCallGraph
         => type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
 
     private static string DirectDiagnosticKey(ITypeSymbol type)
-        => type.WithNullableAnnotation(NullableAnnotation.NotAnnotated)
+        => (type is INamedTypeSymbol named ? named.OriginalDefinition : type)
+            .WithNullableAnnotation(NullableAnnotation.NotAnnotated)
             .ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
 
     private static ISymbol Normalize(ISymbol symbol)
