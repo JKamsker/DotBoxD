@@ -41,6 +41,9 @@ internal sealed class ForbiddenHelperCallGraph
     public bool TryRecordDirectDiagnostic(IMethodSymbol method, ITypeSymbol type)
         => _directDiagnostics.TryAdd(Normalize(method), DirectDiagnosticKey(type));
 
+    public bool TryRecordDirectDiagnostic(IMethodSymbol method, string displayName)
+        => _directDiagnostics.TryAdd(Normalize(method), displayName);
+
     public void RecordDynamicLocalType(ILocalSymbol local, ITypeSymbol? type)
         => _dynamicHelperCalls.RecordLocalType(local, type);
 
