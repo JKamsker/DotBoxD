@@ -110,7 +110,13 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
             var localName = ReserveGeneratedLocal(
                 "__sir_km_" + invocationId + "_" + ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            AddExpressionPrelude(SetStatement(localName, LowerArgument(argument)));
+            var loweredArgument = argument.Expression is { } argumentExpression
+                ? LowerRequiredExpression(
+                    argumentExpression,
+                    argument.Parameter.Type,
+                    $"[KernelMethod] '{call.Method.Name}' parameter '{argument.Parameter.Name}'")
+                : LiteralJson(argument.Parameter, argument.DefaultValue);
+            AddExpressionPrelude(SetStatement(localName, loweredArgument));
             bindings[argument.Parameter.Name] = new RpcInlinedBinding(
                 Var(localName),
                 expected);
@@ -118,11 +124,6 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
         return bindings;
     }
-
-    private string LowerArgument(BoundKernelMethodArgument argument)
-        => argument.Expression is { } expression
-            ? LowerExpression(expression)
-            : LiteralJson(argument.Parameter, argument.DefaultValue);
 
     private string LiteralJson(IParameterSymbol parameter, object? value)
     {

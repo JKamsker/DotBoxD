@@ -12,6 +12,7 @@ internal static class ForbiddenApiNamePolicy
         DotBoxDGenerationNames.TypeNames.SystemGcSettings, DotBoxDGenerationNames.TypeNames.SystemTimeZoneInfo,
         DotBoxDGenerationNames.TypeNames.SystemDelegate, DotBoxDGenerationNames.TypeNames.SystemServiceProvider,
         DotBoxDGenerationNames.TypeNames.SystemType, DotBoxDGenerationNames.TypeNames.SystemUnsafe,
+        DotBoxDGenerationNames.TypeNames.SystemArrayPoolOriginal,
         DotBoxDGenerationNames.TypeNames.SystemComponentModelTypeDescriptor,
         "Microsoft.Win32.Registry", "System.Security.Principal.WindowsIdentity",
         "System.Security.Cryptography.X509Certificates.X509Store"
@@ -21,7 +22,7 @@ internal static class ForbiddenApiNamePolicy
     [
         "System.IO.", "System.Net.", "System.Reflection.", "System.Runtime.InteropServices.",
         "System.Runtime.Loader.", "System.Diagnostics.", "System.Threading.", "System.Threading.Tasks.",
-        "System.Linq.Expressions.", "System.Security.Principal.", "System.Data.", "Microsoft.CSharp.",
+        "System.Timers.", "System.Linq.Expressions.", "System.Security.Principal.", "System.Data.", "Microsoft.CSharp.",
         "Microsoft.EntityFrameworkCore.", "Microsoft.Win32."
     ];
 

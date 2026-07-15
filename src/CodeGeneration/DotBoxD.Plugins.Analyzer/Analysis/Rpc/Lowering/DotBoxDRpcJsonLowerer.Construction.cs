@@ -27,6 +27,11 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         _reserveGeneratedName = reserveGeneratedName;
         _serverContextParameterName = serverContextParameterName;
         _serverContextType = serverContextType;
+        _serverContextHostBindings = new ServerContextHostBindingResolver(
+            model,
+            serverContextParameterName,
+            serverContextType,
+            cancellationToken);
     }
 
     private string LowerRecordCreation(BaseObjectCreationExpressionSyntax creation)
@@ -227,7 +232,10 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 throw new NotSupportedException($"Server extension initializer for '{named.Name}' must assign named fields.");
             }
             var index = IndexOfField(fields, fieldName.Identifier.ValueText, named);
-            args[index] = HoistInitializerMember(LowerExpression(assignment.Right));
+            args[index] = HoistInitializerMember(LowerRequiredExpression(
+                assignment.Right,
+                fields[index].Type,
+                $"Server extension initializer for '{named.Name}' member '{fields[index].Name}'"));
             assigned[index] = true;
         }
         if (!requireAllFields)
