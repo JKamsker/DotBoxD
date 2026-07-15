@@ -5,7 +5,7 @@
       <DataCollector friendlyName="XPlat Code Coverage">
         <Configuration>
           <Format>cobertura</Format>
-          <Include>[DotBoxD.Kernels*]*,[DotBoxD.Hosting*]*,[DotBoxD.Plugins]*,[DotBoxD.Queryable]*,[DotBoxD.Pushdown.Services]*,[DotBoxD.Services.SourceGenerator]*</Include>
+          <Include>[DotBoxD.Kernels*]*,[DotBoxD.Abstractions]*,[DotBoxD.Hosting*]*,[DotBoxD.Plugins]*,[DotBoxD.Queryable]*,[DotBoxD.Pushdown.Services]*,[DotBoxD.Services.SourceGenerator]*</Include>
           <Exclude>[*.Tests]*,[DotBoxD.Kernels.TestFixtures.*]*,[DotBoxD.Services]*,[DotBoxD.Codecs.MessagePack]*,[DotBoxD.Transports.*]*,[Examples.*]*</Exclude>
           <ExcludeByFile>**/obj/**/*.cs,**/bin/**/*.cs</ExcludeByFile>
           <SingleHit>true</SingleHit>
