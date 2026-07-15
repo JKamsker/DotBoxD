@@ -151,6 +151,26 @@ public sealed class InvokeAsyncSingleRuntimeOperationBoundaryTests
         Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
     }
 
+    [Theory]
+    [InlineData("condition ? left : right")]
+    [InlineData("condition switch { true => left, false => right }")]
+    public void Unsupported_runtime_single_branching_expressions_fail_closed(string expression)
+    {
+        var result = RunGenerator(UsageSource($$"""
+            public static ValueTask<double> Run(RemotePluginServer kernels)
+                => kernels.InvokeAsync(async (IGameWorldAccess world) =>
+                {
+                    bool condition = world.GetHealth("monster-1") > 0;
+                    float left = world.GetScore("left");
+                    float right = world.GetScore("right");
+                    float value = {{expression}};
+                    return (double)value;
+                });
+            """, worldMembers: FloatWorldMember));
+
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+    }
+
     [Fact]
     public void Compile_time_single_arithmetic_remains_supported()
     {
