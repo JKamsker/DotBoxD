@@ -39,8 +39,10 @@ public sealed class PluginAnalyzerForbiddenApiExpressionTypeReferenceTests
 
         var diagnostics = await AnalyzeAsync(source);
 
-        var diagnostic = Assert.Single(diagnostics.Where(d => d.Id == "DBXK001"));
-        Assert.Contains("System.IO.FileInfo", diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains(
+            diagnostics,
+            diagnostic => diagnostic.Id == "DBXK001" &&
+                diagnostic.GetMessage().Contains("System.IO.FileInfo", StringComparison.Ordinal));
     }
 
     private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string source)

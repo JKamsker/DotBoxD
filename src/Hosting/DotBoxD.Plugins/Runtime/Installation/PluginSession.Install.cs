@@ -21,7 +21,7 @@ public sealed partial class PluginSession
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+            ThrowIfDisposed();
             var kernel = await _server.InstallOwnedAsync(this, package, policy, cancellationToken).ConfigureAwait(false);
             _ownedInstallIds.Add(kernel.InstallId);
             return kernel;
@@ -47,7 +47,7 @@ public sealed partial class PluginSession
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+            ThrowIfDisposed();
             var kernel = await _server.InstallOwnedServerExtensionAsync(this, package, policy, cancellationToken).ConfigureAwait(false);
             _ownedInstallIds.Add(kernel.InstallId);
             return kernel;
@@ -150,6 +150,7 @@ public sealed partial class PluginSession
             cancellationToken.ThrowIfCancellationRequested();
 
             wire(staged);
+            ThrowIfDisposed();
             cancellationToken.ThrowIfCancellationRequested();
 
             _server.PromoteOwned(this, staged);
@@ -243,7 +244,7 @@ public sealed partial class PluginSession
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+            ThrowIfDisposed();
             var kernel = await _server.InstallOwnedStagedAsync(this, package, policy, cancellationToken).ConfigureAwait(false);
             _ownedInstallIds.Add(kernel.InstallId);
             return kernel;
@@ -266,7 +267,7 @@ public sealed partial class PluginSession
         _gate.Wait();
         try
         {
-            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+            ThrowIfDisposed();
             if (!_ownedInstallIds.Contains(kernel.InstallId))
             {
                 throw new InvalidOperationException(

@@ -224,6 +224,16 @@ public sealed partial class RpcPeer : IAsyncDisposable, IRpcInvoker
             }
 
             var proxy = GeneratedServiceRegistry.CreateProxy(serviceType, this, out var registrationVersion);
+            if (_disposed != 0)
+            {
+                throw new ObjectDisposedException(nameof(RpcPeer));
+            }
+
+            if (_closed != 0)
+            {
+                throw new ServiceConnectionException("Connection closed.");
+            }
+
             (_proxyCache ??= new Dictionary<Type, ProxyCacheEntry>())[serviceType] =
                 new ProxyCacheEntry(proxy, registrationVersion, registrationVersion);
             return (TService)proxy;
