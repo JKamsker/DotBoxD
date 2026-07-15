@@ -13,8 +13,12 @@ public sealed partial class SandboxContext
         long checkpoint)
     {
         var audit = _audit ?? InitializeAudit();
+        // IsAsync is a declaration hint; with the runtime-async grant a binding may
+        // legitimately return pending even when under-declared, so audit identity
+        // follows the required-audit contract instead. Exact append-and-seal uses the
+        // in-memory sink's private event gate; custom IAuditSink implementations expose
+        // separate Write/Has operations and retain their public checkpoint contract.
         if (descriptor.AuditLevel == AuditLevel.None ||
-            !descriptor.IsAsync ||
             audit is not InMemoryAuditSink inMemoryAudit)
         {
             return new BindingAuditInvocation(checkpoint);
@@ -22,7 +26,7 @@ public sealed partial class SandboxContext
 
         return new BindingAuditInvocation(
             checkpoint,
-            new BindingAuditInvocationSink(this, inMemoryAudit, descriptor, checkpoint));
+            new BindingAuditInvocationSink(this, inMemoryAudit, descriptor));
     }
 
     public void EnsureRequiredBindingSuccessAudit(BindingDescriptor descriptor, long checkpoint)
@@ -101,7 +105,7 @@ public sealed partial class SandboxContext
         var timestamp = AuditTimestamp();
         return new SandboxAuditEvent(
             RunId,
-            "BindingCall",
+            descriptor.AuditKind,
             timestamp,
             Success: false,
             BindingId: descriptor.Id,

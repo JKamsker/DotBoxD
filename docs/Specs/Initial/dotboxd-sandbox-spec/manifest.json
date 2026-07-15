@@ -109,8 +109,8 @@
     },
     {
       "path": "spec/08-runtime-safe-apis.md",
-      "sha256": "09553fd942add976efa0f55fa85f02df57c94788577dc1e9d4f181a6371a9980",
-      "bytes": 8029
+      "sha256": "1222046faf7f998b33af19d4d2517d74baf47d3e08ba468bc909a95f4ad5ba9b",
+      "bytes": 8792
     },
     {
       "path": "spec/09-interpreted-mode.md",
@@ -139,8 +139,8 @@
     },
     {
       "path": "spec/14-observability-audit.md",
-      "sha256": "ff69b34b289b4a1a0955cac717985e1456f55ca605682517bc1c1d22ec95eb6a",
-      "bytes": 5733
+      "sha256": "0673fc0c16eaee7047c924b29260e13339573e6d413ada4c0e28af48e72f814b",
+      "bytes": 6160
     },
     {
       "path": "spec/15-testing-red-team.md",

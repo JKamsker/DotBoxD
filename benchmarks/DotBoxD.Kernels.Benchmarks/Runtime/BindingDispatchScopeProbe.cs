@@ -43,8 +43,9 @@ internal static class BindingDispatchScopeProbe
 
         var context = CreateContext();
         var args = Array.Empty<SandboxValue>();
+        var sw = new Stopwatch();
         var before = GC.GetAllocatedBytesForCurrentThread();
-        var sw = Stopwatch.StartNew();
+        sw.Start();
         for (var i = 0; i < iterations; i++)
         {
             _ = CompiledRuntime.CallBinding(context, BindingId, args);
@@ -65,8 +66,9 @@ internal static class BindingDispatchScopeProbe
 
         var (context, invoker) = CreateAuditedContext(isAsync);
         var args = Array.Empty<SandboxValue>();
+        var sw = new Stopwatch();
         var before = GC.GetAllocatedBytesForCurrentThread();
-        var sw = Stopwatch.StartNew();
+        sw.Start();
         for (var i = 0; i < iterations; i++)
         {
             _ = CompiledRuntime.CallBinding(context, BindingId, args);

@@ -83,6 +83,10 @@ Services, Kernels, and Pushdown.
   disable debug tracing, and declare no binding references now defer their normal run identity and in-memory audit sink
   until audit evidence is actually needed. Failures and unexpected audited access materialize the full envelope, preserving
   event ordering, identity, and resource accounting instead of discarding evidence through a shared no-op sink.
+- **Race-safe required binding audits:** default in-memory audits now give every required-audit call a unique flow identity,
+  including sync-declared bindings that return pending work and calls that fail during preflight. Terminal evidence is
+  claimed by its originating invocation, fallback arbitration shares the destination event gate, and matching late writes
+  are suppressed without shortening the wall-time budget. Custom sinks retain their documented checkpoint contract.
 - **Value-type compiled attempt handoff:** public compiled host executions now carry the private result-or-fallback attempt
   between host helpers in a readonly value envelope, removing one 32-byte object from each successful dispatch. Audited
   successes, compiled failures, verifier fallback, and the public and generated-code ABI remain unchanged.

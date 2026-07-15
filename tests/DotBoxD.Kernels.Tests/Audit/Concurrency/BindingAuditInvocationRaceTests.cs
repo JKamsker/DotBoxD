@@ -12,7 +12,16 @@ public sealed class BindingAuditInvocationRaceTests
 {
     private const string BindingId = "test.async.audit";
 
-    public static TheoryData<ExecutionMode> Modes()
+    public static TheoryData<ExecutionMode, bool> Modes()
+        => new()
+        {
+            { ExecutionMode.Interpreted, true },
+            { ExecutionMode.Compiled, true },
+            { ExecutionMode.Interpreted, false },
+            { ExecutionMode.Compiled, false }
+        };
+
+    public static TheoryData<ExecutionMode> ExecutionModes()
         => new()
         {
             ExecutionMode.Interpreted,
@@ -21,7 +30,9 @@ public sealed class BindingAuditInvocationRaceTests
 
     [Theory]
     [MemberData(nameof(Modes))]
-    public async Task Detailed_terminal_audit_wins_before_runtime_failure_fallback(ExecutionMode mode)
+    public async Task Detailed_terminal_audit_wins_before_runtime_failure_fallback(
+        ExecutionMode mode,
+        bool declaresAsync)
     {
         var entered = NewSignal();
         var release = NewSignal();
@@ -29,17 +40,16 @@ public sealed class BindingAuditInvocationRaceTests
         {
             entered.TrySetResult();
             await release.Task.ConfigureAwait(false);
-            WriteTimeoutAudit(context, "detailed timeout");
+            WriteTimeoutAudit(context, context.Audit, "detailed timeout");
             throw new SandboxRuntimeException(new SandboxError(
                 SandboxErrorCode.Timeout,
                 "binding timed out"));
-        });
+        }, declaresAsync);
         var (host, plan) = await CreateExecutionAsync(descriptor, TimeSpan.FromSeconds(5));
 
+        var releaseAfterEntry = ReleaseFromThreadPoolAfterEntryAsync(entered.Task, release);
         var execution = ExecuteAsync(host, plan, mode);
-        await entered.Task.WaitAsync(TimeSpan.FromSeconds(2));
-        release.TrySetResult();
-
+        await releaseAfterEntry.WaitAsync(TimeSpan.FromSeconds(2));
         var result = await execution.WaitAsync(TimeSpan.FromSeconds(2));
 
         Assert.False(result.Succeeded);
@@ -50,7 +60,9 @@ public sealed class BindingAuditInvocationRaceTests
 
     [Theory]
     [MemberData(nameof(Modes))]
-    public async Task Runtime_fallback_wins_and_suppresses_late_terminal_audit(ExecutionMode mode)
+    public async Task Runtime_fallback_wins_and_suppresses_late_terminal_audit(
+        ExecutionMode mode,
+        bool declaresAsync)
     {
         var entered = NewSignal();
         var releaseAudit = NewSignal();
@@ -58,7 +70,8 @@ public sealed class BindingAuditInvocationRaceTests
         IAuditSink? invocationAudit = null;
         var descriptor = Descriptor(async (context, _, cancellationToken) =>
         {
-            invocationAudit = context.Audit;
+            var cachedAudit = context.Audit;
+            invocationAudit = cachedAudit;
             entered.TrySetResult();
             try
             {
@@ -67,12 +80,13 @@ public sealed class BindingAuditInvocationRaceTests
             catch (OperationCanceledException)
             {
                 await releaseAudit.Task.ConfigureAwait(false);
-                WriteTimeoutAudit(context, "late detailed timeout");
+                WriteTimeoutAudit(context, context.Audit, "late dynamic timeout");
+                WriteTimeoutAudit(context, cachedAudit, "late detailed timeout");
                 auditAttempted.TrySetResult();
             }
 
             return SandboxValue.Unit;
-        });
+        }, declaresAsync);
         var (host, plan) = await CreateExecutionAsync(descriptor, TimeSpan.FromMilliseconds(100));
 
         var execution = ExecuteAsync(host, plan, mode);
@@ -91,14 +105,46 @@ public sealed class BindingAuditInvocationRaceTests
         Assert.Equal(eventsBeforeLateWrite, invocationAudit.EventsWritten);
     }
 
+    [Theory]
+    [MemberData(nameof(ExecutionModes))]
+    public async Task Reentrant_same_descriptor_preflight_failure_owns_terminal_audit(
+        ExecutionMode mode)
+    {
+        var descriptor = Descriptor(
+            static (context, _, _) =>
+            {
+                _ = CompiledRuntime.CallBinding(context, BindingId, []);
+                return ValueTask.FromResult(SandboxValue.Unit);
+            },
+            isAsync: false);
+        var (host, plan) = await CreateExecutionAsync(
+            descriptor,
+            TimeSpan.FromSeconds(5),
+            maxHostCalls: 1);
+
+        var result = await ExecuteAsync(host, plan, mode).WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.QuotaExceeded, result.Error!.Code);
+        var terminal = result.AuditEvents.Where(auditEvent =>
+            auditEvent.BindingId == BindingId &&
+            !auditEvent.Success &&
+            auditEvent.ErrorCode == SandboxErrorCode.QuotaExceeded).ToArray();
+        Assert.Equal(2, terminal.Length);
+        Assert.All(terminal, auditEvent =>
+            Assert.Equal("binding failed before emitting audit", auditEvent.Message));
+        Assert.Equal(2, terminal.Select(auditEvent => auditEvent.SequenceNumber).Distinct().Count());
+    }
+
     private static async Task<(SandboxHost Host, ExecutionPlan Plan)> CreateExecutionAsync(
         BindingDescriptor descriptor,
-        TimeSpan wallTime)
+        TimeSpan wallTime,
+        int maxHostCalls = 10)
     {
         var limits = new ResourceLimits(
             MaxFuel: 10_000,
             MaxAllocatedBytes: 1_000_000,
-            MaxHostCalls: 10,
+            MaxHostCalls: maxHostCalls,
             MaxWallTime: wallTime);
         var policy = SandboxPolicyBuilder.Create().AllowRuntimeAsync().Build() with
         {
@@ -130,7 +176,7 @@ public sealed class BindingAuditInvocationRaceTests
                 })
             .AsTask();
 
-    private static BindingDescriptor Descriptor(BindingInvoker invoke)
+    private static BindingDescriptor Descriptor(BindingInvoker invoke, bool isAsync)
         => new(
             BindingId,
             SemVersion.One,
@@ -144,13 +190,16 @@ public sealed class BindingAuditInvocationRaceTests
             invoke,
             CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)))
         {
-            IsAsync = true
+            IsAsync = isAsync
         };
 
-    private static void WriteTimeoutAudit(SandboxContext context, string message)
+    private static void WriteTimeoutAudit(
+        SandboxContext context,
+        IAuditSink audit,
+        string message)
     {
         var timestamp = DateTimeOffset.UtcNow;
-        context.Audit.Write(new SandboxAuditEvent(
+        audit.Write(new SandboxAuditEvent(
             context.RunId,
             BindingAuditKinds.BindingCall,
             timestamp,
@@ -173,6 +222,17 @@ public sealed class BindingAuditInvocationRaceTests
 
     private static TaskCompletionSource NewSignal()
         => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private static Task ReleaseFromThreadPoolAfterEntryAsync(
+        Task entered,
+        TaskCompletionSource release)
+        // Compiled under-declared async calls synchronously enter their inline pump,
+        // so the releaser must not depend on the blocked xUnit synchronization context.
+        => Task.Run(async () =>
+        {
+            await entered.ConfigureAwait(false);
+            release.TrySetResult();
+        });
 
     private static string ModuleJson()
         => """

@@ -2,62 +2,56 @@ using DotBoxD.Kernels.Bindings;
 
 namespace DotBoxD.Kernels.Sandbox;
 
+internal abstract class BindingAuditInvocationFlowNode
+{
+    internal abstract BindingAuditInvocationSink Invocation { get; }
+    internal abstract BindingAuditInvocationFlowNode? Previous { get; }
+}
+
+internal sealed class BindingAuditInvocationFlowLink(
+    BindingAuditInvocationSink invocation,
+    BindingAuditInvocationFlowNode? previous) : BindingAuditInvocationFlowNode
+{
+    internal override BindingAuditInvocationSink Invocation { get; } = invocation;
+    internal override BindingAuditInvocationFlowNode? Previous { get; } = previous;
+}
+
 /// <summary>
 /// Serializes terminal audit writes with the runtime's required-audit decision for one
-/// async binding invocation. The current invocation flows into the binding's async
+/// binding invocation. The current invocation flows into the binding's async
 /// continuation so a terminal write that loses to the runtime fallback can be rejected.
 /// </summary>
-internal sealed class BindingAuditInvocationSink : IAuditSink
+internal sealed class BindingAuditInvocationSink : BindingAuditInvocationFlowNode, IAuditSink
 {
-    private static readonly AsyncLocal<BindingAuditInvocationSink?> CurrentInvocation = new();
+    private static readonly AsyncLocal<BindingAuditInvocationFlowNode?> CurrentInvocation = new();
 
-    private readonly object _gate = new();
     private readonly SandboxContext _context;
     private readonly InMemoryAuditSink _destination;
     private readonly BindingDescriptor _descriptor;
-    private readonly long _checkpoint;
-    private readonly BindingAuditInvocationSink? _previous;
+    private readonly BindingAuditInvocationFlowNode? _previous;
+    private ulong _failureEvidence;
+    private bool _hasSuccessEvidence;
     private bool _sealed;
-    private bool _suppressSuccess;
-    private SandboxErrorCode? _suppressedFailureCode;
 
     internal BindingAuditInvocationSink(
         SandboxContext context,
         InMemoryAuditSink destination,
-        BindingDescriptor descriptor,
-        long checkpoint)
+        BindingDescriptor descriptor)
     {
         _context = context;
         _destination = destination;
         _descriptor = descriptor;
-        _checkpoint = checkpoint;
         _previous = CurrentInvocation.Value;
         CurrentInvocation.Value = this;
     }
 
-    public long EventsWritten
-    {
-        get
-        {
-            lock (_gate)
-            {
-                return _destination.EventsWritten;
-            }
-        }
-    }
+    internal override BindingAuditInvocationSink Invocation => this;
+    internal override BindingAuditInvocationFlowNode? Previous => _previous;
+
+    public long EventsWritten => _destination.EventsWritten;
 
     public void Write(SandboxAuditEvent auditEvent)
-    {
-        ArgumentNullException.ThrowIfNull(auditEvent);
-
-        lock (_gate)
-        {
-            if (!IsSuppressedTerminal(auditEvent))
-            {
-                _destination.Write(auditEvent);
-            }
-        }
-    }
+        => _destination.WriteBindingInvocation(this, auditEvent);
 
     public bool HasBindingAuditSince(
         BindingDescriptor descriptor,
@@ -67,27 +61,22 @@ internal sealed class BindingAuditInvocationSink : IAuditSink
         SandboxRunId runId,
         string moduleHash,
         string policyHash)
-    {
-        lock (_gate)
-        {
-            return _destination.HasBindingAuditSince(
-                descriptor,
-                checkpoint,
-                success,
-                expectedErrorCode,
-                runId,
-                moduleHash,
-                policyHash);
-        }
-    }
+        => _destination.HasBindingAuditSince(
+            descriptor,
+            checkpoint,
+            success,
+            expectedErrorCode,
+            runId,
+            moduleHash,
+            policyHash);
 
     internal static BindingAuditInvocationSink? CurrentFor(SandboxContext context)
     {
-        for (var current = CurrentInvocation.Value; current is not null; current = current._previous)
+        for (var current = CurrentInvocation.Value; current is not null; current = current.Previous)
         {
-            if (ReferenceEquals(current._context, context))
+            if (ReferenceEquals(current.Invocation._context, context))
             {
-                return current;
+                return current.Invocation;
             }
         }
 
@@ -95,87 +84,115 @@ internal sealed class BindingAuditInvocationSink : IAuditSink
     }
 
     internal bool TrySealSuccess()
-    {
-        lock (_gate)
-        {
-            var hasRequiredAudit = HasRequiredAudit(success: true, null);
-            Seal(success: true, null);
-            return hasRequiredAudit;
-        }
-    }
+        => _destination.TrySealBindingInvocationSuccess(this);
 
     internal void EnsureFailure(SandboxErrorCode errorCode)
-    {
-        lock (_gate)
-        {
-            if (!HasRequiredAudit(success: false, errorCode))
-            {
-                _destination.Write(_context.CreateRequiredBindingFailureAudit(_descriptor, errorCode));
-            }
-
-            Seal(success: false, errorCode);
-        }
-    }
+        => _destination.EnsureBindingInvocationFailure(this, errorCode);
 
     internal void Exit()
     {
-        if (ReferenceEquals(CurrentInvocation.Value, this))
+        var current = CurrentInvocation.Value;
+        if (current is null)
         {
-            CurrentInvocation.Value = _previous;
+            return;
+        }
+
+        if (ReferenceEquals(current.Invocation, this))
+        {
+            CurrentInvocation.Value = current.Previous;
+            return;
+        }
+
+        var updated = RemoveFromFlow(current, this, out var removed);
+        if (removed)
+        {
+            CurrentInvocation.Value = updated;
         }
     }
 
-    private bool HasRequiredAudit(bool success, SandboxErrorCode? errorCode)
-        => _destination.HasBindingAuditSince(
-            _descriptor,
-            _checkpoint,
-            success,
-            errorCode,
-            _context.RunId,
-            _context.ModuleHash,
-            _context.PolicyHash);
+    internal bool ShouldSuppressTerminalUnderLock(SandboxAuditEvent auditEvent)
+        => _sealed && MatchesInvocationTerminalIdentity(auditEvent);
 
-    private bool IsSuppressedTerminal(SandboxAuditEvent auditEvent)
+    internal void RecordTerminalEvidenceUnderLock(SandboxAuditEvent auditEvent)
     {
-        if (!_sealed)
+        if (!IsRequiredTerminalEvidence(auditEvent))
         {
-            return false;
+            return;
         }
 
-        if (_suppressSuccess && BindingAuditMatches(auditEvent, success: true, null))
+        if (auditEvent.Success)
         {
-            return true;
+            _hasSuccessEvidence = true;
         }
-
-        return _suppressedFailureCode is { } errorCode &&
-               BindingAuditMatches(auditEvent, success: false, errorCode);
+        else if (auditEvent.ErrorCode is { } errorCode)
+        {
+            _failureEvidence |= FailureCodeBit(errorCode);
+        }
     }
 
-    private bool BindingAuditMatches(
-        SandboxAuditEvent auditEvent,
-        bool success,
-        SandboxErrorCode? errorCode)
+    internal bool TrySealSuccessUnderLock()
+    {
+        _sealed = true;
+        return _hasSuccessEvidence;
+    }
+
+    internal bool HasFailureEvidenceUnderLock(SandboxErrorCode errorCode)
+        => (_failureEvidence & FailureCodeBit(errorCode)) != 0;
+
+    internal void RecordFailureEvidenceUnderLock(SandboxErrorCode errorCode)
+        => _failureEvidence |= FailureCodeBit(errorCode);
+
+    internal SandboxAuditEvent CreateRequiredFailureAudit(SandboxErrorCode errorCode)
+        => _context.CreateRequiredBindingFailureAudit(_descriptor, errorCode);
+
+    internal void SealUnderLock() => _sealed = true;
+
+    private bool MatchesInvocationTerminalIdentity(SandboxAuditEvent auditEvent)
+        => auditEvent.RunId == _context.RunId &&
+           StringComparer.Ordinal.Equals(auditEvent.Kind, _descriptor.AuditKind) &&
+           StringComparer.Ordinal.Equals(auditEvent.BindingId, _descriptor.Id);
+
+    private bool IsRequiredTerminalEvidence(SandboxAuditEvent auditEvent)
         => InMemoryAuditSink.BindingAuditMatches(
             auditEvent,
             _descriptor,
-            success,
-            errorCode,
+            auditEvent.Success,
+            auditEvent.ErrorCode,
             _context.RunId,
             _context.ModuleHash,
             _context.PolicyHash);
 
-    private void Seal(bool success, SandboxErrorCode? errorCode)
+    private static ulong FailureCodeBit(SandboxErrorCode errorCode)
     {
-        if (success)
+        // All current error codes fit in one allocation-free mask. Future codes
+        // outside the mask fail closed because their evidence cannot be claimed.
+        var code = (int)errorCode;
+        return (uint)code < 64 ? 1UL << code : 0;
+    }
+
+    // Rebuild only this ExecutionContext's chain. Detached continuations keep their
+    // original nodes and still route late terminal writes through the sealed wrapper.
+    private static BindingAuditInvocationFlowNode? RemoveFromFlow(
+        BindingAuditInvocationFlowNode current,
+        BindingAuditInvocationSink removed,
+        out bool found)
+    {
+        if (ReferenceEquals(current.Invocation, removed))
         {
-            _suppressSuccess = true;
-        }
-        else
-        {
-            _suppressedFailureCode = errorCode;
+            found = true;
+            return current.Previous;
         }
 
-        _sealed = true;
+        if (current.Previous is null)
+        {
+            found = false;
+            return current;
+        }
+
+        var previous = RemoveFromFlow(current.Previous, removed, out found);
+        return found
+            ? new BindingAuditInvocationFlowLink(current.Invocation, previous)
+            : current;
     }
 }
 

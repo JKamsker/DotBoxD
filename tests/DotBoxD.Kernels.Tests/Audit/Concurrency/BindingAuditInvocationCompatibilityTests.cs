@@ -79,6 +79,34 @@ public sealed class BindingAuditInvocationCompatibilityTests
         Assert.Equal("custom success", success.Message);
     }
 
+    [Fact]
+    public void In_memory_fallback_uses_custom_descriptor_audit_kind()
+    {
+        var descriptor = Descriptor() with { AuditKind = BindingAuditKinds.SandboxLog };
+        var audit = new InMemoryAuditSink();
+        var context = CreateContext(descriptor, audit);
+        using var invocation = context.BeginBindingAuditInvocation(descriptor, context.AuditCheckpoint());
+
+        context.EnsureRequiredBindingFailureAudit(descriptor, invocation, SandboxErrorCode.Timeout);
+        context.EnsureRequiredBindingFailureAudit(descriptor, invocation, SandboxErrorCode.Timeout);
+
+        Assert.Equal(BindingAuditKinds.SandboxLog, Assert.Single(audit.Events).Kind);
+    }
+
+    [Fact]
+    public void Custom_sink_fallback_uses_custom_audit_kind_and_remains_idempotent()
+    {
+        var descriptor = Descriptor() with { AuditKind = BindingAuditKinds.SandboxLog };
+        var audit = new ForwardingAuditSink();
+        var context = CreateContext(descriptor, audit);
+        using var invocation = context.BeginBindingAuditInvocation(descriptor, context.AuditCheckpoint());
+
+        context.EnsureRequiredBindingFailureAudit(descriptor, invocation, SandboxErrorCode.Timeout);
+        context.EnsureRequiredBindingFailureAudit(descriptor, invocation, SandboxErrorCode.Timeout);
+
+        Assert.Equal(BindingAuditKinds.SandboxLog, Assert.Single(audit.Events).Kind);
+    }
+
     private static async Task WriteSuccessAfterAsync(
         SandboxContext context,
         Task release,

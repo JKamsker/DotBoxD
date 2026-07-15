@@ -5,10 +5,14 @@
     <Description>DotBoxD.Kernels interpreted execution backend for validated IR modules.</Description>
     <PackageTags>dotboxd;sandbox;interpreter;execution</PackageTags>
   </PropertyGroup>
-<ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\DotBoxD.Kernels\DotBoxD.Kernels.csproj" />
     <ProjectReference Include="..\DotBoxD.Kernels.Validation\DotBoxD.Kernels.Validation.csproj" />
     <ProjectReference Include="..\DotBoxD.Kernels.Runtime\DotBoxD.Kernels.Runtime.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DotBoxD.Kernels.Tests" />
   </ItemGroup>
 
   <PropertyGroup>

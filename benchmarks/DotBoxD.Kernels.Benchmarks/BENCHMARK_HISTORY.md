@@ -202,6 +202,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Value-type I32 comparison plans | this commit | `--probe-interpreter-while-plan-setup`, `--probe-interpreter-branched-plan-setup` | Embedded the immutable two-operand comparison plan in its owning loop plan. Across 50,000 executions, I32 `while` and branched rows fell exactly from 1,168.3 to 1,128.3 B/op and 1,456.3 to 1,416.3 B/op. F64 branched planning fell from 1,840.5 to 1,760.5 B/op because both its rejected I32 attempt and selected F64 plan stop allocating a 40-byte comparison object. Checksums and resource usage are unchanged; elapsed samples are not claimed. |
 | Copy-on-write live-state synchronizer snapshots | this commit | `--probe-live-state-sync` | Published a new immutable synchronizer array only when class-shaped live state registers, removing the hot per-input/per-flush clone. Across 1,000,000 input synchronizations, Sync x1/x8 fell from 32/88 to 0/0 B/call and AsyncSet x1/x8 from 120/264 to 88/176 B/call. The exact snapshot savings are 32 B with one synchronizer and 88 B with eight; concurrent visibility, callback lock boundaries, deferred-list ownership, and flush semantics remain pinned. |
 | Value-type I64 plan slot-read state | this commit | `--probe-interpreter-i64-plan-setup` | Replaced captured slot-read predicates with a readonly frame/earlier-target state threaded through recursive I64 planning. Across 50,000 executions, a single plan fell from 1,184.3 to 1,120.3 B/op (-64 B) and a two-assignment plan from 1,760.5 to 1,600.5 B/op (-160 B). Same-plan zero-loop and source-ordered earlier-target controls isolate setup and preserve the fast path; values and resource usage are unchanged, and elapsed time is not claimed. |
+| Invocation-owned binding audit arbitration | this commit | `--probe-binding-dispatch-scope` | Reused the in-memory destination's event-list gate and removed global checkpoint ownership from the committed async audit wrapper. Across four fresh 500,000-call processes, the async-completed median fell from 320.8 to 280.8 B/call (-40.0 B), while no-audit stayed at 144 total bytes. Sound identity now also covers supported sync-declared pending calls, intentionally moving declared-sync audited calls from 144.8 to 280.8 B/call (+136.0 B). No timing claim is made. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -2311,3 +2312,48 @@ Checksums, preorder fuel, loop iterations, sandbox allocation, and host calls ar
 source ordering, a forged later-target read-before-assignment failure, checked overflow, and all-or-nothing fallback when
 one multi-body expression is unsupported. Elapsed samples varied by process, so this step makes no timing claim and changes
 no public API, generated ABI, verifier identity, persisted artifact, or sandbox contract.
+
+## Invocation-owned binding audit arbitration
+
+Required binding audit enforcement must decide atomically whether the binding's detailed terminal event or the runtime's
+sanitized fallback wins. The committed first implementation gave declared-async calls an invocation wrapper, but each
+wrapper allocated a private gate and searched the shared destination after a global checkpoint. Overlapping same-descriptor
+calls could therefore claim one event twice, and a wall-time cancellation could race a late detailed write into two events.
+It also missed the supported case where `IsAsync=false` returns pending work under an explicit runtime-async grant.
+
+Every required-audit call on the default `InMemoryAuditSink` now receives a unique writer identity before validation,
+charging, or async-grant checks. Writes append and claim evidence under the destination's existing event-list gate; seal and
+fallback use that same gate and consult only the wrapper's local claims. Sealed wrappers suppress later terminal writes for
+their run/kind/binding identity while preserving supplementary audit kinds. An immutable `AsyncLocal` flow chain keeps the
+identity in detached continuations without pooling retained wrappers; rare out-of-order disposal rebuilds only that flow's
+chain. Reentrant preflight failures consequently own their own fallback instead of donating it to an outer call.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-binding-dispatch-scope
+```
+
+Four fresh Release processes, 500,000 calls each, produced these median totals after moving the probe's `Stopwatch` outside
+the allocation interval:
+
+```text
+case                       committed baseline        final total / B/call        delta/call
+no audit                              144 B                     144 B                  0 B
+audited declared sync      72,396,880 / 144.8       140,389,548 / 280.8          +136.0 B
+audited async-completed   160,391,072 / 320.8       140,389,924 / 280.8           -40.0 B
+```
+
+The async lane is the like-for-like allocation improvement: sharing the destination gate and shrinking the owner state
+removes about 40 B/call from the committed wrapper. The sync increase is deliberate and reported separately. Runtime async
+semantics allow a sync-declared binding to return pending work, so sound identity must exist before `Invoke`; it cannot be
+installed after observing the `ValueTask` without losing aliases already captured by its continuation. No-audit calls do
+not create the wrapper and remain allocation-identical. Elapsed samples varied by process, so no timing claim is made.
+
+Regressions cover interpreted and compiled declared/under-declared races, dynamic and cached late sink lookup, all current
+error codes, malformed and contradictory terminals, overlapping and sequential same-descriptor calls, raw-destination
+fail-closed behavior, nested preflight quota failures, fallback idempotence, and detached/out-of-order flow cleanup. Stress
+runs passed 260/260 race/deadline cases, and the broader audit/async/network filter passed 919/919. Custom `IAuditSink`
+implementations retain their public checkpoint contract and own cross-invocation concurrency/atomic persistence because the
+current interface has no invocation token; bindings must resolve `SandboxContext.Audit` for each call. No public API,
+generated ABI, verifier identity, persisted artifact, sandbox resource accounting, or wall-time limit changes.
