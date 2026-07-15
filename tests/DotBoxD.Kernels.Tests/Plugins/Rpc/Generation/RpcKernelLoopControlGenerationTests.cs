@@ -1,3 +1,4 @@
+using DotBoxD.Kernels.Debugging;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
@@ -12,7 +13,7 @@ namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 /// </summary>
 public sealed class RpcKernelLoopControlGenerationTests
 {
-    private const string SumPositivesContinueSource = """
+    internal const string SumPositivesContinueSource = """
         using System.Collections.Generic;
         using DotBoxD.Kernels;
         using DotBoxD.Kernels.Sandbox;
@@ -78,6 +79,24 @@ public sealed class RpcKernelLoopControlGenerationTests
         var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(SumUntilNegativeBreakSource);
 
         Assert.DoesNotContain(diagnostics, d => d.Id == "DBXK100");
+    }
+
+    [Fact]
+    public void Server_extension_loop_emits_precise_local_debug_metadata()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create(
+            SumPositivesContinueSource,
+            "Sample.LoopContinuePluginPackage");
+
+        var debugInfo = Assert.IsType<KernelDebugInfo>(package.DebugInfo);
+        var document = Assert.Single(debugInfo.Documents);
+        Assert.True(document.MatchesSource(SumPositivesContinueSource));
+        Assert.Contains(debugInfo.VariableBindings, binding => binding.SourceName == "values");
+        var locations = debugInfo.SequencePoints
+            .Select(point => (point.Span.Line, point.Span.Column, point.Span.EndLine, point.Span.EndColumn))
+            .Distinct()
+            .ToArray();
+        Assert.True(locations.Length > 5);
     }
 
     [Fact]

@@ -26,7 +26,10 @@ internal static class PluginModelCopy
         return new PluginPackage(
             Manifest(package.Manifest),
             Module(package.Module),
-            Entrypoints(package.Entrypoints));
+            Entrypoints(package.Entrypoints))
+        {
+            DebugInfo = package.DebugInfo
+        };
     }
 
     public static PluginManifest Manifest(PluginManifest manifest)

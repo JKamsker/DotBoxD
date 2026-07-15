@@ -1081,6 +1081,20 @@ branched f64 loop                 1.5 ms      6.6 ms   4.5       39.2 ms   26.7
 The `while loop` row is the new guarded modulo-index closed form. The `branch in loop` row now has an O(1)
 success path for same-direction modulo-branch deltas and an exact per-iteration fallback for unsafe cases.
 
+## Detached interpreter debug checkpoint branches (2026-07-10)
+
+Added `DetachedDebugCheckpointBenchmarks` to compare otherwise identical detached interpreter executions with
+1 and 1,024 statement/expression checkpoint sites. A short local .NET 10 Arm64 run measured 1.482 us / 6.13 KB
+and 21.436 us / 6.21 KB respectively. The 1023 additional sites added about 80 bytes total per execution, not
+an allocation per node; execution time necessarily scales because the interpreter still evaluates each unit
+statement. `DetachedDebugAllocationTests` ratchets this property with a 128-byte fixed-noise allowance.
+
+Command:
+
+```text
+dotnet run -c Release --no-build --project benchmarks/DotBoxD.Kernels.Benchmarks/DotBoxD.Kernels.Benchmarks.csproj -- --filter '*DetachedDebugCheckpointBenchmarks*' --job short --warmupCount 3 --iterationCount 5
+```
+
 ## Prepared-plan interpreter frame layouts
 
 `InterpreterEvaluator` previously owned the only frame-layout cache, but a new evaluator is created for every

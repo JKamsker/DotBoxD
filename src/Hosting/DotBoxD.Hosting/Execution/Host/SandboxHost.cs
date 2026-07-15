@@ -73,8 +73,7 @@ public sealed partial class SandboxHost : IDisposable
         return ValueTask.FromResult(plan);
     }
 
-    internal IReadOnlyList<string> GetRequiredCapabilities(SandboxModule module)
-        => GetRequiredCapabilities(module, policy: null);
+    internal IReadOnlyList<string> GetRequiredCapabilities(SandboxModule module) => GetRequiredCapabilities(module, policy: null);
 
     internal IReadOnlyList<string> GetRequiredCapabilities(
         SandboxModule module,
@@ -114,10 +113,8 @@ public sealed partial class SandboxHost : IDisposable
         }
 
         var result = options.Isolation == SandboxIsolation.WorkerProcess
-            ? await _workerExecutor.ExecuteAsync(plan, entrypoint, input, options, cancellationToken)
-                .ConfigureAwait(false)
-            : await ExecuteSelectedModeAsync(plan, entrypoint, input, options, cancellationToken)
-                .ConfigureAwait(false);
+            ? await _workerExecutor.ExecuteAsync(plan, entrypoint, input, options, cancellationToken).ConfigureAwait(false)
+            : await ExecuteSelectedModeAsync(plan, entrypoint, input, options, cancellationToken).ConfigureAwait(false);
         ThrowIfDisposed();
         return Publish(result);
     }
@@ -175,6 +172,15 @@ public sealed partial class SandboxHost : IDisposable
             return true;
         }
 
+        if (options.DebugHook is not null && options.Isolation == SandboxIsolation.WorkerProcess)
+        {
+            result = InvalidExecutionOptionsResult(
+                plan,
+                options,
+                "worker-process interpreter debugging is not supported by protocol version 1");
+            return true;
+        }
+
         if (TryGetCapabilityDenial(plan, entrypoint, out var denial))
         {
             result = CapabilityDeniedResult(plan, options, denial);
@@ -191,9 +197,7 @@ public sealed partial class SandboxHost : IDisposable
         return false;
     }
 
-    private static SandboxExecutionResult PreDispatchCancelledResult(
-        ExecutionPlan plan,
-        SandboxExecutionOptions options)
+    private static SandboxExecutionResult PreDispatchCancelledResult(ExecutionPlan plan, SandboxExecutionOptions options)
     {
         var runId = options.RunId ?? SandboxRunId.New();
         var budget = new ResourceMeter(plan.Budget);

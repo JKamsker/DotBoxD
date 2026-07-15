@@ -38,7 +38,7 @@ internal sealed class RemotePipelineIr
             return package;
         }
 
-        var module = LoweredPipelineComposer.Compose(new LoweredPipelineComposition(
+        var composed = LoweredPipelineDebugComposer.Compose(new LoweredPipelineComposition(
             package.Module.Id,
             _steps,
             handle.ReturnType)
@@ -48,12 +48,14 @@ internal sealed class RemotePipelineIr
             ShouldHandleFunctionId = package.Entrypoints.ShouldHandle,
             HandleFunctionId = package.Entrypoints.Handle,
         });
+        var module = composed.Module;
         module = module with { Metadata = Merge(package.Module.Metadata, module.Metadata) };
 
         return PluginPackage.Create(
             MergeManifestStepMetadata(package.Manifest),
             module,
-            package.Entrypoints);
+            package.Entrypoints,
+            composed.DebugInfo);
     }
 
     private RemotePipelineIr AppendStep(LoweredPipelineStep step)

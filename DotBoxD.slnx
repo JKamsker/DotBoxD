@@ -38,6 +38,7 @@
     <Project Path="src/Kernels/DotBoxD.Kernels.Compiler/DotBoxD.Kernels.Compiler.csproj" />
     <Project Path="src/Kernels/DotBoxD.Kernels.Verifier/DotBoxD.Kernels.Verifier.csproj" />
     <Project Path="src/Kernels/DotBoxD.Kernels.Serialization.Json/DotBoxD.Kernels.Serialization.Json.csproj" />
+    <Project Path="src/Kernels/DotBoxD.Kernels.Debugging.Clr/DotBoxD.Kernels.Debugging.Clr.csproj" />
   </Folder>
 
   <Folder Name="/src/Hosting/">
@@ -81,13 +82,14 @@
   </Folder>
 
   <Folder Name="/tools/">
+    <Project Path="tools/DotBoxD.DebugAdapter/DotBoxD.DebugAdapter.csproj" />
     <Project Path="tools/AgentQueue/src/AgentQueue/AgentQueue.csproj" />
     <Project Path="tools/AgentQueue/tests/AgentQueue.Tests/AgentQueue.Tests.csproj" />
     <Project Path="tools/Fuzzing/DotBoxD.Fuzzing/DotBoxD.Fuzzing.csproj" />
   </Folder>
 
   <Properties Name="Visual Studio">
-    <Property Name="OpenWith" Value="17" />
+    <Property Name="OpenWith" Value="18" />
   </Properties>
 
 </Solution>

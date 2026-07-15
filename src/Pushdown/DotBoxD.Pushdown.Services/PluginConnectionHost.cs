@@ -1,4 +1,5 @@
 using DotBoxD.Plugins;
+using DotBoxD.Plugins.Debugging;
 using DotBoxD.Services.Peer;
 using DotBoxD.Services.Server;
 using DotBoxD.Services.Transport;
@@ -30,6 +31,7 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
 
     private RpcHost _host = null!;
     private PluginSession? _session;
+    private PluginDebugSession? _debugSession;
     private int _accepted;
     private int _sessionDisposed;
 
@@ -57,12 +59,49 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
         Func<RpcPeer, PluginSession, TConnection> configure,
         RpcPeerOptions? options = null)
     {
+        return StartAsync(server, pipeName, configure, new PluginConnectionDebugOptions(Enabled: false), options);
+    }
+
+    /// <summary>
+    /// Starts a named-pipe connection host and optionally provisions the authenticated duplex debug endpoint on
+    /// the same protected peer connection.
+    /// </summary>
+    public static Task<PluginConnectionHost<TConnection>> StartAsync(
+        PluginServer server,
+        string pipeName,
+        Func<RpcPeer, PluginSession, TConnection> configure,
+        PluginConnectionDebugOptions debugOptions,
+        RpcPeerOptions? options = null)
+        => StartAsync(
+            server,
+            pipeName,
+            configure,
+            debugOptions,
+            NamedPipeTransportOptions.Default,
+            options);
+
+    /// <summary>Starts a named-pipe host with explicit transport and peer options for long-lived sessions.</summary>
+    public static Task<PluginConnectionHost<TConnection>> StartAsync(
+        PluginServer server,
+        string pipeName,
+        Func<RpcPeer, PluginSession, TConnection> configure,
+        PluginConnectionDebugOptions debugOptions,
+        NamedPipeTransportOptions transportOptions,
+        RpcPeerOptions? options = null)
+    {
         ArgumentException.ThrowIfNullOrEmpty(pipeName);
+        ArgumentNullException.ThrowIfNull(debugOptions);
+        ArgumentNullException.ThrowIfNull(transportOptions);
         return StartCoreAsync(
             server,
             pipeName,
             configure,
-            configurePeer => RpcMessagePackIpc.ListenNamedPipe(pipeName, configurePeer, options));
+            debugOptions,
+            configurePeer => RpcMessagePackIpc.ListenNamedPipe(
+                pipeName,
+                configurePeer,
+                transportOptions,
+                options));
     }
 
     /// <summary>
@@ -76,11 +115,27 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
         Func<RpcPeer, PluginSession, TConnection> configure,
         RpcPeerOptions? options = null)
     {
+        return StartAsync(server, transport, configure, new PluginConnectionDebugOptions(Enabled: false), options);
+    }
+
+    /// <summary>
+    /// Starts a transport-agnostic connection host and optionally provisions the authenticated duplex debug
+    /// endpoint on the same protected peer connection.
+    /// </summary>
+    public static Task<PluginConnectionHost<TConnection>> StartAsync(
+        PluginServer server,
+        IServerTransport transport,
+        Func<RpcPeer, PluginSession, TConnection> configure,
+        PluginConnectionDebugOptions debugOptions,
+        RpcPeerOptions? options = null)
+    {
         ArgumentNullException.ThrowIfNull(transport);
+        ArgumentNullException.ThrowIfNull(debugOptions);
         return StartCoreAsync(
             server,
             pipeName: string.Empty,
             configure,
+            debugOptions,
             configurePeer => RpcMessagePackIpc.Listen(transport, configurePeer, options));
     }
 
@@ -88,6 +143,7 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
         PluginServer server,
         string pipeName,
         Func<RpcPeer, PluginSession, TConnection> configure,
+        PluginConnectionDebugOptions debugOptions,
         Func<Action<RpcPeer>, RpcHost> listen)
     {
         ArgumentNullException.ThrowIfNull(server);
@@ -124,6 +180,13 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
                     self._disconnected.TrySetResult();
                 };
 
+                if (debugOptions.Enabled)
+                {
+                    var events = new PluginDebugEventRpcAdapter(peer.GetPluginDebugEvents());
+                    self._debugSession = session.CreateDebugSession(events);
+                    peer.ProvidePluginDebugControl(new PluginDebugControlRpcAdapter(self._debugSession));
+                }
+
                 var connection = configure(peer, session);
                 self._connected.TrySetResult(connection);
             }
@@ -134,6 +197,7 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
                 self._disconnected.TrySetException(ex);
             }
         });
+        self._host.PeerConnected += (_, _) => self.StartDebugBootstrap();
         try
         {
             await self._host.StartAsync().ConfigureAwait(false);
@@ -153,6 +217,26 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
         }
 
         return self;
+    }
+
+    private void StartDebugBootstrap()
+    {
+        if (_debugSession is not null)
+        {
+            _ = PublishDebugBootstrapAsync(_debugSession);
+        }
+    }
+
+    private static async Task PublishDebugBootstrapAsync(PluginDebugSession debugSession)
+    {
+        try
+        {
+            await debugSession.PublishBootstrapAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            debugSession.Dispose();
+        }
     }
 
     private void DisposeSessionOnce()

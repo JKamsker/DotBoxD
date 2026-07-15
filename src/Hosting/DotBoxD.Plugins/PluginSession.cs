@@ -156,6 +156,7 @@ public sealed partial class PluginSession : IDisposable, IAsyncDisposable
         _gate.Wait();
         try
         {
+            DisposeDebugSession();
             owned = [.. _ownedInstallIds];
             _ownedInstallIds.Clear();
         }

@@ -38,6 +38,7 @@ internal static partial class PluginServerFacadeModelFactory
             "InstallPluginPackageAsync",
             "InstallSubscriptionPackageAsync",
             "InstallServerExtensionPackageAsync",
+            "PrepareDebugPackageAsync",
             "Equals",
             "GetHashCode",
             "GetType",

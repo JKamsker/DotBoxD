@@ -20,7 +20,7 @@ public sealed partial class SandboxHost
             return PreDispatchCancelledResult(plan, options);
         }
 
-        if (!_compiled.IsAvailable || options.EnableDebugTrace)
+        if (!_compiled.IsAvailable || options.RequiresInterpreter)
         {
             return await ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken)
                 .ConfigureAwait(false);

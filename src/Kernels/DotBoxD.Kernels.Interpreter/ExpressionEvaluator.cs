@@ -1,3 +1,5 @@
+using DotBoxD.Kernels.Debugging;
+using DotBoxD.Kernels.Interpreter.Debugging;
 using DotBoxD.Kernels.Interpreter.Frame;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
@@ -13,19 +15,22 @@ internal sealed partial class ExpressionEvaluator
     private readonly IReadOnlyDictionary<string, FunctionAnalysis> _functionAnalysis;
     private readonly SandboxExecutionOptions _options;
     private readonly string _moduleHash;
+    private readonly InterpreterDebugState? _debug;
 
     public ExpressionEvaluator(
         SandboxContext context,
         InterpreterEvaluator interpreter,
         IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis,
         SandboxExecutionOptions options,
-        string moduleHash)
+        string moduleHash,
+        InterpreterDebugState? debug)
     {
         _context = context;
         _interpreter = interpreter;
         _functionAnalysis = functionAnalysis;
         _options = options;
         _moduleHash = moduleHash;
+        _debug = debug;
     }
 
     // Non-async dispatch: literals, variables, arithmetic, and pure helper calls all
@@ -34,7 +39,12 @@ internal sealed partial class ExpressionEvaluator
     // binding whose ValueTask is still pending) walks the async continuation path.
     public ValueTask<SandboxValue> EvaluateAsync(Expression expression, InterpreterFrame frame)
     {
-        if (!_options.EnableDebugTrace &&
+        if (_debug is not null)
+        {
+            return EvaluateDebugAsync(expression, frame);
+        }
+
+        if (!_options.RequiresInterpreter &&
             I32ExpressionEvaluator.CanEvaluate(expression, frame, _interpreter))
         {
             return new ValueTask<SandboxValue>(
@@ -50,7 +60,31 @@ internal sealed partial class ExpressionEvaluator
             "expression",
             expression.GetType().Name,
             expression.Span);
-        return expression switch
+        return EvaluateNode(expression, frame);
+    }
+
+    private async ValueTask<SandboxValue> EvaluateDebugAsync(Expression expression, InterpreterFrame frame)
+    {
+        var previousNode = _debug!.EnterNode(expression);
+        try
+        {
+            await _debug.CheckpointAsync(SandboxDebugCheckpointKind.Expression, expression, frame).ConfigureAwait(false);
+            _context.ChargeFuel(1);
+            return await EvaluateNode(expression, frame).ConfigureAwait(false);
+        }
+        catch (SandboxRuntimeException exception)
+        {
+            await _debug.ReportExceptionAsync(exception).ConfigureAwait(false);
+            throw;
+        }
+        finally
+        {
+            _debug.RestoreNode(previousNode);
+        }
+    }
+
+    private ValueTask<SandboxValue> EvaluateNode(Expression expression, InterpreterFrame frame)
+        => expression switch
         {
             LiteralExpression literal => new ValueTask<SandboxValue>(ChargeLiteral(literal.Value)),
             VariableExpression variable => new ValueTask<SandboxValue>(frame.Read(variable.Name)),
@@ -59,11 +93,10 @@ internal sealed partial class ExpressionEvaluator
             CallExpression call => EvaluateCall(call, frame),
             _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported expression"))
         };
-    }
 
     public bool TryEvaluateInt32(Expression expression, InterpreterFrame frame, out int value)
     {
-        if (!_options.EnableDebugTrace && I32ExpressionEvaluator.CanEvaluate(expression, frame, _interpreter))
+        if (!_options.RequiresInterpreter && I32ExpressionEvaluator.CanEvaluate(expression, frame, _interpreter))
         {
             value = I32ExpressionEvaluator.Evaluate(expression, frame, _context, _interpreter);
             return true;

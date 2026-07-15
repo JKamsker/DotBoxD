@@ -122,6 +122,7 @@ internal static partial class ResultHookChain
             GeneratedPackageAttributes: default,
             GeneratedAttributeSource: ExperimentalAttributeSource.FromTypes(contextType, resultType),
             EventName: hookName,
+            EventTypeName: EventTypeName.Qualified(contextType),
             EventParameterName: DotBoxDGenerationNames.DefaultEventParameterName,
             ContextParameterName: terminalContextParam ?? DotBoxDGenerationNames.DefaultContextParameterName,
             HandleEventParameterName: terminalElementParam,
@@ -140,6 +141,14 @@ internal static partial class ResultHookChain
             ResultType = resultType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             ResultLocalTerminal = isLocal,
         };
+        kernelModel = HookChainDebugSourceFactory.ApplyToResult(
+            kernelModel,
+            invocation,
+            stages,
+            terminalLambda,
+            isLocal,
+            model,
+            cancellationToken);
 
         var interception = Interception(
             invocation,

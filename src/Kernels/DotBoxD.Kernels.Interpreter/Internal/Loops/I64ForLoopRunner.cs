@@ -20,7 +20,7 @@ internal static class I64ForLoopRunner
         SandboxContext context,
         SandboxExecutionOptions options)
     {
-        if (options.EnableDebugTrace || start >= end)
+        if (options.RequiresInterpreter || start >= end)
         {
             return false;
         }

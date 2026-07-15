@@ -120,6 +120,23 @@ public sealed class PluginServerFacadeRegressionTests
             "new MonsterPluginService(_owner, await ((global::Regression.Game.IMonsterControl)_inner).GetAsync",
             generated,
             StringComparison.Ordinal);
+        Assert.Contains("FromPipeNameWithKernelDebugging", generated, StringComparison.Ordinal);
+        Assert.Contains(
+            "FromPipeName(string pipeName, global::DotBoxD.Services.Peer.RpcPeerOptions? options)",
+            generated,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "FromPipeNameWithKernelDebugging(string pipeName, global::DotBoxD.Pushdown.Services.PluginDebugBridge debugBridge, global::DotBoxD.Services.Peer.RpcPeerOptions? options)",
+            generated,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "FromPipeName(string pipeName, global::DotBoxD.Pushdown.Services.NamedPipeTransportOptions transportOptions, global::DotBoxD.Services.Peer.RpcPeerOptions? options = null)",
+            generated,
+            StringComparison.Ordinal);
+        Assert.Contains("namedPipeOptions: transportOptions, options: options", generated, StringComparison.Ordinal);
+        Assert.Contains("ProvidePluginDebugEvents(peer, debugBridge)", generated, StringComparison.Ordinal);
+        Assert.Contains("_debugBridge?.AttachControl", generated, StringComparison.Ordinal);
+        Assert.Contains("await PrepareDebugPackageAsync(package, cancellationToken)", generated, StringComparison.Ordinal);
     }
 
     [Fact]

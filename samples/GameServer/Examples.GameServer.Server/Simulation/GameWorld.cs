@@ -42,17 +42,14 @@ internal sealed class GameWorld
     public EventIndexRegistry IndexRegistry { get; } = new();
 
     public static GameWorld CreateDefault(HookRegistry hooks, SubscriptionRegistry subscriptions)
-        => new(
-            [
-                new GameEntity("player-1", EntityKind.Player, level: 1, hp: 30, position: 0),
-                new GameEntity("player-2", EntityKind.Player, level: 3, hp: 30, position: 4),
-                new GameEntity("monster-1", EntityKind.Monster, level: 8, hp: 80, position: 7),
-                new GameEntity("monster-2", EntityKind.Monster, level: 8, hp: 80, position: 12),
-                new GameEntity("monster-3", EntityKind.Monster, level: 6, hp: 55, position: 80),
-                new GameEntity("monster-4", EntityKind.Monster, level: 6, hp: 45, position: 90)
-            ],
-            hooks,
-            subscriptions);
+        => new(CreateDefaultEntities(), hooks, subscriptions);
+
+    /// <summary>Starts another deterministic combat round without replacing the world bound to RPC services.</summary>
+    public void Reset()
+    {
+        _entities.Clear();
+        _entities.AddRange(CreateDefaultEntities());
+    }
 
     public WorldSnapshot Snapshot()
     {
@@ -183,4 +180,15 @@ internal sealed class GameWorld
 
     private IEnumerable<GameEntity> Monsters()
         => _entities.Where(e => e.Kind == EntityKind.Monster);
+
+    private static GameEntity[] CreateDefaultEntities()
+        =>
+        [
+            new("player-1", EntityKind.Player, level: 1, hp: 30, position: 0),
+            new("player-2", EntityKind.Player, level: 3, hp: 30, position: 4),
+            new("monster-1", EntityKind.Monster, level: 8, hp: 80, position: 7),
+            new("monster-2", EntityKind.Monster, level: 8, hp: 80, position: 12),
+            new("monster-3", EntityKind.Monster, level: 6, hp: 55, position: 80),
+            new("monster-4", EntityKind.Monster, level: 6, hp: 45, position: 90)
+        ];
 }

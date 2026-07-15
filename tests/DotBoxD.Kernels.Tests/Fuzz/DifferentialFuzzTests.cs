@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using CsCheck;
@@ -23,10 +22,11 @@ public sealed class DifferentialFuzzTests
             threads: 1);
 
     [Theory]
-    [InlineData(-23_438_956)]
-    [InlineData(-23_392_650)]
-    public void Fuzz_module_ids_do_not_form_forbidden_metadata_tokens(int seed)
-        => Assert.False(SandboxDescriptorGuards.ContainsForbiddenDescriptor(ModuleId(seed)));
+    [InlineData(23696560)]
+    [InlineData(23823498)]
+    [InlineData(-23577633)]
+    public async Task Numeric_seeds_do_not_look_like_compact_metadata_references(int seed)
+        => await RunCaseAsync(seed);
 
     private static async Task RunCaseAsync(int seed)
     {
@@ -117,7 +117,7 @@ public sealed class DifferentialFuzzTests
     private static string ModuleJson(int index, JsonObject expression)
         => new JsonObject
         {
-            ["id"] = ModuleId(index),
+            ["id"] = FuzzModuleId.FromSeed("differential-fuzz", index),
             ["version"] = "1.0.0",
             ["functions"] = new JsonArray {
                 new JsonObject {
@@ -138,28 +138,6 @@ public sealed class DifferentialFuzzTests
                 }
             }
         }.ToJsonString(JsonOptions);
-
-    private static string ModuleId(int index)
-    {
-        var seed = (long)index;
-        var encodedSeed = EncodeDigits(seed);
-        return seed < 0
-            ? $"differential-fuzz-negative-{encodedSeed}"
-            : $"differential-fuzz-positive-{encodedSeed}";
-    }
-
-    private static string EncodeDigits(long value)
-    {
-        var digits = Math.Abs(value).ToString(CultureInfo.InvariantCulture);
-        return string.Create(digits.Length, digits, static (characters, source) =>
-        {
-            for (var index = 0; index < source.Length; index++)
-            {
-                // G through P cannot form the hexadecimal metadata-token pattern rejected by the descriptor guard.
-                characters[index] = (char)('g' + source[index] - '0');
-            }
-        });
-    }
 
     private static JsonObject Parameter(string name)
         => new()

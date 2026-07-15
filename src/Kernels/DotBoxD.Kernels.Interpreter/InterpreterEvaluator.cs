@@ -1,3 +1,4 @@
+using DotBoxD.Kernels.Interpreter.Debugging;
 using DotBoxD.Kernels.Interpreter.Frame;
 using DotBoxD.Kernels.Interpreter.Internal.Expressions;
 using DotBoxD.Kernels.Model;
@@ -16,6 +17,7 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
     private readonly string _moduleHash;
     private readonly ExpressionEvaluator _expressions;
     private readonly StatementExecutor _statements;
+    private readonly InterpreterDebugFunctionExecutor? _debugFunctions;
     private readonly FunctionFrameLayoutCache _frameLayouts;
     private SandboxFunction? _lastFrameLayoutFunction;
     private FunctionFrameLayout? _lastFrameLayout;
@@ -32,8 +34,14 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
         _functions = plan.FunctionLookup;
         _functionAnalysis = plan.FunctionAnalysis;
         _frameLayouts = frameLayouts;
-        _expressions = new ExpressionEvaluator(_context, this, _functionAnalysis, _options, _moduleHash);
-        _statements = new StatementExecutor(_context, _expressions, this, _options, _moduleHash);
+        var debug = options.DebugHook is null
+            ? null
+            : new InterpreterDebugState(options.DebugHook, plan.DebugNodeMap, context);
+        _expressions = new ExpressionEvaluator(_context, this, _functionAnalysis, _options, _moduleHash, debug);
+        _statements = new StatementExecutor(_context, _expressions, this, _options, _moduleHash, debug);
+        _debugFunctions = debug is null
+            ? null
+            : new InterpreterDebugFunctionExecutor(_context, _statements, debug, GetFrameLayout);
     }
 
     public ValueTask<SandboxValue> ExecuteEntrypointAsync(string entrypoint, SandboxValue input)
@@ -124,6 +132,11 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
         LocalFunctionArguments arguments,
         SandboxValue? entrypointInput)
     {
+        if (_debugFunctions is not null)
+        {
+            return _debugFunctions.InvokeAsync(function, arguments, entrypointInput);
+        }
+
         _context.EnterCall();
         var exited = false;
         try

@@ -20,7 +20,7 @@ internal static class I32ForLoopRunner
         SandboxExecutionOptions options,
         I32CallEvaluator calls)
     {
-        if (options.EnableDebugTrace || start >= end)
+        if (options.RequiresInterpreter || start >= end)
         {
             return false;
         }

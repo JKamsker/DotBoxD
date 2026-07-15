@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Opt-in trusted Roslyn evaluators for DotBoxD remote kernel debugging.</Description>
+    <PackageTags>dotboxd;kernels;debugging;roslyn;trusted</PackageTags>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Hosting\DotBoxD.Plugins\DotBoxD.Plugins.csproj" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="4.14.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="$(OutputPath)$(AssemblyName).deps.json"
+          Pack="true"
+          PackagePath="lib/$(TargetFramework)/$(AssemblyName).deps.json"
+          Visible="false" />
+  </ItemGroup>
+</Project>

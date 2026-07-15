@@ -1,0 +1,27 @@
+<idea-plugin>
+  <id>dev.dotboxd.kernel-debug</id>
+  <name>DotBoxD Kernel Debugger</name>
+  <vendor>DotBoxD</vendor>
+  <description><![CDATA[Debug server-executed DotBoxD kernels from JetBrains Rider.]]></description>
+  <depends>com.intellij.modules.platform</depends>
+  <depends>com.intellij.modules.rider</depends>
+  <extensions defaultExtensionNs="com.intellij">
+    <configurationType implementation="dev.dotboxd.rider.run.DotBoxDConfigurationType"/>
+    <programRunner implementation="dev.dotboxd.rider.run.DotBoxDDebugProgramRunner"
+                   id="DotBoxDKernelDebugProgramRunner"/>
+    <notificationGroup id="DotBoxD Kernel Debugger" displayType="BALLOON" toolWindowId="Debug"/>
+    <completion.contributor language="TEXT"
+                            implementationClass="dev.dotboxd.rider.run.DotBoxDExpressionCompletionContributor"/>
+  </extensions>
+  <actions>
+    <action id="DotBoxD.AttachToKernels"
+            class="dev.dotboxd.rider.run.DotBoxDAttachAction"
+            text="Attach to DotBoxD Kernels..."
+            description="Discover and attach to a local DotBoxD kernel debug bridge">
+      <add-to-group group-id="XDebugger.AttachGroup"
+                    relative-to-action="XDebugger.AttachToProcess"
+                    anchor="after"/>
+    </action>
+  </actions>
+  <idea-version since-build="252"/>
+</idea-plugin>

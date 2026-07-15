@@ -30,6 +30,9 @@ and fuel-meters before running next to its data. Full story in three diagrams:
 
 ## Quick start
 
+The opt-in tooling for pausing real server-executed kernels is covered in
+[Remote kernel debugging](docs-site/src/content/docs/concepts/remote-kernel-debugging.md).
+
 ```bash
 dotnet new console -n CatalogQuickstart
 cd CatalogQuickstart
@@ -266,6 +269,7 @@ published as a standalone package.
 | [`DotBoxD.Kernels.Compiler`](https://www.nuget.org/packages/DotBoxD.Kernels.Compiler) | Generated-runtime backend + persistent artifact cache |
 | [`DotBoxD.Kernels.Verifier`](https://www.nuget.org/packages/DotBoxD.Kernels.Verifier) | Generated-assembly verifier |
 | [`DotBoxD.Kernels.Serialization.Json`](https://www.nuget.org/packages/DotBoxD.Kernels.Serialization.Json) | JSON IR importer/exporter (`JsonImporter`/`JsonExporter`) + schema |
+| `DotBoxD.Kernels.Debugging.Clr` | Opt-in trusted Roslyn debug evaluators (unsafe by design) |
 | [`DotBoxD.Hosting`](https://www.nuget.org/packages/DotBoxD.Hosting) | Host-facing orchestration API (`SandboxHost`: import, prepare, execute under policy) |
 | [`DotBoxD.Hosting.Http`](https://www.nuget.org/packages/DotBoxD.Hosting.Http) | HTTP GET binding, grant helpers, pinned-transport policy validation |
 | [`DotBoxD.Plugins`](https://www.nuget.org/packages/DotBoxD.Plugins) | Host runtime that loads, validates, and dispatches plugins (`PluginPackageJsonSerializer` reads the plugin-package JSON envelope) |

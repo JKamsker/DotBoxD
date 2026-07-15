@@ -243,6 +243,11 @@ public sealed class ResourceMeter
     public TimeSpan RemainingWallTime()
         => ResourceMeterDeadline.RemainingWallTime(_deadline);
 
+    internal long BeginWallTimeSuspension() => ResourceMeterDeadline.BeginSuspension(_deadline);
+
+    internal void EndWallTimeSuspension(long startedAt)
+        => _deadline = ResourceMeterDeadline.Extend(_deadline, startedAt);
+
     private void ChargeMeasuredShape(in ShapeInfo info)
     {
         var scanFuel = info.Nodes / 64;

@@ -1,4 +1,5 @@
 using System.Text;
+using DotBoxD.Plugins.Analyzer.Analysis.Debugging;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
@@ -24,11 +25,7 @@ internal static class MergeableIrStepSourceEmitter
 
         builder.Append("public static class ").Append(model.ClassName).AppendLine();
         builder.AppendLine("{");
-        builder.Append("    private static readonly ").Append(TypeNames.GlobalSourceSpan).Append(" Span = new(")
-            .Append(DotBoxDGenerationNames.GeneratedSpanLine)
-            .Append(", ")
-            .Append(DotBoxDGenerationNames.GeneratedSpanColumn)
-            .AppendLine(");");
+        EmitSpan(builder, model.Source);
         builder.AppendLine();
         builder.Append("    public static ").Append(MergeableIrContractNames.GlobalLoweredPipelineStep).AppendLine(" Create()");
         builder.AppendLine("        => new(");
@@ -39,7 +36,8 @@ internal static class MergeableIrStepSourceEmitter
         builder.Append("            ").Append(TypeNames.GlobalArray).Append(".Empty<").Append(TypeNames.GlobalStatement).AppendLine(">(),");
         builder.Append("            ").Append(model.ValueSource).AppendLine(",");
         builder.Append("            ").Append(StringArray(model.RequiredCapabilities)).AppendLine(",");
-        builder.Append("            ").Append(StringArray(model.Effects)).AppendLine(");");
+        builder.Append("            ").Append(StringArray(model.Effects));
+        EmitDebugInfoInitializer(builder, model);
         builder.AppendLine();
         if (model.IRFuncType is not null)
         {
@@ -75,4 +73,71 @@ internal static class MergeableIrStepSourceEmitter
         builder.Append(" }");
         return builder.ToString();
     }
+
+    private static void EmitSpan(StringBuilder builder, KernelSourceLocationModel? source)
+    {
+        builder.Append("    private static readonly ").Append(TypeNames.GlobalSourceSpan).Append(" Span = new(");
+        if (source is null)
+        {
+            builder.Append(DotBoxDGenerationNames.GeneratedSpanLine)
+                .Append(", ")
+                .Append(DotBoxDGenerationNames.GeneratedSpanColumn)
+                .Append(", SequencePointKind: ")
+                .Append(TypeNames.GlobalSourceSequencePointKind)
+                .AppendLine(".Hidden);");
+            return;
+        }
+
+        builder.Append(source.StartLine).Append(", ")
+            .Append(source.StartColumn).Append(", ")
+            .Append(LiteralReader.StringLiteral(source.DocumentId)).Append(", ")
+            .Append(source.EndLine).Append(", ")
+            .Append(source.EndColumn).AppendLine(");");
+    }
+
+    private static void EmitDebugInfoInitializer(StringBuilder builder, MergeableIrStepModel model)
+    {
+        if (model.Source is null)
+        {
+            builder.AppendLine(");");
+            return;
+        }
+
+        builder.AppendLine(")");
+        builder.AppendLine("        {");
+        builder.Append("            DebugInfo = new ")
+            .Append(MergeableIrContractNames.GlobalLoweredPipelineDebugInfo).AppendLine("(");
+        builder.AppendLine("                new global::DotBoxD.Kernels.Debugging.KernelDebugDocument[]");
+        builder.AppendLine("                {");
+        foreach (var document in SequencePoints(model.Source)
+                     .GroupBy(point => point.DocumentId, StringComparer.Ordinal)
+                     .Select(group => group.First()))
+        {
+            builder.Append("                    new ").Append(TypeNames.GlobalKernelDebugDocument).Append('(')
+                .Append(LiteralReader.StringLiteral(document.DocumentId)).Append(", ")
+                .Append(LiteralReader.StringLiteral(document.Path)).Append(", ")
+                .Append(LiteralReader.StringLiteral(document.Sha256Checksum)).AppendLine("),");
+        }
+
+        builder.AppendLine("                },");
+        builder.Append("                ").Append(LiteralReader.StringLiteral(model.InputSourceName ?? "value"))
+            .AppendLine(",");
+        builder.AppendLine("                new global::DotBoxD.Kernels.Model.SourceSpan[]");
+        builder.AppendLine("                {");
+        foreach (var point in SequencePoints(model.Source))
+        {
+            builder.Append("                    new ").Append(TypeNames.GlobalSourceSpan).Append('(')
+                .Append(point.StartLine).Append(", ")
+                .Append(point.StartColumn).Append(", ")
+                .Append(LiteralReader.StringLiteral(point.DocumentId)).Append(", ")
+                .Append(point.EndLine).Append(", ")
+                .Append(point.EndColumn).AppendLine("),");
+        }
+
+        builder.AppendLine("                })");
+        builder.AppendLine("        };");
+    }
+
+    private static IEnumerable<KernelSourceLocationModel> SequencePoints(KernelSourceLocationModel source)
+        => source.SequencePoints.Count == 0 ? [source] : source.SequencePoints;
 }

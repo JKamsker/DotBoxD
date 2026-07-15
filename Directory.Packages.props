@@ -21,6 +21,7 @@
          consumer SDKs. Test/host projects that need newer APIs use VersionOverride
          (DotBoxD.Plugins.Analyzer + DotBoxD.Kernels.Tests -> 4.14.0, DotBoxD.Services.SourceGenerator.Tests -> 4.11.0). -->
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.14.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0" />
 
     <!-- Static-analysis layer (analyzer-only, wired in Directory.Build.props with
@@ -52,5 +53,12 @@
     <PackageVersion Include="Basic.Reference.Assemblies.Net80" Version="1.7.9" />
     <PackageVersion Include="Microsoft.NETFramework.ReferenceAssemblies.net461" Version="1.0.3" />
     <PackageVersion Include="System.Threading.Tasks.Extensions" Version="4.5.4" />
+
+    <!-- Optional Visual Studio Debug Adapter Host packaging (not referenced by runtime packages). -->
+    <PackageVersion Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3" />
+    <PackageVersion Include="Microsoft.VisualStudio.Shell.15.0" Version="17.14.40264" />
+    <PackageVersion Include="Microsoft.VisualStudio.Shell.Interop" Version="17.14.40260" />
+    <PackageVersion Include="Microsoft.VisualStudio.Debugger.DebugAdapterHost.Interfaces" Version="17.10.10123.1-preview" />
+    <PackageVersion Include="Microsoft.VSSDK.BuildTools" Version="17.14.2142" />
   </ItemGroup>
 </Project>

@@ -240,7 +240,7 @@ internal static class HookChainStageLowerer
         return false;
     }
 
-    private static string SelectTemp(LambdaExpressionSyntax lambda)
+    internal static string SelectTemp(LambdaExpressionSyntax lambda)
         => "$dotboxd.select." + lambda.SpanStart.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     private sealed record Projection(DotBoxDStatementBodyModel Assignment, DotBoxDExpressionModel Current, ITypeSymbol? CurrentType);

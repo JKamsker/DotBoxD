@@ -1,6 +1,7 @@
 using DotBoxD.Kernels.Game.Server.Abstractions.Events;
 using DotBoxD.Kernels.Game.Server.Ipc;
 using DotBoxD.Kernels.Game.Server.Simulation;
+using DotBoxD.Plugins.Debugging;
 using DotBoxD.Pushdown.Services;
 using PluginServer = DotBoxD.Plugins.PluginServer;
 
@@ -34,11 +35,18 @@ internal static class Program
         // read bindings. Both are bound to the world once it exists.
         var sink = new GameCommandSink();
         var worldHost = new GameWorldHost();
+        var kernelDebugging = KernelDebuggingRequested();
         using var server = PluginServer.Create(
-            sink,
+            messages: sink,
             configureHost: worldHost.AddBindings,
             defaultPolicy: ServerPolicy.Create(),
-            executionMode: ExecutionMode.Compiled);
+            executionMode: ExecutionMode.Compiled,
+            remoteDebugOptions: kernelDebugging ? new PluginRemoteDebugOptions
+            {
+                Enabled = true,
+                DefaultPauseScope = KernelDebugPauseScope.Execution,
+                AllowedPauseScopes = [KernelDebugPauseScope.Execution]
+            } : null);
 
         _ = server.Events.Resolve<MonsterAggroEvent>();
         _ = server.Events.Resolve<AttackEvent>();
@@ -79,7 +87,13 @@ internal static class Program
         // provisioning both services; when the connection drops it disposes the session and unloads the
         // kernels it owned.
         await using var host = await GamePluginHost
-            .StartAsync(server, sink, world, options.ExternalPluginPipeName)
+            .StartAsync(
+                server,
+                sink,
+                world,
+                options.ExternalPluginPipeName,
+                enableKernelDebugging: kernelDebugging,
+                allowIdleConnection: options.Continuous)
             .ConfigureAwait(false);
         Console.WriteLine($"[server] listening for plugin on pipe '{host.PipeName}'.");
 
@@ -121,20 +135,27 @@ internal static class Program
         Console.WriteLine("[server] Running with-plugin phase after the plugin's direct IPC/RPC setup calls.");
         Console.WriteLine();
 
-        // (f) With-plugin phase: the untrusted kernels run sandboxed WHILE the plugin is connected.
-        Console.WriteLine("--- WITH PLUGINS (guardian calms, retaliation taunts) ---");
-        var pluginPhaseStart = PlayerHpById(world);
-        for (var i = 0; i < PluginTicks; i++)
+        double? perTickPlugin = null;
+        if (options.Continuous)
         {
-            await world.TickAsync().ConfigureAwait(false);
-            Console.WriteLine($"[tick {world.Tick}]");
-            PrintEffects(sink.DrainEffects());
-            PrintWorld(world);
+            await ContinuousSimulation.RunAsync(world, sink).ConfigureAwait(false);
         }
+        else
+        {
+            // (f) With-plugin phase: the untrusted kernels run sandboxed WHILE the plugin is connected.
+            Console.WriteLine("--- WITH PLUGINS (guardian calms, retaliation taunts) ---");
+            var pluginPhaseStart = PlayerHpById(world);
+            for (var i = 0; i < PluginTicks; i++)
+            {
+                await world.TickAsync().ConfigureAwait(false);
+                Console.WriteLine($"[tick {world.Tick}]");
+                PrintEffects(sink.DrainEffects());
+                PrintWorld(world);
+            }
 
-        var pluginDamage = TotalDamageTaken(pluginPhaseStart, world);
-        var perTickBaseline = (double)baselineDamage / BaselineTicks;
-        var perTickPlugin = (double)pluginDamage / PluginTicks;
+            var pluginDamage = TotalDamageTaken(pluginPhaseStart, world);
+            perTickPlugin = (double)pluginDamage / PluginTicks;
+        }
 
         // (g) Release the plugin; it disconnects, and ownership unloads its kernels.
         control.SignalShutdown();
@@ -158,15 +179,19 @@ internal static class Program
         }
 
         // (h) Summary, plus proof that disconnect unloaded the plugin's kernels.
-        Console.WriteLine();
-        Console.WriteLine("=== SUMMARY ===");
-        Console.WriteLine(Format("Baseline damage/tick (no plugin)", perTickBaseline));
-        Console.WriteLine(Format("With-plugin damage/tick", perTickPlugin));
-        Console.WriteLine(perTickPlugin < perTickBaseline
-            ? "Plugins reduced bullying: low-level players survive longer than baseline."
-            : "Plugins applied (see per-tick effects above).");
-        Console.WriteLine($"On disconnect the plugin's kernels were unloaded (installed kernels now: {server.Kernels.Snapshot().Count}).");
-        PrintSurvivors(world);
+        if (perTickPlugin is { } measuredPluginDamage)
+        {
+            var perTickBaseline = (double)baselineDamage / BaselineTicks;
+            Console.WriteLine();
+            Console.WriteLine("=== SUMMARY ===");
+            Console.WriteLine(Format("Baseline damage/tick (no plugin)", perTickBaseline));
+            Console.WriteLine(Format("With-plugin damage/tick", measuredPluginDamage));
+            Console.WriteLine(measuredPluginDamage < perTickBaseline
+                ? "Plugins reduced bullying: low-level players survive longer than baseline."
+                : "Plugins applied (see per-tick effects above).");
+            Console.WriteLine($"On disconnect the plugin's kernels were unloaded (installed kernels now: {server.Kernels.Snapshot().Count}).");
+            PrintSurvivors(world);
+        }
 
         await host.StopAsync().ConfigureAwait(false);
         return 0;
@@ -225,6 +250,9 @@ internal static class Program
         }
     }
 
+    private static bool KernelDebuggingRequested()
+        => string.Equals(Environment.GetEnvironmentVariable("DOTBOXD_KERNEL_DEBUG"), "1", StringComparison.Ordinal);
+
     private static Dictionary<string, int> PlayerHpById(GameWorld world)
         => world.Players().ToDictionary(p => p.Id, p => p.Hp, StringComparer.Ordinal);
 
@@ -242,8 +270,7 @@ internal static class Program
         return total;
     }
 
-    private static void PrintWorld(GameWorld world)
-        => Console.WriteLine(world.Render());
+    private static void PrintWorld(GameWorld world) => Console.WriteLine(world.Render());
 
     private static void PrintEffects(IReadOnlyList<string> effects)
     {

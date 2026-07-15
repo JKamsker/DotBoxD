@@ -1,0 +1,57 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "GameServer (wait for managed plugin)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build GameServer debugging",
+      "program": "${workspaceFolder}/samples/GameServer/Examples.GameServer.Server/bin/Debug/net10.0/Examples.GameServer.Server.dll",
+      "args": [
+        "--external-plugin",
+        "--pipe-name",
+        "dotboxd-game-debug-0123456789abcdef"
+      ],
+      "cwd": "${workspaceFolder}/samples/GameServer/Examples.GameServer.Server",
+      "console": "integratedTerminal",
+      "env": {
+        "DOTNET_ENVIRONMENT": "Development",
+        "DOTBOXD_KERNEL_DEBUG": "1",
+        "DOTBOXD_GAME_PLUGIN_READINESS_TIMEOUT_MS": "300000"
+      }
+    },
+    {
+      "name": "GameServer managed plugin",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build GameServer debugging",
+      "program": "${workspaceFolder}/samples/GameServer/Examples.GameServer.Plugin/bin/Debug/net10.0/Examples.GameServer.Plugin.dll",
+      "args": [
+        "dotboxd-game-debug-0123456789abcdef"
+      ],
+      "cwd": "${workspaceFolder}/samples/GameServer/Examples.GameServer.Plugin",
+      "console": "integratedTerminal",
+      "env": {
+        "DOTNET_ENVIRONMENT": "Development",
+        "DOTBOXD_KERNEL_DEBUG": "1"
+      }
+    },
+    {
+      "name": "GameServer remote kernels",
+      "type": "dotboxd-kernel",
+      "request": "attach",
+      "processId": "${command:dotboxd.pickKernelProcess}"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "GameServer + managed plugin + remote kernels",
+      "configurations": [
+        "GameServer (wait for managed plugin)",
+        "GameServer managed plugin",
+        "GameServer remote kernels"
+      ],
+      "stopAll": true
+    }
+  ]
+}

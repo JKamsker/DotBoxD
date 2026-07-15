@@ -26,27 +26,32 @@ One command builds and runs everything. The server launches the plugin child pro
 dotnet run -c Release --project samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
 ```
 
-The server accepts one optional argument, `--use-builder`, which selects the fluent builder entrypoint on the plugin side; without it the plugin uses the same generated server through its default path. The argument is validated in [`Examples.GameServer.Server/Program.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Program.cs):
+The server accepts `--use-builder`, which selects the fluent builder entrypoint on the plugin side, and
+`--continuous`, which resets the deterministic world after each short round and keeps exercising the installed
+kernels until Ctrl+C or the run configuration is stopped. The checked-in launch profiles-including the default
+profile used by the command above-enable it. Use `dotnet run --no-launch-profile ...` for the finite default, or
+pass `--continuous` directly to the built executable. The arguments are parsed by
+[`GameServerLaunchOptions.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/GameServerLaunchOptions.cs):
 
-```csharp
-if (args.Length > 1 || (args.Length == 1 && args[0] != "--use-builder"))
-{
-    await Console.Error
-        .WriteLineAsync("Usage: Examples.GameServer.Server [--use-builder]")
-        .ConfigureAwait(false);
-    return 1;
-}
+```text
+Usage: Examples.GameServer.Server [--use-builder] [--continuous]
+       [--external-plugin --pipe-name <named-pipe-name>]
 ```
 
 ### What the run prints
 
-`Program.Main` runs three phases so the effect of the plugin is visible:
+Without `--continuous`, `Program.Main` runs three phases so the effect of the plugin is visible:
 
 1. **Baseline** - no plugins; lvl-8 monsters bully the low-level players for a few ticks.
 2. **With plugins** - the plugin connects, installs its kernels, and the same simulation now shows guardian/retaliation effects.
 3. **Summary** - per-tick damage before vs. after, plus proof that disconnect unloaded the plugin's kernels.
 
 The phase structure is driven by `BaselineTicks` / `PluginTicks` and the `world.TickAsync()` loop in `Program.cs`.
+Continuous mode keeps the baseline and installation phases, then runs six-tick debug rounds at a 500 ms cadence.
+Each new round resets the entities on the same bound world instance, so the existing RPC services, subscriptions,
+and installed kernels stay live while fresh aggro and attack events repeatedly hit debugger breakpoints.
+The sample's debug profile publishes its kernel bridge without delaying installation, so Rider can attach before or
+after `StartAsync()` completes; later rounds provide another opportunity to hit every configured breakpoint.
 
 ## Project layout
 

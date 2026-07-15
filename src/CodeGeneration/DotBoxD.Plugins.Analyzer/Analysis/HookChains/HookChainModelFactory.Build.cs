@@ -47,6 +47,14 @@ internal static partial class HookChainModelFactory
             eventShape,
             lowered,
             collectors);
+        modelResult = HookChainDebugSourceFactory.ApplyToSend(
+            modelResult,
+            invocation,
+            prepared.Stages,
+            prepared.TerminalLambda,
+            prepared.InstallKind == HookChainInterceptorInstallKind.LocalCallback,
+            model,
+            cancellationToken);
         var interception = BuildSendHookInterception(
             invocation,
             model,
@@ -171,6 +179,7 @@ internal static partial class HookChainModelFactory
                 eventShape.EventType,
                 lowered.ProjectedTypeSymbol),
             EventName: EventTypeName.HookOrQualified(eventShape.EventType),
+            EventTypeName: EventTypeName.Qualified(eventShape.EventType),
             EventParameterName: DotBoxDGenerationNames.DefaultEventParameterName,
             ContextParameterName: prepared.TerminalContextParam ?? DotBoxDGenerationNames.DefaultContextParameterName,
             HandleEventParameterName: prepared.TerminalElementParam,
@@ -192,6 +201,10 @@ internal static partial class HookChainModelFactory
             LocalTerminal = prepared.InstallKind == HookChainInterceptorInstallKind.LocalCallback,
             ProjectedType = LocalProjectedManifestType(lowered.LocalCallbackProjection, lowered.ProjectedTypeSymbol),
             LocalDecoderSource = lowered.LocalDecoderSource,
+            HandleProjectedSlotName = HookChainProjectionSlotResolver.Final(prepared.Stages),
+            HandleProjectedSourceSlotName = HookChainProjectionSlotResolver.FinalSource(
+                prepared.Stages,
+                eventShape.EventProperties),
         };
     }
 

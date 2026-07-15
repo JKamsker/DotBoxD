@@ -28,7 +28,7 @@ internal static partial class PluginServerFacadeEmitter
 
             PluginServerContextSurfaceEmitter.AppendRegistries(builder, model);
             builder.AppendLine();
-            PluginServerSetupEmitter.AppendBuilder(builder, model);
+            PluginServerBuilderEmitter.Append(builder, model);
             PluginServerSetupEmitter.AppendSetupInterfaces(builder, model);
         });
         if (!string.Equals(model.ContextNamespace, model.Namespace, StringComparison.Ordinal))
@@ -93,6 +93,10 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("    private readonly global::System.Collections.Generic.Dictionary<string, global::System.Collections.Generic.Dictionary<string, object?>> _liveSettingValues = new(global::System.StringComparer.Ordinal);");
         builder.AppendLine("    private readonly object _liveSettingsGate = new();");
         builder.AppendLine("    private readonly global::System.Collections.Generic.List<RecordedInstall> _setupInstalls;");
+        if (model.EmitPipeBuilder)
+        {
+            builder.AppendLine("    private readonly global::DotBoxD.Pushdown.Services.PluginDebugBridge? _debugBridge;");
+        }
         builder.Append("    private ").Append(model.ControlServiceType).AppendLine("? _control;");
         builder.Append("    private ").Append(model.WorldType).AppendLine("? _world;");
         builder.Append("    private ").Append(model.HookRegistryName).AppendLine("? _hooks;");
@@ -151,9 +155,23 @@ internal static partial class PluginServerFacadeEmitter
         builder.Append("    internal ").Append(PluginServerIdentifier.Escape(model.ClassName))
             .Append("(global::System.Func<global::System.Action<global::DotBoxD.Services.Peer.RpcPeer>?, global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>> connectionFactory, global::System.Action<")
             .Append(model.SetupInterfaceName).AppendLine(">? setup)");
+        if (model.EmitPipeBuilder)
+        {
+            builder.AppendLine("        : this(connectionFactory, setup, debugBridge: null)");
+            builder.AppendLine("    {");
+            builder.AppendLine("    }");
+            builder.AppendLine();
+            builder.Append("    internal ").Append(PluginServerIdentifier.Escape(model.ClassName))
+                .Append("(global::System.Func<global::System.Action<global::DotBoxD.Services.Peer.RpcPeer>?, global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>> connectionFactory, global::System.Action<")
+                .Append(model.SetupInterfaceName).AppendLine(">? setup, global::DotBoxD.Pushdown.Services.PluginDebugBridge? debugBridge)");
+        }
         builder.AppendLine("    {");
         builder.AppendLine("        _connectionFactory = connectionFactory ?? throw new global::System.ArgumentNullException(nameof(connectionFactory));");
         builder.AppendLine("        _setupInstalls = RecordSetup(setup);");
+        if (model.EmitPipeBuilder)
+        {
+            builder.AppendLine("        _debugBridge = debugBridge;");
+        }
         builder.AppendLine("    }");
         builder.AppendLine();
         builder.AppendLine("    partial void OnConfigured();");

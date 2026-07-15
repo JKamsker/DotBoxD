@@ -1,3 +1,4 @@
+using DotBoxD.Plugins.Analyzer.Analysis.Debugging;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -55,7 +56,15 @@ internal static partial class RpcKernelModelFactory
         var method = ResolveValidatedBatchMethod(type, context, cancellationToken, graftType, out var liveSettings, out var graft);
         var client = ResolveClientGeneration(type, method, serviceType, graft, context);
         var body = LowerRpcBody(context, cancellationToken, type, method, graft);
-        var source = EmitPackage(
+        var methodBody = MethodBody(method, cancellationToken);
+        var sourceNode = (SyntaxNode?)methodBody.Block ?? methodBody.Expression!;
+        var debugSource = KernelSourceLocationModel.CreateWithKernelMethods(
+            pluginId + ":" + method.Name,
+            sourceNode,
+            context.SemanticModel,
+            cancellationToken);
+        var debugBindings = DebugBindings(method, liveSettings, body.HasReceiverId);
+        var package = EmitPackage(
             type,
             pluginId,
             method,
@@ -69,7 +78,9 @@ internal static partial class RpcKernelModelFactory
             client.DirectClientMethod,
             graft,
             body.HasReceiverId,
-            context.SemanticModel.Compilation);
+            context.SemanticModel.Compilation,
+            debugSource,
+            debugBindings);
         var grafts = RpcKernelGraftSignatureFactory.Create(
             type,
             method,
@@ -77,7 +88,24 @@ internal static partial class RpcKernelModelFactory
             client.ClientExtensions,
             client.DirectClientMethod,
             graft);
-        return new RpcKernelModelResult(source, null, grafts);
+        return new RpcKernelModelResult(package, null, grafts);
+    }
+
+    private static IReadOnlyList<(string SlotName, string SourceName)> DebugBindings(
+        IMethodSymbol method,
+        EquatableArray<LiveSettingModel> liveSettings,
+        bool hasReceiverId)
+    {
+        var bindings = new List<(string, string)>();
+        if (hasReceiverId)
+        {
+            bindings.Add((RpcKernelReceiverHandleSeeder.ReceiverIdParameter, "this"));
+        }
+
+        bindings.AddRange(method.Parameters.Take(method.Parameters.Length - 1)
+            .Select(parameter => (parameter.Name, parameter.Name)));
+        bindings.AddRange(liveSettings.Select(setting => (setting.Name, setting.Name)));
+        return bindings;
     }
 
     private static IMethodSymbol ResolveValidatedBatchMethod(
