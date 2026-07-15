@@ -70,7 +70,9 @@ internal static partial class RpcKernelClientProxyEmitter
             _kernelType = kernelType;
             _serviceType = serviceType;
             _serviceMethod = serviceMethod;
-            _conv = new RpcKernelValueConversionEmitter(compilation);
+            _conv = new RpcKernelValueConversionEmitter(
+                compilation,
+                reservedMemberName: serviceMethod.Name);
             _responseReader = new RpcKernelClientResponseReadEmitter(
                 compilation,
                 serviceType,

@@ -21,6 +21,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-numeric-conversion
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-hook-chain-discovery
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-plugin-package-collision-discovery
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-server-extension-request-helpers
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-examples
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-prepared-values
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-runtime-types
@@ -181,6 +182,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Direct server-extension RPC response encoding | this commit | `--probe-kernel-rpc-response-encoding` | Routed the already-validated `SandboxValue` result from `InvokeServerExtensionRpcAsync` through the existing direct binary codec instead of materializing a parallel `KernelRpcValue` tree, and matched declared collection types without rebuilding structural `SandboxType` descriptors. Across 200,000 encodes, `List<I32>` fell from 272 to 80 B/op, `Map<String,I32>` from 4,072 to 464 B/op, and an eight-item `List<Record<I32,String>>` from 2,808 to 160 B/op; the scalar control remained 64 B/op. The nested 2,648 B/op saving decomposes into 1,088 B of record-type materialization and 1,560 B from the intermediate wire tree, with byte-identical payloads and unchanged malformed-collection rejection. |
 | Scalar single-assignment I32 while plans | this commit | `--probe-interpreter-while-plan-setup` | Kept one-statement I32 `while` planning in a scalar local instead of allocating and indexing an `AssignmentPlan[1]`. Across 50,000 executions, both one- and zero-iteration rows fell by exactly 2,000,000 B (40 B/op); the no-while and dependent two-assignment controls were byte-identical. Six alternating published-binary samples per variant moved the 20-million-iteration median from 192.9 ms to 182.1 ms (-5.6%), with non-overlapping 191.7-195.3 ms and 181.1-184.1 ms ranges and identical results/resources. |
 | Direct generated-client RPC response decoding | this commit | `--probe-kernel-rpc-client-response-decode` | Generated service proxies and direct graft clients now validate response bytes without allocation and project the declared CLR return type directly from the payload instead of first materializing a `KernelRpcValue` tree. Across 100,000 decodes, `List<I32>` fell from 264 to 72 B/op, `Map<String,I32>` from 5,976 to 2,368 B/op, and an eight-item `List<Record<I32,String>>` from 2,000 to 440 B/op; I32 stayed allocation-free. Four process runs, each using four internally alternating rounds, moved timing medians from 5.9/26.2/200.3/85.3 ms to 5.1/21.2/125.4/45.1 ms. Full structural validation remains ahead of DTO construction, and the emitted ref-struct reader is isolated in synchronous helpers so C# 12 async clients still compile. |
+| Lazy collision-safe server-extension request helpers | this commit | `--probe-server-extension-request-helpers` | Request conversion now evaluates a framework-type resolver only after its type predicate matches and skips the generated outer method name when allocating numbered or fixed helpers. A `List<int>` proxy falls from seven request helpers, 6,143 UTF-8 bytes, and 121 lines to one helper, 3,698 bytes, and 67 lines. Across ten cold generations of 100 proxies, allocation falls from 106,581,552 B to 70,499,272 B (33.9%, or 3,608,228 B/run). Generated-compilation tests pin the former `WriteKernelRpcValue5` and `DateTimeToWireOffset` collisions, the post-cleanup `WriteKernelRpcValue0` boundary, and the direct-graft form. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -1665,3 +1667,42 @@ validation/projection workflow as the generator; the public API baseline advance
 analyzer runs against an older runtime that lacks `SkipValue`, symbol capability detection retains the legacy
 value-tree projection instead of emitting an uncompilable call. The wire format,
 compiler/verifier identity, persisted artifacts, sandbox accounting, and service contracts do not change.
+
+## Lazy collision-safe server-extension request helpers
+
+`RpcKernelValueConversionEmitter` previously passed already-interpolated expressions into each framework-type
+resolver. C# evaluated those expressions before the resolver tested its predicate. For a `List<int>` request, the
+failed DateTime, decimal, Index, and Range candidates therefore appended six unrelated numbered/fixed helpers before
+the actual list writer was reached. The generated client contained seven request helper bodies in total, and the real
+list writer was unexpectedly named `WriteKernelRpcValue5`.
+
+Resolvers now test their type predicate before building an expression or calling an `Ensure...` helper. The same
+ordering applies to the materialized-value readers retained for compatibility and RunLocal projection. Numbered and
+fixed DateTime helpers also skip the generated outer service/extension method name; this prevents the cleanup from
+merely moving the collision from `WriteKernelRpcValue5` to `WriteKernelRpcValue0`.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -- --probe-server-extension-request-helpers
+```
+
+The probe runs the real `PluginPackageGenerator` ten times over pre-parsed, balanced trivia snapshots. Allocation and
+generated shape were identical across three separately launched processes; elapsed time overlapped and is included only
+for context:
+
+```text
+proxies   before ms/run / B/run       after ms/run / B/run        before -> after source shape
+      1        1.39 /    294,686          1.35 /    258,606        6,143 ->   3,698 B;   121 ->   67 lines;   7 ->   1 helpers
+     10        4.58 /  1,225,274          4.71 /    863,566       61,430 ->  36,980 B; 1,210 ->  670 lines;  70 ->  10 helpers
+    100       48.39 / 10,658,155         47.26 /  7,049,927      615,290 -> 370,790 B;12,100 ->6,700 lines; 700 -> 100 helpers
+```
+
+At 100 proxies, each cold generation removes 3,608,228 B (33.9%), while every proxy removes exactly 2,445 UTF-8
+bytes, 54 generated lines, and six phantom helpers. The one-proxy allocation delta is 36,080 B/run; larger rows show
+the same approximately 36.1 KB/proxy scaling after fixed generator overhead.
+
+Focused generated-compilation tests reproduce the former raw `CS0111`/`CS0121` failure for a valid
+`WriteKernelRpcValue5(List<int>)` service method and `CS0111` for `DateTimeToWireOffset(DateTime)`. They also pin the
+post-cleanup `WriteKernelRpcValue0` boundary, the one-helper list source shape, and collision-safe direct-graft emission.
+No public API, wire format, compiler/verifier identity, persisted artifact, or sandbox resource behavior changes.

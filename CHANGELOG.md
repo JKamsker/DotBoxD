@@ -54,6 +54,10 @@ Services, Kernels, and Pushdown.
   responses keep their existing exception behavior; a known-but-wrong wire kind for a payload-bearing return
   now fails with `FormatException` from the payload reader instead of `NotSupportedException` from the former
   value-tree projection.
+- **Lean, collision-safe server-extension request helpers:** generated clients now emit conversion helpers only
+  for framework types that actually match a request or legacy response shape. Helper names also avoid the
+  generated service/extension method, so valid methods such as `WriteKernelRpcValue0` or
+  `DateTimeToWireOffset` no longer produce raw C# name-collision errors.
 - **Documentation & repo polish:** new top-level README, `docs/` information architecture
   (getting-started, concepts, security, reference, contributing), `SECURITY.md`, `CONTRIBUTING.md`,
   `CODE_OF_CONDUCT.md`, and GitHub repo metadata files.

@@ -20,7 +20,9 @@ internal static class RpcKernelDirectClientExtensionEmitter
         RpcKernelClientMethodExtension methodExtension,
         Compilation compilation)
     {
-        private readonly RpcKernelValueConversionEmitter _conv = new(compilation);
+        private readonly RpcKernelValueConversionEmitter _conv = new(
+            compilation,
+            reservedMemberName: methodExtension.Name);
         private readonly RpcKernelClientResponseReadEmitter _responseReader = new(
             compilation,
             reservedMemberName: methodExtension.Name);

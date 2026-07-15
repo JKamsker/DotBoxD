@@ -25,6 +25,12 @@ if (args.Contains("--probe-plugin-package-collision-discovery", StringComparer.O
     return;
 }
 
+if (args.Contains("--probe-server-extension-request-helpers", StringComparer.OrdinalIgnoreCase))
+{
+    DotBoxD.Kernels.Benchmarks.PluginAnalyzer.ServerExtensionRequestHelperProbe.Run();
+    return;
+}
+
 if (args.Contains("--probe-rogue", StringComparer.OrdinalIgnoreCase))
 {
     await DotBoxD.Kernels.Benchmarks.Interpreter.RogueScalingProbe.RunAsync();
