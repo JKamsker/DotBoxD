@@ -8,27 +8,26 @@ if (args.Contains("--smoke", StringComparer.OrdinalIgnoreCase))
     return;
 }
 
-if (args.Contains("--probe-compiled", StringComparer.OrdinalIgnoreCase))
+if (await DotBoxD.Kernels.Benchmarks.Interpreter.InterpreterProbeDispatcher.TryRunAsync(args))
 {
-    await DotBoxD.Kernels.Benchmarks.Interpreter.CompiledSpeedProbe.RunAsync();
     return;
 }
 
-if (args.Contains("--probe-bindings", StringComparer.OrdinalIgnoreCase))
+if (args.Contains("--probe-hook-chain-discovery", StringComparer.OrdinalIgnoreCase))
 {
-    await DotBoxD.Kernels.Benchmarks.Interpreter.BindingCrossingProbe.RunAsync();
+    DotBoxD.Kernels.Benchmarks.PluginAnalyzer.HookChainDiscoveryProbe.Run();
     return;
 }
 
-if (args.Contains("--probe-matrix", StringComparer.OrdinalIgnoreCase))
+if (args.Contains("--probe-plugin-package-collision-discovery", StringComparer.OrdinalIgnoreCase))
 {
-    await DotBoxD.Kernels.Benchmarks.Interpreter.PerformanceMatrixProbe.RunAsync();
+    DotBoxD.Kernels.Benchmarks.PluginAnalyzer.PluginPackageCollisionDiscoveryProbe.Run();
     return;
 }
 
-if (args.Contains("--probe-branched-f64-loop", StringComparer.OrdinalIgnoreCase))
+if (args.Contains("--probe-server-extension-request-helpers", StringComparer.OrdinalIgnoreCase))
 {
-    await DotBoxD.Kernels.Benchmarks.Interpreter.BranchedF64LoopProbe.RunAsync();
+    DotBoxD.Kernels.Benchmarks.PluginAnalyzer.ServerExtensionRequestHelperProbe.Run();
     return;
 }
 
@@ -53,6 +52,12 @@ if (args.Contains("--probe-prepared-values", StringComparer.OrdinalIgnoreCase))
 if (args.Contains("--probe-runtime-types", StringComparer.OrdinalIgnoreCase))
 {
     DotBoxD.Kernels.Benchmarks.Runtime.RuntimeTypeProbe.Run();
+    return;
+}
+
+if (args.Contains("--probe-compiled-input-types", StringComparer.OrdinalIgnoreCase))
+{
+    DotBoxD.Kernels.Benchmarks.Runtime.Types.CompiledInputTypeProbe.Run();
     return;
 }
 
@@ -227,21 +232,8 @@ if (args.Contains("--probe-runlocal-push", StringComparer.OrdinalIgnoreCase))
     return;
 }
 
-if (args.Contains("--probe-remote-result-hook", StringComparer.OrdinalIgnoreCase))
+if (DotBoxD.Kernels.Benchmarks.Plugins.PluginProbeDispatcher.TryRun(args))
 {
-    DotBoxD.Kernels.Benchmarks.Plugins.RemoteResultHookProbe.Run();
-    return;
-}
-
-if (args.Contains("--probe-subscription-dispatch", StringComparer.OrdinalIgnoreCase))
-{
-    DotBoxD.Kernels.Benchmarks.Plugins.SubscriptionDispatchProbe.Run();
-    return;
-}
-
-if (args.Contains("--probe-hook-dispatch", StringComparer.OrdinalIgnoreCase))
-{
-    DotBoxD.Kernels.Benchmarks.Plugins.HookDispatchProbe.Run();
     return;
 }
 

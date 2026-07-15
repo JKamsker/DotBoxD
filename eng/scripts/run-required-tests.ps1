@@ -101,6 +101,7 @@ $defaultMinimums = @{
     PluginAnalyzerHookChainResultValidationTests = 9
     PluginAnalyzerHookChainTerminalTests = 9
     InvokeAsyncGenerationTests = 7
+    InvokeAsyncImplicitCaptureWeaverTests = 2
     InvokeAsyncSurpriseGenerationTests = 10
     InvokeAsyncGeneratedReceiverSurpriseTests = 15
     InvokeAsyncGeneratedReceiverFacadeTests = 12

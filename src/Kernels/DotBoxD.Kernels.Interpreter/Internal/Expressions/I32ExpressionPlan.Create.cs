@@ -10,7 +10,7 @@ internal sealed partial class I32ExpressionPlan
         InterpreterFrame frame,
         string assumedInt32Local,
         out I32ExpressionPlan plan)
-        => TryCreate(expression, frame, assumedInt32Local, calls: null, substitutions: null, out plan);
+        => TryCreate(expression, frame, assumedInt32Local, calls: null, substitution: default, out plan);
 
     public static bool TryCreate(
         Expression expression,
@@ -18,14 +18,14 @@ internal sealed partial class I32ExpressionPlan
         string assumedInt32Local,
         I32CallEvaluator calls,
         out I32ExpressionPlan plan)
-        => TryCreate(expression, frame, assumedInt32Local, calls, substitutions: null, out plan);
+        => TryCreate(expression, frame, assumedInt32Local, calls, substitution: default, out plan);
 
     public static bool TryCreate(
         Expression expression,
         InterpreterFrame frame,
         string assumedInt32Local,
         I32CallEvaluator? calls,
-        IReadOnlyDictionary<string, I32ExpressionPlan>? substitutions,
+        I32ExpressionSubstitution substitution,
         out I32ExpressionPlan plan)
     {
         if (TryCreateLiteral(expression, out plan))
@@ -33,17 +33,17 @@ internal sealed partial class I32ExpressionPlan
             return true;
         }
 
-        if (TryCreateVariable(expression, frame, assumedInt32Local, substitutions, out plan))
+        if (TryCreateVariable(expression, frame, assumedInt32Local, substitution, out plan))
         {
             return true;
         }
 
-        if (TryCreateUnary(expression, frame, assumedInt32Local, calls, substitutions, out plan))
+        if (TryCreateUnary(expression, frame, assumedInt32Local, calls, substitution, out plan))
         {
             return true;
         }
 
-        if (TryCreateBinaryExpression(expression, frame, assumedInt32Local, calls, substitutions, out plan))
+        if (TryCreateBinaryExpression(expression, frame, assumedInt32Local, calls, substitution, out plan))
         {
             return true;
         }
@@ -67,7 +67,7 @@ internal sealed partial class I32ExpressionPlan
         Expression expression,
         InterpreterFrame frame,
         string assumedInt32Local,
-        IReadOnlyDictionary<string, I32ExpressionPlan>? substitutions,
+        I32ExpressionSubstitution substitution,
         out I32ExpressionPlan plan)
     {
         if (expression is not VariableExpression variable)
@@ -76,9 +76,9 @@ internal sealed partial class I32ExpressionPlan
             return false;
         }
 
-        if (substitutions?.TryGetValue(variable.Name, out var substitution) == true)
+        if (substitution.TryGetValue(variable.Name, out var replacement))
         {
-            plan = substitution;
+            plan = replacement;
             return true;
         }
 
@@ -100,11 +100,11 @@ internal sealed partial class I32ExpressionPlan
         InterpreterFrame frame,
         string assumedInt32Local,
         I32CallEvaluator? calls,
-        IReadOnlyDictionary<string, I32ExpressionPlan>? substitutions,
+        I32ExpressionSubstitution substitution,
         out I32ExpressionPlan plan)
     {
         if (expression is UnaryExpression { Operator: "-" } unary &&
-            TryCreate(unary.Operand, frame, assumedInt32Local, calls, substitutions, out var operand))
+            TryCreate(unary.Operand, frame, assumedInt32Local, calls, substitution, out var operand))
         {
             plan = new I32ExpressionPlan(ExpressionKind.Negate, 0, operand);
             return true;
@@ -119,7 +119,7 @@ internal sealed partial class I32ExpressionPlan
         InterpreterFrame frame,
         string assumedInt32Local,
         I32CallEvaluator? calls,
-        IReadOnlyDictionary<string, I32ExpressionPlan>? substitutions,
+        I32ExpressionSubstitution substitution,
         out I32ExpressionPlan plan)
     {
         if (expression is not BinaryExpression binary)
@@ -134,12 +134,12 @@ internal sealed partial class I32ExpressionPlan
             return false;
         }
 
-        if (TryCreateSpecialBinary(binary, frame, assumedInt32Local, substitutions, out plan))
+        if (TryCreateSpecialBinary(binary, frame, assumedInt32Local, substitution, out plan))
         {
             return true;
         }
 
-        return TryCreateBinary(binary, frame, assumedInt32Local, calls, substitutions, out plan);
+        return TryCreateBinary(binary, frame, assumedInt32Local, calls, substitution, out plan);
     }
 
     private static bool TryCreateCall(

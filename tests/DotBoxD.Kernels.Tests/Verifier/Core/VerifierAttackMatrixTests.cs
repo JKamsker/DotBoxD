@@ -14,6 +14,7 @@ public sealed class VerifierAttackMatrixTests
             { "System.Net.Http.HttpClient", HttpClientAssembly, ["V-TYPE-FORBIDDEN", "V-ASM-REF"] },
             { "System.Diagnostics.Process.Start", ProcessStartAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER"] },
             { "System.Threading.Tasks.Task.Run", TaskRunAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER"] },
+            { "Microsoft.VisualBasic.Interaction.Shell", VisualBasicShellAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER"] },
             { "calli opcode", CalliAssembly, ["V-OPCODE"] },
             { "ldftn opcode", LdftnAssembly, ["V-OPCODE"] },
             { "ldvirtftn opcode", LdvirtftnAssembly, ["V-OPCODE"] },
@@ -62,6 +63,32 @@ public sealed class VerifierAttackMatrixTests
             var il = method.GetILGenerator();
             il.Emit(OpCodes.Ldnull);
             il.Emit(OpCodes.Call, typeof(Task).GetMethod(nameof(Task.Run), [typeof(Action)])!);
+            il.Emit(OpCodes.Pop);
+            ReturnInput(il);
+        });
+
+    private static byte[] VisualBasicShellAssembly()
+        => VerifierTestHelpers.BuildGeneratedAssembly(type =>
+        {
+            var interactionType = Type.GetType(
+                "Microsoft.VisualBasic.Interaction, Microsoft.VisualBasic.Core",
+                throwOnError: true)!;
+            var appWinStyleType = Type.GetType(
+                "Microsoft.VisualBasic.AppWinStyle, Microsoft.VisualBasic.Core",
+                throwOnError: true)!;
+            var shell = interactionType.GetMethod(
+                "Shell",
+                BindingFlags.Public | BindingFlags.Static,
+                binder: null,
+                [typeof(string), appWinStyleType, typeof(bool), typeof(int)],
+                modifiers: null)!;
+            var method = DefineExecute(type);
+            var il = method.GetILGenerator();
+            il.Emit(OpCodes.Ldstr, "plugin-command");
+            il.Emit(OpCodes.Ldc_I4_2);
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Ldc_I4_M1);
+            il.Emit(OpCodes.Call, shell);
             il.Emit(OpCodes.Pop);
             ReturnInput(il);
         });
