@@ -12,15 +12,12 @@ public sealed class PluginAnalyzerForbiddenApiHostAclReachabilityTests
 
     [Theory]
     [InlineData(
-        "file ACL read",
         "_ = new FileSecurity(\"plugin.txt\", AccessControlSections.All);",
         "System.Security.AccessControl.FileSecurity")]
     [InlineData(
-        "directory ACL read",
         "_ = new DirectorySecurity(\"plugin-dir\", AccessControlSections.All);",
         "System.Security.AccessControl.DirectorySecurity")]
     public async Task Reports_host_acl_path_constructors_from_event_kernel(
-        string testCase,
         string statement,
         string expectedForbiddenApi)
     {
@@ -30,9 +27,7 @@ public sealed class PluginAnalyzerForbiddenApiHostAclReachabilityTests
 
         var diagnostic = Assert.Single(diagnostics.Where(d => d.Id == "DBXK001"));
         var message = diagnostic.GetMessage();
-        Assert.True(
-            message.Contains(expectedForbiddenApi, StringComparison.Ordinal),
-            $"{testCase}: {message}");
+        Assert.Contains(expectedForbiddenApi, message, StringComparison.Ordinal);
     }
 
     private static string Source(string statement)

@@ -15,7 +15,9 @@ internal static class ForbiddenApiNamePolicy
         DotBoxDGenerationNames.TypeNames.SystemArrayPoolOriginal,
         DotBoxDGenerationNames.TypeNames.SystemComponentModelTypeDescriptor,
         "Microsoft.Win32.Registry", "System.Security.Principal.WindowsIdentity",
-        "System.Security.Cryptography.X509Certificates.X509Store"
+        "System.Security.Cryptography.X509Certificates.X509Store",
+        "System.Security.AccessControl.DirectorySecurity",
+        "System.Security.AccessControl.FileSecurity"
     ];
 
     private static readonly string[] NamespacePrefixes =
