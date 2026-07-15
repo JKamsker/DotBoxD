@@ -89,7 +89,9 @@ internal sealed partial class InterpreterFrame
     public bool IsF64Slot(int slot) => _layout.IsF64Slot(slot);
     public bool IsF64Slot(string name) => _layout.IsF64Slot(name);
     public bool IsSlotAssigned(int slot)
-        => _layout.HasRawSlots ? RawSlotAssignmentState.IsAssigned(_assigned, slot) : _slots[slot] is not null;
+        => _layout.IsBoxedSlot(slot)
+            ? _slots[slot] is not null
+            : RawSlotAssignmentState.IsAssigned(_assigned, slot);
     public int ReadInt32(string name)
     {
         var slot = _layout.GetSlot(name);

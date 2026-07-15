@@ -190,6 +190,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Parameter-only raw frame assignment state | this commit | `--probe-interpreter-frame-layout` | Reused an empty assignment-state sentinel when every frame slot is a parameter initialized before execution. One- and two-raw-parameter rows each fell from 912.0 to 880.0 B/op, removing exactly one 32-byte array per invocation. Zero-parameter, eight-local, and mixed raw/boxed controls remained byte-identical, and genuine locals retain read-before-assignment tracking. |
 | Scalar interpreted local-function arguments | this commit | `--probe-interpreter-local-call-arguments` | Passed synchronously evaluated one- and two-argument local calls to the callee frame through an internal scalar carrier instead of a temporary array. Across 100,000 executions, arity one fell from 1,024.1 to 992.1 B/op and arity two from 1,040.1 to 1,000.1 B/op. Arity-zero and direct controls are byte-identical; pending operands and arity three retain the original array path. |
 | Lazy interpreter audit envelope | this commit | `--probe-interpreter-audit-envelope` | Deferred the normal run identity and in-memory audit sink for strictly eligible suppressed pure successes. Across 50,000 executions, generated-RunId allocation fell from 848.0 to 784.0 B/op (-64 B/op), while an explicit RunId fell from 816.0 to 784.0 B/op (-32 B/op). Failures and unexpected audit access materialize a real per-run envelope; debug and audited-binding controls remain byte-identical. |
+| Mixed-frame raw assignment state | this commit | `--probe-interpreter-frame-layout` | Allocate assignment state only when a raw slot exists after the leading parameter region; boxed locals retain null/non-null assignment tracking. Across 50,000 raw-parameter-plus-boxed-local executions, allocation fell from 44,402,824 B (888.1 B/op) to 42,802,824 B (856.1 B/op), exactly 32 B/frame. Parameter-only and eight-raw-local controls remain byte-identical, while genuine raw locals preserve `ValidationError` for reads before assignment. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -1895,3 +1896,32 @@ trace, and an audited `SandboxLog` binding. It pins value/failure outcomes, audi
 shared per-execution identities, module and binding metadata, and all twelve resource counters. Focused regressions add a
 forged-binding-metadata case, failure/debug/binding semantics, exact allocation bands, and same-plan concurrency. Public
 API, compiler/verifier identity, persisted artifacts, sandbox policy, and resource accounting are unchanged.
+
+## Mixed-frame raw assignment state
+
+The parameter-only optimization originally omitted a frame's `bool[]` assignment state only when every slot was a
+parameter. That predicate was conservative for mixed layouts: a frame with an initialized raw I32 parameter and a boxed
+String local still allocated raw assignment state even though it contained no raw local that could be read before a
+write. Boxed locals already represent assignment directly through a null or non-null boxed slot.
+
+The prepared layout now requires raw assignment state only when an I32, I64, or F64 slot occurs after the leading
+parameter region. Raw parameters are populated before the frame is published, while a boxed slot continues to use its
+own null/non-null state. Any genuine raw local keeps the per-frame Boolean array, including mixed layouts that also have
+boxed slots.
+
+The existing `--probe-interpreter-frame-layout` command reports these allocation results over 50,000 prepared
+executions:
+
+```text
+case                                  before B / B/op       after B / B/op        delta/op
+raw I32 parameter + boxed String local 44,402,824 / 888.1    42,802,824 / 856.1       -32 B
+```
+
+The exact 1,600,000-byte reduction is one 32-byte assignment-state array per frame. Zero-parameter, one/two-raw-parameter,
+and eight-raw-local controls are byte-identical. The new genuine-raw-local control measures 42,402,152 B
+(848.0 B/op) after the change and retains its assignment-state array. No elapsed-time result is claimed.
+
+The permanent probe pins returned values, checksums, and all twelve resource counters. It also forges a plan whose false
+branch reads an unassigned raw local and verifies that the execution still fails with `ValidationError`, proving that the
+narrower allocation predicate does not weaken read-before-assignment behavior. Public API, compiler/verifier identity,
+persisted artifacts, and sandbox accounting are unchanged.

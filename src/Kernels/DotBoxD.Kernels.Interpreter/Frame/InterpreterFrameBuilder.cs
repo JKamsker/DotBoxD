@@ -29,7 +29,7 @@ internal static class InterpreterFrameBuilder
         var i32Slots = layout.HasI32Slots ? new int[layout.SlotCount] : Array.Empty<int>();
         var i64Slots = layout.HasI64Slots ? new long[layout.SlotCount] : Array.Empty<long>();
         var f64Slots = layout.HasF64Slots ? new double[layout.SlotCount] : Array.Empty<double>();
-        var assigned = layout.HasRawSlots && !layout.HasOnlyParameterSlots
+        var assigned = layout.RequiresRawAssignmentState
             ? new bool[layout.SlotCount]
             : Array.Empty<bool>();
 

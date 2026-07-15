@@ -26,13 +26,16 @@ internal sealed class FunctionFrameLayout
         string functionId,
         Dictionary<string, int> slots,
         SlotKind[] slotKinds,
-        bool hasOnlyParameterSlots)
+        int parameterSlotCount)
     {
         FunctionId = functionId;
         _slots = slots;
         _slotKinds = slotKinds;
         SlotCount = slots.Count;
-        HasOnlyParameterSlots = hasOnlyParameterSlots;
+        RequiresRawAssignmentState =
+            Array.IndexOf(slotKinds, SlotKind.I32, parameterSlotCount) >= 0 ||
+            Array.IndexOf(slotKinds, SlotKind.I64, parameterSlotCount) >= 0 ||
+            Array.IndexOf(slotKinds, SlotKind.F64, parameterSlotCount) >= 0;
         HasBoxedSlots = Array.IndexOf(slotKinds, SlotKind.Boxed) >= 0;
         HasI32Slots = Array.IndexOf(slotKinds, SlotKind.I32) >= 0;
         HasI64Slots = Array.IndexOf(slotKinds, SlotKind.I64) >= 0;
@@ -43,7 +46,7 @@ internal sealed class FunctionFrameLayout
 
     public int SlotCount { get; }
 
-    public bool HasOnlyParameterSlots { get; }
+    public bool RequiresRawAssignmentState { get; }
 
     public bool HasBoxedSlots { get; }
 
@@ -75,7 +78,7 @@ internal sealed class FunctionFrameLayout
             function.Id,
             slots,
             BuildSlotKinds(function, functionAnalysis, bindings, slots),
-            hasOnlyParameterSlots: slots.Count == parameterSlotCount);
+            parameterSlotCount);
     }
 
     public int GetSlot(string name)
