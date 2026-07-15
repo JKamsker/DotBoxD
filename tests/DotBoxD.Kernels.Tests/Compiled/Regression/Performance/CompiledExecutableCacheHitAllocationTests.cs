@@ -7,6 +7,7 @@ using DotBoxD.Kernels.Tests.Compiled.Core;
 namespace DotBoxD.Kernels.Tests.Compiled.Regression.Performance;
 
 [Collection(AllocationMeasurementCollection.Name)]
+[Trait(AllocationMeasurementCollection.TraitName, AllocationMeasurementCollection.TraitValue)]
 public sealed class CompiledExecutableCacheHitAllocationTests
 {
     private const int WarmupIterations = 5_000;

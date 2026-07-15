@@ -12,7 +12,7 @@ using DotBoxD.Kernels.Verifier;
 
 public static class CacheKeyBuilder
 {
-    public const string CompilerVersion = "dotboxd-compiler-9";
+    public const string CompilerVersion = "dotboxd-compiler-10";
     public const string TypeSystemVersion = "dotboxd-type-system-2";
     public const string EffectAnalysisVersion = "dotboxd-effect-analysis-3";
     public const string CanonicalizerVersion = CanonicalModuleHasher.CanonicalizerVersion;

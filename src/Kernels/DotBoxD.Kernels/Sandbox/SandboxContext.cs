@@ -14,6 +14,8 @@ public sealed partial class SandboxContext
     private CapabilityGrant? _lastCapabilityGrant;
     private string? _lastBindingId;
     private BindingDescriptor? _lastBindingDescriptor;
+    private SandboxRunId? _runId;
+    private IAuditSink? _audit;
     private int _callDepth;
 
     public SandboxContext(
@@ -26,27 +28,95 @@ public sealed partial class SandboxContext
         IReadOnlySet<string>? allowedBindingIds = null,
         string? moduleHash = null,
         string? policyHash = null)
+        : this(
+            runId,
+            policy,
+            budget,
+            bindings,
+            audit,
+            cancellationToken,
+            allowedBindingIds,
+            moduleHash,
+            policyHash,
+            initializeAuditEnvelopeLazily: false)
     {
-        RunId = runId;
+    }
+
+    private SandboxContext(
+        SandboxRunId? runId,
+        SandboxPolicy policy,
+        ResourceMeter budget,
+        BindingRegistry bindings,
+        IAuditSink? audit,
+        CancellationToken cancellationToken,
+        IReadOnlySet<string>? allowedBindingIds,
+        string? moduleHash,
+        string? policyHash,
+        bool initializeAuditEnvelopeLazily)
+    {
+        _runId = runId;
         Policy = policy ?? throw new ArgumentNullException(nameof(policy));
         Budget = budget ?? throw new ArgumentNullException(nameof(budget));
         Bindings = bindings ?? throw new ArgumentNullException(nameof(bindings));
-        Audit = audit ?? throw new ArgumentNullException(nameof(audit));
+        _audit = initializeAuditEnvelopeLazily ? null : audit ?? throw new ArgumentNullException(nameof(audit));
         CancellationToken = cancellationToken;
         AllowedBindingIds = allowedBindingIds;
         ModuleHash = moduleHash ?? "";
         PolicyHash = policyHash ?? "";
     }
 
-    public SandboxRunId RunId { get; }
+    public SandboxRunId RunId
+    {
+        get => _runId ?? InitializeRunId();
+    }
+
     public SandboxPolicy Policy { get; }
     public ResourceMeter Budget { get; }
     public BindingRegistry Bindings { get; }
-    public IAuditSink Audit { get; }
+    public IAuditSink Audit
+    {
+        get => _audit ?? InitializeAudit();
+    }
+
     public CancellationToken CancellationToken { get; }
     public string ModuleHash { get; }
     public string PolicyHash { get; }
     private IReadOnlySet<string>? AllowedBindingIds { get; }
+
+    internal IAuditSink? AuditIfCreated => Volatile.Read(ref _audit);
+
+    internal static SandboxContext CreateWithLazyAuditEnvelope(
+        SandboxRunId? runId,
+        SandboxPolicy policy,
+        ResourceMeter budget,
+        BindingRegistry bindings,
+        CancellationToken cancellationToken,
+        IReadOnlySet<string>? allowedBindingIds,
+        string moduleHash,
+        string policyHash)
+        => new(
+            runId,
+            policy,
+            budget,
+            bindings,
+            audit: null,
+            cancellationToken,
+            allowedBindingIds,
+            moduleHash,
+            policyHash,
+            initializeAuditEnvelopeLazily: true);
+
+    private SandboxRunId InitializeRunId()
+    {
+        var created = SandboxRunId.New();
+        return Interlocked.CompareExchange(ref _runId, created, null) ?? created;
+    }
+
+    private IAuditSink InitializeAudit()
+    {
+        var created = new InMemoryAuditSink();
+        return Interlocked.CompareExchange(ref _audit, created, null) ?? created;
+    }
 
     public void RequireCapability(string capabilityId)
     {

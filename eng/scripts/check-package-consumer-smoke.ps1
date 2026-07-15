@@ -4,6 +4,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "package-consumer-fody-smoke.ps1")
 
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $fullPackageDirectory = if ([System.IO.Path]::IsPathRooted($PackageDirectory)) {
@@ -429,20 +430,37 @@ public sealed partial class SmokeKernel : IEventKernel<SmokeEvent>
 "@
     Set-Content -LiteralPath (Join-Path $projectRoot "Program.cs") -Value $program
 
+    Add-DotBoxDFodySmokeSource -ProjectRoot $projectRoot
+
     dotnet restore $projectRoot --configfile (Join-Path $resolvedWorkRoot "NuGet.config")
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }
+
+    Assert-DotBoxDFodyTargetsImported -ProjectRoot $projectRoot
 
     dotnet build $projectRoot --configuration $Configuration --no-restore
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }
 
+    Assert-DotBoxDFodySmokeAssembly `
+        -ProjectRoot $projectRoot `
+        -IsolatedPackagesFolder $isolatedPackagesFolder `
+        -Configuration $Configuration
+
     dotnet run --project $projectRoot --configuration $Configuration --no-build
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }
+
+    Assert-DotBoxDFodyConfigurationFailure `
+        -ProjectRoot $projectRoot `
+        -Configuration $Configuration
+
+    Assert-DotBoxDFodyImportFailure `
+        -ProjectRoot $projectRoot `
+        -Configuration $Configuration
 }
 
 Invoke-DotBoxDPluginAuthoringSmoke

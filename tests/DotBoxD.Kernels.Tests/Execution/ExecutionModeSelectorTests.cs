@@ -160,6 +160,35 @@ public sealed class ExecutionModeSelectorTests
     }
 
     [Fact]
+    public async Task Auto_mode_selector_disposing_host_fails_before_dispatch()
+    {
+        var selector = new DisposingExecutionModeSelector();
+        var host = SandboxHost.Create(builder =>
+        {
+            builder.AddDefaultPureBindings();
+            builder.UseInterpreter();
+            builder.UseCompilerIfAvailable(new FailingCompiler());
+            builder.UseExecutionModeSelector(selector);
+        });
+        selector.Host = host;
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+        var input = SandboxValue.FromList([SandboxValue.FromInt32(1), SandboxValue.FromInt32(1)]);
+        var options = new SandboxExecutionOptions { Mode = ExecutionMode.Auto, AutoCompileThreshold = 1 };
+
+        var first = await host.ExecuteAsync(plan, "main", input, options);
+        SandboxExecutionResult? second = null;
+        var exception = await Record.ExceptionAsync(
+            async () => second = await host.ExecuteAsync(plan, "main", input, options));
+
+        Assert.True(first.Succeeded, first.Error?.SafeMessage);
+        Assert.True(first.ExecutionDispatched);
+        Assert.Equal(1, selector.Calls);
+        Assert.IsType<ObjectDisposedException>(exception);
+        Assert.Null(second);
+    }
+
+    [Fact]
     public async Task Auto_mode_allows_compiled_selector_decision()
     {
         var selector = new RecordingSelector(ExecutionModeDecision.Compiled);

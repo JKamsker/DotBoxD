@@ -6,6 +6,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 public sealed partial class PluginAnalyzer
 {
     private const string CultureInfoTypeName = "System.Globalization.CultureInfo";
+    private const string RegexTypeName = "System.Text.RegularExpressions.Regex";
 
     private static void ReportAndRecordAmbientCultureMutation(
         OperationAnalysisContext context,
@@ -26,7 +27,7 @@ public sealed partial class PluginAnalyzer
                 helperGraph.RecordForbidden(method, type);
                 if (IsForbiddenApiRoot(context, method))
                 {
-                    ReportForbiddenAmbientCultureMutation(context, type);
+                    ReportForbiddenHostStateMutation(context, type);
                 }
 
                 break;
@@ -34,7 +35,7 @@ public sealed partial class PluginAnalyzer
                 helperGraph.RecordForbiddenInitializer(context.ContainingSymbol, type);
                 if (IsEventKernel(context.ContainingSymbol.ContainingType))
                 {
-                    ReportForbiddenAmbientCultureMutation(context, type);
+                    ReportForbiddenHostStateMutation(context, type);
                 }
 
                 break;
@@ -53,11 +54,57 @@ public sealed partial class PluginAnalyzer
                CultureInfoTypeName,
                StringComparison.Ordinal);
 
-    private static void ReportForbiddenAmbientCultureMutation(
+    private static void ReportForbiddenHostStateMutation(
         OperationAnalysisContext context,
         ITypeSymbol type)
         => context.ReportDiagnostic(Diagnostic.Create(
             ForbiddenHostApiRule,
             context.Operation.Syntax.GetLocation(),
             type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
+
+    private static void ReportAndRecordRegexCacheSizeMutation(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IPropertySymbol property,
+        bool writesProperty)
+    {
+        if (!writesProperty ||
+            !IsRegexCacheSizeProperty(property))
+        {
+            return;
+        }
+
+        var type = property.ContainingType;
+        switch (context.ContainingSymbol)
+        {
+            case IMethodSymbol method:
+                helperGraph.RecordForbidden(method, type);
+                if (IsForbiddenApiRoot(context, method))
+                {
+                    ReportForbiddenHostStateMutation(context, type);
+                }
+
+                break;
+            case IFieldSymbol or IPropertySymbol:
+                helperGraph.RecordForbiddenInitializer(context.ContainingSymbol, type);
+                if (IsEventKernel(context.ContainingSymbol.ContainingType))
+                {
+                    ReportForbiddenHostStateMutation(context, type);
+                }
+
+                break;
+        }
+    }
+
+    private static bool IsRegexCacheSizeProperty(IPropertySymbol property)
+        => property is
+        {
+            IsStatic: true,
+            SetMethod: not null,
+            Name: "CacheSize"
+        } &&
+           string.Equals(
+               property.ContainingType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
+               RegexTypeName,
+               StringComparison.Ordinal);
 }

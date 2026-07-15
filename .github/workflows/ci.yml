@@ -390,6 +390,7 @@ jobs:
               "PluginAnalyzerHookChainResultValidationTests",
               "PluginAnalyzerHookChainTerminalTests",
               "InvokeAsyncGenerationTests",
+              "InvokeAsyncImplicitCaptureWeaverTests",
               "InvokeAsyncSurpriseGenerationTests",
               "InvokeAsyncGeneratedReceiverSurpriseTests",
               "InvokeAsyncGeneratedReceiverFacadeTests",
