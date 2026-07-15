@@ -56,6 +56,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-installed-rpc-input
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-kernel-rpc-value-items
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-kernel-rpc-value-list-writer
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-kernel-rpc-response-encoding
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-kernel-rpc-binary-codec-empty-decode
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-invokeasync-capture-argument-writer
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-kernel-rpc-marshaller-dto
@@ -175,6 +176,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Cached compiled entrypoint input types | this commit | `--probe-compiled-input-types` | Generated `Execute` methods now use the existing bounded structural-type cache for direct built-in List/Map parameter validation. Two million generated-input-shaped validations fell from 112.0 B/op to ~0 for `List<I32>` and from 160.0 B/op to ~0 for `Map<String,I32>`. Nested and opaque fallback controls remained byte-identical at 224.0 and 144.0 B/op; compiler and verifier identities advanced to v10. |
 | Scalar single-assignment I64 loop plans | this commit | `--probe-interpreter-i64-plan-setup` | Kept one-statement I64 loop planning out of the multi-statement array/`HashSet`/closure path. A fully warmed execution removed exactly 240 B, while 50,000 one-iteration executions fell from 74,406,960 B to 62,405,576 B (~240 B/op). Zero-iteration and dependent two-assignment controls were byte-identical. Alternating 20-million-iteration samples improved from a 126.3 ms median to 106.9 ms (-15.4%) with identical result and sandbox resource usage. |
 | Syntax-filtered hook-chain discovery | this commit | `--probe-hook-chain-discovery` | Limited the hook-chain semantic transform to member calls named `Run`, `RunLocal`, `Register`, or `RegisterLocal`, while retaining method-group terminals. Across 1,000 retained-driver edits of a tree with 1,000 unrelated `Touch` calls, allocation fell from 1,809,295,360 B to 1,664,179,784 B (-145.1 KB/edit) and time fell from 7.312 to 4.899 ms/edit (-33.0%). An unrelated `Run` control retained semantic validation and stayed allocation-equivalent; generated sources and diagnostics were byte-identical. |
+| Direct server-extension RPC response encoding | this commit | `--probe-kernel-rpc-response-encoding` | Routed the already-validated `SandboxValue` result from `InvokeServerExtensionRpcAsync` through the existing direct binary codec instead of materializing a parallel `KernelRpcValue` tree, and matched declared collection types without rebuilding structural `SandboxType` descriptors. Across 200,000 encodes, `List<I32>` fell from 272 to 80 B/op, `Map<String,I32>` from 4,072 to 464 B/op, and an eight-item `List<Record<I32,String>>` from 2,808 to 160 B/op; the scalar control remained 64 B/op. The nested 2,648 B/op saving decomposes into 1,088 B of record-type materialization and 1,560 B from the intermediate wire tree, with byte-identical payloads and unchanged malformed-collection rejection. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -1506,3 +1508,48 @@ output SHA256, `DA0DA060957A948DC1A20DCD406F117137FDEC66F52413D5090591DF8807C0D3
 escaped identifier handling, method-group diagnostics, ordinary-member rejection, and cached/unchanged chain-package
 outputs without captured Roslyn objects. No public API, generated source, diagnostic, analyzer contract, or persisted
 artifact version changes.
+
+## Direct server-extension RPC response encoding
+
+`InstalledKernel.InvokeServerExtensionRpcAsync` receives an already-validated `SandboxValue` result from sandbox
+execution. It previously converted that result into a parallel `KernelRpcValue` graph solely to pass it to the binary
+codec. The installed RPC path now uses the existing direct `SandboxValue` codec already exercised by RunLocal, avoiding
+the intermediate wire tree.
+
+The compatibility converter still validates declared collection element types for public callers. Its exact matcher now
+compares values against the expected `SandboxType` without first materializing `SandboxValue.Type`; record fields are
+checked recursively, so malformed nested records remain rejected.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -- --probe-kernel-rpc-response-encoding
+```
+
+Allocation results, 200,000 response encodes per row:
+
+```text
+case                              Before allocated / B/op       After allocated / B/op        delta
+I32 control                         12,800,040 B /    64.0         12,800,040 B /  64.0           0 B/op
+List<I32>, 3 items                  54,400,040 B /   272.0         16,000,040 B /  80.0        -192 B/op
+Map<String,I32>, 32 entries        814,400,040 B / 4,072.0         92,800,040 B / 464.0      -3,608 B/op
+List<Record<I32,String>>, 8        561,600,040 B / 2,808.0         32,000,040 B / 160.0      -2,648 B/op
+```
+
+The nested row provides an exact decomposition. Before this change, its eight record elements each materialized a
+136-byte structural type during declared-type comparison, costing 1,088 B/op. With the exact matcher already applied,
+the compatibility `KernelRpcValue` route measures 1,720 B/op and the direct codec measures 160 B/op, isolating another
+1,560 B/op for the intermediate wire tree. Together these account for the full 2,648 B/op production reduction.
+
+The standalone matcher lanes corroborate the first component: scalar matching remains allocation-free, while
+`List<I32>`, `Map<String,I32>`, and `Record<I32,String>` move from 112, 160, and 136 B/op respectively to approximately
+zero.
+
+The probe requires byte parity for scalar, list, map, and nested-record values. The nested checksum remains 98 bytes per
+encode. An installed-kernel integration test compares the actual RPC response bytes with the legacy value-tree route,
+and malformed record values nested in lists or maps remain rejected by both the converter and direct codec. The scalar
+64 B/op output-array control is unchanged. Unsupported custom value subtypes and null collection metadata can now fail at
+the declared-type check instead of at the later converter switch or type factory, but these values were never serializable;
+focused tests pin the fail-closed behavior. Stopwatch output is deliberately unclaimed because no reliable paired timing
+baseline was retained. No public API, wire format, compiler/verifier identity, persisted artifact version, or sandbox
+resource accounting changes; the encoder accepts no `SandboxContext`.
