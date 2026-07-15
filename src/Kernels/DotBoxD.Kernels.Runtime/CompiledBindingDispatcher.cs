@@ -34,6 +34,7 @@ internal static partial class CompiledBindingDispatcher
             throw;
         }
 
+        using var auditInvocation = context.BeginBindingAuditInvocation(descriptor, auditCheckpoint);
         CancellationTokenSource? timeout = null;
         try
         {
@@ -42,35 +43,35 @@ internal static partial class CompiledBindingDispatcher
             var value = AwaitBinding(context, descriptor.Invoke(context, args, timeout.Token), timeout.Token);
             context.Checkpoint();
             value = context.ChargeBindingReturn(descriptor, value);
-            context.EnsureRequiredBindingSuccessAudit(descriptor, auditCheckpoint);
+            context.EnsureRequiredBindingSuccessAudit(descriptor, auditInvocation);
             return value;
         }
         catch (SandboxRuntimeException ex)
         {
-            context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, ex.Error.Code);
+            context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, ex.Error.Code);
             throw;
         }
         catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
         {
-            context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, SandboxErrorCode.Cancelled);
+            context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, SandboxErrorCode.Cancelled);
             throw;
         }
         catch (OperationCanceledException) when (timeout?.IsCancellationRequested == true)
         {
             var error = new SandboxError(SandboxErrorCode.Timeout, $"binding '{id}' timed out");
-            context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, error.Code);
+            context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, error.Code);
             throw new SandboxRuntimeException(error);
         }
         catch (OperationCanceledException)
         {
             var error = new SandboxError(SandboxErrorCode.BindingFailure, $"binding '{id}' failed");
-            context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, error.Code);
+            context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, error.Code);
             throw new SandboxRuntimeException(error);
         }
         catch (Exception)
         {
             var error = new SandboxError(SandboxErrorCode.BindingFailure, $"binding '{id}' failed");
-            context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, error.Code);
+            context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, error.Code);
             throw new SandboxRuntimeException(error);
         }
         finally
@@ -99,6 +100,7 @@ internal static partial class CompiledBindingDispatcher
             throw;
         }
 
+        using var auditInvocation = context.BeginBindingAuditInvocation(descriptor, auditCheckpoint);
         CancellationTokenSource? timeout = null;
         try
         {
@@ -110,35 +112,35 @@ internal static partial class CompiledBindingDispatcher
             var value = AwaitBinding(context, pending, timeout.Token);
             context.Checkpoint();
             value = context.ChargeBindingReturn(descriptor, value);
-            context.EnsureRequiredBindingSuccessAudit(descriptor, auditCheckpoint);
+            context.EnsureRequiredBindingSuccessAudit(descriptor, auditInvocation);
             return value;
         }
         catch (SandboxRuntimeException ex)
         {
-            context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, ex.Error.Code);
+            context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, ex.Error.Code);
             throw;
         }
         catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
         {
-            context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, SandboxErrorCode.Cancelled);
+            context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, SandboxErrorCode.Cancelled);
             throw;
         }
         catch (OperationCanceledException) when (timeout?.IsCancellationRequested == true)
         {
             var error = new SandboxError(SandboxErrorCode.Timeout, $"binding '{id}' timed out");
-            context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, error.Code);
+            context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, error.Code);
             throw new SandboxRuntimeException(error);
         }
         catch (OperationCanceledException)
         {
             var error = new SandboxError(SandboxErrorCode.BindingFailure, $"binding '{id}' failed");
-            context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, error.Code);
+            context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, error.Code);
             throw new SandboxRuntimeException(error);
         }
         catch (Exception)
         {
             var error = new SandboxError(SandboxErrorCode.BindingFailure, $"binding '{id}' failed");
-            context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, error.Code);
+            context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, error.Code);
             throw new SandboxRuntimeException(error);
         }
         finally
@@ -168,6 +170,7 @@ internal static partial class CompiledBindingDispatcher
             throw;
         }
 
+        using var auditInvocation = context.BeginBindingAuditInvocation(descriptor, auditCheckpoint);
         CancellationTokenSource? timeout = null;
         try
         {
@@ -179,35 +182,35 @@ internal static partial class CompiledBindingDispatcher
             var value = AwaitBinding(context, pending, timeout.Token);
             context.Checkpoint();
             value = context.ChargeBindingReturn(descriptor, value);
-            context.EnsureRequiredBindingSuccessAudit(descriptor, auditCheckpoint);
+            context.EnsureRequiredBindingSuccessAudit(descriptor, auditInvocation);
             return value;
         }
         catch (SandboxRuntimeException ex)
         {
-            context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, ex.Error.Code);
+            context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, ex.Error.Code);
             throw;
         }
         catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
         {
-            context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, SandboxErrorCode.Cancelled);
+            context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, SandboxErrorCode.Cancelled);
             throw;
         }
         catch (OperationCanceledException) when (timeout?.IsCancellationRequested == true)
         {
             var error = new SandboxError(SandboxErrorCode.Timeout, $"binding '{id}' timed out");
-            context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, error.Code);
+            context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, error.Code);
             throw new SandboxRuntimeException(error);
         }
         catch (OperationCanceledException)
         {
             var error = new SandboxError(SandboxErrorCode.BindingFailure, $"binding '{id}' failed");
-            context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, error.Code);
+            context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, error.Code);
             throw new SandboxRuntimeException(error);
         }
         catch (Exception)
         {
             var error = new SandboxError(SandboxErrorCode.BindingFailure, $"binding '{id}' failed");
-            context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, error.Code);
+            context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, error.Code);
             throw new SandboxRuntimeException(error);
         }
         finally

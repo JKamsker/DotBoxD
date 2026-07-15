@@ -164,7 +164,7 @@ public sealed class InMemoryAuditSink : IAuditSink
         }
     }
 
-    private static bool BindingAuditMatches(
+    internal static bool BindingAuditMatches(
         SandboxAuditEvent auditEvent,
         BindingDescriptor descriptor,
         bool success,

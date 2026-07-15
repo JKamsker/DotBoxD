@@ -37,7 +37,13 @@ public sealed partial class SandboxHost
                 options,
                 cancellationToken,
                 reusableNoAuditState)
-            : ExecutePreparedResultAsValueAsync(plan, entrypoint, input, options, cancellationToken);
+            : ExecutePreparedResultAsValueAsync(
+                plan,
+                entrypoint,
+                input,
+                options,
+                cancellationToken,
+                reusableNoAuditState);
     }
 
     private async ValueTask<PreparedExecutionResult> ExecuteCompiledPreparedValueAsync(
@@ -187,9 +193,16 @@ public sealed partial class SandboxHost
         string entrypoint,
         SandboxValue input,
         SandboxExecutionOptions options,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CompiledNoAuditRunState? reusableNoAuditState)
     {
-        var result = await ExecutePreparedInProcessAsync(plan, entrypoint, input, options, cancellationToken)
+        var result = await ExecutePreparedInProcessAsync(
+                plan,
+                entrypoint,
+                input,
+                options,
+                cancellationToken,
+                reusableNoAuditState)
             .ConfigureAwait(false);
         return PreparedExecutionResult.FromResult(result);
     }

@@ -18,16 +18,18 @@ public sealed partial class InstalledKernel
         using var executionCancellation = PluginExecutionCancellation.Create(
             cancellationToken,
             _revocation.Token);
+        var reusableNoAuditState = ReusableNoAuditState(entrypoint);
         var result = await _host.ExecutePreparedValueInProcessAsync(
                 _plan,
                 entrypoint,
                 input,
                 _executionOptions,
                 executionCancellation.Token,
-                ReusableNoAuditState(entrypoint))
+                reusableNoAuditState)
             .ConfigureAwait(false);
         var isRevoked = IsRevoked;
         var terminalResult = isRevoked ? WithRevokedError(result) : result;
+        RememberSuccessfulAutoCompiledRun(entrypoint, terminalResult);
         _executionObserver.Record(entrypoint, _executionMode, terminalResult);
         if (isRevoked)
         {
@@ -70,13 +72,29 @@ public sealed partial class InstalledKernel
 
     private CompiledNoAuditRunState? ReusableNoAuditState(string entrypoint)
     {
-        if (_executionMode != ExecutionMode.Compiled ||
+        if (_executionMode is not (ExecutionMode.Auto or ExecutionMode.Compiled) ||
             !_plan.BindingReferences.TryGetValue(entrypoint, out var bindings) ||
             bindings.Count != 0)
         {
             return null;
         }
 
-        return _preparedValueState ??= new CompiledNoAuditRunState(_plan);
+        return _executionMode == ExecutionMode.Compiled
+            ? _preparedValueState ??= new CompiledNoAuditRunState(_plan)
+            : _preparedValueState;
+    }
+
+    private void RememberSuccessfulAutoCompiledRun(
+        string entrypoint,
+        PreparedExecutionResult result)
+    {
+        if (_executionMode == ExecutionMode.Auto &&
+            result.Succeeded &&
+            result.ActualMode == ExecutionMode.Compiled &&
+            _plan.BindingReferences.TryGetValue(entrypoint, out var bindings) &&
+            bindings.Count == 0)
+        {
+            _preparedValueState ??= new CompiledNoAuditRunState(_plan);
+        }
     }
 }

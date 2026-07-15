@@ -75,7 +75,11 @@ public sealed partial class SandboxContext
     public BindingRegistry Bindings { get; }
     public IAuditSink Audit
     {
-        get => _audit ?? InitializeAudit();
+        get
+        {
+            var audit = _audit ?? InitializeAudit();
+            return BindingAuditInvocationSink.CurrentFor(this) ?? audit;
+        }
     }
 
     public CancellationToken CancellationToken { get; }

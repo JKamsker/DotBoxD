@@ -169,7 +169,8 @@ internal static class ExampleWorkflowProbe
             "pluginId": "benchmark-fire-damage",
             "contract": "IEventKernel<DamageEvent>",
             "mode": "Auto",
-            "effects": ["Cpu", "Alloc", "HostStateWrite", "Audit"],
+            "effects": ["Cpu", "Alloc", "HostStateWrite", "Concurrency", "Audit"],
+            "requiredCapabilities": ["dotboxd.runtime.async", "host.message.write"],
             "liveSettings": [
               { "name": "DamageType", "type": "string", "defaultValue": "fire" },
               { "name": "MinDamage", "type": "int", "defaultValue": 100, "min": 0, "max": 10000 }

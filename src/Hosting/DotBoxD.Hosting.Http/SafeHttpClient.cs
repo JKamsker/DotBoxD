@@ -281,7 +281,7 @@ public static class SafeHttpClient
         long? measuredBytes)
     {
         var observedBytes = context.Budget.NetworkBytesRead - networkBytesReadBefore;
-        return observedBytes > 0 ? observedBytes : measuredBytes;
+        return observedBytes > 0 ? observedBytes : measuredBytes ?? 0;
     }
 
     private static long? ObservedRequestBytes(
@@ -290,7 +290,7 @@ public static class SafeHttpClient
         long? measuredBytes)
     {
         var observedBytes = context.Budget.NetworkBytesWritten - networkBytesWrittenBefore;
-        return observedBytes > 0 ? observedBytes : measuredBytes;
+        return observedBytes > 0 ? observedBytes : measuredBytes ?? 0;
     }
 
     private static SandboxRuntimeException Error(SandboxErrorCode code, string message) => new(new SandboxError(code, message));
