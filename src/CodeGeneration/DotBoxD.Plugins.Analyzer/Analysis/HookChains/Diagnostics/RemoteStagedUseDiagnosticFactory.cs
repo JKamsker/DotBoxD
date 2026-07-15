@@ -22,19 +22,34 @@ internal static partial class RemoteStagedUseDiagnosticFactory
             Expression: MemberAccessExpressionSyntax
             {
                 Name.Identifier.ValueText: "Use"
-                    or "UseGeneratedChain"
-                    or "UseGeneratedLocalChain"
-                    or "UseGeneratedResultChain"
-                    or "UseGeneratedLocalResultChain"
-                    or "Where"
-                    or "Select"
+                        or "UseGeneratedChain"
+                        or "UseGeneratedLocalChain"
+                        or "UseGeneratedResultChain"
+                        or "UseGeneratedLocalResultChain"
+                        or "Where"
+                        or "Select"
             }
-        };
+        } ||
+            node is ConditionalAccessExpressionSyntax
+            {
+                WhenNotNull: InvocationExpressionSyntax
+                {
+                    Expression: MemberBindingExpressionSyntax
+                    {
+                        Name.Identifier.ValueText: "Where" or "Select"
+                    }
+                }
+            };
 
     public static PluginKernelDiagnostic? Create(
         GeneratorSyntaxContext context,
         CancellationToken cancellationToken)
     {
+        if (context.Node is ConditionalAccessExpressionSyntax conditional)
+        {
+            return CreateConditionalDiscardedStageDiagnostic(conditional, context.SemanticModel, cancellationToken);
+        }
+
         var invocation = (InvocationExpressionSyntax)context.Node;
         if (invocation.Expression is not MemberAccessExpressionSyntax access)
         {
@@ -62,6 +77,37 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         return new PluginKernelDiagnostic(
             UnsupportedTerminalMessage(access.Name.Identifier.ValueText),
             PluginDiagnosticLocation.From(access.Name.GetLocation()));
+    }
+
+    private static PluginKernelDiagnostic? CreateConditionalDiscardedStageDiagnostic(
+        ConditionalAccessExpressionSyntax conditional,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (conditional.WhenNotNull is not InvocationExpressionSyntax
+            {
+                Expression: MemberBindingExpressionSyntax binding
+            })
+        {
+            return null;
+        }
+
+        var transparentExpression = UnwrapTransparentParent(conditional);
+        if (transparentExpression.Parent is not ExpressionStatementSyntax)
+        {
+            return null;
+        }
+
+        var receiverType = model.GetTypeInfo(conditional.Expression, cancellationToken).Type;
+        if (!IsRemoteChainOrStageType(receiverType) &&
+            !IsGeneratedRemoteChain(conditional.Expression, model, cancellationToken))
+        {
+            return null;
+        }
+
+        return new PluginKernelDiagnostic(
+            DiscardedStageMessage,
+            PluginDiagnosticLocation.From(binding.Name.GetLocation()));
     }
 
     private static string UnsupportedTerminalMessage(string terminal)
