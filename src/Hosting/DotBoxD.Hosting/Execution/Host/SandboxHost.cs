@@ -118,6 +118,7 @@ public sealed partial class SandboxHost : IDisposable
                 .ConfigureAwait(false)
             : await ExecuteSelectedModeAsync(plan, entrypoint, input, options, cancellationToken)
                 .ConfigureAwait(false);
+        ThrowIfDisposed();
         return Publish(result);
     }
 
