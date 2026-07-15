@@ -11,7 +11,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                          ?? _model.GetTypeInfo(cast, _cancellationToken).ConvertedType
                          ?? throw new NotSupportedException(
                              $"Server extension cast '{cast}' could not resolve its target type.");
-        return ApplyRequiredNumericConversion(
+        return ApplyRequiredConversion(
             cast.Expression,
             targetType,
             LowerExpression(cast.Expression),
@@ -43,7 +43,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         ExpressionSyntax expression,
         ITypeSymbol targetType,
         string lowered)
-        => ApplyRequiredNumericConversion(
+        => ApplyRequiredConversion(
             expression,
             targetType,
             lowered,
@@ -64,7 +64,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             _fallbackLocalTypes[local] = targetType;
         }
 
-        return ApplyRequiredNumericConversion(
+        return ApplyRequiredConversion(
             expression,
             targetType,
             lowered,
@@ -76,13 +76,13 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         ITypeSymbol targetType,
         string lowered,
         string targetName)
-        => ApplyRequiredNumericConversion(
+        => ApplyRequiredConversion(
             expression,
             targetType,
             lowered,
             $"Server extension assignment to '{targetName}'");
 
-    private string ApplyRequiredNumericConversion(
+    private string ApplyRequiredConversion(
         ExpressionSyntax expression,
         ITypeSymbol targetType,
         string lowered,
@@ -102,16 +102,27 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             throw UnsupportedConversion(description);
         }
 
-        return ApplyRequiredTypeConversion(effectiveType, targetType, lowered, description);
+        return ApplyRequiredTypeConversion(
+            effectiveType,
+            targetType,
+            _model.Compilation,
+            lowered,
+            description);
     }
 
     internal static string ApplyRequiredTypeConversion(
         ITypeSymbol sourceType,
         ITypeSymbol targetType,
+        Compilation compilation,
         string lowered,
         string description)
     {
-        if (RpcNumericConversion.TryApply(sourceType, targetType, lowered, out var converted))
+        if (RpcRequiredConversion.TryApply(
+                sourceType,
+                targetType,
+                compilation,
+                lowered,
+                out var converted))
         {
             return converted;
         }
@@ -166,7 +177,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
         if (IsLoweredEnumConstant(expression, convertedType) ||
             IsRepresentableNarrowI32Constant(expression, sourceType, convertedType) ||
-            RpcNumericConversion.IsSupported(sourceType, convertedType))
+            RpcRequiredConversion.IsSupported(sourceType, convertedType, _model.Compilation))
         {
             effectiveType = convertedType;
             return true;
@@ -194,5 +205,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     }
 
     private static NotSupportedException UnsupportedConversion(string description)
-        => new($"{description} is not supported because it is not a supported numeric widening conversion.");
+        => new(
+            $"{description} is not supported because it is not an identity conversion, supported numeric widening " +
+            "conversion, or representation-preserving collection conversion.");
 }
