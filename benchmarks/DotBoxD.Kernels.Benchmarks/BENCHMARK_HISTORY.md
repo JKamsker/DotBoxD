@@ -18,6 +18,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-frame-layout
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-i64-plan-setup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-while-plan-setup
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-branched-plan-setup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-numeric-conversion
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-hook-chain-discovery
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-plugin-package-collision-discovery
@@ -183,6 +184,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Scalar single-assignment I32 while plans | this commit | `--probe-interpreter-while-plan-setup` | Kept one-statement I32 `while` planning in a scalar local instead of allocating and indexing an `AssignmentPlan[1]`. Across 50,000 executions, both one- and zero-iteration rows fell by exactly 2,000,000 B (40 B/op); the no-while and dependent two-assignment controls were byte-identical. Six alternating published-binary samples per variant moved the 20-million-iteration median from 192.9 ms to 182.1 ms (-5.6%), with non-overlapping 191.7-195.3 ms and 181.1-184.1 ms ranges and identical results/resources. |
 | Direct generated-client RPC response decoding | this commit | `--probe-kernel-rpc-client-response-decode` | Generated service proxies and direct graft clients now validate response bytes without allocation and project the declared CLR return type directly from the payload instead of first materializing a `KernelRpcValue` tree. Across 100,000 decodes, `List<I32>` fell from 264 to 72 B/op, `Map<String,I32>` from 5,976 to 2,368 B/op, and an eight-item `List<Record<I32,String>>` from 2,000 to 440 B/op; I32 stayed allocation-free. Four process runs, each using four internally alternating rounds, moved timing medians from 5.9/26.2/200.3/85.3 ms to 5.1/21.2/125.4/45.1 ms. Full structural validation remains ahead of DTO construction, and the emitted ref-struct reader is isolated in synchronous helpers so C# 12 async clients still compile. |
 | Lazy collision-safe server-extension request helpers | this commit | `--probe-server-extension-request-helpers` | Request conversion now evaluates a framework-type resolver only after its type predicate matches and skips the generated outer method name when allocating numbered or fixed helpers. A `List<int>` proxy falls from seven request helpers, 6,143 UTF-8 bytes, and 121 lines to one helper, 3,698 bytes, and 67 lines. Across ten cold generations of 100 proxies, allocation falls from 106,581,552 B to 70,499,272 B (33.9%, or 3,608,228 B/run). Generated-compilation tests pin the former `WriteKernelRpcValue5` and `DateTimeToWireOffset` collisions, the post-cleanup `WriteKernelRpcValue0` boundary, and the direct-graft form. |
+| Scalar empty/single branched interpreter plans | this commit | `--probe-interpreter-branched-plan-setup`, `--probe-branched-f64-loop` | Branched I32/F64 loop planners now store empty branches without a plan and one-assignment branches inline, retaining arrays only for two or more ordered assignments. Across 50,000 executions, I32 one-one / empty-one branches remove exactly 80 / 64 B/op; F64 removes about 120 / exactly 128 B/op because the tentative I32 planner also stops allocating before F64 fallback. Zero/no-branch/two-two controls are byte-identical. Four long-F64 process medians moved from 90.4 to 82.8 ms (an observed -8.4%), with non-overlapping ranges and unchanged results/resources. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -1706,3 +1708,60 @@ Focused generated-compilation tests reproduce the former raw `CS0111`/`CS0121` f
 `WriteKernelRpcValue5(List<int>)` service method and `CS0111` for `DateTimeToWireOffset(DateTime)`. They also pin the
 post-cleanup `WriteKernelRpcValue0` boundary, the one-helper list source shape, and collision-safe direct-graft emission.
 No public API, wire format, compiler/verifier identity, persisted artifact, or sandbox resource behavior changes.
+
+## Scalar empty/single branched interpreter plans
+
+`BranchedI32ForLoopRunner` and `BranchedF64ForLoopRunner` previously allocated an exact-size `AssignmentPlan[]` for
+both sides of every supported `if`, including zero- and one-assignment branches. On x64, those arrays cost 24 B when
+empty and 40 B for one assignment. The common one/one shape therefore paid 80 B every interpreted execution before
+entering the loop.
+
+Each branch now has an explicit empty/single/many shape. Empty branches carry no plan, single assignments live inline,
+and two-or-more assignments retain the existing exact array and immediate source-order execution. Planning still
+validates the condition, complete `then` branch, and complete `else` branch before any metering or frame mutation.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -- --probe-interpreter-branched-plan-setup
+```
+
+Allocation results over 50,000 prepared executions:
+
+```text
+case                         before B / B/op       after B / B/op        delta/op
+I32 one assignment each      80,004,680 / 1,600.1  76,004,680 / 1,520.1     -80 B
+I32 one empty, one single     70,804,680 / 1,416.1  67,604,680 / 1,352.1     -64 B
+I32 zero-iteration control    46,002,824 /   920.1  46,002,824 /   920.1       0 B
+I32 no-branch control         54,403,752 / 1,088.1  54,403,752 / 1,088.1       0 B
+I32 dependent two/two         98,405,608 / 1,968.1  98,405,608 / 1,968.1       0 B
+F64 one assignment each     101,209,728 / 2,024.2  95,208,344 / 1,904.2    ~-120 B
+F64 one empty, one single     92,008,344 / 1,840.2  85,608,344 / 1,712.2    -128 B
+F64 zero-iteration control    49,604,192 /   992.1  49,604,192 /   992.1       0 B
+F64 no-branch control         59,205,576 / 1,184.1  59,205,576 / 1,184.1       0 B
+F64 dependent two/two        123,211,112 / 2,464.2 123,211,112 / 2,464.2       0 B
+```
+
+F64 saves more than its own 80/64 B of branch arrays because the fast-path dispatcher first probes the I32 branch
+runner. Before this change, that incompatible tentative plan allocated its short arrays before discovering the F64
+target and falling through. Multi-assignment F64 controls still allocate the same tentative and actual arrays, so they
+remain byte-identical.
+
+The existing long-running F64 probe executes five million branch iterations per sample. Four separate processes, each
+reporting the median of seven samples, produced:
+
+```text
+array plans ms    91.1  89.5  94.6  89.7   cross-process median 90.4
+scalar plans ms   82.0  80.8  83.8  83.6   cross-process median 82.8
+```
+
+The process-median ranges do not overlap, and the median showed an 8.4% improvement. Per-process maxima remained noisy,
+so the short-run allocation result is still the primary claim.
+
+The probe pins I32/F64 checksums at `150,000 / 50,000 / 150,000 / 50,000 / 300,000` and per-execution
+fuel/loop/sandbox-allocation/host-call tuples at `23/1/0/0`, `8/0/0/0`, `17/1/0/0`, `19/1/0/0`, and `29/1/0/0`.
+Focused allocation tests cover empty, single, and multiple plans for both numeric lanes; a two-iteration dependent
+case takes both branches and proves each second assignment observes the first assignment's write. `ChargeFuel(0)` for
+an empty taken branch remains in its original position, preserving cancellation/deadline cadence. Debug and unsupported
+shapes still fall back before frame or resource mutation. Public API, compiler/verifier identity, persisted artifacts,
+and sandbox accounting are unchanged.

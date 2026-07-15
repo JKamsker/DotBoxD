@@ -58,6 +58,10 @@ Services, Kernels, and Pushdown.
   for framework types that actually match a request or legacy response shape. Helper names also avoid the
   generated service/extension method, so valid methods such as `WriteKernelRpcValue0` or
   `DateTimeToWireOffset` no longer produce raw C# name-collision errors.
+- **Lean branched interpreter plans:** interpreted branched I32/F64 loops now store empty and single-assignment
+  branches without short-lived plan arrays while retaining ordered arrays for multi-assignment branches.
+  Branch-dependent fuel, cancellation/deadline checks, debug fallback, and sandbox resource accounting remain
+  unchanged.
 - **Documentation & repo polish:** new top-level README, `docs/` information architecture
   (getting-started, concepts, security, reference, contributing), `SECURITY.md`, `CONTRIBUTING.md`,
   `CODE_OF_CONDUCT.md`, and GitHub repo metadata files.
