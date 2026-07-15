@@ -18,6 +18,7 @@ internal static class ForbiddenApiNamePolicy
         DotBoxDGenerationNames.TypeNames.SystemComponentModelTypeDescriptor,
         "System.ComponentModel.LicenseManager",
         "System.Collections.Concurrent.BlockingCollection<T>",
+        "System.Buffers.MemoryPool<T>",
         "Microsoft.Win32.Registry", "System.OperatingSystem", "System.Runtime.ProfileOptimization",
         "System.Security.Principal.WindowsIdentity", "System.UriParser",
         "System.Security.Cryptography.X509Certificates.X509Store",
