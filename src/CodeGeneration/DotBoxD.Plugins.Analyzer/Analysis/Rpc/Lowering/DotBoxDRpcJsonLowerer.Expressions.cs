@@ -82,6 +82,8 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
     private string LowerBinary(BinaryExpressionSyntax binary, Func<ExpressionSyntax, string> lower)
     {
+        ValidateBinarySingleSemantics(binary);
+
         if (binary.Kind() == SyntaxKind.AddExpression)
         {
             var leftIsString = IsStringExpression(binary.Left);
