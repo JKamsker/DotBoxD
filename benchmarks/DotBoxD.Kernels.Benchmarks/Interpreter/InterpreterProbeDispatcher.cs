@@ -40,6 +40,12 @@ internal static class InterpreterProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-interpreter-numeric-conversion", StringComparer.OrdinalIgnoreCase))
+        {
+            await InterpreterNumericConversionProbe.RunAsync();
+            return true;
+        }
+
         return false;
     }
 }
