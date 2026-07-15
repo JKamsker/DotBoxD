@@ -18,6 +18,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-frame-layout
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-i64-plan-setup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-numeric-conversion
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-hook-chain-discovery
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-plugin-package-collision-discovery
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-examples
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-prepared-values
@@ -173,6 +174,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Scalar single-assignment I32 loop plans | this commit | `--probe-interpreter-plan-setup` | Kept the common one-assignment I32 loop plan in a scalar local instead of allocating a one-element `AssignmentPlan[]`, and executed it without an inner array loop. Across 50,000 executions, helper and direct rows fell by about 40 B/op while zero-iteration and two-assignment controls remained byte-identical. A 20-million-iteration lane improved from 47.1-48.9 ms to 35.4-36.7 ms with identical result and resource usage. |
 | Cached compiled entrypoint input types | this commit | `--probe-compiled-input-types` | Generated `Execute` methods now use the existing bounded structural-type cache for direct built-in List/Map parameter validation. Two million generated-input-shaped validations fell from 112.0 B/op to ~0 for `List<I32>` and from 160.0 B/op to ~0 for `Map<String,I32>`. Nested and opaque fallback controls remained byte-identical at 224.0 and 144.0 B/op; compiler and verifier identities advanced to v10. |
 | Scalar single-assignment I64 loop plans | this commit | `--probe-interpreter-i64-plan-setup` | Kept one-statement I64 loop planning out of the multi-statement array/`HashSet`/closure path. A fully warmed execution removed exactly 240 B, while 50,000 one-iteration executions fell from 74,406,960 B to 62,405,576 B (~240 B/op). Zero-iteration and dependent two-assignment controls were byte-identical. Alternating 20-million-iteration samples improved from a 126.3 ms median to 106.9 ms (-15.4%) with identical result and sandbox resource usage. |
+| Syntax-filtered hook-chain discovery | this commit | `--probe-hook-chain-discovery` | Limited the hook-chain semantic transform to member calls named `Run`, `RunLocal`, `Register`, or `RegisterLocal`, while retaining method-group terminals. Across 1,000 retained-driver edits of a tree with 1,000 unrelated `Touch` calls, allocation fell from 1,809,295,360 B to 1,664,179,784 B (-145.1 KB/edit) and time fell from 7.312 to 4.899 ms/edit (-33.0%). An unrelated `Run` control retained semantic validation and stayed allocation-equivalent; generated sources and diagnostics were byte-identical. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -1469,3 +1471,38 @@ For CPU evidence, alternating published-binary 20-million-iteration samples move
 (120.5-143.1 ms range) to a 106.9 ms scalar median (105.2-120.2 ms range), a 15.4% reduction and about 1.18x throughput.
 Timing is secondary to the exact allocation and control evidence. No public API, compiler/verifier identity, persisted
 artifact, or sandbox resource-accounting behavior changes.
+
+## Syntax-filtered hook-chain discovery
+
+The hook-chain incremental syntax provider previously admitted every member-access invocation to semantic lowering. That
+broad predicate was introduced so method-group terminals such as `.Run(Handle)` would reach diagnostics, but the semantic
+resolver can install only four terminal roles: `Run`, `RunLocal`, `Register`, and `RegisterLocal`. The syntax predicate now
+checks those names through `PipelineRoleReader` before Roslyn invokes the semantic transform. Method groups and escaped
+identifiers remain candidates; conditional-access and staged-use diagnostics keep their separate providers.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -- --probe-hook-chain-discovery
+```
+
+Representative warmed retained-driver runs, 1,000 alternating edits between two pre-parsed comment-only snapshots:
+
+```text
+case                         Before ms / B / B-edit          After ms / B / B-edit             delta
+1,000 unrelated Touch calls  7,312.2 / 1,809,295,360 / 1,809,295.4  4,899.0 / 1,664,179,784 / 1,664,179.8  -145,115.6 B/edit
+1,000 unrelated Run calls    7,322.8 / 1,808,306,552 / 1,808,306.6  7,232.9 / 1,808,049,104 / 1,808,049.1      -257.4 B/edit
+```
+
+The `Touch` workload removes about 145.1 KB/edit from the complete generator and improves elapsed time by 33.0%. The
+unrelated `Run` workload is the false-positive control: terminal-named calls still reach semantic validation, its
+allocation moved by less than 0.02%, and its 1.2% elapsed movement shows the stopwatch variability around unchanged
+work. A separate broad `InvokeAsync` syntax provider still examines every invocation, so these whole-generator results
+include that remaining floor.
+
+Both workloads keep one unchanged, valid hook chain active. The probe requires empty diagnostics and byte-identical
+generated sources across both trivia snapshots and both workloads. Before and after runs produced the same generated-
+output SHA256, `DA0DA060957A948DC1A20DCD406F117137FDEC66F52413D5090591DF8807C0D3`. Focused tests also pin all four public terminal names,
+escaped identifier handling, method-group diagnostics, ordinary-member rejection, and cached/unchanged chain-package
+outputs without captured Roslyn objects. No public API, generated source, diagnostic, analyzer contract, or persisted
+artifact version changes.

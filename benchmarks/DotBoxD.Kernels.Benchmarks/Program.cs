@@ -13,6 +13,12 @@ if (await DotBoxD.Kernels.Benchmarks.Interpreter.InterpreterProbeDispatcher.TryR
     return;
 }
 
+if (args.Contains("--probe-hook-chain-discovery", StringComparer.OrdinalIgnoreCase))
+{
+    DotBoxD.Kernels.Benchmarks.PluginAnalyzer.HookChainDiscoveryProbe.Run();
+    return;
+}
+
 if (args.Contains("--probe-plugin-package-collision-discovery", StringComparer.OrdinalIgnoreCase))
 {
     DotBoxD.Kernels.Benchmarks.PluginAnalyzer.PluginPackageCollisionDiscoveryProbe.Run();
