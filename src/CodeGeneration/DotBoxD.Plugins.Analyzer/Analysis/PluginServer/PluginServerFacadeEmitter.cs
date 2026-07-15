@@ -92,6 +92,7 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("    private readonly global::System.Collections.Generic.Dictionary<global::System.Type, string> _serverExtensions = new();");
         builder.AppendLine("    private readonly global::System.Collections.Generic.Dictionary<string, global::System.Collections.Generic.Dictionary<string, object?>> _liveSettingValues = new(global::System.StringComparer.Ordinal);");
         builder.AppendLine("    private readonly object _liveSettingsGate = new();");
+        builder.AppendLine("    private readonly object _disposeGate = new();");
         builder.AppendLine("    private readonly global::System.Collections.Generic.List<RecordedInstall> _setupInstalls;");
         builder.Append("    private ").Append(model.ControlServiceType).AppendLine("? _control;");
         builder.Append("    private ").Append(model.WorldType).AppendLine("? _world;");
@@ -114,6 +115,7 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("    private bool _setupReplayed;");
         builder.AppendLine("    private int _setupReplayIndex;");
         builder.AppendLine("    private bool _configured;");
+        builder.AppendLine("    private global::System.Threading.Tasks.Task? _disposeTask;");
         builder.AppendLine("    private bool _disposed;");
         builder.AppendLine();
         PluginServerXmlDocumentation.AppendSummary(

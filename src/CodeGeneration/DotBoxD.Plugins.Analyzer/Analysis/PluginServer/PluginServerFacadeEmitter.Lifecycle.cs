@@ -100,10 +100,24 @@ internal static partial class PluginServerFacadeEmitter
             builder,
             "    ",
             "Asynchronously releases the generated plugin server session and any owned connection.");
-        builder.AppendLine("    public async global::System.Threading.Tasks.ValueTask DisposeAsync()");
+        builder.AppendLine("    public global::System.Threading.Tasks.ValueTask DisposeAsync()");
         builder.AppendLine("    {");
-        builder.AppendLine("        if (_disposed) { return; }");
-        builder.AppendLine("        _disposed = true;");
+        builder.AppendLine("        return new global::System.Threading.Tasks.ValueTask(GetOrStartDisposeAsync());");
+        builder.AppendLine("    }");
+        builder.AppendLine();
+        builder.AppendLine("    private global::System.Threading.Tasks.Task GetOrStartDisposeAsync()");
+        builder.AppendLine("    {");
+        builder.AppendLine("        lock (_disposeGate)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            if (_disposeTask is not null) { return _disposeTask; }");
+        builder.AppendLine("            _disposed = true;");
+        builder.AppendLine("            _disposeTask = DisposeCoreAsync();");
+        builder.AppendLine("            return _disposeTask;");
+        builder.AppendLine("        }");
+        builder.AppendLine("    }");
+        builder.AppendLine();
+        builder.AppendLine("    private async global::System.Threading.Tasks.Task DisposeCoreAsync()");
+        builder.AppendLine("    {");
         builder.AppendLine("        if (_session is not null) { await _session.DisposeAsync().ConfigureAwait(false); }");
         builder.AppendLine("        _started = false; _control = null; _world = null; _hooks = null; _subscriptions = null; _session = null;");
         if (model.EventCallbackType is not null)
