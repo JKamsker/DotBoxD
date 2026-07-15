@@ -189,7 +189,8 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Lazy collision-safe server-extension request helpers | this commit | `--probe-server-extension-request-helpers` | Request conversion now evaluates a framework-type resolver only after its type predicate matches and skips the generated outer method name when allocating numbered or fixed helpers. A `List<int>` proxy falls from seven request helpers, 6,143 UTF-8 bytes, and 121 lines to one helper, 3,698 bytes, and 67 lines. Across ten cold generations of 100 proxies, allocation falls from 106,581,552 B to 70,499,272 B (33.9%, or 3,608,228 B/run). Generated-compilation tests pin the former `WriteKernelRpcValue5` and `DateTimeToWireOffset` collisions, the post-cleanup `WriteKernelRpcValue0` boundary, and the direct-graft form. |
 | Scalar empty/single branched interpreter plans | this commit | `--probe-interpreter-branched-plan-setup`, `--probe-branched-f64-loop` | Branched I32/F64 loop planners now store empty branches without a plan and one-assignment branches inline, retaining arrays only for two or more ordered assignments. Across 50,000 executions, I32 one-one / empty-one branches remove exactly 80 / 64 B/op; F64 removes about 120 / exactly 128 B/op because the tentative I32 planner also stops allocating before F64 fallback. Zero/no-branch/two-two controls are byte-identical. Four long-F64 process medians moved from 90.4 to 82.8 ms (an observed -8.4%), with non-overlapping ranges and unchanged results/resources. |
 | Parameter-only raw frame assignment state | this commit | `--probe-interpreter-frame-layout` | Reused an empty assignment-state sentinel when every frame slot is a parameter initialized before execution. One- and two-raw-parameter rows each fell from 912.0 to 880.0 B/op, removing exactly one 32-byte array per invocation. Zero-parameter, eight-local, and mixed raw/boxed controls remained byte-identical, and genuine locals retain read-before-assignment tracking. |
-| Scalar interpreted local-function arguments | this commit | `--probe-interpreter-local-call-arguments` | Passed synchronously evaluated one- and two-argument local calls to the callee frame through an internal scalar carrier instead of a temporary array. Across 100,000 executions, arity one fell from 1,024.1 to 992.1 B/op and arity two from 1,040.1 to 1,000.1 B/op. Arity-zero and direct controls are byte-identical; pending operands and arity three retain the original array path. |
+| Scalar interpreted local-function arguments | this commit | `--probe-interpreter-local-call-arguments` | Passed synchronously evaluated one- and two-argument local calls to the callee frame through an internal scalar carrier instead of a temporary array. Across 100,000 executions, arity one fell from 1,024.1 to 992.1 B/op and arity two from 1,040.1 to 1,000.1 B/op. Arity-zero and direct controls are byte-identical; pending operands retain the original array path. |
+| Triple interpreted local-function arguments | this commit | `--probe-interpreter-local-call-arguments` | Extended the synchronous scalar path with a dedicated three-value carrier and explicit overloads that do not grow or genericize the established one/two carrier and frame-invocation path. Across 100,000 calls, the arity-three row fell from 99,232,832 B (992.3 B/op) to 94,431,464 B (944.3 B/op), while arity zero/one/two and all paired direct controls remained byte-identical. Elapsed samples were process-variable, so this is allocation-only. |
 | Lazy interpreter audit envelope | this commit | `--probe-interpreter-audit-envelope` | Deferred the normal run identity and in-memory audit sink for strictly eligible suppressed pure successes. Across 50,000 executions, generated-RunId allocation fell from 848.0 to 784.0 B/op (-64 B/op), while an explicit RunId fell from 816.0 to 784.0 B/op (-32 B/op). Failures and unexpected audit access materialize a real per-run envelope; debug and audited-binding controls remain byte-identical. |
 | Mixed-frame raw assignment state | this commit | `--probe-interpreter-frame-layout` | Allocate assignment state only when a raw slot exists after the leading parameter region; boxed locals retain null/non-null assignment tracking. Across 50,000 raw-parameter-plus-boxed-local executions, allocation fell from 44,402,824 B (888.1 B/op) to 42,802,824 B (856.1 B/op), exactly 32 B/frame. Parameter-only and eight-raw-local controls remain byte-identical, while genuine raw locals preserve `ValidationError` for reads before assignment. |
 | Value-type compiled attempt envelope | this commit | `--probe-compiled-execution-envelope` | Changed the host's private result-or-fallback `CompiledAttempt` from a reference record to a readonly record struct. Across 50,000 warmed public compiled suppressed successes, allocation fell exactly from 42,001,504 B (840.0 B/op) to 40,401,504 B (808.0 B/op), or 32 B/execution. The timing ranges overlap, so this step makes no timing claim. |
@@ -1854,6 +1855,48 @@ Elapsed samples moved in mixed directions (arity-one call 96.1 to 94.1 ms; arity
 allocation reduction is the claim. Focused regressions pin arity-zero-through-three allocation and resource behavior,
 left-to-right exactly-once synchronous evaluation, pending first/second operands, same-plan concurrency, and collection
 name precedence. Public API, compiler/verifier identity, persisted artifacts, and sandbox accounting are unchanged.
+
+## Triple interpreted local-function arguments
+
+The one/two-argument scalar call path deliberately left arity three on the general evaluator, where it allocated a
+three-element `SandboxValue[]` and the callee frame immediately copied those values into its own slots. The array did not
+escape. The follow-up keeps three synchronously completed operands in a dedicated three-reference value carrier and adds
+explicit triple-only evaluator, invocation, and frame-builder overloads. The established array/one/two carrier remains
+non-generic and unchanged; pending operands still resume through the original array continuation.
+
+The permanent probe now includes a padded arity-three direct/call pair and constructs `Stopwatch` before taking the
+thread-local allocation baseline. Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-local-call-arguments
+```
+
+The baseline was rebuilt from merged commit `5252efcf4` with only the expanded/corrected probe. Repeated optimized
+processes reproduced every managed-allocation total below:
+
+```text
+case                    before B / B/op         after B / B/op          delta/op
+arity 0 direct          78,408,968 / 784.1      78,408,968 / 784.1          0 B
+arity 0 local call      89,624,992 / 896.2      89,624,992 / 896.2          0 B
+arity 1 direct          81,609,440 / 816.1      81,609,440 / 816.1          0 B
+arity 1 local call      92,831,464 / 928.3      92,831,464 / 928.3          0 B
+arity 2 direct          82,409,440 / 824.1      82,409,440 / 824.1          0 B
+arity 2 local call      93,631,464 / 936.3      93,631,464 / 936.3          0 B
+arity 3 direct          83,209,440 / 832.1      83,209,440 / 832.1          0 B
+arity 3 local call      99,232,832 / 992.3      94,431,464 / 944.3        -48 B
+```
+
+Subtracting each direct row and then the fixed arity-zero call/frame delta moves the arity-three caller-storage residual
+from 48.1 to 0.1 B/op; the whole execution row falls by 4,801,368 B over 100,000 calls. Elapsed samples were highly
+process-variable, so no timing claim is made. All checksums remain `700,000`; arity-three direct/call
+fuel/loop/sandbox-allocation/host-call tuples remain `3/0/6/0` and `11/0/6/0`.
+
+Focused regressions require zero residual caller-array allocation for arities one through three, preserve arity-zero
+through-three values/resource totals, evaluate three operands left-to-right exactly once, cover pending and failed
+operands at all three positions, ensure a failure stops later operands and the callee body, and resume a pending callee
+body before reading all three retained frame values in a later statement. The extraction of the I32 local-function shape
+analyzer keeps every changed non-generated C# file below 300 lines without adding public API. Compiler/verifier identity,
+persisted artifacts, call-depth cleanup, tracing, and sandbox accounting are unchanged.
 
 ## Lazy interpreter audit envelope
 

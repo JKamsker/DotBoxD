@@ -69,9 +69,9 @@ Services, Kernels, and Pushdown.
   after the leading parameter region. Boxed locals continue to track assignment through their null/non-null slot,
   so a frame with raw parameters and boxed locals can reuse the empty sentinel while genuine raw locals retain
   read-before-assignment validation.
-- **Array-free scalar interpreted local calls:** synchronous one- and two-argument calls to module-local functions
-  now carry evaluated values directly into the callee frame. Pending operands, host bindings, collection constructors,
-  and calls with three or more arguments retain their existing array-backed paths and ordering.
+- **Array-free scalar interpreted local calls:** synchronous one-, two-, and three-argument calls to module-local
+  functions now carry evaluated values directly into the callee frame. Pending operands, host bindings, collection
+  constructors, and calls with four or more arguments retain their existing array-backed paths and ordering.
 - **Lazy interpreter audit envelopes:** strictly eligible in-process interpreter runs that suppress successful summaries,
   disable debug tracing, and declare no binding references now defer their normal run identity and in-memory audit sink
   until audit evidence is actually needed. Failures and unexpected audited access materialize the full envelope, preserving

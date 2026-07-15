@@ -55,12 +55,12 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
            _functions.TryGetValue(call.Name, out var function) &&
            function.Parameters.Count == 0 &&
            function.ReturnType == SandboxType.I32 &&
-           TryGetConstantInt32Return(function, out _);
+           I32LocalFunctionAnalyzer.TryGetConstantReturn(function, out _);
 
     public int EvaluateInt32Call(CallExpression call)
     {
         if (!_functions.TryGetValue(call.Name, out var function) ||
-            !TryGetConstantInt32Return(function, out var expression))
+            !I32LocalFunctionAnalyzer.TryGetConstantReturn(function, out var expression))
         {
             throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, $"unknown call '{call.Name}' at runtime"));
         }
@@ -86,7 +86,7 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
     {
         plan = null!;
         if (!_functions.TryGetValue(call.Name, out var function) ||
-            !TryGetInlineableInt32Return(function, call, out var expression))
+            !I32LocalFunctionAnalyzer.TryGetInlineableReturn(function, call, out var expression))
         {
             return false;
         }
@@ -119,6 +119,9 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
     public ValueTask<SandboxValue> InvokeFunctionAsync(SandboxFunction function, LocalFunctionArguments args)
         => InvokeFunctionCoreAsync(function, args, entrypointInput: null);
 
+    public ValueTask<SandboxValue> InvokeFunctionAsync(SandboxFunction function, LocalFunctionTripleArguments args)
+        => InvokeTripleFunctionCoreAsync(function, args);
+
     private ValueTask<SandboxValue> InvokeFunctionCoreAsync(
         SandboxFunction function,
         LocalFunctionArguments arguments,
@@ -133,6 +136,47 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
             var frame = entrypointInput is null
                 ? InterpreterFrame.Create(layout, function, arguments)
                 : InterpreterFrame.CreateValidatedEntrypoint(layout, function, entrypointInput);
+            var body = function.Body;
+            for (var i = 0; i < body.Count; i++)
+            {
+                var statementTask = _statements.ExecuteStatementAsync(body[i], frame);
+                if (!statementTask.IsCompletedSuccessfully)
+                {
+                    exited = true;
+                    return AwaitInvoke(function, statementTask, frame, i + 1);
+                }
+
+                var result = statementTask.Result;
+                if (result is not null)
+                {
+                    EntrypointBinder.RequireType(result, function.ReturnType, "function return type mismatch");
+                    return new ValueTask<SandboxValue>(result);
+                }
+            }
+
+            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, $"function '{function.Id}' returned no value"));
+        }
+        finally
+        {
+            if (!exited)
+            {
+                _context.ExitCall();
+            }
+        }
+    }
+
+    private ValueTask<SandboxValue> InvokeTripleFunctionCoreAsync(
+        SandboxFunction function,
+        LocalFunctionTripleArguments arguments)
+    {
+        // This overload deliberately leaves the existing one/two-argument hot path unchanged.
+        _context.EnterCall();
+        var exited = false;
+        try
+        {
+            _context.ChargeFuel(1);
+            var layout = GetFrameLayout(function);
+            var frame = InterpreterFrameBuilder.Create(layout, function, arguments);
             var body = function.Body;
             for (var i = 0; i < body.Count; i++)
             {
@@ -222,62 +266,4 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
         return layout;
     }
 
-    private static bool TryGetConstantInt32Return(SandboxFunction function, out Expression expression)
-    {
-        if (function.Body.Count == 1 &&
-            function.Body[0] is ReturnStatement ret &&
-            I32ExpressionEvaluator.CanEvaluate(ret.Value, frame: null))
-        {
-            expression = ret.Value;
-            return true;
-        }
-
-        expression = null!;
-        return false;
-    }
-
-    private static bool TryGetInlineableInt32Return(
-        SandboxFunction function,
-        CallExpression call,
-        out Expression expression)
-    {
-        if (call.Arguments.Count == 1 &&
-            IsSimpleInlineArgument(call.Arguments[0]) &&
-            function.Parameters.Count == 1 &&
-            function.Parameters[0].Type == SandboxType.I32 &&
-            function.ReturnType == SandboxType.I32 &&
-            function.Body.Count == 1 &&
-            function.Body[0] is ReturnStatement ret &&
-            !ContainsCall(ret.Value) &&
-            CountVariableUses(ret.Value, function.Parameters[0].Name) == 1)
-        {
-            expression = ret.Value;
-            return true;
-        }
-
-        expression = null!;
-        return false;
-    }
-
-    private static int CountVariableUses(Expression expression, string name)
-        => expression switch
-        {
-            VariableExpression variable => string.Equals(variable.Name, name, StringComparison.Ordinal) ? 1 : 0,
-            UnaryExpression unary => CountVariableUses(unary.Operand, name),
-            BinaryExpression binary => CountVariableUses(binary.Left, name) + CountVariableUses(binary.Right, name),
-            CallExpression call => call.Arguments.Sum(argument => CountVariableUses(argument, name)),
-            _ => 0
-        };
-
-    private static bool IsSimpleInlineArgument(Expression expression)
-        => expression is LiteralExpression { Value: I32Value } or VariableExpression;
-
-    private static bool ContainsCall(Expression expression)
-        => expression switch
-        {
-            CallExpression => true,
-            UnaryExpression unary => ContainsCall(unary.Operand),
-            BinaryExpression binary => ContainsCall(binary.Left) || ContainsCall(binary.Right),
-            _ => false
-        };
 }
