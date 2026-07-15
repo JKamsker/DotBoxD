@@ -35,6 +35,7 @@ internal static partial class PluginServerFacadeEmitter
         }
 
         builder.AppendLine("                    cancellationToken.ThrowIfCancellationRequested();");
+        builder.AppendLine("                    ThrowIfDisposed();");
         builder.AppendLine("                    var control = session.Get<" + model.ControlServiceType + ">();");
         builder.AppendLine("                    var world = global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.Get" + model.WorldExtensionSuffix + "(session.Peer);");
         builder.AppendLine("                    Initialize(control, world);");
