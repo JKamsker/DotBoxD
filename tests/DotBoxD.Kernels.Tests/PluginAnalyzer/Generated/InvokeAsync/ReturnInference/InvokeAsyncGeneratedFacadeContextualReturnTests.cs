@@ -29,6 +29,32 @@ public sealed class InvokeAsyncGeneratedFacadeContextualReturnTests
     [InlineData("", "")]
     [InlineData("(", ")")]
     [InlineData("", "!")]
+    public void Explicitly_typed_assignment_supplies_unresolved_facade_return_type(
+        string prefix,
+        string suffix)
+    {
+        var result = RunGeneratorAndAssertCompiles(GeneratedFacadeBodySource($$"""
+                public ValueTask<int> Probe()
+                {
+                    ValueTask<int> invocation;
+                    invocation = {{prefix}}InvokeAsync(async world =>
+                    {
+                        return world.GetHealth("monster-1");
+                    }){{suffix}};
+                    return invocation;
+                }
+            """));
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.Contains("AnonymousInvokeAsync", source, StringComparison.Ordinal);
+        Assert.Contains("\\\"returnType\\\":\\\"I32\\\"", source, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("", "")]
+    [InlineData("(", ")")]
+    [InlineData("", "!")]
     [InlineData("((", "))!")]
     public void Transparent_direct_return_supplies_unresolved_facade_return_type(
         string prefix,
@@ -57,6 +83,26 @@ public sealed class InvokeAsyncGeneratedFacadeContextualReturnTests
                 public ValueTask<string> Probe()
                 {
                     ValueTask<string> invocation = InvokeAsync(async world =>
+                    {
+                        return world.GetHealth("monster-1");
+                    });
+                    return invocation;
+                }
+            """));
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.DoesNotContain("AnonymousInvokeAsync", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Incompatible_typed_assignment_context_remains_rejected()
+    {
+        var result = RunGenerator(GeneratedFacadeBodySource("""
+                public ValueTask<string> Probe()
+                {
+                    ValueTask<string> invocation;
+                    invocation = InvokeAsync(async world =>
                     {
                         return world.GetHealth("monster-1");
                     });
