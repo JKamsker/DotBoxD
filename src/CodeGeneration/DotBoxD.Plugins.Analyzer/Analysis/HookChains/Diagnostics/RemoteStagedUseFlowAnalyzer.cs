@@ -193,7 +193,7 @@ internal static class RemoteStagedUseFlowAnalyzer
         CancellationToken cancellationToken,
         int depth)
     {
-        if (depth > 8)
+        if (depth > HookChainAliasResolver.MaxResolutionDepth)
         {
             return false;
         }

@@ -53,7 +53,7 @@ internal static partial class GeneratedRemoteHookChainFallback
         CancellationToken cancellationToken,
         int depth)
     {
-        if (depth > 8)
+        if (depth > HookChainAliasResolver.MaxResolutionDepth)
         {
             return false;
         }
