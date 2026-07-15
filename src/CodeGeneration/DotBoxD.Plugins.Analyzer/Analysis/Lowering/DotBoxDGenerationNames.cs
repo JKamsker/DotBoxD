@@ -84,6 +84,7 @@ internal static partial class DotBoxDGenerationNames
         public const string SystemGc = "System.GC";
         public const string SystemGcSettings = "System.Runtime.GCSettings";
         public const string SystemTimeZoneInfo = "System.TimeZoneInfo";
+        public const string SystemProgressOriginal = "System.Progress<T>";
         public const string SystemDelegate = "System.Delegate";
         public const string SystemTextEncoding = "System.Text.Encoding";
         public const string SystemServiceProvider = "System.IServiceProvider";
