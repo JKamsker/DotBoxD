@@ -105,6 +105,8 @@ public sealed partial class PluginAnalyzer
                 return true;
             case IMethodSymbol method when TryGetForbiddenX509HostIoMethod(method, out forbidden):
                 return true;
+            case IMethodSymbol method when TryGetForbiddenXmlFileMethod(method, out forbidden):
+                return true;
             case IMethodSymbol method when TryGetForbiddenNondeterministicMethod(method, out forbidden):
                 return true;
             case IMethodSymbol method:
@@ -146,8 +148,24 @@ public sealed partial class PluginAnalyzer
            containingTypeName is
                "System.Security.Cryptography.X509Certificates.X509Certificate" or
                "System.Security.Cryptography.X509Certificates.X509Certificate2" &&
-           method.Parameters.Any(static parameter =>
-               parameter.Type.SpecialType == SpecialType.System_String);
+           method.Parameters.FirstOrDefault()?.Type.SpecialType == SpecialType.System_String;
+
+    private static bool TryGetForbiddenXmlFileMethod(IMethodSymbol method, out ITypeSymbol forbidden)
+    {
+        var containingType = method.ContainingType;
+        var containingTypeName = containingType?.OriginalDefinition.ToDisplayString(
+            SymbolDisplayFormat.CSharpErrorMessageFormat);
+        if (string.Equals(method.Name, "Create", StringComparison.Ordinal) &&
+            containingTypeName is "System.Xml.XmlReader" or "System.Xml.XmlWriter" &&
+            method.Parameters.FirstOrDefault()?.Type.SpecialType == SpecialType.System_String)
+        {
+            forbidden = containingType!;
+            return true;
+        }
+
+        forbidden = null!;
+        return false;
+    }
 
     private static bool IsX509ChainBuild(
         IMethodSymbol method,

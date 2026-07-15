@@ -35,8 +35,9 @@ public sealed class SandboxHostWorkerClientLifecycleContractTests
                     Options()));
 
             await factoryEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            worker.Dispose();
+            var disposeTask = Task.Run(worker.Dispose);
             releaseFactory.SetResult();
+            await disposeTask;
 
             var executionException = await Record.ExceptionAsync(
                 async () => await execution.WaitAsync(TimeSpan.FromSeconds(5)));

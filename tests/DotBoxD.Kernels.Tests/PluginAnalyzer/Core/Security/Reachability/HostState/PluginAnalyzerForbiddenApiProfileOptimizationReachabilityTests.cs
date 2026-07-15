@@ -36,11 +36,8 @@ public sealed class PluginAnalyzerForbiddenApiProfileOptimizationReachabilityTes
 
         var diagnostics = await AnalyzeAsync(source);
 
-        Assert.Contains(diagnostics, diagnostic =>
-            diagnostic.Id == "DBXK001"
-            && diagnostic.GetMessage().Contains(
-                "System.Runtime.ProfileOptimization",
-                StringComparison.Ordinal));
+        var diagnostic = Assert.Single(diagnostics.Where(d => d.Id == "DBXK001"));
+        Assert.Contains("System.Runtime.ProfileOptimization", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
     [Fact]

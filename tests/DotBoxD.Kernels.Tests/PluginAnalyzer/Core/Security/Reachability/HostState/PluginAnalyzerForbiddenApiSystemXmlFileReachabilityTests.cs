@@ -44,6 +44,35 @@ public sealed class PluginAnalyzerForbiddenApiSystemXmlFileReachabilityTests
         Assert.Contains(expectedApi, diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(
+        "xml-reader-memory",
+        """
+        using var reader = System.Xml.XmlReader.Create(new System.IO.StringReader(e));
+        return reader.NodeType == System.Xml.XmlNodeType.None;
+        """,
+        "System.Xml.XmlReader")]
+    [InlineData(
+        "xml-writer-memory",
+        """
+        using var writer = System.Xml.XmlWriter.Create(new System.Text.StringBuilder());
+        writer.WriteStartDocument();
+        return true;
+        """,
+        "System.Xml.XmlWriter")]
+    public async Task Does_not_report_memory_factories_as_xml_file_io(
+        string pluginId,
+        string shouldHandleBody,
+        string xmlApi)
+    {
+        var diagnostics = await AnalyzeAsync(Source(pluginId, shouldHandleBody));
+
+        Assert.DoesNotContain(
+            diagnostics,
+            diagnostic => diagnostic.Id == "DBXK001" &&
+                diagnostic.GetMessage().Contains(xmlApi, StringComparison.Ordinal));
+    }
+
     private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string source)
     {
         var compilation = CreateCompilation(source);

@@ -33,6 +33,45 @@ public sealed class PluginAnalyzerForbiddenApiStringAllocationReachabilityTests
         Assert.True(message.Contains(expectedApi, StringComparison.Ordinal), $"{testCase}: {message}");
     }
 
+    [Theory]
+    [InlineData(
+        "string.Create",
+        "string.Create(16, 0, static (span, state) => { })",
+        "System.String.Create")]
+    [InlineData(
+        "RSA.Create",
+        "System.Security.Cryptography.RSA.Create(2048)",
+        "System.Security.Cryptography.RSA.Create")]
+    public async Task Reports_exact_forbidden_members_in_event_kernel_initializers(
+        string testCase,
+        string initializer,
+        string expectedApi)
+    {
+        var source = $$"""
+            namespace Sample
+            {
+                using DotBoxD.Abstractions;
+                using DotBoxD.Plugins;
+
+                [Plugin("initializer-exact-member")]
+                public sealed class InitializerKernel : IEventKernel<string>
+                {
+                    private readonly object _value = {{initializer}};
+
+                    public bool ShouldHandle(string e, HookContext context) => _value is not null;
+                    public void Handle(string e, HookContext context) { }
+                }
+            }
+            """;
+
+        var diagnostics = await AnalyzeAsync(source);
+
+        Assert.True(
+            diagnostics.Any(diagnostic => diagnostic.Id == "DBXK001" &&
+                diagnostic.GetMessage().Contains(expectedApi, StringComparison.Ordinal)),
+            $"{testCase}: expected an initializer diagnostic for {expectedApi}.");
+    }
+
     private static string Source(string statement)
         => $$"""
             #nullable enable

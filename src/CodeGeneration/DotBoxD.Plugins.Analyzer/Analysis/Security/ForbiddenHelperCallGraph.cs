@@ -35,9 +35,6 @@ internal sealed class ForbiddenHelperCallGraph
     public void RecordForbidden(IFieldSymbol field, ITypeSymbol type)
         => _forbidden.TryAdd(Normalize(field), DisplayName(type));
 
-    public bool TryRecordDirectDiagnostic(IMethodSymbol method)
-        => _directDiagnostics.TryAdd(Normalize(method), string.Empty);
-
     public bool TryRecordDirectDiagnostic(IMethodSymbol method, ITypeSymbol type)
         => _directDiagnostics.TryAdd(Normalize(method), DirectDiagnosticKey(type));
 

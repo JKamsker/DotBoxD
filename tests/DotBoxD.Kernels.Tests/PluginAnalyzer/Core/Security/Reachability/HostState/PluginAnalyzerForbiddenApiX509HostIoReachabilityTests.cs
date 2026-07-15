@@ -63,6 +63,26 @@ public sealed class PluginAnalyzerForbiddenApiX509HostIoReachabilityTests
         Assert.DoesNotContain(diagnostics, d => d.Id == "DBXK001");
     }
 
+    [Fact]
+    public async Task Allows_in_memory_certificate_parsing_with_password()
+    {
+        var source = Source(
+            """
+            using var certificate =
+                new System.Security.Cryptography.X509Certificates.X509Certificate2(
+                    System.Array.Empty<byte>(),
+                    "password");
+            return certificate.RawData.Length >= 0;
+            """);
+
+        var diagnostics = await AnalyzeAsync(source);
+
+        Assert.DoesNotContain(
+            diagnostics,
+            diagnostic => diagnostic.Id == "DBXK001" &&
+                diagnostic.GetMessage().Contains("X509Certificate", StringComparison.Ordinal));
+    }
+
     private static string Source(string shouldHandleBody)
         => $$"""
             #nullable enable

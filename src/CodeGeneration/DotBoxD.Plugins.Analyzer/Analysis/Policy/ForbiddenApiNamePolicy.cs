@@ -26,7 +26,6 @@ internal static class ForbiddenApiNamePolicy
         "System.Runtime.ProfileOptimization",
         "System.Security.Principal.WindowsIdentity", "System.UriParser",
         "System.Security.Cryptography.X509Certificates.X509Store",
-        "System.Xml.XmlReader", "System.Xml.XmlWriter",
         "System.Security.Cryptography.CngKey",
         "System.Security.Cryptography.CspKeyContainerInfo",
         "System.Security.Cryptography.CspParameters",

@@ -4,6 +4,7 @@ using Xunit;
 
 namespace DotBoxD.Services.Tests.Diagnostics;
 
+[Collection(RpcTelemetryCollection.Name)]
 public sealed class RpcDiagnosticsTelemetryIsolationTests
 {
     private static readonly SemaphoreSlim s_diagnosticsGate = new(1, 1);

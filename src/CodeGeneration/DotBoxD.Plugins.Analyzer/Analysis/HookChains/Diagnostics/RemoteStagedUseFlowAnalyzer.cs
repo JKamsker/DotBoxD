@@ -138,8 +138,14 @@ internal static class RemoteStagedUseFlowAnalyzer
         CancellationToken cancellationToken)
     {
         var info = model.GetSymbolInfo(terminal, cancellationToken);
-        var symbol = info.Symbol ?? (info.CandidateSymbols.Length > 0 ? info.CandidateSymbols[0] : null);
-        return PipelineRoleReader.RoleOf(symbol as IMethodSymbol, model.Compilation) is
+        var method = (info.Symbol ?? (info.CandidateSymbols.Length > 0 ? info.CandidateSymbols[0] : null)) as IMethodSymbol;
+        var role = PipelineRoleReader.RoleOf(method, model.Compilation) ??
+            GeneratedRemoteHookChainFallback.RoleOfUnresolvedGeneratedSurface(
+                terminal,
+                model,
+                cancellationToken,
+                method);
+        return role is
             PipelineCallRole.Run or
             PipelineCallRole.RunLocal or
             PipelineCallRole.Register or

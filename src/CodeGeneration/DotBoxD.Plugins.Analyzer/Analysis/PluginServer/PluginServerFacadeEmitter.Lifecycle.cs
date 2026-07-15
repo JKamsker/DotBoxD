@@ -40,11 +40,13 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("                    var world = global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.Get" + model.WorldExtensionSuffix + "(session.Peer);");
         builder.AppendLine("                    Initialize(control, world);");
         builder.AppendLine("                    _session = session;");
+        builder.AppendLine("                    ThrowIfDisposed();");
         builder.AppendLine("                    session = null;");
         builder.AppendLine("                    _started = true;");
         builder.AppendLine("                }");
         builder.AppendLine("                catch (global::System.Exception startEx)");
         builder.AppendLine("                {");
+        builder.AppendLine("                    if (global::System.Object.ReferenceEquals(_session, session)) { _session = null; }");
         builder.AppendLine("                    if (session is not null)");
         builder.AppendLine("                    {");
         builder.AppendLine("                        try");

@@ -13,7 +13,7 @@ public sealed partial class PluginAnalyzer
         {
             helperGraph.RecordForbidden(method, ArrayAllocationForbiddenApiName);
             if (IsForbiddenApiRoot(context, method) &&
-                helperGraph.TryRecordDirectDiagnostic(method))
+                helperGraph.TryRecordDirectDiagnostic(method, ArrayAllocationForbiddenApiName))
             {
                 ReportArrayAllocationDiagnostic(context);
             }
