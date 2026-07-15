@@ -10,6 +10,8 @@ public sealed class PluginAnalyzerForbiddenApiTransactionReachabilityTests
     private static readonly CSharpParseOptions ParseOptions =
         CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
 
+    private static readonly Lazy<ImmutableArray<MetadataReference>> SharedReferences = new(CreateSharedReferences);
+
     [Fact]
     public async Task Reports_ambient_transaction_mutation_from_event_kernel()
     {
@@ -19,7 +21,7 @@ public sealed class PluginAnalyzerForbiddenApiTransactionReachabilityTests
             return true;
             """));
 
-        var diagnostic = Assert.Single(diagnostics.Where(d => d.Id == "DBXK001"));
+        var diagnostic = Assert.Single(diagnostics, d => d.Id == "DBXK001");
         Assert.Contains("System.Transactions", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
@@ -31,7 +33,7 @@ public sealed class PluginAnalyzerForbiddenApiTransactionReachabilityTests
             return true;
             """));
 
-        var diagnostic = Assert.Single(diagnostics.Where(d => d.Id == "DBXK001"));
+        var diagnostic = Assert.Single(diagnostics, d => d.Id == "DBXK001");
         Assert.Contains("System.IO.File", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
@@ -43,7 +45,7 @@ public sealed class PluginAnalyzerForbiddenApiTransactionReachabilityTests
             return normalized.Length > 0;
             """));
 
-        Assert.Empty(diagnostics.Where(d => d.Id == "DBXK001"));
+        Assert.DoesNotContain(diagnostics, d => d.Id == "DBXK001");
     }
 
     private static string Source(string shouldHandleBody)
@@ -71,8 +73,7 @@ public sealed class PluginAnalyzerForbiddenApiTransactionReachabilityTests
     private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string source)
     {
         var compilation = CreateCompilation(source);
-        var compilerErrors = compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error);
-        Assert.Empty(compilerErrors);
+        Assert.DoesNotContain(compilation.GetDiagnostics(), d => d.Severity == DiagnosticSeverity.Error);
 
         var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(new DotBoxD.Plugins.Analyzer.Analysis.PluginAnalyzer());
         return await compilation.WithAnalyzers(analyzers).GetAnalyzerDiagnosticsAsync();
@@ -84,16 +85,17 @@ public sealed class PluginAnalyzerForbiddenApiTransactionReachabilityTests
         return CSharpCompilation.Create(
             "DotBoxDPluginAnalyzerTransactionReachabilityTest",
             [syntaxTree],
-            TrustedPlatformReferences()
-                .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
-                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location)),
+            SharedReferences.Value,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     }
 
-    private static IEnumerable<MetadataReference> TrustedPlatformReferences()
+    private static ImmutableArray<MetadataReference> CreateSharedReferences()
     {
         var references = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))?
             .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries) ?? [];
-        return references.Select(reference => MetadataReference.CreateFromFile(reference));
+        return references.Select<string, MetadataReference>(reference => MetadataReference.CreateFromFile(reference))
+            .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
+            .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
+            .ToImmutableArray();
     }
 }
