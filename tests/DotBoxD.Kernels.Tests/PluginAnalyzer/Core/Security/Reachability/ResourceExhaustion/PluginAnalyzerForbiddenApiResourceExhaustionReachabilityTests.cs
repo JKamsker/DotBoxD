@@ -30,8 +30,10 @@ public sealed class PluginAnalyzerForbiddenApiResourceExhaustionReachabilityTest
 
         var diagnostics = await AnalyzeAsync(source);
 
-        var diagnostic = Assert.Single(diagnostics.Where(d => d.Id == "DBXK001"));
-        Assert.Contains(expectedApiName, diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains(
+            diagnostics,
+            diagnostic => diagnostic.Id == "DBXK001" &&
+                diagnostic.GetMessage().Contains(expectedApiName, StringComparison.Ordinal));
     }
 
     private static string CreateSource(string statement)

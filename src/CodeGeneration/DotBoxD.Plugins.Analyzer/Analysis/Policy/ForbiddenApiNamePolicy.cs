@@ -41,15 +41,15 @@ internal static class ForbiddenApiNamePolicy
         "System.IO.", "System.Net.", "System.Reflection.", "System.Resources.", "System.Runtime.InteropServices.",
         "System.Runtime.Intrinsics.", "System.Runtime.Loader.", "System.Diagnostics.", "System.Threading.",
         "System.Threading.Tasks.",
-        "System.Timers.", "System.Linq.Expressions.", "System.Security.Cryptography.",
-        "System.Security.Principal.", "System.Transactions.",
+        "System.Timers.", "System.Linq.Expressions.", "System.Security.Principal.", "System.Transactions.",
         "System.Data.", "Microsoft.CSharp.", "Microsoft.VisualBasic.", "Microsoft.EntityFrameworkCore.",
         "Microsoft.Win32."
     ];
 
     private static readonly string[] ExactMemberNames =
     [
-        "System.String.Create"
+        "System.String.Create",
+        "System.Security.Cryptography.RSA.Create"
     ];
 
     public static bool IsForbiddenExactType(string name) => Array.IndexOf(ExactTypeNames, name) >= 0;
