@@ -228,10 +228,8 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
         => Use(_kernels.GetByKernelType<TKernel>());
 
     /// <summary>
-    /// Wires a lowered <b>local-terminal</b> subscription chain (a remote <c>RunLocal</c> chain): the lowered
-    /// <c>Where</c>/<c>Select</c> always run here in the sandbox, and for each event that passes the filter the
-    /// projected value is encoded and handed to <paramref name="push"/> for delivery across the IPC boundary to
-    /// the plugin's native delegate. Non-matching events never reach <paramref name="push"/>.
+    /// Wires a lowered local-terminal subscription chain and pushes each matching projected value across IPC.
+    /// Non-matching events never reach <paramref name="push"/>.
     /// </summary>
     public SubscriptionPipeline<TEvent, TContext> UseProjecting(
         InstalledKernel kernel,
@@ -252,7 +250,6 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
         ThrowIfDisposed();
         _handlerSet.Add(kernel, (e, rawContext, _) =>
             Hooks.LocalCallbackProjection.PushAsync(kernel, _adapter, e, rawContext, wholeEvent, subscriptionId, push));
-
         return this;
     }
 
@@ -297,6 +294,5 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
     void ISubscriptionPipeline<TEvent>.Publish(TEvent e, CancellationToken cancellationToken)
         => Publish(e, cancellationToken);
 
-    private void ThrowIfDisposed()
-        => _throwIfDisposed?.Invoke();
+    private void ThrowIfDisposed() => _throwIfDisposed?.Invoke();
 }
