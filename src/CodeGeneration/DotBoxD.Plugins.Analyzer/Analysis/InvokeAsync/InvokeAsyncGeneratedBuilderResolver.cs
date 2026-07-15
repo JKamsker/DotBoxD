@@ -122,11 +122,10 @@ internal static class InvokeAsyncGeneratedBuilderResolver
                     identifier.SpanStart,
                     model,
                     cancellationToken,
-                    designation.SyntaxTree.GetRoot(cancellationToken),
-                    nestedFunctionPathNode: identifier) &&
+                designation.SyntaxTree.GetRoot(cancellationToken),
+                nestedFunctionPathNode: identifier) &&
                 DeconstructionInitializer(designation, cancellationToken) is { } initializer &&
-                TryFacadeNameFromBuilderInitializer(initializer, out var facadeName) &&
-                TryFindGeneratedFacade(model.Compilation, facadeName, cancellationToken, out receiverType))
+                TryResolveGeneratedBuilderExpression(model, initializer, cancellationToken, out receiverType))
             {
                 return true;
             }
