@@ -18,6 +18,11 @@ internal static class InvokeAsyncGeneratedBuilderResolver
     {
         receiver = HookChainAliasResolver.UnwrapTransparentExpression(receiver);
         receiverType = null!;
+        if (TryResolveGeneratedBuilderComposition(model, receiver, cancellationToken, out receiverType))
+        {
+            return true;
+        }
+
         if (TryResolveGeneratedBuilderExpression(model, receiver, cancellationToken, out receiverType))
         {
             return true;
@@ -48,6 +53,55 @@ internal static class InvokeAsyncGeneratedBuilderResolver
         }
 
         return TryResolveDeconstructionLocal(model, identifier, local, cancellationToken, out receiverType);
+    }
+
+    private static bool TryResolveGeneratedBuilderComposition(
+        SemanticModel model,
+        ExpressionSyntax receiver,
+        CancellationToken cancellationToken,
+        out INamedTypeSymbol receiverType)
+    {
+        receiverType = null!;
+        if (receiver is ConditionalExpressionSyntax conditional)
+        {
+            return TryResolveMatchingTypes(
+                model,
+                conditional.WhenTrue,
+                conditional.WhenFalse,
+                cancellationToken,
+                out receiverType);
+        }
+
+        if (receiver is BinaryExpressionSyntax coalesce && coalesce.IsKind(SyntaxKind.CoalesceExpression))
+        {
+            return TryResolveMatchingTypes(
+                model,
+                coalesce.Left,
+                coalesce.Right,
+                cancellationToken,
+                out receiverType);
+        }
+
+        return false;
+    }
+
+    private static bool TryResolveMatchingTypes(
+        SemanticModel model,
+        ExpressionSyntax left,
+        ExpressionSyntax right,
+        CancellationToken cancellationToken,
+        out INamedTypeSymbol receiverType)
+    {
+        receiverType = null!;
+        if (!TryResolve(model, left, cancellationToken, out var leftType) ||
+            !TryResolve(model, right, cancellationToken, out var rightType) ||
+            !SymbolEqualityComparer.Default.Equals(leftType, rightType))
+        {
+            return false;
+        }
+
+        receiverType = leftType;
+        return true;
     }
 
     private static bool TryResolveDeconstructionLocal(
