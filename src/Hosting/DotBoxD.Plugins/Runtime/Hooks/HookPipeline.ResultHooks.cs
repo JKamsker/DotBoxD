@@ -105,9 +105,11 @@ public partial class HookPipeline<TEvent, TContext>
         ArgumentNullException.ThrowIfNull(resultType);
         ArgumentNullException.ThrowIfNull(request);
         EnsureHookResultType(resultType);
+        ThrowIfDisposed();
         LocalCallbackProjection.EnsureWholeEventSupported(_adapter);
         filterKernel.ValidateFor(_adapter);
         ValidateResultKernel(filterKernel, resultType, resultLocalTerminal: true);
+        ThrowIfDisposed();
         _resultHooks.AddRemote(filterKernel, priority, async (e, rawContext, _, ct) =>
         {
             var response = await LocalCallbackProjection.RequestResultAsync(
