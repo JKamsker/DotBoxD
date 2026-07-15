@@ -15,7 +15,7 @@ internal static class ForbiddenApiNamePolicy
         DotBoxDGenerationNames.TypeNames.SystemArrayPoolOriginal,
         DotBoxDGenerationNames.TypeNames.SystemComponentModelTypeDescriptor,
         "System.ComponentModel.LicenseManager",
-        "Microsoft.Win32.Registry", "System.Runtime.ProfileOptimization",
+        "Microsoft.Win32.Registry", "System.OperatingSystem", "System.Runtime.ProfileOptimization",
         "System.Security.Principal.WindowsIdentity", "System.Security.Cryptography.X509Certificates.X509Store",
         "System.Xml.XmlReader", "System.Xml.XmlWriter",
         "System.Security.Cryptography.CngKey",
@@ -29,7 +29,8 @@ internal static class ForbiddenApiNamePolicy
     private static readonly string[] NamespacePrefixes =
     [
         "System.IO.", "System.Net.", "System.Reflection.", "System.Resources.", "System.Runtime.InteropServices.",
-        "System.Runtime.Loader.", "System.Diagnostics.", "System.Threading.", "System.Threading.Tasks.",
+        "System.Runtime.Intrinsics.", "System.Runtime.Loader.", "System.Diagnostics.", "System.Threading.",
+        "System.Threading.Tasks.",
         "System.Timers.", "System.Linq.Expressions.", "System.Security.Principal.", "System.Transactions.",
         "System.Data.", "Microsoft.CSharp.", "Microsoft.EntityFrameworkCore.", "Microsoft.Win32."
     ];
