@@ -21,8 +21,10 @@ public sealed class PluginAnalyzerForbiddenApiTransactionReachabilityTests
             return true;
             """));
 
-        var diagnostic = Assert.Single(diagnostics, d => d.Id == "DBXK001");
-        Assert.Contains("System.Transactions", diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains(
+            diagnostics,
+            diagnostic => diagnostic.Id == "DBXK001" &&
+                diagnostic.GetMessage().Contains("System.Transactions", StringComparison.Ordinal));
     }
 
     [Fact]

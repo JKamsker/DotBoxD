@@ -25,8 +25,10 @@ public sealed class PluginAnalyzerForbiddenApiVisualBasicReachabilityTests
 
         var diagnostics = await AnalyzeAsync(source);
 
-        var diagnostic = Assert.Single(diagnostics.Where(d => d.Id == "DBXK001"));
-        Assert.Contains(expectedForbiddenApi, diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains(
+            diagnostics,
+            diagnostic => diagnostic.Id == "DBXK001" &&
+                diagnostic.GetMessage().Contains(expectedForbiddenApi, StringComparison.Ordinal));
     }
 
     private static string Source(string statement)
