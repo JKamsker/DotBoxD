@@ -91,6 +91,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Synchronous hook and message dispatch fast paths | this commit | `--probe-examples` | Kept hook publish and `host.message.send` binding dispatch on completed `ValueTask` fast paths, falling back to awaited helpers only when a filter, handler, or sink actually suspends. Three local samples measured `mixed fire/ice` native hook 7.1-7.2 ms, compiled 480.9-518.2 ms, interpreted 489.9-536.9 ms; `predicate miss` native hook 1.2-1.3 ms, compiled 64.5-70.9 ms, interpreted 177.9-190.6 ms; `predicate hit` native hook 2.3-2.4 ms, compiled 193.9-213.4 ms, interpreted 400.4-486.4 ms. Compared with the previous row, native hook dispatch moved down consistently; compiled/interpreted plugin dispatch remains noisy and still far from native. |
 | Compiled runtime scalar type singleton reuse | this commit | `--probe-runtime-types` | `CompiledRuntime.TypeScalar("I32")` now returns the built-in scalar singleton used by generated entrypoint type checks instead of rebuilding `SandboxType.Scalar("I32")`. Two local samples for 2M calls measured the allocating scalar baseline at 115.8-123.9 ms and 112,000,040 B, while the compiled-runtime built-in path measured 21.5-25.7 ms and 40 B. The non-built-in fallback stayed allocating as expected: `CompiledRuntime.TypeScalar("MonsterId")` measured 105.6-115.4 ms and 112,000,040 B. |
 | Compiled Guid type singleton reuse | this commit | `--probe-runtime-types` | Added the `Guid` singleton omitted when built-in scalar reuse was introduced before `SandboxType.Guid` existed. Two million `TypeScalar("Guid")` calls improved from 123.7 ms and 64,000,040 B to 17.1 ms and 40 B; generated-shaped `RequireType(Guid, TypeScalar("Guid"))` calls improved from 166.3 ms and 64,000,040 B to 28.3 ms and 40 B by reaching the existing reference-equality validator fast path. The opaque-id fallback remained at 64,000,040 B. |
+| Lazy per-binding host-call tracker | this commit | `--probe-resource-meter`, `--probe-interpreter-frame-layout` | Deferred `ResourceHostCallTracker` construction until a binding actually declares `MaxCallsPerRun`. One million meters with no limited calls fell from 168,000,040 B (168.0 B/op) to 128,000,040 B (128.0 B/op); fresh limited-call controls remained exactly 168.0 B/op and 384.0 B/op. Interpreted parameter/local execution envelopes each fell another 40 B/op. |
 | Interpreter single-parameter inline substitution | this commit | `--probe-interpreter-plan-setup` | Replaced the one-entry dictionary created for every inlineable one-parameter I32 helper plan with a two-reference value. Across 50,000 one-iteration interpreted executions, the helper lane fell from 79,206,040 B (1,584.1 B/op) to 68,406,040 B (1,368.1 B/op), while zero-iteration and equivalent direct-expression controls were unchanged. |
 | Compiled built-in structural type cache | this commit | `--probe-runtime-types` | Added bounded generated-ABI factories for the nine built-in list types and 81 built-in map pairs. Two million generated-return-shaped `List<I32>` / `Map<String,I32>` checks dropped from 224,000,040 B / 320,000,040 B to 40 B total per row. Nested, opaque, and record-derived descriptors stay on the legacy factories to avoid lookup overhead or attacker-controlled retention. |
 | Built-in scalar validation fast path | this commit | `--probe-runtime-types`, `--probe-examples` | Short-circuited `SandboxValueValidator.RequireType` when the value is a built-in scalar and the expected type is the matching singleton, preserving the existing generic path for non-singleton and opaque-id scalar types. Two local runtime-type samples for 2M calls measured forced generic validation with `RequireType(I32, Scalar("I32"))` at 313.4-319.4 ms and 40 B, while the singleton fast path `RequireType(I32, SandboxType.I32)` measured 19.7-27.5 ms and 40 B. One example workflow sanity sample was still noisy (`mixed fire/ice` compiled 400.2 ms, `predicate miss` compiled 160.6 ms, `predicate hit` compiled 222.9 ms), so this step claims only the direct scalar validation improvement. |
@@ -1176,3 +1177,39 @@ helper planning: the argument, body, and `InlineCall` plan nodes still exist. Ea
 checksum and retained 23 fuel, one loop iteration, zero sandbox allocation, and zero host calls; the direct control retained
 19 fuel. Stopwatch differences are secondary. Regression coverage also pins the subtle shadowing case where a literal
 substitution must not fall through to a same-named caller slot, plus the commuted raw-variable fused path.
+
+## Lazy per-binding host-call tracking
+
+Every `ResourceMeter` previously constructed a `ResourceHostCallTracker` even when the execution made no host calls or
+used only bindings without `MaxCallsPerRun`. The tracker contains optional per-binding state that the global host-call
+counter does not need. This added a separate 40-byte CLR object to every fresh meter, including ordinary interpreted and
+compiled execution envelopes.
+
+The meter now creates the existing tracker only inside the limited-binding branch. Unlimited calls continue to use the
+global counter alone. Once created, the tracker is retained across `ResetForReuse` and cleared exactly as before, so
+serialized reusable execution state does not repeatedly allocate it. No public API or sandbox accounting changed.
+
+Commands:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -- --probe-resource-meter
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -- --probe-interpreter-frame-layout
+```
+
+Representative local runs:
+
+```text
+case                                  Iterations   Before ms / allocated / B/op      After ms / allocated / B/op
+new ResourceMeter(limits)             1,000,000     94.3 / 168,000,040 B / 168.0       92.5 / 128,000,040 B / 128.0
+fresh meter + one limited call          250,000     28.8 /  42,000,040 B / 168.0       23.9 /  42,000,040 B / 168.0
+fresh meter + A/B/A limited calls       250,000     58.3 /  96,000,040 B / 384.0       53.9 /  96,000,040 B / 384.0
+interpreter parameter return             50,000     68.4 / 1,016.0 B/op                69.1 /   976.0 B/op
+interpreter eight-local chain             50,000    180.0 / 1,120.1 B/op               191.0 / 1,080.1 B/op
+```
+
+Allocation is the claim: unused-tracker meter construction removes exactly 40 B/op (23.8%), and both interpreted
+execution controls inherit the same fixed reduction. The limited-call controls are byte-for-byte unchanged, including
+the alternating A/B/A lane that materializes the ordinal dictionary. Checksums and snapshots confirm that only `HostCalls`
+changes in those lanes; fuel, loops, sandbox allocation, file/network bytes, logs, collection elements, and string bytes
+remain zero. Focused tests cover the null reset path, dictionary-backed reset, same-binding quota, binding switches, and
+the 128 B fresh-meter allocation guard. Stopwatch movement is secondary.
