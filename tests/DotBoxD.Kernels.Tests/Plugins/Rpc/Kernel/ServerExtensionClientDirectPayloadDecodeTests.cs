@@ -225,12 +225,12 @@ public sealed class ServerExtensionClientDirectPayloadDecodeTests
         public sealed partial class NullableKernel
         {
             [ServerExtensionMethod(typeof(IRemoteControl))]
-            public int? Read(HookContext ctx) => 0;
+            public int? Read(int? value, HookContext ctx) => value;
         }
 
         public static class Probe
         {
-            public static int? Read(RemoteControl control) => control.Read();
+            public static int? Read(RemoteControl control) => control.Read(null);
         }
         """;
 
