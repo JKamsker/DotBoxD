@@ -106,11 +106,13 @@ public sealed class PluginAnalyzerForbiddenApiGenericHostReachabilityTests
 
     private static IEnumerable<string> AspNetCoreReferenceAssemblyPaths()
     {
+        var coreLibDirectory = Path.GetDirectoryName(typeof(object).Assembly.Location);
+        var dotnetRoot = coreLibDirectory is null
+            ? string.Empty
+            : Path.GetFullPath(Path.Combine(coreLibDirectory, "..", "..", ".."));
+
         var packsRoot = Path.Combine(
-            Path.GetPathRoot(Environment.SystemDirectory) ?? Path.DirectorySeparatorChar.ToString(),
-            "usr",
-            "share",
-            "dotnet",
+            dotnetRoot,
             "packs",
             "Microsoft.AspNetCore.App.Ref");
         if (!Directory.Exists(packsRoot))

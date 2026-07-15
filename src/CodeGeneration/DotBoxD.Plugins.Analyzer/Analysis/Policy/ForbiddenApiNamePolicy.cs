@@ -47,6 +47,7 @@ internal static class ForbiddenApiNamePolicy
 
     private static readonly string[] ExactMemberNames =
     [
+        "Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder",
         "System.String.Create",
         "System.Security.Cryptography.RSA.Create"
     ];
