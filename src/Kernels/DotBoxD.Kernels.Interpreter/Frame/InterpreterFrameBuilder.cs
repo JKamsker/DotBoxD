@@ -1,4 +1,5 @@
 using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Sandbox.Values;
 
 namespace DotBoxD.Kernels.Interpreter.Frame;
 
@@ -7,25 +8,49 @@ internal static class InterpreterFrameBuilder
     public static InterpreterFrame Create(
         FunctionFrameLayout layout,
         SandboxFunction function,
-        IReadOnlyList<SandboxValue> args)
+        LocalFunctionArguments args)
+        => CreateCore(layout, function, args, entrypointInput: null);
+
+    // The evaluator validates the shape and every parameter before entering
+    // the function call. Reading that immutable input here must stay unchecked.
+    public static InterpreterFrame CreateValidatedEntrypoint(
+        FunctionFrameLayout layout,
+        SandboxFunction function,
+        SandboxValue input)
+        => CreateCore(layout, function, arguments: default, entrypointInput: input);
+
+    private static InterpreterFrame CreateCore(
+        FunctionFrameLayout layout,
+        SandboxFunction function,
+        LocalFunctionArguments arguments,
+        SandboxValue? entrypointInput)
     {
-        var slots = layout.SlotCount == 0
-            ? Array.Empty<SandboxValue?>()
-            : new SandboxValue?[layout.SlotCount];
+        var slots = layout.HasBoxedSlots ? new SandboxValue?[layout.SlotCount] : Array.Empty<SandboxValue?>();
         var i32Slots = layout.HasI32Slots ? new int[layout.SlotCount] : Array.Empty<int>();
         var i64Slots = layout.HasI64Slots ? new long[layout.SlotCount] : Array.Empty<long>();
         var f64Slots = layout.HasF64Slots ? new double[layout.SlotCount] : Array.Empty<double>();
-        var assigned = layout.HasRawSlots ? new bool[layout.SlotCount] : Array.Empty<bool>();
+        var assigned = layout.RequiresRawAssignmentState
+            ? new bool[layout.SlotCount]
+            : Array.Empty<bool>();
 
         // Parameters occupy the leading slots in declaration order (see
         // FunctionFrameLayout.Build), so positional arguments map directly.
         for (var i = 0; i < function.Parameters.Count; i++)
         {
-            AssignArgumentSlot(layout, args[i], i, slots, i32Slots, i64Slots, f64Slots, assigned);
+            var argument = entrypointInput is null
+                ? arguments[i]
+                : GetValidatedEntrypointArgument(entrypointInput, i, function.Parameters.Count);
+            AssignArgumentSlot(layout, argument, i, slots, i32Slots, i64Slots, f64Slots, assigned);
         }
 
         return new InterpreterFrame(layout, slots, i32Slots, i64Slots, f64Slots, assigned);
     }
+
+    private static SandboxValue GetValidatedEntrypointArgument(
+        SandboxValue input,
+        int index,
+        int parameterCount)
+        => parameterCount == 1 ? input : ((ListValue)input).Values[index];
 
     private static void AssignArgumentSlot(
         FunctionFrameLayout layout,
@@ -54,9 +79,6 @@ internal static class InterpreterFrameBuilder
             slots[slot] = argument;
         }
 
-        if (layout.HasRawSlots)
-        {
-            assigned[slot] = true;
-        }
+        RawSlotAssignmentState.MarkAssigned(assigned, slot);
     }
 }
