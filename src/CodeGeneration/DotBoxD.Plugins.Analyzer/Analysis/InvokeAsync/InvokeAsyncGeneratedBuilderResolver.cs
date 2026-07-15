@@ -23,6 +23,11 @@ internal static class InvokeAsyncGeneratedBuilderResolver
             return true;
         }
 
+        if (TryResolveGeneratedFacadeExpression(model, receiver, cancellationToken, out receiverType))
+        {
+            return true;
+        }
+
         if (TryResolveGeneratedBuilderExpression(model, receiver, cancellationToken, out receiverType))
         {
             return true;
@@ -46,7 +51,7 @@ internal static class InvokeAsyncGeneratedBuilderResolver
                 {
                     Initializer.Value: { } initializer
                 } &&
-                TryResolveGeneratedBuilderExpression(model, initializer, cancellationToken, out receiverType))
+                TryResolve(model, initializer, cancellationToken, out receiverType))
             {
                 return true;
             }
@@ -83,6 +88,16 @@ internal static class InvokeAsyncGeneratedBuilderResolver
         }
 
         return false;
+    }
+
+    private static bool TryResolveGeneratedFacadeExpression(
+        SemanticModel model,
+        ExpressionSyntax receiver,
+        CancellationToken cancellationToken,
+        out INamedTypeSymbol receiverType)
+    {
+        receiverType = model.GetTypeInfo(receiver, cancellationToken).Type as INamedTypeSymbol;
+        return receiverType is not null && InvokeAsyncAttributeMatcher.HasGeneratePluginServerAttribute(receiverType);
     }
 
     private static bool TryResolveMatchingTypes(
