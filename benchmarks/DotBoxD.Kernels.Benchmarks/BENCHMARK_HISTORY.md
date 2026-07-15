@@ -198,6 +198,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Mixed-frame raw assignment state | this commit | `--probe-interpreter-frame-layout` | Allocate assignment state only when a raw slot exists after the leading parameter region; boxed locals retain null/non-null assignment tracking. Across 50,000 raw-parameter-plus-boxed-local executions, allocation fell from 44,402,824 B (888.1 B/op) to 42,802,824 B (856.1 B/op), exactly 32 B/frame. Parameter-only and eight-raw-local controls remain byte-identical, while genuine raw locals preserve `ValidationError` for reads before assignment. |
 | Value-type compiled attempt envelope | this commit | `--probe-compiled-execution-envelope` | Changed the host's private result-or-fallback `CompiledAttempt` from a reference record to a readonly record struct. Across 50,000 warmed public compiled suppressed successes, allocation fell exactly from 42,001,504 B (840.0 B/op) to 40,401,504 B (808.0 B/op), or 32 B/execution. The timing ranges overlap, so this step makes no timing claim. |
 | Allocation-free warmed compiled cache hits | this commit | `--probe-compiled-execution-envelope` | Moved non-persistent reflection compilation/materialization factories into miss-only cache helpers and the inline-await capture into its selected worker boundary. Across 50,000 warmed public compiled suppressed successes, allocation fell from 40,404,920 B (808.1 B/op) to 25,602,968 B (512.1 B/op), removing 296.0 B/execution. Provider and both execution-cache completed hits independently measure 0 B/hit; checksums, identity, resource usage, cancellation/coalescing, custom compilers, failures, and fallback remain pinned. |
+| Reusable Auto compiled no-audit state | this commit | `--probe-prepared-values` | Reused the installed kernel's existing no-audit meter/context state after a successful binding-free Auto-compiled run, while retaining Auto selection, hotness tracking, full results, and provider cache lookup. The warmed Auto miss lane fell from 2,216.3 to 1,896.2 B/op; subtracting the one-decimal displays gives 320.1 B/op, while the exact mechanism removes a 128-byte `ResourceMeter` plus a 192-byte `SandboxContext`, or 320 B/run. Repeated after processes reproduced 1,896.2 B/op. Elapsed samples are not claimed. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -2155,3 +2156,50 @@ module/plan/policy/artifact identity, empty audit output, and all twelve resourc
 pre-cancelled and independently cancelled waiters, same-key in-flight coalescing, LRU recency, miss/hit status, custom and
 persistent compiler behavior, audited failure, inline-await execution, and interpreter fallback. No public API, generated
 ABI, verifier identity, persisted artifact, security boundary, or resource-accounting behavior changes.
+
+## Reusable Auto compiled no-audit state
+
+Installed kernels already serialize execution through their per-kernel gate and reuse a no-audit `ResourceMeter` and
+`SandboxContext` for explicit Compiled mode. Auto mode continued to allocate fresh copies after promoting a binding-free
+entrypoint because it must retain selector/hotness processing and a full `SandboxExecutionResult`; the explicit Compiled
+prepared-value shortcut cannot be applied to Auto without dropping those semantics.
+
+Auto now receives the same owner-scoped state only after a prior terminal run actually succeeded in Compiled mode. The
+state is used solely by the runner's existing suppressed, binding-free, cache-valid success branch. Auto still performs
+its mandatory first interpreted run, invokes the mode selector on every later attempt, records full resource usage and
+hotness, and asks the compiled provider for the executable. In particular, Auto does not use the state's explicit-mode
+executable shortcut, so provider LRU, materialization, cache invalidation, custom compiler, and artifact lifetime behavior
+remain unchanged. A different effective cancellation token creates a fresh context, and a cancelled, failed, fallback,
+binding, or concurrently revoked run cannot seed reusable Auto state. Audited or cache-invalid executions never consume
+the state because they remain on the full audited runner path.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-prepared-values
+```
+
+Warmed installed-kernel results over 200,000 predicate misses:
+
+```text
+case                         before B/op    after B/op    displayed delta/op
+auto compiled miss               2,216.3       1,896.2               -320.1 B
+```
+
+The displayed difference is 320.1 B/op because each total is rounded independently to one decimal. The implementation's
+exact removed state is 320 B/run: one 128-byte `ResourceMeter` plus one 192-byte `SandboxContext`. The focused full-result
+runner guard measured fresh execution at 512.032 B/run and reuse at 192.010 B/run across 100,000 iterations, with the
+small fixed process noise isolated by a 0.1 B/run threshold. The remaining 192 B/run is the required resource snapshot and
+full result envelope, which Auto intentionally preserves.
+
+Three fresh after-process samples reproduced the Auto lane at 1,896.2 B/op. Elapsed samples were 385.8-393.8 ms, but no
+timing baseline was isolated for this change, so this step makes only the allocation claim. The paired explicit Compiled
+lane remains a control. The probe pins synchronous completion, predicate result, requested and actual modes, fallback,
+success, and artifact identity. Its fire-damage manifest now also declares the `Concurrency` effect and the
+`dotboxd.runtime.async` / `host.message.write` required capabilities that its host-message path already uses; that manifest
+correction is probe maintenance and is not part of the allocation reduction.
+
+Regression coverage additionally pins mandatory-first interpretation, Compiled-to-Interpreted-to-Compiled selector
+non-stickiness, full-result and hotness accounting, provider lookup despite a poisoned state executable, meter reset,
+cancelled-token recovery, failed audit evidence, and terminal revocation handling. No public API, generated ABI, verifier
+identity, persisted artifact, sandbox policy, audit/security boundary, or resource-accounting contract changes.

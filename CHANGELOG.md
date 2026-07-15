@@ -90,6 +90,10 @@ Services, Kernels, and Pushdown.
   materialization factories only on cache misses, while preserving atomic same-key coalescing and LRU updates. Inline-await
   closure state is likewise created only when that pump is selected; cancellation, custom/persistent compilers, audit, and
   fallback behavior are unchanged.
+- **Reusable Auto compiled no-audit state:** serialized installed kernels now reuse their resource meter and sandbox context
+  after Auto mode has completed a successful binding-free compiled run. Auto still interprets its mandatory first run,
+  re-evaluates selector and hotness decisions, returns full execution results, and uses the host provider caches; failures,
+  fallback, cancellation-token changes, revocation, audited runs, and binding entrypoints retain their prior paths.
 - **Documentation & repo polish:** new top-level README, `docs/` information architecture
   (getting-started, concepts, security, reference, contributing), `SECURITY.md`, `CONTRIBUTING.md`,
   `CODE_OF_CONDUCT.md`, and GitHub repo metadata files.
