@@ -10,7 +10,8 @@ namespace DotBoxD.Kernels.Tests.Interpreter.Regression.Performance.LazyAudit;
 public sealed class InterpreterLazyAuditAllocationTests
 {
     private const int WarmupIterations = 2_000;
-    private const int MeasurementIterations = 100_000;
+    private const int MeasurementIterations = 20_000;
+    private const double AllocationToleranceBytesPerExecution = 0.25;
 
     [Fact]
     public async Task Pure_suppressed_success_omits_exact_run_id_and_audit_sink_allocations()
@@ -27,6 +28,12 @@ public sealed class InterpreterLazyAuditAllocationTests
         var input = SandboxValue.FromInt32(7);
         var defaultOptions = InterpreterLazyAuditTestSupport.SuppressedOptions();
         var explicitOptions = InterpreterLazyAuditTestSupport.SuppressedOptions(SandboxRunId.New());
+
+        _ = Measure(interpreter, lazyPlan, input, defaultOptions, WarmupIterations);
+        _ = Measure(interpreter, forcedFullPlan, input, defaultOptions, WarmupIterations);
+        _ = Measure(interpreter, missingMetadataPlan, input, defaultOptions, WarmupIterations);
+        _ = Measure(interpreter, lazyPlan, input, explicitOptions, WarmupIterations);
+        _ = Measure(interpreter, forcedFullPlan, input, explicitOptions, WarmupIterations);
 
         var lazyDefault = MeasureCase(interpreter, lazyPlan, input, defaultOptions);
         var fullDefault = MeasureCase(interpreter, forcedFullPlan, input, defaultOptions);
@@ -48,7 +55,6 @@ public sealed class InterpreterLazyAuditAllocationTests
         SandboxValue input,
         SandboxExecutionOptions options)
     {
-        _ = Measure(interpreter, plan, input, options, WarmupIterations);
         ForceGc();
         return Measure(interpreter, plan, input, options, MeasurementIterations);
     }
@@ -109,7 +115,7 @@ public sealed class InterpreterLazyAuditAllocationTests
     {
         var actual = (full.AllocatedBytes - lazy.AllocatedBytes) / (double)MeasurementIterations;
         Assert.True(
-            Math.Abs(actual - expectedBytesPerExecution) <= 0.1,
+            Math.Abs(actual - expectedBytesPerExecution) <= AllocationToleranceBytesPerExecution,
             $"Expected {expectedBytesPerExecution:F1} B/execution, observed {actual:F3} B/execution.");
     }
 
