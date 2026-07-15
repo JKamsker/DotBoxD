@@ -43,6 +43,12 @@ if (args.Contains("--probe-runtime-types", StringComparer.OrdinalIgnoreCase))
     return;
 }
 
+if (args.Contains("--probe-compiled-input-types", StringComparer.OrdinalIgnoreCase))
+{
+    DotBoxD.Kernels.Benchmarks.Runtime.Types.CompiledInputTypeProbe.Run();
+    return;
+}
+
 if (args.Contains("--probe-resource-meter", StringComparer.OrdinalIgnoreCase))
 {
     DotBoxD.Kernels.Benchmarks.Runtime.ResourceMeterProbe.Run();

@@ -59,7 +59,4 @@ internal static class CompiledTypeEmitter
         il.Emit(OpCodes.Ldstr, type.Name);
         il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.TypeScalar)));
     }
-
-    private static bool IsBuiltinScalar(SandboxType type)
-        => type.Arguments.Count == 0 && type.IsKnownBuiltIn();
 }

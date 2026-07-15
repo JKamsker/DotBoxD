@@ -21,6 +21,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-examples
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-prepared-values
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-runtime-types
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-input-types
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-resource-meter
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-binding-fast-path
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-value-shape-cache
@@ -169,6 +170,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Cached compiled literal validation types | this commit | `--probe-literal-collection-construction` | Reused the bounded compiled structural-type cache when validating list/map literals with direct built-in scalar operands. `ListLiteralValue` arity 8 fell from 240.0 to 128.0 B/op (-112 B/op), and `MapLiteralValue` arity 8 fell from 840.0 to 680.0 B/op (-160 B/op). Prebuilt nested, opaque, and record list controls remained byte-identical at 152.0 B/op. |
 | Array-free interpreted numeric conversions | this commit | `--probe-interpreter-numeric-conversion` | Evaluated exact-arity `numeric.toI64`/`numeric.toF64` operands directly instead of routing them through a one-element argument array. All three legal conversions removed 32.0 B/conversion: one-conversion rows fell by exactly 3,200,000 B across 100,000 executions, and eight-conversion rows fell by about 25.6 MB. After-runs matched paired unary controls byte-for-byte with identical checksums and per-execution sandbox resource usage. |
 | Scalar single-assignment I32 loop plans | this commit | `--probe-interpreter-plan-setup` | Kept the common one-assignment I32 loop plan in a scalar local instead of allocating a one-element `AssignmentPlan[]`, and executed it without an inner array loop. Across 50,000 executions, helper and direct rows fell by about 40 B/op while zero-iteration and two-assignment controls remained byte-identical. A 20-million-iteration lane improved from 47.1-48.9 ms to 35.4-36.7 ms with identical result and resource usage. |
+| Cached compiled entrypoint input types | this commit | `--probe-compiled-input-types` | Generated `Execute` methods now use the existing bounded structural-type cache for direct built-in List/Map parameter validation. Two million generated-input-shaped validations fell from 112.0 B/op to ~0 for `List<I32>` and from 160.0 B/op to ~0 for `Map<String,I32>`. Nested and opaque fallback controls remained byte-identical at 224.0 and 144.0 B/op; compiler and verifier identities advanced to v10. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -1394,3 +1396,39 @@ are byte-identical. Short-row stopwatch results are noisy. The long-loop timing 
 35.4-36.7 ms after, a 22-28% improvement from removing the inner one-element array walk. Checksums remain 150,000, 0,
 150,000, 300,000, and 999,823. Per-execution fuel/loop/sandbox-allocation/host-call usage remains `23/1/0/0`, `8/0/0/0`,
 `19/1/0/0`, `25/1/0/0`, and `220,000,008/20,000,000/0/0` respectively.
+
+## Cached compiled entrypoint input types
+
+Generated `Execute` methods validate each entrypoint argument against a freshly emitted expected `SandboxType`. Function
+return emission already used cached factories for direct built-in List/Map types, but input emission still called the
+allocating legacy factories. The compiler now selects `TypeListCached` or `TypeMapCached` only for the outermost direct
+built-in structural parameter. Nested, opaque, and record-derived shapes retain legacy emission, while malformed shapes
+retain legacy rejection behavior; other `EmitSandboxType` consumers are unchanged.
+
+The cached methods already exist in the generated-code runtime facade. `Execute`'s method-shape allowlist now admits those
+exact signatures, so verifier identity advances from `dotboxd-verifier-9` to `dotboxd-verifier-10`; compiler identity also
+advances from `dotboxd-compiler-9` to `dotboxd-compiler-10` so existing artifacts receive the optimized IL. Existing v9
+artifacts remain correct, but the next lookup is a new-key cache miss. Older cache directories remain eligible for normal
+eviction rather than being quarantined or reported as invalid.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -- --probe-compiled-input-types
+```
+
+Representative local runs, 2,000,000 generated-input-shaped validations per row:
+
+```text
+case                         Before ms / allocated / B/op       After ms / allocated / B/op       delta
+List<I32> input                285.3 / 224,000,040 B / 112.0      186.7 /           40 B / ~0.0    -112 B/op
+Map<String,I32> input          384.8 / 320,000,040 B / 160.0      241.1 /           40 B / ~0.0    -160 B/op
+List<List<I32>> fallback       288.5 / 448,000,040 B / 224.0      292.4 /  448,000,040 B / 224.0       0 B/op
+List<MonsterId> fallback       273.8 / 288,000,040 B / 144.0      264.3 /  288,000,040 B / 144.0       0 B/op
+```
+
+Allocation is the claim: direct List/Map input validation removes exactly 224,000,000 B and 320,000,000 B across the
+sample. The permanent probe executes explicit legacy/cached direct lanes; fallback rows retain the same legacy sequence on
+both sides and are byte-identical. Every checksum remains `2,000,000`. The changed type factories and input accessor accept
+no `SandboxContext`, so sandbox resource accounting is unchanged by construction. Stopwatch results are secondary and
+varied between repeated runs.

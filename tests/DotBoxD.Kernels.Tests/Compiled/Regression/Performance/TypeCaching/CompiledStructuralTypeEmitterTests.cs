@@ -12,19 +12,19 @@ namespace DotBoxD.Kernels.Tests.Compiled.Regression.Performance;
 public sealed class CompiledStructuralTypeEmitterTests
 {
     [Fact]
-    public async Task Direct_builtin_structural_returns_use_cached_factories_and_verify()
+    public async Task Direct_builtin_structural_inputs_and_returns_use_cached_factories_and_verify()
     {
         var listCalls = await CompileRuntimeCallsAsync(
             """{ "name": "List", "arguments": ["I32"] }""");
         var mapCalls = await CompileRuntimeCallsAsync(
             """{ "name": "Map", "arguments": ["String", "I32"] }""");
 
-        Assert.Equal([nameof(CompiledRuntime.TypeListCached)], listCalls);
-        Assert.Equal([nameof(CompiledRuntime.TypeMapCached)], mapCalls);
+        AssertCalls(listCalls, [nameof(CompiledRuntime.TypeListCached)]);
+        AssertCalls(mapCalls, [nameof(CompiledRuntime.TypeMapCached)]);
     }
 
     [Fact]
-    public async Task Non_direct_builtin_structural_returns_use_legacy_factories_and_verify()
+    public async Task Non_direct_builtin_structural_inputs_and_returns_use_legacy_factories_and_verify()
     {
         var nestedCalls = await CompileRuntimeCallsAsync(
             """
@@ -53,6 +53,9 @@ public sealed class CompiledStructuralTypeEmitterTests
         var opaqueMapCalls = await CompileRuntimeCallsAsync(
             """{ "name": "Map", "arguments": ["String", "MonsterId"] }""",
             declareOpaqueId: true);
+        var opaqueKeyMapCalls = await CompileRuntimeCallsAsync(
+            """{ "name": "Map", "arguments": ["MonsterId", "I32"] }""",
+            declareOpaqueId: true);
         var recordMapCalls = await CompileRuntimeCallsAsync(
             """
             {
@@ -61,24 +64,25 @@ public sealed class CompiledStructuralTypeEmitterTests
             }
             """);
 
-        Assert.Equal(
-            [nameof(CompiledRuntime.TypeList), nameof(CompiledRuntime.TypeList)],
-            nestedCalls);
-        Assert.Equal([nameof(CompiledRuntime.TypeList)], opaqueCalls);
-        Assert.Equal(
-            [nameof(CompiledRuntime.TypeRecord), nameof(CompiledRuntime.TypeList)],
-            recordCalls);
-        Assert.Equal(
-            [nameof(CompiledRuntime.TypeList), nameof(CompiledRuntime.TypeMap)],
-            nestedMapCalls);
-        Assert.Equal([nameof(CompiledRuntime.TypeMap)], opaqueMapCalls);
-        Assert.Equal(
-            [nameof(CompiledRuntime.TypeRecord), nameof(CompiledRuntime.TypeMap)],
-            recordMapCalls);
+        AssertCalls(
+            nestedCalls,
+            [nameof(CompiledRuntime.TypeList), nameof(CompiledRuntime.TypeList)]);
+        AssertCalls(opaqueCalls, [nameof(CompiledRuntime.TypeList)]);
+        AssertCalls(
+            recordCalls,
+            [nameof(CompiledRuntime.TypeRecord), nameof(CompiledRuntime.TypeList)]);
+        AssertCalls(
+            nestedMapCalls,
+            [nameof(CompiledRuntime.TypeList), nameof(CompiledRuntime.TypeMap)]);
+        AssertCalls(opaqueMapCalls, [nameof(CompiledRuntime.TypeMap)]);
+        AssertCalls(opaqueKeyMapCalls, [nameof(CompiledRuntime.TypeMap)]);
+        AssertCalls(
+            recordMapCalls,
+            [nameof(CompiledRuntime.TypeRecord), nameof(CompiledRuntime.TypeMap)]);
     }
 
-    private static async Task<IReadOnlyList<string>> CompileRuntimeCallsAsync(
-        string returnType,
+    private static async Task<RuntimeCalls> CompileRuntimeCallsAsync(
+        string structuralType,
         bool declareOpaqueId = false)
     {
         using var host = SandboxTestHost.Create();
@@ -90,8 +94,8 @@ public sealed class CompiledStructuralTypeEmitterTests
             {
               "id": "main",
               "visibility": "entrypoint",
-              "parameters": [{ "name": "value", "type": {{returnType}} }],
-              "returnType": {{returnType}},
+              "parameters": [{ "name": "value", "type": {{structuralType}} }],
+              "returnType": {{structuralType}},
               "body": [{ "op": "return", "value": { "var": "value" } }]
             }
           ]
@@ -110,9 +114,15 @@ public sealed class CompiledStructuralTypeEmitterTests
         Assert.True(artifact.Verification.Succeeded);
         using var image = new MemoryStream(artifact.AssemblyBytes);
         using var assembly = AssemblyDefinition.ReadAssembly(image);
-        return assembly.MainModule.Types
+        return new RuntimeCalls(
+            CallsFrom(assembly, "Execute"),
+            CallsFrom(assembly, "Fn_0"));
+    }
+
+    private static IReadOnlyList<string> CallsFrom(AssemblyDefinition assembly, string methodName)
+        => assembly.MainModule.Types
             .SelectMany(type => type.Methods)
-            .Single(method => method.Name == "Fn_0")
+            .Single(method => method.Name == methodName)
             .Body
             .Instructions
             .Where(instruction => instruction.OpCode.Code == Code.Call)
@@ -127,5 +137,14 @@ public sealed class CompiledStructuralTypeEmitterTests
                 nameof(CompiledRuntime.TypeRecord))
             .Select(method => method.Name)
             .ToArray();
+
+    private static void AssertCalls(RuntimeCalls actual, IReadOnlyList<string> expected)
+    {
+        Assert.Equal(expected, actual.Execute);
+        Assert.Equal(expected, actual.Function);
     }
+
+    private sealed record RuntimeCalls(
+        IReadOnlyList<string> Execute,
+        IReadOnlyList<string> Function);
 }
