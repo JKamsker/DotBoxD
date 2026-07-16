@@ -5,7 +5,7 @@ using DotBoxD.Services.Streaming.Core;
 using DotBoxD.Services.Streaming.Frames;
 using Xunit;
 
-namespace DotBoxD.Services.Tests.Streaming.Lifecycle;
+namespace DotBoxD.Services.Tests.Streaming.Lifecycle.Outbound;
 
 public sealed class RpcOutboundStreamSetStartDisposeRaceTests
 {
