@@ -41,9 +41,7 @@ internal static partial class ServiceModelFactory
 
     private static ServiceResult? BuildServiceResult(GeneratorSyntaxContext context, CancellationToken ct)
     {
-        if (context.Node is not InterfaceDeclarationSyntax declaration ||
-            context.SemanticModel.GetDeclaredSymbol(declaration, ct) is not INamedTypeSymbol interfaceSymbol ||
-            !TryGetRpcServiceAttribute(interfaceSymbol, ct, out var serviceAttribute))
+        if (!TryGetServiceCandidate(context, ct, out var interfaceSymbol, out var serviceAttribute))
         {
             return null;
         }
@@ -162,6 +160,25 @@ internal static partial class ServiceModelFactory
             ServiceLocation: buildContext.ServiceLocation,
             QualifiedInterfaceName: buildContext.QualifiedInterfaceName,
             ServiceDiagnostic: null);
+    }
+
+    private static bool TryGetServiceCandidate(
+        GeneratorSyntaxContext context,
+        CancellationToken ct,
+        out INamedTypeSymbol interfaceSymbol,
+        out AttributeData serviceAttribute)
+    {
+        if (context.Node is not InterfaceDeclarationSyntax declaration ||
+            context.SemanticModel.GetDeclaredSymbol(declaration, ct) is not INamedTypeSymbol candidate ||
+            !TryGetRpcServiceAttribute(candidate, ct, out serviceAttribute))
+        {
+            interfaceSymbol = null!;
+            serviceAttribute = null!;
+            return false;
+        }
+
+        interfaceSymbol = candidate;
+        return true;
     }
 
     private static ServiceResult? ValidateServiceSymbol(
