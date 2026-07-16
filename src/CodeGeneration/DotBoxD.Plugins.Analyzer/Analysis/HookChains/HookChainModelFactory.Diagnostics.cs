@@ -12,6 +12,11 @@ internal static partial class HookChainModelFactory
         CancellationToken cancellationToken,
         string? detail = null)
     {
+        if (TryUnsupportedAnonymousMethodStageDiagnostic(invocation, model, cancellationToken, out var unsupportedStage))
+        {
+            return new HookChainCreateResult(null, null, unsupportedStage);
+        }
+
         if (HasDiscardedStageReceiver(invocation, model, cancellationToken))
         {
             return null;
