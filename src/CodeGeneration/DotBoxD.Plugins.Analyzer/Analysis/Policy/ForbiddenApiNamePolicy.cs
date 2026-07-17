@@ -50,6 +50,7 @@ internal static class ForbiddenApiNamePolicy
 
     private static readonly string[] ExactMemberNames =
     [
+        "Microsoft.Extensions.Configuration.EnvironmentVariablesExtensions.AddEnvironmentVariables",
         "System.String.Create",
         "System.Security.Cryptography.RSA.Create"
     ];
