@@ -43,6 +43,52 @@ public sealed class PluginAnalyzerForbiddenApiMemberAttributeMetadataTests
         Assert.Empty(ForbiddenFileInfoDiagnostics(diagnostics));
     }
 
+    [Fact]
+    public async Task Allows_null_array_attribute_metadata_without_analyzer_failure()
+    {
+        const string source = """
+            #nullable enable
+
+            namespace Sample
+            {
+                using System;
+                using DotBoxD.Plugins;
+                using DotBoxD.Abstractions;
+
+                [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
+                public sealed class ValuesAttribute : Attribute
+                {
+                    public ValuesAttribute(params object?[]? values) { }
+                }
+
+                public static class OrdinaryTests
+                {
+                    [Values(null)]
+                    public static void NullArrayArgument() { }
+                }
+
+                [Plugin("null-array-attribute")]
+                [Values(null)]
+                public sealed class NullArrayAttributeKernel : IEventKernel<string>
+                {
+                    public bool ShouldHandle(string e, HookContext context)
+                    {
+                        [Values(null)]
+                        static bool IsNotEmpty(string value) => value.Length > 0;
+
+                        return IsNotEmpty(e);
+                    }
+
+                    public void Handle(string e, HookContext context) { }
+                }
+            }
+            """;
+
+        var diagnostics = await AnalyzeAsync(source);
+
+        Assert.Empty(diagnostics);
+    }
+
     private static IEnumerable<Diagnostic> ForbiddenFileInfoDiagnostics(ImmutableArray<Diagnostic> diagnostics)
         => diagnostics.Where(d =>
             d.Id == "DBXK001"
