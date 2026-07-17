@@ -4,6 +4,7 @@ using System.Threading;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
 using DotBoxD.Services.SourceGenerator.Validation;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Services.SourceGenerator.Models;
 
@@ -11,7 +12,7 @@ internal static partial class ServiceModelFactory
 {
     private const string CancellationTokenFullName = ServicesGeneratorTypeNames.CancellationTokenMetadata;
 
-    public static ServiceResult GetServiceResult(GeneratorAttributeSyntaxContext context, CancellationToken ct)
+    public static ServiceResult? GetServiceResult(GeneratorSyntaxContext context, CancellationToken ct)
     {
         try
         {
@@ -23,7 +24,9 @@ internal static partial class ServiceModelFactory
         }
         catch (Exception ex)
         {
-            var name = context.TargetSymbol?.ToDisplayString() ?? "<unknown>";
+            var name = context.Node is InterfaceDeclarationSyntax declaration
+                ? declaration.Identifier.ValueText
+                : "<unknown>";
             return new ServiceResult(
                 Model: null,
                 Error: new GeneratorError(name, ex.ToString()),
@@ -36,11 +39,11 @@ internal static partial class ServiceModelFactory
         }
     }
 
-    private static ServiceResult BuildServiceResult(GeneratorAttributeSyntaxContext context, CancellationToken ct)
+    private static ServiceResult? BuildServiceResult(GeneratorSyntaxContext context, CancellationToken ct)
     {
-        if (context.TargetSymbol is not INamedTypeSymbol interfaceSymbol)
+        if (!TryGetServiceCandidate(context, ct, out var interfaceSymbol, out var serviceAttribute))
         {
-            return default;
+            return null;
         }
 
         var displayName = interfaceSymbol.ToDisplayString();
@@ -63,7 +66,7 @@ internal static partial class ServiceModelFactory
 
         ct.ThrowIfCancellationRequested();
 
-        var serviceName = GetConfiguredServiceName(context) ?? interfaceSymbol.Name;
+        var serviceName = GetConfiguredServiceName(serviceAttribute) ?? interfaceSymbol.Name;
         if (string.IsNullOrWhiteSpace(serviceName))
         {
             // An explicit empty/whitespace [RpcService(Name = "")] compiles but no inbound call can ever
@@ -159,6 +162,25 @@ internal static partial class ServiceModelFactory
             ServiceDiagnostic: null);
     }
 
+    private static bool TryGetServiceCandidate(
+        GeneratorSyntaxContext context,
+        CancellationToken ct,
+        out INamedTypeSymbol interfaceSymbol,
+        out AttributeData serviceAttribute)
+    {
+        if (context.Node is not InterfaceDeclarationSyntax declaration ||
+            context.SemanticModel.GetDeclaredSymbol(declaration, ct) is not INamedTypeSymbol candidate ||
+            !TryGetRpcServiceAttribute(candidate, ct, out serviceAttribute))
+        {
+            interfaceSymbol = null!;
+            serviceAttribute = null!;
+            return false;
+        }
+
+        interfaceSymbol = candidate;
+        return true;
+    }
+
     private static ServiceResult? ValidateServiceSymbol(
         INamedTypeSymbol interfaceSymbol,
         ServiceBuildContext buildContext,
@@ -199,16 +221,33 @@ internal static partial class ServiceModelFactory
             QualifiedInterfaceName: qualifiedInterfaceName,
             ServiceDiagnostic: new ServiceDiagnostic(displayName, reason, location));
 
-    private static string? GetConfiguredServiceName(GeneratorAttributeSyntaxContext context)
+    private static bool TryGetRpcServiceAttribute(
+        INamedTypeSymbol interfaceSymbol,
+        CancellationToken ct,
+        out AttributeData serviceAttribute)
     {
-        foreach (var attr in context.Attributes)
+        foreach (var attr in interfaceSymbol.GetAttributes())
         {
-            foreach (var namedArg in attr.NamedArguments)
+            ct.ThrowIfCancellationRequested();
+
+            if (ServicesGeneratorTypeNames.IsRpcServiceAttribute(attr.AttributeClass))
             {
-                if (namedArg.Key == "Name" && namedArg.Value.Value is string s)
-                {
-                    return s;
-                }
+                serviceAttribute = attr;
+                return true;
+            }
+        }
+
+        serviceAttribute = null!;
+        return false;
+    }
+
+    private static string? GetConfiguredServiceName(AttributeData serviceAttribute)
+    {
+        foreach (var namedArg in serviceAttribute.NamedArguments)
+        {
+            if (namedArg.Key == "Name" && namedArg.Value.Value is string s)
+            {
+                return s;
             }
         }
 
