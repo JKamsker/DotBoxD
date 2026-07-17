@@ -32,7 +32,11 @@ internal static class ForbiddenApiNamePolicy
         "System.Security.Cryptography.DSACryptoServiceProvider",
         "System.Security.Cryptography.RSACryptoServiceProvider",
         "System.Security.Cryptography.Rfc2898DeriveBytes",
-        "System.Security.Cryptography.CryptoConfig"
+        "System.Security.Cryptography.CryptoConfig",
+        "Microsoft.Extensions.Configuration.FileConfigurationExtensions",
+        "Microsoft.Extensions.Configuration.IniConfigurationExtensions",
+        "Microsoft.Extensions.Configuration.JsonConfigurationExtensions",
+        "Microsoft.Extensions.Configuration.XmlConfigurationExtensions"
     ];
 
     private static readonly string[] NamespacePrefixes =
