@@ -121,6 +121,7 @@ internal static class InterpreterBindingCaller
     {
         if (!context.AsyncEnabled)
         {
+            _ = await pending.AsTask().WaitAsync(timeoutToken).ConfigureAwait(false);
             throw new SandboxRuntimeException(new SandboxError(
                 SandboxErrorCode.BindingFailure,
                 "binding returned a pending result; async capability is not granted"));

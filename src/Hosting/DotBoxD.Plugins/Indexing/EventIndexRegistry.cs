@@ -29,6 +29,8 @@ public sealed partial class EventIndexRegistry
     // own Snapshot()/Add()/Remove() are already safe to run concurrently (Publish snapshots outside _gate).
     private readonly ConcurrentDictionary<Type, IEventIndexChannel> _channels = new();
     private readonly List<Task> _inFlight = [];
+    private TaskCompletionSource<bool>? _activePublishesDrained;
+    private int _activePublishCount;
     private long _considered;
     private long _prefiltered;
     private long _dispatched;
@@ -116,7 +118,22 @@ public sealed partial class EventIndexRegistry
         }
 
         var channel = (EventIndexChannel<TEvent>)existing;
+        EnterPublish();
+        try
+        {
+            PublishCore(channel, value, cancellationToken);
+        }
+        finally
+        {
+            CompletePublish();
+        }
+    }
 
+    private void PublishCore<TEvent>(
+        EventIndexChannel<TEvent> channel,
+        TEvent value,
+        CancellationToken cancellationToken)
+    {
         foreach (var entry in channel.Snapshot())
         {
             Interlocked.Increment(ref _considered);
@@ -163,15 +180,23 @@ public sealed partial class EventIndexRegistry
         }
     }
 
-    /// <summary>Awaits every in-flight dispatch launched by <see cref="Publish"/> (e.g. on host shutdown).</summary>
+    /// <summary>Awaits active publishers and every in-flight dispatch launched by <see cref="Publish"/>.</summary>
     public async Task DrainAsync()
     {
         while (true)
         {
+            Task? activePublishes;
             Task[] pending;
             lock (_gate)
             {
+                activePublishes = _activePublishCount == 0 ? null : ActivePublishesDrainedTask();
                 pending = [.. _inFlight];
+            }
+
+            if (activePublishes is not null)
+            {
+                await activePublishes.ConfigureAwait(false);
+                continue;
             }
 
             if (pending.Length == 0)
@@ -181,6 +206,36 @@ public sealed partial class EventIndexRegistry
 
             await Task.WhenAll(pending).ConfigureAwait(false);
         }
+    }
+
+    private void EnterPublish()
+    {
+        lock (_gate)
+        {
+            _activePublishCount++;
+        }
+    }
+
+    private void CompletePublish()
+    {
+        TaskCompletionSource<bool>? activePublishesDrained = null;
+        lock (_gate)
+        {
+            if (--_activePublishCount == 0)
+            {
+                activePublishesDrained = _activePublishesDrained;
+                _activePublishesDrained = null;
+            }
+        }
+
+        activePublishesDrained?.TrySetResult(true);
+    }
+
+    private Task ActivePublishesDrainedTask()
+    {
+        _activePublishesDrained ??= new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        return _activePublishesDrained.Task;
     }
 
     private void Track(Task task)
