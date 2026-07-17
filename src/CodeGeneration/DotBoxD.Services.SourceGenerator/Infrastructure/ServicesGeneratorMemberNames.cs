@@ -40,6 +40,7 @@ internal static class ServicesGeneratorMemberNames
     {
         public const string TryGet = "TryGet";
         public const string Register = "Register";
+        public const string Release = "Release";
         public const string ReleaseAsync = "ReleaseAsync";
     }
 
