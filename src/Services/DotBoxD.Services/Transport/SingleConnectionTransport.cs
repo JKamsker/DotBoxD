@@ -7,6 +7,8 @@ public sealed class SingleConnectionTransport : ITransport
 {
     private readonly IRpcChannel _connection;
     private readonly bool _ownsConnection;
+    private readonly object _disposeLock = new();
+    private Task? _disposeTask;
     private int _disposed;
 
     public SingleConnectionTransport(IRpcChannel connection, bool ownsConnection = false)
@@ -31,18 +33,23 @@ public sealed class SingleConnectionTransport : ITransport
         return Task.CompletedTask;
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        lock (_disposeLock)
         {
-            return;
-        }
+            if (_disposeTask is not null)
+            {
+                return new ValueTask(_disposeTask);
+            }
 
-        if (_ownsConnection)
-        {
-            await _connection.DisposeAsync().ConfigureAwait(false);
+            Interlocked.Exchange(ref _disposed, 1);
+            _disposeTask = _ownsConnection ? DisposeConnectionAsync(_connection) : Task.CompletedTask;
+            return new ValueTask(_disposeTask);
         }
     }
+
+    private static async Task DisposeConnectionAsync(IRpcChannel connection)
+        => await connection.DisposeAsync().ConfigureAwait(false);
 }
 
 /// <summary>
@@ -53,7 +60,9 @@ public sealed class SingleConnectionServerTransport : IServerTransport
     private readonly object _sync = new();
     private readonly IRpcChannel _connection;
     private readonly bool _ownsConnection;
+    private readonly object _disposeLock = new();
     private TaskCompletionSource<bool> _stopped = CreateStoppedSignal();
+    private Task? _disposeTask;
     private int _accepted;
     private int _started;
     private int _disposed;
@@ -164,27 +173,32 @@ public sealed class SingleConnectionServerTransport : IServerTransport
         return Task.CompletedTask;
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        lock (_disposeLock)
         {
-            return;
-        }
+            if (_disposeTask is not null)
+            {
+                return new ValueTask(_disposeTask);
+            }
 
-        TaskCompletionSource<bool> stopped;
-        lock (_sync)
-        {
-            _started = 0;
-            stopped = _stopped;
-        }
+            Interlocked.Exchange(ref _disposed, 1);
 
-        stopped.TrySetResult(true);
+            TaskCompletionSource<bool> stopped;
+            lock (_sync)
+            {
+                _started = 0;
+                stopped = _stopped;
+            }
 
-        if (_ownsConnection)
-        {
-            await _connection.DisposeAsync().ConfigureAwait(false);
+            stopped.TrySetResult(true);
+            _disposeTask = _ownsConnection ? DisposeConnectionAsync(_connection) : Task.CompletedTask;
+            return new ValueTask(_disposeTask);
         }
     }
+
+    private static async Task DisposeConnectionAsync(IRpcChannel connection)
+        => await connection.DisposeAsync().ConfigureAwait(false);
 
     private static TaskCompletionSource<bool> CreateStoppedSignal()
         => new(TaskCreationOptions.RunContinuationsAsynchronously);
