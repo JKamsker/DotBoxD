@@ -17,6 +17,7 @@ internal static class ForbiddenApiNamePolicy
         DotBoxDGenerationNames.TypeNames.SystemComponentModelBackgroundWorker,
         DotBoxDGenerationNames.TypeNames.SystemComponentModelTypeDescriptor,
         "System.Text.StringBuilder",
+        "Microsoft.Extensions.Configuration.XmlConfigurationExtensions",
         "System.ComponentModel.LicenseManager",
         "System.Collections.Concurrent.BlockingCollection<T>",
         "System.Buffers.MemoryPool<T>",
