@@ -69,12 +69,14 @@ internal sealed class I64ExpressionPlan
         => divisor > 1 ? (ulong)((System.UInt128.One << 64) / (System.UInt128)(ulong)divisor) : 0u;
 
     public static bool TryCreate(Expression expression, InterpreterFrame frame, out I64ExpressionPlan plan)
-        => TryCreate(expression, frame, frame.IsSlotAssigned, out plan);
+    {
+        var slotReads = new I64ExpressionSlotReadState(frame);
+        return TryCreate(expression, in slotReads, out plan);
+    }
 
     public static bool TryCreate(
         Expression expression,
-        InterpreterFrame frame,
-        System.Func<int, bool> canReadSlot,
+        in I64ExpressionSlotReadState slotReads,
         out I64ExpressionPlan plan)
     {
         if (TryCreateLiteral(expression, out plan))
@@ -82,17 +84,17 @@ internal sealed class I64ExpressionPlan
             return true;
         }
 
-        if (TryCreateVariable(expression, frame, canReadSlot, out plan))
+        if (TryCreateVariable(expression, in slotReads, out plan))
         {
             return true;
         }
 
-        if (TryCreateUnary(expression, frame, canReadSlot, out plan))
+        if (TryCreateUnary(expression, in slotReads, out plan))
         {
             return true;
         }
 
-        return TryCreateBinary(expression, frame, canReadSlot, out plan);
+        return TryCreateBinary(expression, in slotReads, out plan);
     }
 
     private static bool TryCreateLiteral(Expression expression, out I64ExpressionPlan plan)
@@ -109,8 +111,7 @@ internal sealed class I64ExpressionPlan
 
     private static bool TryCreateVariable(
         Expression expression,
-        InterpreterFrame frame,
-        Func<int, bool> canReadSlot,
+        in I64ExpressionSlotReadState slotReads,
         out I64ExpressionPlan plan)
     {
         if (expression is not VariableExpression variable)
@@ -119,8 +120,7 @@ internal sealed class I64ExpressionPlan
             return false;
         }
 
-        var slot = frame.GetSlot(variable.Name);
-        if (!frame.IsI64Slot(slot) || !canReadSlot(slot))
+        if (!slotReads.TryGetReadableI64Slot(variable.Name, out var slot))
         {
             plan = null!;
             return false;
@@ -132,12 +132,11 @@ internal sealed class I64ExpressionPlan
 
     private static bool TryCreateUnary(
         Expression expression,
-        InterpreterFrame frame,
-        Func<int, bool> canReadSlot,
+        in I64ExpressionSlotReadState slotReads,
         out I64ExpressionPlan plan)
     {
         if (expression is UnaryExpression { Operator: "-" } unary &&
-            TryCreate(unary.Operand, frame, canReadSlot, out var operand))
+            TryCreate(unary.Operand, in slotReads, out var operand))
         {
             plan = new I64ExpressionPlan(ExpressionKind.Negate, left: operand);
             return true;
@@ -149,11 +148,10 @@ internal sealed class I64ExpressionPlan
 
     private static bool TryCreateBinary(
         Expression expression,
-        InterpreterFrame frame,
-        Func<int, bool> canReadSlot,
+        in I64ExpressionSlotReadState slotReads,
         out I64ExpressionPlan plan)
     {
-        if (TryCreateRemainderByConstant(expression, frame, canReadSlot, out plan))
+        if (TryCreateRemainderByConstant(expression, in slotReads, out plan))
         {
             return true;
         }
@@ -164,8 +162,8 @@ internal sealed class I64ExpressionPlan
             return false;
         }
 
-        if (!TryCreate(binary.Left, frame, canReadSlot, out var left) ||
-            !TryCreate(binary.Right, frame, canReadSlot, out var right))
+        if (!TryCreate(binary.Left, in slotReads, out var left) ||
+            !TryCreate(binary.Right, in slotReads, out var right))
         {
             plan = null!;
             return false;
@@ -177,8 +175,7 @@ internal sealed class I64ExpressionPlan
 
     private static bool TryCreateRemainderByConstant(
         Expression expression,
-        InterpreterFrame frame,
-        Func<int, bool> canReadSlot,
+        in I64ExpressionSlotReadState slotReads,
         out I64ExpressionPlan plan)
     {
         if (expression is BinaryExpression
@@ -187,7 +184,7 @@ internal sealed class I64ExpressionPlan
                 Right: LiteralExpression { Value: I64Value divisor }
             } modByConst &&
             divisor.Value > 0 &&
-            TryCreate(modByConst.Left, frame, canReadSlot, out var dividend))
+            TryCreate(modByConst.Left, in slotReads, out var dividend))
         {
             plan = new I64ExpressionPlan(
                 ExpressionKind.RemainderByConst,

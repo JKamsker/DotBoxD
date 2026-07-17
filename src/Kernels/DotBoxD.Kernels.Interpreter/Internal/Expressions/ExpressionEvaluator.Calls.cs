@@ -54,7 +54,7 @@ internal sealed partial class ExpressionEvaluator
 
         if (TryGetScalarLocalFunction(call, out var function))
         {
-            return EvaluateScalarLocalFunctionCall(call, function, frame);
+            return LocalFunctionCallEvaluator.Evaluate(this, call, function, frame);
         }
 
         return EvaluateCallViaArray(call, frame);
@@ -154,45 +154,10 @@ internal sealed partial class ExpressionEvaluator
     private bool TryGetScalarLocalFunction(CallExpression call, out SandboxFunction function)
     {
         function = null!;
-        return call.Arguments.Count is 1 or 2 &&
+        return call.Arguments.Count is 1 or 2 or 3 &&
                !CollectionCalls.ContainsKey(call.Name) &&
                _interpreter.TryGetFunction(call.Name, out function) &&
                function.Parameters.Count == call.Arguments.Count;
-    }
-
-    private ValueTask<SandboxValue> EvaluateScalarLocalFunctionCall(
-        CallExpression call,
-        SandboxFunction function,
-        InterpreterFrame frame)
-    {
-        var argumentCount = call.Arguments.Count;
-        var firstTask = EvaluateAsync(call.Arguments[0], frame);
-        if (!firstTask.IsCompletedSuccessfully)
-        {
-            return AwaitCallArguments(
-                call,
-                new SandboxValue[argumentCount],
-                pending: 0,
-                firstTask,
-                frame);
-        }
-
-        var first = firstTask.Result;
-        if (argumentCount == 1)
-        {
-            return _interpreter.InvokeFunctionAsync(function, LocalFunctionArguments.FromSingle(first));
-        }
-
-        var secondTask = EvaluateAsync(call.Arguments[1], frame);
-        if (!secondTask.IsCompletedSuccessfully)
-        {
-            var arguments = new SandboxValue[2];
-            arguments[0] = first;
-            return AwaitCallArguments(call, arguments, pending: 1, secondTask, frame);
-        }
-
-        return _interpreter.InvokeFunctionAsync(
-            function, LocalFunctionArguments.FromPair(first, secondTask.Result));
     }
 
     private ValueTask<SandboxValue> EvaluateCallViaArray(CallExpression call, InterpreterFrame frame)

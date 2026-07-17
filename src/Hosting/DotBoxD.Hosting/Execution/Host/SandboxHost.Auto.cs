@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using DotBoxD.Hosting.Execution.Compiled;
+using DotBoxD.Hosting.Execution.Prepared;
 using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
@@ -13,7 +14,8 @@ public sealed partial class SandboxHost
         string entrypoint,
         SandboxValue input,
         SandboxExecutionOptions options,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CompiledNoAuditRunState? reusableNoAuditState = null)
     {
         if (cancellationToken.IsCancellationRequested)
         {
@@ -63,7 +65,14 @@ public sealed partial class SandboxHost
 
         return await ExecuteTrackedAutoAsync(
                 hotness,
-                () => ExecuteCompiledAsync(plan, entrypoint, input, options, cancellationToken))
+                state => ExecuteCompiledAsync(
+                    plan,
+                    entrypoint,
+                    input,
+                    options,
+                    cancellationToken,
+                    state),
+                reusableNoAuditState)
             .ConfigureAwait(false);
     }
 
@@ -144,6 +153,18 @@ public sealed partial class SandboxHost
     {
         var stopwatch = Stopwatch.StartNew();
         var result = await execute().ConfigureAwait(false);
+        stopwatch.Stop();
+        hotness.Complete(result, stopwatch.Elapsed);
+        return result;
+    }
+
+    private static async ValueTask<SandboxExecutionResult> ExecuteTrackedAutoAsync(
+        AutoHotnessAttempt hotness,
+        Func<CompiledNoAuditRunState?, ValueTask<SandboxExecutionResult>> execute,
+        CompiledNoAuditRunState? reusableNoAuditState)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var result = await execute(reusableNoAuditState).ConfigureAwait(false);
         stopwatch.Stop();
         hotness.Complete(result, stopwatch.Elapsed);
         return result;

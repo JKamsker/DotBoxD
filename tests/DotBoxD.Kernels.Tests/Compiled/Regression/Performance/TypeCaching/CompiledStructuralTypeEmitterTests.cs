@@ -18,9 +18,15 @@ public sealed class CompiledStructuralTypeEmitterTests
             """{ "name": "List", "arguments": ["I32"] }""");
         var mapCalls = await CompileRuntimeCallsAsync(
             """{ "name": "Map", "arguments": ["String", "I32"] }""");
+        var oneFieldRecordCalls = await CompileRuntimeCallsAsync(
+            """{ "name": "Record", "arguments": ["I32"] }""");
+        var twoFieldRecordCalls = await CompileRuntimeCallsAsync(
+            """{ "name": "Record", "arguments": ["I32", "String"] }""");
 
         AssertCalls(listCalls, [nameof(CompiledRuntime.TypeListCached)]);
         AssertCalls(mapCalls, [nameof(CompiledRuntime.TypeMapCached)]);
+        AssertCalls(oneFieldRecordCalls, [nameof(CompiledRuntime.TypeRecordCached)]);
+        AssertCalls(twoFieldRecordCalls, [nameof(CompiledRuntime.TypeRecordCached)]);
     }
 
     [Fact]
@@ -63,6 +69,18 @@ public sealed class CompiledStructuralTypeEmitterTests
               "arguments": ["String", { "name": "Record", "arguments": ["I32"] }]
             }
             """);
+        var arityThreeRecordCalls = await CompileRuntimeCallsAsync(
+            """{ "name": "Record", "arguments": ["I32", "String", "Bool"] }""");
+        var opaqueRecordCalls = await CompileRuntimeCallsAsync(
+            """{ "name": "Record", "arguments": ["I32", "MonsterId"] }""",
+            declareOpaqueId: true);
+        var nestedFieldRecordCalls = await CompileRuntimeCallsAsync(
+            """
+            {
+              "name": "Record",
+              "arguments": ["I32", { "name": "List", "arguments": ["I32"] }]
+            }
+            """);
 
         AssertCalls(
             nestedCalls,
@@ -79,6 +97,11 @@ public sealed class CompiledStructuralTypeEmitterTests
         AssertCalls(
             recordMapCalls,
             [nameof(CompiledRuntime.TypeRecord), nameof(CompiledRuntime.TypeMap)]);
+        AssertCalls(arityThreeRecordCalls, [nameof(CompiledRuntime.TypeRecord)]);
+        AssertCalls(opaqueRecordCalls, [nameof(CompiledRuntime.TypeRecord)]);
+        AssertCalls(
+            nestedFieldRecordCalls,
+            [nameof(CompiledRuntime.TypeList), nameof(CompiledRuntime.TypeRecord)]);
     }
 
     private static async Task<RuntimeCalls> CompileRuntimeCallsAsync(
@@ -134,7 +157,8 @@ public sealed class CompiledStructuralTypeEmitterTests
                 nameof(CompiledRuntime.TypeListCached) or
                 nameof(CompiledRuntime.TypeMap) or
                 nameof(CompiledRuntime.TypeMapCached) or
-                nameof(CompiledRuntime.TypeRecord))
+                nameof(CompiledRuntime.TypeRecord) or
+                nameof(CompiledRuntime.TypeRecordCached))
             .Select(method => method.Name)
             .ToArray();
 

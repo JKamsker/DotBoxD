@@ -16,13 +16,24 @@ internal static class BindingDispatchScopeProbe
     public static void Run()
     {
         _ = Measure(Warmup);
+        _ = MeasureAudited(Warmup, isAsync: false);
+        _ = MeasureAudited(Warmup, isAsync: true);
 
         var measurement = Measure(Iterations);
+        var auditedSync = MeasureAudited(Iterations, isAsync: false);
+        var auditedAsyncCompleted = MeasureAudited(Iterations, isAsync: true);
         Console.WriteLine($"iterations = {Iterations:N0}");
         Console.WriteLine(
             $"CompiledRuntime.CallBinding no-op {measurement.Milliseconds,8:N1} ms " +
             $"{measurement.AllocatedBytes,14:N0} B {measurement.HostCalls,12:N0} calls");
+        WriteMeasurement("audited sync", auditedSync);
+        WriteMeasurement("audited async-completed", auditedAsyncCompleted);
     }
+
+    private static void WriteMeasurement(string label, Measurement measurement)
+        => Console.WriteLine(
+            $"CompiledRuntime.CallBinding {label,-23} {measurement.Milliseconds,8:N1} ms " +
+            $"{measurement.AllocatedBytes,14:N0} B {measurement.HostCalls,12:N0} calls");
 
     private static Measurement Measure(int iterations)
     {
@@ -32,14 +43,39 @@ internal static class BindingDispatchScopeProbe
 
         var context = CreateContext();
         var args = Array.Empty<SandboxValue>();
+        var sw = new Stopwatch();
         var before = GC.GetAllocatedBytesForCurrentThread();
-        var sw = Stopwatch.StartNew();
+        sw.Start();
         for (var i = 0; i < iterations; i++)
         {
             _ = CompiledRuntime.CallBinding(context, BindingId, args);
         }
 
         sw.Stop();
+        return new Measurement(
+            sw.Elapsed.TotalMilliseconds,
+            GC.GetAllocatedBytesForCurrentThread() - before,
+            context.Budget.HostCalls);
+    }
+
+    private static Measurement MeasureAudited(int iterations, bool isAsync)
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        var (context, invoker) = CreateAuditedContext(isAsync);
+        var args = Array.Empty<SandboxValue>();
+        var sw = new Stopwatch();
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        sw.Start();
+        for (var i = 0; i < iterations; i++)
+        {
+            _ = CompiledRuntime.CallBinding(context, BindingId, args);
+        }
+
+        sw.Stop();
+        GC.KeepAlive(invoker);
         return new Measurement(
             sw.Elapsed.TotalMilliseconds,
             GC.GetAllocatedBytesForCurrentThread() - before,
@@ -63,7 +99,31 @@ internal static class BindingDispatchScopeProbe
             CancellationToken.None);
     }
 
+    private static (SandboxContext Context, AuditInvoker Invoker) CreateAuditedContext(bool isAsync)
+    {
+        var limits = new ResourceLimits(
+            MaxFuel: long.MaxValue,
+            MaxAllocatedBytes: long.MaxValue,
+            MaxHostCalls: int.MaxValue,
+            MaxWallTime: TimeSpan.FromMinutes(5));
+        var policy = SandboxPolicyBuilder.Create().AllowRuntimeAsync().Build() with { ResourceLimits = limits };
+        var invoker = new AuditInvoker();
+        var descriptor = Descriptor(invoker.Invoke, AuditLevel.PerCall) with { IsAsync = isAsync };
+        var context = new SandboxContext(
+            SandboxRunId.New(),
+            policy,
+            new ResourceMeter(limits),
+            new BindingRegistryBuilder().Add(descriptor).Build(),
+            new InMemoryAuditSink(),
+            CancellationToken.None);
+        invoker.Initialize(context);
+        return (context, invoker);
+    }
+
     private static BindingDescriptor Descriptor()
+        => Descriptor(static (_, _, _) => ValueTask.FromResult(SandboxValue.Unit), AuditLevel.None);
+
+    private static BindingDescriptor Descriptor(BindingInvoker invoke, AuditLevel auditLevel)
         => new(
             BindingId,
             SemVersion.One,
@@ -72,10 +132,38 @@ internal static class BindingDispatchScopeProbe
             SandboxEffect.Cpu,
             null,
             BindingCostModel.Fixed(1),
-            AuditLevel.None,
+            auditLevel,
             BindingSafety.PureHostFacade,
-            static (_, _, _) => ValueTask.FromResult(SandboxValue.Unit),
+            invoke,
             CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+
+    private sealed class AuditInvoker
+    {
+        private SandboxAuditEvent? _auditEvent;
+
+        public void Initialize(SandboxContext context)
+        {
+            var timestamp = DateTimeOffset.UnixEpoch;
+            _auditEvent = new SandboxAuditEvent(
+                context.RunId,
+                BindingAuditKinds.BindingCall,
+                timestamp,
+                Success: true,
+                BindingId: BindingId,
+                Effect: SandboxEffect.Cpu,
+                ResourceId: "probe:unit",
+                Fields: context.BindingAuditFields("probe", timestamp));
+        }
+
+        public ValueTask<SandboxValue> Invoke(
+            SandboxContext context,
+            IReadOnlyList<SandboxValue> _,
+            CancellationToken __)
+        {
+            context.Audit.Write(_auditEvent!);
+            return ValueTask.FromResult(SandboxValue.Unit);
+        }
+    }
 
     private sealed class NoopAuditSink : IAuditSink
     {

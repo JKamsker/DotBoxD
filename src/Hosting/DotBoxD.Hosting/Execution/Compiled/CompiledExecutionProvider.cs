@@ -42,13 +42,14 @@ internal sealed class CompiledExecutionProvider(ISandboxCompiler? compiler) : ID
         var artifact = await _artifacts.GetAsync(
                 plan,
                 entrypoint,
-                ct => compiler!.CompileAsync(plan, new CompileOptions(entrypoint), ct),
+                compiler!,
                 cancellationToken)
             .ConfigureAwait(false);
         return await _executables.GetAsync(
                 plan,
                 entrypoint,
-                ct => _materialized.GetAsync(artifact, plan, entrypoint, ct),
+                _materialized,
+                artifact,
                 cancellationToken)
             .ConfigureAwait(false);
     }

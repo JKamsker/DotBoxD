@@ -14,6 +14,9 @@ if (args.Length == 1)
         case "--probe-generated-metadata-parameters":
             GeneratedMetadataParameterArrayProbe.Run();
             return;
+        case "--probe-messagepack-envelope-read-state":
+            MessagePackEnvelopeReadStateProbe.Run();
+            return;
     }
 }
 

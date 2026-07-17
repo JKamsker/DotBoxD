@@ -51,7 +51,7 @@ internal static class CompiledTypeEmitter
             }
 
             CompiledMeterEmitter.Fuel(il, 1);
-            il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.TypeRecord)));
+            il.Emit(OpCodes.Call, Runtime(GetRecordFactory(type, allowCachedFactory)));
             return;
         }
 
@@ -59,4 +59,9 @@ internal static class CompiledTypeEmitter
         il.Emit(OpCodes.Ldstr, type.Name);
         il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.TypeScalar)));
     }
+
+    private static string GetRecordFactory(SandboxType type, bool allowCachedFactory)
+        => allowCachedFactory && IsCacheableRecord(type)
+            ? nameof(Kernels.Runtime.CompiledRuntime.TypeRecordCached)
+            : nameof(Kernels.Runtime.CompiledRuntime.TypeRecord);
 }

@@ -189,10 +189,21 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Lazy collision-safe server-extension request helpers | this commit | `--probe-server-extension-request-helpers` | Request conversion now evaluates a framework-type resolver only after its type predicate matches and skips the generated outer method name when allocating numbered or fixed helpers. A `List<int>` proxy falls from seven request helpers, 6,143 UTF-8 bytes, and 121 lines to one helper, 3,698 bytes, and 67 lines. Across ten cold generations of 100 proxies, allocation falls from 106,581,552 B to 70,499,272 B (33.9%, or 3,608,228 B/run). Generated-compilation tests pin the former `WriteKernelRpcValue5` and `DateTimeToWireOffset` collisions, the post-cleanup `WriteKernelRpcValue0` boundary, and the direct-graft form. |
 | Scalar empty/single branched interpreter plans | this commit | `--probe-interpreter-branched-plan-setup`, `--probe-branched-f64-loop` | Branched I32/F64 loop planners now store empty branches without a plan and one-assignment branches inline, retaining arrays only for two or more ordered assignments. Across 50,000 executions, I32 one-one / empty-one branches remove exactly 80 / 64 B/op; F64 removes about 120 / exactly 128 B/op because the tentative I32 planner also stops allocating before F64 fallback. Zero/no-branch/two-two controls are byte-identical. Four long-F64 process medians moved from 90.4 to 82.8 ms (an observed -8.4%), with non-overlapping ranges and unchanged results/resources. |
 | Parameter-only raw frame assignment state | this commit | `--probe-interpreter-frame-layout` | Reused an empty assignment-state sentinel when every frame slot is a parameter initialized before execution. One- and two-raw-parameter rows each fell from 912.0 to 880.0 B/op, removing exactly one 32-byte array per invocation. Zero-parameter, eight-local, and mixed raw/boxed controls remained byte-identical, and genuine locals retain read-before-assignment tracking. |
-| Scalar interpreted local-function arguments | this commit | `--probe-interpreter-local-call-arguments` | Passed synchronously evaluated one- and two-argument local calls to the callee frame through an internal scalar carrier instead of a temporary array. Across 100,000 executions, arity one fell from 1,024.1 to 992.1 B/op and arity two from 1,040.1 to 1,000.1 B/op. Arity-zero and direct controls are byte-identical; pending operands and arity three retain the original array path. |
+| Scalar interpreted local-function arguments | this commit | `--probe-interpreter-local-call-arguments` | Passed synchronously evaluated one- and two-argument local calls to the callee frame through an internal scalar carrier instead of a temporary array. Across 100,000 executions, arity one fell from 1,024.1 to 992.1 B/op and arity two from 1,040.1 to 1,000.1 B/op. Arity-zero and direct controls are byte-identical; pending operands retain the original array path. |
+| Triple interpreted local-function arguments | this commit | `--probe-interpreter-local-call-arguments` | Extended the synchronous scalar path with a dedicated three-value carrier and explicit overloads that do not grow or genericize the established one/two carrier and frame-invocation path. Across 100,000 calls, the arity-three row fell from 99,232,832 B (992.3 B/op) to 94,431,464 B (944.3 B/op), while arity zero/one/two and all paired direct controls remained byte-identical. Elapsed samples were process-variable, so this is allocation-only. |
+| Allocation-free straight I64/F64 assignments | this commit | `--probe-interpreter-scalar-assignment` | Evaluated eligible non-debug I64/F64 literal, variable, unary, and arithmetic assignment trees directly in primitive slots. Eight literal recurrences fell from 1,224.4 to 840.2 B/op (-384 B/execution); two-variable recurrences fell from 1,424.4 to 848.2 B/op (-576 B/execution). I64/F64 controls, values, and resource usage are byte-identical; elapsed samples are not claimed. |
+| Allocation-free interpreted numeric-conversion assignments | this commit | `--probe-interpreter-numeric-conversion` | Passed eligible I32->I64, I32->F64, and I64->F64 assignment operands/results through primitive evaluators. Eight-conversion rows remove about 384 B/execution (48 B/conversion) and now match the unary controls byte-for-byte. Debug, async, malformed, and unsupported shapes retain generic behavior. |
+| Allocation-free MessagePack envelope read state | this commit | `--probe-messagepack-envelope-read-state` | Changed the formatter-private synchronous request/response field trackers from heap objects to mutable stack values. Across 1,000,000 warmed decodes, each lane fell exactly from 72,000,000 B (72.0 B/decode) to 0 B. Reverse-order fields, streams, interleaved unknown values, duplicate/missing fields, depth limits, validation, and trailing-byte rejection remain covered; elapsed samples are not claimed. |
 | Lazy interpreter audit envelope | this commit | `--probe-interpreter-audit-envelope` | Deferred the normal run identity and in-memory audit sink for strictly eligible suppressed pure successes. Across 50,000 executions, generated-RunId allocation fell from 848.0 to 784.0 B/op (-64 B/op), while an explicit RunId fell from 816.0 to 784.0 B/op (-32 B/op). Failures and unexpected audit access materialize a real per-run envelope; debug and audited-binding controls remain byte-identical. |
 | Mixed-frame raw assignment state | this commit | `--probe-interpreter-frame-layout` | Allocate assignment state only when a raw slot exists after the leading parameter region; boxed locals retain null/non-null assignment tracking. Across 50,000 raw-parameter-plus-boxed-local executions, allocation fell from 44,402,824 B (888.1 B/op) to 42,802,824 B (856.1 B/op), exactly 32 B/frame. Parameter-only and eight-raw-local controls remain byte-identical, while genuine raw locals preserve `ValidationError` for reads before assignment. |
 | Value-type compiled attempt envelope | this commit | `--probe-compiled-execution-envelope` | Changed the host's private result-or-fallback `CompiledAttempt` from a reference record to a readonly record struct. Across 50,000 warmed public compiled suppressed successes, allocation fell exactly from 42,001,504 B (840.0 B/op) to 40,401,504 B (808.0 B/op), or 32 B/execution. The timing ranges overlap, so this step makes no timing claim. |
+| Allocation-free warmed compiled cache hits | this commit | `--probe-compiled-execution-envelope` | Moved non-persistent reflection compilation/materialization factories into miss-only cache helpers and the inline-await capture into its selected worker boundary. Across 50,000 warmed public compiled suppressed successes, allocation fell from 40,404,920 B (808.1 B/op) to 25,602,968 B (512.1 B/op), removing 296.0 B/execution. Provider and both execution-cache completed hits independently measure 0 B/hit; checksums, identity, resource usage, cancellation/coalescing, custom compilers, failures, and fallback remain pinned. |
+| Reusable Auto compiled no-audit state | this commit | `--probe-prepared-values` | Reused the installed kernel's existing no-audit meter/context state after a successful binding-free Auto-compiled run, while retaining Auto selection, hotness tracking, full results, and provider cache lookup. The warmed Auto miss lane fell from 2,216.3 to 1,896.2 B/op; subtracting the one-decimal displays gives 320.1 B/op, while the exact mechanism removes a 128-byte `ResourceMeter` plus a 192-byte `SandboxContext`, or 320 B/run. Repeated after processes reproduced 1,896.2 B/op. Elapsed samples are not claimed. |
+| Value-type I32 comparison plans | this commit | `--probe-interpreter-while-plan-setup`, `--probe-interpreter-branched-plan-setup` | Embedded the immutable two-operand comparison plan in its owning loop plan. Across 50,000 executions, I32 `while` and branched rows fell exactly from 1,168.3 to 1,128.3 B/op and 1,456.3 to 1,416.3 B/op. F64 branched planning fell from 1,840.5 to 1,760.5 B/op because both its rejected I32 attempt and selected F64 plan stop allocating a 40-byte comparison object. Checksums and resource usage are unchanged; elapsed samples are not claimed. |
+| Copy-on-write live-state synchronizer snapshots | this commit | `--probe-live-state-sync` | Published a new immutable synchronizer array only when class-shaped live state registers, removing the hot per-input/per-flush clone. Across 1,000,000 input synchronizations, Sync x1/x8 fell from 32/88 to 0/0 B/call and AsyncSet x1/x8 from 120/264 to 88/176 B/call. The exact snapshot savings are 32 B with one synchronizer and 88 B with eight; concurrent visibility, callback lock boundaries, deferred-list ownership, and flush semantics remain pinned. |
+| Value-type I64 plan slot-read state | this commit | `--probe-interpreter-i64-plan-setup` | Replaced captured slot-read predicates with a readonly frame/earlier-target state threaded through recursive I64 planning. Across 50,000 executions, a single plan fell from 1,184.3 to 1,120.3 B/op (-64 B) and a two-assignment plan from 1,760.5 to 1,600.5 B/op (-160 B). Same-plan zero-loop and source-ordered earlier-target controls isolate setup and preserve the fast path; values and resource usage are unchanged, and elapsed time is not claimed. |
+| Invocation-owned binding audit arbitration | this commit | `--probe-binding-dispatch-scope` | Reused the in-memory destination's event-list gate and removed global checkpoint ownership from the committed async audit wrapper. Across four fresh 500,000-call processes, the async-completed median fell from 320.8 to 280.8 B/call (-40.0 B), while no-audit stayed at 144 total bytes. Sound identity now also covers supported sync-declared pending calls, intentionally moving declared-sync audited calls from 144.8 to 280.8 B/call (+136.0 B). No timing claim is made. |
+| Primitive I64/F64 return trees | this commit | `--probe-interpreter-scalar-return` | Evaluated eligible non-debug unary/binary return trees through the existing primitive evaluators and boxed only the final public result. Across 100,000 executions, one/eight literal increments remove exactly 24/192 B per call and one/eight raw-variable increments remove 48/384 B. I64 and F64 rows are byte-identical; x0 literal/plain-variable controls, checksums, and all resource counters are unchanged. Elapsed time is not claimed. |
 
 Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
@@ -1855,6 +1866,152 @@ allocation reduction is the claim. Focused regressions pin arity-zero-through-th
 left-to-right exactly-once synchronous evaluation, pending first/second operands, same-plan concurrency, and collection
 name precedence. Public API, compiler/verifier identity, persisted artifacts, and sandbox accounting are unchanged.
 
+## Triple interpreted local-function arguments
+
+The one/two-argument scalar call path deliberately left arity three on the general evaluator, where it allocated a
+three-element `SandboxValue[]` and the callee frame immediately copied those values into its own slots. The array did not
+escape. The follow-up keeps three synchronously completed operands in a dedicated three-reference value carrier and adds
+explicit triple-only evaluator, invocation, and frame-builder overloads. The established array/one/two carrier remains
+non-generic and unchanged; pending operands still resume through the original array continuation.
+
+The permanent probe now includes a padded arity-three direct/call pair and constructs `Stopwatch` before taking the
+thread-local allocation baseline. Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-local-call-arguments
+```
+
+The baseline was rebuilt from merged commit `5252efcf4` with only the expanded/corrected probe. Repeated optimized
+processes reproduced every managed-allocation total below:
+
+```text
+case                    before B / B/op         after B / B/op          delta/op
+arity 0 direct          78,408,968 / 784.1      78,408,968 / 784.1          0 B
+arity 0 local call      89,624,992 / 896.2      89,624,992 / 896.2          0 B
+arity 1 direct          81,609,440 / 816.1      81,609,440 / 816.1          0 B
+arity 1 local call      92,831,464 / 928.3      92,831,464 / 928.3          0 B
+arity 2 direct          82,409,440 / 824.1      82,409,440 / 824.1          0 B
+arity 2 local call      93,631,464 / 936.3      93,631,464 / 936.3          0 B
+arity 3 direct          83,209,440 / 832.1      83,209,440 / 832.1          0 B
+arity 3 local call      99,232,832 / 992.3      94,431,464 / 944.3        -48 B
+```
+
+Subtracting each direct row and then the fixed arity-zero call/frame delta moves the arity-three caller-storage residual
+from 48.1 to 0.1 B/op; the whole execution row falls by 4,801,368 B over 100,000 calls. Elapsed samples were highly
+process-variable, so no timing claim is made. All checksums remain `700,000`; arity-three direct/call
+fuel/loop/sandbox-allocation/host-call tuples remain `3/0/6/0` and `11/0/6/0`.
+
+Focused regressions require zero residual caller-array allocation for arities one through three, preserve arity-zero
+through-three values/resource totals, evaluate three operands left-to-right exactly once, cover pending and failed
+operands at all three positions, ensure a failure stops later operands and the callee body, and resume a pending callee
+body before reading all three retained frame values in a later statement. The extraction of the I32 local-function shape
+analyzer keeps every changed non-generated C# file below 300 lines without adding public API. Compiler/verifier identity,
+persisted artifacts, call-depth cleanup, tracing, and sandbox accounting are unchanged.
+
+## Allocation-free straight I64/F64 assignments
+
+Outside loop-specific plans, an interpreted assignment such as `value = value + 1` used the generic boxed expression
+evaluator. Reading one raw I64/F64 variable created a 24-byte `SandboxValue`, the arithmetic result created another, and
+the frame immediately unboxed that result into its primitive target slot. A second raw-variable operand added a third
+box. Eight literal recurrences therefore added about 384 B/execution; eight two-variable recurrences added about 576 B.
+
+Two non-mutating shape checks now recognize I64/F64 literals and assigned raw variables combined through unary negation
+or `+`, `-`, `*`, `/`, and `%`. The recursive evaluators charge one fuel at each node in preorder, evaluate left before
+right, and use `SandboxInt64Math` / `SandboxFloat64Math` at every intermediate. Only a fully successful RHS is committed
+to the target primitive slot. Debug tracing, unsupported calls, wrong shapes, and unassigned variables fall back before
+evaluation; the established I32 assignment fast path remains inline in `StatementExecutor`.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-scalar-assignment
+```
+
+The permanent probe prepares and warms its full matrix before measurement, reuses inputs, requires synchronous
+completion, excludes `Stopwatch` construction from thread-local allocation totals, and pins checksums plus all twelve
+resource fields. Representative 100,000-execution rows:
+
+```text
+case                    before B / B/op          after B / B/op          delta/op
+I64 literal x0           84,014,784 /   840.1     84,014,784 / 840.1          0 B
+I64 literal x8          122,441,520 / 1,224.4     84,019,656 / 840.2       -384 B
+I64 raw variable x0      84,814,784 /   848.1     84,814,784 / 848.1          0 B
+I64 raw variable x8     142,440,600 / 1,424.4     84,819,656 / 848.2       -576 B
+F64 literal x0           84,014,784 /   840.1     84,014,784 / 840.1          0 B
+F64 literal x8          122,441,520 / 1,224.4     84,019,656 / 840.2       -384 B
+F64 raw variable x0      84,814,784 /   848.1     84,814,784 / 848.1          0 B
+F64 raw variable x8     142,440,600 / 1,424.4     84,819,656 / 848.2       -576 B
+```
+
+The x1/x4 rows establish linear baselines of 48.0 B per literal recurrence and 72.0 B per two-variable recurrence; every
+optimized recurrence row reports 0.0 B incremental allocation. The two-variable lane uses two raw parameters rather
+than initializing a second local, keeping its control at fuel `3` while pinning `CollectionElements = 2`. Literal and
+two-variable x8 fuel remains `35`; loop, sandbox allocation, host-call, file/network, log, and string counters are zero.
+
+Unloaded samples moved the four x8 lanes from 72.2/85.8/81.4/105.1 ms to ranges of
+54.3-55.3/68.5-70.0/64.9-66.1/76.7-78.1 ms. Later loaded samples were slower, so this step deliberately claims only the
+exact allocation reduction. Focused regressions cover both allocation shapes, every supported operator, I64 overflow
+and zero-division behavior, F64 non-finite intermediates and signed zero, left-first failure/fuel order,
+read-before-assignment, exact debug traces, and unsupported-call fallback. No public API or generated ABI changes.
+
+## Allocation-free interpreted numeric-conversion assignments
+
+The earlier exact-arity conversion optimization removed a one-element argument array, but a straight assignment still
+boxed the raw source operand and converted result. Once unary I64/F64 assignments became allocation-free, the permanent
+numeric-conversion probe exposed that remaining cost cleanly at 48 B/conversion. Eligible `numeric.toI64` and
+`numeric.toF64` assignment calls now charge the call node, evaluate the operand through the matching primitive evaluator,
+convert the primitive value directly, and commit it through the same primitive target handoff.
+
+This baseline was captured after the straight-assignment evaluator landed but before direct conversion was enabled, so
+it records a distinct improvement without rewriting the earlier argument-array evidence. Eight-conversion rows over
+100,000 executions:
+
+```text
+case        before B / B/op          after B / B/op          delta/op
+I32->I64    140,039,440 / 1,400.4    101,623,400 / 1,016.2      -384 B
+I32->F64    140,039,440 / 1,400.4    101,623,400 / 1,016.2      -384 B
+I64->F64    144,040,600 / 1,440.4    105,624,336 / 1,056.2      -384 B
+```
+
+Every optimized row is byte-identical to its unary control, including checksum and fuel/loop/sandbox-allocation/host-call
+usage; x1/x4 rows likewise report 0.0 B/conversion. Timings moved in mixed directions across scenarios and runs, so no
+latency claim is made. Direct value/resource tests cover all three legal conversions; debug tests require the original
+call/operand trace sequence, and asynchronous operands, operand failures, wrong types, and malformed arity retain their
+generic validation or continuation paths. Public API, compiler/verifier identity, and persisted artifacts are unchanged.
+
+## Allocation-free MessagePack envelope read state
+
+Every MessagePack `RpcRequest` and `RpcResponse` decode previously allocated a private 72-byte field-tracking object.
+The tracker exists only for one synchronous formatter call: it records seen fields, owns or accumulates the result, and
+passes the reader by reference while decoding nested stream values. Making that private state a mutable struct keeps the
+same mutation and validation sequence on the stack; it does not escape, cross an await, implement an interface, or box.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Services.Benchmarks -p:UseSharedCompilation=false -- --probe-messagepack-envelope-read-state
+```
+
+The probe serializes a cached-name request without streams and a successful response without error details, warms both
+lanes for 100,000 decodes, then measures 1,000,000 generic deserializations per lane on the current thread. It folds every
+envelope member into stable checksums and excludes `Stopwatch` construction from allocation totals:
+
+```text
+case                 before B / B/decode       after B / B/decode       checksum
+request envelope     72,000,000 / 72.0                 0 / 0.0         68,000,000
+response envelope    72,000,000 / 72.0                 0 / 0.0         43,000,000
+```
+
+Representative elapsed samples were 224.2/229.9 ms before and 212.1/226.2 ms after for request/response, which is too
+small and process-sensitive for a latency claim. The exact allocation result applies to the fixed formatter state;
+uncached strings, error details, and stream collections may still allocate. A typical unary request/response exchange
+removes 144 B of decode state.
+
+Regressions exercise reverse-ordered fields, stream values, and an interleaved nested unknown field so mutable state,
+reader advancement, and formatter options are all observed together. Existing coverage continues to pin duplicate and
+missing fields, invalid response combinations, malformed names, and unknown-field depth limits; generic and runtime-typed
+controls reject trailing bytes. The wire format and public API are unchanged.
+
 ## Lazy interpreter audit envelope
 
 Every public interpreter execution previously constructed both a fresh `SandboxRunId` and an `InMemoryAuditSink` before
@@ -1962,3 +2119,323 @@ audit snapshot, and all twelve resource counters (`fuel = 4`, `max fuel = long.M
 Audited success, a compiled `InvalidInput` failure, and verifier fallback remain semantic controls. This private
 representation change does not alter public API, generated-code ABI, compiler or verifier identity, persisted artifacts,
 sandbox policy, audit/security boundaries, or resource accounting.
+
+## Allocation-free warmed compiled cache hits
+
+The default non-persistent reflection compiler keeps two host-local execution caches: one for completed artifacts and one
+for their materialized executables. Their warmed path returned synchronously, but the provider still constructed a shared
+48-byte display class and two 64-byte delegates for factories needed only on a miss. Each cache also eagerly allocated a
+24-byte display class for its miss-only `Lazy<Task<T>>` candidate. The provider layer therefore cost exactly 224 B/hit.
+
+Both caches now expose a typed internal path for their concrete compiler/materializer dependency. Lookup, LRU touch, and
+capture of either the completed value or the existing shared `Lazy` remain atomic under the original lock; only a genuine
+miss enters a helper that creates factory closure state. The existing delegate-based path remains for focused tests and
+uses the same lookup, completion, cancellation, failure-removal, and coalescing logic. Custom and persistent compilers
+continue through their prior path so current-artifact validation is never bypassed.
+
+The public runner had a second dormant cost: its optional inline-await-pump lambda captured six values in a 72-byte
+display class at method entry, even when the earlier binding-free no-audit branch returned. A parameterized helper on the
+async worker now owns that lambda, so the capture is created only when the inline pump is actually selected.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-execution-envelope
+```
+
+Repeated warmed public results over 50,000 executions:
+
+```text
+case                       before B / B/op       after B / B/op        delta/op
+public compiled cache hit   40,404,920 / 808.1    25,602,968 / 512.1      -296 B
+```
+
+The 296 B/execution reduction decomposes into the exact 224-byte provider/cache cost and 72-byte inactive runner capture.
+Independent 100,000-hit allocation guards measure the combined typed provider path, delegate-based artifact cache, and
+delegate-based executable cache at 0 B/hit after warmup. The remaining 512 B/run is accounted for by the per-run resource
+meter, sandbox context, resource snapshot, and result envelope; those are separate follow-up candidates.
+
+Post-change elapsed samples of 90.9, 101.2, and 102.6 ms straddled the 97.1 ms baseline, so this step makes only the
+byte-exact allocation claim. The probe pins result `7`, checksum, compiled mode/dispatch,
+module/plan/policy/artifact identity, empty audit output, and all twelve resource counters. Regression coverage preserves
+pre-cancelled and independently cancelled waiters, same-key in-flight coalescing, LRU recency, miss/hit status, custom and
+persistent compiler behavior, audited failure, inline-await execution, and interpreter fallback. No public API, generated
+ABI, verifier identity, persisted artifact, security boundary, or resource-accounting behavior changes.
+
+## Reusable Auto compiled no-audit state
+
+Installed kernels already serialize execution through their per-kernel gate and reuse a no-audit `ResourceMeter` and
+`SandboxContext` for explicit Compiled mode. Auto mode continued to allocate fresh copies after promoting a binding-free
+entrypoint because it must retain selector/hotness processing and a full `SandboxExecutionResult`; the explicit Compiled
+prepared-value shortcut cannot be applied to Auto without dropping those semantics.
+
+Auto now receives the same owner-scoped state only after a prior terminal run actually succeeded in Compiled mode. The
+state is used solely by the runner's existing suppressed, binding-free, cache-valid success branch. Auto still performs
+its mandatory first interpreted run, invokes the mode selector on every later attempt, records full resource usage and
+hotness, and asks the compiled provider for the executable. In particular, Auto does not use the state's explicit-mode
+executable shortcut, so provider LRU, materialization, cache invalidation, custom compiler, and artifact lifetime behavior
+remain unchanged. A different effective cancellation token creates a fresh context, and a cancelled, failed, fallback,
+binding, or concurrently revoked run cannot seed reusable Auto state. Audited or cache-invalid executions never consume
+the state because they remain on the full audited runner path.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-prepared-values
+```
+
+Warmed installed-kernel results over 200,000 predicate misses:
+
+```text
+case                         before B/op    after B/op    displayed delta/op
+auto compiled miss               2,216.3       1,896.2               -320.1 B
+```
+
+The displayed difference is 320.1 B/op because each total is rounded independently to one decimal. The implementation's
+exact removed state is 320 B/run: one 128-byte `ResourceMeter` plus one 192-byte `SandboxContext`. The focused full-result
+runner guard measured fresh execution at 512.032 B/run and reuse at 192.010 B/run across 100,000 iterations, with the
+small fixed process noise isolated by a 0.1 B/run threshold. The remaining 192 B/run is the required resource snapshot and
+full result envelope, which Auto intentionally preserves.
+
+Three fresh after-process samples reproduced the Auto lane at 1,896.2 B/op. Elapsed samples were 385.8-393.8 ms, but no
+timing baseline was isolated for this change, so this step makes only the allocation claim. The paired explicit Compiled
+lane remains a control. The probe pins synchronous completion, predicate result, requested and actual modes, fallback,
+success, and artifact identity. Its fire-damage manifest now also declares the `Concurrency` effect and the
+`dotboxd.runtime.async` / `host.message.write` required capabilities that its host-message path already uses; that manifest
+correction is probe maintenance and is not part of the allocation reduction.
+
+Regression coverage additionally pins mandatory-first interpretation, Compiled-to-Interpreted-to-Compiled selector
+non-stickiness, full-result and hotness accounting, provider lookup despite a poisoned state executable, meter reset,
+cancelled-token recovery, failed audit evidence, and terminal revocation handling. No public API, generated ABI, verifier
+identity, persisted artifact, sandbox policy, audit/security boundary, or resource-accounting contract changes.
+
+## Value-type I32 comparison plans
+
+The scalar I32 `while` and branched-loop planners stored an immutable comparison in a separate reference object even though
+its lifetime and ownership exactly match the enclosing execution plan. Each object is 40 bytes on x64 (two plan references,
+two integers, and the object header). F64 branched planning paid twice: the interpreter first builds and rejects a tentative
+I32 runner, then builds the selected F64 runner with another comparison.
+
+`I32ComparisonPlan` is now a private readonly value embedded in its owner. `TryCreate` still publishes a plan only after the
+operator and both operands validate, and callers observe `default` only on its false path. Planning and evaluation remain
+left-to-right, preorder fuel is unchanged, and unsupported or debug-traced shapes retain the general evaluator.
+
+Commands:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-while-plan-setup
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-branched-plan-setup
+```
+
+Repeated Release allocation results over 50,000 executions:
+
+```text
+case                         before B/op    after B/op    delta/op
+I32 while                         1,168.3       1,128.3       -40 B
+I32 branched                      1,456.3       1,416.3       -40 B
+F64 branched                      1,840.5       1,760.5       -80 B
+```
+
+The 40/40/80-byte reductions reproduced exactly across three fresh processes. The zero-iteration, no-branch,
+empty-branch, and two-assignment controls retain their expected relative bands. Results, fuel, loop iterations, sandbox
+allocation, and host-call usage are unchanged. This setup-only representation change has no isolated timing evidence, so
+it makes only the allocation claim and changes no public API, verifier identity, persisted artifact, or sandbox contract.
+
+## Copy-on-write live-state synchronizer snapshots
+
+Each installed kernel owns a live-state synchronizer registry. Class-shaped state registers one immutable synchronizer when
+its typed live value is first created, but every later input build and flush previously locked the registry and cloned the
+entire reference list before invoking callbacks. Registration is rare and append-only; synchronization is the hot path.
+
+The registry now copies and appends under the existing registration lock, then publishes the immutable array with a
+volatile write. Readers take one volatile snapshot and iterate it without a lock or copy. A registration that races an
+active synchronization is excluded from that stable pass and visible on the next pass, matching the prior snapshot
+contract. Callbacks still run outside the lock. `AsyncSet` continues to return a fresh caller-owned deferred-action list;
+that list is intentionally neither cached nor pooled.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-live-state-sync
+```
+
+Warmed results over 1,000,000 input synchronizations:
+
+```text
+case             before B/call    after B/call    saved/call
+Sync x1                    32.0             0.0          32 B
+Sync x8                    88.0             0.0          88 B
+AsyncSet x1               120.0            88.0          32 B
+AsyncSet x8               264.0           176.0          88 B
+```
+
+All four after totals reproduced exactly in four fresh Release processes. Timing samples were affected by tiering, so this
+step makes only the byte-exact allocation claim. Exact callback/deferred counts, concurrent registration during input and
+flush, concurrent append publication, mode filtering, and caller-owned list identity are permanent controls.
+
+The intentional tradeoff is an O(n) array copy when each class-shaped state type first registers (and therefore O(n²)
+across a hypothetical bulk setup) in exchange for zero snapshot allocation on every hot synchronization. Installed-kernel
+typed values register once per state type and entries are never removed or replaced, so this moves work to the bounded cold
+path without changing public API, plugin state semantics, or update ordering.
+
+## Value-type I64 plan slot-read state
+
+`I64ExpressionPlan` previously accepted a `Func<int, bool>` that decided whether a raw I64 slot was readable while a loop
+body was planned. A single-assignment plan allocated one 64-byte method-group delegate. Multi-assignment planning captured
+the frame and its earlier-target set in a 32-byte display object, then allocated one 64-byte delegate per assignment.
+
+The recursive planner now receives a readonly two-reference state containing the frame and, only for multi-assignment
+bodies, the existing earlier-target `HashSet`. The target is added only after that statement's expression and target type
+validate, so a statement can read targets established by earlier statements but cannot read a later target. The state does
+not escape planning; the multi-body plan array and dependency set intentionally remain.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-i64-plan-setup
+```
+
+Fresh Release allocation results over 50,000 prepared executions:
+
+```text
+case                            before total / B/op       after total / B/op       state removed
+single assignment              59,217,440 / 1,184.3      56,016,280 / 1,120.3            64 B
+two ordered assignments        88,025,560 / 1,760.5      80,023,240 / 1,600.5           160 B
+```
+
+Repeated after processes reproduced the displayed totals. Same-plan zero-loop rows stay at 928.3 B/op for the single plan
+and 936.3 B/op for the two-assignment plan, separating setup from loop work. A second multi-assignment control begins with
+an unassigned target and has its later statement read the value written by the earlier statement; its one/zero-loop delta
+is 664.2 B/op, matching the retained fast plan. A one-shot 20-million-iteration single plan independently fell from 2,384
+to 2,320 allocated bytes, isolating the exact 64-byte setup object without per-iteration noise.
+
+Checksums, preorder fuel, loop iterations, sandbox allocation, and host calls are unchanged. Regression coverage pins
+source ordering, a forged later-target read-before-assignment failure, checked overflow, and all-or-nothing fallback when
+one multi-body expression is unsupported. Elapsed samples varied by process, so this step makes no timing claim and changes
+no public API, generated ABI, verifier identity, persisted artifact, or sandbox contract.
+
+## Invocation-owned binding audit arbitration
+
+Required binding audit enforcement must decide atomically whether the binding's detailed terminal event or the runtime's
+sanitized fallback wins. The committed first implementation gave declared-async calls an invocation wrapper, but each
+wrapper allocated a private gate and searched the shared destination after a global checkpoint. Overlapping same-descriptor
+calls could therefore claim one event twice, and a wall-time cancellation could race a late detailed write into two events.
+It also missed the supported case where `IsAsync=false` returns pending work under an explicit runtime-async grant.
+
+Every required-audit call on the default `InMemoryAuditSink` now receives a unique writer identity before validation,
+charging, or async-grant checks. Writes append and claim evidence under the destination's existing event-list gate; seal and
+fallback use that same gate and consult only the wrapper's local claims. Sealed wrappers suppress later terminal writes for
+their run/kind/binding identity while preserving supplementary audit kinds. An immutable `AsyncLocal` flow chain keeps the
+identity in detached continuations without pooling retained wrappers; rare out-of-order disposal rebuilds only that flow's
+chain. Reentrant preflight failures consequently own their own fallback instead of donating it to an outer call.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-binding-dispatch-scope
+```
+
+Four fresh Release processes, 500,000 calls each, produced these median totals after moving the probe's `Stopwatch` outside
+the allocation interval:
+
+```text
+case                       committed baseline        final total / B/call        delta/call
+no audit                              144 B                     144 B                  0 B
+audited declared sync      72,396,880 / 144.8       140,389,548 / 280.8          +136.0 B
+audited async-completed   160,391,072 / 320.8       140,389,924 / 280.8           -40.0 B
+```
+
+The async lane is the like-for-like allocation improvement: sharing the destination gate and shrinking the owner state
+removes about 40 B/call from the committed wrapper. The sync increase is deliberate and reported separately. Runtime async
+semantics allow a sync-declared binding to return pending work, so sound identity must exist before `Invoke`; it cannot be
+installed after observing the `ValueTask` without losing aliases already captured by its continuation. No-audit calls do
+not create the wrapper and remain allocation-identical. Elapsed samples varied by process, so no timing claim is made.
+
+Regressions cover interpreted and compiled declared/under-declared races, dynamic and cached late sink lookup, all current
+error codes, malformed and contradictory terminals, overlapping and sequential same-descriptor calls, raw-destination
+fail-closed behavior, nested preflight quota failures, fallback idempotence, and detached/out-of-order flow cleanup. Stress
+runs passed 260/260 race/deadline cases, and the broader audit/async/network filter passed 919/919. Custom `IAuditSink`
+implementations retain their public checkpoint contract and own cross-invocation concurrency/atomic persistence because the
+current interface has no invocation token; bindings must resolve `SandboxContext.Audit` for each call. No public API,
+generated ABI, verifier identity, persisted artifact, sandbox resource accounting, or wall-time limit changes.
+
+## Primitive I64/F64 return trees
+
+The boxed expression path materialized a 24-byte `I64Value` or `F64Value` for each raw-slot read and another for every
+arithmetic result. A direct `return value + literal` therefore allocated the intermediate result plus the unavoidable final
+public value; `return left + right` also boxed both raw operands. Nested trees multiplied that cost even though the existing
+primitive evaluators already preserve checked I64 arithmetic, finite F64 results, preorder fuel, and left-to-right failure.
+
+Return execution now selects those evaluators only for non-debug unary and binary trees and creates one final
+`SandboxValue`. Literal leaves and plain variables deliberately retain the generic path: literal returns reuse the prepared
+object identity, while a variable already needs only the final public box. Unsupported trees, intrinsic/host calls, pending
+continuations, and debug traces fall back before evaluation, so side effects are never evaluated twice.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-scalar-return
+```
+
+Two fresh detached-baseline processes and two fresh optimized processes were byte-identical within each state. Managed
+allocation over 100,000 executions (I64 and F64 produced identical totals):
+
+```text
+case                   baseline total / B/op       final total / B/op       exact boxes removed
+literal x0             84,014,784 /   840.1        84,014,784 / 840.1                         0 B
+literal x1             86,424,192 /   864.2        84,009,912 / 840.1                        24 B
+literal x8            103,228,800 / 1,032.3        84,009,912 / 840.1                       192 B
+raw variable x0        84,814,784 /   848.1        84,814,784 / 848.1                         0 B
+raw variable x1        89,620,416 /   896.2        84,809,912 / 848.1                        48 B
+raw variable x8       123,227,840 / 1,232.3        84,809,912 / 848.1                       384 B
+```
+
+The optimized candidate rows sit a stable 4,872 total bytes (0.04872 B/op) below their x0 control because of fixed
+process/probe effects; the claimed 24/48-byte per-node mechanisms are separated from those raw-total differences. Fuel is
+3/5/19 for x0/x1/x8, with unchanged results, zero loops/sandbox bytes/host calls, and all twelve counters pinned. Focused
+regressions cover all I64/F64 operators, overflow, division by zero, non-finite intermediates, signed zero, left-first
+failure fuel, exact debug trace order, unsupported comparisons, pure intrinsics, top-level and nested pending bindings, and
+literal identity. Timing varied by process and is not claimed. No public API, generated ABI, verifier identity, persisted
+artifact, or sandbox contract changes.
+
+## Cached direct compiled record types
+
+Generated entrypoint and return validation materialized a metered `SandboxType[]` for every record type, then copied that
+array into a new immutable `SandboxType` descriptor. Direct one- and two-field records of built-in scalars have only 9 and
+81 possible ordered shapes, so rebuilding their descriptor graphs added 88 or 96 managed bytes after the required caller
+array had already been allocated and charged.
+
+The compiler now selects a dedicated `CompiledRuntime.TypeRecordCached` facade only for those direct roots. Its bounded,
+lazy caches accept exact canonical scalar singletons, snapshot the mutable caller array before indexing or publication, and
+construct the descriptor from those snapshots. Null, empty, null-element, arity-three-or-larger, nested, opaque, and
+structurally equal but noncanonical inputs delegate to `SandboxType.Record` with the same result or exception. The record
+cache arrays live in a nested holder so first use of the existing List/Map caches does not initialize them.
+
+Command:
+
+```text
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-record-types
+```
+
+Two fresh baseline processes were byte-identical, and repeated optimized processes reproduced the displayed direct totals.
+Managed allocation was:
+
+```text
+case                                      baseline / legacy          optimized / cached       exact saving
+TypeRecord(I32), 1,000,000 calls          120,000,040 / 120.0 B/op   32,000,040 / 32.0 B/op            88 B
+TypeRecord(I32,String), 1,000,000 calls   136,000,040 / 136.0 B/op   40,000,040 / 40.0 B/op            96 B
+arity-three cached-factory fallback       152,000,040 / 152.0 B/op  152,000,040 / 152.0 B/op             0 B
+compiled identity, 50,000 executions       39,204,920 / 784.1 B/op   29,603,944 / 592.1 B/op           192 B
+```
+
+The direct lanes isolate the exact mechanism: compiled `Record<I32,String>` identity validates the same type at input and
+return, removing two 96-byte graphs while retaining two 40-byte metered arrays. The compiled raw-total difference includes
+another 976 fixed bytes across the process, so the claim remains the exact 192-byte mechanism, not 192.02 B/op. Value
+identity, compiled dispatch, empty audit, and resource usage remain pinned; fuel/loops/sandbox allocation/collection
+elements/string bytes are `10/0/34/2/2` before and after. Elapsed samples are not claimed.
+
+`TypeRecordCached` is public solely as opt-in generated-code ABI sugar over the unchanged public `TypeRecord` primitive.
+Both entrypoint and function emitters retain legacy factories for unsupported shapes, and verifier coverage pins the new
+metered call shape plus null-field rejection. Compiler and verifier identities advance from 10 to 11; API baselines and the
+spec manifest record the additive runtime facade. No type-system, effect-analysis, language, artifact-format, or sandbox
+resource-accounting contract changes.

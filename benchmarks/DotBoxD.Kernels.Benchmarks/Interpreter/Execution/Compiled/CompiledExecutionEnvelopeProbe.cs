@@ -10,6 +10,8 @@ internal static class CompiledExecutionEnvelopeProbe
 {
     private const int WarmupIterations = 2_000;
     private const int Iterations = 50_000;
+    private const double HistoricalBytesPerOperation = 808.1D;
+    private const double MaximumExpectedBytesPerOperation = 520D;
     private static readonly SandboxExecutionOptions SuppressedOptions = new()
     {
         Mode = ExecutionMode.Compiled,
@@ -33,6 +35,13 @@ internal static class CompiledExecutionEnvelopeProbe
         _ = Measure(host, successPlan, expected, WarmupIterations);
         ForceGc();
         var measurement = Measure(host, successPlan, expected, Iterations);
+        var bytesPerOperation = measurement.Bytes / (double)Iterations;
+        if (bytesPerOperation > MaximumExpectedBytesPerOperation)
+        {
+            throw new InvalidOperationException(
+                $"expected warmed public compiled hits to allocate at most " +
+                $"{MaximumExpectedBytesPerOperation:N1} B/op, got {bytesPerOperation:N1} B/op");
+        }
 
         await CompiledExecutionEnvelopeControls.ValidateAsync(
             host,
@@ -44,8 +53,11 @@ internal static class CompiledExecutionEnvelopeProbe
         Console.WriteLine($"compiled public execution-envelope executions = {Iterations:N0}");
         Console.WriteLine("case                         total ms    allocated B       B/op   checksum");
         Console.WriteLine(
-            $"suppressed pure compiled     {measurement.ElapsedMilliseconds,8:N1} {measurement.Bytes,14:N0} " +
-            $"{measurement.Bytes / (double)Iterations,10:N1} {measurement.Checksum,10:N0}");
+            $"public compiled cache hit     {measurement.ElapsedMilliseconds,8:N1} {measurement.Bytes,14:N0} " +
+            $"{bytesPerOperation,10:N1} {measurement.Checksum,10:N0}");
+        Console.WriteLine(
+            $"allocation-only = {HistoricalBytesPerOperation:N1} B/op baseline -> " +
+            $"{bytesPerOperation:N1} B/op current");
         Console.WriteLine(
             "resources F/Max/L/A/H/R/W/NR/NW/Log/Elem/String = " +
             CompiledExecutionInvariant.FormatUsage(expected.ResourceUsage));

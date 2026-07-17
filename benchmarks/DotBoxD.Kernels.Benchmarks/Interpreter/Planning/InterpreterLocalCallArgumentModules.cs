@@ -38,6 +38,21 @@ internal static class InterpreterLocalCallArgumentModules
             { "op": "set", "name": "padding2", "value": { "string": "unused" } }
             """);
 
+    public static string ThreeArity()
+        => Module(
+            3,
+            parametersJson: """
+            { "name": "first", "type": "String" },
+            { "name": "second", "type": "String" },
+            { "name": "third", "type": "String" }
+            """,
+            argumentsJson: """
+            { "var": "first" },
+            { "var": "second" },
+            { "var": "third" }
+            """,
+            paddingStatementsJson: "");
+
     private static string Module(
         int arity,
         string parametersJson,

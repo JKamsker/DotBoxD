@@ -1,10 +1,9 @@
-using DotBoxD.Kernels.Verifier.Generated;
-
 namespace DotBoxD.Kernels.Verifier;
 
 using System.Collections.Frozen;
 using System.Security.Cryptography;
 using System.Text;
+using DotBoxD.Kernels.Verifier.Generated;
 using static DotBoxD.Kernels.Verifier.VerificationPolicyDefaults;
 using static DotBoxD.Kernels.Verifier.VerifierTypeNames;
 
@@ -88,6 +87,7 @@ public sealed record VerificationPolicy(
                 RuntimeMember("TypeMap", $"{SandboxTypeName},{SandboxTypeName}", SandboxTypeName),
                 RuntimeMember("TypeMapCached", $"{SandboxTypeName},{SandboxTypeName}", SandboxTypeName),
                 RuntimeMember("TypeRecord", SandboxTypeArrayName, SandboxTypeName),
+                RuntimeMember("TypeRecordCached", SandboxTypeArrayName, SandboxTypeName),
                 RuntimeMember("CreateMeteredTypeArray", $"{SandboxContextName},{Int32Name}", SandboxTypeArrayName),
                 RuntimeMember("StringConst", $"{SandboxContextName},{StringName}", SandboxValueName),
                 RuntimeMember("OpaqueIdConst", $"{SandboxContextName},{StringName},{StringName}", SandboxValueName),
@@ -226,7 +226,7 @@ public sealed record VerificationPolicy(
                 "System.Linq.Expressions.", "Microsoft.CSharp."
             },
             RuntimeFacadeIdentityDefaults(),
-            "dotboxd-verifier-10");
+            "dotboxd-verifier-11");
 
     public bool IsMemberAllowed(string memberSignature)
     {

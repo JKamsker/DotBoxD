@@ -1,3 +1,4 @@
+using DotBoxD.Hosting.Execution.Prepared;
 using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
@@ -11,7 +12,8 @@ public sealed partial class SandboxHost
         string entrypoint,
         SandboxValue input,
         SandboxExecutionOptions options,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CompiledNoAuditRunState? reusableNoAuditState = null)
     {
         if (!_compiled.IsAvailable || options.EnableDebugTrace)
         {
@@ -28,7 +30,13 @@ public sealed partial class SandboxHost
                 : CompilerUnavailableResult(plan, options, reason);
         }
 
-        var compiled = await TryExecuteCompiledAsync(plan, entrypoint, input, options, cancellationToken)
+        var compiled = await TryExecuteCompiledAsync(
+                plan,
+                entrypoint,
+                input,
+                options,
+                cancellationToken,
+                reusableNoAuditState)
             .ConfigureAwait(false);
         if (compiled.Result is not null)
         {
@@ -77,7 +85,8 @@ public sealed partial class SandboxHost
         string entrypoint,
         SandboxValue input,
         SandboxExecutionOptions options,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CompiledNoAuditRunState? reusableNoAuditState)
     {
         try
         {
@@ -91,7 +100,8 @@ public sealed partial class SandboxHost
                     input,
                     options,
                     cancellationToken,
-                    ShouldUseCompiledInlineAwaitPump(plan, entrypoint));
+                    ShouldUseCompiledInlineAwaitPump(plan, entrypoint),
+                    reusableNoAuditState);
             var result = await execution
                 .ConfigureAwait(false);
             return new CompiledAttempt(result, null);

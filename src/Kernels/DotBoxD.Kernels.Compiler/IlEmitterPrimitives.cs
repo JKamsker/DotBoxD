@@ -96,7 +96,10 @@ internal static class IlEmitterPrimitives
                 il.Emit(OpCodes.Stelem_Ref);
             }
 
-            il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.TypeRecord)));
+            var factory = allowCachedFactory && IsCacheableRecord(type)
+                ? nameof(Kernels.Runtime.CompiledRuntime.TypeRecordCached)
+                : nameof(Kernels.Runtime.CompiledRuntime.TypeRecord);
+            il.Emit(OpCodes.Call, Runtime(factory));
             return;
         }
 
@@ -119,4 +122,22 @@ internal static class IlEmitterPrimitives
 
     public static bool IsBuiltinScalar(SandboxType type)
         => type.Arguments.Count == 0 && type.IsKnownBuiltIn();
+
+    public static bool IsCacheableRecord(SandboxType type)
+    {
+        if (!type.IsRecord || type.Arguments.Count is < 1 or > 2)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < type.Arguments.Count; i++)
+        {
+            if (!IsBuiltinScalar(type.Arguments[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }

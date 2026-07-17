@@ -8,6 +8,27 @@ public sealed partial class SandboxContext
 {
     public long AuditCheckpoint() => Audit.EventsWritten;
 
+    internal BindingAuditInvocation BeginBindingAuditInvocation(
+        BindingDescriptor descriptor,
+        long checkpoint)
+    {
+        var audit = _audit ?? InitializeAudit();
+        // IsAsync is a declaration hint; with the runtime-async grant a binding may
+        // legitimately return pending even when under-declared, so audit identity
+        // follows the required-audit contract instead. Exact append-and-seal uses the
+        // in-memory sink's private event gate; custom IAuditSink implementations expose
+        // separate Write/Has operations and retain their public checkpoint contract.
+        if (descriptor.AuditLevel == AuditLevel.None ||
+            audit is not InMemoryAuditSink inMemoryAudit)
+        {
+            return new BindingAuditInvocation(checkpoint);
+        }
+
+        return new BindingAuditInvocation(
+            checkpoint,
+            new BindingAuditInvocationSink(this, inMemoryAudit, descriptor));
+    }
+
     public void EnsureRequiredBindingSuccessAudit(BindingDescriptor descriptor, long checkpoint)
     {
         if (descriptor.AuditLevel == AuditLevel.None ||
@@ -21,6 +42,29 @@ public sealed partial class SandboxContext
             $"binding '{descriptor.Id}' did not emit a required audit event"));
     }
 
+    internal void EnsureRequiredBindingSuccessAudit(
+        BindingDescriptor descriptor,
+        BindingAuditInvocation invocation)
+    {
+        if (descriptor.AuditLevel == AuditLevel.None)
+        {
+            return;
+        }
+
+        if (invocation.Sink is null)
+        {
+            EnsureRequiredBindingSuccessAudit(descriptor, invocation.Checkpoint);
+            return;
+        }
+
+        if (!invocation.Sink.TrySealSuccess())
+        {
+            throw new SandboxRuntimeException(new SandboxError(
+                SandboxErrorCode.BindingFailure,
+                $"binding '{descriptor.Id}' did not emit a required audit event"));
+        }
+    }
+
     public void EnsureRequiredBindingFailureAudit(
         BindingDescriptor descriptor,
         long checkpoint,
@@ -32,10 +76,36 @@ public sealed partial class SandboxContext
             return;
         }
 
+        Audit.Write(CreateRequiredBindingFailureAudit(descriptor, errorCode));
+    }
+
+    internal void EnsureRequiredBindingFailureAudit(
+        BindingDescriptor descriptor,
+        BindingAuditInvocation invocation,
+        SandboxErrorCode errorCode)
+    {
+        if (descriptor.AuditLevel == AuditLevel.None)
+        {
+            return;
+        }
+
+        if (invocation.Sink is null)
+        {
+            EnsureRequiredBindingFailureAudit(descriptor, invocation.Checkpoint, errorCode);
+            return;
+        }
+
+        invocation.Sink.EnsureFailure(errorCode);
+    }
+
+    internal SandboxAuditEvent CreateRequiredBindingFailureAudit(
+        BindingDescriptor descriptor,
+        SandboxErrorCode errorCode)
+    {
         var timestamp = AuditTimestamp();
-        Audit.Write(new SandboxAuditEvent(
+        return new SandboxAuditEvent(
             RunId,
-            "BindingCall",
+            BindingAuditKinds.BindingCall,
             timestamp,
             Success: false,
             BindingId: descriptor.Id,
@@ -44,7 +114,7 @@ public sealed partial class SandboxContext
             ResourceId: $"binding:{descriptor.Id}",
             ErrorCode: errorCode,
             Message: "binding failed before emitting audit",
-            Fields: BindingAuditFields("binding", timestamp)));
+            Fields: BindingAuditFields("binding", timestamp));
     }
 
     public IReadOnlyDictionary<string, string> BindingAuditFields(

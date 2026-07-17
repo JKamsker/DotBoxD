@@ -35,6 +35,7 @@ internal static class GeneratedMethodShapeSignatures
         $"{CompiledRuntimeName}.TypeMap({SandboxTypeName},{SandboxTypeName}):{SandboxTypeName}",
         $"{CompiledRuntimeName}.TypeMapCached({SandboxTypeName},{SandboxTypeName}):{SandboxTypeName}",
         $"{CompiledRuntimeName}.TypeRecord({SandboxTypeArrayName}):{SandboxTypeName}",
+        $"{CompiledRuntimeName}.TypeRecordCached({SandboxTypeArrayName}):{SandboxTypeName}",
         $"{CompiledRuntimeName}.CreateMeteredTypeArray({SandboxContextName},{Int32Name}):{SandboxTypeArrayName}"
     };
 

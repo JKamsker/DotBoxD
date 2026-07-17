@@ -14,11 +14,12 @@ public sealed class I64SingleAssignmentLoopAllocationTests
     private const int MeasurementIterations = 20_000;
 
     [Fact]
-    public async Task Single_assignment_loop_uses_the_scalar_planner()
+    public async Task I64_loop_planning_avoids_slot_predicate_allocations()
     {
         using var host = SandboxTestHost.Create();
         var singlePlan = await PrepareAsync(host, SingleAssignmentModule);
         var twoPlan = await PrepareAsync(host, TwoAssignmentModule);
+        var sourceOrderedPlan = await PrepareAsync(host, SourceOrderedModule);
         var interpreter = new SandboxInterpreter();
         var options = new SandboxExecutionOptions
         {
@@ -30,18 +31,41 @@ public sealed class I64SingleAssignmentLoopAllocationTests
         var single = MeasureCase(interpreter, singlePlan, options, input: 1, expectedValue: 4);
         var zero = MeasureCase(interpreter, singlePlan, options, input: 0, expectedValue: 1);
         var two = MeasureCase(interpreter, twoPlan, options, input: 1, expectedValue: 8);
+        var twoZero = MeasureCase(interpreter, twoPlan, options, input: 0, expectedValue: 0);
+        var sourceOrdered = MeasureCase(interpreter, sourceOrderedPlan, options, input: 1, expectedValue: 8);
+        var sourceOrderedZero = MeasureCase(interpreter, sourceOrderedPlan, options, input: 0, expectedValue: 0);
 
         AssertUsage(single.Usage, fuel: 17, loops: 1);
         AssertUsage(zero.Usage, fuel: 8, loops: 0);
         AssertUsage(two.Usage, fuel: 23, loops: 1);
+        AssertUsage(twoZero.Usage, fuel: 10, loops: 0);
+        AssertUsage(sourceOrdered.Usage, fuel: 23, loops: 1);
+        AssertUsage(sourceOrderedZero.Usage, fuel: 10, loops: 0);
 
         var isolatedSingleLoopBytes = (single.AllocatedBytes - zero.AllocatedBytes) /
                                       (double)MeasurementIterations;
         Assert.True(
-            isolatedSingleLoopBytes < 280,
+            isolatedSingleLoopBytes < 224,
             $"One scalar I64 loop execution added {isolatedSingleLoopBytes:F1} B " +
             $"(single={single.AllocatedBytes}, zero={zero.AllocatedBytes}). " +
-            "The legacy multi-assignment planner raises this isolated cost to about 496 B.");
+            "A captured assigned-slot predicate raises this isolated cost to about 256 B.");
+
+        AssertMultipleLoopAllocation(two, twoZero, "preassigned targets");
+        AssertMultipleLoopAllocation(sourceOrdered, sourceOrderedZero, "earlier unassigned target");
+    }
+
+    private static void AssertMultipleLoopAllocation(
+        Measurement loop,
+        Measurement zero,
+        string scenario)
+    {
+        var isolatedMultipleLoopBytes = (loop.AllocatedBytes - zero.AllocatedBytes) /
+                                        (double)MeasurementIterations;
+        Assert.True(
+            isolatedMultipleLoopBytes < 700,
+            $"One multi-assignment I64 loop execution ({scenario}) added {isolatedMultipleLoopBytes:F1} B " +
+            $"(loop={loop.AllocatedBytes}, zero={zero.AllocatedBytes}). " +
+            "Captured per-assignment slot predicates raise this isolated cost to about 824 B.");
     }
 
     private static void AssertUsage(Usage usage, long fuel, long loops)
@@ -178,6 +202,42 @@ public sealed class I64SingleAssignmentLoopAllocationTests
                 "op": "set",
                 "name": "total",
                 "value": { "op": "add", "left": { "var": "total" }, "right": { "i64": 3 } }
+              },
+              {
+                "op": "set",
+                "name": "doubled",
+                "value": { "op": "add", "left": { "var": "total" }, "right": { "var": "total" } }
+              }
+            ]
+          },
+          { "op": "return", "value": { "var": "doubled" } }
+        ]
+      }]
+    }
+    """;
+
+    private const string SourceOrderedModule = """
+    {
+      "id": "i64-source-ordered-assignment-control",
+      "version": "1.0.0",
+      "functions": [{
+        "id": "main",
+        "visibility": "entrypoint",
+        "parameters": [{ "name": "iterations", "type": "I32" }],
+        "returnType": "I64",
+        "body": [
+          { "op": "set", "name": "source", "value": { "i64": 1 } },
+          { "op": "set", "name": "doubled", "value": { "i64": 0 } },
+          {
+            "op": "forRange",
+            "local": "i",
+            "start": { "i32": 0 },
+            "end": { "var": "iterations" },
+            "body": [
+              {
+                "op": "set",
+                "name": "total",
+                "value": { "op": "add", "left": { "var": "source" }, "right": { "i64": 3 } }
               },
               {
                 "op": "set",

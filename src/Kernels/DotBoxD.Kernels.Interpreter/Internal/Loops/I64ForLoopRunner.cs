@@ -152,11 +152,12 @@ internal static class I64ForLoopRunner
 
         var plans = new AssignmentPlan[statement.Body.Count];
         var assignedSlots = new HashSet<int>();
+        var slotReads = new I64ExpressionSlotReadState(frame, assignedSlots);
         var fuel = LoopFuel;
         for (var i = 0; i < statement.Body.Count; i++)
         {
             if (statement.Body[i] is not AssignmentStatement assignment ||
-                !I64ExpressionPlan.TryCreate(assignment.Value, frame, CanReadSlot, out var expression))
+                !I64ExpressionPlan.TryCreate(assignment.Value, in slotReads, out var expression))
             {
                 return false;
             }
@@ -175,8 +176,6 @@ internal static class I64ForLoopRunner
         body = plans;
         fuelPerIteration = fuel;
         return true;
-
-        bool CanReadSlot(int slot) => frame.IsSlotAssigned(slot) || assignedSlots.Contains(slot);
     }
 
     private readonly record struct AssignmentPlan(int TargetSlot, I64ExpressionPlan Expression);

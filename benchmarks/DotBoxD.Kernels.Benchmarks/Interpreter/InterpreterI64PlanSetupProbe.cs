@@ -27,6 +27,7 @@ internal static class InterpreterI64PlanSetupProbe
             .Build();
         var singlePlan = await PrepareAsync(host, SingleAssignmentModuleJson(), policy);
         var twoPlan = await PrepareAsync(host, TwoAssignmentModuleJson(), policy);
+        var sourceOrderedPlan = await PrepareAsync(host, SourceOrderedModuleJson(), policy);
         var interpreter = new SandboxInterpreter();
         var options = new SandboxExecutionOptions
         {
@@ -39,8 +40,11 @@ internal static class InterpreterI64PlanSetupProbe
         Console.WriteLine(
             "case                         total ms    allocated B       B/op   checksum   fuel/op  loops/op sandbox B/op host/op");
         RunCase(interpreter, singlePlan, options, "one assignment, one loop", input: 1, expectedValue: 4);
-        RunCase(interpreter, singlePlan, options, "one assignment, zero control", input: 0, expectedValue: 1);
-        RunCase(interpreter, twoPlan, options, "two-assignment control", input: 1, expectedValue: 8);
+        RunCase(interpreter, singlePlan, options, "one assignment, zero loop", input: 0, expectedValue: 1);
+        RunCase(interpreter, twoPlan, options, "two assignments, one loop", input: 1, expectedValue: 8);
+        RunCase(interpreter, twoPlan, options, "two assignments, zero loop", input: 0, expectedValue: 0);
+        RunCase(interpreter, sourceOrderedPlan, options, "earlier target, one loop", input: 1, expectedValue: 8);
+        RunCase(interpreter, sourceOrderedPlan, options, "earlier target, zero loop", input: 0, expectedValue: 0);
         RunCase(
             interpreter,
             singlePlan,
@@ -191,6 +195,43 @@ internal static class InterpreterI64PlanSetupProbe
                     "op": "set",
                     "name": "total",
                     "value": { "op": "add", "left": { "var": "total" }, "right": { "i64": 3 } }
+                  },
+                  {
+                    "op": "set",
+                    "name": "doubled",
+                    "value": { "op": "add", "left": { "var": "total" }, "right": { "var": "total" } }
+                  }
+                ]
+              },
+              { "op": "return", "value": { "var": "doubled" } }
+            ]
+          }]
+        }
+        """;
+
+    private static string SourceOrderedModuleJson()
+        => """
+        {
+          "id": "interpreter-i64-plan-source-order",
+          "version": "1.0.0",
+          "functions": [{
+            "id": "main",
+            "visibility": "entrypoint",
+            "parameters": [{ "name": "iterations", "type": "I32" }],
+            "returnType": "I64",
+            "body": [
+              { "op": "set", "name": "source", "value": { "i64": 1 } },
+              { "op": "set", "name": "doubled", "value": { "i64": 0 } },
+              {
+                "op": "forRange",
+                "local": "i",
+                "start": { "i32": 0 },
+                "end": { "var": "iterations" },
+                "body": [
+                  {
+                    "op": "set",
+                    "name": "total",
+                    "value": { "op": "add", "left": { "var": "source" }, "right": { "i64": 3 } }
                   },
                   {
                     "op": "set",

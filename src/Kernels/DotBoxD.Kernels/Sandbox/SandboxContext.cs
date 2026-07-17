@@ -73,9 +73,21 @@ public sealed partial class SandboxContext
     public SandboxPolicy Policy { get; }
     public ResourceMeter Budget { get; }
     public BindingRegistry Bindings { get; }
+    /// <summary>
+    /// Gets the audit sink for the current execution flow. During a required-audit
+    /// binding call, the default in-memory sink may be exposed through an invocation
+    /// decorator that owns terminal evidence and suppresses late duplicates. Bindings
+    /// should resolve this property for each invocation instead of reusing a host-retained
+    /// sink alias. Custom sinks retain their public checkpoint contract and remain
+    /// responsible for cross-invocation concurrency and atomic persistence semantics.
+    /// </summary>
     public IAuditSink Audit
     {
-        get => _audit ?? InitializeAudit();
+        get
+        {
+            var audit = _audit ?? InitializeAudit();
+            return BindingAuditInvocationSink.CurrentFor(this) ?? audit;
+        }
     }
 
     public CancellationToken CancellationToken { get; }

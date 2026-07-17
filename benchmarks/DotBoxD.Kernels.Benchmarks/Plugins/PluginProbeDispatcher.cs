@@ -4,6 +4,12 @@ internal static class PluginProbeDispatcher
 {
     public static bool TryRun(string[] args)
     {
+        if (args.Contains("--probe-live-state-sync", StringComparer.OrdinalIgnoreCase))
+        {
+            LiveStateSyncRegistryProbe.Run();
+            return true;
+        }
+
         if (args.Contains("--probe-remote-result-hook", StringComparer.OrdinalIgnoreCase))
         {
             RemoteResultHookProbe.Run();

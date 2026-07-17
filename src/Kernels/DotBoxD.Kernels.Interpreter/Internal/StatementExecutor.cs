@@ -47,7 +47,7 @@ internal sealed partial class StatementExecutor
             case AssignmentStatement assignment:
                 return ExecuteAssignment(assignment, frame);
             case ReturnStatement ret:
-                return AsNullable(EvaluateAsync(ret.Value, frame));
+                return PrimitiveStatementExecutor.ExecuteReturn(ret, frame, _expressions);
             case ExpressionStatement expression:
                 return DiscardResult(EvaluateAsync(expression.Value, frame));
             case IfStatement branch:
@@ -88,28 +88,9 @@ internal sealed partial class StatementExecutor
             frame.WriteInt32(assignment.Name, i32Value);
             return default;
         }
-        var valueTask = EvaluateAsync(assignment.Value, frame);
-        if (valueTask.IsCompletedSuccessfully)
-        {
-            frame.Write(assignment.Name, valueTask.Result);
-            return default;
-        }
-        return AwaitAssignment(assignment, valueTask, frame);
+
+        return PrimitiveStatementExecutor.ExecuteAssignment(assignment, frame, _expressions);
     }
-    private async ValueTask<SandboxValue?> AwaitAssignment(
-        AssignmentStatement assignment,
-        ValueTask<SandboxValue> valueTask,
-        InterpreterFrame frame)
-    {
-        frame.Write(assignment.Name, await valueTask.ConfigureAwait(false));
-        return null;
-    }
-    private static ValueTask<SandboxValue?> AsNullable(ValueTask<SandboxValue> task)
-        => task.IsCompletedSuccessfully
-            ? new ValueTask<SandboxValue?>(task.Result)
-            : AwaitNullable(task);
-    private static async ValueTask<SandboxValue?> AwaitNullable(ValueTask<SandboxValue> task)
-        => await task.ConfigureAwait(false);
     private static ValueTask<SandboxValue?> DiscardResult(ValueTask<SandboxValue> task)
     {
         if (task.IsCompletedSuccessfully)
