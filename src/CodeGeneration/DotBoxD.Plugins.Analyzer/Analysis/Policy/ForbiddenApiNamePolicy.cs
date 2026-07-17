@@ -35,7 +35,8 @@ internal static class ForbiddenApiNamePolicy
         "System.Security.Cryptography.CryptoConfig",
         "System.Security.AccessControl.DirectorySecurity",
         "System.Security.AccessControl.FileSecurity",
-        "Microsoft.Extensions.FileProviders.PhysicalFileProvider"
+        "Microsoft.Extensions.FileProviders.PhysicalFileProvider",
+        "Microsoft.Extensions.Logging.ConsoleLoggerExtensions"
     ];
 
     private static readonly string[] NamespacePrefixes =
@@ -45,7 +46,8 @@ internal static class ForbiddenApiNamePolicy
         "System.Threading.Tasks.",
         "System.Timers.", "System.Linq.Expressions.", "System.Security.Principal.", "System.Transactions.",
         "System.Data.", "Microsoft.AspNetCore.", "Microsoft.CSharp.", "Microsoft.VisualBasic.",
-        "Microsoft.EntityFrameworkCore.", "Microsoft.Extensions.Logging.EventLog.", "Microsoft.Win32."
+        "Microsoft.EntityFrameworkCore.", "Microsoft.Extensions.Logging.Console.",
+        "Microsoft.Extensions.Logging.EventLog.", "Microsoft.Win32."
     ];
 
     private static readonly string[] ExactMemberNames =
