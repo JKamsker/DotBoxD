@@ -99,7 +99,10 @@ public sealed partial class PluginAnalyzer
             return FirstForbiddenHostApi(type);
         }
 
-        if (argument.Kind != TypedConstantKind.Array)
+        // Roslyn uses a default Values array for null array arguments such as [InlineData(null)].
+        if (argument.Kind != TypedConstantKind.Array ||
+            argument.IsNull ||
+            argument.Values.IsDefault)
         {
             return null;
         }
