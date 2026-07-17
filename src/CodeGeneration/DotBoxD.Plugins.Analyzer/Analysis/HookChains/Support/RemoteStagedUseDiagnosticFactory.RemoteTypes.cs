@@ -22,7 +22,7 @@ internal static partial class RemoteStagedUseDiagnosticFactory
             return false;
         }
 
-        if (RemoteStagedUseFlowAnalyzer.ContainsStageInvocation(expression))
+        if (ContainsPipelineStageInvocation(expression, model, cancellationToken, depth))
         {
             return true;
         }

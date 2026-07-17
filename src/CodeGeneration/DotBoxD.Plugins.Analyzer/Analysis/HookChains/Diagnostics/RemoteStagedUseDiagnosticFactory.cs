@@ -188,6 +188,11 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         SemanticModel model,
         CancellationToken cancellationToken)
     {
+        if (!IsPipelineStageInvocation(invocation, model, cancellationToken))
+        {
+            return null;
+        }
+
         var transparentExpression = UnwrapTransparentParent(invocation);
         ExpressionSyntax discardedExpression = transparentExpression;
         if (TryHandleAssignmentDiscard(
