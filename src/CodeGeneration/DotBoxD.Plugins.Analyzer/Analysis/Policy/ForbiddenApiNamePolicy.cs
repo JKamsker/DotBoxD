@@ -36,7 +36,11 @@ internal static class ForbiddenApiNamePolicy
         "System.Security.AccessControl.DirectorySecurity",
         "System.Security.AccessControl.FileSecurity",
         "Microsoft.Extensions.FileProviders.PhysicalFileProvider",
-        "Microsoft.Extensions.Logging.ConsoleLoggerExtensions"
+        "Microsoft.Extensions.Logging.ConsoleLoggerExtensions",
+        "Microsoft.Extensions.Configuration.FileConfigurationExtensions",
+        "Microsoft.Extensions.Configuration.IniConfigurationExtensions",
+        "Microsoft.Extensions.Configuration.JsonConfigurationExtensions",
+        "Microsoft.Extensions.Configuration.XmlConfigurationExtensions"
     ];
 
     private static readonly string[] NamespacePrefixes =
