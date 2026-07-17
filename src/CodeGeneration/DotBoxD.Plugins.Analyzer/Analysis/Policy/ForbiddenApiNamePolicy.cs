@@ -45,12 +45,13 @@ internal static class ForbiddenApiNamePolicy
         "System.Threading.Tasks.",
         "System.Timers.", "System.Linq.Expressions.", "System.Security.Principal.", "System.Transactions.",
         "System.Data.", "Microsoft.AspNetCore.", "Microsoft.CSharp.", "Microsoft.VisualBasic.",
-        "Microsoft.EntityFrameworkCore.", "Microsoft.Win32."
+        "Microsoft.EntityFrameworkCore.", "Microsoft.Extensions.Logging.EventLog.", "Microsoft.Win32."
     ];
 
     private static readonly string[] ExactMemberNames =
     [
         "Microsoft.Extensions.Configuration.EnvironmentVariablesExtensions.AddEnvironmentVariables",
+        "Microsoft.Extensions.Logging.EventLoggerFactoryExtensions.AddEventLog",
         "System.String.Create",
         "System.Security.Cryptography.RSA.Create"
     ];
