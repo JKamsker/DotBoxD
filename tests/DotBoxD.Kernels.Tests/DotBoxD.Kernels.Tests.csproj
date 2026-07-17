@@ -18,6 +18,7 @@
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="CsCheck" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="4.14.0" />
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Physical" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net461" PrivateAssets="all" />
     <PackageReference Include="Mono.Cecil" />

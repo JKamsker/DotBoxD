@@ -34,7 +34,8 @@ internal static class ForbiddenApiNamePolicy
         "System.Security.Cryptography.Rfc2898DeriveBytes",
         "System.Security.Cryptography.CryptoConfig",
         "System.Security.AccessControl.DirectorySecurity",
-        "System.Security.AccessControl.FileSecurity"
+        "System.Security.AccessControl.FileSecurity",
+        "Microsoft.Extensions.FileProviders.PhysicalFileProvider"
     ];
 
     private static readonly string[] NamespacePrefixes =
