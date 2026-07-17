@@ -44,7 +44,7 @@ internal static partial class HookChainModelFactory
         CancellationToken cancellationToken,
         int depth)
     {
-        if (depth > 8)
+        if (depth > HookChainAliasResolver.MaxResolutionDepth)
         {
             return null;
         }
