@@ -14,11 +14,13 @@ public sealed class StreamConnection : IRpcFrameChannel
     private readonly bool _ownsStream;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
     private readonly CancellationTokenSource _disposeCts = new();
+    private readonly object _closeSync = new();
     private readonly string _remoteEndpoint;
     private readonly int _maxMessageSize;
     private readonly TimeSpan _frameReadIdleTimeout;
     private readonly FrameReadTimeoutSource? _frameReadTimeout;
     private readonly byte[] _lengthBuffer = new byte[4];
+    private Task? _closeTask;
     private int _activeReceives;
     private int _disposed;
 
@@ -174,15 +176,24 @@ public sealed class StreamConnection : IRpcFrameChannel
     /// <summary>
     /// Closes the connection. This operation is idempotent.
     /// </summary>
-    public async Task CloseAsync(CancellationToken ct = default)
+    public Task CloseAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
 
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        lock (_closeSync)
         {
-            return;
-        }
+            if (_closeTask is null)
+            {
+                Volatile.Write(ref _disposed, 1);
+                _closeTask = CloseCoreAsync();
+            }
 
+            return _closeTask;
+        }
+    }
+
+    private async Task CloseCoreAsync()
+    {
         _disposeCts.Cancel();
         _frameReadTimeout?.Dispose();
         if (_ownsStream || Volatile.Read(ref _activeReceives) != 0)
