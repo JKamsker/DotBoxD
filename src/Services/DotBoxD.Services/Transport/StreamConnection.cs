@@ -176,10 +176,11 @@ public sealed class StreamConnection : IRpcFrameChannel
     /// <summary>
     /// Closes the connection. This operation is idempotent.
     /// </summary>
-    public Task CloseAsync(CancellationToken ct = default)
+    public async Task CloseAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
 
+        Task closeTask;
         lock (_closeSync)
         {
             if (_closeTask is null)
@@ -188,8 +189,10 @@ public sealed class StreamConnection : IRpcFrameChannel
                 _closeTask = CloseCoreAsync();
             }
 
-            return _closeTask;
+            closeTask = _closeTask;
         }
+
+        await closeTask.ConfigureAwait(false);
     }
 
     private async Task CloseCoreAsync()
