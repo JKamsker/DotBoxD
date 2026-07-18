@@ -93,7 +93,7 @@ public sealed class PluginAnalyzerForbiddenApiKeyPerFileConfigurationReachabilit
 
     private static string FindCompatibleAspNetCoreRuntimeDirectory(string aspNetCoreDirectory, string version)
     {
-        if (!Version.TryParse(version, out var runtimeVersion))
+        if (!Version.TryParse(StripPrereleaseSuffix(version), out var runtimeVersion))
         {
             throw new InvalidOperationException($"Unable to parse the .NET runtime version '{version}'.");
         }
@@ -108,7 +108,7 @@ public sealed class PluginAnalyzerForbiddenApiKeyPerFileConfigurationReachabilit
         foreach (var directory in Directory.EnumerateDirectories(aspNetCoreDirectory))
         {
             var candidateName = Path.GetFileName(directory);
-            if (Version.TryParse(candidateName, out var candidateVersion) &&
+            if (Version.TryParse(StripPrereleaseSuffix(candidateName), out var candidateVersion) &&
                 candidateVersion.Major == runtimeVersion.Major &&
                 candidateVersion.Minor == runtimeVersion.Minor)
             {
@@ -127,6 +127,12 @@ public sealed class PluginAnalyzerForbiddenApiKeyPerFileConfigurationReachabilit
 
         throw new InvalidOperationException(
             $"Unable to locate an ASP.NET Core runtime directory compatible with .NET runtime '{version}'.");
+    }
+
+    private static string StripPrereleaseSuffix(string version)
+    {
+        var suffixStart = version.IndexOf('-', StringComparison.Ordinal);
+        return suffixStart < 0 ? version : version[..suffixStart];
     }
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()
