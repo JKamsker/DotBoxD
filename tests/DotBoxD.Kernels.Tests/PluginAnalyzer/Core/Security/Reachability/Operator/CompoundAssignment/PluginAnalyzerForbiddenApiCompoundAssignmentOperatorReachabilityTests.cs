@@ -10,10 +10,14 @@ public sealed class PluginAnalyzerForbiddenApiCompoundAssignmentOperatorReachabi
     private static readonly CSharpParseOptions ParseOptions =
         CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
 
-    [Fact]
-    public async Task Reports_forbidden_operator_reached_through_compound_assignment()
+    [Theory]
+    [InlineData("counter += 1;", "operator-compound-leak")]
+    [InlineData("counter = counter + 1;", "operator-explicit-leak")]
+    public async Task Reports_forbidden_operator_reached_through_assignment(
+        string assignment,
+        string pluginName)
     {
-        const string source = """
+        string source = $$"""
             namespace Sample
             {
                 using DotBoxD.Abstractions;
@@ -29,13 +33,13 @@ public sealed class PluginAnalyzerForbiddenApiCompoundAssignmentOperatorReachabi
                     }
                 }
 
-                [Plugin("operator-compound-leak")]
+                [Plugin("{{pluginName}}")]
                 public sealed class OperatorKernel : IEventKernel<string>
                 {
                     public bool ShouldHandle(string e, HookContext context)
                     {
                         var counter = new Counter();
-                        counter += 1;
+                        {{assignment}}
                         return true;
                     }
 
@@ -45,45 +49,7 @@ public sealed class PluginAnalyzerForbiddenApiCompoundAssignmentOperatorReachabi
             """;
 
         var diagnostics = await AnalyzeAsync(source);
-        AssertSingleForbiddenDiagnosticAt(source, diagnostics, "counter += 1;");
-    }
-
-    [Fact]
-    public async Task Reports_forbidden_operator_reached_through_explicit_assignment_control()
-    {
-        const string source = """
-            namespace Sample
-            {
-                using DotBoxD.Abstractions;
-                using DotBoxD.Plugins;
-
-                public readonly struct Counter
-                {
-                    public static Counter operator +(Counter value, int amount)
-                    {
-                        _ = amount;
-                        _ = System.IO.File.ReadAllText("/x");
-                        return value;
-                    }
-                }
-
-                [Plugin("operator-explicit-leak")]
-                public sealed class OperatorKernel : IEventKernel<string>
-                {
-                    public bool ShouldHandle(string e, HookContext context)
-                    {
-                        var counter = new Counter();
-                        counter = counter + 1;
-                        return true;
-                    }
-
-                    public void Handle(string e, HookContext context) { }
-                }
-            }
-            """;
-
-        var diagnostics = await AnalyzeAsync(source);
-        AssertSingleForbiddenDiagnosticAt(source, diagnostics, "counter = counter + 1;");
+        AssertSingleForbiddenDiagnosticAt(source, diagnostics, assignment);
     }
 
     private static void AssertSingleForbiddenDiagnosticAt(
