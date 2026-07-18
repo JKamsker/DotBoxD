@@ -82,7 +82,51 @@ public sealed class PluginAnalyzerForbiddenApiKeyPerFileConfigurationReachabilit
             throw new InvalidOperationException("Unable to locate the shared runtime root.");
         var aspNetCoreDirectory = Path.Combine(runtimeRoot, "Microsoft.AspNetCore.App");
         var version = Path.GetFileName(netCoreAppDirectory);
-        return Path.Combine(aspNetCoreDirectory, version, assemblyName);
+        var targetDirectory = Path.Combine(aspNetCoreDirectory, version);
+        if (!Directory.Exists(targetDirectory))
+        {
+            targetDirectory = FindCompatibleAspNetCoreRuntimeDirectory(aspNetCoreDirectory, version);
+        }
+
+        return Path.Combine(targetDirectory, assemblyName);
+    }
+
+    private static string FindCompatibleAspNetCoreRuntimeDirectory(string aspNetCoreDirectory, string version)
+    {
+        if (!Version.TryParse(version, out var runtimeVersion))
+        {
+            throw new InvalidOperationException($"Unable to parse the .NET runtime version '{version}'.");
+        }
+
+        if (!Directory.Exists(aspNetCoreDirectory))
+        {
+            throw new InvalidOperationException("Unable to locate the ASP.NET Core runtime directory.");
+        }
+
+        string? bestDirectory = null;
+        Version? bestVersion = null;
+        foreach (var directory in Directory.EnumerateDirectories(aspNetCoreDirectory))
+        {
+            var candidateName = Path.GetFileName(directory);
+            if (Version.TryParse(candidateName, out var candidateVersion) &&
+                candidateVersion.Major == runtimeVersion.Major &&
+                candidateVersion.Minor == runtimeVersion.Minor)
+            {
+                if (bestVersion is null || candidateVersion.CompareTo(bestVersion) > 0)
+                {
+                    bestDirectory = directory;
+                    bestVersion = candidateVersion;
+                }
+            }
+        }
+
+        if (bestDirectory is not null)
+        {
+            return bestDirectory;
+        }
+
+        throw new InvalidOperationException(
+            $"Unable to locate an ASP.NET Core runtime directory compatible with .NET runtime '{version}'.");
     }
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()
