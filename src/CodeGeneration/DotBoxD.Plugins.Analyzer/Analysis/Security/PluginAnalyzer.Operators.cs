@@ -12,6 +12,7 @@ public sealed partial class PluginAnalyzer
         {
             IUnaryOperation unary => unary.OperatorMethod,
             IBinaryOperation binary => binary.OperatorMethod,
+            IIncrementOrDecrementOperation increment => increment.OperatorMethod,
             IConversionOperation conversion => conversion.OperatorMethod,
             _ => null
         };
