@@ -48,7 +48,8 @@ internal static class ForbiddenApiNamePolicy
     private static readonly string[] ExactMemberNames =
     [
         "System.String.Create",
-        "System.Security.Cryptography.RSA.Create"
+        "System.Security.Cryptography.RSA.Create",
+        "Microsoft.Extensions.Configuration.KeyPerFileConfigurationBuilderExtensions.AddKeyPerFile"
     ];
 
     public static bool IsForbiddenExactType(string name) => Array.IndexOf(ExactTypeNames, name) >= 0;
