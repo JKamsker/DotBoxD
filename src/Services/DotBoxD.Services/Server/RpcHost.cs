@@ -24,6 +24,7 @@ public sealed partial class RpcHost : IAsyncDisposable
     private CancellationTokenSource? _cts;
     private Task? _acceptTask;
     private Task? _stopTask;
+    private Task? _disposeTask;
     private bool _starting;
     private int _disposed;
     private int _listenerStopped;

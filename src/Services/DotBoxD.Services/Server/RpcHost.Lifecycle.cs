@@ -270,13 +270,23 @@ public sealed partial class RpcHost
         }
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        lock (_lifecycleLock)
         {
-            return;
-        }
+            if (_disposeTask is not null)
+            {
+                return new ValueTask(_disposeTask);
+            }
 
+            Volatile.Write(ref _disposed, 1);
+            _disposeTask = DisposeCoreAsync();
+            return new ValueTask(_disposeTask);
+        }
+    }
+
+    private async Task DisposeCoreAsync()
+    {
         await RpcHostDisposeCoordinator.DisposeAsync(
             () => StopAsync(),
             _peers.CloseAllAsync,
