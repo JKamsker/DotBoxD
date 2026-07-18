@@ -14,7 +14,7 @@ public sealed class NamedPipeServerConcurrentDisposalTests
         var stopEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseStop = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        await using var server = new NamedPipeServerTransport(CreatePipeName());
+        var server = new NamedPipeServerTransport(CreatePipeName());
         await server.StartAsync().WaitAsync(Timeout);
         server._beforeStopCancelForTest = async () =>
         {

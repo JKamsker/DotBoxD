@@ -14,7 +14,6 @@ public sealed class NamedPipeServerTransport : IServerTransport
     /// connections get the same finite slow-loris defense the TCP transport applies by default.
     /// </summary>
     public static readonly TimeSpan DefaultFrameReadIdleTimeout = TimeSpan.FromSeconds(30);
-    private const int MaxSpecificServerInstances = 254;
     private readonly object _sync = new();
     private readonly string _pipeName;
     private readonly int _maxAllowedServerInstances;
@@ -29,11 +28,13 @@ public sealed class NamedPipeServerTransport : IServerTransport
         int maxAllowedServerInstances = NamedPipeServerStream.MaxAllowedServerInstances,
         int maxMessageSize = MessageFramer.MaxMessageSize)
     {
-        _pipeName = ValidatePipeName(pipeName);
-        _maxAllowedServerInstances = ValidateMaxAllowedServerInstances(
+        _pipeName = NamedPipeServerTransportValidation.ValidatePipeName(pipeName);
+        _maxAllowedServerInstances = NamedPipeServerTransportValidation.ValidateMaxAllowedServerInstances(
             maxAllowedServerInstances,
             nameof(maxAllowedServerInstances));
-        _maxMessageSize = ValidateMaxMessageSize(maxMessageSize, nameof(maxMessageSize));
+        _maxMessageSize = NamedPipeServerTransportValidation.ValidateMaxMessageSize(
+            maxMessageSize,
+            nameof(maxMessageSize));
     }
     /// <summary>
     /// Idle timeout applied to accepted connections' frame reads (slow-loris
@@ -285,45 +286,4 @@ public sealed class NamedPipeServerTransport : IServerTransport
         }
     }
 
-    private static string ValidatePipeName(string pipeName)
-    {
-        if (pipeName is null)
-        {
-            throw new ArgumentNullException(nameof(pipeName));
-        }
-        if (string.IsNullOrWhiteSpace(pipeName))
-        {
-            throw new ArgumentException("Pipe name cannot be null, empty, or whitespace.", nameof(pipeName));
-        }
-        return pipeName;
-    }
-
-    private static int ValidateMaxAllowedServerInstances(int value, string paramName)
-    {
-        if (value == NamedPipeServerStream.MaxAllowedServerInstances)
-        {
-            return value;
-        }
-        if (value < 1 || value > MaxSpecificServerInstances)
-        {
-            throw new ArgumentOutOfRangeException(
-                paramName,
-                value,
-                $"Maximum server instances must be {NamedPipeServerStream.MaxAllowedServerInstances} or between 1 and {MaxSpecificServerInstances}.");
-        }
-
-        return value;
-    }
-
-    private static int ValidateMaxMessageSize(int value, string paramName)
-    {
-        if (value < MessageFramer.HeaderSize)
-        {
-            throw new ArgumentOutOfRangeException(
-                paramName,
-                value,
-                "Maximum message size must be at least the DotBoxD header size.");
-        }
-        return value;
-    }
 }
