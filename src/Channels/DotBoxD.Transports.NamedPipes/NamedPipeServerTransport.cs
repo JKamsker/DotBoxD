@@ -21,6 +21,7 @@ public sealed class NamedPipeServerTransport : IServerTransport
     private readonly int _maxMessageSize;
     private CancellationTokenSource? _stopCts;
     private NamedPipeServerStream? _pendingStream;
+    private Task? _disposeTask;
     private int _started;
     private int _disposed;
     public NamedPipeServerTransport(
@@ -197,13 +198,41 @@ public sealed class NamedPipeServerTransport : IServerTransport
         await hook().ConfigureAwait(false);
         stopCts?.Dispose();
     }
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        TaskCompletionSource<bool> disposeCompletion;
+        lock (_sync)
         {
-            return;
+            if (_disposeTask is not null)
+            {
+                if (_disposeTask.IsCompleted)
+                {
+                    return default;
+                }
+
+                return new ValueTask(_disposeTask);
+            }
+
+            Volatile.Write(ref _disposed, 1);
+            disposeCompletion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _disposeTask = disposeCompletion.Task;
         }
-        await StopAsync().ConfigureAwait(false);
+
+        _ = CompleteDisposeAsync(disposeCompletion);
+        return new ValueTask(disposeCompletion.Task);
+    }
+
+    private async Task CompleteDisposeAsync(TaskCompletionSource<bool> disposeCompletion)
+    {
+        try
+        {
+            await StopAsync().ConfigureAwait(false);
+            disposeCompletion.TrySetResult(true);
+        }
+        catch (Exception ex)
+        {
+            disposeCompletion.TrySetException(ex);
+        }
     }
     private NamedPipeServerStream CreateStream() =>
         new(
