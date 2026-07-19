@@ -139,6 +139,13 @@ internal sealed class ForbiddenHelperCallGraph
     public void RecordGenericInvocation(IMethodSymbol caller, IMethodSymbol target, Location location)
         => _genericConstructionReachability.RecordInvocation(caller, target, location);
 
+    public void RecordGenericObjectCreation(
+        IMethodSymbol caller,
+        IMethodSymbol constructor,
+        INamedTypeSymbol constructedType,
+        Location location)
+        => _genericConstructionReachability.RecordObjectCreation(caller, constructor, constructedType, location);
+
     public void RecordConstructorInitializers(IMethodSymbol constructor)
     {
         if (constructor.MethodKind != MethodKind.Constructor ||

@@ -12,13 +12,12 @@ internal sealed class GenericConstructionReachability
     public void RecordTypeParameterConstruction(IMethodSymbol method, ITypeParameterSymbol typeParameter)
     {
         if (method.DeclaringSyntaxReferences.Length == 0 ||
-            !typeParameter.HasConstructorConstraint ||
-            !TryGetTypeParameterOrdinal(method, typeParameter, out var ordinal))
+            !TryGetTypeParameterSlot(method, typeParameter, out var slot))
         {
             return;
         }
 
-        _constructions.Add(new GenericConstruction(Normalize(method), ordinal));
+        _constructions.Add(new GenericConstruction(Normalize(method), slot));
     }
 
     public void RecordInvocation(IMethodSymbol caller, IMethodSymbol target, Location location)
@@ -34,6 +33,28 @@ internal sealed class GenericConstructionReachability
             Normalize(caller),
             Normalize(target),
             target.TypeArguments,
+            [],
+            location));
+    }
+
+    public void RecordObjectCreation(
+        IMethodSymbol caller,
+        IMethodSymbol constructor,
+        INamedTypeSymbol constructedType,
+        Location location)
+    {
+        if (constructedType.TypeParameters.Length == 0 ||
+            constructedType.TypeParameters.Length != constructedType.TypeArguments.Length ||
+            constructedType.OriginalDefinition.DeclaringSyntaxReferences.Length == 0)
+        {
+            return;
+        }
+
+        _invocations.Add(new GenericInvocation(
+            Normalize(caller),
+            Normalize(constructor),
+            [],
+            constructedType.TypeArguments,
             location));
     }
 
@@ -47,6 +68,7 @@ internal sealed class GenericConstructionReachability
         }
 
         var constructions = BuildConstructionOrdinals(_constructions);
+        PropagateConstructionOrdinals(constructions, _invocations);
 
         foreach (var invocation in _invocations)
         {
@@ -68,10 +90,10 @@ internal sealed class GenericConstructionReachability
         }
     }
 
-    private static Dictionary<IMethodSymbol, HashSet<int>> BuildConstructionOrdinals(
+    private static Dictionary<IMethodSymbol, HashSet<GenericParameterSlot>> BuildConstructionOrdinals(
         IEnumerable<GenericConstruction> constructions)
     {
-        var ordinalsByMethod = new Dictionary<IMethodSymbol, HashSet<int>>(SymbolEqualityComparer.Default);
+        var ordinalsByMethod = new Dictionary<IMethodSymbol, HashSet<GenericParameterSlot>>(SymbolEqualityComparer.Default);
         foreach (var construction in constructions)
         {
             if (!ordinalsByMethod.TryGetValue(construction.Method, out var ordinals))
@@ -86,14 +108,53 @@ internal sealed class GenericConstructionReachability
         return ordinalsByMethod;
     }
 
+    private static void PropagateConstructionOrdinals(
+        Dictionary<IMethodSymbol, HashSet<GenericParameterSlot>> constructions,
+        IEnumerable<GenericInvocation> invocations)
+    {
+        bool changed;
+        do
+        {
+            changed = false;
+            foreach (var invocation in invocations)
+            {
+                if (!constructions.TryGetValue(invocation.Target, out var targetOrdinals))
+                {
+                    continue;
+                }
+
+                foreach (var ordinal in targetOrdinals)
+                {
+                    if (!TryGetTypeArgument(invocation, ordinal, out var typeArgument) ||
+                        typeArgument is not ITypeParameterSymbol typeParameter ||
+                        !TryGetTypeParameterSlot(invocation.Caller, typeParameter, out var callerOrdinal))
+                    {
+                        continue;
+                    }
+
+                    if (!constructions.TryGetValue(invocation.Caller, out var callerOrdinals))
+                    {
+                        callerOrdinals = [];
+                        constructions.Add(invocation.Caller, callerOrdinals);
+                    }
+
+                    if (callerOrdinals.Add(callerOrdinal))
+                    {
+                        changed = true;
+                    }
+                }
+            }
+        } while (changed);
+    }
+
     private static bool TryResolveConstructedConstructor(
         GenericInvocation invocation,
-        int ordinal,
+        GenericParameterSlot ordinal,
         out IMethodSymbol constructor)
     {
-        if (ordinal < invocation.TypeArguments.Length &&
-            invocation.TypeArguments[ordinal] is INamedTypeSymbol typeArgument &&
-            ParameterlessInstanceConstructor(typeArgument) is { } parameterlessConstructor)
+        if (TryGetTypeArgument(invocation, ordinal, out var typeArgument) &&
+            typeArgument is INamedTypeSymbol namedTypeArgument &&
+            ParameterlessInstanceConstructor(namedTypeArgument) is { } parameterlessConstructor)
         {
             constructor = parameterlessConstructor;
             return true;
@@ -104,13 +165,13 @@ internal sealed class GenericConstructionReachability
     }
 
     private static bool TryGetTypeParameterOrdinal(
-        IMethodSymbol method,
+        ImmutableArray<ITypeParameterSymbol> typeParameters,
         ITypeParameterSymbol typeParameter,
         out int ordinal)
     {
-        for (var i = 0; i < method.TypeParameters.Length; i++)
+        for (var i = 0; i < typeParameters.Length; i++)
         {
-            if (SymbolEqualityComparer.Default.Equals(method.TypeParameters[i], typeParameter))
+            if (SymbolEqualityComparer.Default.Equals(typeParameters[i], typeParameter))
             {
                 ordinal = i;
                 return true;
@@ -118,6 +179,45 @@ internal sealed class GenericConstructionReachability
         }
 
         ordinal = -1;
+        return false;
+    }
+
+    private static bool TryGetTypeParameterSlot(
+        IMethodSymbol method,
+        ITypeParameterSymbol typeParameter,
+        out GenericParameterSlot slot)
+    {
+        if (TryGetTypeParameterOrdinal(method.TypeParameters, typeParameter, out var methodOrdinal))
+        {
+            slot = new GenericParameterSlot(GenericParameterOwner.Method, methodOrdinal);
+            return true;
+        }
+
+        if (TryGetTypeParameterOrdinal(method.ContainingType.TypeParameters, typeParameter, out var typeOrdinal))
+        {
+            slot = new GenericParameterSlot(GenericParameterOwner.ContainingType, typeOrdinal);
+            return true;
+        }
+
+        slot = default;
+        return false;
+    }
+
+    private static bool TryGetTypeArgument(
+        GenericInvocation invocation,
+        GenericParameterSlot slot,
+        out ITypeSymbol typeArgument)
+    {
+        var arguments = slot.Owner == GenericParameterOwner.Method
+            ? invocation.MethodTypeArguments
+            : invocation.ContainingTypeArguments;
+        if (slot.Ordinal >= 0 && slot.Ordinal < arguments.Length)
+        {
+            typeArgument = arguments[slot.Ordinal];
+            return true;
+        }
+
+        typeArgument = null!;
         return false;
     }
 
@@ -129,11 +229,20 @@ internal sealed class GenericConstructionReachability
     private static IMethodSymbol Normalize(IMethodSymbol method)
         => method.OriginalDefinition;
 
-    private readonly record struct GenericConstruction(IMethodSymbol Method, int Ordinal);
+    private readonly record struct GenericConstruction(IMethodSymbol Method, GenericParameterSlot Ordinal);
 
     private readonly record struct GenericInvocation(
         IMethodSymbol Caller,
         IMethodSymbol Target,
-        ImmutableArray<ITypeSymbol> TypeArguments,
+        ImmutableArray<ITypeSymbol> MethodTypeArguments,
+        ImmutableArray<ITypeSymbol> ContainingTypeArguments,
         Location Location);
+
+    private readonly record struct GenericParameterSlot(GenericParameterOwner Owner, int Ordinal);
+
+    private enum GenericParameterOwner
+    {
+        Method,
+        ContainingType
+    }
 }

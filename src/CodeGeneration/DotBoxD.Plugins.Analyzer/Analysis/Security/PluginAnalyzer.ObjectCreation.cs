@@ -36,11 +36,6 @@ public sealed partial class PluginAnalyzer
             return;
         }
 
-        if (creation.Type is ITypeParameterSymbol typeParameter)
-        {
-            helperGraph.RecordGenericTypeParameterConstruction(method, typeParameter);
-        }
-
         ReportAndRecordIfForbidden(
             context,
             helperGraph,
@@ -51,6 +46,15 @@ public sealed partial class PluginAnalyzer
         if (creation.Constructor is { } constructor)
         {
             helperGraph.RecordConstructorInitializers(constructor);
+            if (creation.Type is INamedTypeSymbol constructedType)
+            {
+                helperGraph.RecordGenericObjectCreation(
+                    method,
+                    constructor,
+                    constructedType,
+                    context.Operation.Syntax.GetLocation());
+            }
+
             helperGraph.RecordCall(method, constructor, context.Operation.Syntax.GetLocation());
         }
     }

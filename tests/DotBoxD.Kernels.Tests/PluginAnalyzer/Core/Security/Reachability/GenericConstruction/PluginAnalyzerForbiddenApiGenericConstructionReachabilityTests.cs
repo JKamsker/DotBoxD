@@ -92,6 +92,148 @@ public sealed class PluginAnalyzerForbiddenApiGenericConstructionReachabilityTes
         Assert.DoesNotContain(diagnostics, d => d.Id == "DBXK001");
     }
 
+    [Fact]
+    public async Task Reports_forbidden_constructor_reached_through_struct_constraint()
+    {
+        const string source = """
+            namespace Sample
+            {
+                using DotBoxD.Abstractions;
+                using DotBoxD.Plugins;
+
+                public sealed class SafeGenericFactory
+                {
+                    public static T Create<T>() where T : struct => new T();
+                }
+
+                public struct DangerousConstructed
+                {
+                    public DangerousConstructed()
+                    {
+                        _ = System.IO.File.ReadAllText("/x");
+                    }
+
+                    public bool Ok => true;
+                }
+
+                [Plugin("struct-generic-constructor-reachability")]
+                public sealed class GenericConstructorKernel : IEventKernel<string>
+                {
+                    public bool ShouldHandle(string e, HookContext context)
+                    {
+                        return SafeGenericFactory.Create<DangerousConstructed>().Ok;
+                    }
+
+                    public void Handle(string e, HookContext context) { }
+                }
+            }
+            """;
+
+        var diagnostics = await AnalyzeAsync(source);
+
+        AssertSingleForbiddenDiagnosticAt(
+            source,
+            diagnostics,
+            "return SafeGenericFactory.Create<DangerousConstructed>().Ok;");
+    }
+
+    [Fact]
+    public async Task Reports_forbidden_constructor_reached_through_transitive_generic_forwarder()
+    {
+        const string source = """
+            namespace Sample
+            {
+                using DotBoxD.Abstractions;
+                using DotBoxD.Plugins;
+
+                public sealed class FirstFactory
+                {
+                    public static T Create<T>() where T : new() => SecondFactory.Create<T>();
+                }
+
+                public sealed class SecondFactory
+                {
+                    public static T Create<T>() where T : new() => new T();
+                }
+
+                public sealed class DangerousConstructed
+                {
+                    public DangerousConstructed()
+                    {
+                        _ = System.IO.File.ReadAllText("/x");
+                    }
+
+                    public bool Ok => true;
+                }
+
+                [Plugin("transitive-generic-constructor-reachability")]
+                public sealed class GenericConstructorKernel : IEventKernel<string>
+                {
+                    public bool ShouldHandle(string e, HookContext context)
+                    {
+                        return FirstFactory.Create<DangerousConstructed>().Ok;
+                    }
+
+                    public void Handle(string e, HookContext context) { }
+                }
+            }
+            """;
+
+        var diagnostics = await AnalyzeAsync(source);
+
+        AssertSingleForbiddenDiagnosticAt(
+            source,
+            diagnostics,
+            "return FirstFactory.Create<DangerousConstructed>().Ok;");
+    }
+
+    [Fact]
+    public async Task Reports_forbidden_constructor_reached_through_generic_type_construction()
+    {
+        const string source = """
+            namespace Sample
+            {
+                using DotBoxD.Abstractions;
+                using DotBoxD.Plugins;
+
+                public sealed class GenericContainer<T> where T : new()
+                {
+                    public GenericContainer()
+                    {
+                        _ = new T();
+                    }
+                }
+
+                public sealed class DangerousConstructed
+                {
+                    public DangerousConstructed()
+                    {
+                        _ = System.IO.File.ReadAllText("/x");
+                    }
+                }
+
+                [Plugin("generic-type-constructor-reachability")]
+                public sealed class GenericConstructorKernel : IEventKernel<string>
+                {
+                    public bool ShouldHandle(string e, HookContext context)
+                    {
+                        _ = new GenericContainer<DangerousConstructed>();
+                        return true;
+                    }
+
+                    public void Handle(string e, HookContext context) { }
+                }
+            }
+            """;
+
+        var diagnostics = await AnalyzeAsync(source);
+
+        AssertSingleForbiddenDiagnosticAt(
+            source,
+            diagnostics,
+            "_ = new GenericContainer<DangerousConstructed>();");
+    }
+
     private static void AssertSingleForbiddenDiagnosticAt(
         string source,
         ImmutableArray<Diagnostic> diagnostics,
