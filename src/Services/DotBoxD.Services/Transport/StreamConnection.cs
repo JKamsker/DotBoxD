@@ -186,13 +186,13 @@ public sealed class StreamConnection : IRpcFrameChannel
             if (_closeTask is null)
             {
                 Volatile.Write(ref _disposed, 1);
-                _closeTask = CloseCoreAsync();
+                _closeTask = Task.Run(CloseCoreAsync);
             }
 
             closeTask = _closeTask;
         }
 
-        await closeTask.ConfigureAwait(false);
+        await TransportTaskWaiter.WaitAsync(closeTask, ct).ConfigureAwait(false);
     }
 
     private async Task CloseCoreAsync()

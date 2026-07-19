@@ -43,6 +43,31 @@ public sealed class StreamConnectionConcurrentCloseRegressionTests
         }
     }
 
+    [Fact]
+    public async Task CloseAsync_CanceledWaitLeavesSharedCloseRunning()
+    {
+        var stream = new GatedDisposeStream();
+        var connection = new StreamConnection(stream, ownsStream: true);
+        var firstClose = connection.CloseAsync();
+
+        await stream.DisposeEntered.WaitAsync(Timeout);
+
+        using var cts = new CancellationTokenSource();
+        var canceledClose = connection.CloseAsync(cts.Token);
+        cts.Cancel();
+
+        try
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceledClose.WaitAsync(Timeout));
+            Assert.False(firstClose.IsCompleted, "Caller cancellation should not complete shared shutdown.");
+        }
+        finally
+        {
+            stream.ReleaseDispose();
+            await firstClose.WaitAsync(Timeout);
+        }
+    }
+
     private sealed class GatedDisposeStream : Stream
     {
         private readonly TaskCompletionSource _disposeEntered =
