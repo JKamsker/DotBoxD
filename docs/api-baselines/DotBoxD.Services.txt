@@ -359,7 +359,6 @@ public Task<TResponse> InvokeOnInstanceAsync<TResponse>(string service, string i
 public TimeSpan RequestTimeout { get; init; }
 public TService Get<TService>() where TService : class
 public ValueTask DisposeAsync()
-public ValueTask DisposeAsync() => _inner.DisposeAsync()
 public ValueTask DisposeAsync() => new(CloseAsync())
 public ValueTask InvokeValueAsync(string service, string method, CancellationToken ct = default) =>
 public ValueTask InvokeValueAsync<TRequest>(string service, string method, TRequest request, CancellationToken ct = default) =>

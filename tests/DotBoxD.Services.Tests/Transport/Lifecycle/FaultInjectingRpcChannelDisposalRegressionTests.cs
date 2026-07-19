@@ -18,31 +18,33 @@ public sealed class FaultInjectingRpcChannelDisposalRegressionTests
             inner,
             static (_, _, _) => default);
 
-        var firstDispose = wrapper.DisposeAsync().AsTask();
-        await inner.FirstDisposeEntered.WaitAsync(Timeout);
-
-        var secondDispose = wrapper.DisposeAsync().AsTask();
-
         try
         {
+            var firstDispose = wrapper.DisposeAsync().AsTask();
+            await inner.FirstDisposeEntered.WaitAsync(Timeout);
+
+            var secondDispose = wrapper.DisposeAsync().AsTask();
+
             Assert.Equal(1, inner.DisposeEntries);
             Assert.False(
                 secondDispose.IsCompleted,
                 "The second concurrent DisposeAsync completed before the inner teardown finished.");
+
+            inner.Release();
+
+            var firstFailure = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => firstDispose.WaitAsync(Timeout));
+            var secondFailure = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => secondDispose.WaitAsync(Timeout));
+
+            Assert.Same(failure, firstFailure);
+            Assert.Same(failure, secondFailure);
+            Assert.Equal(1, inner.DisposeEntries);
         }
         finally
         {
             inner.Release();
         }
-
-        var firstFailure = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => firstDispose.WaitAsync(Timeout));
-        var secondFailure = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => secondDispose.WaitAsync(Timeout));
-
-        Assert.Same(failure, firstFailure);
-        Assert.Same(failure, secondFailure);
-        Assert.Equal(1, inner.DisposeEntries);
     }
 
     private sealed class GatedFaultingChannel(InvalidOperationException failure) : IRpcChannel
