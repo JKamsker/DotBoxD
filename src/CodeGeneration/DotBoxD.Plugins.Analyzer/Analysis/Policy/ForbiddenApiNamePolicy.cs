@@ -32,7 +32,8 @@ internal static class ForbiddenApiNamePolicy
         "System.Security.Cryptography.DSACryptoServiceProvider",
         "System.Security.Cryptography.RSACryptoServiceProvider",
         "System.Security.Cryptography.Rfc2898DeriveBytes",
-        "System.Security.Cryptography.CryptoConfig"
+        "System.Security.Cryptography.CryptoConfig",
+        "Microsoft.Extensions.Configuration.UserSecretsConfigurationExtensions"
     ];
 
     private static readonly string[] NamespacePrefixes =
@@ -42,7 +43,7 @@ internal static class ForbiddenApiNamePolicy
         "System.Threading.Tasks.",
         "System.Timers.", "System.Linq.Expressions.", "System.Security.Principal.", "System.Transactions.",
         "System.Data.", "Microsoft.CSharp.", "Microsoft.VisualBasic.", "Microsoft.EntityFrameworkCore.",
-        "Microsoft.Win32."
+        "Microsoft.Extensions.Configuration.UserSecrets.", "Microsoft.Win32."
     ];
 
     private static readonly string[] ExactMemberNames =
