@@ -101,7 +101,7 @@ public sealed class PluginAnalyzerForbiddenApiGenericConstructionReachabilityTes
         Assert.Contains("System.IO.File", diagnostic.GetMessage(), StringComparison.Ordinal);
 
         var position = diagnostic.Location.GetLineSpan().StartLinePosition;
-        var actualLine = source.Split('\n')[position.Line].Trim();
+        var actualLine = diagnostic.Location.SourceTree!.GetText().Lines[position.Line].ToString().Trim();
         Assert.Equal(expectedLine, actualLine);
     }
 
@@ -111,7 +111,9 @@ public sealed class PluginAnalyzerForbiddenApiGenericConstructionReachabilityTes
         Assert.Empty(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
 
         var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(new DotBoxD.Plugins.Analyzer.Analysis.PluginAnalyzer());
-        return await compilation.WithAnalyzers(analyzers).GetAnalyzerDiagnosticsAsync();
+        var diagnostics = await compilation.WithAnalyzers(analyzers).GetAnalyzerDiagnosticsAsync();
+        Assert.DoesNotContain(diagnostics, d => d.Id == "AD0001");
+        return diagnostics;
     }
 
     private static CSharpCompilation CreateCompilation(string source)

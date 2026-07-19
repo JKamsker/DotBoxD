@@ -46,17 +46,7 @@ internal sealed class GenericConstructionReachability
             return;
         }
 
-        var constructions = new Dictionary<IMethodSymbol, HashSet<int>>(SymbolEqualityComparer.Default);
-        foreach (var construction in _constructions)
-        {
-            if (!constructions.TryGetValue(construction.Method, out var ordinals))
-            {
-                ordinals = [];
-                constructions.Add(construction.Method, ordinals);
-            }
-
-            ordinals.Add(construction.Ordinal);
-        }
+        var constructions = BuildConstructionOrdinals(_constructions);
 
         foreach (var invocation in _invocations)
         {
@@ -67,9 +57,7 @@ internal sealed class GenericConstructionReachability
 
             foreach (var ordinal in ordinals)
             {
-                if (ordinal >= invocation.TypeArguments.Length ||
-                    invocation.TypeArguments[ordinal] is not INamedTypeSymbol typeArgument ||
-                    ParameterlessInstanceConstructor(typeArgument) is not { } constructor)
+                if (!TryResolveConstructedConstructor(invocation, ordinal, out var constructor))
                 {
                     continue;
                 }
@@ -78,6 +66,41 @@ internal sealed class GenericConstructionReachability
                 recordCall(invocation.Caller, constructor, invocation.Location);
             }
         }
+    }
+
+    private static Dictionary<IMethodSymbol, HashSet<int>> BuildConstructionOrdinals(
+        IEnumerable<GenericConstruction> constructions)
+    {
+        var ordinalsByMethod = new Dictionary<IMethodSymbol, HashSet<int>>(SymbolEqualityComparer.Default);
+        foreach (var construction in constructions)
+        {
+            if (!ordinalsByMethod.TryGetValue(construction.Method, out var ordinals))
+            {
+                ordinals = [];
+                ordinalsByMethod.Add(construction.Method, ordinals);
+            }
+
+            ordinals.Add(construction.Ordinal);
+        }
+
+        return ordinalsByMethod;
+    }
+
+    private static bool TryResolveConstructedConstructor(
+        GenericInvocation invocation,
+        int ordinal,
+        out IMethodSymbol constructor)
+    {
+        if (ordinal < invocation.TypeArguments.Length &&
+            invocation.TypeArguments[ordinal] is INamedTypeSymbol typeArgument &&
+            ParameterlessInstanceConstructor(typeArgument) is { } parameterlessConstructor)
+        {
+            constructor = parameterlessConstructor;
+            return true;
+        }
+
+        constructor = null!;
+        return false;
     }
 
     private static bool TryGetTypeParameterOrdinal(
