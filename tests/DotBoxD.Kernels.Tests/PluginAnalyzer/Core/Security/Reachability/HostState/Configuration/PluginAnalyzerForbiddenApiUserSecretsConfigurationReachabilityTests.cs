@@ -111,11 +111,23 @@ public sealed class PluginAnalyzerForbiddenApiUserSecretsConfigurationReachabili
         var sharedRoot = Directory.GetParent(Directory.GetParent(runtimeDirectory)!.FullName)!.FullName;
         var frameworkRoot = Path.Combine(sharedRoot, "Microsoft.AspNetCore.App");
         var assembly = Directory.EnumerateDirectories(frameworkRoot)
-            .OrderByDescending(directory => Version.Parse(Path.GetFileName(directory)))
+            .OrderByDescending(ParseFrameworkDirectoryVersion)
             .Select(directory => Path.Combine(directory, fileName))
             .First(File.Exists);
 
         return assembly;
+    }
+
+    private static Version ParseFrameworkDirectoryVersion(string directory)
+    {
+        var directoryName = Path.GetFileName(directory);
+        var suffixStart = directoryName.IndexOf('-');
+        if (suffixStart >= 0)
+        {
+            directoryName = directoryName[..suffixStart];
+        }
+
+        return Version.TryParse(directoryName, out var version) ? version : new Version();
     }
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()
