@@ -22,8 +22,13 @@ internal sealed class GenericConstructionReachability
 
     public void RecordInvocation(IMethodSymbol caller, IMethodSymbol target, Location location)
     {
-        if (!target.IsGenericMethod ||
-            target.TypeParameters.Length != target.TypeArguments.Length ||
+        var hasMethodTypeArguments =
+            target.IsGenericMethod &&
+            target.TypeParameters.Length == target.TypeArguments.Length;
+        var hasContainingTypeArguments =
+            target.ContainingType.IsGenericType &&
+            target.ContainingType.TypeParameters.Length == target.ContainingType.TypeArguments.Length;
+        if ((!hasMethodTypeArguments && !hasContainingTypeArguments) ||
             target.OriginalDefinition.DeclaringSyntaxReferences.Length == 0)
         {
             return;
@@ -32,8 +37,8 @@ internal sealed class GenericConstructionReachability
         _invocations.Add(new GenericInvocation(
             Normalize(caller),
             Normalize(target),
-            target.TypeArguments,
-            [],
+            hasMethodTypeArguments ? target.TypeArguments : [],
+            hasContainingTypeArguments ? target.ContainingType.TypeArguments : [],
             location));
     }
 
@@ -123,7 +128,7 @@ internal sealed class GenericConstructionReachability
                     continue;
                 }
 
-                foreach (var ordinal in targetOrdinals)
+                foreach (var ordinal in targetOrdinals.ToArray())
                 {
                     if (!TryGetTypeArgument(invocation, ordinal, out var typeArgument) ||
                         typeArgument is not ITypeParameterSymbol typeParameter ||
@@ -223,8 +228,7 @@ internal sealed class GenericConstructionReachability
 
     private static IMethodSymbol? ParameterlessInstanceConstructor(INamedTypeSymbol type)
         => type.InstanceConstructors.FirstOrDefault(static constructor =>
-            constructor.Parameters.Length == 0 &&
-            !constructor.IsStatic);
+            constructor.Parameters.Length == 0);
 
     private static IMethodSymbol Normalize(IMethodSymbol method)
         => method.OriginalDefinition;
