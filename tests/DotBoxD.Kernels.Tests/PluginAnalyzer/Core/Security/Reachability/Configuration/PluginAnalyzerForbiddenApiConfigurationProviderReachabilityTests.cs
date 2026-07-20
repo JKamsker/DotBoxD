@@ -37,6 +37,28 @@ public sealed class PluginAnalyzerForbiddenApiConfigurationProviderReachabilityT
     }
 
     [Theory]
+    [InlineData(
+        """
+        private static readonly IConfiguration Configuration =
+            new ConfigurationBuilder().AddXmlFile("plugin.xml", optional: true, reloadOnChange: false).Build();
+        """,
+        "Microsoft.Extensions.Configuration.Xml")]
+    [InlineData(
+        """
+        private static readonly bool FileExists = System.IO.File.Exists("plugin.txt");
+        """,
+        "System.IO.File")]
+    public async Task Reports_forbidden_configuration_file_provider_static_initializers(
+        string staticMember,
+        string expectedApi)
+    {
+        var diagnostics = await AnalyzeAsync(StaticInitializerSource(staticMember));
+
+        var diagnostic = Assert.Single(diagnostics.Where(d => d.Id == "DBXK001"));
+        Assert.Contains(expectedApi, diagnostic.GetMessage(), StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData("9.0.0-rc.2.24474.3", "9.0.0")]
     [InlineData("10.0.1", "10.0.1")]
     public void RuntimeVersionPrefix_extracts_numeric_prefix(string directoryName, string expectedVersion)
@@ -79,6 +101,31 @@ public sealed class PluginAnalyzerForbiddenApiConfigurationProviderReachabilityT
             }
             """;
 
+    private static string StaticInitializerSource(string staticMember)
+        => $$"""
+            namespace Sample
+            {
+                using DotBoxD.Abstractions;
+                using DotBoxD.Plugins;
+                using Microsoft.Extensions.Configuration;
+
+                [Plugin("configuration-provider-host-api")]
+                public sealed class ConfigurationProviderKernel : IEventKernel<string>
+                {
+            {{Indent(staticMember, 8)}}
+
+                    public bool ShouldHandle(string e, HookContext context) => e.Length > 0;
+
+                    public void Handle(string e, HookContext context) { }
+                }
+            }
+            """;
+
+    private static string Indent(string text, int spaces)
+        => string.Join(
+            Environment.NewLine,
+            text.Split('\n').Select(line => new string(' ', spaces) + line.TrimEnd()));
+
     private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string source)
     {
         var compilation = CreateCompilation(source);
@@ -117,6 +164,7 @@ public sealed class PluginAnalyzerForbiddenApiConfigurationProviderReachabilityT
             "Microsoft.Extensions.Configuration.Abstractions.dll",
             "Microsoft.Extensions.Configuration.dll",
             "Microsoft.Extensions.Configuration.EnvironmentVariables.dll",
+            "Microsoft.Extensions.Configuration.Xml.dll",
             "Microsoft.Extensions.Primitives.dll"
         ];
 
