@@ -8,6 +8,9 @@ namespace DotBoxD.Services.Peer;
 
 public sealed partial class RpcPeer
 {
+    [ThreadStatic]
+    private static RpcPeer? s_disconnectedEventPeer;
+
     /// <summary>Begins the read loop. Idempotent; safe to call from a fluent chain.</summary>
     public RpcPeer Start()
     {
@@ -69,7 +72,7 @@ public sealed partial class RpcPeer
             Interlocked.Exchange(ref _closed, 1);
             _proxyCache = null;
             cts = _cts;
-            readLoop = _readLoop;
+            readLoop = ReferenceEquals(s_disconnectedEventPeer, this) ? null : _readLoop;
             cts?.Cancel();
             disposeTask = DisposeCoreAsync(readLoop, cts);
             _disposeTask = disposeTask;
@@ -148,9 +151,20 @@ public sealed partial class RpcPeer
             this,
             new RpcReadErrorEventArgs(_channel.RemoteEndpoint, error));
 
-    private void RaiseDisconnected(Exception? error) =>
-        RpcEventHandlerInvoker.Raise(
-            Disconnected,
-            this,
-            new RpcDisconnectedEventArgs(_channel.RemoteEndpoint, error));
+    private void RaiseDisconnected(Exception? error)
+    {
+        var previousPeer = s_disconnectedEventPeer;
+        s_disconnectedEventPeer = this;
+        try
+        {
+            RpcEventHandlerInvoker.Raise(
+                Disconnected,
+                this,
+                new RpcDisconnectedEventArgs(_channel.RemoteEndpoint, error));
+        }
+        finally
+        {
+            s_disconnectedEventPeer = previousPeer;
+        }
+    }
 }

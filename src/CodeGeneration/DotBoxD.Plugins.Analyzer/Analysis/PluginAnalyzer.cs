@@ -58,6 +58,9 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
                 c => AnalyzeDynamicIndexerAccess(c, helperGraph),
                 OperationKind.DynamicIndexerAccess);
             startContext.RegisterOperationAction(c => AnalyzeObjectCreation(c, helperGraph), OperationKind.ObjectCreation);
+            startContext.RegisterOperationAction(
+                c => AnalyzeTypeParameterObjectCreation(c, helperGraph),
+                OperationKind.TypeParameterObjectCreation);
             startContext.RegisterOperationAction(c => AnalyzeArrayCreation(c, helperGraph), OperationKind.ArrayCreation);
             startContext.RegisterOperationAction(c => AnalyzeWithExpression(c, helperGraph), OperationKind.With);
             startContext.RegisterOperationAction(c => AnalyzePropertyReference(c, helperGraph), OperationKind.PropertyReference);
@@ -85,6 +88,9 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
                 c => AnalyzeOperator(c, helperGraph),
                 OperationKind.UnaryOperator,
                 OperationKind.BinaryOperator,
+                OperationKind.Increment,
+                OperationKind.Decrement,
+                OperationKind.CompoundAssignment,
                 OperationKind.Conversion);
             startContext.RegisterOperationAction(
                 c => AnalyzeImplicitStringFormatting(c, helperGraph),
@@ -122,6 +128,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             method,
             invocation.TargetMethod);
         ReportForbiddenInvocationTypeArguments(context, helperGraph, method, invocation.TargetMethod);
+        RecordGenericNewConstraintConstructorReachability(context, helperGraph, method, invocation.TargetMethod);
         RecordStaticConstructorReachability(context, helperGraph, invocation.TargetMethod);
         ReportForbiddenReferencedMethodSignature(context, helperGraph, invocation.TargetMethod);
         if (!reportedUnsafeAccessor)
@@ -147,6 +154,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             RecordInitializerMemberReference(context, helperGraph, property);
             ReportAndRecordAmbientCultureMutation(context, helperGraph, property, usesSetter);
             ReportAndRecordRegexCacheSizeMutation(context, helperGraph, property, usesSetter);
+            ReportAndRecordClaimsPrincipalSelectorMutation(context, helperGraph, property, usesSetter);
             return;
         }
 
@@ -160,6 +168,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         }
         ReportAndRecordAmbientCultureMutation(context, helperGraph, property, usesSetter);
         ReportAndRecordRegexCacheSizeMutation(context, helperGraph, property, usesSetter);
+        ReportAndRecordClaimsPrincipalSelectorMutation(context, helperGraph, property, usesSetter);
         RecordStaticConstructorReachability(context, helperGraph, property);
         if (!IsForbiddenHostApi(property.ContainingType))
         {

@@ -189,14 +189,21 @@ public sealed partial class EventIndexCancellationTests
         return Assembly.Load(stream.ToArray());
     }
 
-    private static SandboxPolicy ChainPolicy()
-        => SandboxPolicyBuilder.Create()
+    private static SandboxPolicy ChainPolicy(bool allowRuntimeAsync = false)
+    {
+        var builder = SandboxPolicyBuilder.Create()
             .GrantLogging()
             .GrantHostMessageWrite()
             .WithFuel(100_000)
             .WithMaxHostCalls(1_000)
-            .WithWallTime(TimeSpan.FromSeconds(10))
-            .Build();
+            .WithWallTime(TimeSpan.FromSeconds(10));
+        if (allowRuntimeAsync)
+        {
+            builder.AllowRuntimeAsync();
+        }
+
+        return builder.Build();
+    }
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()
     {

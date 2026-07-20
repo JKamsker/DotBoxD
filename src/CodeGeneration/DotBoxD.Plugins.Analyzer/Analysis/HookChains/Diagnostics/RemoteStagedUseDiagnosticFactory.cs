@@ -1,11 +1,16 @@
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
 internal static partial class RemoteStagedUseDiagnosticFactory
 {
+    private static readonly string[] CandidateInvocationNames =
+    [
+        "Use", "UseGeneratedChain", "UseGeneratedLocalChain", "UseGeneratedResultChain",
+        "UseGeneratedLocalResultChain", "Where", "Select"
+    ];
+
     private const string TerminalMessagePrefix =
         "Remote Where/Select stages only lower when the terminal is Run, RunLocal, Register, or RegisterLocal; " +
         "calling ";
@@ -18,28 +23,37 @@ internal static partial class RemoteStagedUseDiagnosticFactory
 
     public static bool IsCandidate(SyntaxNode node)
     {
-        if (node is not InvocationExpressionSyntax invocation)
+        if (node is InvocationExpressionSyntax invocation)
         {
-            return false;
+            return IsCandidateInvocation(invocation);
         }
 
-        return invocation.Expression is MemberAccessExpressionSyntax
+        return node is ConditionalAccessExpressionSyntax
         {
-            Name.Identifier.ValueText: "Use"
-                    or "UseGeneratedChain"
-                    or "UseGeneratedLocalChain"
-                    or "UseGeneratedResultChain"
-                    or "UseGeneratedLocalResultChain"
-                    or "Where"
-                    or "Select"
-        } ||
-            IsStoredInvocation(invocation);
+            WhenNotNull: InvocationExpressionSyntax
+            {
+                Expression: MemberBindingExpressionSyntax binding
+            }
+        } && IsPipelineStageName(binding.Name.Identifier.ValueText);
     }
+
+    private static bool IsCandidateInvocation(InvocationExpressionSyntax invocation)
+        => invocation.Expression is MemberAccessExpressionSyntax access &&
+            Array.IndexOf(CandidateInvocationNames, access.Name.Identifier.ValueText) >= 0 ||
+            IsStoredInvocation(invocation);
+
+    private static bool IsPipelineStageName(string name)
+        => name is "Where" or "Select";
 
     public static PluginKernelDiagnostic? Create(
         GeneratorSyntaxContext context,
         CancellationToken cancellationToken)
     {
+        if (context.Node is ConditionalAccessExpressionSyntax conditional)
+        {
+            return CreateConditionalDiscardedStageDiagnostic(conditional, context.SemanticModel, cancellationToken);
+        }
+
         var invocation = (InvocationExpressionSyntax)context.Node;
         if (invocation.Expression is not MemberAccessExpressionSyntax access)
         {
@@ -72,6 +86,36 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         return new PluginKernelDiagnostic(
             UnsupportedTerminalMessage(access.Name.Identifier.ValueText),
             PluginDiagnosticLocation.From(access.Name.GetLocation()));
+    }
+
+    private static PluginKernelDiagnostic? CreateConditionalDiscardedStageDiagnostic(
+        ConditionalAccessExpressionSyntax conditional,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (conditional.WhenNotNull is not InvocationExpressionSyntax invocation ||
+            invocation.Expression is not MemberBindingExpressionSyntax binding ||
+            !IsPipelineStageInvocation(invocation, model, cancellationToken))
+        {
+            return null;
+        }
+
+        var transparentExpression = UnwrapTransparentParent(conditional);
+        if (transparentExpression.Parent is not ExpressionStatementSyntax)
+        {
+            return null;
+        }
+
+        var receiverType = model.GetTypeInfo(conditional.Expression, cancellationToken).Type;
+        if (!IsRemoteChainOrStageType(receiverType) &&
+            !IsGeneratedRemoteChain(conditional.Expression, model, cancellationToken))
+        {
+            return null;
+        }
+
+        return new PluginKernelDiagnostic(
+            DiscardedStageMessage,
+            PluginDiagnosticLocation.From(binding.Name.GetLocation()));
     }
 
     private static string UnsupportedTerminalMessage(string terminal)
@@ -147,6 +191,11 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         SemanticModel model,
         CancellationToken cancellationToken)
     {
+        if (!IsPipelineStageInvocation(invocation, model, cancellationToken))
+        {
+            return null;
+        }
+
         var transparentExpression = UnwrapTransparentParent(invocation);
         ExpressionSyntax discardedExpression = transparentExpression;
         if (TryHandleAssignmentDiscard(
@@ -172,6 +221,17 @@ internal static partial class RemoteStagedUseDiagnosticFactory
             return localDiagnostic;
         }
 
+        if (TryCreateNestedDiscardDiagnostic(
+                invocation,
+                access,
+                model,
+                cancellationToken,
+                transparentExpression,
+                out var nestedDiagnostic))
+        {
+            return nestedDiagnostic;
+        }
+
         if (discardedExpression.Parent is not ExpressionStatementSyntax)
         {
             return null;
@@ -186,106 +246,6 @@ internal static partial class RemoteStagedUseDiagnosticFactory
 
         return new PluginKernelDiagnostic(
             DiscardedStageMessage,
-            PluginDiagnosticLocation.From(access.Name.GetLocation()));
-    }
-
-    private static bool TryHandleAssignmentDiscard(
-        InvocationExpressionSyntax invocation,
-        MemberAccessExpressionSyntax access,
-        SemanticModel model,
-        CancellationToken cancellationToken,
-        ExpressionSyntax transparentExpression,
-        ref ExpressionSyntax discardedExpression,
-        out PluginKernelDiagnostic? diagnostic)
-    {
-        diagnostic = null;
-        if (transparentExpression.Parent is not AssignmentExpressionSyntax assignment ||
-            assignment.Right != transparentExpression ||
-            assignment.Parent is not ExpressionStatementSyntax)
-        {
-            return false;
-        }
-
-        var assignsLocal = model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is ILocalSymbol;
-        if (CreateAssignedStageDiagnostic(invocation, assignment, access, model, cancellationToken) is { } assigned)
-        {
-            diagnostic = assigned;
-            return true;
-        }
-
-        if (assignsLocal)
-        {
-            return true;
-        }
-
-        discardedExpression = assignment;
-        return false;
-    }
-
-    private static bool TryCreateLocalDeclarationDiagnostic(
-        InvocationExpressionSyntax invocation,
-        MemberAccessExpressionSyntax access,
-        SemanticModel model,
-        CancellationToken cancellationToken,
-        ExpressionSyntax transparentExpression,
-        out PluginKernelDiagnostic? diagnostic)
-    {
-        diagnostic = null;
-        if (transparentExpression.Parent is not EqualsValueClauseSyntax
-            {
-                Parent: VariableDeclaratorSyntax declarator
-            } ||
-            model.GetDeclaredSymbol(declarator, cancellationToken) is not ILocalSymbol local)
-        {
-            return false;
-        }
-
-        diagnostic = CreateStagedLocalDiagnostic(invocation, access, model, local, cancellationToken);
-        return true;
-    }
-
-    private static PluginKernelDiagnostic? CreateStagedLocalDiagnostic(
-        InvocationExpressionSyntax invocation,
-        MemberAccessExpressionSyntax access,
-        SemanticModel model,
-        ILocalSymbol local,
-        CancellationToken cancellationToken)
-    {
-        var receiverType = model.GetTypeInfo(access.Expression, cancellationToken).Type;
-        if ((!IsRemoteChainOrStageType(receiverType) &&
-             !IsGeneratedRemoteChain(access.Expression, model, cancellationToken)) ||
-            RemoteStagedUseFlowAnalyzer.LocalFlowsIntoTerminalOrUse(invocation, local, model, cancellationToken))
-        {
-            return null;
-        }
-
-        return new PluginKernelDiagnostic(
-            DiscardedStageMessage,
-            PluginDiagnosticLocation.From(access.Name.GetLocation()));
-    }
-
-    private static PluginKernelDiagnostic? CreateAssignedStageDiagnostic(
-        InvocationExpressionSyntax invocation,
-        AssignmentExpressionSyntax assignment,
-        MemberAccessExpressionSyntax access,
-        SemanticModel model,
-        CancellationToken cancellationToken)
-    {
-        var receiverType = model.GetTypeInfo(access.Expression, cancellationToken).Type;
-        if (!IsRemoteChainOrStageType(receiverType) &&
-            !IsGeneratedRemoteChain(access.Expression, model, cancellationToken))
-        {
-            return null;
-        }
-
-        if (model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not ILocalSymbol local ||
-            !RemoteStagedUseFlowAnalyzer.LocalFlowsIntoTerminalOrUse(invocation, local, model, cancellationToken))
-        {
-            return null;
-        }
-
-        return new PluginKernelDiagnostic(
-            AssignedStageMessage,
             PluginDiagnosticLocation.From(access.Name.GetLocation()));
     }
 

@@ -17,12 +17,12 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         CancellationToken cancellationToken,
         int depth)
     {
-        if (depth > 8)
+        if (depth > HookChainAliasResolver.MaxResolutionDepth)
         {
             return false;
         }
 
-        if (RemoteStagedUseFlowAnalyzer.ContainsStageInvocation(expression))
+        if (ContainsPipelineStageInvocation(expression, model, cancellationToken, depth))
         {
             return true;
         }

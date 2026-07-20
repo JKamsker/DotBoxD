@@ -21,6 +21,7 @@ public sealed partial class InstalledKernel
 
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             CommitSettings(values);
         }
         finally
@@ -52,12 +53,14 @@ public sealed partial class InstalledKernel
                 var draftStore = Value.Copy(Manifest.LiveSettings);
                 var draft = draftStore.As<TState>();
                 modify(draft);
+                cancellationToken.ThrowIfCancellationRequested();
                 CommitSettings(draftStore.ToObjectValues(Manifest.LiveSettings));
                 return;
             }
 
             var classDraft = LiveKernelValueFactory.CreateDraft(current);
             modify(classDraft);
+            cancellationToken.ThrowIfCancellationRequested();
             lock (_lifecycleGate)
             {
                 PluginKernelRevocation.ThrowIfRevoked(IsRevoked);

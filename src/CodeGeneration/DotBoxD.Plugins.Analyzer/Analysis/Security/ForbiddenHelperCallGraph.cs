@@ -9,6 +9,7 @@ internal sealed class ForbiddenHelperCallGraph
     private readonly ConcurrentDictionary<ISymbol, string> _forbidden = new(SymbolEqualityComparer.Default);
     private readonly ForbiddenDirectDiagnosticSet _directDiagnostics = new();
     private readonly DynamicHelperCallResolver _dynamicHelperCalls = new();
+    private readonly GenericConstructionReachability _genericConstructionReachability = new();
     private readonly ConcurrentBag<HelperEdge> _helperEdges = [];
     private readonly ConcurrentBag<RootHelperCall> _rootCalls = [];
 
@@ -124,13 +125,26 @@ internal sealed class ForbiddenHelperCallGraph
             return;
         }
 
-        if (caller.DeclaringSyntaxReferences.Length == 0)
+        if (!ForbiddenGraphAnalysis.IsReachableSourceMethod(caller))
         {
             return;
         }
 
         _helperEdges.Add(new HelperEdge(Normalize(caller), normalizedTarget));
     }
+
+    public void RecordGenericTypeParameterConstruction(IMethodSymbol method, ITypeParameterSymbol typeParameter)
+        => _genericConstructionReachability.RecordTypeParameterConstruction(method, typeParameter);
+
+    public void RecordGenericInvocation(IMethodSymbol caller, IMethodSymbol target, Location location)
+        => _genericConstructionReachability.RecordInvocation(caller, target, location);
+
+    public void RecordGenericObjectCreation(
+        IMethodSymbol caller,
+        IMethodSymbol constructor,
+        INamedTypeSymbol constructedType,
+        Location location)
+        => _genericConstructionReachability.RecordObjectCreation(caller, constructor, constructedType, location);
 
     public void RecordConstructorInitializers(IMethodSymbol constructor)
     {
@@ -241,6 +255,7 @@ internal sealed class ForbiddenHelperCallGraph
 
     public void ReportDiagnostics(CompilationAnalysisContext context)
     {
+        _genericConstructionReachability.Resolve(RecordConstructorInitializers, RecordCall);
         _dynamicHelperCalls.Resolve(RecordCall, RecordInitializerRootCall, RecordDynamicTargetSignature);
         if (_forbidden.IsEmpty ||
             _rootCalls.IsEmpty ||

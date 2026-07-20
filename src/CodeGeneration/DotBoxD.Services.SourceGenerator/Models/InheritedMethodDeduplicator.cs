@@ -276,7 +276,7 @@ internal static class InheritedMethodDeduplicator
     {
         foreach (var attr in methodSymbol.GetAttributes())
         {
-            if (!ServicesGeneratorTypeNames.IsRpcMethodAttribute(attr.AttributeClass?.ToDisplayString()))
+            if (!ServicesGeneratorTypeNames.IsRpcMethodAttribute(attr.AttributeClass))
             {
                 continue;
             }

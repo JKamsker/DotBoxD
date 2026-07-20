@@ -1,3 +1,5 @@
+using Microsoft.CodeAnalysis;
+
 namespace DotBoxD.Services.SourceGenerator.Infrastructure;
 
 internal static class ServicesGeneratorTypeNames
@@ -90,4 +92,23 @@ internal static class ServicesGeneratorTypeNames
 
     public static bool IsRpcMethodAttribute(string? typeName) =>
         typeName is RpcMethodAttribute;
+
+    public static bool IsRpcServiceAttribute(INamedTypeSymbol? type) =>
+        IsOrInheritsFrom(type, RpcServiceAttribute);
+
+    public static bool IsRpcMethodAttribute(INamedTypeSymbol? type) =>
+        IsOrInheritsFrom(type, RpcMethodAttribute);
+
+    private static bool IsOrInheritsFrom(INamedTypeSymbol? type, string metadataName)
+    {
+        for (var current = type; current is not null; current = current.BaseType)
+        {
+            if (current.ToDisplayString() == metadataName)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

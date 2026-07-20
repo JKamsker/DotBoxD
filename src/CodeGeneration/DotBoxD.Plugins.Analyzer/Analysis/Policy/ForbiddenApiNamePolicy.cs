@@ -32,7 +32,16 @@ internal static class ForbiddenApiNamePolicy
         "System.Security.Cryptography.DSACryptoServiceProvider",
         "System.Security.Cryptography.RSACryptoServiceProvider",
         "System.Security.Cryptography.Rfc2898DeriveBytes",
-        "System.Security.Cryptography.CryptoConfig"
+        "System.Security.Cryptography.CryptoConfig",
+        "System.Security.AccessControl.DirectorySecurity",
+        "System.Security.AccessControl.FileSecurity",
+        "Microsoft.Extensions.FileProviders.PhysicalFileProvider",
+        "Microsoft.Extensions.Logging.ConsoleLoggerExtensions",
+        "Microsoft.Extensions.Configuration.FileConfigurationExtensions",
+        "Microsoft.Extensions.Configuration.IniConfigurationExtensions",
+        "Microsoft.Extensions.Configuration.JsonConfigurationExtensions",
+        "Microsoft.Extensions.Configuration.XmlConfigurationExtensions",
+        "Microsoft.Extensions.Configuration.UserSecretsConfigurationExtensions"
     ];
 
     private static readonly string[] NamespacePrefixes =
@@ -41,14 +50,20 @@ internal static class ForbiddenApiNamePolicy
         "System.Runtime.Intrinsics.", "System.Runtime.Loader.", "System.Diagnostics.", "System.Threading.",
         "System.Threading.Tasks.",
         "System.Timers.", "System.Linq.Expressions.", "System.Security.Principal.", "System.Transactions.",
-        "System.Data.", "Microsoft.CSharp.", "Microsoft.VisualBasic.", "Microsoft.EntityFrameworkCore.",
+        "System.Data.", "Microsoft.AspNetCore.", "Microsoft.CSharp.", "Microsoft.VisualBasic.",
+        "Microsoft.EntityFrameworkCore.", "Microsoft.Extensions.Logging.Console.",
+        "Microsoft.Extensions.Logging.EventLog.", "Microsoft.Extensions.Configuration.UserSecrets.",
         "Microsoft.Win32."
     ];
 
     private static readonly string[] ExactMemberNames =
     [
+        "Microsoft.Extensions.Configuration.EnvironmentVariablesExtensions.AddEnvironmentVariables",
+        "Microsoft.Extensions.Logging.EventLoggerFactoryExtensions.AddEventLog",
+        "Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder",
         "System.String.Create",
-        "System.Security.Cryptography.RSA.Create"
+        "System.Security.Cryptography.RSA.Create",
+        "Microsoft.Extensions.Configuration.KeyPerFileConfigurationBuilderExtensions.AddKeyPerFile"
     ];
 
     public static bool IsForbiddenExactType(string name) => Array.IndexOf(ExactTypeNames, name) >= 0;
