@@ -85,6 +85,8 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
                 c => AnalyzeOperator(c, helperGraph),
                 OperationKind.UnaryOperator,
                 OperationKind.BinaryOperator,
+                OperationKind.Increment,
+                OperationKind.Decrement,
                 OperationKind.Conversion);
             startContext.RegisterOperationAction(
                 c => AnalyzeImplicitStringFormatting(c, helperGraph),
