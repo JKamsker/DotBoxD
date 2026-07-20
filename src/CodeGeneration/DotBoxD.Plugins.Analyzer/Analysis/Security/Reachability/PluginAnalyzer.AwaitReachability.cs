@@ -197,27 +197,29 @@ public sealed partial class PluginAnalyzer
             return;
         }
 
-        foreach (var member in awaitableType.GetMembers("GetAwaiter").OfType<IMethodSymbol>())
+        var getAwaiter = FindPatternMember<IMethodSymbol>(
+            awaitableType,
+            "GetAwaiter",
+            static method => method.Parameters.Length == 0 && !method.IsStatic);
+        if (getAwaiter is null)
         {
-            if (member.Parameters.Length != 0 || member.IsStatic)
-            {
-                continue;
-            }
-
-            RecordAwaiterCall(context, helperGraph, method, member, location);
-            if (member.ReturnType.GetMembers("IsCompleted").OfType<IPropertySymbol>().FirstOrDefault()?.GetMethod is
-                { } isCompletedGetter)
-            {
-                RecordAwaiterCall(context, helperGraph, method, isCompletedGetter, location);
-            }
-
-            var getResult = member.ReturnType
-                .GetMembers("GetResult")
-                .OfType<IMethodSymbol>()
-                .FirstOrDefault(static m => m.Parameters.Length == 0);
-            RecordAwaiterCall(context, helperGraph, method, getResult, location);
             return;
         }
+
+        RecordAwaiterCall(context, helperGraph, method, getAwaiter, location);
+        if (FindPatternMember<IPropertySymbol>(
+            getAwaiter.ReturnType,
+            "IsCompleted",
+            static property => property.GetMethod is not null)?.GetMethod is { } isCompletedGetter)
+        {
+            RecordAwaiterCall(context, helperGraph, method, isCompletedGetter, location);
+        }
+
+        var getResult = FindPatternMember<IMethodSymbol>(
+            getAwaiter.ReturnType,
+            "GetResult",
+            static method => method.Parameters.Length == 0);
+        RecordAwaiterCall(context, helperGraph, method, getResult, location);
     }
 
     private static void RecordAwaitablePatternCalls(
@@ -232,26 +234,46 @@ public sealed partial class PluginAnalyzer
             return;
         }
 
-        foreach (var member in awaitableType.GetMembers("GetAwaiter").OfType<IMethodSymbol>())
+        var getAwaiter = FindPatternMember<IMethodSymbol>(
+            awaitableType,
+            "GetAwaiter",
+            static method => method.Parameters.Length == 0 && !method.IsStatic);
+        if (getAwaiter is null)
         {
-            if (member.Parameters.Length != 0 || member.IsStatic)
-            {
-                continue;
-            }
-
-            RecordAwaiterCall(context, helperGraph, method, member, location);
-            if (member.ReturnType.GetMembers("IsCompleted").OfType<IPropertySymbol>().FirstOrDefault()?.GetMethod is
-                { } isCompletedGetter)
-            {
-                RecordAwaiterCall(context, helperGraph, method, isCompletedGetter, location);
-            }
-
-            var getResult = member.ReturnType
-                .GetMembers("GetResult")
-                .OfType<IMethodSymbol>()
-                .FirstOrDefault(static m => m.Parameters.Length == 0);
-            RecordAwaiterCall(context, helperGraph, method, getResult, location);
             return;
         }
+
+        RecordAwaiterCall(context, helperGraph, method, getAwaiter, location);
+        if (FindPatternMember<IPropertySymbol>(
+            getAwaiter.ReturnType,
+            "IsCompleted",
+            static property => property.GetMethod is not null)?.GetMethod is { } isCompletedGetter)
+        {
+            RecordAwaiterCall(context, helperGraph, method, isCompletedGetter, location);
+        }
+
+        var getResult = FindPatternMember<IMethodSymbol>(
+            getAwaiter.ReturnType,
+            "GetResult",
+            static method => method.Parameters.Length == 0);
+        RecordAwaiterCall(context, helperGraph, method, getResult, location);
+    }
+
+    private static TSymbol? FindPatternMember<TSymbol>(
+        ITypeSymbol type,
+        string name,
+        Func<TSymbol, bool> predicate)
+        where TSymbol : class, ISymbol
+    {
+        for (var current = type; current is not null; current = current.BaseType)
+        {
+            var member = current.GetMembers(name).OfType<TSymbol>().FirstOrDefault(predicate);
+            if (member is not null)
+            {
+                return member;
+            }
+        }
+
+        return null;
     }
 }

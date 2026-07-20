@@ -75,6 +75,61 @@ public sealed class PluginAnalyzerForbiddenApiAwaitUsingAwaiterReachabilityTests
         AssertSingleForbiddenDiagnosticAt(source, diagnostics, "await new DisposeAwaitable();");
     }
 
+    [Fact]
+    public async Task Reports_forbidden_api_reached_through_inherited_awaitable_pattern_members()
+    {
+        const string source = """
+            namespace Sample
+            {
+                using System;
+                using System.Runtime.CompilerServices;
+                using DotBoxD.Abstractions;
+                using DotBoxD.Plugins;
+
+                public sealed class Helper
+                {
+                    public InheritedDisposeAwaitable DisposeAsync() => new();
+                }
+
+                public sealed class InheritedDisposeAwaitable : DisposeAwaitableBase
+                {
+                }
+
+                public class DisposeAwaitableBase
+                {
+                    public InheritedDisposeAwaiter GetAwaiter() => new();
+                }
+
+                public sealed class InheritedDisposeAwaiter : DisposeAwaiterBase
+                {
+                }
+
+                public class DisposeAwaiterBase : INotifyCompletion
+                {
+                    public bool IsCompleted => true;
+
+                    public void OnCompleted(Action continuation) => continuation();
+
+                    public void GetResult() => _ = System.IO.File.ReadAllText("/x");
+                }
+
+                [Plugin("inherited-await-using-awaiter-leak")]
+                public sealed class InheritedAwaitUsingAwaiterKernel : IEventKernel<string>
+                {
+                    public bool ShouldHandle(string e, HookContext context) => true;
+
+                    public async void Handle(string e, HookContext context)
+                    {
+                        await using var helper = new Helper();
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await AnalyzeAsync(source);
+        AssertSingleForbiddenDiagnosticAt(source, diagnostics, "await using var helper = new Helper();");
+    }
+
     private const string DisposeAwaitableSource = """
         public sealed class DisposeAwaitable
         {
