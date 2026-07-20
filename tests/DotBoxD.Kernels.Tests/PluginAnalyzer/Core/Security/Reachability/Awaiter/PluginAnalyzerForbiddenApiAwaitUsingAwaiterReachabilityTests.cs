@@ -13,7 +13,7 @@ public sealed class PluginAnalyzerForbiddenApiAwaitUsingAwaiterReachabilityTests
     [Fact]
     public async Task Reports_forbidden_api_reached_through_await_using_awaiter_get_result()
     {
-        const string source = """
+        var source = $$"""
             namespace Sample
             {
                 using System;
@@ -26,19 +26,7 @@ public sealed class PluginAnalyzerForbiddenApiAwaitUsingAwaiterReachabilityTests
                     public DisposeAwaitable DisposeAsync() => new();
                 }
 
-                public sealed class DisposeAwaitable
-                {
-                    public DisposeAwaiter GetAwaiter() => new();
-                }
-
-                public sealed class DisposeAwaiter : INotifyCompletion
-                {
-                    public bool IsCompleted => true;
-
-                    public void OnCompleted(Action continuation) => continuation();
-
-                    public void GetResult() => _ = System.IO.File.ReadAllText("/x");
-                }
+                {{DisposeAwaitableSource}}
 
                 [Plugin("await-using-awaiter-leak")]
                 public sealed class AwaitUsingAwaiterKernel : IEventKernel<string>
@@ -60,7 +48,7 @@ public sealed class PluginAnalyzerForbiddenApiAwaitUsingAwaiterReachabilityTests
     [Fact]
     public async Task Reports_forbidden_api_reached_through_explicit_dispose_awaitable()
     {
-        const string source = """
+        var source = $$"""
             namespace Sample
             {
                 using System;
@@ -68,19 +56,7 @@ public sealed class PluginAnalyzerForbiddenApiAwaitUsingAwaiterReachabilityTests
                 using DotBoxD.Abstractions;
                 using DotBoxD.Plugins;
 
-                public sealed class DisposeAwaitable
-                {
-                    public DisposeAwaiter GetAwaiter() => new();
-                }
-
-                public sealed class DisposeAwaiter : INotifyCompletion
-                {
-                    public bool IsCompleted => true;
-
-                    public void OnCompleted(Action continuation) => continuation();
-
-                    public void GetResult() => _ = System.IO.File.ReadAllText("/x");
-                }
+                {{DisposeAwaitableSource}}
 
                 [Plugin("explicit-dispose-awaitable-leak")]
                 public sealed class ExplicitDisposeAwaitableKernel : IEventKernel<string>
@@ -98,6 +74,22 @@ public sealed class PluginAnalyzerForbiddenApiAwaitUsingAwaiterReachabilityTests
         var diagnostics = await AnalyzeAsync(source);
         AssertSingleForbiddenDiagnosticAt(source, diagnostics, "await new DisposeAwaitable();");
     }
+
+    private const string DisposeAwaitableSource = """
+        public sealed class DisposeAwaitable
+        {
+            public DisposeAwaiter GetAwaiter() => new();
+        }
+
+        public sealed class DisposeAwaiter : INotifyCompletion
+        {
+            public bool IsCompleted => true;
+
+            public void OnCompleted(Action continuation) => continuation();
+
+            public void GetResult() => _ = System.IO.File.ReadAllText("/x");
+        }
+        """;
 
     private static void AssertSingleForbiddenDiagnosticAt(
         string source,
