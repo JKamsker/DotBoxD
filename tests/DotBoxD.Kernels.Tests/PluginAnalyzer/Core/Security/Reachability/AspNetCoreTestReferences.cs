@@ -6,7 +6,7 @@ internal static class AspNetCoreTestReferences
 {
     public static string FindAssembly(string fileName)
     {
-        var path = Path.Combine(HighestVersionedRuntimeDirectory(), fileName);
+        var path = Path.Combine(HighestVersionedReferenceDirectory(), fileName);
         return File.Exists(path)
             ? path
             : throw new FileNotFoundException(
@@ -15,25 +15,26 @@ internal static class AspNetCoreTestReferences
     }
 
     public static IEnumerable<string> AssemblyPaths(string searchPattern)
-        => Directory.EnumerateFiles(HighestVersionedRuntimeDirectory(), searchPattern);
+        => Directory.EnumerateFiles(HighestVersionedReferenceDirectory(), searchPattern);
 
-    private static string HighestVersionedRuntimeDirectory()
+    private static string HighestVersionedReferenceDirectory()
     {
         var runtimeDirectory = RuntimeEnvironment.GetRuntimeDirectory()
             .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var sharedRoot = Directory.GetParent(runtimeDirectory)?.Parent?.FullName ??
-            throw new DirectoryNotFoundException("Could not locate the dotnet shared-runtime directory.");
-        var aspNetCoreRoot = Path.Combine(sharedRoot, "Microsoft.AspNetCore.App");
+        var dotnetRoot = Directory.GetParent(runtimeDirectory)?.Parent?.Parent?.FullName ??
+            throw new DirectoryNotFoundException("Could not locate the dotnet installation directory.");
+        var aspNetCoreRoot = Path.Combine(dotnetRoot, "packs", "Microsoft.AspNetCore.App.Ref");
+        var targetFramework = $"net{Environment.Version.Major}.0";
         var selected = Directory
             .EnumerateDirectories(aspNetCoreRoot)
             .Select(path => (Path: path, Version: VersionPrefix(path)))
             .Where(candidate => candidate.Version is not null)
             .OrderByDescending(candidate => candidate.Version)
-            .Select(candidate => candidate.Path)
-            .FirstOrDefault();
+            .Select(candidate => Path.Combine(candidate.Path, "ref", targetFramework))
+            .FirstOrDefault(Directory.Exists);
 
         return selected ?? throw new DirectoryNotFoundException(
-            "Could not locate a versioned Microsoft.AspNetCore.App shared runtime.");
+            $"Could not locate a versioned Microsoft.AspNetCore.App reference pack for {targetFramework}.");
     }
 
     private static Version? VersionPrefix(string path)
