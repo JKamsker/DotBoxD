@@ -19,6 +19,8 @@ public sealed class FaultInjectingRpcChannel : IRpcChannel
     private readonly IRpcChannel _inner;
     private readonly Func<RpcChannelOperation, int, CancellationToken, ValueTask> _beforeOperation;
     private readonly Func<ReadOnlyMemory<byte>, int, CancellationToken, ValueTask<ReadOnlyMemory<byte>>> _transformSend;
+    private readonly object _disposeGate = new();
+    private Task? _disposeTask;
     private int _receives;
     private int _sends;
 
@@ -58,5 +60,24 @@ public sealed class FaultInjectingRpcChannel : IRpcChannel
         return await _inner.ReceiveAsync(ct).ConfigureAwait(false);
     }
 
-    public ValueTask DisposeAsync() => _inner.DisposeAsync();
+    public ValueTask DisposeAsync()
+    {
+        lock (_disposeGate)
+        {
+            _disposeTask ??= DisposeInnerAsync();
+            return new ValueTask(_disposeTask);
+        }
+    }
+
+    private Task DisposeInnerAsync()
+    {
+        try
+        {
+            return _inner.DisposeAsync().AsTask();
+        }
+        catch (Exception ex)
+        {
+            return Task.FromException(ex);
+        }
+    }
 }
