@@ -90,7 +90,7 @@ public sealed class PluginAnalyzerForbiddenApiIniConfigurationReachabilityTests
         {
             if (!references.ContainsKey(fileName))
             {
-                yield return MetadataReference.CreateFromFile(FindAspNetCoreReferenceAssembly(fileName));
+                yield return MetadataReference.CreateFromFile(AspNetCoreTestReferences.FindAssembly(fileName));
             }
         }
 
@@ -117,18 +117,4 @@ public sealed class PluginAnalyzerForbiddenApiIniConfigurationReachabilityTests
             "Microsoft.Extensions.Primitives.dll",
         ];
 
-    private static string FindAspNetCoreReferenceAssembly(string fileName)
-    {
-        const string packRoot = "/usr/share/dotnet/packs/Microsoft.AspNetCore.App.Ref";
-
-        var candidates = Directory.EnumerateDirectories(packRoot)
-            .Select(directory => Path.Combine(directory, "ref", "net10.0", fileName))
-            .Where(File.Exists)
-            .OrderByDescending(static path => path, StringComparer.Ordinal)
-            .ToArray();
-
-        return candidates.Length > 0
-            ? candidates[0]
-            : throw new FileNotFoundException($"Could not find ASP.NET Core reference assembly '{fileName}'.", fileName);
-    }
 }

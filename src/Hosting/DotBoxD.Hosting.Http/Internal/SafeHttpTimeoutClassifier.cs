@@ -20,12 +20,17 @@ internal static class SafeHttpTimeoutClassifier
             return false;
         }
 
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+
         if (WallTimeExpiredOrNearlyExpired(context))
         {
             return true;
         }
 
-        return !cancellationToken.IsCancellationRequested;
+        return true;
     }
 
     internal static bool WallTimeExpiredOrNearlyExpired(SandboxContext context)

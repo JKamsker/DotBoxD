@@ -29,7 +29,7 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         CancellationToken cancellationToken,
         int depth)
     {
-        if (depth > 8)
+        if (depth > HookChainAliasResolver.MaxResolutionDepth)
         {
             return false;
         }

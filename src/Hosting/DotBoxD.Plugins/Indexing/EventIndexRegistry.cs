@@ -110,17 +110,17 @@ public sealed partial class EventIndexRegistry
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Lock-free lookup: ConcurrentDictionary makes the read safe against Register's concurrent create,
-        // and the channel's Snapshot() already tolerates a registration adding to it mid-publish.
-        if (!_channels.TryGetValue(typeof(TEvent), out var existing))
-        {
-            return;
-        }
-
-        var channel = (EventIndexChannel<TEvent>)existing;
         EnterPublish();
         try
         {
+            // Lock-free lookup: ConcurrentDictionary makes the read safe against Register's concurrent create,
+            // and the channel's Snapshot() already tolerates a registration adding to it mid-publish.
+            if (!_channels.TryGetValue(typeof(TEvent), out var existing))
+            {
+                return;
+            }
+
+            var channel = (EventIndexChannel<TEvent>)existing;
             PublishCore(channel, value, cancellationToken);
         }
         finally

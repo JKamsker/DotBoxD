@@ -256,13 +256,8 @@ internal static partial class CompiledBindingDispatcher
             return pending.GetAwaiter().GetResult();
         }
 
-        var task = pending.AsTask();
         if (!context.AsyncEnabled)
         {
-            // The descriptor promised a synchronous binding, but the host already returned pending work.
-            // Wait for it to settle before failing so callers do not observe sandbox execution as complete
-            // while invoked host work is still running.
-            _ = task.GetAwaiter().GetResult();
             throw new SandboxRuntimeException(new SandboxError(
                 SandboxErrorCode.BindingFailure,
                 "binding returned a pending result; async capability is not granted"));

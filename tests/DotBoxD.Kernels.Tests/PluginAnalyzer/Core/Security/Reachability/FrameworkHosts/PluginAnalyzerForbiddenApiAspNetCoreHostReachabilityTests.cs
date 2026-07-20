@@ -82,7 +82,8 @@ public sealed class PluginAnalyzerForbiddenApiAspNetCoreHostReachabilityTests
             TrustedPlatformReferences()
                 .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
-                .Concat(AspNetCoreReferencePackReferences()),
+                .Concat(AspNetCoreTestReferences.AssemblyPaths("*.dll")
+                    .Select(path => MetadataReference.CreateFromFile(path))),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     }
 
@@ -93,25 +94,4 @@ public sealed class PluginAnalyzerForbiddenApiAspNetCoreHostReachabilityTests
         return references.Select(reference => MetadataReference.CreateFromFile(reference));
     }
 
-    private static IEnumerable<MetadataReference> AspNetCoreReferencePackReferences()
-    {
-        var dotnetRoot = Path.GetFullPath(
-            Path.Combine(Path.GetDirectoryName(typeof(object).Assembly.Location)!, "..", "..", ".."));
-        var packRoot = Path.Combine(dotnetRoot, "packs", "Microsoft.AspNetCore.App.Ref");
-        if (!Directory.Exists(packRoot))
-        {
-            return [];
-        }
-
-        var referenceDirectory = Directory.GetDirectories(packRoot)
-            .Select(path => Path.Combine(path, "ref", "net10.0"))
-            .Where(Directory.Exists)
-            .OrderByDescending(path => path, StringComparer.Ordinal)
-            .FirstOrDefault();
-
-        return referenceDirectory is null
-            ? []
-            : Directory.EnumerateFiles(referenceDirectory, "*.dll")
-                .Select(reference => MetadataReference.CreateFromFile(reference));
-    }
 }

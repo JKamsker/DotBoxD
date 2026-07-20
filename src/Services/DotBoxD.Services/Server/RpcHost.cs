@@ -238,8 +238,8 @@ public sealed partial class RpcHost : IAsyncDisposable
         }
 
         peer.Disconnected -= OnPeerDisconnected;
-        _peers.Remove(peer);
         var cleanup = _peers.BeginCleanup();
+        _peers.Remove(peer);
         try
         {
             RpcEventHandlerInvoker.Raise(PeerDisconnected, this, new RpcPeerEventArgs(peer));

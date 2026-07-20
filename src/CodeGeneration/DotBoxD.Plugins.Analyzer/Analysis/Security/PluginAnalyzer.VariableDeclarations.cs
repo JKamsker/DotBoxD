@@ -107,8 +107,6 @@ public sealed partial class PluginAnalyzer
                 return true;
             case IMethodSymbol method when TryGetForbiddenXmlFileMethod(method, out forbidden):
                 return true;
-            case IMethodSymbol method when TryGetForbiddenConfigurationFileMethod(method, out forbidden):
-                return true;
             case IMethodSymbol method when TryGetForbiddenNondeterministicMethod(method, out forbidden):
                 return true;
             case IMethodSymbol method:
@@ -160,25 +158,6 @@ public sealed partial class PluginAnalyzer
         if (string.Equals(method.Name, "Create", StringComparison.Ordinal) &&
             containingTypeName is "System.Xml.XmlReader" or "System.Xml.XmlWriter" &&
             method.Parameters.FirstOrDefault()?.Type.SpecialType == SpecialType.System_String)
-        {
-            forbidden = containingType!;
-            return true;
-        }
-
-        forbidden = null!;
-        return false;
-    }
-
-    private static bool TryGetForbiddenConfigurationFileMethod(IMethodSymbol method, out ITypeSymbol forbidden)
-    {
-        var containingType = method.ContainingType;
-        var containingTypeName = containingType?.OriginalDefinition.ToDisplayString(
-            SymbolDisplayFormat.CSharpErrorMessageFormat);
-        if (string.Equals(method.Name, "AddJsonFile", StringComparison.Ordinal) &&
-            string.Equals(
-                containingTypeName,
-                "Microsoft.Extensions.Configuration.JsonConfigurationExtensions",
-                StringComparison.Ordinal))
         {
             forbidden = containingType!;
             return true;

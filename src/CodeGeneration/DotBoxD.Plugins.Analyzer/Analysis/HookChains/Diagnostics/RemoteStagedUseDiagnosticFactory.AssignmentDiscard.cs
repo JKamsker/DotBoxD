@@ -70,7 +70,8 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         var receiverType = model.GetTypeInfo(access.Expression, cancellationToken).Type;
         if ((!IsRemoteChainOrStageType(receiverType) &&
              !IsGeneratedRemoteChain(access.Expression, model, cancellationToken)) ||
-            RemoteStagedUseFlowAnalyzer.LocalFlowsIntoTerminalOrUse(invocation, local, model, cancellationToken))
+            RemoteStagedUseFlowAnalyzer.LocalFlowsIntoTerminalOrUse(invocation, local, model, cancellationToken) ||
+            HasLaterByRefStageReplacement(invocation, local, model, cancellationToken))
         {
             return null;
         }
@@ -78,6 +79,40 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         return new PluginKernelDiagnostic(
             DiscardedStageMessage,
             PluginDiagnosticLocation.From(access.Name.GetLocation()));
+    }
+
+    private static bool HasLaterByRefStageReplacement(
+        InvocationExpressionSyntax invocation,
+        ILocalSymbol local,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        var block = invocation.FirstAncestorOrSelf<BlockSyntax>();
+        if (block is null)
+        {
+            return false;
+        }
+
+        foreach (var argument in block.DescendantNodes().OfType<ArgumentSyntax>())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (argument.SpanStart <= invocation.SpanStart ||
+                argument.RefKindKeyword.ValueText is not ("ref" or "out") ||
+                !SymbolEqualityComparer.Default.Equals(model.GetSymbolInfo(argument.Expression, cancellationToken).Symbol, local))
+            {
+                continue;
+            }
+
+            var containingInvocation = argument.FirstAncestorOrSelf<InvocationExpressionSyntax>();
+            if (containingInvocation?.ArgumentList.Arguments.Any(candidate =>
+                candidate != argument &&
+                ContainsPipelineStageInvocation(candidate.Expression, model, cancellationToken, depth: 0)) == true)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static PluginKernelDiagnostic? CreateAssignedStageDiagnostic(

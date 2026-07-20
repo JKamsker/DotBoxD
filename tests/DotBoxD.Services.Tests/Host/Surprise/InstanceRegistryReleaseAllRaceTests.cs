@@ -16,19 +16,13 @@ public sealed class InstanceRegistryReleaseAllRaceTests
         await first.DisposeEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         var second = new TrackingDisposable();
-        var secondId = TryRegister(registry, second);
+        Assert.Throws<InvalidOperationException>(() => registry.Register("svc", second));
 
         first.AllowDispose.SetResult();
         await release.WaitAsync(TimeSpan.FromSeconds(5));
 
-        if (secondId is null)
-        {
-            Assert.False(second.Disposed);
-            return;
-        }
-
-        Assert.False(registry.TryGet("svc", secondId, out _));
-        Assert.True(second.Disposed);
+        Assert.False(second.Disposed);
+        Assert.Throws<InvalidOperationException>(() => registry.Register("svc", second));
     }
 
     [Fact]
@@ -42,31 +36,13 @@ public sealed class InstanceRegistryReleaseAllRaceTests
         await first.DisposeEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         var second = new TrackingAsyncDisposable();
-        var secondId = TryRegister(registry, second);
+        Assert.Throws<InvalidOperationException>(() => registry.Register("svc", second));
 
         first.AllowDispose.SetResult();
         await release.WaitAsync(TimeSpan.FromSeconds(5));
 
-        if (secondId is null)
-        {
-            Assert.False(second.Disposed);
-            return;
-        }
-
-        Assert.False(registry.TryGet("svc", secondId, out _));
-        Assert.True(second.Disposed);
-    }
-
-    private static string? TryRegister(InstanceRegistry registry, object instance)
-    {
-        try
-        {
-            return registry.Register("svc", instance);
-        }
-        catch (InvalidOperationException)
-        {
-            return null;
-        }
+        Assert.False(second.Disposed);
+        Assert.Throws<InvalidOperationException>(() => registry.Register("svc", second));
     }
 
     private sealed class BlockingDisposable : IDisposable

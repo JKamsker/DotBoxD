@@ -91,7 +91,7 @@ public sealed class PluginAnalyzerForbiddenApiGenericHostReachabilityTests
             yield return MetadataReference.CreateFromFile(path);
         }
 
-        foreach (var path in AspNetCoreReferenceAssemblyPaths())
+        foreach (var path in AspNetCoreTestReferences.AssemblyPaths("Microsoft.Extensions.*.dll"))
         {
             if (seenFileNames.Add(Path.GetFileName(path)))
             {
@@ -104,34 +104,4 @@ public sealed class PluginAnalyzerForbiddenApiGenericHostReachabilityTests
         => ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))?
             .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries) ?? [];
 
-    private static IEnumerable<string> AspNetCoreReferenceAssemblyPaths()
-    {
-        var coreLibDirectory = Path.GetDirectoryName(typeof(object).Assembly.Location);
-        var dotnetRoot = coreLibDirectory is null
-            ? string.Empty
-            : Path.GetFullPath(Path.Combine(coreLibDirectory, "..", "..", ".."));
-
-        var packsRoot = Path.Combine(
-            dotnetRoot,
-            "packs",
-            "Microsoft.AspNetCore.App.Ref");
-        if (!Directory.Exists(packsRoot))
-        {
-            yield break;
-        }
-
-        var refDirectory = Directory.EnumerateDirectories(packsRoot)
-            .OrderByDescending(static path => path, StringComparer.Ordinal)
-            .Select(path => Path.Combine(path, "ref", "net10.0"))
-            .FirstOrDefault(Directory.Exists);
-        if (refDirectory is null)
-        {
-            yield break;
-        }
-
-        foreach (var path in Directory.EnumerateFiles(refDirectory, "Microsoft.Extensions.*.dll"))
-        {
-            yield return path;
-        }
-    }
 }

@@ -41,7 +41,7 @@ internal static partial class ServiceModelFactory
 
     private static ServiceResult? BuildServiceResult(GeneratorSyntaxContext context, CancellationToken ct)
     {
-        if (!TryGetServiceCandidate(context, ct, out var interfaceSymbol, out var serviceAttribute))
+        if (!ServiceCandidateSelector.TryGet(context, ct, out var interfaceSymbol, out var serviceAttribute))
         {
             return null;
         }
@@ -162,25 +162,6 @@ internal static partial class ServiceModelFactory
             ServiceDiagnostic: null);
     }
 
-    private static bool TryGetServiceCandidate(
-        GeneratorSyntaxContext context,
-        CancellationToken ct,
-        out INamedTypeSymbol interfaceSymbol,
-        out AttributeData serviceAttribute)
-    {
-        if (context.Node is not InterfaceDeclarationSyntax declaration ||
-            context.SemanticModel.GetDeclaredSymbol(declaration, ct) is not INamedTypeSymbol candidate ||
-            !TryGetRpcServiceAttribute(candidate, ct, out serviceAttribute))
-        {
-            interfaceSymbol = null!;
-            serviceAttribute = null!;
-            return false;
-        }
-
-        interfaceSymbol = candidate;
-        return true;
-    }
-
     private static ServiceResult? ValidateServiceSymbol(
         INamedTypeSymbol interfaceSymbol,
         ServiceBuildContext buildContext,
@@ -220,26 +201,6 @@ internal static partial class ServiceModelFactory
             ServiceLocation: location,
             QualifiedInterfaceName: qualifiedInterfaceName,
             ServiceDiagnostic: new ServiceDiagnostic(displayName, reason, location));
-
-    private static bool TryGetRpcServiceAttribute(
-        INamedTypeSymbol interfaceSymbol,
-        CancellationToken ct,
-        out AttributeData serviceAttribute)
-    {
-        foreach (var attr in interfaceSymbol.GetAttributes())
-        {
-            ct.ThrowIfCancellationRequested();
-
-            if (ServicesGeneratorTypeNames.IsRpcServiceAttribute(attr.AttributeClass))
-            {
-                serviceAttribute = attr;
-                return true;
-            }
-        }
-
-        serviceAttribute = null!;
-        return false;
-    }
 
     private static string? GetConfiguredServiceName(AttributeData serviceAttribute)
     {

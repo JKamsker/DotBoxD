@@ -20,11 +20,11 @@ public sealed partial class EventIndexCancellationTests
 
         using var server = PluginServer.Create(
             configureHost: builder => builder.AddBinding(BlockingRecordBinding(handlerEntered, releaseHandler)),
-            defaultPolicy: ChainPolicy());
+            defaultPolicy: ChainPolicy(allowRuntimeAsync: true));
         var adapter = new DrainBlockingEventAdapter();
         server.RegisterEventAdapter(adapter);
         var package = DrainBlockingPackage();
-        var kernel = await server.InstallAsync(package, ChainPolicy());
+        var kernel = await server.InstallAsync(package, ChainPolicy(allowRuntimeAsync: true));
         var subscription = Assert.Single(package.Manifest.Subscriptions);
         var registry = new EventIndexRegistry();
         Assert.True(registry.Register(
@@ -75,7 +75,7 @@ public sealed partial class EventIndexCancellationTests
             pluginId,
             $"IEventKernel<{eventName}>",
             ExecutionMode.Auto,
-            ["Cpu", "Alloc"],
+            ["Cpu", "Alloc", "Concurrency"],
             [],
             [
                 new HookSubscriptionManifest(eventName, pluginId)
@@ -89,7 +89,10 @@ public sealed partial class EventIndexCancellationTests
                             "string")
                     ]
                 }
-            ]);
+            ])
+        {
+            RequiredCapabilities = ["dotboxd.runtime.async"]
+        };
         var module = new SandboxModule(
             pluginId,
             SemVersion.One,
@@ -140,7 +143,7 @@ public sealed partial class EventIndexCancellationTests
     private static BindingDescriptor BlockingRecordBinding(
         TaskCompletionSource handlerEntered,
         TaskCompletionSource releaseHandler)
-        => new(
+        => new BindingDescriptor(
             "test.block",
             SemVersion.One,
             [],
@@ -156,7 +159,11 @@ public sealed partial class EventIndexCancellationTests
                 await releaseHandler.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
                 return SandboxValue.FromBool(true);
             },
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)))
+        with
+        {
+            IsAsync = true
+        };
 
     private static async Task AssertNotCompletedAsync(Task task, string message)
     {

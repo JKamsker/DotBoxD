@@ -115,44 +115,7 @@ public sealed class PluginAnalyzerForbiddenApiJsonConfigurationReachabilityTests
         ];
 
     private static string AspNetCoreReferencePath(string assemblyName)
-    {
-        var targetFramework = $"net{Environment.Version.Major}.0";
-        var runtimeVersion = new DirectoryInfo(Path.GetDirectoryName(typeof(object).Assembly.Location)!).Name;
-        var packRoot = Path.Combine(DotNetRoot(), "packs", "Microsoft.AspNetCore.App.Ref");
-        var versionedCandidate = Path.Combine(packRoot, runtimeVersion, "ref", targetFramework, assemblyName);
-
-        if (File.Exists(versionedCandidate))
-        {
-            return versionedCandidate;
-        }
-
-        var fallback = Directory
-            .GetFiles(packRoot, assemblyName, SearchOption.AllDirectories)
-            .Where(path => path.Contains($"{Path.DirectorySeparatorChar}ref{Path.DirectorySeparatorChar}" +
-                $"{targetFramework}{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            .Order(StringComparer.Ordinal)
-            .LastOrDefault();
-
-        return fallback ?? throw new FileNotFoundException(
-            $"Could not find {assemblyName} in the Microsoft.AspNetCore.App reference pack.");
-    }
-
-    private static string DotNetRoot()
-    {
-        var directory = new DirectoryInfo(Path.GetDirectoryName(typeof(object).Assembly.Location)!);
-
-        while (directory is not null)
-        {
-            if (Directory.Exists(Path.Combine(directory.FullName, "packs")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-
-        throw new DirectoryNotFoundException("Could not locate the dotnet packs directory.");
-    }
+        => AspNetCoreTestReferences.FindAssembly(assemblyName);
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()
     {

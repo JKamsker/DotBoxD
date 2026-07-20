@@ -18,20 +18,7 @@ public static class SafeHttpClient
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(uri);
-        if (context.CancellationToken.IsCancellationRequested)
-        {
-            throw Error(SandboxErrorCode.Cancelled, "net.http.get cancelled");
-        }
-        if (cancellationToken.IsCancellationRequested)
-        {
-            var code = SafeHttpTimeoutClassifier.IsRequestTimeout(context, cancellationToken, requestTimeoutExpired: false)
-                ? SandboxErrorCode.Timeout
-                : SandboxErrorCode.Cancelled;
-            var message = code == SandboxErrorCode.Timeout
-                ? "net.http.get denied: request timed out"
-                : "net.http.get cancelled";
-            throw Error(code, message);
-        }
+        ThrowIfCancelledBeforeRequest(context, cancellationToken);
 
         var startedAt = DateTimeOffset.UtcNow;
         var resource = SafeHttpUriAudit.Sanitize(uri.Value);
@@ -112,6 +99,24 @@ public static class SafeHttpClient
         {
             timeout?.Dispose();
             requestTimeout?.Dispose();
+        }
+    }
+
+    private static void ThrowIfCancelledBeforeRequest(SandboxContext context, CancellationToken cancellationToken)
+    {
+        if (context.CancellationToken.IsCancellationRequested)
+        {
+            throw Error(SandboxErrorCode.Cancelled, "net.http.get cancelled");
+        }
+        if (cancellationToken.IsCancellationRequested)
+        {
+            var code = SafeHttpTimeoutClassifier.IsRequestTimeout(context, cancellationToken, requestTimeoutExpired: false)
+                ? SandboxErrorCode.Timeout
+                : SandboxErrorCode.Cancelled;
+            var message = code == SandboxErrorCode.Timeout
+                ? "net.http.get denied: request timed out"
+                : "net.http.get cancelled";
+            throw Error(code, message);
         }
     }
 

@@ -5,6 +5,12 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
 internal static partial class RemoteStagedUseDiagnosticFactory
 {
+    private static readonly string[] CandidateInvocationNames =
+    [
+        "Use", "UseGeneratedChain", "UseGeneratedLocalChain", "UseGeneratedResultChain",
+        "UseGeneratedLocalResultChain", "Where", "Select"
+    ];
+
     private const string TerminalMessagePrefix =
         "Remote Where/Select stages only lower when the terminal is Run, RunLocal, Register, or RegisterLocal; " +
         "calling ";
@@ -16,30 +22,28 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         "keep the stage in the fluent chain or initialize a new local with the staged expression.";
 
     public static bool IsCandidate(SyntaxNode node)
-        => node is InvocationExpressionSyntax
+    {
+        if (node is InvocationExpressionSyntax invocation)
         {
-            Expression: MemberAccessExpressionSyntax
+            return IsCandidateInvocation(invocation);
+        }
+
+        return node is ConditionalAccessExpressionSyntax
+        {
+            WhenNotNull: InvocationExpressionSyntax
             {
-                Name.Identifier.ValueText: "Use"
-                        or "UseGeneratedChain"
-                        or "UseGeneratedLocalChain"
-                        or "UseGeneratedResultChain"
-                        or "UseGeneratedLocalResultChain"
-                        or "Where"
-                        or "Select"
+                Expression: MemberBindingExpressionSyntax binding
             }
-        } ||
-            node is InvocationExpressionSyntax invocation && IsStoredInvocation(invocation) ||
-            node is ConditionalAccessExpressionSyntax
-            {
-                WhenNotNull: InvocationExpressionSyntax
-                {
-                    Expression: MemberBindingExpressionSyntax
-                    {
-                        Name.Identifier.ValueText: "Where" or "Select"
-                    }
-                }
-            };
+        } && IsPipelineStageName(binding.Name.Identifier.ValueText);
+    }
+
+    private static bool IsCandidateInvocation(InvocationExpressionSyntax invocation)
+        => invocation.Expression is MemberAccessExpressionSyntax access &&
+            Array.IndexOf(CandidateInvocationNames, access.Name.Identifier.ValueText) >= 0 ||
+            IsStoredInvocation(invocation);
+
+    private static bool IsPipelineStageName(string name)
+        => name is "Where" or "Select";
 
     public static PluginKernelDiagnostic? Create(
         GeneratorSyntaxContext context,
@@ -89,10 +93,9 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        if (conditional.WhenNotNull is not InvocationExpressionSyntax
-            {
-                Expression: MemberBindingExpressionSyntax binding
-            })
+        if (conditional.WhenNotNull is not InvocationExpressionSyntax invocation ||
+            invocation.Expression is not MemberBindingExpressionSyntax binding ||
+            !IsPipelineStageInvocation(invocation, model, cancellationToken))
         {
             return null;
         }

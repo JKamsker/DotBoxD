@@ -5,6 +5,12 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
 internal static partial class RemoteStagedUseDiagnosticFactory
 {
+    private static readonly string[] FluentContinuationNames =
+    [
+        "Where", "Select", "Run", "RunLocal", "Register", "RegisterLocal", "Use",
+        "UseGeneratedChain", "UseGeneratedLocalChain", "UseGeneratedResultChain", "UseGeneratedLocalResultChain"
+    ];
+
     private static bool TryCreateNestedDiscardDiagnostic(
         InvocationExpressionSyntax invocation,
         MemberAccessExpressionSyntax access,
@@ -44,18 +50,7 @@ internal static partial class RemoteStagedUseDiagnosticFactory
             return false;
         }
 
-        return access.Name.Identifier.ValueText is
-            "Where" or
-            "Select" or
-            "Run" or
-            "RunLocal" or
-            "Register" or
-            "RegisterLocal" or
-            "Use" or
-            "UseGeneratedChain" or
-            "UseGeneratedLocalChain" or
-            "UseGeneratedResultChain" or
-            "UseGeneratedLocalResultChain";
+        return Array.IndexOf(FluentContinuationNames, access.Name.Identifier.ValueText) >= 0;
     }
 
     private static bool IsReturnedOrDeferredExpressionBody(ExpressionSyntax expression)
@@ -69,7 +64,12 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        var declarator = expression.FirstAncestorOrSelf<VariableDeclaratorSyntax>();
+        var declarator = expression.AncestorsAndSelf()
+            .TakeWhile(static node =>
+                node is not AnonymousFunctionExpressionSyntax and
+                not LocalFunctionStatementSyntax)
+            .OfType<VariableDeclaratorSyntax>()
+            .FirstOrDefault();
         return declarator is not null &&
             model.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol local &&
             RemoteStagedUseFlowAnalyzer.LocalFlowsIntoTerminalOrUse(invocation, local, model, cancellationToken);
