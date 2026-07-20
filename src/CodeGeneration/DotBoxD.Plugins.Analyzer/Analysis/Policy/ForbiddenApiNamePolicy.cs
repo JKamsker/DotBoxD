@@ -61,7 +61,8 @@ internal static class ForbiddenApiNamePolicy
         "Microsoft.Extensions.Logging.EventLoggerFactoryExtensions.AddEventLog",
         "Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder",
         "System.String.Create",
-        "System.Security.Cryptography.RSA.Create"
+        "System.Security.Cryptography.RSA.Create",
+        "Microsoft.Extensions.Configuration.KeyPerFileConfigurationBuilderExtensions.AddKeyPerFile"
     ];
 
     public static bool IsForbiddenExactType(string name) => Array.IndexOf(ExactTypeNames, name) >= 0;
