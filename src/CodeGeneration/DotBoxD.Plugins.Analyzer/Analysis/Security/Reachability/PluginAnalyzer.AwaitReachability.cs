@@ -117,4 +117,39 @@ public sealed partial class PluginAnalyzer
             location,
             "[NativeOnly] context members run natively and cannot be used in lowered hook chains or server-extension bodies."));
     }
+
+    private static void RecordAwaitablePatternCalls(
+        SyntaxNodeAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol method,
+        ITypeSymbol? awaitableType,
+        Location location)
+    {
+        if (awaitableType is null || awaitableType.DeclaringSyntaxReferences.Length == 0)
+        {
+            return;
+        }
+
+        foreach (var member in awaitableType.GetMembers("GetAwaiter").OfType<IMethodSymbol>())
+        {
+            if (member.Parameters.Length != 0 || member.IsStatic)
+            {
+                continue;
+            }
+
+            RecordAwaiterCall(context, helperGraph, method, member, location);
+            if (member.ReturnType.GetMembers("IsCompleted").OfType<IPropertySymbol>().FirstOrDefault()?.GetMethod is
+                { } isCompletedGetter)
+            {
+                RecordAwaiterCall(context, helperGraph, method, isCompletedGetter, location);
+            }
+
+            var getResult = member.ReturnType
+                .GetMembers("GetResult")
+                .OfType<IMethodSymbol>()
+                .FirstOrDefault(static m => m.Parameters.Length == 0);
+            RecordAwaiterCall(context, helperGraph, method, getResult, location);
+            return;
+        }
+    }
 }
