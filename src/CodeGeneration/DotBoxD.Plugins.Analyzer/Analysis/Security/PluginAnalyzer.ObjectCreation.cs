@@ -46,7 +46,27 @@ public sealed partial class PluginAnalyzer
         if (creation.Constructor is { } constructor)
         {
             helperGraph.RecordConstructorInitializers(constructor);
+            if (creation.Type is INamedTypeSymbol constructedType)
+            {
+                helperGraph.RecordGenericObjectCreation(
+                    method,
+                    constructor,
+                    constructedType,
+                    context.Operation.Syntax.GetLocation());
+            }
+
             helperGraph.RecordCall(method, constructor, context.Operation.Syntax.GetLocation());
+        }
+    }
+
+    private static void AnalyzeTypeParameterObjectCreation(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph)
+    {
+        if (context.ContainingSymbol is IMethodSymbol method &&
+            context.Operation.Type is ITypeParameterSymbol typeParameter)
+        {
+            helperGraph.RecordGenericTypeParameterConstruction(method, typeParameter);
         }
     }
 
