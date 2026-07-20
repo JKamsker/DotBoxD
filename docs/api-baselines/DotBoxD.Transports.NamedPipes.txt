@@ -5,6 +5,7 @@
 public async Task ConnectAsync(CancellationToken ct = default)
 public async Task<IRpcChannel> AcceptAsync(CancellationToken ct = default)
 public async ValueTask DisposeAsync()
+public ValueTask DisposeAsync()
 public bool IsConnected => _connection?.IsConnected ?? false
 public IRpcChannel? Connection => _connection
 public NamedPipeClientTransport( string serverName, string pipeName, int maxMessageSize = MessageFramer.MaxMessageSize)
