@@ -11,7 +11,7 @@ internal sealed class GenericConstructionReachability
 
     public void RecordTypeParameterConstruction(IMethodSymbol method, ITypeParameterSymbol typeParameter)
     {
-        if (method.DeclaringSyntaxReferences.Length == 0 ||
+        if (!ForbiddenGraphAnalysis.IsReachableSourceMethod(method) ||
             !TryGetTypeParameterSlot(method, typeParameter, out var slot))
         {
             return;

@@ -125,7 +125,7 @@ internal sealed class ForbiddenHelperCallGraph
             return;
         }
 
-        if (caller.DeclaringSyntaxReferences.Length == 0)
+        if (!ForbiddenGraphAnalysis.IsReachableSourceMethod(caller))
         {
             return;
         }

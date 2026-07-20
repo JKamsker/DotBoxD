@@ -13,8 +13,7 @@ internal static class ForbiddenGraphAnalysis
         => method.DeclaringSyntaxReferences.Length != 0 ||
             method is
             {
-                MethodKind: MethodKind.Constructor,
-                IsStatic: false,
+                MethodKind: MethodKind.Constructor or MethodKind.StaticConstructor,
                 ContainingType.DeclaringSyntaxReferences.Length: > 0
             };
 

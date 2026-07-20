@@ -206,11 +206,6 @@ public sealed class NamedPipeServerTransport : IServerTransport
         {
             if (_disposeTask is not null)
             {
-                if (_disposeTask.IsCompleted)
-                {
-                    return default;
-                }
-
                 return new ValueTask(_disposeTask);
             }
 

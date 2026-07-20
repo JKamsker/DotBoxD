@@ -24,18 +24,21 @@ public sealed class NamedPipeServerConcurrentDisposalTests
         };
 
         var firstDispose = server.DisposeAsync().AsTask();
+        Task? secondDispose = null;
         try
         {
             await stopEntered.Task.WaitAsync(Timeout);
 
-            var secondDispose = server.DisposeAsync().AsTask();
+            secondDispose = server.DisposeAsync().AsTask();
             var secondCompletedBeforeStopFinished = await CompletesWithinAsync(secondDispose, EarlyCompletionWindow);
 
             releaseStop.SetResult();
 
             var firstFailure = await Assert.ThrowsAsync<InvalidOperationException>(
                 () => firstDispose.WaitAsync(Timeout));
-            var secondFailure = await Record.ExceptionAsync(() => secondDispose.WaitAsync(Timeout));
+            var secondFailure = await Record.ExceptionAsync(() => secondDispose!.WaitAsync(Timeout));
+            var lateFailure = await Record.ExceptionAsync(
+                () => server.DisposeAsync().AsTask().WaitAsync(Timeout));
 
             Assert.Equal("stop failed", firstFailure.Message);
             Assert.False(
@@ -43,11 +46,17 @@ public sealed class NamedPipeServerConcurrentDisposalTests
                 "The second concurrent DisposeAsync completed before StopAsync finished.");
             var stopFailure = Assert.IsType<InvalidOperationException>(secondFailure);
             Assert.Equal("stop failed", stopFailure.Message);
+            var lateStopFailure = Assert.IsType<InvalidOperationException>(lateFailure);
+            Assert.Equal("stop failed", lateStopFailure.Message);
         }
         finally
         {
             releaseStop.TrySetResult();
             await Record.ExceptionAsync(() => firstDispose.WaitAsync(Timeout));
+            if (secondDispose is not null)
+            {
+                await Record.ExceptionAsync(() => secondDispose.WaitAsync(Timeout));
+            }
         }
     }
 
