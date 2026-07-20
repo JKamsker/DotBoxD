@@ -128,7 +128,7 @@ public sealed class PluginAnalyzerForbiddenApiDebugLoggingReachabilityTests
             .Select(static directory => new
             {
                 Directory = Path.Combine(directory, "ref", "net10.0"),
-                Version = Version.TryParse(Path.GetFileName(directory), out var version) ? version : null,
+                Version = Version.TryParse(Path.GetFileName(directory).Split('-')[0], out var version) ? version : null,
             })
             .Where(static candidate => candidate.Version is { Major: 10 } && Directory.Exists(candidate.Directory))
             .OrderByDescending(static candidate => candidate.Version)
@@ -164,7 +164,7 @@ public sealed class PluginAnalyzerForbiddenApiDebugLoggingReachabilityTests
         var packsRoot = Path.Combine(dotnetRoot, "packs", "Microsoft.AspNetCore.App.Ref");
         return Directory.Exists(packsRoot) &&
             Directory.EnumerateDirectories(packsRoot).Any(static directory =>
-                Version.TryParse(Path.GetFileName(directory), out var version) &&
+                Version.TryParse(Path.GetFileName(directory).Split('-')[0], out var version) &&
                 version.Major == 10 &&
                 Directory.Exists(Path.Combine(directory, "ref", "net10.0")));
     }
