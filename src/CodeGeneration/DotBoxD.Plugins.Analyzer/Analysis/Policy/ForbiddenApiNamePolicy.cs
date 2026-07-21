@@ -60,6 +60,7 @@ internal static class ForbiddenApiNamePolicy
     [
         "Microsoft.Extensions.Configuration.EnvironmentVariablesExtensions.AddEnvironmentVariables",
         "Microsoft.Extensions.Logging.EventLoggerFactoryExtensions.AddEventLog",
+        "Microsoft.Extensions.Logging.EventSourceLoggerFactoryExtensions.AddEventSourceLogger",
         "Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder",
         "System.String.Create",
         "System.Security.Cryptography.RSA.Create",
