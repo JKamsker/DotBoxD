@@ -261,8 +261,14 @@ public sealed class TcpConnection : IRpcFrameChannel
     {
         try
         {
-            if (_sendLock.Wait(0, ct))
+            if (_sendLock.Wait(0))
             {
+                if (ct.IsCancellationRequested)
+                {
+                    _sendLock.Release();
+                    ct.ThrowIfCancellationRequested();
+                }
+
                 return;
             }
 

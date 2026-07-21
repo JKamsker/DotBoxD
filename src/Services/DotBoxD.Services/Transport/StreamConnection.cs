@@ -219,8 +219,14 @@ public sealed class StreamConnection : IRpcFrameChannel
     {
         try
         {
-            if (_sendLock.Wait(0, ct))
+            if (_sendLock.Wait(0))
             {
+                if (ct.IsCancellationRequested)
+                {
+                    _sendLock.Release();
+                    ct.ThrowIfCancellationRequested();
+                }
+
                 return;
             }
 
