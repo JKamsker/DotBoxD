@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Diagnostics;
 using DotBoxD.Services.Buffers;
 using DotBoxD.Services.Transport;
@@ -6,16 +7,22 @@ namespace DotBoxD.Services.Benchmarks.Probes;
 
 internal static class StreamConnectionReceiveTrackingProbe
 {
+    private const int FrameLength = 1_024;
+    private const int WarmupIterations = 10_000;
     private const int Iterations = 1_000_000;
 
     public static void Run()
     {
         var legacy = Measure(Iterations, simulateLegacyTracking: true);
         var current = Measure(Iterations, simulateLegacyTracking: false);
+        var finiteFrame = MeasureFrames(Iterations, frameReadIdleTimeout: null);
+        var infiniteFrame = MeasureFrames(Iterations, Timeout.InfiniteTimeSpan);
 
         Console.WriteLine("StreamConnection receive tracking probe");
         Write("Owned receive with legacy tracking", legacy);
         Write("Owned receive current", current);
+        Write("ValueTask frame finite timeout", finiteFrame);
+        Write("ValueTask frame infinite timeout", infiniteFrame);
     }
 
     private static Measurement Measure(int iterations, bool simulateLegacyTracking)
@@ -29,7 +36,7 @@ internal static class StreamConnectionReceiveTrackingProbe
         GC.Collect();
 
         var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-        var sw = Stopwatch.StartNew();
+        var started = Stopwatch.GetTimestamp();
         for (var i = 0; i < iterations; i++)
         {
             if (simulateLegacyTracking)
@@ -54,12 +61,71 @@ internal static class StreamConnectionReceiveTrackingProbe
             }
         }
 
-        sw.Stop();
+        var elapsed = Stopwatch.GetElapsedTime(started);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
         connection.DisposeAsync().AsTask().GetAwaiter().GetResult();
         return new Measurement(
             iterations,
-            sw.Elapsed.TotalMilliseconds,
-            GC.GetAllocatedBytesForCurrentThread() - allocatedBefore);
+            elapsed.TotalMilliseconds,
+            allocated);
+    }
+
+    private static Measurement MeasureFrames(int iterations, TimeSpan? frameReadIdleTimeout)
+    {
+        var frame = new byte[FrameLength];
+        BinaryPrimitives.WriteInt32LittleEndian(frame, frame.Length);
+        using var stream = new MemoryStream(frame, writable: false);
+        var connection = new StreamConnection(
+            stream,
+            ownsStream: false,
+            frameReadIdleTimeout: frameReadIdleTimeout);
+
+        for (var i = 0; i < WarmupIterations; i++)
+        {
+            ReadFrame(connection, stream);
+        }
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var started = Stopwatch.GetTimestamp();
+        long checksum = 0;
+        for (var i = 0; i < iterations; i++)
+        {
+            checksum += ReadFrame(connection, stream);
+        }
+
+        var elapsed = Stopwatch.GetElapsedTime(started);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        connection.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        if (checksum != (long)FrameLength * iterations)
+        {
+            throw new InvalidOperationException($"Expected checksum {(long)FrameLength * iterations}, observed {checksum}.");
+        }
+
+        return new Measurement(iterations, elapsed.TotalMilliseconds, allocated);
+    }
+
+    private static int ReadFrame(StreamConnection connection, MemoryStream stream)
+    {
+        stream.Position = 0;
+        var pending = connection.ReceiveValueAsync();
+        if (!pending.IsCompletedSuccessfully)
+        {
+            throw new InvalidOperationException("Memory-backed receive did not complete synchronously.");
+        }
+
+        var payload = pending.Result;
+        try
+        {
+            return payload.Length;
+        }
+        finally
+        {
+            payload.Dispose();
+        }
     }
 
     private static void Write(string name, Measurement measurement)
