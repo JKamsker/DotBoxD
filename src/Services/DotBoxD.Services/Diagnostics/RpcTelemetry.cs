@@ -46,7 +46,24 @@ public static class RpcTelemetry
         description: "RPC envelopes or payloads that failed serialization or deserialization.");
 
     internal static RpcServerRequestScope StartServerRequest()
-        => new(s_serverDuration);
+    {
+        var measureDuration = s_serverDuration.Enabled;
+        if (!measureDuration && !Activities.HasListeners())
+        {
+            return default;
+        }
+
+        var startedTimestamp = measureDuration ? Stopwatch.GetTimestamp() : 0;
+        var activity = Activities.StartActivity("dotboxd.rpc.server", ActivityKind.Server);
+        if (!measureDuration && activity is null)
+        {
+            return default;
+        }
+
+        // Like ActivitySource, request telemetry snapshots enabled listeners at request start.
+        return new RpcServerRequestScope(
+            new RpcServerRequestTelemetry(s_serverDuration, measureDuration, startedTimestamp, activity));
+    }
 
     internal static void ReportDiagnosticError(string operation, Exception error)
     {
@@ -89,21 +106,50 @@ public static class RpcTelemetry
     }
 }
 
-internal sealed class RpcServerRequestScope : IDisposable
+internal readonly struct RpcServerRequestScope : IDisposable
+{
+    private readonly RpcServerRequestTelemetry? _telemetry;
+
+    public RpcServerRequestScope(RpcServerRequestTelemetry telemetry)
+    {
+        _telemetry = telemetry;
+    }
+
+    public void SetResolvedOperation(string service, string method)
+        => _telemetry?.SetResolvedOperation(service, method);
+
+    public void MarkFailed(Exception error)
+    {
+        RpcTelemetry.ReportServerFailure(error);
+        _telemetry?.MarkFailed(error);
+    }
+
+    public void Dispose() => _telemetry?.Dispose();
+}
+
+internal sealed class RpcServerRequestTelemetry : IDisposable
 {
     private readonly Activity? _activity;
     private readonly Histogram<double> _duration;
-    private readonly long _startedTimestamp = Stopwatch.GetTimestamp();
+    private readonly bool _measureDuration;
+    private readonly long _startedTimestamp;
     private string _method;
     private string _service;
+    private int _disposed;
     private bool _failed;
 
-    public RpcServerRequestScope(Histogram<double> duration)
+    public RpcServerRequestTelemetry(
+        Histogram<double> duration,
+        bool measureDuration,
+        long startedTimestamp,
+        Activity? activity)
     {
         _duration = duration;
+        _measureDuration = measureDuration;
+        _startedTimestamp = startedTimestamp;
         _service = "unknown";
         _method = "unknown";
-        _activity = RpcTelemetry.Activities.StartActivity("dotboxd.rpc.server", ActivityKind.Server);
+        _activity = activity;
         _activity?.SetTag("rpc.system", "dotboxd");
         _activity?.SetTag("rpc.service", _service);
         _activity?.SetTag("rpc.method", _method);
@@ -120,22 +166,30 @@ internal sealed class RpcServerRequestScope : IDisposable
     public void MarkFailed(Exception error)
     {
         _failed = true;
-        RpcTelemetry.ReportServerFailure(error);
         _activity?.SetTag("error.type", error.GetType().FullName);
         _activity?.SetStatus(ActivityStatusCode.Error, error.Message);
     }
 
     public void Dispose()
     {
-        var elapsed = (Stopwatch.GetTimestamp() - _startedTimestamp) * 1000d / Stopwatch.Frequency;
-        var tags = new TagList
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
         {
-            { "rpc.system", "dotboxd" },
-            { "rpc.service", _service },
-            { "rpc.method", _method },
-            { "error.type", _failed ? "dispatch" : null }
-        };
-        _duration.Record(elapsed, tags);
+            return;
+        }
+
+        if (_measureDuration && _duration.Enabled)
+        {
+            var elapsed = (Stopwatch.GetTimestamp() - _startedTimestamp) * 1000d / Stopwatch.Frequency;
+            var tags = new TagList
+            {
+                { "rpc.system", "dotboxd" },
+                { "rpc.service", _service },
+                { "rpc.method", _method },
+                { "error.type", _failed ? "dispatch" : null }
+            };
+            _duration.Record(elapsed, tags);
+        }
+
         _activity?.Dispose();
     }
 }

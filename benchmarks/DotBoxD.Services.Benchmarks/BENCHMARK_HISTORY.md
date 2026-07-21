@@ -5,6 +5,7 @@ All results below are local stopwatch probes on this machine, run in Release mod
 ## Commands
 
 ```text
+dotnet run -c Release --project benchmarks/DotBoxD.Services.Benchmarks -p:UseSharedCompilation=false -- --filter "*RpcTelemetryBenchmarks*" --job short --warmupCount 3 --iterationCount 8
 dotnet run -c Release --project benchmarks/DotBoxD.Services.Benchmarks -p:UseSharedCompilation=false -- --probe-peer-proxy-cache
 dotnet run -c Release --project benchmarks/DotBoxD.Services.Benchmarks -p:UseSharedCompilation=false -- --probe-stream-connection-receive-tracking
 DOTNET_ROLL_FORWARD=Major dotnet run -c Release --project benchmarks/DotBoxD.Services.Benchmarks -p:UseSharedCompilation=false -- --probe-generated-metadata-parameters
@@ -16,6 +17,7 @@ DOTNET_ROLL_FORWARD=Major dotnet run -c Release --project benchmarks/DotBoxD.Ser
 
 | Change | Commit | Probe | Result |
 | --- | --- | --- | --- |
+| Listener-free RPC request telemetry | this commit | `RpcTelemetryBenchmarks.SuccessfulRequestWithoutListeners` and `PeerRoundTripBenchmarks.MovePlayerAsync` | The focused scope benchmark improved from 55.49 ns / 64 B to 0.54 ns / 0 B by keeping only a one-reference value scope and creating detailed request state when tracing or duration metrics are enabled. Enabled duration tags, activities, and timeout counters remain covered by tests. The end-to-end control corroborated exactly 64 B/request saved in both profiles (640 B to 576 B and 320 B to 256 B); its asynchronous latency moved in opposite directions between runs, so only the isolated latency and end-to-end allocation improvements are claimed. |
 | Root RPC proxy cache | `7126981` | `--probe-peer-proxy-cache` | Repeated locked proxy creation measured 33.5 ms / 32,000,040 B for 1,000,000 calls; cached `RpcPeer.Get<IGameService>` measured 36.9 ms / 40 B. This is an allocation-only win for the small root proxy in the probe, with registry-stamp invalidation preserving replacement registration behavior. |
 | Owned stream receive tracking | `4ec4439` | `--probe-stream-connection-receive-tracking` | Owned empty-stream receives with legacy active-receive tracking simulated around the current body measured 124.2 ms / 72,001,584 B for 1,000,000 calls; current owned receives measured 113.8 ms / 72,000,040 B. Non-owned streams still track active receives for blocked-read shutdown. |
 | Generated Get extension proxy cache | this commit | `--probe-peer-proxy-cache` | Repeated generated `GetGameService` calls used to directly construct `GameServiceProxy`, measuring 8.6 ms / 32,000,040 B for 1,000,000 calls. Routing generated extensions through cached `RpcPeer.Get<IGameService>` measured 37.9 ms / 40 B, so this is an allocation-only tradeoff and preserves shared root proxy identity. |
