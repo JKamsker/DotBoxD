@@ -167,7 +167,7 @@ public static class SafeHttpClient
 
     private static void RequireAllowedHost(SafeHttpGrantOptions grant, Uri uri)
     {
-        if (!SafeHttpUriAudit.MatchesAllowedAuthority(grant.AllowedHosts, uri))
+        if (!SafeHttpUriAudit.MatchesAllowedAuthority(grant.AllowedAuthorities, uri))
         {
             throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: host is not allowed");
         }

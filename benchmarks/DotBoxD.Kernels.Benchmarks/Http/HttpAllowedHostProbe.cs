@@ -1,206 +1,193 @@
 using System.Diagnostics;
-using System.Reflection;
 using DotBoxD.Hosting.Http;
+using DotBoxD.Hosting.Http.Internal;
 
 namespace DotBoxD.Kernels.Benchmarks.Http;
 
 internal static class HttpAllowedHostProbe
 {
-    private const int HostCount = 1_000;
-    private const int Warmup = 100;
-    private const int Iterations = 10_000;
-    private static readonly Func<IReadOnlySet<string>, Uri, bool> ProductionMatch = CreateMatchDelegate();
+    private const int IndexedIterations = 500_000;
+    private const int CompatibilityIterations = 10_000;
+    private const int WarmupIterations = 1_000;
 
     public static void Run()
     {
-        var scenarios = CreateScenarios();
-        foreach (var scenario in scenarios)
+        var indexedScenarios = CreateIndexedScenarios();
+        foreach (var scenario in indexedScenarios)
         {
-            _ = Measure(Warmup, scenario, ProductionMatch);
+            _ = Measure(WarmupIterations, scenario);
         }
 
-        var measurements = new Measurement[scenarios.Length + 1];
-        for (var i = 0; i < scenarios.Length; i++)
+        var compatibility = CreateCompatibilityScenario();
+        _ = MeasureCompatibility(WarmupIterations, compatibility);
+
+        Console.WriteLine("path                                    hosts  iterations      ns/op       B/op    matches");
+        foreach (var scenario in indexedScenarios)
         {
-            measurements[i] = Measure(Iterations, scenarios[i], ProductionMatch);
+            Write(Measure(IndexedIterations, scenario));
         }
 
-        var nonDefaultLast = scenarios[1];
-        _ = Measure(Warmup, nonDefaultLast, MatchesAllowedAuthorityBySet, "direct set control");
-        measurements[^1] = Measure(
-            Iterations,
-            nonDefaultLast,
-            MatchesAllowedAuthorityBySet,
-            "direct set control");
-
-        Console.WriteLine($"hosts = {HostCount:N0}");
-        Console.WriteLine($"iterations = {Iterations:N0}");
-        foreach (var measurement in measurements)
-        {
-            Write(measurement);
-        }
+        Write(MeasureCompatibility(CompatibilityIterations, compatibility));
     }
 
-    private static Measurement Measure(
-        int iterations,
-        Scenario scenario,
-        Func<IReadOnlySet<string>, Uri, bool> match,
-        string? name = null)
+    private static Measurement Measure(int iterations, IndexedScenario scenario)
     {
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
-
-        var sw = Stopwatch.StartNew();
+        PrepareMeasurement();
         var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var started = Stopwatch.GetTimestamp();
         var matches = 0;
         for (var i = 0; i < iterations; i++)
         {
-            if (match(scenario.AllowedHosts, scenario.Target))
+            if (SafeHttpUriAudit.MatchesAllowedAuthority(scenario.AllowedAuthorities, scenario.Target))
             {
                 matches++;
             }
         }
 
-        var allocatedAfter = GC.GetAllocatedBytesForCurrentThread();
-        sw.Stop();
-        var expectedMatches = scenario.Expected ? iterations : 0;
+        var elapsed = Stopwatch.GetElapsedTime(started);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        ValidateMatches(scenario.Name, scenario.Expected, iterations, matches);
+        return new Measurement(scenario.Name, scenario.HostCount, iterations, elapsed, allocated, matches);
+    }
+
+    private static Measurement MeasureCompatibility(int iterations, CompatibilityScenario scenario)
+    {
+        PrepareMeasurement();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var started = Stopwatch.GetTimestamp();
+        var matches = 0;
+        for (var i = 0; i < iterations; i++)
+        {
+            if (SafeHttpUriAudit.MatchesAllowedAuthority(scenario.AllowedAuthorities, scenario.Target))
+            {
+                matches++;
+            }
+        }
+
+        var elapsed = Stopwatch.GetElapsedTime(started);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        ValidateMatches(scenario.Name, expected: true, iterations, matches);
+        return new Measurement(scenario.Name, scenario.AllowedAuthorities.Count, iterations, elapsed, allocated, matches);
+    }
+
+    private static IndexedScenario[] CreateIndexedScenarios()
+    {
+        var scenarios = new List<IndexedScenario>();
+        foreach (var count in new[] { 1, 16, 1_000 })
+        {
+            var authorities = NumberedAuthorities(count, ":8443");
+            var index = ReadProductionIndex(authorities);
+            scenarios.Add(new(
+                $"indexed non-default hit ({count:N0})",
+                count,
+                index,
+                new Uri($"https://api-{count - 1}.example.com:8443/config"),
+                Expected: true));
+            scenarios.Add(new(
+                $"indexed non-default miss ({count:N0})",
+                count,
+                index,
+                new Uri("https://missing.example.com:8443/config"),
+                Expected: false));
+        }
+
+        scenarios.Add(CreateDefaultScenario("indexed default host hit", string.Empty, expected: true));
+        scenarios.Add(CreateDefaultScenario("indexed explicit :443 hit", ":443", expected: true));
+        scenarios.Add(CreateDefaultScenario("indexed zero-padded :0443 hit", ":0443", expected: true));
+        scenarios.Add(CreateDefaultScenario("indexed wrong-scheme :80 miss", ":80", expected: false));
+        return scenarios.ToArray();
+    }
+
+    private static IndexedScenario CreateDefaultScenario(string name, string suffix, bool expected)
+    {
+        const int count = 1_000;
+        return new(
+            name,
+            count,
+            ReadProductionIndex(NumberedAuthorities(count, suffix)),
+            new Uri($"https://api-{count - 1}.example.com/config"),
+            expected);
+    }
+
+    private static CompatibilityScenario CreateCompatibilityScenario()
+    {
+        const int count = 1_000;
+        var authorities = NumberedAuthorities(count, ":8443").ToHashSet(StringComparer.Ordinal);
+        authorities.Remove($"api-{count - 1}.example.com:8443");
+        authorities.Add($"API-{count - 1}.EXAMPLE.COM:8443");
+        return new(
+            "generic ordinal case-folded hit",
+            authorities,
+            new Uri($"https://api-{count - 1}.example.com:8443/config"));
+    }
+
+    private static SafeHttpAllowedAuthorityIndex ReadProductionIndex(IEnumerable<string> authorities)
+    {
+        var grant = new CapabilityGrant(
+            "net.http.get",
+            new Dictionary<string, string>
+            {
+                ["allowedHosts"] = string.Join(',', authorities),
+                ["maxResponseBytes"] = "1024"
+            });
+        return SafeHttpGrantReader.Read(grant).AllowedAuthorities;
+    }
+
+    private static string[] NumberedAuthorities(int count, string suffix)
+    {
+        var authorities = new string[count];
+        for (var i = 0; i < authorities.Length; i++)
+        {
+            authorities[i] = $"api-{i}.example.com{suffix}";
+        }
+
+        return authorities;
+    }
+
+    private static void PrepareMeasurement()
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+    }
+
+    private static void ValidateMatches(string name, bool expected, int iterations, int matches)
+    {
+        var expectedMatches = expected ? iterations : 0;
         if (matches != expectedMatches)
         {
             throw new InvalidOperationException(
-                $"{scenario.Name} expected {expectedMatches:N0} matches but observed {matches:N0}.");
+                $"{name} expected {expectedMatches:N0} matches but observed {matches:N0}.");
         }
-
-        return new Measurement(
-            name ?? scenario.Name,
-            iterations,
-            sw.Elapsed.TotalMilliseconds,
-            allocatedAfter - allocatedBefore,
-            matches);
-    }
-
-    private static bool MatchesAllowedAuthorityBySet(IReadOnlySet<string> allowedHosts, Uri uri)
-        => allowedHosts.Count > 0 && allowedHosts.Contains(NormalizedAuthority(uri));
-
-    private static string NormalizedAuthority(Uri uri)
-        => uri.IsDefaultPort ? uri.Host : $"{uri.Host}:{uri.Port}";
-
-    private static Scenario[] CreateScenarios()
-        =>
-        [
-            new(
-                "ignore-case non-default hit first",
-                CreateNumberedHosts(":8443", targetFirst: true),
-                new Uri($"https://api-{HostCount - 1}.example.com:8443/config"),
-                Expected: true),
-            new(
-                "ignore-case non-default hit last",
-                CreateNumberedHosts(":8443"),
-                new Uri($"https://api-{HostCount - 1}.example.com:8443/config"),
-                Expected: true),
-            new(
-                "ignore-case non-default miss",
-                CreateNumberedHosts(":8443"),
-                new Uri("https://missing.example.com:8443/config"),
-                Expected: false),
-            new(
-                "ordinal comparer case-folded hit",
-                CreateOrdinalCaseControl(),
-                new Uri($"https://api-{HostCount - 1}.example.com:8443/config"),
-                Expected: true),
-            new(
-                "default-port host hit last",
-                CreateNumberedHosts(string.Empty),
-                new Uri($"https://api-{HostCount - 1}.example.com/config"),
-                Expected: true),
-            new(
-                "explicit default-port hit last",
-                CreateNumberedHosts(":443"),
-                new Uri($"https://api-{HostCount - 1}.example.com/config"),
-                Expected: true),
-            new(
-                "wrong-scheme default-port miss",
-                CreateNumberedHosts(":80"),
-                new Uri($"https://api-{HostCount - 1}.example.com/config"),
-                Expected: false),
-            new(
-                "IPv6 explicit default-port hit",
-                CreateIpv6Control(),
-                new Uri("https://[2001:db8::1]/config"),
-                Expected: true)
-        ];
-
-    private static HashSet<string> CreateNumberedHosts(string suffix, bool targetFirst = false)
-    {
-        var hosts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (targetFirst)
-        {
-            hosts.Add($"api-{HostCount - 1}.example.com{suffix}");
-        }
-
-        var count = targetFirst ? HostCount - 1 : HostCount;
-        for (var i = 0; i < count; i++)
-        {
-            hosts.Add($"api-{i}.example.com{suffix}");
-        }
-
-        return hosts;
-    }
-
-    private static HashSet<string> CreateOrdinalCaseControl()
-    {
-        var hosts = new HashSet<string>(StringComparer.Ordinal);
-        for (var i = 0; i < HostCount - 1; i++)
-        {
-            hosts.Add($"api-{i}.example.com:8443");
-        }
-
-        hosts.Add($"API-{HostCount - 1}.EXAMPLE.COM:8443");
-        return hosts;
-    }
-
-    private static HashSet<string> CreateIpv6Control()
-    {
-        var hosts = CreateNumberedHosts(":443");
-        hosts.Remove($"api-{HostCount - 1}.example.com:443");
-        hosts.Add("[2001:db8::1]:443");
-        return hosts;
-    }
-
-    private static Func<IReadOnlySet<string>, Uri, bool> CreateMatchDelegate()
-    {
-        var method = typeof(SafeHttpClient).Assembly.GetType(
-            "DotBoxD.Hosting.Http.SafeHttpUriAudit",
-            throwOnError: true)!
-            .GetMethod(
-                "MatchesAllowedAuthority",
-                BindingFlags.Public | BindingFlags.Static,
-                [typeof(IReadOnlySet<string>), typeof(Uri)])!;
-        return method.CreateDelegate<Func<IReadOnlySet<string>, Uri, bool>>();
     }
 
     private static void Write(Measurement measurement)
         => Console.WriteLine(
-            $"{measurement.Name,-39} {measurement.Milliseconds,8:N1} ms " +
-            $"{measurement.NanosecondsPerOperation,10:N1} ns/op " +
-            $"{measurement.AllocatedBytes,14:N0} B " +
-            $"{measurement.BytesPerOperation,10:N1} B/op " +
-            $"{measurement.Matches,10:N0} matches");
+            $"{measurement.Name,-39} {measurement.HostCount,6:N0} " +
+            $"{measurement.Iterations,11:N0} {measurement.NanosecondsPerOperation,10:N1} " +
+            $"{measurement.BytesPerOperation,10:N1} {measurement.Matches,10:N0}");
 
-    private sealed record Scenario(
+    private sealed record IndexedScenario(
         string Name,
-        IReadOnlySet<string> AllowedHosts,
+        int HostCount,
+        SafeHttpAllowedAuthorityIndex AllowedAuthorities,
         Uri Target,
         bool Expected);
 
+    private sealed record CompatibilityScenario(
+        string Name,
+        IReadOnlySet<string> AllowedAuthorities,
+        Uri Target);
+
     private readonly record struct Measurement(
         string Name,
+        int HostCount,
         int Iterations,
-        double Milliseconds,
+        TimeSpan Elapsed,
         long AllocatedBytes,
         int Matches)
     {
-        public double NanosecondsPerOperation => Milliseconds * 1_000_000 / Iterations;
+        public double NanosecondsPerOperation => Elapsed.TotalNanoseconds / Iterations;
 
         public double BytesPerOperation => AllocatedBytes / (double)Iterations;
     }
