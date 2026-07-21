@@ -23,6 +23,9 @@ if (args.Length == 1)
         case "--probe-messagepack-envelope-read-state":
             MessagePackEnvelopeReadStateProbe.Run();
             return;
+        case "--probe-request-name-cache":
+            RpcRequestNameCacheProbe.Run();
+            return;
     }
 }
 
