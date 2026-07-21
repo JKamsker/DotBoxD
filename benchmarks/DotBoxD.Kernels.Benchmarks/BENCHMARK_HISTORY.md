@@ -2440,3 +2440,20 @@ Both entrypoint and function emitters retain legacy factories for unsupported sh
 metered call shape plus null-field rejection. Compiler and verifier identities advance from 10 to 11; API baselines and the
 spec manifest record the additive runtime facade. No type-system, effect-analysis, language, artifact-format, or sandbox
 resource-accounting contract changes.
+
+## Disabled interpreter trace guards
+
+Generic statement and expression dispatch called `InterpreterTrace.Write` even when debug tracing was disabled, evaluating
+the runtime node type name before the writer could observe the disabled flag. Both dispatchers now test the immutable
+per-run option before constructing those arguments; the writer retains its own guard as a defensive contract.
+
+Command:
+
+```text
+DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-trace-guard
+```
+
+Across four fresh Release processes, 250,000 prepared executions containing 33 generic statements improved from
+282.7-291.9 ms (34.3-35.4 ns/statement) to 251.6-254.0 ms (30.5-30.8 ns/statement). The medians improve from
+286.7 to 252.9 ms, or 11.8%. Allocation remains effectively unchanged and is not claimed. The probe pins the Unit result,
+empty audit stream, and exact 67 fuel units per execution; existing debug regressions preserve trace order and node names.

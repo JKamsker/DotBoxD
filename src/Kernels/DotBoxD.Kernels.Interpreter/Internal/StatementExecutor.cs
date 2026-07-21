@@ -28,14 +28,18 @@ internal readonly partial struct StatementExecutor
     public ValueTask<SandboxValue?> ExecuteStatementAsync(Statement statement, InterpreterFrame frame)
     {
         Context.ChargeFuel(1);
-        InterpreterTrace.Write(
-            Context,
-            Options,
-            ModuleHash,
-            frame.FunctionId,
-            "statement",
-            statement.GetType().Name,
-            statement.Span);
+        if (Options.EnableDebugTrace)
+        {
+            InterpreterTrace.Write(
+                Context,
+                Options,
+                ModuleHash,
+                frame.FunctionId,
+                "statement",
+                statement.GetType().Name,
+                statement.Span);
+        }
+
         switch (statement)
         {
             case AssignmentStatement assignment:

@@ -38,14 +38,18 @@ internal readonly partial struct ExpressionEvaluator
         }
 
         Context.ChargeFuel(1);
-        InterpreterTrace.Write(
-            Context,
-            Options,
-            ModuleHash,
-            frame.FunctionId,
-            "expression",
-            expression.GetType().Name,
-            expression.Span);
+        if (Options.EnableDebugTrace)
+        {
+            InterpreterTrace.Write(
+                Context,
+                Options,
+                ModuleHash,
+                frame.FunctionId,
+                "expression",
+                expression.GetType().Name,
+                expression.Span);
+        }
+
         return expression switch
         {
             LiteralExpression literal => new ValueTask<SandboxValue>(ChargeLiteral(literal.Value)),
