@@ -1,3 +1,4 @@
+using System.Buffers;
 using DotBoxD.Codecs.MessagePack;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Serialization;
@@ -48,6 +49,75 @@ public class MessagePackRpcSerializerTests
     }
 
     [Fact]
+    public void RecurringRemoteRequestNames_RecoverAfterBoundedCacheChurn()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        AddRemoteNameChurn(serializer, 512);
+        var payload = SerializeRawRequest("RecoveredService", "RecoveredMethod");
+
+        _ = serializer.Deserialize<RpcRequest>(payload);
+        var first = serializer.Deserialize<RpcRequest>(payload);
+        var second = serializer.Deserialize<RpcRequest>(payload);
+
+        Assert.Same(first.ServiceName, second.ServiceName);
+        Assert.Same(first.MethodName, second.MethodName);
+    }
+
+    [Fact]
+    public void RegisteredRequestNames_SurviveRemoteCacheChurn()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var serviceName = new string("ProtectedService".ToCharArray());
+        var methodName = new string("ProtectedMethod".ToCharArray());
+        var request = CreateRequest(1, serviceName, methodName);
+        var registered = RoundTrip(serializer, request);
+        AddRemoteNameChurn(serializer, 512);
+
+        var decoded = serializer.Deserialize<RpcRequest>(
+            SerializeRawRequest(serviceName, methodName));
+
+        Assert.Same(request.ServiceName, registered.ServiceName);
+        Assert.Same(request.MethodName, registered.MethodName);
+        Assert.Same(request.ServiceName, decoded.ServiceName);
+        Assert.Same(request.MethodName, decoded.MethodName);
+    }
+
+    [Fact]
+    public void IndependentSerializers_DoNotShareRemoteNameCachePressure()
+    {
+        var noisySerializer = new MessagePackRpcSerializer();
+        AddRemoteNameChurn(noisySerializer, 512);
+        var isolatedSerializer = new MessagePackRpcSerializer();
+        var payload = SerializeRawRequest("IsolatedService", "IsolatedMethod");
+
+        var first = isolatedSerializer.Deserialize<RpcRequest>(payload);
+        var second = isolatedSerializer.Deserialize<RpcRequest>(payload);
+
+        Assert.Same(first.ServiceName, second.ServiceName);
+        Assert.Same(first.MethodName, second.MethodName);
+    }
+
+    [Fact]
+    public void ConcurrentRemoteRequestNameAdmission_ConvergesOnStableReferences()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var payload = SerializeRawRequest("ConcurrentService", "ConcurrentMethod");
+        var requests = new RpcRequest[64];
+
+        Parallel.For(
+            0,
+            requests.Length,
+            index => requests[index] = serializer.Deserialize<RpcRequest>(payload));
+
+        var first = requests[0];
+        Assert.All(requests, request =>
+        {
+            Assert.Same(first.ServiceName, request.ServiceName);
+            Assert.Same(first.MethodName, request.MethodName);
+        });
+    }
+
+    [Fact]
     public void LongRpcRequestNames_AreNotCached()
     {
         var serializer = new MessagePackRpcSerializer();
@@ -61,6 +131,27 @@ public class MessagePackRpcSerializerTests
         Assert.Equal(methodName, first.MethodName);
         Assert.NotSame(first.ServiceName, second.ServiceName);
         Assert.NotSame(first.MethodName, second.MethodName);
+    }
+
+    [Theory]
+    [InlineData("a", 256, true)]
+    [InlineData("a", 257, false)]
+    [InlineData("é", 128, true)]
+    [InlineData("é", 129, false)]
+    public void RemoteRequestNames_RespectUtf8CacheBoundary(
+        string character,
+        int characterCount,
+        bool expectedCached)
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var name = string.Concat(Enumerable.Repeat(character, characterCount));
+        var payload = SerializeRawRequest(name, name);
+
+        var first = serializer.Deserialize<RpcRequest>(payload);
+        var second = serializer.Deserialize<RpcRequest>(payload);
+
+        Assert.Equal(expectedCached, ReferenceEquals(first.ServiceName, second.ServiceName));
+        Assert.Equal(expectedCached, ReferenceEquals(first.MethodName, second.MethodName));
     }
 
     [Fact]
@@ -102,6 +193,30 @@ public class MessagePackRpcSerializerTests
             ServiceName = new string(serviceName.ToCharArray()),
             MethodName = new string(methodName.ToCharArray()),
         };
+
+    private static void AddRemoteNameChurn(MessagePackRpcSerializer serializer, int requestCount)
+    {
+        for (var i = 0; i < requestCount; i++)
+        {
+            _ = serializer.Deserialize<RpcRequest>(
+                SerializeRawRequest($"ChurnService{i:D4}", $"ChurnMethod{i:D4}"));
+        }
+    }
+
+    private static ReadOnlyMemory<byte> SerializeRawRequest(string serviceName, string methodName)
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        var writer = new MessagePackWriter(buffer);
+        writer.WriteMapHeader(3);
+        writer.Write("MessageId");
+        writer.Write(42);
+        writer.Write("ServiceName");
+        writer.Write(serviceName);
+        writer.Write("MethodName");
+        writer.Write(methodName);
+        writer.Flush();
+        return buffer.WrittenMemory.ToArray();
+    }
 
     public sealed class BinaryDto
     {

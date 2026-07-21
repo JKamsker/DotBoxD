@@ -7,8 +7,6 @@ namespace DotBoxD.Codecs.MessagePack;
 
 internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
 {
-    public static readonly RpcRequestFormatter Instance = new();
-
     private static readonly byte[] MessageIdKey = Encoding.UTF8.GetBytes("MessageId");
     private static readonly byte[] ServiceNameKey = Encoding.UTF8.GetBytes("ServiceName");
     private static readonly byte[] MethodNameKey = Encoding.UTF8.GetBytes("MethodName");
@@ -22,10 +20,9 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
         new("InstanceId", InstanceIdKey, RpcRequestField.InstanceId),
         new("Streams", StreamsKey, RpcRequestField.Streams)
     ];
+    private RpcRequestNameCache? _requestNames;
 
-    private RpcRequestFormatter()
-    {
-    }
+    private RpcRequestNameCache RequestNames => LazyInitializer.EnsureInitialized(ref _requestNames)!;
 
     public void Serialize(
         ref MessagePackWriter writer,
@@ -38,8 +35,9 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
             value.InstanceId,
             "request",
             nameof(RpcRequest.InstanceId));
-        RpcRequestNameCache.Register(value.ServiceName);
-        RpcRequestNameCache.Register(value.MethodName);
+        var requestNames = RequestNames;
+        requestNames.Register(value.ServiceName, RpcRequestNameKind.Service);
+        requestNames.Register(value.MethodName, RpcRequestNameKind.Method);
 
         writer.WriteMapHeader(5);
         writer.WriteString(MessageIdKey);
@@ -57,7 +55,7 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
     public RpcRequest Deserialize(ref MessagePackReader reader, MessagePackSerializerOptions options)
     {
         var count = reader.ReadMapHeader();
-        var state = new RpcRequestReadState(options);
+        var state = new RpcRequestReadState(options, RequestNames);
 
         for (var i = 0; i < count; i++)
         {
@@ -70,7 +68,9 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
 
     // This state is local to synchronous deserialization, so keeping it as a mutable value type
     // avoids a fixed heap allocation without introducing shared state or lifetime concerns.
-    private struct RpcRequestReadState(MessagePackSerializerOptions options)
+    private struct RpcRequestReadState(
+        MessagePackSerializerOptions options,
+        RpcRequestNameCache requestNames)
     {
         private bool _seenMessageId;
         private bool _seenServiceName;
@@ -93,12 +93,12 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
                 case RpcRequestField.ServiceName:
                     ThrowIfDuplicate(_seenServiceName, nameof(RpcRequest.ServiceName));
                     _seenServiceName = true;
-                    _request.ServiceName = ReadCachedName(ref reader)!;
+                    _request.ServiceName = ReadCachedName(ref reader, requestNames, RpcRequestNameKind.Service)!;
                     break;
                 case RpcRequestField.MethodName:
                     ThrowIfDuplicate(_seenMethodName, nameof(RpcRequest.MethodName));
                     _seenMethodName = true;
-                    _request.MethodName = ReadCachedName(ref reader)!;
+                    _request.MethodName = ReadCachedName(ref reader, requestNames, RpcRequestNameKind.Method)!;
                     break;
                 case RpcRequestField.InstanceId:
                     ThrowIfDuplicate(_seenInstanceId, nameof(RpcRequest.InstanceId));
@@ -219,7 +219,10 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
         writer.Write(value);
     }
 
-    private static string? ReadCachedName(ref MessagePackReader reader)
+    private static string? ReadCachedName(
+        ref MessagePackReader reader,
+        RpcRequestNameCache requestNames,
+        RpcRequestNameKind kind)
     {
         if (reader.TryReadNil())
         {
@@ -227,8 +230,8 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
         }
 
         return reader.TryReadStringSpan(out var utf8)
-            ? RpcRequestNameCache.GetOrAdd(utf8)
-            : RpcRequestNameCache.GetOrAdd(reader.ReadString()!);
+            ? requestNames.GetOrAdd(utf8, kind)
+            : requestNames.GetOrAdd(reader.ReadString()!, kind);
     }
 
     private static RpcRequestField ReadField(ref MessagePackReader reader)
