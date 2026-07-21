@@ -10,6 +10,7 @@ internal sealed class RpcPeerSender : IDisposable
     private readonly IRpcChannel _channel;
     private readonly IRpcValueTaskChannel? _valueTaskChannel;
     private readonly IRpcFrameChannel? _frameChannel;
+    private readonly IValidatedSerialFrameChannel? _validatedSerialFrameChannel;
     private readonly Func<bool> _isClosed;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
 
@@ -18,6 +19,7 @@ internal sealed class RpcPeerSender : IDisposable
         _channel = channel;
         _valueTaskChannel = channel as IRpcValueTaskChannel;
         _frameChannel = channel as IRpcFrameChannel;
+        _validatedSerialFrameChannel = channel as IValidatedSerialFrameChannel;
         _isClosed = isClosed;
     }
 
@@ -69,7 +71,23 @@ internal sealed class RpcPeerSender : IDisposable
         }
     }
 
-    public async ValueTask SendFrameValueAsync(PooledBufferWriter frame, CancellationToken ct)
+    public ValueTask SendFrameValueAsync(PooledBufferWriter frame, CancellationToken ct)
+    {
+        var validatedSerialFrameChannel = _validatedSerialFrameChannel;
+        if (validatedSerialFrameChannel is not null)
+        {
+            if (_isClosed())
+            {
+                return ClosedFrame(frame);
+            }
+
+            return validatedSerialFrameChannel.SendFrameValueAsync(frame, ct);
+        }
+
+        return SendFrameSlowAsync(frame, ct);
+    }
+
+    private async ValueTask SendFrameSlowAsync(PooledBufferWriter frame, CancellationToken ct)
     {
         if (_frameChannel is null)
         {
@@ -128,6 +146,12 @@ internal sealed class RpcPeerSender : IDisposable
             {
             }
         }
+    }
+
+    private static ValueTask ClosedFrame(PooledBufferWriter frame)
+    {
+        frame.Dispose();
+        return new ValueTask(Task.FromException(new ServiceConnectionException("Connection closed.")));
     }
 
     public void Dispose() => _sendLock.Dispose();

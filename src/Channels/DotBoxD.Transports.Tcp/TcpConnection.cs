@@ -9,7 +9,7 @@ namespace DotBoxD.Transports.Tcp;
 /// <summary>
 /// TCP-based connection implementation.
 /// </summary>
-public sealed class TcpConnection : IRpcFrameChannel
+public sealed class TcpConnection : IValidatedSerialFrameChannel
 {
     /// <summary>Default idle timeout applied to frame reads (30 seconds).</summary>
     public static readonly TimeSpan DefaultFrameReadIdleTimeout = TimeSpan.FromSeconds(30);

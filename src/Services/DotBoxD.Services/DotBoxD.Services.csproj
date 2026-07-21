@@ -13,6 +13,7 @@
     <!-- Expose internal test and benchmark seams without adding shipped public surface. -->
     <InternalsVisibleTo Include="DotBoxD.Services.Tests" />
     <InternalsVisibleTo Include="DotBoxD.Services.Benchmarks" />
+    <InternalsVisibleTo Include="DotBoxD.Transports.Tcp" />
   </ItemGroup>
 
   <ItemGroup>

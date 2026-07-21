@@ -8,7 +8,7 @@ namespace DotBoxD.Services.Transport;
 /// <summary>
 /// DotBoxD connection over a duplex stream, including named pipe streams.
 /// </summary>
-public sealed class StreamConnection : IRpcFrameChannel
+public sealed class StreamConnection : IValidatedSerialFrameChannel
 {
     private readonly Stream _stream;
     private readonly bool _ownsStream;
