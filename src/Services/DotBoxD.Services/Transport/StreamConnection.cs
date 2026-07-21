@@ -219,6 +219,11 @@ public sealed class StreamConnection : IRpcFrameChannel
     {
         try
         {
+            if (_sendLock.Wait(0, ct))
+            {
+                return;
+            }
+
             if (ct.CanBeCanceled)
             {
                 using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _disposeCts.Token);
