@@ -49,8 +49,8 @@ internal static class IlEmitterPrimitives
                 .GetMethods(BindingFlags.Public | BindingFlags.Static)
                 .Single(m => m.Name == key));
 
-    // Execute rebuilds each expected input type on every invocation. Cache only a direct
-    // built-in structural root; recursive shapes retain the legacy construction sequence.
+    // Execute rebuilds each expected input type on every invocation. Cache every eligible
+    // built-in structural node while preserving the legacy EmitSandboxType behavior.
     public static void EmitEntrypointSandboxType(ILGenerator il, SandboxType type)
         => EmitSandboxType(il, type, allowCachedFactory: true);
 
@@ -68,15 +68,15 @@ internal static class IlEmitterPrimitives
 
         if (type is { Name: "List", Arguments.Count: 1 })
         {
-            EmitSandboxType(il, type.Arguments[0], allowCachedFactory: false);
+            EmitSandboxType(il, type.Arguments[0], allowCachedFactory);
             il.Emit(OpCodes.Call, Runtime(GetListFactory(type, allowCachedFactory)));
             return;
         }
 
         if (type is { Name: "Map", Arguments.Count: 2 })
         {
-            EmitSandboxType(il, type.Arguments[0], allowCachedFactory: false);
-            EmitSandboxType(il, type.Arguments[1], allowCachedFactory: false);
+            EmitSandboxType(il, type.Arguments[0], allowCachedFactory);
+            EmitSandboxType(il, type.Arguments[1], allowCachedFactory);
             il.Emit(OpCodes.Call, Runtime(GetMapFactory(type, allowCachedFactory)));
             return;
         }
@@ -92,7 +92,7 @@ internal static class IlEmitterPrimitives
             {
                 il.Emit(OpCodes.Dup);
                 EmitInt32(il, i);
-                EmitSandboxType(il, type.Arguments[i], allowCachedFactory: false);
+                EmitSandboxType(il, type.Arguments[i], allowCachedFactory);
                 il.Emit(OpCodes.Stelem_Ref);
             }
 

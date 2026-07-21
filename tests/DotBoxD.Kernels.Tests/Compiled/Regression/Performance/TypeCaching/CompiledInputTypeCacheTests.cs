@@ -8,7 +8,7 @@ public sealed class CompiledInputTypeCacheTests
 {
     [Fact]
     [Trait(AllocationMeasurementCollection.TraitName, AllocationMeasurementCollection.TraitValue)]
-    public void Generated_input_shape_avoids_direct_builtin_structural_type_allocations()
+    public void Generated_input_shape_avoids_eligible_builtin_structural_type_allocations()
     {
         const int iterations = 100_000;
         var i32 = SandboxValue.FromInt32(42);
@@ -30,14 +30,14 @@ public sealed class CompiledInputTypeCacheTests
         _ = MeasureInput(list, CachedListType, 1_000);
         _ = MeasureInput(map, LegacyMapType, 1_000);
         _ = MeasureInput(map, CachedMapType, 1_000);
-        _ = MeasureInput(nestedList, NestedListFallbackType, 1_000);
+        _ = MeasureInput(nestedList, NestedListCachedChildType, 1_000);
         _ = MeasureInput(opaqueList, OpaqueListFallbackType, 1_000);
 
         var legacyList = MeasureInput(list, LegacyListType, iterations);
         var cachedList = MeasureInput(list, CachedListType, iterations);
         var legacyMap = MeasureInput(map, LegacyMapType, iterations);
         var cachedMap = MeasureInput(map, CachedMapType, iterations);
-        var nestedFallback = MeasureInput(nestedList, NestedListFallbackType, iterations);
+        var nestedCachedChild = MeasureInput(nestedList, NestedListCachedChildType, iterations);
         var opaqueFallback = MeasureInput(opaqueList, OpaqueListFallbackType, iterations);
         var listFactory = MeasureFactory(LegacyListType, SandboxType.I32, argumentIndex: 0, iterations);
         var mapFactory = MeasureFactory(LegacyMapType, SandboxType.I32, argumentIndex: 1, iterations);
@@ -48,7 +48,7 @@ public sealed class CompiledInputTypeCacheTests
         Assert.Equal(160L * iterations, mapFactory.Bytes);
         Assert.Equal(listFactory.Bytes, legacyList.Bytes - cachedList.Bytes);
         Assert.Equal(mapFactory.Bytes, legacyMap.Bytes - cachedMap.Bytes);
-        Assert.Equal(224L * iterations, nestedFallback.Bytes);
+        Assert.Equal(listFactory.Bytes, nestedCachedChild.Bytes);
         Assert.Equal(144L * iterations, opaqueFallback.Bytes);
         Assert.All(
             new[]
@@ -57,7 +57,7 @@ public sealed class CompiledInputTypeCacheTests
                 cachedList,
                 legacyMap,
                 cachedMap,
-                nestedFallback,
+                nestedCachedChild,
                 opaqueFallback
             },
             measurement => Assert.Equal(iterations, measurement.Checksum));
@@ -121,9 +121,9 @@ public sealed class CompiledInputTypeCacheTests
             CompiledRuntime.TypeScalar("String"),
             CompiledRuntime.TypeScalar("I32"));
 
-    private static SandboxType NestedListFallbackType()
+    private static SandboxType NestedListCachedChildType()
         => CompiledRuntime.TypeList(
-            CompiledRuntime.TypeList(CompiledRuntime.TypeScalar("I32")));
+            CompiledRuntime.TypeListCached(CompiledRuntime.TypeScalar("I32")));
 
     private static SandboxType OpaqueListFallbackType()
         => CompiledRuntime.TypeList(CompiledRuntime.TypeScalar("MonsterId"));
