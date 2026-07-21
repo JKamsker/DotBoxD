@@ -9,6 +9,11 @@ namespace DotBoxD.Services.SourceGenerator.Generation;
 internal static class ProxyGenerationHelpers
 {
     public const string CallerCancellationHelperName = "__dotboxd_observeCallerCancellationAsync";
+    public const string CallerCancellationCoreHelperName = "__dotboxd_observeCallerCancellationCoreAsync";
+
+    public static bool IsCallerCancellationHelperName(string methodName) =>
+        string.Equals(methodName, CallerCancellationHelperName, System.StringComparison.Ordinal) ||
+        string.Equals(methodName, CallerCancellationCoreHelperName, System.StringComparison.Ordinal);
 
     public static void AppendParameterList(
         StringBuilder sb,
@@ -175,6 +180,71 @@ internal static class ProxyGenerationHelpers
         }
 
         return candidate;
+    }
+}
+
+internal static class ProxyCallerCancellationHelperEmitter
+{
+    public static void Append(StringBuilder sb)
+    {
+        var task = ServicesGeneratorTypeNames.GlobalTask;
+        var valueTask = ServicesGeneratorTypeNames.GlobalValueTask;
+        var cancellationToken = ServicesGeneratorTypeNames.GlobalCancellationToken;
+        var helper = ProxyGenerationHelpers.CallerCancellationHelperName;
+        var core = ProxyGenerationHelpers.CallerCancellationCoreHelperName;
+
+        AppendFront(sb, task, helper, core, cancellationToken, generic: false);
+        AppendCore(sb, task, core, cancellationToken, generic: false);
+        AppendFront(sb, task, helper, core, cancellationToken, generic: true);
+        AppendCore(sb, task, core, cancellationToken, generic: true);
+        AppendFront(sb, valueTask, helper, core, cancellationToken, generic: false);
+        AppendCore(sb, valueTask, core, cancellationToken, generic: false);
+        AppendFront(sb, valueTask, helper, core, cancellationToken, generic: true);
+        AppendCore(sb, valueTask, core, cancellationToken, generic: true);
+    }
+
+    private static void AppendFront(
+        StringBuilder sb,
+        string taskType,
+        string helper,
+        string core,
+        string cancellationToken,
+        bool generic)
+    {
+        var type = generic ? ServicesGeneratorTypeNames.Generic(taskType, "T") : taskType;
+        var typeParameter = generic ? "<T>" : string.Empty;
+        sb.AppendLine();
+        sb.AppendLine($"        private static {type} {helper}{typeParameter}({type} task, {cancellationToken} ct)");
+        sb.AppendLine("        {");
+        sb.AppendLine($"            return !ct.CanBeCanceled ? task : {core}(task, ct);");
+        sb.AppendLine("        }");
+    }
+
+    private static void AppendCore(
+        StringBuilder sb,
+        string taskType,
+        string core,
+        string cancellationToken,
+        bool generic)
+    {
+        var type = generic ? ServicesGeneratorTypeNames.Generic(taskType, "T") : taskType;
+        var typeParameter = generic ? "<T>" : string.Empty;
+        sb.AppendLine();
+        sb.AppendLine($"        private static async {type} {core}{typeParameter}({type} task, {cancellationToken} ct)");
+        sb.AppendLine("        {");
+        if (generic)
+        {
+            sb.AppendLine("            var result = await task.ConfigureAwait(false);");
+            sb.AppendLine("            ct.ThrowIfCancellationRequested();");
+            sb.AppendLine("            return result;");
+        }
+        else
+        {
+            sb.AppendLine("            await task.ConfigureAwait(false);");
+            sb.AppendLine("            ct.ThrowIfCancellationRequested();");
+        }
+
+        sb.AppendLine("        }");
     }
 }
 
