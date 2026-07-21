@@ -20,6 +20,18 @@ public sealed partial class RpcPeer
 
     private void EnsureStarted()
     {
+        if (Volatile.Read(ref _startCompleted) != 0 &&
+            Volatile.Read(ref _disposed) == 0 &&
+            Volatile.Read(ref _closed) == 0)
+        {
+            return;
+        }
+
+        EnsureStartedSlow();
+    }
+
+    private void EnsureStartedSlow()
+    {
         lock (_lifecycleLock)
         {
             if (_disposed != 0)
@@ -42,6 +54,7 @@ public sealed partial class RpcPeer
             _inbound.Start(_cts.Token);
             _readLoop = Task.Run(() => _readLoopRunner.RunAsync(_cts.Token));
             RpcTelemetry.PeerStarted();
+            Volatile.Write(ref _startCompleted, 1);
         }
     }
 

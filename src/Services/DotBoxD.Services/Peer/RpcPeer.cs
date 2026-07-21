@@ -27,6 +27,7 @@ public sealed partial class RpcPeer : IAsyncDisposable, IRpcInvoker
     private Task? _readLoop;
     private Task? _disposeTask;
     private int _started;
+    private int _startCompleted;
     private int _closed;
     private int _disposed;
 
