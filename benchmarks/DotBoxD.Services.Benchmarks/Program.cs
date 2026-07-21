@@ -32,6 +32,9 @@ if (args.Length == 1)
         case "--probe-peer-start-guard":
             RpcPeerStartGuardProbe.Run();
             return;
+        case "--probe-constructor-replay":
+            ConstructorReplayGuardProbe.Run();
+            return;
     }
 }
 
