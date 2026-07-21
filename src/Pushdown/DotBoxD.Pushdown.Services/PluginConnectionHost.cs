@@ -132,6 +132,7 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
                 self.DisposeSessionOnce();
                 self._connected.TrySetException(ex);
                 self._disconnected.TrySetException(ex);
+                throw;
             }
         });
         try
