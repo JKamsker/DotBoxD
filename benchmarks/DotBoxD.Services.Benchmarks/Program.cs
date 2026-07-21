@@ -29,6 +29,9 @@ if (args.Length == 1)
         case "--probe-peer-frame-send":
             RpcPeerFrameSendProbe.Run();
             return;
+        case "--probe-peer-start-guard":
+            RpcPeerStartGuardProbe.Run();
+            return;
     }
 }
 
