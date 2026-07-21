@@ -107,8 +107,8 @@ internal static class MapRemoveProbe
         var run = RunState.Create();
         var checksum = 0;
         var reusedSource = 0;
-        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
         var sw = Stopwatch.StartNew();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
         for (var i = 0; i < iterations; i++)
         {
             var removed = (MapValue)remove(run.Context, map, key);
@@ -116,11 +116,12 @@ internal static class MapRemoveProbe
             reusedSource += ReferenceEquals(map, removed) ? 1 : 0;
         }
 
+        var allocatedAfter = GC.GetAllocatedBytesForCurrentThread();
         sw.Stop();
         var usage = run.Context.Budget.Snapshot();
         return Measurement.Create(
             sw.Elapsed.TotalMilliseconds,
-            GC.GetAllocatedBytesForCurrentThread() - allocatedBefore,
+            allocatedAfter - allocatedBefore,
             checksum,
             reusedSource,
             usage,

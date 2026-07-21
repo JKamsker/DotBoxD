@@ -185,7 +185,11 @@ internal static class ValueShapeCache
         {
             var unchangedInfo = GetOrMeasure(source, context);
             context.ChargeComposedValue(unchangedInfo);
-            Set(removed, unchangedInfo);
+            if (!ReferenceEquals(source, removed))
+            {
+                Set(removed, unchangedInfo);
+            }
+
             return true;
         }
 
