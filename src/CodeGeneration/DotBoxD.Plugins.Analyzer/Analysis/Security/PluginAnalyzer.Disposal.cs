@@ -111,46 +111,62 @@ public sealed partial class PluginAnalyzer
 
     private static IEnumerable<ITypeSymbol> AwaitUsingResourceTypes(SyntaxNodeAnalysisContext context)
     {
-        switch (context.Node)
+        return context.Node switch
         {
-            case LocalDeclarationStatementSyntax declaration
-                when declaration.AwaitKeyword.IsKind(SyntaxKind.AwaitKeyword) &&
-                    declaration.UsingKeyword.IsKind(SyntaxKind.UsingKeyword):
-                foreach (var variable in declaration.Declaration.Variables)
-                {
-                    if (context.SemanticModel.GetDeclaredSymbol(
-                            variable,
-                            context.CancellationToken) is ILocalSymbol local)
-                    {
-                        yield return local.Type;
-                    }
-                }
+            LocalDeclarationStatementSyntax declaration => AwaitUsingDeclarationResourceTypes(context, declaration),
+            UsingStatementSyntax usingStatement => AwaitUsingStatementResourceTypes(context, usingStatement),
+            _ => [],
+        };
+    }
 
-                yield break;
+    private static IEnumerable<ITypeSymbol> AwaitUsingDeclarationResourceTypes(
+        SyntaxNodeAnalysisContext context,
+        LocalDeclarationStatementSyntax declaration)
+    {
+        if (!declaration.AwaitKeyword.IsKind(SyntaxKind.AwaitKeyword) ||
+            !declaration.UsingKeyword.IsKind(SyntaxKind.UsingKeyword))
+        {
+            yield break;
+        }
 
-            case UsingStatementSyntax usingStatement
-                when usingStatement.AwaitKeyword.IsKind(SyntaxKind.AwaitKeyword):
-                if (usingStatement.Declaration is { } usingDeclaration)
-                {
-                    foreach (var variable in usingDeclaration.Variables)
-                    {
-                        if (context.SemanticModel.GetDeclaredSymbol(
-                                variable,
-                                context.CancellationToken) is ILocalSymbol local)
-                        {
-                            yield return local.Type;
-                        }
-                    }
-                }
-                else if (usingStatement.Expression is { } expression &&
-                    context.SemanticModel.GetTypeInfo(
-                        expression,
-                        context.CancellationToken).Type is { } expressionType)
-                {
-                    yield return expressionType;
-                }
+        foreach (var variable in declaration.Declaration.Variables)
+        {
+            if (context.SemanticModel.GetDeclaredSymbol(
+                    variable,
+                    context.CancellationToken) is ILocalSymbol local)
+            {
+                yield return local.Type;
+            }
+        }
+    }
 
-                yield break;
+    private static IEnumerable<ITypeSymbol> AwaitUsingStatementResourceTypes(
+        SyntaxNodeAnalysisContext context,
+        UsingStatementSyntax usingStatement)
+    {
+        if (!usingStatement.AwaitKeyword.IsKind(SyntaxKind.AwaitKeyword))
+        {
+            yield break;
+        }
+
+        if (usingStatement.Declaration is { } usingDeclaration)
+        {
+            foreach (var variable in usingDeclaration.Variables)
+            {
+                if (context.SemanticModel.GetDeclaredSymbol(
+                        variable,
+                        context.CancellationToken) is ILocalSymbol local)
+                {
+                    yield return local.Type;
+                }
+            }
+        }
+        else if (usingStatement.Expression is { } expression &&
+            context.SemanticModel.GetTypeInfo(
+                expression,
+                context.CancellationToken).Type is { } expressionType)
+        {
+            yield return expressionType;
         }
     }
 
