@@ -101,10 +101,13 @@ public sealed class TcpConnection : IRpcFrameChannel
         }
     }
 
-    public Task<Payload> ReceiveAsync(CancellationToken ct = default) =>
-        ReceiveValueAsync(ct).AsTask();
+    public async Task<Payload> ReceiveAsync(CancellationToken ct = default)
+    {
+        var frame = await ReceiveFrameValueAsync(ct).ConfigureAwait(false);
+        return frame.DetachPayload();
+    }
 
-    public async ValueTask<Payload> ReceiveValueAsync(CancellationToken ct = default)
+    public async ValueTask<RpcFrame> ReceiveFrameValueAsync(CancellationToken ct = default)
     {
         ThrowIfDisposed();
         ReceiveConcurrencyGuard.Enter(ref _activeReceive, nameof(TcpConnection));
@@ -118,7 +121,7 @@ public sealed class TcpConnection : IRpcFrameChannel
                 .ConfigureAwait(false);
             if (bytesRead == 0)
             {
-                return Payload.Empty; // Connection closed
+                return new RpcFrame(Payload.Empty); // Connection closed
             }
 
             if (bytesRead < 4)
@@ -159,7 +162,7 @@ public sealed class TcpConnection : IRpcFrameChannel
                 throw;
             }
 
-            return payload;
+            return new RpcFrame(payload);
         }
         finally
         {
@@ -179,10 +182,22 @@ public sealed class TcpConnection : IRpcFrameChannel
         }
     }
 
-    public async ValueTask<RpcFrame> ReceiveFrameValueAsync(CancellationToken ct = default)
+    public ValueTask<Payload> ReceiveValueAsync(CancellationToken ct = default)
     {
-        var payload = await ReceiveValueAsync(ct).ConfigureAwait(false);
-        return new RpcFrame(payload);
+        var pending = ReceiveFrameValueAsync(ct);
+        if (pending.IsCompletedSuccessfully)
+        {
+            var frame = pending.Result;
+            return new ValueTask<Payload>(frame.DetachPayload());
+        }
+
+        return AwaitPayloadAsync(pending);
+    }
+
+    private static async ValueTask<Payload> AwaitPayloadAsync(ValueTask<RpcFrame> pending)
+    {
+        var frame = await pending.ConfigureAwait(false);
+        return frame.DetachPayload();
     }
 
     private async ValueTask<int> ReadExactAsync(Memory<byte> buffer, CancellationToken ct)

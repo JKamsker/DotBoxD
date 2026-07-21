@@ -96,10 +96,13 @@ public sealed class StreamConnection : IRpcFrameChannel
         }
     }
 
-    public Task<Payload> ReceiveAsync(CancellationToken ct = default) =>
-        ReceiveValueAsync(ct).AsTask();
+    public async Task<Payload> ReceiveAsync(CancellationToken ct = default)
+    {
+        var frame = await ReceiveFrameValueAsync(ct).ConfigureAwait(false);
+        return frame.DetachPayload();
+    }
 
-    public async ValueTask<Payload> ReceiveValueAsync(CancellationToken ct = default)
+    public async ValueTask<RpcFrame> ReceiveFrameValueAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         ReceiveConcurrencyGuard.Enter(ref _activeReceives, nameof(StreamConnection));
@@ -112,7 +115,7 @@ public sealed class StreamConnection : IRpcFrameChannel
                 .ConfigureAwait(false);
             if (read == 0)
             {
-                return Payload.Empty;
+                return new RpcFrame(Payload.Empty);
             }
 
             if (read < 4)
@@ -142,7 +145,7 @@ public sealed class StreamConnection : IRpcFrameChannel
                 throw;
             }
 
-            return frame;
+            return new RpcFrame(frame);
         }
         finally
         {
@@ -167,11 +170,8 @@ public sealed class StreamConnection : IRpcFrameChannel
         }
     }
 
-    public async ValueTask<RpcFrame> ReceiveFrameValueAsync(CancellationToken ct = default)
-    {
-        var payload = await ReceiveValueAsync(ct).ConfigureAwait(false);
-        return new RpcFrame(payload);
-    }
+    public ValueTask<Payload> ReceiveValueAsync(CancellationToken ct = default) =>
+        RpcFramePayloadAdapter.DetachAsync(ReceiveFrameValueAsync(ct));
 
     /// <summary>
     /// Closes the connection. This operation is idempotent.
