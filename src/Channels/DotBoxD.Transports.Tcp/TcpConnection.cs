@@ -203,21 +203,15 @@ public sealed class TcpConnection : IRpcFrameChannel
     private async ValueTask<int> ReadExactAsync(Memory<byte> buffer, CancellationToken ct)
     {
         var totalRead = 0;
-        try
+        while (totalRead < buffer.Length)
         {
-            while (totalRead < buffer.Length)
+            var read = await ReadChunkAsync(buffer.Slice(totalRead), ct).ConfigureAwait(false);
+            if (read == 0)
             {
-                var read = await ReadChunkAsync(buffer.Slice(totalRead), ct).ConfigureAwait(false);
-                if (read == 0)
-                {
-                    return totalRead; // Connection closed
-                }
-                totalRead += read;
+                return totalRead; // Connection closed
             }
-        }
-        finally
-        {
-            _frameReadTimeout?.CancelPendingTimeout();
+
+            totalRead += read;
         }
 
         return totalRead;
