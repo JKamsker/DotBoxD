@@ -28,12 +28,13 @@ public sealed class Fix_PAL_0014_Tests
 {
     private const int WarmupIterations = 200;
     private const int MeasureIterations = 4000;
+    private const int MeasurementSamples = 3;
 
     [Fact]
     public async Task Default_convenience_options_use_the_low_allocation_unary_path()
     {
-        var lowAllocPerCall = await MeasureUnaryAllocationsPerCallAsync(useLowAllocationOptions: true);
-        var defaultPerCall = await MeasureUnaryAllocationsPerCallAsync(useLowAllocationOptions: false);
+        var lowAllocPerCall = await MeasureBestUnaryAllocationsPerCallAsync(useLowAllocationOptions: true);
+        var defaultPerCall = await MeasureBestUnaryAllocationsPerCallAsync(useLowAllocationOptions: false);
 
         // The convenience default path must not pay materially more per call than the explicit
         // low-allocation path. A generous absolute slack (128 bytes/call) absorbs measurement noise
@@ -43,6 +44,17 @@ public sealed class Fix_PAL_0014_Tests
             $"Default IPC convenience options allocated {defaultPerCall:N1} bytes/call but the " +
             $"explicit low-allocation path allocated {lowAllocPerCall:N1} bytes/call. The public " +
             "convenience defaults should be on the low-allocation profile (PAL-0014).");
+    }
+
+    private static async Task<double> MeasureBestUnaryAllocationsPerCallAsync(bool useLowAllocationOptions)
+    {
+        var best = double.PositiveInfinity;
+        for (var sample = 0; sample < MeasurementSamples; sample++)
+        {
+            best = Math.Min(best, await MeasureUnaryAllocationsPerCallAsync(useLowAllocationOptions));
+        }
+
+        return best;
     }
 
     private static async Task<double> MeasureUnaryAllocationsPerCallAsync(bool useLowAllocationOptions)
