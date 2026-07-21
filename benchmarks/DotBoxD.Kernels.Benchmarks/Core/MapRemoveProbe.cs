@@ -20,20 +20,25 @@ internal static class MapRemoveProbe
         var key = SandboxValue.FromInt32(Entries / 2);
         var stringSource = CreateStringSourceMap();
         var missingStringKey = SandboxValue.FromString("missing-key");
+        var dictionarySource = CreateDictionaryBackedSourceMap();
+        var missingScalarKey = SandboxValue.FromInt32(Entries + 1);
 
         _ = MeasureLegacy(source, key, Warmup);
         _ = MeasureCurrent(source, key, Warmup);
         _ = MeasureCurrent(stringSource, missingStringKey, Warmup);
+        _ = MeasureCurrent(dictionarySource, missingScalarKey, Warmup);
 
         var legacy = MeasureLegacy(source, key, Iterations);
         var current = MeasureCurrent(source, key, Iterations);
         var stringMiss = MeasureCurrent(stringSource, missingStringKey, Iterations);
+        var dictionaryMiss = MeasureCurrent(dictionarySource, missingScalarKey, Iterations);
 
         Console.WriteLine($"entries = {Entries:N0}");
         Console.WriteLine($"iterations = {Iterations:N0}");
         Print("legacy scalar present remove", legacy);
         Print("scalar present remove", current);
-        Print("string missing remove", stringMiss);
+        Print("immutable string missing remove", stringMiss);
+        Print("dictionary scalar missing remove", dictionaryMiss);
     }
 
     private static MapValue CreateSourceMap()
@@ -68,6 +73,17 @@ internal static class MapRemoveProbe
         return (MapValue)map;
     }
 
+    private static MapValue CreateDictionaryBackedSourceMap()
+    {
+        var values = new Dictionary<SandboxValue, SandboxValue>(Entries);
+        for (var i = 0; i < Entries; i++)
+        {
+            values.Add(SandboxValue.FromInt32(i), SandboxValue.FromInt32(i * 10));
+        }
+
+        return (MapValue)SandboxValue.FromMap(values, SandboxType.I32, SandboxType.I32);
+    }
+
     private static Measurement MeasureLegacy(MapValue map, SandboxValue key, int iterations)
         => Measure(map, key, iterations, LegacyRemove);
 
@@ -90,19 +106,24 @@ internal static class MapRemoveProbe
 
         var run = RunState.Create();
         var checksum = 0;
+        var reusedSource = 0;
         var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
         var sw = Stopwatch.StartNew();
         for (var i = 0; i < iterations; i++)
         {
             var removed = (MapValue)remove(run.Context, map, key);
             checksum += removed.Values.Count;
+            reusedSource += ReferenceEquals(map, removed) ? 1 : 0;
         }
 
         sw.Stop();
+        var usage = run.Context.Budget.Snapshot();
         return Measurement.Create(
             sw.Elapsed.TotalMilliseconds,
             GC.GetAllocatedBytesForCurrentThread() - allocatedBefore,
             checksum,
+            reusedSource,
+            usage,
             iterations);
     }
 
@@ -128,9 +149,15 @@ internal static class MapRemoveProbe
 
     private static void Print(string name, Measurement measurement)
         => Console.WriteLine(
-            $"{name,-20} {measurement.Milliseconds,8:N1} ms " +
+            $"{name,-34} {measurement.Milliseconds,8:N1} ms " +
             $"{measurement.NanosecondsPerOperation,8:N1} ns/op " +
-            $"{measurement.AllocatedBytes,14:N0} B {measurement.Checksum,10:N0} checksum");
+            $"{measurement.AllocatedBytes,14:N0} B " +
+            $"{measurement.ReusedSource,8:N0} reused " +
+            $"{measurement.ChargedFuel,12:N0} fuel " +
+            $"{measurement.ChargedAllocation,12:N0} charged B " +
+            $"{measurement.ChargedElements,10:N0} elements " +
+            $"{measurement.ChargedStringBytes,10:N0} string B " +
+            $"{measurement.Checksum,10:N0} checksum");
 
     private sealed class RunState
     {
@@ -163,17 +190,29 @@ internal static class MapRemoveProbe
         double Milliseconds,
         double NanosecondsPerOperation,
         long AllocatedBytes,
-        int Checksum)
+        int Checksum,
+        int ReusedSource,
+        long ChargedFuel,
+        long ChargedAllocation,
+        long ChargedElements,
+        long ChargedStringBytes)
     {
         public static Measurement Create(
             double milliseconds,
             long allocatedBytes,
             int checksum,
+            int reusedSource,
+            SandboxResourceUsage usage,
             int iterations)
             => new(
                 milliseconds,
                 milliseconds * 1_000_000 / iterations,
                 allocatedBytes,
-                checksum);
+                checksum,
+                reusedSource,
+                usage.FuelUsed,
+                usage.AllocatedBytes,
+                usage.CollectionElements,
+                usage.StringBytes);
     }
 }
