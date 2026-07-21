@@ -88,6 +88,12 @@ internal static class InterpreterProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-interpreter-trace-guard", StringComparer.OrdinalIgnoreCase))
+        {
+            await InterpreterTraceGuardProbe.RunAsync();
+            return true;
+        }
+
         if (args.Contains("--probe-compiled-execution-envelope", StringComparer.OrdinalIgnoreCase))
         {
             await CompiledExecutionEnvelopeProbe.RunAsync();
