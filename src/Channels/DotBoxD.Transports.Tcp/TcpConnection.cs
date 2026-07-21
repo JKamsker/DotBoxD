@@ -185,7 +185,7 @@ public sealed class TcpConnection : IRpcFrameChannel
         return new RpcFrame(payload);
     }
 
-    private async Task<int> ReadExactAsync(Memory<byte> buffer, CancellationToken ct)
+    private async ValueTask<int> ReadExactAsync(Memory<byte> buffer, CancellationToken ct)
     {
         var totalRead = 0;
         try
@@ -208,17 +208,14 @@ public sealed class TcpConnection : IRpcFrameChannel
         return totalRead;
     }
 
-    private async Task<int> ReadChunkAsync(
+    private ValueTask<int> ReadChunkAsync(
         Memory<byte> buffer,
         CancellationToken ct)
     {
         var timeout = _frameReadTimeout;
-        if (timeout is null)
-        {
-            return await _stream.ReadAsync(buffer, ct).ConfigureAwait(false);
-        }
-
-        return await timeout.ReadAsync(_stream, buffer, ct, _frameReadIdleTimeout).ConfigureAwait(false);
+        return timeout is null
+            ? _stream.ReadAsync(buffer, ct)
+            : timeout.ReadAsync(_stream, buffer, ct, _frameReadIdleTimeout);
     }
 
     public ValueTask DisposeAsync()
