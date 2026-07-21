@@ -4,7 +4,7 @@ using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Kernels.Interpreter;
 
-internal sealed partial class ExpressionEvaluator
+internal readonly partial struct ExpressionEvaluator
 {
     private ValueTask<SandboxValue> EvaluateUnary(UnaryExpression unary, InterpreterFrame frame)
     {
@@ -36,7 +36,11 @@ internal sealed partial class ExpressionEvaluator
             return AwaitBinaryRight(binary, leftTask.Result, rightTask);
         }
 
-        return new ValueTask<SandboxValue>(OperatorEvaluator.ApplyBinary(binary, leftTask.Result, rightTask.Result, _context));
+        return new ValueTask<SandboxValue>(OperatorEvaluator.ApplyBinary(
+            binary,
+            leftTask.Result,
+            rightTask.Result,
+            Context));
     }
 
     private async ValueTask<SandboxValue> AwaitBinary(
@@ -46,19 +50,26 @@ internal sealed partial class ExpressionEvaluator
     {
         var left = await leftTask.ConfigureAwait(false);
         var right = await EvaluateAsync(binary.Right, frame).ConfigureAwait(false);
-        return OperatorEvaluator.ApplyBinary(binary, left, right, _context);
+        return OperatorEvaluator.ApplyBinary(binary, left, right, Context);
     }
 
     private async ValueTask<SandboxValue> AwaitBinaryRight(
         BinaryExpression binary,
         SandboxValue left,
         ValueTask<SandboxValue> rightTask)
-        => OperatorEvaluator.ApplyBinary(binary, left, await rightTask.ConfigureAwait(false), _context);
+        => OperatorEvaluator.ApplyBinary(
+            binary,
+            left,
+            await rightTask.ConfigureAwait(false),
+            Context);
 
     private ValueTask<SandboxValue> EvaluateShortCircuit(BinaryExpression binary, InterpreterFrame frame)
     {
         var shortCircuitOn = binary.Operator == "||";
-        var order = ShortCircuitExpressionOrder.Choose(binary, _context.Bindings, _functionAnalysis);
+        var order = ShortCircuitExpressionOrder.Choose(
+            binary,
+            Context.Bindings,
+            FunctionAnalysis);
         var firstTask = EvaluateAsync(order.First, frame);
         if (!firstTask.IsCompletedSuccessfully)
         {

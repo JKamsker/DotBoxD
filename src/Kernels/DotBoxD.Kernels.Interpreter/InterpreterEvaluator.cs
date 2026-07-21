@@ -32,9 +32,19 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
         _functions = plan.FunctionLookup;
         _functionAnalysis = plan.FunctionAnalysis;
         _frameLayouts = frameLayouts;
-        _expressions = new ExpressionEvaluator(_context, this, _functionAnalysis, _options, _moduleHash);
-        _statements = new StatementExecutor(_context, _expressions, this, _options, _moduleHash);
+        _expressions = new ExpressionEvaluator(this);
+        _statements = new StatementExecutor(this);
     }
+
+    internal SandboxContext Context => _context;
+
+    internal IReadOnlyDictionary<string, FunctionAnalysis> FunctionAnalysis => _functionAnalysis;
+
+    internal SandboxExecutionOptions Options => _options;
+
+    internal string ModuleHash => _moduleHash;
+
+    internal ExpressionEvaluator Expressions => _expressions;
 
     public ValueTask<SandboxValue> ExecuteEntrypointAsync(string entrypoint, SandboxValue input)
     {

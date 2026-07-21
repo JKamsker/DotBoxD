@@ -5,7 +5,7 @@ using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Kernels.Interpreter;
 
-internal sealed partial class ExpressionEvaluator
+internal readonly partial struct ExpressionEvaluator
 {
     private delegate SandboxValue CollectionCallHandler(
         ExpressionEvaluator evaluator,
@@ -15,20 +15,20 @@ internal sealed partial class ExpressionEvaluator
     private static readonly Dictionary<string, CollectionCallHandler> CollectionCalls = new(StringComparer.Ordinal)
     {
         ["list.empty"] = static (evaluator, call, _) =>
-            CollectionOperations.CreateList(call.GenericType ?? SandboxType.Unit, evaluator._context),
-        ["list.of"] = static (evaluator, _, args) => CollectionOperations.BuildList(args, evaluator._context),
-        ["list.count"] = static (evaluator, _, args) => CollectionOperations.CountList(Arg(args, 0), evaluator._context),
-        ["list.get"] = static (evaluator, _, args) => CollectionOperations.GetListItem(Arg(args, 1), Arg(args, 0), evaluator._context),
-        ["list.add"] = static (evaluator, _, args) => CollectionOperations.AddListItem(Arg(args, 1), Arg(args, 0), evaluator._context),
+            CollectionOperations.CreateList(call.GenericType ?? SandboxType.Unit, evaluator.Context),
+        ["list.of"] = static (evaluator, _, args) => CollectionOperations.BuildList(args, evaluator.Context),
+        ["list.count"] = static (evaluator, _, args) => CollectionOperations.CountList(Arg(args, 0), evaluator.Context),
+        ["list.get"] = static (evaluator, _, args) => CollectionOperations.GetListItem(Arg(args, 1), Arg(args, 0), evaluator.Context),
+        ["list.add"] = static (evaluator, _, args) => CollectionOperations.AddListItem(Arg(args, 1), Arg(args, 0), evaluator.Context),
         ["map.empty"] = static (evaluator, call, _) => CollectionOperations.CreateMap(
             call.GenericType ?? SandboxType.Map(SandboxType.Unit, SandboxType.Unit),
-            evaluator._context),
-        ["map.containsKey"] = static (evaluator, _, args) => CollectionOperations.ContainsMapKey(Arg(args, 1), Arg(args, 0), evaluator._context),
-        ["map.get"] = static (evaluator, _, args) => CollectionOperations.GetMapValue(Arg(args, 1), Arg(args, 0), evaluator._context),
-        ["map.set"] = static (evaluator, _, args) => CollectionOperations.SetMapValue(Arg(args, 2), Arg(args, 1), Arg(args, 0), evaluator._context),
-        ["map.remove"] = static (evaluator, _, args) => CollectionOperations.RemoveMapValue(Arg(args, 1), Arg(args, 0), evaluator._context),
-        ["record.new"] = static (evaluator, _, args) => CollectionOperations.BuildRecord(args, evaluator._context),
-        ["record.get"] = static (evaluator, _, args) => CollectionOperations.GetRecordField(Arg(args, 1), Arg(args, 0), evaluator._context),
+            evaluator.Context),
+        ["map.containsKey"] = static (evaluator, _, args) => CollectionOperations.ContainsMapKey(Arg(args, 1), Arg(args, 0), evaluator.Context),
+        ["map.get"] = static (evaluator, _, args) => CollectionOperations.GetMapValue(Arg(args, 1), Arg(args, 0), evaluator.Context),
+        ["map.set"] = static (evaluator, _, args) => CollectionOperations.SetMapValue(Arg(args, 2), Arg(args, 1), Arg(args, 0), evaluator.Context),
+        ["map.remove"] = static (evaluator, _, args) => CollectionOperations.RemoveMapValue(Arg(args, 1), Arg(args, 0), evaluator.Context),
+        ["record.new"] = static (evaluator, _, args) => CollectionOperations.BuildRecord(args, evaluator.Context),
+        ["record.get"] = static (evaluator, _, args) => CollectionOperations.GetRecordField(Arg(args, 1), Arg(args, 0), evaluator.Context),
         ["numeric.toI64"] = static (_, _, args) => NumericToInt64(Arg(args, 0)),
         ["numeric.toF64"] = static (_, _, args) => NumericToDouble(Arg(args, 0)),
     };
@@ -37,7 +37,7 @@ internal sealed partial class ExpressionEvaluator
     {
         if (UnaryPureIntrinsicDispatcher.IsCandidate(call.Name) &&
             UnaryPureIntrinsicDispatcher.TryEvaluate(
-                call, this, frame, _context, _options, _moduleHash, frame.FunctionId, out var mathValue))
+                call, this, frame, Context, Options, ModuleHash, frame.FunctionId, out var mathValue))
         {
             return mathValue;
         }
@@ -66,7 +66,7 @@ internal sealed partial class ExpressionEvaluator
                 : EvaluateCallViaArray(call, frame);
         }
 
-        if (_context.Bindings.TryGetDescriptor(call.Name, out var descriptor))
+        if (Context.Bindings.TryGetDescriptor(call.Name, out var descriptor))
         {
             return CanUseScalarBinding(call, descriptor)
                 ? BindingCallEvaluator.Evaluate(this, call, descriptor, frame)
@@ -123,7 +123,7 @@ internal sealed partial class ExpressionEvaluator
         }
 
         return new ValueTask<SandboxValue>(
-            CollectionIntrinsicDispatcher.Dispatch(call, arg0, arg1, arg2, _context));
+            CollectionIntrinsicDispatcher.Dispatch(call, arg0, arg1, arg2, Context));
     }
 
     private async ValueTask<SandboxValue> AwaitCollectionOperands(
@@ -164,7 +164,7 @@ internal sealed partial class ExpressionEvaluator
             }
         }
 
-        return CollectionIntrinsicDispatcher.Dispatch(call, arg0, arg1, arg2, _context);
+        return CollectionIntrinsicDispatcher.Dispatch(call, arg0, arg1, arg2, Context);
     }
 
     private static bool CanUseScalarBinding(CallExpression call, BindingDescriptor descriptor)
@@ -232,13 +232,13 @@ internal sealed partial class ExpressionEvaluator
         if (resolvedBinding is not null)
         {
             return InterpreterBindingCaller.CallAsync(
-                _context, _options, _moduleHash, resolvedBinding, args, frame.FunctionId);
+                Context, Options, ModuleHash, resolvedBinding, args, frame.FunctionId);
         }
 
-        if (_context.Bindings.TryGetDescriptor(call.Name, out var descriptor))
+        if (Context.Bindings.TryGetDescriptor(call.Name, out var descriptor))
         {
             return InterpreterBindingCaller.CallAsync(
-                _context, _options, _moduleHash, descriptor, args, frame.FunctionId);
+                Context, Options, ModuleHash, descriptor, args, frame.FunctionId);
         }
 
         throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, $"unknown call '{call.Name}' at runtime"));

@@ -48,7 +48,7 @@ public sealed class WhileI32SingleAssignmentLoopAllocationTests
         // the allocation bands separate.
         Assert.InRange(singleWhileOverhead, 260, 300);
         Assert.InRange(zeroWhileOverhead, 260, 300);
-        Assert.InRange(twoAssignmentBytesPerExecution, 1_335, 1_385);
+        Assert.InRange(twoAssignmentBytesPerExecution, 1_223, 1_273);
     }
 
     [Fact]
