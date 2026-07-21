@@ -1,4 +1,6 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
 
@@ -22,6 +24,40 @@ public sealed partial class PluginAnalyzer
         var operation = (IUsingDeclarationOperation)context.Operation;
         RecordDisposalReachability(context, helperGraph, operation.DeclarationGroup, operation.IsAsynchronous);
     }
+
+    private static void AnalyzeAwaitUsing(SyntaxNodeAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
+    {
+        if (!IsAwaitUsingNode(context.Node))
+        {
+            return;
+        }
+
+        if (context.SemanticModel.GetEnclosingSymbol(
+                context.Node.SpanStart,
+                context.CancellationToken) is not IMethodSymbol method)
+        {
+            return;
+        }
+
+        var location = context.Node.GetLocation();
+        foreach (var resourceType in AwaitUsingResourceTypes(context))
+        {
+            if (TryResolveDisposeMethod(resourceType, isAsynchronous: true, out var disposeMethod))
+            {
+                RecordAwaitablePatternCalls(context, helperGraph, method, disposeMethod.ReturnType, location);
+            }
+        }
+    }
+
+    private static bool IsAwaitUsingNode(SyntaxNode node)
+        => node switch
+        {
+            LocalDeclarationStatementSyntax declaration =>
+                declaration.AwaitKeyword.IsKind(SyntaxKind.AwaitKeyword) &&
+                declaration.UsingKeyword.IsKind(SyntaxKind.UsingKeyword),
+            UsingStatementSyntax usingStatement => usingStatement.AwaitKeyword.IsKind(SyntaxKind.AwaitKeyword),
+            _ => false,
+        };
 
     private static void RecordDisposalReachability(
         OperationAnalysisContext context,
@@ -85,6 +121,67 @@ public sealed partial class PluginAnalyzer
                 }
 
                 yield break;
+        }
+    }
+
+    private static IEnumerable<ITypeSymbol> AwaitUsingResourceTypes(SyntaxNodeAnalysisContext context)
+    {
+        return context.Node switch
+        {
+            LocalDeclarationStatementSyntax declaration => AwaitUsingDeclarationResourceTypes(context, declaration),
+            UsingStatementSyntax usingStatement => AwaitUsingStatementResourceTypes(context, usingStatement),
+            _ => [],
+        };
+    }
+
+    private static IEnumerable<ITypeSymbol> AwaitUsingDeclarationResourceTypes(
+        SyntaxNodeAnalysisContext context,
+        LocalDeclarationStatementSyntax declaration)
+    {
+        if (!declaration.AwaitKeyword.IsKind(SyntaxKind.AwaitKeyword) ||
+            !declaration.UsingKeyword.IsKind(SyntaxKind.UsingKeyword))
+        {
+            yield break;
+        }
+
+        foreach (var variable in declaration.Declaration.Variables)
+        {
+            if (context.SemanticModel.GetDeclaredSymbol(
+                    variable,
+                    context.CancellationToken) is ILocalSymbol local)
+            {
+                yield return local.Type;
+            }
+        }
+    }
+
+    private static IEnumerable<ITypeSymbol> AwaitUsingStatementResourceTypes(
+        SyntaxNodeAnalysisContext context,
+        UsingStatementSyntax usingStatement)
+    {
+        if (!usingStatement.AwaitKeyword.IsKind(SyntaxKind.AwaitKeyword))
+        {
+            yield break;
+        }
+
+        if (usingStatement.Declaration is { } usingDeclaration)
+        {
+            foreach (var variable in usingDeclaration.Variables)
+            {
+                if (context.SemanticModel.GetDeclaredSymbol(
+                        variable,
+                        context.CancellationToken) is ILocalSymbol local)
+                {
+                    yield return local.Type;
+                }
+            }
+        }
+        else if (usingStatement.Expression is { } expression &&
+            context.SemanticModel.GetTypeInfo(
+                expression,
+                context.CancellationToken).Type is { } expressionType)
+        {
+            yield return expressionType;
         }
     }
 
