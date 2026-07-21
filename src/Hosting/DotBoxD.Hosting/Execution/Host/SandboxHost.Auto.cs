@@ -37,9 +37,13 @@ public sealed partial class SandboxHost
         var hotness = _autoHotness.BeginAttempt(plan, entrypoint);
         if (hotness.Stats.RunCount == 1)
         {
-            return await ExecuteTrackedAutoAsync(
+            return await ExecuteTrackedInterpretedAutoAsync(
                     hotness,
-                    () => ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken))
+                    plan,
+                    entrypoint,
+                    input,
+                    options,
+                    cancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -57,21 +61,23 @@ public sealed partial class SandboxHost
         if (selectedMode == ExecutionMode.Interpreted ||
             !CompiledEntrypointSupport.CanCompile(plan, entrypoint))
         {
-            return await ExecuteTrackedAutoAsync(
+            return await ExecuteTrackedInterpretedAutoAsync(
                     hotness,
-                    () => ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken))
-                .ConfigureAwait(false);
-        }
-
-        return await ExecuteTrackedAutoAsync(
-                hotness,
-                state => ExecuteCompiledAsync(
                     plan,
                     entrypoint,
                     input,
                     options,
-                    cancellationToken,
-                    state),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        return await ExecuteTrackedCompiledAutoAsync(
+                hotness,
+                plan,
+                entrypoint,
+                input,
+                options,
+                cancellationToken,
                 reusableNoAuditState)
             .ConfigureAwait(false);
     }
@@ -147,24 +153,40 @@ public sealed partial class SandboxHost
         return false;
     }
 
-    private static async ValueTask<SandboxExecutionResult> ExecuteTrackedAutoAsync(
+    private async ValueTask<SandboxExecutionResult> ExecuteTrackedInterpretedAutoAsync(
         AutoHotnessAttempt hotness,
-        Func<ValueTask<SandboxExecutionResult>> execute)
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxValue input,
+        SandboxExecutionOptions options,
+        CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
-        var result = await execute().ConfigureAwait(false);
+        var result = await ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken)
+            .ConfigureAwait(false);
         stopwatch.Stop();
         hotness.Complete(result, stopwatch.Elapsed);
         return result;
     }
 
-    private static async ValueTask<SandboxExecutionResult> ExecuteTrackedAutoAsync(
+    private async ValueTask<SandboxExecutionResult> ExecuteTrackedCompiledAutoAsync(
         AutoHotnessAttempt hotness,
-        Func<CompiledNoAuditRunState?, ValueTask<SandboxExecutionResult>> execute,
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxValue input,
+        SandboxExecutionOptions options,
+        CancellationToken cancellationToken,
         CompiledNoAuditRunState? reusableNoAuditState)
     {
         var stopwatch = Stopwatch.StartNew();
-        var result = await execute(reusableNoAuditState).ConfigureAwait(false);
+        var result = await ExecuteCompiledAsync(
+                plan,
+                entrypoint,
+                input,
+                options,
+                cancellationToken,
+                reusableNoAuditState)
+            .ConfigureAwait(false);
         stopwatch.Stop();
         hotness.Complete(result, stopwatch.Elapsed);
         return result;
