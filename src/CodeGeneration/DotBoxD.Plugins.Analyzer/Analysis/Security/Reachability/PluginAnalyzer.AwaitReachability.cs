@@ -15,6 +15,14 @@ public sealed partial class PluginAnalyzer
             c => AnalyzeAwait(c, helperGraph),
             SyntaxKind.AwaitExpression);
 
+    private static void RegisterAwaitUsingReachabilityAnalysis(
+        CompilationStartAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph)
+        => context.RegisterSyntaxNodeAction(
+            c => AnalyzeAwaitUsing(c, helperGraph),
+            SyntaxKind.LocalDeclarationStatement,
+            SyntaxKind.UsingStatement);
+
     private static void AnalyzeAwait(SyntaxNodeAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
         if (context.Node is not AwaitExpressionSyntax awaitExpression ||
@@ -130,13 +138,12 @@ public sealed partial class PluginAnalyzer
             return;
         }
 
-        foreach (var member in awaitableType.GetMembers("GetAwaiter").OfType<IMethodSymbol>())
+        foreach (var member in AwaiterPatternMethods(
+            context.SemanticModel,
+            awaitableType,
+            location.SourceSpan.Start,
+            context.CancellationToken))
         {
-            if (member.Parameters.Length != 0 || member.IsStatic)
-            {
-                continue;
-            }
-
             RecordAwaiterCall(context, helperGraph, method, member, location);
             if (member.ReturnType.GetMembers("IsCompleted").OfType<IPropertySymbol>().FirstOrDefault()?.GetMethod is
                 { } isCompletedGetter)
@@ -151,5 +158,85 @@ public sealed partial class PluginAnalyzer
             RecordAwaiterCall(context, helperGraph, method, getResult, location);
             return;
         }
+    }
+
+    private static IEnumerable<IMethodSymbol> AwaiterPatternMethods(
+        SemanticModel semanticModel,
+        ITypeSymbol awaitableType,
+        int position,
+        CancellationToken cancellationToken)
+    {
+        foreach (var member in awaitableType.GetMembers("GetAwaiter").OfType<IMethodSymbol>())
+        {
+            if (!member.IsStatic && member.Parameters.Length == 0)
+            {
+                yield return member;
+            }
+        }
+
+        var foundExtension = false;
+        foreach (var symbol in semanticModel.LookupSymbols(
+                position,
+                name: "GetAwaiter",
+                includeReducedExtensionMethods: true).OfType<IMethodSymbol>())
+        {
+            var method = symbol.ReducedFrom ?? symbol;
+            if (IsAwaiterExtensionFor(semanticModel.Compilation, awaitableType, method))
+            {
+                foundExtension = true;
+                yield return method;
+            }
+        }
+
+        if (foundExtension)
+        {
+            yield break;
+        }
+
+        foreach (var method in SourceExtensionAwaiterPatternMethods(
+            semanticModel,
+            awaitableType,
+            cancellationToken))
+        {
+            yield return method;
+        }
+    }
+
+    private static IEnumerable<IMethodSymbol> SourceExtensionAwaiterPatternMethods(
+        SemanticModel semanticModel,
+        ITypeSymbol awaitableType,
+        CancellationToken cancellationToken)
+    {
+        foreach (var declaration in semanticModel.SyntaxTree
+            .GetRoot(cancellationToken)
+            .DescendantNodes()
+            .OfType<MethodDeclarationSyntax>())
+        {
+            if (!string.Equals(declaration.Identifier.ValueText, "GetAwaiter", StringComparison.Ordinal) ||
+                semanticModel.GetDeclaredSymbol(declaration, cancellationToken) is not { } method ||
+                !IsAwaiterExtensionFor(semanticModel.Compilation, awaitableType, method))
+            {
+                continue;
+            }
+
+            yield return method;
+        }
+    }
+
+    private static bool IsAwaiterExtensionFor(
+        Compilation compilation,
+        ITypeSymbol awaitableType,
+        IMethodSymbol method)
+    {
+        if (!method.IsExtensionMethod ||
+            method.Parameters.Length == 0 ||
+            method.Parameters[0].RefKind != RefKind.None ||
+            method.ReturnsVoid)
+        {
+            return false;
+        }
+
+        var receiverConversion = compilation.ClassifyConversion(awaitableType, method.Parameters[0].Type);
+        return receiverConversion.IsImplicit;
     }
 }

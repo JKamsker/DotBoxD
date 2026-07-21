@@ -1,4 +1,6 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
 
@@ -21,6 +23,25 @@ public sealed partial class PluginAnalyzer
     {
         var operation = (IUsingDeclarationOperation)context.Operation;
         RecordDisposalReachability(context, helperGraph, operation.DeclarationGroup, operation.IsAsynchronous);
+    }
+
+    private static void AnalyzeAwaitUsing(SyntaxNodeAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
+    {
+        if (context.SemanticModel.GetEnclosingSymbol(
+                context.Node.SpanStart,
+                context.CancellationToken) is not IMethodSymbol method)
+        {
+            return;
+        }
+
+        var location = context.Node.GetLocation();
+        foreach (var resourceType in AwaitUsingResourceTypes(context))
+        {
+            if (TryResolveDisposeMethod(resourceType, isAsynchronous: true, out var disposeMethod))
+            {
+                RecordAwaitablePatternCalls(context, helperGraph, method, disposeMethod.ReturnType, location);
+            }
+        }
     }
 
     private static void RecordDisposalReachability(
@@ -82,6 +103,51 @@ public sealed partial class PluginAnalyzer
                 if (operation.Type is { } type)
                 {
                     yield return type;
+                }
+
+                yield break;
+        }
+    }
+
+    private static IEnumerable<ITypeSymbol> AwaitUsingResourceTypes(SyntaxNodeAnalysisContext context)
+    {
+        switch (context.Node)
+        {
+            case LocalDeclarationStatementSyntax declaration
+                when declaration.AwaitKeyword.IsKind(SyntaxKind.AwaitKeyword) &&
+                    declaration.UsingKeyword.IsKind(SyntaxKind.UsingKeyword):
+                foreach (var variable in declaration.Declaration.Variables)
+                {
+                    if (context.SemanticModel.GetDeclaredSymbol(
+                            variable,
+                            context.CancellationToken) is ILocalSymbol local)
+                    {
+                        yield return local.Type;
+                    }
+                }
+
+                yield break;
+
+            case UsingStatementSyntax usingStatement
+                when usingStatement.AwaitKeyword.IsKind(SyntaxKind.AwaitKeyword):
+                if (usingStatement.Declaration is { } usingDeclaration)
+                {
+                    foreach (var variable in usingDeclaration.Variables)
+                    {
+                        if (context.SemanticModel.GetDeclaredSymbol(
+                                variable,
+                                context.CancellationToken) is ILocalSymbol local)
+                        {
+                            yield return local.Type;
+                        }
+                    }
+                }
+                else if (usingStatement.Expression is { } expression &&
+                    context.SemanticModel.GetTypeInfo(
+                        expression,
+                        context.CancellationToken).Type is { } expressionType)
+                {
+                    yield return expressionType;
                 }
 
                 yield break;
