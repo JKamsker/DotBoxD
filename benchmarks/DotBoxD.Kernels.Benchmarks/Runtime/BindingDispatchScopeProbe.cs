@@ -15,17 +15,19 @@ internal static class BindingDispatchScopeProbe
 
     public static void Run()
     {
-        _ = Measure(Warmup);
+        using var liveCancellation = new CancellationTokenSource();
+        _ = Measure(Warmup, CancellationToken.None);
+        _ = Measure(Warmup, liveCancellation.Token);
         _ = MeasureAudited(Warmup, isAsync: false);
         _ = MeasureAudited(Warmup, isAsync: true);
 
-        var measurement = Measure(Iterations);
+        var defaultToken = Measure(Iterations, CancellationToken.None);
+        var liveToken = Measure(Iterations, liveCancellation.Token);
         var auditedSync = MeasureAudited(Iterations, isAsync: false);
         var auditedAsyncCompleted = MeasureAudited(Iterations, isAsync: true);
         Console.WriteLine($"iterations = {Iterations:N0}");
-        Console.WriteLine(
-            $"CompiledRuntime.CallBinding no-op {measurement.Milliseconds,8:N1} ms " +
-            $"{measurement.AllocatedBytes,14:N0} B {measurement.HostCalls,12:N0} calls");
+        WriteMeasurement("no-op, default token", defaultToken);
+        WriteMeasurement("no-op, live token", liveToken);
         WriteMeasurement("audited sync", auditedSync);
         WriteMeasurement("audited async-completed", auditedAsyncCompleted);
     }
@@ -33,15 +35,17 @@ internal static class BindingDispatchScopeProbe
     private static void WriteMeasurement(string label, Measurement measurement)
         => Console.WriteLine(
             $"CompiledRuntime.CallBinding {label,-23} {measurement.Milliseconds,8:N1} ms " +
-            $"{measurement.AllocatedBytes,14:N0} B {measurement.HostCalls,12:N0} calls");
+            $"{measurement.NanosecondsPerCall,8:N1} ns/call " +
+            $"{measurement.AllocatedBytes,14:N0} B {measurement.BytesPerCall,8:N1} B/call " +
+            $"{measurement.HostCalls,12:N0} calls");
 
-    private static Measurement Measure(int iterations)
+    private static Measurement Measure(int iterations, CancellationToken runToken)
     {
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
 
-        var context = CreateContext();
+        var context = CreateContext(runToken);
         var args = Array.Empty<SandboxValue>();
         var sw = new Stopwatch();
         var before = GC.GetAllocatedBytesForCurrentThread();
@@ -82,7 +86,7 @@ internal static class BindingDispatchScopeProbe
             context.Budget.HostCalls);
     }
 
-    private static SandboxContext CreateContext()
+    private static SandboxContext CreateContext(CancellationToken runToken)
     {
         var limits = new ResourceLimits(
             MaxFuel: long.MaxValue,
@@ -96,7 +100,7 @@ internal static class BindingDispatchScopeProbe
             new ResourceMeter(limits),
             new BindingRegistryBuilder().Add(Descriptor()).Build(),
             NoopAuditSink.Instance,
-            CancellationToken.None);
+            runToken);
     }
 
     private static (SandboxContext Context, AuditInvoker Invoker) CreateAuditedContext(bool isAsync)
@@ -181,5 +185,10 @@ internal static class BindingDispatchScopeProbe
             => false;
     }
 
-    private readonly record struct Measurement(double Milliseconds, long AllocatedBytes, int HostCalls);
+    private readonly record struct Measurement(double Milliseconds, long AllocatedBytes, int HostCalls)
+    {
+        public double NanosecondsPerCall => Milliseconds * 1_000_000 / Iterations;
+
+        public double BytesPerCall => AllocatedBytes / (double)Iterations;
+    }
 }
