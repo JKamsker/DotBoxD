@@ -91,14 +91,20 @@ internal sealed class AutoExecutionHotness
     private readonly record struct AutoHotnessKey(string PlanHash, string Entrypoint);
 }
 
-internal sealed class AutoHotnessAttempt(
-    AutoHotnessState state,
-    ModuleHotnessStats stats)
+internal readonly struct AutoHotnessAttempt
 {
-    public ModuleHotnessStats Stats { get; } = stats;
+    private readonly AutoHotnessState _state;
+
+    public AutoHotnessAttempt(AutoHotnessState state, ModuleHotnessStats stats)
+    {
+        _state = state;
+        Stats = stats;
+    }
+
+    public ModuleHotnessStats Stats { get; }
 
     public void Complete(SandboxExecutionResult result, TimeSpan elapsed)
-        => state.RecordResult(result, elapsed);
+        => _state.RecordResult(result, elapsed);
 }
 
 internal sealed class AutoHotnessState(string planHash, string entrypoint)
