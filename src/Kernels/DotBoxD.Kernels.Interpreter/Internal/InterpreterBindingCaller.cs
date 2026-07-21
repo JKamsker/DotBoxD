@@ -98,10 +98,10 @@ internal static class InterpreterBindingCaller
             throw BindingFailure(context, descriptor, auditInvocation);
         }
 
-        CancellationTokenSource? timeout = null;
+        var timeout = default(BindingWallTimeTokenLease);
         try
         {
-            timeout = context.CreateWallTimeToken();
+            timeout = context.CreateBindingWallTimeToken();
             using var returnCredits = context.BeginBindingReturnCreditScope(descriptor.ReturnType);
             var pending = arguments.Invoke(context, descriptor, timeout.Token);
             var value = pending.IsCompleted
@@ -122,7 +122,7 @@ internal static class InterpreterBindingCaller
             context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, SandboxErrorCode.Cancelled);
             throw;
         }
-        catch (OperationCanceledException) when (timeout?.IsCancellationRequested == true)
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
         {
             var error = new SandboxError(SandboxErrorCode.Timeout, $"binding '{descriptor.Id}' timed out");
             context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, error.Code);
@@ -134,7 +134,7 @@ internal static class InterpreterBindingCaller
         }
         finally
         {
-            timeout?.Dispose();
+            timeout.Dispose();
         }
     }
 

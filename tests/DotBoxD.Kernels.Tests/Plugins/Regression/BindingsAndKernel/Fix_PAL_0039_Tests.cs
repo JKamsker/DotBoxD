@@ -19,7 +19,7 @@ public sealed class Fix_PAL_0039_Tests
 {
     // A generous wall-time budget so the produced token is never cancelled
     // mid-test and the deadline is the only reason a source would exist.
-    private static SandboxContext Context()
+    private static SandboxContext Context(CancellationToken cancellationToken = default)
     {
         var limits = new ResourceLimits(
             MaxFuel: 1_000_000,
@@ -32,7 +32,7 @@ public sealed class Fix_PAL_0039_Tests
             new ResourceMeter(limits),
             new BindingRegistryBuilder().Build(),
             new InMemoryAuditSink(),
-            CancellationToken.None);
+            cancellationToken);
     }
 
     [Fact]
@@ -86,6 +86,86 @@ public sealed class Fix_PAL_0039_Tests
                 DisposeIfOwned(second);
             }
         }
+    }
+
+    [Fact]
+    public void Binding_wall_time_lease_for_cancelable_run_does_not_allocate_per_call()
+    {
+        using var runCancellation = new CancellationTokenSource();
+        var context = Context(runCancellation.Token);
+        context.CreateBindingWallTimeToken().Dispose();
+
+        const int iterations = 1_000;
+        var allTokensCancelable = true;
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < iterations; i++)
+        {
+            using var lease = context.CreateBindingWallTimeToken();
+            allTokensCancelable &= lease.Token.CanBeCanceled;
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        Assert.True(allTokensCancelable);
+        Assert.Equal(0, allocated);
+    }
+
+    [Fact]
+    public async Task Disposing_nested_lease_does_not_unlink_outer_run_cancellation()
+    {
+        using var runCancellation = new CancellationTokenSource();
+        var context = Context(runCancellation.Token);
+        using var outer = context.CreateBindingWallTimeToken();
+        var inner = context.CreateBindingWallTimeToken();
+
+        inner.Dispose();
+        await runCancellation.CancelAsync();
+
+        Assert.True(outer.IsCancellationRequested);
+        Assert.True(outer.Token.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task Disposed_final_lease_unlinks_run_cancellation_from_deadline_source()
+    {
+        using var runCancellation = new CancellationTokenSource();
+        var context = Context(runCancellation.Token);
+        var lease = context.CreateBindingWallTimeToken();
+        var deadlineToken = lease.Token;
+
+        lease.Dispose();
+        await runCancellation.CancelAsync();
+
+        Assert.False(deadlineToken.IsCancellationRequested);
+    }
+
+    [Fact]
+    public void Recycled_context_generation_replaces_its_wall_time_source()
+    {
+        var context = Context();
+        var first = context.CreateBindingWallTimeToken();
+        var firstToken = first.Token;
+        first.Dispose();
+
+        context.Budget.ResetForReuse();
+        context.ResetForCompiledNoAuditReuse();
+
+        using var second = context.CreateBindingWallTimeToken();
+        Assert.NotEqual(firstToken, second.Token);
+    }
+
+    [Fact]
+    public void Concurrent_first_leases_publish_one_wall_time_source()
+    {
+        var context = Context();
+        var tokens = new CancellationToken[32];
+
+        Parallel.For(0, tokens.Length, i =>
+        {
+            using var lease = context.CreateBindingWallTimeToken();
+            tokens[i] = lease.Token;
+        });
+
+        Assert.All(tokens, token => Assert.Equal(tokens[0], token));
     }
 
     private static void DisposeIfOwned(CancellationTokenSource? source) => source?.Dispose();

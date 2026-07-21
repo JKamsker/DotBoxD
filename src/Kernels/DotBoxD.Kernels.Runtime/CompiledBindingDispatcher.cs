@@ -44,10 +44,10 @@ internal static partial class CompiledBindingDispatcher
             throw BindingFailure(context, descriptor, auditInvocation);
         }
 
-        CancellationTokenSource? timeout = null;
+        var timeout = default(BindingWallTimeTokenLease);
         try
         {
-            timeout = context.CreateWallTimeToken();
+            timeout = context.CreateBindingWallTimeToken();
             using var returnCredits = context.BeginBindingReturnCreditScope(descriptor.ReturnType);
             var value = AwaitBinding(context, descriptor.Invoke(context, args, timeout.Token), timeout.Token);
             context.Checkpoint();
@@ -65,7 +65,7 @@ internal static partial class CompiledBindingDispatcher
             context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, SandboxErrorCode.Cancelled);
             throw;
         }
-        catch (OperationCanceledException) when (timeout?.IsCancellationRequested == true)
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
         {
             var error = new SandboxError(SandboxErrorCode.Timeout, $"binding '{id}' timed out");
             context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, error.Code);
@@ -77,7 +77,7 @@ internal static partial class CompiledBindingDispatcher
         }
         finally
         {
-            timeout?.Dispose();
+            timeout.Dispose();
         }
     }
 
@@ -111,10 +111,10 @@ internal static partial class CompiledBindingDispatcher
             throw BindingFailure(context, descriptor, auditInvocation);
         }
 
-        CancellationTokenSource? timeout = null;
+        var timeout = default(BindingWallTimeTokenLease);
         try
         {
-            timeout = context.CreateWallTimeToken();
+            timeout = context.CreateBindingWallTimeToken();
             using var returnCredits = context.BeginBindingReturnCreditScope(descriptor.ReturnType);
             var pending = descriptor.Invoke.Target is IOneArgumentBindingInvoker fastInvoker
                 ? fastInvoker.Invoke(context, arg0, timeout.Token)
@@ -135,7 +135,7 @@ internal static partial class CompiledBindingDispatcher
             context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, SandboxErrorCode.Cancelled);
             throw;
         }
-        catch (OperationCanceledException) when (timeout?.IsCancellationRequested == true)
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
         {
             var error = new SandboxError(SandboxErrorCode.Timeout, $"binding '{id}' timed out");
             context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, error.Code);
@@ -147,7 +147,7 @@ internal static partial class CompiledBindingDispatcher
         }
         finally
         {
-            timeout?.Dispose();
+            timeout.Dispose();
         }
     }
 
@@ -182,10 +182,10 @@ internal static partial class CompiledBindingDispatcher
             throw BindingFailure(context, descriptor, auditInvocation);
         }
 
-        CancellationTokenSource? timeout = null;
+        var timeout = default(BindingWallTimeTokenLease);
         try
         {
-            timeout = context.CreateWallTimeToken();
+            timeout = context.CreateBindingWallTimeToken();
             using var returnCredits = context.BeginBindingReturnCreditScope(descriptor.ReturnType);
             var pending = descriptor.Invoke.Target is ITwoArgumentBindingInvoker fastInvoker
                 ? fastInvoker.Invoke(context, arg0, arg1, timeout.Token)
@@ -206,7 +206,7 @@ internal static partial class CompiledBindingDispatcher
             context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, SandboxErrorCode.Cancelled);
             throw;
         }
-        catch (OperationCanceledException) when (timeout?.IsCancellationRequested == true)
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
         {
             var error = new SandboxError(SandboxErrorCode.Timeout, $"binding '{id}' timed out");
             context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, error.Code);
@@ -218,7 +218,7 @@ internal static partial class CompiledBindingDispatcher
         }
         finally
         {
-            timeout?.Dispose();
+            timeout.Dispose();
         }
     }
 

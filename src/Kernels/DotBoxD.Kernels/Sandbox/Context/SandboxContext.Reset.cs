@@ -4,6 +4,7 @@ public sealed partial class SandboxContext
 {
     internal void ResetForCompiledNoAuditReuse()
     {
+        Interlocked.Exchange(ref _sharedWallTimeToken, null)?.DisposeOwned();
         _deterministicRandom = null;
         _returnCredits = null;
         _bindingGrantClock = null;

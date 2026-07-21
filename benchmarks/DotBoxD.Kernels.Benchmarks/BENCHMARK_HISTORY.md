@@ -44,7 +44,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-map-set-replace
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-host-call-accounting
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-run-summary-policy-id
-dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-binding-dispatch-scope
+DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-binding-dispatch-scope
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-binding-arity
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-capability-grant-lookup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-host-service-arguments
@@ -2457,3 +2457,30 @@ Across four fresh Release processes, 250,000 prepared executions containing 33 g
 282.7-291.9 ms (34.3-35.4 ns/statement) to 251.6-254.0 ms (30.5-30.8 ns/statement). The medians improve from
 286.7 to 252.9 ms, or 11.8%. Allocation remains effectively unchanged and is not claimed. The probe pins the Unit result,
 empty audit stream, and exact 67 fuel units per execution; existing debug regressions preserve trace order and node names.
+
+## Shared binding wall-time deadline
+
+Binding dispatch previously called `CancelAfter(RemainingWallTime)` for every host call. Default-token runs repeatedly
+re-armed one timer; live-token runs allocated, armed, linked, and disposed a fresh source. The interpreter and all three
+compiled arities now lease one context-generation source armed once to the resource meter's fixed absolute deadline. A
+live run token is linked only for the duration of each call through an unsafe cancellation registration, and recycled
+contexts dispose and replace the generation source instead of rearming a canceled token.
+
+Command:
+
+```text
+DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-binding-dispatch-scope
+```
+
+Four fresh Release processes, 500,000 completed compiled no-op calls each, measured:
+
+```text
+run token    baseline ns/call / B/call       final ns/call / B/call       median time
+default             146.3-148.4 / 0.0               82.8-89.0 / 0.0            -42.0%
+live              205.9-212.4 / 160.0              98.4-102.0 / 0.0            -52.4%
+```
+
+The live lane removes exactly 80,000,000 bytes, or 160 B/call. Tests cover interpreted and compiled mid-call cancellation,
+default and live-token wall-time expiry, cancellation classification, nested leases, allocation-free warmed registration,
+concurrent first publication, and context-generation replacement. The public source-returning API retains its ownership
+behavior; the lease is internal runtime plumbing. No public API, sandbox budget, or timeout deadline changes.
