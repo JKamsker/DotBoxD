@@ -60,21 +60,28 @@ internal readonly partial struct ExpressionEvaluator
 
         if (_interpreter.TryGetFunction(call.Name, out var function))
         {
-            return call.Arguments.Count is 1 or 2 or 3 &&
-                   function.Parameters.Count == call.Arguments.Count
-                ? LocalFunctionCallEvaluator.Evaluate(this, call, function, frame)
-                : EvaluateCallViaArray(call, frame);
+            return EvaluateLocalFunctionCall(call, function, frame);
         }
 
         if (Context.Bindings.TryGetDescriptor(call.Name, out var descriptor))
         {
-            return CanUseScalarBinding(call, descriptor)
-                ? BindingCallEvaluator.Evaluate(this, call, descriptor, frame)
-                : EvaluateCallViaArray(call, frame, descriptor);
+            return EvaluateBindingCall(call, descriptor, frame);
         }
 
         return EvaluateCallViaArray(call, frame);
     }
+
+    private ValueTask<SandboxValue> EvaluateLocalFunctionCall(
+        CallExpression call, SandboxFunction function, InterpreterFrame frame) =>
+        call.Arguments.Count is 1 or 2 or 3 && function.Parameters.Count == call.Arguments.Count
+            ? LocalFunctionCallEvaluator.Evaluate(this, call, function, frame)
+            : EvaluateCallViaArray(call, frame);
+
+    private ValueTask<SandboxValue> EvaluateBindingCall(
+        CallExpression call, BindingDescriptor descriptor, InterpreterFrame frame) =>
+        CanUseScalarBinding(call, descriptor)
+            ? BindingCallEvaluator.Evaluate(this, call, descriptor, frame)
+            : EvaluateCallViaArray(call, frame, descriptor);
 
     private ValueTask<SandboxValue> EvaluateNumericConversion(
         string name,
