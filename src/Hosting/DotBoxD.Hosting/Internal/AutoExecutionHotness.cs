@@ -12,8 +12,7 @@ internal sealed class AutoExecutionHotness
     internal const int DefaultMaxEntries = 4096;
 
     private readonly object _gate = new();
-    private readonly Dictionary<string, LinkedListNode<AutoHotnessState>> _states =
-        new(StringComparer.Ordinal);
+    private readonly Dictionary<AutoHotnessKey, LinkedListNode<AutoHotnessState>> _states = new();
     private readonly LinkedList<AutoHotnessState> _recency = new();
     private readonly int _maxEntries;
 
@@ -45,11 +44,11 @@ internal sealed class AutoExecutionHotness
 
     public AutoHotnessAttempt BeginAttempt(ExecutionPlan plan, string entrypoint)
     {
-        var state = Touch(Key(plan.PlanHash, entrypoint), plan.PlanHash, entrypoint);
+        var state = Touch(new AutoHotnessKey(plan.PlanHash, entrypoint));
         return state.BeginAttempt();
     }
 
-    private AutoHotnessState Touch(string key, string planHash, string entrypoint)
+    private AutoHotnessState Touch(AutoHotnessKey key)
     {
         lock (_gate)
         {
@@ -60,14 +59,14 @@ internal sealed class AutoExecutionHotness
                 return existing.Value;
             }
 
-            var node = _recency.AddLast(new AutoHotnessState(planHash, entrypoint));
+            var node = _recency.AddLast(new AutoHotnessState(key.PlanHash, key.Entrypoint));
             _states.Add(key, node);
             EvictIfNeeded(key);
             return node.Value;
         }
     }
 
-    private void EvictIfNeeded(string addedKey)
+    private void EvictIfNeeded(AutoHotnessKey addedKey)
     {
         while (_states.Count > _maxEntries)
         {
@@ -77,8 +76,8 @@ internal sealed class AutoExecutionHotness
                 return;
             }
 
-            var oldestKey = Key(oldest.Value.PlanHash, oldest.Value.Entrypoint);
-            if (StringComparer.Ordinal.Equals(oldestKey, addedKey))
+            var oldestKey = new AutoHotnessKey(oldest.Value.PlanHash, oldest.Value.Entrypoint);
+            if (oldestKey == addedKey)
             {
                 // Never evict the entry we just added in response to this attempt.
                 return;
@@ -89,8 +88,7 @@ internal sealed class AutoExecutionHotness
         }
     }
 
-    private static string Key(string planHash, string entrypoint)
-        => planHash + "|" + entrypoint;
+    private readonly record struct AutoHotnessKey(string PlanHash, string Entrypoint);
 }
 
 internal sealed class AutoHotnessAttempt(

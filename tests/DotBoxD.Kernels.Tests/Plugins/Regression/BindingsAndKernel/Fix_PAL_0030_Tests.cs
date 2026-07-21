@@ -76,6 +76,23 @@ public sealed class Fix_PAL_0030_Tests
     }
 
     [Fact]
+    public async Task Plan_and_entrypoint_delimiters_do_not_merge_distinct_hotness_entries()
+    {
+        var hotness = new AutoExecutionHotness(maxEntries: 16);
+        var template = await PrepareTemplatePlanAsync();
+
+        var first = hotness.BeginAttempt(WithPlanHash(template, "a|b"), "c");
+        var second = hotness.BeginAttempt(WithPlanHash(template, "a"), "b|c");
+
+        Assert.Equal("a|b", first.Stats.PlanHash);
+        Assert.Equal("c", first.Stats.Entrypoint);
+        Assert.Equal("a", second.Stats.PlanHash);
+        Assert.Equal("b|c", second.Stats.Entrypoint);
+        Assert.Equal(1, second.Stats.RunCount);
+        Assert.Equal(2, hotness.Count);
+    }
+
+    [Fact]
     public void Rejects_non_positive_capacity()
         => Assert.Throws<ArgumentOutOfRangeException>(() => new AutoExecutionHotness(maxEntries: 0));
 
