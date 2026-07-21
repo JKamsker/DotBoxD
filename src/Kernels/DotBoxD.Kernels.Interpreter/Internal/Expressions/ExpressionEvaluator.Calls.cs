@@ -1,3 +1,4 @@
+using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Interpreter.Frame;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
@@ -52,9 +53,24 @@ internal sealed partial class ExpressionEvaluator
             return EvaluateFixedArityCollectionCall(call, fixedArity, frame);
         }
 
-        if (TryGetScalarLocalFunction(call, out var function))
+        if (CollectionCalls.ContainsKey(call.Name))
         {
-            return LocalFunctionCallEvaluator.Evaluate(this, call, function, frame);
+            return EvaluateCallViaArray(call, frame);
+        }
+
+        if (_interpreter.TryGetFunction(call.Name, out var function))
+        {
+            return call.Arguments.Count is 1 or 2 or 3 &&
+                   function.Parameters.Count == call.Arguments.Count
+                ? LocalFunctionCallEvaluator.Evaluate(this, call, function, frame)
+                : EvaluateCallViaArray(call, frame);
+        }
+
+        if (_context.Bindings.TryGetDescriptor(call.Name, out var descriptor))
+        {
+            return CanUseScalarBinding(call, descriptor)
+                ? BindingCallEvaluator.Evaluate(this, call, descriptor, frame)
+                : EvaluateCallViaArray(call, frame, descriptor);
         }
 
         return EvaluateCallViaArray(call, frame);
@@ -151,16 +167,17 @@ internal sealed partial class ExpressionEvaluator
         return CollectionIntrinsicDispatcher.Dispatch(call, arg0, arg1, arg2, _context);
     }
 
-    private bool TryGetScalarLocalFunction(CallExpression call, out SandboxFunction function)
-    {
-        function = null!;
-        return call.Arguments.Count is 1 or 2 or 3 &&
-               !CollectionCalls.ContainsKey(call.Name) &&
-               _interpreter.TryGetFunction(call.Name, out function) &&
-               function.Parameters.Count == call.Arguments.Count;
-    }
+    private static bool CanUseScalarBinding(CallExpression call, BindingDescriptor descriptor)
+        => descriptor.Parameters.Count == call.Arguments.Count &&
+           (call.Arguments.Count == 1
+            ? descriptor.Invoke.Target is IOneArgumentBindingInvoker
+            : call.Arguments.Count == 2 &&
+              descriptor.Invoke.Target is ITwoArgumentBindingInvoker);
 
-    private ValueTask<SandboxValue> EvaluateCallViaArray(CallExpression call, InterpreterFrame frame)
+    private ValueTask<SandboxValue> EvaluateCallViaArray(
+        CallExpression call,
+        InterpreterFrame frame,
+        BindingDescriptor? resolvedBinding = null)
     {
         var arguments = call.Arguments;
         var argCount = arguments.Count;
@@ -170,13 +187,13 @@ internal sealed partial class ExpressionEvaluator
             var argTask = EvaluateAsync(arguments[i], frame);
             if (!argTask.IsCompletedSuccessfully)
             {
-                return AwaitCallArguments(call, args, i, argTask, frame);
+                return AwaitCallArguments(call, args, i, argTask, frame, resolvedBinding);
             }
 
             args[i] = argTask.Result;
         }
 
-        return DispatchCall(call, args, frame);
+        return DispatchCall(call, args, frame, resolvedBinding);
     }
 
     private async ValueTask<SandboxValue> AwaitCallArguments(
@@ -184,7 +201,8 @@ internal sealed partial class ExpressionEvaluator
         SandboxValue[] args,
         int pending,
         ValueTask<SandboxValue> pendingTask,
-        InterpreterFrame frame)
+        InterpreterFrame frame,
+        BindingDescriptor? resolvedBinding)
     {
         args[pending] = await pendingTask.ConfigureAwait(false);
         for (var i = pending + 1; i < args.Length; i++)
@@ -192,10 +210,14 @@ internal sealed partial class ExpressionEvaluator
             args[i] = await EvaluateAsync(call.Arguments[i], frame).ConfigureAwait(false);
         }
 
-        return await DispatchCall(call, args, frame).ConfigureAwait(false);
+        return await DispatchCall(call, args, frame, resolvedBinding).ConfigureAwait(false);
     }
 
-    private ValueTask<SandboxValue> DispatchCall(CallExpression call, SandboxValue[] args, InterpreterFrame frame)
+    private ValueTask<SandboxValue> DispatchCall(
+        CallExpression call,
+        SandboxValue[] args,
+        InterpreterFrame frame,
+        BindingDescriptor? resolvedBinding)
     {
         if (TryEvaluateCollectionCall(call, args, out var collectionValue))
         {
@@ -205,6 +227,12 @@ internal sealed partial class ExpressionEvaluator
         if (_interpreter.TryGetFunction(call.Name, out var function))
         {
             return _interpreter.InvokeFunctionAsync(function, LocalFunctionArguments.FromArray(args));
+        }
+
+        if (resolvedBinding is not null)
+        {
+            return InterpreterBindingCaller.CallAsync(
+                _context, _options, _moduleHash, resolvedBinding, args, frame.FunctionId);
         }
 
         if (_context.Bindings.TryGetDescriptor(call.Name, out var descriptor))

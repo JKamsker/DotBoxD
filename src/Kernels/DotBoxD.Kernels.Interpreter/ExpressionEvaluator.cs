@@ -1,4 +1,5 @@
 using DotBoxD.Kernels.Interpreter.Frame;
+using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 
@@ -165,6 +166,21 @@ internal sealed partial class ExpressionEvaluator
 
     public ValueTask<SandboxValue> InvokeFunctionAsync(SandboxFunction function, LocalFunctionTripleArguments args)
         => _interpreter.InvokeFunctionAsync(function, args);
+
+    public ValueTask<SandboxValue> InvokeBindingAsync(
+        BindingDescriptor descriptor,
+        SandboxValue arg0,
+        string functionId)
+        => InterpreterBindingCaller.CallAsync(
+            _context, _options, _moduleHash, descriptor, arg0, functionId);
+
+    public ValueTask<SandboxValue> InvokeBindingAsync(
+        BindingDescriptor descriptor,
+        SandboxValue arg0,
+        SandboxValue arg1,
+        string functionId)
+        => InterpreterBindingCaller.CallAsync(
+            _context, _options, _moduleHash, descriptor, arg0, arg1, functionId);
 
     private SandboxValue ChargeLiteral(SandboxValue value)
     {

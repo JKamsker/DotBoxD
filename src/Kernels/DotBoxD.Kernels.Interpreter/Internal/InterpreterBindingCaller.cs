@@ -20,12 +20,58 @@ internal static class InterpreterBindingCaller
     /// <paramref name="args"/> sequence is caller-owned and may be retained by the host
     /// binding, so it must be a stable, dedicated sequence (never a pooled or reused buffer).
     /// </summary>
-    public static async ValueTask<SandboxValue> CallAsync(
+    public static ValueTask<SandboxValue> CallAsync(
         SandboxContext context,
         SandboxExecutionOptions options,
         string moduleHash,
         BindingDescriptor descriptor,
         IReadOnlyList<SandboxValue> args,
+        string functionId)
+        => CallCoreAsync(
+            context,
+            options,
+            moduleHash,
+            descriptor,
+            BindingInvocationArguments.FromList(args),
+            functionId);
+
+    public static ValueTask<SandboxValue> CallAsync(
+        SandboxContext context,
+        SandboxExecutionOptions options,
+        string moduleHash,
+        BindingDescriptor descriptor,
+        SandboxValue arg0,
+        string functionId)
+        => CallCoreAsync(
+            context,
+            options,
+            moduleHash,
+            descriptor,
+            BindingInvocationArguments.FromSingle(arg0),
+            functionId);
+
+    public static ValueTask<SandboxValue> CallAsync(
+        SandboxContext context,
+        SandboxExecutionOptions options,
+        string moduleHash,
+        BindingDescriptor descriptor,
+        SandboxValue arg0,
+        SandboxValue arg1,
+        string functionId)
+        => CallCoreAsync(
+            context,
+            options,
+            moduleHash,
+            descriptor,
+            BindingInvocationArguments.FromPair(arg0, arg1),
+            functionId);
+
+    private static async ValueTask<SandboxValue> CallCoreAsync(
+        SandboxContext context,
+        SandboxExecutionOptions options,
+        string moduleHash,
+        BindingDescriptor descriptor,
+        BindingInvocationArguments arguments,
         string functionId)
     {
         InterpreterTrace.WriteBindingCall(context, options, moduleHash, functionId, descriptor);
@@ -57,7 +103,7 @@ internal static class InterpreterBindingCaller
         {
             timeout = context.CreateWallTimeToken();
             using var returnCredits = context.BeginBindingReturnCreditScope(descriptor.ReturnType);
-            var pending = descriptor.Invoke(context, args, timeout.Token);
+            var pending = arguments.Invoke(context, descriptor, timeout.Token);
             var value = pending.IsCompleted
                 ? pending.GetAwaiter().GetResult()
                 : await AwaitPendingAsync(context, pending, timeout.Token).ConfigureAwait(false);
@@ -127,5 +173,56 @@ internal static class InterpreterBindingCaller
         }
 
         return await pending.AsTask().WaitAsync(timeoutToken).ConfigureAwait(false);
+    }
+
+    private readonly struct BindingInvocationArguments
+    {
+        private readonly IReadOnlyList<SandboxValue>? _list;
+        private readonly SandboxValue? _arg0;
+        private readonly SandboxValue? _arg1;
+        private readonly InvocationShape _shape;
+
+        private BindingInvocationArguments(
+            IReadOnlyList<SandboxValue>? list,
+            SandboxValue? arg0,
+            SandboxValue? arg1,
+            InvocationShape shape)
+        {
+            _list = list;
+            _arg0 = arg0;
+            _arg1 = arg1;
+            _shape = shape;
+        }
+
+        public static BindingInvocationArguments FromList(IReadOnlyList<SandboxValue> args)
+            => new(args, null, null, InvocationShape.List);
+
+        public static BindingInvocationArguments FromSingle(SandboxValue arg0)
+            => new(null, arg0, null, InvocationShape.Single);
+
+        public static BindingInvocationArguments FromPair(SandboxValue arg0, SandboxValue arg1)
+            => new(null, arg0, arg1, InvocationShape.Pair);
+
+        public ValueTask<SandboxValue> Invoke(
+            SandboxContext context,
+            BindingDescriptor descriptor,
+            CancellationToken cancellationToken)
+            => _shape switch
+            {
+                InvocationShape.Single when descriptor.Invoke.Target is IOneArgumentBindingInvoker invoker =>
+                    invoker.Invoke(context, _arg0!, cancellationToken),
+                InvocationShape.Pair when descriptor.Invoke.Target is ITwoArgumentBindingInvoker invoker =>
+                    invoker.Invoke(context, _arg0!, _arg1!, cancellationToken),
+                InvocationShape.Single => descriptor.Invoke(context, [_arg0!], cancellationToken),
+                InvocationShape.Pair => descriptor.Invoke(context, [_arg0!, _arg1!], cancellationToken),
+                _ => descriptor.Invoke(context, _list!, cancellationToken)
+            };
+    }
+
+    private enum InvocationShape : byte
+    {
+        List,
+        Single,
+        Pair
     }
 }
