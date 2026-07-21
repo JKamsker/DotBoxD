@@ -10,10 +10,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Expose internal test seams (e.g. RpcPeer.HasStarted, catalog registration override) to the
-         test assembly so race-condition fixes can be covered by deterministic red→green tests. No
-         external surface — the test assembly is not shipped. -->
+    <!-- Expose internal test and benchmark seams without adding shipped public surface. -->
     <InternalsVisibleTo Include="DotBoxD.Services.Tests" />
+    <InternalsVisibleTo Include="DotBoxD.Services.Benchmarks" />
   </ItemGroup>
 
   <ItemGroup>
