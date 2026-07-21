@@ -103,7 +103,7 @@ public sealed class PluginAnalyzerForbiddenApiEventSourceLoggingReachabilityTest
         ];
 
         var trustedReferenceNames = new HashSet<string>(
-            TrustedPlatformReferences().Select(reference => Path.GetFileName(reference.Display!)),
+            TrustedPlatformAssemblyPaths().Select(path => Path.GetFileName(path)!),
             StringComparer.OrdinalIgnoreCase);
 
         foreach (var fileName in fileNames)
@@ -115,10 +115,10 @@ public sealed class PluginAnalyzerForbiddenApiEventSourceLoggingReachabilityTest
         }
     }
 
-    private static IEnumerable<MetadataReference> TrustedPlatformReferences()
-    {
-        var references = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))?
+    private static IEnumerable<string> TrustedPlatformAssemblyPaths()
+        => ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))?
             .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries) ?? [];
-        return references.Select(reference => MetadataReference.CreateFromFile(reference));
-    }
+
+    private static IEnumerable<MetadataReference> TrustedPlatformReferences()
+        => TrustedPlatformAssemblyPaths().Select(reference => MetadataReference.CreateFromFile(reference));
 }
