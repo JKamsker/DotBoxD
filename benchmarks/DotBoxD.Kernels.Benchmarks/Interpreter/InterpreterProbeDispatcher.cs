@@ -16,6 +16,12 @@ internal static class InterpreterProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-interpreter-binding-arity", StringComparer.OrdinalIgnoreCase))
+        {
+            await InterpreterBindingArityProbe.RunAsync();
+            return true;
+        }
+
         if (args.Contains("--probe-matrix", StringComparer.OrdinalIgnoreCase))
         {
             await PerformanceMatrixProbe.RunAsync();
