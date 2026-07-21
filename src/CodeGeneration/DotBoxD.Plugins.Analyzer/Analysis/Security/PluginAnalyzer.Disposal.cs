@@ -27,6 +27,11 @@ public sealed partial class PluginAnalyzer
 
     private static void AnalyzeAwaitUsing(SyntaxNodeAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
+        if (!IsAwaitUsingNode(context.Node))
+        {
+            return;
+        }
+
         if (context.SemanticModel.GetEnclosingSymbol(
                 context.Node.SpanStart,
                 context.CancellationToken) is not IMethodSymbol method)
@@ -43,6 +48,16 @@ public sealed partial class PluginAnalyzer
             }
         }
     }
+
+    private static bool IsAwaitUsingNode(SyntaxNode node)
+        => node switch
+        {
+            LocalDeclarationStatementSyntax declaration =>
+                declaration.AwaitKeyword.IsKind(SyntaxKind.AwaitKeyword) &&
+                declaration.UsingKeyword.IsKind(SyntaxKind.UsingKeyword),
+            UsingStatementSyntax usingStatement => usingStatement.AwaitKeyword.IsKind(SyntaxKind.AwaitKeyword),
+            _ => false,
+        };
 
     private static void RecordDisposalReachability(
         OperationAnalysisContext context,
