@@ -161,11 +161,11 @@ public sealed partial class SandboxHost
         SandboxExecutionOptions options,
         CancellationToken cancellationToken)
     {
-        var stopwatch = Stopwatch.StartNew();
+        var started = Stopwatch.GetTimestamp();
         var result = await ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken)
             .ConfigureAwait(false);
-        stopwatch.Stop();
-        hotness.Complete(result, stopwatch.Elapsed);
+        var elapsed = Stopwatch.GetElapsedTime(started);
+        hotness.Complete(result, elapsed);
         return result;
     }
 
@@ -178,7 +178,7 @@ public sealed partial class SandboxHost
         CancellationToken cancellationToken,
         CompiledNoAuditRunState? reusableNoAuditState)
     {
-        var stopwatch = Stopwatch.StartNew();
+        var started = Stopwatch.GetTimestamp();
         var result = await ExecuteCompiledAsync(
                 plan,
                 entrypoint,
@@ -187,8 +187,8 @@ public sealed partial class SandboxHost
                 cancellationToken,
                 reusableNoAuditState)
             .ConfigureAwait(false);
-        stopwatch.Stop();
-        hotness.Complete(result, stopwatch.Elapsed);
+        var elapsed = Stopwatch.GetElapsedTime(started);
+        hotness.Complete(result, elapsed);
         return result;
     }
 
