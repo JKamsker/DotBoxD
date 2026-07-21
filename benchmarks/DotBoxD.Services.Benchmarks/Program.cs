@@ -26,6 +26,9 @@ if (args.Length == 1)
         case "--probe-request-name-cache":
             RpcRequestNameCacheProbe.Run();
             return;
+        case "--probe-peer-frame-send":
+            RpcPeerFrameSendProbe.Run();
+            return;
     }
 }
 
