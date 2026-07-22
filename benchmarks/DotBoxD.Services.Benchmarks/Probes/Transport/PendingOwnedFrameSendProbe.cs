@@ -20,6 +20,7 @@ internal static class PendingOwnedFrameSendProbe
         var pendingConnection = new StreamConnection(pendingStream, ownsStream: false);
         try
         {
+            VerifyOwnedFrameLifetime(synchronousConnection, synchronousStream);
             VerifyOwnedFrameLifetime(pendingConnection, pendingStream);
             var synchronousRaw = Measure(
                 "synchronous raw send",
@@ -134,15 +135,28 @@ internal static class PendingOwnedFrameSendProbe
     {
         var frame = CreateOwnedFrame();
         var pending = connection.SendFrameValueAsync(frame);
-        if (pending.IsCompleted)
+        if (!stream.ForcePending)
         {
-            throw new InvalidOperationException("The lifetime check did not remain pending.");
+            if (!pending.IsCompletedSuccessfully)
+            {
+                throw new InvalidOperationException("The lifetime check did not complete synchronously.");
+            }
+
+            pending.GetAwaiter().GetResult();
+        }
+        else
+        {
+            if (pending.IsCompleted)
+            {
+                throw new InvalidOperationException("The lifetime check did not remain pending.");
+            }
+
+            _ = frame.WrittenMemory;
+            stream.CompletePendingWrite();
+            pending.GetAwaiter().GetResult();
+            stream.ResetCompletedWrite();
         }
 
-        _ = frame.WrittenMemory;
-        stream.CompletePendingWrite();
-        pending.GetAwaiter().GetResult();
-        stream.ResetCompletedWrite();
         try
         {
             _ = frame.WrittenMemory;

@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using DotBoxD.Services.Buffers;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Transports.Tcp;
 
@@ -14,18 +15,24 @@ internal static class TcpSendGateContentionProbe
 
     public static async Task RunAsync()
     {
-        var defaultToken = await MeasureAsync(CancellationToken.None).ConfigureAwait(false);
+        var rawDefault = await MeasureAsync(CancellationToken.None, ownedFrames: false).ConfigureAwait(false);
         using var cancellation = new CancellationTokenSource();
-        var liveToken = await MeasureAsync(cancellation.Token).ConfigureAwait(false);
+        var rawLive = await MeasureAsync(cancellation.Token, ownedFrames: false).ConfigureAwait(false);
+        var ownedDefault = await MeasureAsync(CancellationToken.None, ownedFrames: true).ConfigureAwait(false);
+        var ownedLive = await MeasureAsync(cancellation.Token, ownedFrames: true).ConfigureAwait(false);
 
         Console.WriteLine("TCP contended send-gate admission probe");
-        Console.WriteLine("token         enqueue ns/waiter   enqueue B/waiter");
-        Write("default", defaultToken);
-        Write("live reusable", liveToken);
+        Console.WriteLine("path/token             enqueue ns/waiter   enqueue B/waiter");
+        Write("raw/default", rawDefault);
+        Write("raw/live reusable", rawLive);
+        Write("owned/default", ownedDefault);
+        Write("owned/live reusable", ownedLive);
         Console.WriteLine($"invariants: {Iterations:N0} queued sends behind one backpressured TCP write/lane");
     }
 
-    private static async Task<Measurement> MeasureAsync(CancellationToken cancellationToken)
+    private static async Task<Measurement> MeasureAsync(
+        CancellationToken cancellationToken,
+        bool ownedFrames)
     {
         using var listener = new TcpListener(IPAddress.Loopback, port: 0);
         listener.Start();
@@ -48,12 +55,15 @@ internal static class TcpSendGateContentionProbe
 
         var waitingSends = new Task[Iterations];
         var frame = CreateFrame(MessageFramer.HeaderSize);
+        var frameOwners = ownedFrames ? CreateOwnedFrames() : null;
         ForceGc();
         var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
         var startedAt = Stopwatch.GetTimestamp();
         for (var index = 0; index < waitingSends.Length; index++)
         {
-            waitingSends[index] = connection.SendValueAsync(frame, cancellationToken).AsTask();
+            waitingSends[index] = frameOwners is null
+                ? connection.SendValueAsync(frame, cancellationToken).AsTask()
+                : connection.SendFrameValueAsync(frameOwners[index], cancellationToken).AsTask();
         }
 
         var elapsed = Stopwatch.GetElapsedTime(startedAt);
@@ -75,6 +85,10 @@ internal static class TcpSendGateContentionProbe
             catch (ObjectDisposedException)
             {
             }
+        }
+        if (frameOwners is not null)
+        {
+            AssertDisposed(frameOwners[0]);
         }
 
         return new Measurement(elapsed, allocated);
@@ -111,6 +125,31 @@ internal static class TcpSendGateContentionProbe
         BinaryPrimitives.WriteInt32LittleEndian(frame.AsSpan(4), 1);
         frame[8] = (byte)MessageType.Request;
         return frame;
+    }
+
+    private static PooledBufferWriter[] CreateOwnedFrames()
+    {
+        var frames = new PooledBufferWriter[Iterations];
+        for (var index = 0; index < frames.Length; index++)
+        {
+            var frame = PooledBufferWriter.Rent(MessageFramer.HeaderSize);
+            MessageFramer.WriteFrame(frame, 1, MessageType.Request, ReadOnlySpan<byte>.Empty);
+            frames[index] = frame;
+        }
+
+        return frames;
+    }
+
+    private static void AssertDisposed(PooledBufferWriter frame)
+    {
+        try
+        {
+            _ = frame.WrittenMemory;
+            throw new InvalidOperationException("A queued owned frame was not disposed.");
+        }
+        catch (ObjectDisposedException)
+        {
+        }
     }
 
     private static void ForceGc()

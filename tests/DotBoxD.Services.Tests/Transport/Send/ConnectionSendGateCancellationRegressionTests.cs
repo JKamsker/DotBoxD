@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Net;
 using System.Net.Sockets;
+using DotBoxD.Services.Buffers;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Transport;
 using DotBoxD.Transports.Tcp;
@@ -41,6 +42,34 @@ public sealed class ConnectionSendGateCancellationRegressionTests
     }
 
     [Fact]
+    public async Task StreamConnection_OwnedFrameCanceledWhileSendGateIsContendedIsDisposed()
+    {
+        await using var stream = new BlockingWriteStream();
+        await using var connection = new StreamConnection(stream, ownsStream: false);
+        var rawFrame = CreateFrame(MessageFramer.HeaderSize);
+        var firstSend = connection.SendValueAsync(rawFrame).AsTask();
+        await stream.WriteEntered.WaitAsync(TestTimeout);
+        using var cancellation = new CancellationTokenSource();
+        var ownedFrame = CreateOwnedFrame(MessageFramer.HeaderSize);
+        var waitingSend = connection.SendFrameValueAsync(ownedFrame, cancellation.Token).AsTask();
+
+        try
+        {
+            Assert.False(waitingSend.IsCompleted);
+            _ = ownedFrame.WrittenMemory;
+            cancellation.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => waitingSend.WaitAsync(TestTimeout));
+            AssertDisposed(ownedFrame);
+        }
+        finally
+        {
+            stream.CompleteWrite();
+            await firstSend.WaitAsync(TestTimeout);
+        }
+    }
+
+    [Fact]
     public async Task TcpConnection_LiveTokenCancelsWhileSendGateIsContended()
     {
         await using var pair = await ConnectedTcpPair.CreateAsync();
@@ -51,14 +80,21 @@ public sealed class ConnectionSendGateCancellationRegressionTests
 
         using var cancellation = new CancellationTokenSource();
         var waitingSend = pair.Server.SendValueAsync(smallFrame, cancellation.Token).AsTask();
+        var ownedFrame = CreateOwnedFrame(MessageFramer.HeaderSize);
+        var ownedWaitingSend = pair.Server.SendFrameValueAsync(ownedFrame, cancellation.Token).AsTask();
 
         try
         {
             Assert.False(waitingSend.IsCompleted);
+            Assert.False(ownedWaitingSend.IsCompleted);
+            _ = ownedFrame.WrittenMemory;
             cancellation.Cancel();
 
             await Assert.ThrowsAnyAsync<OperationCanceledException>(
                 () => waitingSend.WaitAsync(TestTimeout));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => ownedWaitingSend.WaitAsync(TestTimeout));
+            AssertDisposed(ownedFrame);
             Assert.False(firstSend.IsCompleted);
         }
         finally
@@ -72,15 +108,20 @@ public sealed class ConnectionSendGateCancellationRegressionTests
     public async Task TcpConnection_DisposeCompletesAllSendsWaitingForGate()
     {
         await using var pair = await ConnectedTcpPair.CreateAsync();
-        var blockingFrame = CreateFrame(MessageFramer.MaxMessageSize);
+        var blockingFrame = CreateOwnedFrame(MessageFramer.MaxMessageSize);
         var smallFrame = CreateFrame(MessageFramer.HeaderSize);
-        var firstSend = pair.Server.SendValueAsync(blockingFrame).AsTask();
+        var firstSend = pair.Server.SendFrameValueAsync(blockingFrame).AsTask();
         Assert.False(firstSend.IsCompleted);
+        _ = blockingFrame.WrittenMemory;
 
         var waitingSends = Enumerable.Range(0, 4)
             .Select(_ => pair.Server.SendValueAsync(smallFrame).AsTask())
             .ToArray();
         Assert.All(waitingSends, static waiting => Assert.False(waiting.IsCompleted));
+        var ownedFrame = CreateOwnedFrame(MessageFramer.HeaderSize);
+        var ownedWaitingSend = pair.Server.SendFrameValueAsync(ownedFrame).AsTask();
+        Assert.False(ownedWaitingSend.IsCompleted);
+        _ = ownedFrame.WrittenMemory;
         using var cancellation = new CancellationTokenSource();
         var canceledSend = pair.Server.SendValueAsync(smallFrame, cancellation.Token).AsTask();
         cancellation.Cancel();
@@ -93,8 +134,12 @@ public sealed class ConnectionSendGateCancellationRegressionTests
             await Assert.ThrowsAsync<ObjectDisposedException>(
                 () => waitingSend.WaitAsync(TestTimeout));
         }
+        await Assert.ThrowsAsync<ObjectDisposedException>(
+            () => ownedWaitingSend.WaitAsync(TestTimeout));
+        AssertDisposed(ownedFrame);
 
         _ = await Record.ExceptionAsync(() => firstSend.WaitAsync(TestTimeout));
+        AssertDisposed(blockingFrame);
         await Assert.ThrowsAsync<ObjectDisposedException>(
             () => pair.Server.SendValueAsync(smallFrame).AsTask());
     }
@@ -135,6 +180,21 @@ public sealed class ConnectionSendGateCancellationRegressionTests
         frame[8] = (byte)MessageType.Request;
         return frame;
     }
+
+    private static PooledBufferWriter CreateOwnedFrame(int length)
+    {
+        var frame = new PooledBufferWriter(length);
+        var span = frame.GetSpan(length);
+        span.Slice(0, length).Clear();
+        BinaryPrimitives.WriteInt32LittleEndian(span, length);
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(4), 1);
+        span[8] = (byte)MessageType.Request;
+        frame.Advance(length);
+        return frame;
+    }
+
+    private static void AssertDisposed(PooledBufferWriter frame) =>
+        Assert.Throws<ObjectDisposedException>(() => _ = frame.WrittenMemory);
 
     private sealed class BlockingWriteStream : Stream
     {

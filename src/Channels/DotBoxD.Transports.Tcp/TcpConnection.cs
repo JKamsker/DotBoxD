@@ -52,6 +52,10 @@ public sealed class TcpConnection : IValidatedSerialFrameChannel
     /// </summary>
     public bool IsConnected => _client.Connected && Volatile.Read(ref _disposed) == 0;
     public string RemoteEndpoint { get; }
+    internal NetworkStream SendStream => _stream;
+    internal SemaphoreSlim SendGate => _sendLock;
+    internal void ThrowIfDisposedForSend() => ThrowIfDisposed();
+    internal void ReleaseSendGate() => TransportSendGate.ReleaseAfterSend(_sendLock, ref _disposed);
 
     public Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) =>
         SendValueAsync(data, ct).AsTask();
@@ -179,17 +183,8 @@ public sealed class TcpConnection : IValidatedSerialFrameChannel
         }
     }
 
-    public async ValueTask SendFrameValueAsync(PooledBufferWriter frame, CancellationToken ct = default)
-    {
-        try
-        {
-            await SendValueAsync(frame.WrittenMemory, ct).ConfigureAwait(false);
-        }
-        finally
-        {
-            frame.Dispose();
-        }
-    }
+    public ValueTask SendFrameValueAsync(PooledBufferWriter frame, CancellationToken ct = default) =>
+        TcpConnectionFrameSender.SendAsync(this, frame, ct);
 
     public ValueTask<Payload> ReceiveValueAsync(CancellationToken ct = default)
     {

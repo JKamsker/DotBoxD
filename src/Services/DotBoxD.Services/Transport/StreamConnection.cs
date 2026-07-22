@@ -53,6 +53,11 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
 
     /// <summary>Configured idle timeout for frame reads.</summary>
     internal TimeSpan FrameReadIdleTimeout => _frameReadIdleTimeout;
+    internal Stream SendStream => _stream;
+    internal SemaphoreSlim SendGate => _sendLock;
+    internal CancellationToken SendDisposalToken => _disposeCts.Token;
+    internal int MaxOutgoingMessageSize => _maxMessageSize;
+    internal void ThrowIfDisposedForSend() => ThrowIfDisposed();
 
     public bool IsConnected =>
         Volatile.Read(ref _disposed) == 0 &&
@@ -222,22 +227,8 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
         }
     }
 
-    public async ValueTask SendFrameValueAsync(PooledBufferWriter frame, CancellationToken ct = default)
-    {
-        if (frame is null)
-        {
-            throw new ArgumentNullException(nameof(frame));
-        }
-
-        try
-        {
-            await SendValueAsync(frame.WrittenMemory, ct).ConfigureAwait(false);
-        }
-        finally
-        {
-            frame.Dispose();
-        }
-    }
+    public ValueTask SendFrameValueAsync(PooledBufferWriter frame, CancellationToken ct = default) =>
+        StreamConnectionFrameSender.SendAsync(this, frame, ct);
 
     public ValueTask<Payload> ReceiveValueAsync(CancellationToken ct = default) =>
         RpcFramePayloadAdapter.DetachAsync(ReceiveFrameValueAsync(ct));

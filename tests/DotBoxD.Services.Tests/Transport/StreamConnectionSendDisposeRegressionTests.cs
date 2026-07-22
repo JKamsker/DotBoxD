@@ -1,3 +1,4 @@
+using DotBoxD.Services.Buffers;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Transport;
 using Xunit;
@@ -20,6 +21,9 @@ public sealed class StreamConnectionSendDisposeRegressionTests
         await stream.WriteEntered.WaitAsync(Timeout);
 
         var secondSend = connection.SendAsync(secondFrame.Memory);
+        var ownedFrame = CreateOwnedFrame();
+        var ownedSend = connection.SendFrameValueAsync(ownedFrame).AsTask();
+        _ = ownedFrame.WrittenMemory;
         await connection.DisposeAsync();
 
         try
@@ -28,14 +32,28 @@ public sealed class StreamConnectionSendDisposeRegressionTests
 
             Assert.NotNull(exception);
             Assert.IsNotType<TimeoutException>(exception);
+            await Assert.ThrowsAsync<ObjectDisposedException>(
+                () => ownedSend.WaitAsync(Timeout));
+            AssertDisposed(ownedFrame);
         }
         finally
         {
             stream.CompleteWrites();
             await Record.ExceptionAsync(() => firstSend.WaitAsync(Timeout));
             await Record.ExceptionAsync(() => secondSend.WaitAsync(Timeout));
+            await Record.ExceptionAsync(() => ownedSend.WaitAsync(Timeout));
         }
     }
+
+    private static PooledBufferWriter CreateOwnedFrame()
+    {
+        var frame = new PooledBufferWriter(MessageFramer.HeaderSize);
+        MessageFramer.WriteFrame(frame, 3, MessageType.Request, ReadOnlySpan<byte>.Empty);
+        return frame;
+    }
+
+    private static void AssertDisposed(PooledBufferWriter frame) =>
+        Assert.Throws<ObjectDisposedException>(() => _ = frame.WrittenMemory);
 
     private sealed class BlockingWriteStream : Stream
     {
