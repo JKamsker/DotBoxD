@@ -134,27 +134,34 @@ public sealed partial class PluginAnalyzer
         out IMethodSymbol getEnumerator)
     {
         getEnumerator = null!;
-        if (collectionType is not INamespaceOrTypeSymbol lookupContainer)
+
+        var symbolInfo = semanticModel.GetSpeculativeSymbolInfo(
+            spread.SpanStart,
+            ExtensionGetEnumeratorInvocation(spread.Expression),
+            SpeculativeBindingOption.BindAsExpression);
+        if (symbolInfo.Symbol is not IMethodSymbol selected)
         {
             return false;
         }
 
-        foreach (var symbol in semanticModel.LookupSymbols(
-                spread.SpanStart,
-                lookupContainer,
-                name: WellKnownMemberNames.GetEnumeratorMethodName,
-                includeReducedExtensionMethods: true)
-            .OfType<IMethodSymbol>())
+        var reduced = ReducedExtensionMethod(selected, collectionType);
+        if (reduced is not { Parameters.Length: 0, ReturnsVoid: false })
         {
-            var reduced = ReducedExtensionMethod(symbol, collectionType);
-            if (reduced is { Parameters.Length: 0, ReturnsVoid: false })
-            {
-                getEnumerator = reduced;
-                return true;
-            }
+            return false;
         }
 
-        return false;
+        getEnumerator = reduced;
+        return true;
+    }
+
+    private static InvocationExpressionSyntax ExtensionGetEnumeratorInvocation(ExpressionSyntax expression)
+    {
+        var receiver = SyntaxFactory.ParenthesizedExpression(expression.WithoutTrivia());
+        return SyntaxFactory.InvocationExpression(
+            SyntaxFactory.MemberAccessExpression(
+                SyntaxKind.SimpleMemberAccessExpression,
+                receiver,
+                SyntaxFactory.IdentifierName(WellKnownMemberNames.GetEnumeratorMethodName)));
     }
 
     private static IMethodSymbol? ReducedExtensionMethod(IMethodSymbol method, ITypeSymbol receiverType)

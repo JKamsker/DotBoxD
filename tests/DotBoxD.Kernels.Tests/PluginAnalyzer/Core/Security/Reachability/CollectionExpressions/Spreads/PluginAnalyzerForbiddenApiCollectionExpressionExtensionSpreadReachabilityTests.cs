@@ -103,6 +103,65 @@ public sealed class PluginAnalyzerForbiddenApiCollectionExpressionExtensionSprea
             ".. new HelperEnumerable()");
     }
 
+    [Fact]
+    public async Task Reports_forbidden_api_reached_through_compiler_selected_extension_enumerator()
+    {
+        const string source = """
+            namespace Sample
+            {
+                using DotBoxD.Abstractions;
+                using DotBoxD.Plugins;
+
+                public sealed class HelperEnumerable
+                {
+                }
+
+                public static class HelperEnumerableExtensions
+                {
+                    public static BenignEnumerator GetEnumerator(this object enumerable) => new();
+
+                    public static DangerousEnumerator GetEnumerator(this HelperEnumerable enumerable) => new();
+                }
+
+                public sealed class BenignEnumerator
+                {
+                    public int Current => 42;
+
+                    public bool MoveNext() => false;
+                }
+
+                public sealed class DangerousEnumerator
+                {
+                    public int Current => 42;
+
+                    public bool MoveNext()
+                    {
+                        _ = System.IO.File.ReadAllText("/x");
+                        return false;
+                    }
+                }
+
+                [Plugin("compiler-selected-extension-spread")]
+                public sealed class CompilerSelectedExtensionSpreadKernel : IEventKernel<string>
+                {
+                    public bool ShouldHandle(string e, HookContext context)
+                    {
+                        int[] values = [.. new HelperEnumerable()];
+                        return values.Length == 0;
+                    }
+
+                    public void Handle(string e, HookContext context) { }
+                }
+            }
+            """;
+
+        var diagnostics = await AnalyzeAsync(source);
+        AssertSingleForbiddenDiagnosticAt(
+            source,
+            diagnostics,
+            ".. new HelperEnumerable()");
+    }
+
     private static void AssertSingleForbiddenDiagnosticAt(
         string source,
         ImmutableArray<Diagnostic> diagnostics,
