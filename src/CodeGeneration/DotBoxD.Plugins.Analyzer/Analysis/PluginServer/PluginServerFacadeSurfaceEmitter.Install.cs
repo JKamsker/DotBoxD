@@ -149,7 +149,9 @@ internal static class PluginServerFacadeInstallSurfaceEmitter
         builder.AppendLine("        try");
         builder.AppendLine("        {");
         builder.AppendLine("            ThrowIfDisposed();");
-        builder.AppendLine("            var installedId = await InstallServerExtensionPackageAsync(factory(), default).ConfigureAwait(false);");
+        builder.AppendLine("            var package = factory();");
+        builder.AppendLine("            RequireInstalledPackageId(package, pluginId);");
+        builder.AppendLine("            var installedId = await InstallServerExtensionPackageAsync(package, default).ConfigureAwait(false);");
         builder.AppendLine("            if (!global::System.StringComparer.Ordinal.Equals(installedId, pluginId))");
         builder.AppendLine("            {");
         builder.AppendLine("                RemoveAnonymousKernel(pluginId, install);");
