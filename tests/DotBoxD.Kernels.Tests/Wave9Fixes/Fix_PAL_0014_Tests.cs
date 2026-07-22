@@ -9,19 +9,15 @@ namespace DotBoxD.Kernels.Tests.Wave9Fixes;
 
 // Regression test for PAL-0014: IPC convenience defaults bypass the low-allocation profile.
 //
-// The DotBoxD.Kernels DotBoxD MessagePack IPC convenience defaults (the options applied when callers pass
-// no RpcPeerOptions to ConnectAsync / ListenNamedPipe etc.) use a finite RequestTimeout and do not
-// set EnableLowAllocationValueTaskInvocations. Per the DotBoxD contract, the pooled low-allocation
-// unary ValueTask<T> path is only taken when RequestTimeout == Timeout.InfiniteTimeSpan AND
-// EnableLowAllocationValueTaskInvocations == true. Callers using the convenience helpers therefore
-// silently get the higher-allocation Task<T>-backed path.
+// The DotBoxD.Kernels MessagePack IPC convenience defaults must opt callers into pooled unary
+// ValueTask<T> responses. Finite request timeouts are supported by that pooled path, while the
+// convenience profile also uses an infinite timeout to remove timeout-scheduler coordination.
 //
 // This test connects two sessions over identical in-memory transports: one using the default
 // convenience options (null) and one using explicit low-allocation options, then measures per-call
 // allocation of a unary ValueTask<int> round trip. The CORRECT behavior the fix should establish is
-// that the public convenience path IS the low-allocation path, so the default path's per-call
-// allocation should be at parity with the explicit low-allocation path. It is red today because the
-// default path allocates materially more per call.
+// that the public convenience path remains the low-allocation path, so its per-call allocation stays
+// at parity with the explicit profile.
 [Collection(AllocationMeasurementCollection.Name)]
 [Trait(AllocationMeasurementCollection.TraitName, AllocationMeasurementCollection.TraitValue)]
 public sealed class Fix_PAL_0014_Tests

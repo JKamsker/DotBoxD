@@ -34,21 +34,29 @@ internal sealed class PendingRequests : IDisposable
         return TryAddCore(messageId, candidate, out pending);
     }
 
-    public bool TryAddValueTaskUnary<TResponse>(int messageId, out PendingValueTaskUnaryResponse<TResponse> pending)
+    public bool TryAddValueTaskUnary<TResponse>(
+        int messageId,
+        string service,
+        string method,
+        out PendingValueTaskUnaryResponse<TResponse> pending)
     {
-        var candidate = PendingValueTaskUnaryResponse<TResponse>.Rent(messageId);
+        var candidate = PendingValueTaskUnaryResponse<TResponse>.Rent(messageId, service, method);
         var added = TryAddCore(messageId, candidate, out pending);
         if (!added)
-            candidate.Abandon();
+            candidate.AbandonUnpublished();
         return added;
     }
 
-    public bool TryAddValueTaskNoResponse(int messageId, out PendingValueTaskNoResponse pending)
+    public bool TryAddValueTaskNoResponse(
+        int messageId,
+        string service,
+        string method,
+        out PendingValueTaskNoResponse pending)
     {
-        var candidate = PendingValueTaskNoResponse.Rent(messageId);
+        var candidate = PendingValueTaskNoResponse.Rent(messageId, service, method);
         var added = TryAddCore(messageId, candidate, out pending);
         if (!added)
-            candidate.Abandon();
+            candidate.AbandonUnpublished();
         return added;
     }
 
@@ -68,13 +76,15 @@ internal sealed class PendingRequests : IDisposable
         return false;
     }
 
-    public void Remove(int messageId, IPendingResponse pending, bool consumed)
+    public bool Remove(int messageId, IPendingResponse pending, bool consumed)
     {
-        TryRemove(messageId, pending);
+        var removed = TryRemove(messageId, pending);
         if (!consumed)
         {
             pending.DisposeResultWhenAvailable();
         }
+
+        return removed;
     }
 
     public bool TryTake(int messageId, out IPendingResponse pending)

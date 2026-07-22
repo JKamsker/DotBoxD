@@ -8,19 +8,16 @@ using DotBoxD.Services.Transport;
 namespace DotBoxD.Services.Client;
 
 internal sealed class PendingValueTaskUnaryResponse<TResponse> :
-    IPendingResponse,
+    PooledPendingResponse,
     IValueTaskSource<TResponse>
 {
+    // Sequential callers use the atomic slot; concurrent returns spill into the locked list.
     private static readonly object PoolGate = new();
-    private static PendingValueTaskUnaryResponse<TResponse>? s_pool;
+    private static PendingValueTaskUnaryResponse<TResponse>? s_cached;
+    private static PendingValueTaskUnaryResponse<TResponse>? s_overflowPool;
 
     private ManualResetValueTaskSourceCore<TResponse> _source;
     private PendingValueTaskUnaryResponse<TResponse>? _next;
-    private RpcPeerOutboundInvoker? _directOwner;
-    private int _messageId;
-    private int _completed;
-    private int _returned;
-    private int _valueTaskIssued;
 
     private PendingValueTaskUnaryResponse()
     {
@@ -29,29 +26,27 @@ internal sealed class PendingValueTaskUnaryResponse<TResponse> :
         _source.RunContinuationsAsynchronously = true;
     }
 
-    public int MessageId => _messageId;
-
-    public long TimeoutDeadline => long.MaxValue;
-
-    public PendingCancellationKind CancellationKind => PendingCancellationKind.None;
-
-    public bool RegistersStreamingResponse => false;
-
-    public static PendingValueTaskUnaryResponse<TResponse> Rent(int messageId)
+    public static PendingValueTaskUnaryResponse<TResponse> Rent(
+        int messageId,
+        string service,
+        string method)
     {
-        PendingValueTaskUnaryResponse<TResponse>? pending;
-        lock (PoolGate)
+        var pending = Interlocked.Exchange(ref s_cached, null);
+        if (pending is null)
         {
-            pending = s_pool;
-            if (pending is not null)
+            lock (PoolGate)
             {
-                s_pool = pending._next;
-                pending._next = null;
+                pending = s_overflowPool;
+                if (pending is not null)
+                {
+                    s_overflowPool = pending._next;
+                    pending._next = null;
+                }
             }
         }
 
         pending ??= new PendingValueTaskUnaryResponse<TResponse>();
-        pending.Reset(messageId);
+        pending.Initialize(messageId, service, method);
         return pending;
     }
 
@@ -59,40 +54,18 @@ internal sealed class PendingValueTaskUnaryResponse<TResponse> :
     {
         get
         {
-            Volatile.Write(ref _valueTaskIssued, 1);
+            MarkIssued();
             return new ValueTask<TResponse>(this, _source.Version);
         }
     }
 
-    public void SetTimeoutDeadline(long deadline)
+    public ValueTask<TResponse> GetDirectValueTask(RpcPeerOutboundInvoker owner)
     {
+        MarkIssuedForDirect(owner);
+        return new ValueTask<TResponse>(this, _source.Version);
     }
 
-    public void CancelByCaller()
-    {
-    }
-
-    public void DisposeResultWhenAvailable()
-    {
-    }
-
-    public void SetError(Exception error)
-    {
-        CompleteDirect(sendCancel: false);
-        _source.SetException(error);
-    }
-
-    public void EnableDirectCompletion(RpcPeerOutboundInvoker owner)
-    {
-        Volatile.Write(ref _directOwner, owner);
-
-        if (_source.GetStatus(_source.Version) != ValueTaskSourceStatus.Pending)
-        {
-            CompleteDirect(sendCancel: false);
-        }
-    }
-
-    public bool TrySetResponse(
+    public override bool TrySetResponse(
         RpcResponse response,
         ReadOnlyMemory<byte> payload,
         RpcFrame frame,
@@ -101,24 +74,31 @@ internal sealed class PendingValueTaskUnaryResponse<TResponse> :
     {
         try
         {
-            if (!response.IsSuccess)
+            TResponse result;
+            try
             {
-                throw new RemoteServiceException(
-                    response.ErrorMessage ?? "Unknown error",
-                    response.ErrorType ?? "Unknown");
+                if (!response.IsSuccess)
+                {
+                    throw new RemoteServiceException(
+                        response.ErrorMessage ?? "Unknown error",
+                        response.ErrorType ?? "Unknown");
+                }
+
+                if (response.Stream is not null)
+                {
+                    throw new ServiceProtocolException(
+                        "Response opened a stream for a non-streaming invocation.");
+                }
+
+                result = serializer.Deserialize<TResponse>(payload);
+            }
+            catch (Exception ex)
+            {
+                SetError(ex);
+                return true;
             }
 
-            if (response.Stream is not null)
-            {
-                throw new ServiceProtocolException(
-                    "Response opened a stream for a non-streaming invocation.");
-            }
-
-            CompleteAndSetResult(serializer.Deserialize<TResponse>(payload));
-        }
-        catch (Exception ex)
-        {
-            SetError(ex);
+            CompleteAndSetResult(result);
         }
         finally
         {
@@ -129,21 +109,29 @@ internal sealed class PendingValueTaskUnaryResponse<TResponse> :
         return true;
     }
 
-    public void TrySetCanceled(PendingCancellationKind kind)
-    {
-        CompleteDirect(sendCancel: true);
-        _source.SetException(new OperationCanceledException());
-    }
-
     public TResponse GetResult(short token)
     {
+        var isCurrentGeneration = token == _source.Version;
         try
         {
             return _source.GetResult(token);
         }
+        catch
+        {
+            if (isCurrentGeneration &&
+                _source.GetStatus(token) == ValueTaskSourceStatus.Pending)
+            {
+                isCurrentGeneration = false;
+            }
+
+            throw;
+        }
         finally
         {
-            Return();
+            if (isCurrentGeneration)
+            {
+                MarkConsumed();
+            }
         }
     }
 
@@ -157,69 +145,35 @@ internal sealed class PendingValueTaskUnaryResponse<TResponse> :
         ValueTaskSourceOnCompletedFlags flags) =>
         _source.OnCompleted(continuation, state, token, flags);
 
-    public void Abandon()
-    {
-        if (_source.GetStatus(_source.Version) == ValueTaskSourceStatus.Pending)
-        {
-            _source.SetException(new ServiceConnectionException("Request abandoned."));
-        }
-
-        if (Volatile.Read(ref _valueTaskIssued) == 0)
-        {
-            Return();
-        }
-    }
-
-    private void Reset(int messageId)
-    {
-        _messageId = messageId;
-        _directOwner = null;
-        _completed = 0;
-        _returned = 0;
-        _valueTaskIssued = 0;
-    }
-
     private void CompleteAndSetResult(TResponse response)
     {
-        if (Volatile.Read(ref _directOwner) is not null)
+        var start = BeginResultCompletion();
+        if (start == PooledCompletionStart.Rejected)
         {
-            CompleteDirect(sendCancel: false);
+            return;
         }
 
         _source.SetResult(response);
+        FinishResultCompletion(start);
     }
 
-    private void CompleteDirect(bool sendCancel)
+    protected override void SetExceptionCore(Exception error) =>
+        _source.SetException(error);
+
+    protected override void ResetSourceCore() =>
+        _source.Reset();
+
+    protected override void PushToPoolCore()
     {
-        if (Interlocked.Exchange(ref _completed, 1) != 0)
+        if (Interlocked.CompareExchange(ref s_cached, this, null) is null)
         {
             return;
         }
 
-        Volatile.Read(ref _directOwner)?.CompleteUnaryPending(this, sendCancel);
-    }
-
-    private void Return()
-    {
-        if (Interlocked.Exchange(ref _returned, 1) != 0)
-        {
-            return;
-        }
-
-        ClearForPool();
         lock (PoolGate)
         {
-            _next = s_pool;
-            s_pool = this;
+            _next = s_overflowPool;
+            s_overflowPool = this;
         }
-    }
-
-    private void ClearForPool()
-    {
-        _source.Reset();
-        _messageId = 0;
-        _directOwner = null;
-        _completed = 0;
-        _valueTaskIssued = 0;
     }
 }

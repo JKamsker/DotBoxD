@@ -12,14 +12,35 @@ internal static class IpcAllocationProfile
     public const string NamedPipeTransport = "namedpipe";
     public const string InMemoryTransport = "inmemory";
 
-    public static async Task RunAsync(string transport, int iterations, bool disableTimeout, bool lowAllocationProfile)
+    public static async Task RunAsync(
+        string transport,
+        int iterations,
+        bool disableTimeout,
+        bool finiteTimeout,
+        bool lowAllocationProfile,
+        bool taskBackedClient)
     {
         if (iterations <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(iterations), iterations, "Iterations must be positive.");
         }
 
-        await using var fixture = await CreateFixtureAsync(transport, disableTimeout, lowAllocationProfile).ConfigureAwait(false);
+        if (disableTimeout && finiteTimeout)
+        {
+            throw new ArgumentException("IPC profile timeout modes are mutually exclusive.");
+        }
+
+        if (taskBackedClient && !lowAllocationProfile)
+        {
+            throw new ArgumentException("The task-backed client control requires the low-allocation profile.");
+        }
+
+        await using var fixture = await CreateFixtureAsync(
+            transport,
+            disableTimeout,
+            finiteTimeout,
+            lowAllocationProfile,
+            taskBackedClient).ConfigureAwait(false);
         var service = fixture.Session.Get<IAllocationProbeService>();
 
         await service.AddAsync(1).ConfigureAwait(false);
@@ -29,8 +50,13 @@ internal static class IpcAllocationProfile
         var structBytes = await MeasureEchoAllocationsAsync(service, iterations).ConfigureAwait(false);
 
         Console.WriteLine("IPC profile transport: " + transport);
-        Console.WriteLine("IPC profile timeout: " + (disableTimeout || lowAllocationProfile ? "disabled" : "default"));
+        Console.WriteLine(
+            "IPC profile timeout: " +
+            (finiteTimeout ? "finite" : disableTimeout || lowAllocationProfile ? "disabled" : "default"));
         Console.WriteLine("IPC profile low allocation: " + (lowAllocationProfile ? "enabled" : "disabled"));
+        Console.WriteLine(
+            "IPC profile pooled client: " +
+            (lowAllocationProfile && !taskBackedClient ? "enabled" : "disabled"));
         Console.WriteLine("IPC profile iterations: " + iterations.ToString(CultureInfo.InvariantCulture));
         Console.WriteLine("AddAsync total allocated bytes: " + intBytes.ToString(CultureInfo.InvariantCulture));
         Console.WriteLine("AddAsync allocated bytes/call: " + FormatBytesPerCall(intBytes, iterations));
@@ -41,9 +67,15 @@ internal static class IpcAllocationProfile
     private static async Task<ProfileFixture> CreateFixtureAsync(
         string transport,
         bool disableTimeout,
-        bool lowAllocationProfile)
+        bool finiteTimeout,
+        bool lowAllocationProfile,
+        bool taskBackedClient)
     {
-        var clientOptions = CreateClientOptions(disableTimeout, lowAllocationProfile);
+        var clientOptions = CreateClientOptions(
+            disableTimeout,
+            finiteTimeout,
+            lowAllocationProfile,
+            taskBackedClient);
         var serverOptions = CreateServerOptions(disableTimeout, lowAllocationProfile);
         if (transport.Equals(NamedPipeTransport, StringComparison.OrdinalIgnoreCase))
         {
@@ -76,18 +108,22 @@ internal static class IpcAllocationProfile
         throw new ArgumentException($"Unknown IPC profile transport '{transport}'.", nameof(transport));
     }
 
-    private static RpcPeerOptions? CreateClientOptions(bool disableTimeout, bool lowAllocationProfile)
+    private static RpcPeerOptions? CreateClientOptions(
+        bool disableTimeout,
+        bool finiteTimeout,
+        bool lowAllocationProfile,
+        bool taskBackedClient)
     {
-        if (!disableTimeout && !lowAllocationProfile)
+        if (!disableTimeout && !finiteTimeout && !lowAllocationProfile)
         {
             return null;
         }
 
         return new RpcPeerOptions
         {
-            EnableLowAllocationValueTaskInvocations = lowAllocationProfile,
+            EnableLowAllocationValueTaskInvocations = lowAllocationProfile && !taskBackedClient,
             RejectInboundCalls = true,
-            RequestTimeout = disableTimeout || lowAllocationProfile
+            RequestTimeout = disableTimeout || lowAllocationProfile && !finiteTimeout
                 ? Timeout.InfiniteTimeSpan
                 : TimeSpan.FromSeconds(30)
         };

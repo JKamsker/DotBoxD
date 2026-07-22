@@ -11,8 +11,8 @@ namespace DotBoxD.Services.Benchmarks.Probes;
 
 internal static class FiniteTimeoutValueTaskUnaryProbe
 {
-    private const int WarmupIterations = 2_000;
-    private const int MeasurementIterations = 50_000;
+    private const int WarmupIterations = 10_000;
+    private const int MeasurementIterations = 500_000;
 
     public static async Task RunAsync()
     {

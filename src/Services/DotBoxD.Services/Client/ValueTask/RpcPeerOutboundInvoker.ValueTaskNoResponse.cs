@@ -1,4 +1,5 @@
 using DotBoxD.Services.Buffers;
+using DotBoxD.Services.Exceptions;
 using DotBoxD.Services.Protocol;
 
 namespace DotBoxD.Services.Client;
@@ -66,7 +67,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         try
         {
             ValidateTargetAndStart(service, method, ct);
-            pending = ReservePendingValueTaskNoResponseRequest(ct);
+            pending = ReservePendingValueTaskNoResponseRequest(service, method, ct);
         }
         catch (Exception ex)
         {
@@ -86,9 +87,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         }
         catch (Exception ex)
         {
-            _pending.Remove(pending.MessageId, pending, consumed: true);
-            ReleasePendingSlot();
-            pending.Abandon();
+            CompletePooledSetupFailure(pending);
             return new ValueTask(Task.FromException(ex));
         }
 
@@ -113,7 +112,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         try
         {
             ValidateTargetAndStart(service, method, ct);
-            pending = ReservePendingValueTaskNoResponseRequest(ct);
+            pending = ReservePendingValueTaskNoResponseRequest(service, method, ct);
         }
         catch (Exception ex)
         {
@@ -133,9 +132,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         }
         catch (Exception ex)
         {
-            _pending.Remove(pending.MessageId, pending, consumed: true);
-            ReleasePendingSlot();
-            pending.Abandon();
+            CompletePooledSetupFailure(pending);
             return new ValueTask(Task.FromException(ex));
         }
 
@@ -159,18 +156,21 @@ internal sealed partial class RpcPeerOutboundInvoker
             catch (Exception ex)
             {
                 frame.Dispose();
-                _pending.Remove(messageId, pending, consumed: true);
-                ReleasePendingSlot();
-                pending.Abandon();
+                CompletePooledSetupFailure(pending);
                 return new ValueTask(Task.FromException(ex));
             }
 
             if (sendValueTask.IsCompletedSuccessfully)
             {
-                pending.EnableDirectCompletion(this);
-                return pending.ValueTask;
+                if (_hasFiniteTimeout && !pending.CompletionStarted)
+                {
+                    _pending.StartTimeout(pending, _timeout);
+                }
+
+                return pending.GetDirectValueTask(this);
             }
 
+            pending.TransferSetupToWrapper();
             return AwaitNoResponseFrameValueAsync(messageId, pending, sendValueTask);
         }
 
@@ -182,19 +182,22 @@ internal sealed partial class RpcPeerOutboundInvoker
         catch (Exception ex)
         {
             frame.Dispose();
-            _pending.Remove(messageId, pending, consumed: true);
-            ReleasePendingSlot();
-            pending.Abandon();
+            CompletePooledSetupFailure(pending);
             return new ValueTask(Task.FromException(ex));
         }
 
         if (sendTask.IsCompletedSuccessfully)
         {
             frame.Dispose();
-            pending.EnableDirectCompletion(this);
-            return pending.ValueTask;
+            if (_hasFiniteTimeout && !pending.CompletionStarted)
+            {
+                _pending.StartTimeout(pending, _timeout);
+            }
+
+            return pending.GetDirectValueTask(this);
         }
 
+        pending.TransferSetupToWrapper();
         return AwaitNoResponseValueAsync(messageId, pending, frame, sendTask);
     }
 
@@ -207,10 +210,19 @@ internal sealed partial class RpcPeerOutboundInvoker
         try
         {
             await sendTask.ConfigureAwait(false);
+            if (_hasFiniteTimeout && !pending.CompletionStarted)
+            {
+                _pending.StartTimeout(pending, _timeout);
+            }
 
             try
             {
                 await pending.ValueTask.ConfigureAwait(false);
+            }
+            catch (ServiceTimeoutException)
+            {
+                _cancelFrames.TrySend(messageId);
+                throw;
             }
             finally
             {
@@ -219,12 +231,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         }
         finally
         {
-            _pending.Remove(messageId, pending, pendingConsumed);
-            ReleasePendingSlot();
-            if (!pendingConsumed)
-            {
-                pending.Abandon();
-            }
+            CompletePooledWrapper(pending, pendingConsumed);
         }
     }
 
@@ -242,9 +249,19 @@ internal sealed partial class RpcPeerOutboundInvoker
                 await sendTask.ConfigureAwait(false);
             }
 
+            if (_hasFiniteTimeout && !pending.CompletionStarted)
+            {
+                _pending.StartTimeout(pending, _timeout);
+            }
+
             try
             {
                 await pending.ValueTask.ConfigureAwait(false);
+            }
+            catch (ServiceTimeoutException)
+            {
+                _cancelFrames.TrySend(messageId);
+                throw;
             }
             finally
             {
@@ -253,12 +270,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         }
         finally
         {
-            _pending.Remove(messageId, pending, pendingConsumed);
-            ReleasePendingSlot();
-            if (!pendingConsumed)
-            {
-                pending.Abandon();
-            }
+            CompletePooledWrapper(pending, pendingConsumed);
         }
     }
 }

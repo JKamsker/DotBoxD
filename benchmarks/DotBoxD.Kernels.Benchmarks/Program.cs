@@ -292,8 +292,16 @@ if (profileIndex >= 0)
     var iterationsText = args.ElementAtOrDefault(profileIndex + 2) ?? "10000";
     var iterations = int.Parse(iterationsText, CultureInfo.InvariantCulture);
     var disableTimeout = args.Contains("--no-timeout", StringComparer.OrdinalIgnoreCase);
+    var finiteTimeout = args.Contains("--finite-timeout", StringComparer.OrdinalIgnoreCase);
     var lowAllocationProfile = args.Contains("--low-alloc", StringComparer.OrdinalIgnoreCase);
-    await IpcAllocationProfile.RunAsync(transport, iterations, disableTimeout, lowAllocationProfile);
+    var taskBackedClient = args.Contains("--task-backed-client", StringComparer.OrdinalIgnoreCase);
+    await IpcAllocationProfile.RunAsync(
+        transport,
+        iterations,
+        disableTimeout,
+        finiteTimeout,
+        lowAllocationProfile,
+        taskBackedClient);
     return;
 }
 

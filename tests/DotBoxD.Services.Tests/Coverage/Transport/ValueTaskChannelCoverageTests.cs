@@ -123,7 +123,7 @@ public sealed class ValueTaskChannelCoverageTests
     }
 
     [Fact]
-    public async Task InvokeValueAsync_OptInUsesTaskBackedResponsePath_WhenTimeoutOrCancellationIsRequired()
+    public async Task InvokeValueAsync_FiniteTimeoutUsesOptIn_WhileCancellationUsesTaskBackedPath()
     {
         await using (var timeoutHarness = new ValueTaskInvokerHarness(
             new RpcPeerOptions
