@@ -91,13 +91,7 @@ internal sealed class PendingRequests : IDisposable
     {
         lock (_requestsGate)
         {
-            if (!_requests.TryGetValue(messageId, out pending!))
-            {
-                return false;
-            }
-
-            _requests.Remove(messageId);
-            return true;
+            return _requests.Remove(messageId, out pending!);
         }
     }
 
