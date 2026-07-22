@@ -3,21 +3,23 @@ using DotBoxD.Kernels.Interpreter.Frame;
 
 namespace DotBoxD.Kernels.Interpreter.Internal;
 
-internal sealed partial class FunctionFrameLayout
+/// <summary>
+/// Holds a frame layout's lazily initialized i32 loop-plan admission and cache state.
+/// As an inline mutable value, the first observed statement needs no extra owner allocation.
+/// </summary>
+internal struct I32LoopPlanStore
 {
-    // Keep one-shot layouts allocation-free. A second distinct statement promotes
-    // admission tracking to an index; actual plans use the same scalar-first shape.
-    private ForRangeStatement? _i32LoopPlanCandidate;
-    private ConcurrentDictionary<ForRangeStatement, byte>? _i32LoopPlanCandidates;
-    private I32ForLoopPlanCache? _i32LoopPlans;
+    private ForRangeStatement? _candidate;
+    private ConcurrentDictionary<ForRangeStatement, byte>? _candidateIndex;
+    private I32ForLoopPlanCache? _plans;
 
-    public bool TryGetI32LoopPlan(
+    public bool TryGet(
         ForRangeStatement statement,
         InterpreterFrame frame,
         int loopSlot,
         out I32ForLoopPlan plan)
     {
-        var cache = Volatile.Read(ref _i32LoopPlans);
+        var cache = Volatile.Read(ref _plans);
         if (cache is null)
         {
             plan = null!;
@@ -27,15 +29,15 @@ internal sealed partial class FunctionFrameLayout
         return cache.TryGet(statement, frame, loopSlot, out plan);
     }
 
-    public bool ShouldCacheI32LoopPlan(ForRangeStatement statement)
+    public bool ShouldCache(ForRangeStatement statement)
     {
-        var cache = Volatile.Read(ref _i32LoopPlans);
+        var cache = Volatile.Read(ref _plans);
         if (cache?.Contains(statement) == true)
         {
             return false;
         }
 
-        var candidates = Volatile.Read(ref _i32LoopPlanCandidates);
+        var candidates = Volatile.Read(ref _candidateIndex);
         if (candidates is not null)
         {
             return !candidates.TryAdd(statement, 0);
@@ -46,7 +48,7 @@ internal sealed partial class FunctionFrameLayout
 
     private bool ShouldCacheBeforeCandidateIndex(ForRangeStatement statement)
     {
-        var candidate = Volatile.Read(ref _i32LoopPlanCandidate);
+        var candidate = Volatile.Read(ref _candidate);
         if (ReferenceEquals(candidate, statement))
         {
             return true;
@@ -54,10 +56,7 @@ internal sealed partial class FunctionFrameLayout
 
         if (candidate is null)
         {
-            var existingCandidate = Interlocked.CompareExchange(
-                ref _i32LoopPlanCandidate,
-                statement,
-                null);
+            var existingCandidate = Interlocked.CompareExchange(ref _candidate, statement, null);
             if (existingCandidate is null)
             {
                 return false;
@@ -71,40 +70,35 @@ internal sealed partial class FunctionFrameLayout
             return true;
         }
 
-        return PromoteI32LoopPlanCandidates(candidate, statement);
+        return PromoteCandidates(candidate, statement);
     }
 
-    private bool PromoteI32LoopPlanCandidates(
-        ForRangeStatement firstCandidate,
-        ForRangeStatement statement)
+    private bool PromoteCandidates(ForRangeStatement firstCandidate, ForRangeStatement statement)
     {
         var created = new ConcurrentDictionary<ForRangeStatement, byte>(
             ReferenceEqualityComparer.Instance);
         created.TryAdd(firstCandidate, 0);
         created.TryAdd(statement, 0);
-        var published = Interlocked.CompareExchange(
-            ref _i32LoopPlanCandidates,
-            created,
-            null);
+        var published = Interlocked.CompareExchange(ref _candidateIndex, created, null);
         if (published is null)
         {
-            Interlocked.CompareExchange(ref _i32LoopPlanCandidate, null, firstCandidate);
+            Interlocked.CompareExchange(ref _candidate, null, firstCandidate);
             return false;
         }
 
         return !published.TryAdd(statement, 0);
     }
 
-    public void CacheI32LoopPlan(I32ForLoopPlan plan)
+    public void Cache(I32ForLoopPlan plan)
     {
-        var cache = Volatile.Read(ref _i32LoopPlans);
+        var cache = Volatile.Read(ref _plans);
         if (cache is null)
         {
             var created = new I32ForLoopPlanCache();
-            cache = Interlocked.CompareExchange(ref _i32LoopPlans, created, null) ?? created;
+            cache = Interlocked.CompareExchange(ref _plans, created, null) ?? created;
         }
 
         cache.Store(plan);
-        Interlocked.CompareExchange(ref _i32LoopPlanCandidate, null, plan.Statement);
+        Interlocked.CompareExchange(ref _candidate, null, plan.Statement);
     }
 }

@@ -13,21 +13,8 @@ if (await DotBoxD.Kernels.Benchmarks.Interpreter.InterpreterProbeDispatcher.TryR
     return;
 }
 
-if (args.Contains("--probe-hook-chain-discovery", StringComparer.OrdinalIgnoreCase))
+if (DotBoxD.Kernels.Benchmarks.PluginAnalyzer.PluginAnalyzerProbeDispatcher.TryRun(args))
 {
-    DotBoxD.Kernels.Benchmarks.PluginAnalyzer.HookChainDiscoveryProbe.Run();
-    return;
-}
-
-if (args.Contains("--probe-plugin-package-collision-discovery", StringComparer.OrdinalIgnoreCase))
-{
-    DotBoxD.Kernels.Benchmarks.PluginAnalyzer.PluginPackageCollisionDiscoveryProbe.Run();
-    return;
-}
-
-if (args.Contains("--probe-server-extension-request-helpers", StringComparer.OrdinalIgnoreCase))
-{
-    DotBoxD.Kernels.Benchmarks.PluginAnalyzer.ServerExtensionRequestHelperProbe.Run();
     return;
 }
 

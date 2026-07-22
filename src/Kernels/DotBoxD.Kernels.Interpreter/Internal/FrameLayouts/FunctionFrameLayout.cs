@@ -1,4 +1,5 @@
 using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Interpreter.Frame;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 
@@ -12,7 +13,7 @@ using DotBoxD.Kernels;
 /// then store locals in a flat <see cref="SandboxValue"/> array indexed by slot
 /// instead of allocating a string-keyed dictionary per invocation.
 /// </summary>
-internal sealed partial class FunctionFrameLayout
+internal sealed class FunctionFrameLayout
 {
     private static readonly HashSet<string> BoolBinaryOperators = new(StringComparer.Ordinal)
     {
@@ -21,6 +22,7 @@ internal sealed partial class FunctionFrameLayout
 
     private readonly Dictionary<string, int> _slots;
     private readonly SlotKind[] _slotKinds;
+    private I32LoopPlanStore _i32LoopPlans;
 
     private FunctionFrameLayout(
         string functionId,
@@ -43,21 +45,13 @@ internal sealed partial class FunctionFrameLayout
     }
 
     public string FunctionId { get; }
-
     public int SlotCount { get; }
-
     public bool RequiresRawAssignmentState { get; }
-
     public bool HasBoxedSlots { get; }
-
     public bool HasI32Slots { get; }
-
     public bool HasI64Slots { get; }
-
     public bool HasF64Slots { get; }
-
     public bool HasRawSlots => HasI32Slots || HasI64Slots || HasF64Slots;
-
     public static FunctionFrameLayout Build(
         SandboxFunction function,
         IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis,
@@ -95,8 +89,16 @@ internal sealed partial class FunctionFrameLayout
     public bool IsF64Slot(string name) => IsF64Slot(GetSlot(name));
 
     public bool IsI64Slot(int slot) => _slotKinds[slot] == SlotKind.I64;
-
     public bool IsBoxedSlot(int slot) => _slotKinds[slot] == SlotKind.Boxed;
+
+    public bool TryGetI32LoopPlan(ForRangeStatement statement, InterpreterFrame frame, int loopSlot, out I32ForLoopPlan plan)
+        => _i32LoopPlans.TryGet(statement, frame, loopSlot, out plan);
+
+    public bool ShouldCacheI32LoopPlan(ForRangeStatement statement)
+        => _i32LoopPlans.ShouldCache(statement);
+
+    public void CacheI32LoopPlan(I32ForLoopPlan plan)
+        => _i32LoopPlans.Cache(plan);
 
     private static void CollectStatements(IReadOnlyList<Statement> statements, Dictionary<string, int> slots)
     {
