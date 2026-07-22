@@ -6,7 +6,6 @@ using DotBoxD.Services.Transport;
 using DotBoxD.Transports.Tcp;
 using Xunit;
 using ServiceFrameReadTimeoutSource = DotBoxD.Services.Protocol.FrameReadTimeoutSource;
-using TcpFrameReadTimeoutSource = DotBoxD.Transports.Tcp.FrameReadTimeoutSource;
 
 namespace DotBoxD.Services.Tests.Transport;
 
@@ -130,51 +129,7 @@ public sealed class FrameReadIdleTimeoutRegressionTests
         Assert.Equal(buffer.Length, count);
     }
 
-    [Fact]
-    public void TcpFrameReadTimeoutSource_CancelPendingTimeout_IgnoresDisposedSource()
-    {
-        using var source = new TcpFrameReadTimeoutSource();
-        source.Start(CancellationToken.None, IdleTimeout);
-        DisposeInnerCancellationTokenSource(source);
-
-        var exception = Record.Exception(source.CancelPendingTimeout);
-
-        Assert.Null(exception);
-    }
-
-    [Fact]
-    public void TcpFrameReadTimeoutSource_Start_RecreatesDisposedCachedSource()
-    {
-        using var source = new TcpFrameReadTimeoutSource();
-        source.Start(CancellationToken.None, IdleTimeout);
-        DisposeInnerCancellationTokenSource(source);
-
-        var exception = Record.Exception(() => source.Start(CancellationToken.None, IdleTimeout));
-
-        Assert.Null(exception);
-    }
-
-    [Fact]
-    public void TcpFrameReadTimeoutSource_Start_AfterWrapperDispose_Throws()
-    {
-        var source = new TcpFrameReadTimeoutSource();
-        source.Dispose();
-
-        try
-        {
-            Assert.Throws<ObjectDisposedException>(() =>
-                source.Start(CancellationToken.None, IdleTimeout));
-        }
-        finally
-        {
-            source.Dispose();
-        }
-    }
-
     private static void DisposeInnerCancellationTokenSource(ServiceFrameReadTimeoutSource timeoutSource) =>
-        timeoutSource.DisposeCurrentSourceForTest();
-
-    private static void DisposeInnerCancellationTokenSource(TcpFrameReadTimeoutSource timeoutSource) =>
         timeoutSource.DisposeCurrentSourceForTest();
 
     private sealed class PrefixThenStallStream : Stream

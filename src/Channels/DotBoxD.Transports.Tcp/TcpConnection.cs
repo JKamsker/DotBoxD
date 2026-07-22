@@ -20,7 +20,7 @@ public sealed class TcpConnection : IValidatedSerialFrameChannel
     private readonly CancellationTokenSource _disposeCts = new();
     private readonly TimeSpan _frameReadIdleTimeout;
     private readonly FrameReadTimeoutSource? _frameReadTimeout;
-    private readonly byte[] _lengthBuffer = new byte[4];
+    private readonly byte[] _lengthBuffer = new byte[StreamFrameReadOperations.LengthPrefixSize];
     private int _activeReceive;
     private int _disposed;
 
@@ -70,10 +70,7 @@ public sealed class TcpConnection : IValidatedSerialFrameChannel
 
     public async ValueTask SendValueAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
     {
-        if (Volatile.Read(ref _disposed) != 0)
-        {
-            throw new ObjectDisposedException(nameof(TcpConnection));
-        }
+        ThrowIfDisposed();
 
         ct.ThrowIfCancellationRequested();
 
@@ -111,60 +108,82 @@ public sealed class TcpConnection : IValidatedSerialFrameChannel
     {
         ThrowIfDisposed();
         ReceiveConcurrencyGuard.Enter(ref _activeReceive, nameof(TcpConnection));
-
+        Payload? payload = null;
         try
         {
-            // Read length prefix (4 bytes). Keep this per connection instead of renting
-            // a tiny ArrayPool buffer for every received frame.
-            var lengthBuffer = _lengthBuffer;
             var readToken = _frameReadTimeout?.Start(ct, _frameReadIdleTimeout) ?? ct;
-            var bytesRead = await ReadExactAsync(lengthBuffer.AsMemory(0, 4), readToken)
-                .ConfigureAwait(false);
-            if (bytesRead == 0)
+            var remaining = StreamFrameReadOperations.LengthPrefixSize;
+
+            while (true)
             {
-                return new RpcFrame(Payload.Empty); // Connection closed
-            }
-
-            if (bytesRead < 4)
-            {
-                throw new InvalidDataException($"Connection closed after {bytesRead} of 4 frame length bytes.");
-            }
-
-            var totalLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBuffer.AsSpan(0, 4));
-            MessageFrameReader.ValidateIncomingFrameLength(totalLength, MessageFramer.MaxMessageSize);
-
-            // Rent the full frame buffer and write back the length prefix we already consumed.
-            var payload = Payload.Rent(totalLength);
-            try
-            {
-                lengthBuffer.AsSpan(0, 4).CopyTo(payload.Memory.Span);
-
-                readToken = _frameReadTimeout?.Start(ct, _frameReadIdleTimeout) ?? ct;
-                bytesRead = await ReadExactAsync(payload.Memory.Slice(4), readToken)
-                    .ConfigureAwait(false);
-                if (bytesRead < totalLength - 4)
+                while (remaining > 0)
                 {
-                    throw new InvalidDataException(
-                        $"Connection closed after {bytesRead} of {totalLength - 4} frame bytes.");
-                }
-            }
-            catch
-            {
-                payload.Dispose();
-                throw;
-            }
+                    int read;
+                    try
+                    {
+                        read = await _stream.ReadAsync(
+                            payload is null
+                                ? _lengthBuffer.AsMemory(
+                                    StreamFrameReadOperations.LengthPrefixSize - remaining,
+                                    remaining)
+                                : payload.Memory.Slice(
+                                    payload.Length - remaining,
+                                    remaining),
+                            readToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (
+                        StreamFrameReadOperations.IsTimeoutCancellation(_frameReadTimeout))
+                    {
+                        throw FrameReadTimeoutSource.CreateTimeoutException(_frameReadIdleTimeout);
+                    }
 
-            return new RpcFrame(payload);
+                    if (read == 0)
+                    {
+                        return StreamFrameReadOperations.HandleEndOfStream(
+                            payload,
+                            remaining,
+                            StreamFrameReadProgressFormat.Body);
+                    }
+
+                    remaining -= read;
+                    if (remaining > 0 && _frameReadTimeout is not null)
+                    {
+                        readToken = _frameReadTimeout.Rearm(_frameReadIdleTimeout);
+                    }
+                }
+
+                if (payload is not null)
+                {
+                    var frame = new RpcFrame(payload);
+                    payload = null;
+                    return frame;
+                }
+
+                var totalLength = BinaryPrimitives.ReadInt32LittleEndian(_lengthBuffer);
+                MessageFrameReader.ValidateIncomingFrameLength(totalLength, MessageFramer.MaxMessageSize);
+
+                payload = Payload.Rent(totalLength);
+                _lengthBuffer.CopyTo(payload.Memory.Span);
+                remaining = totalLength - StreamFrameReadOperations.LengthPrefixSize;
+                readToken = _frameReadTimeout?.Start(ct, _frameReadIdleTimeout) ?? ct;
+            }
         }
         finally
         {
             try
             {
-                _frameReadTimeout?.CancelPendingTimeout();
+                payload?.Dispose();
             }
             finally
             {
-                ReceiveConcurrencyGuard.Exit(ref _activeReceive);
+                try
+                {
+                    _frameReadTimeout?.CancelPendingTimeout();
+                }
+                finally
+                {
+                    ReceiveConcurrencyGuard.Exit(ref _activeReceive);
+                }
             }
         }
     }
@@ -197,41 +216,6 @@ public sealed class TcpConnection : IValidatedSerialFrameChannel
     {
         var frame = await pending.ConfigureAwait(false);
         return frame.DetachPayload();
-    }
-
-    private ValueTask<int> ReadExactAsync(Memory<byte> buffer, CancellationToken readToken) =>
-        _frameReadTimeout is null
-            ? StreamReadOperations.ReadExactAsync(_stream, buffer, readToken)
-            : ReadExactWithTimeoutAsync(buffer, readToken);
-
-    private async ValueTask<int> ReadExactWithTimeoutAsync(Memory<byte> buffer, CancellationToken readToken)
-    {
-        var totalRead = 0;
-        while (totalRead < buffer.Length)
-        {
-            int read;
-            try
-            {
-                read = await _stream.ReadAsync(buffer.Slice(totalRead), readToken).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException) when (_frameReadTimeout!.IsCurrentOwnerTimeoutCancellation())
-            {
-                throw FrameReadTimeoutSource.CreateTimeoutException(_frameReadIdleTimeout);
-            }
-
-            if (read == 0)
-            {
-                return totalRead; // Connection closed
-            }
-
-            totalRead += read;
-            if (totalRead < buffer.Length)
-            {
-                readToken = _frameReadTimeout!.Rearm(_frameReadIdleTimeout);
-            }
-        }
-
-        return totalRead;
     }
 
     public ValueTask DisposeAsync()
