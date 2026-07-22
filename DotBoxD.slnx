@@ -73,6 +73,7 @@
 
   <Folder Name="/benchmarks/">
     <Project Path="benchmarks/DotBoxD.Kernels.Benchmarks/DotBoxD.Kernels.Benchmarks.csproj" />
+    <Project Path="benchmarks/DotBoxD.LookaheadCapacityProbe/DotBoxD.LookaheadCapacityProbe.csproj" />
     <Project Path="benchmarks/DotBoxD.Services.Benchmarks/DotBoxD.Services.Benchmarks.csproj" />
   </Folder>
 
