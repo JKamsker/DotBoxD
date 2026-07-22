@@ -48,6 +48,9 @@ internal static class InterpreterWhilePlanSetupProbe
             20_000_000,
             warmupIterations: 1,
             measurementIterations: 1);
+
+        Console.WriteLine();
+        await InterpreterNestedWhilePlanProbe.RunAsync();
     }
 
     private static async Task<ExecutionPlan> PrepareAsync(
