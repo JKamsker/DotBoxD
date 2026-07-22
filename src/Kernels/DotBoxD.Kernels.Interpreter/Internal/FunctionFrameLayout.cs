@@ -12,7 +12,7 @@ using DotBoxD.Kernels;
 /// then store locals in a flat <see cref="SandboxValue"/> array indexed by slot
 /// instead of allocating a string-keyed dictionary per invocation.
 /// </summary>
-internal sealed class FunctionFrameLayout
+internal sealed partial class FunctionFrameLayout
 {
     private static readonly HashSet<string> BoolBinaryOperators = new(StringComparer.Ordinal)
     {

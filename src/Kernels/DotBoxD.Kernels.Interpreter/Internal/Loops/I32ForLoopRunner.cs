@@ -27,7 +27,22 @@ internal static class I32ForLoopRunner
 
         if (statement.Body.Count == 1)
         {
-            return TryRunSingleAssignment(statement, start, end, frame, context, calls);
+            var singleLoopSlot = frame.GetSlot(statement.LocalName);
+            if (frame.Layout.TryGetI32LoopPlan(statement, frame, singleLoopSlot, out var cached))
+            {
+                RunSingleAssignment(
+                    start,
+                    end,
+                    frame,
+                    context,
+                    singleLoopSlot,
+                    cached.TargetSlot,
+                    cached.Expression,
+                    cached.FuelPerIteration);
+                return true;
+            }
+
+            return TryRunSingleAssignment(statement, start, end, frame, context, calls, singleLoopSlot);
         }
 
         if (!TryCreateBodyPlan(statement, frame, calls, out var body, out var fuelPerIteration))
@@ -63,7 +78,8 @@ internal static class I32ForLoopRunner
         int end,
         InterpreterFrame frame,
         SandboxContext context,
-        I32CallEvaluator calls)
+        I32CallEvaluator calls,
+        int loopSlot)
     {
         if (!TryCreateAssignmentPlan(
                 statement.Body[0],
@@ -76,15 +92,48 @@ internal static class I32ForLoopRunner
             return false;
         }
 
-        context.ChargeLoopIterations((long)end - start, LoopFuel + assignmentFuel);
-        var loopSlot = frame.GetSlot(statement.LocalName);
+        var fuelPerIteration = LoopFuel + assignmentFuel;
+        if (assignment.Expression.HasOnlyRawVariables() &&
+            frame.Layout.ShouldCacheI32LoopPlan(statement))
+        {
+            frame.Layout.CacheI32LoopPlan(new I32ForLoopPlan(
+                statement,
+                assignment.TargetSlot,
+                assignment.Expression,
+                fuelPerIteration,
+                assignment.Expression.GetRequiredRawSlots()));
+        }
+
+        RunSingleAssignment(
+            start,
+            end,
+            frame,
+            context,
+            loopSlot,
+            assignment.TargetSlot,
+            assignment.Expression,
+            fuelPerIteration);
+        return true;
+    }
+
+    private static void RunSingleAssignment(
+        int start,
+        int end,
+        InterpreterFrame frame,
+        SandboxContext context,
+        int loopSlot,
+        int targetSlot,
+        I32ExpressionPlan expression,
+        long fuelPerIteration)
+    {
+        context.ChargeLoopIterations((long)end - start, fuelPerIteration);
         var checkpoint = CheckpointInterval;
         for (var i = start; i < end; i++)
         {
             frame.WriteRawInt32Slot(loopSlot, i);
             frame.WriteRawInt32Slot(
-                assignment.TargetSlot,
-                assignment.Expression.Evaluate(frame, context));
+                targetSlot,
+                expression.Evaluate(frame, context));
 
             if (--checkpoint == 0)
             {
@@ -92,8 +141,6 @@ internal static class I32ForLoopRunner
                 checkpoint = CheckpointInterval;
             }
         }
-
-        return true;
     }
 
     private static bool TryCreateBodyPlan(

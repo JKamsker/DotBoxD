@@ -27,6 +27,7 @@ internal sealed partial class InterpreterFrame
         _assigned = assigned;
     }
     public string FunctionId => _layout.FunctionId;
+    internal FunctionFrameLayout Layout => _layout;
     public int GetSlot(string name) => _layout.GetSlot(name);
     public SandboxValue Read(string name)
     {

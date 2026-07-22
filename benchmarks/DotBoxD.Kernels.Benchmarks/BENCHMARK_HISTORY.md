@@ -2484,3 +2484,31 @@ The live lane removes exactly 80,000,000 bytes, or 160 B/call. Tests cover inter
 default and live-token wall-time expiry, cancellation classification, nested leases, allocation-free warmed registration,
 concurrent first publication, and context-generation replacement. The public source-returning API retains its ownership
 behavior; the lease is internal runtime plumbing. No public API, sandbox budget, or timeout deadline changes.
+
+## Reused nested I32 loop plans
+
+The interpreter's optimized single-assignment I32 loop path built an identical expression plan every time a nested loop
+was entered. A million outer iterations around a one-iteration inner loop therefore allocated one plan per inner entry,
+although the prepared statement, frame layout, target slot, expression shape, and fuel cost were all invariant.
+
+Function layouts now publish a reusable plan only after the same statement has planned successfully twice. Reuse is
+limited to expressions whose variables all have raw I32 slots. Every cache hit still verifies that the required raw slots
+are assigned in the current frame, so the cache cannot turn read-before-assignment failures into stale-value reads. The
+common execution helper retains the same loop charging, checkpoint cadence, checked expression evaluation, and fallback
+behavior. Scalar admission and hot-plan entries keep the common one-loop layout allocation-free; reference-keyed admission
+and plan indexes are created lazily only when one function layout proves it needs multiple reusable loops.
+
+Command:
+
+```text
+DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-nested-loop-plan
+```
+
+Across four fresh Release processes, the one-million-entry nested workload changed from 224.2-246.1 ms and 56,004,832 B
+to 179.3-192.5 ms and 1,296 B. Its median improves from 224.4 to 182.1 ms, or 18.9%, while incremental allocation over
+the zero-inner control falls from 56,003,832 B to 296 B (56.0 B to effectively 0 B per inner entry). The outer-one,
+inner-one-million control remains at 2.4-2.7 ms before and 2.6-2.7 ms after, confirming the benefit comes from repeated
+planning rather than loop-body execution. The zero-inner timing ranges overlap and are not claimed. The probe pins the
+result and all resource counters; regressions cover required-slot assignment, debug fallback, concurrent publication,
+alternating cached statements, and the allocation bound. No public API, fuel, loop-budget, trace, or sandbox accounting
+contract changes.
