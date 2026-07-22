@@ -2,6 +2,7 @@ using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Sandbox.Values;
 
 namespace DotBoxD.Kernels.Benchmarks.Runtime;
 
@@ -13,14 +14,19 @@ internal static class ValueShapeCacheProbe
     private const int Warmup = 500;
     private const int ListIterations = 10_000;
     private const int MapIterations = 20_000;
+    private const int ControlIterations = 1_000_000;
 
     public static void Run()
     {
         _ = MeasureListAppend(Warmup);
         _ = MeasureMapReplace(Warmup);
+        _ = MeasureListConstruction(Warmup);
+        _ = MeasureOwnedListReset(Warmup);
 
         Write("CompiledRuntime.ListAdd scalar shape cache", MeasureListAppend(ListIterations));
         Write("CompiledRuntime.MapSet scalar replace cache", MeasureMapReplace(MapIterations));
+        Write("ListValue empty construction control", MeasureListConstruction(ControlIterations));
+        Write("ListValue owned reset control", MeasureOwnedListReset(ControlIterations));
     }
 
     private static Measurement MeasureListAppend(int iterations)
@@ -64,6 +70,48 @@ internal static class ValueShapeCacheProbe
         return Capture(iterations, context, sw, allocatedBefore);
     }
 
+    private static Measurement MeasureListConstruction(int iterations)
+    {
+        var values = Array.Empty<SandboxValue>();
+        ListValue? value = null;
+        Collect();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var sw = Stopwatch.StartNew();
+        for (var i = 0; i < iterations; i++)
+        {
+            value = new ListValue(values, SandboxType.I32);
+        }
+
+        sw.Stop();
+        GC.KeepAlive(value);
+        return Capture(iterations, sw, allocatedBefore);
+    }
+
+    private static Measurement MeasureOwnedListReset(int iterations)
+    {
+        var first = new[] { SandboxValue.FromInt32(1) };
+        var second = new[] { SandboxValue.FromInt32(2) };
+        var value = ListValue.FromOwnedValues(first, SandboxType.I32);
+        Collect();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var sw = Stopwatch.StartNew();
+        long checksum = 0;
+        for (var i = 0; i < iterations; i++)
+        {
+            value.ResetOwnedValues((i & 1) == 0 ? first : second);
+            checksum += ((I32Value)value[0]).Value;
+        }
+
+        sw.Stop();
+        if (checksum != (long)iterations / 2 * 3)
+        {
+            throw new InvalidOperationException($"Owned-list reset checksum changed: {checksum}.");
+        }
+
+        GC.KeepAlive(value);
+        return Capture(iterations, sw, allocatedBefore);
+    }
+
     private static Measurement Capture(
         int iterations,
         SandboxContext context,
@@ -78,6 +126,17 @@ internal static class ValueShapeCacheProbe
             context.Budget.FuelUsed,
             context.Budget.CollectionElements);
     }
+
+    private static Measurement Capture(
+        int iterations,
+        Stopwatch sw,
+        long allocatedBefore) =>
+        new(
+            iterations,
+            sw.Elapsed.TotalMilliseconds,
+            GC.GetAllocatedBytesForCurrentThread() - allocatedBefore,
+            FuelUsed: 0,
+            CollectionElements: 0);
 
     private static void Collect()
     {
@@ -96,9 +155,12 @@ internal static class ValueShapeCacheProbe
             $"{name,-48} {measurement.Milliseconds,8:N1} ms " +
             $"{nanosecondsPerOperation,10:N1} ns/op {measurement.AllocatedBytes,14:N0} B " +
             $"{bytesPerOperation,8:N1} B/op");
-        Console.WriteLine(
-            $"usage: fuel={measurement.FuelUsed:N0}, " +
-            $"collectionElements={measurement.CollectionElements:N0}");
+        if (measurement.FuelUsed != 0 || measurement.CollectionElements != 0)
+        {
+            Console.WriteLine(
+                $"usage: fuel={measurement.FuelUsed:N0}, " +
+                $"collectionElements={measurement.CollectionElements:N0}");
+        }
     }
 
     private static SandboxContext CreateContext(int maxListLength, int maxMapEntries)
