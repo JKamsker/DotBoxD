@@ -153,8 +153,9 @@ internal sealed class RpcPeerSender : IDisposable
             }
 
             MessageFramer.ValidateOutgoingFrame(frame.WrittenSpan);
-            await _frameChannel.SendFrameValueAsync(frame, ct).ConfigureAwait(false);
+            var pendingSend = _frameChannel.SendFrameValueAsync(frame, ct);
             frame = null!;
+            await pendingSend.ConfigureAwait(false);
         }
         finally
         {

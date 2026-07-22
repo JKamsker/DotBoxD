@@ -14,6 +14,18 @@ public sealed class OwnedFrameSendValidationTests
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
     [Fact]
+    public async Task Tcp_owned_frame_rejects_null_frame()
+    {
+        var ex = await Assert.ThrowsAsync<ArgumentNullException>(
+            () => TcpConnectionFrameSender.SendAsync(
+                connection: null!,
+                frame: null!,
+                CancellationToken.None).AsTask());
+
+        Assert.Equal("frame", ex.ParamName);
+    }
+
+    [Fact]
     public async Task Stream_owned_frame_honors_configured_maximum_and_is_disposed()
     {
         using var stream = new MemoryStream();

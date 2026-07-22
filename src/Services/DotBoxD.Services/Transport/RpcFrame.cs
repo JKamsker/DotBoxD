@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using DotBoxD.Services.Buffers;
 
 namespace DotBoxD.Services.Transport;
@@ -6,77 +7,86 @@ namespace DotBoxD.Services.Transport;
 /// Owns one received wire frame. The frame can be backed by the legacy <see cref="Payload"/>
 /// owner or by a pooled writer transferred by a low-allocation transport.
 /// <para>
-/// This is a value type and may be copied. Ownership of the underlying <see cref="Payload"/> or
-/// <see cref="PooledBufferWriter"/> transfers only through <see cref="DetachPayload"/>; otherwise
-/// callers dispose it through <see cref="Dispose"/>. Follow the boolean contract returned by
-/// <c>RpcPeerFrameProcessor.ShouldDisposeAsync</c> inside <c>RpcPeerReadLoop</c>: <see langword="true"/>
-/// means the caller owns the frame, <see langword="false"/> means the read loop retained ownership
-/// (for example, a <c>StreamItem</c>). Both backing owners are idempotent, so double-dispose is safe.
+/// Copies of this value alias one logical owner, so callers must coordinate detachment. A
+/// writer-backed owner can be detached only once across all aliases; stale writer aliases fail
+/// closed and cannot access or dispose a later pooled-writer lease. <see cref="Dispose"/> is
+/// idempotent across aliases and both backing owners. Follow the boolean contract returned by
+/// <c>RpcPeerFrameProcessor.ShouldDisposeAsync</c> inside <c>RpcPeerReadLoop</c>:
+/// <see langword="true"/> means the caller owns the frame, <see langword="false"/> means the read
+/// loop retained ownership (for example, a <c>StreamItem</c>).
 /// </para>
 /// </summary>
 public struct RpcFrame : IDisposable
 {
-    private Payload? _payload;
-    private PooledBufferWriter? _writer;
+    private object? _owner;
+    private long _writerLeaseToken;
 
     public RpcFrame(Payload payload)
     {
-        _payload = payload ?? throw new ArgumentNullException(nameof(payload));
-        _writer = null;
+        _owner = payload ?? throw new ArgumentNullException(nameof(payload));
+        _writerLeaseToken = 0;
     }
 
     public RpcFrame(PooledBufferWriter writer)
     {
-        _payload = null;
-        _writer = writer ?? throw new ArgumentNullException(nameof(writer));
+        _owner = writer ?? throw new ArgumentNullException(nameof(writer));
+        _writerLeaseToken = writer.LeaseToken;
     }
 
     public ReadOnlyMemory<byte> Memory
     {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get
         {
-            if (_payload is { } payload)
+            var owner = _owner ?? throw new ObjectDisposedException(nameof(RpcFrame));
+            if (_writerLeaseToken == 0)
             {
-                return payload.Memory;
+                return ((Payload)owner).Memory;
             }
 
-            if (_writer is { } writer)
-            {
-                return writer.WrittenMemory;
-            }
-
-            throw new ObjectDisposedException(nameof(RpcFrame));
+            return ((PooledBufferWriter)owner).GetWrittenMemory(_writerLeaseToken);
         }
     }
 
     public int Length => Memory.Length;
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Payload DetachPayload()
     {
-        if (_payload is { } payload)
+        var owner = _owner ?? throw new ObjectDisposedException(nameof(RpcFrame));
+        if (_writerLeaseToken == 0)
         {
+            var payload = (Payload)owner;
             _ = payload.Memory;
-            _payload = null;
+            _owner = null;
             return payload;
         }
 
-        if (_writer is { } writer)
-        {
-            _ = writer.WrittenMemory;
-            _writer = null;
-            var detached = writer.DetachPayload();
-            writer.Dispose();
-            return detached;
-        }
-
-        throw new ObjectDisposedException(nameof(RpcFrame));
+        var detached = ((PooledBufferWriter)owner).DetachLeasePayload(_writerLeaseToken);
+        _owner = null;
+        _writerLeaseToken = 0;
+        return detached;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Dispose()
     {
-        _payload?.Dispose();
-        _payload = null;
-        _writer?.Dispose();
-        _writer = null;
+        var owner = _owner;
+        _owner = null;
+        if (owner is null)
+        {
+            return;
+        }
+
+        var writerLeaseToken = _writerLeaseToken;
+        _writerLeaseToken = 0;
+        if (writerLeaseToken == 0)
+        {
+            ((Payload)owner).Dispose();
+        }
+        else
+        {
+            ((PooledBufferWriter)owner).DisposeLease(writerLeaseToken);
+        }
     }
 }

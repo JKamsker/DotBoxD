@@ -56,25 +56,10 @@ internal static class InMemoryRpcChannel
 
         public ValueTask SendFrameValueAsync(PooledBufferWriter frame, CancellationToken ct = default)
         {
-            if (_disposed)
-            {
-                frame.Dispose();
-                throw new ObjectDisposedException(nameof(PipeConnection));
-            }
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            ct.ThrowIfCancellationRequested();
 
-            if (ct.IsCancellationRequested)
-            {
-                frame.Dispose();
-                return new ValueTask(Task.FromCanceled(ct));
-            }
-
-            var remote = _remote;
-            if (remote is null)
-            {
-                frame.Dispose();
-                throw new InvalidOperationException("Pipe is not connected.");
-            }
-
+            var remote = _remote ?? throw new InvalidOperationException("Pipe is not connected.");
             return remote.TryEnqueue(new RpcFrame(frame))
                 ? default
                 : new ValueTask(Task.FromException(new ObjectDisposedException(nameof(PipeConnection))));

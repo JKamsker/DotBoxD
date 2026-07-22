@@ -11,6 +11,11 @@ internal static class TcpConnectionFrameSender
         PooledBufferWriter frame,
         CancellationToken cancellationToken)
     {
+        if (frame is null)
+        {
+            throw new ArgumentNullException(nameof(frame));
+        }
+
         try
         {
             var data = frame.WrittenMemory;

@@ -121,7 +121,15 @@ internal sealed partial class RpcPeerInboundDispatcher
         if (_sendFrameAsync is not null &&
             response.TryDetachWriter(out var responseWriter))
         {
-            return _sendFrameAsync(responseWriter, cancellationToken);
+            try
+            {
+                return _sendFrameAsync(responseWriter, cancellationToken);
+            }
+            catch
+            {
+                responseWriter.Dispose();
+                throw;
+            }
         }
 
         return new ValueTask(_sendAsync(response.FrameMemory, cancellationToken));
