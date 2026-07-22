@@ -100,20 +100,19 @@ public sealed class PluginAnalyzerForbiddenApiCollectionExpressionExtensionSprea
         AssertSingleForbiddenDiagnosticAt(
             source,
             diagnostics,
-            "int[] values = [.. new HelperEnumerable()];");
+            ".. new HelperEnumerable()");
     }
 
     private static void AssertSingleForbiddenDiagnosticAt(
         string source,
         ImmutableArray<Diagnostic> diagnostics,
-        string expectedLine)
+        string expectedSpan)
     {
         var diagnostic = Assert.Single(diagnostics.Where(d => d.Id == "DBXK001"));
         Assert.Contains("System.IO.File", diagnostic.GetMessage(), StringComparison.Ordinal);
 
-        var position = diagnostic.Location.GetLineSpan().StartLinePosition;
-        var actualLine = source.Split('\n')[position.Line].Trim();
-        Assert.Equal(expectedLine, actualLine);
+        var actualSpan = diagnostic.Location.SourceSpan;
+        Assert.Equal(expectedSpan, source.AsSpan(actualSpan.Start, actualSpan.Length).ToString());
     }
 
     private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string source)
