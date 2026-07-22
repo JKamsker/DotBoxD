@@ -179,6 +179,23 @@ public sealed class Fix_PAL_0039_Tests
             Assert.True(lease.Token.WaitHandle.WaitOne(TimeSpan.FromSeconds(5)));
         }
 
+        // CancelAfter is an advisory wake-up and may fire at the platform timer boundary just
+        // before the Stopwatch-based resource deadline. Prove that the exact deadline has elapsed
+        // before asserting the dispatcher's pre-invocation rejection.
+        Assert.True(SpinWait.SpinUntil(() =>
+        {
+            try
+            {
+                context.Budget.CheckDeadline();
+                return false;
+            }
+            catch (SandboxRuntimeException exception)
+                when (exception.Error.Code == SandboxErrorCode.Timeout)
+            {
+                return true;
+            }
+        }, TimeSpan.FromSeconds(5)));
+
         var exception = Assert.Throws<SandboxRuntimeException>(
             () => CompiledRuntime.CallBinding(context, descriptor.Id, []));
 
