@@ -129,6 +129,111 @@ internal static class InterpreterScalarBindingModules
     }
     """;
 
+    internal const string Ternary = """
+    {
+      "id": "interpreter-scalar-binding-ternary",
+      "version": "1.0.0",
+      "functions": [{
+        "id": "main",
+        "visibility": "entrypoint",
+        "parameters": [],
+        "returnType": "I32",
+        "body": [{
+          "op": "return",
+          "value": {
+            "call": "test.ternary",
+            "args": [{ "i32": 1 }, { "i32": 2 }, { "i32": 3 }]
+          }
+        }]
+      }]
+    }
+    """;
+
+    internal const string RetainedTernaryArguments = """
+    {
+      "id": "interpreter-binding-retained-ternary-arguments",
+      "version": "1.0.0",
+      "functions": [{
+        "id": "main",
+        "visibility": "entrypoint",
+        "parameters": [],
+        "returnType": "I32",
+        "body": [
+          {
+            "op": "expr",
+            "value": {
+              "call": "test.ternary",
+              "args": [{ "i32": 1 }, { "i32": 2 }, { "i32": 3 }]
+            }
+          },
+          {
+            "op": "return",
+            "value": {
+              "call": "test.ternary",
+              "args": [{ "i32": 4 }, { "i32": 5 }, { "i32": 6 }]
+            }
+          }
+        ]
+      }]
+    }
+    """;
+
+    internal const string OrderedTernaryOperands = """
+    {
+      "id": "interpreter-scalar-binding-ordered-ternary-operands",
+      "version": "1.0.0",
+      "functions": [{
+        "id": "main",
+        "visibility": "entrypoint",
+        "parameters": [],
+        "returnType": "I32",
+        "body": [{
+          "op": "return",
+          "value": {
+            "call": "test.ordered3",
+            "args": [
+              { "call": "test.first", "args": [] },
+              { "call": "test.second", "args": [] },
+              { "call": "test.third", "args": [] }
+            ]
+          }
+        }]
+      }]
+    }
+    """;
+
+    internal const string LocalFunctionShadowsFastTernaryBinding = """
+    {
+      "id": "interpreter-local-function-shadows-fast-ternary-binding",
+      "version": "1.0.0",
+      "functions": [
+        {
+          "id": "main",
+          "visibility": "entrypoint",
+          "parameters": [],
+          "returnType": "I32",
+          "body": [{
+            "op": "return",
+            "value": {
+              "call": "test.shadow3",
+              "args": [{ "i32": 1 }, { "i32": 2 }, { "i32": 3 }]
+            }
+          }]
+        },
+        {
+          "id": "test.shadow3",
+          "parameters": [
+            { "name": "first", "type": "I32" },
+            { "name": "second", "type": "I32" },
+            { "name": "third", "type": "I32" }
+          ],
+          "returnType": "I32",
+          "body": [{ "op": "return", "value": { "i32": 7 } }]
+        }
+      ]
+    }
+    """;
+
     internal static SandboxHost CreateHost(params BindingDescriptor[] bindings)
         => SandboxHost.Create(builder =>
         {

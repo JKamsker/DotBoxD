@@ -176,10 +176,9 @@ internal readonly partial struct ExpressionEvaluator
 
     private static bool CanUseScalarBinding(CallExpression call, BindingDescriptor descriptor)
         => descriptor.Parameters.Count == call.Arguments.Count &&
-           (call.Arguments.Count == 1
-            ? descriptor.Invoke.Target is IOneArgumentBindingInvoker
-            : call.Arguments.Count == 2 &&
-              descriptor.Invoke.Target is ITwoArgumentBindingInvoker);
+           ((call.Arguments.Count == 1 && descriptor.Invoke.Target is IOneArgumentBindingInvoker) ||
+            (call.Arguments.Count == 2 && descriptor.Invoke.Target is ITwoArgumentBindingInvoker) ||
+            (call.Arguments.Count == 3 && descriptor.Invoke.Target is IThreeArgumentBindingInvoker));
 
     private ValueTask<SandboxValue> EvaluateCallViaArray(
         CallExpression call,

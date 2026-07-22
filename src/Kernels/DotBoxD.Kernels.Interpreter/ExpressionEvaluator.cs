@@ -196,6 +196,22 @@ internal readonly partial struct ExpressionEvaluator
             arg1,
             functionId);
 
+    public ValueTask<SandboxValue> InvokeBindingAsync(
+        BindingDescriptor descriptor,
+        SandboxValue arg0,
+        SandboxValue arg1,
+        SandboxValue arg2,
+        string functionId)
+        => InterpreterBindingCaller.CallAsync(
+            Context,
+            Options,
+            ModuleHash,
+            descriptor,
+            arg0,
+            arg1,
+            arg2,
+            functionId);
+
     private SandboxValue ChargeLiteral(SandboxValue value)
     {
         Context.ChargeValue(value);

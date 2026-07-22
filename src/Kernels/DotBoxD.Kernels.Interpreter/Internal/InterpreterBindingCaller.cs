@@ -66,6 +66,23 @@ internal static class InterpreterBindingCaller
             BindingInvocationArguments.FromPair(arg0, arg1),
             functionId);
 
+    public static ValueTask<SandboxValue> CallAsync(
+        SandboxContext context,
+        SandboxExecutionOptions options,
+        string moduleHash,
+        BindingDescriptor descriptor,
+        SandboxValue arg0,
+        SandboxValue arg1,
+        SandboxValue arg2,
+        string functionId)
+        => CallCoreAsync(
+            context,
+            options,
+            moduleHash,
+            descriptor,
+            BindingInvocationArguments.FromTriple(arg0, arg1, arg2),
+            functionId);
+
     private static async ValueTask<SandboxValue> CallCoreAsync(
         SandboxContext context,
         SandboxExecutionOptions options,
@@ -177,18 +194,20 @@ internal static class InterpreterBindingCaller
 
     private readonly struct BindingInvocationArguments
     {
-        private readonly IReadOnlyList<SandboxValue>? _list;
+        // List and Triple are mutually exclusive shapes, so this slot holds either the
+        // retainable public argument list or arg2 without growing the three-reference carrier.
+        private readonly object? _listOrArg2;
         private readonly SandboxValue? _arg0;
         private readonly SandboxValue? _arg1;
         private readonly InvocationShape _shape;
 
         private BindingInvocationArguments(
-            IReadOnlyList<SandboxValue>? list,
+            object? listOrArg2,
             SandboxValue? arg0,
             SandboxValue? arg1,
             InvocationShape shape)
         {
-            _list = list;
+            _listOrArg2 = listOrArg2;
             _arg0 = arg0;
             _arg1 = arg1;
             _shape = shape;
@@ -203,6 +222,12 @@ internal static class InterpreterBindingCaller
         public static BindingInvocationArguments FromPair(SandboxValue arg0, SandboxValue arg1)
             => new(null, arg0, arg1, InvocationShape.Pair);
 
+        public static BindingInvocationArguments FromTriple(
+            SandboxValue arg0,
+            SandboxValue arg1,
+            SandboxValue arg2)
+            => new(arg2, arg0, arg1, InvocationShape.Triple);
+
         public ValueTask<SandboxValue> Invoke(
             SandboxContext context,
             BindingDescriptor descriptor,
@@ -215,14 +240,33 @@ internal static class InterpreterBindingCaller
                     invoker.Invoke(context, _arg0!, _arg1!, cancellationToken),
                 InvocationShape.Single => descriptor.Invoke(context, [_arg0!], cancellationToken),
                 InvocationShape.Pair => descriptor.Invoke(context, [_arg0!, _arg1!], cancellationToken),
-                _ => descriptor.Invoke(context, _list!, cancellationToken)
+                InvocationShape.Triple => InvokeTriple(context, descriptor, cancellationToken),
+                _ => descriptor.Invoke(
+                    context,
+                    (IReadOnlyList<SandboxValue>)_listOrArg2!,
+                    cancellationToken)
             };
+
+        private ValueTask<SandboxValue> InvokeTriple(
+            SandboxContext context,
+            BindingDescriptor descriptor,
+            CancellationToken cancellationToken)
+        {
+            var arg2 = (SandboxValue)_listOrArg2!;
+            return descriptor.Invoke.Target is IThreeArgumentBindingInvoker invoker
+                ? invoker.Invoke(context, _arg0!, _arg1!, arg2, cancellationToken)
+                : descriptor.Invoke(
+                    context,
+                    new[] { _arg0!, _arg1!, arg2 },
+                    cancellationToken);
+        }
     }
 
     private enum InvocationShape : byte
     {
         List,
         Single,
-        Pair
+        Pair,
+        Triple
     }
 }

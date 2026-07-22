@@ -62,6 +62,43 @@ public sealed class InterpreterScalarBindingDispatchTests
     }
 
     [Fact]
+    public async Task Three_argument_binding_uses_scalar_invoker_in_argument_order_and_preserves_resource_usage()
+    {
+        var fastBinding = new FastTernaryBinding();
+        var regularBinding = new RegularTernaryBinding();
+
+        var fast = await RunAsync(fastBinding.Descriptor(), InterpreterScalarBindingModules.Ternary);
+        var regular = await RunAsync(regularBinding.Descriptor(), InterpreterScalarBindingModules.Ternary);
+
+        AssertSucceededWithInt32(fast, 123);
+        AssertSucceededWithInt32(regular, 123);
+        Assert.Equal(regular.ResourceUsage, fast.ResourceUsage);
+        Assert.Equal(1, fast.ResourceUsage.HostCalls);
+        Assert.Equal(1, fastBinding.FastCalls);
+        Assert.Equal(0, fastBinding.ListCalls);
+        Assert.Equal(1, regularBinding.Calls);
+    }
+
+    [Fact]
+    public async Task Regular_three_argument_fallback_retains_a_distinct_argument_list_per_call()
+    {
+        var binding = new RegularTernaryBinding();
+
+        var result = await RunAsync(
+            binding.Descriptor(),
+            InterpreterScalarBindingModules.RetainedTernaryArguments);
+
+        AssertSucceededWithInt32(result, 456);
+        Assert.Equal(2, result.ResourceUsage.HostCalls);
+        Assert.Equal(2, binding.Arguments.Count);
+        var first = binding.Arguments[0];
+        var second = binding.Arguments[1];
+        Assert.NotSame(first, second);
+        Assert.Equal([1, 2, 3], Int32Values(first));
+        Assert.Equal([4, 5, 6], Int32Values(second));
+    }
+
+    [Fact]
     public async Task Local_function_shadows_same_named_fast_binding()
     {
         var binding = new FastUnaryBinding();
@@ -69,6 +106,21 @@ public sealed class InterpreterScalarBindingDispatchTests
         var result = await RunAsync(
             binding.Descriptor("test.shadow"),
             InterpreterScalarBindingModules.LocalFunctionShadowsFastBinding);
+
+        AssertSucceededWithInt32(result, 7);
+        Assert.Equal(0, result.ResourceUsage.HostCalls);
+        Assert.Equal(0, binding.FastCalls);
+        Assert.Equal(0, binding.ListCalls);
+    }
+
+    [Fact]
+    public async Task Three_argument_local_function_shadows_same_named_fast_binding()
+    {
+        var binding = new FastTernaryBinding();
+
+        var result = await RunAsync(
+            binding.Descriptor("test.shadow3"),
+            InterpreterScalarBindingModules.LocalFunctionShadowsFastTernaryBinding);
 
         AssertSucceededWithInt32(result, 7);
         Assert.Equal(0, result.ResourceUsage.HostCalls);
