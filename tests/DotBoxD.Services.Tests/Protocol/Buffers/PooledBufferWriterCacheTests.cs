@@ -51,9 +51,9 @@ public sealed class PooledBufferWriterCacheTests
     }
 
     [Fact]
-    public void Cross_thread_returns_never_lease_one_writer_twice()
+    public void Cross_thread_burst_retention_is_bounded_without_double_leasing()
     {
-        const int writerCount = 1024;
+        var writerCount = PooledBufferWriterPool.MaxGlobalOverflowWriters + 64;
         var firstLeases = RentDistinct(writerCount);
         Exception? returnFailure = null;
         var returnThread = new Thread(() =>
@@ -73,10 +73,19 @@ public sealed class PooledBufferWriterCacheTests
         Assert.Null(returnFailure);
 
         var secondLeases = RentDistinct(writerCount);
-        Assert.True(
-            new HashSet<PooledBufferWriter>(firstLeases).SetEquals(secondLeases),
-            "The cross-thread cache did not preserve every returned writer.");
-        DisposeAll(secondLeases);
+        try
+        {
+            var returnedWriters = new HashSet<PooledBufferWriter>(firstLeases);
+            var retainedWriterCount = secondLeases.Count(returnedWriters.Contains);
+
+            Assert.Equal(
+                PooledBufferWriterPool.MaxGlobalOverflowWriters + 1,
+                retainedWriterCount);
+        }
+        finally
+        {
+            DisposeAll(secondLeases);
+        }
     }
 
     private static PooledBufferWriter[] RentDistinct(int count)

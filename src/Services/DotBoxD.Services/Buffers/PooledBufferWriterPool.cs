@@ -5,12 +5,15 @@ namespace DotBoxD.Services.Buffers;
 /// <summary>Owns the bounded object and small-buffer caches used by internal frame writers.</summary>
 internal static class PooledBufferWriterPool
 {
+    // Absorb modest cross-thread bursts without retaining every writer from an unbounded spike.
+    internal const int MaxGlobalOverflowWriters = 16;
     private const int MaxRetainedBufferLength = 4096;
     [ThreadStatic]
     private static PooledBufferWriter? s_cachedWriter;
     private static readonly object GlobalOverflowGate = new();
     private static PooledBufferWriter? s_globalCachedWriter;
     private static PooledBufferWriter? s_globalOverflowWriter;
+    private static int s_globalOverflowWriterCount;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static PooledBufferWriter Rent(int initialCapacity, int maxWritten)
@@ -92,16 +95,22 @@ internal static class PooledBufferWriterPool
         byte[]? buffer,
         bool retainBuffer)
     {
+        writer.CachedResource = null;
         if (retainBuffer)
         {
-            writer.CachedResource = null;
             PooledBufferWriter.ReturnBuffer(buffer);
         }
 
         lock (GlobalOverflowGate)
         {
+            if (s_globalOverflowWriterCount >= MaxGlobalOverflowWriters)
+            {
+                return;
+            }
+
             writer.CachedResource = s_globalOverflowWriter;
             s_globalOverflowWriter = writer;
+            s_globalOverflowWriterCount++;
         }
     }
 
@@ -115,6 +124,7 @@ internal static class PooledBufferWriterPool
             {
                 s_globalOverflowWriter = writer.CachedResource as PooledBufferWriter;
                 writer.CachedResource = null;
+                s_globalOverflowWriterCount--;
             }
 
             return writer;
