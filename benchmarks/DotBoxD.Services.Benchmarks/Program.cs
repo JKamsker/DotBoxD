@@ -35,6 +35,9 @@ if (args.Length == 1)
         case "--probe-constructor-replay":
             ConstructorReplayGuardProbe.Run();
             return;
+        case "--probe-finite-timeout-valuetask-unary":
+            await FiniteTimeoutValueTaskUnaryProbe.RunAsync();
+            return;
     }
 }
 
