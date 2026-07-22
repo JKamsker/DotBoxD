@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Diagnostics;
 using DotBoxD.Services.Buffers;
 
@@ -7,26 +8,80 @@ internal static class PooledBufferWriterCacheProbe
 {
     private const int SameThreadIterations = 5_000_000;
     private const int CrossThreadIterations = 1_000_000;
+    private const int LargeBufferIterations = 1_000_000;
+    private const int CrossThreadLargeBufferIterations = 500_000;
+    private const int PublicWriterIterations = 200_000;
     private const int SameThreadWarmup = 100_000;
     private const int CrossThreadWarmup = 20_000;
+    private const int LargeBufferWarmup = 20_000;
 
     public static void Run()
     {
+        PrewarmArrayPool();
+        var firstInternalRent = MeasureFirstInternalRent();
         for (var i = 0; i < SameThreadWarmup; i++)
         {
             UseAndDispose(i);
         }
 
-        using var returner = new CrossThreadReturner();
+        for (var i = 0; i < CrossThreadWarmup; i++)
+        {
+            UsePublicWriter(i);
+        }
+
+        using var returner = new CrossThreadWriterReturner();
         for (var i = 0; i < CrossThreadWarmup; i++)
         {
             UseAndReturn(returner, i);
         }
 
+        for (var i = 0; i < LargeBufferWarmup; i++)
+        {
+            UseAndDispose(i, 8192);
+            UseAndReturn(returner, i, 8192);
+        }
+
         Console.WriteLine("PooledBufferWriter cache probe");
         Console.WriteLine("case                                ms      ns/op    allocated B      B/op checksum");
+        Write(firstInternalRent);
+        Write(MeasurePublicWriters());
         Write(MeasureSameThread());
         Write(MeasureCrossThread(returner));
+        Write(MeasureSameThreadLargeBuffer());
+        Write(MeasureCrossThreadLargeBuffer(returner));
+    }
+
+    private static Measurement MeasureFirstInternalRent()
+    {
+        ForceGc();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var started = Stopwatch.GetTimestamp();
+        var checksum = UseAndDispose(0);
+        return Measurement.Create(
+            "first internal rent, pool warm",
+            1,
+            started,
+            allocatedBefore,
+            checksum);
+    }
+
+    private static Measurement MeasurePublicWriters()
+    {
+        ForceGc();
+        long checksum = 0;
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var started = Stopwatch.GetTimestamp();
+        for (var i = 0; i < PublicWriterIterations; i++)
+        {
+            checksum += UsePublicWriter(i);
+        }
+
+        return Measurement.Create(
+            "public writer construction",
+            PublicWriterIterations,
+            started,
+            allocatedBefore,
+            checksum);
     }
 
     private static Measurement MeasureSameThread()
@@ -48,35 +103,87 @@ internal static class PooledBufferWriterCacheProbe
             checksum);
     }
 
-    private static Measurement MeasureCrossThread(CrossThreadReturner returner)
+    private static Measurement MeasureCrossThread(CrossThreadWriterReturner returner)
     {
         ForceGc();
         long checksum = 0;
-        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
         var started = Stopwatch.GetTimestamp();
         for (var i = 0; i < CrossThreadIterations; i++)
         {
             checksum += UseAndReturn(returner, i);
         }
 
-        return Measurement.Create(
+        var elapsed = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+        var allocated = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
+        return new Measurement(
             "cross-thread rent + return",
             CrossThreadIterations,
+            elapsed,
+            allocated,
+            checksum);
+    }
+
+    private static Measurement MeasureSameThreadLargeBuffer()
+    {
+        ForceGc();
+        long checksum = 0;
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var started = Stopwatch.GetTimestamp();
+        for (var i = 0; i < LargeBufferIterations; i++)
+        {
+            checksum += UseAndDispose(i, 8192);
+        }
+
+        return Measurement.Create(
+            "same-thread 8 KiB fallback",
+            LargeBufferIterations,
             started,
             allocatedBefore,
             checksum);
     }
 
-    private static int UseAndDispose(int value)
+    private static Measurement MeasureCrossThreadLargeBuffer(CrossThreadWriterReturner returner)
     {
-        using var writer = PooledBufferWriter.Rent();
+        ForceGc();
+        long checksum = 0;
+        var allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
+        var started = Stopwatch.GetTimestamp();
+        for (var i = 0; i < CrossThreadLargeBufferIterations; i++)
+        {
+            checksum += UseAndReturn(returner, i, 8192);
+        }
+
+        var elapsed = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+        var allocated = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
+        return new Measurement(
+            "cross-thread 8 KiB fallback",
+            CrossThreadLargeBufferIterations,
+            elapsed,
+            allocated,
+            checksum);
+    }
+
+    private static int UseAndDispose(int value, int initialCapacity = 256)
+    {
+        using var writer = PooledBufferWriter.Rent(initialCapacity);
         WriteByte(writer, value);
         return writer.WrittenCount;
     }
 
-    private static int UseAndReturn(CrossThreadReturner returner, int value)
+    private static int UsePublicWriter(int value)
     {
-        var writer = PooledBufferWriter.Rent();
+        using var writer = new PooledBufferWriter();
+        WriteByte(writer, value);
+        return writer.WrittenCount;
+    }
+
+    private static int UseAndReturn(
+        CrossThreadWriterReturner returner,
+        int value,
+        int initialCapacity = 256)
+    {
+        var writer = PooledBufferWriter.Rent(initialCapacity);
         WriteByte(writer, value);
         var written = writer.WrittenCount;
         returner.Return(writer);
@@ -101,6 +208,12 @@ internal static class PooledBufferWriterCacheProbe
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
+    }
+
+    private static void PrewarmArrayPool()
+    {
+        var buffer = ArrayPool<byte>.Shared.Rent(256);
+        ArrayPool<byte>.Shared.Return(buffer);
     }
 
     private readonly record struct Measurement(
@@ -128,85 +241,4 @@ internal static class PooledBufferWriterCacheProbe
                 checksum);
     }
 
-    private sealed class CrossThreadReturner : IDisposable
-    {
-        private readonly Thread _thread;
-        private PooledBufferWriter? _writer;
-        private Exception? _failure;
-        private int _published;
-        private int _completed;
-        private int _nextSequence;
-        private int _stopping;
-
-        public CrossThreadReturner()
-        {
-            _thread = new Thread(ReturnLoop)
-            {
-                IsBackground = true,
-                Name = "PooledBufferWriter benchmark returner",
-            };
-            _thread.Start();
-        }
-
-        public void Return(PooledBufferWriter writer)
-        {
-            var sequence = ++_nextSequence;
-            _writer = writer;
-            Volatile.Write(ref _published, sequence);
-
-            while (Volatile.Read(ref _completed) != sequence)
-            {
-                Thread.SpinWait(1);
-            }
-
-            if (_failure is { } failure)
-            {
-                throw new InvalidOperationException("Cross-thread writer return failed.", failure);
-            }
-        }
-
-        public void Dispose()
-        {
-            Volatile.Write(ref _stopping, 1);
-            _thread.Join();
-            if (_failure is { } failure)
-            {
-                throw new InvalidOperationException("Cross-thread writer return failed.", failure);
-            }
-        }
-
-        private void ReturnLoop()
-        {
-            var sequence = 1;
-            while (true)
-            {
-                while (Volatile.Read(ref _published) < sequence)
-                {
-                    if (Volatile.Read(ref _stopping) != 0)
-                    {
-                        return;
-                    }
-
-                    Thread.SpinWait(1);
-                }
-
-                var writer = _writer;
-                _writer = null;
-                try
-                {
-                    (writer ?? throw new InvalidOperationException("No writer was published.")).Dispose();
-                }
-                catch (Exception ex)
-                {
-                    _failure = ex;
-                }
-                finally
-                {
-                    Volatile.Write(ref _completed, sequence);
-                }
-
-                sequence++;
-            }
-        }
-    }
 }
