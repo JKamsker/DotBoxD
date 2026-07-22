@@ -8,6 +8,7 @@ All results below are local stopwatch probes on this machine, run in Release mod
 dotnet run -c Release --project benchmarks/DotBoxD.Services.Benchmarks -p:UseSharedCompilation=false -- --filter "*RpcTelemetryBenchmarks*" --job short --warmupCount 3 --iterationCount 8
 dotnet run -c Release --project benchmarks/DotBoxD.Services.Benchmarks -p:UseSharedCompilation=false -- --probe-peer-proxy-cache
 dotnet run -c Release --project benchmarks/DotBoxD.Services.Benchmarks -p:UseSharedCompilation=false -- --probe-stream-connection-receive-tracking
+DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Services.Benchmarks -p:UseSharedCompilation=false -- --probe-stream-connection-pending-receive
 DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Services.Benchmarks -p:UseSharedCompilation=false -- --probe-peer-start-guard
 DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Services.Benchmarks -p:UseSharedCompilation=false -- --probe-constructor-replay
 DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Services.Benchmarks -p:UseSharedCompilation=false -- --probe-pending-timeout-scheduler
