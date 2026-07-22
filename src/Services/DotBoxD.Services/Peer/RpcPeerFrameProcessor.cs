@@ -14,13 +14,6 @@ internal sealed class RpcPeerFrameProcessor
     private readonly RpcPeerOutboundInvoker _outbound;
     private readonly RpcStreamManager _streams;
     private readonly Action<int, MessageType, string, Exception?> _protocolError;
-    private readonly Dictionary<MessageType, FrameHandler> _handlers;
-
-    private delegate ValueTask<bool> FrameHandler(
-        RpcFrame frame,
-        int messageId,
-        MessageType messageType,
-        CancellationToken ct);
 
     public RpcPeerFrameProcessor(
         RpcPeerInboundDispatcher inbound,
@@ -32,56 +25,43 @@ internal sealed class RpcPeerFrameProcessor
         _outbound = outbound;
         _streams = streams;
         _protocolError = protocolError;
-        _handlers = new Dictionary<MessageType, FrameHandler>
-        {
-            [MessageType.Response] = HandleResponseAsync,
-            [MessageType.Error] = HandleResponseAsync,
-            [MessageType.Request] = HandleRequestAsync,
-            [MessageType.Cancel] = HandleCancelAsync,
-            [MessageType.StreamCancel] = HandleStreamCancelAsync,
-            [MessageType.StreamItem] = HandleStreamItemAsync,
-            [MessageType.StreamComplete] = HandleStreamCompleteAsync,
-            [MessageType.StreamError] = HandleStreamErrorAsync,
-            [MessageType.StreamCredit] = HandleStreamCreditAsync,
-        };
     }
 
-    public async ValueTask<bool> ShouldDisposeAsync(RpcFrame frame, CancellationToken ct)
+    public ValueTask<bool> ShouldDisposeAsync(RpcFrame frame, CancellationToken ct)
     {
         if (!MessageFrameReader.TryReadFrameHeaderUnchecked(frame.Memory, out var messageId, out var messageType))
         {
             _protocolError(0, default, "Malformed frame header.", null);
-            return true;
+            return new ValueTask<bool>(true);
         }
 
-        if (_handlers.TryGetValue(messageType, out var handler))
+        return messageType switch
         {
-            return await handler(frame, messageId, messageType, ct).ConfigureAwait(false);
-        }
-
-        _protocolError(messageId, messageType, "Unknown message type.", null);
-        return true;
+            MessageType.Response or MessageType.Error => HandleResponse(frame, messageId),
+            MessageType.Request => HandleRequestAsync(frame, messageId, ct),
+            MessageType.Cancel => HandleCancel(frame, messageId, messageType),
+            MessageType.StreamCancel => HandleStreamCancel(frame, messageId, messageType),
+            MessageType.StreamItem => HandleStreamItem(frame, messageId, messageType),
+            MessageType.StreamComplete => HandleStreamComplete(frame, messageId, messageType),
+            MessageType.StreamError => HandleStreamError(frame, messageId, messageType),
+            MessageType.StreamCredit => HandleStreamCredit(frame, messageId, messageType),
+            _ => HandleUnknown(messageId, messageType),
+        };
     }
 
-    private ValueTask<bool> HandleResponseAsync(
-        RpcFrame frame,
-        int messageId,
-        MessageType messageType,
-        CancellationToken ct)
+    private ValueTask<bool> HandleResponse(RpcFrame frame, int messageId)
         => new(!_outbound.TryCompleteResponse(messageId, frame));
 
     private async ValueTask<bool> HandleRequestAsync(
         RpcFrame frame,
         int messageId,
-        MessageType messageType,
         CancellationToken ct)
         => !await _inbound.AcceptRequestAsync(frame, messageId, ct).ConfigureAwait(false);
 
-    private ValueTask<bool> HandleCancelAsync(
+    private ValueTask<bool> HandleCancel(
         RpcFrame frame,
         int messageId,
-        MessageType messageType,
-        CancellationToken ct)
+        MessageType messageType)
     {
         if (messageId == 0 || frame.Length != MessageFramer.HeaderSize)
         {
@@ -93,11 +73,10 @@ internal sealed class RpcPeerFrameProcessor
         return new ValueTask<bool>(true);
     }
 
-    private ValueTask<bool> HandleStreamCancelAsync(
+    private ValueTask<bool> HandleStreamCancel(
         RpcFrame frame,
         int messageId,
-        MessageType messageType,
-        CancellationToken ct)
+        MessageType messageType)
     {
         if (!RpcStreamControlFrameReader.TryRead(frame.Memory, MessageType.StreamCancel, out var streamCancelId))
         {
@@ -109,11 +88,10 @@ internal sealed class RpcPeerFrameProcessor
         return new ValueTask<bool>(true);
     }
 
-    private ValueTask<bool> HandleStreamItemAsync(
+    private ValueTask<bool> HandleStreamItem(
         RpcFrame frame,
         int messageId,
-        MessageType messageType,
-        CancellationToken ct)
+        MessageType messageType)
     {
         if (messageId == 0)
         {
@@ -132,11 +110,10 @@ internal sealed class RpcPeerFrameProcessor
         return new ValueTask<bool>(true);
     }
 
-    private ValueTask<bool> HandleStreamCompleteAsync(
+    private ValueTask<bool> HandleStreamComplete(
         RpcFrame frame,
         int messageId,
-        MessageType messageType,
-        CancellationToken ct)
+        MessageType messageType)
     {
         if (!RpcStreamCompleteFrameReader.TryRead(frame.Memory, out var streamId))
         {
@@ -152,11 +129,10 @@ internal sealed class RpcPeerFrameProcessor
         return new ValueTask<bool>(true);
     }
 
-    private ValueTask<bool> HandleStreamErrorAsync(
+    private ValueTask<bool> HandleStreamError(
         RpcFrame frame,
         int messageId,
-        MessageType messageType,
-        CancellationToken ct)
+        MessageType messageType)
     {
         if (!_streams.TryCompleteInboundError(frame.Memory, out var malformed))
         {
@@ -167,17 +143,22 @@ internal sealed class RpcPeerFrameProcessor
         return new ValueTask<bool>(true);
     }
 
-    private ValueTask<bool> HandleStreamCreditAsync(
+    private ValueTask<bool> HandleStreamCredit(
         RpcFrame frame,
         int messageId,
-        MessageType messageType,
-        CancellationToken ct)
+        MessageType messageType)
     {
         if (!_streams.TryAddCredit(frame.Memory))
         {
             _protocolError(messageId, messageType, "Malformed stream credit frame.", null);
         }
 
+        return new ValueTask<bool>(true);
+    }
+
+    private ValueTask<bool> HandleUnknown(int messageId, MessageType messageType)
+    {
+        _protocolError(messageId, messageType, "Unknown message type.", null);
         return new ValueTask<bool>(true);
     }
 
