@@ -12,7 +12,6 @@ public async ValueTask DisposeAsync()
 public async ValueTask ReleaseAsync(string serviceName, string instanceId)
 public async ValueTask SendFrameValueAsync(PooledBufferWriter frame, CancellationToken ct = default)
 public async ValueTask SendValueAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
-public async ValueTask<Payload> ReceiveValueAsync(CancellationToken ct = default)
 public async ValueTask<RpcFrame> ReceiveFrameValueAsync(CancellationToken ct = default)
 public bool DisableInboundRequestCancellation { get; init; }
 public bool EnableLowAllocationValueTaskInvocations { get; init; }
@@ -210,7 +209,7 @@ public sealed class RpcReadErrorEventArgs : EventArgs
 public sealed class RpcStreamingContext : IRpcStreamingContext
 public sealed class SingleConnectionServerTransport : IServerTransport
 public sealed class SingleConnectionTransport : ITransport
-public sealed class StreamConnection : IRpcFrameChannel
+public sealed class StreamConnection : IValidatedSerialFrameChannel
 public sealed partial class RpcHost
 public sealed partial class RpcHost : IAsyncDisposable
 public sealed partial class RpcPeer
@@ -335,7 +334,6 @@ public Task<IAsyncEnumerable<T>> InvokeAsyncEnumerableAsync<TRequest, T>(string 
 public Task<IAsyncEnumerable<T>> InvokeAsyncEnumerableOnInstanceAsync<T>(string service, string instanceId, string method, CancellationToken ct = default) =>
 public Task<IAsyncEnumerable<T>> InvokeAsyncEnumerableOnInstanceAsync<TRequest, T>( string service, string instanceId, string method, TRequest request, RpcStreamAttachment stream, CancellationToken ct = default) =>
 public Task<IAsyncEnumerable<T>> InvokeAsyncEnumerableOnInstanceAsync<TRequest, T>(string service, string instanceId, string method, TRequest request, RpcStreamAttachment[]? streams = null, CancellationToken ct = default) =>
-public Task<Payload> ReceiveAsync(CancellationToken ct = default) =>
 public Task<Pipe> InvokePipeAsync(string service, string method, CancellationToken ct = default) =>
 public Task<Pipe> InvokePipeAsync<TRequest>( string service, string method, TRequest request, RpcStreamAttachment stream, CancellationToken ct = default) =>
 public Task<Pipe> InvokePipeAsync<TRequest>(string service, string method, TRequest request, RpcStreamAttachment[]? streams = null, CancellationToken ct = default) =>
@@ -364,6 +362,7 @@ public ValueTask InvokeValueAsync(string service, string method, CancellationTok
 public ValueTask InvokeValueAsync<TRequest>(string service, string method, TRequest request, CancellationToken ct = default) =>
 public ValueTask InvokeValueOnInstanceAsync(string service, string instanceId, string method, CancellationToken ct = default) =>
 public ValueTask InvokeValueOnInstanceAsync<TRequest>(string service, string instanceId, string method, TRequest request, CancellationToken ct = default) =>
+public ValueTask<Payload> ReceiveValueAsync(CancellationToken ct = default) =>
 public ValueTask<TResponse> InvokeValueAsync<TRequest, TResponse>(string service, string method, TRequest request, CancellationToken ct = default) =>
 public ValueTask<TResponse> InvokeValueAsync<TResponse>(string service, string method, CancellationToken ct = default) =>
 public ValueTask<TResponse> InvokeValueOnInstanceAsync<TRequest, TResponse>(string service, string instanceId, string method, TRequest request, CancellationToken ct = default) =>

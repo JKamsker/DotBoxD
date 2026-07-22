@@ -153,7 +153,7 @@ public IReadOnlyList<SandboxFunction> Functions { get => _functions; init => _fu
 public IReadOnlyList<SandboxType> Arguments { get; init; }
 public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = BindingParameterTypes.Copy(value, nameof(Parameters)); }
 public IReadOnlyList<SandboxValue> Fields { get => _fields; init => _fields = Snapshot(value); }
-public IReadOnlyList<SandboxValue> Values { get => this; init => _values = Snapshot(value); }
+public IReadOnlyList<SandboxValue> Values { get; init; }
 public IReadOnlyList<Statement> Body { get => _body; init => _body = ModelCopy.List(value, nameof(Body)); }
 public IReadOnlyList<Statement> Else { get => _else; init => _else = ModelCopy.List(value, nameof(Else)); }
 public IReadOnlyList<Statement> Then { get => _then; init => _then = ModelCopy.List(value, nameof(Then)); }

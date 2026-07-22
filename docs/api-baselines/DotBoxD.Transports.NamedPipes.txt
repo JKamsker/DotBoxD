@@ -5,7 +5,6 @@
 public async Task ConnectAsync(CancellationToken ct = default)
 public async Task<IRpcChannel> AcceptAsync(CancellationToken ct = default)
 public async ValueTask DisposeAsync()
-public ValueTask DisposeAsync()
 public bool IsConnected => _connection?.IsConnected ?? false
 public IRpcChannel? Connection => _connection
 public NamedPipeClientTransport( string serverName, string pipeName, int maxMessageSize = MessageFramer.MaxMessageSize)
@@ -18,3 +17,4 @@ public static readonly TimeSpan DefaultFrameReadIdleTimeout = TimeSpan.FromSecon
 public Task StartAsync(CancellationToken ct = default)
 public Task StopAsync(CancellationToken ct = default)
 public TimeSpan? FrameReadIdleTimeout { get; init; }
+public ValueTask DisposeAsync()
