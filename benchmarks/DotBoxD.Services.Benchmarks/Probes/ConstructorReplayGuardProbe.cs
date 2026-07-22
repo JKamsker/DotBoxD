@@ -7,12 +7,14 @@ namespace DotBoxD.Services.Benchmarks.Probes;
 
 internal static class ConstructorReplayGuardProbe
 {
+    private const int FastValidatorAdmissionCall = 8192;
     private const int WarmupIterations = 100_000;
     private const int MeasurementIterations = 1_000_000;
 
     public static void Run()
     {
         var serializer = new MessagePackRpcSerializer();
+        MeasureColdActivation(serializer);
         var stable = new ConstructorReplayStableDto(42);
         ConstructorReplayBaseDto derived = new ConstructorReplayDerivedDto(42);
         var settable = new ConstructorReplaySettableDto { Id = 42 };
@@ -31,6 +33,55 @@ internal static class ConstructorReplayGuardProbe
         Write(Measure(
             "direct MessagePack lower bound",
             writer => MessagePackSerializer.Serialize(writer, stable, serializer.Options)));
+    }
+
+    private static void MeasureColdActivation(MessagePackRpcSerializer serializer)
+    {
+        var writer = new ArrayBufferWriter<byte>();
+        var warmup = new ConstructorReplayActivationWarmupDto(42);
+        for (var i = 0; i <= FastValidatorAdmissionCall; i++)
+        {
+            serializer.Serialize(writer, warmup);
+            writer.Clear();
+        }
+
+        var value = new ConstructorReplayActivationDto(42);
+        ForceGc();
+        Console.WriteLine("cold activation calls");
+        MeasureColdCalls(serializer, writer, value, "first call", 1);
+        MeasureColdCalls(serializer, writer, value, "calls 2-128", 127);
+        MeasureColdCalls(serializer, writer, value, "calls 129-4,096", 3968);
+        MeasureColdCalls(serializer, writer, value, "calls 4,097-8,191", 4095);
+        MeasureColdCalls(serializer, writer, value, "call 8,192 activate", 1);
+        MeasureColdCalls(
+            serializer,
+            writer,
+            value,
+            "calls 8,193-16,384",
+            FastValidatorAdmissionCall);
+    }
+
+    private static void MeasureColdCalls(
+        MessagePackRpcSerializer serializer,
+        ArrayBufferWriter<byte> writer,
+        ConstructorReplayActivationDto value,
+        string name,
+        int calls)
+    {
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var started = Stopwatch.GetTimestamp();
+        for (var call = 0; call < calls; call++)
+        {
+            serializer.Serialize(writer, value);
+            writer.Clear();
+        }
+
+        var elapsed = Stopwatch.GetElapsedTime(started);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        Console.WriteLine(
+            $"{name,-18} {elapsed.TotalMicroseconds,9:N1} us " +
+            $"{elapsed.TotalNanoseconds / calls,8:N1} ns/op " +
+            $"{allocated,12:N0} B {allocated / (double)calls,8:N1} B/op");
     }
 
     private static Measurement Measure(
@@ -136,6 +187,20 @@ internal static class ConstructorReplayGuardProbe
 public sealed class ConstructorReplayStableDto
 {
     public ConstructorReplayStableDto(int id) => Id = id;
+
+    public int Id { get; }
+}
+
+public sealed class ConstructorReplayActivationDto
+{
+    public ConstructorReplayActivationDto(int id) => Id = id;
+
+    public int Id { get; }
+}
+
+public sealed class ConstructorReplayActivationWarmupDto
+{
+    public ConstructorReplayActivationWarmupDto(int id) => Id = id;
 
     public int Id { get; }
 }
