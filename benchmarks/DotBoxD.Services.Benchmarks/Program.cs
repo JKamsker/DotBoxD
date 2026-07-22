@@ -14,6 +14,9 @@ if (args.Length == 1)
         case "--probe-stream-connection-pending-receive":
             await StreamConnectionPendingReceiveProbe.RunAsync();
             return;
+        case "--probe-stream-connection-pending-receive-core":
+            await StreamConnectionPendingReceiveProbe.RunCoreAsync();
+            return;
         case "--probe-stream-connection-send-gate":
             StreamConnectionSendGateProbe.Run();
             return;

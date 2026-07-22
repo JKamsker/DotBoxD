@@ -1,4 +1,5 @@
 using System.IO.Pipes;
+using System.Runtime.CompilerServices;
 using DotBoxD.Services.Buffers;
 using DotBoxD.Services.Protocol;
 
@@ -62,9 +63,7 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
     public bool IsConnected =>
         Volatile.Read(ref _disposed) == 0 &&
         (_stream is not PipeStream pipe || pipe.IsConnected);
-
     public string RemoteEndpoint => _remoteEndpoint;
-
     public Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) =>
         SendValueAsync(data, ct).AsTask();
 
@@ -104,15 +103,34 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
 
     public async Task<Payload> ReceiveAsync(CancellationToken ct = default)
     {
-        var frame = await ReceiveFrameValueAsync(ct).ConfigureAwait(false);
+        var frame = await StartReceive(writerBacked: false, ct).ConfigureAwait(false);
         return frame.DetachPayload();
     }
 
-    public async ValueTask<RpcFrame> ReceiveFrameValueAsync(CancellationToken ct = default)
+    public ValueTask<RpcFrame> ReceiveFrameValueAsync(CancellationToken ct = default) =>
+        StartReceive(writerBacked: true, ct);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private ValueTask<RpcFrame> StartReceive(bool writerBacked, CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        ReceiveConcurrencyGuard.Enter(ref _activeReceives, nameof(StreamConnection));
-        Payload? payload = null;
+        if (ct.IsCancellationRequested)
+        {
+            return StreamFrameReadOperations.CreateCanceledReceive(ct);
+        }
+
+        var failure = ReceiveConcurrencyGuard.TryEnter(ref _activeReceives);
+        if (failure != ReceiveEnterFailure.None)
+        {
+            return StreamFrameReadOperations.CreateFailedReceive(failure, nameof(StreamConnection));
+        }
+
+        _receiveBuffer.WriterBackedOwner = writerBacked;
+        return ReceiveFrameCoreAsync(ct);
+    }
+
+    private async ValueTask<RpcFrame> ReceiveFrameCoreAsync(CancellationToken ct)
+    {
+        var owner = new StreamFrameReceiveOwner();
         try
         {
             ThrowIfDisposed();
@@ -139,12 +157,12 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
                                 StreamFrameReadOperations.PrepareRead(
                                     ref _receiveBuffer,
                                     _lengthBuffer,
-                                    payload,
+                                    ref owner,
                                     remaining),
                                 readToken);
                             StreamFrameReadOperations.ObservePendingRead(
                                 ref _receiveBuffer,
-                                payload,
+                                owner,
                                 pendingRead.IsCompletedSuccessfully);
                         }
                         else
@@ -152,7 +170,8 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
                             pendingRead = _stream.ReadAsync(
                                 StreamFrameReadOperations.PrepareExactRead(
                                     _lengthBuffer,
-                                    payload,
+                                    ref owner,
+                                    _receiveBuffer.WriterBackedOwner,
                                     remaining),
                                 readToken);
                         }
@@ -167,7 +186,7 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
                     if (read == 0)
                     {
                         return StreamFrameReadOperations.HandleEndOfStream(
-                            payload,
+                            owner,
                             remaining,
                             StreamFrameReadProgressFormat.WholeFrame);
                     }
@@ -175,12 +194,13 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
                     {
                         remaining = StreamFrameReadOperations.CommitRead(
                             ref _receiveBuffer,
-                            payload,
+                            ref owner,
                             remaining,
                             read);
                     }
                     else
                     {
+                        owner.AdvanceBodyRead(read, _receiveBuffer.WriterBackedOwner);
                         remaining -= read;
                     }
                     readToken = StreamFrameReadOperations.RearmTimeout(
@@ -189,29 +209,29 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
                         _frameReadIdleTimeout,
                         remaining);
                 }
-                if (payload is not null)
+                if (owner.IsAllocated)
                 {
-                    var frame = new RpcFrame(payload);
-                    payload = null;
-                    return frame;
+                    return owner.TransferFrame(_receiveBuffer.WriterBackedOwner);
                 }
                 remaining = _useReceiveLookahead
-                    ? StreamFrameReadOperations.InitializePayload(
+                    ? StreamFrameReadOperations.InitializeOwner(
                         ref _receiveBuffer,
                         _lengthBuffer,
                         _maxMessageSize,
-                        out payload)
-                    : StreamFrameReadOperations.InitializeExactPayload(
+                        _receiveBuffer.WriterBackedOwner,
+                        ref owner)
+                    : StreamFrameReadOperations.InitializeExactOwner(
                         _lengthBuffer,
                         _maxMessageSize,
-                        out payload);
+                        _receiveBuffer.WriterBackedOwner,
+                        ref owner);
             }
         }
         finally
         {
             try
             {
-                payload?.Dispose();
+                owner.Dispose(_receiveBuffer.WriterBackedOwner);
             }
             finally
             {
@@ -229,9 +249,8 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
 
     public ValueTask SendFrameValueAsync(PooledBufferWriter frame, CancellationToken ct = default) =>
         StreamConnectionFrameSender.SendAsync(this, frame, ct);
-
     public ValueTask<Payload> ReceiveValueAsync(CancellationToken ct = default) =>
-        RpcFramePayloadAdapter.DetachAsync(ReceiveFrameValueAsync(ct));
+        RpcFramePayloadAdapter.DetachAsync(StartReceive(writerBacked: false, ct));
 
     /// <summary>Closes the connection. This operation is idempotent.</summary>
     public async Task CloseAsync(CancellationToken ct = default)

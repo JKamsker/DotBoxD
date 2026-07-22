@@ -13,25 +13,37 @@ internal static class StreamConnectionPendingReceiveProbe
 
     public static async Task RunAsync()
     {
-        var finite = await MeasureAsync("finite timeout", frameReadIdleTimeout: null)
+        await RunCoreAsync().ConfigureAwait(false);
+        await TransportPendingReceiveProbe.RunAsync().ConfigureAwait(false);
+    }
+
+    public static async Task RunCoreAsync()
+    {
+        var finite = await MeasureAsync("finite timeout", frameReadIdleTimeout: null, legacyPayload: false)
             .ConfigureAwait(false);
-        var infinite = await MeasureAsync("infinite timeout", Timeout.InfiniteTimeSpan)
+        var infinite = await MeasureAsync("infinite timeout", Timeout.InfiniteTimeSpan, legacyPayload: false)
+            .ConfigureAwait(false);
+        var legacyInfinite = await MeasureAsync(
+                "legacy payload infinite",
+                Timeout.InfiniteTimeSpan,
+                legacyPayload: true)
             .ConfigureAwait(false);
 
         Console.WriteLine("StreamConnection forced-pending receive probe");
         Console.WriteLine("case                    total ms       ns/frame    allocated B    B/frame  reads/frame");
         Write(finite);
         Write(infinite);
+        Write(legacyInfinite);
         Console.WriteLine(
             $"invariants: {MeasurementIterations:N0} frames/lane, 2 pending reads/frame, " +
             $"{FrameLength:N0} bytes/frame, checksum {finite.Checksum:N0}/lane");
 
-        await TransportPendingReceiveProbe.RunAsync().ConfigureAwait(false);
     }
 
     private static async Task<Measurement> MeasureAsync(
         string name,
-        TimeSpan? frameReadIdleTimeout)
+        TimeSpan? frameReadIdleTimeout,
+        bool legacyPayload)
     {
         var frameBytes = CreateFrame();
         using var stream = new ForcedPendingFrameStream(frameBytes);
@@ -40,7 +52,7 @@ internal static class StreamConnectionPendingReceiveProbe
             ownsStream: false,
             frameReadIdleTimeout: frameReadIdleTimeout);
 
-        await ReadFramesAsync(connection, WarmupIterations).ConfigureAwait(false);
+        await ReadSelectedFramesAsync(connection, WarmupIterations, legacyPayload).ConfigureAwait(false);
 
         ForceGc();
         var readsBefore = stream.ReadCount;
@@ -50,7 +62,8 @@ internal static class StreamConnectionPendingReceiveProbe
         var allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
         var startedAt = Stopwatch.GetTimestamp();
 
-        var checksum = await ReadFramesAsync(connection, MeasurementIterations).ConfigureAwait(false);
+        var checksum = await ReadSelectedFramesAsync(connection, MeasurementIterations, legacyPayload)
+            .ConfigureAwait(false);
 
         var elapsed = Stopwatch.GetElapsedTime(startedAt);
         var allocated = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
@@ -82,6 +95,30 @@ internal static class StreamConnectionPendingReceiveProbe
             {
                 frame.Dispose();
             }
+        }
+
+        return checksum;
+    }
+
+    private static Task<long> ReadSelectedFramesAsync(
+        StreamConnection connection,
+        int iterations,
+        bool legacyPayload) =>
+        legacyPayload
+            ? ReadPayloadFramesAsync(connection, iterations)
+            : ReadFramesAsync(connection, iterations);
+
+    private static async Task<long> ReadPayloadFramesAsync(
+        StreamConnection connection,
+        int iterations)
+    {
+        long checksum = 0;
+        for (var i = 0; i < iterations; i++)
+        {
+            using var payload = await connection.ReceiveValueAsync().ConfigureAwait(false);
+            var bytes = payload.Memory.Span;
+            checksum += BinaryPrimitives.ReadInt32LittleEndian(bytes);
+            checksum += bytes[4] + bytes[FrameLength / 2] + bytes[^1];
         }
 
         return checksum;

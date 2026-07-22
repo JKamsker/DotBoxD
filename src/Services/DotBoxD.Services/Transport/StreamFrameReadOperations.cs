@@ -59,10 +59,10 @@ internal static class StreamFrameReadOperations
     public static Memory<byte> PrepareRead(
         ref StreamFrameReceiveBuffer receiveBuffer,
         byte[] lengthBuffer,
-        Payload? payload,
+        ref StreamFrameReceiveOwner owner,
         int remaining)
     {
-        if (payload is null)
+        if (!owner.IsAllocated)
         {
             return receiveBuffer.ReadBodyWithLookahead && receiveBuffer.Count != 0
                 ? receiveBuffer.PrepareRead()
@@ -71,25 +71,26 @@ internal static class StreamFrameReadOperations
 
         return receiveBuffer.ReadBodyWithLookahead
             ? receiveBuffer.PrepareRead()
-            : payload.Memory.Slice(payload.Length - remaining, remaining);
+            : owner.PrepareBodyRead(remaining, receiveBuffer.WriterBackedOwner);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Memory<byte> PrepareExactRead(
         byte[] lengthBuffer,
-        Payload? payload,
+        ref StreamFrameReceiveOwner owner,
+        bool writerBacked,
         int remaining) =>
-        payload is null
+        !owner.IsAllocated
             ? lengthBuffer.AsMemory(LengthPrefixSize - remaining, remaining)
-            : payload.Memory.Slice(payload.Length - remaining, remaining);
+            : owner.PrepareBodyRead(remaining, writerBacked);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void ObservePendingRead(
         ref StreamFrameReceiveBuffer receiveBuffer,
-        Payload? payload,
+        StreamFrameReceiveOwner owner,
         bool completedSynchronously)
     {
-        if (payload is null &&
+        if (!owner.IsAllocated &&
             receiveBuffer.ReadBodyWithLookahead &&
             receiveBuffer.Count == 0 &&
             !completedSynchronously)
@@ -101,11 +102,11 @@ internal static class StreamFrameReadOperations
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int CommitRead(
         ref StreamFrameReceiveBuffer receiveBuffer,
-        Payload? payload,
+        ref StreamFrameReceiveOwner owner,
         int remaining,
         int read)
     {
-        if (payload is null)
+        if (!owner.IsAllocated)
         {
             return receiveBuffer.ReadBodyWithLookahead && receiveBuffer.Count != 0
                 ? receiveBuffer.CommitRead(read)
@@ -114,31 +115,32 @@ internal static class StreamFrameReadOperations
 
         if (!receiveBuffer.ReadBodyWithLookahead)
         {
+            owner.AdvanceBodyRead(read, receiveBuffer.WriterBackedOwner);
             return remaining - read;
         }
 
         receiveBuffer.CommitBodyRead(read);
-        return receiveBuffer.CopyBodyTo(payload, remaining);
+        return receiveBuffer.CopyBodyTo(ref owner, remaining);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static int InitializePayload(
+    public static int InitializeOwner(
         ref StreamFrameReceiveBuffer receiveBuffer,
         byte[] lengthBuffer,
         int maxMessageSize,
-        out Payload payload)
+        bool writerBacked,
+        ref StreamFrameReceiveOwner owner)
     {
         var totalLength = receiveBuffer.ReadBodyWithLookahead && receiveBuffer.Count != 0
             ? receiveBuffer.ConsumeLengthPrefix()
             : BinaryPrimitives.ReadInt32LittleEndian(lengthBuffer);
         MessageFrameReader.ValidateIncomingFrameLength(totalLength, maxMessageSize);
 
-        payload = Payload.Rent(totalLength);
-        BinaryPrimitives.WriteInt32LittleEndian(payload.Memory.Span, totalLength);
+        owner.Initialize(totalLength, writerBacked);
         var remaining = totalLength - LengthPrefixSize;
         if (receiveBuffer.ReadBodyWithLookahead)
         {
-            remaining = receiveBuffer.CopyBodyTo(payload, remaining);
+            remaining = receiveBuffer.CopyBodyTo(ref owner, remaining);
             receiveBuffer.ApplyFrameLength(totalLength);
         }
 
@@ -146,31 +148,42 @@ internal static class StreamFrameReadOperations
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static int InitializeExactPayload(
+    public static int InitializeExactOwner(
         byte[] lengthBuffer,
         int maxMessageSize,
-        out Payload payload)
+        bool writerBacked,
+        ref StreamFrameReceiveOwner owner)
     {
         var totalLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBuffer);
         MessageFrameReader.ValidateIncomingFrameLength(totalLength, maxMessageSize);
-        payload = Payload.Rent(totalLength);
-        lengthBuffer.CopyTo(payload.Memory.Span);
+        owner.Initialize(totalLength, writerBacked, lengthBuffer);
         return totalLength - LengthPrefixSize;
     }
 
     public static bool IsTimeoutCancellation(FrameReadTimeoutSource? readTimeout) =>
         readTimeout is not null && readTimeout.IsCurrentOwnerTimeoutCancellation();
 
+    public static ValueTask<RpcFrame> CreateCanceledReceive(CancellationToken ct) =>
+        new(Task.FromCanceled<RpcFrame>(ct));
+
+    public static ValueTask<RpcFrame> CreateFailedReceive(Exception error) =>
+        new(Task.FromException<RpcFrame>(error));
+
+    public static ValueTask<RpcFrame> CreateFailedReceive(
+        ReceiveEnterFailure failure,
+        string channelName) =>
+        CreateFailedReceive(ReceiveConcurrencyGuard.CreateEnterException(failure, channelName));
+
     public static RpcFrame HandleEndOfStream(
-        Payload? payload,
+        StreamFrameReceiveOwner owner,
         int remaining,
         StreamFrameReadProgressFormat progressFormat)
     {
-        var targetLength = payload is null
-            ? LengthPrefixSize
-            : payload.Length - LengthPrefixSize;
-        var bytesRead = targetLength - remaining;
-        if (payload is null)
+        var targetLength = owner.GetTargetBodyLength(remaining);
+        var bytesRead = owner.IsAllocated
+            ? owner.GetBodyBytesRead(remaining)
+            : targetLength - remaining;
+        if (!owner.IsAllocated)
         {
             if (bytesRead == 0)
             {

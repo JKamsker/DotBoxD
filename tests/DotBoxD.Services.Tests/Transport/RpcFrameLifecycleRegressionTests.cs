@@ -123,6 +123,23 @@ public sealed class RpcFrameLifecycleRegressionTests
     }
 
     [Fact]
+    public void MaterializePayloadOwner_ConvertsWriterAndInvalidatesStaleAliases()
+    {
+        var writer = PooledBufferWriter.Rent(3);
+        new byte[] { 1, 2, 3 }.CopyTo(writer.GetSpan(3));
+        writer.Advance(3);
+        var source = new RpcFrame(writer);
+        var stale = source;
+
+        using var materialized = source.MaterializePayloadOwner();
+
+        Assert.False(materialized.IsWriterBacked);
+        Assert.Equal(new byte[] { 1, 2, 3 }, materialized.Memory.ToArray());
+        Assert.Throws<ObjectDisposedException>(() => stale.Memory);
+        stale.Dispose();
+    }
+
+    [Fact]
     public async Task WriterBackedCopies_ConcurrentDetachAndDispose_CompleteOwnershipExactlyOnce()
     {
         for (var iteration = 0; iteration < 100; iteration++)

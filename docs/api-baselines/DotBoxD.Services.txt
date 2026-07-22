@@ -10,9 +10,9 @@ public async Task<IRpcChannel> AcceptAsync(CancellationToken ct = default)
 public async Task<Payload> ReceiveAsync(CancellationToken ct = default)
 public async ValueTask DisposeAsync()
 public async ValueTask ReleaseAsync(string serviceName, string instanceId)
-public async ValueTask SendFrameValueAsync(PooledBufferWriter frame, CancellationToken ct = default)
+public ValueTask SendFrameValueAsync(PooledBufferWriter frame, CancellationToken ct = default) =>
 public async ValueTask SendValueAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
-public async ValueTask<RpcFrame> ReceiveFrameValueAsync(CancellationToken ct = default)
+public ValueTask<RpcFrame> ReceiveFrameValueAsync(CancellationToken ct = default) =>
 public bool DisableInboundRequestCancellation { get; init; }
 public bool EnableLowAllocationValueTaskInvocations { get; init; }
 public bool IsBreaking => Kind is RpcContractChangeKind.Removed or RpcContractChangeKind.SignatureChanged or RpcContractChangeKind.UnsupportedVersion

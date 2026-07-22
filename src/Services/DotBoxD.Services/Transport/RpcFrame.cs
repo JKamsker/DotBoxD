@@ -50,6 +50,8 @@ public struct RpcFrame : IDisposable
 
     public int Length => Memory.Length;
 
+    internal bool IsWriterBacked => _writerLeaseToken != 0;
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Payload DetachPayload()
     {
@@ -67,6 +69,9 @@ public struct RpcFrame : IDisposable
         _writerLeaseToken = 0;
         return detached;
     }
+
+    internal RpcFrame MaterializePayloadOwner() =>
+        IsWriterBacked ? new RpcFrame(DetachPayload()) : this;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Dispose()

@@ -40,13 +40,42 @@ internal sealed partial class RpcPeerOutboundInvoker
                 stream = _streams.RegisterInboundResponse(handle, CancellationToken.None);
             }
 
-            return completion.TrySetResponse(response, payload, frame, stream, _serializer);
+            return SetResponse(completion, response, payload, frame, stream);
         }
         catch (Exception ex)
         {
             stream?.Cancel();
             completion.SetError(ex);
             return false;
+        }
+    }
+
+    private bool SetResponse(
+        IPendingResponse completion,
+        RpcResponse response,
+        ReadOnlyMemory<byte> payload,
+        RpcFrame frame,
+        RpcStreamReceiver? stream)
+    {
+        var ownsMaterializedFrame = false;
+        try
+        {
+            if (completion.RegistersStreamingResponse && frame.IsWriterBacked)
+            {
+                frame = frame.MaterializePayloadOwner();
+                ownsMaterializedFrame = true;
+            }
+
+            var accepted = completion.TrySetResponse(response, payload, frame, stream, _serializer);
+            ownsMaterializedFrame &= !accepted;
+            return accepted;
+        }
+        finally
+        {
+            if (ownsMaterializedFrame)
+            {
+                frame.Dispose();
+            }
         }
     }
 

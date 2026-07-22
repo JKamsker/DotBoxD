@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Buffers.Binary;
-using DotBoxD.Services.Buffers;
 
 namespace DotBoxD.Services.Transport;
 
@@ -23,6 +22,7 @@ internal struct StreamFrameReceiveBuffer
     private bool _readBodyWithLookahead;
     private bool _bodyLookaheadRead;
     private byte _lookaheadMissCountdown;
+    private bool _writerBackedOwner;
 
     public readonly int Count => _end - _start;
 
@@ -30,6 +30,12 @@ internal struct StreamFrameReceiveBuffer
         Math.Max(0, StreamFrameReadOperations.LengthPrefixSize - Count);
 
     public readonly bool ReadBodyWithLookahead => _readBodyWithLookahead;
+
+    public bool WriterBackedOwner
+    {
+        readonly get => _writerBackedOwner;
+        set => _writerBackedOwner = value;
+    }
 
     public void BeginFrame()
     {
@@ -83,7 +89,7 @@ internal struct StreamFrameReceiveBuffer
         return totalLength;
     }
 
-    public int CopyBodyTo(Payload payload, int remaining)
+    public int CopyBodyTo(ref StreamFrameReceiveOwner owner, int remaining)
     {
         var count = Math.Min(Count, remaining);
         if (count == 0)
@@ -91,10 +97,12 @@ internal struct StreamFrameReceiveBuffer
             return remaining;
         }
 
-        _buffer!.AsSpan(_start, count).CopyTo(
-            payload.Memory.Span.Slice(payload.Length - remaining, count));
+        remaining = owner.CopyBodyFrom(
+            _buffer!.AsSpan(_start, count),
+            remaining,
+            _writerBackedOwner);
         Advance(count);
-        return remaining - count;
+        return remaining;
     }
 
     public void ReturnPooledBuffer()

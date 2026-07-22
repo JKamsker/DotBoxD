@@ -1,5 +1,12 @@
 namespace DotBoxD.Services.Transport;
 
+internal enum ReceiveEnterFailure
+{
+    None,
+    Disposed,
+    Concurrent,
+}
+
 internal static class ReceiveConcurrencyGuard
 {
     private const int Idle = 0;
@@ -9,20 +16,33 @@ internal static class ReceiveConcurrencyGuard
 
     public static void Enter(ref int receiveLifecycle, string channelName)
     {
-        var observed = Interlocked.CompareExchange(ref receiveLifecycle, Active, Idle);
-        if (observed == Idle)
+        var failure = TryEnter(ref receiveLifecycle);
+        if (failure == ReceiveEnterFailure.None)
         {
             return;
         }
 
-        if ((observed & Disposed) != 0)
+        throw CreateEnterException(failure, channelName);
+    }
+
+    public static ReceiveEnterFailure TryEnter(ref int receiveLifecycle)
+    {
+        var observed = Interlocked.CompareExchange(ref receiveLifecycle, Active, Idle);
+        if (observed == Idle)
         {
-            throw new ObjectDisposedException(channelName);
+            return ReceiveEnterFailure.None;
         }
 
-        throw new InvalidOperationException(
-            $"{channelName} only supports one pending receive operation at a time.");
+        return (observed & Disposed) != 0
+            ? ReceiveEnterFailure.Disposed
+            : ReceiveEnterFailure.Concurrent;
     }
+
+    public static Exception CreateEnterException(ReceiveEnterFailure failure, string channelName) =>
+        failure == ReceiveEnterFailure.Disposed
+            ? new ObjectDisposedException(channelName)
+            : new InvalidOperationException(
+                $"{channelName} only supports one pending receive operation at a time.");
 
     // Exact-prefix stream connections do not share a pooled buffer with disposal, so they retain
     // the cheaper active/idle flag instead of participating in the packed lifecycle below.

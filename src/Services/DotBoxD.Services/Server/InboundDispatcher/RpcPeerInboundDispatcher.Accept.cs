@@ -38,7 +38,25 @@ internal sealed partial class RpcPeerInboundDispatcher
             return true;
         }
 
-        var result = await _queue.EnqueueAsync(inbound, loopCt).ConfigureAwait(false);
+        inbound = inbound.MaterializePayloadFrame();
+        InboundEnqueueResult result;
+        try
+        {
+            result = await _queue.EnqueueAsync(inbound, loopCt).ConfigureAwait(false);
+        }
+        catch
+        {
+            inbound.Frame.Dispose();
+            throw;
+        }
+
+        if (result != InboundEnqueueResult.Accepted)
+        {
+            // Materialization may have invalidated the read loop's writer-backed alias, so this
+            // dispatcher owns cleanup for any frame that the queue did not accept.
+            inbound.Frame.Dispose();
+        }
+
         if (result == InboundEnqueueResult.Dropped)
         {
             RpcTelemetry.QueueSaturated();
