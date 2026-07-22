@@ -26,15 +26,20 @@ internal static class InterpreterBindingArityProbe
         var fastOne = await MeasureAsync("fast-capable one argument", arity: 1, useFastTarget: true);
         var regularTwo = await MeasureAsync("regular two arguments", arity: 2, useFastTarget: false);
         var fastTwo = await MeasureAsync("fast-capable two arguments", arity: 2, useFastTarget: true);
+        var regularThree = await MeasureAsync("regular three arguments", arity: 3, useFastTarget: false);
+        var fastThree = await MeasureAsync("fast-capable three arguments", arity: 3, useFastTarget: true);
 
         AssertSameResources(regularOne, fastOne);
         AssertSameResources(regularTwo, fastTwo);
+        AssertSameResources(regularThree, fastThree);
 
         Console.WriteLine("path                          ns/op       B/op   list calls   fast calls");
         Write(regularOne);
         Write(fastOne);
         Write(regularTwo);
         Write(fastTwo);
+        Write(regularThree);
+        Write(fastThree);
     }
 
     private static async Task<Measurement> MeasureAsync(string name, int arity, bool useFastTarget)
@@ -80,7 +85,7 @@ internal static class InterpreterBindingArityProbe
         var listCalls = invoker?.ListCalls ?? regular!.ListCalls;
         var fastCalls = invoker?.FastCalls ?? 0;
         if (listCalls + fastCalls != expectedCalls ||
-            checksum != (long)(arity == 1 ? 41 : 42) * Iterations)
+            checksum != (long)ExpectedValue(arity) * Iterations)
         {
             throw new InvalidOperationException("Interpreter binding probe invariants changed.");
         }
@@ -105,7 +110,7 @@ internal static class InterpreterBindingArityProbe
         var result = pending.Result;
         if (!result.Succeeded ||
             result.ActualMode != ExecutionMode.Interpreted ||
-            ((I32Value)result.Value!).Value != (arity == 1 ? 41 : 42))
+            ((I32Value)result.Value!).Value != ExpectedValue(arity))
         {
             throw new InvalidOperationException(result.Error?.SafeMessage ?? "Interpreter binding result changed.");
         }
@@ -124,9 +129,12 @@ internal static class InterpreterBindingArityProbe
 
     private static string ModuleJson(int arity)
     {
-        var call = arity == 1
-            ? "{ \"call\": \"probe.binding\", \"args\": [{ \"i32\": 41 }] }"
-            : "{ \"call\": \"probe.binding\", \"args\": [{ \"i32\": 20 }, { \"i32\": 22 }] }";
+        var call = arity switch
+        {
+            1 => "{ \"call\": \"probe.binding\", \"args\": [{ \"i32\": 41 }] }",
+            2 => "{ \"call\": \"probe.binding\", \"args\": [{ \"i32\": 20 }, { \"i32\": 22 }] }",
+            _ => "{ \"call\": \"probe.binding\", \"args\": [{ \"i32\": 1 }, { \"i32\": 2 }, { \"i32\": 3 }] }"
+        };
         return $$"""
         {
           "id": "interpreter-binding-arity-{{arity}}",
@@ -146,7 +154,12 @@ internal static class InterpreterBindingArityProbe
         => new(
             "probe.binding",
             SemVersion.One,
-            arity == 1 ? [SandboxType.I32] : [SandboxType.I32, SandboxType.I32],
+            arity switch
+            {
+                1 => [SandboxType.I32],
+                2 => [SandboxType.I32, SandboxType.I32],
+                _ => [SandboxType.I32, SandboxType.I32, SandboxType.I32]
+            },
             SandboxType.I32,
             SandboxEffect.Cpu,
             null,
@@ -156,7 +169,10 @@ internal static class InterpreterBindingArityProbe
             invoke,
             CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
 
-    private sealed class FastBinding : IOneArgumentBindingInvoker, ITwoArgumentBindingInvoker
+    private sealed class FastBinding :
+        IOneArgumentBindingInvoker,
+        ITwoArgumentBindingInvoker,
+        IThreeArgumentBindingInvoker
     {
         public int ListCalls { get; private set; }
         public int FastCalls { get; private set; }
@@ -170,9 +186,7 @@ internal static class InterpreterBindingArityProbe
             CancellationToken cancellationToken)
         {
             ListCalls++;
-            return args.Count == 1
-                ? ValueTask.FromResult(args[0])
-                : Add(args[0], args[1]);
+            return Complete(args);
         }
 
         public ValueTask<SandboxValue> Invoke(
@@ -193,6 +207,17 @@ internal static class InterpreterBindingArityProbe
             FastCalls++;
             return Add(arg0, arg1);
         }
+
+        public ValueTask<SandboxValue> Invoke(
+            SandboxContext context,
+            SandboxValue arg0,
+            SandboxValue arg1,
+            SandboxValue arg2,
+            CancellationToken cancellationToken)
+        {
+            FastCalls++;
+            return Combine(arg0, arg1, arg2);
+        }
     }
 
     private sealed class RegularBinding
@@ -208,15 +233,38 @@ internal static class InterpreterBindingArityProbe
             CancellationToken cancellationToken)
         {
             ListCalls++;
-            return args.Count == 1
-                ? ValueTask.FromResult(args[0])
-                : Add(args[0], args[1]);
+            return Complete(args);
         }
     }
+
+    private static ValueTask<SandboxValue> Complete(IReadOnlyList<SandboxValue> args)
+        => args.Count switch
+        {
+            1 => ValueTask.FromResult(args[0]),
+            2 => Add(args[0], args[1]),
+            _ => Combine(args[0], args[1], args[2])
+        };
 
     private static ValueTask<SandboxValue> Add(SandboxValue left, SandboxValue right)
         => ValueTask.FromResult(SandboxValue.FromInt32(
             ((I32Value)left).Value + ((I32Value)right).Value));
+
+    private static ValueTask<SandboxValue> Combine(
+        SandboxValue first,
+        SandboxValue second,
+        SandboxValue third)
+        => ValueTask.FromResult(SandboxValue.FromInt32(
+            ((I32Value)first).Value * 100 +
+            ((I32Value)second).Value * 10 +
+            ((I32Value)third).Value));
+
+    private static int ExpectedValue(int arity)
+        => arity switch
+        {
+            1 => 41,
+            2 => 42,
+            _ => 123
+        };
 
     private static void ForceGc()
     {
