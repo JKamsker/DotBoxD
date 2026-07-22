@@ -12,7 +12,7 @@ internal interface IKernelHandlerPipeline
 internal interface IHookPipeline<TEvent> : IKernelHandlerPipeline
 {
     bool UsesAdapter(IPluginEventAdapter<TEvent> adapter);
-    Hooks.IResultHookRegistration<TEvent>[] ResultRegistrations();
+    Hooks.ResultHookRegistrationSnapshot<TEvent> ResultRegistrations();
     ValueTask PublishAsync(TEvent e, CancellationToken cancellationToken);
     ValueTask<TResult?> FireResultAsync<TResult>(TEvent e, CancellationToken cancellationToken = default)
         where TResult : struct, IHookResult;
@@ -148,34 +148,6 @@ public sealed partial class HookRegistry
         lock (_gate)
         {
             EnsureCanRegisterLocked(adapter);
-        }
-    }
-
-    internal void RemoveKernel(InstalledKernel kernel)
-    {
-        object[] pipelines;
-        lock (_gate)
-        {
-            pipelines = [.. _pipelines.Values];
-        }
-
-        foreach (var pipeline in pipelines)
-        {
-            ((IKernelHandlerPipeline)pipeline).RemoveKernel(kernel);
-        }
-    }
-
-    internal void RemoveKernelPool(InstalledKernelPool pool)
-    {
-        object[] pipelines;
-        lock (_gate)
-        {
-            pipelines = [.. _pipelines.Values];
-        }
-
-        foreach (var pipeline in pipelines)
-        {
-            ((IKernelHandlerPipeline)pipeline).RemoveKernelPool(pool);
         }
     }
 

@@ -1,9 +1,52 @@
 using DotBoxD.Kernels.Model;
+using DotBoxD.Plugins.Kernel;
 
 namespace DotBoxD.Plugins.Runtime;
 
 public sealed partial class HookRegistry
 {
+    internal void RemoveKernel(InstalledKernel kernel)
+    {
+        object[] pipelines;
+        lock (_gate)
+        {
+            pipelines = [.. _pipelines.Values];
+        }
+
+        foreach (var pipeline in pipelines)
+        {
+            ((IKernelHandlerPipeline)pipeline).RemoveKernel(kernel);
+        }
+
+        EvictPipelineFanoutCaches();
+    }
+
+    internal void RemoveKernelPool(InstalledKernelPool pool)
+    {
+        object[] pipelines;
+        lock (_gate)
+        {
+            pipelines = [.. _pipelines.Values];
+        }
+
+        foreach (var pipeline in pipelines)
+        {
+            ((IKernelHandlerPipeline)pipeline).RemoveKernelPool(pool);
+        }
+
+        EvictPipelineFanoutCaches();
+    }
+
+    private void EvictPipelineFanoutCaches()
+    {
+        lock (_gate)
+        {
+            // Dropping the state owner prevents a pre-removal aggregate builder from republishing stale wrappers
+            // through a cleared cache field. In-flight dispatches may finish against their stable old fanout.
+            _pipelineFanout.Clear();
+        }
+    }
+
     internal HookPipeline<TEvent, HookContext> OnForWire<TEvent>(
         IPluginEventAdapter<TEvent> adapter,
         out bool created)
@@ -173,7 +216,7 @@ public sealed partial class HookRegistry
         CancellationToken cancellationToken)
         where TResult : struct, IHookResult
     {
-        var registrations = OrderedResultRegistrations<TEvent>(pipelines);
+        var registrations = Hooks.ResultHookRegistrationFanout.Ordered<TEvent>(pipelines);
         foreach (var registration in registrations)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -196,7 +239,7 @@ public sealed partial class HookRegistry
         CancellationToken cancellationToken)
         where TResult : struct, IHookResult
     {
-        var registrations = OrderedResultRegistrations<TEvent>(pipelines);
+        var registrations = Hooks.ResultHookRegistrationFanout.Ordered<TEvent>(pipelines);
         foreach (var registration in registrations)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -212,18 +255,4 @@ public sealed partial class HookRegistry
         return null;
     }
 
-    private static Hooks.IResultHookRegistration<TEvent>[] OrderedResultRegistrations<TEvent>(
-        CachedPipelineFanout pipelines)
-    {
-        var registrations = new List<Hooks.IResultHookRegistration<TEvent>>();
-        for (var i = 0; i < pipelines.Count; i++)
-        {
-            registrations.AddRange(((IHookPipeline<TEvent>)pipelines[i]).ResultRegistrations());
-        }
-
-        registrations.Sort(static (left, right) => left.Priority != right.Priority
-            ? right.Priority.CompareTo(left.Priority)
-            : left.Order.CompareTo(right.Order));
-        return [.. registrations];
-    }
 }

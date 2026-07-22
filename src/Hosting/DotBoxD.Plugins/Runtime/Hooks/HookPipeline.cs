@@ -159,7 +159,18 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
 
     void IKernelHandlerPipeline.RemoveKernel(InstalledKernel kernel)
     {
-        _resultHooks.RemoveKernel(kernel);
+        lock (_gate)
+        {
+            if (_resultHooks.RemoveKernel(kernel))
+            {
+                // Snapshot writers take this same gate after the lock-free exact-match fast path. Publishing the
+                // replacement while holding it prevents an older builder from retaining the removed kernel.
+                var entries = _resultHooks.RegistrationEntries;
+                var replacement = ResultHookRegistrationSnapshot<TEvent>.Create(this, entries);
+                Volatile.Write(ref _resultRegistrationSnapshot, replacement);
+            }
+        }
+
         _handlerSet.Remove(kernel);
     }
 
