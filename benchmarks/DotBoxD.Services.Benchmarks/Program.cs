@@ -68,6 +68,9 @@ if (args.Length == 1)
         case "--probe-pending-timeout-scheduler":
             PendingTimeoutSchedulerProbe.Run();
             return;
+        case "--probe-pending-request-removal":
+            PendingRequestRemovalProbe.Run();
+            return;
         case "--probe-frame-read-timeout-source-lifetime":
             FrameReadTimeoutSourceLifetimeProbe.Run();
             return;
