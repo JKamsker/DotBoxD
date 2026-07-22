@@ -28,7 +28,11 @@ internal static class I32ForLoopRunner
         if (statement.Body.Count == 1)
         {
             var singleLoopSlot = frame.GetSlot(statement.LocalName);
-            if (frame.Layout.TryGetI32LoopPlan(statement, frame, singleLoopSlot, out var cached))
+            if (frame.Layout.LoopPlans.TryGetI32ForRangePlan(
+                    statement,
+                    frame,
+                    singleLoopSlot,
+                    out var cached))
             {
                 RunSingleAssignment(
                     start,
@@ -93,15 +97,18 @@ internal static class I32ForLoopRunner
         }
 
         var fuelPerIteration = LoopFuel + assignmentFuel;
-        if (assignment.Expression.HasOnlyRawVariables() &&
-            frame.Layout.ShouldCacheI32LoopPlan(statement))
+        if (assignment.Expression.HasOnlyRawVariables())
         {
-            frame.Layout.CacheI32LoopPlan(new I32ForLoopPlan(
-                statement,
-                assignment.TargetSlot,
-                assignment.Expression,
-                fuelPerIteration,
-                assignment.Expression.GetRequiredRawSlots()));
+            ref var loopPlans = ref frame.Layout.LoopPlans;
+            if (loopPlans.ShouldCacheI32ForRangePlan(statement))
+            {
+                loopPlans.CacheI32ForRangePlan(new I32ForLoopPlan(
+                    statement,
+                    assignment.TargetSlot,
+                    assignment.Expression,
+                    fuelPerIteration,
+                    assignment.Expression.GetRequiredRawSlots()));
+            }
         }
 
         RunSingleAssignment(

@@ -3,19 +3,18 @@ using DotBoxD.Kernels.Interpreter.Frame;
 namespace DotBoxD.Kernels.Interpreter.Internal;
 
 /// <summary>
-/// Holds a frame layout's lazily initialized i32 loop-plan admission and cache state.
-/// As an inline mutable value, the first observed statement needs no extra owner allocation.
+/// Admits a reusable i32 while-loop plan only after the same statement has
+/// produced a safe plan twice, avoiding cache objects for one-shot loops.
 /// </summary>
-internal struct I32LoopPlanStore
+internal struct I32WhileLoopPlanStore
 {
-    private TwoHitPlanAdmission<ForRangeStatement> _admission;
-    private I32ForLoopPlanCache? _plans;
+    private TwoHitPlanAdmission<WhileStatement> _admission;
+    private I32WhileLoopPlanCache? _plans;
 
     public bool TryGet(
-        ForRangeStatement statement,
+        WhileStatement statement,
         InterpreterFrame frame,
-        int loopSlot,
-        out I32ForLoopPlan plan)
+        out I32WhileLoopPlan plan)
     {
         var cache = Volatile.Read(ref _plans);
         if (cache is null)
@@ -24,10 +23,10 @@ internal struct I32LoopPlanStore
             return false;
         }
 
-        return cache.TryGet(statement, frame, loopSlot, out plan);
+        return cache.TryGet(statement, frame, out plan);
     }
 
-    public bool ShouldCache(ForRangeStatement statement)
+    public bool ShouldCache(WhileStatement statement)
     {
         var cache = Volatile.Read(ref _plans);
         if (cache?.Contains(statement) == true)
@@ -38,12 +37,12 @@ internal struct I32LoopPlanStore
         return _admission.ShouldCache(statement);
     }
 
-    public void Cache(I32ForLoopPlan plan)
+    public void Cache(I32WhileLoopPlan plan)
     {
         var cache = Volatile.Read(ref _plans);
         if (cache is null)
         {
-            var created = new I32ForLoopPlanCache();
+            var created = new I32WhileLoopPlanCache();
             cache = Interlocked.CompareExchange(ref _plans, created, null) ?? created;
         }
 

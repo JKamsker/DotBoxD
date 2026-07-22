@@ -26,7 +26,7 @@ internal sealed partial class I32ExpressionPlan
         return slots.ToArray();
     }
 
-    private void CollectRequiredRawSlots(List<int> slots)
+    internal void CollectRequiredRawSlots(List<int> slots)
     {
         if (TryCollectDirectRawSlots(slots))
         {

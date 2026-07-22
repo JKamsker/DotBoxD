@@ -43,11 +43,11 @@ public sealed class WhileI32SingleAssignmentLoopAllocationTests
                                 (double)MeasurementIterations;
         var twoAssignmentBytesPerExecution = two.AllocatedBytes /
                                              (double)MeasurementIterations;
-        // The comparison plan is embedded in the loop plan, so a single-assignment while adds about
-        // 280 B/op over the no-while control. Leave room for full-suite runtime bookkeeping while keeping
-        // the allocation bands separate.
-        Assert.InRange(singleWhileOverhead, 260, 300);
-        Assert.InRange(zeroWhileOverhead, 260, 300);
+        // The warmed function layout retains the immutable comparison and assignment plans. Both a taken
+        // and an untaken while should therefore stay in the no-while allocation band instead of rebuilding
+        // five expression-plan objects (about 280 B) on every entry.
+        Assert.InRange(singleWhileOverhead, 0, 8);
+        Assert.InRange(zeroWhileOverhead, 0, 8);
         Assert.InRange(twoAssignmentBytesPerExecution, 1_223, 1_273);
     }
 

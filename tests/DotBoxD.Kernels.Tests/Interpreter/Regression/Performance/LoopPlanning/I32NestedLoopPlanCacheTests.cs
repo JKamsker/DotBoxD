@@ -100,10 +100,11 @@ public sealed class I32NestedLoopPlanCacheTests
             expressionPlan,
             fuelPerIteration: 5 + 1 + expressionPlan.FuelCost,
             expressionPlan.GetRequiredRawSlots());
-        Assert.False(layout.ShouldCacheI32LoopPlan(loop));
-        Assert.True(layout.ShouldCacheI32LoopPlan(loop));
-        layout.CacheI32LoopPlan(loopPlan);
-        Assert.True(layout.TryGetI32LoopPlan(
+        ref var loopPlans = ref layout.LoopPlans;
+        Assert.False(loopPlans.ShouldCacheI32ForRangePlan(loop));
+        Assert.True(loopPlans.ShouldCacheI32ForRangePlan(loop));
+        loopPlans.CacheI32ForRangePlan(loopPlan);
+        Assert.True(loopPlans.TryGetI32ForRangePlan(
             loop,
             assignedFrame,
             assignedFrame.GetSlot(loop.LocalName),
@@ -113,7 +114,7 @@ public sealed class I32NestedLoopPlanCacheTests
             layout,
             function,
             LocalFunctionArguments.FromArray([]));
-        Assert.False(layout.TryGetI32LoopPlan(
+        Assert.False(loopPlans.TryGetI32ForRangePlan(
             loop,
             unassignedFrame,
             unassignedFrame.GetSlot(loop.LocalName),

@@ -1,5 +1,4 @@
 using DotBoxD.Kernels.Bindings;
-using DotBoxD.Kernels.Interpreter.Frame;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 
@@ -22,7 +21,7 @@ internal sealed class FunctionFrameLayout
 
     private readonly Dictionary<string, int> _slots;
     private readonly SlotKind[] _slotKinds;
-    private I32LoopPlanStore _i32LoopPlans;
+    private FunctionLoopPlans _loopPlans;
 
     private FunctionFrameLayout(
         string functionId,
@@ -91,14 +90,7 @@ internal sealed class FunctionFrameLayout
     public bool IsI64Slot(int slot) => _slotKinds[slot] == SlotKind.I64;
     public bool IsBoxedSlot(int slot) => _slotKinds[slot] == SlotKind.Boxed;
 
-    public bool TryGetI32LoopPlan(ForRangeStatement statement, InterpreterFrame frame, int loopSlot, out I32ForLoopPlan plan)
-        => _i32LoopPlans.TryGet(statement, frame, loopSlot, out plan);
-
-    public bool ShouldCacheI32LoopPlan(ForRangeStatement statement)
-        => _i32LoopPlans.ShouldCache(statement);
-
-    public void CacheI32LoopPlan(I32ForLoopPlan plan)
-        => _i32LoopPlans.Cache(plan);
+    public ref FunctionLoopPlans LoopPlans => ref _loopPlans;
 
     private static void CollectStatements(IReadOnlyList<Statement> statements, Dictionary<string, int> slots)
     {
