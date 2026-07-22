@@ -27,7 +27,7 @@ public sealed class PluginAnalyzerForbiddenApiMemoryCacheReachabilityTests
             return cache;
         }
         """,
-        "Microsoft.Extensions.Caching.Memory")]
+        "Microsoft.Extensions.Caching.Memory.MemoryCache")]
     [InlineData(
         "file-control",
         """
