@@ -12,6 +12,7 @@ DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Se
 DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Services.Benchmarks -p:UseSharedCompilation=false -- --probe-peer-start-guard
 DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Services.Benchmarks -p:UseSharedCompilation=false -- --probe-constructor-replay
 DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Services.Benchmarks -p:UseSharedCompilation=false -- --probe-pending-timeout-scheduler
+DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Services.Benchmarks -p:UseSharedCompilation=false -- --probe-frame-read-timeout-source-lifetime
 DOTNET_ROLL_FORWARD=Major dotnet run -c Release --project benchmarks/DotBoxD.Services.Benchmarks -p:UseSharedCompilation=false -- --probe-generated-metadata-parameters
 dotnet run -c Release --project benchmarks/DotBoxD.Services.Benchmarks -p:UseSharedCompilation=false -- --filter "*PeerRoundTripBenchmarks.MovePlayerAsync*" --job Short --warmupCount 1 --iterationCount 3
 DOTNET_ROLL_FORWARD=Major dotnet run -c Release --project benchmarks/DotBoxD.Services.Benchmarks/DotBoxD.Services.Benchmarks.csproj -- --filter "*StreamedArgumentProxyBenchmarks*" --job short --warmupCount 1 --iterationCount 3
