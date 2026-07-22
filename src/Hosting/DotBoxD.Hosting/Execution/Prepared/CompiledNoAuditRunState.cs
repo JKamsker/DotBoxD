@@ -25,6 +25,7 @@ internal sealed class CompiledNoAuditRunState(ExecutionPlan plan)
             return _context;
         }
 
+        _context?.Dispose();
         _contextToken = cancellationToken;
         _context = new SandboxContext(
             SandboxRunId.Suppressed,

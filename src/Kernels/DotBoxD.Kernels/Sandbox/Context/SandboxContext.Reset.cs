@@ -1,6 +1,6 @@
 namespace DotBoxD.Kernels.Sandbox;
 
-public sealed partial class SandboxContext
+public sealed partial class SandboxContext : IDisposable
 {
     // A compiled entrypoint is synchronous: generated code publishes immediately before returning, and the
     // host consumes on the same call stack. Thread-local storage avoids growing every SandboxContext (including
@@ -11,8 +11,7 @@ public sealed partial class SandboxContext
 
     internal void ResetForCompiledNoAuditReuse()
     {
-        ClearCompiledReturnValidation();
-        Interlocked.Exchange(ref _sharedWallTimeToken, null)?.DisposeOwned();
+        ReleaseExecutionResources();
         _deterministicRandom = null;
         _returnCredits = null;
         _bindingGrantClock = null;

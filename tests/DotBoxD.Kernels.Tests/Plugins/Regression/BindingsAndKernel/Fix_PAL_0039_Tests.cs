@@ -1,98 +1,80 @@
 using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Runtime;
 using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Regression.BindingsAndKernel;
 
 /// <summary>
-/// Regression coverage for PAL-0039: binding dispatch creates a wall-time
-/// cancellation source per host call. Both interpreted and compiled binding
-/// dispatch call <see cref="SandboxContext.CreateWallTimeToken"/> for every
-/// invocation. When the run cancellation token is the default
-/// (non-cancelable) token, the wall-time deadline is already tracked by the
-/// <see cref="ResourceMeter"/>, so the fast path should not allocate a fresh
-/// linked <see cref="CancellationTokenSource"/> (plus its armed timer state)
-/// per call.
+/// Regression coverage for PAL-0039: interpreted and compiled binding dispatch share one internally
+/// owned wall-time source per execution while public token requests remain caller-owned.
 /// </summary>
 public sealed class Fix_PAL_0039_Tests
 {
-    // A generous wall-time budget so the produced token is never cancelled
-    // mid-test and the deadline is the only reason a source would exist.
-    private static SandboxContext Context(CancellationToken cancellationToken = default)
+    private static SandboxContext Context(
+        CancellationToken cancellationToken = default,
+        BindingRegistry? bindings = null,
+        TimeSpan? wallTime = null)
     {
         var limits = new ResourceLimits(
             MaxFuel: 1_000_000,
             MaxAllocatedBytes: 1_000_000,
-            MaxWallTime: TimeSpan.FromHours(1));
+            MaxWallTime: wallTime ?? TimeSpan.FromHours(1));
 
         return new SandboxContext(
             SandboxRunId.New(),
             SandboxPolicyBuilder.Create().Build() with { ResourceLimits = limits },
             new ResourceMeter(limits),
-            new BindingRegistryBuilder().Build(),
+            bindings ?? new BindingRegistryBuilder().Build(),
             new InMemoryAuditSink(),
             cancellationToken);
     }
 
     [Fact]
-    public void Wall_time_token_for_non_cancelable_run_does_not_allocate_per_call()
+    public void Public_wall_time_tokens_are_distinct_and_caller_owned()
     {
-        var context = Context();
+        using var context = Context();
+        using var first = context.CreateWallTimeToken();
+        using var second = context.CreateWallTimeToken();
 
-        // Warm up first-call JIT / one-time allocations so the measured loop
-        // only reflects per-call dispatch cost.
-        DisposeIfOwned(context.CreateWallTimeToken());
-
-        const int iterations = 1_000;
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < iterations; i++)
-        {
-            DisposeIfOwned(context.CreateWallTimeToken());
-        }
-
-        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
-
-        // RED until PAL-0039 is fixed: today every call links a fresh
-        // CancellationTokenSource and arms a CancelAfter timer, so the fast
-        // path allocates hundreds of bytes per invocation. A non-cancelable
-        // run with the deadline tracked by the ResourceMeter must not allocate
-        // a per-call cancellation source.
-        Assert.Equal(0, allocated);
+        Assert.NotSame(first, second);
+        first.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => first.CancelAfter(TimeSpan.FromSeconds(1)));
+        Assert.False(second.IsCancellationRequested);
     }
 
     [Fact]
-    public void Wall_time_token_for_non_cancelable_run_reuses_a_shared_source()
+    public void Public_token_cancellation_does_not_poison_internal_binding_deadline()
     {
-        var context = Context();
+        using var context = Context();
+        using var publicSource = context.CreateWallTimeToken();
+        using var lease = context.CreateBindingWallTimeToken();
 
-        var first = context.CreateWallTimeToken();
-        var second = context.CreateWallTimeToken();
+        publicSource.Cancel();
 
-        try
-        {
-            // RED until PAL-0039 is fixed: CreateLinkedTokenSource currently
-            // returns a brand-new instance every call. On the fast path (a
-            // non-cancelable run token) there is no asynchronous cancellation
-            // to link, so the same wall-time source should be reused across
-            // calls instead of allocating a distinct one each time.
-            Assert.Same(first, second);
-        }
-        finally
-        {
-            DisposeIfOwned(first);
-            if (!ReferenceEquals(first, second))
-            {
-                DisposeIfOwned(second);
-            }
-        }
+        Assert.True(publicSource.IsCancellationRequested);
+        Assert.False(lease.IsCancellationRequested);
+        Assert.False(lease.Token.IsCancellationRequested);
+    }
+
+    [Fact]
+    public void Public_wall_time_token_preserves_pre_canceled_context_state()
+    {
+        using var runCancellation = new CancellationTokenSource();
+        runCancellation.Cancel();
+        using var context = Context(runCancellation.Token);
+
+        using var publicSource = context.CreateWallTimeToken();
+
+        Assert.True(publicSource.IsCancellationRequested);
     }
 
     [Fact]
     public void Binding_wall_time_lease_for_cancelable_run_does_not_allocate_per_call()
     {
         using var runCancellation = new CancellationTokenSource();
-        var context = Context(runCancellation.Token);
+        using var context = Context(runCancellation.Token);
         context.CreateBindingWallTimeToken().Dispose();
 
         const int iterations = 1_000;
@@ -113,7 +95,7 @@ public sealed class Fix_PAL_0039_Tests
     public async Task Disposing_nested_lease_does_not_unlink_outer_run_cancellation()
     {
         using var runCancellation = new CancellationTokenSource();
-        var context = Context(runCancellation.Token);
+        using var context = Context(runCancellation.Token);
         using var outer = context.CreateBindingWallTimeToken();
         var inner = context.CreateBindingWallTimeToken();
 
@@ -128,7 +110,7 @@ public sealed class Fix_PAL_0039_Tests
     public async Task Disposed_final_lease_unlinks_run_cancellation_from_deadline_source()
     {
         using var runCancellation = new CancellationTokenSource();
-        var context = Context(runCancellation.Token);
+        using var context = Context(runCancellation.Token);
         var lease = context.CreateBindingWallTimeToken();
         var deadlineToken = lease.Token;
 
@@ -141,7 +123,7 @@ public sealed class Fix_PAL_0039_Tests
     [Fact]
     public void Recycled_context_generation_replaces_its_wall_time_source()
     {
-        var context = Context();
+        using var context = Context();
         var first = context.CreateBindingWallTimeToken();
         var firstToken = first.Token;
         first.Dispose();
@@ -156,7 +138,7 @@ public sealed class Fix_PAL_0039_Tests
     [Fact]
     public void Concurrent_first_leases_publish_one_wall_time_source()
     {
-        var context = Context();
+        using var context = Context();
         var tokens = new CancellationToken[32];
 
         Parallel.For(0, tokens.Length, i =>
@@ -168,5 +150,39 @@ public sealed class Fix_PAL_0039_Tests
         Assert.All(tokens, token => Assert.Equal(tokens[0], token));
     }
 
-    private static void DisposeIfOwned(CancellationTokenSource? source) => source?.Dispose();
+    [Fact]
+    public void Expired_shared_deadline_rejects_before_invoking_token_ignoring_binding()
+    {
+        var invocationCount = 0;
+        var descriptor = new BindingDescriptor(
+            "test.ignore",
+            SemVersion.One,
+            [],
+            SandboxType.Unit,
+            SandboxEffect.Cpu,
+            null,
+            BindingCostModel.Fixed(1),
+            AuditLevel.None,
+            BindingSafety.PureHostFacade,
+            (_, _, _) =>
+            {
+                invocationCount++;
+                return ValueTask.FromResult(SandboxValue.Unit);
+            },
+            CompiledBinding.RuntimeStub(
+                typeof(CompiledRuntime).FullName!,
+                nameof(CompiledRuntime.CallBinding)));
+        var bindings = new BindingRegistryBuilder().Add(descriptor).Build();
+        using var context = Context(bindings: bindings, wallTime: TimeSpan.FromMilliseconds(25));
+        using (var lease = context.CreateBindingWallTimeToken())
+        {
+            Assert.True(lease.Token.WaitHandle.WaitOne(TimeSpan.FromSeconds(5)));
+        }
+
+        var exception = Assert.Throws<SandboxRuntimeException>(
+            () => CompiledRuntime.CallBinding(context, descriptor.Id, []));
+
+        Assert.Equal(SandboxErrorCode.Timeout, exception.Error.Code);
+        Assert.Equal(0, invocationCount);
+    }
 }

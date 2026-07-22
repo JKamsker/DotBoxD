@@ -2462,9 +2462,11 @@ empty audit stream, and exact 67 fuel units per execution; existing debug regres
 
 Binding dispatch previously called `CancelAfter(RemainingWallTime)` for every host call. Default-token runs repeatedly
 re-armed one timer; live-token runs allocated, armed, linked, and disposed a fresh source. The interpreter and all three
-compiled arities now lease one context-generation source armed once to the resource meter's fixed absolute deadline. A
-live run token is linked only for the duration of each call through an unsafe cancellation registration, and recycled
-contexts dispose and replace the generation source instead of rearming a canceled token.
+compiled arities now lease one execution-owned source armed once to the resource meter's fixed absolute deadline. A
+live run token is linked only for the duration of each call through an unsafe cancellation registration. Every lease
+performs an exact deadline check before invoking host code, and execution boundaries dispose the source after success,
+timeout, cancellation, or failure. Recycled contexts release and replace the generation source instead of rearming a
+canceled token.
 
 Command:
 
@@ -2472,18 +2474,21 @@ Command:
 DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-binding-dispatch-scope
 ```
 
-Four fresh Release processes, 500,000 completed compiled no-op calls each, measured:
+The final hardened implementation was measured across five fresh Release processes, 500,000 completed compiled no-op
+calls each. The baseline is the original per-call source/timer implementation:
 
 ```text
 run token    baseline ns/call / B/call       final ns/call / B/call       median time
-default             146.3-148.4 / 0.0               82.8-89.0 / 0.0            -42.0%
-live              205.9-212.4 / 160.0              98.4-102.0 / 0.0            -52.4%
+default             146.3-148.4 / 0.0              95.2-116.0 / 0.0            -33.5%
+live              205.9-212.4 / 160.0             110.8-114.0 / 0.0            -46.2%
 ```
 
-The live lane removes exactly 80,000,000 bytes, or 160 B/call. Tests cover interpreted and compiled mid-call cancellation,
-default and live-token wall-time expiry, cancellation classification, nested leases, allocation-free warmed registration,
-concurrent first publication, and context-generation replacement. The public source-returning API retains its ownership
-behavior; the lease is internal runtime plumbing. No public API, sandbox budget, or timeout deadline changes.
+The live lane eliminates 160 B/call of churn: total allocation falls from 80,000,000 B to one 144 B execution source. Tests cover interpreted and compiled mid-call cancellation,
+default and live-token wall-time expiry, pre-invocation rejection after expiry, cancellation classification, nested leases,
+allocation-free warmed registration, concurrent first publication, context-generation replacement, and collection of the
+disposed source after every terminal run outcome. `SandboxContext` is now disposable so hand-written runtime consumers can
+release the same execution resource; its public source-returning API always returns a separate caller-owned source. Sandbox
+budget accounting and the fixed timeout deadline are unchanged.
 
 ## Reused nested I32 loop plans
 

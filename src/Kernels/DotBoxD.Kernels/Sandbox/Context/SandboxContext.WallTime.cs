@@ -2,12 +2,15 @@ using DotBoxD.Kernels.Sandbox.Values;
 
 namespace DotBoxD.Kernels.Sandbox;
 
-public sealed partial class SandboxContext
+public sealed partial class SandboxContext : IDisposable
 {
     private SharedWallTimeTokenSource? _sharedWallTimeToken;
 
     internal BindingWallTimeTokenLease CreateBindingWallTimeToken()
     {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+        CancellationToken.ThrowIfCancellationRequested();
+        Budget.CheckDeadline();
         var shared = GetOrCreateSharedWallTimeToken();
         var registration = CancellationToken.CanBeCanceled
             ? CancellationToken.UnsafeRegister(
@@ -19,18 +22,19 @@ public sealed partial class SandboxContext
 
     public CancellationTokenSource CreateWallTimeToken()
     {
-        // Preserve the public ownership contract: cancelable callers receive a source they own,
-        // while non-cancelable runs reuse the context-owned deadline source.
-        if (!CancellationToken.CanBeCanceled)
-        {
-            var shared = GetOrCreateSharedWallTimeToken();
-            shared.ArmDeadline(Budget.RemainingWallTime());
-            return shared;
-        }
-
-        var timeout = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
-        timeout.CancelAfter(Budget.RemainingWallTime());
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+        var remaining = Budget.RemainingWallTime();
+        var timeout = CancellationToken.CanBeCanceled
+            ? CancellationTokenSource.CreateLinkedTokenSource(CancellationToken)
+            : new CancellationTokenSource();
+        timeout.CancelAfter(remaining);
         return timeout;
+    }
+
+    internal void ReleaseExecutionResources()
+    {
+        ClearCompiledReturnValidation();
+        Interlocked.Exchange(ref _sharedWallTimeToken, null)?.Dispose();
     }
 
     private SharedWallTimeTokenSource GetOrCreateSharedWallTimeToken()
@@ -46,7 +50,7 @@ public sealed partial class SandboxContext
         shared = Interlocked.CompareExchange(ref _sharedWallTimeToken, created, null);
         if (shared is not null)
         {
-            created.DisposeOwned();
+            created.Dispose();
             return shared;
         }
 

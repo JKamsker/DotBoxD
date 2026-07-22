@@ -4,7 +4,7 @@ using DotBoxD.Kernels.Sandbox.Values;
 
 namespace DotBoxD.Kernels.Sandbox;
 
-public sealed partial class SandboxContext
+public sealed partial class SandboxContext : IDisposable
 {
     public long AuditCheckpoint() => Audit.EventsWritten;
 

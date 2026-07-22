@@ -6,9 +6,8 @@ namespace DotBoxD.Kernels.Sandbox.Values;
 /// and temporarily links cancelable run tokens through allocation-free registrations.
 /// </summary>
 /// <remarks>
-/// The public compatibility path can still return this source and callers may dispose it, so
-/// <see cref="Dispose(bool)"/> remains a no-op. The owning context uses <see cref="DisposeOwned"/>
-/// when replacing a recycled generation.
+/// The owning context disposes this source at the execution boundary. Public wall-time token
+/// requests receive a separate caller-owned source and cannot cancel or dispose this internal timer.
 /// </remarks>
 internal sealed class SharedWallTimeTokenSource : CancellationTokenSource
 {
@@ -23,10 +22,4 @@ internal sealed class SharedWallTimeTokenSource : CancellationTokenSource
         }
     }
 
-    public void DisposeOwned() => base.Dispose(disposing: true);
-
-    // Public CreateWallTimeToken callers may dispose the shared source they receive.
-    protected override void Dispose(bool disposing)
-    {
-    }
 }

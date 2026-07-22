@@ -66,7 +66,7 @@ internal static class CompiledNoAuditValueRunner
         }
         finally
         {
-            context.ClearCompiledReturnValidation();
+            context.ReleaseExecutionResources();
         }
     }
 }

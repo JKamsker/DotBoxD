@@ -2,7 +2,7 @@ namespace DotBoxD.Kernels.Sandbox;
 
 using DotBoxD.Kernels;
 
-public sealed partial class SandboxContext
+public sealed partial class SandboxContext : IDisposable
 {
     private DateTimeOffset? _bindingGrantClock;
 

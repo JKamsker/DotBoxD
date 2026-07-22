@@ -106,7 +106,7 @@ internal static class CompiledExecutionRunner
         }
         finally
         {
-            context.ClearCompiledReturnValidation();
+            context.Dispose();
         }
     }
 

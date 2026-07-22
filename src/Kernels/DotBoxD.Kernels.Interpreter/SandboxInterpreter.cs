@@ -78,6 +78,10 @@ public sealed class SandboxInterpreter : ISandboxInterpreter
             WriteSummary(context, startedAt, plan, budget, false, error);
             return Result(plan, budget, context, false, null, error);
         }
+        finally
+        {
+            context.Dispose();
+        }
     }
 
     private static SandboxExecutionResult Result(
