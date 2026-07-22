@@ -16,6 +16,7 @@ internal sealed class ValueTaskTimeoutTestHarness : IAsyncDisposable
     internal const string Method = "Unary";
     internal const int ResponseValue = 17;
     internal const string SendFailureMessage = "Synthetic request send failed.";
+    internal const string ConnectionFailureMessage = "Synthetic connection failure.";
 
     // Inspect the reserved response while holding PendingRequests' own gate. This pins the optimized
     // implementation choice without depending on private ValueTask runtime fields.
@@ -169,6 +170,9 @@ internal sealed class ValueTaskTimeoutTestHarness : IAsyncDisposable
             case ReentrantResponseKind.Error:
                 Complete(messageId, isSuccess: false, ReadOnlySpan<byte>.Empty);
                 return;
+            case ReentrantResponseKind.ConnectionFailure:
+                Invoker.FailPending(new ServiceConnectionException(ConnectionFailureMessage));
+                return;
             default:
                 throw new InvalidOperationException("Unknown reentrant response kind.");
         }
@@ -206,4 +210,5 @@ internal enum ReentrantResponseKind
     None,
     Success,
     Error,
+    ConnectionFailure,
 }
