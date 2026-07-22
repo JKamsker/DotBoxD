@@ -189,7 +189,7 @@ internal static partial class CompiledBindingDispatcher
             using var returnCredits = context.BeginBindingReturnCreditScope(descriptor.ReturnType);
             var pending = descriptor.Invoke.Target is ITwoArgumentBindingInvoker fastInvoker
                 ? fastInvoker.Invoke(context, arg0, arg1, timeout.Token)
-                : descriptor.Invoke(context, [arg0, arg1], timeout.Token);
+                : descriptor.Invoke(context, new[] { arg0, arg1 }, timeout.Token);
             var value = AwaitBinding(context, pending, timeout.Token);
             context.Checkpoint();
             value = context.ChargeBindingReturn(descriptor, value);

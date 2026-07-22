@@ -60,6 +60,34 @@ public sealed class CompiledTwoArgumentBindingFastPathTests
         Assert.Equal(1, invoker.Calls);
     }
 
+    [Fact]
+    public void Regular_two_argument_scalar_fallback_allocates_only_argument_array()
+    {
+        const int warmup = 100;
+        const int iterations = 5_000;
+        var invoker = new RegularAddBinding();
+        using var context = Context(invoker.Descriptor());
+        var left = SandboxValue.FromInt32(20);
+        var right = SandboxValue.FromInt32(22);
+        for (var i = 0; i < warmup; i++)
+        {
+            _ = Kernels.Runtime.CompiledRuntime.CallBinding2(context, "test.add2", left, right);
+        }
+
+        long checksum = 0;
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < iterations; i++)
+        {
+            checksum += ((I32Value)Kernels.Runtime.CompiledRuntime
+                .CallBinding2(context, "test.add2", left, right)).Value;
+        }
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+
+        Assert.Equal(42L * iterations, checksum);
+        Assert.Equal(warmup + iterations, invoker.Calls);
+        Assert.Equal(40L * iterations, allocated);
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(2)]
@@ -155,7 +183,11 @@ public sealed class CompiledTwoArgumentBindingFastPathTests
 
     private static SandboxContext Context(params BindingDescriptor[] bindings)
     {
-        var limits = new ResourceLimits(MaxFuel: 1_000_000, MaxAllocatedBytes: 1_000_000);
+        var limits = new ResourceLimits(
+            MaxFuel: 1_000_000,
+            MaxAllocatedBytes: 1_000_000,
+            MaxHostCalls: int.MaxValue,
+            MaxWallTime: TimeSpan.FromMinutes(5));
         return new SandboxContext(
             SandboxRunId.New(),
             SandboxPolicyBuilder.Create().Build() with { ResourceLimits = limits },
