@@ -5,6 +5,7 @@ internal sealed class FrameReadTimeoutSource : IDisposable
     private CancellationTokenSource? _source;
     private CancellationToken _ownerToken;
     private bool _ownerTokenCanCancel;
+    private bool _disposed;
 
     public static TimeSpan Resolve(TimeSpan? timeout, TimeSpan defaultTimeout, string parameterName)
     {
@@ -52,7 +53,7 @@ internal sealed class FrameReadTimeoutSource : IDisposable
         }
         catch (ObjectDisposedException)
         {
-            source = CreateSource(ownerToken);
+            source = ReplaceSource(ownerToken);
             source.CancelAfter(timeout);
         }
 
@@ -94,8 +95,22 @@ internal sealed class FrameReadTimeoutSource : IDisposable
 
     public void Dispose()
     {
-        _source?.Dispose();
-        _source = null;
+        // The internal wrapper never escapes its owning connection, so its identity is a stable
+        // allocation-free lifecycle gate.
+        lock (this)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            var source = _source;
+            _source = null;
+            _ownerToken = default;
+            _ownerTokenCanCancel = false;
+            source?.Dispose();
+        }
     }
 
     internal void DisposeCurrentSourceForTest() => _source?.Dispose();
@@ -108,22 +123,39 @@ internal sealed class FrameReadTimeoutSource : IDisposable
             source.IsCancellationRequested ||
             !MatchesOwner(ownerToken))
         {
-            source?.Dispose();
-            source = CreateSource(ownerToken);
+            return ReplaceSource(ownerToken);
         }
 
         return source;
     }
 
-    private CancellationTokenSource CreateSource(CancellationToken ownerToken)
+    private CancellationTokenSource ReplaceSource(CancellationToken ownerToken)
     {
-        var source = ownerToken.CanBeCanceled
-            ? CancellationTokenSource.CreateLinkedTokenSource(ownerToken)
-            : new CancellationTokenSource();
-        _source = source;
-        _ownerToken = ownerToken;
-        _ownerTokenCanCancel = ownerToken.CanBeCanceled;
-        return source;
+        lock (this)
+        {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(FrameReadTimeoutSource));
+            }
+
+            var source = _source;
+            if (source is not null &&
+                !IsDisposed(source) &&
+                !source.IsCancellationRequested &&
+                MatchesOwner(ownerToken))
+            {
+                return source;
+            }
+
+            source?.Dispose();
+            source = ownerToken.CanBeCanceled
+                ? CancellationTokenSource.CreateLinkedTokenSource(ownerToken)
+                : new CancellationTokenSource();
+            _source = source;
+            _ownerToken = ownerToken;
+            _ownerTokenCanCancel = ownerToken.CanBeCanceled;
+            return source;
+        }
     }
 
     private static bool IsDisposed(CancellationTokenSource source)

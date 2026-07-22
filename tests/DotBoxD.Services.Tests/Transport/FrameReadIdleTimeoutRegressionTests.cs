@@ -100,6 +100,23 @@ public sealed class FrameReadIdleTimeoutRegressionTests
     }
 
     [Fact]
+    public void ServiceFrameReadTimeoutSource_Start_AfterWrapperDispose_Throws()
+    {
+        var source = new ServiceFrameReadTimeoutSource();
+        source.Dispose();
+
+        try
+        {
+            Assert.Throws<ObjectDisposedException>(() =>
+                source.Start(CancellationToken.None, IdleTimeout));
+        }
+        finally
+        {
+            source.Dispose();
+        }
+    }
+
+    [Fact]
     public async Task ServiceFrameReadTimeoutSource_ReadAsync_RecreatesDisposedCachedSource()
     {
         using var source = new ServiceFrameReadTimeoutSource();
@@ -135,6 +152,23 @@ public sealed class FrameReadIdleTimeoutRegressionTests
         var exception = Record.Exception(() => source.Start(CancellationToken.None, IdleTimeout));
 
         Assert.Null(exception);
+    }
+
+    [Fact]
+    public void TcpFrameReadTimeoutSource_Start_AfterWrapperDispose_Throws()
+    {
+        var source = new TcpFrameReadTimeoutSource();
+        source.Dispose();
+
+        try
+        {
+            Assert.Throws<ObjectDisposedException>(() =>
+                source.Start(CancellationToken.None, IdleTimeout));
+        }
+        finally
+        {
+            source.Dispose();
+        }
     }
 
     private static void DisposeInnerCancellationTokenSource(ServiceFrameReadTimeoutSource timeoutSource) =>
