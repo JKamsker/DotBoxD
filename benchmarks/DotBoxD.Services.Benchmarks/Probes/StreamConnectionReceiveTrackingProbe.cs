@@ -13,16 +13,74 @@ internal static class StreamConnectionReceiveTrackingProbe
 
     public static void Run()
     {
+        var construction = MeasureConstruction(iterations: 10_000);
+        var activatedConstruction = MeasureActivatedConstruction(iterations: 10_000);
         var legacy = Measure(Iterations, simulateLegacyTracking: true);
         var current = Measure(Iterations, simulateLegacyTracking: false);
         var finiteFrame = MeasureFrames(Iterations, frameReadIdleTimeout: null);
         var infiniteFrame = MeasureFrames(Iterations, Timeout.InfiniteTimeSpan);
 
         Console.WriteLine("StreamConnection receive tracking probe");
+        Write("Connection construction", construction);
+        Write("Construction plus first EOF", activatedConstruction);
         Write("Owned receive with legacy tracking", legacy);
         Write("Owned receive current", current);
         Write("ValueTask frame finite timeout", finiteFrame);
         Write("ValueTask frame infinite timeout", infiniteFrame);
+    }
+
+    private static Measurement MeasureConstruction(int iterations)
+    {
+        using var stream = new MemoryStream();
+        var connections = new StreamConnection[iterations];
+        ForceGc();
+
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var started = Stopwatch.GetTimestamp();
+        for (var index = 0; index < connections.Length; index++)
+        {
+            connections[index] = new StreamConnection(
+                stream,
+                ownsStream: false,
+                frameReadIdleTimeout: Timeout.InfiniteTimeSpan);
+        }
+
+        var elapsed = Stopwatch.GetElapsedTime(started);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        foreach (var connection in connections)
+        {
+            connection.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        }
+
+        return new Measurement(iterations, elapsed.TotalMilliseconds, allocated);
+    }
+
+    private static Measurement MeasureActivatedConstruction(int iterations)
+    {
+        using var stream = new MemoryStream(Array.Empty<byte>());
+        var connections = new StreamConnection[iterations];
+        ForceGc();
+
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var started = Stopwatch.GetTimestamp();
+        for (var index = 0; index < connections.Length; index++)
+        {
+            var connection = new StreamConnection(
+                stream,
+                ownsStream: false,
+                frameReadIdleTimeout: Timeout.InfiniteTimeSpan);
+            connections[index] = connection;
+            connection.ReceiveFrameValueAsync().GetAwaiter().GetResult().Dispose();
+        }
+
+        var elapsed = Stopwatch.GetElapsedTime(started);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        foreach (var connection in connections)
+        {
+            connection.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        }
+
+        return new Measurement(iterations, elapsed.TotalMilliseconds, allocated);
     }
 
     private static Measurement Measure(int iterations, bool simulateLegacyTracking)
@@ -31,9 +89,7 @@ internal static class StreamConnectionReceiveTrackingProbe
         var connection = new StreamConnection(stream, ownsStream: true);
         var activeReceives = 0;
 
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
+        ForceGc();
 
         var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
         var started = Stopwatch.GetTimestamp();
@@ -85,9 +141,7 @@ internal static class StreamConnectionReceiveTrackingProbe
             ReadFrame(connection, stream);
         }
 
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
+        ForceGc();
 
         var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
         var started = Stopwatch.GetTimestamp();
@@ -135,6 +189,13 @@ internal static class StreamConnectionReceiveTrackingProbe
             $"{measurement.NanosecondsPerOperation,8:N1} ns/op " +
             $"{measurement.AllocatedBytes,12:N0} B " +
             $"{measurement.BytesPerOperation,8:N1} B/op");
+    }
+
+    private static void ForceGc()
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
     }
 
     private readonly record struct Measurement(

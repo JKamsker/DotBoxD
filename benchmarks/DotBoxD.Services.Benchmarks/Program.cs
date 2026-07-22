@@ -17,6 +17,21 @@ if (args.Length == 1)
         case "--probe-stream-connection-send-gate":
             StreamConnectionSendGateProbe.Run();
             return;
+        case "--probe-transport-receive-lookahead":
+            await TransportBurstReceiveProbe.RunAsync();
+            return;
+        case "--probe-transport-large-frame-receive":
+            await TransportLargeFrameReceiveProbe.RunAsync();
+            return;
+        case "--probe-transport-idle-receive-footprint":
+            await TransportIdleReceiveFootprintProbe.RunAsync();
+            return;
+        case "--probe-transport-connection-construction":
+            await TransportConnectionConstructionProbe.RunAsync();
+            return;
+        case "--probe-tcp-send-gate-contention":
+            await TcpSendGateContentionProbe.RunAsync();
+            return;
         case "--probe-generated-metadata-parameters":
             GeneratedMetadataParameterArrayProbe.Run();
             return;

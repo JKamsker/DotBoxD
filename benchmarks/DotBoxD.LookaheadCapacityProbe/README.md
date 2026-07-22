@@ -14,8 +14,16 @@ Filter a confirmation run with `--named-pipe` or `--tcp`, one of `--gated`, `--b
 `--fragmented`, and comma-separated values such as `--frame=1024,262144` and
 `--capacity=4096,16384,32768,65536`. `--scale=N` multiplies the measured batch count.
 
-The July 2026 sweep rejected 64 KiB despite its coalesced throughput: three 1 GiB-per-capacity TCP
-runs over 256 KiB frames measured an 8.7% regression versus the four-byte control. A 32 KiB
-follow-up regressed that lane by 6.2%. The selected 16 KiB capacity stayed within the 5% large-frame
-guard while substantially reducing reads and latency for small burst traffic. It is a Pareto choice,
-not within 3% of the fastest capacity in every individual lane.
+The July 2026 raw-reader sweep exposed the capacity tradeoff: three 1 GiB-per-capacity TCP runs over
+256 KiB frames moved +8.7% at 64 KiB versus the four-byte control, and a 32 KiB follow-up moved
++6.2%. These experiments guided the bound; they do not model the final adaptive production reader.
+The selected 16 KiB window is the smallest tested capacity that delivered the small-batch wins while
+also bounding worst-case retained carry.
+
+Production starts every idle receive with an exact four-byte prefix and rents the window only for a
+small frame whose prefix completed synchronously. A pending prefix disables lookahead for that frame,
+and frames larger than 16 KiB read their body directly. An exact-body miss returns the drained rental
+and backs off for 255 frames; actual unread carry keeps lookahead active until consumed. A 1,000-pair
+idle-footprint probe retained zero lookahead windows for both named pipes and TCP. Five alternating
+production runs over pending 256 KiB frames improved medians by 4.5% for direct named pipes and
+3.3% for TCP.

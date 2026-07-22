@@ -1,6 +1,8 @@
+using DotBoxD.Services.Transport;
+
 namespace DotBoxD.Services.Benchmarks.Support.Transport;
 
-internal sealed class CountingReadStream : Stream
+internal sealed class CountingReadStream : Stream, IStreamReceiveLookaheadCapable
 {
     private readonly Stream _inner;
     private long _pendingReadCount;
@@ -86,4 +88,16 @@ internal sealed class CountingReadStream : Stream
         ReadOnlyMemory<byte> buffer,
         CancellationToken cancellationToken = default) =>
         _inner.WriteAsync(buffer, cancellationToken);
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _inner.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
+
+    public override ValueTask DisposeAsync() => _inner.DisposeAsync();
 }

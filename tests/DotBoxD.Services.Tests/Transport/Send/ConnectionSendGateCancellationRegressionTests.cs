@@ -68,6 +68,65 @@ public sealed class ConnectionSendGateCancellationRegressionTests
         }
     }
 
+    [Fact]
+    public async Task TcpConnection_DisposeCompletesAllSendsWaitingForGate()
+    {
+        await using var pair = await ConnectedTcpPair.CreateAsync();
+        var blockingFrame = CreateFrame(MessageFramer.MaxMessageSize);
+        var smallFrame = CreateFrame(MessageFramer.HeaderSize);
+        var firstSend = pair.Server.SendValueAsync(blockingFrame).AsTask();
+        Assert.False(firstSend.IsCompleted);
+
+        var waitingSends = Enumerable.Range(0, 4)
+            .Select(_ => pair.Server.SendValueAsync(smallFrame).AsTask())
+            .ToArray();
+        Assert.All(waitingSends, static waiting => Assert.False(waiting.IsCompleted));
+        using var cancellation = new CancellationTokenSource();
+        var canceledSend = pair.Server.SendValueAsync(smallFrame, cancellation.Token).AsTask();
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => canceledSend.WaitAsync(TestTimeout));
+
+        await pair.Server.DisposeAsync();
+        foreach (var waitingSend in waitingSends)
+        {
+            await Assert.ThrowsAsync<ObjectDisposedException>(
+                () => waitingSend.WaitAsync(TestTimeout));
+        }
+
+        _ = await Record.ExceptionAsync(() => firstSend.WaitAsync(TestTimeout));
+        await Assert.ThrowsAsync<ObjectDisposedException>(
+            () => pair.Server.SendValueAsync(smallFrame).AsTask());
+    }
+
+    [Fact]
+    public void TransportSendGate_CancellationAfterFastAdmissionWinsOverTerminalPermit()
+    {
+        using var gate = new SemaphoreSlim(1, 1);
+        using var cancellation = new CancellationTokenSource();
+        var admission = TransportSendGate.WaitAsync(gate, cancellation.Token);
+        Assert.True(admission.IsCompletedSuccessfully);
+
+        var disposed = 1;
+        TransportSendGate.WakeDisposedWaiters(gate);
+        cancellation.Cancel();
+
+        var exception = Record.Exception(() =>
+        {
+            try
+            {
+                cancellation.Token.ThrowIfCancellationRequested();
+            }
+            finally
+            {
+                TransportSendGate.ReleaseAfterSend(gate, ref disposed);
+            }
+        });
+
+        Assert.IsAssignableFrom<OperationCanceledException>(exception);
+        Assert.Equal(1, gate.CurrentCount);
+    }
+
     private static byte[] CreateFrame(int length)
     {
         var frame = new byte[length];

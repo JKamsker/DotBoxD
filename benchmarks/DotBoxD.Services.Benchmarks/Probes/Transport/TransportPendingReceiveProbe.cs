@@ -68,7 +68,7 @@ internal static class TransportPendingReceiveProbe
         var countedReceiver = new CountingReadStream(receiver);
         await using var connection = new StreamConnection(
             countedReceiver,
-            ownsStream: false,
+            ownsStream: true,
             frameReadIdleTimeout: frameReadIdleTimeout);
         using var writer = new GatedFrameWriter(sender, CreateFrame());
         return await MeasureAsync(name, connection, writer, countedReceiver).ConfigureAwait(false);
