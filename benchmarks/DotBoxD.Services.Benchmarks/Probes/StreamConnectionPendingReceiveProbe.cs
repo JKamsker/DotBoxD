@@ -25,6 +25,8 @@ internal static class StreamConnectionPendingReceiveProbe
         Console.WriteLine(
             $"invariants: {MeasurementIterations:N0} frames/lane, 2 pending reads/frame, " +
             $"{FrameLength:N0} bytes/frame, checksum {finite.Checksum:N0}/lane");
+
+        await TransportPendingReceiveProbe.RunAsync().ConfigureAwait(false);
     }
 
     private static async Task<Measurement> MeasureAsync(
