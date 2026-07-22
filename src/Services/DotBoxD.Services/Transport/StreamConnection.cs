@@ -5,9 +5,7 @@ using DotBoxD.Services.Protocol;
 
 namespace DotBoxD.Services.Transport;
 
-/// <summary>
-/// DotBoxD connection over a duplex stream, including named pipe streams.
-/// </summary>
+/// <summary>DotBoxD connection over a duplex stream, including named pipe streams.</summary>
 public sealed class StreamConnection : IValidatedSerialFrameChannel
 {
     private readonly Stream _stream;
@@ -25,9 +23,8 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
     private int _disposed;
 
     /// <summary>
-    /// Creates a framed connection over <paramref name="stream"/>. A null
-    /// <paramref name="frameReadIdleTimeout"/> uses the finite default frame-read idle timeout.
-    /// Pass <see cref="Timeout.InfiniteTimeSpan"/> to disable the timeout for trusted streams.
+    /// Creates a framed connection over <paramref name="stream"/>. A null timeout uses the finite
+    /// default; <see cref="Timeout.InfiniteTimeSpan"/> disables it for trusted streams.
     /// </summary>
     public StreamConnection(
         Stream stream,
@@ -90,8 +87,7 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
             }
             catch (ObjectDisposedException)
             {
-                // CloseAsync disposed the send lock while this send was in flight; the real I/O fault
-                // (if any) already propagates from the WriteAsync above. Mirrors TcpConnection.SendAsync.
+                // Close may dispose the gate; any I/O fault already propagates from WriteAsync.
             }
         }
     }
@@ -111,7 +107,8 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
         {
             ThrowIfDisposed();
 
-            var read = await ReadExactAsync(_lengthBuffer.AsMemory(0, 4), ct)
+            var readToken = _frameReadTimeout?.Start(ct, _frameReadIdleTimeout) ?? ct;
+            var read = await ReadExactAsync(_lengthBuffer.AsMemory(0, 4), readToken)
                 .ConfigureAwait(false);
             if (read == 0)
             {
@@ -124,14 +121,15 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
             }
 
             var totalLength = BinaryPrimitives.ReadInt32LittleEndian(_lengthBuffer.AsSpan(0, 4));
-            ValidateIncomingLength(totalLength);
+            MessageFrameReader.ValidateIncomingFrameLength(totalLength, _maxMessageSize);
 
             var frame = Payload.Rent(totalLength);
             BinaryPrimitives.WriteInt32LittleEndian(frame.Memory.Span.Slice(0, 4), totalLength);
 
             try
             {
-                read = await ReadExactAsync(frame.Memory.Slice(4), ct).ConfigureAwait(false);
+                readToken = _frameReadTimeout?.Start(ct, _frameReadIdleTimeout) ?? ct;
+                read = await ReadExactAsync(frame.Memory.Slice(4), readToken).ConfigureAwait(false);
                 if (read < totalLength - 4)
                 {
                     frame.Dispose();
@@ -149,7 +147,14 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
         }
         finally
         {
-            ReceiveConcurrencyGuard.Exit(ref _activeReceives);
+            try
+            {
+                _frameReadTimeout?.CancelPendingTimeout();
+            }
+            finally
+            {
+                ReceiveConcurrencyGuard.Exit(ref _activeReceives);
+            }
         }
     }
 
@@ -173,9 +178,7 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
     public ValueTask<Payload> ReceiveValueAsync(CancellationToken ct = default) =>
         RpcFramePayloadAdapter.DetachAsync(ReceiveFrameValueAsync(ct));
 
-    /// <summary>
-    /// Closes the connection. This operation is idempotent.
-    /// </summary>
+    /// <summary>Closes the connection. This operation is idempotent.</summary>
     public async Task CloseAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -246,39 +249,39 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
         }
     }
 
-    private void ValidateIncomingLength(int totalLength)
-    {
-        if (totalLength < MessageFramer.HeaderSize || totalLength > _maxMessageSize)
-        {
-            throw new InvalidDataException($"Invalid DotBoxD frame length: {totalLength}.");
-        }
-    }
+    private ValueTask<int> ReadExactAsync(Memory<byte> buffer, CancellationToken readToken) =>
+        _frameReadTimeout is null
+            ? StreamReadOperations.ReadExactAsync(_stream, buffer, readToken)
+            : ReadExactWithTimeoutAsync(buffer, readToken);
 
-    private async ValueTask<int> ReadExactAsync(Memory<byte> buffer, CancellationToken ct)
+    private async ValueTask<int> ReadExactWithTimeoutAsync(Memory<byte> buffer, CancellationToken readToken)
     {
         var totalRead = 0;
         while (totalRead < buffer.Length)
         {
-            var read = await ReadChunkAsync(buffer.Slice(totalRead), ct).ConfigureAwait(false);
+            int read;
+            try
+            {
+                read = await _stream.ReadAsync(buffer.Slice(totalRead), readToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (_frameReadTimeout!.IsCurrentOwnerTimeoutCancellation())
+            {
+                throw FrameReadTimeoutSource.CreateTimeoutException(_frameReadIdleTimeout);
+            }
+
             if (read == 0)
             {
                 return totalRead;
             }
 
             totalRead += read;
+            if (totalRead < buffer.Length)
+            {
+                readToken = _frameReadTimeout!.Rearm(_frameReadIdleTimeout);
+            }
         }
 
         return totalRead;
-    }
-
-    private ValueTask<int> ReadChunkAsync(
-        Memory<byte> buffer,
-        CancellationToken ct)
-    {
-        var timeout = _frameReadTimeout;
-        return timeout is null
-            ? _stream.ReadAsync(buffer, ct)
-            : timeout.ReadAsync(_stream, buffer, ct, _frameReadIdleTimeout);
     }
 
     private static async ValueTask DisposeStreamAsync(Stream stream)

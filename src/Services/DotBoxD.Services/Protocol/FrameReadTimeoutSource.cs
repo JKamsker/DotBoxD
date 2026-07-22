@@ -41,8 +41,7 @@ internal sealed class FrameReadTimeoutSource : IDisposable
         }
         catch (OperationCanceledException) when (IsTimeoutCancellation(ownerToken))
         {
-            throw new IOException(
-                $"Inbound frame read stalled for longer than {timeout} with no data (possible slow-loris peer).");
+            throw CreateTimeoutException(timeout);
         }
         finally
         {
@@ -67,6 +66,10 @@ internal sealed class FrameReadTimeoutSource : IDisposable
         return source.Token;
     }
 
+    // Start establishes the frame owner. Reusing it here keeps ReadExactAsync's state machine to one
+    // token while still returning a replacement token if the cached source had to be recreated.
+    public CancellationToken Rearm(TimeSpan timeout) => Start(_ownerToken, timeout);
+
     public bool IsTimeoutCancellation(CancellationToken ownerToken)
     {
         var source = _source;
@@ -74,6 +77,11 @@ internal sealed class FrameReadTimeoutSource : IDisposable
             source.IsCancellationRequested &&
             !ownerToken.IsCancellationRequested;
     }
+
+    public bool IsCurrentOwnerTimeoutCancellation() => IsTimeoutCancellation(_ownerToken);
+
+    public static IOException CreateTimeoutException(TimeSpan timeout) =>
+        new($"Inbound frame read stalled for longer than {timeout} with no data (possible slow-loris peer).");
 
     public void CancelPendingTimeout()
     {
