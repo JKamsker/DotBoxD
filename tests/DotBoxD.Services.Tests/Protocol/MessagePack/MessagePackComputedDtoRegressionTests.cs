@@ -83,6 +83,50 @@ public sealed class MessagePackComputedDtoRegressionTests
         Assert.Equal("replay getter failed", inner.Message);
     }
 
+    [Fact]
+    public void Successful_constructor_replay_is_not_cached_for_later_values()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var stable = new InstanceSensitiveDto(5, changesValue: false);
+        var changing = new InstanceSensitiveDto(5, changesValue: true);
+
+        using var stablePayload = serializer.SerializeToPayload(stable);
+        var stableRoundTrip = serializer.Deserialize<InstanceSensitiveDto>(stablePayload.Memory);
+        Assert.Equal(stable.Id, stableRoundTrip.Id);
+
+        var exception = Assert.Throws<MessagePackSerializationException>(
+            () => serializer.SerializeToPayload(changing));
+        Assert.Contains(
+            "cannot be serialized without changing constructor-bound get-only values",
+            exception.Message);
+    }
+
+    [Fact]
+    public void Constructor_only_dto_hidden_as_base_type_round_trips()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        ConstructorBaseDto value = new ConstructorDerivedDto(5);
+
+        using var payload = serializer.SerializeToPayload(value);
+        var roundTrip = serializer.Deserialize<ConstructorBaseDto>(payload.Memory);
+
+        Assert.Equal(value.Id, roundTrip.Id);
+    }
+
+    [Fact]
+    public void Constructor_guard_metadata_is_safe_during_concurrent_first_use()
+    {
+        var serializer = new MessagePackRpcSerializer();
+
+        Parallel.For(0, 32, i =>
+        {
+            var value = new ConcurrentConstructorDto(i);
+            using var payload = serializer.SerializeToPayload(value);
+            var roundTrip = serializer.Deserialize<ConcurrentConstructorDto>(payload.Memory);
+            Assert.Equal(value.Id, roundTrip.Id);
+        });
+    }
+
     private static BufferPayload? TrySerializeOrNull(
         MessagePackRpcSerializer serializer,
         ComputedGetOnlyDto value)
@@ -130,6 +174,41 @@ public sealed class MessagePackComputedDtoRegressionTests
                 throw new InvalidOperationException("replay getter failed");
             }
         }
+    }
+
+    public sealed class InstanceSensitiveDto
+    {
+        public InstanceSensitiveDto(int id, bool changesValue)
+        {
+            Id = changesValue ? id + 1 : id;
+            ChangesValue = changesValue;
+        }
+
+        public int Id { get; }
+
+        public bool ChangesValue { get; }
+    }
+
+    public class ConstructorBaseDto
+    {
+        public ConstructorBaseDto(int id) => Id = id;
+
+        public int Id { get; }
+    }
+
+    public sealed class ConstructorDerivedDto : ConstructorBaseDto
+    {
+        public ConstructorDerivedDto(int id)
+            : base(id)
+        {
+        }
+    }
+
+    public sealed class ConcurrentConstructorDto
+    {
+        public ConcurrentConstructorDto(int id) => Id = id;
+
+        public int Id { get; }
     }
 
     private interface IComputedDto

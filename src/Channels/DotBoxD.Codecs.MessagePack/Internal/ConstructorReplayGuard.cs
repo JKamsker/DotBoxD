@@ -40,7 +40,21 @@ internal sealed class ConstructorReplayGuard
             return false;
         }
 
-        var guard = Guards.GetOrAdd(value.GetType(), Create);
+        var declaredType = typeof(T);
+        if (declaredType.IsValueType || declaredType == typeof(string))
+        {
+            return false;
+        }
+
+        var runtimeType = declaredType.IsSealed ? declaredType : value.GetType();
+        if (runtimeType.IsValueType || runtimeType == typeof(string))
+        {
+            return false;
+        }
+
+        var guard = runtimeType == declaredType
+            ? GetOrAddDeclaredTypeGuard<T>(declaredType)
+            : Guards.GetOrAdd(runtimeType, Create);
         if (ReferenceEquals(guard, None))
         {
             return false;
@@ -54,6 +68,21 @@ internal sealed class ConstructorReplayGuard
 
         guard.SerializeWithReplayValidation(writer, value, options);
         return true;
+    }
+
+    private static ConstructorReplayGuard GetOrAddDeclaredTypeGuard<T>(Type declaredType)
+    {
+        var cached = Volatile.Read(ref DeclaredTypeGuardCache<T>.Guard);
+        if (cached is not null)
+        {
+            return cached;
+        }
+
+        var resolved = Guards.GetOrAdd(declaredType, Create);
+        return Interlocked.CompareExchange(
+            ref DeclaredTypeGuardCache<T>.Guard,
+            resolved,
+            null) ?? resolved;
     }
 
     private static ConstructorReplayGuard Create(Type type)
@@ -132,9 +161,13 @@ internal sealed class ConstructorReplayGuard
         try
         {
             var replayed = InvokeConstructor(value);
-            if (_boundProperties.Any(property => !Equals(property.GetValue(value), property.GetValue(replayed))))
+            for (var i = 0; i < _boundProperties.Length; i++)
             {
-                ThrowChangingValues(value!.GetType());
+                var property = _boundProperties[i];
+                if (!Equals(property.GetValue(value), property.GetValue(replayed)))
+                {
+                    ThrowChangingValues(value!.GetType());
+                }
             }
         }
         catch (TargetInvocationException ex)
@@ -199,4 +232,9 @@ internal sealed class ConstructorReplayGuard
         throw new MessagePackSerializationException(
             $"Type '{type.FullName}' cannot be serialized without changing constructor-bound get-only values.",
             innerException);
+
+    private static class DeclaredTypeGuardCache<T>
+    {
+        public static ConstructorReplayGuard? Guard;
+    }
 }
