@@ -28,6 +28,12 @@ internal static class PluginProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-result-hook-fanout", StringComparer.OrdinalIgnoreCase))
+        {
+            ResultHookFanoutProbe.Run();
+            return true;
+        }
+
         return false;
     }
 }
