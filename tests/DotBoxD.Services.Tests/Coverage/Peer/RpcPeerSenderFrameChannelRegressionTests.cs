@@ -53,6 +53,46 @@ public sealed class RpcPeerSenderFrameChannelRegressionTests
     }
 
     [Fact]
+    public async Task ThirdPartyValueTaskChannel_RawSendsRemainSerializedByPeer()
+    {
+        var channel = new BlockingValueTaskChannel();
+        using var sender = new RpcPeerSender(channel, static () => false);
+        var frameBytes = CreateValidFrameBytes();
+
+        var first = sender.SendAsync(frameBytes, CancellationToken.None);
+        await channel.SendEntered.Task.WaitAsync(Timeout);
+        var second = sender.SendAsync(frameBytes, CancellationToken.None);
+
+        Assert.False(second.IsCompleted);
+        Assert.Equal(1, channel.SendCalls);
+
+        channel.Release();
+        await Task.WhenAll(first, second).WaitAsync(Timeout);
+        Assert.Equal(2, channel.SendCalls);
+    }
+
+    [Fact]
+    public async Task ThirdPartyValueTaskChannel_RawSendWaiterRemainsCancellable()
+    {
+        var channel = new BlockingValueTaskChannel();
+        using var sender = new RpcPeerSender(channel, static () => false);
+        var frameBytes = CreateValidFrameBytes();
+        var first = sender.SendAsync(frameBytes, CancellationToken.None);
+        await channel.SendEntered.Task.WaitAsync(Timeout);
+        using var cts = new CancellationTokenSource();
+
+        var waiting = sender.SendAsync(frameBytes, cts.Token);
+        Assert.False(waiting.IsCompleted);
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => waiting);
+        Assert.Equal(1, channel.SendCalls);
+
+        channel.Release();
+        await first.WaitAsync(Timeout);
+    }
+
+    [Fact]
     public async Task InvokeAsync_DirectFrameSend_KeepsTransferredFrameAlive()
     {
         var serializer = new MessagePackRpcSerializer();
@@ -122,6 +162,12 @@ public sealed class RpcPeerSenderFrameChannelRegressionTests
         return frame;
     }
 
+    private static byte[] CreateValidFrameBytes()
+    {
+        using var frame = CreateValidFrame();
+        return frame.WrittenMemory.ToArray();
+    }
+
     private static PooledBufferWriter CreateLengthMismatchFrame()
     {
         var frame = new PooledBufferWriter();
@@ -181,6 +227,42 @@ public sealed class RpcPeerSenderFrameChannelRegressionTests
 
         public ValueTask<RpcFrame> ReceiveFrameValueAsync(CancellationToken ct = default) =>
             new(new RpcFrame(Payload.Empty));
+
+        public ValueTask DisposeAsync()
+        {
+            Release();
+            return default;
+        }
+
+        public void Release() => _release.TrySetResult();
+    }
+
+    private sealed class BlockingValueTaskChannel : IRpcValueTaskChannel
+    {
+        private readonly TaskCompletionSource _release =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool IsConnected => true;
+        public string RemoteEndpoint => "value-task://test";
+        public int SendCalls { get; private set; }
+        public TaskCompletionSource SendEntered { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) =>
+            SendValueAsync(data, ct).AsTask();
+
+        public async ValueTask SendValueAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
+        {
+            SendCalls++;
+            SendEntered.TrySetResult();
+            await _release.Task.WaitAsync(ct);
+        }
+
+        public Task<Payload> ReceiveAsync(CancellationToken ct = default) =>
+            ReceiveValueAsync(ct).AsTask();
+
+        public ValueTask<Payload> ReceiveValueAsync(CancellationToken ct = default) =>
+            new(Payload.Empty);
 
         public ValueTask DisposeAsync()
         {

@@ -23,7 +23,28 @@ internal sealed class RpcPeerSender : IDisposable
         _isClosed = isClosed;
     }
 
-    public async Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    public Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    {
+        var validatedSerialFrameChannel = _validatedSerialFrameChannel;
+        if (validatedSerialFrameChannel is null)
+        {
+            return SendSlowAsync(data, ct);
+        }
+
+        if (_isClosed())
+        {
+            return Task.FromException(new ServiceConnectionException("Connection closed."));
+        }
+
+        if (ct.IsCancellationRequested)
+        {
+            return Task.FromCanceled(ct);
+        }
+
+        return validatedSerialFrameChannel.SendValueAsync(data, ct).AsTask();
+    }
+
+    private async Task SendSlowAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
     {
         // Fast-fail once the peer is closing so an outbound call started during teardown does not
         // park in WaitAsync (with a non-cancellable token) only to strand on a disposed send lock.

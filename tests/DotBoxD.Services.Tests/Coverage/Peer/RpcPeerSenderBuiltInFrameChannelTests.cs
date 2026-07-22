@@ -26,6 +26,47 @@ public sealed class RpcPeerSenderBuiltInFrameChannelTests
     }
 
     [Fact]
+    public async Task BuiltInFastPath_RejectsMalformedRawFrameWithoutWriting()
+    {
+        await using var stream = new FirstWriteBlockingStream(blockFirstWrite: false);
+        await using var connection = new StreamConnection(stream, ownsStream: false);
+        using var sender = new RpcPeerSender(connection, static () => false);
+
+        await Assert.ThrowsAsync<InvalidDataException>(
+            () => sender.SendAsync(CreateLengthMismatchFrameBytes(), CancellationToken.None));
+
+        Assert.Equal(0, stream.WriteCount);
+    }
+
+    [Fact]
+    public async Task BuiltInFastPath_PreCanceledRawSendDoesNotWrite()
+    {
+        await using var stream = new FirstWriteBlockingStream(blockFirstWrite: false);
+        await using var connection = new StreamConnection(stream, ownsStream: false);
+        using var sender = new RpcPeerSender(connection, static () => false);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => sender.SendAsync(CreateValidFrameBytes(), cts.Token));
+
+        Assert.Equal(0, stream.WriteCount);
+    }
+
+    [Fact]
+    public async Task BuiltInFastPath_ClosedPeerRejectsRawSendWithoutWriting()
+    {
+        await using var stream = new FirstWriteBlockingStream(blockFirstWrite: false);
+        await using var connection = new StreamConnection(stream, ownsStream: false);
+        using var sender = new RpcPeerSender(connection, static () => true);
+
+        await Assert.ThrowsAsync<ServiceConnectionException>(
+            () => sender.SendAsync(CreateValidFrameBytes(), CancellationToken.None));
+
+        Assert.Equal(0, stream.WriteCount);
+    }
+
+    [Fact]
     public async Task BuiltInFastPath_SerializesFrameAndRawSendsAtTheChannel()
     {
         await using var stream = new FirstWriteBlockingStream();
@@ -82,11 +123,18 @@ public sealed class RpcPeerSenderBuiltInFrameChannelTests
         return frame;
     }
 
+    private static byte[] CreateLengthMismatchFrameBytes()
+    {
+        using var frame = CreateLengthMismatchFrame();
+        return frame.WrittenMemory.ToArray();
+    }
+
     private static void AssertDisposed(PooledBufferWriter frame) =>
         Assert.Throws<ObjectDisposedException>(() => _ = frame.WrittenMemory);
 
     private sealed class FirstWriteBlockingStream : Stream
     {
+        private readonly bool _blockFirstWrite;
         private readonly TaskCompletionSource _firstWriteEntered =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource _releaseFirstWrite =
@@ -95,6 +143,9 @@ public sealed class RpcPeerSenderBuiltInFrameChannelTests
         public Task FirstWriteEntered => _firstWriteEntered.Task;
 
         public int WriteCount { get; private set; }
+
+        public FirstWriteBlockingStream(bool blockFirstWrite = true) =>
+            _blockFirstWrite = blockFirstWrite;
 
         public override bool CanRead => false;
         public override bool CanSeek => false;
@@ -119,7 +170,7 @@ public sealed class RpcPeerSenderBuiltInFrameChannelTests
             CancellationToken cancellationToken = default)
         {
             WriteCount++;
-            if (WriteCount != 1)
+            if (!_blockFirstWrite || WriteCount != 1)
             {
                 return default;
             }
