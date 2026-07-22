@@ -222,7 +222,7 @@ internal static partial class CompiledBindingDispatcher
         }
     }
 
-    private static void EnsureAsyncGrant(SandboxContext context, BindingDescriptor descriptor)
+    internal static void EnsureAsyncGrant(SandboxContext context, BindingDescriptor descriptor)
     {
         if (!descriptor.IsAsync || context.AsyncEnabled)
         {
@@ -234,7 +234,7 @@ internal static partial class CompiledBindingDispatcher
             $"binding '{descriptor.Id}' requires the '{RuntimeCapabilityIds.Async}' capability"));
     }
 
-    private static SandboxRuntimeException BindingFailure(
+    internal static SandboxRuntimeException BindingFailure(
         SandboxContext context,
         BindingDescriptor descriptor,
         BindingAuditInvocation auditInvocation)
@@ -244,7 +244,7 @@ internal static partial class CompiledBindingDispatcher
         return new SandboxRuntimeException(error);
     }
 
-    private static SandboxValue AwaitBinding(
+    internal static SandboxValue AwaitBinding(
         SandboxContext context,
         ValueTask<SandboxValue> pending,
         CancellationToken timeoutToken)

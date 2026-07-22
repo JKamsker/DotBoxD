@@ -46,6 +46,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-run-summary-policy-id
 DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-binding-dispatch-scope
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-binding-arity
+DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-binding-arity-three
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-capability-grant-lookup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-host-service-arguments
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-binding-structural-validation
@@ -78,6 +79,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 
 | Step | Commit | Probe | Key result |
 | --- | --- | --- | --- |
+| Compiled three-argument binding fast path | this commit | `--probe-compiled-binding-arity-three` | Generated three-argument runtime-stub calls now pass scalar values through verifier-allowlisted `CompiledRuntime.CallBinding3`, and `string.substringBudgeted` implements the typed invoker. Eight fresh direct processes improve the 500,000-call median from 189.8 to 164.5 ns/call (13.3%) and allocation exactly from 104 to 56 B/call. Eight alternating end-to-end processes, each running one million compiled substring calls, improve the median from 246.1 to 202.8 ns/binding (17.6%, 8/8 wins) and allocation exactly from 137.3 to 89.3 B/binding. A regular non-fast three-argument binding remains exactly 48 B/call through the explicit-array fallback. Value-array sandbox charging, argument order, structural validation, async denial, failure audit, and legacy list invocation remain pinned. Compiler/verifier versions advance to 14/13 because the emitted ABI and allowlist changed. |
 | I32 interpreted loop fast path | `44bc06f` | `--probe-compiled` | Interpreted scalar loop dropped to about 3.3x to 3.5x handwritten in subsequent scalar probes. |
 | I32 compiled raw loop path | `024f1ca` | `--probe-compiled` | Scalar compiled loop reached 62.2 ms vs 47.9 ms handwritten, or 1.3x. |
 | Binding crossing optimization | `216eec6` | `--probe-bindings` | `math.sqrt` crossing improved from compiled 542.1 ms / 68.8x to 196.7 ms / 25.1x; interpreted improved from 677.7 ms / 86.0x to 514.7 ms / 65.6x. |
@@ -207,7 +209,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Invocation-owned binding audit arbitration | this commit | `--probe-binding-dispatch-scope` | Reused the in-memory destination's event-list gate and removed global checkpoint ownership from the committed async audit wrapper. Across four fresh 500,000-call processes, the async-completed median fell from 320.8 to 280.8 B/call (-40.0 B), while no-audit stayed at 144 total bytes. Sound identity now also covers supported sync-declared pending calls, intentionally moving declared-sync audited calls from 144.8 to 280.8 B/call (+136.0 B). No timing claim is made. |
 | Primitive I64/F64 return trees | this commit | `--probe-interpreter-scalar-return` | Evaluated eligible non-debug unary/binary return trees through the existing primitive evaluators and boxed only the final public result. Across 100,000 executions, one/eight literal increments remove exactly 24/192 B per call and one/eight raw-variable increments remove 48/384 B. I64 and F64 rows are byte-identical; x0 literal/plain-variable controls, checksums, and all resource counters are unchanged. Elapsed time is not claimed. |
 
-Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
+Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, `CallBinding3`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
 members: compiled assemblies must call them across assembly boundaries and the verifier allowlist
 hashes their exact signatures. They are not supported host API.
@@ -2462,8 +2464,8 @@ empty audit stream, and exact 67 fuel units per execution; existing debug regres
 ## Shared binding wall-time deadline
 
 Binding dispatch previously called `CancelAfter(RemainingWallTime)` for every host call. Default-token runs repeatedly
-re-armed one timer; live-token runs allocated, armed, linked, and disposed a fresh source. The interpreter and all three
-compiled arities now lease one execution-owned source armed once to the resource meter's fixed absolute deadline. A
+re-armed one timer; live-token runs allocated, armed, linked, and disposed a fresh source. The interpreter and all
+compiled binding dispatch shapes now lease one execution-owned source armed once to the resource meter's fixed absolute deadline. A
 live run token is linked only for the duration of each call through an unsafe cancellation registration. Every lease
 performs an exact deadline check before invoking host code, and execution boundaries dispose the source after success,
 timeout, cancellation, or failure. Recycled contexts release and replace the generation source instead of rearming a

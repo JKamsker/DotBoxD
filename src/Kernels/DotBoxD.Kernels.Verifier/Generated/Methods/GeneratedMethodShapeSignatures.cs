@@ -107,6 +107,9 @@ internal static class GeneratedMethodShapeSignatures
                    CompiledRuntimeName + ".CallBinding2(" + SandboxContextName,
                    StringComparison.Ordinal) &&
                !calledMember.StartsWith(
+                   CompiledRuntimeName + ".CallBinding3(" + SandboxContextName,
+                   StringComparison.Ordinal) &&
+               !calledMember.StartsWith(
                    CompiledRuntimeName + ".CreateValueArray(" + SandboxContextName,
                    StringComparison.Ordinal) &&
                !calledMember.StartsWith(

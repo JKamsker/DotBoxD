@@ -203,6 +203,11 @@ if (args.Contains("--probe-compiled-binding-arity", StringComparer.OrdinalIgnore
     return;
 }
 
+if (await DotBoxD.Kernels.Benchmarks.Runtime.Bindings.BindingProbeDispatcher.TryRunAsync(args))
+{
+    return;
+}
+
 if (args.Contains("--probe-capability-grant-lookup", StringComparer.OrdinalIgnoreCase))
 {
     DotBoxD.Kernels.Benchmarks.Runtime.CapabilityGrantLookupProbe.Run();

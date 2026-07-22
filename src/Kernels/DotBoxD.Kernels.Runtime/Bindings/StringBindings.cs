@@ -36,10 +36,7 @@ public static class StringBindings
             SandboxType.String,
             SandboxEffect.Cpu | SandboxEffect.Alloc,
             BindingCostModel.PerByte(2, 1),
-            (ctx, args, _) => {
-                var text = ctx.CreateChargedSubstring(String(args[0]), I32(args[1]), I32(args[2]));
-                return ValueTask.FromResult(SandboxValue.FromString(text));
-            }),
+            SubstringBudgetedInvoker.Instance.Invoke),
         Pure(
             "string.concatBudgeted",
             [SandboxType.String, SandboxType.String],
@@ -112,6 +109,28 @@ public static class StringBindings
         catch (OverflowException)
         {
             throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.QuotaExceeded, "string CPU budget exhausted"));
+        }
+    }
+
+    private sealed class SubstringBudgetedInvoker : IThreeArgumentBindingInvoker
+    {
+        public static SubstringBudgetedInvoker Instance { get; } = new();
+
+        public ValueTask<SandboxValue> Invoke(
+            SandboxContext context,
+            IReadOnlyList<SandboxValue> args,
+            CancellationToken cancellationToken)
+            => Invoke(context, args[0], args[1], args[2], cancellationToken);
+
+        public ValueTask<SandboxValue> Invoke(
+            SandboxContext context,
+            SandboxValue arg0,
+            SandboxValue arg1,
+            SandboxValue arg2,
+            CancellationToken cancellationToken)
+        {
+            var text = context.CreateChargedSubstring(String(arg0), I32(arg1), I32(arg2));
+            return ValueTask.FromResult(SandboxValue.FromString(text));
         }
     }
 }

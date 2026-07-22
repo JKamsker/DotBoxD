@@ -63,6 +63,7 @@ public sealed class CompiledTwoArgumentBindingFastPathTests
     [Theory]
     [InlineData(0)]
     [InlineData(2)]
+    [InlineData(3)]
     public void Charge_value_array_matches_create_value_array_accounting(int count)
     {
         var charged = Context();

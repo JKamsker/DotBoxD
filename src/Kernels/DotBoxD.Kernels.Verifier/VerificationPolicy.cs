@@ -217,7 +217,8 @@ public sealed record VerificationPolicy(
                 RuntimeMember("RecordGet", $"{SandboxContextName},{SandboxValueName},{SandboxValueName}", SandboxValueName),
                 RuntimeMember("CallBinding", $"{SandboxContextName},{StringName},{SandboxValueArrayName}", SandboxValueName),
                 RuntimeMember("CallBinding1", $"{SandboxContextName},{StringName},{SandboxValueName}", SandboxValueName),
-                RuntimeMember("CallBinding2", $"{SandboxContextName},{StringName},{SandboxValueName},{SandboxValueName}", SandboxValueName)
+                RuntimeMember("CallBinding2", $"{SandboxContextName},{StringName},{SandboxValueName},{SandboxValueName}", SandboxValueName),
+                RuntimeMember("CallBinding3", $"{SandboxContextName},{StringName},{SandboxValueName},{SandboxValueName},{SandboxValueName}", SandboxValueName)
             },
             new HashSet<string>(StringComparer.Ordinal) {
                 "System.IO.", "System.Net.", "System.Reflection.", "System.Runtime.Loader.",
@@ -226,8 +227,7 @@ public sealed record VerificationPolicy(
                 "System.GC", "System.Delegate", "System.IServiceProvider",
                 "System.Linq.Expressions.", "Microsoft.CSharp."
             },
-            RuntimeFacadeIdentityDefaults(),
-            "dotboxd-verifier-12");
+            RuntimeFacadeIdentityDefaults(), "dotboxd-verifier-13");
 
     public bool IsMemberAllowed(string memberSignature)
     {
