@@ -14,7 +14,7 @@ internal static class ConstructorReplayGuardProbe
     public static void Run()
     {
         var serializer = new MessagePackRpcSerializer();
-        MeasureColdActivation(serializer);
+        MeasureWarmCompilerActivation(serializer);
         var stable = new ConstructorReplayStableDto(42);
         ConstructorReplayBaseDto derived = new ConstructorReplayDerivedDto(42);
         var settable = new ConstructorReplaySettableDto { Id = 42 };
@@ -35,7 +35,7 @@ internal static class ConstructorReplayGuardProbe
             writer => MessagePackSerializer.Serialize(writer, stable, serializer.Options)));
     }
 
-    private static void MeasureColdActivation(MessagePackRpcSerializer serializer)
+    private static void MeasureWarmCompilerActivation(MessagePackRpcSerializer serializer)
     {
         var writer = new ArrayBufferWriter<byte>();
         var warmup = new ConstructorReplayActivationWarmupDto(42);
@@ -47,7 +47,7 @@ internal static class ConstructorReplayGuardProbe
 
         var value = new ConstructorReplayActivationDto(42);
         ForceGc();
-        Console.WriteLine("cold activation calls");
+        Console.WriteLine("warm-compiler per-type activation calls");
         MeasureColdCalls(serializer, writer, value, "first call", 1);
         MeasureColdCalls(serializer, writer, value, "calls 2-128", 127);
         MeasureColdCalls(serializer, writer, value, "calls 129-4,096", 3968);

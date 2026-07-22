@@ -1,12 +1,14 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using MessagePack;
 
 namespace DotBoxD.Codecs.MessagePack;
 
 internal sealed class ConstructorReplayGuard
 {
+    private const int SerializedReplayState = -1;
     private static readonly ConcurrentDictionary<Type, ConstructorReplayGuard> Guards = new();
     private static readonly ConstructorReplayGuard None = new(null, [], [], [], useSerializedReplay: false);
 
@@ -14,7 +16,8 @@ internal sealed class ConstructorReplayGuard
     private readonly ParameterInfo[] _parameters;
     private readonly PropertyInfo[] _parameterProperties;
     private readonly PropertyInfo[] _boundProperties;
-    private readonly bool _useSerializedReplay;
+    private int _successfulReplays;
+    private int _validatorCreationState;
 
     private ConstructorReplayGuard(
         ConstructorInfo? constructor,
@@ -27,7 +30,7 @@ internal sealed class ConstructorReplayGuard
         _parameters = parameters;
         _parameterProperties = parameterProperties;
         _boundProperties = boundProperties;
-        _useSerializedReplay = useSerializedReplay;
+        _validatorCreationState = useSerializedReplay ? SerializedReplayState : 0;
     }
 
     public static bool TrySerialize<T>(
@@ -41,18 +44,19 @@ internal sealed class ConstructorReplayGuard
         }
 
         var declaredType = typeof(T);
-        if (declaredType.IsValueType || declaredType == typeof(string))
+        if (ShouldBypass(declaredType))
         {
             return false;
         }
 
         var runtimeType = declaredType.IsSealed ? declaredType : value.GetType();
-        if (runtimeType.IsValueType || runtimeType == typeof(string))
+        if (ShouldBypass(runtimeType))
         {
             return false;
         }
 
-        var guard = runtimeType == declaredType
+        var isExactDeclaredType = runtimeType == declaredType;
+        var guard = isExactDeclaredType
             ? GetOrAddDeclaredTypeGuard<T>(declaredType)
             : Guards.GetOrAdd(runtimeType, Create);
         if (ReferenceEquals(guard, None))
@@ -60,15 +64,50 @@ internal sealed class ConstructorReplayGuard
             return false;
         }
 
-        if (!guard._useSerializedReplay)
+        if (guard._validatorCreationState == SerializedReplayState)
+        {
+            guard.SerializeWithReplayValidation(writer, value, options);
+            return true;
+        }
+
+        if (!isExactDeclaredType)
         {
             guard.ThrowIfConstructorReplayChangesValues(value);
             return false;
         }
 
-        guard.SerializeWithReplayValidation(writer, value, options);
-        return true;
+        guard.ValidateSimpleExact(value);
+        return false;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void ValidateSimpleExact<T>(T value)
+    {
+        var fastValidator = _validatorCreationState ==
+            ConstructorReplayValidatorAdmission.CreationStartedState
+            ? Volatile.Read(ref ConstructorReplayValidatorStorage<T>.Validator)
+            : null;
+        if (fastValidator is not null)
+        {
+            ValidateFast(fastValidator, value!);
+            return;
+        }
+
+        ThrowIfConstructorReplayChangesValues(value);
+        if (ConstructorReplayValidatorAdmission.TryClaimCreation(
+            ref _successfulReplays,
+            ref _validatorCreationState))
+        {
+            ConstructorReplayValidatorAdmission.Publish<T>(
+                ref _successfulReplays,
+                ref _validatorCreationState,
+                _constructor!,
+                _parameterProperties,
+                _boundProperties);
+        }
+    }
+
+    private static bool ShouldBypass(Type type) => type.IsValueType || type == typeof(string);
 
     private static ConstructorReplayGuard GetOrAddDeclaredTypeGuard<T>(Type declaredType)
     {
@@ -138,7 +177,8 @@ internal sealed class ConstructorReplayGuard
             constructor.Parameters,
             constructor.Parameters.Select(parameter => readableProperties[parameter.Name!]).ToArray(),
             boundProperties,
-            boundProperties.Any(static property => !IsSimpleComparableType(property.PropertyType)));
+            boundProperties.Any(static property =>
+                !ConstructorReplayValidatorCompiler.SupportsTypedEquality(property.PropertyType)));
     }
 
     private static bool TryGetCompatibleProperty(
@@ -177,6 +217,25 @@ internal sealed class ConstructorReplayGuard
         }
     }
 
+    private static void ValidateFast(Func<object, bool> validator, object value)
+    {
+        bool valuesMatch;
+        try
+        {
+            valuesMatch = validator(value);
+        }
+        catch (Exception ex)
+        {
+            ThrowChangingValues(value.GetType(), ex);
+            return;
+        }
+
+        if (!valuesMatch)
+        {
+            ThrowChangingValues(value.GetType());
+        }
+    }
+
     private object InvokeConstructor<T>(T value)
     {
         var arguments = new object?[_parameters.Length];
@@ -209,16 +268,6 @@ internal sealed class ConstructorReplayGuard
 
         writer.Write(serialized.WrittenSpan);
     }
-
-    private static bool IsSimpleComparableType(Type type) =>
-        type.IsPrimitive ||
-        type.IsEnum ||
-        type == typeof(string) ||
-        type == typeof(decimal) ||
-        type == typeof(Guid) ||
-        type == typeof(DateTime) ||
-        type == typeof(DateTimeOffset) ||
-        type == typeof(TimeSpan);
 
     private static void ThrowIfTrailingBytes(int totalLength, int bytesRead)
     {
