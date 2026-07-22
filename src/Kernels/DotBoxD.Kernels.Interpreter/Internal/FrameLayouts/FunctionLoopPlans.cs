@@ -10,6 +10,7 @@ namespace DotBoxD.Kernels.Interpreter.Internal;
 internal struct FunctionLoopPlans
 {
     private I32LoopPlanStore _i32ForRangePlans;
+    private I32BranchedLoopPlanStore _i32BranchedForRangePlans;
     private I32WhileLoopPlanStore _i32WhilePlans;
 
     public bool TryGetI32ForRangePlan(
@@ -24,6 +25,18 @@ internal struct FunctionLoopPlans
 
     public void CacheI32ForRangePlan(I32ForLoopPlan plan)
         => _i32ForRangePlans.Cache(plan);
+
+    public bool TryGetI32BranchedForRangePlan(
+        ForRangeStatement statement,
+        InterpreterFrame frame,
+        out I32BranchedLoopPlan plan)
+        => _i32BranchedForRangePlans.TryGet(statement, frame, out plan);
+
+    public bool ShouldCacheI32BranchedForRangePlan(ForRangeStatement statement)
+        => _i32BranchedForRangePlans.ShouldCache(statement);
+
+    public void CacheI32BranchedForRangePlan(I32BranchedLoopPlan plan)
+        => _i32BranchedForRangePlans.Cache(plan);
 
     public bool TryGetI32WhilePlan(
         WhileStatement statement,
