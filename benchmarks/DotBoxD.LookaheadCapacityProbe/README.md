@@ -24,6 +24,6 @@ Production starts every idle receive with an exact four-byte prefix and rents th
 small frame whose prefix completed synchronously. A pending prefix disables lookahead for that frame,
 and frames larger than 16 KiB read their body directly. An exact-body miss returns the drained rental
 and backs off for 255 frames; actual unread carry keeps lookahead active until consumed. A 1,000-pair
-idle-footprint probe retained zero lookahead windows for both named pipes and TCP. Five alternating
-production runs over pending 256 KiB frames improved medians by 4.5% for direct named pipes and
-3.3% for TCP.
+idle-footprint probe retained zero lookahead windows for both named pipes and TCP. Repeated
+production process sets over pending 256 KiB frames kept both transports inside the 5% regression
+guard, but moved in both directions, so no large-frame latency improvement is claimed.
