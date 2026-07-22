@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using DotBoxD.Services.Buffers;
 using DotBoxD.Services.Protocol;
+using DotBoxD.Services.Streaming.Core;
 using DotBoxD.Services.Transport;
 
 namespace DotBoxD.Services.Benchmarks.Probes;
@@ -18,6 +19,8 @@ internal static class PendingOwnedFrameSendProbe
         using var pendingStream = new ControlledWriteStream(forcePending: true);
         var synchronousConnection = new StreamConnection(synchronousStream, ownsStream: false);
         var pendingConnection = new StreamConnection(pendingStream, ownsStream: false);
+        var synchronousStreamSender = CreateStreamSender(synchronousConnection);
+        var pendingStreamSender = CreateStreamSender(pendingConnection);
         try
         {
             VerifyOwnedFrameLifetime(synchronousConnection, synchronousStream);
@@ -30,6 +33,10 @@ internal static class PendingOwnedFrameSendProbe
                 "synchronous owned-frame send",
                 synchronousStream,
                 () => SendOwnedFrame(synchronousConnection, synchronousStream));
+            var synchronousStreaming = Measure(
+                "synchronous streaming-frame send",
+                synchronousStream,
+                () => SendStreamingFrame(synchronousStreamSender, synchronousStream));
             var pendingRaw = Measure(
                 "forced-pending raw send",
                 pendingStream,
@@ -38,6 +45,10 @@ internal static class PendingOwnedFrameSendProbe
                 "forced-pending owned-frame send",
                 pendingStream,
                 () => SendOwnedFrame(pendingConnection, pendingStream));
+            var pendingStreaming = Measure(
+                "forced-pending streaming-frame send",
+                pendingStream,
+                () => SendStreamingFrame(pendingStreamSender, pendingStream));
 
             Console.WriteLine("Pending owned-frame send probe");
             Console.WriteLine($"iterations = {Iterations:N0}; warmup = {WarmupIterations:N0}");
@@ -46,8 +57,10 @@ internal static class PendingOwnedFrameSendProbe
                 $"per-frame checksum = {s_frameChecksum}");
             Write(synchronousRaw);
             Write(synchronousOwned);
+            Write(synchronousStreaming);
             Write(pendingRaw);
             Write(pendingOwned);
+            Write(pendingStreaming);
             var synchronousOwnershipCost =
                 synchronousOwned.NanosecondsPerOperation - synchronousRaw.NanosecondsPerOperation;
             var pendingOwnershipCost =
@@ -59,6 +72,17 @@ internal static class PendingOwnedFrameSendProbe
             Console.WriteLine(
                 $"pending state-machine overhead   " +
                 $"{pendingOwnershipCost - synchronousOwnershipCost,9:N1} ns/op");
+            var synchronousStreamingCost =
+                synchronousStreaming.NanosecondsPerOperation - synchronousOwned.NanosecondsPerOperation;
+            var pendingStreamingCost =
+                pendingStreaming.NanosecondsPerOperation - pendingOwned.NanosecondsPerOperation;
+            Console.WriteLine(
+                $"pending streaming overhead       " +
+                $"{pendingStreamingCost,9:N1} ns/op " +
+                $"{pendingStreaming.BytesPerOperation - pendingOwned.BytesPerOperation,9:N1} B/op");
+            Console.WriteLine(
+                $"streaming state-machine overhead " +
+                $"{pendingStreamingCost - synchronousStreamingCost,9:N1} ns/op");
         }
         finally
         {
@@ -105,6 +129,18 @@ internal static class PendingOwnedFrameSendProbe
         var pending = connection.SendFrameValueAsync(frame);
         CompleteSend(pending, stream);
     }
+
+    private static void SendStreamingFrame(
+        RpcStreamFrameSender sender,
+        ControlledWriteStream stream)
+    {
+        var frame = CreateOwnedFrame();
+        var pending = sender.SendAsync(frame, CancellationToken.None);
+        CompleteSend(pending, stream);
+    }
+
+    private static RpcStreamFrameSender CreateStreamSender(StreamConnection connection) =>
+        new(connection.SendAsync, connection.SendFrameValueAsync);
 
     private static void CompleteSend(ValueTask pending, ControlledWriteStream stream)
     {
