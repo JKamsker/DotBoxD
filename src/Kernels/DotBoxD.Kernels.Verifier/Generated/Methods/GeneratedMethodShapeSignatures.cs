@@ -8,6 +8,10 @@ internal static class GeneratedMethodShapeSignatures
         $"{CompiledRuntimeName}.ValidateEntrypointInput({SandboxValueName},{Int32Name}):{VoidName}";
     internal static readonly string EnterCall = $"{CompiledRuntimeName}.EnterCall({SandboxContextName}):{VoidName}";
     internal static readonly string ExitCall = $"{CompiledRuntimeName}.ExitCall({SandboxContextName}):{VoidName}";
+    internal static readonly string EnterInlineCall =
+        $"{CompiledRuntimeName}.EnterInlineCall({SandboxContextName}):{VoidName}";
+    internal static readonly string ExitInlineCall =
+        $"{CompiledRuntimeName}.ExitInlineCall({SandboxContextName}):{VoidName}";
     internal static readonly string ChargeFuelSignature =
         $"{CompiledRuntimeName}.ChargeFuel({SandboxContextName},{Int32Name}):{VoidName}";
     internal static readonly string ChargeLoopIterationSignature =
@@ -41,6 +45,8 @@ internal static class GeneratedMethodShapeSignatures
 
     private static readonly string RequireValueType =
         $"{CompiledRuntimeName}.RequireValueType({SandboxValueName},{SandboxTypeName}):{SandboxValueName}";
+    internal static readonly string RequireValueTypeAndRecordValidation =
+        $"{CompiledRuntimeName}.RequireValueTypeAndRecordValidation({SandboxContextName},{SandboxValueName},{SandboxTypeName}):{SandboxValueName}";
 
     internal static GeneratedMeterState StateFor(GeneratedInstruction instruction)
     {
@@ -64,6 +70,9 @@ internal static class GeneratedMethodShapeSignatures
     internal static bool IsGeneratedFunctionCall(string? calledMember)
         => calledMember is not null && calledMember.StartsWith("Fn_", StringComparison.Ordinal);
 
+    internal static bool IsEntrypointFunctionCall(string? calledMember)
+        => calledMember is not null && calledMember.StartsWith("Fn_0(", StringComparison.Ordinal);
+
     internal static bool IsFuelMeter(string? calledMember)
         => calledMember == ChargeFuelSignature
            || calledMember == ChargeLoopIterationSignature
@@ -78,7 +87,8 @@ internal static class GeneratedMethodShapeSignatures
            calledMember != ExitCall &&
            calledMember != ChargeFuelSignature &&
            calledMember != ChargeLoopIterationSignature &&
-           calledMember != RequireValueType;
+           calledMember != RequireValueType &&
+           calledMember != RequireValueTypeAndRecordValidation;
 
     internal static bool IsMeterDensityWorkCall(string? calledMember)
     {

@@ -73,7 +73,10 @@ internal sealed class CompiledExecutableCache : IDisposable
                 throw new ObjectDisposedException(nameof(CompiledExecutableCache));
             }
 
-            return new CompiledExecutable(WithCurrentMetadata(materialized.Artifact, current), status);
+            return new CompiledExecutable(
+                WithCurrentMetadata(materialized.Artifact, current),
+                status,
+                materialized.SupportsReturnValidationProof);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

@@ -72,8 +72,14 @@ internal static class CompiledExecutionRunner
             budget.CheckDeadline();
             context.ChargeValue(input);
             WriteCacheInvalidated(audit, runId, startedAt, plan, artifact);
+            context.ClearCompiledReturnValidation();
             var value = artifact.Entrypoint(context, input);
-            EnsureReturnType(plan, entrypoint, value);
+            EnsureReturnType(
+                context,
+                plan,
+                entrypoint,
+                value,
+                executable.SupportsReturnValidationProof);
             if (!options.SuppressSuccessfulRunSummaryAudit)
             {
                 WriteSummary(audit, runId, startedAt, plan, executable, budget, true, null);
@@ -97,6 +103,10 @@ internal static class CompiledExecutionRunner
             var error = new SandboxError(SandboxErrorCode.HostFailure, "compiled sandbox execution failed");
             WriteSummary(audit, runId, startedAt, plan, executable, budget, false, error);
             return Result(plan, artifact, budget, audit, false, null, error);
+        }
+        finally
+        {
+            context.ClearCompiledReturnValidation();
         }
     }
 
@@ -220,11 +230,23 @@ internal static class CompiledExecutionRunner
             }));
     }
 
-    internal static void EnsureReturnType(ExecutionPlan plan, string entrypoint, SandboxValue? value)
+    internal static void EnsureReturnType(
+        SandboxContext context,
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxValue? value,
+        bool supportsReturnValidationProof)
     {
         if (value is null || !plan.FunctionAnalysis.TryGetValue(entrypoint, out var analysis))
         {
             throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "function return type mismatch"));
+        }
+
+        if (supportsReturnValidationProof &&
+            analysis.ReturnType.Arguments.Count > 0 &&
+            context.TryConsumeCompiledReturnValidation(value, analysis.ReturnType))
+        {
+            return;
         }
 
         EntrypointBinder.RequireType(value, analysis.ReturnType, "function return type mismatch");

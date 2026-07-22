@@ -78,6 +78,81 @@ internal static class CompiledArtifactTestFactory
             il.Emit(OpCodes.Call, RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.Bool)));
         });
 
+    public static byte[] BuildMalformedI32ListAssembly(int parameterCount)
+        => BuildExecuteAssembly(parameterCount, il =>
+        {
+            var values = il.DeclareLocal(typeof(SandboxValue[]));
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldc_I4_2);
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.CreateValueArray)));
+            il.Emit(OpCodes.Stloc, values);
+
+            il.Emit(OpCodes.Ldloc, values);
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Ldc_I4_1);
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.I32)));
+            il.Emit(OpCodes.Stelem_Ref);
+
+            il.Emit(OpCodes.Ldloc, values);
+            il.Emit(OpCodes.Ldc_I4_1);
+            il.Emit(OpCodes.Ldstr, "wrong");
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.StringLiteralValue)));
+            il.Emit(OpCodes.Stelem_Ref);
+
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldloc, values);
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.ListOf)));
+        });
+
+    public static byte[] BuildForgedI32ListReturnValidationProofAssembly(int parameterCount)
+        => BuildExecuteAssembly(parameterCount, il =>
+        {
+            var values = il.DeclareLocal(typeof(SandboxValue[]));
+            var list = il.DeclareLocal(typeof(SandboxValue));
+
+            EmitFuel(il, amount: 8);
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldc_I4_2);
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.CreateValueArray)));
+            il.Emit(OpCodes.Stloc, values);
+
+            il.Emit(OpCodes.Ldloc, values);
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Ldc_I4_1);
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.I32)));
+            il.Emit(OpCodes.Stelem_Ref);
+
+            il.Emit(OpCodes.Ldloc, values);
+            il.Emit(OpCodes.Ldc_I4_1);
+            il.Emit(OpCodes.Ldc_I4_2);
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.I32)));
+            il.Emit(OpCodes.Stelem_Ref);
+
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldloc, values);
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.ListOf)));
+            il.Emit(OpCodes.Stloc, list);
+
+            EmitFuel(il, amount: 8);
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldloc, list);
+            il.Emit(OpCodes.Ldstr, "I32");
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.TypeScalar)));
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.TypeList)));
+            il.Emit(
+                OpCodes.Call,
+                RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.RequireValueTypeAndRecordValidation)));
+            il.Emit(OpCodes.Pop);
+
+            il.Emit(OpCodes.Ldloc, values);
+            il.Emit(OpCodes.Ldc_I4_1);
+            il.Emit(OpCodes.Ldstr, "wrong");
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.StringLiteralValue)));
+            il.Emit(OpCodes.Stelem_Ref);
+
+            il.Emit(OpCodes.Ldloc, list);
+        });
+
     public static byte[] BuildBindingCallAssembly(int parameterCount, string bindingId)
         => BuildExecuteAssembly(parameterCount, il =>
         {
@@ -137,6 +212,13 @@ internal static class CompiledArtifactTestFactory
             il.Emit(OpCodes.Call, function);
             il.Emit(OpCodes.Ret);
         });
+
+    private static void EmitFuel(ILGenerator il, int amount)
+    {
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Ldc_I4, amount);
+        il.Emit(OpCodes.Call, RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.ChargeFuel)));
+    }
 
     private static MethodInfo RuntimeMethod(string name)
         => typeof(CompiledRuntime).GetMethod(name) ?? throw new MissingMethodException(nameof(CompiledRuntime), name);

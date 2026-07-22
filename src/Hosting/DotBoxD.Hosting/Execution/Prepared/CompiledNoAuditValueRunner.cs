@@ -34,8 +34,14 @@ internal static class CompiledNoAuditValueRunner
         {
             budget.CheckDeadline();
             context.ChargeValue(input);
+            context.ClearCompiledReturnValidation();
             var value = artifact.Entrypoint(context, input);
-            CompiledExecutionRunner.EnsureReturnType(plan, entrypoint, value);
+            CompiledExecutionRunner.EnsureReturnType(
+                context,
+                plan,
+                entrypoint,
+                value,
+                executable.SupportsReturnValidationProof);
             return PreparedExecutionResult.FromNoAuditSuccess(
                 value,
                 ExecutionMode.Compiled,
@@ -57,6 +63,10 @@ internal static class CompiledNoAuditValueRunner
             var error = new SandboxError(SandboxErrorCode.HostFailure, "compiled sandbox execution failed");
             return PreparedExecutionResult.FromResult(
                 CompiledExecutionRunner.FailureResult(plan, executable, options, budget, error));
+        }
+        finally
+        {
+            context.ClearCompiledReturnValidation();
         }
     }
 }

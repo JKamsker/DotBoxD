@@ -76,6 +76,7 @@ public sealed record VerificationPolicy(
                 RuntimeMember("ValidateEntrypointInput", $"{SandboxValueName},{Int32Name}", VoidName),
                 RuntimeMember("GetInputArgument", $"{SandboxValueName},{Int32Name},{Int32Name},{SandboxTypeName}", SandboxValueName),
                 RuntimeMember("RequireValueType", $"{SandboxValueName},{SandboxTypeName}", SandboxValueName),
+                RuntimeMember("RequireValueTypeAndRecordValidation", $"{SandboxContextName},{SandboxValueName},{SandboxTypeName}", SandboxValueName),
                 RuntimeMember("Unit", "", SandboxValueName),
                 RuntimeMember("I32", Int32Name, SandboxValueName),
                 RuntimeMember("I64", Int64Name, SandboxValueName),
@@ -226,7 +227,7 @@ public sealed record VerificationPolicy(
                 "System.Linq.Expressions.", "Microsoft.CSharp."
             },
             RuntimeFacadeIdentityDefaults(),
-            "dotboxd-verifier-11");
+            "dotboxd-verifier-12");
 
     public bool IsMemberAllowed(string memberSignature)
     {
@@ -266,7 +267,6 @@ public sealed record VerificationPolicy(
     {
         var builder = new StringBuilder();
         AppendHashPart(builder, prefix);
-
         foreach (var value in values.Order(StringComparer.Ordinal))
         {
             AppendHashPart(builder, value);

@@ -106,6 +106,12 @@ internal static class InterpreterProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-compiled-return-validation", StringComparer.OrdinalIgnoreCase))
+        {
+            await CompiledReturnValidationProbe.RunAsync();
+            return true;
+        }
+
         if (args.Contains("--probe-interpreter-numeric-conversion", StringComparer.OrdinalIgnoreCase))
         {
             await InterpreterNumericConversionProbe.RunAsync();
