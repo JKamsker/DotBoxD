@@ -59,6 +59,9 @@ if (args.Length == 1)
         case "--probe-pooled-buffer-writer-cache":
             PooledBufferWriterCacheProbe.Run();
             return;
+        case "--probe-pending-owned-frame-send":
+            PendingOwnedFrameSendProbe.Run();
+            return;
         case "--probe-finite-timeout-valuetask-unary":
             await FiniteTimeoutValueTaskUnaryProbe.RunAsync();
             return;
