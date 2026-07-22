@@ -40,6 +40,16 @@ internal sealed class RpcPeerFrameProcessor
             MessageType.Response or MessageType.Error => HandleResponse(frame, messageId),
             MessageType.Request => HandleRequestAsync(frame, messageId, ct),
             MessageType.Cancel => HandleCancel(frame, messageId, messageType),
+            _ => HandleStreamingOrUnknown(frame, messageId, messageType),
+        };
+    }
+
+    private ValueTask<bool> HandleStreamingOrUnknown(
+        RpcFrame frame,
+        int messageId,
+        MessageType messageType) =>
+        messageType switch
+        {
             MessageType.StreamCancel => HandleStreamCancel(frame, messageId, messageType),
             MessageType.StreamItem => HandleStreamItem(frame, messageId, messageType),
             MessageType.StreamComplete => HandleStreamComplete(frame, messageId, messageType),
@@ -47,7 +57,6 @@ internal sealed class RpcPeerFrameProcessor
             MessageType.StreamCredit => HandleStreamCredit(frame, messageId, messageType),
             _ => HandleUnknown(messageId, messageType),
         };
-    }
 
     private ValueTask<bool> HandleResponse(RpcFrame frame, int messageId)
         => new(!_outbound.TryCompleteResponse(messageId, frame));
