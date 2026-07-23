@@ -19,12 +19,13 @@ internal static class TransportIdleReceiveFootprintProbe
         typeof(TcpConnection),
         "_receiveBuffer");
 
-    public static async Task RunAsync()
+    public static async Task RunAsync(bool taskBacked = true)
     {
-        var namedPipe = await MeasureNamedPipesAsync().ConfigureAwait(false);
-        var tcp = await MeasureTcpAsync().ConfigureAwait(false);
+        var namedPipe = await MeasureNamedPipesAsync(taskBacked).ConfigureAwait(false);
+        var tcp = await MeasureTcpAsync(taskBacked).ConfigureAwait(false);
 
         Console.WriteLine("Idle pending transport receive footprint probe");
+        Console.WriteLine("completion: " + (taskBacked ? "AsTask" : "direct ValueTask"));
         Console.WriteLine(
             "transport       connections  pending  rented windows  logical KiB  allocated B  live delta B");
         Write(namedPipe);
@@ -34,11 +35,11 @@ internal static class TransportIdleReceiveFootprintProbe
             $"{StreamFrameReceiveBuffer.LookaheadCapacity / 1_024:N0} KiB per rented window");
     }
 
-    private static async Task<Measurement> MeasureNamedPipesAsync()
+    private static async Task<Measurement> MeasureNamedPipesAsync(bool taskBacked)
     {
         var connections = new List<StreamConnection>(ConnectionCount);
         var senders = new List<NamedPipeClientStream>(ConnectionCount);
-        var receives = new List<Task<RpcFrame>>(ConnectionCount);
+        var receives = new PendingFrameReceiveSet(ConnectionCount, taskBacked);
         try
         {
             for (var index = 0; index < ConnectionCount; index++)
@@ -70,9 +71,7 @@ internal static class TransportIdleReceiveFootprintProbe
             var allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
             foreach (var connection in connections)
             {
-                var receive = connection.ReceiveFrameValueAsync().AsTask();
-                EnsurePending(receive);
-                receives.Add(receive);
+                receives.Add(connection.ReceiveFrameValueAsync());
             }
 
             var allocated = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
@@ -88,18 +87,18 @@ internal static class TransportIdleReceiveFootprintProbe
                 sender.Dispose();
             }
 
-            await ObserveReceivesAsync(receives).ConfigureAwait(false);
+            await receives.ObserveAsync().ConfigureAwait(false);
         }
     }
 
-    private static async Task<Measurement> MeasureTcpAsync()
+    private static async Task<Measurement> MeasureTcpAsync(bool taskBacked)
     {
         using var listener = new TcpListener(IPAddress.Loopback, port: 0);
         listener.Start(ConnectionCount);
         var endpoint = (IPEndPoint)listener.LocalEndpoint;
         var connections = new List<TcpConnection>(ConnectionCount);
         var senders = new List<TcpClient>(ConnectionCount);
-        var receives = new List<Task<RpcFrame>>(ConnectionCount);
+        var receives = new PendingFrameReceiveSet(ConnectionCount, taskBacked);
         try
         {
             for (var index = 0; index < ConnectionCount; index++)
@@ -117,9 +116,7 @@ internal static class TransportIdleReceiveFootprintProbe
             var allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
             foreach (var connection in connections)
             {
-                var receive = connection.ReceiveFrameValueAsync().AsTask();
-                EnsurePending(receive);
-                receives.Add(receive);
+                receives.Add(connection.ReceiveFrameValueAsync());
             }
 
             var allocated = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
@@ -139,7 +136,7 @@ internal static class TransportIdleReceiveFootprintProbe
                 sender.Dispose();
             }
 
-            await ObserveReceivesAsync(receives).ConfigureAwait(false);
+            await receives.ObserveAsync().ConfigureAwait(false);
         }
     }
 
@@ -157,40 +154,11 @@ internal static class TransportIdleReceiveFootprintProbe
         connectionType.GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)
         ?? throw new InvalidOperationException($"{connectionType.Name}.{name} was not found.");
 
-    private static void EnsurePending(Task<RpcFrame> receive)
-    {
-        if (receive.IsCompleted)
-        {
-            throw new InvalidOperationException("Idle receive completed before peer bytes were written.");
-        }
-    }
-
     private static async Task DisposeConnectionsAsync(IEnumerable<StreamConnection> connections)
     {
         foreach (var connection in connections)
         {
             await connection.DisposeAsync().ConfigureAwait(false);
-        }
-    }
-
-    private static async Task ObserveReceivesAsync(IEnumerable<Task<RpcFrame>> receives)
-    {
-        foreach (var receive in receives)
-        {
-            _ = await RecordExceptionAsync(receive).ConfigureAwait(false);
-        }
-    }
-
-    private static async Task<Exception?> RecordExceptionAsync(Task receive)
-    {
-        try
-        {
-            await receive.ConfigureAwait(false);
-            return null;
-        }
-        catch (Exception exception)
-        {
-            return exception;
         }
     }
 

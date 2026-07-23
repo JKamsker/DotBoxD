@@ -29,6 +29,9 @@ if (args.Length == 1)
         case "--probe-transport-idle-receive-footprint":
             await TransportIdleReceiveFootprintProbe.RunAsync();
             return;
+        case "--probe-transport-idle-receive-footprint-direct":
+            await TransportIdleReceiveFootprintProbe.RunAsync(taskBacked: false);
+            return;
         case "--probe-transport-connection-construction":
             await TransportConnectionConstructionProbe.RunAsync();
             return;
