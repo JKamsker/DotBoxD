@@ -57,6 +57,9 @@ public sealed class StreamConnection : IRpcFrameChannel
     /// <summary>Configured idle timeout for frame reads.</summary>
     internal TimeSpan FrameReadIdleTimeout => _frameReadIdleTimeout;
 
+    internal bool OwnsStream => _ownsStream;
+    internal bool HasActiveReceive => Volatile.Read(ref _activeReceives) != 0;
+
     public bool IsConnected =>
         Volatile.Read(ref _disposed) == 0 &&
         (_stream is not PipeStream pipe || pipe.IsConnected);
@@ -199,7 +202,7 @@ public sealed class StreamConnection : IRpcFrameChannel
     {
         _disposeCts.Cancel();
         _frameReadTimeout?.Dispose();
-        if (_ownsStream || Volatile.Read(ref _activeReceives) != 0)
+        if (_ownsStream)
         {
             await DisposeStreamAsync(_stream).ConfigureAwait(false);
         }
@@ -267,17 +270,19 @@ public sealed class StreamConnection : IRpcFrameChannel
         return totalRead;
     }
 
-    private async Task<int> ReadChunkAsync(
-        Memory<byte> buffer,
-        CancellationToken ct)
+    private async Task<int> ReadChunkAsync(Memory<byte> buffer, CancellationToken ct)
     {
+        using var linkedCts = ct.CanBeCanceled
+            ? CancellationTokenSource.CreateLinkedTokenSource(ct, _disposeCts.Token)
+            : null;
+        var readToken = linkedCts?.Token ?? _disposeCts.Token;
         var timeout = _frameReadTimeout;
         if (timeout is null)
         {
-            return await _stream.ReadAsync(buffer, ct).ConfigureAwait(false);
+            return await _stream.ReadAsync(buffer, readToken).ConfigureAwait(false);
         }
 
-        return await timeout.ReadAsync(_stream, buffer, ct, _frameReadIdleTimeout).ConfigureAwait(false);
+        return await timeout.ReadAsync(_stream, buffer, readToken, _frameReadIdleTimeout).ConfigureAwait(false);
     }
 
     private static async ValueTask DisposeStreamAsync(Stream stream)
