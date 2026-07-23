@@ -75,6 +75,9 @@ if (args.Length == 1)
         case "--probe-pending-owned-frame-send":
             PendingOwnedFrameSendProbe.Run();
             return;
+        case "--probe-pending-owned-frame-send-stages":
+            await PendingOwnedFrameStageProbe.RunAsync();
+            return;
         case "--probe-streaming-frame-validation":
             StreamingFrameValidationProbe.Run();
             return;
