@@ -14,11 +14,13 @@ public sealed class BoundedFrameReceiveOperationPoolTests
         Parallel.ForEach(entries, pool.Return);
 
         Assert.Equal(BoundedFrameReceiveOperationPool<CapacityPoolEntry>.MaxRetainedCount, pool.RetainedCount);
+        Assert.True(pool.HasAvailable);
         var rented = Drain(pool);
         Assert.Equal(BoundedFrameReceiveOperationPool<CapacityPoolEntry>.MaxRetainedCount, rented.Count);
         Assert.Equal(rented.Count, rented.Distinct().Count());
         Assert.All(rented, entry => Assert.Contains(entry, entries));
         Assert.Equal(0, pool.RetainedCount);
+        Assert.False(pool.HasAvailable);
     }
 
     [Fact]
@@ -52,6 +54,45 @@ public sealed class BoundedFrameReceiveOperationPoolTests
         Assert.Equal(retained.Count, retained.Distinct().Count());
     }
 
+    [Fact]
+    public void OperationCreationReservation_StopsAtPoolCapacityAndSupportsRollback()
+    {
+        var capacity = BoundedFrameReceiveOperationPool<CapacityPoolEntry>.MaxRetainedCount;
+        for (var index = 0; index < capacity; index++)
+        {
+            Assert.True(
+                BoundedFrameReceiveOperationCreationBudget<ReservationTag>.TryReserve(out _));
+        }
+
+        Assert.False(
+            BoundedFrameReceiveOperationCreationBudget<ReservationTag>.TryReserve(out _));
+
+        BoundedFrameReceiveOperationCreationBudget<ReservationTag>.CancelReservation();
+
+        Assert.True(BoundedFrameReceiveOperationCreationBudget<ReservationTag>.TryReserve(out _));
+        Assert.False(BoundedFrameReceiveOperationCreationBudget<ReservationTag>.TryReserve(out _));
+    }
+
+    [Fact]
+    public void ConcurrentOperationCreationReservation_NeverExceedsPoolCapacity()
+    {
+        var reservations = 0;
+        Parallel.For(0, 64, iteration =>
+        {
+            if (BoundedFrameReceiveOperationCreationBudget<ConcurrentReservationTag>.TryReserve(
+                    out _))
+            {
+                Interlocked.Increment(ref reservations);
+            }
+        });
+
+        Assert.Equal(
+            BoundedFrameReceiveOperationPool<CapacityPoolEntry>.MaxRetainedCount,
+            reservations);
+        Assert.False(
+            BoundedFrameReceiveOperationCreationBudget<ConcurrentReservationTag>.TryReserve(out _));
+    }
+
     private static List<CapacityPoolEntry> Drain(
         BoundedFrameReceiveOperationPool<CapacityPoolEntry> pool)
     {
@@ -67,4 +108,6 @@ public sealed class BoundedFrameReceiveOperationPoolTests
 
     private sealed class CapacityPoolEntry;
     private sealed class CapacityOperationTag;
+    private sealed class ConcurrentReservationTag;
+    private sealed class ReservationTag;
 }

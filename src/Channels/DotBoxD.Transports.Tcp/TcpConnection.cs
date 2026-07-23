@@ -107,98 +107,36 @@ public sealed class TcpConnection : IValidatedSerialFrameChannel
         }
 
         _receiveBuffer.WriterBackedOwner = writerBacked;
-        return ReceiveFrameCoreAsync(ct);
+        return TcpFrameReceiveOperation.Start(this, ct);
     }
 
-    private async ValueTask<RpcFrame> ReceiveFrameCoreAsync(CancellationToken ct)
+    internal NetworkStream FrameReceiveStream => _stream;
+    internal TimeSpan FrameReadIdleTimeout => _frameReadIdleTimeout;
+    internal byte[] FrameReceiveLengthBuffer => _lengthBuffer;
+    internal FrameReadTimeoutSource? FrameReceiveTimeout => _frameReadTimeout;
+    internal ref StreamFrameReceiveBuffer FrameReceiveBuffer => ref _receiveBuffer;
+    internal void ThrowIfDisposedForReceive() => ThrowIfDisposed();
+
+    internal void FinishFrameReceive(ref FrameReceiveOperationState state)
     {
-        var owner = new StreamFrameReceiveOwner();
+        FinishFrameReceive(ref state.Owner, state.WriterBacked);
+    }
+
+    internal void FinishFrameReceive(ref StreamFrameReceiveOwner owner, bool writerBacked)
+    {
         try
         {
-            ThrowIfDisposed();
-            ct.ThrowIfCancellationRequested();
-            var readToken = ct;
-            var remaining = StreamFrameReadOperations.BeginFrame(ref _receiveBuffer);
-
-            while (true)
-            {
-                readToken = StreamFrameReadOperations.StartTimeout(
-                    _frameReadTimeout,
-                    ct,
-                    _frameReadIdleTimeout,
-                    remaining);
-
-                while (remaining > 0)
-                {
-                    int read;
-                    try
-                    {
-                        var pendingRead = _stream.ReadAsync(
-                            StreamFrameReadOperations.PrepareRead(
-                                ref _receiveBuffer,
-                                _lengthBuffer,
-                                ref owner,
-                                remaining),
-                            readToken);
-                        StreamFrameReadOperations.ObservePendingRead(
-                            ref _receiveBuffer,
-                            owner,
-                            pendingRead.IsCompletedSuccessfully);
-                        read = await pendingRead.ConfigureAwait(false);
-                    }
-                    catch (OperationCanceledException) when (
-                        StreamFrameReadOperations.IsTimeoutCancellation(_frameReadTimeout))
-                    {
-                        throw FrameReadTimeoutSource.CreateTimeoutException(_frameReadIdleTimeout);
-                    }
-
-                    if (read == 0)
-                    {
-                        return StreamFrameReadOperations.HandleEndOfStream(
-                            owner,
-                            remaining,
-                            StreamFrameReadProgressFormat.Body);
-                    }
-                    remaining = StreamFrameReadOperations.CommitRead(
-                        ref _receiveBuffer,
-                        ref owner,
-                        remaining,
-                        read);
-                    readToken = StreamFrameReadOperations.RearmTimeout(
-                        _frameReadTimeout,
-                        readToken,
-                        _frameReadIdleTimeout,
-                        remaining);
-                }
-
-                if (owner.IsAllocated)
-                {
-                    return owner.TransferFrame(_receiveBuffer.WriterBackedOwner);
-                }
-                remaining = StreamFrameReadOperations.InitializeOwner(
-                    ref _receiveBuffer,
-                    _lengthBuffer,
-                    MessageFramer.MaxMessageSize,
-                    _receiveBuffer.WriterBackedOwner,
-                    ref owner);
-            }
+            owner.Dispose(writerBacked);
         }
         finally
         {
             try
             {
-                owner.Dispose(_receiveBuffer.WriterBackedOwner);
+                _frameReadTimeout?.CancelPendingTimeout();
             }
             finally
             {
-                try
-                {
-                    _frameReadTimeout?.CancelPendingTimeout();
-                }
-                finally
-                {
-                    ReceiveConcurrencyGuard.Exit(ref _activeReceive, ref _receiveBuffer);
-                }
+                ReceiveConcurrencyGuard.Exit(ref _activeReceive, ref _receiveBuffer);
             }
         }
     }

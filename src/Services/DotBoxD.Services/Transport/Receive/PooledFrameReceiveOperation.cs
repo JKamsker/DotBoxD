@@ -13,6 +13,8 @@ internal abstract class PooledFrameReceiveOperation<TOperation> : IValueTaskSour
 
     protected static TOperation? TryRentOperation() => Pool.Rent();
 
+    protected static bool HasAvailableOperation => Pool.HasAvailable;
+
     protected ValueTask<RpcFrame> IssueValueTask()
     {
         _lifecycle.Initialize();

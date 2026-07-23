@@ -62,4 +62,9 @@ internal sealed class BoundedFrameReceiveOperationPool<TOperation>
             }
         }
     }
+
+    // This is a nonmutating saturation hint, not a rent guarantee. A concurrent rent/return may
+    // make either answer stale; callers still use Rent and choose an equivalent safe fallback.
+    internal bool HasAvailable =>
+        Volatile.Read(ref _cached) is not null || Volatile.Read(ref _overflowCount) != 0;
 }
