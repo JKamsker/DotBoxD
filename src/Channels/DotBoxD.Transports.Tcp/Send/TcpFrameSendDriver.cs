@@ -4,19 +4,34 @@ using DotBoxD.Services.Transport;
 
 namespace DotBoxD.Transports.Tcp;
 
-/// <summary>Advances one TCP owned-frame send without allocating for completed stages.</summary>
+/// <summary>Advances one TCP frame send without allocating for completed stages.</summary>
 internal static class TcpFrameSendDriver
 {
     public static void Initialize(
         TcpConnection connection,
+        ReadOnlyMemory<byte> data,
+        CancellationToken cancellationToken,
+        ref TcpFrameSendState state) =>
+        Initialize(connection, frame: null, data, cancellationToken, ref state);
+
+    public static void Initialize(
+        TcpConnection connection,
         PooledBufferWriter frame,
+        CancellationToken cancellationToken,
+        ref TcpFrameSendState state) =>
+        Initialize(connection, frame, frame.WrittenMemory, cancellationToken, ref state);
+
+    private static void Initialize(
+        TcpConnection connection,
+        PooledBufferWriter? frame,
+        ReadOnlyMemory<byte> data,
         CancellationToken cancellationToken,
         ref TcpFrameSendState state)
     {
         state.Frame = frame;
         state.Connection = connection;
         state.CancellationToken = cancellationToken;
-        state.Data = frame.WrittenMemory;
+        state.Data = data;
 
         connection.ThrowIfDisposedForSend();
         cancellationToken.ThrowIfCancellationRequested();
@@ -104,6 +119,17 @@ internal static class TcpFrameSendDriver
         ref TcpFrameSendState state)
     {
         Initialize(connection, frame, cancellationToken, ref state);
+        state.OwnsGate = true;
+        state.PendingStage = TcpFrameSendStage.Write;
+    }
+
+    internal static void InitializePendingWriteForTests(
+        TcpConnection connection,
+        ReadOnlyMemory<byte> data,
+        CancellationToken cancellationToken,
+        ref TcpFrameSendState state)
+    {
+        Initialize(connection, data, cancellationToken, ref state);
         state.OwnsGate = true;
         state.PendingStage = TcpFrameSendStage.Write;
     }

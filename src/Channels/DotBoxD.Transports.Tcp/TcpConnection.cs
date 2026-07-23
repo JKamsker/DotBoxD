@@ -61,26 +61,8 @@ public sealed class TcpConnection : IValidatedSerialFrameChannel
     public Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) =>
         SendValueAsync(data, ct).AsTask();
 
-    public async ValueTask SendValueAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
-    {
-        ThrowIfDisposed();
-        ct.ThrowIfCancellationRequested();
-        // Reject malformed/oversized frames locally rather than shipping them to the peer, matching
-        // StreamConnection and the inbound length check in ReceiveAsync below.
-        MessageFramer.ValidateOutgoingFrame(data.Span);
-
-        await TransportSendGate.WaitAsync(_sendLock, ct).ConfigureAwait(false);
-        try
-        {
-            ct.ThrowIfCancellationRequested();
-            ThrowIfDisposed();
-            await _stream.WriteAsync(data, ct).ConfigureAwait(false);
-        }
-        finally
-        {
-            TransportSendGate.ReleaseAfterSend(_sendLock, ref _disposed);
-        }
-    }
+    public ValueTask SendValueAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) =>
+        TcpConnectionFrameSender.SendAsync(this, data, ct);
 
     public async Task<Payload> ReceiveAsync(CancellationToken ct = default)
     {

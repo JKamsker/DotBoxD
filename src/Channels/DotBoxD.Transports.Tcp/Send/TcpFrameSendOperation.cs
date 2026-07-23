@@ -1,20 +1,57 @@
+using System.Runtime.CompilerServices;
 using DotBoxD.Services.Transport;
 
 namespace DotBoxD.Transports.Tcp;
 
-/// <summary>Reusable completion source for a TCP owned-frame send that suspended.</summary>
+/// <summary>Reusable completion source for a TCP frame send that suspended.</summary>
 internal sealed class TcpFrameSendOperation :
     PooledFrameSendOperation<TcpFrameSendOperation>
 {
     private static readonly Func<TcpFrameSendOperation> Factory =
         static () => new TcpFrameSendOperation();
 
+    private static bool s_isAtCapacity;
+    private static bool s_requiresPreflight;
     private TcpFrameSendState _state;
 
+    // A stale false only selects the safe transferred-state fallback for that send.
+    internal static bool IsAtCapacity => Volatile.Read(ref s_isAtCapacity);
+    internal static bool RequiresPreflight => Volatile.Read(ref s_requiresPreflight);
     internal static int RetainedCountForTests => RetainedOperationCount;
 
-    internal static TcpFrameSendOperation? TryRentOrCreate() =>
-        TryRentOrCreateOperation(Factory);
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    internal static bool MustUseRawFallback()
+    {
+        if (!HasAvailableOperation)
+        {
+            return true;
+        }
+
+        // A returned source makes preflight unnecessary until a pending send drains the pool.
+        Volatile.Write(ref s_requiresPreflight, false);
+        return false;
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    internal static void ObserveAcquiredOperation()
+    {
+        if (!HasAvailableOperation)
+        {
+            Volatile.Write(ref s_requiresPreflight, true);
+        }
+    }
+
+    internal static TcpFrameSendOperation? TryRentOrCreate()
+    {
+        var operation = TryRentOrCreateOperation(Factory);
+        if (operation is null)
+        {
+            Volatile.Write(ref s_isAtCapacity, true);
+            Volatile.Write(ref s_requiresPreflight, true);
+        }
+
+        return operation;
+    }
 
     public ValueTask Start(
         ref TcpFrameSendState state,

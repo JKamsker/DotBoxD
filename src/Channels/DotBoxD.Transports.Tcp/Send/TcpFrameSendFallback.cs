@@ -1,4 +1,6 @@
 using System.Runtime.ExceptionServices;
+using DotBoxD.Services.Protocol;
+using DotBoxD.Services.Transport;
 
 namespace DotBoxD.Transports.Tcp;
 
@@ -6,8 +8,17 @@ namespace DotBoxD.Transports.Tcp;
 internal static class TcpFrameSendFallback
 {
     private static int s_startedCount;
+    private static int s_rawFromBeginningCount;
 
     internal static int StartedCountForTests => Volatile.Read(ref s_startedCount);
+    internal static int RawFromBeginningCountForTests =>
+        Volatile.Read(ref s_rawFromBeginningCount);
+
+    public static ValueTask StartRawFromBeginning(
+        TcpConnection connection,
+        ReadOnlyMemory<byte> data,
+        CancellationToken cancellationToken) =>
+        ContinueRawFromBeginningAsync(connection, data, cancellationToken);
 
     public static ValueTask Start(
         ref TcpFrameSendState state,
@@ -56,5 +67,33 @@ internal static class TcpFrameSendFallback
     private static async Task AwaitFailureAsync(Exception error)
     {
         await Task.FromException(error).ConfigureAwait(false);
+    }
+
+    private static async ValueTask ContinueRawFromBeginningAsync(
+        TcpConnection connection,
+        ReadOnlyMemory<byte> data,
+        CancellationToken cancellationToken)
+    {
+        // The compact raw-send state machine is cheaper than transferring the larger shared state
+        // after the bounded reusable population is exhausted. Start it before claiming a gate so
+        // saturated raw fan-out keeps its established allocation profile.
+        Interlocked.Increment(ref s_rawFromBeginningCount);
+        connection.ThrowIfDisposedForSend();
+        cancellationToken.ThrowIfCancellationRequested();
+        MessageFramer.ValidateOutgoingFrame(data.Span);
+
+        await TransportSendGate.WaitAsync(connection.SendGate, cancellationToken)
+            .ConfigureAwait(false);
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            connection.ThrowIfDisposedForSend();
+            await connection.SendStream.WriteAsync(data, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            connection.ReleaseSendGate();
+        }
     }
 }
