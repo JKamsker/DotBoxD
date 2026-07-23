@@ -18,16 +18,19 @@ internal static class BindingDispatchScopeProbe
         using var liveCancellation = new CancellationTokenSource();
         _ = Measure(Warmup, CancellationToken.None);
         _ = Measure(Warmup, liveCancellation.Token);
+        _ = MeasureWithPopulatedAudit(Warmup);
         _ = MeasureAudited(Warmup, isAsync: false);
         _ = MeasureAudited(Warmup, isAsync: true);
 
         var defaultToken = Measure(Iterations, CancellationToken.None);
         var liveToken = Measure(Iterations, liveCancellation.Token);
+        var populatedAudit = MeasureWithPopulatedAudit(Iterations);
         var auditedSync = MeasureAudited(Iterations, isAsync: false);
         var auditedAsyncCompleted = MeasureAudited(Iterations, isAsync: true);
         Console.WriteLine($"iterations = {Iterations:N0}");
         WriteMeasurement("no-op, default token", defaultToken);
         WriteMeasurement("no-op, live token", liveToken);
+        WriteMeasurement("no-op, populated audit", populatedAudit);
         WriteMeasurement("audited sync", auditedSync);
         WriteMeasurement("audited async-completed", auditedAsyncCompleted);
     }
@@ -37,15 +40,35 @@ internal static class BindingDispatchScopeProbe
             $"CompiledRuntime.CallBinding {label,-23} {measurement.Milliseconds,8:N1} ms " +
             $"{measurement.NanosecondsPerCall,8:N1} ns/call " +
             $"{measurement.AllocatedBytes,14:N0} B {measurement.BytesPerCall,8:N1} B/call " +
-            $"{measurement.HostCalls,12:N0} calls");
+            $"{measurement.HostCalls,12:N0} calls {measurement.AuditEvents,12:N0} audits");
 
     private static Measurement Measure(int iterations, CancellationToken runToken)
+        => Measure(iterations, runToken, NoopAuditSink.Instance, populateAudit: false);
+
+    private static Measurement MeasureWithPopulatedAudit(int iterations)
+        => Measure(iterations, CancellationToken.None, new InMemoryAuditSink(), populateAudit: true);
+
+    private static Measurement Measure(
+        int iterations,
+        CancellationToken runToken,
+        IAuditSink audit,
+        bool populateAudit)
     {
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
 
-        var context = CreateContext(runToken);
+        using var context = CreateContext(runToken, audit);
+        if (populateAudit)
+        {
+            audit.Write(new SandboxAuditEvent(
+                context.RunId,
+                "ProbeSeed",
+                DateTimeOffset.UnixEpoch,
+                Success: true));
+        }
+
+        var expectedAuditEvents = populateAudit ? 1 : 0;
         var args = Array.Empty<SandboxValue>();
         var sw = new Stopwatch();
         var before = GC.GetAllocatedBytesForCurrentThread();
@@ -56,10 +79,13 @@ internal static class BindingDispatchScopeProbe
         }
 
         sw.Stop();
-        return new Measurement(
+        var measurement = new Measurement(
             sw.Elapsed.TotalMilliseconds,
             GC.GetAllocatedBytesForCurrentThread() - before,
-            context.Budget.HostCalls);
+            context.Budget.HostCalls,
+            audit.EventsWritten);
+        ValidateMeasurement(iterations, expectedAuditEvents, measurement);
+        return measurement;
     }
 
     private static Measurement MeasureAudited(int iterations, bool isAsync)
@@ -69,24 +95,30 @@ internal static class BindingDispatchScopeProbe
         GC.Collect();
 
         var (context, invoker) = CreateAuditedContext(isAsync);
-        var args = Array.Empty<SandboxValue>();
-        var sw = new Stopwatch();
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        sw.Start();
-        for (var i = 0; i < iterations; i++)
+        using (context)
         {
-            _ = CompiledRuntime.CallBinding(context, BindingId, args);
-        }
+            var args = Array.Empty<SandboxValue>();
+            var sw = new Stopwatch();
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            sw.Start();
+            for (var i = 0; i < iterations; i++)
+            {
+                _ = CompiledRuntime.CallBinding(context, BindingId, args);
+            }
 
-        sw.Stop();
-        GC.KeepAlive(invoker);
-        return new Measurement(
-            sw.Elapsed.TotalMilliseconds,
-            GC.GetAllocatedBytesForCurrentThread() - before,
-            context.Budget.HostCalls);
+            sw.Stop();
+            GC.KeepAlive(invoker);
+            var measurement = new Measurement(
+                sw.Elapsed.TotalMilliseconds,
+                GC.GetAllocatedBytesForCurrentThread() - before,
+                context.Budget.HostCalls,
+                context.Audit.EventsWritten);
+            ValidateMeasurement(iterations, iterations, measurement);
+            return measurement;
+        }
     }
 
-    private static SandboxContext CreateContext(CancellationToken runToken)
+    private static SandboxContext CreateContext(CancellationToken runToken, IAuditSink audit)
     {
         var limits = new ResourceLimits(
             MaxFuel: long.MaxValue,
@@ -99,8 +131,20 @@ internal static class BindingDispatchScopeProbe
             policy,
             new ResourceMeter(limits),
             new BindingRegistryBuilder().Add(Descriptor()).Build(),
-            NoopAuditSink.Instance,
+            audit,
             runToken);
+    }
+
+    private static void ValidateMeasurement(
+        int iterations,
+        long expectedAuditEvents,
+        Measurement measurement)
+    {
+        if (measurement.HostCalls != iterations ||
+            measurement.AuditEvents != expectedAuditEvents)
+        {
+            throw new InvalidOperationException("Binding dispatch probe invariants changed.");
+        }
     }
 
     private static (SandboxContext Context, AuditInvoker Invoker) CreateAuditedContext(bool isAsync)
@@ -185,7 +229,11 @@ internal static class BindingDispatchScopeProbe
             => false;
     }
 
-    private readonly record struct Measurement(double Milliseconds, long AllocatedBytes, int HostCalls)
+    private readonly record struct Measurement(
+        double Milliseconds,
+        long AllocatedBytes,
+        int HostCalls,
+        long AuditEvents)
     {
         public double NanosecondsPerCall => Milliseconds * 1_000_000 / Iterations;
 
