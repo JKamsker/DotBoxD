@@ -113,6 +113,10 @@ internal static class InterpreterNestedLoopPlanProbe
         SandboxExecutionOptions options,
         NestedLoopScenario scenario)
     {
+        // The optimized lanes reach later controls much sooner than the baseline.
+        // Run the same full-size workload immediately before each timed sample so
+        // process power-state ramp does not masquerade as a fallback regression.
+        _ = Measure(interpreter, plan, options, scenario with { Name = string.Empty });
         ForceGc();
         return Measure(interpreter, plan, options, scenario);
     }
