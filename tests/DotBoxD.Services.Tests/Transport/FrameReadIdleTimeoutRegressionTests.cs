@@ -87,15 +87,23 @@ public sealed class FrameReadIdleTimeoutRegressionTests
     }
 
     [Fact]
-    public void ServiceFrameReadTimeoutSource_Start_RecreatesDisposedCachedSource()
+    public async Task ServiceFrameReadTimeoutSource_Start_RecreatesAndRearmsDisposedCachedSource()
     {
         using var source = new ServiceFrameReadTimeoutSource();
-        source.Start(CancellationToken.None, IdleTimeout);
+        var disposedToken = source.Start(CancellationToken.None, IdleTimeout);
         DisposeInnerCancellationTokenSource(source);
 
-        var exception = Record.Exception(() => source.Start(CancellationToken.None, IdleTimeout));
+        var replacementToken = source.Start(CancellationToken.None, IdleTimeout);
+        source.CancelPendingTimeout();
+        source.CancelPendingTimeout();
 
-        Assert.Null(exception);
+        await Task.Delay(IdleTimeout + IdleTimeout);
+        Assert.NotEqual(disposedToken, replacementToken);
+        Assert.False(replacementToken.IsCancellationRequested);
+
+        var rearmedToken = source.Rearm(IdleTimeout);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, rearmedToken).WaitAsync(Guard));
     }
 
     [Fact]
@@ -113,6 +121,35 @@ public sealed class FrameReadIdleTimeoutRegressionTests
         {
             source.Dispose();
         }
+    }
+
+    [Fact]
+    public async Task ServiceFrameReadTimeoutSource_RepeatedInactiveCancel_DoesNotSuppressNextTimeout()
+    {
+        using var source = new ServiceFrameReadTimeoutSource();
+        source.CancelPendingTimeout();
+        source.CancelPendingTimeout();
+
+        var token = source.Start(CancellationToken.None, IdleTimeout);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, token).WaitAsync(Guard));
+    }
+
+    [Fact]
+    public async Task ServiceFrameReadTimeoutSource_RepeatedCancel_DisarmsUntilRearmed()
+    {
+        using var source = new ServiceFrameReadTimeoutSource();
+        var token = source.Start(CancellationToken.None, IdleTimeout);
+        source.CancelPendingTimeout();
+        source.CancelPendingTimeout();
+
+        await Task.Delay(IdleTimeout + IdleTimeout);
+        Assert.False(token.IsCancellationRequested);
+
+        var rearmedToken = source.Start(CancellationToken.None, IdleTimeout);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, rearmedToken).WaitAsync(Guard));
     }
 
     [Fact]

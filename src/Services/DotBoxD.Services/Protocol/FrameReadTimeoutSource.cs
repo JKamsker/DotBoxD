@@ -8,6 +8,7 @@ internal sealed class FrameReadTimeoutSource : IDisposable
     private CancellationToken _ownerToken;
     private bool _ownerTokenCanCancel;
     private bool _disposed;
+    private int _timeoutArmed;
 
     public static TimeSpan Resolve(TimeSpan? timeout, string parameterName) =>
         Validate(timeout ?? DefaultIdleTimeout, parameterName);
@@ -57,11 +58,13 @@ internal sealed class FrameReadTimeoutSource : IDisposable
         try
         {
             source.CancelAfter(timeout);
+            PublishTimeoutState(timeout);
         }
         catch (ObjectDisposedException)
         {
             source = ReplaceSource(ownerToken);
             source.CancelAfter(timeout);
+            PublishTimeoutState(timeout);
         }
 
         return source.Token;
@@ -86,6 +89,11 @@ internal sealed class FrameReadTimeoutSource : IDisposable
 
     public void CancelPendingTimeout()
     {
+        if (Interlocked.Exchange(ref _timeoutArmed, 0) == 0)
+        {
+            return;
+        }
+
         var source = _source;
         if (source is { IsCancellationRequested: false })
         {
@@ -116,6 +124,7 @@ internal sealed class FrameReadTimeoutSource : IDisposable
             _source = null;
             _ownerToken = default;
             _ownerTokenCanCancel = false;
+            Volatile.Write(ref _timeoutArmed, 0);
             source?.Dispose();
         }
     }
@@ -154,6 +163,7 @@ internal sealed class FrameReadTimeoutSource : IDisposable
                 return source;
             }
 
+            Volatile.Write(ref _timeoutArmed, 0);
             source?.Dispose();
             source = ownerToken.CanBeCanceled
                 ? CancellationTokenSource.CreateLinkedTokenSource(ownerToken)
@@ -181,4 +191,9 @@ internal sealed class FrameReadTimeoutSource : IDisposable
     private bool MatchesOwner(CancellationToken ownerToken) =>
         _ownerTokenCanCancel == ownerToken.CanBeCanceled &&
         (!_ownerTokenCanCancel || _ownerToken.Equals(ownerToken));
+
+    private void PublishTimeoutState(TimeSpan timeout) =>
+        Volatile.Write(
+            ref _timeoutArmed,
+            timeout == Timeout.InfiniteTimeSpan ? 0 : 1);
 }
