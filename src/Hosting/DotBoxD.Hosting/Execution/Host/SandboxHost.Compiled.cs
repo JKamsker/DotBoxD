@@ -94,7 +94,13 @@ public sealed partial class SandboxHost
     {
         try
         {
-            var executable = await _compiled.GetAsync(plan, entrypoint, cancellationToken).ConfigureAwait(false);
+            var executable = await GetCompiledExecutableAsync(
+                    plan,
+                    entrypoint,
+                    options,
+                    cancellationToken,
+                    reusableNoAuditState)
+                .ConfigureAwait(false);
             var result = await ExecuteMaterializedCompiledAsync(
                     executable,
                     plan,

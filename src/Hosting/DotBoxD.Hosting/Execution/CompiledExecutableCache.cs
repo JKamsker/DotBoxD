@@ -91,14 +91,21 @@ internal sealed class CompiledExecutableCache : IDisposable
 
     public void Dispose()
     {
+        if (!TryBeginDispose())
+        {
+            return;
+        }
+
+        CompleteDispose();
+    }
+
+    internal bool TryBeginDispose() => Interlocked.Exchange(ref _disposed, 1) == 0;
+
+    internal void CompleteDispose()
+    {
         LinkedListNode<CacheEntry>[] entries;
         lock (_gate)
         {
-            if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            {
-                return;
-            }
-
             entries = new LinkedListNode<CacheEntry>[_recency.Count];
             var index = 0;
             for (var node = _recency.First; node is not null; node = node.Next)
