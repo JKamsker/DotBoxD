@@ -74,6 +74,48 @@ public sealed class RpcRequestNameSerializationTests
         Assert.All(actual, bytes => Assert.Equal(expected, bytes));
     }
 
+    [Fact]
+    public void Malformed_first_registration_does_not_poison_later_valid_names()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var malformed = Request("Service" + new string('\uD800', 1), "Method");
+
+        Assert.Throws<MessagePackSerializationException>(() => Serialize(serializer, malformed));
+
+        var valid = Request("Service", "Method");
+        var expected = SerializeCanonical(valid, oldSpec: false);
+        Assert.Equal(expected, Serialize(serializer, valid));
+        Assert.Equal(expected, Serialize(serializer, valid));
+    }
+
+    [Theory]
+    [InlineData(nameof(RpcRequest.MethodName))]
+    [InlineData(nameof(RpcRequest.InstanceId))]
+    public void Cached_names_do_not_bypass_later_field_validation(string malformedField)
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var valid = Request("Service", "Method");
+        valid.InstanceId = "Instance";
+        var expected = SerializeCanonical(valid, oldSpec: false);
+        Assert.Equal(expected, Serialize(serializer, valid));
+
+        var malformedText = "invalid" + new string('\uD800', 1);
+        var malformed = Request(
+            valid.ServiceName,
+            malformedField == nameof(RpcRequest.MethodName) ? malformedText : valid.MethodName);
+        malformed.InstanceId = malformedField == nameof(RpcRequest.InstanceId)
+            ? malformedText
+            : valid.InstanceId;
+        var writer = new ArrayBufferWriter<byte>();
+
+        var exception = Assert.Throws<MessagePackSerializationException>(
+            () => serializer.Serialize(writer, malformed));
+
+        Assert.Contains(malformedField, exception.Message, StringComparison.Ordinal);
+        Assert.Equal(0, writer.WrittenCount);
+        Assert.Equal(expected, Serialize(serializer, valid));
+    }
+
     private static RpcRequest Request(string serviceName, string methodName) =>
         new()
         {

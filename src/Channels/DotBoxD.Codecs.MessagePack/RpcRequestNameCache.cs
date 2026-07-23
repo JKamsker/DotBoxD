@@ -37,13 +37,12 @@ internal sealed class RpcRequestNameCache
             return null;
         }
 
-        var registered = Volatile.Read(ref _registeredNames);
-        if (registered.ByValue.TryGetValue(value, out var registeredEntry))
+        if (TryGetRegistered(value, kind, out var registeredUtf8))
         {
-            SetHot(kind, registeredEntry);
-            return registeredEntry.Utf8;
+            return registeredUtf8;
         }
 
+        var registered = Volatile.Read(ref _registeredNames);
         if (registered.Count >= MaxRegisteredEntries ||
             !CanCache(value))
         {
@@ -53,6 +52,20 @@ internal sealed class RpcRequestNameCache
         Span<byte> utf8 = stackalloc byte[MaxCachedUtf8Bytes];
         var bytesWritten = Encoding.UTF8.GetBytes(value.AsSpan(), utf8);
         return AddRegistered(value, utf8[..bytesWritten], Hash(utf8[..bytesWritten]), kind);
+    }
+
+    public bool TryGetRegistered(string value, RpcRequestNameKind kind, out byte[]? utf8)
+    {
+        var registered = Volatile.Read(ref _registeredNames);
+        if (registered.ByValue.TryGetValue(value, out var entry))
+        {
+            SetHot(kind, entry);
+            utf8 = entry.Utf8;
+            return true;
+        }
+
+        utf8 = null;
+        return false;
     }
 
     public string GetOrAdd(ReadOnlySpan<byte> utf8, RpcRequestNameKind kind)

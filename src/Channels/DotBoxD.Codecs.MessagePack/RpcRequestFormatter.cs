@@ -2,6 +2,7 @@ using System.Text;
 using DotBoxD.Services.Protocol;
 using MessagePack;
 using MessagePack.Formatters;
+using static DotBoxD.Codecs.MessagePack.RpcRequestNameValidation;
 
 namespace DotBoxD.Codecs.MessagePack;
 
@@ -29,15 +30,24 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
         RpcRequest value,
         MessagePackSerializerOptions options)
     {
-        ThrowIfMissingRequiredName(value.ServiceName, nameof(RpcRequest.ServiceName));
-        ThrowIfMissingRequiredName(value.MethodName, nameof(RpcRequest.MethodName));
+        var requestNames = Volatile.Read(ref _requestNames);
+        var serviceNameUtf8 = ValidateRequestName(
+            requestNames,
+            value.ServiceName,
+            RpcRequestNameKind.Service,
+            nameof(RpcRequest.ServiceName));
+        var methodNameUtf8 = ValidateRequestName(
+            requestNames,
+            value.MethodName,
+            RpcRequestNameKind.Method,
+            nameof(RpcRequest.MethodName));
         RpcEnvelopeStringValidation.ThrowIfMalformedUtf16(
             value.InstanceId,
             "request",
             nameof(RpcRequest.InstanceId));
-        var requestNames = RequestNames;
-        var serviceNameUtf8 = requestNames.Register(value.ServiceName, RpcRequestNameKind.Service);
-        var methodNameUtf8 = requestNames.Register(value.MethodName, RpcRequestNameKind.Method);
+        requestNames ??= RequestNames;
+        serviceNameUtf8 ??= requestNames.Register(value.ServiceName, RpcRequestNameKind.Service);
+        methodNameUtf8 ??= requestNames.Register(value.MethodName, RpcRequestNameKind.Method);
 
         writer.WriteMapHeader(5);
         writer.WriteString(MessageIdKey);
@@ -185,27 +195,6 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
             throw new RpcEnvelopeValidationException(
                 $"RPC request contains duplicate {fieldName}.");
         }
-    }
-
-    private static void ThrowIfEmptyOrWhitespaceRequiredName(string value, string fieldName)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            throw new RpcEnvelopeValidationException(
-                $"RPC request contains empty or whitespace required {fieldName}.");
-        }
-    }
-
-    private static void ThrowIfMissingRequiredName(string? value, string fieldName)
-    {
-        if (value is null)
-        {
-            throw new RpcEnvelopeValidationException(
-                $"RPC request is missing required {fieldName}.");
-        }
-
-        ThrowIfEmptyOrWhitespaceRequiredName(value, fieldName);
-        RpcEnvelopeStringValidation.ThrowIfMalformedUtf16(value, "request", fieldName);
     }
 
     private static string? ReadCachedName(
