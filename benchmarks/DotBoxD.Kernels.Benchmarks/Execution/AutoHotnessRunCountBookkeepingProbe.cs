@@ -9,6 +9,7 @@ using DotBoxD.Kernels;
 internal static class AutoHotnessRunCountBookkeepingProbe
 {
     private const string Entrypoint = "ShouldHandle";
+    private const string AlternateEntrypoint = "Alternate";
     private const int WarmupIterations = 10_000;
     private const int Iterations = 500_000;
     private static readonly TimeSpan Elapsed = TimeSpan.FromTicks(37);
@@ -19,6 +20,7 @@ internal static class AutoHotnessRunCountBookkeepingProbe
         SandboxExecutionResult compiled)
     {
         Write("table built-in interpreted", MeasureTable(plan, interpreted, interpreted));
+        Write("table built-in alternating keys", MeasureAlternatingTable(plan, interpreted));
         Write("state built-in interpreted", MeasureState(plan, interpreted, interpreted));
         Write("table built-in warmed compiled", MeasureTable(plan, interpreted, compiled));
         Write("state built-in warmed compiled", MeasureState(plan, interpreted, compiled));
@@ -34,7 +36,7 @@ internal static class AutoHotnessRunCountBookkeepingProbe
         var seededRuns = SeedIfCompiled(hotness, plan, interpreted, result.ActualMode);
         for (var i = 0; i < WarmupIterations; i++)
         {
-            _ = Run(hotness, plan, options, result);
+            _ = Run(hotness, plan, Entrypoint, options, result);
         }
 
         ForceGc();
@@ -43,7 +45,7 @@ internal static class AutoHotnessRunCountBookkeepingProbe
         long checksum = 0;
         for (var i = 0; i < Iterations; i++)
         {
-            checksum += Run(hotness, plan, options, result);
+            checksum += Run(hotness, plan, Entrypoint, options, result);
         }
 
         var elapsed = Stopwatch.GetElapsedTime(started);
@@ -56,6 +58,44 @@ internal static class AutoHotnessRunCountBookkeepingProbe
         if (hotness.Count != 1)
         {
             throw new InvalidOperationException($"Expected one hotness entry, observed {hotness.Count}.");
+        }
+
+        return new Measurement(elapsed, allocated, checksum);
+    }
+
+    private static Measurement MeasureAlternatingTable(
+        ExecutionPlan plan,
+        SandboxExecutionResult result)
+    {
+        var hotness = new AutoExecutionHotness(maxEntries: 16);
+        var options = Options(ExecutionMode.Interpreted);
+        for (var i = 0; i < WarmupIterations; i++)
+        {
+            _ = Run(hotness, plan, AlternatingEntrypoint(i), options, result);
+        }
+
+        ForceGc();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var started = Stopwatch.GetTimestamp();
+        long checksum = 0;
+        for (var i = 0; i < Iterations; i++)
+        {
+            checksum += Run(hotness, plan, AlternatingEntrypoint(i), options, result);
+        }
+
+        var elapsed = Stopwatch.GetElapsedTime(started);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        ValidateAlternatingChecksum(checksum);
+        var completedRuns = (WarmupIterations + Iterations) / 2;
+        Validate(hotness.BeginAttempt(plan, Entrypoint).Stats, completedRuns, result);
+        Validate(
+            hotness.BeginAttempt(plan, AlternateEntrypoint).Stats,
+            completedRuns,
+            result,
+            AlternateEntrypoint);
+        if (hotness.Count != 2)
+        {
+            throw new InvalidOperationException($"Expected two hotness entries, observed {hotness.Count}.");
         }
 
         return new Measurement(elapsed, allocated, checksum);
@@ -96,10 +136,11 @@ internal static class AutoHotnessRunCountBookkeepingProbe
     private static int Run(
         AutoExecutionHotness hotness,
         ExecutionPlan plan,
+        string entrypoint,
         SandboxExecutionOptions options,
         SandboxExecutionResult result)
     {
-        var attempt = hotness.BeginRunCountAttempt(plan, Entrypoint);
+        var attempt = hotness.BeginRunCountAttempt(plan, entrypoint);
         ValidateDecision(options, attempt.RunCount, result.ActualMode);
         attempt.Complete(result, Elapsed);
         return attempt.RunCount;
@@ -160,10 +201,11 @@ internal static class AutoHotnessRunCountBookkeepingProbe
     private static void Validate(
         ModuleHotnessStats stats,
         int completedRuns,
-        SandboxExecutionResult result)
+        SandboxExecutionResult result,
+        string expectedEntrypoint = Entrypoint)
     {
         if (stats.PlanHash.Length != 64 ||
-            stats.Entrypoint != Entrypoint ||
+            stats.Entrypoint != expectedEntrypoint ||
             stats.RunCount != completedRuns + 1 ||
             stats.CompletedRunCount != completedRuns ||
             stats.AverageFuelUsed != 7 ||
@@ -186,6 +228,21 @@ internal static class AutoHotnessRunCountBookkeepingProbe
             throw new InvalidOperationException($"Expected checksum {expected}, observed {checksum}.");
         }
     }
+
+    private static void ValidateAlternatingChecksum(long checksum)
+    {
+        var measuredRunsPerKey = Iterations / 2L;
+        var firstMeasuredRun = (WarmupIterations / 2L) + 1;
+        var lastMeasuredRun = (WarmupIterations + Iterations) / 2L;
+        var expected = measuredRunsPerKey * (firstMeasuredRun + lastMeasuredRun);
+        if (checksum != expected)
+        {
+            throw new InvalidOperationException($"Expected checksum {expected}, observed {checksum}.");
+        }
+    }
+
+    private static string AlternatingEntrypoint(int iteration)
+        => (iteration & 1) == 0 ? Entrypoint : AlternateEntrypoint;
 
     private static SandboxExecutionOptions Options(ExecutionMode expectedMode)
         => new()
