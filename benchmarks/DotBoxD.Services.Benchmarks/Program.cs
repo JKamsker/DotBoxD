@@ -81,6 +81,9 @@ if (args.Length == 1)
         case "--probe-pending-request-removal":
             PendingRequestRemovalProbe.Run();
             return;
+        case "--probe-pending-response-wrapper-cleanup":
+            PendingResponseWrapperCleanupProbe.Run();
+            return;
         case "--probe-frame-read-timeout-source-lifetime":
             FrameReadTimeoutSourceLifetimeProbe.Run();
             return;
