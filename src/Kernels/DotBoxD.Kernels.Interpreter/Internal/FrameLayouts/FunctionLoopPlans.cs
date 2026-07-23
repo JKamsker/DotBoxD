@@ -20,6 +20,19 @@ internal struct FunctionLoopPlans
         out I32ForLoopPlan plan)
         => _i32ForRangePlans.TryGet(statement, frame, loopSlot, out plan);
 
+    public bool TryGetI32ForRangePlan(
+        ForRangeStatement statement,
+        InterpreterFrame frame,
+        int loopSlot,
+        int slotWrittenBeforeEvaluation,
+        out I32ForLoopPlan plan)
+        => _i32ForRangePlans.TryGet(
+            statement,
+            frame,
+            loopSlot,
+            slotWrittenBeforeEvaluation,
+            out plan);
+
     public bool ShouldCacheI32ForRangePlan(ForRangeStatement statement)
         => _i32ForRangePlans.ShouldCache(statement);
 

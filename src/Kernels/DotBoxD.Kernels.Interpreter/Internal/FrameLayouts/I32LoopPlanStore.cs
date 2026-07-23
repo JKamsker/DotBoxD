@@ -16,6 +16,14 @@ internal struct I32LoopPlanStore
         InterpreterFrame frame,
         int loopSlot,
         out I32ForLoopPlan plan)
+        => TryGet(statement, frame, loopSlot, loopSlot, out plan);
+
+    public bool TryGet(
+        ForRangeStatement statement,
+        InterpreterFrame frame,
+        int loopSlot,
+        int slotWrittenBeforeEvaluation,
+        out I32ForLoopPlan plan)
     {
         var cache = Volatile.Read(ref _plans);
         if (cache is null)
@@ -24,7 +32,12 @@ internal struct I32LoopPlanStore
             return false;
         }
 
-        return cache.TryGet(statement, frame, loopSlot, out plan);
+        return cache.TryGet(
+            statement,
+            frame,
+            loopSlot,
+            slotWrittenBeforeEvaluation,
+            out plan);
     }
 
     public bool ShouldCache(ForRangeStatement statement)

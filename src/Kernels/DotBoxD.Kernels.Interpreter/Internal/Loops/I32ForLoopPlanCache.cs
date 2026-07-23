@@ -31,12 +31,21 @@ internal sealed class I32ForLoopPlan
     public long FuelPerIteration { get; }
 
     public bool CanRun(InterpreterFrame frame, int loopSlot)
+        => CanRun(frame, loopSlot, loopSlot);
+
+    public bool CanRun(
+        InterpreterFrame frame,
+        int loopSlot,
+        int slotWrittenBeforeEvaluation)
     {
         // A layout fixes slot identities, but assignment state belongs to each invocation.
+        // The selected runner writes both exempt slots before evaluating the cached expression.
         for (var i = 0; i < _requiredSlots.Length; i++)
         {
             var slot = _requiredSlots[i];
-            if (slot != loopSlot && !frame.IsSlotAssigned(slot))
+            if (slot != loopSlot &&
+                slot != slotWrittenBeforeEvaluation &&
+                !frame.IsSlotAssigned(slot))
             {
                 return false;
             }
@@ -56,6 +65,14 @@ internal sealed class I32ForLoopPlanCache
         InterpreterFrame frame,
         int loopSlot,
         out I32ForLoopPlan plan)
+        => TryGet(statement, frame, loopSlot, loopSlot, out plan);
+
+    public bool TryGet(
+        ForRangeStatement statement,
+        InterpreterFrame frame,
+        int loopSlot,
+        int slotWrittenBeforeEvaluation,
+        out I32ForLoopPlan plan)
     {
         plan = Volatile.Read(ref _hotPlan)!;
         if (!ReferenceEquals(plan?.Statement, statement))
@@ -68,7 +85,7 @@ internal sealed class I32ForLoopPlanCache
             }
         }
 
-        return plan.CanRun(frame, loopSlot);
+        return plan.CanRun(frame, loopSlot, slotWrittenBeforeEvaluation);
     }
 
     public bool Contains(ForRangeStatement statement)

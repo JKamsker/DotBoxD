@@ -34,15 +34,13 @@ internal static class I32ForLoopRunner
                     singleLoopSlot,
                     out var cached))
             {
-                RunSingleAssignment(
+                RunValidatedCachedSingleAssignment(
                     start,
                     end,
                     frame,
                     context,
                     singleLoopSlot,
-                    cached.TargetSlot,
-                    cached.Expression,
-                    cached.FuelPerIteration);
+                    cached);
                 return true;
             }
 
@@ -122,6 +120,28 @@ internal static class I32ForLoopRunner
             fuelPerIteration);
         return true;
     }
+
+    /// <summary>
+    /// Runs a plan that the layout cache has validated against this frame and the caller's
+    /// promised slot writes. Callers must obtain it from <see cref="FunctionLoopPlans"/>
+    /// and perform those writes before the cached expression is evaluated.
+    /// </summary>
+    internal static void RunValidatedCachedSingleAssignment(
+        int start,
+        int end,
+        InterpreterFrame frame,
+        SandboxContext context,
+        int loopSlot,
+        I32ForLoopPlan plan)
+        => RunSingleAssignment(
+            start,
+            end,
+            frame,
+            context,
+            loopSlot,
+            plan.TargetSlot,
+            plan.Expression,
+            plan.FuelPerIteration);
 
     private static void RunSingleAssignment(
         int start,

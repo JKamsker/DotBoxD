@@ -27,5 +27,7 @@ internal readonly partial struct StatementExecutor
            F64ForLoopRunner.TryRun(
                statement, start, end, frame, Context, Options) ||
            I64ForLoopRunner.TryRun(
+               statement, start, end, frame, Context, Options) ||
+           NestedI32ForLoopRunner.TryRun(
                statement, start, end, frame, Context, Options);
 }
