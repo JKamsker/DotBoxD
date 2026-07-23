@@ -53,6 +53,9 @@ internal sealed class TestPooledFrameSendOperation<TTag> :
         return IssuePendingOperation(pendingOperation);
     }
 
+    public ValueTask IssueWithoutExternalStateMutation(ValueTask pendingOperation) =>
+        IssuePendingOperation(pendingOperation);
+
     public void RegisterNext(ValueTask pendingOperation) =>
         RegisterPendingOperation(pendingOperation);
 

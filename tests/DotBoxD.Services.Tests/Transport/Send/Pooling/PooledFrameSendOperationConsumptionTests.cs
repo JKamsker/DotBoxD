@@ -25,6 +25,31 @@ public sealed class PooledFrameSendOperationConsumptionTests
     }
 
     [Fact]
+    public async Task SecondIssueWhileActive_RejectsWithoutChangingFirstLease()
+    {
+        var operation = RequireOperation<SecondIssueTag>();
+        var firstSource = new ControlledPendingSend();
+        var retainedState = new object();
+        var firstSend = operation.Issue(firstSource.Pending, retainedState);
+        var secondSource = new ControlledPendingSend();
+
+        Assert.Throws<InvalidOperationException>(
+            () => operation.IssueWithoutExternalStateMutation(secondSource.Pending));
+        Assert.Same(retainedState, operation.RetainedState);
+        Assert.False(firstSend.IsCompleted);
+        Assert.Equal(0, secondSource.GetResultCount);
+
+        firstSource.Succeed();
+        await firstSend;
+
+        Assert.Equal(1, firstSource.GetResultCount);
+        Assert.Equal(0, secondSource.GetResultCount);
+        Assert.Same(
+            operation,
+            TestPooledFrameSendOperation<SecondIssueTag>.TryTakeRecycled());
+    }
+
+    [Fact]
     public async Task StaleTokenAfterReuse_DoesNotConsumeCurrentLease()
     {
         var operation = RequireOperation<StaleTokenTag>();
@@ -135,6 +160,7 @@ public sealed class PooledFrameSendOperationConsumptionTests
     }
 
     private sealed class EarlyConsumptionTag;
+    private sealed class SecondIssueTag;
     private sealed class StaleTokenTag;
     private sealed class SequentialDoubleTag;
     private sealed class ConcurrentDoubleTag;

@@ -8,6 +8,11 @@ namespace DotBoxD.Services.Transport;
 internal abstract class PooledFrameSendOperation<TOperation> : IValueTaskSource
     where TOperation : PooledFrameSendOperation<TOperation>
 {
+    private const int ProducerIdle = 0;
+    private const int ProducerInitializing = 1;
+    private const int ProducerActive = 2;
+    private const int ProducerPublishing = 3;
+
     private static readonly ContextCallback ResumeInContext =
         static state => ((PooledFrameSendOperation<TOperation>)state!).ResumeCore();
     private static readonly BoundedTransportOperationPool<TOperation> Pool = new();
@@ -18,8 +23,7 @@ internal abstract class PooledFrameSendOperation<TOperation> : IValueTaskSource
     private ExecutionContext? _executionContext;
     private ValueTask _pendingOperation;
     private int _leaseGeneration;
-    private int _leaseIssued;
-    private int _producerActive;
+    private int _producerState;
 
     protected PooledFrameSendOperation() => _resume = Resume;
 
@@ -65,14 +69,17 @@ internal abstract class PooledFrameSendOperation<TOperation> : IValueTaskSource
     /// <summary>Issues this lease and registers its first genuinely pending operation.</summary>
     protected ValueTask IssuePendingOperation(ValueTask pendingOperation)
     {
-        if (Interlocked.CompareExchange(ref _leaseIssued, 1, 0) != 0)
+        if (Interlocked.CompareExchange(
+                ref _producerState,
+                ProducerInitializing,
+                ProducerIdle) != ProducerIdle)
         {
             throw new InvalidOperationException("The frame-send operation already has an active lease.");
         }
 
-        Volatile.Write(ref _producerActive, 1);
         var generation = NextLeaseGeneration();
         _lifecycle.Initialize();
+        Volatile.Write(ref _producerState, ProducerActive);
         var result = new ValueTask(this, _source.Version);
         RegisterPendingOperationCore(pendingOperation, generation);
         return result;
@@ -81,7 +88,7 @@ internal abstract class PooledFrameSendOperation<TOperation> : IValueTaskSource
     /// <summary>Registers the next suspension in the current send lease.</summary>
     protected void RegisterPendingOperation(ValueTask pendingOperation)
     {
-        if (Volatile.Read(ref _producerActive) == 0)
+        if (Volatile.Read(ref _producerState) != ProducerActive)
         {
             throw new InvalidOperationException("The frame-send producer has already completed.");
         }
@@ -174,8 +181,8 @@ internal abstract class PooledFrameSendOperation<TOperation> : IValueTaskSource
         }
         catch (Exception error)
         {
-            if (generation != Volatile.Read(ref _leaseGeneration) ||
-                Volatile.Read(ref _producerActive) == 0)
+            if (Volatile.Read(ref _producerState) != ProducerActive ||
+                generation != Volatile.Read(ref _leaseGeneration))
             {
                 throw;
             }
@@ -208,7 +215,10 @@ internal abstract class PooledFrameSendOperation<TOperation> : IValueTaskSource
 
     private void Publish(Exception? error)
     {
-        if (Interlocked.Exchange(ref _producerActive, 0) != 1)
+        if (Interlocked.CompareExchange(
+                ref _producerState,
+                ProducerPublishing,
+                ProducerActive) != ProducerActive)
         {
             throw new InvalidOperationException("The frame-send producer already completed.");
         }
@@ -247,7 +257,7 @@ internal abstract class PooledFrameSendOperation<TOperation> : IValueTaskSource
     private void Recycle()
     {
         _source.Reset();
-        Volatile.Write(ref _leaseIssued, 0);
+        Volatile.Write(ref _producerState, ProducerIdle);
         Pool.Return((TOperation)this);
     }
 

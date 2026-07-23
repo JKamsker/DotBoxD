@@ -86,6 +86,45 @@ public sealed class PooledFrameSendOperationContinuationTests
     }
 
     [Fact]
+    public async Task ResumeMutation_DoesNotLeakIntoProducerCompletionContext()
+    {
+        var previous = Context.Value;
+        var callerContext = new object();
+        var producerContext = new object();
+        var resumeMutation = new object();
+        Context.Value = callerContext;
+        try
+        {
+            var operation = RequireOperation<ExecutionContextRestorationTag>();
+            var source = new ControlledPendingSend();
+            object? observedResumeContext = null;
+            var send = operation.Issue(
+                source.Pending,
+                resumeHandler: (current, pending) =>
+                {
+                    observedResumeContext = Context.Value;
+                    pending.GetAwaiter().GetResult();
+                    Context.Value = resumeMutation;
+                    current.CompleteSuccessfully();
+                });
+
+            Context.Value = producerContext;
+            source.Succeed();
+
+            Assert.Same(callerContext, observedResumeContext);
+            Assert.Same(producerContext, Context.Value);
+            await send;
+            Assert.Same(
+                operation,
+                TestPooledFrameSendOperation<ExecutionContextRestorationTag>.TryTakeRecycled());
+        }
+        finally
+        {
+            Context.Value = previous;
+        }
+    }
+
+    [Fact]
     public async Task StaleRegistrationFailure_DoesNotClearReusedLease()
     {
         var operation = RequireOperation<RegistrationRaceTag>();
@@ -155,6 +194,7 @@ public sealed class PooledFrameSendOperationContinuationTests
 
     private sealed class InlineThrowTag;
     private sealed class ExecutionContextTag;
+    private sealed class ExecutionContextRestorationTag;
     private sealed class RegistrationRaceTag;
     private sealed class InlineConsumerException : Exception;
     private sealed class RegistrationRaceException : Exception;
