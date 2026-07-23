@@ -1,12 +1,11 @@
-using System.Buffers.Binary;
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Net;
 using System.Net.Sockets;
 using DotBoxD.Services.Benchmarks.Support.Transport;
-using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Transport;
 using DotBoxD.Transports.Tcp;
+using static DotBoxD.Services.Benchmarks.Probes.TransportBurstReceiveProbeSupport;
 
 namespace DotBoxD.Services.Benchmarks.Probes;
 
@@ -29,6 +28,16 @@ internal static class TransportBurstReceiveProbe
             Timeout.InfiniteTimeSpan,
             startReceiveBeforeWrite: false,
             countReads: true).ConfigureAwait(false);
+        var namedPipeBufferedFiniteDirect = await MeasureNamedPipeAsync(
+            "pipe buffered finite direct",
+            frameReadIdleTimeout: null,
+            startReceiveBeforeWrite: false,
+            countReads: false).ConfigureAwait(false);
+        var namedPipeBufferedFiniteCounted = await MeasureNamedPipeAsync(
+            "pipe buffered finite counted",
+            frameReadIdleTimeout: null,
+            startReceiveBeforeWrite: false,
+            countReads: true).ConfigureAwait(false);
         var namedPipePendingFiniteDirect = await MeasureNamedPipeAsync(
             "pipe pending finite direct",
             frameReadIdleTimeout: null,
@@ -48,6 +57,10 @@ internal static class TransportBurstReceiveProbe
             "TCP buffered",
             Timeout.InfiniteTimeSpan,
             startReceiveBeforeWrite: false).ConfigureAwait(false);
+        var tcpBufferedFinite = await MeasureTcpAsync(
+            "TCP buffered finite",
+            frameReadIdleTimeout: null,
+            startReceiveBeforeWrite: false).ConfigureAwait(false);
         var tcpPendingFinite = await MeasureTcpAsync(
             "TCP pending finite",
             frameReadIdleTimeout: null,
@@ -61,14 +74,17 @@ internal static class TransportBurstReceiveProbe
         Console.WriteLine(
             "transport                  total ms       ns/frame    allocated B    B/frame  " +
             "reads/frame  pending/frame");
-        Write(namedPipeBufferedDirect);
-        Write(namedPipeBufferedCounted);
-        Write(namedPipePendingFiniteDirect);
-        Write(namedPipePendingFiniteCounted);
-        Write(namedPipePendingInfiniteCounted);
-        Write(tcpBuffered);
-        Write(tcpPendingFinite);
-        Write(tcpPendingInfinite);
+        Write(namedPipeBufferedDirect, MeasurementBatches, BatchSize);
+        Write(namedPipeBufferedCounted, MeasurementBatches, BatchSize);
+        Write(namedPipeBufferedFiniteDirect, MeasurementBatches, BatchSize);
+        Write(namedPipeBufferedFiniteCounted, MeasurementBatches, BatchSize);
+        Write(namedPipePendingFiniteDirect, MeasurementBatches, BatchSize);
+        Write(namedPipePendingFiniteCounted, MeasurementBatches, BatchSize);
+        Write(namedPipePendingInfiniteCounted, MeasurementBatches, BatchSize);
+        Write(tcpBuffered, MeasurementBatches, BatchSize);
+        Write(tcpBufferedFinite, MeasurementBatches, BatchSize);
+        Write(tcpPendingFinite, MeasurementBatches, BatchSize);
+        Write(tcpPendingInfinite, MeasurementBatches, BatchSize);
         Console.WriteLine(
             $"invariants: {MeasurementBatches * BatchSize:N0} frames/lane, " +
             $"{BatchSize} frames/write, {FrameLength:N0} bytes/frame");
@@ -143,7 +159,7 @@ internal static class TransportBurstReceiveProbe
         CountingReadStream? readCounter,
         bool startReceiveBeforeWrite)
     {
-        var batch = CreateBatch();
+        var batch = CreateBatch(FrameLength, BatchSize);
         await ExchangeBatchesAsync(
             connection,
             writer,
@@ -165,7 +181,13 @@ internal static class TransportBurstReceiveProbe
         var allocated = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
         long? readCount = readCounter is null ? null : readCounter.ReadCount - readsBefore;
 
-        Validate(result, readCount, startReceiveBeforeWrite);
+        Validate(
+            result,
+            readCount,
+            startReceiveBeforeWrite,
+            MeasurementBatches,
+            BatchSize,
+            FrameLength);
         return new Measurement(name, elapsed.TotalMilliseconds, allocated, readCount, result.PendingReceives);
     }
 
@@ -224,69 +246,4 @@ internal static class TransportBurstReceiveProbe
         }
     }
 
-    private static byte[] CreateBatch()
-    {
-        var frame = new byte[FrameLength];
-        BinaryPrimitives.WriteInt32LittleEndian(frame, FrameLength);
-        frame[8] = (byte)MessageType.Response;
-        for (var index = MessageFramer.HeaderSize; index < frame.Length; index++)
-        {
-            frame[index] = unchecked((byte)(index * 31));
-        }
-
-        var batch = new byte[FrameLength * BatchSize];
-        for (var index = 0; index < BatchSize; index++)
-        {
-            frame.CopyTo(batch, index * FrameLength);
-        }
-
-        return batch;
-    }
-
-    private static void Validate(
-        ExchangeResult result,
-        long? readCount,
-        bool startReceiveBeforeWrite)
-    {
-        var frameCount = MeasurementBatches * BatchSize;
-        var expectedChecksum = (FrameLength + 0 + unchecked((byte)((FrameLength - 1) * 31))) *
-            (long)frameCount;
-        var expectedPendingReceives = startReceiveBeforeWrite ? MeasurementBatches : 0;
-        if (result.Checksum != expectedChecksum ||
-            readCount is <= 0 ||
-            result.PendingReceives < expectedPendingReceives)
-        {
-            throw new InvalidOperationException(
-                $"Probe invariants failed: checksum {result.Checksum:N0}/{expectedChecksum:N0}, " +
-                $"reads {readCount?.ToString("N0") ?? "unavailable"}, pending receives " +
-                $"{result.PendingReceives:N0}/{expectedPendingReceives:N0} minimum.");
-        }
-    }
-
-    private static void Write(Measurement measurement)
-    {
-        var frameCount = MeasurementBatches * BatchSize;
-        var readsPerFrame = measurement.ReadCount / (double?)frameCount;
-        Console.WriteLine(
-            $"{measurement.Name,-25} {measurement.ElapsedMilliseconds,12:N1} " +
-            $"{measurement.ElapsedMilliseconds * 1_000_000 / frameCount,14:N1} " +
-            $"{measurement.AllocatedBytes,14:N0} {measurement.AllocatedBytes / (double)frameCount,10:N1} " +
-            $"{readsPerFrame,12:N4} {measurement.PendingReceives / (double)frameCount,14:N4}");
-    }
-
-    private static void ForceGc()
-    {
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
-    }
-
-    private readonly record struct ExchangeResult(long Checksum, int PendingReceives);
-
-    private readonly record struct Measurement(
-        string Name,
-        double ElapsedMilliseconds,
-        long AllocatedBytes,
-        long? ReadCount,
-        int PendingReceives);
 }

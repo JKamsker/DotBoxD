@@ -22,6 +22,9 @@ internal static class FrameReadTimeoutSourceLifetimeProbe
         ValidateCachedSource(cachedSource, cachedToken);
         var cached = MeasureCachedSource(cachedSource);
         ValidateCachedSource(cachedSource, cachedToken);
+        WarmupInactiveCancel(cachedSource);
+        var inactiveCancel = MeasureInactiveCancel(cachedSource);
+        ValidateCachedSource(cachedSource, cachedToken);
 
         var disposedStartStatus = ObserveDisposedStartStatus();
 
@@ -29,6 +32,7 @@ internal static class FrameReadTimeoutSourceLifetimeProbe
         Console.WriteLine($"iterations = {Iterations:N0}; warmup = {WarmupIterations:N0}");
         WriteResult("Construct + Dispose", construction);
         WriteResult("Cached Start + Cancel", cached);
+        WriteResult("Cached inactive Cancel", inactiveCancel);
         Console.WriteLine($"Start after Dispose       {disposedStartStatus}");
     }
 
@@ -85,6 +89,29 @@ internal static class FrameReadTimeoutSourceLifetimeProbe
         for (var i = 0; i < Iterations; i++)
         {
             source.Start(CancellationToken.None, IdleTimeout);
+            source.CancelPendingTimeout();
+        }
+
+        var elapsed = Stopwatch.GetElapsedTime(started);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        return new ProbeResult(elapsed, allocated);
+    }
+
+    private static void WarmupInactiveCancel(FrameReadTimeoutSource source)
+    {
+        for (var i = 0; i < WarmupIterations; i++)
+        {
+            source.CancelPendingTimeout();
+        }
+    }
+
+    private static ProbeResult MeasureInactiveCancel(FrameReadTimeoutSource source)
+    {
+        ForceGc();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var started = Stopwatch.GetTimestamp();
+        for (var i = 0; i < Iterations; i++)
+        {
             source.CancelPendingTimeout();
         }
 
