@@ -37,6 +37,7 @@ internal static class RpcRequestNameCacheProbe
         Write(Measure(serializer, "late warmed names", late));
         Write(Measure(serializer, "recurring after poison", afterPoison));
         MeasureRegisteredNamesAfterRemoteChurn();
+        RpcRequestNameSerializationProbe.RunLongNameScenarios();
         MeasureUniqueRemoteChurn();
     }
 
