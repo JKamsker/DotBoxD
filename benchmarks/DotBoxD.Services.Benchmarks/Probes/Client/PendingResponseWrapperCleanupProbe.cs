@@ -15,23 +15,31 @@ internal static class PendingResponseWrapperCleanupProbe
         var pendingUnary = Measure(
             "pending send, ValueTask<T>",
             pending,
-            PendingResponseShape.Unary);
+            PendingInvocationKind.PooledUnary);
         var pendingNoResponse = Measure(
             "pending send, ValueTask",
             pending,
-            PendingResponseShape.NoResponse);
-        pending.VerifyTotals(CallsPerShape);
+            PendingInvocationKind.PooledNoResponse);
+        var pendingTaskUnary = Measure(
+            "pending send, Task<T>",
+            pending,
+            PendingInvocationKind.TaskUnary);
+        var pendingTaskNoResponse = Measure(
+            "pending send, Task",
+            pending,
+            PendingInvocationKind.TaskNoResponse);
+        pending.VerifyTotals(CallsPerLane, CallsPerLane);
 
         using var synchronous = new PendingResponseWrapperHarness(forcePendingSend: false);
         var synchronousUnary = Measure(
             "synchronous send, ValueTask<T>",
             synchronous,
-            PendingResponseShape.Unary);
+            PendingInvocationKind.PooledUnary);
         var synchronousNoResponse = Measure(
             "synchronous send, ValueTask",
             synchronous,
-            PendingResponseShape.NoResponse);
-        synchronous.VerifyTotals(CallsPerShape);
+            PendingInvocationKind.PooledNoResponse);
+        synchronous.VerifyTotals(CallsPerLane, taskCallsPerShape: 0);
 
         var lockedMiss = MeasureLockedMiss();
 
@@ -42,6 +50,8 @@ internal static class PendingResponseWrapperCleanupProbe
         Console.WriteLine("case                                  total ms       ns/op    allocated B      B/op");
         Write(pendingUnary);
         Write(pendingNoResponse);
+        Write(pendingTaskUnary);
+        Write(pendingTaskNoResponse);
         Write(synchronousUnary);
         Write(synchronousNoResponse);
         Write(lockedMiss);
@@ -57,17 +67,17 @@ internal static class PendingResponseWrapperCleanupProbe
             $"follow-ups = {synchronous.FollowUpCalls:N0}");
     }
 
-    private static long CallsPerShape =>
+    private static long CallsPerLane =>
         WarmupIterations + MeasurementIterations + 1L;
 
     private static Measurement Measure(
         string name,
         PendingResponseWrapperHarness harness,
-        PendingResponseShape shape)
+        PendingInvocationKind kind)
     {
         for (var iteration = 0; iteration < WarmupIterations; iteration++)
         {
-            _ = harness.InvokeOnce(shape);
+            _ = harness.InvokeOnce(kind);
         }
 
         ForceGc();
@@ -76,12 +86,12 @@ internal static class PendingResponseWrapperCleanupProbe
         long checksum = 0;
         for (var iteration = 0; iteration < MeasurementIterations; iteration++)
         {
-            checksum += harness.InvokeOnce(shape);
+            checksum += harness.InvokeOnce(kind);
         }
 
         var elapsed = Stopwatch.GetElapsedTime(startedAt);
         var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
-        var expectedChecksum = shape == PendingResponseShape.Unary
+        var expectedChecksum = PendingResponseWrapperHarness.IsUnary(kind)
             ? (long)MeasurementIterations * PendingResponseWrapperHarness.ResponseValue
             : MeasurementIterations;
         if (checksum != expectedChecksum)
@@ -90,7 +100,7 @@ internal static class PendingResponseWrapperCleanupProbe
                 $"{name} checksum changed: expected {expectedChecksum}, got {checksum}.");
         }
 
-        harness.VerifyFollowUpCapacity(shape);
+        harness.VerifyFollowUpCapacity(kind);
         return new Measurement(name, MeasurementIterations, elapsed, allocated);
     }
 

@@ -20,9 +20,11 @@ internal sealed class PendingResponseWrapperHarness : IDisposable
     private long _fallbackMemorySends;
     private long _followUpCalls;
     private long _invocations;
-    private long _noResponseInvocations;
+    private long _pooledNoResponseInvocations;
+    private long _pooledUnaryInvocations;
     private long _resultChecksum;
-    private long _unaryInvocations;
+    private long _taskNoResponseInvocations;
+    private long _taskUnaryInvocations;
 
     public PendingResponseWrapperHarness(bool forcePendingSend)
     {
@@ -63,33 +65,42 @@ internal sealed class PendingResponseWrapperHarness : IDisposable
 
     public long SourceReuseCycles => _sender.SourceResetCount;
 
-    public int InvokeOnce(PendingResponseShape shape)
+    public int InvokeOnce(PendingInvocationKind kind)
     {
-        var result = shape switch
+        var result = kind switch
         {
-            PendingResponseShape.Unary => InvokeUnaryOnce(),
-            PendingResponseShape.NoResponse => InvokeNoResponseOnce(),
-            _ => throw new ArgumentOutOfRangeException(nameof(shape), shape, "Unknown response shape."),
+            PendingInvocationKind.PooledUnary => InvokePooledUnaryOnce(),
+            PendingInvocationKind.PooledNoResponse => InvokePooledNoResponseOnce(),
+            PendingInvocationKind.TaskUnary => InvokeTaskUnaryOnce(),
+            PendingInvocationKind.TaskNoResponse => InvokeTaskNoResponseOnce(),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown invocation kind."),
         };
 
         _invocations++;
         _resultChecksum += result;
-        if (shape == PendingResponseShape.Unary)
+        switch (kind)
         {
-            _unaryInvocations++;
-        }
-        else
-        {
-            _noResponseInvocations++;
+            case PendingInvocationKind.PooledUnary:
+                _pooledUnaryInvocations++;
+                break;
+            case PendingInvocationKind.PooledNoResponse:
+                _pooledNoResponseInvocations++;
+                break;
+            case PendingInvocationKind.TaskUnary:
+                _taskUnaryInvocations++;
+                break;
+            case PendingInvocationKind.TaskNoResponse:
+                _taskNoResponseInvocations++;
+                break;
         }
 
         return result;
     }
 
-    public void VerifyFollowUpCapacity(PendingResponseShape shape)
+    public void VerifyFollowUpCapacity(PendingInvocationKind kind)
     {
-        var result = InvokeOnce(shape);
-        var expected = shape == PendingResponseShape.Unary ? ResponseValue : 1;
+        var result = InvokeOnce(kind);
+        var expected = IsUnary(kind) ? ResponseValue : 1;
         if (result != expected)
         {
             throw new InvalidOperationException(
@@ -99,19 +110,23 @@ internal sealed class PendingResponseWrapperHarness : IDisposable
         _followUpCalls++;
     }
 
-    public void VerifyTotals(long callsPerShape)
+    public void VerifyTotals(long pooledCallsPerShape, long taskCallsPerShape)
     {
-        var totalCalls = checked(callsPerShape * 2);
+        var totalCalls = checked((pooledCallsPerShape + taskCallsPerShape) * 2);
         var sender = _sender.Snapshot();
         var expectedPendingSends = _sender.ForcePendingSend ? totalCalls : 0;
         var expectedSynchronousSends = _sender.ForcePendingSend ? 0 : totalCalls;
         var expectedMessageIdChecksum = checked(totalCalls * (totalCalls + 1) / 2);
-        var expectedResultChecksum = checked(callsPerShape * (ResponseValue + 1L));
+        var expectedResultChecksum = checked(
+            (pooledCallsPerShape + taskCallsPerShape) * (ResponseValue + 1L));
+        var expectedFollowUps = taskCallsPerShape == 0 ? 2 : 4;
         if (_invocations != totalCalls ||
-            _unaryInvocations != callsPerShape ||
-            _noResponseInvocations != callsPerShape ||
+            _pooledUnaryInvocations != pooledCallsPerShape ||
+            _pooledNoResponseInvocations != pooledCallsPerShape ||
+            _taskUnaryInvocations != taskCallsPerShape ||
+            _taskNoResponseInvocations != taskCallsPerShape ||
             _resultChecksum != expectedResultChecksum ||
-            _followUpCalls != 2 ||
+            _followUpCalls != expectedFollowUps ||
             _fallbackMemorySends != 0 ||
             sender.FrameSendCount != totalCalls ||
             sender.PendingSendCount != expectedPendingSends ||
@@ -130,6 +145,9 @@ internal sealed class PendingResponseWrapperHarness : IDisposable
         }
     }
 
+    public static bool IsUnary(PendingInvocationKind kind) =>
+        kind is PendingInvocationKind.PooledUnary or PendingInvocationKind.TaskUnary;
+
     public void Dispose()
     {
         if (!_sender.Snapshot().IsIdle)
@@ -142,7 +160,7 @@ internal sealed class PendingResponseWrapperHarness : IDisposable
         _streams.Stop();
     }
 
-    private int InvokeUnaryOnce()
+    private int InvokePooledUnaryOnce()
     {
         _sender.Prepare(PendingResponseShape.Unary);
         var call = Invoker.InvokeValueAsync<int>(ServiceName, MethodName);
@@ -156,7 +174,7 @@ internal sealed class PendingResponseWrapperHarness : IDisposable
         return ResponseValue;
     }
 
-    private int InvokeNoResponseOnce()
+    private int InvokePooledNoResponseOnce()
     {
         _sender.Prepare(PendingResponseShape.NoResponse);
         var call = Invoker.InvokeValueAsync(ServiceName, MethodName);
@@ -165,6 +183,35 @@ internal sealed class PendingResponseWrapperHarness : IDisposable
         if (!call.IsCompletedSuccessfully)
         {
             throw new InvalidOperationException("The pooled no-response call did not complete successfully.");
+        }
+
+        call.GetAwaiter().GetResult();
+        return 1;
+    }
+
+    private int InvokeTaskUnaryOnce()
+    {
+        _sender.Prepare(PendingResponseShape.Unary);
+        var call = Invoker.InvokeAsync<int>(ServiceName, MethodName);
+        EnsureInitiallyPending(call.IsCompleted);
+        _sender.CompleteSendAndResponse();
+        if (!call.IsCompletedSuccessfully || call.Result != ResponseValue)
+        {
+            throw new InvalidOperationException("The Task unary response did not complete successfully.");
+        }
+
+        return ResponseValue;
+    }
+
+    private int InvokeTaskNoResponseOnce()
+    {
+        _sender.Prepare(PendingResponseShape.NoResponse);
+        var call = Invoker.InvokeAsync(ServiceName, MethodName);
+        EnsureInitiallyPending(call.IsCompleted);
+        _sender.CompleteSendAndResponse();
+        if (!call.IsCompletedSuccessfully)
+        {
+            throw new InvalidOperationException("The Task no-response call did not complete successfully.");
         }
 
         call.GetAwaiter().GetResult();
@@ -192,4 +239,12 @@ internal enum PendingResponseShape
 {
     Unary,
     NoResponse,
+}
+
+internal enum PendingInvocationKind
+{
+    PooledUnary,
+    PooledNoResponse,
+    TaskUnary,
+    TaskNoResponse,
 }
