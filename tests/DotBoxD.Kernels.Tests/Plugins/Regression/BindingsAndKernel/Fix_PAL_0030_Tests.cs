@@ -93,6 +93,24 @@ public sealed class Fix_PAL_0030_Tests
     }
 
     [Fact]
+    public async Task Run_count_attempts_share_exact_history_with_snapshot_attempts()
+    {
+        var hotness = new AutoExecutionHotness(maxEntries: 16);
+        var plan = WithPlanHash(await PrepareTemplatePlanAsync(), "shared-history");
+
+        var first = hotness.BeginRunCountAttempt(plan, "main");
+        var second = hotness.BeginRunCountAttempt(plan, "main");
+        var snapshot = hotness.BeginAttempt(plan, "main");
+
+        Assert.Equal(1, first.RunCount);
+        Assert.Equal(2, second.RunCount);
+        Assert.Equal(3, snapshot.Stats.RunCount);
+        Assert.Equal("shared-history", snapshot.Stats.PlanHash);
+        Assert.Equal("main", snapshot.Stats.Entrypoint);
+        Assert.Equal(1, hotness.Count);
+    }
+
+    [Fact]
     public void Rejects_non_positive_capacity()
         => Assert.Throws<ArgumentOutOfRangeException>(() => new AutoExecutionHotness(maxEntries: 0));
 

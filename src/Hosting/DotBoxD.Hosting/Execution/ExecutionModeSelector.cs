@@ -97,9 +97,14 @@ public sealed class HotnessExecutionModeSelector : IExecutionModeSelector
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(hotness);
 
-        var threshold = Math.Max(2, options.AutoCompileThreshold);
-        return hotness.RunCount < threshold
+        return ChooseMode(options, hotness.RunCount) == ExecutionMode.Interpreted
             ? ExecutionModeDecision.Interpreted
             : ExecutionModeDecision.Compiled;
+    }
+
+    internal static ExecutionMode ChooseMode(SandboxExecutionOptions options, int runCount)
+    {
+        var threshold = Math.Max(2, options.AutoCompileThreshold);
+        return runCount < threshold ? ExecutionMode.Interpreted : ExecutionMode.Compiled;
     }
 }

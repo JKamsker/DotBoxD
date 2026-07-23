@@ -29,10 +29,11 @@ internal static class AutoHotnessBookkeepingProbe
         var compiled = Result(plan, ExecutionMode.Compiled);
 
         Console.WriteLine("path                                  ns/op       B/op       checksum");
-        Write("table interpreted", MeasureTable(plan, interpreted, ExecutionMode.Interpreted));
-        Write("state interpreted", MeasureState(plan, interpreted, ExecutionMode.Interpreted));
-        Write("table warmed compiled", MeasureTable(plan, compiled, ExecutionMode.Compiled));
-        Write("state warmed compiled", MeasureState(plan, compiled, ExecutionMode.Compiled));
+        AutoHotnessRunCountBookkeepingProbe.WriteResults(plan, interpreted, compiled);
+        Write("table snapshot interpreted", MeasureTable(plan, interpreted, ExecutionMode.Interpreted));
+        Write("state snapshot interpreted", MeasureState(plan, interpreted, ExecutionMode.Interpreted));
+        Write("table snapshot warmed compiled", MeasureTable(plan, compiled, ExecutionMode.Compiled));
+        Write("state snapshot warmed compiled", MeasureState(plan, compiled, ExecutionMode.Compiled));
     }
 
     private static Measurement MeasureTable(
@@ -59,6 +60,7 @@ internal static class AutoHotnessBookkeepingProbe
 
         var elapsed = Stopwatch.GetElapsedTime(started);
         var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        ValidateChecksum(checksum, completedBeforeWarmup);
         Validate(
             hotness.BeginAttempt(plan, Entrypoint).Stats,
             completedBeforeWarmup + WarmupIterations + Iterations,
@@ -95,6 +97,7 @@ internal static class AutoHotnessBookkeepingProbe
 
         var elapsed = Stopwatch.GetElapsedTime(started);
         var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        ValidateChecksum(checksum, completedBeforeWarmup);
         Validate(
             state.BeginAttempt().Stats,
             completedBeforeWarmup + WarmupIterations + Iterations,
@@ -183,6 +186,17 @@ internal static class AutoHotnessBookkeepingProbe
             stats.LastCompiledArtifactHash != (expectedMode == ExecutionMode.Compiled ? ArtifactHash : null))
         {
             throw new InvalidOperationException("Auto hotness bookkeeping invariants changed.");
+        }
+    }
+
+    private static void ValidateChecksum(long checksum, int completedBeforeWarmup)
+    {
+        var firstMeasuredRun = completedBeforeWarmup + WarmupIterations + 1L;
+        var lastMeasuredRun = completedBeforeWarmup + WarmupIterations + Iterations;
+        var expected = Iterations * (firstMeasuredRun + lastMeasuredRun) / 2;
+        if (checksum != expected)
+        {
+            throw new InvalidOperationException($"Expected checksum {expected}, observed {checksum}.");
         }
     }
 

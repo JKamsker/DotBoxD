@@ -22,40 +22,65 @@ public sealed partial class SandboxHost
             return PreDispatchCancelledResult(plan, options);
         }
 
-        if (!_compiled.IsAvailable || options.EnableDebugTrace)
+        if (MustInterpretAuto(plan, entrypoint, options))
         {
             return await ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken)
                 .ConfigureAwait(false);
         }
 
-        if (EntrypointHasAsyncBinding(plan, entrypoint))
+        AutoHotnessCompletion hotness;
+        ExecutionMode selectedMode;
+        // The built-in selector is sealed and its run-count decision is centralized
+        // in ChooseMode, so it does not need the retainable snapshot custom selectors receive.
+        if (_modeSelector is HotnessExecutionModeSelector)
         {
-            return await ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken)
-                .ConfigureAwait(false);
-        }
+            var attempt = _autoHotness.BeginRunCountAttempt(plan, entrypoint);
+            hotness = attempt.Completion;
+            if (attempt.RunCount == 1)
+            {
+                return await ExecuteTrackedInterpretedAutoAsync(
+                        hotness,
+                        plan,
+                        entrypoint,
+                        input,
+                        options,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
 
-        var hotness = _autoHotness.BeginAttempt(plan, entrypoint);
-        if (hotness.Stats.RunCount == 1)
+            selectedMode = HotnessExecutionModeSelector.ChooseMode(options, attempt.RunCount);
+            ThrowIfDisposed();
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return CompleteAutoResult(hotness, PreDispatchCancelledResult(plan, options));
+            }
+        }
+        else
         {
-            return await ExecuteTrackedInterpretedAutoAsync(
-                    hotness,
+            var attempt = _autoHotness.BeginAttempt(plan, entrypoint);
+            hotness = attempt.Completion;
+            if (attempt.Stats.RunCount == 1)
+            {
+                return await ExecuteTrackedInterpretedAutoAsync(
+                        hotness,
+                        plan,
+                        entrypoint,
+                        input,
+                        options,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            if (!TrySelectAutoMode(
                     plan,
-                    entrypoint,
-                    input,
                     options,
-                    cancellationToken)
-                .ConfigureAwait(false);
-        }
-
-        if (!TrySelectAutoMode(
-                plan,
-                options,
-                hotness.Stats,
-                cancellationToken,
-                out var selectedMode,
-                out var selectionResult))
-        {
-            return CompleteAutoResult(hotness, selectionResult);
+                    attempt.Stats,
+                    cancellationToken,
+                    out selectedMode,
+                    out var selectionResult))
+            {
+                return CompleteAutoResult(hotness, selectionResult);
+            }
         }
 
         if (selectedMode == ExecutionMode.Interpreted ||
@@ -81,6 +106,14 @@ public sealed partial class SandboxHost
                 reusableNoAuditState)
             .ConfigureAwait(false);
     }
+
+    private bool MustInterpretAuto(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxExecutionOptions options)
+        => !_compiled.IsAvailable ||
+           options.EnableDebugTrace ||
+           EntrypointHasAsyncBinding(plan, entrypoint);
 
     private bool TrySelectAutoMode(
         ExecutionPlan plan,
@@ -154,7 +187,7 @@ public sealed partial class SandboxHost
     }
 
     private async ValueTask<SandboxExecutionResult> ExecuteTrackedInterpretedAutoAsync(
-        AutoHotnessAttempt hotness,
+        AutoHotnessCompletion hotness,
         ExecutionPlan plan,
         string entrypoint,
         SandboxValue input,
@@ -170,7 +203,7 @@ public sealed partial class SandboxHost
     }
 
     private async ValueTask<SandboxExecutionResult> ExecuteTrackedCompiledAutoAsync(
-        AutoHotnessAttempt hotness,
+        AutoHotnessCompletion hotness,
         ExecutionPlan plan,
         string entrypoint,
         SandboxValue input,
@@ -193,7 +226,7 @@ public sealed partial class SandboxHost
     }
 
     private static SandboxExecutionResult CompleteAutoResult(
-        AutoHotnessAttempt hotness,
+        AutoHotnessCompletion hotness,
         SandboxExecutionResult result)
     {
         hotness.Complete(result, TimeSpan.Zero);

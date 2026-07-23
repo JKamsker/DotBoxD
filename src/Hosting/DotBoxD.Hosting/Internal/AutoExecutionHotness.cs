@@ -48,6 +48,12 @@ internal sealed class AutoExecutionHotness
         return state.BeginAttempt();
     }
 
+    public AutoHotnessRunCountAttempt BeginRunCountAttempt(ExecutionPlan plan, string entrypoint)
+    {
+        var state = Touch(new AutoHotnessKey(plan.PlanHash, entrypoint));
+        return state.BeginRunCountAttempt();
+    }
+
     private AutoHotnessState Touch(AutoHotnessKey key)
     {
         lock (_gate)
@@ -103,8 +109,34 @@ internal readonly struct AutoHotnessAttempt
 
     public ModuleHotnessStats Stats { get; }
 
+    public AutoHotnessCompletion Completion => new(_state);
+
     public void Complete(SandboxExecutionResult result, TimeSpan elapsed)
         => _state.RecordResult(result, elapsed);
+}
+
+internal readonly struct AutoHotnessRunCountAttempt
+{
+    private readonly AutoHotnessState _state;
+
+    public AutoHotnessRunCountAttempt(AutoHotnessState state, int runCount)
+    {
+        _state = state;
+        RunCount = runCount;
+    }
+
+    public int RunCount { get; }
+
+    public AutoHotnessCompletion Completion => new(_state);
+
+    public void Complete(SandboxExecutionResult result, TimeSpan elapsed)
+        => _state.RecordResult(result, elapsed);
+}
+
+internal readonly struct AutoHotnessCompletion(AutoHotnessState state)
+{
+    public void Complete(SandboxExecutionResult result, TimeSpan elapsed)
+        => state.RecordResult(result, elapsed);
 }
 
 internal sealed class AutoHotnessState(string planHash, string entrypoint)
@@ -127,12 +159,17 @@ internal sealed class AutoHotnessState(string planHash, string entrypoint)
     {
         lock (_gate)
         {
-            if (_runCount < int.MaxValue)
-            {
-                _runCount++;
-            }
-
+            IncrementRunCount();
             return new AutoHotnessAttempt(this, Snapshot());
+        }
+    }
+
+    public AutoHotnessRunCountAttempt BeginRunCountAttempt()
+    {
+        lock (_gate)
+        {
+            IncrementRunCount();
+            return new AutoHotnessRunCountAttempt(this, _runCount);
         }
     }
 
@@ -184,6 +221,14 @@ internal sealed class AutoHotnessState(string planHash, string entrypoint)
             _lastRunAt,
             _compileFailures,
             _lastCompiledArtifactHash);
+    }
+
+    private void IncrementRunCount()
+    {
+        if (_runCount < int.MaxValue)
+        {
+            _runCount++;
+        }
     }
 
     private static bool IsCompileFailure(SandboxExecutionResult result)
