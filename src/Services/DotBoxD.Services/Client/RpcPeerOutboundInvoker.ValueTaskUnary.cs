@@ -163,7 +163,7 @@ internal sealed partial class RpcPeerOutboundInvoker
                 return new ValueTask<TResponse>(ToFaultedTask<TResponse>(ex));
             }
 
-            if (sendValueTask.IsCompletedSuccessfully && !ct.CanBeCanceled)
+            if (CanCompletePooledSendDirectly(sendValueTask.IsCompletedSuccessfully, ct))
             {
                 try
                 {
@@ -195,7 +195,7 @@ internal sealed partial class RpcPeerOutboundInvoker
             return new ValueTask<TResponse>(ToFaultedTask<TResponse>(ex));
         }
 
-        if (sendTask.IsCompletedSuccessfully && !ct.CanBeCanceled)
+        if (CanCompletePooledSendDirectly(sendTask.IsCompletedSuccessfully, ct))
         {
             frame.Dispose();
             if (_hasFiniteTimeout && !pending.CompletionStarted)
@@ -209,4 +209,9 @@ internal sealed partial class RpcPeerOutboundInvoker
         pending.TransferSetupToWrapper();
         return PooledUnaryPendingSend.AwaitMemoryAsync(this, messageId, pending, frame, sendTask, ct);
     }
+
+    private static bool CanCompletePooledSendDirectly(
+        bool sendCompletedSuccessfully,
+        CancellationToken callerToken)
+        => sendCompletedSuccessfully && !callerToken.CanBeCanceled;
 }
