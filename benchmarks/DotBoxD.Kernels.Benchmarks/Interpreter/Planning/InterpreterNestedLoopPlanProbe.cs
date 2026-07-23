@@ -12,6 +12,7 @@ internal static class InterpreterNestedLoopPlanProbe
     private const int MainOuterIterations = 1_000_000;
     private const int MainInnerIterations = 1;
     private const int IndexOuterIterations = 500_000;
+    private const int TriangleOuterIterations = 2_000;
     private const int BodyControlInnerIterations = 10_000_000;
     private const int WarmupIterations = 4_096;
     private const int Modulus = 1_000_003;
@@ -59,6 +60,13 @@ internal static class InterpreterNestedLoopPlanProbe
             OuterIterations = 1,
             InnerIterations = BodyControlInnerIterations
         };
+        var triangleScenario = new NestedLoopScenario(
+            "outer 2k, triangular/outer index",
+            "outerIndexDependent",
+            TriangleOuterIterations,
+            InnerIterations: 0,
+            InnerEndFuel: 1,
+            ResultFormula.OuterIndexTriangle);
         var fallbackScenario = mainScenario with
         {
             Name = "arithmetic-bound fallback",
@@ -71,12 +79,14 @@ internal static class InterpreterNestedLoopPlanProbe
         WarmTwice(interpreter, plan, options, zeroScenario);
         WarmTwice(interpreter, plan, options, indexScenario);
         WarmTwice(interpreter, plan, options, bodyControlScenario);
+        WarmTwice(interpreter, plan, options, triangleScenario);
         WarmTwice(interpreter, plan, options, fallbackScenario);
 
         var main = RunCase(interpreter, plan, options, mainScenario);
         var zero = RunCase(interpreter, plan, options, zeroScenario);
         var index = RunCase(interpreter, plan, options, indexScenario);
         var bodyControl = RunCase(interpreter, plan, options, bodyControlScenario);
+        var triangle = RunCase(interpreter, plan, options, triangleScenario);
         var fallback = RunCase(interpreter, plan, options, fallbackScenario);
 
         Console.WriteLine("interpreter nested-loop plan probe");
@@ -85,6 +95,7 @@ internal static class InterpreterNestedLoopPlanProbe
         Write(zero);
         Write(index);
         Write(bodyControl);
+        Write(triangle);
         Write(fallback);
         Console.WriteLine(
             $"main-minus-zero allocation = {main.AllocatedBytes - zero.AllocatedBytes:N0} B " +
@@ -168,19 +179,23 @@ internal static class InterpreterNestedLoopPlanProbe
 
     private static int ExpectedValue(NestedLoopScenario scenario)
     {
-        var innerExecutions = checked((long)scenario.OuterIterations * scenario.InnerIterations);
-        var accumulated = scenario.ResultFormula == ResultFormula.FixedIncrement
-            ? checked(innerExecutions * Increment)
-            : checked(
+        var innerExecutions = InnerExecutions(scenario);
+        var accumulated = scenario.ResultFormula switch
+        {
+            ResultFormula.FixedIncrement => checked(innerExecutions * Increment),
+            ResultFormula.InnerIndex => checked(
                 (long)scenario.OuterIterations *
                 scenario.InnerIterations *
-                (scenario.InnerIterations - 1) / 2);
+                (scenario.InnerIterations - 1) / 2),
+            ResultFormula.OuterIndexTriangle => SumSquares(scenario.OuterIterations),
+            _ => throw new InvalidOperationException("unknown nested-loop result formula")
+        };
         return (int)(accumulated % Modulus);
     }
 
     private static ResourceUsageInvariant ExpectedUsage(NestedLoopScenario scenario)
     {
-        var innerExecutions = checked((long)scenario.OuterIterations * scenario.InnerIterations);
+        var innerExecutions = InnerExecutions(scenario);
         var outerFuel = 7L + scenario.InnerEndFuel;
         var fuel = checked(8L + (outerFuel * scenario.OuterIterations) + (11L * innerExecutions));
         var loops = checked(scenario.OuterIterations + innerExecutions);
@@ -198,6 +213,14 @@ internal static class InterpreterNestedLoopPlanProbe
             CollectionElements: 2,
             StringBytes: 0);
     }
+
+    private static long InnerExecutions(NestedLoopScenario scenario)
+        => scenario.ResultFormula == ResultFormula.OuterIndexTriangle
+            ? checked((long)scenario.OuterIterations * (scenario.OuterIterations - 1) / 2)
+            : checked((long)scenario.OuterIterations * scenario.InnerIterations);
+
+    private static long SumSquares(int exclusiveEnd)
+        => checked((long)exclusiveEnd * (exclusiveEnd - 1) * ((2L * exclusiveEnd) - 1) / 6);
 
     private static SandboxValue Input(int outerIterations, int innerIterations)
         => SandboxValue.FromList(
@@ -254,5 +277,6 @@ internal static class InterpreterNestedLoopPlanProbe
     {
         FixedIncrement,
         InnerIndex,
+        OuterIndexTriangle,
     }
 }

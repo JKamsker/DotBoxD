@@ -81,6 +81,43 @@ internal static class InterpreterNestedLoopPlanModule
           { "op": "return", "value": { "var": "total" } }
         ]
       }, {
+        "id": "outerIndexDependent",
+        "visibility": "entrypoint",
+        "parameters": [
+          { "name": "outerIterations", "type": "I32" },
+          { "name": "innerIterations", "type": "I32" }
+        ],
+        "returnType": "I32",
+        "body": [
+          { "op": "set", "name": "total", "value": { "i32": 0 } },
+          {
+            "op": "forRange",
+            "local": "outerIndex",
+            "start": { "i32": 0 },
+            "end": { "var": "outerIterations" },
+            "body": [{
+              "op": "forRange",
+              "local": "innerIndex",
+              "start": { "i32": 0 },
+              "end": { "var": "outerIndex" },
+              "body": [{
+                "op": "set",
+                "name": "total",
+                "value": {
+                  "op": "rem",
+                  "left": {
+                    "op": "add",
+                    "left": { "var": "total" },
+                    "right": { "var": "outerIndex" }
+                  },
+                  "right": { "i32": 1000003 }
+                }
+              }]
+            }]
+          },
+          { "op": "return", "value": { "var": "total" } }
+        ]
+      }, {
         "id": "unsupportedBound",
         "visibility": "entrypoint",
         "parameters": [
