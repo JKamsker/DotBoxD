@@ -12,27 +12,28 @@ public sealed class MessagePackConstructorReplayPublicationTests
     public void Published_validator_survives_a_lagging_admission_count_write()
     {
         var serializer = new MessagePackRpcSerializer();
-        var value = new PublicationRaceDto(42);
+        PublicationRaceBaseDto value = new PublicationRaceDto(42);
         var writer = new ArrayBufferWriter<byte>();
         serializer.Serialize(writer, value);
         writer.Clear();
 
-        var guard = GetGuard(typeof(PublicationRaceDto));
+        var guard = GetGuard(value.GetType());
         var successfulReplays = GetGuardField("_successfulReplays");
         var creationState = GetGuardField("_validatorCreationState");
+        var validator = GetGuardField("_validator");
         successfulReplays.SetValue(
             guard,
             ConstructorReplayValidatorAdmission.SuccessfulReplayThreshold - 1);
         creationState.SetValue(guard, ConstructorReplayValidatorAdmission.CreationStartedState);
 
         var validatorCalls = 0;
-        Volatile.Write(
-            ref ConstructorReplayValidatorStorage<PublicationRaceDto>.Validator,
-            _ =>
+        validator.SetValue(
+            guard,
+            (Func<object, bool>)(_ =>
             {
                 validatorCalls++;
                 return true;
-            });
+            }));
         try
         {
             serializer.Serialize(writer, value);
@@ -40,7 +41,7 @@ public sealed class MessagePackConstructorReplayPublicationTests
         }
         finally
         {
-            Volatile.Write(ref ConstructorReplayValidatorStorage<PublicationRaceDto>.Validator, null);
+            validator.SetValue(guard, null);
             successfulReplays.SetValue(guard, 0);
             creationState.SetValue(guard, 0);
         }
@@ -61,10 +62,18 @@ public sealed class MessagePackConstructorReplayPublicationTests
             name,
             BindingFlags.NonPublic | BindingFlags.Instance));
 
-    public sealed class PublicationRaceDto
+    public class PublicationRaceBaseDto
     {
-        public PublicationRaceDto(int id) => Id = id;
+        public PublicationRaceBaseDto(int id) => Id = id;
 
         public int Id { get; }
+    }
+
+    public sealed class PublicationRaceDto : PublicationRaceBaseDto
+    {
+        public PublicationRaceDto(int id)
+            : base(id)
+        {
+        }
     }
 }

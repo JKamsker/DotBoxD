@@ -36,7 +36,8 @@ internal static class ConstructorReplayValidatorAdmission
         return Interlocked.CompareExchange(ref creationStarted, CreationStartedState, 0) == 0;
     }
 
-    public static void Publish<T>(
+    public static void Publish(
+        ConstructorReplayGuard guard,
         ref int successfulReplays,
         ref int creationState,
         ConstructorInfo constructor,
@@ -54,12 +55,6 @@ internal static class ConstructorReplayValidatorAdmission
             return;
         }
 
-        Volatile.Write(ref ConstructorReplayValidatorStorage<T>.Validator, validator);
+        guard.PublishValidator(validator);
     }
-}
-
-internal static class ConstructorReplayValidatorStorage<T>
-{
-    // Kept in a separate generic static so cold/AOT types never allocate GC-tracked validator storage.
-    public static Func<object, bool>? Validator;
 }

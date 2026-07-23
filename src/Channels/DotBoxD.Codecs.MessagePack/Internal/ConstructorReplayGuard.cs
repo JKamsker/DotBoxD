@@ -16,6 +16,7 @@ internal sealed class ConstructorReplayGuard
     private readonly ParameterInfo[] _parameters;
     private readonly PropertyInfo[] _parameterProperties;
     private readonly PropertyInfo[] _boundProperties;
+    private Func<object, bool>? _validator;
     private int _successfulReplays;
     private int _validatorCreationState;
 
@@ -55,8 +56,7 @@ internal sealed class ConstructorReplayGuard
             return false;
         }
 
-        var isExactDeclaredType = runtimeType == declaredType;
-        var guard = isExactDeclaredType
+        var guard = runtimeType == declaredType
             ? GetOrAddDeclaredTypeGuard<T>(declaredType)
             : Guards.GetOrAdd(runtimeType, Create);
         if (ReferenceEquals(guard, None))
@@ -70,22 +70,16 @@ internal sealed class ConstructorReplayGuard
             return true;
         }
 
-        if (!isExactDeclaredType)
-        {
-            guard.ThrowIfConstructorReplayChangesValues(value);
-            return false;
-        }
-
-        guard.ValidateSimpleExact(value);
+        guard.ValidateSimple(value);
         return false;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void ValidateSimpleExact<T>(T value)
+    private void ValidateSimple<T>(T value)
     {
         var fastValidator = _validatorCreationState ==
             ConstructorReplayValidatorAdmission.CreationStartedState
-            ? Volatile.Read(ref ConstructorReplayValidatorStorage<T>.Validator)
+            ? Volatile.Read(ref _validator)
             : null;
         if (fastValidator is not null)
         {
@@ -98,7 +92,8 @@ internal sealed class ConstructorReplayGuard
             ref _successfulReplays,
             ref _validatorCreationState))
         {
-            ConstructorReplayValidatorAdmission.Publish<T>(
+            ConstructorReplayValidatorAdmission.Publish(
+                this,
                 ref _successfulReplays,
                 ref _validatorCreationState,
                 _constructor!,
@@ -106,6 +101,9 @@ internal sealed class ConstructorReplayGuard
                 _boundProperties);
         }
     }
+
+    internal void PublishValidator(Func<object, bool> validator) =>
+        Volatile.Write(ref _validator, validator);
 
     private static bool ShouldBypass(Type type) => type.IsValueType || type == typeof(string);
 
