@@ -1,7 +1,7 @@
 namespace DotBoxD.Services.Transport;
 
-/// <summary>Caps one receive-operation population at the number its pool can retain.</summary>
-internal static class BoundedFrameReceiveOperationCreationBudget<TOperation>
+/// <summary>Caps one transport-operation population at the number its pool can retain.</summary>
+internal static class BoundedTransportOperationCreationBudget<TOperation>
     where TOperation : class
 {
     private static int _createdCount;
@@ -10,16 +10,16 @@ internal static class BoundedFrameReceiveOperationCreationBudget<TOperation>
     {
         reachedCapacity = false;
         // Successful reservations are lifetime-scoped. If a completed source is abandoned before
-        // consumption, later receives fail soft to the task-backed overflow path instead of
+        // consumption, later operations fail soft to a task-backed overflow path instead of
         // replacing it and allowing the reusable-source population to grow without a bound.
         var count = Volatile.Read(ref _createdCount);
-        while (count < BoundedFrameReceiveOperationPool<TOperation>.MaxRetainedCount)
+        while (count < BoundedTransportOperationPool<TOperation>.MaxRetainedCount)
         {
             var observed = Interlocked.CompareExchange(ref _createdCount, count + 1, count);
             if (observed == count)
             {
                 reachedCapacity = count + 1 ==
-                    BoundedFrameReceiveOperationPool<TOperation>.MaxRetainedCount;
+                    BoundedTransportOperationPool<TOperation>.MaxRetainedCount;
                 return true;
             }
 
@@ -37,7 +37,7 @@ internal static class BoundedFrameReceiveOperationCreationBudget<TOperation>
             if (count == 0)
             {
                 throw new InvalidOperationException(
-                    "No receive-operation creation is reserved.");
+                    "No transport-operation creation is reserved.");
             }
 
             var observed = Interlocked.CompareExchange(ref _createdCount, count - 1, count);

@@ -17,7 +17,7 @@ public sealed class TcpTransferredStateFallbackCoverageTests
     [Fact]
     public async Task Transferred_fallback_preserves_success_cancellation_timeout_and_eof()
     {
-        var capacity = BoundedFrameReceiveOperationPool<object>.MaxRetainedCount;
+        var capacity = BoundedTransportOperationPool<object>.MaxRetainedCount;
         var pairs = new List<TcpReceiveTestPair>(capacity + 4);
         var holders = new List<ValueTask<RpcFrame>>(capacity);
         using var holderCancellation = new CancellationTokenSource();

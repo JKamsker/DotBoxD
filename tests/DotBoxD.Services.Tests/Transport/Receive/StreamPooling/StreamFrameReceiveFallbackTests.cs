@@ -15,7 +15,7 @@ public sealed class StreamFrameReceiveFallbackTests
     [Fact]
     public async Task LookaheadReceivesBeyondCapacity_TimeoutAndRecoverTogether()
     {
-        var capacity = BoundedFrameReceiveOperationPool<object>.MaxRetainedCount;
+        var capacity = BoundedTransportOperationPool<object>.MaxRetainedCount;
         var streams = Enumerable.Range(0, capacity + 1)
             .Select(index => new ScriptedLookaheadReadStream(
                 CreateFrame(600 + index),
@@ -59,7 +59,7 @@ public sealed class StreamFrameReceiveFallbackTests
     [Fact]
     public async Task ExactReceivesBeyondCapacity_CancelAndRecoverTogether()
     {
-        var capacity = BoundedFrameReceiveOperationPool<object>.MaxRetainedCount;
+        var capacity = BoundedTransportOperationPool<object>.MaxRetainedCount;
         var streams = Enumerable.Range(0, capacity + 1)
             .Select(index => new ScriptedLookaheadReadStream(
                 CreateFrame(650 + index),
@@ -105,7 +105,7 @@ public sealed class StreamFrameReceiveFallbackTests
     [Fact]
     public async Task SaturatedSources_FallbackPreservesEofAndCallerContext()
     {
-        var capacity = BoundedFrameReceiveOperationPool<object>.MaxRetainedCount;
+        var capacity = BoundedTransportOperationPool<object>.MaxRetainedCount;
         var holderStreams = Enumerable.Range(0, capacity)
             .Select(index => new ControlledPendingFrameStream(CreateFrame(700 + index)))
             .ToArray();

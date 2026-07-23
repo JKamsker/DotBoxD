@@ -1,5 +1,5 @@
 using System.Runtime.CompilerServices;
-using CreationBudget = DotBoxD.Services.Transport.BoundedFrameReceiveOperationCreationBudget<DotBoxD.Transports.Tcp.TcpFrameReceiveOperation>;
+using CreationBudget = DotBoxD.Services.Transport.BoundedTransportOperationCreationBudget<DotBoxD.Transports.Tcp.TcpFrameReceiveOperation>;
 
 namespace DotBoxD.Transports.Tcp;
 

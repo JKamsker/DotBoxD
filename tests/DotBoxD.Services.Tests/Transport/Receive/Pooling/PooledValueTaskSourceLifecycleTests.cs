@@ -3,12 +3,12 @@ using Xunit;
 
 namespace DotBoxD.Services.Tests.Transport.Receive.Pooling;
 
-public sealed class PooledFrameReceiveOperationLifecycleTests
+public sealed class PooledValueTaskSourceLifecycleTests
 {
     [Fact]
     public void ProducerFirst_ConsumerClaimsReturn()
     {
-        var lifecycle = new PooledFrameReceiveOperationLifecycle();
+        var lifecycle = new PooledValueTaskSourceLifecycle();
         lifecycle.Initialize();
 
         Assert.False(lifecycle.FinishProducer());
@@ -20,7 +20,7 @@ public sealed class PooledFrameReceiveOperationLifecycleTests
     [Fact]
     public void ConsumerFirst_ProducerClaimsReturn()
     {
-        var lifecycle = new PooledFrameReceiveOperationLifecycle();
+        var lifecycle = new PooledValueTaskSourceLifecycle();
         lifecycle.Initialize();
 
         Assert.True(lifecycle.TryBeginReading());
@@ -32,7 +32,7 @@ public sealed class PooledFrameReceiveOperationLifecycleTests
     [Fact]
     public void RollBackReading_RestoresConsumerLease()
     {
-        var lifecycle = new PooledFrameReceiveOperationLifecycle();
+        var lifecycle = new PooledValueTaskSourceLifecycle();
         lifecycle.Initialize();
 
         Assert.True(lifecycle.TryBeginReading());
@@ -72,7 +72,7 @@ public sealed class PooledFrameReceiveOperationLifecycleTests
 
     private sealed class LifecycleState
     {
-        public PooledFrameReceiveOperationLifecycle Lifecycle;
+        public PooledValueTaskSourceLifecycle Lifecycle;
         public bool ProducerClaimed;
         public bool ConsumerClaimed;
     }

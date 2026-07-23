@@ -12,7 +12,7 @@ public sealed class TcpFrameReceiveFallbackTests
     [Fact]
     public async Task ReceivesBeyondPoolCapacity_TimeoutCancelAndRecoverTogether()
     {
-        var capacity = BoundedFrameReceiveOperationPool<object>.MaxRetainedCount;
+        var capacity = BoundedTransportOperationPool<object>.MaxRetainedCount;
         var pairs = new List<TcpReceiveTestPair>(capacity + 1);
         var previous = Context.Value;
         try

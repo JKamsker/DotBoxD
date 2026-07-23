@@ -6,10 +6,10 @@ namespace DotBoxD.Services.Transport;
 internal abstract class PooledFrameReceiveOperation<TOperation> : IValueTaskSource<RpcFrame>
     where TOperation : PooledFrameReceiveOperation<TOperation>
 {
-    private static readonly BoundedFrameReceiveOperationPool<TOperation> Pool = new();
+    private static readonly BoundedTransportOperationPool<TOperation> Pool = new();
 
     private ManualResetValueTaskSourceCore<RpcFrame> _source;
-    private PooledFrameReceiveOperationLifecycle _lifecycle;
+    private PooledValueTaskSourceLifecycle _lifecycle;
 
     protected static TOperation? TryRentOperation() => Pool.Rent();
 

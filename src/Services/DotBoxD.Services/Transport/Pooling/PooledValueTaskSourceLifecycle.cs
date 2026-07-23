@@ -1,10 +1,10 @@
 namespace DotBoxD.Services.Transport;
 
 /// <summary>
-/// Coordinates one receive producer and one ValueTask consumer without resetting the source while
+/// Coordinates one producer and one ValueTask consumer without resetting the source while
 /// either side is still using it.
 /// </summary>
-internal struct PooledFrameReceiveOperationLifecycle
+internal struct PooledValueTaskSourceLifecycle
 {
     private const int ConsumerMask = 0x03;
     private const int ConsumerIssued = 0x00;
@@ -25,7 +25,7 @@ internal struct PooledFrameReceiveOperationLifecycle
         if (!TryTransition(ConsumerMask, ConsumerReading, ConsumerIssued, claimReturn: false))
         {
             throw new InvalidOperationException(
-                "Pooled receive consumer rollback transition is invalid.");
+                "Pooled ValueTask consumer rollback transition is invalid.");
         }
     }
 
@@ -39,7 +39,7 @@ internal struct PooledFrameReceiveOperationLifecycle
                 out var returnClaimed))
         {
             throw new InvalidOperationException(
-                "Pooled receive consumer completion transition is invalid.");
+                "Pooled ValueTask consumer completion transition is invalid.");
         }
 
         return returnClaimed;
@@ -53,7 +53,7 @@ internal struct PooledFrameReceiveOperationLifecycle
             if ((state & (ProducerFinished | ReturnClaimed)) != 0)
             {
                 throw new InvalidOperationException(
-                    "Pooled receive producer completion transition is invalid.");
+                    "Pooled ValueTask producer completion transition is invalid.");
             }
 
             var next = state | ProducerFinished;

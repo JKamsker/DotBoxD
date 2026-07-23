@@ -1,7 +1,7 @@
 namespace DotBoxD.Services.Transport;
 
-/// <summary>Keeps a bounded process-wide cache for one reusable receive-operation type.</summary>
-internal sealed class BoundedFrameReceiveOperationPool<TOperation>
+/// <summary>Keeps a bounded process-wide cache for one reusable transport-operation type.</summary>
+internal sealed class BoundedTransportOperationPool<TOperation>
     where TOperation : class
 {
     internal const int MaxOverflowCount = 16;
