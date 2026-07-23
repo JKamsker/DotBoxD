@@ -180,11 +180,7 @@ internal sealed partial class RpcPeerOutboundInvoker
                     return new ValueTask<TResponse>(ToFaultedTask<TResponse>(ex));
                 }
 
-                if (_hasFiniteTimeout && !pending.CompletionStarted)
-                {
-                    _pending.StartTimeout(pending, _timeout);
-                }
-
+                StartPooledTimeoutIfNeeded(pending);
                 return pending.GetDirectValueTask(this);
             }
 
