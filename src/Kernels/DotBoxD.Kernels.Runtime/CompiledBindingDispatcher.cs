@@ -20,7 +20,7 @@ internal static partial class CompiledBindingDispatcher
     public static SandboxValue CallBinding(SandboxContext context, string id, SandboxValue[] args)
     {
         var descriptor = context.GetBindingDescriptor(id);
-        var auditCheckpoint = context.AuditCheckpoint();
+        var auditCheckpoint = context.AuditCheckpoint(descriptor);
         using var grantClock = context.BeginBindingGrantClockScope(context.Policy.GrantClock);
         using var auditInvocation = context.BeginBindingAuditInvocation(descriptor, auditCheckpoint);
         try
@@ -87,7 +87,7 @@ internal static partial class CompiledBindingDispatcher
         SandboxValue arg0)
     {
         var descriptor = context.GetBindingDescriptor(id);
-        var auditCheckpoint = context.AuditCheckpoint();
+        var auditCheckpoint = context.AuditCheckpoint(descriptor);
         using var grantClock = context.BeginBindingGrantClockScope(context.Policy.GrantClock);
         using var auditInvocation = context.BeginBindingAuditInvocation(descriptor, auditCheckpoint);
         try
@@ -158,7 +158,7 @@ internal static partial class CompiledBindingDispatcher
         SandboxValue arg1)
     {
         var descriptor = context.GetBindingDescriptor(id);
-        var auditCheckpoint = context.AuditCheckpoint();
+        var auditCheckpoint = context.AuditCheckpoint(descriptor);
         using var grantClock = context.BeginBindingGrantClockScope(context.Policy.GrantClock);
         using var auditInvocation = context.BeginBindingAuditInvocation(descriptor, auditCheckpoint);
         try

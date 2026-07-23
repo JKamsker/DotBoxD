@@ -92,7 +92,7 @@ internal static class InterpreterBindingCaller
         string functionId)
     {
         InterpreterTrace.WriteBindingCall(context, options, moduleHash, functionId, descriptor);
-        var auditCheckpoint = context.AuditCheckpoint();
+        var auditCheckpoint = context.AuditCheckpoint(descriptor);
         using var grantClock = context.BeginBindingGrantClockScope(context.Policy.GrantClock);
         using var auditInvocation = context.BeginBindingAuditInvocation(descriptor, auditCheckpoint);
         try

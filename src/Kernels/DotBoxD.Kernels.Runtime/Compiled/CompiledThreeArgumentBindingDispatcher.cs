@@ -14,7 +14,7 @@ internal static class CompiledThreeArgumentBindingDispatcher
         SandboxValue arg2)
     {
         var descriptor = context.GetBindingDescriptor(id);
-        var auditCheckpoint = context.AuditCheckpoint();
+        var auditCheckpoint = context.AuditCheckpoint(descriptor);
         using var grantClock = context.BeginBindingGrantClockScope(context.Policy.GrantClock);
         using var auditInvocation = context.BeginBindingAuditInvocation(descriptor, auditCheckpoint);
         try
