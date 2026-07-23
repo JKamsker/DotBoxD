@@ -19,6 +19,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-local-call-arguments
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-audit-envelope
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-execution-envelope
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-plan-setup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-i64-plan-setup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-while-plan-setup
 DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-branched-plan-setup
@@ -83,6 +84,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 
 | Step | Commit | Probe | Key result |
 | --- | --- | --- | --- |
+| Layout-scoped multi-assignment I32 loop-plan reuse | `e23caf57b` | `--probe-interpreter-plan-setup`, `--probe-interpreter-while-plan-setup` | Extended the existing exact-reference, two-hit prepared-layout caches to retain eligible all-raw multi-assignment I32 `forRange` and `while` plans, while revalidating every required raw source and condition slot on each hit. Twelve CPU-pinned alternating AB/BA pairs reproduced exact planner-allocation reductions of 280→0 B per entered `forRange` and 504.0-504.1→0 B per planned `while`. Seven pairs passed a one-sided 5% regression guard across seven target/control lanes; their 50,000-execution medians improved from 27.4→20.8 ms for one-iteration `forRange` (-24.1%, 7/7 wins), 28.7→18.5 ms for one-iteration `while` (-35.5%, 7/7), and 27.8→17.5 ms for zero-iteration `while` (-37.1%, 7/7). The direct-expression 20M, scalar-while 20M, and nested-skip controls were allocation-identical; no long-loop timing claim is made. Three-assignment source ordering, nonreusable fully plannable inputs, raw-slot fallback, faults, metering, debug tracing, identity, and concurrent publication are pinned. |
 | Reuse the most-recent Auto hotness state | `1d4752ca5` | `--probe-auto-hotness-bookkeeping` | Repeated Auto execution normally presents the same plan-hash and entrypoint string instances, but the bounded table still hashed the composite key and removed/re-added the node already at the LRU tail. Under the existing table gate, an exact reference-identity hit now returns that resident state; different references retain the original ordinal-value dictionary lookup and LRU path. Ten alternating fresh-process pairs pinned to CPU 3 with Tiering, PGO, and ReadyToRun disabled improve built-in interpreted/warmed-compiled table medians `81.2→42.1 ns` (48.2%) and `81.0→42.5 ns` (47.6%), while custom-selector snapshot table medians improve `88.7→51.7 ns` (41.7%) and `88.5→52.2 ns` (41.0%). All four same-key lanes win 10/10. Their paired direct-state controls remain within 2%; subtracting those medians reduces isolated table overhead `47.9→8.6 ns` and `47.3→8.1 ns` (82.2%/82.9%). A new two-key alternating control forces the unchanged dictionary/LRU path and is flat within noise at `96.2→94.4 ns` with 6/10 wins. Built-in lanes stay at 0 B/op, snapshot lanes stay exactly 96 B/op, and all checksums remain exact. Tests pin value-equal distinct-string fallback, exact eviction order, completion after eviction, concurrent same-key run counts, capacity, key separation, and selector history. This is an isolated bookkeeping claim; no end-to-end Auto latency claim is made. |
 | Descriptor-aware no-audit checkpoint skip | `60f8ae29c` | `--probe-binding-dispatch-scope` | Generic binding dispatch no longer reads `IAuditSink.EventsWritten` through the `AsyncLocal`-aware audit property when the descriptor is exactly `AuditLevel.None`; required and unknown levels retain the original checkpoint path. Ten alternating fresh-process pairs pinned to CPU 3 with Tiering, PGO, and ReadyToRun disabled improve the no-op default-token median `93.9→90.1 ns` (4.1%), reusable-live-token median `109.6→102.7 ns` (6.3%), and production-style pre-populated `InMemoryAuditSink` median `102.3→90.8 ns` (11.2%). Every no-audit lane wins 10/10 pairs, remains exactly 144 B total across 500,000 calls, and retains exact audit counts `0/0/1`. Audited sync/async controls retain exactly 500,000 events and 280.8 B/call; their separate medians move `437.9→429.8` and `439.6→434.6 ns`, while paired means move +1.1%/+2.8%, so no audited timing claim is made. The same descriptor-aware helper covers interpreter dispatch; the full host-level interpreter probe is too coarse/noisy for a timing claim, while custom-sink tests prove zero checkpoint/scan/write observations across interpreter and compiled array/arity-1/2/3 dispatch. Required-audit tests preserve checkpoint 1, and a nested regression proves an inner no-audit call leaves an outer required-audit scope and event ordering intact. The sole intentional custom-sink difference is that an unused `EventsWritten` getter is no longer invoked for `None`. |
 | Lock-free plugin registry fanout lookup | `daf21943c` | `--probe-hook-dispatch`, `--probe-subscription-dispatch`, `--probe-result-hook-fanout` | Registry writers now clone and atomically publish never-mutated event-fanout dictionaries, while warmed dispatch performs one volatile snapshot read and lookup without taking the registry monitor. Ten accepted alternating baseline/candidate pairs were pinned to one CPU with Tiering, PGO, and ReadyToRun disabled. Hook single/eight/miss medians improve 29.0→15.9 ns (45.1%), 90.3→76.4 ns (15.4%), and 15.1→7.8 ns (48.5%); subscription medians improve 25.9→11.9 ns (54.2%), 57.5→43.1 ns (25.0%), and 14.7→7.8 ns (46.9%). Every affected lane wins 10/10 pairs, while direct empty-pipeline controls remain median-flat at 6.4→6.4 ns and 2.4→2.4 ns. One preliminary hook pair was discarded by the predeclared control threshold before selecting the ten accepted pairs. Supplementary result-hook medians improve 84.0→73.1 ns (one handler), 128.9→113.4 ns (two), 447.9→431.6 ns (eight), and 61.2→47.3 ns (eight empty), also 10/10 each. Every process reports the exact one million dispatches and 0 B/op. Mutation remains serialized and pays copy-on-write setup cost; deterministic tests hold the mutation gate while readers complete and cover dictionary immutability, concurrent registration, eviction/registration overlap, stable in-flight snapshots, delayed stale aggregate publication, and removed-registration collection. The timing claim is uncontended steady-state lookup only. |
@@ -2598,3 +2600,37 @@ outer-dependent bounds, outer-slot/body aliasing, arithmetic faults, fuel and lo
 mutation, assignment state, debug fallback, cache publication, and unsupported shapes. The final strict solution build,
 5,904 kernel tests, architecture tests, formatting, and C# size/layout gates pass. No public API or sandbox accounting
 contract changes.
+
+## Reused multi-assignment I32 loop plans
+
+The multi-assignment I32 fast paths still rebuilt an immutable assignment-plan array on each eligible loop entry even
+though the prepared statement identity and frame layout were unchanged. The existing exact-reference, two-hit layout
+caches now retain eligible all-raw multi plans for both `forRange` and `while`. A hit revalidates every required raw
+source and condition slot against the current frame before executing; boxed, unassigned, traced, unsupported, and
+nonreusable shapes continue through the generic path.
+
+The benchmark-only baseline at `4126375b2` and candidate at `e23caf57b` were published separately. Twelve fresh process
+pairs, six in each AB/BA order, ran pinned to CPU 3 with tiered compilation, Tiered PGO, and ReadyToRun disabled:
+
+```text
+taskset -c 3 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 dotnet <published-benchmark.dll> --probe-interpreter-plan-setup
+taskset -c 3 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 dotnet <published-benchmark.dll> --probe-interpreter-while-plan-setup
+```
+
+All twelve pairs reproduced the exact displayed allocation deltas: 280→0 B per entered multi-assignment `forRange`,
+and 504.0-504.1→0 B per planned multi-assignment `while`. Seven pairs passed the preregistered one-sided 5% regression
+guard across direct-expression, direct-20M, multi-for-20M, scalar-while-zero, scalar-while-20M, multi-while-20M, and
+nested-skip lanes. Guarded medians for the short target lanes were:
+
+```text
+case                               baseline       candidate      change    pair wins
+multi forRange, one iteration       27.40 ms        20.80 ms      -24.1%       7/7
+multi while, one iteration          28.70 ms        18.50 ms      -35.5%       7/7
+multi while, zero iterations        27.80 ms        17.50 ms      -37.1%       7/7
+```
+
+The direct-20M, scalar-while-20M, and nested-skip control medians moved by -1.1%, -0.1%, and +0.3%; no control timing
+claim is made. Every target and control retained its exact checksum, fuel, loop, sandbox-allocation, host-call, and
+completion signature. Focused tests cover three-assignment source ordering, required source/condition-slot revalidation, arithmetic and
+quota ordering, mixed-break fallback, debug tracing, exact reference identity, concurrent publication, and fully
+plannable but deliberately nonreusable bodies and conditions.
