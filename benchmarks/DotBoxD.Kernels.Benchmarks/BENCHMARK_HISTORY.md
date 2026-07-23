@@ -18,6 +18,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-frame-layout
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-local-call-arguments
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-audit-envelope
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-host-boundary
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-execution-envelope
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-plan-setup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-i64-plan-setup
@@ -84,6 +85,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 
 | Step | Commit | Probe | Key result |
 | --- | --- | --- | --- |
+| Trusted pure built-in interpreter results | `2edb44296`, `89d8fe202` | `--probe-interpreter-host-boundary` | The public interpreted host now skips custom-result sanitization only for the exact sealed built-in interpreter's canonical binding-free, summary-suppressed in-process success envelope. Fifteen balanced-order attempts produced five accepted pairs per order under absolute 5% guards on the unchanged direct/forwarding controls and the two baseline full-validation lanes. Across those ten pairs, built-in host execution improved `13,372.50→383.85 ns/op` (-97.1%, 10/10 wins), while direct and forwarding controls moved `276.65→280.35` and `13,412.35→13,338.55 ns/op`; no control timing change is claimed. All ten target samples recorded exactly `584,420,040→33,608,336 B` per 50,000 executions, removing `11,016.23408 B/op` and leaving only `0.0816 B/op` above direct. Custom, audited, debug, worker, Auto, binding-bearing, failed, malformed, and side-effect-bearing results retain full validation, and cancellation remains shared. |
 | Layout-scoped multi-assignment I32 loop-plan reuse | `e23caf57b` | `--probe-interpreter-plan-setup`, `--probe-interpreter-while-plan-setup` | Extended the existing exact-reference, two-hit prepared-layout caches to retain eligible all-raw multi-assignment I32 `forRange` and `while` plans, while revalidating every required raw source and condition slot on each hit. Twelve CPU-pinned alternating AB/BA pairs reproduced exact planner-allocation reductions of 280→0 B per entered `forRange` and 504.0-504.1→0 B per planned `while`. Seven pairs passed a one-sided 5% regression guard across seven target/control lanes; their 50,000-execution medians improved from 27.4→20.8 ms for one-iteration `forRange` (-24.1%, 7/7 wins), 28.7→18.5 ms for one-iteration `while` (-35.5%, 7/7), and 27.8→17.5 ms for zero-iteration `while` (-37.1%, 7/7). The direct-expression 20M, scalar-while 20M, and nested-skip controls were allocation-identical; no long-loop timing claim is made. Three-assignment source ordering, nonreusable fully plannable inputs, raw-slot fallback, faults, metering, debug tracing, identity, and concurrent publication are pinned. |
 | Reuse the most-recent Auto hotness state | `1d4752ca5` | `--probe-auto-hotness-bookkeeping` | Repeated Auto execution normally presents the same plan-hash and entrypoint string instances, but the bounded table still hashed the composite key and removed/re-added the node already at the LRU tail. Under the existing table gate, an exact reference-identity hit now returns that resident state; different references retain the original ordinal-value dictionary lookup and LRU path. Ten alternating fresh-process pairs pinned to CPU 3 with Tiering, PGO, and ReadyToRun disabled improve built-in interpreted/warmed-compiled table medians `81.2→42.1 ns` (48.2%) and `81.0→42.5 ns` (47.6%), while custom-selector snapshot table medians improve `88.7→51.7 ns` (41.7%) and `88.5→52.2 ns` (41.0%). All four same-key lanes win 10/10. Their paired direct-state controls remain within 2%; subtracting those medians reduces isolated table overhead `47.9→8.6 ns` and `47.3→8.1 ns` (82.2%/82.9%). A new two-key alternating control forces the unchanged dictionary/LRU path and is flat within noise at `96.2→94.4 ns` with 6/10 wins. Built-in lanes stay at 0 B/op, snapshot lanes stay exactly 96 B/op, and all checksums remain exact. Tests pin value-equal distinct-string fallback, exact eviction order, completion after eviction, concurrent same-key run counts, capacity, key separation, and selector history. This is an isolated bookkeeping claim; no end-to-end Auto latency claim is made. |
 | Descriptor-aware no-audit checkpoint skip | `60f8ae29c` | `--probe-binding-dispatch-scope` | Generic binding dispatch no longer reads `IAuditSink.EventsWritten` through the `AsyncLocal`-aware audit property when the descriptor is exactly `AuditLevel.None`; required and unknown levels retain the original checkpoint path. Ten alternating fresh-process pairs pinned to CPU 3 with Tiering, PGO, and ReadyToRun disabled improve the no-op default-token median `93.9→90.1 ns` (4.1%), reusable-live-token median `109.6→102.7 ns` (6.3%), and production-style pre-populated `InMemoryAuditSink` median `102.3→90.8 ns` (11.2%). Every no-audit lane wins 10/10 pairs, remains exactly 144 B total across 500,000 calls, and retains exact audit counts `0/0/1`. Audited sync/async controls retain exactly 500,000 events and 280.8 B/call; their separate medians move `437.9→429.8` and `439.6→434.6 ns`, while paired means move +1.1%/+2.8%, so no audited timing claim is made. The same descriptor-aware helper covers interpreter dispatch; the full host-level interpreter probe is too coarse/noisy for a timing claim, while custom-sink tests prove zero checkpoint/scan/write observations across interpreter and compiled array/arity-1/2/3 dispatch. Required-audit tests preserve checkpoint 1, and a nested regression proves an inner no-audit call leaves an outer required-audit scope and event ordering intact. The sole intentional custom-sink difference is that an unused `EventsWritten` getter is no longer invoked for `None`. |
@@ -2634,3 +2636,44 @@ claim is made. Every target and control retained its exact checksum, fuel, loop,
 completion signature. Focused tests cover three-assignment source ordering, required source/condition-slot revalidation, arithmetic and
 quota ordering, mixed-break fallback, debug tracing, exact reference identity, concurrent publication, and fully
 plannable but deliberately nonreusable bodies and conditions.
+
+## Trusted pure built-in interpreter results
+
+`InterpreterExecutionBoundary` protected the public host from arbitrary custom-interpreter results, but it also sent the
+sealed built-in interpreter's already validated pure success through the same sanitizer. For summary-suppressed success,
+that path synthesized a validation-only `RunSummary`, sanitized and worker-validated it, filtered it back out, and cloned
+the result. The host now trusts only the exact sealed built-in type when the request is explicitly interpreted and
+in-process, debug is off, the entrypoint has no binding references, the result owns the canonical empty audit snapshot,
+its success envelope and plan identities match, and all host/file/network/log counters are zero. Every miss retains the
+existing validator, and both branches converge before the post-dispatch cancellation check.
+
+The benchmark-only baseline at `899628e70` and final candidate at `89d8fe202` were published separately. Each process
+measured the unchanged direct and forwarding-custom controls before the built-in host target. Runs were pinned to CPU 3
+with tiered compilation, Tiered PGO, and ReadyToRun disabled:
+
+```text
+taskset -c 3 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 dotnet <published-benchmark.dll> --probe-interpreter-host-boundary
+```
+
+The final proof attempted 15 pairs and accepted exactly five in each BF/FB order. Its absolute 5% guard covered both
+unchanged controls and required the two baseline full-validation lanes to remain within 5% inside each process. Attempts
+7, 9, 10, 12, and 14 were discarded because a direct or forwarding control exceeded the guard. Accepted medians were:
+
+```text
+case                         baseline       candidate      change      wins       allocation per operation
+built-in public host       13,372.50 ns       383.85 ns      -97.1%     10/10       11,688.4008 -> 672.16672 B
+direct built-in control       276.65 ns       280.35 ns     no claim      4/10          672.08512 -> 672.08512 B
+forwarding custom host     13,412.35 ns    13,338.55 ns     no claim      7/10         11,688.4 -> 11,688.4 B displayed
+```
+
+Target ranges do not overlap (`13,291.1-13,530.0` versus `375.8-395.3 ns/op`). All ten accepted target samples recorded
+exact totals of `584,420,040→33,608,336 B` over 50,000 executions, a reduction of `11,016.23408 B/op`; candidate host
+allocation is only `0.0816 B/op` above the direct control. The forwarding control retained its displayed `11,688.4 B/op`
+while process-level totals varied by at most 160 B, so no exact-total or timing claim is made for that control. Every
+sample retained synchronous completion, checksum `350,000`, the complete success envelope and plan hashes, canonical
+empty audit, and all twelve resource counters.
+
+Thirty-four focused tests pin every eligibility branch, an otherwise fast-shaped wrong-typed custom result, audit/debug/
+binding/failure/Auto behavior, explicit run IDs, cancellation, and warmed allocation within 1 B/run of direct execution.
+The strict solution build, 5,990 kernel tests, 217 hosting tests, eight lazy-audit tests, 23 architecture tests, formatting,
+and size/layout gates pass. No public API or sandbox accounting contract changes.
