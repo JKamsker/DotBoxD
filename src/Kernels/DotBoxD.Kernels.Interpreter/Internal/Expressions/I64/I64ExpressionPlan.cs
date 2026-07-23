@@ -29,6 +29,18 @@ internal sealed class I64ExpressionPlan
 
     public int FuelCost { get; }
 
+    public void CollectRequiredRawSlots(List<int> slots)
+    {
+        if (_kind == ExpressionKind.RawVariable)
+        {
+            slots.Add(_slot);
+            return;
+        }
+
+        _left?.CollectRequiredRawSlots(slots);
+        _right?.CollectRequiredRawSlots(slots);
+    }
+
     public long Evaluate(InterpreterFrame frame)
         => _kind switch
         {

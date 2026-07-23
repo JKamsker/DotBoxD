@@ -9,7 +9,7 @@ namespace DotBoxD.Kernels.Interpreter.Internal;
 /// </summary>
 internal struct FunctionLoopPlans
 {
-    private I32LoopPlanStore _i32ForRangePlans;
+    private ForLoopPlanStore _forRangePlans;
     private I32BranchedLoopPlanStore _i32BranchedForRangePlans;
     private I32WhileLoopPlanStore _i32WhilePlans;
 
@@ -18,7 +18,7 @@ internal struct FunctionLoopPlans
         InterpreterFrame frame,
         int loopSlot,
         out I32ForLoopPlan plan)
-        => _i32ForRangePlans.TryGet(statement, frame, loopSlot, out plan);
+        => _forRangePlans.TryGetI32(statement, frame, loopSlot, out plan);
 
     public bool TryGetI32ForRangePlan(
         ForRangeStatement statement,
@@ -26,7 +26,7 @@ internal struct FunctionLoopPlans
         int loopSlot,
         int slotWrittenBeforeEvaluation,
         out I32ForLoopPlan plan)
-        => _i32ForRangePlans.TryGet(
+        => _forRangePlans.TryGetI32(
             statement,
             frame,
             loopSlot,
@@ -34,10 +34,10 @@ internal struct FunctionLoopPlans
             out plan);
 
     public bool ShouldCacheI32ForRangePlan(ForRangeStatement statement)
-        => _i32ForRangePlans.ShouldCache(statement);
+        => _forRangePlans.ShouldCache(statement);
 
     public void CacheI32ForRangePlan(I32ForLoopPlan plan)
-        => _i32ForRangePlans.Cache(plan);
+        => _forRangePlans.Cache(plan);
 
     public bool TryGetI32BranchedForRangePlan(
         ForRangeStatement statement,
@@ -62,4 +62,16 @@ internal struct FunctionLoopPlans
 
     public void CacheI32WhilePlan(I32WhileLoopPlan plan)
         => _i32WhilePlans.Cache(plan);
+
+    public bool TryGetI64ForRangePlan(
+        ForRangeStatement statement,
+        InterpreterFrame frame,
+        out I64ForLoopPlan plan)
+        => _forRangePlans.TryGetI64(statement, frame, out plan);
+
+    public bool ShouldCacheI64ForRangePlan(ForRangeStatement statement)
+        => _forRangePlans.ShouldCache(statement);
+
+    public void CacheI64ForRangePlan(I64ForLoopPlan plan)
+        => _forRangePlans.Cache(plan);
 }

@@ -3,22 +3,22 @@ using DotBoxD.Kernels.Interpreter.Frame;
 namespace DotBoxD.Kernels.Interpreter.Internal;
 
 /// <summary>
-/// Holds a frame layout's lazily initialized i32 loop-plan admission and cache state.
+/// Holds a frame layout's lazily initialized for-range plan admission and cache state.
 /// As an inline mutable value, the first observed statement needs no extra owner allocation.
 /// </summary>
-internal struct I32LoopPlanStore
+internal struct ForLoopPlanStore
 {
     private TwoHitPlanAdmission<ForRangeStatement> _admission;
-    private I32ForLoopPlanCache? _plans;
+    private ForLoopPlanCache? _plans;
 
-    public bool TryGet(
+    public bool TryGetI32(
         ForRangeStatement statement,
         InterpreterFrame frame,
         int loopSlot,
         out I32ForLoopPlan plan)
-        => TryGet(statement, frame, loopSlot, loopSlot, out plan);
+        => TryGetI32(statement, frame, loopSlot, loopSlot, out plan);
 
-    public bool TryGet(
+    public bool TryGetI32(
         ForRangeStatement statement,
         InterpreterFrame frame,
         int loopSlot,
@@ -32,12 +32,27 @@ internal struct I32LoopPlanStore
             return false;
         }
 
-        return cache.TryGet(
+        return cache.TryGetI32(
             statement,
             frame,
             loopSlot,
             slotWrittenBeforeEvaluation,
             out plan);
+    }
+
+    public bool TryGetI64(
+        ForRangeStatement statement,
+        InterpreterFrame frame,
+        out I64ForLoopPlan plan)
+    {
+        var cache = Volatile.Read(ref _plans);
+        if (cache is null)
+        {
+            plan = null!;
+            return false;
+        }
+
+        return cache.TryGetI64(statement, frame, out plan);
     }
 
     public bool ShouldCache(ForRangeStatement statement)
@@ -51,12 +66,12 @@ internal struct I32LoopPlanStore
         return _admission.ShouldCache(statement);
     }
 
-    public void Cache(I32ForLoopPlan plan)
+    public void Cache(IForLoopPlan plan)
     {
         var cache = Volatile.Read(ref _plans);
         if (cache is null)
         {
-            var created = new I32ForLoopPlanCache();
+            var created = new ForLoopPlanCache();
             cache = Interlocked.CompareExchange(ref _plans, created, null) ?? created;
         }
 

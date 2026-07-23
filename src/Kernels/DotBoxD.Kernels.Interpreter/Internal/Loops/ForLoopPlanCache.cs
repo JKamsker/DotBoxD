@@ -4,7 +4,12 @@ using DotBoxD.Kernels.Interpreter.Internal.Expressions;
 
 namespace DotBoxD.Kernels.Interpreter.Internal;
 
-internal sealed class I32ForLoopPlan
+internal interface IForLoopPlan
+{
+    ForRangeStatement Statement { get; }
+}
+
+internal sealed class I32ForLoopPlan : IForLoopPlan
 {
     private readonly I32LoopAssignmentPlan[]? _multipleAssignments;
     private readonly int[] _requiredSlots;
@@ -81,37 +86,88 @@ internal sealed class I32ForLoopPlan
     }
 }
 
-internal sealed class I32ForLoopPlanCache
+/// <summary>One immutable, reusable single-assignment I64 for-range plan.</summary>
+internal sealed class I64ForLoopPlan : IForLoopPlan
 {
-    private I32ForLoopPlan? _hotPlan;
-    private ConcurrentDictionary<ForRangeStatement, I32ForLoopPlan>? _additionalPlans;
+    private readonly int[] _requiredSlots;
 
-    public bool TryGet(
+    public I64ForLoopPlan(
         ForRangeStatement statement,
-        InterpreterFrame frame,
-        int loopSlot,
-        out I32ForLoopPlan plan)
-        => TryGet(statement, frame, loopSlot, loopSlot, out plan);
+        int targetSlot,
+        I64ExpressionPlan expression,
+        long fuelPerIteration)
+    {
+        Statement = statement;
+        TargetSlot = targetSlot;
+        Expression = expression;
+        FuelPerIteration = fuelPerIteration;
 
-    public bool TryGet(
+        var requiredSlots = new List<int>();
+        expression.CollectRequiredRawSlots(requiredSlots);
+        _requiredSlots = requiredSlots.ToArray();
+    }
+
+    public ForRangeStatement Statement { get; }
+
+    public int TargetSlot { get; }
+
+    public I64ExpressionPlan Expression { get; }
+
+    public long FuelPerIteration { get; }
+
+    public bool CanRun(InterpreterFrame frame)
+    {
+        for (var i = 0; i < _requiredSlots.Length; i++)
+        {
+            if (!frame.IsSlotAssigned(_requiredSlots[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}
+
+internal sealed class ForLoopPlanCache
+{
+    private IForLoopPlan? _hotPlan;
+    private ConcurrentDictionary<ForRangeStatement, IForLoopPlan>? _additionalPlans;
+
+    public bool TryGetI32(
         ForRangeStatement statement,
         InterpreterFrame frame,
         int loopSlot,
         int slotWrittenBeforeEvaluation,
         out I32ForLoopPlan plan)
     {
-        plan = Volatile.Read(ref _hotPlan)!;
-        if (!ReferenceEquals(plan?.Statement, statement))
+        if (!TryGet(statement, out var candidate) ||
+            candidate is not I32ForLoopPlan typed ||
+            !typed.CanRun(frame, loopSlot, slotWrittenBeforeEvaluation))
         {
-            var additional = Volatile.Read(ref _additionalPlans);
-            if (additional is null || !additional.TryGetValue(statement, out plan!))
-            {
-                plan = null!;
-                return false;
-            }
+            plan = null!;
+            return false;
         }
 
-        return plan.CanRun(frame, loopSlot, slotWrittenBeforeEvaluation);
+        plan = typed;
+        return true;
+    }
+
+    public bool TryGetI64(
+        ForRangeStatement statement,
+        InterpreterFrame frame,
+        out I64ForLoopPlan plan)
+    {
+        if (!TryGet(statement, out var candidate) ||
+            candidate is not I64ForLoopPlan typed ||
+            !typed.CanRun(frame))
+        {
+            plan = null!;
+            return false;
+        }
+
+        plan = typed;
+        return true;
     }
 
     public bool Contains(ForRangeStatement statement)
@@ -126,7 +182,7 @@ internal sealed class I32ForLoopPlanCache
         return additional?.ContainsKey(statement) == true;
     }
 
-    public void Store(I32ForLoopPlan plan)
+    public void Store(IForLoopPlan plan)
     {
         var hot = Volatile.Read(ref _hotPlan);
         if (hot is null)
@@ -146,11 +202,29 @@ internal sealed class I32ForLoopPlanCache
         var additional = Volatile.Read(ref _additionalPlans);
         if (additional is null)
         {
-            var created = new ConcurrentDictionary<ForRangeStatement, I32ForLoopPlan>(
+            var created = new ConcurrentDictionary<ForRangeStatement, IForLoopPlan>(
                 ReferenceEqualityComparer.Instance);
             additional = Interlocked.CompareExchange(ref _additionalPlans, created, null) ?? created;
         }
 
         additional.TryAdd(plan.Statement, plan);
+    }
+
+    private bool TryGet(ForRangeStatement statement, out IForLoopPlan plan)
+    {
+        plan = Volatile.Read(ref _hotPlan)!;
+        if (ReferenceEquals(plan?.Statement, statement))
+        {
+            return true;
+        }
+
+        var additional = Volatile.Read(ref _additionalPlans);
+        if (additional is not null && additional.TryGetValue(statement, out plan!))
+        {
+            return true;
+        }
+
+        plan = null!;
+        return false;
     }
 }

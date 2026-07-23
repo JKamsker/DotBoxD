@@ -37,6 +37,11 @@ internal static class I64ForLoopRunner
         InterpreterFrame frame,
         SandboxContext context)
     {
+        if (frame.Layout.LoopPlans.TryGetI64ForRangePlan(statement, frame, out var cached))
+        {
+            return TryRunSingleAssignment(cached, start, end, frame, context);
+        }
+
         if (!TryCreateSingleAssignmentPlan(
                 statement.Body[0],
                 frame,
@@ -46,6 +51,53 @@ internal static class I64ForLoopRunner
             return false;
         }
 
+        ref var loopPlans = ref frame.Layout.LoopPlans;
+        if (loopPlans.ShouldCacheI64ForRangePlan(statement))
+        {
+            loopPlans.CacheI64ForRangePlan(new I64ForLoopPlan(
+                statement,
+                assignment.TargetSlot,
+                assignment.Expression,
+                fuelPerIteration));
+        }
+
+        return TryRunSingleAssignment(
+            statement,
+            assignment.TargetSlot,
+            assignment.Expression,
+            fuelPerIteration,
+            start,
+            end,
+            frame,
+            context);
+    }
+
+    private static bool TryRunSingleAssignment(
+        I64ForLoopPlan plan,
+        int start,
+        int end,
+        InterpreterFrame frame,
+        SandboxContext context)
+        => TryRunSingleAssignment(
+            plan.Statement,
+            plan.TargetSlot,
+            plan.Expression,
+            plan.FuelPerIteration,
+            start,
+            end,
+            frame,
+            context);
+
+    private static bool TryRunSingleAssignment(
+        ForRangeStatement statement,
+        int targetSlot,
+        I64ExpressionPlan expression,
+        long fuelPerIteration,
+        int start,
+        int end,
+        InterpreterFrame frame,
+        SandboxContext context)
+    {
         var iterations = (long)end - start;
         if (!context.CanBulkChargeLoopIterations(iterations, fuelPerIteration))
         {
@@ -59,8 +111,8 @@ internal static class I64ForLoopRunner
         {
             frame.WriteRawInt32Slot(loopSlot, i);
             frame.WriteRawInt64Slot(
-                assignment.TargetSlot,
-                assignment.Expression.Evaluate(frame));
+                targetSlot,
+                expression.Evaluate(frame));
 
             if (--checkpoint == 0)
             {

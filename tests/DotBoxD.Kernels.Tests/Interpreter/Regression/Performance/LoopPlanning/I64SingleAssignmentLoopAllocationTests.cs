@@ -44,11 +44,7 @@ public sealed class I64SingleAssignmentLoopAllocationTests
 
         var isolatedSingleLoopBytes = (single.AllocatedBytes - zero.AllocatedBytes) /
                                       (double)MeasurementIterations;
-        Assert.True(
-            isolatedSingleLoopBytes < 224,
-            $"One scalar I64 loop execution added {isolatedSingleLoopBytes:F1} B " +
-            $"(single={single.AllocatedBytes}, zero={zero.AllocatedBytes}). " +
-            "A captured assigned-slot predicate raises this isolated cost to about 256 B.");
+        Assert.InRange(isolatedSingleLoopBytes, 0, 8);
 
         AssertMultipleLoopAllocation(two, twoZero, "preassigned targets");
         AssertMultipleLoopAllocation(sourceOrdered, sourceOrderedZero, "earlier unassigned target");
