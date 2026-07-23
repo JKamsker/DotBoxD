@@ -1,0 +1,118 @@
+using System.Buffers;
+using DotBoxD.Codecs.MessagePack;
+using DotBoxD.Services.Protocol;
+using MessagePack;
+using Xunit;
+
+namespace DotBoxD.Services.Tests.Protocol.RequestNames;
+
+public sealed class RpcRequestNameSerializationTests
+{
+    [Theory]
+    [InlineData(false, 31)]
+    [InlineData(false, 32)]
+    [InlineData(false, 255)]
+    [InlineData(false, 256)]
+    [InlineData(false, 257)]
+    [InlineData(true, 31)]
+    [InlineData(true, 32)]
+    [InlineData(true, 255)]
+    [InlineData(true, 256)]
+    [InlineData(true, 257)]
+    public void Ascii_names_match_canonical_wire_bytes(bool oldSpec, int length)
+    {
+        var request = Request(new string('S', length), new string('M', length));
+
+        Assert.Equal(SerializeCanonical(request, oldSpec), Serialize(request, oldSpec));
+    }
+
+    [Theory]
+    [InlineData(false, "\u00e9", 128)]
+    [InlineData(false, "\u00e9", 129)]
+    [InlineData(false, "\U0001f600", 64)]
+    [InlineData(false, "\U0001f600", 65)]
+    [InlineData(true, "\u00e9", 128)]
+    [InlineData(true, "\u00e9", 129)]
+    [InlineData(true, "\U0001f600", 64)]
+    [InlineData(true, "\U0001f600", 65)]
+    public void Multibyte_names_match_canonical_wire_bytes(
+        bool oldSpec,
+        string character,
+        int characterCount)
+    {
+        var serviceName = Repeat(character, characterCount);
+        var methodName = Repeat(character == "\u00e9" ? "\u00f8" : "\U0001f680", characterCount);
+        var request = Request(serviceName, methodName);
+
+        Assert.Equal(SerializeCanonical(request, oldSpec), Serialize(request, oldSpec));
+    }
+
+    [Fact]
+    public void Registration_capacity_fallback_matches_canonical_wire_bytes()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        for (var i = 0; i < 64; i++)
+        {
+            _ = Serialize(serializer, Request($"Service{i:D3}", $"Method{i:D3}"));
+        }
+
+        var request = Request(new string('\u00e9', 64), new string('\u00f8', 64));
+
+        Assert.Equal(SerializeCanonical(request, oldSpec: false), Serialize(serializer, request));
+    }
+
+    [Fact]
+    public void Concurrent_first_registration_publishes_canonical_bytes()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var request = Request(new string('\u00e9', 128), Repeat("\U0001f680", 64));
+        var expected = SerializeCanonical(request, oldSpec: false);
+        var actual = new byte[64][];
+
+        Parallel.For(0, actual.Length, index => actual[index] = Serialize(serializer, request));
+
+        Assert.All(actual, bytes => Assert.Equal(expected, bytes));
+    }
+
+    private static RpcRequest Request(string serviceName, string methodName) =>
+        new()
+        {
+            MessageId = 42,
+            ServiceName = serviceName,
+            MethodName = methodName,
+        };
+
+    private static byte[] Serialize(RpcRequest request, bool oldSpec)
+    {
+        var options = MessagePackRpcSerializer.CreateOptions().WithOldSpec(oldSpec);
+        return Serialize(new MessagePackRpcSerializer(options), request);
+    }
+
+    private static byte[] Serialize(MessagePackRpcSerializer serializer, RpcRequest request)
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        serializer.Serialize(buffer, request);
+        return buffer.WrittenSpan.ToArray();
+    }
+
+    private static byte[] SerializeCanonical(RpcRequest request, bool oldSpec)
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        var writer = new MessagePackWriter(buffer) { OldSpec = oldSpec };
+        writer.WriteMapHeader(5);
+        writer.Write("MessageId");
+        writer.Write(request.MessageId);
+        writer.Write("ServiceName");
+        writer.Write(request.ServiceName);
+        writer.Write("MethodName");
+        writer.Write(request.MethodName);
+        writer.Write("InstanceId");
+        writer.Write(request.InstanceId);
+        writer.Write("Streams");
+        writer.WriteNil();
+        writer.Flush();
+        return buffer.WrittenSpan.ToArray();
+    }
+
+    private static string Repeat(string value, int count) => string.Concat(Enumerable.Repeat(value, count));
+}

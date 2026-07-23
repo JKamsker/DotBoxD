@@ -30,29 +30,29 @@ internal sealed class RpcRequestNameCache
     private RpcRequestNameEntry? _hotService;
     private RegisteredRpcRequestNames _registeredNames = RegisteredRpcRequestNames.Empty;
 
-    public void Register(string? value, RpcRequestNameKind kind)
+    public byte[]? Register(string? value, RpcRequestNameKind kind)
     {
         if (value is null)
         {
-            return;
+            return null;
         }
 
         var registered = Volatile.Read(ref _registeredNames);
         if (registered.ByValue.TryGetValue(value, out var registeredEntry))
         {
             SetHot(kind, registeredEntry);
-            return;
+            return registeredEntry.Utf8;
         }
 
         if (registered.Count >= MaxRegisteredEntries ||
             !CanCache(value))
         {
-            return;
+            return null;
         }
 
         Span<byte> utf8 = stackalloc byte[MaxCachedUtf8Bytes];
         var bytesWritten = Encoding.UTF8.GetBytes(value.AsSpan(), utf8);
-        AddRegistered(value, utf8[..bytesWritten], Hash(utf8[..bytesWritten]), kind);
+        return AddRegistered(value, utf8[..bytesWritten], Hash(utf8[..bytesWritten]), kind);
     }
 
     public string GetOrAdd(ReadOnlySpan<byte> utf8, RpcRequestNameKind kind)
@@ -113,7 +113,7 @@ internal sealed class RpcRequestNameCache
         return AddRemote(value, encoded, hash, kind);
     }
 
-    private void AddRegistered(
+    private byte[]? AddRegistered(
         string value,
         ReadOnlySpan<byte> utf8,
         ulong hash,
@@ -125,17 +125,18 @@ internal sealed class RpcRequestNameCache
             if (registered.ByValue.TryGetValue(value, out var registeredEntry))
             {
                 SetHot(kind, registeredEntry);
-                return;
+                return registeredEntry.Utf8;
             }
 
             if (registered.Count >= MaxRegisteredEntries)
             {
-                return;
+                return null;
             }
 
             var entry = new RpcRequestNameEntry(value, utf8.ToArray(), hash);
             SetHot(kind, entry);
             Volatile.Write(ref _registeredNames, registered.Add(entry));
+            return entry.Utf8;
         }
     }
 
@@ -214,12 +215,10 @@ internal sealed class RpcRequestNameCache
         return null;
     }
 
-    private RpcRequestNameEntry? ReadHot(RpcRequestNameKind kind)
-    {
-        return kind == RpcRequestNameKind.Service
+    private RpcRequestNameEntry? ReadHot(RpcRequestNameKind kind) =>
+        kind == RpcRequestNameKind.Service
             ? Volatile.Read(ref _hotService)
             : Volatile.Read(ref _hotMethod);
-    }
 
     private void SetHot(RpcRequestNameKind kind, RpcRequestNameEntry entry)
     {
@@ -264,15 +263,9 @@ internal sealed class RpcRequestNameCache
     private static int GetRemoteSet(ulong hash) =>
         (int)((hash ^ (hash >> 32)) & RemoteSetMask);
 
-    private static bool CanCache(string value)
-    {
-        if (value.Length > MaxCachedUtf8Bytes)
-        {
-            return false;
-        }
-
-        return Encoding.UTF8.GetByteCount(value) <= MaxCachedUtf8Bytes;
-    }
+    private static bool CanCache(string value) =>
+        value.Length <= MaxCachedUtf8Bytes &&
+        Encoding.UTF8.GetByteCount(value) <= MaxCachedUtf8Bytes;
 
     private static ulong Hash(ReadOnlySpan<byte> utf8)
     {

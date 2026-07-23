@@ -36,18 +36,18 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
             "request",
             nameof(RpcRequest.InstanceId));
         var requestNames = RequestNames;
-        requestNames.Register(value.ServiceName, RpcRequestNameKind.Service);
-        requestNames.Register(value.MethodName, RpcRequestNameKind.Method);
+        var serviceNameUtf8 = requestNames.Register(value.ServiceName, RpcRequestNameKind.Service);
+        var methodNameUtf8 = requestNames.Register(value.MethodName, RpcRequestNameKind.Method);
 
         writer.WriteMapHeader(5);
         writer.WriteString(MessageIdKey);
         writer.Write(value.MessageId);
         writer.WriteString(ServiceNameKey);
-        WriteNullableString(ref writer, value.ServiceName);
+        RpcRequestNameWriter.Write(ref writer, value.ServiceName, serviceNameUtf8);
         writer.WriteString(MethodNameKey);
-        WriteNullableString(ref writer, value.MethodName);
+        RpcRequestNameWriter.Write(ref writer, value.MethodName, methodNameUtf8);
         writer.WriteString(InstanceIdKey);
-        WriteNullableString(ref writer, value.InstanceId);
+        writer.Write(value.InstanceId);
         writer.WriteString(StreamsKey);
         WriteStreams(ref writer, value.Streams, options);
     }
@@ -206,17 +206,6 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
 
         ThrowIfEmptyOrWhitespaceRequiredName(value, fieldName);
         RpcEnvelopeStringValidation.ThrowIfMalformedUtf16(value, "request", fieldName);
-    }
-
-    private static void WriteNullableString(ref MessagePackWriter writer, string? value)
-    {
-        if (value is null)
-        {
-            writer.WriteNil();
-            return;
-        }
-
-        writer.Write(value);
     }
 
     private static string? ReadCachedName(
