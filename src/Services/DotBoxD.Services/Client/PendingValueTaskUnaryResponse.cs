@@ -18,6 +18,8 @@ internal sealed class PendingValueTaskUnaryResponse<TResponse> :
 
     private ManualResetValueTaskSourceCore<TResponse> _source;
     private PendingValueTaskUnaryResponse<TResponse>? _next;
+    private CancellationTokenRegistration _ownedCallerCancellation;
+    private bool _ownsCallerCancellation;
 
     private PendingValueTaskUnaryResponse()
     {
@@ -65,6 +67,12 @@ internal sealed class PendingValueTaskUnaryResponse<TResponse> :
     {
         MarkIssuedForDirect(owner);
         return new ValueTask<TResponse>(this, _source.Version);
+    }
+
+    internal void RegisterOwnedCallerCancellation(CancellationToken callerToken)
+    {
+        _ownedCallerCancellation = RegisterCallerCancellation(callerToken);
+        _ownsCallerCancellation = true;
     }
 
     public override bool TrySetResponse(
@@ -130,6 +138,11 @@ internal sealed class PendingValueTaskUnaryResponse<TResponse> :
                 isCurrentGeneration = false;
             }
 
+            if (isCurrentGeneration)
+            {
+                ThrowIfOwnedCallerCancellationOverridesTimeout();
+            }
+
             throw;
         }
         finally
@@ -166,8 +179,14 @@ internal sealed class PendingValueTaskUnaryResponse<TResponse> :
     protected override void SetExceptionCore(Exception error) =>
         _source.SetException(error);
 
-    protected override void ResetSourceCore() =>
+    protected override void ResetSourceCore()
+    {
+        var callerCancellation = _ownedCallerCancellation;
+        _ownedCallerCancellation = default;
+        _ownsCallerCancellation = false;
+        callerCancellation.Dispose();
         _source.Reset();
+    }
 
     protected override void PushToPoolCore()
     {
@@ -180,6 +199,15 @@ internal sealed class PendingValueTaskUnaryResponse<TResponse> :
         {
             _next = s_overflowPool;
             s_overflowPool = this;
+        }
+    }
+
+    private void ThrowIfOwnedCallerCancellationOverridesTimeout()
+    {
+        if (_ownsCallerCancellation &&
+            CancellationKind == PendingCancellationKind.Timeout)
+        {
+            ThrowIfCallerCancellationRequested();
         }
     }
 }

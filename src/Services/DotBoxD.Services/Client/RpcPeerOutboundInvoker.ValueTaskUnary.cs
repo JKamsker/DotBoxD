@@ -163,7 +163,7 @@ internal sealed partial class RpcPeerOutboundInvoker
                 return new ValueTask<TResponse>(ToFaultedTask<TResponse>(ex));
             }
 
-            if (CanCompletePooledSendDirectly(sendValueTask.IsCompletedSuccessfully, ct))
+            if (sendValueTask.IsCompletedSuccessfully)
             {
                 try
                 {
@@ -175,8 +175,9 @@ internal sealed partial class RpcPeerOutboundInvoker
                     return new ValueTask<TResponse>(ToFaultedTask<TResponse>(ex));
                 }
 
-                StartPooledTimeoutIfNeeded(pending);
-                return pending.GetDirectValueTask(this);
+                return ct.CanBeCanceled
+                    ? CompleteCallerCancelablePooledSendDirectly(pending, ct)
+                    : CompletePooledSendDirectly(pending);
             }
 
             pending.TransferSetupToWrapper();
@@ -195,23 +196,40 @@ internal sealed partial class RpcPeerOutboundInvoker
             return new ValueTask<TResponse>(ToFaultedTask<TResponse>(ex));
         }
 
-        if (CanCompletePooledSendDirectly(sendTask.IsCompletedSuccessfully, ct))
+        if (sendTask.IsCompletedSuccessfully)
         {
             frame.Dispose();
-            if (_hasFiniteTimeout && !pending.CompletionStarted)
-            {
-                _pending.StartTimeout(pending, _timeout);
-            }
-
-            return pending.GetDirectValueTask(this);
+            return ct.CanBeCanceled
+                ? CompleteCallerCancelablePooledSendDirectly(pending, ct)
+                : CompletePooledSendDirectly(pending);
         }
 
         pending.TransferSetupToWrapper();
         return PooledUnaryPendingSend.AwaitMemoryAsync(this, messageId, pending, frame, sendTask, ct);
     }
 
-    private static bool CanCompletePooledSendDirectly(
-        bool sendCompletedSuccessfully,
+    private ValueTask<TResponse> CompleteCallerCancelablePooledSendDirectly<TResponse>(
+        PendingValueTaskUnaryResponse<TResponse> pending,
         CancellationToken callerToken)
-        => sendCompletedSuccessfully && !callerToken.CanBeCanceled;
+    {
+        try
+        {
+            pending.RegisterOwnedCallerCancellation(callerToken);
+            StartPooledTimeoutIfNeeded(pending);
+        }
+        catch (Exception ex)
+        {
+            CompletePooledSetupFailure(pending);
+            return new ValueTask<TResponse>(ToFaultedTask<TResponse>(ex));
+        }
+
+        return pending.GetDirectValueTask(this);
+    }
+
+    private ValueTask<TResponse> CompletePooledSendDirectly<TResponse>(
+        PendingValueTaskUnaryResponse<TResponse> pending)
+    {
+        StartPooledTimeoutIfNeeded(pending);
+        return pending.GetDirectValueTask(this);
+    }
 }

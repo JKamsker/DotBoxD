@@ -54,14 +54,16 @@ public sealed class PooledCallerCancellationTests
         Assert.IsType<CancellablePendingUnaryResponse<CallerResponse>>(pending);
     }
 
-    [Fact]
-    public async Task Cancellation_during_response_materialization_wins_after_correlation_removal()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Cancellation_during_response_materialization_wins_after_correlation_removal(bool useFrameSender)
     {
         using var cancellation = new CancellationTokenSource();
         var serializer = new CancelingResponseSerializer(cancellation);
         await using var harness = new ValueTaskTimeoutTestHarness(
             Timeout.InfiniteTimeSpan,
-            serializer: serializer);
+            serializer: serializer, useFrameSender: useFrameSender);
 
         var call = Invoke(harness, CallerResponse.First, cancellation.Token);
         var source = harness.GetPendingResponse(harness.LastRequestMessageId);

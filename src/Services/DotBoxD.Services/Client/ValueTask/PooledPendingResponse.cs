@@ -64,7 +64,7 @@ internal abstract class PooledPendingResponse : IPendingResponse
         {
             PendingCancellationKind.Caller => (
                 PooledCompletionKind.Caller,
-                (Exception)new OperationCanceledException()),
+                (Exception)new OperationCanceledException(_callerToken)),
             PendingCancellationKind.Timeout => (
                 PooledCompletionKind.Timeout,
                 new ServiceTimeoutException($"Request to {_service}.{_method} timed out.")),
@@ -189,6 +189,9 @@ internal abstract class PooledPendingResponse : IPendingResponse
             static state => ((PooledPendingResponse)state!).CancelByCaller(),
             this);
     }
+
+    protected void ThrowIfCallerCancellationRequested() =>
+        _callerToken.ThrowIfCancellationRequested();
 
     protected bool TryCancelIfCallerCanceledAfterMaterialization()
     {

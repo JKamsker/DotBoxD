@@ -101,14 +101,14 @@ public sealed class RpcPeerOptions
 
     /// <summary>
     /// When <see langword="true"/>, generated unary <see cref="ValueTask"/> and
-    /// <see cref="ValueTask{TResult}"/> proxy calls may use a pooled response source instead of a
-    /// task-backed path.
+    /// <see cref="ValueTask{TResult}"/> proxy calls may use a pooled rather than task-backed response.
     /// </summary>
     /// <remarks>
-    /// Finite <see cref="RequestTimeout"/> values are supported. The optimized path is not used when the
-    /// caller passes a cancellable token. Continuations are scheduled away from the peer read loop, and
-    /// returned value tasks follow the normal single-consumption rules. Leave this disabled unless the
-    /// peer is on a measured hot path and every returned value task is awaited exactly once.
+    /// Finite <see cref="RequestTimeout"/> values are supported. Result-bearing
+    /// <see cref="ValueTask{TResult}"/> calls support cancellable caller tokens, while non-generic
+    /// <see cref="ValueTask"/> calls with such a token retain the task-backed path. Continuations run
+    /// away from the peer read loop, and returned value tasks follow normal single-consumption rules;
+    /// enable it only when every returned value task on the measured hot path is awaited exactly once.
     /// </remarks>
     public bool EnableLowAllocationValueTaskInvocations { get; init; }
 
