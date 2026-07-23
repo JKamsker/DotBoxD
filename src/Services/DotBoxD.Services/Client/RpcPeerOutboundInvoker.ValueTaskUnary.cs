@@ -170,6 +170,16 @@ internal sealed partial class RpcPeerOutboundInvoker
 
             if (sendValueTask.IsCompletedSuccessfully)
             {
+                try
+                {
+                    sendValueTask.GetAwaiter().GetResult();
+                }
+                catch (Exception ex)
+                {
+                    CompletePooledSetupFailure(pending);
+                    return new ValueTask<TResponse>(ToFaultedTask<TResponse>(ex));
+                }
+
                 if (_hasFiniteTimeout && !pending.CompletionStarted)
                 {
                     _pending.StartTimeout(pending, _timeout);

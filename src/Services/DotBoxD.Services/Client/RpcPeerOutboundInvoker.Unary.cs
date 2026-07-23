@@ -118,6 +118,17 @@ internal sealed partial class RpcPeerOutboundInvoker
 
         if (!ct.CanBeCanceled && sendTask.IsCompletedSuccessfully)
         {
+            try
+            {
+                sendTask.GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                _pending.Remove(messageId, pending, consumed: true);
+                ReleasePendingSlot();
+                return ToFaultedTask<TResponse>(ex);
+            }
+
             pending.EnableDirectCompletion(this);
             if (!pending.Task.IsCompleted)
             {
