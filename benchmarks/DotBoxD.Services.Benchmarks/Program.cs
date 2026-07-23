@@ -11,6 +11,10 @@ if (args.Length == 1)
         case "--probe-stream-connection-receive-tracking":
             StreamConnectionReceiveTrackingProbe.Run();
             return;
+        case "--probe-stream-connection-receive-tracking-post-capacity":
+            await TransportIdleReceiveFootprintProbe.SaturateStreamReceiveOperationsAsync();
+            StreamConnectionReceiveTrackingProbe.Run();
+            return;
         case "--probe-stream-connection-pending-receive":
             await StreamConnectionPendingReceiveProbe.RunAsync();
             return;

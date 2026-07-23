@@ -35,6 +35,16 @@ internal static class TransportIdleReceiveFootprintProbe
             $"{StreamFrameReceiveBuffer.LookaheadCapacity / 1_024:N0} KiB per rented window");
     }
 
+    public static async Task SaturateStreamReceiveOperationsAsync()
+    {
+        var measurement = await MeasureNamedPipesAsync(taskBacked: false).ConfigureAwait(false);
+        if (measurement.PendingReceives != ConnectionCount)
+        {
+            throw new InvalidOperationException(
+                $"Expected {ConnectionCount:N0} pending Stream receives before the control lane.");
+        }
+    }
+
     private static async Task<Measurement> MeasureNamedPipesAsync(bool taskBacked)
     {
         var connections = new List<StreamConnection>(ConnectionCount);
