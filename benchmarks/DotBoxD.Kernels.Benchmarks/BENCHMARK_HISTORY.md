@@ -85,6 +85,8 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 
 | Step | Commit | Probe | Key result |
 | --- | --- | --- | --- |
+| Saturating provider-owned completed-executable hot set | this commit | `--probe-compiled-execution-envelope` | The default non-persistent reflection provider publishes two exact-plan completed executables for lock-free lookup during binding-free suppressed execution. Once saturated, another exact completed plan uses one execution-cache lock without touching either backing LRU; a true miss retains the original artifact→executable pipeline. Against exact pooled-state baseline `5084f8559`, six CPU-pinned balanced pairs improve monomorphic `563.75→414.75 ns/op` (26.43%), A/B `557.25→432.80` (22.33%), saturated C-only `549.95→462.10` (15.97%), and A/B/C `546.65→449.40` (17.79%), every target winning 6/6. The cancelable provider/fresh-state control is noise-flat (`559.05→567.05 ns` unpaired; paired-difference median -4.45 ns, 3/6). Every allocation total is byte-identical. A permanent alternating lane exposed and eliminated 48 B/switch of publication churn (`240.0→192.0 B/op`). Exact identity, ordinal entrypoints, aligned eviction, invalidation, custom/persistent providers, all eligibility bypasses, and collectible load-context teardown remain pinned. |
+| Public compiled no-audit run-state pool | `5084f8559` | `--probe-compiled-execution-envelope` | A lazy bounded exact-plan pool reuses the 128-byte resource meter and 192-byte sandbox context for public binding-free suppressed compiled runs. Six balanced pairs reduce allocation `512,118,624→192,044,408 B` across one million executions, or `512.1→192.0 B/op`; the intended repeated mechanism is exactly 320 B/run. The cancelable bypass remains `512.1 B/op`. Timing did not improve at this step and is not claimed. Five isolated test processes keep cold default/explicit-interpreter hosts exactly `4,888 B/host` and pending audited provider suspension exactly `1,032 B`. Busy slots fall back to fresh state, and all ineligible or externally supplied state paths bypass the pool. |
 | Trusted pure built-in interpreter results | `2edb44296`, `89d8fe202` | `--probe-interpreter-host-boundary` | The public interpreted host now skips custom-result sanitization only for the exact sealed built-in interpreter's canonical binding-free, summary-suppressed in-process success envelope. Fifteen balanced-order attempts produced five accepted pairs per order under absolute 5% guards on the unchanged direct/forwarding controls and the two baseline full-validation lanes. Across those ten pairs, built-in host execution improved `13,372.50→383.85 ns/op` (-97.1%, 10/10 wins), while direct and forwarding controls moved `276.65→280.35` and `13,412.35→13,338.55 ns/op`; no control timing change is claimed. All ten target samples recorded exactly `584,420,040→33,608,336 B` per 50,000 executions, removing `11,016.23408 B/op` and leaving only `0.0816 B/op` above direct. Custom, audited, debug, worker, Auto, binding-bearing, failed, malformed, and side-effect-bearing results retain full validation, and cancellation remains shared. |
 | Layout-scoped multi-assignment I32 loop-plan reuse | `e23caf57b` | `--probe-interpreter-plan-setup`, `--probe-interpreter-while-plan-setup` | Extended the existing exact-reference, two-hit prepared-layout caches to retain eligible all-raw multi-assignment I32 `forRange` and `while` plans, while revalidating every required raw source and condition slot on each hit. Twelve CPU-pinned alternating AB/BA pairs reproduced exact planner-allocation reductions of 280→0 B per entered `forRange` and 504.0-504.1→0 B per planned `while`. Seven pairs passed a one-sided 5% regression guard across seven target/control lanes; their 50,000-execution medians improved from 27.4→20.8 ms for one-iteration `forRange` (-24.1%, 7/7 wins), 28.7→18.5 ms for one-iteration `while` (-35.5%, 7/7), and 27.8→17.5 ms for zero-iteration `while` (-37.1%, 7/7). The direct-expression 20M, scalar-while 20M, and nested-skip controls were allocation-identical; no long-loop timing claim is made. Three-assignment source ordering, nonreusable fully plannable inputs, raw-slot fallback, faults, metering, debug tracing, identity, and concurrent publication are pinned. |
 | Reuse the most-recent Auto hotness state | `1d4752ca5` | `--probe-auto-hotness-bookkeeping` | Repeated Auto execution normally presents the same plan-hash and entrypoint string instances, but the bounded table still hashed the composite key and removed/re-added the node already at the LRU tail. Under the existing table gate, an exact reference-identity hit now returns that resident state; different references retain the original ordinal-value dictionary lookup and LRU path. Ten alternating fresh-process pairs pinned to CPU 3 with Tiering, PGO, and ReadyToRun disabled improve built-in interpreted/warmed-compiled table medians `81.2→42.1 ns` (48.2%) and `81.0→42.5 ns` (47.6%), while custom-selector snapshot table medians improve `88.7→51.7 ns` (41.7%) and `88.5→52.2 ns` (41.0%). All four same-key lanes win 10/10. Their paired direct-state controls remain within 2%; subtracting those medians reduces isolated table overhead `47.9→8.6 ns` and `47.3→8.1 ns` (82.2%/82.9%). A new two-key alternating control forces the unchanged dictionary/LRU path and is flat within noise at `96.2→94.4 ns` with 6/10 wins. Built-in lanes stay at 0 B/op, snapshot lanes stay exactly 96 B/op, and all checksums remain exact. Tests pin value-equal distinct-string fallback, exact eviction order, completion after eviction, concurrent same-key run counts, capacity, key separation, and selector history. This is an isolated bookkeeping claim; no end-to-end Auto latency claim is made. |
@@ -2677,3 +2679,59 @@ Thirty-four focused tests pin every eligibility branch, an otherwise fast-shaped
 binding/failure/Auto behavior, explicit run IDs, cancellation, and warmed allocation within 1 B/run of direct execution.
 The strict solution build, 5,990 kernel tests, 217 hosting tests, eight lazy-audit tests, 23 architecture tests, formatting,
 and size/layout gates pass. No public API or sandbox accounting contract changes.
+
+## Public compiled state pooling and completed-executable reuse
+
+Binding-free, summary-suppressed public compiled execution still allocated a fresh 128-byte `ResourceMeter` and
+192-byte `SandboxContext` on every run, then traversed the provider's artifact and executable cache locks even after
+the exact executable had completed materialization. A lazy bounded exact-plan state pool first removes the 320-byte
+per-run state pair. The default non-persistent reflection provider then publishes immutable completed executables into
+a saturating two-entry exact-reference hot set used only by the same narrow no-audit eligibility predicate. Once full,
+another exact completed plan uses one execution-cache lock without touching either backing LRU; a true miss continues
+through the original artifact and executable cache pipeline. This keeps artifact and executable eviction order aligned.
+
+The permanent probe uses one million warmed public executions, checks the I32 result and full compiled identity
+envelope, validates all twelve resource counters, and retains audited success, compiled failure, verifier fallback,
+and cancelable provider/fresh-state controls. Frozen binaries were pinned to CPU 3 with tiering disabled:
+
+```text
+taskset -c 3 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  COMPlus_TieredCompilation=0 COMPlus_TieredPGO=0 COMPlus_ReadyToRun=0 \
+  dotnet <published-benchmark.dll> --probe-compiled-execution-envelope
+```
+
+Six balanced pairs for the state-pool step reproduce `512,118,624→192,044,408 B`, or `512.1→192.0 B/op` at
+displayed precision. The repeated mechanism is exactly 320 B/run; fixed probe/JIT bytes account for the smaller
+cross-process remainder. That step's timing median moved `517.55→533.45 ns/op`, so it receives no latency claim.
+The cancelable bypass remains `512.1 B/op`.
+
+Against exact pooled-state commit `5084f8559`, six further balanced pairs produce:
+
+```text
+case                         baseline median    final median    change     wins       allocation
+single completed plan           563.75 ns         414.75 ns     -26.43%     6/6       192.0 -> 192.0 B/op
+alternating completed A/B       557.25 ns         432.80 ns     -22.33%     6/6       192.0 -> 192.0 B/op
+saturated completed C-only      549.95 ns         462.10 ns     -15.97%     6/6       192.0 -> 192.0 B/op
+alternating completed A/B/C     546.65 ns         449.40 ns     -17.79%     6/6       192.0 -> 192.0 B/op
+cancelable provider + fresh     559.05 ns         567.05 ns      no claim     3/6       512.1 -> 512.1 B/op
+```
+
+An interim single publication allocated a 48-byte immutable snapshot on every A/B switch; the permanent lane exposed
+`240.0 B/op`, and entry-owned publication reuse plus the saturating hot set restores it exactly to `192.0 B/op`.
+The cancelable lane intentionally changes both provider lookup and state reuse, so it is a regression control rather
+than isolated shortcut attribution. Its unpaired medians move +1.43%, while the paired-difference median favors the
+candidate by 4.45 ns and only 3/6 pairs favor either side; no timing change is claimed.
+
+Twenty-four fresh-provider samples isolate the bounded publication setup after ordinary artifact/executable caches
+are warm: an ordinary completed-cache hit allocates 0 B, first hot activation/publication 120 B, a second distinct
+publication 48 B, and repeated publication plus hot lookup 0 B. Thus two-slot activation is bounded at 168 B. This is
+not a claim that cold first execution is allocation-neutral: execution entries also gain plan/publication references.
+
+Eligibility requires the built-in non-persistent reflection compiler, exact plan reference and ordinal entrypoint,
+in-process execution, no debug trace or async worker, no binding references, a non-cancelable token, no supplied state,
+and suppressed successful-run audit. Custom and persistent compilers never publish. Cache eviction, failed
+materialization, disposal, and collectible load-context teardown invalidate publications before materialized assembly
+state is released. Five isolated allocation-test processes retain exactly `4,888 B/host` for cold default and explicit
+interpreter hosts and `1,032 B` for a pending audited provider suspension. Focused tests cover exact hash-collision
+clones, LRU churn, concurrent publication/invalidation, failures, disposal races, audit/cancellation bypasses, and both
+audited and suppressed collectible contexts. No public API or sandbox accounting contract changes.
