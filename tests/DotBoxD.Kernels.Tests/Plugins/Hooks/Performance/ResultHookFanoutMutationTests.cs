@@ -198,7 +198,7 @@ public sealed class ResultHookFanoutMutationTests
         AddResult(second, priority: 200, value: 2);
         release.SetResult(null);
 
-        Assert.Equal(1, (await inflight).Value.Value);
+        Assert.Equal(1, (await inflight)?.Value);
         Assert.Equal(2, Fire(server.Hooks)?.Value);
     }
 
