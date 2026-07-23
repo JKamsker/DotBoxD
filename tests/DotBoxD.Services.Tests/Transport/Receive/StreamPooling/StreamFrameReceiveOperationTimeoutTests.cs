@@ -4,6 +4,7 @@ using Xunit;
 
 namespace DotBoxD.Services.Tests.Transport.Receive.StreamPooling;
 
+[Collection(StreamReceiveOperationCollection.Name)]
 public sealed class StreamFrameReceiveOperationTimeoutTests
 {
     private static readonly TimeSpan Guard = TimeSpan.FromSeconds(5);

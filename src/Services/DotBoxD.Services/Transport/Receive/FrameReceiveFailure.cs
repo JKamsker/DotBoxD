@@ -1,9 +1,7 @@
-using DotBoxD.Services.Transport;
+namespace DotBoxD.Services.Transport;
 
-namespace DotBoxD.Transports.Tcp;
-
-/// <summary>Creates faulted TCP receive values with stable cancellation tokens.</summary>
-internal static class TcpFrameReceiveFailure
+/// <summary>Creates faulted frame receive values with stable cancellation tokens.</summary>
+internal static class FrameReceiveFailure
 {
     public static ValueTask<RpcFrame> Create(
         Exception error,

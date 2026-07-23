@@ -5,6 +5,7 @@ using Xunit;
 
 namespace DotBoxD.Services.Tests.Transport.Receive.StreamPooling;
 
+[Collection(StreamReceiveOperationCollection.Name)]
 public sealed class StreamFrameReceiveOperationIntegrationTests
 {
     private static readonly AsyncLocal<string?> Context = new();

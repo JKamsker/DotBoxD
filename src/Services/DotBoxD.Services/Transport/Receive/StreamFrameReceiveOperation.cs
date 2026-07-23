@@ -17,10 +17,16 @@ internal sealed class StreamFrameReceiveOperation :
     private ValueTask<int> _pendingRead;
     private int _leaseGeneration;
 
-    private StreamFrameReceiveOperation() => _resume = Resume;
+    internal StreamFrameReceiveOperation() => _resume = Resume;
 
     public static ValueTask<RpcFrame> Start(StreamConnection connection, CancellationToken ct)
     {
+        if (StreamFrameReceiveOperationPopulation.RequiresPreflight &&
+            StreamFrameReceiveOperationPopulation.MustUseFallback())
+        {
+            return StreamFrameReceiveFallback.StartFromBeginning(connection, ct);
+        }
+
         var state = new FrameReceiveOperationState();
         RpcFrame frame;
         ValueTask<int> pendingRead;
@@ -44,18 +50,46 @@ internal sealed class StreamFrameReceiveOperation :
             return CompleteSynchronously(connection, ref state, frame);
         }
 
-        StreamFrameReceiveOperation operation;
+        StreamFrameReceiveOperation? operation;
         try
         {
-            operation = TryRentOperation() ?? new StreamFrameReceiveOperation();
+            operation = TryRentOperation();
+            if (operation is null)
+            {
+                operation = StreamFrameReceiveOperationPopulation.CreateOrRentRaced();
+            }
         }
         catch (Exception error)
         {
             return FailSynchronously(connection, ref state, error);
         }
 
+        if (operation is null)
+        {
+            try
+            {
+                var fallback = StreamFrameReceiveFallback.Start(connection, state, pendingRead);
+                state = default;
+                return fallback;
+            }
+            catch (Exception error)
+            {
+                return FailSynchronously(connection, ref state, error);
+            }
+        }
+
+        if (StreamFrameReceiveOperationPopulation.IsAtCapacity)
+        {
+            StreamFrameReceiveOperationPopulation.ObserveAcquiredOperation();
+        }
+
         return StartPending(operation, connection, ref state, pendingRead);
     }
+
+    internal static bool HasAvailableOperationForPopulation => HasAvailableOperation;
+
+    internal static StreamFrameReceiveOperation? TryRentOperationForPopulation() =>
+        TryRentOperation();
 
     private static ValueTask<RpcFrame> StartPending(
         StreamFrameReceiveOperation operation,
@@ -87,7 +121,7 @@ internal sealed class StreamFrameReceiveOperation :
         catch (Exception error)
         {
             frame.Dispose();
-            return CreateFailedReceive(error, state.CallerToken);
+            return FrameReceiveFailure.Create(error, state.CallerToken);
         }
 
         return new ValueTask<RpcFrame>(frame);
@@ -108,27 +142,7 @@ internal sealed class StreamFrameReceiveOperation :
             error = cleanupError;
         }
 
-        return CreateFailedReceive(error, callerToken);
-    }
-
-    private static ValueTask<RpcFrame> CreateFailedReceive(
-        Exception error,
-        CancellationToken callerToken)
-    {
-        if (error is not OperationCanceledException canceled)
-        {
-            return StreamFrameReadOperations.CreateFailedReceive(error);
-        }
-
-        var cancellationToken = canceled.CancellationToken;
-        if (!cancellationToken.IsCancellationRequested)
-        {
-            cancellationToken = callerToken.IsCancellationRequested
-                ? callerToken
-                : new CancellationToken(canceled: true);
-        }
-
-        return StreamFrameReadOperations.CreateCanceledReceive(cancellationToken);
+        return FrameReceiveFailure.Create(error, callerToken);
     }
 
     private void Resume()

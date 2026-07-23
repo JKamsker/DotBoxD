@@ -117,7 +117,7 @@ internal sealed class TcpFrameReceiveOperation :
         catch (Exception error)
         {
             frame.Dispose();
-            return TcpFrameReceiveFailure.Create(error, state.CallerToken);
+            return FrameReceiveFailure.Create(error, state.CallerToken);
         }
 
         return new ValueTask<RpcFrame>(frame);
@@ -138,7 +138,7 @@ internal sealed class TcpFrameReceiveOperation :
             error = cleanupError;
         }
 
-        return TcpFrameReceiveFailure.Create(error, callerToken);
+        return FrameReceiveFailure.Create(error, callerToken);
     }
 
     private void Resume()

@@ -86,6 +86,22 @@ internal static class StreamFrameReceiveDriver
         return TryAdvance(connection, ref state, out frame, out nextPendingRead);
     }
 
+    public static bool ResumeAfterRead(
+        StreamConnection connection,
+        ref FrameReceiveOperationState state,
+        int read,
+        out RpcFrame frame,
+        out ValueTask<int> nextPendingRead)
+    {
+        nextPendingRead = default;
+        if (CommitRead(connection, ref state, read, out frame))
+        {
+            return true;
+        }
+
+        return TryAdvance(connection, ref state, out frame, out nextPendingRead);
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void StartPhase(
         StreamConnection connection,
