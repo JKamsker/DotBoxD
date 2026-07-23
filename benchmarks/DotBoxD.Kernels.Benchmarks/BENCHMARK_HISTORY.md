@@ -28,6 +28,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-server-extension-request-helpers
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-examples
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-prepared-values
+DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-auto-hotness-bookkeeping
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-runtime-types
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-input-types
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-resource-meter
@@ -2525,3 +2526,36 @@ planning rather than loop-body execution. The zero-inner timing ranges overlap a
 result and all resource counters; regressions cover required-slot assignment, debug fallback, concurrent publication,
 alternating cached statements, and the allocation bound. No public API, fuel, loop-budget, trace, or sandbox accounting
 contract changes.
+
+## Snapshot-free built-in Auto hotness selection
+
+The sealed default execution-mode selector reads only the current run count, but every eligible Auto execution still
+materialized the full retainable `ModuleHotnessStats` snapshot required by arbitrary custom selectors. The default path now
+captures the exact saturated run count while holding the existing hotness-state lock and carries a state-only completion
+handle through backend execution. Custom selectors continue to receive the same immutable point-in-time snapshot.
+
+Commands:
+
+```text
+DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-auto-hotness-bookkeeping
+DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-prepared-values
+```
+
+Three fresh Release processes paired 500,000 built-in attempts with the retained snapshot control. Median results were:
+
+```text
+path                       snapshot control       built-in path        allocation
+table interpreted                 98.6 ns              88.7 ns       96.0 -> 0.0 B/op
+state interpreted                 43.7 ns              35.8 ns       96.0 -> 0.0 B/op
+table warmed compiled             96.8 ns              88.6 ns       96.0 -> 0.0 B/op
+state warmed compiled             44.7 ns              35.9 ns       96.0 -> 0.0 B/op
+```
+
+Every run reproduced checksums of `130,000,250,000` for interpreted and `130,000,750,000` for seeded compiled lanes.
+The probe also validates the final run/completion counts, average fuel and interpreted duration, last-run timestamp,
+compile failures, artifact history, and table population outside the measured region.
+
+The warmed end-to-end Auto-compiled lane falls exactly from `1,584.2` to `1,488.2 B/op` in all three processes, while
+the compiled no-audit control remains exactly `1,160.0 B/op`. End-to-end elapsed samples overlap prior process variation,
+so no end-to-end timing improvement is claimed. Mandatory-first interpretation, threshold clamping, LRU behavior,
+cancellation/disposal ordering, failure completion, and the public selector contract remain unchanged.
