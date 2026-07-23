@@ -7,13 +7,13 @@ public sealed class SandboxHostCompiledNoAuditStateColdHostAllocationTests
     private const int WarmupIterations = 1_000;
     private const int MeasuredIterations = 100_000;
     private const int SampleCount = 3;
-    private const long ExpectedBytesPerHost = 4_888;
+    private const long MaximumBytesPerHost = 4_856;
 
     private static readonly Action<SandboxHostBuilder> InterpreterConfiguration =
         static builder => builder.UseInterpreter();
 
     [Fact]
-    public void Default_and_explicit_interpreter_cold_hosts_remain_allocation_identical()
+    public void Default_and_explicit_interpreter_cold_hosts_remain_allocation_identical_and_bounded()
     {
         _ = MeasureDefaultHosts(WarmupIterations);
         _ = MeasureInterpreterHosts(WarmupIterations);
@@ -32,8 +32,10 @@ public sealed class SandboxHostCompiledNoAuditStateColdHostAllocationTests
         Console.WriteLine(
             $"cold host construction: default={defaultAllocated / (double)MeasuredIterations:N3} B/host, " +
             $"interpreter={interpreterAllocated / (double)MeasuredIterations:N3} B/host.");
-        Assert.Equal(ExpectedBytesPerHost, defaultAllocated / MeasuredIterations);
-        Assert.Equal(ExpectedBytesPerHost, interpreterAllocated / MeasuredIterations);
+        var defaultBytesPerHost = defaultAllocated / MeasuredIterations;
+        var interpreterBytesPerHost = interpreterAllocated / MeasuredIterations;
+        Assert.Equal(defaultBytesPerHost, interpreterBytesPerHost);
+        Assert.InRange(defaultBytesPerHost, 0, MaximumBytesPerHost);
     }
 
     private static long MeasureDefaultHosts(int iterations)
