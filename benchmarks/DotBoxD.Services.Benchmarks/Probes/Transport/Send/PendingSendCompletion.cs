@@ -12,14 +12,31 @@ internal static class PendingSendCompletion
         var spinner = new SpinWait();
         while (!pending.IsCompleted)
         {
-            if (Stopwatch.GetElapsedTime(startedAt) >= Timeout)
-            {
-                throw new TimeoutException("A controlled pending send did not complete.");
-            }
-
+            ThrowIfTimedOut(startedAt);
             spinner.SpinOnce();
         }
 
         pending.GetAwaiter().GetResult();
+    }
+
+    public static TResult Consume<TResult>(ref ValueTask<TResult> pending)
+    {
+        var startedAt = Stopwatch.GetTimestamp();
+        var spinner = new SpinWait();
+        while (!pending.IsCompleted)
+        {
+            ThrowIfTimedOut(startedAt);
+            spinner.SpinOnce();
+        }
+
+        return pending.GetAwaiter().GetResult();
+    }
+
+    private static void ThrowIfTimedOut(long startedAt)
+    {
+        if (Stopwatch.GetElapsedTime(startedAt) >= Timeout)
+        {
+            throw new TimeoutException("A controlled pending operation did not complete.");
+        }
     }
 }

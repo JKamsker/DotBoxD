@@ -11,7 +11,8 @@ internal sealed class StreamPendingSendLane : IDisposable
     private readonly PendingSendStage _stage;
     private readonly PendingSendKind _kind;
     private readonly CancellationToken _cancellationToken;
-    private PooledBufferWriter? _lastOwnedFrame;
+    private readonly SendProbeFrameLease[]? _ownedLeases;
+    private int _ownedLeaseCount;
 
     public StreamPendingSendLane(
         PendingSendStage stage,
@@ -24,15 +25,28 @@ internal sealed class StreamPendingSendLane : IDisposable
         _cancellationToken = cancellationToken;
         _stream = new StagedSendStream(stage, cancellationToken, totalOperations);
         _connection = new StreamConnection(_stream, ownsStream: false);
+        _ownedLeases = kind == PendingSendKind.Owned
+            ? new SendProbeFrameLease[totalOperations]
+            : null;
     }
 
     public SendOutputSnapshot Snapshot() => _stream.Snapshot();
 
-    public void VerifyLastOwnedFrameDisposed()
+    public void VerifyOwnedFramesDisposed()
     {
-        if (_lastOwnedFrame is not null)
+        if (_ownedLeases is null)
         {
-            SendProbeFrame.AssertDisposed(_lastOwnedFrame);
+            return;
+        }
+
+        if (_ownedLeaseCount != _ownedLeases.Length)
+        {
+            throw new InvalidOperationException("Not every Stream owned-frame lease was recorded.");
+        }
+
+        foreach (var lease in _ownedLeases)
+        {
+            SendProbeFrame.AssertDisposed(lease);
         }
     }
 
@@ -52,6 +66,11 @@ internal sealed class StreamPendingSendLane : IDisposable
         PooledBufferWriter? frame = _kind == PendingSendKind.Owned
             ? SendProbeFrame.Rent()
             : null;
+        if (frame is not null)
+        {
+            _ownedLeases![_ownedLeaseCount++] = SendProbeFrame.CaptureLease(frame);
+        }
+
         try
         {
             var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
@@ -85,7 +104,6 @@ internal sealed class StreamPendingSendLane : IDisposable
 
             PendingSendCompletion.Consume(ref pending);
             _stream.ResetCompletedOperation();
-            _lastOwnedFrame = frame;
 
             if (_connection.SendGate.CurrentCount != 1)
             {

@@ -1,19 +1,19 @@
 using System.Diagnostics;
-using System.Net;
-using System.Net.Sockets;
+using System.IO.Pipes;
 using DotBoxD.Services.Buffers;
-using DotBoxD.Transports.Tcp;
+using DotBoxD.Services.Transport;
 
 namespace DotBoxD.Services.Benchmarks.Probes;
 
-internal sealed class TcpHeldGateSendLane : IAsyncDisposable
+internal sealed class NamedPipeHeldGateSendLane : IAsyncDisposable
 {
     private static readonly TimeSpan SetupTimeout = TimeSpan.FromSeconds(10);
-    private readonly TcpConnection _connection;
-    private readonly TcpClient _peer;
-    private readonly NetworkStream _peerStream;
+    private readonly NamedPipeServerStream _peer;
+    private readonly NamedPipeClientStream _sender;
+    private readonly StreamConnection _connection;
     private readonly PendingSendKind _kind;
     private readonly CancellationToken _cancellationToken;
+    private readonly CancellationTokenSource _readTimeout = new(TimeSpan.FromMinutes(2));
     private readonly byte[] _receiveBuffer = new byte[SendProbeFrame.Length];
     private readonly SendProbeFrameLease[]? _ownedLeases;
     private int _ownedLeaseCount;
@@ -21,16 +21,16 @@ internal sealed class TcpHeldGateSendLane : IAsyncDisposable
     private long _checksum;
     private long _writes;
 
-    private TcpHeldGateSendLane(
-        TcpConnection connection,
-        TcpClient peer,
+    private NamedPipeHeldGateSendLane(
+        NamedPipeServerStream peer,
+        NamedPipeClientStream sender,
         PendingSendKind kind,
         CancellationToken cancellationToken,
         int totalOperations)
     {
-        _connection = connection;
         _peer = peer;
-        _peerStream = peer.GetStream();
+        _sender = sender;
+        _connection = new StreamConnection(sender, ownsStream: false);
         _kind = kind;
         _cancellationToken = cancellationToken;
         _ownedLeases = kind == PendingSendKind.Owned
@@ -38,40 +38,38 @@ internal sealed class TcpHeldGateSendLane : IAsyncDisposable
             : null;
     }
 
-    public static async Task<TcpHeldGateSendLane> CreateAsync(
+    public static async Task<NamedPipeHeldGateSendLane> CreateAsync(
         PendingSendKind kind,
         CancellationToken cancellationToken,
         int totalOperations)
     {
-        using var listener = new TcpListener(IPAddress.Loopback, port: 0);
-        listener.Start();
-        var endpoint = (IPEndPoint)listener.LocalEndpoint;
-        var peer = new TcpClient(AddressFamily.InterNetwork)
-        {
-            NoDelay = true,
-            ReceiveTimeout = 10_000,
-        };
-        TcpClient? sender = null;
+        var pipeName = $"dotboxd-send-stage-{Guid.NewGuid():N}";
+        var peer = new NamedPipeServerStream(
+            pipeName,
+            PipeDirection.InOut,
+            maxNumberOfServerInstances: 1,
+            PipeTransmissionMode.Byte,
+            PipeOptions.Asynchronous);
+        var sender = new NamedPipeClientStream(
+            ".",
+            pipeName,
+            PipeDirection.InOut,
+            PipeOptions.Asynchronous);
         try
         {
-            var accepting = listener.AcceptTcpClientAsync();
-            await peer.ConnectAsync(endpoint.Address, endpoint.Port)
-                .WaitAsync(SetupTimeout)
-                .ConfigureAwait(false);
-            sender = await accepting.WaitAsync(SetupTimeout).ConfigureAwait(false);
-            sender.NoDelay = true;
-            var lane = new TcpHeldGateSendLane(
-                new TcpConnection(sender, Timeout.InfiniteTimeSpan),
+            var accepting = peer.WaitForConnectionAsync();
+            await sender.ConnectAsync().WaitAsync(SetupTimeout).ConfigureAwait(false);
+            await accepting.WaitAsync(SetupTimeout).ConfigureAwait(false);
+            return new NamedPipeHeldGateSendLane(
                 peer,
+                sender,
                 kind,
                 cancellationToken,
                 totalOperations);
-            sender = null;
-            return lane;
         }
         catch
         {
-            sender?.Dispose();
+            sender.Dispose();
             peer.Dispose();
             throw;
         }
@@ -88,7 +86,7 @@ internal sealed class TcpHeldGateSendLane : IAsyncDisposable
 
         if (_ownedLeaseCount != _ownedLeases.Length)
         {
-            throw new InvalidOperationException("Not every TCP owned-frame lease was recorded.");
+            throw new InvalidOperationException("Not every named-pipe owned-frame lease was recorded.");
         }
 
         foreach (var lease in _ownedLeases)
@@ -101,7 +99,7 @@ internal sealed class TcpHeldGateSendLane : IAsyncDisposable
     {
         if (_connection.SendGate.CurrentCount != 1 || !_connection.SendGate.Wait(0))
         {
-            throw new InvalidOperationException("The TCP send gate could not be held.");
+            throw new InvalidOperationException("The named-pipe send gate could not be held.");
         }
 
         var gateHeldByHarness = true;
@@ -125,18 +123,18 @@ internal sealed class TcpHeldGateSendLane : IAsyncDisposable
 
             if (pending.IsCompleted || _connection.SendGate.CurrentCount != 0)
             {
-                throw new InvalidOperationException("The TCP send did not remain behind the held gate.");
+                throw new InvalidOperationException(
+                    "The named-pipe send did not remain behind the held gate.");
             }
 
             _ = frame?.WrittenMemory;
-            _connection.ReleaseSendGate();
+            _connection.SendGate.Release();
             gateHeldByHarness = false;
             PendingSendCompletion.Consume(ref pending);
-
-            ReadExactly(_peerStream, _receiveBuffer);
+            ReadExactly(_peer, _receiveBuffer, _readTimeout.Token);
             if (!_receiveBuffer.AsSpan().SequenceEqual(SendProbeFrame.Raw))
             {
-                throw new InvalidOperationException("The TCP peer received unexpected frame bytes.");
+                throw new InvalidOperationException("The named-pipe peer received unexpected frame bytes.");
             }
 
             _writes++;
@@ -144,7 +142,7 @@ internal sealed class TcpHeldGateSendLane : IAsyncDisposable
             _checksum += SendProbeFrame.CalculateChecksum(_receiveBuffer);
             if (_connection.SendGate.CurrentCount != 1)
             {
-                throw new InvalidOperationException("The TCP send gate was not restored.");
+                throw new InvalidOperationException("The named-pipe send gate was not restored.");
             }
 
             return new PendingSendCallSample(elapsedTicks, callerAllocated);
@@ -153,7 +151,7 @@ internal sealed class TcpHeldGateSendLane : IAsyncDisposable
         {
             if (gateHeldByHarness)
             {
-                _connection.ReleaseSendGate();
+                _connection.SendGate.Release();
             }
         }
     }
@@ -161,17 +159,24 @@ internal sealed class TcpHeldGateSendLane : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await _connection.DisposeAsync().ConfigureAwait(false);
+        _readTimeout.Dispose();
+        _sender.Dispose();
         _peer.Dispose();
     }
 
-    private static void ReadExactly(Stream stream, Span<byte> buffer)
+    private static void ReadExactly(
+        Stream stream,
+        Memory<byte> buffer,
+        CancellationToken cancellationToken)
     {
         while (!buffer.IsEmpty)
         {
-            var read = stream.Read(buffer);
+            var pending = stream.ReadAsync(buffer, cancellationToken);
+            var read = PendingSendCompletion.Consume(ref pending);
             if (read == 0)
             {
-                throw new EndOfStreamException("The TCP peer closed before one frame was drained.");
+                throw new EndOfStreamException(
+                    "The named-pipe peer closed before one frame was drained.");
             }
 
             buffer = buffer.Slice(read);

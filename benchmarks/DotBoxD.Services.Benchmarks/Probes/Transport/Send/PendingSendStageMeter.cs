@@ -99,12 +99,12 @@ internal readonly record struct PendingSendStageMeasurement(
     int Iterations,
     long CallTicks,
     long CallerAllocatedBytes,
-    long TotalAllocatedBytes)
+    long LoopProcessAllocatedBytes)
 {
     public double CallNanosecondsPerOperation =>
         CallTicks * (1_000_000_000d / Stopwatch.Frequency) / Iterations;
 
     public double CallerBytesPerOperation => CallerAllocatedBytes / (double)Iterations;
 
-    public double TotalBytesPerOperation => TotalAllocatedBytes / (double)Iterations;
+    public double LoopProcessBytesPerOperation => LoopProcessAllocatedBytes / (double)Iterations;
 }

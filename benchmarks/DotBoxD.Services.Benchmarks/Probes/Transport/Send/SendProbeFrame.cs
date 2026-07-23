@@ -17,12 +17,15 @@ internal static class SendProbeFrame
         return frame;
     }
 
-    public static void AssertDisposed(PooledBufferWriter frame)
+    public static SendProbeFrameLease CaptureLease(PooledBufferWriter frame) =>
+        new(frame, frame.LeaseToken);
+
+    public static void AssertDisposed(SendProbeFrameLease lease)
     {
         try
         {
-            _ = frame.WrittenMemory;
-            throw new InvalidOperationException("A completed send did not dispose its owned frame.");
+            _ = lease.Frame.GetWrittenMemory(lease.Token);
+            throw new InvalidOperationException("A completed send did not dispose its owned lease.");
         }
         catch (ObjectDisposedException)
         {
@@ -46,3 +49,5 @@ internal static class SendProbeFrame
         return frame.WrittenMemory.ToArray();
     }
 }
+
+internal readonly record struct SendProbeFrameLease(PooledBufferWriter Frame, long Token);
