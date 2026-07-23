@@ -1,4 +1,5 @@
 using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Benchmarks.Runtime.ValueShapeHandoff;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
@@ -27,6 +28,7 @@ internal static class ValueShapeCacheProbe
         Write("CompiledRuntime.MapSet scalar replace cache", MeasureMapReplace(MapIterations));
         Write("ListValue empty construction control", MeasureListConstruction(ControlIterations));
         Write("ListValue owned reset control", MeasureOwnedListReset(ControlIterations));
+        ValueShapeCrossThreadHandoffProbe.Run();
     }
 
     private static Measurement MeasureListAppend(int iterations)
@@ -167,6 +169,7 @@ internal static class ValueShapeCacheProbe
     {
         var limits = new ResourceLimits(
             MaxFuel: long.MaxValue,
+            MaxWallTime: TimeSpan.FromMinutes(5),
             MaxAllocatedBytes: long.MaxValue,
             MaxListLength: maxListLength,
             MaxMapEntries: maxMapEntries,

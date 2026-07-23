@@ -2,20 +2,35 @@ namespace DotBoxD.Kernels.Sandbox.Values;
 
 /// <summary>
 /// Keeps the most recently composed shape on each thread without retaining the value or allocating a
-/// per-result cache box. A weak target bounds retention, and mutable owned lists carry a generation so a
-/// reset performed on another thread cannot revive an old shape.
+/// per-result cache box. Same-thread hits remain lock-free. A bounded weak registry lets another thread
+/// discover the producer's current entry and promote it locally; ordinary misses still use the persistent
+/// cache and full measurement. Mutable owned lists carry a generation so reset cannot revive an old shape.
 /// </summary>
 internal static class ValueShapeHotCache
 {
+    private const int MinimumPublishedListElements = 16;
+    private const int MinimumPublishedMapEntries = 8;
+
     [ThreadStatic]
-    private static Entry? t_entry;
+    private static ValueShapeHotEntry? t_entry;
 
     public static bool TryGet(SandboxValue value, out ShapeInfo info)
     {
         var entry = t_entry;
-        if (entry is not null && entry.TryGet(value, GetGeneration(value), out info))
+        if (entry is not null && entry.TryGetLocal(value, GetGeneration(value), out info))
         {
             return true;
+        }
+
+        info = default;
+        return false;
+    }
+
+    public static bool TryGetPublished(SandboxValue value, out ShapeInfo info)
+    {
+        if (ShouldPublishCrossThread(value))
+        {
+            return ValueShapeHotEntryRegistry.TryGet(value, GetGeneration(value), t_entry, out info);
         }
 
         info = default;
@@ -27,57 +42,45 @@ internal static class ValueShapeHotCache
         var generation = GetGeneration(value);
         if (t_entry is { } entry)
         {
-            entry.Set(value, generation, info);
+            entry.SetLocal(value, generation, info);
             return;
         }
 
-        t_entry = new Entry(value, generation, info);
+        entry = new ValueShapeHotEntry(value, generation, info);
+        t_entry = entry;
+    }
+
+    public static void Publish(SandboxValue value, ShapeInfo info)
+    {
+        var generation = GetGeneration(value);
+        var entry = t_entry;
+        if (entry is null)
+        {
+            entry = new ValueShapeHotEntry(value, generation, info);
+            t_entry = entry;
+        }
+
+        entry.Publish(value, generation, info);
+        if (!ShouldPublishCrossThread(value))
+        {
+            return;
+        }
+
+        if (entry.TryBeginRegistration())
+        {
+            ValueShapeHotEntryRegistry.TryRegister(entry);
+        }
+
+        ValueShapeHotEntryRegistry.Publish(entry, value);
     }
 
     private static ValueShapeGeneration GetGeneration(SandboxValue value) =>
         value is ListValue list ? list.ShapeGeneration : default;
 
-    private sealed class Entry
+    private static bool ShouldPublishCrossThread(SandboxValue value) => value switch
     {
-        private readonly WeakReference<SandboxValue> _value;
-        private ShapeInfo _info;
-        private ValueShapeGeneration _generation;
-
-        public Entry(
-            SandboxValue value,
-            ValueShapeGeneration generation,
-            ShapeInfo info)
-        {
-            _value = new WeakReference<SandboxValue>(value);
-            _generation = generation;
-            _info = info;
-        }
-
-        public bool TryGet(
-            SandboxValue value,
-            ValueShapeGeneration generation,
-            out ShapeInfo info)
-        {
-            if (_generation == generation &&
-                _value.TryGetTarget(out var cached) &&
-                ReferenceEquals(cached, value))
-            {
-                info = _info;
-                return true;
-            }
-
-            info = default;
-            return false;
-        }
-
-        public void Set(
-            SandboxValue value,
-            ValueShapeGeneration generation,
-            ShapeInfo info)
-        {
-            _info = info;
-            _generation = generation;
-            _value.SetTarget(value);
-        }
-    }
+        ListValue list => list.Values.Count >= MinimumPublishedListElements,
+        MapValue map => map.Values.Count >= MinimumPublishedMapEntries,
+        _ => false,
+    };
 }

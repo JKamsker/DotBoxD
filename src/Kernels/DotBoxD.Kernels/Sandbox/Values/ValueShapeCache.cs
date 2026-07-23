@@ -65,6 +65,12 @@ internal static class ValueShapeCache
             return true;
         }
 
+        if (ValueShapeHotCache.TryGetPublished(value, out info))
+        {
+            ValueShapeHotCache.Set(value, info);
+            return true;
+        }
+
         info = default;
         return false;
     }
@@ -257,7 +263,7 @@ internal static class ValueShapeCache
     }
 
     private static void PublishIncremental(SandboxValue value, ShapeInfo info) =>
-        ValueShapeHotCache.Set(value, info);
+        ValueShapeHotCache.Publish(value, info);
 
     private static bool HasZeroShape(SandboxType type)
         => ReferenceEquals(type, SandboxType.Unit) ||
