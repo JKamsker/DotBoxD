@@ -58,6 +58,15 @@ internal sealed class AutoExecutionHotness
     {
         lock (_gate)
         {
+            if (_recency.Last is { Value: var mostRecent } &&
+                ReferenceEquals(key.Entrypoint, mostRecent.Entrypoint) &&
+                ReferenceEquals(key.PlanHash, mostRecent.PlanHash))
+            {
+                // The matching node is already most recently used, so returning it leaves the
+                // exact eviction order unchanged. Value-equal strings still use the dictionary.
+                return mostRecent;
+            }
+
             if (_states.TryGetValue(key, out var existing))
             {
                 _recency.Remove(existing);
