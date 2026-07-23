@@ -66,6 +66,9 @@ if (args.Length == 1)
         case "--probe-constructor-replay":
             ConstructorReplayGuardProbe.Run();
             return;
+        case "--probe-messagepack-utf16-validation":
+            MessagePackUtf16ValidationProbe.Run();
+            return;
         case "--probe-pooled-buffer-writer-cache":
             PooledBufferWriterCacheProbe.Run();
             return;
