@@ -88,7 +88,13 @@ internal sealed partial class RpcPeerOutboundInvoker
                 ct.ThrowIfCancellationRequested();
                 var messageId = NextMessageId(ct);
                 if (messageId != 0 &&
-                    _pending.TryAddValueTaskUnary<TResponse>(messageId, service, method, out var pending))
+                    _pending.TryAddValueTaskUnary<TResponse>(
+                        messageId,
+                        service,
+                        method,
+                        this,
+                        ct,
+                        out var pending))
                 {
                     return pending;
                 }
@@ -161,7 +167,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         pending.ReleaseSetup();
     }
 
-    private void CompletePooledWrapper(
+    internal void CompletePooledWrapper(
         PooledPendingResponse pending,
         bool consumed)
     {
@@ -179,6 +185,12 @@ internal sealed partial class RpcPeerOutboundInvoker
         ReleasePendingSlot();
         pending.ReleaseWrapper();
     }
+
+    internal void CancelPooledByCaller(PooledPendingResponse pending) =>
+        _pending.TryCancel(pending.MessageId, pending, PendingCancellationKind.Caller);
+
+    internal void TrySendPooledCancel(int messageId) =>
+        _cancelFrames.TrySend(messageId);
 
     internal void CompleteUnaryPending(IPendingResponse pending, bool sendCancel)
     {

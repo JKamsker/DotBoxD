@@ -38,9 +38,16 @@ internal sealed class PendingRequests : IDisposable
         int messageId,
         string service,
         string method,
+        RpcPeerOutboundInvoker owner,
+        CancellationToken callerToken,
         out PendingValueTaskUnaryResponse<TResponse> pending)
     {
-        var candidate = PendingValueTaskUnaryResponse<TResponse>.Rent(messageId, service, method);
+        var candidate = PendingValueTaskUnaryResponse<TResponse>.Rent(
+            messageId,
+            service,
+            method,
+            owner,
+            callerToken);
         var added = TryAddCore(messageId, candidate, out pending);
         if (!added)
             candidate.AbandonUnpublished();

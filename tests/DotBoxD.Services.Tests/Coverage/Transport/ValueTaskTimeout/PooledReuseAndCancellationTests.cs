@@ -9,7 +9,7 @@ public sealed class PooledReuseAndCancellationTests
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(5);
 
     [Fact]
-    public async Task Live_caller_token_keeps_generic_invocation_task_backed()
+    public async Task Live_caller_token_uses_generic_pooled_source()
     {
         await using var harness = new ValueTaskTimeoutTestHarness(Timeout.InfiniteTimeSpan);
         using var cancellation = new CancellationTokenSource();
@@ -23,7 +23,7 @@ public sealed class PooledReuseAndCancellationTests
         harness.CompleteGeneric(harness.LastRequestMessageId);
 
         Assert.Equal(ValueTaskTimeoutTestHarness.ResponseValue, await call);
-        Assert.IsType<CancellablePendingUnaryResponse<int>>(pending);
+        Assert.IsType<PendingValueTaskUnaryResponse<int>>(pending);
     }
 
     [Fact]

@@ -1,5 +1,4 @@
 using DotBoxD.Services.Buffers;
-using DotBoxD.Services.Exceptions;
 using DotBoxD.Services.Protocol;
 
 namespace DotBoxD.Services.Client;
@@ -55,7 +54,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         string? instanceId,
         CancellationToken ct)
     {
-        if (!CanUseLowAllocationValueTaskPath(ct))
+        if (!_enableLowAllocationValueTaskInvocations)
         {
             return new ValueTask<TResponse>(
                 SendUnaryRequestAsync<TRequest, TResponse>(service, method, request, instanceId, ct));
@@ -102,7 +101,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         string? instanceId,
         CancellationToken ct)
     {
-        if (!CanUseLowAllocationValueTaskPath(ct))
+        if (!_enableLowAllocationValueTaskInvocations)
         {
             return new ValueTask<TResponse>(
                 SendUnaryRequestAsync<TResponse>(service, method, instanceId, ct));
@@ -143,10 +142,6 @@ internal sealed partial class RpcPeerOutboundInvoker
             ct);
     }
 
-    private bool CanUseLowAllocationValueTaskPath(CancellationToken ct) =>
-        _enableLowAllocationValueTaskInvocations &&
-        !ct.CanBeCanceled;
-
     private ValueTask<TResponse> SendFrameAndReadUnaryValueResponseAsync<TResponse>(
         int messageId,
         PendingValueTaskUnaryResponse<TResponse> pending,
@@ -168,7 +163,7 @@ internal sealed partial class RpcPeerOutboundInvoker
                 return new ValueTask<TResponse>(ToFaultedTask<TResponse>(ex));
             }
 
-            if (sendValueTask.IsCompletedSuccessfully)
+            if (sendValueTask.IsCompletedSuccessfully && !ct.CanBeCanceled)
             {
                 try
                 {
@@ -185,7 +180,7 @@ internal sealed partial class RpcPeerOutboundInvoker
             }
 
             pending.TransferSetupToWrapper();
-            return AwaitUnaryFrameValueResponseAsync(messageId, pending, sendValueTask);
+            return PooledUnaryPendingSend.AwaitFrameAsync(this, messageId, pending, sendValueTask, ct);
         }
 
         Task sendTask;
@@ -200,7 +195,7 @@ internal sealed partial class RpcPeerOutboundInvoker
             return new ValueTask<TResponse>(ToFaultedTask<TResponse>(ex));
         }
 
-        if (sendTask.IsCompletedSuccessfully)
+        if (sendTask.IsCompletedSuccessfully && !ct.CanBeCanceled)
         {
             frame.Dispose();
             if (_hasFiniteTimeout && !pending.CompletionStarted)
@@ -212,79 +207,6 @@ internal sealed partial class RpcPeerOutboundInvoker
         }
 
         pending.TransferSetupToWrapper();
-        return AwaitUnaryValueResponseAsync(messageId, pending, frame, sendTask);
-    }
-
-    private async ValueTask<TResponse> AwaitUnaryFrameValueResponseAsync<TResponse>(
-        int messageId,
-        PendingValueTaskUnaryResponse<TResponse> pending,
-        ValueTask sendTask)
-    {
-        var pendingConsumed = false;
-        try
-        {
-            await sendTask.ConfigureAwait(false);
-            if (_hasFiniteTimeout && !pending.CompletionStarted)
-            {
-                _pending.StartTimeout(pending, _timeout);
-            }
-
-            try
-            {
-                return await pending.ValueTask.ConfigureAwait(false);
-            }
-            catch (ServiceTimeoutException)
-            {
-                _cancelFrames.TrySend(messageId);
-                throw;
-            }
-            finally
-            {
-                pendingConsumed = true;
-            }
-        }
-        finally
-        {
-            CompletePooledWrapper(pending, pendingConsumed);
-        }
-    }
-
-    private async ValueTask<TResponse> AwaitUnaryValueResponseAsync<TResponse>(
-        int messageId,
-        PendingValueTaskUnaryResponse<TResponse> pending,
-        PooledBufferWriter frame,
-        Task sendTask)
-    {
-        var pendingConsumed = false;
-        try
-        {
-            using (frame)
-            {
-                await sendTask.ConfigureAwait(false);
-            }
-
-            if (_hasFiniteTimeout && !pending.CompletionStarted)
-            {
-                _pending.StartTimeout(pending, _timeout);
-            }
-
-            try
-            {
-                return await pending.ValueTask.ConfigureAwait(false);
-            }
-            catch (ServiceTimeoutException)
-            {
-                _cancelFrames.TrySend(messageId);
-                throw;
-            }
-            finally
-            {
-                pendingConsumed = true;
-            }
-        }
-        finally
-        {
-            CompletePooledWrapper(pending, pendingConsumed);
-        }
+        return PooledUnaryPendingSend.AwaitMemoryAsync(this, messageId, pending, frame, sendTask, ct);
     }
 }

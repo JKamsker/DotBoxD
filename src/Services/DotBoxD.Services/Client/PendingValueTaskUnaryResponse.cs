@@ -29,7 +29,9 @@ internal sealed class PendingValueTaskUnaryResponse<TResponse> :
     public static PendingValueTaskUnaryResponse<TResponse> Rent(
         int messageId,
         string service,
-        string method)
+        string method,
+        RpcPeerOutboundInvoker owner,
+        CancellationToken callerToken)
     {
         var pending = Interlocked.Exchange(ref s_cached, null);
         if (pending is null)
@@ -46,7 +48,7 @@ internal sealed class PendingValueTaskUnaryResponse<TResponse> :
         }
 
         pending ??= new PendingValueTaskUnaryResponse<TResponse>();
-        pending.Initialize(messageId, service, method);
+        pending.Initialize(messageId, service, method, owner, callerToken);
         return pending;
     }
 
@@ -91,6 +93,10 @@ internal sealed class PendingValueTaskUnaryResponse<TResponse> :
                 }
 
                 result = serializer.Deserialize<TResponse>(payload);
+                if (TryCancelIfCallerCanceledAfterMaterialization())
+                {
+                    return true;
+                }
             }
             catch (Exception ex)
             {

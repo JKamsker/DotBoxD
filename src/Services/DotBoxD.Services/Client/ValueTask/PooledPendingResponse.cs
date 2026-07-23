@@ -9,7 +9,8 @@ namespace DotBoxD.Services.Client;
 
 internal abstract class PooledPendingResponse : IPendingResponse
 {
-    private RpcPeerOutboundInvoker? _directOwner;
+    private RpcPeerOutboundInvoker? _owner;
+    private CancellationToken _callerToken;
     private string? _service;
     private string? _method;
     private long _timeoutDeadline = long.MaxValue;
@@ -30,6 +31,9 @@ internal abstract class PooledPendingResponse : IPendingResponse
 
     public void CancelByCaller()
     {
+        var owner = Volatile.Read(ref _owner)
+            ?? throw new InvalidOperationException("Pooled pending owner was not published.");
+        owner.CancelPooledByCaller(this);
     }
 
     public void DisposeResultWhenAvailable() =>
@@ -82,12 +86,18 @@ internal abstract class PooledPendingResponse : IPendingResponse
         _lifecycle.FinishCompletion(this, completionKind, start);
     }
 
-    internal void Initialize(int messageId, string service, string method)
+    internal void Initialize(
+        int messageId,
+        string service,
+        string method,
+        RpcPeerOutboundInvoker? owner,
+        CancellationToken callerToken)
     {
         MessageId = messageId;
         _service = service;
         _method = method;
-        _directOwner = null;
+        _owner = owner;
+        _callerToken = callerToken;
         _timeoutDeadline = long.MaxValue;
         _lifecycle.Initialize();
     }
@@ -123,7 +133,7 @@ internal abstract class PooledPendingResponse : IPendingResponse
 
     internal void NotifyDirectOwner(bool sendCancel)
     {
-        var owner = Volatile.Read(ref _directOwner)
+        var owner = Volatile.Read(ref _owner)
             ?? throw new InvalidOperationException("Direct pending owner was not published.");
         owner.CompleteUnaryPending(this, sendCancel);
     }
@@ -135,7 +145,8 @@ internal abstract class PooledPendingResponse : IPendingResponse
         _timeoutDeadline = long.MaxValue;
         _service = null;
         _method = null;
-        _directOwner = null;
+        _owner = null;
+        _callerToken = default;
         PushToPoolCore();
     }
 
@@ -144,12 +155,51 @@ internal abstract class PooledPendingResponse : IPendingResponse
 
     protected void MarkIssuedForDirect(RpcPeerOutboundInvoker owner)
     {
-        Volatile.Write(ref _directOwner, owner);
+        var publishedOwner = Volatile.Read(ref _owner);
+        if (publishedOwner is null)
+        {
+            publishedOwner = Interlocked.CompareExchange(ref _owner, owner, null);
+            publishedOwner ??= owner;
+        }
+
+        if (!ReferenceEquals(publishedOwner, owner))
+        {
+            throw new InvalidOperationException("Direct pending owner does not match the reserved owner.");
+        }
+
         _lifecycle.MarkIssuedForDirect(this);
     }
 
     protected void MarkConsumed() =>
         _lifecycle.MarkConsumed(this);
+
+    internal CancellationTokenRegistration RegisterCallerCancellation(CancellationToken callerToken)
+    {
+        if (!callerToken.CanBeCanceled)
+        {
+            return default;
+        }
+
+        if (callerToken != _callerToken)
+        {
+            throw new InvalidOperationException("Caller cancellation token does not match the reserved token.");
+        }
+
+        return callerToken.Register(
+            static state => ((PooledPendingResponse)state!).CancelByCaller(),
+            this);
+    }
+
+    protected bool TryCancelIfCallerCanceledAfterMaterialization()
+    {
+        if (!_callerToken.IsCancellationRequested)
+        {
+            return false;
+        }
+
+        TrySetCanceled(PendingCancellationKind.Caller);
+        return true;
+    }
 
     protected PooledCompletionStart BeginResultCompletion() =>
         _lifecycle.BeginCompletion(this, PooledCompletionKind.Normal);

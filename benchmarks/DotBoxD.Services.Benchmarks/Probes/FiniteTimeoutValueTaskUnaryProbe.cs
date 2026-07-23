@@ -16,48 +16,82 @@ internal static class FiniteTimeoutValueTaskUnaryProbe
 
     public static async Task RunAsync()
     {
-        var taskBacked = await MeasureAsync(
-            "finite task-backed",
-            enableLowAllocation: false,
-            TimeSpan.FromSeconds(30));
-        var finiteOptIn = await MeasureAsync(
-            "finite opt-in",
-            enableLowAllocation: true,
-            TimeSpan.FromSeconds(30));
-        var pooledControl = await MeasureAsync(
-            "infinite pooled control",
-            enableLowAllocation: true,
-            Timeout.InfiniteTimeSpan);
+        using var liveCancellation = new CancellationTokenSource();
+        var measurements = new[]
+        {
+            await MeasureAsync(
+                "finite task-backed/default",
+                enableLowAllocation: false,
+                TimeSpan.FromSeconds(30),
+                CancellationToken.None),
+            await MeasureAsync(
+                "finite task-backed/live",
+                enableLowAllocation: false,
+                TimeSpan.FromSeconds(30),
+                liveCancellation.Token),
+            await MeasureAsync(
+                "finite opt-in/default",
+                enableLowAllocation: true,
+                TimeSpan.FromSeconds(30),
+                CancellationToken.None),
+            await MeasureAsync(
+                "finite opt-in/live",
+                enableLowAllocation: true,
+                TimeSpan.FromSeconds(30),
+                liveCancellation.Token),
+            await MeasureAsync(
+                "infinite task-backed/default",
+                enableLowAllocation: false,
+                Timeout.InfiniteTimeSpan,
+                CancellationToken.None),
+            await MeasureAsync(
+                "infinite task-backed/live",
+                enableLowAllocation: false,
+                Timeout.InfiniteTimeSpan,
+                liveCancellation.Token),
+            await MeasureAsync(
+                "infinite opt-in/default",
+                enableLowAllocation: true,
+                Timeout.InfiniteTimeSpan,
+                CancellationToken.None),
+            await MeasureAsync(
+                "infinite opt-in/live",
+                enableLowAllocation: true,
+                Timeout.InfiniteTimeSpan,
+                liveCancellation.Token),
+        };
 
         Console.WriteLine("finite-timeout ValueTask unary probe");
         Console.WriteLine("case                          total ms       ns/op    allocated B      B/op");
-        Write(taskBacked);
-        Write(finiteOptIn);
-        Write(pooledControl);
+        foreach (var measurement in measurements)
+        {
+            Write(measurement);
+        }
     }
 
     private static async Task<Measurement> MeasureAsync(
         string name,
         bool enableLowAllocation,
-        TimeSpan timeout)
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
     {
         await using var harness = new UnaryHarness(enableLowAllocation, timeout);
         for (var i = 0; i < WarmupIterations; i++)
         {
-            _ = harness.InvokeOnce();
+            _ = await harness.InvokeOnceAsync(cancellationToken).ConfigureAwait(false);
         }
 
         ForceGc();
-        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
         var startedAt = Stopwatch.GetTimestamp();
         long checksum = 0;
         for (var i = 0; i < MeasurementIterations; i++)
         {
-            checksum += harness.InvokeOnce();
+            checksum += await harness.InvokeOnceAsync(cancellationToken).ConfigureAwait(false);
         }
 
         var elapsed = Stopwatch.GetElapsedTime(startedAt);
-        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        var allocated = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
         var expectedChecksum = (long)MeasurementIterations * UnaryHarness.ResponseValue;
         if (checksum != expectedChecksum)
         {
@@ -116,10 +150,14 @@ internal static class FiniteTimeoutValueTaskUnaryProbe
 
         private RpcPeerOutboundInvoker Invoker { get; }
 
-        public int InvokeOnce()
+        public async ValueTask<int> InvokeOnceAsync(CancellationToken cancellationToken)
         {
             var messageId = ++_messageId;
-            var call = Invoker.InvokeValueAsync<int, int>("Probe", "Unary", request: 7);
+            var call = Invoker.InvokeValueAsync<int, int>(
+                "Probe",
+                "Unary",
+                request: 7,
+                cancellationToken);
             var response = MessageFramer.FrameMessage(
                 _serializer,
                 messageId,
@@ -132,12 +170,7 @@ internal static class FiniteTimeoutValueTaskUnaryProbe
                 throw new InvalidOperationException("the synthetic response was not accepted");
             }
 
-            if (!call.IsCompletedSuccessfully)
-            {
-                throw new InvalidOperationException("the synthetic unary call did not complete synchronously");
-            }
-
-            return call.Result;
+            return await call.ConfigureAwait(false);
         }
 
         public async ValueTask DisposeAsync()

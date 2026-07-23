@@ -55,7 +55,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         string? instanceId,
         CancellationToken ct)
     {
-        if (!CanUseLowAllocationValueTaskPath(ct))
+        if (!CanUseLowAllocationNoResponseValueTaskPath(ct))
         {
             var task = instanceId is null
                 ? InvokeAsync(service, method, request, ct)
@@ -100,7 +100,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         string? instanceId,
         CancellationToken ct)
     {
-        if (!CanUseLowAllocationValueTaskPath(ct))
+        if (!CanUseLowAllocationNoResponseValueTaskPath(ct))
         {
             var task = instanceId is null
                 ? InvokeAsync(service, method, ct)
@@ -206,6 +206,10 @@ internal sealed partial class RpcPeerOutboundInvoker
         pending.TransferSetupToWrapper();
         return AwaitNoResponseValueAsync(messageId, pending, frame, sendTask);
     }
+
+    private bool CanUseLowAllocationNoResponseValueTaskPath(CancellationToken ct) =>
+        _enableLowAllocationValueTaskInvocations &&
+        !ct.CanBeCanceled;
 
     private async ValueTask AwaitNoResponseFrameValueAsync(
         int messageId,

@@ -2,7 +2,7 @@ namespace DotBoxD.Services.Client;
 
 internal sealed partial class RpcPeerOutboundInvoker
 {
-    private void StartPooledTimeoutIfNeeded(PooledPendingResponse pending)
+    internal void StartPooledTimeoutIfNeeded(PooledPendingResponse pending)
     {
         if (_hasFiniteTimeout && !pending.CompletionStarted)
         {

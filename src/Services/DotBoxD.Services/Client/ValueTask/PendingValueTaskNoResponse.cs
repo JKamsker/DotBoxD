@@ -44,7 +44,12 @@ internal sealed class PendingValueTaskNoResponse :
         }
 
         pending ??= new PendingValueTaskNoResponse();
-        pending.Initialize(messageId, service, method);
+        pending.Initialize(
+            messageId,
+            service,
+            method,
+            owner: null,
+            CancellationToken.None);
         return pending;
     }
 
