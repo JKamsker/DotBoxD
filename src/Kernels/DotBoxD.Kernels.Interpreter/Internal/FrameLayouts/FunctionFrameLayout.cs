@@ -79,6 +79,8 @@ internal sealed class FunctionFrameLayout
             ? slot
             : throw Unknown(name);
 
+    internal bool TryGetSlot(string name, out int slot) => _slots.TryGetValue(name, out slot);
+
     public bool IsI32Slot(int slot) => _slotKinds[slot] == SlotKind.I32;
 
     public bool IsI32Slot(string name) => IsI32Slot(GetSlot(name));

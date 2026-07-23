@@ -29,6 +29,7 @@ internal sealed partial class InterpreterFrame
     public string FunctionId => _layout.FunctionId;
     internal FunctionFrameLayout Layout => _layout;
     public int GetSlot(string name) => _layout.GetSlot(name);
+    internal bool TryGetSlot(string name, out int slot) => _layout.TryGetSlot(name, out slot);
     public SandboxValue Read(string name)
     {
         var slot = _layout.GetSlot(name);
@@ -54,9 +55,9 @@ internal sealed partial class InterpreterFrame
             ? value
             : throw Unassigned(name);
     }
-    public void Write(string name, SandboxValue value)
+    public void Write(string name, SandboxValue value) => WriteSlot(_layout.GetSlot(name), value);
+    internal void WriteSlot(int slot, SandboxValue value)
     {
-        var slot = _layout.GetSlot(name);
         if (_layout.IsI32Slot(slot))
         {
             _i32Slots[slot] = ((I32Value)value).Value;

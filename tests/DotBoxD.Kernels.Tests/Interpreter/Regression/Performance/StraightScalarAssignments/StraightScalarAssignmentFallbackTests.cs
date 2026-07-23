@@ -9,6 +9,7 @@ namespace DotBoxD.Kernels.Tests.Interpreter.Regression.Performance.StraightScala
 public sealed class StraightScalarAssignmentFallbackTests
 {
     [Theory]
+    [InlineData("I32", "i32")]
     [InlineData("I64", "i64")]
     [InlineData("F64", "f64")]
     public async Task Assigned_raw_variable_leaf_can_be_copied_to_a_new_local(
@@ -70,6 +71,7 @@ public sealed class StraightScalarAssignmentFallbackTests
     }
 
     [Theory]
+    [InlineData("I32", "i32")]
     [InlineData("I64", "i64")]
     [InlineData("F64", "f64")]
     public async Task Debug_trace_uses_generic_preorder_expression_events(
@@ -96,6 +98,13 @@ public sealed class StraightScalarAssignmentFallbackTests
                 type,
                 "value",
                 expression));
+
+        var untraced = await StraightScalarAssignmentTestSupport.ExecuteAsync(
+            host,
+            plan,
+            Scalar(type, 4));
+        Assert.True(untraced.Succeeded, untraced.Error?.SafeMessage);
+        Assert.DoesNotContain(untraced.AuditEvents, audit => audit.Kind == "DebugTrace");
 
         var result = await StraightScalarAssignmentTestSupport.ExecuteAsync(
             host,
@@ -224,13 +233,18 @@ public sealed class StraightScalarAssignmentFallbackTests
     }
 
     private static SandboxValue Scalar(string type, double value)
-        => type == "I64"
-            ? SandboxValue.FromInt64((long)value)
-            : SandboxValue.FromDouble(value);
+        => type switch
+        {
+            "I32" => SandboxValue.FromInt32((int)value),
+            "I64" => SandboxValue.FromInt64((long)value),
+            "F64" => SandboxValue.FromDouble(value),
+            _ => throw new ArgumentOutOfRangeException(nameof(type), type, "unknown scalar type")
+        };
 
     private static double NumericValue(SandboxValue value)
         => value switch
         {
+            I32Value number => number.Value,
             I64Value number => number.Value,
             F64Value number => number.Value,
             _ => throw new Xunit.Sdk.XunitException("unexpected straight assignment value")

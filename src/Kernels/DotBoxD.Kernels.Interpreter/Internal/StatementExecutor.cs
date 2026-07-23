@@ -81,17 +81,8 @@ internal readonly partial struct StatementExecutor
         return default;
     }
     private ValueTask<SandboxValue?> ExecuteAssignment(AssignmentStatement assignment, InterpreterFrame frame)
-    {
-        if (Expressions.TryEvaluateInt32(
-                assignment.Value, frame, out var i32Value))
-        {
-            frame.WriteInt32(assignment.Name, i32Value);
-            return default;
-        }
-
-        return PrimitiveStatementExecutor.ExecuteAssignment(
+        => PrimitiveStatementExecutor.ExecuteAssignment(
             assignment, frame, Expressions);
-    }
     private static ValueTask<SandboxValue?> DiscardResult(ValueTask<SandboxValue> task)
     {
         if (task.IsCompletedSuccessfully)
