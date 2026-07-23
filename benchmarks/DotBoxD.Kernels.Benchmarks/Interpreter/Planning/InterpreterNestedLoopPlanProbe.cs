@@ -114,10 +114,10 @@ internal static class InterpreterNestedLoopPlanProbe
         NestedLoopScenario scenario)
     {
         // The optimized lanes reach later controls much sooner than the baseline.
-        // Run the same full-size workload immediately before each timed sample so
-        // process power-state ramp does not masquerade as a fallback regression.
-        _ = Measure(interpreter, plan, options, scenario with { Name = string.Empty });
+        // After collection, run the same full-size workload immediately before each
+        // sample so post-GC core/cache warm-up is outside the measured interval.
         ForceGc();
+        _ = Measure(interpreter, plan, options, scenario with { Name = string.Empty });
         return Measure(interpreter, plan, options, scenario);
     }
 
