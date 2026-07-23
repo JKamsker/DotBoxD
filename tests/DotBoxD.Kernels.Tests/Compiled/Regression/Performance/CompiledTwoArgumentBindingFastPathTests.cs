@@ -8,6 +8,7 @@ using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
 namespace DotBoxD.Kernels.Tests.Compiled.Regression.Performance;
 
+[Collection(AllocationMeasurementCollection.Name)]
 public sealed class CompiledTwoArgumentBindingFastPathTests
 {
     [Fact]
@@ -61,6 +62,7 @@ public sealed class CompiledTwoArgumentBindingFastPathTests
     }
 
     [Fact]
+    [Trait(AllocationMeasurementCollection.TraitName, AllocationMeasurementCollection.TraitValue)]
     public void Regular_two_argument_scalar_fallback_allocates_only_argument_array()
     {
         const int warmup = 100;
