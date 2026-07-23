@@ -94,6 +94,12 @@ internal static class InterpreterProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-interpreter-host-boundary", StringComparer.OrdinalIgnoreCase))
+        {
+            await InterpreterHostBoundaryProbe.RunAsync();
+            return true;
+        }
+
         if (args.Contains("--probe-interpreter-trace-guard", StringComparer.OrdinalIgnoreCase))
         {
             await InterpreterTraceGuardProbe.RunAsync();
