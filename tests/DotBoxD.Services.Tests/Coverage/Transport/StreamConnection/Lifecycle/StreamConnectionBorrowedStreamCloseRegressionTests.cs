@@ -16,21 +16,18 @@ public sealed class StreamConnectionBorrowedStreamCloseRegressionTests
             ownsStream: false,
             frameReadIdleTimeout: System.Threading.Timeout.InfiniteTimeSpan);
 
-        var receiveTask = connection.ReceiveAsync();
+        using var receiveCts = new CancellationTokenSource();
+        var receiveTask = connection.ReceiveAsync(receiveCts.Token);
         await stream.WaitForReadAsync(Timeout);
 
         await connection.CloseAsync().WaitAsync(Timeout);
+        Assert.Equal(0, stream.DisposeCount);
+
+        receiveCts.Cancel();
         var receiveException = await Record.ExceptionAsync(
             () => receiveTask.WaitAsync(Timeout));
 
-        if (receiveException is not null)
-        {
-            Assert.True(
-                receiveException is OperationCanceledException or ObjectDisposedException,
-                $"Unexpected receive teardown exception: {receiveException}");
-        }
-
-        Assert.Equal(0, stream.DisposeCount);
+        Assert.IsAssignableFrom<OperationCanceledException>(receiveException);
 
         await stream.DisposeAsync();
     }
