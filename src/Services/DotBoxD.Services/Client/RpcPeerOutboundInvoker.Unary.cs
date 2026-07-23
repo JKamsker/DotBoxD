@@ -189,7 +189,11 @@ internal sealed partial class RpcPeerOutboundInvoker
         }
         finally
         {
-            _pending.Remove(messageId, pending, responseOwned);
+            if (!responseOwned)
+            {
+                _pending.Remove(messageId, pending, consumed: false);
+            }
+
             ReleasePendingSlot();
         }
     }

@@ -165,10 +165,15 @@ internal sealed partial class RpcPeerOutboundInvoker
         PooledPendingResponse pending,
         bool consumed)
     {
-        var removed = _pending.Remove(pending.MessageId, pending, consumed);
-        if (!consumed && removed)
+        // Terminal producers remove correlation before signaling the source. Once the wrapper
+        // consumes that signal, another locked lookup can only miss.
+        if (!consumed)
         {
-            pending.CompleteAbandonedAfterRemoval();
+            var removed = _pending.Remove(pending.MessageId, pending, consumed: false);
+            if (removed)
+            {
+                pending.CompleteAbandonedAfterRemoval();
+            }
         }
 
         ReleasePendingSlot();
