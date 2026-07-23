@@ -9,6 +9,7 @@ internal readonly struct RpcStreamFrameSender
 {
     private readonly Func<ReadOnlyMemory<byte>, CancellationToken, Task> _sendAsync;
     private readonly Func<PooledBufferWriter, CancellationToken, ValueTask>? _sendFrameAsync;
+    private readonly bool _downstreamValidates;
 
     public RpcStreamFrameSender(
         Func<ReadOnlyMemory<byte>, CancellationToken, Task> sendAsync,
@@ -16,24 +17,30 @@ internal readonly struct RpcStreamFrameSender
     {
         _sendAsync = sendAsync;
         _sendFrameAsync = sendFrameAsync;
+        _downstreamValidates = false;
     }
 
     public RpcStreamFrameSender(
         Func<ReadOnlyMemory<byte>, CancellationToken, Task> sendAsync,
         ValidatedOwnedFrameSender sendFrameSender)
-        : this(sendAsync, sendFrameSender.SendAsync)
     {
+        _sendAsync = sendAsync;
+        _sendFrameAsync = sendFrameSender.SendAsync;
+        _downstreamValidates = true;
     }
 
     public ValueTask SendAsync(PooledBufferWriter frame, CancellationToken ct)
     {
-        try
+        if (!_downstreamValidates)
         {
-            MessageFramer.ValidateOutgoingFrame(frame.WrittenSpan);
-        }
-        catch (Exception ex)
-        {
-            return DisposeAndCapture(frame, ex);
+            try
+            {
+                MessageFramer.ValidateOutgoingFrame(frame.WrittenSpan);
+            }
+            catch (Exception ex)
+            {
+                return DisposeAndCapture(frame, ex);
+            }
         }
 
         if (_sendFrameAsync is not null)

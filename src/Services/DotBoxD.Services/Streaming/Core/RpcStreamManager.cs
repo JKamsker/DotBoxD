@@ -29,19 +29,12 @@ internal sealed partial class RpcStreamManager
         Func<Exception, RpcErrorInfo?>? exceptionTransformer,
         Func<PooledBufferWriter, CancellationToken, ValueTask>? sendFrameAsync = null,
         int maxInboundStreamsPerPeer = 1024)
+        : this(
+            serializer,
+            new RpcStreamFrameSender(sendAsync, sendFrameAsync),
+            exceptionTransformer,
+            maxInboundStreamsPerPeer)
     {
-        if (maxInboundStreamsPerPeer <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(maxInboundStreamsPerPeer),
-                maxInboundStreamsPerPeer,
-                "Maximum inbound streams per peer must be greater than zero.");
-        }
-
-        _serializer = serializer;
-        _frameSender = new RpcStreamFrameSender(sendAsync, sendFrameAsync);
-        _exceptionTransformer = exceptionTransformer;
-        _maxInboundStreamsPerPeer = maxInboundStreamsPerPeer;
     }
 
     public RpcStreamManager(
@@ -52,11 +45,30 @@ internal sealed partial class RpcStreamManager
         int maxInboundStreamsPerPeer = 1024)
         : this(
             serializer,
-            sendAsync,
+            new RpcStreamFrameSender(sendAsync, sendFrameSender),
             exceptionTransformer,
-            sendFrameSender.SendAsync,
             maxInboundStreamsPerPeer)
     {
+    }
+
+    private RpcStreamManager(
+        ISerializer serializer,
+        RpcStreamFrameSender frameSender,
+        Func<Exception, RpcErrorInfo?>? exceptionTransformer,
+        int maxInboundStreamsPerPeer)
+    {
+        if (maxInboundStreamsPerPeer <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxInboundStreamsPerPeer),
+                maxInboundStreamsPerPeer,
+                "Maximum inbound streams per peer must be greater than zero.");
+        }
+
+        _serializer = serializer;
+        _frameSender = frameSender;
+        _exceptionTransformer = exceptionTransformer;
+        _maxInboundStreamsPerPeer = maxInboundStreamsPerPeer;
     }
     internal int InboundReceiverCount => Volatile.Read(ref _activeInboundCount);
     internal int OutboundSenderCount => _senders.Count;

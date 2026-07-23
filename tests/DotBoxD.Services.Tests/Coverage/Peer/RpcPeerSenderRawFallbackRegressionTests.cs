@@ -15,6 +15,8 @@ public sealed class RpcPeerSenderRawFallbackRegressionTests
         using var sender = new RpcPeerSender(channel, static () => false);
         var frame = CreateMalformedFrame();
 
+        Assert.Null(sender.ValidatedFrameSender);
+
         await Assert.ThrowsAsync<InvalidDataException>(
             () => sender.SendFrameValueAsync(frame, CancellationToken.None).AsTask());
 
