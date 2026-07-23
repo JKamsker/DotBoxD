@@ -36,14 +36,23 @@ public sealed class TcpFrameSendOperationTests
         });
 
         source.Succeed();
-
-        Assert.True(await continuationObservedCleanup.Task.WaitAsync(Guard));
-        await send;
-        Assert.Equal(1, source.GetResultCount);
         var successor = PooledBufferWriter.Rent();
-        Assert.Same(frame, successor);
-        Assert.NotEqual(leaseToken, successor.LeaseToken);
-        successor.Dispose();
+        try
+        {
+            Assert.Same(frame, successor);
+            var successorLeaseToken = successor.LeaseToken;
+            Assert.NotEqual(leaseToken, successorLeaseToken);
+
+            Assert.True(await continuationObservedCleanup.Task.WaitAsync(Guard));
+            await send;
+
+            Assert.Equal(1, source.GetResultCount);
+            Assert.True(successor.GetWrittenMemory(successorLeaseToken).IsEmpty);
+        }
+        finally
+        {
+            successor.Dispose();
+        }
     }
 
     [Fact]
