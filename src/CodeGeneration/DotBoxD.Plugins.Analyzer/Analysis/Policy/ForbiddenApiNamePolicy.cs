@@ -19,6 +19,7 @@ internal static class ForbiddenApiNamePolicy
         "System.Text.StringBuilder",
         "System.ComponentModel.LicenseManager",
         "System.Collections.Concurrent.BlockingCollection<T>",
+        "Microsoft.Extensions.ObjectPool.ObjectPool<T>",
         "System.Buffers.MemoryPool<T>",
         "System.Formats.Tar.TarFile",
         "Microsoft.Win32.Registry", "System.Linq.ParallelEnumerable", "System.Numerics.BigInteger",

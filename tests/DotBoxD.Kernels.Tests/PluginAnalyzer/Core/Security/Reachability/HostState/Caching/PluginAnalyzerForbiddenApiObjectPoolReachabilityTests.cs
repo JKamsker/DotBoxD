@@ -48,11 +48,11 @@ public sealed class PluginAnalyzerForbiddenApiObjectPoolReachabilityTests
 
         var diagnostics = await AnalyzeAsync(source);
 
-        var diagnostic = Assert.Single(diagnostics.Where(d => d.Id == "DBXK001"));
-        var message = diagnostic.GetMessage();
         Assert.True(
-            message.Contains(expectedForbiddenApi, StringComparison.Ordinal),
-            $"{testCase}: {message}");
+            diagnostics.Any(
+                diagnostic => diagnostic.Id == "DBXK001" &&
+                    diagnostic.GetMessage().Contains(expectedForbiddenApi, StringComparison.Ordinal)),
+            $"{testCase}: {string.Join(Environment.NewLine, diagnostics.Select(d => d.GetMessage()))}");
     }
 
     private static string Source(string staticMember)

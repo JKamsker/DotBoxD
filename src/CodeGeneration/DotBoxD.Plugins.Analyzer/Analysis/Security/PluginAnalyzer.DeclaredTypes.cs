@@ -6,8 +6,6 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 public sealed partial class PluginAnalyzer
 {
-    private const string ObjectPoolOriginalDefinitionName = "Microsoft.Extensions.ObjectPool.ObjectPool<T>";
-
     private static void AnalyzeNamedType(SymbolAnalysisContext context)
     {
         AnalyzeNamedTypeAttributes(context);
@@ -23,7 +21,6 @@ public sealed partial class PluginAnalyzer
         var field = (IFieldSymbol)context.Symbol;
         if (!field.IsImplicitlyDeclared)
         {
-            ReportForbiddenStaticObjectPoolRetention(context.ReportDiagnostic, field, field.Type);
             ReportForbiddenDeclaredType(context, field.ContainingType, field.Type, field.Locations.FirstOrDefault());
         }
     }
@@ -70,8 +67,6 @@ public sealed partial class PluginAnalyzer
         if (!IsDeclaredInEventKernelSurface(property.ContainingType))
             return;
         var location = property.Locations.FirstOrDefault();
-        if (ReportForbiddenStaticObjectPoolRetention(context.ReportDiagnostic, property, property.Type))
-            return;
         if (ReportForbiddenDeclaredType(context, property.Type, location))
             return;
         foreach (var parameter in property.Parameters)
@@ -202,53 +197,6 @@ public sealed partial class PluginAnalyzer
         reportDiagnostic(Diagnostic.Create(ForbiddenHostApiRule, location, forbiddenType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
         return true;
     }
-
-    private static bool ReportForbiddenStaticObjectPoolRetention(
-        Action<Diagnostic> reportDiagnostic,
-        ISymbol member,
-        ITypeSymbol type)
-    {
-        if (!IsStaticObjectPoolRetentionMember(member) ||
-            FirstObjectPoolHostApi(type) is not { } forbiddenType)
-        {
-            return false;
-        }
-
-        reportDiagnostic(Diagnostic.Create(
-            ForbiddenHostApiRule,
-            member.Locations.FirstOrDefault(),
-            forbiddenType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
-        return true;
-    }
-
-    private static bool IsStaticObjectPoolRetentionMember(ISymbol member)
-        => member is IFieldSymbol { IsStatic: true } or IPropertySymbol { IsStatic: true } &&
-           IsDeclaredInEventKernelSurface(member.ContainingType);
-
-    private static ITypeSymbol? FirstObjectPoolHostApi(ITypeSymbol? type)
-    {
-        if (type is null)
-            return null;
-        if (IsObjectPoolHostApi(type))
-            return type;
-        if (type is INamedTypeSymbol namedType)
-        {
-            foreach (var argument in namedType.TypeArguments)
-            {
-                if (FirstObjectPoolHostApi(argument) is { } forbiddenArgument)
-                    return forbiddenArgument;
-            }
-        }
-
-        return null;
-    }
-
-    private static bool IsObjectPoolHostApi(ITypeSymbol type)
-        => type is INamedTypeSymbol namedType &&
-           string.Equals(
-               namedType.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
-               ObjectPoolOriginalDefinitionName,
-               StringComparison.Ordinal);
 
     internal static ITypeSymbol? FirstForbiddenHostApi(ITypeSymbol? type)
     {
