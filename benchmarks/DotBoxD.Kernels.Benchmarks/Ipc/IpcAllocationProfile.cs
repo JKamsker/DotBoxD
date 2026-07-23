@@ -5,12 +5,15 @@ using DotBoxD.Services.Server;
 namespace DotBoxD.Kernels.Benchmarks.Ipc;
 
 using System.Globalization;
+using System.Net;
 using DotBoxD.Services.Transport;
+using DotBoxD.Transports.Tcp;
 
 internal static class IpcAllocationProfile
 {
     public const string NamedPipeTransport = "namedpipe";
     public const string InMemoryTransport = "inmemory";
+    public const string TcpTransportName = "tcp";
 
     public static async Task RunAsync(
         string transport,
@@ -103,6 +106,40 @@ internal static class IpcAllocationProfile
                     clientOptions)
                 .ConfigureAwait(false);
             return new ProfileFixture(host, session);
+        }
+
+        if (transport.Equals(TcpTransportName, StringComparison.OrdinalIgnoreCase))
+        {
+            var frameReadIdleTimeout = disableTimeout
+                ? Timeout.InfiniteTimeSpan
+                : (TimeSpan?)null;
+            var serverTransport = new TcpServerTransport(IPAddress.Loopback, 0)
+            {
+                FrameReadIdleTimeout = frameReadIdleTimeout,
+            };
+            var host = RpcMessagePackIpc.Listen(
+                serverTransport,
+                peer => peer.Provide<IAllocationProbeService>(new AllocationProbeService()),
+                serverOptions);
+            try
+            {
+                await host.StartAsync().ConfigureAwait(false);
+                var endpoint = serverTransport.LocalEndpoint ??
+                    throw new InvalidOperationException(
+                        "TCP profile server did not expose a bound endpoint.");
+                var clientTransport = new TcpTransport(endpoint.Address.ToString(), endpoint.Port)
+                {
+                    FrameReadIdleTimeout = frameReadIdleTimeout,
+                };
+                var session = await RpcMessagePackIpc.ConnectAsync(clientTransport, clientOptions)
+                    .ConfigureAwait(false);
+                return new ProfileFixture(host, session);
+            }
+            catch
+            {
+                await host.DisposeAsync().ConfigureAwait(false);
+                throw;
+            }
         }
 
         throw new ArgumentException($"Unknown IPC profile transport '{transport}'.", nameof(transport));
@@ -198,8 +235,14 @@ internal static class IpcAllocationProfile
 
         public async ValueTask DisposeAsync()
         {
-            await Session.DisposeAsync().ConfigureAwait(false);
-            await _host.DisposeAsync().ConfigureAwait(false);
+            try
+            {
+                await Session.DisposeAsync().ConfigureAwait(false);
+            }
+            finally
+            {
+                await _host.DisposeAsync().ConfigureAwait(false);
+            }
         }
     }
 }

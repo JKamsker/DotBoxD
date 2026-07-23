@@ -5,6 +5,7 @@
     <PackageReference Include="MessagePack" ExcludeAssets="analyzers" />
     <PackageReference Include="MessagePackAnalyzer" ExcludeAssets="all" PrivateAssets="all" />
     <ProjectReference Include="..\..\src\Services\DotBoxD.Services\DotBoxD.Services.csproj" />
+    <ProjectReference Include="..\..\src\Channels\DotBoxD.Transports.Tcp\DotBoxD.Transports.Tcp.csproj" />
     <ProjectReference Include="..\..\src\CodeGeneration\DotBoxD.Services.SourceGenerator\DotBoxD.Services.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
