@@ -2559,3 +2559,38 @@ The warmed end-to-end Auto-compiled lane falls exactly from `1,584.2` to `1,488.
 the compiled no-audit control remains exactly `1,160.0 B/op`. End-to-end elapsed samples overlap prior process variation,
 so no end-to-end timing improvement is claimed. Mandatory-first interpretation, threshold clamping, LRU behavior,
 cancellation/disposal ordering, failure completion, and the public selector contract remain unchanged.
+
+## Composite nested I32 loop dispatch
+
+Even after an inner single-assignment I32 plan was cached, each outer iteration reentered generic statement dispatch and
+reevaluated direct inner bounds through the general expression path. A narrow composite runner now handles an outer body
+containing exactly one inner loop whose body is exactly one already-cached raw-I32 assignment. It supports literal and
+assigned raw-I32 bounds and delegates the inner loop itself to the existing cached runner.
+
+The runner preserves the generic order: charge the outer iteration, write its loop slot, charge the inner statement, then
+charge and read the start and end bounds separately before entering the cached inner loop. Bounds remain captured before
+the body and are reevaluated on every outer iteration. Cache admission stays invocation-specific: required slots must be
+assigned in the current frame except for the inner loop slot and one explicit outer slot that this runner writes before
+bound or expression evaluation. Cold, traced, unassigned, arithmetic-bound, and otherwise unsupported shapes fail closed
+to generic dispatch.
+
+The benchmark-only baseline and candidate use byte-identical probe sources. Ten fresh Release process pairs, five in each
+order, ran their built DLLs pinned to CPU 3 with tiered compilation and Tiered PGO disabled:
+
+```text
+case                                  baseline median   final median    change    pair wins     allocation
+outer 1M, inner 1                         184.628 ms       12.080 ms     -93.5%       10/10      776 -> 776 B
+outer 1M, inner 0                          76.080 ms        5.057 ms     -93.4%       10/10      752 -> 752 B
+outer 500k, inner 2/index                 107.016 ms        7.406 ms     -93.1%       10/10      776 -> 776 B
+outer 2k, triangular/outer index            5.816 ms        5.459 ms      -6.1%        9/10      776 -> 776 B
+outer 1, inner 10M body control            27.144 ms       26.911 ms      no claim      6/10      776 -> 776 B
+arithmetic-bound fallback                  97.588 ms       96.151 ms      no claim      7/10      776 -> 776 B
+```
+
+One fallback candidate process had an isolated `869.547 ms` interruption while its other nine samples were
+`95.338-103.289 ms`; the fallback receives neither an improvement nor a tail-latency claim. Every sample completed
+synchronously and validated its exact result plus all twelve resource fields. Focused regressions cover mutable and
+outer-dependent bounds, outer-slot/body aliasing, arithmetic faults, fuel and loop quota order, cancellation before
+mutation, assignment state, debug fallback, cache publication, and unsupported shapes. The final strict solution build,
+5,904 kernel tests, architecture tests, formatting, and C# size/layout gates pass. No public API or sandbox accounting
+contract changes.
