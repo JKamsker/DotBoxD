@@ -6,6 +6,7 @@ namespace DotBoxD.Kernels.Interpreter.Internal;
 
 internal sealed class I32ForLoopPlan
 {
+    private readonly I32LoopAssignmentPlan[]? _multipleAssignments;
     private readonly int[] _requiredSlots;
 
     public I32ForLoopPlan(
@@ -22,6 +23,29 @@ internal sealed class I32ForLoopPlan
         _requiredSlots = requiredSlots;
     }
 
+    /// <summary>
+    /// Takes ownership of <paramref name="assignments"/>. The caller must not mutate
+    /// the array after construction because plans are shared by concurrent frames.
+    /// </summary>
+    public I32ForLoopPlan(
+        ForRangeStatement statement,
+        I32LoopAssignmentPlan[] assignments,
+        long fuelPerIteration)
+    {
+        ArgumentNullException.ThrowIfNull(assignments);
+        if (assignments.Length < 2)
+        {
+            throw new ArgumentException("A multi-assignment plan requires at least two assignments.", nameof(assignments));
+        }
+
+        Statement = statement;
+        TargetSlot = 0;
+        Expression = null!;
+        FuelPerIteration = fuelPerIteration;
+        _multipleAssignments = assignments;
+        _requiredSlots = I32LoopAssignmentPlans.GetRequiredRawSlots(assignments);
+    }
+
     public ForRangeStatement Statement { get; }
 
     public int TargetSlot { get; }
@@ -29,6 +53,8 @@ internal sealed class I32ForLoopPlan
     public I32ExpressionPlan Expression { get; }
 
     public long FuelPerIteration { get; }
+
+    public ReadOnlySpan<I32LoopAssignmentPlan> MultipleAssignments => _multipleAssignments;
 
     public bool CanRun(InterpreterFrame frame, int loopSlot)
         => CanRun(frame, loopSlot, loopSlot);

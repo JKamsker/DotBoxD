@@ -6,6 +6,7 @@ namespace DotBoxD.Kernels.Interpreter.Internal;
 
 internal sealed class I32WhileLoopPlan
 {
+    private readonly I32LoopAssignmentPlan[]? _multipleAssignments;
     private readonly int[] _requiredSlots;
 
     public I32WhileLoopPlan(
@@ -27,6 +28,35 @@ internal sealed class I32WhileLoopPlan
         _requiredSlots = requiredSlots.ToArray();
     }
 
+    /// <summary>
+    /// Takes ownership of <paramref name="assignments"/>. The caller must not mutate
+    /// the array after construction because plans are shared by concurrent frames.
+    /// </summary>
+    public I32WhileLoopPlan(
+        WhileStatement statement,
+        I32ComparisonPlan condition,
+        I32LoopAssignmentPlan[] assignments,
+        long bodyFuel)
+    {
+        ArgumentNullException.ThrowIfNull(assignments);
+        if (assignments.Length < 2)
+        {
+            throw new ArgumentException("A multi-assignment plan requires at least two assignments.", nameof(assignments));
+        }
+
+        Statement = statement;
+        Condition = condition;
+        TargetSlot = 0;
+        Expression = null!;
+        BodyFuel = bodyFuel;
+        _multipleAssignments = assignments;
+
+        var requiredSlots = new List<int>();
+        condition.CollectRequiredRawSlots(requiredSlots);
+        I32LoopAssignmentPlans.CollectRequiredRawSlots(assignments, requiredSlots);
+        _requiredSlots = requiredSlots.ToArray();
+    }
+
     public WhileStatement Statement { get; }
 
     public I32ComparisonPlan Condition { get; }
@@ -36,6 +66,8 @@ internal sealed class I32WhileLoopPlan
     public I32ExpressionPlan Expression { get; }
 
     public long BodyFuel { get; }
+
+    public ReadOnlySpan<I32LoopAssignmentPlan> MultipleAssignments => _multipleAssignments;
 
     public bool CanRun(InterpreterFrame frame)
     {

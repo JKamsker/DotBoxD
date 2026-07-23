@@ -41,14 +41,15 @@ public sealed class WhileI32SingleAssignmentLoopAllocationTests
                                   (double)MeasurementIterations;
         var zeroWhileOverhead = (zero.AllocatedBytes - noWhile.AllocatedBytes) /
                                 (double)MeasurementIterations;
-        var twoAssignmentBytesPerExecution = two.AllocatedBytes /
-                                             (double)MeasurementIterations;
+        var twoAssignmentOverhead = (two.AllocatedBytes - single.AllocatedBytes) /
+                                    (double)MeasurementIterations;
         // The warmed function layout retains the immutable comparison and assignment plans. Both a taken
         // and an untaken while should therefore stay in the no-while allocation band instead of rebuilding
-        // five expression-plan objects (about 280 B) on every entry.
+        // five expression-plan objects (about 280 B) on every entry. The dependent multi-assignment body
+        // likewise retains its complete plan after warmup.
         Assert.InRange(singleWhileOverhead, 0, 8);
         Assert.InRange(zeroWhileOverhead, 0, 8);
-        Assert.InRange(twoAssignmentBytesPerExecution, 1_223, 1_273);
+        Assert.InRange(twoAssignmentOverhead, 0, 16);
     }
 
     [Fact]

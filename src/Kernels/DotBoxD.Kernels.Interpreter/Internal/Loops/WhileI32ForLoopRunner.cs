@@ -65,6 +65,17 @@ internal static class WhileI32ForLoopRunner
         SandboxContext context,
         I32CallEvaluator calls)
     {
+        if (frame.Layout.LoopPlans.TryGetI32WhilePlan(statement, frame, out var cached))
+        {
+            RunMultipleAssignments(
+                cached.Condition,
+                cached.MultipleAssignments,
+                cached.BodyFuel,
+                frame,
+                context);
+            return true;
+        }
+
         if (!I32ComparisonPlan.TryCreate(statement.Condition, frame, "", calls, out var condition))
         {
             return false;
@@ -75,31 +86,8 @@ internal static class WhileI32ForLoopRunner
             return false;
         }
 
-        long conditionFuel = condition.FuelCost;
-        var checkpoint = CheckpointInterval;
-        while (true)
-        {
-            context.ChargeFuel(conditionFuel);
-            if (!condition.Evaluate(frame, context))
-            {
-                break;
-            }
-
-            context.ChargeLoopIteration(LoopFuel);
-            context.ChargeFuel(bodyFuel);
-            for (var i = 0; i < body.Length; i++)
-            {
-                var assignment = body[i];
-                frame.WriteRawInt32Slot(assignment.TargetSlot, assignment.Expression.Evaluate(frame, context));
-            }
-
-            if (--checkpoint == 0)
-            {
-                context.Checkpoint();
-                checkpoint = CheckpointInterval;
-            }
-        }
-
+        CacheMultipleAssignmentPlanIfReusable(statement, condition, frame, body, bodyFuel);
+        RunMultipleAssignments(condition, body, bodyFuel, frame, context);
         return true;
     }
 
@@ -171,11 +159,46 @@ internal static class WhileI32ForLoopRunner
         }
     }
 
+    private static void RunMultipleAssignments(
+        I32ComparisonPlan condition,
+        ReadOnlySpan<I32LoopAssignmentPlan> body,
+        long bodyFuel,
+        InterpreterFrame frame,
+        SandboxContext context)
+    {
+        long conditionFuel = condition.FuelCost;
+        var checkpoint = CheckpointInterval;
+        while (true)
+        {
+            context.ChargeFuel(conditionFuel);
+            if (!condition.Evaluate(frame, context))
+            {
+                break;
+            }
+
+            context.ChargeLoopIteration(LoopFuel);
+            context.ChargeFuel(bodyFuel);
+            for (var i = 0; i < body.Length; i++)
+            {
+                var assignment = body[i];
+                frame.WriteRawInt32Slot(
+                    assignment.TargetSlot,
+                    assignment.Expression.Evaluate(frame, context));
+            }
+
+            if (--checkpoint == 0)
+            {
+                context.Checkpoint();
+                checkpoint = CheckpointInterval;
+            }
+        }
+    }
+
     private static bool TryCreateBody(
         IReadOnlyList<Statement> statements,
         InterpreterFrame frame,
         I32CallEvaluator calls,
-        out AssignmentPlan[] body,
+        out I32LoopAssignmentPlan[] body,
         out long bodyFuel)
     {
         body = [];
@@ -185,7 +208,7 @@ internal static class WhileI32ForLoopRunner
             return false;
         }
 
-        var plans = new AssignmentPlan[statements.Count];
+        var plans = new I32LoopAssignmentPlan[statements.Count];
         long fuel = 0;
         for (var i = 0; i < statements.Count; i++)
         {
@@ -211,7 +234,7 @@ internal static class WhileI32ForLoopRunner
         Statement statement,
         InterpreterFrame frame,
         I32CallEvaluator calls,
-        out AssignmentPlan plan,
+        out I32LoopAssignmentPlan plan,
         out long fuel)
     {
         plan = default;
@@ -228,10 +251,29 @@ internal static class WhileI32ForLoopRunner
             return false;
         }
 
-        plan = new AssignmentPlan(targetSlot, expression);
+        plan = new I32LoopAssignmentPlan(targetSlot, expression);
         fuel = 1 + expression.FuelCost;
         return true;
     }
 
-    private readonly record struct AssignmentPlan(int TargetSlot, I32ExpressionPlan Expression);
+    private static void CacheMultipleAssignmentPlanIfReusable(
+        WhileStatement statement,
+        I32ComparisonPlan condition,
+        InterpreterFrame frame,
+        I32LoopAssignmentPlan[] body,
+        long bodyFuel)
+    {
+        if (!condition.HasOnlyRawVariables() ||
+            body.Length < 2 ||
+            !I32LoopAssignmentPlans.HaveOnlyRawVariables(body))
+        {
+            return;
+        }
+
+        ref var loopPlans = ref frame.Layout.LoopPlans;
+        if (loopPlans.ShouldCacheI32WhilePlan(statement))
+        {
+            loopPlans.CacheI32WhilePlan(new I32WhileLoopPlan(statement, condition, body, bodyFuel));
+        }
+    }
 }

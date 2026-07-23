@@ -47,13 +47,44 @@ internal static class I32ForLoopRunner
             return TryRunSingleAssignment(statement, start, end, frame, context, calls, singleLoopSlot);
         }
 
+        var loopSlot = frame.GetSlot(statement.LocalName);
+        if (frame.Layout.LoopPlans.TryGetI32ForRangePlan(
+                statement,
+                frame,
+                loopSlot,
+                out var cachedMultiple))
+        {
+            RunMultipleAssignments(
+                start,
+                end,
+                frame,
+                context,
+                loopSlot,
+                cachedMultiple.MultipleAssignments,
+                cachedMultiple.FuelPerIteration);
+            return true;
+        }
+
         if (!TryCreateBodyPlan(statement, frame, calls, out var body, out var fuelPerIteration))
         {
             return false;
         }
 
+        CacheMultipleAssignmentPlanIfReusable(statement, frame, body, fuelPerIteration);
+        RunMultipleAssignments(start, end, frame, context, loopSlot, body, fuelPerIteration);
+        return true;
+    }
+
+    private static void RunMultipleAssignments(
+        int start,
+        int end,
+        InterpreterFrame frame,
+        SandboxContext context,
+        int loopSlot,
+        ReadOnlySpan<I32LoopAssignmentPlan> body,
+        long fuelPerIteration)
+    {
         context.ChargeLoopIterations((long)end - start, fuelPerIteration);
-        var loopSlot = frame.GetSlot(statement.LocalName);
         var checkpoint = CheckpointInterval;
         for (var i = start; i < end; i++)
         {
@@ -70,8 +101,6 @@ internal static class I32ForLoopRunner
                 checkpoint = CheckpointInterval;
             }
         }
-
-        return true;
     }
 
     private static bool TryRunSingleAssignment(
@@ -174,10 +203,10 @@ internal static class I32ForLoopRunner
         ForRangeStatement statement,
         InterpreterFrame frame,
         I32CallEvaluator calls,
-        out AssignmentPlan[] body,
+        out I32LoopAssignmentPlan[] body,
         out long fuelPerIteration)
     {
-        body = new AssignmentPlan[statement.Body.Count];
+        body = new I32LoopAssignmentPlan[statement.Body.Count];
         fuelPerIteration = LoopFuel;
         for (var i = 0; i < statement.Body.Count; i++)
         {
@@ -204,7 +233,7 @@ internal static class I32ForLoopRunner
         InterpreterFrame frame,
         string loopLocal,
         I32CallEvaluator calls,
-        out AssignmentPlan plan,
+        out I32LoopAssignmentPlan plan,
         out long fuel)
     {
         plan = default;
@@ -221,10 +250,26 @@ internal static class I32ForLoopRunner
             return false;
         }
 
-        plan = new AssignmentPlan(targetSlot, expression);
+        plan = new I32LoopAssignmentPlan(targetSlot, expression);
         fuel = 1 + expression.FuelCost;
         return true;
     }
 
-    private readonly record struct AssignmentPlan(int TargetSlot, I32ExpressionPlan Expression);
+    private static void CacheMultipleAssignmentPlanIfReusable(
+        ForRangeStatement statement,
+        InterpreterFrame frame,
+        I32LoopAssignmentPlan[] body,
+        long fuelPerIteration)
+    {
+        if (body.Length < 2 || !I32LoopAssignmentPlans.HaveOnlyRawVariables(body))
+        {
+            return;
+        }
+
+        ref var loopPlans = ref frame.Layout.LoopPlans;
+        if (loopPlans.ShouldCacheI32ForRangePlan(statement))
+        {
+            loopPlans.CacheI32ForRangePlan(new I32ForLoopPlan(statement, body, fuelPerIteration));
+        }
+    }
 }
