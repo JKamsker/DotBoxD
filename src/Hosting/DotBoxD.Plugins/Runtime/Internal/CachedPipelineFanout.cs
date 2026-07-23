@@ -30,6 +30,11 @@ internal readonly struct CachedPipelineFanout
         return Interlocked.CompareExchange(ref state.ResultRegistrationCache, value, comparand);
     }
 
+    internal CachedPipelineFanout CopyWithoutResultRegistrationCache()
+        => _state is null
+            ? Empty
+            : new CachedPipelineFanout(_state.Pipelines);
+
     private object[] Pipelines => _state?.Pipelines ?? EmptyPipelines;
 
     private sealed class State(object[] pipelines)

@@ -27,8 +27,9 @@ public sealed partial class HookRegistry
 {
     private readonly object _gate = new();
     private readonly Dictionary<PipelineKey, object> _pipelines = [];
-    private readonly Dictionary<Type, (object? Single, CachedPipelineFanout Multiple)> _pipelineFanout = [];
-    private readonly HashSet<Type> _pipelineEventTypes = [];
+
+    // Writers clone under _gate and publish the completed dictionary; a published instance is never mutated.
+    private Dictionary<Type, (object? Single, CachedPipelineFanout Multiple)> _pipelineFanout = [];
     private readonly IPluginMessageSink _messages;
     private readonly PluginEventAdapterRegistry _events;
     private readonly KernelRegistry _kernels;
@@ -104,7 +105,7 @@ public sealed partial class HookRegistry
                 NextResultOrder,
                 _throwIfDisposed);
             _pipelines[key] = created;
-            RegisterEventTypeLocked<TEvent>();
+            PublishEventFanoutLocked(typeof(TEvent));
             return created;
         }
     }
@@ -134,7 +135,7 @@ public sealed partial class HookRegistry
                 NextResultOrder,
                 _throwIfDisposed);
             _pipelines[key] = created;
-            RegisterEventTypeLocked<TEvent>();
+            PublishEventFanoutLocked(typeof(TEvent));
             return created;
         }
     }
@@ -155,12 +156,7 @@ public sealed partial class HookRegistry
     {
         ThrowIfDisposed();
         cancellationToken.ThrowIfCancellationRequested();
-        object? single;
-        CachedPipelineFanout multiple;
-        lock (_gate)
-        {
-            (single, multiple) = PipelinesForEventLocked<TEvent>();
-        }
+        var (single, multiple) = PipelinesForEvent<TEvent>();
 
         if (multiple.Count > 0)
         {
@@ -187,12 +183,7 @@ public sealed partial class HookRegistry
     {
         ThrowIfDisposed();
         cancellationToken.ThrowIfCancellationRequested();
-        object? single;
-        CachedPipelineFanout multiple;
-        lock (_gate)
-        {
-            (single, multiple) = PipelinesForEventLocked<TContext>();
-        }
+        var (single, multiple) = PipelinesForEvent<TContext>();
 
         ValidateResultType<TContext, TResult>();
         if (multiple.Count > 0)
@@ -215,12 +206,7 @@ public sealed partial class HookRegistry
         options.Validate();
         ThrowIfDisposed();
         cancellationToken.ThrowIfCancellationRequested();
-        object? single;
-        CachedPipelineFanout multiple;
-        lock (_gate)
-        {
-            (single, multiple) = PipelinesForEventLocked<TContext>();
-        }
+        var (single, multiple) = PipelinesForEvent<TContext>();
 
         ValidateResultType<TContext, TResult>();
         if (multiple.Count > 0)
