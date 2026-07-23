@@ -108,6 +108,30 @@ public sealed class RpcStreamFrameSenderFallbackTests
         AssertDisposed(frame);
     }
 
+    [Fact]
+    public async Task Memory_fallback_rejects_malformed_frame_before_send_and_disposes_frame()
+    {
+        var sendCalled = false;
+        var sender = new RpcStreamFrameSender(
+            (_, _) =>
+            {
+                sendCalled = true;
+                return Task.CompletedTask;
+            },
+            sendFrameAsync: null);
+        var frame = CreateFrame();
+        frame.WrittenSpan[0]++;
+        ValueTask send = default;
+
+        var synchronousFailure = Record.Exception(
+            () => send = sender.SendAsync(frame, CancellationToken.None));
+
+        Assert.Null(synchronousFailure);
+        await Assert.ThrowsAsync<InvalidDataException>(() => send.AsTask());
+        Assert.False(sendCalled);
+        AssertDisposed(frame);
+    }
+
     private static PooledBufferWriter CreateFrame()
     {
         var frame = new PooledBufferWriter(MessageFramer.HeaderSize);

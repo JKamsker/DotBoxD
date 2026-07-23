@@ -1,13 +1,30 @@
 using System.Runtime.ExceptionServices;
 using DotBoxD.Services.Buffers;
 using DotBoxD.Services.Protocol;
+using DotBoxD.Services.Transport;
 
 namespace DotBoxD.Services.Streaming.Core;
 
-internal readonly struct RpcStreamFrameSender(
-    Func<ReadOnlyMemory<byte>, CancellationToken, Task> sendAsync,
-    Func<PooledBufferWriter, CancellationToken, ValueTask>? sendFrameAsync)
+internal readonly struct RpcStreamFrameSender
 {
+    private readonly Func<ReadOnlyMemory<byte>, CancellationToken, Task> _sendAsync;
+    private readonly Func<PooledBufferWriter, CancellationToken, ValueTask>? _sendFrameAsync;
+
+    public RpcStreamFrameSender(
+        Func<ReadOnlyMemory<byte>, CancellationToken, Task> sendAsync,
+        Func<PooledBufferWriter, CancellationToken, ValueTask>? sendFrameAsync)
+    {
+        _sendAsync = sendAsync;
+        _sendFrameAsync = sendFrameAsync;
+    }
+
+    public RpcStreamFrameSender(
+        Func<ReadOnlyMemory<byte>, CancellationToken, Task> sendAsync,
+        ValidatedOwnedFrameSender sendFrameSender)
+        : this(sendAsync, sendFrameSender.SendAsync)
+    {
+    }
+
     public ValueTask SendAsync(PooledBufferWriter frame, CancellationToken ct)
     {
         try
@@ -19,11 +36,11 @@ internal readonly struct RpcStreamFrameSender(
             return DisposeAndCapture(frame, ex);
         }
 
-        if (sendFrameAsync is not null)
+        if (_sendFrameAsync is not null)
         {
             try
             {
-                return sendFrameAsync(frame, ct);
+                return _sendFrameAsync(frame, ct);
             }
             catch (Exception ex)
             {
@@ -31,7 +48,7 @@ internal readonly struct RpcStreamFrameSender(
             }
         }
 
-        return SendMemoryAsync(sendAsync, frame, ct);
+        return SendMemoryAsync(_sendAsync, frame, ct);
     }
 
     private static async ValueTask SendMemoryAsync(

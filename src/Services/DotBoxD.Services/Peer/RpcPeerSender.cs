@@ -21,7 +21,12 @@ internal sealed class RpcPeerSender : IDisposable
         _frameChannel = channel as IRpcFrameChannel;
         _validatedSerialFrameChannel = channel as IValidatedSerialFrameChannel;
         _isClosed = isClosed;
+        ValidatedFrameSender = _validatedSerialFrameChannel is null
+            ? null
+            : new ValidatedOwnedFrameSender(SendFrameValueAsync);
     }
+
+    public ValidatedOwnedFrameSender? ValidatedFrameSender { get; }
 
     public Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
     {
@@ -114,6 +119,7 @@ internal sealed class RpcPeerSender : IDisposable
         {
             try
             {
+                MessageFramer.ValidateOutgoingFrame(frame.WrittenSpan);
                 await SendAsync(frame.WrittenMemory, ct).ConfigureAwait(false);
             }
             finally

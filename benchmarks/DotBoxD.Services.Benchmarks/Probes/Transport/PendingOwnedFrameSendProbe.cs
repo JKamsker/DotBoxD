@@ -1,5 +1,5 @@
-using System.Diagnostics;
 using DotBoxD.Services.Buffers;
+using DotBoxD.Services.Peer;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Streaming.Core;
 using DotBoxD.Services.Transport;
@@ -19,48 +19,77 @@ internal static class PendingOwnedFrameSendProbe
         using var pendingStream = new ControlledWriteStream(forcePending: true);
         var synchronousConnection = new StreamConnection(synchronousStream, ownsStream: false);
         var pendingConnection = new StreamConnection(pendingStream, ownsStream: false);
+        using var synchronousPeerSender = new RpcPeerSender(synchronousConnection, static () => false);
+        using var pendingPeerSender = new RpcPeerSender(pendingConnection, static () => false);
         var synchronousStreamSender = CreateStreamSender(synchronousConnection);
         var pendingStreamSender = CreateStreamSender(pendingConnection);
+        var synchronousPeerStreamSender = CreatePeerStreamSender(synchronousPeerSender);
+        var pendingPeerStreamSender = CreatePeerStreamSender(pendingPeerSender);
+        var meter = new FrameSendProbeMeter(
+            WarmupIterations,
+            Iterations,
+            s_rawFrame.Length,
+            s_frameChecksum);
         try
         {
             VerifyOwnedFrameLifetime(synchronousConnection, synchronousStream);
             VerifyOwnedFrameLifetime(pendingConnection, pendingStream);
-            var synchronousRaw = Measure(
+            var synchronousRaw = meter.Measure(
                 "synchronous raw send",
                 synchronousStream,
                 () => SendRaw(synchronousConnection, synchronousStream));
-            var synchronousOwned = Measure(
+            var synchronousOwned = meter.Measure(
                 "synchronous owned-frame send",
                 synchronousStream,
                 () => SendOwnedFrame(synchronousConnection, synchronousStream));
-            var synchronousStreaming = Measure(
+            var synchronousStreaming = meter.Measure(
                 "synchronous streaming-frame send",
                 synchronousStream,
                 () => SendStreamingFrame(synchronousStreamSender, synchronousStream));
-            var pendingRaw = Measure(
+            var synchronousPeerOwned = meter.Measure(
+                "synchronous peer owned-frame send",
+                synchronousStream,
+                () => SendOwnedFrame(synchronousPeerSender, synchronousStream));
+            var synchronousPeerStreaming = meter.Measure(
+                "synchronous peer streaming-frame send",
+                synchronousStream,
+                () => SendStreamingFrame(synchronousPeerStreamSender, synchronousStream));
+            var pendingRaw = meter.Measure(
                 "forced-pending raw send",
                 pendingStream,
                 () => SendRaw(pendingConnection, pendingStream));
-            var pendingOwned = Measure(
+            var pendingOwned = meter.Measure(
                 "forced-pending owned-frame send",
                 pendingStream,
                 () => SendOwnedFrame(pendingConnection, pendingStream));
-            var pendingStreaming = Measure(
+            var pendingStreaming = meter.Measure(
                 "forced-pending streaming-frame send",
                 pendingStream,
                 () => SendStreamingFrame(pendingStreamSender, pendingStream));
+            var pendingPeerOwned = meter.Measure(
+                "forced-pending peer owned-frame send",
+                pendingStream,
+                () => SendOwnedFrame(pendingPeerSender, pendingStream));
+            var pendingPeerStreaming = meter.Measure(
+                "forced-pending peer streaming-frame send",
+                pendingStream,
+                () => SendStreamingFrame(pendingPeerStreamSender, pendingStream));
 
             Console.WriteLine("Pending owned-frame send probe");
             Console.WriteLine($"iterations = {Iterations:N0}; warmup = {WarmupIterations:N0}");
             Console.WriteLine(
                 $"verified frame bytes = {s_rawFrame.Length}; " +
                 $"per-frame checksum = {s_frameChecksum}");
-            Write(synchronousRaw);
-            Write(synchronousOwned);
-            Write(synchronousStreaming);
-            Write(pendingRaw);
-            Write(pendingOwned);
-            Write(pendingStreaming);
+            FrameSendProbeMeter.Write(synchronousRaw);
+            FrameSendProbeMeter.Write(synchronousOwned);
+            FrameSendProbeMeter.Write(synchronousStreaming);
+            FrameSendProbeMeter.Write(synchronousPeerOwned);
+            FrameSendProbeMeter.Write(synchronousPeerStreaming);
+            FrameSendProbeMeter.Write(pendingRaw);
+            FrameSendProbeMeter.Write(pendingOwned);
+            FrameSendProbeMeter.Write(pendingStreaming);
+            FrameSendProbeMeter.Write(pendingPeerOwned);
+            FrameSendProbeMeter.Write(pendingPeerStreaming);
             var synchronousOwnershipCost =
                 synchronousOwned.NanosecondsPerOperation - synchronousRaw.NanosecondsPerOperation;
             var pendingOwnershipCost =
@@ -83,38 +112,20 @@ internal static class PendingOwnedFrameSendProbe
             Console.WriteLine(
                 $"streaming state-machine overhead " +
                 $"{pendingStreamingCost - synchronousStreamingCost,9:N1} ns/op");
+            WritePeerStreamingOverhead(
+                "synchronous peer streaming overhead",
+                synchronousPeerOwned,
+                synchronousPeerStreaming);
+            WritePeerStreamingOverhead(
+                "pending peer streaming overhead",
+                pendingPeerOwned,
+                pendingPeerStreaming);
         }
         finally
         {
             synchronousConnection.DisposeAsync().AsTask().GetAwaiter().GetResult();
             pendingConnection.DisposeAsync().AsTask().GetAwaiter().GetResult();
         }
-    }
-
-    private static Measurement Measure(
-        string name,
-        ControlledWriteStream stream,
-        Action send)
-    {
-        for (var i = 0; i < WarmupIterations; i++)
-        {
-            send();
-        }
-
-        var before = stream.Snapshot();
-        ForceGc();
-        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-        var started = Stopwatch.GetTimestamp();
-        for (var i = 0; i < Iterations; i++)
-        {
-            send();
-        }
-
-        var finished = Stopwatch.GetTimestamp();
-        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
-        var elapsed = Stopwatch.GetElapsedTime(started, finished).TotalMilliseconds;
-        VerifyOutput(name, before, stream.Snapshot());
-        return new Measurement(name, elapsed, allocated);
     }
 
     private static void SendRaw(StreamConnection connection, ControlledWriteStream stream)
@@ -130,6 +141,13 @@ internal static class PendingOwnedFrameSendProbe
         CompleteSend(pending, stream);
     }
 
+    private static void SendOwnedFrame(RpcPeerSender sender, ControlledWriteStream stream)
+    {
+        var frame = CreateOwnedFrame();
+        var pending = sender.SendFrameValueAsync(frame, CancellationToken.None);
+        CompleteSend(pending, stream);
+    }
+
     private static void SendStreamingFrame(
         RpcStreamFrameSender sender,
         ControlledWriteStream stream)
@@ -141,6 +159,12 @@ internal static class PendingOwnedFrameSendProbe
 
     private static RpcStreamFrameSender CreateStreamSender(StreamConnection connection) =>
         new(connection.SendAsync, connection.SendFrameValueAsync);
+
+    private static RpcStreamFrameSender CreatePeerStreamSender(RpcPeerSender sender) =>
+        new(
+            sender.SendAsync,
+            sender.ValidatedFrameSender ??
+                throw new InvalidOperationException("Expected a validated built-in frame sender."));
 
     private static void CompleteSend(ValueTask pending, ControlledWriteStream stream)
     {
@@ -227,47 +251,12 @@ internal static class PendingOwnedFrameSendProbe
         return checksum;
     }
 
-    private static void VerifyOutput(string name, WriteSnapshot before, WriteSnapshot after)
-    {
-        var writes = after.Writes - before.Writes;
-        var flushes = after.Flushes - before.Flushes;
-        var bytes = after.Bytes - before.Bytes;
-        var checksum = after.Checksum - before.Checksum;
-        var expectedBytes = (long)Iterations * s_rawFrame.Length;
-        var expectedChecksum = Iterations * s_frameChecksum;
-        if (writes != Iterations ||
-            flushes != Iterations ||
-            bytes != expectedBytes ||
-            checksum != expectedChecksum)
-        {
-            throw new InvalidOperationException(
-                $"{name} output mismatch: writes={writes:N0}, flushes={flushes:N0}, " +
-                $"bytes={bytes:N0}, checksum={checksum}; expected {Iterations:N0}, " +
-                $"{Iterations:N0}, {expectedBytes:N0}, {expectedChecksum}.");
-        }
-    }
-
-    private static void ForceGc()
-    {
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
-    }
-
-    private static void Write(Measurement measurement) =>
+    private static void WritePeerStreamingOverhead(
+        string name,
+        FrameSendMeasurement owned,
+        FrameSendMeasurement streaming) =>
         Console.WriteLine(
-            $"{measurement.Name,-34} {measurement.Milliseconds,9:N1} ms " +
-            $"{measurement.NanosecondsPerOperation,9:N1} ns/op " +
-            $"{measurement.AllocatedBytes,14:N0} B " +
-            $"{measurement.BytesPerOperation,9:N1} B/op");
-
-    private readonly record struct Measurement(
-        string Name,
-        double Milliseconds,
-        long AllocatedBytes)
-    {
-        public double NanosecondsPerOperation => Milliseconds * 1_000_000 / Iterations;
-
-        public double BytesPerOperation => AllocatedBytes / (double)Iterations;
-    }
+            $"{name,-40} " +
+            $"{streaming.NanosecondsPerOperation - owned.NanosecondsPerOperation,9:N1} ns/op " +
+            $"{streaming.BytesPerOperation - owned.BytesPerOperation,9:N1} B/op");
 }

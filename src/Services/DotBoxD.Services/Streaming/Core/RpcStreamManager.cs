@@ -3,6 +3,7 @@ using DotBoxD.Services.Buffers;
 using DotBoxD.Services.Diagnostics;
 using DotBoxD.Services.Exceptions;
 using DotBoxD.Services.Serialization;
+using DotBoxD.Services.Transport;
 
 namespace DotBoxD.Services.Streaming.Core;
 
@@ -41,6 +42,21 @@ internal sealed partial class RpcStreamManager
         _frameSender = new RpcStreamFrameSender(sendAsync, sendFrameAsync);
         _exceptionTransformer = exceptionTransformer;
         _maxInboundStreamsPerPeer = maxInboundStreamsPerPeer;
+    }
+
+    public RpcStreamManager(
+        ISerializer serializer,
+        Func<ReadOnlyMemory<byte>, CancellationToken, Task> sendAsync,
+        Func<Exception, RpcErrorInfo?>? exceptionTransformer,
+        ValidatedOwnedFrameSender sendFrameSender,
+        int maxInboundStreamsPerPeer = 1024)
+        : this(
+            serializer,
+            sendAsync,
+            exceptionTransformer,
+            sendFrameSender.SendAsync,
+            maxInboundStreamsPerPeer)
+    {
     }
     internal int InboundReceiverCount => Volatile.Read(ref _activeInboundCount);
     internal int OutboundSenderCount => _senders.Count;
