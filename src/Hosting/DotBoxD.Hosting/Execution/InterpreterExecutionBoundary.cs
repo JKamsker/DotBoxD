@@ -26,13 +26,22 @@ internal static class InterpreterExecutionBoundary
                     options,
                     cancellationToken)
                 .ConfigureAwait(false);
-            if (result is null ||
+            if (result is null)
+            {
+                return FailureResult(
+                    plan,
+                    options,
+                    new SandboxError(SandboxErrorCode.HostFailure, FailureMessage));
+            }
+
+            var validatedResult = result;
+            if (!CanReturnBuiltInResultWithoutValidation(interpreter, plan, entrypoint, options, result) &&
                 !InterpreterResultValidator.TryValidate(
                     plan,
                     entrypoint,
                     options,
                     result,
-                    out var validatedResult))
+                    out validatedResult))
             {
                 return FailureResult(
                     plan,
@@ -58,6 +67,39 @@ internal static class InterpreterExecutionBoundary
                 options,
                 new SandboxError(SandboxErrorCode.HostFailure, FailureMessage));
         }
+    }
+
+    internal static bool CanReturnBuiltInResultWithoutValidation(
+        ISandboxInterpreter interpreter,
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxExecutionOptions options,
+        SandboxExecutionResult result)
+    {
+        var usage = result.ResourceUsage;
+        return interpreter.GetType() == typeof(SandboxInterpreter) &&
+               options.Mode == ExecutionMode.Interpreted &&
+               options.Isolation == SandboxIsolation.InProcess &&
+               options.SuppressSuccessfulRunSummaryAudit &&
+               !options.EnableDebugTrace &&
+               plan.BindingReferences.TryGetValue(entrypoint, out var allowedBindings) &&
+               allowedBindings.Count == 0 &&
+               result.Succeeded &&
+               result.Value is not null &&
+               result.Error is null &&
+               ReferenceEquals(result.AuditEvents, InMemoryAuditSink.EmptyEventSnapshot) &&
+               result.ActualMode == ExecutionMode.Interpreted &&
+               result.ExecutionDispatched &&
+               result.ArtifactHash is null &&
+               string.Equals(result.ModuleHash, plan.ModuleHash, StringComparison.Ordinal) &&
+               string.Equals(result.PlanHash, plan.PlanHash, StringComparison.Ordinal) &&
+               string.Equals(result.PolicyHash, plan.PolicyHash, StringComparison.Ordinal) &&
+               usage.HostCalls == 0 &&
+               usage.FileBytesRead == 0 &&
+               usage.FileBytesWritten == 0 &&
+               usage.NetworkBytesRead == 0 &&
+               usage.NetworkBytesWritten == 0 &&
+               usage.LogEvents == 0;
     }
 
     private static SandboxExecutionResult FailureResult(
