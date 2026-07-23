@@ -1,3 +1,5 @@
+using DotBoxD.Services.Buffers;
+
 namespace DotBoxD.Services.Transport;
 
 /// <summary>Releases owned-frame send resources before producer completion is published.</summary>
@@ -10,6 +12,14 @@ internal static class StreamFrameSendCleanup
         var gateHeld = state.GateHeld;
         state = default;
 
+        return Finish(connection, frame, gateHeld);
+    }
+
+    public static Exception? Finish(
+        StreamConnection? connection,
+        PooledBufferWriter? frame,
+        bool gateHeld)
+    {
         Exception? cleanupError = null;
         try
         {

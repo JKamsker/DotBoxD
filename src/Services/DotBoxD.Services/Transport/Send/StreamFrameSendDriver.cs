@@ -1,51 +1,73 @@
 using System.IO.Pipes;
 using System.Runtime.CompilerServices;
-using DotBoxD.Services.Buffers;
-using DotBoxD.Services.Protocol;
 
 namespace DotBoxD.Services.Transport;
 
 /// <summary>Advances one StreamConnection owned-frame send until completion or suspension.</summary>
 internal static class StreamFrameSendDriver
 {
-    public static void Initialize(
-        StreamConnection connection,
-        PooledBufferWriter frame,
-        CancellationToken cancellationToken,
-        ref StreamFrameSendState state)
-    {
-        state.Connection = connection;
-        state.Frame = frame;
-        state.CallerToken = cancellationToken;
-        state.Stage = StreamFrameSendStage.AcquireGate;
-
-        var data = frame.WrittenMemory;
-        connection.ThrowIfDisposedForSend();
-        cancellationToken.ThrowIfCancellationRequested();
-        MessageFramer.ValidateOutgoingFrame(data.Span, connection.MaxOutgoingMessageSize);
-        state.Data = data;
-    }
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool TryAdvance(
         ref StreamFrameSendState state,
         out ValueTask pendingOperation)
     {
-        while (state.Stage != StreamFrameSendStage.Completed)
+        var connection = RequireConnection(ref state);
+        switch (state.Stage)
         {
-            pendingOperation = StartCurrentStage(ref state);
-            var awaiter = pendingOperation.ConfigureAwait(false).GetAwaiter();
-            if (!awaiter.IsCompleted)
-            {
-                return false;
-            }
+            case StreamFrameSendStage.AcquireGate:
+                pendingOperation = TransportSendGate.WaitAsync(
+                    connection.SendGate,
+                    connection.SendDisposalToken,
+                    state.CallerToken,
+                    nameof(StreamConnection));
+                if (!pendingOperation.IsCompleted)
+                {
+                    return false;
+                }
 
-            awaiter.GetResult();
-            CompleteCurrentStage(ref state);
+                pendingOperation.GetAwaiter().GetResult();
+                state.GateHeld = true;
+                state.CallerToken.ThrowIfCancellationRequested();
+                connection.ThrowIfDisposedForSend();
+                state.Stage = StreamFrameSendStage.Write;
+                goto case StreamFrameSendStage.Write;
+            case StreamFrameSendStage.Write:
+                pendingOperation = connection.SendStream.WriteAsync(
+                    state.Data,
+                    state.CallerToken);
+                if (!pendingOperation.IsCompleted)
+                {
+                    return false;
+                }
+
+                pendingOperation.GetAwaiter().GetResult();
+                if (connection.SendStream is PipeStream)
+                {
+                    state.Stage = StreamFrameSendStage.Completed;
+                    pendingOperation = default;
+                    return true;
+                }
+
+                state.Stage = StreamFrameSendStage.Flush;
+                goto case StreamFrameSendStage.Flush;
+            case StreamFrameSendStage.Flush:
+                pendingOperation = new ValueTask(
+                    connection.SendStream.FlushAsync(state.CallerToken));
+                if (!pendingOperation.IsCompleted)
+                {
+                    return false;
+                }
+
+                pendingOperation.GetAwaiter().GetResult();
+                state.Stage = StreamFrameSendStage.Completed;
+                pendingOperation = default;
+                return true;
+            case StreamFrameSendStage.Completed:
+                pendingOperation = default;
+                return true;
+            default:
+                throw new InvalidOperationException("The stream send has no stage to start.");
         }
-
-        pendingOperation = default;
-        return true;
     }
 
     public static bool Resume(
@@ -63,25 +85,6 @@ internal static class StreamFrameSendDriver
     {
         CompleteCurrentStage(ref state);
         return TryAdvance(ref state, out nextPendingOperation);
-    }
-
-    private static ValueTask StartCurrentStage(ref StreamFrameSendState state)
-    {
-        var connection = RequireConnection(ref state);
-        return state.Stage switch
-        {
-            StreamFrameSendStage.AcquireGate => TransportSendGate.WaitAsync(
-                connection.SendGate,
-                connection.SendDisposalToken,
-                state.CallerToken,
-                nameof(StreamConnection)),
-            StreamFrameSendStage.Write => connection.SendStream.WriteAsync(
-                state.Data,
-                state.CallerToken),
-            StreamFrameSendStage.Flush => new ValueTask(
-                connection.SendStream.FlushAsync(state.CallerToken)),
-            _ => throw new InvalidOperationException("The stream send has no stage to start."),
-        };
     }
 
     private static void CompleteCurrentStage(ref StreamFrameSendState state)

@@ -1,4 +1,7 @@
+using System.IO.Pipes;
+using System.Runtime.CompilerServices;
 using DotBoxD.Services.Buffers;
+using DotBoxD.Services.Protocol;
 
 namespace DotBoxD.Services.Transport;
 
@@ -16,23 +19,99 @@ internal static class StreamConnectionFrameSender
                 new ArgumentNullException(nameof(frame)));
         }
 
-        var state = new StreamFrameSendState();
-        ValueTask pendingOperation;
-        bool completed;
+        var gateHeld = false;
+        var pendingHandoffStarted = false;
         try
         {
-            StreamFrameSendDriver.Initialize(connection, frame, cancellationToken, ref state);
-            completed = StreamFrameSendDriver.TryAdvance(ref state, out pendingOperation);
+            var data = frame.WrittenMemory;
+            connection.ThrowIfDisposedForSend();
+            cancellationToken.ThrowIfCancellationRequested();
+            MessageFramer.ValidateOutgoingFrame(data.Span, connection.MaxOutgoingMessageSize);
+
+            var gateWait = TransportSendGate.WaitAsync(
+                connection.SendGate,
+                connection.SendDisposalToken,
+                cancellationToken,
+                nameof(StreamConnection));
+            if (!gateWait.IsCompleted)
+            {
+                pendingHandoffStarted = true;
+                return ContinuePending(
+                    connection,
+                    frame,
+                    data,
+                    cancellationToken,
+                    StreamFrameSendStage.AcquireGate,
+                    gateHeld: false,
+                    gateWait);
+            }
+
+            gateWait.GetAwaiter().GetResult();
+            gateHeld = true;
+            cancellationToken.ThrowIfCancellationRequested();
+            connection.ThrowIfDisposedForSend();
+
+            var write = connection.SendStream.WriteAsync(data, cancellationToken);
+            if (!write.IsCompleted)
+            {
+                pendingHandoffStarted = true;
+                return ContinuePending(
+                    connection,
+                    frame,
+                    data,
+                    cancellationToken,
+                    StreamFrameSendStage.Write,
+                    gateHeld,
+                    write);
+            }
+
+            write.GetAwaiter().GetResult();
+            if (connection.SendStream is not PipeStream)
+            {
+                var flush = connection.SendStream.FlushAsync(cancellationToken);
+                if (!flush.IsCompleted)
+                {
+                    pendingHandoffStarted = true;
+                    return ContinuePending(
+                        connection,
+                        frame,
+                        data,
+                        cancellationToken,
+                        StreamFrameSendStage.Flush,
+                        gateHeld,
+                        new ValueTask(flush));
+                }
+
+                flush.GetAwaiter().GetResult();
+            }
         }
-        catch (Exception error)
+        catch (Exception error) when (!pendingHandoffStarted)
         {
-            return CompleteSynchronously(ref state, error);
+            return CompleteSynchronously(connection, frame, gateHeld, error);
         }
 
-        if (completed)
+        return CompleteSynchronously(connection, frame, gateHeld, error: null);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static ValueTask ContinuePending(
+        StreamConnection connection,
+        PooledBufferWriter frame,
+        ReadOnlyMemory<byte> data,
+        CancellationToken cancellationToken,
+        StreamFrameSendStage stage,
+        bool gateHeld,
+        ValueTask pendingOperation)
+    {
+        var state = new StreamFrameSendState
         {
-            return CompleteSynchronously(ref state, error: null);
-        }
+            Connection = connection,
+            Frame = frame,
+            Data = data,
+            CallerToken = cancellationToken,
+            Stage = stage,
+            GateHeld = gateHeld,
+        };
 
         StreamFrameSendOperation? operation;
         try
@@ -57,10 +136,12 @@ internal static class StreamConnectionFrameSender
     }
 
     private static ValueTask CompleteSynchronously(
-        ref StreamFrameSendState state,
+        StreamConnection connection,
+        PooledBufferWriter frame,
+        bool gateHeld,
         Exception? error)
     {
-        var cleanupError = StreamFrameSendCleanup.Finish(ref state);
+        var cleanupError = StreamFrameSendCleanup.Finish(connection, frame, gateHeld);
         error = cleanupError ?? error;
         return error is null
             ? default
