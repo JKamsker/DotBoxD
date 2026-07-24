@@ -29,6 +29,7 @@ DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 taskset -c 11 
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-numeric-conversion
 DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 taskset -c 11 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-generic-primitive-expression
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-hook-chain-discovery
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-invokeasync-resolution
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-plugin-package-collision-discovery
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-server-extension-request-helpers
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-examples
@@ -88,6 +89,8 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 
 | Step | Commit | Probe | Key result |
 | --- | --- | --- | --- |
+| Single-resolution `InvokeAsync` semantic transform | this commit | `--probe-invokeasync-resolution` | The broad syntax branch still admits every invocation, but each transform now resolves its exact method once and threads it through invalid-kind diagnostics, lowering eligibility, user-binding exclusion, DotBoxD surface recognition, and call-shape construction. Five balanced CPU-6 pairs of 300 retained-driver edits improve resolved ordinary `864.2→811.7 ms` (6.07%, 5/5), user-named `858.2→802.0 ms` (6.55%, 5/5), unresolved `2,986.4→2,761.1 ms` (7.54%, 5/5), custom `ProbeAsync` `6,231.7→6,097.7 ms` (2.15%, 4/5), and invalid-kind/fallback `1,504.4→1,474.3 ms` (2.00%, 4/5). Paired median improvements are 8.00% / 6.30% / 7.47% / 3.38% / 3.37%. Allocation is noise-flat and receives no claim. Probe sources are byte-identical, every output hash matches, and tests pin arbitrary custom names, generated/user receivers, unresolved calls, exact diagnostic text, and `CandidateSymbols[0]` fallback. |
+| Suppress repeated descendant I32 eligibility probes after a wide-unsupported arithmetic root | this commit | `--probe-generic-primitive-expression` | Unsupported generic arithmetic previously fell back node by node, and every descendant operator recursively scanned its suffix for I32 eligibility. Six balanced CPU-pinned pairs reduce depth-96 left-associated intrinsic-call trees from `49,377.70→5,600.35 ns` and `48,843.60→5,634.80 ns`, and the conversion tree from `48,241.25→5,290.20 ns` (88.46-89.03%, 6/6 wins each). Exact allocations remain `3,064.8/3,064.8/3,000.4 B/op`, with exact fuel/host totals `200/1`, `200/1`, and `198/0`. Right-associated negative controls move 2.34-3.36% faster and receive no timing claim. Stabilized supported-F64 controls are noise-flat at `534.55→532.05 ns` and `526.55→533.15 ns`, mixed at 4/6 wins; I64 and shallow controls stay within 1.22% and 1.96%. An artifact-isolated four-pair mixed-sibling follow-up improves all intrinsic/conversion and pure-left/pure-right rows 84.13-90.89% at exact allocation/resource parity. Baseline already suppressed wide descendant probing; the new suppression is limited to repeated descendant Unary/Binary I32 eligibility after the root miss. Leaves, calls, generic evaluation, fuel, trace, cancellation, operator, and fault order are unchanged and pinned. |
 | Bulk-meter equal-cost interpreted F64 branches | this commit | `--probe-branched-f64-loop` | When both branch bodies have identical static fuel and the complete loop fits the fuel and iteration budgets, the interpreter now charges the loop once and runs the existing unboxed condition/assignment plans with only the established 4,096-iteration cancellation/deadline checkpoints. Eight alternating baseline/candidate process pairs pinned to CPU 11 with tiering, PGO, and ReadyToRun disabled improve the median of seven 5,000,000-iteration samples from `65.55→53.10 ms` (19.0%, 8/8 wins). An unequal-cost branch retains path-specific per-iteration metering and stays within the 5% control guard at `53.05→54.20 ms` (+2.17%), so it receives no timing claim. Insufficient whole-loop fuel or loop budget falls back to the original incremental order. Values and the full resource tuple remain exact, and the same four success/unequal/low-fuel/low-loop semantic cases pass against baseline and candidate binaries. |
 | Bounded generic I64/F64 expression eligibility | this commit | `--probe-generic-primitive-expression` | Generic parents previously revisited I32 eligibility throughout deep I64/F64 arithmetic and boxed every intermediate value. A four-entry, exact layout/expression cache now classifies bounded whole trees once, rechecks invocation-specific assignment state, and executes supported trees through the raw evaluators. Two CPU-pinned B-C pairs with tiering/PGO/ReadyToRun disabled improve depth-96 F64 left/right trees `46,105.1→2,594.0 ns` (94.4%) and `4,060.8→1,541.2 ns` (62.0%), with `2,976.4→696.1 B/op`. Warm intrinsic/conversion controls move at most 1.84%, and a full-cache fifth root moves 1.51%; all retain exact allocation, fuel, and host-call counts. First-invocation setup allocations match baseline exactly. Unsupported second-invocation classification has a measured one-time 128 B cost and 3.2% left-deep / 32-38% short right-deep cost; the third and later invocations return to allocation parity and equal-or-better timing. Classification is capped at 512 nodes/64 raw slots, cache growth stops at four keys, debug tracing bypasses it, and tests pin faults, ordering, assignment transitions, exact-reference/layout isolation, capacity, and concurrent publication. |
 | Target-directed interpreter scalar assignments | this commit | `--probe-interpreter-scalar-assignment` | Straight assignments now resolve the target slot once and invoke only its matching raw I32/I64/F64 evaluator; a failed targeted probe is reused before the unchanged legacy fallback cascade. Four isolated, CPU-pinned samples per side with identical expanded probes improve x8 I64 literal `82.95→67.80 ms`, I64 raw-variable `93.90→85.90 ms`, F64 literal `85.35→68.80 ms`, and F64 raw-variable `105.25→90.25 ms`. Subtracting each x0 envelope improves assignment work 15.3-32.5%. I32 controls are flat (`69.45→69.15` and `86.15→87.75 ms`), and boxed-target/evaluator-miss controls overlap. All 48 rows retain exact allocations, checksums, and resource tuples; raw assignments remain `0 B/assignment`. Unknown/boxed targets, evaluator misses, async bindings, faults, tracing, assignment state, and shared-plan concurrency are pinned. |
@@ -2875,3 +2878,130 @@ in every sample. Strict focused tests cover fresh-frame source ordering, self-re
 fallback without admission, checked overflow, low fuel/loop quota fallback, warmed debug preorder, exact identity,
 cross-kind/cache-shape isolation, concurrent immutable-plan publication, and allocation. The plan retains no frame or
 runtime values, and no public API or sandbox accounting contract changes.
+
+## Descendant composite-I32 probe suppression after an unsupported wide root
+
+The bounded generic I64/F64 expression cache removed repeated wide-tree classification and unboxed supported arithmetic,
+but an unsupported arithmetic root still entered the generic evaluator. The root performed one complete I32 eligibility
+walk before the cached wide miss; generic recursion then performed another recursive I32 eligibility walk at every
+descendant operator. A left-associated F64 tree whose deepest leaf was an intrinsic or numeric conversion therefore
+walked progressively shorter suffixes and remained quadratic.
+
+Baseline already disabled wide-primitive probing for descendants after an arithmetic-root wide miss. The candidate adds
+only the suppression of repeated composite Unary/Binary I32 eligibility checks on that existing fallback path. Literal,
+variable, and call nodes retain their established direct dispatch, while unsupported nodes still use the same generic
+evaluator. A non-arithmetic parent continues to enable normal child probing. The change does not move generic fuel
+charging, trace writes, cancellation checks, operand evaluation, operator application, host calls, or fault propagation.
+
+The final detached baseline was `b42543345`. The benchmark runner sources were identical between the two publications,
+with SHA256 `27d6535a6d2aa4c7a502c2e21d4b4f84822549f10496f1ffabdb9614c73c7f5b`. The interpreter assemblies differed as
+intended: baseline `fd8ff81a6966449ca95d51277bb2ef112413134e4239cde6c79a960daf74aa9c`, candidate
+`8d9886acad044547f4a399cc15e8fab008e224fd8d5403b6a37699d6fbb2c2ea`. Six fresh pairs ran in balanced order
+BC/CB/BC/CB/BC/CB, pinned to CPU 11 with tiering, Tiered PGO, and ReadyToRun disabled:
+
+```text
+taskset -c 11 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  dotnet <published-benchmark.dll> --probe-generic-primitive-expression
+```
+
+Pooled process medians for the depth-96 ineligible target and association controls were:
+
+```text
+case                               baseline ns/op  candidate ns/op  change    wins  exact B/op  fuel/hosts
+call left-deep, arithmetic left        49,377.70          5,600.35  -88.66%    6/6      3,064.8     200/1
+call left-deep, arithmetic right       48,843.60          5,634.80  -88.46%    6/6      3,064.8     200/1
+conversion left-deep                   48,241.25          5,290.20  -89.03%    6/6      3,000.4     198/0
+call right-deep, arithmetic left        4,728.10          4,569.10   -3.36%    6/6      3,064.8     200/1
+call right-deep, arithmetic right       4,744.25          4,600.70   -3.03%    6/6      3,064.8     200/1
+conversion right-deep                   4,345.30          4,243.80   -2.34%    6/6      3,000.4     198/0
+cache-full fifth root                   4,736.50          4,615.35   -2.56%    6/6      3,064.8     200/1
+```
+
+The three left-associated targets improve in every pair and preserve exact allocation and resource totals. The
+right-associated and cache-full rows are controls; their smaller improvements receive no timing claim. Two longer
+200,000-iteration supported-F64 controls isolate the dispatch flag from the ineligible-tree target:
+
+```text
+case                               baseline ns/op  candidate ns/op  pooled change  paired median  wins  B/op  fuel/hosts
+F64 right d16, left operand               534.55            532.05        -0.47%         -1.58%    4/6  760.1      39/0
+F64 right d16, right operand              526.55            533.15        +1.25%         -0.90%    4/6  760.1      39/0
+```
+
+The directions disagree between pooled and paired summaries, so both supported-F64 rows are noise-flat and receive no
+timing claim. Additional pooled controls retain exact allocation, fuel, and host-call counts:
+
+```text
+case                         baseline ns/op  candidate ns/op  change  exact B/op  fuel/hosts
+I32 left depth 96                  4,990.25          4,703.05  -5.76%       672.1     195/0
+I32 right depth 96                 2,288.00          2,235.25  -2.31%       672.1     195/0
+I64 left operand depth 96          3,392.95          3,366.65  -0.78%       760.1     199/0
+I64 right operand depth 96         3,419.30          3,377.75  -1.22%       760.1     199/0
+shallow Bool                         294.95            291.20  -1.27%       672.1       5/0
+shallow intrinsic                    584.10            582.05  -0.35%       760.2       6/1
+eligible I32 local call              275.00            269.60  -1.96%       672.1       6/0
+```
+
+One additional risk control places a whole-tree-eligible depth-96 pure-F64 subtree beside a small unsupported intrinsic
+or numeric-conversion subtree. This proves both root operand orders retain the pure sibling's performance rather than
+exposing a descendant-fast-path regression. Four fresh pairs ran BC/CB/BC/CB under the same CPU/runtime controls. The
+published benchmark DLL and every dependency other than the interpreter were byte-identical; the benchmark DLL SHA256
+was `c51bd8ca66fc62c460451e618df5f52347e647b9ea5b6884e263c45894126235`. Interpreter hashes were the accepted baseline
+`fd8ff81a6966449ca95d51277bb2ef112413134e4239cde6c79a960daf74aa9c` and candidate
+`8d9886acad044547f4a399cc15e8fab008e224fd8d5403b6a37699d6fbb2c2ea`:
+
+```text
+case                         baseline ns/op  candidate ns/op  change   wins  exact B/op  fuel/hosts
+intrinsic, pure sibling left      49,270.00          7,819.05  -84.13%   4/4      3,088.8     200/1
+intrinsic, pure sibling right     45,845.85          4,486.00  -90.22%   4/4      3,088.8     200/1
+conversion, pure sibling left     49,141.80          7,284.60  -85.18%   4/4      3,024.4     198/0
+conversion, pure sibling right    45,525.75          4,146.85  -90.89%   4/4      3,024.4     198/0
+```
+
+These results match the mechanism: baseline already prevented a descendant wide probe after the root miss, so the
+candidate cannot remove a pure-F64 fast path there; it removes only the repeated failed composite-I32 scans. All four
+rows preserve exact allocation and resource totals.
+
+The remaining rows are regression controls rather than separate timing claims. Focused tests pin the exact debug-trace preorder and
+fuel sequence, left-to-right intrinsic/fault ordering (`0/1` host calls and `7/11` failure fuel), left- and
+right-associated conversion values with exact fuel, and pre-cancellation before the next fuel charge. Existing tests
+continue to cover supported wide expressions, non-finite and overflow faults, unknown-local order, cache admission,
+capacity, assignment-state revalidation, and concurrent use. No public API or sandbox accounting contract changes.
+
+## Single-resolution InvokeAsync semantic transform
+
+The `InvokeAsync` incremental syntax branch intentionally admits every invocation because public
+`[LowerToIrMethod]` methods may have arbitrary names. Its semantic transform nevertheless resolved the same invocation
+twice for an ordinary call and as many as four times for a lowering candidate. Resolution now happens once at the start
+of the guarded transform. The exact resolved method, including the existing first `CandidateSymbols` fallback, is passed
+through invalid-kind diagnostics, lowering eligibility, user-method exclusion, DotBoxD surface recognition, and
+call-shape construction. No Roslyn symbol escapes into an incremental output.
+
+The permanent probe retains one generator driver while alternating two pre-parsed, comment-only source snapshots. It
+measures resolved ordinary calls, user methods named `InvokeAsync`, unresolved/error calls, an arbitrary custom
+`ProbeAsync` lowering method, and invalid-kind plus ambiguous-candidate diagnostics. Each process performs 30 warmups
+and 300 measured edits. Baseline and candidate artifacts used byte-identical probe sources with SHA-256
+`fbd50db6555be87feb6a39342c1995f48c115fd5a0a0a00f704843933eb2cec6` and
+`de19482fc1252f764157f06671d994e7ff2ad87099046d2966260d4b9e9a0417`.
+
+Command:
+
+```text
+DOTNET_TieredCompilation=0 DOTNET_TC_QuickJitForLoops=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  taskset -c 6 dotnet <published-benchmark.dll> --probe-invokeasync-resolution
+```
+
+Five fresh pairs ran in balanced order BC/CB/BC/CB/BC:
+
+```text
+case                    calls  baseline ms  candidate ms  pooled change  paired median  wins
+resolved ordinary         500        864.2         811.7         -6.07%          -8.00%   5/5
+user InvokeAsync          500        858.2         802.0         -6.55%          -6.30%   5/5
+unresolved InvokeAsync    500      2,986.4       2,761.1         -7.54%          -7.47%   5/5
+custom ProbeAsync          50      6,231.7       6,097.7         -2.15%          -3.38%   4/5
+diagnostic/fallback       100      1,504.4       1,474.3         -2.00%          -3.37%   4/5
+```
+
+Allocation medians vary by less than 75 B/edit in workloads allocating 0.90-11.17 MB/edit, disagree in direction for
+the diagnostic lane, and receive no claim. Every baseline/candidate process reports the same generated-source and
+diagnostic hashes for its snapshot. Focused tests cover custom method names, generated and user receivers, unresolved
+calls, invalid-kind text, call-shape output, and an ambiguous overload whose first candidate carries kind `99`.
