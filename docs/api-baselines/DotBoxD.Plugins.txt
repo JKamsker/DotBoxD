@@ -4,7 +4,7 @@
 
 protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
 public async Task DrainAsync()
-public async ValueTask DispatchAsync( string subscriptionId, ReadOnlyMemory<byte> projectedValue, HookContext context, CancellationToken cancellationToken = default)
+public ValueTask DispatchAsync( string subscriptionId, ReadOnlyMemory<byte> projectedValue, HookContext context, CancellationToken cancellationToken = default)
 public async ValueTask FlushUpdatesAsync(CancellationToken cancellationToken = default)
 public async ValueTask HandleAsync<TEvent>( IPluginEventAdapter<TEvent> adapter, TEvent e, CancellationToken cancellationToken = default)
 public async ValueTask ModifySettingsAsync( IReadOnlyDictionary<string, object?> values, bool atomic = false, CancellationToken cancellationToken = default)
