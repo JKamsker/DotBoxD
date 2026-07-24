@@ -48,7 +48,10 @@ public sealed class StreamDedicatedReceiveOperationRetentionTests
                 new WeakReference(pair.Receiver),
                 new WeakReference(pair.Connection.FrameReceiveStream),
                 new WeakReference(callerCancellation));
-            pair.Peer.Dispose();
+            // Dispose the OS pipe normally before testing managed retention. Windows can
+            // keep an undisposed overlapped pipe object alive independently of the
+            // connection graph until native completion cleanup runs.
+            await pair.DisposeAsync();
             return probe;
         }
         catch
