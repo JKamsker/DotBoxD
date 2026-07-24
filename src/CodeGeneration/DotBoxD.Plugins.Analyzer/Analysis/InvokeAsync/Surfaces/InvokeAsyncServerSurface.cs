@@ -30,11 +30,10 @@ internal static class InvokeAsyncServerSurface
     }
 
     public static bool IsDotBoxDInvokeAsync(
-        SemanticModel model,
-        InvocationExpressionSyntax invocation,
-        CancellationToken cancellationToken)
+        IMethodSymbol? method,
+        Compilation compilation)
     {
-        if (ResolvedMethod(model, invocation, cancellationToken) is not { } method)
+        if (method is null)
         {
             return false;
         }
@@ -44,12 +43,12 @@ internal static class InvokeAsyncServerSurface
             return false;
         }
 
-        if (!HasExplicitIrInvocationCompanion(method, model.Compilation))
+        if (!HasExplicitIrInvocationCompanion(method, compilation))
         {
             return false;
         }
 
-        if (IsPluginServerType(method.ContainingType, model.Compilation))
+        if (IsPluginServerType(method.ContainingType, compilation))
         {
             return true;
         }
@@ -58,37 +57,35 @@ internal static class InvokeAsyncServerSurface
     }
 
     public static bool BindsToUserInvokeAsync(
-        SemanticModel model,
-        InvocationExpressionSyntax invocation,
-        CancellationToken cancellationToken)
+        IMethodSymbol? method,
+        Compilation compilation)
     {
-        if (ResolvedMethod(model, invocation, cancellationToken) is not { } method ||
-            method.ContainingType.TypeKind == TypeKind.Error)
+        if (method is null || method.ContainingType.TypeKind == TypeKind.Error)
         {
             return false;
         }
 
         if (string.Equals(method.Name, InvokeAsyncMethod, StringComparison.Ordinal) &&
             IsGeneratedPluginServerFacadeType(method.ContainingType) &&
-            HasExplicitIrInvocationCompanion(method, model.Compilation))
+            HasExplicitIrInvocationCompanion(method, compilation))
         {
             return false;
         }
 
-        return !LowerToIrMethodReader.IsAnonymousInvocation(method, model.Compilation) &&
-            !IsPluginServerType(method.ContainingType, model.Compilation);
+        return !LowerToIrMethodReader.IsAnonymousInvocation(method, compilation) &&
+            !IsPluginServerType(method.ContainingType, compilation);
     }
 
     public static bool IsLoweringCandidate(
-        SemanticModel model,
-        InvocationExpressionSyntax invocation,
-        CancellationToken cancellationToken)
+        IMethodSymbol? method,
+        Compilation compilation,
+        InvocationExpressionSyntax invocation)
     {
-        if (ResolvedMethod(model, invocation, cancellationToken) is { } method)
+        if (method is not null)
         {
-            return LowerToIrMethodReader.IsAnonymousInvocation(method, model.Compilation) ||
+            return LowerToIrMethodReader.IsAnonymousInvocation(method, compilation) ||
                 (string.Equals(method.Name, InvokeAsyncMethod, StringComparison.Ordinal) &&
-                 HasExplicitIrInvocationCompanion(method, model.Compilation));
+                 HasExplicitIrInvocationCompanion(method, compilation));
         }
 
         return InvocationName(invocation) is { } name &&
@@ -96,14 +93,13 @@ internal static class InvokeAsyncServerSurface
     }
 
     public static bool TryCreateLowerToIrMethodDiagnostic(
-        SemanticModel model,
+        IMethodSymbol? method,
+        Compilation compilation,
         InvocationExpressionSyntax invocation,
-        CancellationToken cancellationToken,
         out PluginKernelDiagnostic diagnostic)
     {
         diagnostic = null!;
-        if (ResolvedMethod(model, invocation, cancellationToken) is not { } method ||
-            !LowerToIrMethodReader.TryReadUnsupportedKind(method, model.Compilation, out var kind))
+        if (!LowerToIrMethodReader.TryReadUnsupportedKind(method, compilation, out var kind))
         {
             return false;
         }

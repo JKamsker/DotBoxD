@@ -28,6 +28,12 @@ internal static class PluginAnalyzerProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-invokeasync-resolution", StringComparer.OrdinalIgnoreCase))
+        {
+            InvokeAsyncResolutionProbe.Run();
+            return true;
+        }
+
         return false;
     }
 }
