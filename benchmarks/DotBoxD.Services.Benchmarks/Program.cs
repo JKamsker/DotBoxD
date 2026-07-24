@@ -106,6 +106,12 @@ if (args.Length == 1)
         case "--probe-frame-read-timeout-source-lifetime":
             FrameReadTimeoutSourceLifetimeProbe.Run();
             return;
+        case "--probe-service-generator-collision-incrementality":
+            ServiceGeneratorCollisionIncrementalityProbe.Run();
+            return;
+        case "--probe-service-generator-collision-incrementality-tracked":
+            ServiceGeneratorCollisionIncrementalityProbe.RunTrackedAudit();
+            return;
     }
 }
 
