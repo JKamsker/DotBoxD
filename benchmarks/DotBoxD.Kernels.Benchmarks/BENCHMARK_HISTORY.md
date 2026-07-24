@@ -92,6 +92,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 
 | Step | Commit | Probe | Key result |
 | --- | --- | --- | --- |
+| Closed-set `SandboxType.IsKnown` name dispatch | this commit | `--probe-sandbox-type-validation`, `--probe-compiled-return-validation` | Recursive known-type validation no longer probes the forbidden-name hash set before dispatching every node: scalar fallthrough already rejects forbidden opaque names, and composites are closed to exact `List`/`Record`/`Map` names. Six balanced CPU-4 pairs improve nested declared/open/built-in checks `445.10→310.95`, `420.95→291.00`, and `367.35→238.10 ns` (30.14%/30.87%/35.18%), all 6/6 at exact 0 B. The unchanged forbidden-only walk is flat at `261.25→260.75 ns`. Compiled nested-record validation corroborates the boundary effect at `2,820.6→2,700.5 ns` (4.26%, 6/6), while its direct validation walk improves `830.9→760.0 ns` (8.53%, 6/6); scalar and large-list controls stay within +1.63%, with exact allocation/resource/malformed-rejection signatures. No cache or state is added; a per-instance cache experiment was rejected for adding 48 B per compiled nested-record call. |
 | Lock-free exact-MRU Auto hotness lookup | this commit | `--probe-auto-hotness-bookkeeping` | A volatile publication bypasses the global hotness-table monitor only when both plan-hash and entrypoint references exactly match the LRU tail; state history retains its own lock and every logical-key/recency mutation remains under the table gate. Six balanced CPU-8-11 pairs improve built-in interpreted `42.40→35.10 ns` (17.22%), warmed compiled `43.75→36.40 ns` (16.80%), snapshot interpreted `53.00→44.50 ns` (16.04%), snapshot compiled `53.30→45.65 ns` (14.35%), and four-worker contention `155.80→16.85 ns` (89.18%), all 6/6. Alternating/distinct-reference/churn controls move only +1.32%/+1.91%/+1.50%, and allocations/checksums are exact. |
 | Single-resolution `InvokeAsync` semantic transform | this commit | `--probe-invokeasync-resolution` | The broad syntax branch still admits every invocation, but each transform now resolves its exact method once and threads it through invalid-kind diagnostics, lowering eligibility, user-binding exclusion, DotBoxD surface recognition, and call-shape construction. Five balanced CPU-6 pairs of 300 retained-driver edits improve resolved ordinary `864.2→811.7 ms` (6.07%, 5/5), user-named `858.2→802.0 ms` (6.55%, 5/5), unresolved `2,986.4→2,761.1 ms` (7.54%, 5/5), custom `ProbeAsync` `6,231.7→6,097.7 ms` (2.15%, 4/5), and invalid-kind/fallback `1,504.4→1,474.3 ms` (2.00%, 4/5). Paired median improvements are 8.00% / 6.30% / 7.47% / 3.38% / 3.37%. Allocation is noise-flat and receives no claim. Probe sources are byte-identical, every output hash matches, and tests pin arbitrary custom names, generated/user receivers, unresolved calls, exact diagnostic text, and `CandidateSymbols[0]` fallback. |
 | Suppress repeated descendant I32 eligibility probes after a wide-unsupported arithmetic root | this commit | `--probe-generic-primitive-expression` | Unsupported generic arithmetic previously fell back node by node, and every descendant operator recursively scanned its suffix for I32 eligibility. Six balanced CPU-pinned pairs reduce depth-96 left-associated intrinsic-call trees from `49,377.70→5,600.35 ns` and `48,843.60→5,634.80 ns`, and the conversion tree from `48,241.25→5,290.20 ns` (88.46-89.03%, 6/6 wins each). Exact allocations remain `3,064.8/3,064.8/3,000.4 B/op`, with exact fuel/host totals `200/1`, `200/1`, and `198/0`. Right-associated negative controls move 2.34-3.36% faster and receive no timing claim. Stabilized supported-F64 controls are noise-flat at `534.55→532.05 ns` and `526.55→533.15 ns`, mixed at 4/6 wins; I64 and shallow controls stay within 1.22% and 1.96%. An artifact-isolated four-pair mixed-sibling follow-up improves all intrinsic/conversion and pure-left/pure-right rows 84.13-90.89% at exact allocation/resource parity. Baseline already suppressed wide descendant probing; the new suppression is limited to repeated descendant Unary/Binary I32 eligibility after the root miss. Leaves, calls, generic evaluation, fuel, trace, cancellation, operator, and fault order are unchanged and pinned. |
@@ -3375,3 +3376,104 @@ Post-change validation passes the 22 existing remote-local registry/cancellation
 new completion/allocation regressions (29/29), and all 23 architecture tests. The complete solution builds under
 `GITHUB_ACTIONS=true` with zero warnings/errors; whitespace verification, diff checks, the 300-line soft-cap budget,
 and C# file/folder layout gates pass. `RemoteLocalHandlerRegistry.cs` remains exactly 300 lines.
+
+## Closed-set `SandboxType.IsKnown` name dispatch
+
+Every recursive `SandboxTypeRules.IsKnown` call first checked `SandboxType.IsForbiddenName(type.Name)`. That lookup is
+redundant on both branches that can succeed: scalar validation accepts only the nine built-ins or a well-formed
+opaque-id brand, whose name validator already rejects forbidden names; composite validation accepts only exact
+`List`, `Record`, and `Map` names. The hot-path change removes only that preliminary lookup. Empty-name and depth
+guards remain first, scalar and composite closed sets are unchanged, and no cache, mutable state, or retained input is
+introduced. A source comment records the security-sensitive invariant so future constructor/scalar changes cannot
+silently invalidate the reasoning.
+
+`SandboxTypeTests` now pins the complete built-in scalar set and a nested built-in composite; open, declared, and
+undeclared opaque-id behavior; forbidden names as a scalar, map key, and composite; opaque/scalar/unknown names with
+arguments; and the exact accepted/rejected depth boundary. The permanent type probe hard-fails any result mismatch,
+separately labels declared/open/built-in targets, and retains undeclared, forbidden, unknown, exact-depth, over-depth,
+legacy double-walk, and unchanged `IsForbidden`-only lanes. Rejection and depth lanes are semantic controls, not speed
+claims.
+
+Six fresh process pairs ran in order BC/CB/BC/CB/BC/CB on otherwise quiescent CPU 4. Both probes used the same frozen
+runner and the following environment; only `DotBoxD.Kernels.dll` differs between directories:
+
+```text
+taskset -c 4 env \
+  DOTNET_TieredCompilation=0 DOTNET_TC_QuickJitForLoops=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  COMPlus_TieredCompilation=0 COMPlus_TieredPGO=0 COMPlus_ReadyToRun=0 \
+  dotnet <frozen-benchmark.dll> --probe-sandbox-type-validation
+
+taskset -c 4 env \
+  DOTNET_TieredCompilation=0 DOTNET_TC_QuickJitForLoops=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  COMPlus_TieredCompilation=0 COMPlus_TieredPGO=0 COMPlus_ReadyToRun=0 \
+  dotnet <frozen-benchmark.dll> --probe-compiled-return-validation
+```
+
+```text
+type-validation lane                 baseline ns   candidate ns   change    wins   B/op baseline→candidate
+declared known only                       445.10         310.95    -30.14%    6/6             0.0→0.0
+open known only                           420.95         291.00    -30.87%    6/6             0.0→0.0
+built-in known only                       367.35         238.10    -35.18%    6/6             0.0→0.0
+legacy known+forbidden                    716.90         578.70    -19.28%    6/6             0.0→0.0
+forbidden walk only (unchanged control)   261.25         260.75     -0.19%    4/6             0.0→0.0
+```
+
+The other permanent type lanes preserve their exact expected result and 1,000,000 checksum in all twelve processes,
+with exact 0 B allocation. Undeclared opaque, forbidden, unknown-composite, exact-depth, and over-depth timing is
+recorded in the logs but receives no separate performance claim. The type result/allocation signature is identical in
+all twelve logs at `9ae9a9272b5330da9871ace064a29c3406f77999d75c509bf9baefcf6efe6c1e`.
+
+The existing compiled-return probe corroborates the change at real compiled and direct structural-validation
+boundaries. Whole compiled execution naturally dilutes one type walk, while its adjacent direct-walk column isolates
+the validation contribution:
+
+```text
+compiled lane             baseline ns   candidate ns   change    wins   direct walk baseline→candidate
+unit no-op                     422.9          429.8      +1.63%    3/6                  5.5→5.5 ns
+i32 identity                   423.6          424.8      +0.26%    3/6                  6.0→6.0 ns
+empty List<I32>                612.8          586.5      -4.30%    5/6                43.5→34.2 ns
+Record<I32,String>             904.0          884.0      -2.21%    5/6              144.0→124.2 ns
+List<I32> x32                1,752.8        1,736.6      -0.92%    4/6              515.8→499.5 ns
+List<I32> x255               7,278.4        7,195.5      -1.14%    5/6            3,326.8→3,351.3 ns
+List<I32> x256               8,965.5        8,978.3      +0.14%    2/6            4,056.4→4,072.5 ns
+List<I32> x1024             32,641.0       32,462.4      -0.55%    3/6          15,501.7→15,311.4 ns
+Map<String,I32> x32          2,535.6        2,499.8      -1.41%    5/6              970.6→939.3 ns
+nested record                2,820.6        2,700.5      -4.26%    6/6              830.9→760.0 ns
+```
+
+The nested compiled boundary is the corroborating timing claim: it improves 4.26% with 6/6 wins, and its direct walk
+improves 8.53%, also 6/6. Empty-list and record medians improve, while scalar and large-list controls remain inside the
+predeclared absolute 5% guard. Every compiled process preserves exact operations, allocation totals/B-op, direct-walk
+B/op, checksums, result reference identity, execution mode and artifact identities, all twelve resource counters, and
+five direct plus five compiled malformed-value rejections. Their canonical invariant signature is identical at
+`d1a8c0b80f7cac180cad3db537feae4e1c69fd3591ce3bc265737869a80cfae7` in all twelve logs.
+
+Accepted logs are under `/tmp/dotboxd-sandboxtype-846309751-cpu4-accepted-v2`; their manifest digest is
+`5f48f18b6e07397081e376e0b28aab327d3b7fd9ca925678868b478dfb521253`. Frozen baseline/candidate directories are
+`/tmp/dotboxd-sandboxtype-846309751-baseline-frozen` and
+`/tmp/dotboxd-sandboxtype-846309751-candidate-frozen`. The apphost and runner DLL are byte-identical at
+`48c26fa0ce2e5c25ba48fcca56347074ff257c1b5a65cbc0b6f071d6a06dd9e8` and
+`de2501d7ff637082e46398ab98a4084bf964648c51f9c39e24a2dfb06306c2fc`; complete non-kernel manifests are
+byte-identical at `89ab6c11d1c630c95b2744fdebf21e6029d4a6c633af56b2fe85f08981e6c5a9`. Exact baseline/candidate Kernels hashes are
+`5f6f9bb0a6f28343c6f08903f3c306a39302e66bd8a9b8aac872781c563fc589` and
+`54c354fbfba5e108e609a07e4e88d47830d823f36bb8775306afe5739959beb1`. Probe, rules, and test source hashes are
+`671f921739c5a5a197ad43d9af438d08de735fafc7052f5b508453310ff6f122`,
+`6a2f563fc4c901ac1e464a7bcf1bb5a401d8c660aa6656c767c520e710ddd658`, and
+`a2f9381a98cf602b8d1c12c304a2d98f878d6bb9e1576e5620fd9508ad7f920f`.
+
+Three sets are excluded. `/tmp/dotboxd-sandboxtype-rules-pairs` was a directional run of the older two-lane probe;
+its sixth candidate compiled process was visibly host-contaminated (`655.3 ns` scalar envelopes and `7,543.3 ns`
+nested versus the other candidate processes' roughly `417-449 ns` and `2,735-2,823 ns`), so none of that set supports
+the accepted claim. `/tmp/dotboxd-sandboxtype-cache-pairs` evaluated a per-instance known-result cache and was rejected:
+compiled nested-record allocation increased exactly 48 B/call at displayed precision, `992.2→1,040.2 B/op`.
+`/tmp/dotboxd-sandboxtype-846309751-cpu4-accepted-v1` is not benchmark evidence; an orchestration quoting error
+overwrote runs into two literal filenames, and the set was rejected before analysis. The accepted v2 set contains the
+required twelve distinct logs per probe.
+
+This is a CPU-only structural-validation claim. Allocation is unchanged, and no timing claim is made for rejected
+names or depth-limit behavior. There is no public API, wire format, compiler/verifier identity, generated ABI,
+persisted artifact, diagnostic, resource-accounting, or malformed-input contract change.
+
+Post-change validation passes all 13 `SandboxTypeTests` and all 23 architecture tests. The complete solution builds
+under `GITHUB_ACTIONS=true` with zero warnings/errors; whitespace verification, diff checks, file-length and soft-cap
+budget, C# folder layout, and banned-API gates pass. All three changed C# files remain below 200 lines.
