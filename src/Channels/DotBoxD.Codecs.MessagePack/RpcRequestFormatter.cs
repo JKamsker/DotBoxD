@@ -219,11 +219,10 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
         // Shape only selects a candidate; the full comparison remains the acceptance boundary.
         return utf8.Length switch
         {
-            7 when utf8[0] == (byte)'S' => MatchField(utf8, StreamsKey, RpcRequestField.Streams),
-            9 when utf8[0] == (byte)'M' => MatchField(utf8, MessageIdKey, RpcRequestField.MessageId),
-            10 when utf8[0] == (byte)'I' => MatchField(utf8, InstanceIdKey, RpcRequestField.InstanceId),
-            10 when utf8[0] == (byte)'M' => MatchField(utf8, MethodNameKey, RpcRequestField.MethodName),
-            11 when utf8[0] == (byte)'S' => MatchField(utf8, ServiceNameKey, RpcRequestField.ServiceName),
+            7 => MatchField(utf8, StreamsKey, RpcRequestField.Streams),
+            9 => MatchField(utf8, MessageIdKey, RpcRequestField.MessageId),
+            10 => ReadTenByteField(utf8),
+            11 => MatchField(utf8, ServiceNameKey, RpcRequestField.ServiceName),
             _ => RpcRequestField.Unknown,
         };
     }
@@ -237,14 +236,29 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
 
         return name.Length switch
         {
-            7 when name[0] == 'S' => MatchField(name, "Streams", RpcRequestField.Streams),
-            9 when name[0] == 'M' => MatchField(name, "MessageId", RpcRequestField.MessageId),
-            10 when name[0] == 'I' => MatchField(name, "InstanceId", RpcRequestField.InstanceId),
-            10 when name[0] == 'M' => MatchField(name, "MethodName", RpcRequestField.MethodName),
-            11 when name[0] == 'S' => MatchField(name, "ServiceName", RpcRequestField.ServiceName),
+            7 => MatchField(name, "Streams", RpcRequestField.Streams),
+            9 => MatchField(name, "MessageId", RpcRequestField.MessageId),
+            10 => ReadTenCharacterField(name),
+            11 => MatchField(name, "ServiceName", RpcRequestField.ServiceName),
             _ => RpcRequestField.Unknown,
         };
     }
+
+    private static RpcRequestField ReadTenByteField(ReadOnlySpan<byte> utf8)
+        => utf8[0] switch
+        {
+            (byte)'I' => MatchField(utf8, InstanceIdKey, RpcRequestField.InstanceId),
+            (byte)'M' => MatchField(utf8, MethodNameKey, RpcRequestField.MethodName),
+            _ => RpcRequestField.Unknown,
+        };
+
+    private static RpcRequestField ReadTenCharacterField(string name)
+        => name[0] switch
+        {
+            'I' => MatchField(name, "InstanceId", RpcRequestField.InstanceId),
+            'M' => MatchField(name, "MethodName", RpcRequestField.MethodName),
+            _ => RpcRequestField.Unknown,
+        };
 
     private static RpcRequestField MatchField(
         ReadOnlySpan<byte> candidate,

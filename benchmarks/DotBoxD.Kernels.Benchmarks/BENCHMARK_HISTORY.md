@@ -2795,8 +2795,8 @@ The final constructor-resolution callback pass is unchanged.
 
 The permanent probe builds deterministic 32, 64, 128, 256, and 512-hop chains in favorable and adverse declaration
 orders, plus a 512-helper nongeneric control. Parsing and compilation are outside the timed interval; every sample
-requires exactly one `DBXK001` diagnostic and no analyzer failure. Seven fresh baseline/candidate processes were run in
-the balanced order BC/CB/BC/CB/BC/CB/BC, pinned to CPU 6 with tiering, Tiered PGO, and ReadyToRun disabled:
+requires exactly one `DBXK001` diagnostic and no analyzer failure. Five fresh baseline/candidate process pairs ran in
+the balanced order BC/CB/BC/CB/BC, pinned to CPU 6 with tiering, Tiered PGO, and ReadyToRun disabled:
 
 ```text
 taskset -c 6 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
@@ -2806,19 +2806,19 @@ taskset -c 6 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun
 The frozen benchmark runners were byte-identical
 (`c4b257fb52f5951052516ddfdf875b081234f5639b6ca85b86b381577c3d7146`). Only the analyzer differed: baseline
 `c177b6e8294e563705b679af7d8e8ebe487a975f47675da7098ccb91354ebacf` versus candidate
-`54b58b1486f921d414c64cad01c550337b3d9c87653a31a82a444dfe5ed9fc44`. Pooled 512-hop medians were:
+`2cf83783fb1e4781d44c7a2262362add342eb5f24aa95df91c80f1882378c390`. Pooled 512-hop medians were:
 
 ```text
-case                         baseline             candidate             change                  time wins
-adverse declaration order    33.43 ms / 28,160,160 B  17.31 ms / 9,264,192 B  -48.2% / -67.1%       7/7
-favorable declaration order  17.98 ms /  9,276,416 B  18.44 ms / 9,273,440 B  no timing claim / parity   -
-ordinary helper control      13.64 ms /  6,905,648 B  14.42 ms / 6,902,552 B  no timing claim / parity   -
+case                         baseline                  candidate                 change                  time wins
+adverse declaration order    32.51 ms / 28,119,536 B  15.79 ms / 9,270,208 B  -51.4% / -67.0%       5/5
+favorable declaration order  15.66 ms /  9,276,128 B  16.60 ms / 9,214,488 B  no timing claim / -0.7%  1/5
+ordinary helper control      13.18 ms /  6,905,032 B  13.18 ms / 6,904,712 B  no timing claim / parity   -
 ```
 
-The adverse target improved in every time pair and removed 18,895,968 B per analysis at 512 hops. Favorable-order and
-ordinary-helper allocations are effectively unchanged. Favorable pooled timing moved +2.6%. Ordinary-helper paired
-percentages had a +3.2% median inside the 5% guard, with the candidate slower in 4/7 pairs and large bidirectional
-outliers. The control timing ranges overlap, so no timing claim is made for either control. All rows retained exactly one
+The adverse target improved in every time pair and removed exactly 18,849,328 B per analysis at 512 hops.
+Favorable-order allocation also fell slightly, while the ordinary-helper control is byte-near-identical. Favorable
+pooled timing moved +6.0%, but the paired-percentage median is +3.7% inside the 5% guard and the candidate is slower in
+4/5 pairs. Ordinary-helper medians are identical. No timing claim is made for either control. All rows retained exactly one
 diagnostic. Focused tests cover adverse/favorable propagation, self-cycles, diamonds, two-slot permutations,
 containing-type forwarding, and ordinary benign controls. No public API, generated-source shape, or diagnostic contract
 changes.

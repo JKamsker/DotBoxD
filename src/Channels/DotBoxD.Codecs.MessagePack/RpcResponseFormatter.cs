@@ -230,11 +230,9 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
         // Shape only selects a candidate; the full comparison remains the acceptance boundary.
         return utf8.Length switch
         {
-            6 when utf8[0] == (byte)'S' => MatchField(utf8, StreamKey, RpcResponseField.Stream),
-            9 when utf8[0] == (byte)'E' => MatchField(utf8, ErrorTypeKey, RpcResponseField.ErrorType),
-            9 when utf8[0] == (byte)'I' => MatchField(utf8, IsSuccessKey, RpcResponseField.IsSuccess),
-            9 when utf8[0] == (byte)'M' => MatchField(utf8, MessageIdKey, RpcResponseField.MessageId),
-            12 when utf8[0] == (byte)'E' => MatchField(utf8, ErrorMessageKey, RpcResponseField.ErrorMessage),
+            6 => MatchField(utf8, StreamKey, RpcResponseField.Stream),
+            9 => ReadNineByteField(utf8),
+            12 => MatchField(utf8, ErrorMessageKey, RpcResponseField.ErrorMessage),
             _ => RpcResponseField.Unknown,
         };
     }
@@ -248,14 +246,30 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
 
         return name.Length switch
         {
-            6 when name[0] == 'S' => MatchField(name, "Stream", RpcResponseField.Stream),
-            9 when name[0] == 'E' => MatchField(name, "ErrorType", RpcResponseField.ErrorType),
-            9 when name[0] == 'I' => MatchField(name, "IsSuccess", RpcResponseField.IsSuccess),
-            9 when name[0] == 'M' => MatchField(name, "MessageId", RpcResponseField.MessageId),
-            12 when name[0] == 'E' => MatchField(name, "ErrorMessage", RpcResponseField.ErrorMessage),
+            6 => MatchField(name, "Stream", RpcResponseField.Stream),
+            9 => ReadNineCharacterField(name),
+            12 => MatchField(name, "ErrorMessage", RpcResponseField.ErrorMessage),
             _ => RpcResponseField.Unknown,
         };
     }
+
+    private static RpcResponseField ReadNineByteField(ReadOnlySpan<byte> utf8)
+        => utf8[0] switch
+        {
+            (byte)'E' => MatchField(utf8, ErrorTypeKey, RpcResponseField.ErrorType),
+            (byte)'I' => MatchField(utf8, IsSuccessKey, RpcResponseField.IsSuccess),
+            (byte)'M' => MatchField(utf8, MessageIdKey, RpcResponseField.MessageId),
+            _ => RpcResponseField.Unknown,
+        };
+
+    private static RpcResponseField ReadNineCharacterField(string name)
+        => name[0] switch
+        {
+            'E' => MatchField(name, "ErrorType", RpcResponseField.ErrorType),
+            'I' => MatchField(name, "IsSuccess", RpcResponseField.IsSuccess),
+            'M' => MatchField(name, "MessageId", RpcResponseField.MessageId),
+            _ => RpcResponseField.Unknown,
+        };
 
     private static RpcResponseField MatchField(
         ReadOnlySpan<byte> candidate,

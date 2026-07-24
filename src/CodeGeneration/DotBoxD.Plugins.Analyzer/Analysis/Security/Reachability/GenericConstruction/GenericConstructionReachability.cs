@@ -121,14 +121,7 @@ internal sealed class GenericConstructionReachability
         // Construction slots only grow. Visit calls to a method when that method gains a slot
         // instead of repeatedly scanning every invocation until a fixed point is reached.
         var invocationsByTarget = IndexInvocationsByTarget(invocations);
-        var pending = new Queue<GenericConstruction>();
-        foreach (var pair in constructions)
-        {
-            foreach (var ordinal in pair.Value)
-            {
-                pending.Enqueue(new GenericConstruction(pair.Key, ordinal));
-            }
-        }
+        var pending = CreatePendingConstructions(constructions);
 
         while (pending.Count > 0)
         {
@@ -160,6 +153,21 @@ internal sealed class GenericConstructionReachability
                 }
             }
         }
+    }
+
+    private static Queue<GenericConstruction> CreatePendingConstructions(
+        Dictionary<IMethodSymbol, HashSet<GenericParameterSlot>> constructions)
+    {
+        var pending = new Queue<GenericConstruction>();
+        foreach (var pair in constructions)
+        {
+            foreach (var ordinal in pair.Value)
+            {
+                pending.Enqueue(new GenericConstruction(pair.Key, ordinal));
+            }
+        }
+
+        return pending;
     }
 
     private static Dictionary<IMethodSymbol, List<int>> IndexInvocationsByTarget(
