@@ -26,22 +26,13 @@ internal static class InterpreterExecutionBoundary
                     options,
                     cancellationToken)
                 .ConfigureAwait(false);
-            if (result is null)
-            {
-                return FailureResult(
-                    plan,
-                    options,
-                    new SandboxError(SandboxErrorCode.HostFailure, FailureMessage));
-            }
-
-            var validatedResult = result;
-            if (!CanReturnBuiltInResultWithoutValidation(interpreter, plan, entrypoint, options, result) &&
+            if (result is null ||
                 !InterpreterResultValidator.TryValidate(
                     plan,
                     entrypoint,
                     options,
                     result,
-                    out validatedResult))
+                    out var validatedResult))
             {
                 return FailureResult(
                     plan,
@@ -68,51 +59,6 @@ internal static class InterpreterExecutionBoundary
                 new SandboxError(SandboxErrorCode.HostFailure, FailureMessage));
         }
     }
-
-    internal static bool CanReturnBuiltInResultWithoutValidation(
-        ISandboxInterpreter interpreter,
-        ExecutionPlan plan,
-        string entrypoint,
-        SandboxExecutionOptions options,
-        SandboxExecutionResult result)
-        => IsEligibleBuiltInRequest(interpreter, plan, entrypoint, options) &&
-           HasCanonicalSuccessEnvelope(result, plan) &&
-           HasNoHostSideEffects(result.ResourceUsage);
-
-    private static bool IsEligibleBuiltInRequest(
-        ISandboxInterpreter interpreter,
-        ExecutionPlan plan,
-        string entrypoint,
-        SandboxExecutionOptions options)
-        => interpreter.GetType() == typeof(SandboxInterpreter) &&
-           options.Mode == ExecutionMode.Interpreted &&
-           options.Isolation == SandboxIsolation.InProcess &&
-           options.SuppressSuccessfulRunSummaryAudit &&
-           !options.EnableDebugTrace &&
-           plan.BindingReferences.TryGetValue(entrypoint, out var allowedBindings) &&
-           allowedBindings.Count == 0;
-
-    private static bool HasCanonicalSuccessEnvelope(
-        SandboxExecutionResult result,
-        ExecutionPlan plan)
-        => result.Succeeded &&
-           result.Value is not null &&
-           result.Error is null &&
-           ReferenceEquals(result.AuditEvents, InMemoryAuditSink.EmptyEventSnapshot) &&
-           result.ActualMode == ExecutionMode.Interpreted &&
-           result.ExecutionDispatched &&
-           result.ArtifactHash is null &&
-           string.Equals(result.ModuleHash, plan.ModuleHash, StringComparison.Ordinal) &&
-           string.Equals(result.PlanHash, plan.PlanHash, StringComparison.Ordinal) &&
-           string.Equals(result.PolicyHash, plan.PolicyHash, StringComparison.Ordinal);
-
-    private static bool HasNoHostSideEffects(SandboxResourceUsage usage)
-        => usage.HostCalls == 0 &&
-           usage.FileBytesRead == 0 &&
-           usage.FileBytesWritten == 0 &&
-           usage.NetworkBytesRead == 0 &&
-           usage.NetworkBytesWritten == 0 &&
-           usage.LogEvents == 0;
 
     private static SandboxExecutionResult FailureResult(
         ExecutionPlan plan,
