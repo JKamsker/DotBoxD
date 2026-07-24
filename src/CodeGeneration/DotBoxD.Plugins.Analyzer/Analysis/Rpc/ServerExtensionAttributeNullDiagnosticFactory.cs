@@ -8,8 +8,22 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 internal static class ServerExtensionAttributeNullDiagnosticFactory
 {
     public static bool IsCandidate(SyntaxNode node)
-        => node is AttributeSyntax { ArgumentList.Arguments.Count: > 0 } attribute &&
-           attribute.Name.ToString().Contains("ServerExtension", StringComparison.Ordinal);
+    {
+        if (node is not AttributeSyntax { ArgumentList.Arguments.Count: > 0 } attribute)
+        {
+            return false;
+        }
+
+        foreach (var argument in attribute.ArgumentList.Arguments)
+        {
+            if (argument.Expression.IsKind(SyntaxKind.NullLiteralExpression))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     public static PluginKernelDiagnostic? Create(
         GeneratorSyntaxContext context,
