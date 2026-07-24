@@ -88,6 +88,9 @@ if (args.Length == 1)
         case "--probe-streaming-frame-validation":
             StreamingFrameValidationProbe.Run();
             return;
+        case "--probe-disabled-streaming-context":
+            DisabledStreamingContextProbe.Run();
+            return;
         case "--probe-finite-timeout-valuetask-unary":
             await FiniteTimeoutValueTaskUnaryProbe.RunAsync();
             return;
