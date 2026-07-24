@@ -55,6 +55,21 @@ internal struct ForLoopPlanStore
         return cache.TryGetI64(statement, frame, out plan);
     }
 
+    public bool TryGetF64(
+        ForRangeStatement statement,
+        InterpreterFrame frame,
+        out F64ForLoopPlan plan)
+    {
+        var cache = Volatile.Read(ref _plans);
+        if (cache is null)
+        {
+            plan = null!;
+            return false;
+        }
+
+        return cache.TryGetF64(statement, frame, out plan);
+    }
+
     public bool ShouldCache(ForRangeStatement statement)
     {
         var cache = Volatile.Read(ref _plans);

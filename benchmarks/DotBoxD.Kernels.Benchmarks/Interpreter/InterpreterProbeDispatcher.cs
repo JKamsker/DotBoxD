@@ -76,6 +76,12 @@ internal static class InterpreterProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-interpreter-f64-plan-setup", StringComparer.OrdinalIgnoreCase))
+        {
+            await InterpreterF64PlanSetupProbe.RunAsync();
+            return true;
+        }
+
         if (args.Contains("--probe-interpreter-while-plan-setup", StringComparer.OrdinalIgnoreCase))
         {
             await InterpreterWhilePlanSetupProbe.RunAsync();

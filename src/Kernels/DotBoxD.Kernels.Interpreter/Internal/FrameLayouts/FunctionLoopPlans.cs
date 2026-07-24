@@ -74,4 +74,16 @@ internal struct FunctionLoopPlans
 
     public void CacheI64ForRangePlan(I64ForLoopPlan plan)
         => _forRangePlans.Cache(plan);
+
+    public bool TryGetF64ForRangePlan(
+        ForRangeStatement statement,
+        InterpreterFrame frame,
+        out F64ForLoopPlan plan)
+        => _forRangePlans.TryGetF64(statement, frame, out plan);
+
+    public bool ShouldCacheF64ForRangePlan(ForRangeStatement statement)
+        => _forRangePlans.ShouldCache(statement);
+
+    public void CacheF64ForRangePlan(F64ForLoopPlan plan)
+        => _forRangePlans.Cache(plan);
 }

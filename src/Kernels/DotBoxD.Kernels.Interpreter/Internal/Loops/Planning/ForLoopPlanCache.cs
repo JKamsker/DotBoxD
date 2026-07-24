@@ -127,6 +127,23 @@ internal sealed class ForLoopPlanCache
         return true;
     }
 
+    public bool TryGetF64(
+        ForRangeStatement statement,
+        InterpreterFrame frame,
+        out F64ForLoopPlan plan)
+    {
+        if (!TryGet(statement, out var candidate) ||
+            candidate is not F64ForLoopPlan typed ||
+            !typed.CanRun(frame))
+        {
+            plan = null!;
+            return false;
+        }
+
+        plan = typed;
+        return true;
+    }
+
     public bool Contains(ForRangeStatement statement)
     {
         var hot = Volatile.Read(ref _hotPlan);

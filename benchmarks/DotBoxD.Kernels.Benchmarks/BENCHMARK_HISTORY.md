@@ -24,6 +24,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-plan-setup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-i64-plan-setup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-i64-nested-loop-plan
+DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 taskset -c 11 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-f64-plan-setup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-while-plan-setup
 DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-branched-plan-setup
 DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 taskset -c 11 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-branched-f64-loop
@@ -3096,3 +3097,62 @@ Frozen artifacts are `/tmp/dotboxd-event-adapter-validation-0499a6f13-baseline-v
 tests, including exact zero allocation over 100,000 warmed gated hits. Mutation, aliased arrays, writer count,
 type-sensitive capability checks, failure recovery, inheritance, concurrency, and per-event output validation are
 pinned. No public API or event-dispatch semantic contract changes.
+
+## Layout-scoped binding-free F64 `forRange` plans
+
+The F64 loop runner rebuilt one `F64ExpressionPlan` object for each literal, raw/boxed variable, arithmetic operator,
+and admitted intrinsic on every eligible loop entry. In a small inner loop, the outer generic dispatcher therefore
+rebuilt the same graph once per outer iteration. The existing layout-owned `ForLoopPlanStore` now admits an exact
+statement only after two complete constructions, matching the established I32/I64 policy. Retained F64 plans are
+strictly narrower than the existing fresh fast path: only literals and raw-F64 `+`, `-`, `*`, and `/` trees qualify.
+Boxed reads and every binding/intrinsic remain uncached, so the value-dependent nonnegative proof used to admit
+`math.sqrt` can never become stale. A hit revalidates every required raw slot's assignment state and retains no frame
+or runtime value.
+
+The final baseline/candidate publications use byte-identical benchmark runners and differ only in
+`DotBoxD.Kernels.Interpreter.dll` and its PDB. Six fresh pairs ran in balanced order BC/CB/BC/CB/BC/CB on CPU 11 with
+tiering, PGO, and ReadyToRun disabled:
+
+```text
+taskset -c 11 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  COMPlus_TieredCompilation=0 COMPlus_TieredPGO=0 COMPlus_ReadyToRun=0 \
+  dotnet <published-benchmark.dll> --probe-interpreter-f64-plan-setup
+```
+
+```text
+case                              baseline          candidate         change                 wins   B/op baseline→candidate
+raw, one loop                     575.180 ns        512.960 ns        -10.82%                6/6    1,008.12→816.10
+literal, one loop                 508.695 ns        476.810 ns         -6.27%                6/6      880.11→816.10
+nested outer 1M / inner 1         217.996 ms        177.576 ms        -18.54%                6/6  192,001,088→840 total
+raw, zero-loop control            418.190 ns        403.925 ns         -3.41%                4/6      816.10→816.10
+intrinsic fallback control        865.010 ns        854.065 ns         -1.27%                4/6    1,008.26→1,008.26
+cached I64 control                519.910 ns        533.775 ns         +2.67%                2/6      816.10→816.10
+nested outer 1M / inner 0          66.917 ms         67.972 ms         +1.58%                1/6          840→840 total
+nested outer 1 / inner 10M         46.249 ms         47.696 ms         +3.13%                1/6        1,032→840 total
+```
+
+Every target wins all six pairs. Raw and literal setup remove exactly one 192-byte three-node graph and one 64-byte
+literal node per execution at displayed fixed-process precision. The nested target removes 192 bytes on each of one
+million entries, leaving only 840 B for the whole invocation. The long-body lane removes the same one-time 192 B and
+is a latency control; all control medians remain inside the predeclared +5% guard. Exact F64 result bits, fuel, loop,
+sandbox allocation, host-call, and collection counters match in all 12 processes.
+
+Layout-prewarmed admission diagnostics preserve bounded cold cost:
+
+```text
+stage                  baseline B   candidate B
+first observation           1,256         1,256
+second / publication        1,008         1,200
+third / cache hit            1,008           816
+```
+
+Publication pays one bounded 192 B premium, recovered by the first hit. Frozen artifacts are
+`/tmp/dotboxd-f64-plan-4a8653dc9-baseline-v2` and `/tmp/dotboxd-f64-plan-4a8653dc9-candidate-v2`; raw logs are in
+`/tmp/dotboxd-f64-plan-4a8653dc9-pairs-v2`. The shared runner hash is
+`d425266708b06d56c244f35e739b17ee2212ee3004c35d196548241e9ff27f0d`; baseline/candidate interpreter hashes are
+`7722c92c640e7102c29e549a5175134a8104312c6b79e43ec04bf5f79220b92b` and
+`d9059dbe86c6c70a9c26ed37ef23c5bd3c991d3c5e6ed61f7019f0a531d30a86`. Focused coverage pins two-hit identity,
+multiple cached statements, fresh-frame assignment revalidation, literal plans, concurrent publication/execution,
+non-finite failure order, quotas, exact debug preorder/fuel, pre-cancellation before mutation, intrinsic and boxed
+exclusion, positive-then-negative `sqrt`, bounded nested allocation, and the adjusted branched-allocation denominator.
+No public API or sandbox accounting contract changes.

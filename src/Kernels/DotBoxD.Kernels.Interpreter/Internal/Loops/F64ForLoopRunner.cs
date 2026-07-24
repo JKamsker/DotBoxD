@@ -23,13 +23,61 @@ internal static class F64ForLoopRunner
             return false;
         }
 
+        if (frame.Layout.LoopPlans.TryGetF64ForRangePlan(statement, frame, out var cached))
+        {
+            return TryRun(
+                statement,
+                cached.TargetSlot,
+                cached.Expression,
+                cached.FuelPerIteration,
+                binding: null,
+                start,
+                end,
+                frame,
+                context);
+        }
+
         if (!TryCreateBodyPlan(statement, frame, context.Bindings, out var body, out var fuelPerIteration, out var binding))
         {
             return false;
         }
 
+        ref var loopPlans = ref frame.Layout.LoopPlans;
+        if (body.Expression.IsReusableForLoopPlan &&
+            loopPlans.ShouldCacheF64ForRangePlan(statement))
+        {
+            loopPlans.CacheF64ForRangePlan(new F64ForLoopPlan(
+                statement,
+                body.TargetSlot,
+                body.Expression,
+                fuelPerIteration));
+        }
+
+        return TryRun(
+            statement,
+            body.TargetSlot,
+            body.Expression,
+            fuelPerIteration,
+            binding,
+            start,
+            end,
+            frame,
+            context);
+    }
+
+    private static bool TryRun(
+        ForRangeStatement statement,
+        int targetSlot,
+        F64ExpressionPlan expression,
+        long fuelPerIteration,
+        BindingDescriptor? binding,
+        int start,
+        int end,
+        InterpreterFrame frame,
+        SandboxContext context)
+    {
         var iterations = (long)end - start;
-        var bindingCalls = BindingCalls(iterations, body.Expression.BindingCallCount);
+        var bindingCalls = BindingCalls(iterations, expression.BindingCallCount);
         if (bindingCalls < 0 ||
             !context.CanBulkChargeLoopIterations(iterations, fuelPerIteration) ||
             (binding is not null && !context.CanBulkChargeBindingCalls(binding, bindingCalls)))
@@ -47,7 +95,7 @@ internal static class F64ForLoopRunner
         for (var i = start; i < end; i++)
         {
             frame.WriteRawInt32Slot(loopSlot, i);
-            frame.WriteRawDoubleSlot(body.TargetSlot, body.Expression.Evaluate(frame));
+            frame.WriteRawDoubleSlot(targetSlot, expression.Evaluate(frame));
             if (--checkpoint == 0)
             {
                 context.Checkpoint();

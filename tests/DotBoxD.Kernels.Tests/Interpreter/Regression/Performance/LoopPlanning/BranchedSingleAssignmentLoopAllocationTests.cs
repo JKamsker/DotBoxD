@@ -16,7 +16,7 @@ public sealed class BranchedSingleAssignmentLoopAllocationTests
 
     [Theory]
     [InlineData("i32", 0, 0, 1_008)]
-    [InlineData("f64", 416, 224, 1_200)]
+    [InlineData("f64", 608, 416, 1_392)]
     public async Task Branch_plan_shapes_preserve_expected_managed_allocation(
         string type,
         double expectedSingleOverhead,
