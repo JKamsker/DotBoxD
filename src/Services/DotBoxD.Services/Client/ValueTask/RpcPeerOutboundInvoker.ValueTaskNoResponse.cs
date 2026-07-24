@@ -1,5 +1,4 @@
 using DotBoxD.Services.Buffers;
-using DotBoxD.Services.Exceptions;
 using DotBoxD.Services.Protocol;
 
 namespace DotBoxD.Services.Client;
@@ -55,7 +54,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         string? instanceId,
         CancellationToken ct)
     {
-        if (!CanUseLowAllocationNoResponseValueTaskPath(ct))
+        if (!_enableLowAllocationValueTaskInvocations)
         {
             var task = instanceId is null
                 ? InvokeAsync(service, method, request, ct)
@@ -100,7 +99,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         string? instanceId,
         CancellationToken ct)
     {
-        if (!CanUseLowAllocationNoResponseValueTaskPath(ct))
+        if (!_enableLowAllocationValueTaskInvocations)
         {
             var task = instanceId is null
                 ? InvokeAsync(service, method, ct)
@@ -172,12 +171,18 @@ internal sealed partial class RpcPeerOutboundInvoker
                     return new ValueTask(Task.FromException(ex));
                 }
 
-                StartPooledTimeoutIfNeeded(pending);
-                return pending.GetDirectValueTask(this);
+                return ct.CanBeCanceled
+                    ? CompleteCallerCancelablePooledNoResponseSendDirectly(pending, ct)
+                    : CompletePooledNoResponseSendDirectly(pending);
             }
 
             pending.TransferSetupToWrapper();
-            return AwaitNoResponseFrameValueAsync(messageId, pending, sendValueTask);
+            return PooledNoResponsePendingSend.AwaitFrameAsync(
+                this,
+                messageId,
+                pending,
+                sendValueTask,
+                ct);
         }
 
         Task sendTask;
@@ -195,92 +200,42 @@ internal sealed partial class RpcPeerOutboundInvoker
         if (sendTask.IsCompletedSuccessfully)
         {
             frame.Dispose();
-            if (_hasFiniteTimeout && !pending.CompletionStarted)
-            {
-                _pending.StartTimeout(pending, _timeout);
-            }
-
-            return pending.GetDirectValueTask(this);
+            return ct.CanBeCanceled
+                ? CompleteCallerCancelablePooledNoResponseSendDirectly(pending, ct)
+                : CompletePooledNoResponseSendDirectly(pending);
         }
 
         pending.TransferSetupToWrapper();
-        return AwaitNoResponseValueAsync(messageId, pending, frame, sendTask);
+        return PooledNoResponsePendingSend.AwaitMemoryAsync(
+            this,
+            messageId,
+            pending,
+            frame,
+            sendTask,
+            ct);
     }
 
-    private bool CanUseLowAllocationNoResponseValueTaskPath(CancellationToken ct) =>
-        _enableLowAllocationValueTaskInvocations &&
-        !ct.CanBeCanceled;
-
-    private async ValueTask AwaitNoResponseFrameValueAsync(
-        int messageId,
+    private ValueTask CompleteCallerCancelablePooledNoResponseSendDirectly(
         PendingValueTaskNoResponse pending,
-        ValueTask sendTask)
+        CancellationToken callerToken)
     {
-        var pendingConsumed = false;
         try
         {
-            await sendTask.ConfigureAwait(false);
-            if (_hasFiniteTimeout && !pending.CompletionStarted)
-            {
-                _pending.StartTimeout(pending, _timeout);
-            }
-
-            try
-            {
-                await pending.ValueTask.ConfigureAwait(false);
-            }
-            catch (ServiceTimeoutException)
-            {
-                _cancelFrames.TrySend(messageId);
-                throw;
-            }
-            finally
-            {
-                pendingConsumed = true;
-            }
+            pending.RegisterOwnedCallerCancellation(callerToken);
+            StartPooledTimeoutIfNeeded(pending);
         }
-        finally
+        catch (Exception ex)
         {
-            CompletePooledWrapper(pending, pendingConsumed);
+            CompletePooledSetupFailure(pending);
+            return new ValueTask(Task.FromException(ex));
         }
+
+        return pending.GetDirectValueTask(this);
     }
 
-    private async ValueTask AwaitNoResponseValueAsync(
-        int messageId,
-        PendingValueTaskNoResponse pending,
-        PooledBufferWriter frame,
-        Task sendTask)
+    private ValueTask CompletePooledNoResponseSendDirectly(PendingValueTaskNoResponse pending)
     {
-        var pendingConsumed = false;
-        try
-        {
-            using (frame)
-            {
-                await sendTask.ConfigureAwait(false);
-            }
-
-            if (_hasFiniteTimeout && !pending.CompletionStarted)
-            {
-                _pending.StartTimeout(pending, _timeout);
-            }
-
-            try
-            {
-                await pending.ValueTask.ConfigureAwait(false);
-            }
-            catch (ServiceTimeoutException)
-            {
-                _cancelFrames.TrySend(messageId);
-                throw;
-            }
-            finally
-            {
-                pendingConsumed = true;
-            }
-        }
-        finally
-        {
-            CompletePooledWrapper(pending, pendingConsumed);
-        }
+        StartPooledTimeoutIfNeeded(pending);
+        return pending.GetDirectValueTask(this);
     }
 }

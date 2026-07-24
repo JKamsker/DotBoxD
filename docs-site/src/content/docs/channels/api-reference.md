@@ -202,7 +202,7 @@ Options for both `RpcPeer` and `RpcHost`.
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `RequestTimeout` | `TimeSpan` | 30s | Per-call timeout for proxies. Use `Timeout.InfiniteTimeSpan` to disable |
-| `EnableLowAllocationValueTaskInvocations` | `bool` | `false` | Opts generated unary `ValueTask` and `ValueTask<T>` proxy calls into the pooled response-source path. Finite `RequestTimeout` values are supported; a call with a cancellable token intentionally uses the task-backed path |
+| `EnableLowAllocationValueTaskInvocations` | `bool` | `false` | Opts generated unary `ValueTask` and `ValueTask<T>` proxy calls into the pooled response-source path. Finite `RequestTimeout` values and cancellable caller tokens are supported |
 | `ServiceProvider` | `IServiceProvider?` | `null` | Resolves dependencies for dispatcher factories and `Provide<TService>()` |
 | `RejectInboundCalls` | `bool` | `false` | Answers inbound requests with an explicit "does not accept inbound calls" error; makes get-only intent explicit. Not an auth boundary |
 | `DisableInboundRequestCancellation` | `bool` | `false` | Disables per-request cancellation state for non-streaming inbound calls. Handlers receive `CancellationToken.None`; inbound Cancel frames for those calls are ignored |

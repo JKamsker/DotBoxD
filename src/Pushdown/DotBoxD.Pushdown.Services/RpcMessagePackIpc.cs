@@ -14,9 +14,9 @@ public static class RpcMessagePackIpc
     // Get-only client default. DotBoxD.Kernels plugin IPC clients are pure callers, so this opts into the
     // DotBoxD low-allocation unary ValueTask<T> path. The opt-in pooled path supports finite timeouts,
     // while this convenience profile uses an infinite timeout to avoid timeout-scheduler coordination
-    // as well. A cancellable caller token intentionally selects the task-backed path. Keeping the
-    // convenience default on this profile means the easy path is the measured low-allocation path
-    // (PAL-0014). Callers needing a per-call timeout can pass their own RpcPeerOptions.
+    // as well. Cancellable caller tokens retain the pooled path but pay cancellation registration.
+    // Keeping the convenience default on this profile means the easy path is the measured
+    // low-allocation path (PAL-0014). Callers needing a per-call timeout can pass their own options.
     private static readonly RpcPeerOptions DefaultClientOptions = new()
     {
         RequestTimeout = Timeout.InfiniteTimeSpan,

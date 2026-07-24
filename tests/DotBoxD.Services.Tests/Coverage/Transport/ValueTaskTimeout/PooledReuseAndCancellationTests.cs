@@ -27,7 +27,7 @@ public sealed class PooledReuseAndCancellationTests
     }
 
     [Fact]
-    public async Task Live_caller_token_keeps_no_response_invocation_task_backed()
+    public async Task Live_caller_token_uses_no_response_pooled_source()
     {
         await using var harness = new ValueTaskTimeoutTestHarness(Timeout.InfiniteTimeSpan);
         using var cancellation = new CancellationTokenSource();
@@ -41,7 +41,7 @@ public sealed class PooledReuseAndCancellationTests
         harness.CompleteNoResponse(harness.LastRequestMessageId);
 
         await call;
-        Assert.IsType<PendingReceivedResponse>(pending);
+        Assert.IsType<PendingValueTaskNoResponse>(pending);
     }
 
     [Fact]

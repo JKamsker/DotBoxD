@@ -126,7 +126,13 @@ internal sealed partial class RpcPeerOutboundInvoker
                 ct.ThrowIfCancellationRequested();
                 var messageId = NextMessageId(ct);
                 if (messageId != 0 &&
-                    _pending.TryAddValueTaskNoResponse(messageId, service, method, out var pending))
+                    _pending.TryAddValueTaskNoResponse(
+                        messageId,
+                        service,
+                        method,
+                        this,
+                        ct,
+                        out var pending))
                 {
                     return pending;
                 }

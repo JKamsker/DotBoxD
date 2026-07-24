@@ -130,6 +130,9 @@ internal sealed class ValueTaskTimeoutTestHarness : IAsyncDisposable
     internal void CompleteNoResponse(int messageId) =>
         Complete(messageId, isSuccess: true, ReadOnlySpan<byte>.Empty);
 
+    internal bool TryCompleteNoResponse(int messageId) =>
+        TryComplete(messageId, isSuccess: true, ReadOnlySpan<byte>.Empty);
+
     internal void CompleteError(int messageId) =>
         Complete(messageId, isSuccess: false, ReadOnlySpan<byte>.Empty);
 

@@ -59,6 +59,26 @@ internal static class FiniteTimeoutValueTaskUnaryProbe
                 enableLowAllocation: true,
                 Timeout.InfiniteTimeSpan,
                 liveCancellation.Token),
+            await MeasureNoResponseAsync(
+                "finite void opt-in/default",
+                enableLowAllocation: true,
+                TimeSpan.FromSeconds(30),
+                CancellationToken.None),
+            await MeasureNoResponseAsync(
+                "finite void opt-in/live",
+                enableLowAllocation: true,
+                TimeSpan.FromSeconds(30),
+                liveCancellation.Token),
+            await MeasureNoResponseAsync(
+                "infinite void opt-in/default",
+                enableLowAllocation: true,
+                Timeout.InfiniteTimeSpan,
+                CancellationToken.None),
+            await MeasureNoResponseAsync(
+                "infinite void opt-in/live",
+                enableLowAllocation: true,
+                Timeout.InfiniteTimeSpan,
+                liveCancellation.Token),
         };
 
         Console.WriteLine("finite-timeout ValueTask unary probe");
@@ -99,6 +119,31 @@ internal static class FiniteTimeoutValueTaskUnaryProbe
                 $"response checksum changed: expected {expectedChecksum}, got {checksum}");
         }
 
+        return new Measurement(name, elapsed.TotalMilliseconds, allocated);
+    }
+
+    private static async Task<Measurement> MeasureNoResponseAsync(
+        string name,
+        bool enableLowAllocation,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        await using var harness = new UnaryHarness(enableLowAllocation, timeout);
+        for (var i = 0; i < WarmupIterations; i++)
+        {
+            await harness.InvokeNoResponseOnceAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        ForceGc();
+        var allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
+        var startedAt = Stopwatch.GetTimestamp();
+        for (var i = 0; i < MeasurementIterations; i++)
+        {
+            await harness.InvokeNoResponseOnceAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        var elapsed = Stopwatch.GetElapsedTime(startedAt);
+        var allocated = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
         return new Measurement(name, elapsed.TotalMilliseconds, allocated);
     }
 
@@ -171,6 +216,28 @@ internal static class FiniteTimeoutValueTaskUnaryProbe
             }
 
             return await call.ConfigureAwait(false);
+        }
+
+        public async ValueTask InvokeNoResponseOnceAsync(CancellationToken cancellationToken)
+        {
+            var messageId = ++_messageId;
+            var call = Invoker.InvokeValueAsync(
+                "Probe",
+                "Unary",
+                cancellationToken);
+            var response = MessageFramer.FrameMessage(
+                _serializer,
+                messageId,
+                MessageType.Response,
+                new RpcResponse { MessageId = messageId, IsSuccess = true },
+                ReadOnlySpan<byte>.Empty);
+            if (!Invoker.TryCompleteResponse(messageId, response))
+            {
+                response.Dispose();
+                throw new InvalidOperationException("the synthetic response was not accepted");
+            }
+
+            await call.ConfigureAwait(false);
         }
 
         public async ValueTask DisposeAsync()

@@ -18,6 +18,8 @@ internal sealed class PendingValueTaskNoResponse :
 
     private ManualResetValueTaskSourceCore<bool> _source;
     private PendingValueTaskNoResponse? _next;
+    private CancellationTokenRegistration _ownedCallerCancellation;
+    private bool _ownsCallerCancellation;
 
     private PendingValueTaskNoResponse()
     {
@@ -27,7 +29,9 @@ internal sealed class PendingValueTaskNoResponse :
     public static PendingValueTaskNoResponse Rent(
         int messageId,
         string service,
-        string method)
+        string method,
+        RpcPeerOutboundInvoker owner,
+        CancellationToken callerToken)
     {
         var pending = Interlocked.Exchange(ref s_cached, null);
         if (pending is null)
@@ -48,8 +52,8 @@ internal sealed class PendingValueTaskNoResponse :
             messageId,
             service,
             method,
-            owner: null,
-            CancellationToken.None);
+            owner,
+            callerToken);
         return pending;
     }
 
@@ -66,6 +70,12 @@ internal sealed class PendingValueTaskNoResponse :
     {
         MarkIssuedForDirect(owner);
         return new ValueTask(this, _source.Version);
+    }
+
+    internal void RegisterOwnedCallerCancellation(CancellationToken callerToken)
+    {
+        _ownedCallerCancellation = RegisterCallerCancellation(callerToken);
+        _ownsCallerCancellation = true;
     }
 
     public override bool TrySetResponse(
@@ -96,6 +106,11 @@ internal sealed class PendingValueTaskNoResponse :
                 {
                     throw new ServiceProtocolException(
                         "Response payload is not allowed for a no-response invocation.");
+                }
+
+                if (TryCancelIfCallerCanceledAfterMaterialization())
+                {
+                    return true;
                 }
             }
             catch (Exception ex)
@@ -128,6 +143,11 @@ internal sealed class PendingValueTaskNoResponse :
                 _source.GetStatus(token) == ValueTaskSourceStatus.Pending)
             {
                 isCurrentGeneration = false;
+            }
+
+            if (isCurrentGeneration)
+            {
+                ThrowIfOwnedCallerCancellationOverridesTimeout();
             }
 
             throw;
@@ -166,8 +186,14 @@ internal sealed class PendingValueTaskNoResponse :
     protected override void SetExceptionCore(Exception error) =>
         _source.SetException(error);
 
-    protected override void ResetSourceCore() =>
+    protected override void ResetSourceCore()
+    {
+        var callerCancellation = _ownedCallerCancellation;
+        _ownedCallerCancellation = default;
+        _ownsCallerCancellation = false;
+        callerCancellation.Dispose();
         _source.Reset();
+    }
 
     protected override void PushToPoolCore()
     {
@@ -180,6 +206,15 @@ internal sealed class PendingValueTaskNoResponse :
         {
             _next = s_overflowPool;
             s_overflowPool = this;
+        }
+    }
+
+    private void ThrowIfOwnedCallerCancellationOverridesTimeout()
+    {
+        if (_ownsCallerCancellation &&
+            CancellationKind == PendingCancellationKind.Timeout)
+        {
+            ThrowIfCallerCancellationRequested();
         }
     }
 }
