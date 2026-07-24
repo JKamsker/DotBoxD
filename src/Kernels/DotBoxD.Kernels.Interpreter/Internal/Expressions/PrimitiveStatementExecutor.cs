@@ -11,7 +11,11 @@ internal static class PrimitiveStatementExecutor
         ExpressionEvaluator expressions)
     {
         var targeted = TryExecuteTargetedAssignment(
-            assignment, frame, expressions, out var targetSlot);
+            assignment,
+            frame,
+            expressions,
+            out var targetSlot,
+            out var resolvedLocalFunction);
         if (targeted == TargetedAssignmentResult.Executed)
         {
             return default;
@@ -41,7 +45,11 @@ internal static class PrimitiveStatementExecutor
             return default;
         }
 
-        var valueTask = expressions.EvaluateAsync(assignment.Value, frame);
+        var valueTask = EvaluateAssignmentValue(
+            assignment.Value,
+            resolvedLocalFunction,
+            frame,
+            expressions);
         if (valueTask.IsCompletedSuccessfully)
         {
             WriteValue(frame, assignment.Name, targetSlot, valueTask.Result);
@@ -51,12 +59,23 @@ internal static class PrimitiveStatementExecutor
         return AwaitAssignment(assignment, targetSlot, valueTask, frame);
     }
 
+    private static ValueTask<SandboxValue> EvaluateAssignmentValue(
+        Expression expression,
+        SandboxFunction? resolvedLocalFunction,
+        InterpreterFrame frame,
+        ExpressionEvaluator expressions)
+        => resolvedLocalFunction is not null && expression is CallExpression call
+            ? expressions.EvaluateResolvedLocalCall(call, resolvedLocalFunction, frame)
+            : expressions.EvaluateAsync(expression, frame);
+
     private static TargetedAssignmentResult TryExecuteTargetedAssignment(
         AssignmentStatement assignment,
         InterpreterFrame frame,
         ExpressionEvaluator expressions,
-        out int targetSlot)
+        out int targetSlot,
+        out SandboxFunction? resolvedLocalFunction)
     {
+        resolvedLocalFunction = null;
         if (!frame.TryGetSlot(assignment.Name, out targetSlot))
         {
             targetSlot = -1;
@@ -65,7 +84,12 @@ internal static class PrimitiveStatementExecutor
 
         if (frame.IsInt32Slot(targetSlot))
         {
-            if (!expressions.TryEvaluateInt32(assignment.Value, frame, out var value))
+            if (!expressions.TryEvaluateInt32(assignment.Value, frame, out var value) &&
+                !expressions.TryEvaluateInlineInt32Call(
+                    assignment.Value,
+                    frame,
+                    out value,
+                    out resolvedLocalFunction))
             {
                 return TargetedAssignmentResult.I32Miss;
             }

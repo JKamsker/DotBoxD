@@ -17,6 +17,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-matrix
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-frame-layout
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-local-call-arguments
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-scalar-assignment
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-audit-envelope
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-host-boundary
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-execution-envelope
@@ -92,6 +93,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 
 | Step | Commit | Probe | Key result |
 | --- | --- | --- | --- |
+| Bounded inline I32 local-helper assignments | this commit | `--probe-interpreter-scalar-assignment` | Raw-I32 assignment targets now execute a narrow one-argument, one-return, pure-I32 local helper without materializing its frame. A 16-entry per-plan identity cache retains positive and negative immutable-shape classifications, rechecks invocation assignment state, and fails closed at capacity; classified local misses reuse the already-resolved function through the existing generic continuation. Six balanced CPU-5 BC/CB pairs improve x1/x4/x8 medians `51.40→35.65`, `111.00→54.95`, and `190.95→84.70 ms` (30.64%/50.50%/55.64%, all 6/6) and remove exactly 96 B/helper call (`800.1/1,088.1/1,472.2→704.1 B/op`). The unsupported repeated-parameter control improves `204.00→193.35 ms`; boxed/raw/I64/F64 and all other non-target medians stay within +2.34%, with exact allocation, checksum, and resource tuples. Broad dispatch, uncached, and linear-cache prototypes were rejected before acceptance for 10-20%, roughly 20%, and 5.86% control regressions. |
 | Closed-set `SandboxType.IsKnown` name dispatch | this commit | `--probe-sandbox-type-validation`, `--probe-compiled-return-validation` | Recursive known-type validation no longer probes the forbidden-name hash set before dispatching every node: scalar fallthrough already rejects forbidden opaque names, and composites are closed to exact `List`/`Record`/`Map` names. Six balanced CPU-4 pairs improve nested declared/open/built-in checks `445.10→310.95`, `420.95→291.00`, and `367.35→238.10 ns` (30.14%/30.87%/35.18%), all 6/6 at exact 0 B. The unchanged forbidden-only walk is flat at `261.25→260.75 ns`. Compiled nested-record validation corroborates the boundary effect at `2,820.6→2,700.5 ns` (4.26%, 6/6), while its direct validation walk improves `830.9→760.0 ns` (8.53%, 6/6); scalar and large-list controls stay within +1.63%, with exact allocation/resource/malformed-rejection signatures. No cache or state is added; a per-instance cache experiment was rejected for adding 48 B per compiled nested-record call. |
 | Lock-free exact-MRU Auto hotness lookup | this commit | `--probe-auto-hotness-bookkeeping` | A volatile publication bypasses the global hotness-table monitor only when both plan-hash and entrypoint references exactly match the LRU tail; state history retains its own lock and every logical-key/recency mutation remains under the table gate. Six balanced CPU-8-11 pairs improve built-in interpreted `42.40→35.10 ns` (17.22%), warmed compiled `43.75→36.40 ns` (16.80%), snapshot interpreted `53.00→44.50 ns` (16.04%), snapshot compiled `53.30→45.65 ns` (14.35%), and four-worker contention `155.80→16.85 ns` (89.18%), all 6/6. Alternating/distinct-reference/churn controls move only +1.32%/+1.91%/+1.50%, and allocations/checksums are exact. |
 | Single-resolution `InvokeAsync` semantic transform | this commit | `--probe-invokeasync-resolution` | The broad syntax branch still admits every invocation, but each transform now resolves its exact method once and threads it through invalid-kind diagnostics, lowering eligibility, user-binding exclusion, DotBoxD surface recognition, and call-shape construction. Five balanced CPU-6 pairs of 300 retained-driver edits improve resolved ordinary `864.2→811.7 ms` (6.07%, 5/5), user-named `858.2→802.0 ms` (6.55%, 5/5), unresolved `2,986.4→2,761.1 ms` (7.54%, 5/5), custom `ProbeAsync` `6,231.7→6,097.7 ms` (2.15%, 4/5), and invalid-kind/fallback `1,504.4→1,474.3 ms` (2.00%, 4/5). Paired median improvements are 8.00% / 6.30% / 7.47% / 3.38% / 3.37%. Allocation is noise-flat and receives no claim. Probe sources are byte-identical, every output hash matches, and tests pin arbitrary custom names, generated/user receivers, unresolved calls, exact diagnostic text, and `CandidateSymbols[0]` fallback. |
@@ -3477,3 +3479,79 @@ persisted artifact, diagnostic, resource-accounting, or malformed-input contract
 Post-change validation passes all 13 `SandboxTypeTests` and all 23 architecture tests. The complete solution builds
 under `GITHUB_ACTIONS=true` with zero warnings/errors; whitespace verification, diff checks, file-length and soft-cap
 budget, C# folder layout, and banned-API gates pass. All three changed C# files remain below 200 lines.
+
+## Bounded inline I32 local-helper assignments
+
+A raw-I32 assignment whose right-hand side called a one-argument local helper entered generic call dispatch, built the
+callee frame, boxed the helper result, and immediately unboxed it into the already-known raw target slot. The accepted
+path is deliberately narrower than general local-function dispatch: debug tracing is off; the caller argument is one
+I32 literal or variable; the helper has one I32 parameter used exactly once, an I32 return, and one return statement;
+and its body contains only I32 literals, that parameter, unary negation, and checked `+`, `-`, `*`, `/`, or `%` nodes.
+Every other shape retains generic behavior.
+
+Classification is retained in the existing interpreter cache owned per exact `ExecutionPlan`. Its fixed 16-slot
+identity-hash table stores both eligible plans and immutable negative shape results, publishes entries with
+`Interlocked.CompareExchange`, never evicts, and fails closed to generic dispatch when full. The first observation does
+not allocate the table. Variable existence, raw-I32 kind, and assignment state are rechecked on every invocation.
+Classified local misses reuse the already-resolved function through the existing `LocalFunctionCallEvaluator` and the
+existing assignment completion/await path. The shared call-precedence resolver keeps unary, numeric, and collection
+intrinsics ahead of local functions, including colliding names. Call, argument, function-entry, return-statement, and
+body-node fuel remains incremental; cancellation, depth, checked-math faults, and left-before-right order therefore
+match generic execution.
+
+The permanent scalar-assignment probe now labels the former I32 evaluator-miss lane as the eligible local-helper
+target and adds an unsupported repeated-parameter I32 helper. I64/F64 evaluator misses, raw I32 literal/variable,
+boxed targets, x0 envelopes, values, checksums, and full resource tuples remain controls. Six fresh process pairs ran
+BC/CB/BC/CB/BC/CB on CPU 5 with one byte-identical runner and exact baseline commit
+`820caecff7239e3d5fc5ee1c8b1818f60666345f`:
+
+```text
+taskset -c 5 env \
+  DOTNET_TieredCompilation=0 DOTNET_TC_QuickJitForLoops=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  COMPlus_TieredCompilation=0 COMPlus_TieredPGO=0 COMPlus_ReadyToRun=0 \
+  dotnet <frozen-benchmark.dll> --probe-interpreter-scalar-assignment
+```
+
+```text
+lane                              baseline ms   candidate ms   change    wins   B/op baseline→candidate
+I32 local helper x0                    29.15          29.05      -0.34%    3/6          704.1→704.1
+I32 local helper x1                    51.40          35.65     -30.64%    6/6          800.1→704.1
+I32 local helper x4                   111.00          54.95     -50.50%    6/6        1,088.1→704.1
+I32 local helper x8                   190.95          84.70     -55.64%    6/6        1,472.2→704.1
+I32 unsupported helper x8             204.00         193.35      -5.22%    5/6        1,472.2→1,472.2
+I32 literal x8                         63.30          64.00      +1.11%                 704.1→704.1
+I32 raw variable x8                    82.00          83.85      +2.26%                 704.1→704.1
+I32 boxed target x8                    65.10          65.30      +0.31%                 712.1→712.1
+I64 evaluator miss x8                 177.60         176.65      -0.53%              1,880.2→1,880.2
+F64 evaluator miss x8                 189.40         189.05      -0.18%              1,880.2→1,880.2
+```
+
+The target removes exactly 96 B per helper call in every process; x0 and every control retain exact allocation.
+Every target checksum and resource tuple is identical (`x1 200,000 / 11/0/0/0`, `x4 500,000 / 35/0/0/0`, and
+`x8 900,000 / 67/0/0/0`). Across all 52 permanent rows, the worst non-target median is only +2.34%, inside the
+predeclared absolute 5% guard.
+
+Accepted logs are under `/tmp/dotboxd-inline-i32-salvage-cc-final-pairs`; their sorted manifest digest is
+`e51290f056d4bd87cd4cbd3af3c790ce74d396ab2689acb4fc4496f83e9e69b6`. Frozen directories are
+`/tmp/dotboxd-inline-i32-baseline` and `/tmp/dotboxd-inline-i32-candidate-final`. The benchmark runner is
+byte-identical at `9a6a218e4b683641e58f4fc7f8ef15479a0698390fdc3239b34b4dcf80f8ed46`; complete non-interpreter
+manifests are byte-identical with manifest-file digest
+`4508aaa353240f4e6cd8b0eb3870b936652da899cd66557675bf865a92cc78cc`. Baseline/candidate interpreter hashes are
+`441787efd00a770b929d97c8df43d89af1ef75d6c412635d5ed20c6773d47de5` and
+`1dcea6b4032e31d68f1ad5d05b907a1482f28f88eef09fc66edbe6311b08bc58`.
+
+Three candidates were rejected before this claim. `/tmp/dotboxd-inline-localcall-pairs` widened generic I32 call
+dispatch and slowed untouched I64/F64 helper controls by roughly 10-20%. The first narrow uncached candidate under
+`/tmp/dotboxd-inline-i32-final-pairs` improved the target but rescanned unsupported helper shape and slowed that control
+by roughly 20%. `/tmp/dotboxd-inline-i32-accepted-pairs` cached shape in a linear table, but its unsupported x8 median
+still moved `204.75→216.75 ms` (+5.86%), beyond the fixed guard, so it too was rejected. An intervening captured-LINQ
+variable-use counter also allocated during classification; the accepted counter is a noncapturing loop. No rejected
+sample contributes to the accepted numbers.
+
+The focused 39-test matrix pins supported values/operators, literal argument substitution, every fuel boundary,
+checked fault order, call depth, direct cancellation, exact debug trace/fuel fallback, unsupported shapes,
+unknown/unassigned locals and helper names, collection-intrinsic precedence, a genuinely pending helper binding and
+assignment continuation, bounded-cache overflow, shared-plan concurrency, and target/control allocation behavior.
+The combined local-call/straight-assignment suite passes 113/113 tests and architecture/quality gates pass 23/23.
+The complete solution builds under `GITHUB_ACTIONS=true` with zero warnings/errors; whitespace and diff verification
+also pass. No public API, compiler/verifier identity, generated ABI, persisted artifact, or wire format changes.

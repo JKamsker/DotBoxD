@@ -38,12 +38,22 @@ internal static class InterpreterScalarAssignmentScenarios
                 host,
                 policy,
                 type,
-                "evaluator miss",
-                InterpreterScalarAssignmentModules.CreateEvaluatorMiss,
+                type == ScalarAssignmentType.I32 ? "inline local helper" : "evaluator miss",
+                InterpreterScalarAssignmentModules.CreateLocalHelper,
                 Scalar(type, 1),
                 static count => count + 1D,
                 static count => Usage(3 + (8L * count), collectionElements: 0)));
         }
+
+        lanes.Add(await PrepareControlLaneAsync(
+            host,
+            policy,
+            ScalarAssignmentType.I32,
+            "unsupported local helper",
+            InterpreterScalarAssignmentModules.CreateUnsupportedLocalHelper,
+            SandboxValue.FromInt32(1),
+            static count => Math.Pow(2, count),
+            static count => Usage(3 + (8L * count), collectionElements: 0)));
 
         return lanes.ToArray();
     }

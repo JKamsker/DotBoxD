@@ -115,12 +115,29 @@ internal static class InterpreterScalarAssignmentModules
             """;
     }
 
-    public static string CreateEvaluatorMiss(ScalarAssignmentType type, int assignmentCount)
+    public static string CreateLocalHelper(ScalarAssignmentType type, int assignmentCount)
+        => CreateLocalHelper(type, assignmentCount, repeatParameter: false);
+
+    public static string CreateUnsupportedLocalHelper(ScalarAssignmentType type, int assignmentCount)
+        => CreateLocalHelper(type, assignmentCount, repeatParameter: true);
+
+    private static string CreateLocalHelper(
+        ScalarAssignmentType type,
+        int assignmentCount,
+        bool repeatParameter)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(assignmentCount);
+        if (repeatParameter && type != ScalarAssignmentType.I32)
+        {
+            throw new ArgumentOutOfRangeException(nameof(type), type, "unsupported helper control is I32-only");
+        }
 
         var typeName = type.ToString();
         var typeId = typeName.ToLowerInvariant();
+        var shapeId = repeatParameter ? "unsupported-local-helper" : "local-helper";
+        var right = repeatParameter
+            ? """{ "var": "value" }"""
+            : Literal(type, "1");
         var body = new StringBuilder();
         for (var i = 0; i < assignmentCount; i++)
         {
@@ -135,7 +152,7 @@ internal static class InterpreterScalarAssignmentModules
 
         return $$"""
             {
-              "id": "interpreter-scalar-assignment-{{typeId}}-evaluator-miss-{{assignmentCount}}",
+              "id": "interpreter-scalar-assignment-{{typeId}}-{{shapeId}}-{{assignmentCount}}",
               "version": "1.0.0",
               "functions": [
                 {
@@ -158,7 +175,7 @@ internal static class InterpreterScalarAssignmentModules
                     "value": {
                       "op": "add",
                       "left": { "var": "value" },
-                      "right": {{Literal(type, "1")}}
+                      "right": {{right}}
                     }
                   }]
                 }

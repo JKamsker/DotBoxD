@@ -35,25 +35,25 @@ internal readonly partial struct ExpressionEvaluator
 
     private ValueTask<SandboxValue> EvaluateCall(CallExpression call, InterpreterFrame frame)
     {
-        if (UnaryPureIntrinsicDispatcher.IsCandidate(call.Name) &&
+        var precedence = ResolveCallPrecedence(call);
+        if (precedence == CallPrecedence.UnaryIntrinsic &&
             UnaryPureIntrinsicDispatcher.TryEvaluate(
                 call, this, frame, Context, Options, ModuleHash, frame.FunctionId, out var mathValue))
         {
             return mathValue;
         }
 
-        if (IsNumericConversion(call.Name) && call.Arguments.Count == 1)
+        if (precedence == CallPrecedence.NumericConversion)
         {
             return EvaluateNumericConversion(call.Name, call.Arguments[0], frame);
         }
 
-        var fixedArity = CollectionIntrinsicDispatcher.FixedArity(call.Name);
-        if (fixedArity >= 0 && fixedArity == call.Arguments.Count)
+        if (precedence == CallPrecedence.FixedCollection)
         {
-            return EvaluateFixedArityCollectionCall(call, fixedArity, frame);
+            return EvaluateFixedArityCollectionCall(call, call.Arguments.Count, frame);
         }
 
-        if (CollectionCalls.ContainsKey(call.Name))
+        if (precedence == CallPrecedence.ArrayCollection)
         {
             return EvaluateCallViaArray(call, frame);
         }

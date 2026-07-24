@@ -46,6 +46,16 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
 
     internal ExpressionEvaluator Expressions => _expressions;
 
+    internal bool TryGetInlineI32LocalFunctionCallPlan(
+        CallExpression call,
+        out InlineI32LocalFunctionCallPlan plan,
+        out SandboxFunction? genericFunction)
+        => _frameLayouts.TryGetInlineI32LocalFunctionCallPlan(
+            call,
+            this,
+            out plan,
+            out genericFunction);
+
     internal bool TryGetWideExpressionKind(
         Expression expression,
         InterpreterFrame frame,
