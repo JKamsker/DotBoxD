@@ -257,7 +257,7 @@ public sealed class ScalarAssignmentTargetDispatchTests
                 plan,
                 context,
                 StraightScalarAssignmentTestSupport.Options(),
-                new FunctionFrameLayoutCache(plan));
+                new FunctionFrameLayoutCache());
             return new StatementHarness(context, meter, new StatementExecutor(evaluator), frame);
         }
 

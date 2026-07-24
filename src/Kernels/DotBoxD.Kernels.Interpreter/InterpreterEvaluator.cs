@@ -13,7 +13,7 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
     private readonly IReadOnlyDictionary<string, SandboxFunction> _functions;
     private readonly IReadOnlyDictionary<string, FunctionAnalysis> _functionAnalysis;
     private readonly SandboxExecutionOptions _options;
-    private readonly string _moduleHash;
+    private readonly ExecutionPlan _plan;
     private readonly ExpressionEvaluator _expressions;
     private readonly StatementExecutor _statements;
     private readonly FunctionFrameLayoutCache _frameLayouts;
@@ -28,7 +28,7 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
     {
         _context = context;
         _options = options;
-        _moduleHash = plan.ModuleHash;
+        _plan = plan;
         _functions = plan.FunctionLookup;
         _functionAnalysis = plan.FunctionAnalysis;
         _frameLayouts = frameLayouts;
@@ -42,9 +42,15 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
 
     internal SandboxExecutionOptions Options => _options;
 
-    internal string ModuleHash => _moduleHash;
+    internal string ModuleHash => _plan.ModuleHash;
 
     internal ExpressionEvaluator Expressions => _expressions;
+
+    internal bool TryGetWideExpressionKind(
+        Expression expression,
+        InterpreterFrame frame,
+        out WideExpressionKind kind)
+        => _frameLayouts.TryGetWideExpressionKind(expression, frame, out kind);
 
     public ValueTask<SandboxValue> ExecuteEntrypointAsync(string entrypoint, SandboxValue input)
     {
@@ -270,7 +276,7 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
             return _lastFrameLayout!;
         }
 
-        var layout = _frameLayouts.Get(function);
+        var layout = _frameLayouts.Get(function, _plan);
         _lastFrameLayoutFunction = function;
         _lastFrameLayout = layout;
         return layout;

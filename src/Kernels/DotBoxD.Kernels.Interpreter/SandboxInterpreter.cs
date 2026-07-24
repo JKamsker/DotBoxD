@@ -51,7 +51,7 @@ public sealed class SandboxInterpreter : ISandboxInterpreter
         {
             budget.CheckDeadline();
             InterpreterNestingGuard.ThrowIfExceeded(plan);
-            var frameLayouts = _frameLayouts.GetValue(plan, static value => new FunctionFrameLayoutCache(value));
+            var frameLayouts = _frameLayouts.GetValue(plan, static _ => new FunctionFrameLayoutCache());
             var evaluator = new InterpreterEvaluator(plan, context, options, frameLayouts);
             var value = await evaluator.ExecuteEntrypointAsync(entrypoint, input).ConfigureAwait(false);
             if (!options.SuppressSuccessfulRunSummaryAudit)

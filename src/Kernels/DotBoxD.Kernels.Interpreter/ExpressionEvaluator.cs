@@ -1,5 +1,6 @@
-using DotBoxD.Kernels.Interpreter.Frame;
+using System.Runtime.CompilerServices;
 using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Interpreter.Frame;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 
@@ -28,16 +29,50 @@ internal readonly partial struct ExpressionEvaluator
     // allocating an async state machine. Only genuinely asynchronous work (a host
     // binding whose ValueTask is still pending) walks the async continuation path.
     public ValueTask<SandboxValue> EvaluateAsync(Expression expression, InterpreterFrame frame)
+        => EvaluateCore(expression, frame, allowWidePrimitiveProbe: true);
+
+    private ValueTask<SandboxValue> EvaluateCore(
+        Expression expression,
+        InterpreterFrame frame,
+        bool allowWidePrimitiveProbe)
     {
-        if (!Options.EnableDebugTrace &&
-            I32ExpressionEvaluator.CanEvaluate(expression, frame, _interpreter))
+        var allowWideDescendantProbe = false;
+        if (!Options.EnableDebugTrace)
         {
-            return new ValueTask<SandboxValue>(
-                SandboxValue.FromInt32(I32ExpressionEvaluator.Evaluate(
-                    expression, frame, Context, _interpreter)));
+            if (I32ExpressionEvaluator.CanEvaluate(expression, frame, _interpreter))
+            {
+                return new ValueTask<SandboxValue>(
+                    SandboxValue.FromInt32(I32ExpressionEvaluator.Evaluate(
+                        expression, frame, Context, _interpreter)));
+            }
+
+            if (TryEvaluateWidePrimitiveArithmetic(
+                expression,
+                frame,
+                allowWidePrimitiveProbe,
+                out allowWideDescendantProbe,
+                out var primitive))
+            {
+                return new ValueTask<SandboxValue>(primitive);
+            }
         }
 
         Context.ChargeFuel(1);
+        WriteTrace(expression, frame);
+        return expression switch
+        {
+            LiteralExpression literal => new ValueTask<SandboxValue>(ChargeLiteral(literal.Value)),
+            VariableExpression variable => new ValueTask<SandboxValue>(frame.Read(variable.Name)),
+            UnaryExpression unary => EvaluateUnary(unary, frame, allowWideDescendantProbe),
+            BinaryExpression binary => EvaluateBinary(binary, frame, allowWideDescendantProbe),
+            CallExpression call => EvaluateCall(call, frame),
+            _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported expression"))
+        };
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void WriteTrace(Expression expression, InterpreterFrame frame)
+    {
         if (Options.EnableDebugTrace)
         {
             InterpreterTrace.Write(
@@ -49,17 +84,60 @@ internal readonly partial struct ExpressionEvaluator
                 expression.GetType().Name,
                 expression.Span);
         }
-
-        return expression switch
-        {
-            LiteralExpression literal => new ValueTask<SandboxValue>(ChargeLiteral(literal.Value)),
-            VariableExpression variable => new ValueTask<SandboxValue>(frame.Read(variable.Name)),
-            UnaryExpression unary => EvaluateUnary(unary, frame),
-            BinaryExpression binary => EvaluateBinary(binary, frame),
-            CallExpression call => EvaluateCall(call, frame),
-            _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported expression"))
-        };
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool TryEvaluateWidePrimitiveArithmetic(
+        Expression expression,
+        InterpreterFrame frame,
+        bool allowWidePrimitiveProbe,
+        out bool allowWideDescendantProbe,
+        out SandboxValue value)
+    {
+        if (!allowWidePrimitiveProbe)
+        {
+            allowWideDescendantProbe = false;
+            value = null!;
+            return false;
+        }
+
+        if (!IsPrimitiveArithmetic(expression))
+        {
+            allowWideDescendantProbe = true;
+            value = null!;
+            return false;
+        }
+
+        allowWideDescendantProbe = false;
+        return TryEvaluateWidePrimitiveArithmeticCore(expression, frame, out value);
+    }
+
+    private bool TryEvaluateWidePrimitiveArithmeticCore(
+        Expression expression,
+        InterpreterFrame frame,
+        out SandboxValue value)
+    {
+        if (!_interpreter.TryGetWideExpressionKind(expression, frame, out var kind))
+        {
+            value = null!;
+            return false;
+        }
+
+        if (kind == WideExpressionKind.I64)
+        {
+            value = SandboxValue.FromInt64(I64ExpressionEvaluator.Evaluate(
+                expression, frame, Context));
+            return true;
+        }
+
+        value = SandboxValue.FromDouble(F64ExpressionEvaluator.Evaluate(
+            expression, frame, Context));
+        return true;
+    }
+
+    private static bool IsPrimitiveArithmetic(Expression expression)
+        => expression is UnaryExpression { Operator: "-" } or
+            BinaryExpression { Operator: "+" or "-" or "*" or "/" or "%" };
 
     public bool TryEvaluateInt32(Expression expression, InterpreterFrame frame, out int value)
     {

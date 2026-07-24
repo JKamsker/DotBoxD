@@ -130,6 +130,12 @@ internal static class InterpreterProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-generic-primitive-expression", StringComparer.OrdinalIgnoreCase))
+        {
+            await GenericPrimitiveExpressionProbe.RunAsync();
+            return true;
+        }
+
         return false;
     }
 }
