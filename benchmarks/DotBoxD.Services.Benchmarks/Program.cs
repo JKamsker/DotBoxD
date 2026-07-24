@@ -39,6 +39,10 @@ if (args.Length == 1)
         case "--probe-transport-connection-construction":
             await TransportConnectionConstructionProbe.RunAsync();
             return;
+        case "--probe-transport-receive-pool-saturation":
+        case "--probe-tcp-receive-population":
+            await TransportReceivePoolSaturationProbe.RunAsync();
+            return;
         case "--probe-tcp-send-gate-contention":
             await TcpSendGateContentionProbe.RunAsync();
             return;

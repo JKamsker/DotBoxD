@@ -52,6 +52,8 @@ public struct RpcFrame : IDisposable
 
     internal bool IsWriterBacked => _writerLeaseToken != 0;
 
+    internal bool IsEndOfStream => ReferenceEquals(_owner, Payload.Empty);
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Payload DetachPayload()
     {

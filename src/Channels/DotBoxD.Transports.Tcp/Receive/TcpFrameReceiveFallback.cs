@@ -128,6 +128,11 @@ internal static class TcpFrameReceiveFallback
             throw;
         }
 
+        if (!frame.IsEndOfStream)
+        {
+            TcpFrameReceiveOperationAcquisition.ObserveSuccessfulFallback(connection);
+        }
+
         return frame;
     }
 
@@ -228,6 +233,11 @@ internal static class TcpFrameReceiveFallback
         {
             frame.Dispose();
             throw;
+        }
+
+        if (!frame.IsEndOfStream)
+        {
+            TcpFrameReceiveOperationAcquisition.ObserveSuccessfulFallback(connection);
         }
 
         return frame;

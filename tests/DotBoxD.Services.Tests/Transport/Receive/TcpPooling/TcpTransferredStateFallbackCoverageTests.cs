@@ -53,6 +53,9 @@ public sealed class TcpTransferredStateFallbackCoverageTests
             await VerifyTimedOutFallbackAsync(timeoutPair);
             await VerifyEofFallbackAsync(eofPair);
             await VerifyFromBeginningBodyEofFallbackAsync(fromBeginningEofPair);
+            Assert.False(timeoutPair.Connection.HasDedicatedReceiveCache);
+            Assert.False(eofPair.Connection.HasDedicatedReceiveCache);
+            Assert.False(fromBeginningEofPair.Connection.HasDedicatedReceiveCache);
         }
         finally
         {

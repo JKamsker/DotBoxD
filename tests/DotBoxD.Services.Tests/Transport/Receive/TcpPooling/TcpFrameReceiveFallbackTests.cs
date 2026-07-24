@@ -4,6 +4,7 @@ using Xunit;
 
 namespace DotBoxD.Services.Tests.Transport.Receive.TcpPooling;
 
+[Collection(TcpReceiveOperationCollection.Name)]
 public sealed class TcpFrameReceiveFallbackTests
 {
     private static readonly AsyncLocal<string?> Context = new();
@@ -31,6 +32,7 @@ public sealed class TcpFrameReceiveFallbackTests
             Assert.All(timedOut, receive => Assert.False(receive.IsCompleted));
             await QueueAndObservePrefixesAsync(pairs, stalledFrames);
             await Task.WhenAll(timedOut.Select(ObserveTimeoutAsync));
+            Assert.False(pairs[^1].Connection.HasDedicatedReceiveCache);
 
             using var cancellation = new CancellationTokenSource();
             var canceledFrames = pairs
@@ -43,6 +45,7 @@ public sealed class TcpFrameReceiveFallbackTests
             await QueueAndObservePrefixesAsync(pairs, canceledFrames);
             cancellation.Cancel();
             await Task.WhenAll(canceled.Select(ObserveCancellationAsync));
+            Assert.False(pairs[^1].Connection.HasDedicatedReceiveCache);
 
             Context.Value = "caller";
             var successors = pairs
@@ -61,6 +64,7 @@ public sealed class TcpFrameReceiveFallbackTests
                 }
             });
             await Task.WhenAll(completions).WaitAsync(Guard);
+            Assert.True(pairs[^1].Connection.HasDedicatedReceiveCache);
         }
         finally
         {

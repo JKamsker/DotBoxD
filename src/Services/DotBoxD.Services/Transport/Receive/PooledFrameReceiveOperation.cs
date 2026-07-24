@@ -106,10 +106,16 @@ internal abstract class PooledFrameReceiveOperation<TOperation> : IValueTaskSour
 
     protected abstract void ClearForRecycle();
 
+    protected virtual bool TryReturnOperation(TOperation operation) => false;
+
     private void Recycle()
     {
         ClearForRecycle();
         _source.Reset();
-        Pool.Return((TOperation)this);
+        var operation = (TOperation)this;
+        if (!TryReturnOperation(operation))
+        {
+            Pool.Return(operation);
+        }
     }
 }

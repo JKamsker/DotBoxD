@@ -14,6 +14,7 @@ internal sealed class TcpFrameReceiveOperation :
     private readonly Action _resume;
     private TcpConnection? _connection;
     private ExecutionContext? _executionContext;
+    private TcpFrameReceiveOperationCache? _returnCache;
     private FrameReceiveOperationState _state;
     private ValueTask<int> _pendingRead;
     private int _leaseGeneration;
@@ -22,8 +23,7 @@ internal sealed class TcpFrameReceiveOperation :
 
     public static ValueTask<RpcFrame> Start(TcpConnection connection, CancellationToken ct)
     {
-        if (TcpFrameReceiveOperationPopulation.IsAtCapacity &&
-            TcpFrameReceiveOperationPopulation.HasNoAvailableOperation())
+        if (TcpFrameReceiveOperationAcquisition.MustUseFallback(connection))
         {
             return TcpFrameReceiveFallback.StartFromBeginning(connection, ct);
         }
@@ -54,11 +54,7 @@ internal sealed class TcpFrameReceiveOperation :
         TcpFrameReceiveOperation? operation;
         try
         {
-            operation = TryRentOperation();
-            if (operation is null)
-            {
-                operation = TcpFrameReceiveOperationPopulation.CreateOrRentRaced();
-            }
+            operation = TcpFrameReceiveOperationAcquisition.Rent(connection);
         }
         catch (Exception error)
         {
@@ -86,6 +82,8 @@ internal sealed class TcpFrameReceiveOperation :
 
     internal static TcpFrameReceiveOperation? TryRentOperationForPopulation() =>
         TryRentOperation();
+
+    internal void ReturnTo(TcpFrameReceiveOperationCache cache) => _returnCache = cache;
 
     private static ValueTask<RpcFrame> StartPending(
         TcpFrameReceiveOperation operation,
@@ -261,6 +259,19 @@ internal sealed class TcpFrameReceiveOperation :
     }
 
     protected override void ClearForRecycle() => ClearExternalState();
+
+    protected override bool TryReturnOperation(TcpFrameReceiveOperation operation)
+    {
+        var cache = _returnCache;
+        _returnCache = null;
+        if (cache is null)
+        {
+            return false;
+        }
+
+        cache.Return(operation);
+        return true;
+    }
 
     private void ClearExternalState()
     {

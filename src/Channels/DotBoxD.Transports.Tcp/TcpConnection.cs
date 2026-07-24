@@ -98,6 +98,15 @@ public sealed class TcpConnection : IValidatedSerialFrameChannel
     internal FrameReadTimeoutSource? FrameReceiveTimeout => _frameReadTimeout;
     internal ref StreamFrameReceiveBuffer FrameReceiveBuffer => ref _receiveBuffer;
     internal void ThrowIfDisposedForReceive() => ThrowIfDisposed();
+    internal bool HasDedicatedReceiveOperation =>
+        TcpFrameReceiveOperationAcquisition.HasDedicatedOperation(this);
+    internal bool HasDedicatedReceiveCache =>
+        TcpFrameReceiveOperationAcquisition.HasDedicatedCache(this);
+    internal int DedicatedReceiveOperationCount =>
+        TcpFrameReceiveOperationAcquisition.GetDedicatedOperationCount(this);
+    internal int AvailableDedicatedReceiveOperationCount =>
+        TcpFrameReceiveOperationAcquisition.GetAvailableDedicatedOperationCount(this);
+    internal bool IsDisposedForReceive => Volatile.Read(ref _disposed) != 0;
 
     internal void FinishFrameReceive(ref FrameReceiveOperationState state)
     {
@@ -156,6 +165,7 @@ public sealed class TcpConnection : IValidatedSerialFrameChannel
         }
 
         TransportSendGate.WakeDisposedWaiters(_sendLock);
+        TcpFrameReceiveOperationAcquisition.Remove(this);
         _frameReadTimeout?.Dispose();
         try
         {
