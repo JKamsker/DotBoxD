@@ -30,6 +30,7 @@ DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 taskset -c 11 
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-numeric-conversion
 DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 taskset -c 11 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-generic-primitive-expression
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-hook-chain-discovery
+DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 taskset -c 11 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-event-adapter-validation
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-invokeasync-resolution
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-plugin-package-collision-discovery
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-server-extension-request-helpers
@@ -3048,3 +3049,50 @@ Frozen artifacts are `/tmp/dotboxd-flat-list-ea112a345-baseline-v1` and
 between artifacts (`561a17c...`, `0df86477...`, and `050b776c...`). Baseline/candidate Kernels DLL hashes are
 `bb4cbc7b...` and `d9190203...`. The retained focused suite passes 37 tests and pins malformed scalar-list behavior,
 recursive fallback, equivalent type shapes, compiled identity/resource accounting, and proof consumption.
+
+## Type-and-shape-stamped event-adapter validation
+
+`PluginEventAdapterValidationCache` previously validated mutable adapter shape, rebuilt required/declared capability
+sets, validated both entrypoints, and only then consulted its successful shape cache. Capability-gated warm hits thus
+allocated one or more hash sets plus LINQ/array state on every dispatch. The cache now retains `typeof(TEvent)` with
+the copied successful shape. Shape validation, including `EventValueCount`, still runs every call; only an exact
+event-type and shape hit returns before capability and entrypoint validation. Failed validation never publishes.
+
+An exploratory v1 harness incorrectly declared the ungated warm lane an unchanged control even though the intended
+early return removes its empty-capability call too. Those samples were stopped and make no claim. A fresh v3 harness
+predeclared all four warm lanes as targets, added a direct call to the unchanged shape validator as the timing control,
+and allowed the structurally expected eight-byte event-type reference on each cold published stamp. Both v3 artifacts
+were rebuilt from the same sources; their benchmark runner DLL is bit-identical. Six fresh pairs ran in balanced order
+BC/CB/BC/CB/BC/CB, pinned to CPU 11 with tiering, PGO, and ReadyToRun disabled:
+
+```text
+taskset -c 11 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  COMPlus_TieredCompilation=0 COMPlus_TieredPGO=0 COMPlus_ReadyToRun=0 \
+  dotnet <published-benchmark.dll> --probe-event-adapter-validation
+```
+
+```text
+case                              baseline ns   candidate ns   change    wins   baseline B/op   candidate B/op
+direct shape-validator control        13.035         12.985     -0.38%    3/6            0.00             0.00
+warm gated, 1 capability             351.680         37.260    -89.41%    6/6        1,552.00             0.00
+warm gated, 8 capabilities         1,044.570        103.480    -90.09%    6/6        2,456.00             0.00
+alternating equal adapters            345.035         39.250    -88.62%    6/6        1,552.00             0.00
+warm ungated                           51.065         36.780    -27.97%    6/6           32.00             0.00
+steady cold constructed misses      1,277.585      1,336.670     +4.62%    0/6        2,420.60         2,428.60
+steady cold preallocated misses     1,843.245      1,809.245     -1.84%    5/6        2,399.92         2,407.90
+```
+
+Every predeclared gate passes. The warm gated lanes remove exactly 1,552/2,456 B per validation, the ungated lane
+removes 32 B, and all warm targets win 6/6 pairs. The direct control is time/allocation flat. Constructed cold misses
+remain below the +5% one-sided time guard at +4.62%; both cold lanes pay exactly (within displayed fixed-process
+rounding) the predeclared +8 B per admission. All 12 processes report exact checksums.
+
+Frozen artifacts are `/tmp/dotboxd-event-adapter-validation-0499a6f13-baseline-v3` and
+`/tmp/dotboxd-event-adapter-validation-0499a6f13-candidate-v3`; raw logs are under
+`/tmp/dotboxd-event-adapter-validation-0499a6f13-pairs-v3`. The shared runner hash is
+`aca7c08181f5959bce72bcf09b9195180d9a6642c07d930ed769f75b9979047c`; baseline/candidate Plugins hashes are
+`1fa8e6b3235ccc04031f573deb93feafae817da718777ed4c4f9b98cffac8231` and
+`65f75896ae3333e06121731f2d51eafc6c0ca7de75a8559f94d4d44510bb0e15`. Candidate validation passes 31 focused
+tests, including exact zero allocation over 100,000 warmed gated hits. Mutation, aliased arrays, writer count,
+type-sensitive capability checks, failure recovery, inheritance, concurrency, and per-event output validation are
+pinned. No public API or event-dispatch semantic contract changes.

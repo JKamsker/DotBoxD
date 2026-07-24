@@ -34,6 +34,12 @@ internal static class PluginProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-event-adapter-validation", StringComparer.OrdinalIgnoreCase))
+        {
+            AdapterValidation.EventAdapterValidationProbe.Run();
+            return true;
+        }
+
         return false;
     }
 }
