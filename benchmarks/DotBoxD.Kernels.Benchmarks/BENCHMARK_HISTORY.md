@@ -2747,3 +2747,94 @@ interpreter construction as identical and at most `4,856 B/host`; pending audite
 `1,032 B`. Focused tests cover exact hash-collision
 clones, LRU churn, concurrent publication/invalidation, failures, disposal races, audit/cancellation bypasses, and both
 audited and suppressed collectible contexts. No public API or sandbox accounting contract changes.
+
+## Worklist generic-construction reachability
+
+Generic-construction reachability previously found its fixed point by rescanning every recorded generic invocation and
+copying every reached target-slot set on each pass. An adverse declaration order therefore made an N-hop forwarding
+chain require N+1 whole-graph passes, with quadratic work and allocation. The analyzer now snapshots invocations once,
+reverse-indexes them by normalized target method with Roslyn symbol equality, and queues each unique method/slot state.
+The final constructor-resolution callback pass is unchanged.
+
+The permanent probe builds deterministic 32, 64, 128, 256, and 512-hop chains in favorable and adverse declaration
+orders, plus a 512-helper nongeneric control. Parsing and compilation are outside the timed interval; every sample
+requires exactly one `DBXK001` diagnostic and no analyzer failure. Seven fresh baseline/candidate processes were run in
+the balanced order BC/CB/BC/CB/BC/CB/BC, pinned to CPU 6 with tiering, Tiered PGO, and ReadyToRun disabled:
+
+```text
+taskset -c 6 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  dotnet <published-benchmark.dll> --probe-generic-construction-reachability
+```
+
+The frozen benchmark runners were byte-identical
+(`c4b257fb52f5951052516ddfdf875b081234f5639b6ca85b86b381577c3d7146`). Only the analyzer differed: baseline
+`c177b6e8294e563705b679af7d8e8ebe487a975f47675da7098ccb91354ebacf` versus candidate
+`54b58b1486f921d414c64cad01c550337b3d9c87653a31a82a444dfe5ed9fc44`. Pooled 512-hop medians were:
+
+```text
+case                         baseline             candidate             change                  time wins
+adverse declaration order    33.43 ms / 28,160,160 B  17.31 ms / 9,264,192 B  -48.2% / -67.1%       7/7
+favorable declaration order  17.98 ms /  9,276,416 B  18.44 ms / 9,273,440 B  no timing claim / parity   -
+ordinary helper control      13.64 ms /  6,905,648 B  14.42 ms / 6,902,552 B  no timing claim / parity   -
+```
+
+The adverse target improved in every time pair and removed 18,895,968 B per analysis at 512 hops. Favorable-order and
+ordinary-helper allocations are effectively unchanged. Favorable pooled timing moved +2.6%. Ordinary-helper paired
+percentages had a +3.2% median inside the 5% guard, with the candidate slower in 4/7 pairs and large bidirectional
+outliers. The control timing ranges overlap, so no timing claim is made for either control. All rows retained exactly one
+diagnostic. Focused tests cover adverse/favorable propagation, self-cycles, diamonds, two-slot permutations,
+containing-type forwarding, and ordinary benign controls. No public API, generated-source shape, or diagnostic contract
+changes.
+
+## Layout-scoped multi-assignment I64 `forRange` plans
+
+Every multi-assignment I64 loop entry rebuilt its immutable body array, dependency set, and one
+`I64ExpressionPlan` object per literal, variable, and operator. This remained after single-assignment I64 and
+multi-assignment I32 plans were cached. The I64 runner now admits a complete source-ordered body after two successful
+constructions into the existing exact-statement, layout-owned typed plan store. A hit revalidates only raw inputs read
+before their first body write: `x = x + 1` still requires assigned `x`, while `x = source; y = x + 1` does not require
+preassigned `x`. Unsupported or incomplete bodies never advance admission and every cache-shape mismatch fails closed.
+
+The setup and nested probes were byte-identical between exact detached baseline `6465c065f` and the candidate (SHA256
+`94ea549bc3775cc1ca85ccdfed63866651a474a52480855a11ea2a43a8bec5e5` and
+`cdfb50f5d5ea0e204bff04260ce3b0a32525caa4745ff61485d471fcdca06a58`). Four fresh final-code pairs ran in balanced
+order BC/CB/BC/CB, pinned to CPU 11 with tiering, Tiered PGO, and ReadyToRun disabled:
+
+```text
+taskset -c 11 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  dotnet <published-benchmark.dll> --probe-interpreter-i64-plan-setup
+taskset -c 11 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  dotnet <published-benchmark.dll> --probe-interpreter-i64-nested-loop-plan
+```
+
+```text
+case                                  baseline                 candidate                change
+two assignments, one loop x50k       30.400 ms / 1,488.2 B/op 22.700 ms / 824.1 B/op  -25.3% / -664.1 B/op
+earlier-write/later-read x50k         30.750 ms / 1,504.2 B/op 23.000 ms / 840.1 B/op  -25.2% / -664.1 B/op
+multi outer 1M / inner 1             268.145 ms / 664,001,288 B 131.224 ms / 1,288 B   -51.1% / -664,000,000 B
+multi outer 1 / inner 10M control     98.491 ms / 1,952 B       96.577 ms / 1,288 B    no timing claim / -664 B fixed
+outer 1M / inner 0 control            66.267 ms / 1,280 B       67.201 ms / 1,280 B    no timing claim / exact
+single-I64 outer 1M / inner 1        188.404 ms / 1,280 B      191.424 ms / 1,280 B    no timing claim / exact
+```
+
+The two setup targets and nested target improved in all four pairs. The nested target removes exactly 664 bytes for each
+of one million repeated entries; the remaining eight-byte target-versus-zero difference is fixed-process noise. Control
+medians stay within 2%, and their timing ranges overlap. A separate serialized final-code I32 multi-body sanity run is
+`122.3 ms` versus the six-process baseline range `122.5-125.4 ms`, with exact `1,016 B` allocation in both; its direct
+expression control is likewise inside the baseline range.
+
+A layout-prewarmed three-stage lane reproduced the same allocations in every process:
+
+```text
+stage                    baseline       candidate
+invocation 1: observe     1,736 B         1,680 B
+invocation 2: publish     1,488 B         2,040 B
+invocation 3: cache hit   1,488 B           824 B
+```
+
+The first observation also avoids the 56-byte rejected-I32 array; publication pays one bounded 552-byte premium over
+baseline, and the third and subsequent entries save exactly 664 bytes. Values and full sandbox resource tuples are exact
+in every sample. Strict focused tests cover fresh-frame source ordering, self-read-before-write, unsupported whole-body
+fallback without admission, checked overflow, low fuel/loop quota fallback, warmed debug preorder, exact identity,
+cross-kind/cache-shape isolation, concurrent immutable-plan publication, and allocation. The plan retains no frame or
+runtime values, and no public API or sandbox accounting contract changes.
