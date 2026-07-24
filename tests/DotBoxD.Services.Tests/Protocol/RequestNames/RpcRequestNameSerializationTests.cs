@@ -74,6 +74,53 @@ public sealed class RpcRequestNameSerializationTests
         Assert.All(actual, bytes => Assert.Equal(expected, bytes));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Equal_value_distinct_registered_names_match_canonical_wire_bytes(bool oldSpec)
+    {
+        var serializer = new MessagePackRpcSerializer(
+            MessagePackRpcSerializer.CreateOptions().WithOldSpec(oldSpec));
+        var registered = Request(new string('S', 128), new string('M', 128));
+        var distinct = Request(
+            new string(registered.ServiceName.ToCharArray()),
+            new string(registered.MethodName.ToCharArray()));
+        var expected = SerializeCanonical(registered, oldSpec);
+
+        Assert.Equal(expected, Serialize(serializer, registered));
+        Assert.NotSame(registered.ServiceName, distinct.ServiceName);
+        Assert.NotSame(registered.MethodName, distinct.MethodName);
+        Assert.Equal(expected, Serialize(serializer, distinct));
+    }
+
+    [Theory]
+    [MemberData(nameof(InvalidWarmCacheRequiredNames))]
+    public void Registered_names_do_not_bypass_required_name_validation(
+        string fieldName,
+        string invalidValueKind)
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var valid = Request(
+            new string("RegisteredService".ToCharArray()),
+            new string("RegisteredMethod".ToCharArray()));
+        var expected = SerializeCanonical(valid, oldSpec: false);
+        Assert.Equal(expected, Serialize(serializer, valid));
+        Assert.Equal(expected, Serialize(serializer, valid));
+        var invalidValue = InvalidRequiredName(invalidValueKind);
+
+        var invalid = Request(
+            fieldName == nameof(RpcRequest.ServiceName) ? invalidValue! : valid.ServiceName,
+            fieldName == nameof(RpcRequest.MethodName) ? invalidValue! : valid.MethodName);
+        var writer = new ArrayBufferWriter<byte>();
+
+        var exception = Assert.Throws<MessagePackSerializationException>(
+            () => serializer.Serialize(writer, invalid));
+
+        Assert.Contains(fieldName, exception.Message, StringComparison.Ordinal);
+        Assert.Equal(0, writer.WrittenCount);
+        Assert.Equal(expected, Serialize(serializer, valid));
+    }
+
     [Fact]
     public void Malformed_first_registration_does_not_poison_later_valid_names()
     {
@@ -115,6 +162,29 @@ public sealed class RpcRequestNameSerializationTests
         Assert.Equal(0, writer.WrittenCount);
         Assert.Equal(expected, Serialize(serializer, valid));
     }
+
+    public static TheoryData<string, string> InvalidWarmCacheRequiredNames() =>
+        new()
+        {
+            { nameof(RpcRequest.ServiceName), "null" },
+            { nameof(RpcRequest.ServiceName), "empty" },
+            { nameof(RpcRequest.ServiceName), "whitespace" },
+            { nameof(RpcRequest.ServiceName), "malformed" },
+            { nameof(RpcRequest.MethodName), "null" },
+            { nameof(RpcRequest.MethodName), "empty" },
+            { nameof(RpcRequest.MethodName), "whitespace" },
+            { nameof(RpcRequest.MethodName), "malformed" },
+        };
+
+    private static string? InvalidRequiredName(string kind) =>
+        kind switch
+        {
+            "null" => null,
+            "empty" => string.Empty,
+            "whitespace" => " \t\u2003",
+            "malformed" => "invalid" + new string('\uD800', 1),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown invalid-name case."),
+        };
 
     private static RpcRequest Request(string serviceName, string methodName) =>
         new()

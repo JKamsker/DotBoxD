@@ -8,13 +8,14 @@ internal static class RpcRequestNameValidation
         RpcRequestNameKind kind,
         string fieldName)
     {
-        value = RequireValue(value, fieldName);
-        if (requestNames is not null &&
+        if (value is not null &&
+            requestNames is not null &&
             requestNames.TryGetRegistered(value, kind, out var registeredUtf8))
         {
             return registeredUtf8;
         }
 
+        value = RequireValue(value, fieldName);
         RpcEnvelopeStringValidation.ThrowIfMalformedUtf16(value, "request", fieldName);
         return null;
     }
