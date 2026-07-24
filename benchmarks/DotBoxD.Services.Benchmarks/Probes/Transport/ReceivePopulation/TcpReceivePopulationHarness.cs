@@ -50,7 +50,7 @@ internal sealed class TcpReceivePopulationHarness : IAsyncDisposable
                 peers[createdCount] = new TcpReceivePopulationPeer(
                     new TcpConnection(receiver, Timeout.InfiniteTimeSpan),
                     sender,
-                    TcpReceivePopulationIo.CreateFrame(messageId: 10_000 + createdCount));
+                    ReceivePopulationFrame.Create(messageId: 10_000 + createdCount));
             }
 
             return new TcpReceivePopulationHarness(peers, sharedCapacity);

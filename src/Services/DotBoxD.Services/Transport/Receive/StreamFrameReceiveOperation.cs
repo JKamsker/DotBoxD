@@ -13,6 +13,7 @@ internal sealed class StreamFrameReceiveOperation :
     private readonly Action _resume;
     private StreamConnection? _connection;
     private ExecutionContext? _executionContext;
+    private StreamFrameReceiveOperationCache? _returnCache;
     private FrameReceiveOperationState _state;
     private ValueTask<int> _pendingRead;
     private int _leaseGeneration;
@@ -22,7 +23,7 @@ internal sealed class StreamFrameReceiveOperation :
     public static ValueTask<RpcFrame> Start(StreamConnection connection, CancellationToken ct)
     {
         if (StreamFrameReceiveOperationPopulation.RequiresPreflight &&
-            StreamFrameReceiveOperationPopulation.MustUseFallback())
+            StreamFrameReceiveOperationPopulation.MustUseFallback(connection))
         {
             return StreamFrameReceiveFallback.StartFromBeginning(connection, ct);
         }
@@ -56,7 +57,7 @@ internal sealed class StreamFrameReceiveOperation :
             operation = TryRentOperation();
             if (operation is null)
             {
-                operation = StreamFrameReceiveOperationPopulation.CreateOrRentRaced();
+                operation = StreamFrameReceiveOperationPopulation.CreateOrRentRaced(connection);
             }
         }
         catch (Exception error)
@@ -90,6 +91,8 @@ internal sealed class StreamFrameReceiveOperation :
 
     internal static StreamFrameReceiveOperation? TryRentOperationForPopulation() =>
         TryRentOperation();
+
+    internal void ReturnTo(StreamFrameReceiveOperationCache cache) => _returnCache = cache;
 
     private static ValueTask<RpcFrame> StartPending(
         StreamFrameReceiveOperation operation,
@@ -265,6 +268,8 @@ internal sealed class StreamFrameReceiveOperation :
     }
 
     protected override void ClearForRecycle() => ClearExternalState();
+    protected override bool TryReturnOperation(StreamFrameReceiveOperation operation) =>
+        StreamFrameReceiveOperationAcquisition.TryReturn(operation, ref _returnCache);
 
     private void ClearExternalState()
     {

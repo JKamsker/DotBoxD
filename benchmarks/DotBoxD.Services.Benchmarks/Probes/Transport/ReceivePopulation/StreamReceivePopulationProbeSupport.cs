@@ -1,58 +1,42 @@
 using System.Diagnostics;
-using System.Net.Sockets;
+using System.IO.Pipes;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using DotBoxD.Services.Transport;
-using DotBoxD.Transports.Tcp;
 
 namespace DotBoxD.Services.Benchmarks.Probes;
 
-internal static class TcpReceivePopulationIo
+internal static class StreamReceivePopulationIo
 {
     private static readonly TimeSpan ReceiveGuard = TimeSpan.FromSeconds(5);
 
-    public static ValueTask<RpcFrame> StartPending(TcpReceivePopulationPeer peer)
+    public static ValueTask<RpcFrame> StartPending(StreamReceivePopulationPeer peer)
     {
         var receive = peer.Connection.ReceiveFrameValueAsync();
         if (receive.IsCompleted)
         {
             throw new InvalidOperationException(
-                "TCP population receive completed before its peer wrote a frame.");
+                "Stream population receive completed before its peer wrote a frame.");
         }
 
         return receive;
     }
 
-    public static void Send(TcpReceivePopulationPeer peer)
-    {
-        var remaining = peer.Frame.AsSpan();
-        while (!remaining.IsEmpty)
-        {
-            var sent = peer.Sender.Client.Send(remaining, SocketFlags.None);
-            if (sent <= 0)
-            {
-                throw new IOException("TCP probe peer closed during a frame send.");
-            }
+    public static void Send(StreamReceivePopulationPeer peer) => peer.Sender.Write(peer.Frame);
 
-            remaining = remaining[sent..];
-        }
-    }
-
-    public static void Consume(
-        TcpReceivePopulationPeer peer,
-        ValueTask<RpcFrame> receive)
+    public static void Consume(StreamReceivePopulationPeer peer, ValueTask<RpcFrame> receive)
     {
         WaitForCompletion(receive);
         using var frame = receive.GetAwaiter().GetResult();
         ValidateFrame(peer, frame);
     }
 
-    public static void ValidateFrame(TcpReceivePopulationPeer peer, RpcFrame frame)
+    public static void ValidateFrame(StreamReceivePopulationPeer peer, RpcFrame frame)
     {
         if (!frame.Memory.Span.SequenceEqual(peer.Frame))
         {
             throw new InvalidOperationException(
-                $"TCP population peer {peer.MessageId} received a stale or malformed frame.");
+                $"Stream population peer {peer.MessageId} received a stale or malformed frame.");
         }
     }
 
@@ -64,7 +48,7 @@ internal static class TcpReceivePopulationIo
         {
             if (Stopwatch.GetElapsedTime(started) >= ReceiveGuard)
             {
-                throw new TimeoutException("TCP population receive did not complete.");
+                throw new TimeoutException("Stream population receive did not complete.");
             }
 
             spinner.SpinOnce();
@@ -72,18 +56,18 @@ internal static class TcpReceivePopulationIo
     }
 }
 
-internal sealed class TcpReceivePopulationInlineLane
+internal sealed class StreamReceivePopulationInlineLane
 {
     private static readonly TimeSpan RearmGuard = TimeSpan.FromSeconds(5);
 
-    private readonly TcpReceivePopulationPeer _peer;
+    private readonly StreamReceivePopulationPeer _peer;
     private readonly Action _continuation;
     private ConfiguredValueTaskAwaitable<RpcFrame>.ConfiguredValueTaskAwaiter _awaiter;
     private ValueTask<RpcFrame> _successor;
     private Exception? _error;
     private int _successorReady;
 
-    public TcpReceivePopulationInlineLane(TcpReceivePopulationPeer peer)
+    public StreamReceivePopulationInlineLane(StreamReceivePopulationPeer peer)
     {
         _peer = peer;
         _continuation = CompleteFirst;
@@ -93,13 +77,13 @@ internal sealed class TcpReceivePopulationInlineLane
     {
         _error = null;
         Volatile.Write(ref _successorReady, 0);
-        _awaiter = TcpReceivePopulationIo.StartPending(_peer)
+        _awaiter = StreamReceivePopulationIo.StartPending(_peer)
             .ConfigureAwait(false)
             .GetAwaiter();
         _awaiter.UnsafeOnCompleted(_continuation);
     }
 
-    public void SendFirst() => TcpReceivePopulationIo.Send(_peer);
+    public void SendFirst() => StreamReceivePopulationIo.Send(_peer);
 
     public void WaitForSuccessor()
     {
@@ -109,7 +93,7 @@ internal sealed class TcpReceivePopulationInlineLane
         {
             if (Stopwatch.GetElapsedTime(started) >= RearmGuard)
             {
-                throw new TimeoutException("TCP inline receive rearm did not complete.");
+                throw new TimeoutException("Stream inline receive rearm did not complete.");
             }
 
             spinner.SpinOnce();
@@ -121,9 +105,9 @@ internal sealed class TcpReceivePopulationInlineLane
         }
     }
 
-    public void SendSuccessor() => TcpReceivePopulationIo.Send(_peer);
+    public void SendSuccessor() => StreamReceivePopulationIo.Send(_peer);
 
-    public void ConsumeSuccessor() => TcpReceivePopulationIo.Consume(_peer, _successor);
+    public void ConsumeSuccessor() => StreamReceivePopulationIo.Consume(_peer, _successor);
 
     public void Clear()
     {
@@ -137,8 +121,8 @@ internal sealed class TcpReceivePopulationInlineLane
         try
         {
             using var frame = _awaiter.GetResult();
-            TcpReceivePopulationIo.ValidateFrame(_peer, frame);
-            _successor = TcpReceivePopulationIo.StartPending(_peer);
+            StreamReceivePopulationIo.ValidateFrame(_peer, frame);
+            _successor = StreamReceivePopulationIo.StartPending(_peer);
         }
         catch (Exception error)
         {
@@ -151,21 +135,24 @@ internal sealed class TcpReceivePopulationInlineLane
     }
 }
 
-internal readonly record struct TcpReceivePopulationPeer(
-    TcpConnection Connection,
-    TcpClient Sender,
+internal readonly record struct StreamReceivePopulationPeer(
+    StreamConnection Connection,
+    NamedPipeClientStream Sender,
     byte[] Frame)
 {
     public int MessageId => BitConverter.ToInt32(Frame, sizeof(int));
 }
 
-internal readonly record struct TcpReceivePopulationRun(
+internal readonly record struct StreamReceivePopulationRun(
     int FrameCount,
     long ElapsedTicks,
-    long AllocatedBytes)
+    long CallerAllocatedBytes,
+    long TotalAllocatedBytes)
 {
     public double NanosecondsPerFrame =>
         ElapsedTicks * (1_000_000_000d / Stopwatch.Frequency) / FrameCount;
 
-    public double BytesPerFrame => AllocatedBytes / (double)FrameCount;
+    public double CallerBytesPerFrame => CallerAllocatedBytes / (double)FrameCount;
+
+    public double TotalBytesPerFrame => TotalAllocatedBytes / (double)FrameCount;
 }

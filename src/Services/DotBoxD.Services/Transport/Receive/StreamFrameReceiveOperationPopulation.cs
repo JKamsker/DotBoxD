@@ -14,11 +14,11 @@ internal static class StreamFrameReceiveOperationPopulation
     public static bool IsAtCapacity => _isAtCapacity;
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static bool MustUseFallback()
+    public static bool MustUseFallback(StreamConnection connection)
     {
         if (!StreamFrameReceiveOperation.HasAvailableOperationForPopulation)
         {
-            return true;
+            return !StreamFrameReceiveOperationAcquisition.CanAcquireDedicatedOperation(connection);
         }
 
         // Returned sources make preflight unnecessary until a pending receive drains the pool.
@@ -35,7 +35,7 @@ internal static class StreamFrameReceiveOperationPopulation
         }
     }
 
-    public static StreamFrameReceiveOperation? CreateOrRentRaced()
+    public static StreamFrameReceiveOperation? CreateOrRentRaced(StreamConnection connection)
     {
         if (!CreationBudget.TryReserve(out var reachedCapacity))
         {
@@ -45,6 +45,7 @@ internal static class StreamFrameReceiveOperationPopulation
             {
                 // Heal a stale false hint after this receive takes the race fallback.
                 _requiresPreflight = true;
+                return StreamFrameReceiveOperationAcquisition.RentDedicated(connection);
             }
 
             return operation;

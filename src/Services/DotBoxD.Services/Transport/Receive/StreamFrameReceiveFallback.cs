@@ -141,6 +141,11 @@ internal static class StreamFrameReceiveFallback
             owner = state.Owner;
         }
 
+        if (!frame.IsEndOfStream)
+        {
+            StreamFrameReceiveOperationAcquisition.ObserveSuccessfulFallback(connection);
+        }
+
         return frame;
     }
 
@@ -253,6 +258,11 @@ internal static class StreamFrameReceiveFallback
         {
             frame.Dispose();
             throw;
+        }
+
+        if (!frame.IsEndOfStream)
+        {
+            StreamFrameReceiveOperationAcquisition.ObserveSuccessfulFallback(connection);
         }
 
         return frame;

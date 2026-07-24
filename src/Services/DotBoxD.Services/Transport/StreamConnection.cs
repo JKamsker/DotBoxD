@@ -135,6 +135,15 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
     internal FrameReadTimeoutSource? FrameReceiveTimeout => _frameReadTimeout;
     internal ref StreamFrameReceiveBuffer FrameReceiveBuffer => ref _receiveBuffer;
     internal void ThrowIfDisposedForReceive() => ThrowIfDisposed();
+    internal bool HasDedicatedReceiveOperation =>
+        StreamFrameReceiveOperationAcquisition.HasDedicatedOperation(this);
+    internal bool HasDedicatedReceiveCache =>
+        StreamFrameReceiveOperationAcquisition.HasDedicatedCache(this);
+    internal int DedicatedReceiveOperationCount =>
+        StreamFrameReceiveOperationAcquisition.GetDedicatedOperationCount(this);
+    internal int AvailableDedicatedReceiveOperationCount =>
+        StreamFrameReceiveOperationAcquisition.GetAvailableDedicatedOperationCount(this);
+    internal bool IsDisposedForReceive => Volatile.Read(ref _disposed) != 0;
 
     internal void FinishFrameReceive(ref FrameReceiveOperationState state)
     {
@@ -189,6 +198,7 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
     private async Task CloseCoreAsync()
     {
         _disposeCts.Cancel();
+        StreamFrameReceiveOperationAcquisition.Remove(this);
         _frameReadTimeout?.Dispose();
         if (_ownsStream || ReceiveConcurrencyGuard.IsActive(Volatile.Read(ref _activeReceives)))
         {

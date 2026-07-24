@@ -27,7 +27,7 @@ internal static class TransportIdleReceiveFootprintProbe
         Console.WriteLine("Idle pending transport receive footprint probe");
         Console.WriteLine("completion: " + (taskBacked ? "AsTask" : "direct ValueTask"));
         Console.WriteLine(
-            "transport       connections  pending  rented windows  logical KiB  allocated B  live delta B");
+            "transport       connections  pending  windows  sidecars  logical KiB  allocated B  live delta B");
         Write(namedPipe);
         Write(tcp);
         Console.WriteLine(
@@ -87,7 +87,14 @@ internal static class TransportIdleReceiveFootprintProbe
             var allocated = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
             var liveAfter = GC.GetTotalMemory(forceFullCollection: true);
             var rented = connections.Count(HasRentedBuffer);
-            return new Measurement("named pipe", receives.Count, rented, allocated, liveAfter - liveBefore);
+            var sidecars = connections.Count(static connection => connection.HasDedicatedReceiveCache);
+            return new Measurement(
+                "named pipe",
+                receives.Count,
+                rented,
+                sidecars,
+                allocated,
+                liveAfter - liveBefore);
         }
         finally
         {
@@ -132,7 +139,14 @@ internal static class TransportIdleReceiveFootprintProbe
             var allocated = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
             var liveAfter = GC.GetTotalMemory(forceFullCollection: true);
             var rented = connections.Count(HasRentedBuffer);
-            return new Measurement("TCP", receives.Count, rented, allocated, liveAfter - liveBefore);
+            var sidecars = connections.Count(static connection => connection.HasDedicatedReceiveCache);
+            return new Measurement(
+                "TCP",
+                receives.Count,
+                rented,
+                sidecars,
+                allocated,
+                liveAfter - liveBefore);
         }
         finally
         {
@@ -181,9 +195,16 @@ internal static class TransportIdleReceiveFootprintProbe
 
     private static void Write(Measurement measurement)
     {
+        if (measurement.DedicatedCaches != 0)
+        {
+            throw new InvalidOperationException(
+                $"{measurement.Name} admitted {measurement.DedicatedCaches} idle receive sidecars.");
+        }
+
         Console.WriteLine(
             $"{measurement.Name,-15} {ConnectionCount,11:N0} {measurement.PendingReceives,8:N0} " +
-            $"{measurement.RentedWindows,15:N0} {measurement.LogicalKilobytes,12:N0} " +
+            $"{measurement.RentedWindows,8:N0} {measurement.DedicatedCaches,9:N0} " +
+            $"{measurement.LogicalKilobytes,12:N0} " +
             $"{measurement.AllocatedBytes,12:N0} {measurement.LiveBytesDelta,13:N0}");
     }
 
@@ -191,6 +212,7 @@ internal static class TransportIdleReceiveFootprintProbe
         string Name,
         int PendingReceives,
         int RentedWindows,
+        int DedicatedCaches,
         long AllocatedBytes,
         long LiveBytesDelta)
     {
