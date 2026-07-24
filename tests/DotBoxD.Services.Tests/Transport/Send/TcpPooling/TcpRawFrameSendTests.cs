@@ -48,9 +48,10 @@ public sealed class TcpRawFrameSendTests
 
         pair.Connection.ReleaseSendGate();
         await send.AsTask();
-        // An AsTask consumer may resume inline from SetResult. Yield before inspecting the pool so
-        // the producer can unwind its publication finally and return the operation.
-        await Task.Yield();
+        // An AsTask consumer may resume inline from SetResult before the producer unwinds its
+        // publication finally. Wait for that observable lifecycle transition instead of assuming
+        // one scheduler yield is sufficient on every runtime and host.
+        await WaitForRetainedCountAsync(retained);
 
         Assert.Equal(retained, TcpFrameSendOperation.RetainedCountForTests);
         Assert.Equal(1, pair.Connection.SendGate.CurrentCount);
@@ -230,6 +231,16 @@ public sealed class TcpRawFrameSendTests
         var synchronousError = Record.Exception(() => { pending = send(); });
         Assert.Null(synchronousError);
         return Assert.IsAssignableFrom<Task>(pending);
+    }
+
+    private static async Task WaitForRetainedCountAsync(int expected)
+    {
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        while (TcpFrameSendOperation.RetainedCountForTests != expected &&
+               watch.Elapsed < Guard)
+        {
+            await Task.Delay(1);
+        }
     }
 
     private static void AssertCallerOwnership(TrackingMemoryOwner owner, byte[] expected)
