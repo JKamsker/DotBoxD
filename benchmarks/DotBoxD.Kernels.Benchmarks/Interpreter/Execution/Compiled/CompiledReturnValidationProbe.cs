@@ -42,6 +42,11 @@ internal static class CompiledReturnValidationProbe
         {
             Console.WriteLine($"{scenario.Scenario.Name,-22} {Format(scenario.ExpectedUsage)}");
         }
+
+        var malformed = CompiledReturnValidationControls.Run();
+        Console.WriteLine(
+            $"malformed direct/compiled {malformed.DirectRejections}/{malformed.CompiledRejections} " +
+            $"checksum={malformed.Checksum}");
     }
 
     private static async Task<PreparedReturnValidationScenario> PrepareAsync(

@@ -20,6 +20,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-audit-envelope
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-host-boundary
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-execution-envelope
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-return-validation
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-plan-setup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-i64-plan-setup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-i64-nested-loop-plan
@@ -3005,3 +3006,45 @@ Allocation medians vary by less than 75 B/edit in workloads allocating 0.90-11.1
 the diagnostic lane, and receive no claim. Every baseline/candidate process reports the same generated-source and
 diagnostic hashes for its snapshot. Focused tests cover custom method names, generated and user receivers, unresolved
 calls, invalid-kind text, call-shape output, and an ambiguous overload whose first candidate carries kind `99`.
+
+## Rejected flat built-in scalar-list validation shortcut
+
+The compiled return-validation probe now includes `List<I32>` lengths 255 and 1,024, a structural map control, and
+malformed first/middle/last, non-finite F64, and null String controls. This exposed the remaining recurring traversal
+allocation for large flat scalar lists: direct x256/x1024 validation allocated exactly 24,912/98,688 B, and the compiled
+identity path paid that traversal twice around its validation-proof boundary.
+
+Three direct-loop placements were tested. The final version left `RequireType` and its empty-collection helper
+byte-for-byte identical to baseline and placed the shortcut only inside the existing non-empty list frame. Six fresh
+pairs ran in balanced order BC/CB/BC/CB/BC/CB, pinned to CPU 11 with tiering, PGO, and ReadyToRun disabled:
+
+```text
+taskset -c 11 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  COMPlus_TieredCompilation=0 COMPlus_TieredPGO=0 COMPlus_ReadyToRun=0 \
+  dotnet <published-benchmark.dll> --probe-compiled-return-validation
+```
+
+```text
+case                       baseline ns   candidate ns   change    wins   baseline B/op   candidate B/op
+compiled List<I32> x32       1,732.50       1,483.35    -14.38%    5/6          192.0            192.0
+direct List<I32> x32           519.90         388.20    -25.33%    6/6            0.0              0.0
+compiled List<I32> x255      7,241.70       5,333.15    -26.35%    6/6          192.0            192.0
+direct List<I32> x255        3,380.60       2,351.20    -30.45%    6/6            0.0              0.0
+compiled List<I32> x256      8,911.55       5,276.35    -40.79%    6/6       50,027.7            192.0
+direct List<I32> x256        4,037.00       2,403.10    -40.47%    6/6       24,912.0              0.0
+compiled List<I32> x1024    31,959.00      18,834.10    -41.07%    6/6      197,613.9            192.2
+direct List<I32> x1024      15,332.20       9,174.10    -40.16%    6/6       98,688.0              0.0
+direct empty List<I32>          42.65          45.30     +6.21%    1/6            0.0              0.0
+```
+
+Unit, scalar, compiled empty-list, record, map, and nested controls remained within 3.18%, but the untouched direct
+empty-list control exceeded the declared +5% guard. The two earlier placements also regressed that lane by more than
+5%, so the optimization was rejected and every production edit was reverted. All 12 processes retained exact result
+identity, allocations, resource tuples, and malformed-value rejection. No timing or allocation improvement is claimed.
+
+Frozen artifacts are `/tmp/dotboxd-flat-list-ea112a345-baseline-v1` and
+`/tmp/dotboxd-flat-list-ea112a345-candidate-v3`; pair logs are under
+`/tmp/dotboxd-flat-list-ea112a345-pairs-v3`. The probe, scenario, and malformed-control source hashes are identical
+between artifacts (`561a17c...`, `0df86477...`, and `050b776c...`). Baseline/candidate Kernels DLL hashes are
+`bb4cbc7b...` and `d9190203...`. The retained focused suite passes 37 tests and pins malformed scalar-list behavior,
+recursive fallback, equivalent type shapes, compiled identity/resource accounting, and proof consumption.
