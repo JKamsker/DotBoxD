@@ -37,6 +37,24 @@ public sealed class RpcRequestWhitespaceEnvelopeValidationTests
         Assert.Contains(fieldName, exception.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("ServiceName")]
+    [InlineData("MethodName")]
+    public void RejectedRemoteWhitespaceDoesNotBecomeRegistered(string fieldName)
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var bytes = WriteRequestMap(fieldName);
+        Assert.Throws<MessagePackSerializationException>(
+            () => serializer.Deserialize<RpcRequest>(bytes));
+        var writer = new ArrayBufferWriter<byte>();
+
+        var exception = Assert.Throws<MessagePackSerializationException>(
+            () => serializer.Serialize(writer, CreateRequest(fieldName)));
+
+        Assert.Contains(fieldName, exception.Message, StringComparison.Ordinal);
+        Assert.Equal(0, writer.WrittenCount);
+    }
+
     private static RpcRequest CreateRequest(string whitespaceField) =>
         new()
         {

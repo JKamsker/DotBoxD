@@ -16,8 +16,8 @@ internal sealed class RpcRequestNameCache
     private const int RemoteWays = 4;
     private const int RemoteSetMask = RemoteSetCount - 1;
 
-    // Locally serialized names are trusted and cannot be displaced by remote churn. Immutable
-    // snapshots keep inbound lookups lock-free while registrations remain rare copy-on-write work.
+    // Locally serialized names are trusted and cannot be displaced by remote churn. Copy-on-write
+    // indexes keep inbound lookups lock-free; their volatile registered-only hints are best effort.
     private readonly object _gate = new();
     private readonly RpcRequestNameEntry?[] _remoteEntries =
         new RpcRequestNameEntry[RemoteSetCount * RemoteWays];
@@ -57,7 +57,7 @@ internal sealed class RpcRequestNameCache
     public bool TryGetRegistered(string value, RpcRequestNameKind kind, out byte[]? utf8)
     {
         var registered = Volatile.Read(ref _registeredNames);
-        if (registered.ByValue.TryGetValue(value, out var entry))
+        if (registered.TryGet(value, kind, out var entry))
         {
             SetHot(kind, entry);
             utf8 = entry.Utf8;
@@ -95,7 +95,7 @@ internal sealed class RpcRequestNameCache
     public string GetOrAdd(string value, RpcRequestNameKind kind)
     {
         var registered = Volatile.Read(ref _registeredNames);
-        if (registered.ByValue.TryGetValue(value, out var registeredEntry))
+        if (registered.TryGet(value, kind, out var registeredEntry))
         {
             SetHot(kind, registeredEntry);
             return registeredEntry.Value;
@@ -135,7 +135,7 @@ internal sealed class RpcRequestNameCache
         lock (_gate)
         {
             var registered = Volatile.Read(ref _registeredNames);
-            if (registered.ByValue.TryGetValue(value, out var registeredEntry))
+            if (registered.TryGet(value, kind, out var registeredEntry))
             {
                 SetHot(kind, registeredEntry);
                 return registeredEntry.Utf8;

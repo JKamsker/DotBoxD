@@ -2,6 +2,11 @@ namespace DotBoxD.Codecs.MessagePack;
 
 internal sealed class RegisteredRpcRequestNames
 {
+    // These hints can only point into the local registration indexes below. Keeping them separate
+    // from the remote-name hints prevents rejected inbound names from bypassing later validation.
+    private RpcRequestNameEntry? _hotMethod;
+    private RpcRequestNameEntry? _hotService;
+
     public static RegisteredRpcRequestNames Empty { get; } = new(
         0,
         new Dictionary<string, RpcRequestNameEntry>(StringComparer.Ordinal),
@@ -23,6 +28,30 @@ internal sealed class RegisteredRpcRequestNames
 
     public Dictionary<ulong, RpcRequestNameEntry[]> ByHash { get; }
 
+    public bool TryGet(
+        string value,
+        RpcRequestNameKind kind,
+        out RpcRequestNameEntry entry)
+    {
+        var hot = kind == RpcRequestNameKind.Service
+            ? Volatile.Read(ref _hotService)
+            : Volatile.Read(ref _hotMethod);
+        if (hot is not null && ReferenceEquals(value, hot.Value))
+        {
+            entry = hot;
+            return true;
+        }
+
+        if (ByValue.TryGetValue(value, out entry))
+        {
+            SetHot(kind, entry);
+            return true;
+        }
+
+        entry = null!;
+        return false;
+    }
+
     public RegisteredRpcRequestNames Add(RpcRequestNameEntry entry)
     {
         var byValue = new Dictionary<string, RpcRequestNameEntry>(ByValue, StringComparer.Ordinal)
@@ -43,6 +72,18 @@ internal sealed class RegisteredRpcRequestNames
         }
 
         return new RegisteredRpcRequestNames(Count + 1, byValue, byHash);
+    }
+
+    private void SetHot(RpcRequestNameKind kind, RpcRequestNameEntry entry)
+    {
+        if (kind == RpcRequestNameKind.Service)
+        {
+            Volatile.Write(ref _hotService, entry);
+        }
+        else
+        {
+            Volatile.Write(ref _hotMethod, entry);
+        }
     }
 }
 
