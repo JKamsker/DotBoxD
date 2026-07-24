@@ -37,7 +37,8 @@ internal static class GenericPrimitiveExpressionMeasurement
         object expected,
         long fuel,
         int hostCalls = 0,
-        string entrypoint = "main")
+        string entrypoint = "main",
+        int measurementIterations = MeasurementIterations)
     {
         var measurements = new Measurement[Samples];
         for (var sample = 0; sample < Samples; sample++)
@@ -51,7 +52,7 @@ internal static class GenericPrimitiveExpressionMeasurement
                 fuel,
                 hostCalls,
                 entrypoint,
-                MeasurementIterations);
+                measurementIterations);
         }
 
         Array.Sort(measurements, static (left, right) =>

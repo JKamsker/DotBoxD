@@ -88,6 +88,26 @@ internal static class GenericPrimitiveExpressionProbeModules
                 Span)]);
     }
 
+    public static SandboxModule MixedF64Sibling(
+        int depth,
+        bool pureOnLeft,
+        bool useConversion)
+    {
+        var pure = NumericTree(depth, leftDeep: true, static () => F64(1));
+        Expression unsupported = useConversion
+            ? new CallExpression("numeric.toF64", [I32(1)], null, Span)
+            : new CallExpression("math.floor", [F64(1.75)], null, Span);
+        return Module(
+            $"probe-generic-f64-mixed-{(useConversion ? "conversion" : "intrinsic")}-" +
+            $"{(pureOnLeft ? "pure-left" : "pure-right")}-{depth}",
+            SandboxType.F64,
+            [new ReturnStatement(
+                pureOnLeft
+                    ? new BinaryExpression(pure, "+", unsupported, Span)
+                    : new BinaryExpression(unsupported, "+", pure, Span),
+                Span)]);
+    }
+
     public static SandboxModule SaturatedCache(int overflowDepth)
     {
         var functions = new List<SandboxFunction>(5);

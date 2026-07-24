@@ -17,8 +17,7 @@ internal readonly partial struct ExpressionEvaluator
 
     private SandboxContext Context => _interpreter.Context;
 
-    private IReadOnlyDictionary<string, FunctionAnalysis> FunctionAnalysis =>
-        _interpreter.FunctionAnalysis;
+    private IReadOnlyDictionary<string, FunctionAnalysis> FunctionAnalysis => _interpreter.FunctionAnalysis;
 
     private SandboxExecutionOptions Options => _interpreter.Options;
 
@@ -28,18 +27,19 @@ internal readonly partial struct ExpressionEvaluator
     // complete synchronously, so they return a finished ValueTask without ever
     // allocating an async state machine. Only genuinely asynchronous work (a host
     // binding whose ValueTask is still pending) walks the async continuation path.
-    public ValueTask<SandboxValue> EvaluateAsync(Expression expression, InterpreterFrame frame)
-        => EvaluateCore(expression, frame, allowWidePrimitiveProbe: true);
+    public ValueTask<SandboxValue> EvaluateAsync(Expression expression, InterpreterFrame frame) =>
+        EvaluateCore(expression, frame, allowCompositeProbe: true);
 
     private ValueTask<SandboxValue> EvaluateCore(
         Expression expression,
         InterpreterFrame frame,
-        bool allowWidePrimitiveProbe)
+        bool allowCompositeProbe)
     {
-        var allowWideDescendantProbe = false;
+        var allowDescendantProbe = false;
         if (!Options.EnableDebugTrace)
         {
-            if (I32ExpressionEvaluator.CanEvaluate(expression, frame, _interpreter))
+            if (I32ExpressionEvaluator.CanEvaluateForDispatch(
+                    expression, frame, _interpreter, allowCompositeProbe))
             {
                 return new ValueTask<SandboxValue>(
                     SandboxValue.FromInt32(I32ExpressionEvaluator.Evaluate(
@@ -49,8 +49,8 @@ internal readonly partial struct ExpressionEvaluator
             if (TryEvaluateWidePrimitiveArithmetic(
                 expression,
                 frame,
-                allowWidePrimitiveProbe,
-                out allowWideDescendantProbe,
+                allowCompositeProbe,
+                out allowDescendantProbe,
                 out var primitive))
             {
                 return new ValueTask<SandboxValue>(primitive);
@@ -63,8 +63,8 @@ internal readonly partial struct ExpressionEvaluator
         {
             LiteralExpression literal => new ValueTask<SandboxValue>(ChargeLiteral(literal.Value)),
             VariableExpression variable => new ValueTask<SandboxValue>(frame.Read(variable.Name)),
-            UnaryExpression unary => EvaluateUnary(unary, frame, allowWideDescendantProbe),
-            BinaryExpression binary => EvaluateBinary(binary, frame, allowWideDescendantProbe),
+            UnaryExpression unary => EvaluateUnary(unary, frame, allowDescendantProbe),
+            BinaryExpression binary => EvaluateBinary(binary, frame, allowDescendantProbe),
             CallExpression call => EvaluateCall(call, frame),
             _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported expression"))
         };

@@ -42,6 +42,10 @@ internal static class GenericPrimitiveExpressionProbeControls
             GenericPrimitiveExpressionProbeModules.ShallowIntrinsicCall(), 1D, 6, 1);
         await WriteControlAsync(host, policy, interpreter, options, "eligible I32 local call",
             GenericPrimitiveExpressionProbeModules.EligibleLocalCall(), 7, 6, 0);
+        await WriteControlAsync(host, policy, interpreter, options, "F64 right d16, left operand",
+            GenericPrimitiveExpressionProbeModules.F64Comparison(16, false, true), true, 39, 0, 200_000);
+        await WriteControlAsync(host, policy, interpreter, options, "F64 right d16, right operand",
+            GenericPrimitiveExpressionProbeModules.F64Comparison(16, false, false), true, 39, 0, 200_000);
     }
 
     private static async Task RunNegativeControlsAsync(
@@ -74,6 +78,22 @@ internal static class GenericPrimitiveExpressionProbeControls
         await WriteControlAsync(host, policy, interpreter, options, "conversion right/left operand",
             GenericPrimitiveExpressionProbeModules.F64ConversionComparison(depth, false),
             true, conversionFuel, 0);
+        await WriteControlAsync(host, policy, interpreter, options, "mixed call, pure left",
+            GenericPrimitiveExpressionProbeModules.MixedF64Sibling(
+                depth, pureOnLeft: true, useConversion: false),
+            depth + 2D, fuel, 1);
+        await WriteControlAsync(host, policy, interpreter, options, "mixed call, pure right",
+            GenericPrimitiveExpressionProbeModules.MixedF64Sibling(
+                depth, pureOnLeft: false, useConversion: false),
+            depth + 2D, fuel, 1);
+        await WriteControlAsync(host, policy, interpreter, options, "mixed conversion, pure left",
+            GenericPrimitiveExpressionProbeModules.MixedF64Sibling(
+                depth, pureOnLeft: true, useConversion: true),
+            depth + 2D, conversionFuel, 0);
+        await WriteControlAsync(host, policy, interpreter, options, "mixed conversion, pure right",
+            GenericPrimitiveExpressionProbeModules.MixedF64Sibling(
+                depth, pureOnLeft: false, useConversion: true),
+            depth + 2D, conversionFuel, 0);
         await WriteSaturatedControlAsync(host, policy, interpreter, options, depth);
         await GenericPrimitiveExpressionColdControls.RunAsync(host, policy, options);
     }
@@ -121,13 +141,20 @@ internal static class GenericPrimitiveExpressionProbeControls
         SandboxModule module,
         object expected,
         long fuel,
-        int hostCalls)
+        int hostCalls,
+        int measurementIterations = GenericPrimitiveExpressionMeasurement.MeasurementIterations)
     {
         var plan = await host.PrepareAsync(module, policy);
         GenericPrimitiveExpressionMeasurement.Warm(
             interpreter, plan, options, expected, fuel, hostCalls);
         var measurement = GenericPrimitiveExpressionMeasurement.MeasureMedian(
-            interpreter, plan, options, expected, fuel, hostCalls);
+            interpreter,
+            plan,
+            options,
+            expected,
+            fuel,
+            hostCalls,
+            measurementIterations: measurementIterations);
         Console.WriteLine(
             $"{name,-30} {measurement.NanosecondsPerOperation,10:N1} " +
             $"{measurement.BytesPerOperation,9:N1} {measurement.Fuel,5:N0}/{hostCalls:N0}");

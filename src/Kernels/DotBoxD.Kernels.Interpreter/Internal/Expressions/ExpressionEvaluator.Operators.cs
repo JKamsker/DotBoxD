@@ -9,9 +9,9 @@ internal readonly partial struct ExpressionEvaluator
     private ValueTask<SandboxValue> EvaluateUnary(
         UnaryExpression unary,
         InterpreterFrame frame,
-        bool allowWidePrimitiveProbe)
+        bool allowCompositeProbe)
     {
-        var operand = EvaluateCore(unary.Operand, frame, allowWidePrimitiveProbe);
+        var operand = EvaluateCore(unary.Operand, frame, allowCompositeProbe);
         return operand.IsCompletedSuccessfully
             ? new ValueTask<SandboxValue>(OperatorEvaluator.ApplyUnary(unary, operand.Result))
             : AwaitUnary(unary, operand);
@@ -23,20 +23,20 @@ internal readonly partial struct ExpressionEvaluator
     private ValueTask<SandboxValue> EvaluateBinary(
         BinaryExpression binary,
         InterpreterFrame frame,
-        bool allowWidePrimitiveProbe)
+        bool allowCompositeProbe)
     {
         if (binary.Operator is "&&" or "||")
         {
-            return EvaluateShortCircuit(binary, frame, allowWidePrimitiveProbe);
+            return EvaluateShortCircuit(binary, frame, allowCompositeProbe);
         }
 
-        var leftTask = EvaluateCore(binary.Left, frame, allowWidePrimitiveProbe);
+        var leftTask = EvaluateCore(binary.Left, frame, allowCompositeProbe);
         if (!leftTask.IsCompletedSuccessfully)
         {
-            return AwaitBinary(binary, leftTask, frame, allowWidePrimitiveProbe);
+            return AwaitBinary(binary, leftTask, frame, allowCompositeProbe);
         }
 
-        var rightTask = EvaluateCore(binary.Right, frame, allowWidePrimitiveProbe);
+        var rightTask = EvaluateCore(binary.Right, frame, allowCompositeProbe);
         if (!rightTask.IsCompletedSuccessfully)
         {
             return AwaitBinaryRight(binary, leftTask.Result, rightTask);
@@ -53,13 +53,13 @@ internal readonly partial struct ExpressionEvaluator
         BinaryExpression binary,
         ValueTask<SandboxValue> leftTask,
         InterpreterFrame frame,
-        bool allowWidePrimitiveProbe)
+        bool allowCompositeProbe)
     {
         var left = await leftTask.ConfigureAwait(false);
         var right = await EvaluateCore(
             binary.Right,
             frame,
-            allowWidePrimitiveProbe).ConfigureAwait(false);
+            allowCompositeProbe).ConfigureAwait(false);
         return OperatorEvaluator.ApplyBinary(binary, left, right, Context);
     }
 
@@ -76,14 +76,14 @@ internal readonly partial struct ExpressionEvaluator
     private ValueTask<SandboxValue> EvaluateShortCircuit(
         BinaryExpression binary,
         InterpreterFrame frame,
-        bool allowWidePrimitiveProbe)
+        bool allowCompositeProbe)
     {
         var shortCircuitOn = binary.Operator == "||";
         var order = ShortCircuitExpressionOrder.Choose(
             binary,
             Context.Bindings,
             FunctionAnalysis);
-        var firstTask = EvaluateCore(order.First, frame, allowWidePrimitiveProbe);
+        var firstTask = EvaluateCore(order.First, frame, allowCompositeProbe);
         if (!firstTask.IsCompletedSuccessfully)
         {
             return AwaitShortCircuit(
@@ -91,7 +91,7 @@ internal readonly partial struct ExpressionEvaluator
                 shortCircuitOn,
                 firstTask,
                 frame,
-                allowWidePrimitiveProbe);
+                allowCompositeProbe);
         }
 
         if (((BoolValue)firstTask.Result).Value == shortCircuitOn)
@@ -99,7 +99,7 @@ internal readonly partial struct ExpressionEvaluator
             return new ValueTask<SandboxValue>(SandboxValue.FromBool(shortCircuitOn));
         }
 
-        var secondTask = EvaluateCore(order.Second, frame, allowWidePrimitiveProbe);
+        var secondTask = EvaluateCore(order.Second, frame, allowCompositeProbe);
         return secondTask.IsCompletedSuccessfully
             ? new ValueTask<SandboxValue>(SandboxValue.FromBool(((BoolValue)secondTask.Result).Value))
             : AwaitShortCircuitSecond(secondTask);
@@ -110,7 +110,7 @@ internal readonly partial struct ExpressionEvaluator
         bool shortCircuitOn,
         ValueTask<SandboxValue> firstTask,
         InterpreterFrame frame,
-        bool allowWidePrimitiveProbe)
+        bool allowCompositeProbe)
     {
         var first = (BoolValue)await firstTask.ConfigureAwait(false);
         if (first.Value == shortCircuitOn)
@@ -121,7 +121,7 @@ internal readonly partial struct ExpressionEvaluator
         var second = (BoolValue)await EvaluateCore(
             order.Second,
             frame,
-            allowWidePrimitiveProbe).ConfigureAwait(false);
+            allowCompositeProbe).ConfigureAwait(false);
         return SandboxValue.FromBool(second.Value);
     }
 
