@@ -3291,3 +3291,87 @@ nonfinite failure order, exact debug preorder and `fuelRemaining`, pre-cancellat
 resource parity with a cold generic interpreter. The combined F64-plan and nested-I32/F64 suite passes 55/55, including
 the existing bounded-allocation test. No public API, compiler/verifier identity, generated ABI, persisted artifact,
 sandbox accounting, or execution-result contract changes.
+
+## Direct remote `RunLocal` completion forwarding
+
+The remote-local registry's generated raw decoder and native terminal commonly both complete synchronously, but
+`RemoteLocalHandlerRegistry.DispatchAsync` still awaited the terminal `ValueTask` in its own async state machine. This
+added a fixed completion wrapper after the dictionary lookup, direct binary decode, and handler had already finished.
+The inner decode lambdas had previously been changed to return their terminal `ValueTask` directly; this removes the
+same redundant final await at the public registry boundary.
+
+The success path now returns the handler's exact `ValueTask`. A broad `try`/`catch` is intentional and behavior-only:
+the former async method captured synchronous argument validation, cancellation, lookup, decoder, and handler throws in
+its returned `ValueTask`. The replacement sends those cold exceptions through an async
+`ExceptionDispatchInfo.Capture(exception).Throw()` helper after a completed await. Synchronously returned faulted,
+canceled, and genuinely pending handler values are forwarded untouched. Tests pin no synchronous exception escape,
+the contextual decoder exception and original inner exception, missing-handler failure, exact caller and handler
+cancellation tokens/status, one pending invocation, and zero warmed raw-Int32 dispatch allocation.
+
+The permanent `--probe-runlocal-push` matrix retains its seven encode halves as unchanged controls and now adds a
+2,000,000-call direct-control pair. Both sides use the same raw Int32 decoder and synchronous terminal; only the target
+enters the registry. Ten fresh, unfiltered pairs ran BC/CB five times on otherwise quiescent CPU 6, with tiering, PGO,
+loop quick-JIT, and ReadyToRun disabled:
+
+```text
+taskset -c 6 env \
+  DOTNET_TieredCompilation=0 DOTNET_TC_QuickJitForLoops=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  COMPlus_TieredCompilation=0 COMPlus_TieredPGO=0 COMPlus_ReadyToRun=0 \
+  dotnet <frozen-benchmark.dll> --probe-runlocal-push
+```
+
+```text
+case                              baseline ms   candidate ms   change    wins   B/op baseline→candidate
+registry raw Int32, 2M                 53.200         32.700    -38.53%   10/10          0.0→0.0
+direct decoder+handler control          9.700          9.600     -1.03%    5/10          0.0→0.0
+generated Int32, 200k                   4.900          3.650    -25.51%   10/10          0.0→0.0
+generated string, 200k                  8.500          7.400    -12.94%   10/10         40.0→40.0
+generated enum, 200k                    5.100          3.300    -35.29%   10/10          0.0→0.0
+generated List<Int32>, 200k             8.500          6.950    -18.24%   10/10         72.0→72.0
+generated DTO, 200k                    10.200          9.050    -11.27%   10/10         64.0→64.0
+generated anonymous DTO, 200k          11.200         10.000    -10.71%   10/10         64.0→64.0
+generated whole event, 200k             7.850          6.200    -21.02%   10/10         40.0→40.0
+fallback Int32, 200k                    6.700          5.100    -23.88%   10/10          0.0→0.0
+fallback string, 200k                  13.100         12.000     -8.40%   10/10         40.0→40.0
+fallback enum, 200k                     6.750          5.000    -25.93%   10/10          0.0→0.0
+fallback List<Int32>, 200k             40.650         39.050     -3.94%   10/10      336.0→336.0
+fallback DTO, 200k                     25.950         24.750     -4.62%   10/10      200.0→200.0
+fallback anonymous DTO, 200k           52.600         50.800     -3.42%   10/10      368.0→368.0
+fallback whole event, 200k             30.850         29.500     -4.38%   10/10      288.0→288.0
+```
+
+Every target wins all ten pairs. The direct control's pooled median is inside the predeclared absolute 5% guard, as
+are all seven encode controls: Int32/string/enum are median-exact, and List/DTO/anonymous/whole-event move
+`+0.85%/+2.52%/+0.83%/+0.33%`. One retained baseline direct-control sample took 29.9 ms while its other nine samples
+were 9.4-9.9 ms; no process was filtered, the candidate control spans 9.5-9.9 ms, and the pooled direct-control median
+remains -1.03% with 5/10 wins. All 20 process logs have byte-identical allocation signature
+`e25b0a0f5d92b84c594223baeb934a29286757faeb0a6bce1294df70a61e0418`; target and direct control report exactly 0 B.
+
+The accepted logs are under `/tmp/dotboxd-runlocal-dispatch-225be0a45-cpu6-pairs-accepted-v2`; their manifest digest is
+`35d86ae500c1ca339e6daac168f6d7dd54b283db80b79830a22d1c4d508f7e0a`. Frozen artifacts are
+`/tmp/dotboxd-runlocal-dispatch-225be0a45-baseline-accepted-v2` and
+`/tmp/dotboxd-runlocal-dispatch-225be0a45-candidate-accepted-v2`. The apphost and runner DLL are byte-identical at
+`48c26fa0ce2e5c25ba48fcca56347074ff257c1b5a65cbc0b6f071d6a06dd9e8` and
+`21ce7b2552a2126110688469d6238eb28b2e347c1eb7fc10d9e9ea1e57b9f6c6`; the complete non-plugin artifact manifests
+are byte-identical at `b51dd62d9a6b866ac4d4a5e2e5131796b34efa60c8087f3d137b5c881b8b6a45`. Exact baseline/candidate Plugins hashes are
+`e45cb10380fbb56225b0d82921f077c1e845e85e69abd316b9925dc3549c22fb` and
+`a2a2cf4ff14982eb5ee12377687daa3f337e34c5867f48ec9b8ab31a7f697550`. Probe, direct-control, and scenario source hashes
+are `248677340703b509ffd460ff086f5a43f8acef006b2e93fd22a580ab51700dbb`,
+`1890de2160a5e11626e5097ab5629ba06602debe570cec0a082df4d3fabcf111`, and
+`2f8696efb799e650660db756e10262e302a9f4f73893dbdbf0a2649a06b333e4`.
+
+Three earlier sets are excluded. `/tmp/dotboxd-wave5-runlocal-pairs` used a naive direct return that would let
+synchronous validation/decoder failures escape the call, so it was rejected before any claim. The exception-bridged
+`/tmp/dotboxd-wave5-runlocal-safe-pairs` was an exploratory six-pair screen using the older probe without the direct
+control. `/tmp/dotboxd-runlocal-dispatch-225be0a45-cpu6-pairs-final` used the permanent matrix but ran while unrelated
+MSBuild work was actively consuming the host, so all ten pairs are retained only as contaminated diagnostics.
+
+This is a synchronous-completion CPU claim. Allocation is unchanged rather than improved. The pending handler path is
+behavior-tested but not benchmarked, so it receives no latency/allocation claim; synchronous failure/cancellation uses
+the cold bridge and receives no speed claim. `DispatchResultAsync`, result hooks, transport, and end-to-end RPC remain
+unchanged and outside the claim. No public API or wire format changed.
+
+Post-change validation passes the 22 existing remote-local registry/cancellation/decoder/allocation tests plus seven
+new completion/allocation regressions (29/29), and all 23 architecture tests. The complete solution builds under
+`GITHUB_ACTIONS=true` with zero warnings/errors; whitespace verification, diff checks, the 300-line soft-cap budget,
+and C# file/folder layout gates pass. `RemoteLocalHandlerRegistry.cs` remains exactly 300 lines.

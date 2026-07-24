@@ -11,6 +11,7 @@ internal static class RunLocalPushProbe
 {
     private const int Warmup = 20_000;
     private const int Iterations = 200_000;
+    private const int DispatchControlIterations = 2_000_000;
 
     public static void Run()
     {
@@ -25,6 +26,8 @@ internal static class RunLocalPushProbe
             Measure(scenario, "decode", static s => s.DecodeInvokeAsync().GetAwaiter().GetResult());
             Measure(scenario, "decode-gen", static s => s.DecodeInvokeGeneratedAsync().GetAwaiter().GetResult());
         }
+
+        MeasureDispatchControl();
     }
 
     private static void Measure(RunLocalPushCase scenario, string half, Action<RunLocalPushScenario> action)
@@ -53,5 +56,55 @@ internal static class RunLocalPushProbe
 
         var perOp = (double)allocated / Iterations;
         Console.WriteLine($"{scenario,-12} {half,-8} {watch.Elapsed.TotalMilliseconds,10:N1} {perOp,12:N1}");
+    }
+
+    private static void MeasureDispatchControl()
+    {
+        var scenario = new RunLocalDispatchControl();
+        MeasureDispatchControl(scenario, "registry-target", scenario.DispatchAsync, Warmup, writeResult: false);
+        MeasureDispatchControl(scenario, "direct-control", scenario.InvokeDirectAsync, Warmup, writeResult: false);
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        Console.WriteLine();
+        Console.WriteLine("Generated Int32 dispatch target vs direct decoder+handler control");
+        Console.WriteLine(new string('-', 78));
+        MeasureDispatchControl(scenario, "registry-target", scenario.DispatchAsync, DispatchControlIterations);
+        MeasureDispatchControl(scenario, "direct-control", scenario.InvokeDirectAsync, DispatchControlIterations);
+    }
+
+    private static void MeasureDispatchControl(
+        RunLocalDispatchControl scenario,
+        string name,
+        Func<ValueTask> dispatch,
+        int iterations,
+        bool writeResult = true)
+    {
+        var initialChecksum = scenario.Checksum;
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var watch = Stopwatch.StartNew();
+        for (var i = 0; i < iterations; i++)
+        {
+            dispatch().GetAwaiter().GetResult();
+        }
+
+        watch.Stop();
+        var checksum = scenario.Checksum - initialChecksum;
+        if (checksum != RunLocalDispatchControl.ExpectedChecksum(iterations))
+        {
+            throw new InvalidOperationException($"Dispatch control checksum mismatch: {checksum}.");
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        if (!writeResult)
+        {
+            return;
+        }
+
+        Console.WriteLine(
+            $"{name,-16} {watch.Elapsed.TotalMilliseconds,10:N1} ms, " +
+            $"{watch.Elapsed.TotalNanoseconds / iterations,8:N1} ns/op, " +
+            $"{allocated,6:N0} B, {(double)allocated / iterations,8:N1} B/op");
     }
 }
