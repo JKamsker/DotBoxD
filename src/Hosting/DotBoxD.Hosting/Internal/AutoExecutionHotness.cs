@@ -15,6 +15,7 @@ internal sealed class AutoExecutionHotness
     private readonly Dictionary<AutoHotnessKey, LinkedListNode<AutoHotnessState>> _states = new();
     private readonly LinkedList<AutoHotnessState> _recency = new();
     private readonly int _maxEntries;
+    private AutoHotnessState? _mostRecent;
 
     public AutoExecutionHotness()
         : this(DefaultMaxEntries)
@@ -56,30 +57,47 @@ internal sealed class AutoExecutionHotness
 
     private AutoHotnessState Touch(AutoHotnessKey key)
     {
+        var mostRecent = Volatile.Read(ref _mostRecent);
+        if (mostRecent is not null && IsExactKey(key, mostRecent))
+        {
+            // An exact hit on the current tail cannot change eviction order. The state has
+            // its own synchronization for history, so the table lock adds no protection here.
+            return mostRecent;
+        }
+
         lock (_gate)
         {
-            if (_recency.Last is { Value: var mostRecent } &&
-                ReferenceEquals(key.Entrypoint, mostRecent.Entrypoint) &&
-                ReferenceEquals(key.PlanHash, mostRecent.PlanHash))
+            if (_recency.Last is { Value: var lockedMostRecent } &&
+                IsExactKey(key, lockedMostRecent))
             {
                 // The matching node is already most recently used, so returning it leaves the
                 // exact eviction order unchanged. Value-equal strings still use the dictionary.
-                return mostRecent;
+                return PublishMostRecent(lockedMostRecent);
             }
 
             if (_states.TryGetValue(key, out var existing))
             {
                 _recency.Remove(existing);
                 _recency.AddLast(existing);
-                return existing.Value;
+                return PublishMostRecent(existing.Value);
             }
 
             var node = _recency.AddLast(new AutoHotnessState(key.PlanHash, key.Entrypoint));
             _states.Add(key, node);
             EvictIfNeeded(key);
-            return node.Value;
+            return PublishMostRecent(node.Value);
         }
     }
+
+    private AutoHotnessState PublishMostRecent(AutoHotnessState state)
+    {
+        Volatile.Write(ref _mostRecent, state);
+        return state;
+    }
+
+    private static bool IsExactKey(AutoHotnessKey key, AutoHotnessState state)
+        => ReferenceEquals(key.Entrypoint, state.Entrypoint) &&
+           ReferenceEquals(key.PlanHash, state.PlanHash);
 
     private void EvictIfNeeded(AutoHotnessKey addedKey)
     {

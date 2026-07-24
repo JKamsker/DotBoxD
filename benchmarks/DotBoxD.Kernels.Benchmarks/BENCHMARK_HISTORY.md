@@ -37,7 +37,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-server-extension-request-helpers
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-examples
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-prepared-values
-DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-auto-hotness-bookkeeping
+DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 taskset -c 8-11 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-auto-hotness-bookkeeping
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-runtime-types
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-input-types
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-resource-meter
@@ -92,6 +92,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 
 | Step | Commit | Probe | Key result |
 | --- | --- | --- | --- |
+| Lock-free exact-MRU Auto hotness lookup | this commit | `--probe-auto-hotness-bookkeeping` | A volatile publication bypasses the global hotness-table monitor only when both plan-hash and entrypoint references exactly match the LRU tail; state history retains its own lock and every logical-key/recency mutation remains under the table gate. Six balanced CPU-8-11 pairs improve built-in interpreted `42.40→35.10 ns` (17.22%), warmed compiled `43.75→36.40 ns` (16.80%), snapshot interpreted `53.00→44.50 ns` (16.04%), snapshot compiled `53.30→45.65 ns` (14.35%), and four-worker contention `155.80→16.85 ns` (89.18%), all 6/6. Alternating/distinct-reference/churn controls move only +1.32%/+1.91%/+1.50%, and allocations/checksums are exact. |
 | Single-resolution `InvokeAsync` semantic transform | this commit | `--probe-invokeasync-resolution` | The broad syntax branch still admits every invocation, but each transform now resolves its exact method once and threads it through invalid-kind diagnostics, lowering eligibility, user-binding exclusion, DotBoxD surface recognition, and call-shape construction. Five balanced CPU-6 pairs of 300 retained-driver edits improve resolved ordinary `864.2→811.7 ms` (6.07%, 5/5), user-named `858.2→802.0 ms` (6.55%, 5/5), unresolved `2,986.4→2,761.1 ms` (7.54%, 5/5), custom `ProbeAsync` `6,231.7→6,097.7 ms` (2.15%, 4/5), and invalid-kind/fallback `1,504.4→1,474.3 ms` (2.00%, 4/5). Paired median improvements are 8.00% / 6.30% / 7.47% / 3.38% / 3.37%. Allocation is noise-flat and receives no claim. Probe sources are byte-identical, every output hash matches, and tests pin arbitrary custom names, generated/user receivers, unresolved calls, exact diagnostic text, and `CandidateSymbols[0]` fallback. |
 | Suppress repeated descendant I32 eligibility probes after a wide-unsupported arithmetic root | this commit | `--probe-generic-primitive-expression` | Unsupported generic arithmetic previously fell back node by node, and every descendant operator recursively scanned its suffix for I32 eligibility. Six balanced CPU-pinned pairs reduce depth-96 left-associated intrinsic-call trees from `49,377.70→5,600.35 ns` and `48,843.60→5,634.80 ns`, and the conversion tree from `48,241.25→5,290.20 ns` (88.46-89.03%, 6/6 wins each). Exact allocations remain `3,064.8/3,064.8/3,000.4 B/op`, with exact fuel/host totals `200/1`, `200/1`, and `198/0`. Right-associated negative controls move 2.34-3.36% faster and receive no timing claim. Stabilized supported-F64 controls are noise-flat at `534.55→532.05 ns` and `526.55→533.15 ns`, mixed at 4/6 wins; I64 and shallow controls stay within 1.22% and 1.96%. An artifact-isolated four-pair mixed-sibling follow-up improves all intrinsic/conversion and pure-left/pure-right rows 84.13-90.89% at exact allocation/resource parity. Baseline already suppressed wide descendant probing; the new suppression is limited to repeated descendant Unary/Binary I32 eligibility after the root miss. Leaves, calls, generic evaluation, fuel, trace, cancellation, operator, and fault order are unchanged and pinned. |
 | Bulk-meter equal-cost interpreted F64 branches | this commit | `--probe-branched-f64-loop` | When both branch bodies have identical static fuel and the complete loop fits the fuel and iteration budgets, the interpreter now charges the loop once and runs the existing unboxed condition/assignment plans with only the established 4,096-iteration cancellation/deadline checkpoints. Eight alternating baseline/candidate process pairs pinned to CPU 11 with tiering, PGO, and ReadyToRun disabled improve the median of seven 5,000,000-iteration samples from `65.55→53.10 ms` (19.0%, 8/8 wins). An unequal-cost branch retains path-specific per-iteration metering and stays within the 5% control guard at `53.05→54.20 ms` (+2.17%), so it receives no timing claim. Insufficient whole-loop fuel or loop budget falls back to the original incremental order. Values and the full resource tuple remain exact, and the same four success/unequal/low-fuel/low-loop semantic cases pass against baseline and candidate binaries. |
@@ -3156,3 +3157,63 @@ multiple cached statements, fresh-frame assignment revalidation, literal plans, 
 non-finite failure order, quotas, exact debug preorder/fuel, pre-cancellation before mutation, intrinsic and boxed
 exclusion, positive-then-negative `sqrt`, bounded nested allocation, and the adjusted branched-allocation denominator.
 No public API or sandbox accounting contract changes.
+
+## Lock-free exact-reference Auto hotness lookup
+
+The earlier Auto MRU optimization returned the LRU tail before hashing or splicing it, but still acquired the global
+hotness-table monitor on every execution. An exact plan-hash and entrypoint reference match cannot change dictionary
+membership or recency. The table now publishes its current tail through one volatile reference and returns it before
+the table gate only when both references match. Each `AutoHotnessState` retains its existing lock for run-count and
+completion history. Value-equal distinct strings, alternating keys, insertion, eviction, and all capacity churn still
+take the unchanged dictionary/LRU path.
+
+The permanent probe adds value-equal/distinct-reference and capacity-two churn controls plus exact-reference table and
+direct-state four-worker lanes. Six fresh pairs ran in balanced order BC/CB/BC/CB/BC/CB on CPUs 8-11 with tiering,
+PGO, and ReadyToRun disabled:
+
+```text
+taskset -c 8-11 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  COMPlus_TieredCompilation=0 COMPlus_TieredPGO=0 COMPlus_ReadyToRun=0 \
+  dotnet <published-benchmark.dll> --probe-auto-hotness-bookkeeping
+```
+
+```text
+case                             baseline ns   candidate ns   change    wins   baseline B/op   candidate B/op
+table built-in interpreted             42.40          35.10    -17.22%    6/6             0.0              0.0
+table built-in warmed compiled         43.75          36.40    -16.80%    6/6             0.0              0.0
+table snapshot interpreted             53.00          44.50    -16.04%    6/6            96.0             96.0
+table snapshot warmed compiled         53.30          45.65    -14.35%    6/6            96.0             96.0
+table four-worker exact refs          155.80          16.85    -89.18%    6/6             0.0              0.0
+table built-in alternating keys        98.80         100.10     +1.32%    2/6             0.0              0.0
+table equal distinct refs              55.05          56.10     +1.91%    2/6             0.0              0.0
+table capacity-two churn              160.50         162.90     +1.50%    3/6           176.0            176.0
+state built-in interpreted             34.40          33.20     -3.49%    6/6             0.0              0.0
+state built-in warmed compiled         35.45          33.95     -4.23%    6/6             0.0              0.0
+state four-worker control              12.85          12.50     -2.72%    3/6             0.0              0.0
+state snapshot interpreted             44.15          41.80     -5.32%    5/6            96.0             96.0
+state snapshot warmed compiled         44.60          43.60     -2.24%    5/6            96.0             96.0
+```
+
+All five target rows win all six pairs. Every unchanged control median is at or below the predeclared +5% one-sided
+guard; the largest slowdown is +1.91%. All 12 processes report exact checksums and byte-identical allocations:
+0 B/op for built-in, alternating, distinct-reference, and concurrent rows; 96 B/op for the required immutable custom
+selector snapshots; and 176 B/op for deliberate capacity churn.
+
+Frozen artifacts are `/tmp/dotboxd-auto-hotness-6366e1a81-baseline-v1` and
+`/tmp/dotboxd-auto-hotness-6366e1a81-candidate-isolated-v1`; raw logs and summaries are under
+`/tmp/dotboxd-auto-hotness-6366e1a81-pairs-v1`. The benchmark runner is byte-identical at
+`5f090f3450acb95202525b368976a63f2eda01636cd1fdcfe4f1c8f223d9ae04`. Baseline/candidate Hosting hashes are
+`e34e4fffe5e919b851d03c58c7dd198994fd143e19f1c23f1cbace499b06709f` and
+`6d66163306e32c6683cdf3a8b846f01bed077cb6ca1a9e3a8e41d84dfb187dac`; the isolated artifacts differ in exactly
+`DotBoxD.Hosting.dll`. Probe-source hashes are `cced335c385668bf8c9bbab26318e7697d55626ff14cd0dc113c3eb94b59399d`,
+`0d5bbc3a5b797785aad1c94108e25fdaf0aed173a804253e2e0d6b0cc52cadaf`, and
+`7f0750de0c58ede9418bd6005b0cf83d5c8481acdb80a031dd279dcc24e6021e`. The raw-log manifest, pooled summary, and
+paired summary hashes are `41755119682880dd21083345d1d9df97c535f9f4261292782cc1b9f9ac09d401`,
+`194bcf1cf85da123979521a062cee5c65234ce76e07cdf2e61c1e9e9eb13bae8`, and
+`5044baeae9a9b4a74e5a926f8fc615e4a36b5b51e53ecbb163573ebb1d56c06d`.
+
+The existing and new focused suites pass 14/14 tests; the four new concurrency/LRU/eviction/retention tests also pass
+20 repeated runs. They pin exact shared run/completion histories, value-equal distinct-reference behavior, eviction
+order, detached completion, bounded capacity, and collection of an evicted key while the table stays alive. No public
+API, compiler/verifier identity (`dotboxd-compiler-14` / `dotboxd-verifier-13`), generated ABI, persisted artifact,
+selection policy, or execution-result contract changes.

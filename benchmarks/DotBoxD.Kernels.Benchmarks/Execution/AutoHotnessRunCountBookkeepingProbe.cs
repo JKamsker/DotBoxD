@@ -24,6 +24,7 @@ internal static class AutoHotnessRunCountBookkeepingProbe
         Write("state built-in interpreted", MeasureState(plan, interpreted, interpreted));
         Write("table built-in warmed compiled", MeasureTable(plan, interpreted, compiled));
         Write("state built-in warmed compiled", MeasureState(plan, interpreted, compiled));
+        AutoHotnessLookupControlProbe.WriteResults(plan);
     }
 
     private static Measurement MeasureTable(
