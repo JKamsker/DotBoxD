@@ -2714,6 +2714,43 @@ displayed precision. The repeated mechanism is exactly 320 B/run; fixed probe/JI
 cross-process remainder. That step's timing median moved `517.55→533.45 ns/op`, so it receives no latency claim.
 The cancelable bypass remains `512.1 B/op`.
 
+The original pool deliberately kept one state per exact plan, so a second simultaneous eligible execution still
+allocated a fresh meter/context pair. The overlap extension adds one direct secondary reference to each primary lane
+and publishes its state only after real contention. Primary acquisition remains lock-free, secondary admission is
+serialized with plan eviction, and a third simultaneous execution retains the existing fresh-state fallback. The
+capacity remains 64 plan identities and the absolute retained-state bound is 128. Retirement is generation checked:
+eviction skips either active lane, while pool disposal retires the lanes independently and lets an already-held exact
+generation finish before its state is disposed.
+
+The detached baseline at `6465c065f` and the direct-secondary candidate used byte-identical probes. Six fresh balanced
+AB/BA pairs ran on CPU 11 with tiering, Tiered PGO, and ReadyToRun disabled. The same process first held the primary,
+then measured one million public executions, held both lanes for the bounded third-run control, and retained the
+ordinary sequential, alternating-plan, cancelable-fresh, audited-success, failure, and verifier-fallback controls:
+
+```text
+case                         baseline median    candidate median    change      wins       allocation
+busy primary                    405.40 ms           409.00 ms        no claim     2/6       512.119 -> 192.044 B/op
+both retained lanes busy        406.75 ms           405.20 ms        no claim     4/6       512.120 -> 512.120 B/op
+ordinary sequential             405.80 ms           394.60 ms        no claim     3/6       192.045 -> 192.045 B/op
+alternating completed plans     407.80 ms           408.20 ms        no claim     3/6       192.045 -> 192.045 B/op
+cancelable provider + fresh     541.65 ms           539.90 ms        no claim     3/6       512.119 -> 512.119 B/op
+```
+
+The target removes exactly `320.075152 B/run` from process totals; the retained mechanism is the same exact 128-byte
+meter plus 192-byte context. Its +0.89% median is inside the predeclared 5% guard but only 2/6 pairs favor the candidate,
+so this is strictly an allocation claim. The saturated third-run control is byte-identical and timing-flat. The three
+bypass controls are also byte-identical and have mixed pair directions, so none receives a timing claim.
+
+A separate 100,000-iteration cold lane repeatedly created a fresh pool and admitted one prebuilt plan. Displayed
+allocation moves `1,032.0→1,040.0 B/admission`, measuring the single direct secondary pointer at +8 B per primary slot,
+or at most +512 B across 64 ordinary one-lane plan groups. With a primary already held, first secondary activation is
+`1,000→1,152 B` once; one subsequent reuse saves 320 B and therefore repays that premium immediately. The permanent
+allocation guard reproduces candidate activation at 1,152 B, secondary reuse at 192.024 B/run, and saturated fallback
+at 512.063 B/run. Thirty-five focused no-audit-state tests cover distinct primary/secondary state, stale lease copies,
+eight-worker isolation, secondary-only active eviction, idle two-lane eviction, disposal of two active generations,
+admission/disposal races, fresh third-run fallback, resource isolation, exact allocation, failure recovery, and all
+eligibility bypasses. No public API, sandbox value, accounting, or result-envelope contract changes.
+
 Against exact pooled-state commit `5084f8559`, six further balanced pairs produce:
 
 ```text
