@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Hosting;
@@ -43,7 +44,7 @@ public interface ISandboxWorkerClient
 /// </remarks>
 public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
 {
-    private readonly ConcurrentDictionary<ExecutionPlanSeal, ExecutionPlan> _preparedPlans = new();
+    private readonly ConcurrentDictionary<PreparedPlanCacheKey, ExecutionPlan> _preparedPlans = new();
     private readonly Lazy<SandboxHost> _workerHost;
     private int _disposed;
 
@@ -92,7 +93,8 @@ public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
         ExecutionPlan plan,
         CancellationToken cancellationToken)
     {
-        if (_preparedPlans.TryGetValue(plan.PlanSeal, out var cached))
+        var cacheKey = PreparedPlanCacheKey.From(plan);
+        if (_preparedPlans.TryGetValue(cacheKey, out var cached))
         {
             return cached;
         }
@@ -100,7 +102,7 @@ public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
         var prepared = await workerHost
             .PrepareAsync(plan.Module, plan.Policy, cancellationToken)
             .ConfigureAwait(false);
-        _preparedPlans.TryAdd(plan.PlanSeal, prepared);
+        _preparedPlans.TryAdd(cacheKey, prepared);
         return prepared;
     }
 
@@ -115,6 +117,20 @@ public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
 
         workerHost.Dispose();
         throw new ObjectDisposedException(GetType().FullName);
+    }
+
+    private readonly record struct PreparedPlanCacheKey(
+        string ModuleHash,
+        string PolicyHash,
+        string BindingManifestHash,
+        ExecutionPlanSeal PlanSeal)
+    {
+        public static PreparedPlanCacheKey From(ExecutionPlan plan)
+            => new(
+                CanonicalModuleHasher.Hash(plan.Module),
+                plan.Policy.Hash,
+                plan.Bindings.ManifestHash,
+                plan.PlanSeal);
     }
 }
 
