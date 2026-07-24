@@ -94,6 +94,9 @@ if (args.Length == 1)
         case "--probe-finite-timeout-valuetask-unary":
             await FiniteTimeoutValueTaskUnaryProbe.RunAsync();
             return;
+        case "--probe-task-unary-pending-construction":
+            TaskUnaryPendingConstructionProbe.Run();
+            return;
         case "--probe-pending-timeout-scheduler":
             PendingTimeoutSchedulerProbe.Run();
             return;

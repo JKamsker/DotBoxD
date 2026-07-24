@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 namespace DotBoxD.Services.Client;
 
 internal sealed class PendingRequests : IDisposable
@@ -16,6 +17,9 @@ internal sealed class PendingRequests : IDisposable
 
     public bool TryAdd(int messageId, out PendingReceivedResponse pending) =>
         TryAddCore(messageId, new PendingReceivedResponse(this, messageId), out pending);
+    // Keep the small allocation factory inline as its fourth type arm crosses the JIT's default
+    // budget. The pending-table insertion remains in TryAddCore.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryAddUnary<TResponse>(
         int messageId,
         bool captureCallerCancellation,
@@ -25,8 +29,15 @@ internal sealed class PendingRequests : IDisposable
         string method,
         out PendingUnaryResponse<TResponse> pending)
     {
-        var candidate = captureTimeoutTarget
-            ? new PendingUnaryResponseWithTimeout<TResponse>(this, messageId, service, method, callerToken)
+        PendingUnaryResponse<TResponse> candidate = captureTimeoutTarget
+            ? captureCallerCancellation
+                ? new PendingUnaryResponseWithTimeout<TResponse>(
+                    this,
+                    messageId,
+                    service,
+                    method,
+                    callerToken)
+                : new TimeoutOnlyPendingUnaryResponse<TResponse>(messageId, service, method)
             : captureCallerCancellation
                 ? new CancellablePendingUnaryResponse<TResponse>(this, messageId, callerToken)
                 : new PendingUnaryResponse<TResponse>(messageId);
