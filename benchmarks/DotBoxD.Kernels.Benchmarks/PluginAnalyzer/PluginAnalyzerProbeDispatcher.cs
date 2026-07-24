@@ -22,6 +22,12 @@ internal static class PluginAnalyzerProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-generic-construction-reachability", StringComparer.OrdinalIgnoreCase))
+        {
+            GenericConstructionReachabilityProbe.Run();
+            return true;
+        }
+
         return false;
     }
 }
