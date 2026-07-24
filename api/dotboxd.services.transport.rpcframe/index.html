@@ -76,12 +76,13 @@ Assembly: DotBoxD.Services.dll</p>
 <p>Owns one received wire frame. The frame can be backed by the legacy <code dir="auto">DotBoxD.Services.Buffers.Payload</code>
 owner or by a pooled writer transferred by a low-allocation transport.</p>
 <p>
-This is a value type and may be copied. Ownership of the underlying `DotBoxD.Services.Buffers.Payload` or
-`DotBoxD.Services.Buffers.PooledBufferWriter` transfers only through `DotBoxD.Services.Transport.RpcFrame.DetachPayload`; otherwise
-callers dispose it through `DotBoxD.Services.Transport.RpcFrame.Dispose`. Follow the boolean contract returned by
-<code>RpcPeerFrameProcessor.ShouldDisposeAsync</code> inside <code>RpcPeerReadLoop</code>: <a href="https://learn.microsoft.com/dotnet/csharp/language-reference/builtin-types/bool">true</a>
-means the caller owns the frame, <a href="https://learn.microsoft.com/dotnet/csharp/language-reference/builtin-types/bool">false</a> means the read loop retained ownership
-(for example, a <code>StreamItem</code>). Both backing owners are idempotent, so double-dispose is safe.
+Copies of this value alias one logical owner, so callers must coordinate detachment. A
+writer-backed owner can be detached only once across all aliases; stale writer aliases fail
+closed and cannot access or dispose a later pooled-writer lease. `DotBoxD.Services.Transport.RpcFrame.Dispose` is
+idempotent across aliases and both backing owners. Follow the boolean contract returned by
+<code>RpcPeerFrameProcessor.ShouldDisposeAsync</code> inside <code>RpcPeerReadLoop</code>:
+<a href="https://learn.microsoft.com/dotnet/csharp/language-reference/builtin-types/bool">true</a> means the caller owns the frame, <a href="https://learn.microsoft.com/dotnet/csharp/language-reference/builtin-types/bool">false</a> means the read
+loop retained ownership (for example, a <code>StreamItem</code>).
 </p>
 <div class="expressive-code"><link rel="stylesheet" href="/_astro/ec.v4551.css"><script type="module" src="/_astro/ec.0vx5m.js"></script><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="csharp"><code><div class="ec-line"><div class="code"><span style="--0:#C792EA;--1:#8844AE">public</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#C792EA;--1:#8844AE">struct</span><span style="--0:#D6DEEB;--1:#403F53"> RpcFrame : IDisposable</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="public struct RpcFrame : IDisposable"><div></div></button></div></figure></div>
 <div class="sl-heading-wrapper level-h4"><h4 id="implements">Implements</h4><a class="sl-anchor-link" href="#implements"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Implements”</span></a></div>
