@@ -45,6 +45,19 @@ internal static class BranchedF64ForLoopRunner
             return true;
         }
 
+        RunIncrementally(plan, start, end, loopSlot, frame, context, conditionFuel);
+        return true;
+    }
+
+    private static void RunIncrementally(
+        in BranchedLoopPlan plan,
+        int start,
+        int end,
+        int loopSlot,
+        InterpreterFrame frame,
+        SandboxContext context,
+        long conditionFuel)
+    {
         var checkpoint = CheckpointInterval;
         for (var i = start; i < end; i++)
         {
@@ -88,8 +101,6 @@ internal static class BranchedF64ForLoopRunner
                 checkpoint = CheckpointInterval;
             }
         }
-
-        return true;
     }
 
     private static void RunBulkMetered(
