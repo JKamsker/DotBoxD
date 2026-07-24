@@ -41,7 +41,7 @@ public sealed class SandboxHostCompiledNoAuditStateConcurrencyTests
     }
 
     [Fact]
-    public async Task Busy_host_slot_falls_back_to_fresh_state_then_recovers()
+    public async Task Busy_primary_uses_an_isolated_secondary_then_recovers()
     {
         using var host = SandboxTestHost.Create(compiler: true);
         var plan = await PrepareAsync(host);
@@ -60,6 +60,24 @@ public sealed class SandboxHostCompiledNoAuditStateConcurrencyTests
             var busyResult = await host.ExecuteAsync(plan, "main", SandboxValue.FromInt32(6), Options);
             AssertSuccessfulResult(busyResult, expectedValue: 7);
             Assert.Equal(0, heldState.Budget.FuelUsed);
+            Assert.True(host.HasCompiledNoAuditRunStatePool);
+            Assert.True(host.HasCompiledNoAuditSecondaryStateFor(plan));
+            using var secondary = host.TryAcquireCompiledNoAuditState(
+                plan,
+                "main",
+                probeExecutable,
+                Options,
+                CancellationToken.None,
+                suppliedState: null,
+                useAsyncWorker: false);
+            var secondaryState = Assert.IsType<CompiledNoAuditRunState>(secondary.State);
+            Assert.NotSame(heldState, secondaryState);
+            Assert.Equal(busyResult.ResourceUsage, secondaryState.Budget.Snapshot());
+
+            var saturatedResult = await host.ExecuteAsync(plan, "main", SandboxValue.FromInt32(10), Options);
+            AssertSuccessfulResult(saturatedResult, expectedValue: 11);
+            Assert.Equal(0, heldState.Budget.FuelUsed);
+            Assert.Equal(busyResult.ResourceUsage, secondaryState.Budget.Snapshot());
         }
         finally
         {

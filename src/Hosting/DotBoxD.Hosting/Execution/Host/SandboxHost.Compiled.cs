@@ -239,6 +239,10 @@ public sealed partial class SandboxHost
     internal bool HasCompiledNoAuditRunStatePool
         => Volatile.Read(ref _compiledNoAuditRunStates) is CompiledNoAuditRunStatePool;
 
+    internal bool HasCompiledNoAuditSecondaryStateFor(ExecutionPlan plan)
+        => Volatile.Read(ref _compiledNoAuditRunStates) is CompiledNoAuditRunStatePool pool &&
+           pool.HasSecondaryStateFor(plan);
+
     private CompiledNoAuditRunStatePool? GetOrCreateCompiledNoAuditStatePool()
     {
         var current = Volatile.Read(ref _compiledNoAuditRunStates);

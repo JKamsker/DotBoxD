@@ -17,7 +17,7 @@ internal static class CompiledExecutionEnvelopeProbe
     private const double MaximumFreshBytesPerOperation = 520D;
     private const double ExpectedStateSavingsBytesPerOperation = 320D;
     private const double AllocationNoiseBytesPerOperation = 2D;
-    private static readonly SandboxExecutionOptions SuppressedOptions = new()
+    internal static readonly SandboxExecutionOptions SuppressedOptions = new()
     {
         Mode = ExecutionMode.Compiled,
         AllowFallbackToInterpreter = false,
@@ -102,6 +102,8 @@ internal static class CompiledExecutionEnvelopeProbe
                 $"got {savedBytesPerOperation:N1} B/op");
         }
 
+        await CompiledExecutionOverlapProbe.RunAsync(host, successPlan, expected);
+
         await CompiledExecutionEnvelopeControls.ValidateAsync(
             host,
             successPlan,
@@ -155,7 +157,7 @@ internal static class CompiledExecutionEnvelopeProbe
         return await host.PrepareAsync(module, policy);
     }
 
-    private static CompiledEnvelopeMeasurement Measure(
+    internal static CompiledEnvelopeMeasurement Measure(
         SandboxHost host,
         ExecutionPlan plan,
         CompiledExecutionInvariant expected,
@@ -196,7 +198,7 @@ internal static class CompiledExecutionEnvelopeProbe
             checksum);
     }
 
-    private static void ForceGc()
+    internal static void ForceGc()
     {
         GC.Collect();
         GC.WaitForPendingFinalizers();

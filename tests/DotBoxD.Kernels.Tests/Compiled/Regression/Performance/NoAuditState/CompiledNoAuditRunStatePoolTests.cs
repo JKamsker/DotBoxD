@@ -10,7 +10,7 @@ namespace DotBoxD.Kernels.Tests.Compiled.Regression.Performance.NoAuditState;
 public sealed class CompiledNoAuditRunStatePoolTests
 {
     [Fact]
-    public async Task Same_plan_state_is_exclusive_and_reused_after_release()
+    public async Task Same_plan_reuses_two_exclusive_states_and_bounds_the_third_overlap()
     {
         using var host = SandboxTestHost.Create();
         var firstPlan = await PrepareAsync(host, "no-audit-pool-first");
@@ -19,8 +19,13 @@ public sealed class CompiledNoAuditRunStatePoolTests
         var first = pool.TryAcquire(firstPlan);
         Assert.True(first.IsAcquired);
         var firstState = Assert.IsType<CompiledNoAuditRunState>(first.State);
+        CompiledNoAuditRunState secondState;
         try
         {
+            using var second = pool.TryAcquire(firstPlan);
+            Assert.True(second.IsAcquired);
+            secondState = Assert.IsType<CompiledNoAuditRunState>(second.State);
+            Assert.NotSame(firstState, secondState);
             using var reentrant = pool.TryAcquire(firstPlan);
             Assert.False(reentrant.IsAcquired);
             Assert.Null(reentrant.State);
@@ -42,6 +47,9 @@ public sealed class CompiledNoAuditRunStatePoolTests
         using var reacquired = pool.TryAcquire(firstPlan);
         Assert.True(reacquired.IsAcquired);
         Assert.Same(firstState, reacquired.State);
+        using var secondaryReacquired = pool.TryAcquire(firstPlan);
+        Assert.True(secondaryReacquired.IsAcquired);
+        Assert.Same(secondState, secondaryReacquired.State);
     }
 
     [Fact]
@@ -86,9 +94,12 @@ public sealed class CompiledNoAuditRunStatePoolTests
         staleCopy.Dispose();
         Assert.False(staleCopy.IsAcquired);
         Assert.Null(staleCopy.State);
+        using var secondary = pool.TryAcquire(plan);
+        Assert.True(secondary.IsAcquired);
         using var stillBusy = pool.TryAcquire(plan);
         Assert.False(stillBusy.IsAcquired);
 
+        secondary.Dispose();
         second.Dispose();
         using var available = pool.TryAcquire(plan);
         Assert.True(available.IsAcquired);
@@ -100,7 +111,7 @@ public sealed class CompiledNoAuditRunStatePoolTests
         using var host = SandboxTestHost.Create();
         var plan = await PrepareAsync(host, "no-audit-pool-eviction-sentinel");
         Assert.True(plan.BindingReferences.TryGetValue("main", out var allowedBindings));
-        var evictedFirst = new CompiledNoAuditRunStatePool.Slot(plan);
+        var evictedFirst = new CompiledNoAuditRunStateSlot(plan);
         var evictedState = evictedFirst.State;
         _ = evictedState.ContextFor(allowedBindings, CancellationToken.None);
         evictedState.StoreExecutable("main", new CompiledExecutable(
@@ -115,7 +126,7 @@ public sealed class CompiledNoAuditRunStatePoolTests
         Assert.Throws<ObjectDisposedException>(
             () => evictedState.ContextFor(allowedBindings, CancellationToken.None));
 
-        var rentedFirst = new CompiledNoAuditRunStatePool.Slot(plan);
+        var rentedFirst = new CompiledNoAuditRunStateSlot(plan);
         Assert.True(rentedFirst.TryTake(out var generation));
         Assert.False(rentedFirst.TryMarkEvicted());
         rentedFirst.Release(generation);
@@ -130,7 +141,7 @@ public sealed class CompiledNoAuditRunStatePoolTests
         using var host = SandboxTestHost.Create();
         var plan = await PrepareAsync(host, "no-audit-pool-retiring-generation");
         Assert.True(plan.BindingReferences.TryGetValue("main", out var allowedBindings));
-        var slot = new CompiledNoAuditRunStatePool.Slot(plan);
+        var slot = new CompiledNoAuditRunStateSlot(plan);
         Assert.True(slot.TryTake(out var firstGeneration));
         slot.Release(firstGeneration);
         Assert.True(slot.TryTake(out var secondGeneration));
@@ -191,9 +202,13 @@ public sealed class CompiledNoAuditRunStatePoolTests
         Assert.NotSame(activeState, replacement.State);
         Assert.True(pool.HasStateFor(plans[0]));
         Assert.False(pool.HasStateFor(plans[1]));
+        using var secondary = pool.TryAcquire(plans[0]);
+        Assert.True(secondary.IsAcquired);
+        Assert.NotSame(activeState, secondary.State);
         using var activeStillExclusive = pool.TryAcquire(plans[0]);
         Assert.False(activeStillExclusive.IsAcquired);
 
+        secondary.Dispose();
         active.Dispose();
         using var reacquired = pool.TryAcquire(plans[0]);
         Assert.True(reacquired.IsAcquired);

@@ -2,6 +2,7 @@ using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Serialization.Json.Hosting;
 using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Kernels.Tests.Compiled.Core;
 
 namespace DotBoxD.Kernels.Tests.Compiled.Regression.Performance.NoAuditState;
 
@@ -16,6 +17,8 @@ public sealed class SandboxHostCompiledNoAuditStatePoolAllocationTests
     private const double MaximumFreshBytesPerRun = 520;
     private const double ExpectedStateSavingsBytesPerRun = 320;
     private const double MeasurementNoiseBytesPerRun = 2;
+    private const long MinimumSecondaryActivationBytes = 1_100;
+    private const long MaximumSecondaryActivationBytes = 1_200;
 
     private static readonly SandboxExecutionOptions Options = new()
     {
@@ -52,6 +55,53 @@ public sealed class SandboxHostCompiledNoAuditStatePoolAllocationTests
             ExpectedStateSavingsBytesPerRun + MeasurementNoiseBytesPerRun);
         Assert.Equal(checked(7L * MeasuredIterations), pooled.Checksum);
         Assert.Equal(pooled.Checksum, fresh.Checksum);
+    }
+
+    [Fact]
+    public async Task Busy_primary_reuses_one_secondary_then_the_third_run_stays_fresh()
+    {
+        using var host = SandboxTestHost.Create(compiler: true);
+        var plan = await PrepareAsync(host, ModuleJson);
+        _ = await host.ExecuteAsync(plan, "main", SandboxValue.Unit, Options);
+        var executable = ProbeExecutable(plan);
+        using var primary = host.TryAcquireCompiledNoAuditState(
+            plan, "main", executable, Options, CancellationToken.None, suppliedState: null, useAsyncWorker: false);
+        Assert.True(primary.IsAcquired);
+
+        ForceGc();
+        var activationBefore = GC.GetAllocatedBytesForCurrentThread();
+        _ = Measure(host, plan, CancellationToken.None, iterations: 1);
+        var activationBytes = GC.GetAllocatedBytesForCurrentThread() - activationBefore;
+        Assert.True(host.HasCompiledNoAuditSecondaryStateFor(plan));
+        _ = Measure(host, plan, CancellationToken.None, WarmupIterations);
+        ForceGc();
+        var secondaryPooled = Measure(host, plan, CancellationToken.None, MeasuredIterations);
+
+        using var secondary = host.TryAcquireCompiledNoAuditState(
+            plan, "main", executable, Options, CancellationToken.None, suppliedState: null, useAsyncWorker: false);
+        Assert.True(secondary.IsAcquired);
+        Assert.NotSame(primary.State, secondary.State);
+        _ = Measure(host, plan, CancellationToken.None, WarmupIterations);
+        ForceGc();
+        var saturated = Measure(host, plan, CancellationToken.None, MeasuredIterations);
+        var pooledBytesPerRun = secondaryPooled.AllocatedBytes / (double)MeasuredIterations;
+        var saturatedBytesPerRun = saturated.AllocatedBytes / (double)MeasuredIterations;
+
+        Console.WriteLine(
+            $"public compiled overlap pool: activation={activationBytes:N0} B, " +
+            $"secondary={pooledBytesPerRun:N3} B/run, saturated={saturatedBytesPerRun:N3} B/run.");
+        Assert.InRange(
+            activationBytes,
+            MinimumSecondaryActivationBytes,
+            MaximumSecondaryActivationBytes);
+        Assert.InRange(pooledBytesPerRun, 0, MaximumPooledBytesPerRun);
+        Assert.InRange(saturatedBytesPerRun, MinimumFreshBytesPerRun, MaximumFreshBytesPerRun);
+        Assert.InRange(
+            saturatedBytesPerRun - pooledBytesPerRun,
+            ExpectedStateSavingsBytesPerRun - MeasurementNoiseBytesPerRun,
+            ExpectedStateSavingsBytesPerRun + MeasurementNoiseBytesPerRun);
+        Assert.Equal(checked(7L * MeasuredIterations), secondaryPooled.Checksum);
+        Assert.Equal(secondaryPooled.Checksum, saturated.Checksum);
     }
 
     [Fact]
@@ -177,6 +227,13 @@ public sealed class SandboxHostCompiledNoAuditStatePoolAllocationTests
                 .WithWallTime(TimeSpan.FromMinutes(5))
                 .Build());
     }
+
+    private static CompiledExecutable ProbeExecutable(ExecutionPlan plan)
+        => new(
+            CompiledArtifactTestFactory.DynamicMethod(
+                plan,
+                static (_, _) => SandboxValue.FromInt32(7)),
+            "Miss");
 
     private static void ForceGc()
     {
