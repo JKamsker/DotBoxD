@@ -86,49 +86,6 @@ internal sealed class I32ForLoopPlan : IForLoopPlan
     }
 }
 
-/// <summary>One immutable, reusable single-assignment I64 for-range plan.</summary>
-internal sealed class I64ForLoopPlan : IForLoopPlan
-{
-    private readonly int[] _requiredSlots;
-
-    public I64ForLoopPlan(
-        ForRangeStatement statement,
-        int targetSlot,
-        I64ExpressionPlan expression,
-        long fuelPerIteration)
-    {
-        Statement = statement;
-        TargetSlot = targetSlot;
-        Expression = expression;
-        FuelPerIteration = fuelPerIteration;
-
-        var requiredSlots = new List<int>();
-        expression.CollectRequiredRawSlots(requiredSlots);
-        _requiredSlots = requiredSlots.ToArray();
-    }
-
-    public ForRangeStatement Statement { get; }
-
-    public int TargetSlot { get; }
-
-    public I64ExpressionPlan Expression { get; }
-
-    public long FuelPerIteration { get; }
-
-    public bool CanRun(InterpreterFrame frame)
-    {
-        for (var i = 0; i < _requiredSlots.Length; i++)
-        {
-            if (!frame.IsSlotAssigned(_requiredSlots[i]))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-}
-
 internal sealed class ForLoopPlanCache
 {
     private IForLoopPlan? _hotPlan;

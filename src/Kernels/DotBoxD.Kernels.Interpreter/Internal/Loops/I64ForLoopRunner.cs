@@ -27,7 +27,12 @@ internal static class I64ForLoopRunner
 
         return statement.Body.Count == 1
             ? TryRunSingleAssignment(statement, start, end, frame, context)
-            : TryRunMultipleAssignments(statement, start, end, frame, context);
+            : I64MultiAssignmentForLoopRunner.TryRun(
+                statement,
+                start,
+                end,
+                frame,
+                context);
     }
 
     private static bool TryRunSingleAssignment(
@@ -37,7 +42,8 @@ internal static class I64ForLoopRunner
         InterpreterFrame frame,
         SandboxContext context)
     {
-        if (frame.Layout.LoopPlans.TryGetI64ForRangePlan(statement, frame, out var cached))
+        if (frame.Layout.LoopPlans.TryGetI64ForRangePlan(statement, frame, out var cached) &&
+            cached.IsSingleAssignment)
         {
             return TryRunSingleAssignment(cached, start, end, frame, context);
         }
@@ -124,46 +130,6 @@ internal static class I64ForLoopRunner
         return true;
     }
 
-    private static bool TryRunMultipleAssignments(
-        ForRangeStatement statement,
-        int start,
-        int end,
-        InterpreterFrame frame,
-        SandboxContext context)
-    {
-        if (!TryCreateBody(statement, frame, out var body, out var fuelPerIteration))
-        {
-            return false;
-        }
-
-        var iterations = (long)end - start;
-        if (!context.CanBulkChargeLoopIterations(iterations, fuelPerIteration))
-        {
-            return false;
-        }
-
-        context.ChargeLoopIterations(iterations, fuelPerIteration);
-        var loopSlot = frame.GetSlot(statement.LocalName);
-        var checkpoint = CheckpointInterval;
-        for (var i = start; i < end; i++)
-        {
-            frame.WriteRawInt32Slot(loopSlot, i);
-            for (var statementIndex = 0; statementIndex < body.Length; statementIndex++)
-            {
-                var assignment = body[statementIndex];
-                frame.WriteRawInt64Slot(assignment.TargetSlot, assignment.Expression.Evaluate(frame));
-            }
-
-            if (--checkpoint == 0)
-            {
-                context.Checkpoint();
-                checkpoint = CheckpointInterval;
-            }
-        }
-
-        return true;
-    }
-
     private static bool TryCreateSingleAssignmentPlan(
         Statement statement,
         InterpreterFrame frame,
@@ -186,47 +152,6 @@ internal static class I64ForLoopRunner
 
         plan = new AssignmentPlan(targetSlot, expression);
         fuelPerIteration += 1 + expression.FuelCost;
-        return true;
-    }
-
-    private static bool TryCreateBody(
-        ForRangeStatement statement,
-        InterpreterFrame frame,
-        out AssignmentPlan[] body,
-        out long fuelPerIteration)
-    {
-        body = [];
-        fuelPerIteration = LoopFuel;
-        if (statement.Body.Count == 0)
-        {
-            return false;
-        }
-
-        var plans = new AssignmentPlan[statement.Body.Count];
-        var assignedSlots = new HashSet<int>();
-        var slotReads = new I64ExpressionSlotReadState(frame, assignedSlots);
-        var fuel = LoopFuel;
-        for (var i = 0; i < statement.Body.Count; i++)
-        {
-            if (statement.Body[i] is not AssignmentStatement assignment ||
-                !I64ExpressionPlan.TryCreate(assignment.Value, in slotReads, out var expression))
-            {
-                return false;
-            }
-
-            var targetSlot = frame.GetSlot(assignment.Name);
-            if (!frame.IsI64Slot(targetSlot))
-            {
-                return false;
-            }
-
-            plans[i] = new AssignmentPlan(targetSlot, expression);
-            assignedSlots.Add(targetSlot);
-            fuel += 1 + expression.FuelCost;
-        }
-
-        body = plans;
-        fuelPerIteration = fuel;
         return true;
     }
 

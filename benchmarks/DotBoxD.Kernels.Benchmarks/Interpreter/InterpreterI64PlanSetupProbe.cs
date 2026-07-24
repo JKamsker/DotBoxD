@@ -54,6 +54,7 @@ internal static class InterpreterI64PlanSetupProbe
             expectedValue: ExpectedValue(20_000_000),
             warmupIterations: 1,
             measurementIterations: 1);
+        InterpreterI64PlanAdmissionProbe.Run(twoPlan, options);
     }
 
     private static async Task<ExecutionPlan> PrepareAsync(

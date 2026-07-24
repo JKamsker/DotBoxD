@@ -14,7 +14,7 @@ public sealed class I64SingleAssignmentLoopAllocationTests
     private const int MeasurementIterations = 20_000;
 
     [Fact]
-    public async Task I64_loop_planning_avoids_slot_predicate_allocations()
+    public async Task I64_loop_planning_reuses_single_and_multi_assignment_plans()
     {
         using var host = SandboxTestHost.Create();
         var singlePlan = await PrepareAsync(host, SingleAssignmentModule);
@@ -58,10 +58,10 @@ public sealed class I64SingleAssignmentLoopAllocationTests
         var isolatedMultipleLoopBytes = (loop.AllocatedBytes - zero.AllocatedBytes) /
                                         (double)MeasurementIterations;
         Assert.True(
-            isolatedMultipleLoopBytes < 700,
+            isolatedMultipleLoopBytes is >= 0 and <= 8,
             $"One multi-assignment I64 loop execution ({scenario}) added {isolatedMultipleLoopBytes:F1} B " +
             $"(loop={loop.AllocatedBytes}, zero={zero.AllocatedBytes}). " +
-            "Captured per-assignment slot predicates raise this isolated cost to about 824 B.");
+            "A warmed reusable plan should remove the former 664 B planner allocation.");
     }
 
     private static void AssertUsage(Usage usage, long fuel, long loops)

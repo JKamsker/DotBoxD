@@ -206,8 +206,17 @@ internal static class I32ForLoopRunner
         out I32LoopAssignmentPlan[] body,
         out long fuelPerIteration)
     {
-        body = new I32LoopAssignmentPlan[statement.Body.Count];
+        body = [];
         fuelPerIteration = LoopFuel;
+        // A multi-assignment I64 loop reaches the I32 runner first. Resolve its
+        // first known target before allocating an I32 plan array. This helper
+        // runs only after the warmed I32 cache lookup has missed.
+        if (HasKnownI64FirstTarget(statement, frame))
+        {
+            return false;
+        }
+
+        body = new I32LoopAssignmentPlan[statement.Body.Count];
         for (var i = 0; i < statement.Body.Count; i++)
         {
             if (!TryCreateAssignmentPlan(
@@ -227,6 +236,14 @@ internal static class I32ForLoopRunner
 
         return true;
     }
+
+    private static bool HasKnownI64FirstTarget(
+        ForRangeStatement statement,
+        InterpreterFrame frame)
+        => statement.Body.Count > 0 &&
+           statement.Body[0] is AssignmentStatement assignment &&
+           frame.TryGetSlot(assignment.Name, out var targetSlot) &&
+           frame.IsI64Slot(targetSlot);
 
     private static bool TryCreateAssignmentPlan(
         Statement statement,

@@ -76,12 +76,85 @@ public sealed class I64ForLoopPlanCacheRuntimeTests
         }
     }
 
+    [Fact]
+    public async Task Cached_multi_plan_preserves_source_order_without_preassigned_intermediate()
+    {
+        using var host = SandboxTestHost.Create();
+        var plan = await PrepareAsync(host, I64ForLoopPlanCacheModules.MultiSourceOrdered);
+        var interpreter = new SandboxInterpreter();
+
+        AssertSuccess(Execute(interpreter, plan, SandboxValue.FromInt64(1)), 3);
+        AssertSuccess(Execute(interpreter, plan, SandboxValue.FromInt64(4)), 6);
+        AssertSuccess(Execute(interpreter, plan, SandboxValue.FromInt64(9)), 11);
+    }
+
+    [Fact]
+    public async Task Cached_multi_plan_preserves_second_assignment_overflow_and_resources()
+    {
+        using var host = SandboxTestHost.Create();
+        var plan = await PrepareAsync(host, I64ForLoopPlanCacheModules.MultiCheckedSecond);
+        var interpreter = new SandboxInterpreter();
+        var input = SandboxValue.FromInt64(long.MaxValue - 1);
+
+        var fresh = Execute(interpreter, plan, input);
+        AssertSuccess(Execute(interpreter, plan, SandboxValue.FromInt64(1)), 3);
+        var cached = Execute(interpreter, plan, input);
+
+        Assert.Equal(fresh.Error, cached.Error);
+        Assert.Equal(fresh.ResourceUsage, cached.ResourceUsage);
+        Assert.False(cached.Succeeded);
+        Assert.Equal("integer overflow", cached.Error!.SafeMessage);
+    }
+
+    [Theory]
+    [InlineData(20L, long.MaxValue)]
+    [InlineData(long.MaxValue, 1L)]
+    public async Task Cached_multi_plan_preserves_low_quota_fallback(
+        long maxFuel,
+        long maxLoopIterations)
+    {
+        using var host = SandboxTestHost.Create();
+        var policy = SandboxPolicyBuilder.Create()
+            .WithFuel(maxFuel)
+            .WithMaxLoopIterations(maxLoopIterations)
+            .WithMaxAllocatedBytes(long.MaxValue)
+            .Build();
+        var plan = await PrepareAsync(host, I64ForLoopPlanCacheModules.MultiQuota, policy);
+        var interpreter = new SandboxInterpreter();
+        var input = SandboxValue.FromInt64(1);
+
+        var fresh = Execute(interpreter, plan, input);
+        _ = Execute(interpreter, plan, input);
+        var cached = Execute(interpreter, plan, input);
+
+        Assert.False(fresh.Succeeded);
+        Assert.Equal(fresh.Error, cached.Error);
+        Assert.Equal(fresh.ResourceUsage, cached.ResourceUsage);
+    }
+
+    [Fact]
+    public async Task Debug_trace_uses_generic_multi_statement_path_after_cache_warmup()
+    {
+        using var host = SandboxTestHost.Create();
+        var plan = await PrepareAsync(host, I64ForLoopPlanCacheModules.MultiSourceOrdered);
+        var interpreter = new SandboxInterpreter();
+
+        AssertSuccess(Execute(interpreter, plan, SandboxValue.FromInt64(1)), 3);
+        AssertSuccess(Execute(interpreter, plan, SandboxValue.FromInt64(1)), 3);
+        var traced = Execute(interpreter, plan, SandboxValue.FromInt64(1), debug: true);
+
+        AssertSuccess(traced, 3);
+        Assert.Equal(3, traced.AuditEvents.Count(audit => IsTrace(audit, "AssignmentStatement")));
+        Assert.Single(traced.AuditEvents, audit => IsTrace(audit, "ForRangeStatement"));
+    }
+
     private static async Task<ExecutionPlan> PrepareAsync(
         DotBoxD.Hosting.Execution.SandboxHost host,
-        string moduleJson)
+        string moduleJson,
+        SandboxPolicy? policy = null)
     {
         var module = await host.ImportJsonAsync(moduleJson);
-        return await host.PrepareAsync(module, SandboxPolicyBuilder.Create()
+        return await host.PrepareAsync(module, policy ?? SandboxPolicyBuilder.Create()
             .WithFuel(long.MaxValue)
             .WithMaxLoopIterations(long.MaxValue)
             .WithMaxAllocatedBytes(long.MaxValue)

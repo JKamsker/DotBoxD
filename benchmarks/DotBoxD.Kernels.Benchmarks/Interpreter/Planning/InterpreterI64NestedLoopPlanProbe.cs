@@ -35,6 +35,13 @@ internal static class InterpreterI64NestedLoopPlanProbe
                 BaseFuel: 10,
                 InnerFuel: 13),
             new Scenario(
+                "multi body, outer 1M/inner 1",
+                "multiBodyControl",
+                RepeatedOuterIterations,
+                1,
+                BaseFuel: 10,
+                InnerFuel: 13),
+            new Scenario(
                 "outer 1M, inner 0",
                 "main",
                 RepeatedOuterIterations,
@@ -56,7 +63,7 @@ internal static class InterpreterI64NestedLoopPlanProbe
         }
 
         Console.WriteLine("interpreter nested-I64 loop-plan probe");
-        Console.WriteLine("case                       total ms    allocated B       result      fuel        loops");
+        Console.WriteLine("case                              total ms    allocated B       result      fuel        loops");
         foreach (var scenario in scenarios)
         {
             ForceGc();
@@ -151,7 +158,7 @@ internal static class InterpreterI64NestedLoopPlanProbe
 
     private static void Write(Measurement measurement)
         => Console.WriteLine(
-            $"{measurement.Name,-26} {measurement.ElapsedMilliseconds,9:N3} " +
+            $"{measurement.Name,-33} {measurement.ElapsedMilliseconds,9:N3} " +
             $"{measurement.AllocatedBytes,14:N0} {measurement.Result,12:N0} " +
             $"{measurement.Fuel,11:N0} {measurement.Loops,12:N0}");
 
