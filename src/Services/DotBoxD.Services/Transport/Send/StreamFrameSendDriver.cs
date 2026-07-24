@@ -17,9 +17,7 @@ internal static class StreamFrameSendDriver
             case StreamFrameSendStage.AcquireGate:
                 pendingOperation = TransportSendGate.WaitAsync(
                     connection.SendGate,
-                    connection.SendDisposalToken,
-                    state.CallerToken,
-                    nameof(StreamConnection));
+                    state.CallerToken);
                 if (!pendingOperation.IsCompleted)
                 {
                     return false;

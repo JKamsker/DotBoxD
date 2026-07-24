@@ -12,7 +12,6 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
     private readonly bool _ownsStream;
     private readonly bool _useReceiveLookahead;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
-    private readonly CancellationTokenSource _disposeCts = new();
     private readonly string _remoteEndpoint;
     private readonly int _maxMessageSize;
     private readonly TimeSpan _frameReadIdleTimeout;
@@ -56,9 +55,10 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
     internal TimeSpan FrameReadIdleTimeout => _frameReadIdleTimeout;
     internal Stream SendStream => _stream;
     internal SemaphoreSlim SendGate => _sendLock;
-    internal CancellationToken SendDisposalToken => _disposeCts.Token;
     internal int MaxOutgoingMessageSize => _maxMessageSize;
     internal void ThrowIfDisposedForSend() => ThrowIfDisposed();
+    internal void ReleaseSendGate() =>
+        TransportSendGate.ReleaseAfterSend(_sendLock, ref _disposed);
 
     public bool IsConnected =>
         Volatile.Read(ref _disposed) == 0 &&
@@ -73,11 +73,7 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
         ct.ThrowIfCancellationRequested();
         MessageFramer.ValidateOutgoingFrame(data.Span, _maxMessageSize);
 
-        await TransportSendGate.WaitAsync(
-            _sendLock,
-            _disposeCts.Token,
-            ct,
-            nameof(StreamConnection)).ConfigureAwait(false);
+        await TransportSendGate.WaitAsync(_sendLock, ct).ConfigureAwait(false);
         try
         {
             ct.ThrowIfCancellationRequested();
@@ -94,9 +90,9 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
             {
                 _sendLock.Release();
             }
-            catch (ObjectDisposedException)
+            catch (SemaphoreFullException) when (Volatile.Read(ref _disposed) != 0)
             {
-                // Close may dispose the gate; any I/O fault already propagates from WriteAsync.
+                // Close supplied the terminal permit while this send still owned the original one.
             }
         }
     }
@@ -176,8 +172,9 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
         ct.ThrowIfCancellationRequested();
 
         Task closeTask;
-        // The private CTS has connection lifetime and also serializes one-time close publication.
-        lock (_disposeCts)
+        // Semaphore operations do not take the object's CLR monitor, so the private send gate can
+        // also serialize one-time close publication without another per-connection allocation.
+        lock (_sendLock)
         {
             if (_closeTask is null)
             {
@@ -197,7 +194,7 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
 
     private async Task CloseCoreAsync()
     {
-        _disposeCts.Cancel();
+        TransportSendGate.WakeDisposedWaiters(_sendLock);
         StreamFrameReceiveOperationAcquisition.Remove(this);
         _frameReadTimeout?.Dispose();
         if (_ownsStream || ReceiveConcurrencyGuard.IsActive(Volatile.Read(ref _activeReceives)))

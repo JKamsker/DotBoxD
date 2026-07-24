@@ -30,9 +30,7 @@ internal static class StreamConnectionFrameSender
 
             var gateWait = TransportSendGate.WaitAsync(
                 connection.SendGate,
-                connection.SendDisposalToken,
-                cancellationToken,
-                nameof(StreamConnection));
+                cancellationToken);
             if (!gateWait.IsCompleted)
             {
                 pendingHandoffStarted = true;

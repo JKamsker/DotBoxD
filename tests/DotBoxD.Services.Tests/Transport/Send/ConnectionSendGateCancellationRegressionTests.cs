@@ -168,7 +168,8 @@ public sealed class ConnectionSendGateCancellationRegressionTests
             }
         });
 
-        Assert.IsAssignableFrom<OperationCanceledException>(exception);
+        var canceled = Assert.IsAssignableFrom<OperationCanceledException>(exception);
+        Assert.Equal(cancellation.Token, canceled.CancellationToken);
         Assert.Equal(1, gate.CurrentCount);
     }
 

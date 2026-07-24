@@ -75,7 +75,7 @@ public sealed class StreamFrameSendFailureTests
     }
 
     [Fact]
-    public async Task DisposeWhileGatePending_FaultsAndDoesNotReleaseUnownedGate()
+    public async Task DisposeWhileGatePending_FaultsAndLeavesOneTerminalPermit()
     {
         await using var stream = new ControlledPendingSendStream(PendingStreamSendStage.None);
         await using var connection = new StreamConnection(stream, ownsStream: false);
@@ -90,11 +90,12 @@ public sealed class StreamFrameSendFailureTests
             await Assert.ThrowsAsync<ObjectDisposedException>(
                 () => send.AsTask().WaitAsync(Guard));
             StreamSendTestFrames.AssertDisposed(frame);
-            Assert.Equal(0, connection.SendGate.CurrentCount);
+            Assert.Equal(1, connection.SendGate.CurrentCount);
         }
         finally
         {
-            connection.SendGate.Release();
+            connection.ReleaseSendGate();
+            Assert.Equal(1, connection.SendGate.CurrentCount);
         }
     }
 }

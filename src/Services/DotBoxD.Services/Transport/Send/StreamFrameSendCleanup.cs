@@ -25,14 +25,7 @@ internal static class StreamFrameSendCleanup
         {
             if (gateHeld && connection is not null)
             {
-                try
-                {
-                    connection.SendGate.Release();
-                }
-                catch (ObjectDisposedException)
-                {
-                    // Close may dispose the gate; an earlier I/O failure remains authoritative.
-                }
+                connection.ReleaseSendGate();
             }
         }
         catch (Exception error)
