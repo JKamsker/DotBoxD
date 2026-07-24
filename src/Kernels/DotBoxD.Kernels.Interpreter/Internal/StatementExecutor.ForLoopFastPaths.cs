@@ -1,5 +1,6 @@
 using DotBoxD.Kernels.Interpreter.Frame;
 using DotBoxD.Kernels.Interpreter.Internal.Loops;
+using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Kernels.Interpreter.Internal;
 
@@ -28,6 +29,18 @@ internal readonly partial struct StatementExecutor
                statement, start, end, frame, Context, Options) ||
            I64ForLoopRunner.TryRun(
                statement, start, end, frame, Context, Options) ||
-           NestedI32ForLoopRunner.TryRun(
+           TryRunNestedForLoopFastPath(
                statement, start, end, frame, Context, Options);
+
+    private static bool TryRunNestedForLoopFastPath(
+        ForRangeStatement statement,
+        int start,
+        int end,
+        InterpreterFrame frame,
+        SandboxContext context,
+        SandboxExecutionOptions options)
+        => NestedI32ForLoopRunner.TryRun(
+               statement, start, end, frame, context, options) ||
+           NestedF64ForLoopRunner.TryRun(
+               statement, start, end, frame, context, options);
 }

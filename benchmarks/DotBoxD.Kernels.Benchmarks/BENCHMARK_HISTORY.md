@@ -3217,3 +3217,77 @@ The existing and new focused suites pass 14/14 tests; the four new concurrency/L
 order, detached completion, bounded capacity, and collection of an evicted key while the table stays alive. No public
 API, compiler/verifier identity (`dotboxd-compiler-14` / `dotboxd-verifier-13`), generated ABI, persisted artifact,
 selection policy, or execution-result contract changes.
+
+## Fixed-bound composite nested F64 dispatch
+
+The preceding F64 plan cache removed the inner expression graph's recurring allocation, but the outer loop still used
+generic statement dispatch. Each outer iteration charged and redispatched the inner `ForRangeStatement`, re-probed its
+start/end expressions, and walked the full fast-path chain before finding the already-cached F64 assignment plan. The
+existing outer-1M/inner-1 probe therefore still took about 175-220 ms even though it allocated only fixed execution state.
+
+A narrow composite runner now activates only when the outer body is exactly one inner loop with one exact-layout cached
+F64 plan. Inner bounds must be literals or assigned raw-I32 slots that are neither loop slot, so the F64 body cannot mutate
+them. The runner retains the generic charge order on every outer entry: outer loop charge and slot write, inner statement,
+start, then end, followed by the existing cached F64 loop executor. It adds no cache and retains no frame or runtime value.
+
+Before making any observable mutation, the runner computes the complete fixed-bound requirement with checked arithmetic:
+
+```text
+inner executions = outer iterations * max(0, inner end - inner start)
+required loops   = outer iterations + inner executions
+required fuel    = outer iterations * 8 + inner executions * inner-plan fuel
+```
+
+Overflow or insufficient current fuel/loop capacity rejects the composite path before the first outer charge, leaving the
+incremental generic path to report the exact quota failure point. Debug tracing, cold/missing plans, unassigned required
+F64 slots, non-leaf and loop-dependent bounds, bindings/intrinsics, and every otherwise unsupported shape also fail closed.
+
+The existing permanent probe and all 170 benchmark source files were hashed before publication. Six fresh isolated pairs
+ran in balanced order BC/CB/BC/CB/BC/CB on CPU 11 with tiering, PGO, and ReadyToRun disabled:
+
+```text
+taskset -c 11 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  COMPlus_TieredCompilation=0 COMPlus_TieredPGO=0 COMPlus_ReadyToRun=0 \
+  dotnet <published-benchmark.dll> --probe-interpreter-f64-plan-setup
+```
+
+```text
+case                              baseline          candidate         change    wins   allocation
+nested outer 1M / inner 1         200.245 ms         14.860 ms         -92.58%    6/6      840→840 B
+nested outer 1M / inner 0          92.722 ms          5.185 ms         -94.41%    6/6      840→840 B
+nested outer 1 / inner 10M         48.423 ms         48.209 ms          -0.44%    3/6      840→840 B
+raw, one loop                     550.690 ns        534.840 ns          -2.88%    6/6    allocation exact
+raw, zero-loop control            424.750 ns        420.690 ns          -0.96%    4/6    allocation exact
+literal, one loop                 508.765 ns        501.800 ns          -1.37%    5/6    allocation exact
+intrinsic fallback control        915.300 ns        896.540 ns          -2.05%    5/6    allocation exact
+cached I64 control                560.900 ns        553.980 ns          -1.23%    4/6    allocation exact
+```
+
+The target baseline ranges were `177.673-222.899 ms` and `68.877-129.572 ms`; candidate ranges tightened to
+`14.742-15.130 ms` and `5.020-5.303 ms`. The untouched 10M-body control stayed `48.124-49.868 ms` baseline versus
+`47.799-50.921 ms` candidate, with every paired candidate at or below baseline +5%. Every row preserved its exact
+allocation, checksum, F64 bits, fuel, loop, sandbox-allocation, host-call, and collection totals in all six pairs.
+
+An earlier six-pair batch under `/tmp/dotboxd-nested-f64-6366e1a81-pairs` is deliberately excluded: concurrent machine
+load moved both binaries' unrelated controls by 2-5x and the untouched 10M lane ranged from 46 to 164 ms. After reserving
+CPU 11, the accepted logs under `/tmp/dotboxd-nested-f64-6366e1a81-pairs-v2` restored stable controls; their raw-log
+manifest digest is `b87e909d448ec39d5653be587b2bc524c02c28845b8f989b34755ddb02bd2e42`.
+
+The frozen baseline is `/tmp/dotboxd-nested-f64-6366e1a81-baseline/publish`; the isolated candidate is
+`/tmp/dotboxd-nested-f64-6366e1a81-candidate`. They differ only in `DotBoxD.Kernels.dll`/PDB and
+`DotBoxD.Kernels.Interpreter.dll`/PDB. The shared benchmark runner hash is
+`5f090f3450acb95202525b368976a63f2eda01636cd1fdcfe4f1c8f223d9ae04`. Baseline/candidate Kernels hashes are
+`b2a849f7be566e635fcb54cdfac4912599cabade040c8340b8abd7804f0e73f5` and
+`3187565ad3887e4805a72ac3b41ee131d581ea330ff183256b38c38a76936459`; Interpreter hashes are
+`94182a45009454f1d29620e00c0d577015edb1702b9529715d23d93e32d0fee4` and
+`3d35cb7f8f52a02933bfb01c4d98a6f5aecf5dc2eb580924b756e149852e6e73`. The complete benchmark-source and key-source
+manifest digests are `b83fbad27ded6f29bcddee35d5c4c61d8d1ff30772d32fc4a7c0aea3d0bc96b5` and
+`3c729b848cb23a156371df5d8a034359c0fd5e6e6f2932544eca5740b2f09b02`; they include the unrelated finalized Auto probe
+additions and are byte-identical between baseline and candidate.
+
+Twenty-two focused nested-F64 tests cover changed/empty/descending bounds, exact success and post-loop fuel boundaries,
+aggregate fuel/loop rejection before mutation, overflow fallback, cold/unassigned/non-leaf/loop-slot-bound rejection,
+nonfinite failure order, exact debug preorder and `fuelRemaining`, pre-cancellation, concurrent frames, and bit-exact
+resource parity with a cold generic interpreter. The combined F64-plan and nested-I32/F64 suite passes 55/55, including
+the existing bounded-allocation test. No public API, compiler/verifier identity, generated ABI, persisted artifact,
+sandbox accounting, or execution-result contract changes.

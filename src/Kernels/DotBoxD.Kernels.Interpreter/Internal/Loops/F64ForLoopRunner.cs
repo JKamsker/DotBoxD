@@ -90,6 +90,7 @@ internal static class F64ForLoopRunner
         {
             context.ChargeBindingCalls(binding, bindingCalls);
         }
+
         var loopSlot = frame.GetSlot(statement.LocalName);
         var checkpoint = 4096;
         for (var i = start; i < end; i++)
@@ -104,6 +105,52 @@ internal static class F64ForLoopRunner
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Runs a cached plan that the layout cache has validated for this frame. The caller
+    /// must also prove that the complete enclosing work fits the remaining fuel and loop
+    /// budgets before making any observable mutation.
+    /// </summary>
+    internal static void RunValidatedCachedSingleAssignment(
+        int start,
+        int end,
+        InterpreterFrame frame,
+        SandboxContext context,
+        int loopSlot,
+        F64ForLoopPlan plan)
+    {
+        context.ChargeLoopIterations((long)end - start, plan.FuelPerIteration);
+        Run(
+            plan.TargetSlot,
+            plan.Expression,
+            start,
+            end,
+            frame,
+            context,
+            loopSlot);
+    }
+
+    private static void Run(
+        int targetSlot,
+        F64ExpressionPlan expression,
+        int start,
+        int end,
+        InterpreterFrame frame,
+        SandboxContext context,
+        int loopSlot)
+    {
+        var checkpoint = 4096;
+        for (var i = start; i < end; i++)
+        {
+            frame.WriteRawInt32Slot(loopSlot, i);
+            frame.WriteRawDoubleSlot(targetSlot, expression.Evaluate(frame));
+            if (--checkpoint == 0)
+            {
+                context.Checkpoint();
+                checkpoint = 4096;
+            }
+        }
     }
 
     private static bool CanUseFastPath(SandboxExecutionOptions options, int start, int end)
