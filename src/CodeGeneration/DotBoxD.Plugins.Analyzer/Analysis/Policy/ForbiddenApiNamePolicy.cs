@@ -36,6 +36,7 @@ internal static class ForbiddenApiNamePolicy
         "System.Security.AccessControl.DirectorySecurity",
         "System.Security.AccessControl.FileSecurity",
         "Microsoft.Extensions.FileProviders.PhysicalFileProvider",
+        "Microsoft.Extensions.Localization.ResourceManagerStringLocalizerFactory",
         "Microsoft.Extensions.Logging.ConsoleLoggerExtensions",
         "Microsoft.Extensions.Configuration.FileConfigurationExtensions",
         "Microsoft.Extensions.Configuration.IniConfigurationExtensions",
@@ -52,7 +53,8 @@ internal static class ForbiddenApiNamePolicy
         "System.Timers.", "System.Linq.Expressions.", "System.Security.Principal.", "System.Transactions.",
         "System.Data.", "Microsoft.AspNetCore.", "Microsoft.CSharp.", "Microsoft.VisualBasic.",
         "Microsoft.EntityFrameworkCore.", "Microsoft.Extensions.Logging.Console.",
-        "Microsoft.Extensions.Logging.EventLog.", "Microsoft.Extensions.Configuration.UserSecrets.",
+        "Microsoft.Extensions.Logging.EventLog.",
+        "Microsoft.Extensions.Configuration.UserSecrets.",
         "Microsoft.Win32."
     ];
 
