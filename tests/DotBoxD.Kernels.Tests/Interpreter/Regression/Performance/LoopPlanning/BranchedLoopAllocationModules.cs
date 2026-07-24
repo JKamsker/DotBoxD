@@ -37,6 +37,14 @@ internal static class BranchedLoopAllocationModules
             type,
             Branch(ThenAssignment(type, value: 2), "{ \"op\": \"break\" }"));
 
+    public static string UnequalBranchFuel(string type)
+        => Module(
+            $"branched-allocation-{type}-unequal-fuel",
+            type,
+            Branch(
+                ThenAssignment(type, value: 2),
+                $"{{ \"op\": \"set\", \"name\": \"total\", \"value\": {{ \"{type}\": 4 }} }}"));
+
     public static string InputDependent()
         => Module(
             "branched-allocation-i32-live-input",
