@@ -13,14 +13,6 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
     private static readonly byte[] MethodNameKey = Encoding.UTF8.GetBytes("MethodName");
     private static readonly byte[] InstanceIdKey = Encoding.UTF8.GetBytes("InstanceId");
     private static readonly byte[] StreamsKey = Encoding.UTF8.GetBytes("Streams");
-    private static readonly RpcRequestFieldName[] FieldNames =
-    [
-        new("MessageId", MessageIdKey, RpcRequestField.MessageId),
-        new("ServiceName", ServiceNameKey, RpcRequestField.ServiceName),
-        new("MethodName", MethodNameKey, RpcRequestField.MethodName),
-        new("InstanceId", InstanceIdKey, RpcRequestField.InstanceId),
-        new("Streams", StreamsKey, RpcRequestField.Streams)
-    ];
     private RpcRequestNameCache? _requestNames;
 
     private RpcRequestNameCache RequestNames => LazyInitializer.EnsureInitialized(ref _requestNames)!;
@@ -224,29 +216,47 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
 
     private static RpcRequestField ReadField(ReadOnlySpan<byte> utf8)
     {
-        foreach (var field in FieldNames)
+        // Shape only selects a candidate; the full comparison remains the acceptance boundary.
+        return utf8.Length switch
         {
-            if (utf8.SequenceEqual(field.Utf8Name))
-            {
-                return field.Field;
-            }
-        }
-
-        return RpcRequestField.Unknown;
+            7 when utf8[0] == (byte)'S' => MatchField(utf8, StreamsKey, RpcRequestField.Streams),
+            9 when utf8[0] == (byte)'M' => MatchField(utf8, MessageIdKey, RpcRequestField.MessageId),
+            10 when utf8[0] == (byte)'I' => MatchField(utf8, InstanceIdKey, RpcRequestField.InstanceId),
+            10 when utf8[0] == (byte)'M' => MatchField(utf8, MethodNameKey, RpcRequestField.MethodName),
+            11 when utf8[0] == (byte)'S' => MatchField(utf8, ServiceNameKey, RpcRequestField.ServiceName),
+            _ => RpcRequestField.Unknown,
+        };
     }
 
     private static RpcRequestField ReadField(string? name)
     {
-        foreach (var field in FieldNames)
+        if (name is null)
         {
-            if (string.Equals(name, field.Name, StringComparison.Ordinal))
-            {
-                return field.Field;
-            }
+            return RpcRequestField.Unknown;
         }
 
-        return RpcRequestField.Unknown;
+        return name.Length switch
+        {
+            7 when name[0] == 'S' => MatchField(name, "Streams", RpcRequestField.Streams),
+            9 when name[0] == 'M' => MatchField(name, "MessageId", RpcRequestField.MessageId),
+            10 when name[0] == 'I' => MatchField(name, "InstanceId", RpcRequestField.InstanceId),
+            10 when name[0] == 'M' => MatchField(name, "MethodName", RpcRequestField.MethodName),
+            11 when name[0] == 'S' => MatchField(name, "ServiceName", RpcRequestField.ServiceName),
+            _ => RpcRequestField.Unknown,
+        };
     }
+
+    private static RpcRequestField MatchField(
+        ReadOnlySpan<byte> candidate,
+        ReadOnlySpan<byte> expected,
+        RpcRequestField field) =>
+        candidate.SequenceEqual(expected) ? field : RpcRequestField.Unknown;
+
+    private static RpcRequestField MatchField(
+        string candidate,
+        string expected,
+        RpcRequestField field) =>
+        string.Equals(candidate, expected, StringComparison.Ordinal) ? field : RpcRequestField.Unknown;
 
     private enum RpcRequestField
     {
@@ -256,21 +266,5 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
         MethodName,
         InstanceId,
         Streams,
-    }
-
-    private readonly struct RpcRequestFieldName
-    {
-        public RpcRequestFieldName(string name, byte[] utf8Name, RpcRequestField field)
-        {
-            Name = name;
-            Utf8Name = utf8Name;
-            Field = field;
-        }
-
-        public string Name { get; }
-
-        public byte[] Utf8Name { get; }
-
-        public RpcRequestField Field { get; }
     }
 }

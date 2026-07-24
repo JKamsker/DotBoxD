@@ -14,15 +14,6 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
     private static readonly byte[] ErrorMessageKey = Encoding.UTF8.GetBytes("ErrorMessage");
     private static readonly byte[] ErrorTypeKey = Encoding.UTF8.GetBytes("ErrorType");
     private static readonly byte[] StreamKey = Encoding.UTF8.GetBytes("Stream");
-    private static readonly RpcResponseFieldName[] FieldNames =
-    [
-        new("MessageId", MessageIdKey, RpcResponseField.MessageId),
-        new("IsSuccess", IsSuccessKey, RpcResponseField.IsSuccess),
-        new("ErrorMessage", ErrorMessageKey, RpcResponseField.ErrorMessage),
-        new("ErrorType", ErrorTypeKey, RpcResponseField.ErrorType),
-        new("Stream", StreamKey, RpcResponseField.Stream)
-    ];
-
     private RpcResponseFormatter()
     {
     }
@@ -236,29 +227,47 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
 
     private static RpcResponseField ReadField(ReadOnlySpan<byte> utf8)
     {
-        foreach (var field in FieldNames)
+        // Shape only selects a candidate; the full comparison remains the acceptance boundary.
+        return utf8.Length switch
         {
-            if (utf8.SequenceEqual(field.Utf8Name))
-            {
-                return field.Field;
-            }
-        }
-
-        return RpcResponseField.Unknown;
+            6 when utf8[0] == (byte)'S' => MatchField(utf8, StreamKey, RpcResponseField.Stream),
+            9 when utf8[0] == (byte)'E' => MatchField(utf8, ErrorTypeKey, RpcResponseField.ErrorType),
+            9 when utf8[0] == (byte)'I' => MatchField(utf8, IsSuccessKey, RpcResponseField.IsSuccess),
+            9 when utf8[0] == (byte)'M' => MatchField(utf8, MessageIdKey, RpcResponseField.MessageId),
+            12 when utf8[0] == (byte)'E' => MatchField(utf8, ErrorMessageKey, RpcResponseField.ErrorMessage),
+            _ => RpcResponseField.Unknown,
+        };
     }
 
     private static RpcResponseField ReadField(string? name)
     {
-        foreach (var field in FieldNames)
+        if (name is null)
         {
-            if (string.Equals(name, field.Name, StringComparison.Ordinal))
-            {
-                return field.Field;
-            }
+            return RpcResponseField.Unknown;
         }
 
-        return RpcResponseField.Unknown;
+        return name.Length switch
+        {
+            6 when name[0] == 'S' => MatchField(name, "Stream", RpcResponseField.Stream),
+            9 when name[0] == 'E' => MatchField(name, "ErrorType", RpcResponseField.ErrorType),
+            9 when name[0] == 'I' => MatchField(name, "IsSuccess", RpcResponseField.IsSuccess),
+            9 when name[0] == 'M' => MatchField(name, "MessageId", RpcResponseField.MessageId),
+            12 when name[0] == 'E' => MatchField(name, "ErrorMessage", RpcResponseField.ErrorMessage),
+            _ => RpcResponseField.Unknown,
+        };
     }
+
+    private static RpcResponseField MatchField(
+        ReadOnlySpan<byte> candidate,
+        ReadOnlySpan<byte> expected,
+        RpcResponseField field) =>
+        candidate.SequenceEqual(expected) ? field : RpcResponseField.Unknown;
+
+    private static RpcResponseField MatchField(
+        string candidate,
+        string expected,
+        RpcResponseField field) =>
+        string.Equals(candidate, expected, StringComparison.Ordinal) ? field : RpcResponseField.Unknown;
 
     private enum RpcResponseField
     {
@@ -268,21 +277,5 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
         ErrorMessage,
         ErrorType,
         Stream,
-    }
-
-    private readonly struct RpcResponseFieldName
-    {
-        public RpcResponseFieldName(string name, byte[] utf8Name, RpcResponseField field)
-        {
-            Name = name;
-            Utf8Name = utf8Name;
-            Field = field;
-        }
-
-        public string Name { get; }
-
-        public byte[] Utf8Name { get; }
-
-        public RpcResponseField Field { get; }
     }
 }
