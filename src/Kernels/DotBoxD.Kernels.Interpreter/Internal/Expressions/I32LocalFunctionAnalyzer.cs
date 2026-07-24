@@ -49,9 +49,20 @@ internal static class I32LocalFunctionAnalyzer
             VariableExpression variable => string.Equals(variable.Name, name, StringComparison.Ordinal) ? 1 : 0,
             UnaryExpression unary => CountVariableUses(unary.Operand, name),
             BinaryExpression binary => CountVariableUses(binary.Left, name) + CountVariableUses(binary.Right, name),
-            CallExpression call => call.Arguments.Sum(argument => CountVariableUses(argument, name)),
+            CallExpression call => CountCallVariableUses(call, name),
             _ => 0
         };
+
+    private static int CountCallVariableUses(CallExpression call, string name)
+    {
+        var count = 0;
+        for (var i = 0; i < call.Arguments.Count; i++)
+        {
+            count += CountVariableUses(call.Arguments[i], name);
+        }
+
+        return count;
+    }
 
     private static bool IsSimpleInlineArgument(Expression expression)
         => expression is LiteralExpression { Value: I32Value } or VariableExpression;

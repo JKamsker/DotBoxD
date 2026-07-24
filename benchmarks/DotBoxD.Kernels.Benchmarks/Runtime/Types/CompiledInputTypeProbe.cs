@@ -32,6 +32,7 @@ internal static class CompiledInputTypeProbe
         _ = Measure(WarmupIterations, map, LegacyMapType);
         _ = Measure(WarmupIterations, map, CachedMapType);
         _ = Measure(WarmupIterations, nestedList, NestedListFallbackType);
+        _ = Measure(WarmupIterations, nestedList, NestedListCachedChildType);
         _ = Measure(WarmupIterations, opaqueList, OpaqueListFallbackType);
 
         Console.WriteLine($"iterations = {Iterations:N0}");
@@ -41,6 +42,7 @@ internal static class CompiledInputTypeProbe
         Write("Map<String,I32> legacy input", Measure(Iterations, map, LegacyMapType));
         Write("Map<String,I32> cached input", Measure(Iterations, map, CachedMapType));
         Write("List<List<I32>> fallback", Measure(Iterations, nestedList, NestedListFallbackType));
+        Write("List<List<I32>> cached child", Measure(Iterations, nestedList, NestedListCachedChildType));
         Write("List<MonsterId> fallback", Measure(Iterations, opaqueList, OpaqueListFallbackType));
     }
 
@@ -94,6 +96,10 @@ internal static class CompiledInputTypeProbe
     private static SandboxType NestedListFallbackType()
         => CompiledRuntime.TypeList(
             CompiledRuntime.TypeList(CompiledRuntime.TypeScalar("I32")));
+
+    private static SandboxType NestedListCachedChildType()
+        => CompiledRuntime.TypeList(
+            CompiledRuntime.TypeListCached(CompiledRuntime.TypeScalar("I32")));
 
     private static SandboxType OpaqueListFallbackType()
         => CompiledRuntime.TypeList(CompiledRuntime.TypeScalar("MonsterId"));

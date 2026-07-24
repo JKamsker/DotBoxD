@@ -13,21 +13,8 @@ if (await DotBoxD.Kernels.Benchmarks.Interpreter.InterpreterProbeDispatcher.TryR
     return;
 }
 
-if (args.Contains("--probe-hook-chain-discovery", StringComparer.OrdinalIgnoreCase))
+if (DotBoxD.Kernels.Benchmarks.PluginAnalyzer.PluginAnalyzerProbeDispatcher.TryRun(args))
 {
-    DotBoxD.Kernels.Benchmarks.PluginAnalyzer.HookChainDiscoveryProbe.Run();
-    return;
-}
-
-if (args.Contains("--probe-plugin-package-collision-discovery", StringComparer.OrdinalIgnoreCase))
-{
-    DotBoxD.Kernels.Benchmarks.PluginAnalyzer.PluginPackageCollisionDiscoveryProbe.Run();
-    return;
-}
-
-if (args.Contains("--probe-server-extension-request-helpers", StringComparer.OrdinalIgnoreCase))
-{
-    DotBoxD.Kernels.Benchmarks.PluginAnalyzer.ServerExtensionRequestHelperProbe.Run();
     return;
 }
 
@@ -46,6 +33,12 @@ if (args.Contains("--probe-examples", StringComparer.OrdinalIgnoreCase))
 if (args.Contains("--probe-prepared-values", StringComparer.OrdinalIgnoreCase))
 {
     await DotBoxD.Kernels.Benchmarks.Examples.PreparedValueProbe.RunAsync();
+    return;
+}
+
+if (args.Contains("--probe-auto-hotness-bookkeeping", StringComparer.OrdinalIgnoreCase))
+{
+    await DotBoxD.Kernels.Benchmarks.Execution.AutoHotnessBookkeepingProbe.RunAsync();
     return;
 }
 
@@ -210,6 +203,11 @@ if (args.Contains("--probe-compiled-binding-arity", StringComparer.OrdinalIgnore
     return;
 }
 
+if (await DotBoxD.Kernels.Benchmarks.Runtime.Bindings.BindingProbeDispatcher.TryRunAsync(args))
+{
+    return;
+}
+
 if (args.Contains("--probe-capability-grant-lookup", StringComparer.OrdinalIgnoreCase))
 {
     DotBoxD.Kernels.Benchmarks.Runtime.CapabilityGrantLookupProbe.Run();
@@ -286,8 +284,16 @@ if (profileIndex >= 0)
     var iterationsText = args.ElementAtOrDefault(profileIndex + 2) ?? "10000";
     var iterations = int.Parse(iterationsText, CultureInfo.InvariantCulture);
     var disableTimeout = args.Contains("--no-timeout", StringComparer.OrdinalIgnoreCase);
+    var finiteTimeout = args.Contains("--finite-timeout", StringComparer.OrdinalIgnoreCase);
     var lowAllocationProfile = args.Contains("--low-alloc", StringComparer.OrdinalIgnoreCase);
-    await IpcAllocationProfile.RunAsync(transport, iterations, disableTimeout, lowAllocationProfile);
+    var taskBackedClient = args.Contains("--task-backed-client", StringComparer.OrdinalIgnoreCase);
+    await IpcAllocationProfile.RunAsync(
+        transport,
+        iterations,
+        disableTimeout,
+        finiteTimeout,
+        lowAllocationProfile,
+        taskBackedClient);
     return;
 }
 

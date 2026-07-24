@@ -37,6 +37,26 @@ internal static class BranchedLoopAllocationModules
             type,
             Branch(ThenAssignment(type, value: 2), "{ \"op\": \"break\" }"));
 
+    public static string UnequalBranchFuel(string type)
+        => Module(
+            $"branched-allocation-{type}-unequal-fuel",
+            type,
+            Branch(
+                ThenAssignment(type, value: 2),
+                $"{{ \"op\": \"set\", \"name\": \"total\", \"value\": {{ \"{type}\": 4 }} }}"));
+
+    public static string InputDependent()
+        => Module(
+            "branched-allocation-i32-live-input",
+            "i32",
+            Branch(InputAssignment, InputAssignment));
+
+    public static string FaultingAssignment()
+        => Module(
+            "branched-allocation-i32-fault",
+            "i32",
+            Branch(DividingAssignment, DividingAssignment));
+
     private static string Branch(string thenStatements, string elseStatements)
         => $$"""
         {
@@ -97,6 +117,22 @@ internal static class BranchedLoopAllocationModules
     private const string DoubledAssignment = """
         { "op": "set", "name": "doubled", "value": {
           "op": "add", "left": { "var": "total" }, "right": { "var": "total" }
+        } }
+        """;
+
+    private const string InputAssignment = """
+        { "op": "set", "name": "total", "value": {
+          "op": "add", "left": { "var": "total" }, "right": { "var": "iterations" }
+        } }
+        """;
+
+    private const string DividingAssignment = """
+        { "op": "set", "name": "total", "value": {
+          "op": "div",
+          "left": { "i32": 1 },
+          "right": {
+            "op": "sub", "left": { "var": "iterations" }, "right": { "i32": 1 }
+          }
         } }
         """;
 }

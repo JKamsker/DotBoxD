@@ -130,13 +130,13 @@ public interface IBindingCatalog
 
 public sealed class BindingRegistryBuilder
 {
-    private readonly List<BindingDescriptor> _bindings = [];
+    private List<BindingDescriptor>? _bindings;
 
     public BindingRegistryBuilder Add(BindingDescriptor descriptor)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
 
-        _bindings.Add(descriptor);
+        (_bindings ??= []).Add(descriptor);
         return this;
     }
 
@@ -155,18 +155,25 @@ public sealed class BindingRegistryBuilder
             validated.Add(descriptor);
         }
 
-        _bindings.AddRange(validated);
+        if (validated.Count > 0)
+        {
+            (_bindings ??= []).AddRange(validated);
+        }
+
         return this;
     }
 
     public BindingRegistry Build()
     {
-        var diagnostics = BindingRegistryValidator.Validate(_bindings);
+        IReadOnlyList<BindingDescriptor> bindings = _bindings is null
+            ? Array.Empty<BindingDescriptor>()
+            : _bindings;
+        var diagnostics = BindingRegistryValidator.Validate(bindings);
         if (diagnostics.Count > 0)
         {
             throw new SandboxValidationException(diagnostics);
         }
 
-        return BindingRegistry.FromValidated(_bindings);
+        return BindingRegistry.FromValidated(bindings);
     }
 }

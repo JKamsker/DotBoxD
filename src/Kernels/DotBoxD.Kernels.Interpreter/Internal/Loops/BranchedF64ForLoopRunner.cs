@@ -11,6 +11,7 @@ namespace DotBoxD.Kernels.Interpreter.Internal.Loops;
 // per iteration 5 (loop) + 1 + condition-node-fuel (if), and each taken assignment 1 + f64 expression node fuel.
 internal static class BranchedF64ForLoopRunner
 {
+    private const int CheckpointInterval = 4096;
     private const long LoopFuel = 5;
 
     public static bool TryRun(
@@ -34,14 +35,39 @@ internal static class BranchedF64ForLoopRunner
 
         var loopSlot = frame.GetSlot(statement.LocalName);
         long conditionFuel = 1 + plan.Condition.FuelCost;
-        var checkpoint = 4096;
+        var iterations = (long)end - start;
+        var fuelPerIteration = LoopFuel + conditionFuel + plan.Then.Fuel;
+        if (plan.Then.Fuel == plan.Else.Fuel &&
+            context.CanBulkChargeLoopIterations(iterations, fuelPerIteration))
+        {
+            context.ChargeLoopIterations(iterations, fuelPerIteration);
+            RunBulkMetered(plan, start, end, loopSlot, frame, context);
+            return true;
+        }
+
+        RunIncrementally(plan, start, end, loopSlot, frame, context, conditionFuel);
+        return true;
+    }
+
+    private static void RunIncrementally(
+        in BranchedLoopPlan plan,
+        int start,
+        int end,
+        int loopSlot,
+        InterpreterFrame frame,
+        SandboxContext context,
+        long conditionFuel)
+    {
+        var checkpoint = CheckpointInterval;
         for (var i = start; i < end; i++)
         {
             context.ChargeLoopIteration(LoopFuel);
             context.ChargeFuel(conditionFuel);
+
             frame.WriteRawInt32Slot(loopSlot, i);
             var taken = plan.Condition.Evaluate(frame, context) ? plan.Then : plan.Else;
             context.ChargeFuel(taken.Fuel);
+
             switch (taken.Kind)
             {
                 case BranchKind.Empty:
@@ -72,11 +98,57 @@ internal static class BranchedF64ForLoopRunner
             if (--checkpoint == 0)
             {
                 context.Checkpoint();
-                checkpoint = 4096;
+                checkpoint = CheckpointInterval;
             }
         }
+    }
 
-        return true;
+    private static void RunBulkMetered(
+        in BranchedLoopPlan plan,
+        int start,
+        int end,
+        int loopSlot,
+        InterpreterFrame frame,
+        SandboxContext context)
+    {
+        var checkpoint = CheckpointInterval;
+        for (var i = start; i < end; i++)
+        {
+            frame.WriteRawInt32Slot(loopSlot, i);
+            var taken = plan.Condition.Evaluate(frame, context) ? plan.Then : plan.Else;
+            switch (taken.Kind)
+            {
+                case BranchKind.Empty:
+                    break;
+                case BranchKind.Single:
+                {
+                    var assignment = taken.SingleAssignment;
+                    frame.WriteRawDoubleSlot(
+                        assignment.TargetSlot,
+                        assignment.Expression.Evaluate(frame));
+                    break;
+                }
+                case BranchKind.Many:
+                {
+                    var assignments = taken.MultipleAssignments!;
+                    for (var statementIndex = 0; statementIndex < assignments.Length; statementIndex++)
+                    {
+                        var assignment = assignments[statementIndex];
+                        frame.WriteRawDoubleSlot(
+                            assignment.TargetSlot,
+                            assignment.Expression.Evaluate(frame));
+                    }
+
+                    break;
+                }
+            }
+
+            if (--checkpoint == 0)
+            {
+                context.Checkpoint();
+                checkpoint = CheckpointInterval;
+            }
+        }
     }
 
     private static bool TryCreateLoopPlan(

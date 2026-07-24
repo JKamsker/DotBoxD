@@ -55,6 +55,60 @@ public sealed class PeerInboundFrameSenderCoverageTests
         await inbound.StopAsync().WaitAsync(ShortTimeout);
     }
 
+    [Fact]
+    public async Task InboundDispatch_WhenFrameSenderThrowsSynchronously_DisposesDetachedWriter()
+    {
+        var serializer = NewSerializer();
+        var expected = new IOException("simulated synchronous frame send failure");
+        PooledBufferWriter? detachedWriter = null;
+        var dispatchError = new TaskCompletionSource<Exception>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        static Task SendMemoryAsync(ReadOnlyMemory<byte> _, CancellationToken __) =>
+            Task.CompletedTask;
+
+        ValueTask SendFrameAsync(PooledBufferWriter writer, CancellationToken _)
+        {
+            detachedWriter = writer;
+            throw expected;
+        }
+
+        var streams = new RpcStreamManager(
+            serializer,
+            SendMemoryAsync,
+            exceptionTransformer: null,
+            SendFrameAsync);
+        var inbound = new RpcPeerInboundDispatcher(
+            serializer,
+            new RpcPeerOptions { InboundQueueCapacity = null, RequestTimeout = ShortTimeout },
+            streams,
+            SendMemoryAsync,
+            SendFrameAsync,
+            static (_, _, _, _) => { },
+            (_, ex) => dispatchError.TrySetResult(ex));
+        inbound.AddDispatcher(new EchoDispatcher());
+        inbound.Start(CancellationToken.None);
+        try
+        {
+            Assert.True(await inbound.AcceptRequestAsync(
+                CreateRequestFrame(serializer, 62, EchoDispatcher.Service, "Echo"),
+                messageId: 62,
+                CancellationToken.None));
+
+            var thrown = await dispatchError.Task.WaitAsync(ShortTimeout);
+            await WaitForInboundDrainAsync(inbound);
+
+            Assert.Same(expected, thrown);
+            Assert.NotNull(detachedWriter);
+            Assert.Throws<ObjectDisposedException>(() => _ = detachedWriter.WrittenMemory);
+        }
+        finally
+        {
+            detachedWriter?.Dispose();
+            await inbound.StopAsync().WaitAsync(ShortTimeout);
+        }
+    }
+
     private static async Task WaitForInboundDrainAsync(RpcPeerInboundDispatcher inbound)
     {
         var deadline = DateTimeOffset.UtcNow + ShortTimeout;

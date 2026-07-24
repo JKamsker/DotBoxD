@@ -1,5 +1,7 @@
 using System.Runtime.CompilerServices;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Sandbox.Values;
 
 namespace DotBoxD.Kernels.Runtime;
 
@@ -52,6 +54,28 @@ public static partial class CompiledRuntime
 
     public static SandboxType[] CreateTypeArray(int count)
         => count >= 0 ? new SandboxType[count] : throw InvalidInput("type array length must be non-negative");
+
+    /// <summary>
+    /// Generated-code ABI helper that validates a selected structural entrypoint return and records a
+    /// single-use proof for the host. The validation happens before publication, so hand-written or custom
+    /// compiled artifacts cannot use the proof to bypass the sandbox value boundary.
+    /// </summary>
+    public static SandboxValue RequireValueTypeAndRecordValidation(
+        SandboxContext context,
+        SandboxValue value,
+        SandboxType expectedType)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        EntrypointBinder.RequireType(value, expectedType, "function return type mismatch");
+        // Empty list/map validation is already O(1); publishing a proof would cost more than the host's
+        // fallback check. Non-empty collections and records avoid a genuine second structural walk.
+        if (value is not ListValue { Count: 0 } and not MapValue { Values.Count: 0 })
+        {
+            context.RecordCompiledReturnValidation(value, expectedType);
+        }
+
+        return value;
+    }
 
     private static void ChargeTypeArray(SandboxContext context, int count)
     {

@@ -22,7 +22,6 @@ public sealed partial class SandboxHost : IDisposable
     private readonly byte[] _planSigningKey = RandomNumberGenerator.GetBytes(32);
     private readonly AutoExecutionHotness _autoHotness = new();
     private readonly PreparedPlanIntegrityCache _preparedPlans = new();
-    private int _disposed;
 
     internal SandboxHost(
         BindingRegistry bindings,
@@ -284,12 +283,14 @@ public sealed partial class SandboxHost : IDisposable
 
     public void Dispose()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) == 0)
+        if (TryDisposeCompiledNoAuditStatePool())
         {
             _compiled.Dispose();
         }
     }
 
     internal void ThrowIfDisposed()
-        => ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+        => ObjectDisposedException.ThrowIf(
+            ReferenceEquals(Volatile.Read(ref _compiledNoAuditRunStates), this),
+            this);
 }

@@ -16,6 +16,12 @@ internal static class InterpreterProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-interpreter-binding-arity", StringComparer.OrdinalIgnoreCase))
+        {
+            await InterpreterBindingArityProbe.RunAsync();
+            return true;
+        }
+
         if (args.Contains("--probe-matrix", StringComparer.OrdinalIgnoreCase))
         {
             await PerformanceMatrixProbe.RunAsync();
@@ -52,9 +58,27 @@ internal static class InterpreterProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-interpreter-nested-loop-plan", StringComparer.OrdinalIgnoreCase))
+        {
+            await InterpreterNestedLoopPlanProbe.RunAsync();
+            return true;
+        }
+
+        if (args.Contains("--probe-interpreter-i64-nested-loop-plan", StringComparer.OrdinalIgnoreCase))
+        {
+            await InterpreterI64NestedLoopPlanProbe.RunAsync();
+            return true;
+        }
+
         if (args.Contains("--probe-interpreter-i64-plan-setup", StringComparer.OrdinalIgnoreCase))
         {
             await InterpreterI64PlanSetupProbe.RunAsync();
+            return true;
+        }
+
+        if (args.Contains("--probe-interpreter-f64-plan-setup", StringComparer.OrdinalIgnoreCase))
+        {
+            await InterpreterF64PlanSetupProbe.RunAsync();
             return true;
         }
 
@@ -82,15 +106,39 @@ internal static class InterpreterProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-interpreter-host-boundary", StringComparer.OrdinalIgnoreCase))
+        {
+            await InterpreterHostBoundaryProbe.RunAsync();
+            return true;
+        }
+
+        if (args.Contains("--probe-interpreter-trace-guard", StringComparer.OrdinalIgnoreCase))
+        {
+            await InterpreterTraceGuardProbe.RunAsync();
+            return true;
+        }
+
         if (args.Contains("--probe-compiled-execution-envelope", StringComparer.OrdinalIgnoreCase))
         {
             await CompiledExecutionEnvelopeProbe.RunAsync();
             return true;
         }
 
+        if (args.Contains("--probe-compiled-return-validation", StringComparer.OrdinalIgnoreCase))
+        {
+            await CompiledReturnValidationProbe.RunAsync();
+            return true;
+        }
+
         if (args.Contains("--probe-interpreter-numeric-conversion", StringComparer.OrdinalIgnoreCase))
         {
             await InterpreterNumericConversionProbe.RunAsync();
+            return true;
+        }
+
+        if (args.Contains("--probe-generic-primitive-expression", StringComparer.OrdinalIgnoreCase))
+        {
+            await GenericPrimitiveExpressionProbe.RunAsync();
             return true;
         }
 

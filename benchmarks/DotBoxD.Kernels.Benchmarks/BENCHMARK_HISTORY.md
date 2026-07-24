@@ -17,17 +17,28 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-matrix
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-frame-layout
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-local-call-arguments
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-scalar-assignment
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-audit-envelope
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-host-boundary
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-execution-envelope
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-return-validation
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-plan-setup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-i64-plan-setup
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-i64-nested-loop-plan
+DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 taskset -c 11 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-f64-plan-setup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-while-plan-setup
-dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-branched-plan-setup
+DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-branched-plan-setup
+DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 taskset -c 11 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-branched-f64-loop
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-numeric-conversion
+DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 taskset -c 11 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-generic-primitive-expression
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-hook-chain-discovery
+DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 taskset -c 11 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-event-adapter-validation
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-invokeasync-resolution
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-plugin-package-collision-discovery
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-server-extension-request-helpers
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-examples
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-prepared-values
+DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 taskset -c 8-11 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-auto-hotness-bookkeeping
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-runtime-types
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-input-types
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-resource-meter
@@ -44,8 +55,10 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-map-set-replace
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-host-call-accounting
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-run-summary-policy-id
-dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-binding-dispatch-scope
+DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-binding-dispatch-scope
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-binding-arity
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-binding-two-argument-fallback
+DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-binding-arity-three
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-capability-grant-lookup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-host-service-arguments
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-binding-structural-validation
@@ -67,7 +80,9 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-kernel-rpc-binary-codec-empty-decode
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-invokeasync-capture-argument-writer
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-kernel-rpc-marshaller-dto
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-hook-dispatch
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-subscription-dispatch
+DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-result-hook-fanout
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-event-query-dispatch
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-runlocal-push
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-collection-construction
@@ -78,6 +93,28 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 
 | Step | Commit | Probe | Key result |
 | --- | --- | --- | --- |
+| Bounded inline I32 local-helper assignments | this commit | `--probe-interpreter-scalar-assignment` | Raw-I32 assignment targets now execute a narrow one-argument, one-return, pure-I32 local helper without materializing its frame. A 16-entry per-plan identity cache retains positive and negative immutable-shape classifications, rechecks invocation assignment state, and fails closed at capacity; classified local misses reuse the already-resolved function through the existing generic continuation. Six balanced CPU-5 BC/CB pairs improve x1/x4/x8 medians `51.40→35.65`, `111.00→54.95`, and `190.95→84.70 ms` (30.64%/50.50%/55.64%, all 6/6) and remove exactly 96 B/helper call (`800.1/1,088.1/1,472.2→704.1 B/op`). The unsupported repeated-parameter control improves `204.00→193.35 ms`; boxed/raw/I64/F64 and all other non-target medians stay within +2.34%, with exact allocation, checksum, and resource tuples. Broad dispatch, uncached, and linear-cache prototypes were rejected before acceptance for 10-20%, roughly 20%, and 5.86% control regressions. |
+| Closed-set `SandboxType.IsKnown` name dispatch | this commit | `--probe-sandbox-type-validation`, `--probe-compiled-return-validation` | Recursive known-type validation no longer probes the forbidden-name hash set before dispatching every node: scalar fallthrough already rejects forbidden opaque names, and composites are closed to exact `List`/`Record`/`Map` names. Six balanced CPU-4 pairs improve nested declared/open/built-in checks `445.10→310.95`, `420.95→291.00`, and `367.35→238.10 ns` (30.14%/30.87%/35.18%), all 6/6 at exact 0 B. The unchanged forbidden-only walk is flat at `261.25→260.75 ns`. Compiled nested-record validation corroborates the boundary effect at `2,820.6→2,700.5 ns` (4.26%, 6/6), while its direct validation walk improves `830.9→760.0 ns` (8.53%, 6/6); scalar and large-list controls stay within +1.63%, with exact allocation/resource/malformed-rejection signatures. No cache or state is added; a per-instance cache experiment was rejected for adding 48 B per compiled nested-record call. |
+| Lock-free exact-MRU Auto hotness lookup | this commit | `--probe-auto-hotness-bookkeeping` | A volatile publication bypasses the global hotness-table monitor only when both plan-hash and entrypoint references exactly match the LRU tail; state history retains its own lock and every logical-key/recency mutation remains under the table gate. Six balanced CPU-8-11 pairs improve built-in interpreted `42.40→35.10 ns` (17.22%), warmed compiled `43.75→36.40 ns` (16.80%), snapshot interpreted `53.00→44.50 ns` (16.04%), snapshot compiled `53.30→45.65 ns` (14.35%), and four-worker contention `155.80→16.85 ns` (89.18%), all 6/6. Alternating/distinct-reference/churn controls move only +1.32%/+1.91%/+1.50%, and allocations/checksums are exact. |
+| Single-resolution `InvokeAsync` semantic transform | this commit | `--probe-invokeasync-resolution` | The broad syntax branch still admits every invocation, but each transform now resolves its exact method once and threads it through invalid-kind diagnostics, lowering eligibility, user-binding exclusion, DotBoxD surface recognition, and call-shape construction. Five balanced CPU-6 pairs of 300 retained-driver edits improve resolved ordinary `864.2→811.7 ms` (6.07%, 5/5), user-named `858.2→802.0 ms` (6.55%, 5/5), unresolved `2,986.4→2,761.1 ms` (7.54%, 5/5), custom `ProbeAsync` `6,231.7→6,097.7 ms` (2.15%, 4/5), and invalid-kind/fallback `1,504.4→1,474.3 ms` (2.00%, 4/5). Paired median improvements are 8.00% / 6.30% / 7.47% / 3.38% / 3.37%. Allocation is noise-flat and receives no claim. Probe sources are byte-identical, every output hash matches, and tests pin arbitrary custom names, generated/user receivers, unresolved calls, exact diagnostic text, and `CandidateSymbols[0]` fallback. |
+| Suppress repeated descendant I32 eligibility probes after a wide-unsupported arithmetic root | this commit | `--probe-generic-primitive-expression` | Unsupported generic arithmetic previously fell back node by node, and every descendant operator recursively scanned its suffix for I32 eligibility. Six balanced CPU-pinned pairs reduce depth-96 left-associated intrinsic-call trees from `49,377.70→5,600.35 ns` and `48,843.60→5,634.80 ns`, and the conversion tree from `48,241.25→5,290.20 ns` (88.46-89.03%, 6/6 wins each). Exact allocations remain `3,064.8/3,064.8/3,000.4 B/op`, with exact fuel/host totals `200/1`, `200/1`, and `198/0`. Right-associated negative controls move 2.34-3.36% faster and receive no timing claim. Stabilized supported-F64 controls are noise-flat at `534.55→532.05 ns` and `526.55→533.15 ns`, mixed at 4/6 wins; I64 and shallow controls stay within 1.22% and 1.96%. An artifact-isolated four-pair mixed-sibling follow-up improves all intrinsic/conversion and pure-left/pure-right rows 84.13-90.89% at exact allocation/resource parity. Baseline already suppressed wide descendant probing; the new suppression is limited to repeated descendant Unary/Binary I32 eligibility after the root miss. Leaves, calls, generic evaluation, fuel, trace, cancellation, operator, and fault order are unchanged and pinned. |
+| Bulk-meter equal-cost interpreted F64 branches | this commit | `--probe-branched-f64-loop` | When both branch bodies have identical static fuel and the complete loop fits the fuel and iteration budgets, the interpreter now charges the loop once and runs the existing unboxed condition/assignment plans with only the established 4,096-iteration cancellation/deadline checkpoints. Eight alternating baseline/candidate process pairs pinned to CPU 11 with tiering, PGO, and ReadyToRun disabled improve the median of seven 5,000,000-iteration samples from `65.55→53.10 ms` (19.0%, 8/8 wins). An unequal-cost branch retains path-specific per-iteration metering and stays within the 5% control guard at `53.05→54.20 ms` (+2.17%), so it receives no timing claim. Insufficient whole-loop fuel or loop budget falls back to the original incremental order. Values and the full resource tuple remain exact, and the same four success/unequal/low-fuel/low-loop semantic cases pass against baseline and candidate binaries. |
+| Bounded generic I64/F64 expression eligibility | this commit | `--probe-generic-primitive-expression` | Generic parents previously revisited I32 eligibility throughout deep I64/F64 arithmetic and boxed every intermediate value. A four-entry, exact layout/expression cache now classifies bounded whole trees once, rechecks invocation-specific assignment state, and executes supported trees through the raw evaluators. Two CPU-pinned B-C pairs with tiering/PGO/ReadyToRun disabled improve depth-96 F64 left/right trees `46,105.1→2,594.0 ns` (94.4%) and `4,060.8→1,541.2 ns` (62.0%), with `2,976.4→696.1 B/op`. Warm intrinsic/conversion controls move at most 1.84%, and a full-cache fifth root moves 1.51%; all retain exact allocation, fuel, and host-call counts. First-invocation setup allocations match baseline exactly. Unsupported second-invocation classification has a measured one-time 128 B cost and 3.2% left-deep / 32-38% short right-deep cost; the third and later invocations return to allocation parity and equal-or-better timing. Classification is capped at 512 nodes/64 raw slots, cache growth stops at four keys, debug tracing bypasses it, and tests pin faults, ordering, assignment transitions, exact-reference/layout isolation, capacity, and concurrent publication. |
+| Target-directed interpreter scalar assignments | this commit | `--probe-interpreter-scalar-assignment` | Straight assignments now resolve the target slot once and invoke only its matching raw I32/I64/F64 evaluator; a failed targeted probe is reused before the unchanged legacy fallback cascade. Four isolated, CPU-pinned samples per side with identical expanded probes improve x8 I64 literal `82.95→67.80 ms`, I64 raw-variable `93.90→85.90 ms`, F64 literal `85.35→68.80 ms`, and F64 raw-variable `105.25→90.25 ms`. Subtracting each x0 envelope improves assignment work 15.3-32.5%. I32 controls are flat (`69.45→69.15` and `86.15→87.75 ms`), and boxed-target/evaluator-miss controls overlap. All 48 rows retain exact allocations, checksums, and resource tuples; raw assignments remain `0 B/assignment`. Unknown/boxed targets, evaluator misses, async bindings, faults, tracing, assignment state, and shared-plan concurrency are pinned. |
+| Bounded cross-thread incremental shape handoff | this commit | `--probe-value-shape-cache` | Large incrementally composed lists and maps can now carry their already-measured shape across a producer/consumer thread boundary without a structural rewalk or persistent per-result weak-table entry. A 16-entry weak producer registry and lazy 256-slot identity-hash directory retain no values; exact reference, owned-list generation, and seqlock validation remain authoritative. Ten CPU-pinned AB/BA pairs reduce List<I32> x256 consumer charge `5,884.2→109.6 ns` (53.7x) and `16,824→0 B/op`, and Map<I32,I32> x256 `15,304.7→103.9 ns` (147.4x) and `33,408.8→0 B/op`. Full ListAdd remains within the 5% guard at +1.71% with exact `705.4 B/op`; MapSet improves 10.23% at the same 40 B/op. Populated x1 cold List/Map/Record controls stay within 3.6% with allocation parity. Five additional balanced pairs force the bounded scan with 16 live publishers and unique x256 misses: list is +1.46% paired (`5,385.1→5,476.8 ns`) and map -3.61% (`11,742.7→11,280.9 ns`), both allocation-identical. Capacity, collision, stale-slot reuse, weak collection, generation reset, torn publication, and fallback are pinned. |
+| Layout-scoped single-assignment I64 `forRange` plans | this commit | `--probe-interpreter-i64-plan-setup`, `--probe-interpreter-i64-nested-loop-plan` | Eligible raw-I64 plans use exact-statement two-hit admission and are retained in the existing layout-owned `forRange` store shared with I32. Every hit revalidates the expression's required assigned slots. One million outer iterations entering the same one-iteration inner loop fall exactly `192,001,280→1,280 B`, removing 192 B/entry; the zero-inner control stays `1,280 B` and an untouched multi-assignment body stays `1,952 B`. Across 50,000 warmed executions, one-iteration allocation falls `50,405,992→40,805,000 B` while zero-iteration and both multi-assignment controls are byte-identical. Six balanced 20M-body pairs are timing-flat (`95.10→95.50 ms`, paired median -0.05 ms, 3/6 wins), so no latency claim is made. Sharing the existing typed cache keeps `FunctionLoopPlans` exactly 72 B and mass layout construction allocation-identical; eight I32 control pairs retain exact allocation and flat timing. Debug, fallback, checked faults, metering, concurrency, cross-kind isolation, and current-frame assignment state remain pinned. |
+| Allocation-stable empty binding registries | this commit | Cold-host allocation regression test | Empty hosts no longer allocate an unused builder list or validation-diagnostics list. Three 100,000-host minima move normal-runtime construction from `4,888→4,824 B/host` and both `DOTNET_TieredPGO=0` and `DOTNET_JitObjectStackAllocation=0` construction from `4,920→4,856 B/host`, exactly 64 B/host from the two 32-byte lists. Default and explicit interpreter hosts remain allocation-identical. The permanent guard accepts further JIT improvements while rejecting any value above the conservative `4,856 B/host` bound; non-empty registry validation remains unchanged. |
+| Saturating provider-owned completed-executable hot set | this commit | `--probe-compiled-execution-envelope` | The default non-persistent reflection provider publishes two exact-plan completed executables for lock-free lookup during binding-free suppressed execution. Once saturated, another exact completed plan uses one execution-cache lock without touching either backing LRU; a true miss retains the original artifact→executable pipeline. Against exact pooled-state baseline `5084f8559`, six CPU-pinned balanced pairs improve monomorphic `563.75→414.75 ns/op` (26.43%), A/B `557.25→432.80` (22.33%), saturated C-only `549.95→462.10` (15.97%), and A/B/C `546.65→449.40` (17.79%), every target winning 6/6. The cancelable provider/fresh-state control is noise-flat (`559.05→567.05 ns` unpaired; paired-difference median -4.45 ns, 3/6). Every allocation total is byte-identical. A permanent alternating lane exposed and eliminated 48 B/switch of publication churn (`240.0→192.0 B/op`). Exact identity, ordinal entrypoints, aligned eviction, invalidation, custom/persistent providers, all eligibility bypasses, and collectible load-context teardown remain pinned. |
+| Public compiled no-audit run-state pool | `5084f8559` | `--probe-compiled-execution-envelope` | A lazy bounded exact-plan pool reuses the 128-byte resource meter and 192-byte sandbox context for public binding-free suppressed compiled runs. Six balanced pairs reduce allocation `512,118,624→192,044,408 B` across one million executions, or `512.1→192.0 B/op`; the intended repeated mechanism is exactly 320 B/run. The cancelable bypass remains `512.1 B/op`. Timing did not improve at this step and is not claimed. Five isolated test processes keep cold default/explicit-interpreter hosts exactly `4,888 B/host` and pending audited provider suspension exactly `1,032 B`. Busy slots fall back to fresh state, and all ineligible or externally supplied state paths bypass the pool. |
+| Trusted pure built-in interpreter results (rejected and reverted) | `2edb44296`, `89d8fe202`, this commit | `--probe-interpreter-host-boundary` | An experiment skipped result sanitization for a narrow exact built-in success envelope and measured `13,372.50→383.85 ns/op` (-97.1%, 10/10 wins) plus an exact `11,016.23408 B/op` reduction. Focused boundary review found that the predicate was not equivalent to `InterpreterResultValidator`: it omitted declared return-shape validation and the complete fuel/loop/allocation/collection/string resource envelope. The bypass and its eligibility/allocation tests were removed, and full validation is again unconditional for every interpreter result. The measurements remain only as rejected experimental evidence; no production claim is made. |
+| Layout-scoped multi-assignment I32 loop-plan reuse | `e23caf57b` | `--probe-interpreter-plan-setup`, `--probe-interpreter-while-plan-setup` | Extended the existing exact-reference, two-hit prepared-layout caches to retain eligible all-raw multi-assignment I32 `forRange` and `while` plans, while revalidating every required raw source and condition slot on each hit. Twelve CPU-pinned alternating AB/BA pairs reproduced exact planner-allocation reductions of 280→0 B per entered `forRange` and 504.0-504.1→0 B per planned `while`. Seven pairs passed a one-sided 5% regression guard across seven target/control lanes; their 50,000-execution medians improved from 27.4→20.8 ms for one-iteration `forRange` (-24.1%, 7/7 wins), 28.7→18.5 ms for one-iteration `while` (-35.5%, 7/7), and 27.8→17.5 ms for zero-iteration `while` (-37.1%, 7/7). The direct-expression 20M, scalar-while 20M, and nested-skip controls were allocation-identical; no long-loop timing claim is made. Three-assignment source ordering, nonreusable fully plannable inputs, raw-slot fallback, faults, metering, debug tracing, identity, and concurrent publication are pinned. |
+| Reuse the most-recent Auto hotness state | `1d4752ca5` | `--probe-auto-hotness-bookkeeping` | Repeated Auto execution normally presents the same plan-hash and entrypoint string instances, but the bounded table still hashed the composite key and removed/re-added the node already at the LRU tail. Under the existing table gate, an exact reference-identity hit now returns that resident state; different references retain the original ordinal-value dictionary lookup and LRU path. Ten alternating fresh-process pairs pinned to CPU 3 with Tiering, PGO, and ReadyToRun disabled improve built-in interpreted/warmed-compiled table medians `81.2→42.1 ns` (48.2%) and `81.0→42.5 ns` (47.6%), while custom-selector snapshot table medians improve `88.7→51.7 ns` (41.7%) and `88.5→52.2 ns` (41.0%). All four same-key lanes win 10/10. Their paired direct-state controls remain within 2%; subtracting those medians reduces isolated table overhead `47.9→8.6 ns` and `47.3→8.1 ns` (82.2%/82.9%). A new two-key alternating control forces the unchanged dictionary/LRU path and is flat within noise at `96.2→94.4 ns` with 6/10 wins. Built-in lanes stay at 0 B/op, snapshot lanes stay exactly 96 B/op, and all checksums remain exact. Tests pin value-equal distinct-string fallback, exact eviction order, completion after eviction, concurrent same-key run counts, capacity, key separation, and selector history. This is an isolated bookkeeping claim; no end-to-end Auto latency claim is made. |
+| Descriptor-aware no-audit checkpoint skip | `60f8ae29c` | `--probe-binding-dispatch-scope` | Generic binding dispatch no longer reads `IAuditSink.EventsWritten` through the `AsyncLocal`-aware audit property when the descriptor is exactly `AuditLevel.None`; required and unknown levels retain the original checkpoint path. Ten alternating fresh-process pairs pinned to CPU 3 with Tiering, PGO, and ReadyToRun disabled improve the no-op default-token median `93.9→90.1 ns` (4.1%), reusable-live-token median `109.6→102.7 ns` (6.3%), and production-style pre-populated `InMemoryAuditSink` median `102.3→90.8 ns` (11.2%). Every no-audit lane wins 10/10 pairs, remains exactly 144 B total across 500,000 calls, and retains exact audit counts `0/0/1`. Audited sync/async controls retain exactly 500,000 events and 280.8 B/call; their separate medians move `437.9→429.8` and `439.6→434.6 ns`, while paired means move +1.1%/+2.8%, so no audited timing claim is made. The same descriptor-aware helper covers interpreter dispatch; the full host-level interpreter probe is too coarse/noisy for a timing claim, while custom-sink tests prove zero checkpoint/scan/write observations across interpreter and compiled array/arity-1/2/3 dispatch. Required-audit tests preserve checkpoint 1, and a nested regression proves an inner no-audit call leaves an outer required-audit scope and event ordering intact. The sole intentional custom-sink difference is that an unused `EventsWritten` getter is no longer invoked for `None`. |
+| Lock-free plugin registry fanout lookup | `daf21943c` | `--probe-hook-dispatch`, `--probe-subscription-dispatch`, `--probe-result-hook-fanout` | Registry writers now clone and atomically publish never-mutated event-fanout dictionaries, while warmed dispatch performs one volatile snapshot read and lookup without taking the registry monitor. Ten accepted alternating baseline/candidate pairs were pinned to one CPU with Tiering, PGO, and ReadyToRun disabled. Hook single/eight/miss medians improve 29.0→15.9 ns (45.1%), 90.3→76.4 ns (15.4%), and 15.1→7.8 ns (48.5%); subscription medians improve 25.9→11.9 ns (54.2%), 57.5→43.1 ns (25.0%), and 14.7→7.8 ns (46.9%). Every affected lane wins 10/10 pairs, while direct empty-pipeline controls remain median-flat at 6.4→6.4 ns and 2.4→2.4 ns. One preliminary hook pair was discarded by the predeclared control threshold before selecting the ten accepted pairs. Supplementary result-hook medians improve 84.0→73.1 ns (one handler), 128.9→113.4 ns (two), 447.9→431.6 ns (eight), and 61.2→47.3 ns (eight empty), also 10/10 each. Every process reports the exact one million dispatches and 0 B/op. Mutation remains serialized and pays copy-on-write setup cost; deterministic tests hold the mutation gate while readers complete and cover dictionary immutability, concurrent registration, eviction/registration overlap, stable in-flight snapshots, delayed stale aggregate publication, and removed-registration collection. The timing claim is uncontended steady-state lookup only. |
+| Cached globally ordered result-hook fanout | this commit | `--probe-result-hook-fanout` | Each result-hook pipeline now caches its type-erased registration wrappers against the exact immutable entry-array reference, while the existing immutable event fanout caches their merged descending-priority/global-install-order array. Five alternating Tiering-disabled one-million-fire pairs remove exactly 256 B/fire for two one-handler context pipelines, 776 B/fire for eight, and 32 B/fire for eight empty pipelines; every candidate lane measures 0 B/fire and wins all five affected timing pairs. Medians improve 374.6→222.9 ns (40.5%), 1,180.6→720.7 ns (39.0%), and 218.1→63.8 ns (70.7%). The allocation-free single-pipeline control is flat at 132.7→133.7 ns and receives no speed claim. Exact source-reference comparison detects handler additions; uninstall eagerly publishes the replacement slot snapshot and evicts the fanout state, releasing removed kernels without requiring another fire. Pipeline add/remove replaces the immutable fanout, while concurrent mutation leaves an in-flight dispatch on one stable snapshot and appears on the next. This adds one state-owner object when each non-empty fanout is constructed; steady-state measurements exclude setup. Existing hook/subscription publish controls remain at 0 B/op and median-flat, so they receive no timing claim. |
+| Layout-scoped I32 branched-loop plan reuse | this commit | `--probe-interpreter-branched-plan-setup` | Exact-reference, two-hit caching retains only immutable raw-I32 plans whose loop body is exactly one `if` and whose branches are empty or single assignments. Eight alternating Tiering-disabled processes of 50,000 executions improve the single/single median from 36.0 to 25.4 ms (29.4%, 8/8 wins) and the empty/single median from 32.0 to 24.4 ms (23.8%, 8/8 wins). Measured totals fall from 1,304.1 to 744.0 B/op and from 1,136.1 to 744.0 B/op at displayed precision, removing the full observed planning overhead and matching the no-branch control. The same narrow target check rejects impossible I32 planning before eligible F64 branches: F64 single/empty fall by 224.0 B/op at displayed precision to 1,424.1/1,232.1 B/op, with medians improving 41.6 to 37.2 ms (10.6%) and 38.6 to 33.4 ms (13.5%), also 8/8. Zero-loop, no-branch, and I32/F64 multi-assignment allocation totals remain byte-identical and their timing ranges overlap. Each hit revalidates the deduplicated condition/then/else raw-slot union while exempting the loop slot written by the runner. Current values, reference identity, concurrent publication, debug tracing, unsupported fallback, arithmetic faults, quota order, checksums, and resource counters are pinned. The inline store adds three reference fields to each prepared function layout, while cache objects are created only after a second complete reusable plan. |
+| Regular compiled two-argument binding fallback | this commit | `--probe-compiled-binding-two-argument-fallback` | Replaced the target-typed collection expression passed to a regular `BindingInvoker` with an explicit two-element array. Five fresh one-million-call processes reproduce exactly 64 B/call for the legacy target-typed fallback, 40 B/call for the explicit-array control, and 40 B/call for the repaired full `CallBinding2` fallback: an exact 24 B/call reduction. This is allocation-only evidence because the isolated construction controls and full dispatcher lane are not timing-comparable. The typed fast invoker, validation, charging, audit, cancellation, and failure paths are unchanged; a focused full-fallback regression pins the allocation and result. No compiler, verifier, or public API version changes are needed. |
+| Compiled three-argument binding fast path | this commit | `--probe-compiled-binding-arity-three` | Generated three-argument runtime-stub calls now pass scalar values through verifier-allowlisted `CompiledRuntime.CallBinding3`, and `string.substringBudgeted` implements the typed invoker. Eight fresh direct processes improve the 500,000-call median from 189.8 to 164.5 ns/call (13.3%) and allocation exactly from 104 to 56 B/call. Eight alternating end-to-end processes, each running one million compiled substring calls, improve the median from 246.1 to 202.8 ns/binding (17.6%, 8/8 wins) and allocation exactly from 137.3 to 89.3 B/binding. A regular non-fast three-argument binding remains exactly 48 B/call through the explicit-array fallback. Value-array sandbox charging, argument order, structural validation, async denial, failure audit, and legacy list invocation remain pinned. Compiler/verifier versions advance to 14/13 because the emitted ABI and allowlist changed. |
 | I32 interpreted loop fast path | `44bc06f` | `--probe-compiled` | Interpreted scalar loop dropped to about 3.3x to 3.5x handwritten in subsequent scalar probes. |
 | I32 compiled raw loop path | `024f1ca` | `--probe-compiled` | Scalar compiled loop reached 62.2 ms vs 47.9 ms handwritten, or 1.3x. |
 | Binding crossing optimization | `216eec6` | `--probe-bindings` | `math.sqrt` crossing improved from compiled 542.1 ms / 68.8x to 196.7 ms / 25.1x; interpreted improved from 677.7 ms / 86.0x to 514.7 ms / 65.6x. |
@@ -134,6 +171,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Single-pass registry-builder validation | this commit | `--probe-binding-registry` | `BindingRegistryBuilder.Build` now hands already validated descriptors to an internal registry constructor path, while public `new BindingRegistry(...)` keeps its validation pass. The 200-build lane over 1,000 bindings improved from 1,200.1 ms and 1,459,970,704 B to 964.1 ms and 1,446,376,080 B. Existing builder and public-constructor validation tests cover the two externally visible validation paths. |
 | Structural map removal | this commit | `--probe-map-remove` | `map.remove` now trusts the already-validated immutable source map like reads and `map.set`, validates only the key, and removes through the `MapValue` immutable backing. The 20k-remove probe over a 128-entry structurally shared map improved from a legacy deep-validate/copy path at 563.9 ms and 831,680,040 B to 141.9 ms and 182,400,040 B while still full-charging the removed result shape. |
 | Missing-key map-remove shape reuse | this commit | `--probe-map-remove` | Missing-key `map.remove` leaves the result shape identical to the source for every map type, so it now reuses the source shape before the scalar-only present-key gate. The 20k missing-key remove lane over a 128-entry `Map<String,String>` improved from 110.8 ms and 340,646,816 B to a repeated after-run of 4.4 ms and 2,575,504 B, while present-key string/nested removals still fall back to a full shape walk. |
+| Missing-key map-remove result reuse | this commit | `--probe-map-remove` | Missing-key removal now returns the immutable source `MapValue` after preserving key validation, copy fuel, projected sandbox allocation, and shape charging. Over 20,000 dictionary-backed scalar misses, the focused lane improved from 253.1 ms / 168,335,464 B to 1.6 ms / 0 B; immutable-backed string misses improved from 5.1 ms / 3,067,192 B to 2.5 ms / 0 B. Every miss reused the source, present-key removal remained distinct, and the probe's fuel/allocation/element/string/checksum totals were byte-identical. |
 | Scalar map-set replacement shape reuse | this commit | `--probe-map-set-replace` | Replacing an existing entry in a zero-shape scalar map keeps the same entry count, aggregate shape, and metering-walk node count, so the result can reuse the source shape cache instead of full-walking the replacement result. Same-session samples for 20k replacements in a 128-entry `Map<I32,I32>` measured the full-walk path at 483.2 ms then 431.6 ms and 350,192,304 B. The cached-shape path measured 29.5 ms and 12,970,904 B. Complex maps still fall back to the full walk. |
 | Lazy unlimited host-call accounting | this commit | `--probe-host-call-accounting` | Avoided constructing interpolated quota messages on successful host-call charges, and skipped per-binding call dictionaries when a descriptor has no `MaxCallsPerRun`. The 1M-call unlimited path improved from 73.7 ms and 232,000,136 B to 2.6 ms and 40 B. The limited control path, which still tracks per-binding counts, improved from 58.8 ms and 232,000,136 B to 35.6 ms and 256 B by removing successful-path quota-string allocation. |
 | Allocation-free no-op compiled binding dispatch | this commit | `--probe-binding-dispatch-scope` | Converted the binding grant-clock scope from an allocated `IDisposable` class to a concrete struct and made binding-return validation messages lazy for the success path. The 500k-call no-arg `Unit` binding probe improved from 228.4 ms and 87,769,944 B to 218.1 ms and 184 B. The intermediate struct-scope-only sample measured 222.8 ms and 68,000,184 B, isolating the remaining allocation to the eager return-validation message. |
@@ -185,6 +223,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Syntax-filtered hook-chain discovery | this commit | `--probe-hook-chain-discovery` | Limited the hook-chain semantic transform to member calls named `Run`, `RunLocal`, `Register`, or `RegisterLocal`, while retaining method-group terminals. Across 1,000 retained-driver edits of a tree with 1,000 unrelated `Touch` calls, allocation fell from 1,809,295,360 B to 1,664,179,784 B (-145.1 KB/edit) and time fell from 7.312 to 4.899 ms/edit (-33.0%). An unrelated `Run` control retained semantic validation and stayed allocation-equivalent; generated sources and diagnostics were byte-identical. |
 | Direct server-extension RPC response encoding | this commit | `--probe-kernel-rpc-response-encoding` | Routed the already-validated `SandboxValue` result from `InvokeServerExtensionRpcAsync` through the existing direct binary codec instead of materializing a parallel `KernelRpcValue` tree, and matched declared collection types without rebuilding structural `SandboxType` descriptors. Across 200,000 encodes, `List<I32>` fell from 272 to 80 B/op, `Map<String,I32>` from 4,072 to 464 B/op, and an eight-item `List<Record<I32,String>>` from 2,808 to 160 B/op; the scalar control remained 64 B/op. The nested 2,648 B/op saving decomposes into 1,088 B of record-type materialization and 1,560 B from the intermediate wire tree, with byte-identical payloads and unchanged malformed-collection rejection. |
 | Scalar single-assignment I32 while plans | this commit | `--probe-interpreter-while-plan-setup` | Kept one-statement I32 `while` planning in a scalar local instead of allocating and indexing an `AssignmentPlan[1]`. Across 50,000 executions, both one- and zero-iteration rows fell by exactly 2,000,000 B (40 B/op); the no-while and dependent two-assignment controls were byte-identical. Six alternating published-binary samples per variant moved the 20-million-iteration median from 192.9 ms to 182.1 ms (-5.6%), with non-overlapping 191.7-195.3 ms and 181.1-184.1 ms ranges and identical results/resources. |
+| Layout-scoped I32 while-plan reuse | this commit | `--probe-interpreter-while-plan-setup` | Exact-reference, two-hit caching now retains immutable single-assignment I32 `while` plans in the prepared function layout and revalidates every required raw slot on each invocation. Seven fresh Tiering-disabled processes per state reduce a million repeated zero-iteration entries from a 243.4 to 145.0 ms median (40.4%) and from exactly 280,001,368 to 1,368 B. The paired skip control is flat at 122.4→121.7 ms and 1,368 B, so isolated entry overhead falls 121.1→23.2 ns (80.8%) and incremental allocation falls exactly 280→0 B/entry. Across 50,000 separate executions, both zero/one-iteration lanes become byte-identical to the no-while control at 736.0 B/op; the multi-assignment allocation control stays exact and the 20-million-body-iteration median is flat at 175.3→174.8 ms. Current values, unassigned-slot fallback, fuel/loop/fault ordering, debug traces, and concurrent publication are pinned. The independent inline store adds exactly three references (24 B on measured x64) once per prepared function layout while avoiding cache-owner allocation on one-shot loops. Eight alternating existing for-range cache pairs retain the exact 1,296 B run total and a flat 185.4→184.3 ms median. |
 | Direct generated-client RPC response decoding | this commit | `--probe-kernel-rpc-client-response-decode` | Generated service proxies and direct graft clients now validate response bytes without allocation and project the declared CLR return type directly from the payload instead of first materializing a `KernelRpcValue` tree. Across 100,000 decodes, `List<I32>` fell from 264 to 72 B/op, `Map<String,I32>` from 5,976 to 2,368 B/op, and an eight-item `List<Record<I32,String>>` from 2,000 to 440 B/op; I32 stayed allocation-free. Four process runs, each using four internally alternating rounds, moved timing medians from 5.9/26.2/200.3/85.3 ms to 5.1/21.2/125.4/45.1 ms. Full structural validation remains ahead of DTO construction, and the emitted ref-struct reader is isolated in synchronous helpers so C# 12 async clients still compile. |
 | Lazy collision-safe server-extension request helpers | this commit | `--probe-server-extension-request-helpers` | Request conversion now evaluates a framework-type resolver only after its type predicate matches and skips the generated outer method name when allocating numbered or fixed helpers. A `List<int>` proxy falls from seven request helpers, 6,143 UTF-8 bytes, and 121 lines to one helper, 3,698 bytes, and 67 lines. Across ten cold generations of 100 proxies, allocation falls from 106,581,552 B to 70,499,272 B (33.9%, or 3,608,228 B/run). Generated-compilation tests pin the former `WriteKernelRpcValue5` and `DateTimeToWireOffset` collisions, the post-cleanup `WriteKernelRpcValue0` boundary, and the direct-graft form. |
 | Scalar empty/single branched interpreter plans | this commit | `--probe-interpreter-branched-plan-setup`, `--probe-branched-f64-loop` | Branched I32/F64 loop planners now store empty branches without a plan and one-assignment branches inline, retaining arrays only for two or more ordered assignments. Across 50,000 executions, I32 one-one / empty-one branches remove exactly 80 / 64 B/op; F64 removes about 120 / exactly 128 B/op because the tentative I32 planner also stops allocating before F64 fallback. Zero/no-branch/two-two controls are byte-identical. Four long-F64 process medians moved from 90.4 to 82.8 ms (an observed -8.4%), with non-overlapping ranges and unchanged results/resources. |
@@ -205,7 +244,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Invocation-owned binding audit arbitration | this commit | `--probe-binding-dispatch-scope` | Reused the in-memory destination's event-list gate and removed global checkpoint ownership from the committed async audit wrapper. Across four fresh 500,000-call processes, the async-completed median fell from 320.8 to 280.8 B/call (-40.0 B), while no-audit stayed at 144 total bytes. Sound identity now also covers supported sync-declared pending calls, intentionally moving declared-sync audited calls from 144.8 to 280.8 B/call (+136.0 B). No timing claim is made. |
 | Primitive I64/F64 return trees | this commit | `--probe-interpreter-scalar-return` | Evaluated eligible non-debug unary/binary return trees through the existing primitive evaluators and boxed only the final public result. Across 100,000 executions, one/eight literal increments remove exactly 24/192 B per call and one/eight raw-variable increments remove 48/384 B. I64 and F64 rows are byte-identical; x0 literal/plain-variable controls, checksums, and all resource counters are unchanged. Elapsed time is not claimed. |
 
-Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, and `ChargeValueArray`
+Versioning note for compiled binding fast paths: `CallBinding1`, `CallBinding2`, `CallBinding3`, and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade
 members: compiled assemblies must call them across assembly boundaries and the verifier allowlist
 hashes their exact signatures. They are not supported host API.
@@ -2439,3 +2478,1085 @@ Both entrypoint and function emitters retain legacy factories for unsupported sh
 metered call shape plus null-field rejection. Compiler and verifier identities advance from 10 to 11; API baselines and the
 spec manifest record the additive runtime facade. No type-system, effect-analysis, language, artifact-format, or sandbox
 resource-accounting contract changes.
+
+## Disabled interpreter trace guards
+
+Generic statement and expression dispatch called `InterpreterTrace.Write` even when debug tracing was disabled, evaluating
+the runtime node type name before the writer could observe the disabled flag. Both dispatchers now test the immutable
+per-run option before constructing those arguments; the writer retains its own guard as a defensive contract.
+
+Command:
+
+```text
+DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-trace-guard
+```
+
+Across four fresh Release processes, 250,000 prepared executions containing 33 generic statements improved from
+282.7-291.9 ms (34.3-35.4 ns/statement) to 251.6-254.0 ms (30.5-30.8 ns/statement). The medians improve from
+286.7 to 252.9 ms, or 11.8%. Allocation remains effectively unchanged and is not claimed. The probe pins the Unit result,
+empty audit stream, and exact 67 fuel units per execution; existing debug regressions preserve trace order and node names.
+
+## Shared binding wall-time deadline
+
+Binding dispatch previously called `CancelAfter(RemainingWallTime)` for every host call. Default-token runs repeatedly
+re-armed one timer; live-token runs allocated, armed, linked, and disposed a fresh source. The interpreter and all
+compiled binding dispatch shapes now lease one execution-owned source armed once to the resource meter's fixed absolute deadline. A
+live run token is linked only for the duration of each call through an unsafe cancellation registration. Every lease
+performs an exact deadline check before invoking host code, and execution boundaries dispose the source after success,
+timeout, cancellation, or failure. Recycled contexts release and replace the generation source instead of rearming a
+canceled token.
+
+Command:
+
+```text
+DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-binding-dispatch-scope
+```
+
+The final hardened implementation was measured across five fresh Release processes, 500,000 completed compiled no-op
+calls each. The baseline is the original per-call source/timer implementation:
+
+```text
+run token    baseline ns/call / B/call       final ns/call / B/call       median time
+default             146.3-148.4 / 0.0              95.2-116.0 / 0.0            -33.5%
+live              205.9-212.4 / 160.0             110.8-114.0 / 0.0            -46.2%
+```
+
+The live lane eliminates 160 B/call of churn: total allocation falls from 80,000,000 B to one 144 B execution source. Tests cover interpreted and compiled mid-call cancellation,
+default and live-token wall-time expiry, pre-invocation rejection after expiry, cancellation classification, nested leases,
+allocation-free warmed registration, concurrent first publication, context-generation replacement, and collection of the
+disposed source after every terminal run outcome. `SandboxContext` is now disposable so hand-written runtime consumers can
+release the same execution resource; its public source-returning API always returns a separate caller-owned source. Sandbox
+budget accounting and the fixed timeout deadline are unchanged.
+
+## Reused nested I32 loop plans
+
+The interpreter's optimized single-assignment I32 loop path built an identical expression plan every time a nested loop
+was entered. A million outer iterations around a one-iteration inner loop therefore allocated one plan per inner entry,
+although the prepared statement, frame layout, target slot, expression shape, and fuel cost were all invariant.
+
+Function layouts now publish a reusable plan only after the same statement has planned successfully twice. Reuse is
+limited to expressions whose variables all have raw I32 slots. Every cache hit still verifies that the required raw slots
+are assigned in the current frame, so the cache cannot turn read-before-assignment failures into stale-value reads. The
+common execution helper retains the same loop charging, checkpoint cadence, checked expression evaluation, and fallback
+behavior. Scalar admission and hot-plan entries keep the common one-loop layout allocation-free; reference-keyed admission
+and plan indexes are created lazily only when one function layout proves it needs multiple reusable loops.
+
+Command:
+
+```text
+DOTNET_TieredCompilation=0 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-interpreter-nested-loop-plan
+```
+
+Across four fresh Release processes, the one-million-entry nested workload changed from 224.2-246.1 ms and 56,004,832 B
+to 179.3-192.5 ms and 1,296 B. Its median improves from 224.4 to 182.1 ms, or 18.9%, while incremental allocation over
+the zero-inner control falls from 56,003,832 B to 296 B (56.0 B to effectively 0 B per inner entry). The outer-one,
+inner-one-million control remains at 2.4-2.7 ms before and 2.6-2.7 ms after, confirming the benefit comes from repeated
+planning rather than loop-body execution. The zero-inner timing ranges overlap and are not claimed. The probe pins the
+result and all resource counters; regressions cover required-slot assignment, debug fallback, concurrent publication,
+alternating cached statements, and the allocation bound. No public API, fuel, loop-budget, trace, or sandbox accounting
+contract changes.
+
+## Snapshot-free built-in Auto hotness selection
+
+The sealed default execution-mode selector reads only the current run count, but every eligible Auto execution still
+materialized the full retainable `ModuleHotnessStats` snapshot required by arbitrary custom selectors. The default path now
+captures the exact saturated run count while holding the existing hotness-state lock and carries a state-only completion
+handle through backend execution. Custom selectors continue to receive the same immutable point-in-time snapshot.
+
+Commands:
+
+```text
+DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-auto-hotness-bookkeeping
+DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-prepared-values
+```
+
+Three fresh Release processes paired 500,000 built-in attempts with the retained snapshot control. Median results were:
+
+```text
+path                       snapshot control       built-in path        allocation
+table interpreted                 98.6 ns              88.7 ns       96.0 -> 0.0 B/op
+state interpreted                 43.7 ns              35.8 ns       96.0 -> 0.0 B/op
+table warmed compiled             96.8 ns              88.6 ns       96.0 -> 0.0 B/op
+state warmed compiled             44.7 ns              35.9 ns       96.0 -> 0.0 B/op
+```
+
+Every run reproduced checksums of `130,000,250,000` for interpreted and `130,000,750,000` for seeded compiled lanes.
+The probe also validates the final run/completion counts, average fuel and interpreted duration, last-run timestamp,
+compile failures, artifact history, and table population outside the measured region.
+
+The warmed end-to-end Auto-compiled lane falls exactly from `1,584.2` to `1,488.2 B/op` in all three processes, while
+the compiled no-audit control remains exactly `1,160.0 B/op`. End-to-end elapsed samples overlap prior process variation,
+so no end-to-end timing improvement is claimed. Mandatory-first interpretation, threshold clamping, LRU behavior,
+cancellation/disposal ordering, failure completion, and the public selector contract remain unchanged.
+
+## Composite nested I32 loop dispatch
+
+Even after an inner single-assignment I32 plan was cached, each outer iteration reentered generic statement dispatch and
+reevaluated direct inner bounds through the general expression path. A narrow composite runner now handles an outer body
+containing exactly one inner loop whose body is exactly one already-cached raw-I32 assignment. It supports literal and
+assigned raw-I32 bounds and delegates the inner loop itself to the existing cached runner.
+
+The runner preserves the generic order: charge the outer iteration, write its loop slot, charge the inner statement, then
+charge and read the start and end bounds separately before entering the cached inner loop. Bounds remain captured before
+the body and are reevaluated on every outer iteration. Cache admission stays invocation-specific: required slots must be
+assigned in the current frame except for the inner loop slot and one explicit outer slot that this runner writes before
+bound or expression evaluation. Cold, traced, unassigned, arithmetic-bound, and otherwise unsupported shapes fail closed
+to generic dispatch.
+
+The benchmark-only baseline and candidate use byte-identical probe sources. Ten fresh Release process pairs, five in each
+order, ran their built DLLs pinned to CPU 3 with tiered compilation and Tiered PGO disabled:
+
+```text
+case                                  baseline median   final median    change    pair wins     allocation
+outer 1M, inner 1                         184.628 ms       12.080 ms     -93.5%       10/10      776 -> 776 B
+outer 1M, inner 0                          76.080 ms        5.057 ms     -93.4%       10/10      752 -> 752 B
+outer 500k, inner 2/index                 107.016 ms        7.406 ms     -93.1%       10/10      776 -> 776 B
+outer 2k, triangular/outer index            5.816 ms        5.459 ms      -6.1%        9/10      776 -> 776 B
+outer 1, inner 10M body control            27.144 ms       26.911 ms      no claim      6/10      776 -> 776 B
+arithmetic-bound fallback                  97.588 ms       96.151 ms      no claim      7/10      776 -> 776 B
+```
+
+One fallback candidate process had an isolated `869.547 ms` interruption while its other nine samples were
+`95.338-103.289 ms`; the fallback receives neither an improvement nor a tail-latency claim. Every sample completed
+synchronously and validated its exact result plus all twelve resource fields. Focused regressions cover mutable and
+outer-dependent bounds, outer-slot/body aliasing, arithmetic faults, fuel and loop quota order, cancellation before
+mutation, assignment state, debug fallback, cache publication, and unsupported shapes. The final strict solution build,
+5,904 kernel tests, architecture tests, formatting, and C# size/layout gates pass. No public API or sandbox accounting
+contract changes.
+
+## Reused multi-assignment I32 loop plans
+
+The multi-assignment I32 fast paths still rebuilt an immutable assignment-plan array on each eligible loop entry even
+though the prepared statement identity and frame layout were unchanged. The existing exact-reference, two-hit layout
+caches now retain eligible all-raw multi plans for both `forRange` and `while`. A hit revalidates every required raw
+source and condition slot against the current frame before executing; boxed, unassigned, traced, unsupported, and
+nonreusable shapes continue through the generic path.
+
+The benchmark-only baseline at `4126375b2` and candidate at `e23caf57b` were published separately. Twelve fresh process
+pairs, six in each AB/BA order, ran pinned to CPU 3 with tiered compilation, Tiered PGO, and ReadyToRun disabled:
+
+```text
+taskset -c 3 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 dotnet <published-benchmark.dll> --probe-interpreter-plan-setup
+taskset -c 3 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 dotnet <published-benchmark.dll> --probe-interpreter-while-plan-setup
+```
+
+All twelve pairs reproduced the exact displayed allocation deltas: 280→0 B per entered multi-assignment `forRange`,
+and 504.0-504.1→0 B per planned multi-assignment `while`. Seven pairs passed the preregistered one-sided 5% regression
+guard across direct-expression, direct-20M, multi-for-20M, scalar-while-zero, scalar-while-20M, multi-while-20M, and
+nested-skip lanes. Guarded medians for the short target lanes were:
+
+```text
+case                               baseline       candidate      change    pair wins
+multi forRange, one iteration       27.40 ms        20.80 ms      -24.1%       7/7
+multi while, one iteration          28.70 ms        18.50 ms      -35.5%       7/7
+multi while, zero iterations        27.80 ms        17.50 ms      -37.1%       7/7
+```
+
+The direct-20M, scalar-while-20M, and nested-skip control medians moved by -1.1%, -0.1%, and +0.3%; no control timing
+claim is made. Every target and control retained its exact checksum, fuel, loop, sandbox-allocation, host-call, and
+completion signature. Focused tests cover three-assignment source ordering, required source/condition-slot revalidation, arithmetic and
+quota ordering, mixed-break fallback, debug tracing, exact reference identity, concurrent publication, and fully
+plannable but deliberately nonreusable bodies and conditions.
+
+## Trusted pure built-in interpreter results (rejected and reverted)
+
+`InterpreterExecutionBoundary` protects the public host from malformed interpreter results. An experiment attempted to
+skip that sanitizer for the exact sealed built-in type when execution was interpreted and in-process, debug was off,
+the entrypoint had no binding references, the result owned the canonical empty audit snapshot, its success envelope and
+plan identities matched, and host/file/network/log counters were zero.
+
+Focused boundary review found that this predicate was not equivalent to `InterpreterResultValidator`. In particular,
+it accepted any non-null success value without validating the entrypoint's declared return shape, and it did not validate
+the complete resource envelope (`MaxFuel`, fuel, loop, allocation, collection, and string counters). Those checks are
+defense in depth even when the producer is the built-in interpreter. The bypass was therefore rejected and reverted;
+the full validator is again unconditional before post-dispatch cancellation. The measurements below are preserved only
+as an experimental ceiling, not as a production performance claim.
+
+The benchmark-only baseline at `899628e70` and final candidate at `89d8fe202` were published separately. Each process
+measured the unchanged direct and forwarding-custom controls before the built-in host target. Runs were pinned to CPU 3
+with tiered compilation, Tiered PGO, and ReadyToRun disabled:
+
+```text
+taskset -c 3 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 dotnet <published-benchmark.dll> --probe-interpreter-host-boundary
+```
+
+The final proof attempted 15 pairs and accepted exactly five in each BF/FB order. Its absolute 5% guard covered both
+unchanged controls and required the two baseline full-validation lanes to remain within 5% inside each process. Attempts
+7, 9, 10, 12, and 14 were discarded because a direct or forwarding control exceeded the guard. Accepted medians were:
+
+```text
+case                         baseline       candidate      change      wins       allocation per operation
+built-in public host       13,372.50 ns       383.85 ns      -97.1%     10/10       11,688.4008 -> 672.16672 B
+direct built-in control       276.65 ns       280.35 ns     no claim      4/10          672.08512 -> 672.08512 B
+forwarding custom host     13,412.35 ns    13,338.55 ns     no claim      7/10         11,688.4 -> 11,688.4 B displayed
+```
+
+Target ranges do not overlap (`13,291.1-13,530.0` versus `375.8-395.3 ns/op`). All ten accepted target samples recorded
+exact totals of `584,420,040→33,608,336 B` over 50,000 executions, a reduction of `11,016.23408 B/op`; candidate host
+allocation is only `0.0816 B/op` above the direct control. The forwarding control retained its displayed `11,688.4 B/op`
+while process-level totals varied by at most 160 B, so no exact-total or timing claim is made for that control. Every
+sample retained synchronous completion, checksum `350,000`, the complete success envelope and plan hashes, canonical
+empty audit, and all twelve resource counters.
+
+The bypass-specific eligibility and allocation tests were removed with the production bypass. The existing interpreter
+result-validation suites continue to pin wrong return types, malformed success/failure envelopes, resource overruns,
+audit sanitization, deterministic evidence, worker compatibility, and post-dispatch cancellation. The permanent probe
+remains so a future independently reviewed validator design can quantify the boundary cost without weakening the
+current security contract. No public API or sandbox accounting contract changes.
+
+## Public compiled state pooling and completed-executable reuse
+
+Binding-free, summary-suppressed public compiled execution still allocated a fresh 128-byte `ResourceMeter` and
+192-byte `SandboxContext` on every run, then traversed the provider's artifact and executable cache locks even after
+the exact executable had completed materialization. A lazy bounded exact-plan state pool first removes the 320-byte
+per-run state pair. The default non-persistent reflection provider then publishes immutable completed executables into
+a saturating two-entry exact-reference hot set used only by the same narrow no-audit eligibility predicate. Once full,
+another exact completed plan uses one execution-cache lock without touching either backing LRU; a true miss continues
+through the original artifact and executable cache pipeline. This keeps artifact and executable eviction order aligned.
+
+The permanent probe uses one million warmed public executions, checks the I32 result and full compiled identity
+envelope, validates all twelve resource counters, and retains audited success, compiled failure, verifier fallback,
+and cancelable provider/fresh-state controls. Frozen binaries were pinned to CPU 3 with tiering disabled:
+
+```text
+taskset -c 3 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  COMPlus_TieredCompilation=0 COMPlus_TieredPGO=0 COMPlus_ReadyToRun=0 \
+  dotnet <published-benchmark.dll> --probe-compiled-execution-envelope
+```
+
+Six balanced pairs for the state-pool step reproduce `512,118,624→192,044,408 B`, or `512.1→192.0 B/op` at
+displayed precision. The repeated mechanism is exactly 320 B/run; fixed probe/JIT bytes account for the smaller
+cross-process remainder. That step's timing median moved `517.55→533.45 ns/op`, so it receives no latency claim.
+The cancelable bypass remains `512.1 B/op`.
+
+The original pool deliberately kept one state per exact plan, so a second simultaneous eligible execution still
+allocated a fresh meter/context pair. The overlap extension adds one direct secondary reference to each primary lane
+and publishes its state only after real contention. Primary acquisition remains lock-free, secondary admission is
+serialized with plan eviction, and a third simultaneous execution retains the existing fresh-state fallback. The
+capacity remains 64 plan identities and the absolute retained-state bound is 128. Retirement is generation checked:
+eviction skips either active lane, while pool disposal retires the lanes independently and lets an already-held exact
+generation finish before its state is disposed.
+
+The detached baseline at `6465c065f` and the direct-secondary candidate used byte-identical probes. Six fresh balanced
+AB/BA pairs ran on CPU 11 with tiering, Tiered PGO, and ReadyToRun disabled. The same process first held the primary,
+then measured one million public executions, held both lanes for the bounded third-run control, and retained the
+ordinary sequential, alternating-plan, cancelable-fresh, audited-success, failure, and verifier-fallback controls:
+
+```text
+case                         baseline median    candidate median    change      wins       allocation
+busy primary                    405.40 ms           409.00 ms        no claim     2/6       512.119 -> 192.044 B/op
+both retained lanes busy        406.75 ms           405.20 ms        no claim     4/6       512.120 -> 512.120 B/op
+ordinary sequential             405.80 ms           394.60 ms        no claim     3/6       192.045 -> 192.045 B/op
+alternating completed plans     407.80 ms           408.20 ms        no claim     3/6       192.045 -> 192.045 B/op
+cancelable provider + fresh     541.65 ms           539.90 ms        no claim     3/6       512.119 -> 512.119 B/op
+```
+
+The target removes exactly `320.075152 B/run` from process totals; the retained mechanism is the same exact 128-byte
+meter plus 192-byte context. Its +0.89% median is inside the predeclared 5% guard but only 2/6 pairs favor the candidate,
+so this is strictly an allocation claim. The saturated third-run control is byte-identical and timing-flat. The three
+bypass controls are also byte-identical and have mixed pair directions, so none receives a timing claim.
+
+A separate 100,000-iteration cold lane repeatedly created a fresh pool and admitted one prebuilt plan. Displayed
+allocation moves `1,032.0→1,040.0 B/admission`, measuring the single direct secondary pointer at +8 B per primary slot,
+or at most +512 B across 64 ordinary one-lane plan groups. With a primary already held, first secondary activation is
+`1,000→1,152 B` once; one subsequent reuse saves 320 B and therefore repays that premium immediately. The permanent
+allocation guard reproduces candidate activation at 1,152 B, secondary reuse at 192.024 B/run, and saturated fallback
+at 512.063 B/run. Thirty-five focused no-audit-state tests cover distinct primary/secondary state, stale lease copies,
+eight-worker isolation, secondary-only active eviction, idle two-lane eviction, disposal of two active generations,
+admission/disposal races, fresh third-run fallback, resource isolation, exact allocation, failure recovery, and all
+eligibility bypasses. No public API, sandbox value, accounting, or result-envelope contract changes.
+
+Against exact pooled-state commit `5084f8559`, six further balanced pairs produce:
+
+```text
+case                         baseline median    final median    change     wins       allocation
+single completed plan           563.75 ns         414.75 ns     -26.43%     6/6       192.0 -> 192.0 B/op
+alternating completed A/B       557.25 ns         432.80 ns     -22.33%     6/6       192.0 -> 192.0 B/op
+saturated completed C-only      549.95 ns         462.10 ns     -15.97%     6/6       192.0 -> 192.0 B/op
+alternating completed A/B/C     546.65 ns         449.40 ns     -17.79%     6/6       192.0 -> 192.0 B/op
+cancelable provider + fresh     559.05 ns         567.05 ns      no claim     3/6       512.1 -> 512.1 B/op
+```
+
+An interim single publication allocated a 48-byte immutable snapshot on every A/B switch; the permanent lane exposed
+`240.0 B/op`, and entry-owned publication reuse plus the saturating hot set restores it exactly to `192.0 B/op`.
+The cancelable lane intentionally changes both provider lookup and state reuse, so it is a regression control rather
+than isolated shortcut attribution. Its unpaired medians move +1.43%, while the paired-difference median favors the
+candidate by 4.45 ns and only 3/6 pairs favor either side; no timing change is claimed.
+
+Twenty-four fresh-provider samples isolate the bounded publication setup after ordinary artifact/executable caches
+are warm: an ordinary completed-cache hit allocates 0 B, first hot activation/publication 120 B, a second distinct
+publication 48 B, and repeated publication plus hot lookup 0 B. Thus two-slot activation is bounded at 168 B. This is
+not a claim that cold first execution is allocation-neutral: execution entries also gain plan/publication references.
+
+Eligibility requires the built-in non-persistent reflection compiler, exact plan reference and ordinal entrypoint,
+in-process execution, no debug trace or async worker, no binding references, a non-cancelable token, no supplied state,
+and suppressed successful-run audit. Custom and persistent compilers never publish. Cache eviction, failed
+materialization, disposal, and collectible load-context teardown invalidate publications before materialized assembly
+state is released. Empty binding-registry construction now removes exactly two unused 32-byte lists per cold host:
+normal runtime samples move `4,888→4,824 B/host`, while `DOTNET_TieredPGO=0` and
+`DOTNET_JitObjectStackAllocation=0` samples move `4,920→4,856 B/host`. The permanent guard pins default and explicit
+interpreter construction as identical and at most `4,856 B/host`; pending audited provider suspension remains exactly
+`1,032 B`. Focused tests cover exact hash-collision
+clones, LRU churn, concurrent publication/invalidation, failures, disposal races, audit/cancellation bypasses, and both
+audited and suppressed collectible contexts. No public API or sandbox accounting contract changes.
+
+## Worklist generic-construction reachability
+
+Generic-construction reachability previously found its fixed point by rescanning every recorded generic invocation and
+copying every reached target-slot set on each pass. An adverse declaration order therefore made an N-hop forwarding
+chain require N+1 whole-graph passes, with quadratic work and allocation. The analyzer now snapshots invocations once,
+reverse-indexes them by normalized target method with Roslyn symbol equality, and queues each unique method/slot state.
+The final constructor-resolution callback pass is unchanged.
+
+The permanent probe builds deterministic 32, 64, 128, 256, and 512-hop chains in favorable and adverse declaration
+orders, plus a 512-helper nongeneric control. Parsing and compilation are outside the timed interval; every sample
+requires exactly one `DBXK001` diagnostic and no analyzer failure. Five fresh baseline/candidate process pairs ran in
+the balanced order BC/CB/BC/CB/BC, pinned to CPU 6 with tiering, Tiered PGO, and ReadyToRun disabled:
+
+```text
+taskset -c 6 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  dotnet <published-benchmark.dll> --probe-generic-construction-reachability
+```
+
+The frozen benchmark runners were byte-identical
+(`c4b257fb52f5951052516ddfdf875b081234f5639b6ca85b86b381577c3d7146`). Only the analyzer differed: baseline
+`c177b6e8294e563705b679af7d8e8ebe487a975f47675da7098ccb91354ebacf` versus candidate
+`2cf83783fb1e4781d44c7a2262362add342eb5f24aa95df91c80f1882378c390`. Pooled 512-hop medians were:
+
+```text
+case                         baseline                  candidate                 change                  time wins
+adverse declaration order    32.51 ms / 28,119,536 B  15.79 ms / 9,270,208 B  -51.4% / -67.0%       5/5
+favorable declaration order  15.66 ms /  9,276,128 B  16.60 ms / 9,214,488 B  no timing claim / -0.7%  1/5
+ordinary helper control      13.18 ms /  6,905,032 B  13.18 ms / 6,904,712 B  no timing claim / parity   -
+```
+
+The adverse target improved in every time pair and removed exactly 18,849,328 B per analysis at 512 hops.
+Favorable-order allocation also fell slightly, while the ordinary-helper control is byte-near-identical. Favorable
+pooled timing moved +6.0%, but the paired-percentage median is +3.7% inside the 5% guard and the candidate is slower in
+4/5 pairs. Ordinary-helper medians are identical. No timing claim is made for either control. All rows retained exactly one
+diagnostic. Focused tests cover adverse/favorable propagation, self-cycles, diamonds, two-slot permutations,
+containing-type forwarding, and ordinary benign controls. No public API, generated-source shape, or diagnostic contract
+changes.
+
+## Layout-scoped multi-assignment I64 `forRange` plans
+
+Every multi-assignment I64 loop entry rebuilt its immutable body array, dependency set, and one
+`I64ExpressionPlan` object per literal, variable, and operator. This remained after single-assignment I64 and
+multi-assignment I32 plans were cached. The I64 runner now admits a complete source-ordered body after two successful
+constructions into the existing exact-statement, layout-owned typed plan store. A hit revalidates only raw inputs read
+before their first body write: `x = x + 1` still requires assigned `x`, while `x = source; y = x + 1` does not require
+preassigned `x`. Unsupported or incomplete bodies never advance admission and every cache-shape mismatch fails closed.
+
+The setup and nested probes were byte-identical between exact detached baseline `6465c065f` and the candidate (SHA256
+`94ea549bc3775cc1ca85ccdfed63866651a474a52480855a11ea2a43a8bec5e5` and
+`cdfb50f5d5ea0e204bff04260ce3b0a32525caa4745ff61485d471fcdca06a58`). Four fresh final-code pairs ran in balanced
+order BC/CB/BC/CB, pinned to CPU 11 with tiering, Tiered PGO, and ReadyToRun disabled:
+
+```text
+taskset -c 11 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  dotnet <published-benchmark.dll> --probe-interpreter-i64-plan-setup
+taskset -c 11 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  dotnet <published-benchmark.dll> --probe-interpreter-i64-nested-loop-plan
+```
+
+```text
+case                                  baseline                 candidate                change
+two assignments, one loop x50k       30.400 ms / 1,488.2 B/op 22.700 ms / 824.1 B/op  -25.3% / -664.1 B/op
+earlier-write/later-read x50k         30.750 ms / 1,504.2 B/op 23.000 ms / 840.1 B/op  -25.2% / -664.1 B/op
+multi outer 1M / inner 1             268.145 ms / 664,001,288 B 131.224 ms / 1,288 B   -51.1% / -664,000,000 B
+multi outer 1 / inner 10M control     98.491 ms / 1,952 B       96.577 ms / 1,288 B    no timing claim / -664 B fixed
+outer 1M / inner 0 control            66.267 ms / 1,280 B       67.201 ms / 1,280 B    no timing claim / exact
+single-I64 outer 1M / inner 1        188.404 ms / 1,280 B      191.424 ms / 1,280 B    no timing claim / exact
+```
+
+The two setup targets and nested target improved in all four pairs. The nested target removes exactly 664 bytes for each
+of one million repeated entries; the remaining eight-byte target-versus-zero difference is fixed-process noise. Control
+medians stay within 2%, and their timing ranges overlap. A separate serialized final-code I32 multi-body sanity run is
+`122.3 ms` versus the six-process baseline range `122.5-125.4 ms`, with exact `1,016 B` allocation in both; its direct
+expression control is likewise inside the baseline range.
+
+A layout-prewarmed three-stage lane reproduced the same allocations in every process:
+
+```text
+stage                    baseline       candidate
+invocation 1: observe     1,736 B         1,680 B
+invocation 2: publish     1,488 B         2,040 B
+invocation 3: cache hit   1,488 B           824 B
+```
+
+The first observation also avoids the 56-byte rejected-I32 array; publication pays one bounded 552-byte premium over
+baseline, and the third and subsequent entries save exactly 664 bytes. Values and full sandbox resource tuples are exact
+in every sample. Strict focused tests cover fresh-frame source ordering, self-read-before-write, unsupported whole-body
+fallback without admission, checked overflow, low fuel/loop quota fallback, warmed debug preorder, exact identity,
+cross-kind/cache-shape isolation, concurrent immutable-plan publication, and allocation. The plan retains no frame or
+runtime values, and no public API or sandbox accounting contract changes.
+
+## Descendant composite-I32 probe suppression after an unsupported wide root
+
+The bounded generic I64/F64 expression cache removed repeated wide-tree classification and unboxed supported arithmetic,
+but an unsupported arithmetic root still entered the generic evaluator. The root performed one complete I32 eligibility
+walk before the cached wide miss; generic recursion then performed another recursive I32 eligibility walk at every
+descendant operator. A left-associated F64 tree whose deepest leaf was an intrinsic or numeric conversion therefore
+walked progressively shorter suffixes and remained quadratic.
+
+Baseline already disabled wide-primitive probing for descendants after an arithmetic-root wide miss. The candidate adds
+only the suppression of repeated composite Unary/Binary I32 eligibility checks on that existing fallback path. Literal,
+variable, and call nodes retain their established direct dispatch, while unsupported nodes still use the same generic
+evaluator. A non-arithmetic parent continues to enable normal child probing. The change does not move generic fuel
+charging, trace writes, cancellation checks, operand evaluation, operator application, host calls, or fault propagation.
+
+The final detached baseline was `b42543345`. The benchmark runner sources were identical between the two publications,
+with SHA256 `27d6535a6d2aa4c7a502c2e21d4b4f84822549f10496f1ffabdb9614c73c7f5b`. The interpreter assemblies differed as
+intended: baseline `fd8ff81a6966449ca95d51277bb2ef112413134e4239cde6c79a960daf74aa9c`, candidate
+`8d9886acad044547f4a399cc15e8fab008e224fd8d5403b6a37699d6fbb2c2ea`. Six fresh pairs ran in balanced order
+BC/CB/BC/CB/BC/CB, pinned to CPU 11 with tiering, Tiered PGO, and ReadyToRun disabled:
+
+```text
+taskset -c 11 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  dotnet <published-benchmark.dll> --probe-generic-primitive-expression
+```
+
+Pooled process medians for the depth-96 ineligible target and association controls were:
+
+```text
+case                               baseline ns/op  candidate ns/op  change    wins  exact B/op  fuel/hosts
+call left-deep, arithmetic left        49,377.70          5,600.35  -88.66%    6/6      3,064.8     200/1
+call left-deep, arithmetic right       48,843.60          5,634.80  -88.46%    6/6      3,064.8     200/1
+conversion left-deep                   48,241.25          5,290.20  -89.03%    6/6      3,000.4     198/0
+call right-deep, arithmetic left        4,728.10          4,569.10   -3.36%    6/6      3,064.8     200/1
+call right-deep, arithmetic right       4,744.25          4,600.70   -3.03%    6/6      3,064.8     200/1
+conversion right-deep                   4,345.30          4,243.80   -2.34%    6/6      3,000.4     198/0
+cache-full fifth root                   4,736.50          4,615.35   -2.56%    6/6      3,064.8     200/1
+```
+
+The three left-associated targets improve in every pair and preserve exact allocation and resource totals. The
+right-associated and cache-full rows are controls; their smaller improvements receive no timing claim. Two longer
+200,000-iteration supported-F64 controls isolate the dispatch flag from the ineligible-tree target:
+
+```text
+case                               baseline ns/op  candidate ns/op  pooled change  paired median  wins  B/op  fuel/hosts
+F64 right d16, left operand               534.55            532.05        -0.47%         -1.58%    4/6  760.1      39/0
+F64 right d16, right operand              526.55            533.15        +1.25%         -0.90%    4/6  760.1      39/0
+```
+
+The directions disagree between pooled and paired summaries, so both supported-F64 rows are noise-flat and receive no
+timing claim. Additional pooled controls retain exact allocation, fuel, and host-call counts:
+
+```text
+case                         baseline ns/op  candidate ns/op  change  exact B/op  fuel/hosts
+I32 left depth 96                  4,990.25          4,703.05  -5.76%       672.1     195/0
+I32 right depth 96                 2,288.00          2,235.25  -2.31%       672.1     195/0
+I64 left operand depth 96          3,392.95          3,366.65  -0.78%       760.1     199/0
+I64 right operand depth 96         3,419.30          3,377.75  -1.22%       760.1     199/0
+shallow Bool                         294.95            291.20  -1.27%       672.1       5/0
+shallow intrinsic                    584.10            582.05  -0.35%       760.2       6/1
+eligible I32 local call              275.00            269.60  -1.96%       672.1       6/0
+```
+
+One additional risk control places a whole-tree-eligible depth-96 pure-F64 subtree beside a small unsupported intrinsic
+or numeric-conversion subtree. This proves both root operand orders retain the pure sibling's performance rather than
+exposing a descendant-fast-path regression. Four fresh pairs ran BC/CB/BC/CB under the same CPU/runtime controls. The
+published benchmark DLL and every dependency other than the interpreter were byte-identical; the benchmark DLL SHA256
+was `c51bd8ca66fc62c460451e618df5f52347e647b9ea5b6884e263c45894126235`. Interpreter hashes were the accepted baseline
+`fd8ff81a6966449ca95d51277bb2ef112413134e4239cde6c79a960daf74aa9c` and candidate
+`8d9886acad044547f4a399cc15e8fab008e224fd8d5403b6a37699d6fbb2c2ea`:
+
+```text
+case                         baseline ns/op  candidate ns/op  change   wins  exact B/op  fuel/hosts
+intrinsic, pure sibling left      49,270.00          7,819.05  -84.13%   4/4      3,088.8     200/1
+intrinsic, pure sibling right     45,845.85          4,486.00  -90.22%   4/4      3,088.8     200/1
+conversion, pure sibling left     49,141.80          7,284.60  -85.18%   4/4      3,024.4     198/0
+conversion, pure sibling right    45,525.75          4,146.85  -90.89%   4/4      3,024.4     198/0
+```
+
+These results match the mechanism: baseline already prevented a descendant wide probe after the root miss, so the
+candidate cannot remove a pure-F64 fast path there; it removes only the repeated failed composite-I32 scans. All four
+rows preserve exact allocation and resource totals.
+
+The remaining rows are regression controls rather than separate timing claims. Focused tests pin the exact debug-trace preorder and
+fuel sequence, left-to-right intrinsic/fault ordering (`0/1` host calls and `7/11` failure fuel), left- and
+right-associated conversion values with exact fuel, and pre-cancellation before the next fuel charge. Existing tests
+continue to cover supported wide expressions, non-finite and overflow faults, unknown-local order, cache admission,
+capacity, assignment-state revalidation, and concurrent use. No public API or sandbox accounting contract changes.
+
+## Single-resolution InvokeAsync semantic transform
+
+The `InvokeAsync` incremental syntax branch intentionally admits every invocation because public
+`[LowerToIrMethod]` methods may have arbitrary names. Its semantic transform nevertheless resolved the same invocation
+twice for an ordinary call and as many as four times for a lowering candidate. Resolution now happens once at the start
+of the guarded transform. The exact resolved method, including the existing first `CandidateSymbols` fallback, is passed
+through invalid-kind diagnostics, lowering eligibility, user-method exclusion, DotBoxD surface recognition, and
+call-shape construction. No Roslyn symbol escapes into an incremental output.
+
+The permanent probe retains one generator driver while alternating two pre-parsed, comment-only source snapshots. It
+measures resolved ordinary calls, user methods named `InvokeAsync`, unresolved/error calls, an arbitrary custom
+`ProbeAsync` lowering method, and invalid-kind plus ambiguous-candidate diagnostics. Each process performs 30 warmups
+and 300 measured edits. Baseline and candidate artifacts used byte-identical probe sources with SHA-256
+`fbd50db6555be87feb6a39342c1995f48c115fd5a0a0a00f704843933eb2cec6` and
+`de19482fc1252f764157f06671d994e7ff2ad87099046d2966260d4b9e9a0417`.
+
+Command:
+
+```text
+DOTNET_TieredCompilation=0 DOTNET_TC_QuickJitForLoops=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  taskset -c 6 dotnet <published-benchmark.dll> --probe-invokeasync-resolution
+```
+
+Five fresh pairs ran in balanced order BC/CB/BC/CB/BC:
+
+```text
+case                    calls  baseline ms  candidate ms  pooled change  paired median  wins
+resolved ordinary         500        864.2         811.7         -6.07%          -8.00%   5/5
+user InvokeAsync          500        858.2         802.0         -6.55%          -6.30%   5/5
+unresolved InvokeAsync    500      2,986.4       2,761.1         -7.54%          -7.47%   5/5
+custom ProbeAsync          50      6,231.7       6,097.7         -2.15%          -3.38%   4/5
+diagnostic/fallback       100      1,504.4       1,474.3         -2.00%          -3.37%   4/5
+```
+
+Allocation medians vary by less than 75 B/edit in workloads allocating 0.90-11.17 MB/edit, disagree in direction for
+the diagnostic lane, and receive no claim. Every baseline/candidate process reports the same generated-source and
+diagnostic hashes for its snapshot. Focused tests cover custom method names, generated and user receivers, unresolved
+calls, invalid-kind text, call-shape output, and an ambiguous overload whose first candidate carries kind `99`.
+
+## Rejected flat built-in scalar-list validation shortcut
+
+The compiled return-validation probe now includes `List<I32>` lengths 255 and 1,024, a structural map control, and
+malformed first/middle/last, non-finite F64, and null String controls. This exposed the remaining recurring traversal
+allocation for large flat scalar lists: direct x256/x1024 validation allocated exactly 24,912/98,688 B, and the compiled
+identity path paid that traversal twice around its validation-proof boundary.
+
+Three direct-loop placements were tested. The final version left `RequireType` and its empty-collection helper
+byte-for-byte identical to baseline and placed the shortcut only inside the existing non-empty list frame. Six fresh
+pairs ran in balanced order BC/CB/BC/CB/BC/CB, pinned to CPU 11 with tiering, PGO, and ReadyToRun disabled:
+
+```text
+taskset -c 11 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  COMPlus_TieredCompilation=0 COMPlus_TieredPGO=0 COMPlus_ReadyToRun=0 \
+  dotnet <published-benchmark.dll> --probe-compiled-return-validation
+```
+
+```text
+case                       baseline ns   candidate ns   change    wins   baseline B/op   candidate B/op
+compiled List<I32> x32       1,732.50       1,483.35    -14.38%    5/6          192.0            192.0
+direct List<I32> x32           519.90         388.20    -25.33%    6/6            0.0              0.0
+compiled List<I32> x255      7,241.70       5,333.15    -26.35%    6/6          192.0            192.0
+direct List<I32> x255        3,380.60       2,351.20    -30.45%    6/6            0.0              0.0
+compiled List<I32> x256      8,911.55       5,276.35    -40.79%    6/6       50,027.7            192.0
+direct List<I32> x256        4,037.00       2,403.10    -40.47%    6/6       24,912.0              0.0
+compiled List<I32> x1024    31,959.00      18,834.10    -41.07%    6/6      197,613.9            192.2
+direct List<I32> x1024      15,332.20       9,174.10    -40.16%    6/6       98,688.0              0.0
+direct empty List<I32>          42.65          45.30     +6.21%    1/6            0.0              0.0
+```
+
+Unit, scalar, compiled empty-list, record, map, and nested controls remained within 3.18%, but the untouched direct
+empty-list control exceeded the declared +5% guard. The two earlier placements also regressed that lane by more than
+5%, so the optimization was rejected and every production edit was reverted. All 12 processes retained exact result
+identity, allocations, resource tuples, and malformed-value rejection. No timing or allocation improvement is claimed.
+
+Frozen artifacts are `/tmp/dotboxd-flat-list-ea112a345-baseline-v1` and
+`/tmp/dotboxd-flat-list-ea112a345-candidate-v3`; pair logs are under
+`/tmp/dotboxd-flat-list-ea112a345-pairs-v3`. The probe, scenario, and malformed-control source hashes are identical
+between artifacts (`561a17c...`, `0df86477...`, and `050b776c...`). Baseline/candidate Kernels DLL hashes are
+`bb4cbc7b...` and `d9190203...`. The retained focused suite passes 37 tests and pins malformed scalar-list behavior,
+recursive fallback, equivalent type shapes, compiled identity/resource accounting, and proof consumption.
+
+## Type-and-shape-stamped event-adapter validation
+
+`PluginEventAdapterValidationCache` previously validated mutable adapter shape, rebuilt required/declared capability
+sets, validated both entrypoints, and only then consulted its successful shape cache. Capability-gated warm hits thus
+allocated one or more hash sets plus LINQ/array state on every dispatch. The cache now retains `typeof(TEvent)` with
+the copied successful shape. Shape validation, including `EventValueCount`, still runs every call; only an exact
+event-type and shape hit returns before capability and entrypoint validation. Failed validation never publishes.
+
+An exploratory v1 harness incorrectly declared the ungated warm lane an unchanged control even though the intended
+early return removes its empty-capability call too. Those samples were stopped and make no claim. A fresh v3 harness
+predeclared all four warm lanes as targets, added a direct call to the unchanged shape validator as the timing control,
+and allowed the structurally expected eight-byte event-type reference on each cold published stamp. Both v3 artifacts
+were rebuilt from the same sources; their benchmark runner DLL is bit-identical. Six fresh pairs ran in balanced order
+BC/CB/BC/CB/BC/CB, pinned to CPU 11 with tiering, PGO, and ReadyToRun disabled:
+
+```text
+taskset -c 11 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  COMPlus_TieredCompilation=0 COMPlus_TieredPGO=0 COMPlus_ReadyToRun=0 \
+  dotnet <published-benchmark.dll> --probe-event-adapter-validation
+```
+
+```text
+case                              baseline ns   candidate ns   change    wins   baseline B/op   candidate B/op
+direct shape-validator control        13.035         12.985     -0.38%    3/6            0.00             0.00
+warm gated, 1 capability             351.680         37.260    -89.41%    6/6        1,552.00             0.00
+warm gated, 8 capabilities         1,044.570        103.480    -90.09%    6/6        2,456.00             0.00
+alternating equal adapters            345.035         39.250    -88.62%    6/6        1,552.00             0.00
+warm ungated                           51.065         36.780    -27.97%    6/6           32.00             0.00
+steady cold constructed misses      1,277.585      1,336.670     +4.62%    0/6        2,420.60         2,428.60
+steady cold preallocated misses     1,843.245      1,809.245     -1.84%    5/6        2,399.92         2,407.90
+```
+
+Every predeclared gate passes. The warm gated lanes remove exactly 1,552/2,456 B per validation, the ungated lane
+removes 32 B, and all warm targets win 6/6 pairs. The direct control is time/allocation flat. Constructed cold misses
+remain below the +5% one-sided time guard at +4.62%; both cold lanes pay exactly (within displayed fixed-process
+rounding) the predeclared +8 B per admission. All 12 processes report exact checksums.
+
+Frozen artifacts are `/tmp/dotboxd-event-adapter-validation-0499a6f13-baseline-v3` and
+`/tmp/dotboxd-event-adapter-validation-0499a6f13-candidate-v3`; raw logs are under
+`/tmp/dotboxd-event-adapter-validation-0499a6f13-pairs-v3`. The shared runner hash is
+`aca7c08181f5959bce72bcf09b9195180d9a6642c07d930ed769f75b9979047c`; baseline/candidate Plugins hashes are
+`1fa8e6b3235ccc04031f573deb93feafae817da718777ed4c4f9b98cffac8231` and
+`65f75896ae3333e06121731f2d51eafc6c0ca7de75a8559f94d4d44510bb0e15`. Candidate validation passes 31 focused
+tests, including exact zero allocation over 100,000 warmed gated hits. Mutation, aliased arrays, writer count,
+type-sensitive capability checks, failure recovery, inheritance, concurrency, and per-event output validation are
+pinned. No public API or event-dispatch semantic contract changes.
+
+## Layout-scoped binding-free F64 `forRange` plans
+
+The F64 loop runner rebuilt one `F64ExpressionPlan` object for each literal, raw/boxed variable, arithmetic operator,
+and admitted intrinsic on every eligible loop entry. In a small inner loop, the outer generic dispatcher therefore
+rebuilt the same graph once per outer iteration. The existing layout-owned `ForLoopPlanStore` now admits an exact
+statement only after two complete constructions, matching the established I32/I64 policy. Retained F64 plans are
+strictly narrower than the existing fresh fast path: only literals and raw-F64 `+`, `-`, `*`, and `/` trees qualify.
+Boxed reads and every binding/intrinsic remain uncached, so the value-dependent nonnegative proof used to admit
+`math.sqrt` can never become stale. A hit revalidates every required raw slot's assignment state and retains no frame
+or runtime value.
+
+The final baseline/candidate publications use byte-identical benchmark runners and differ only in
+`DotBoxD.Kernels.Interpreter.dll` and its PDB. Six fresh pairs ran in balanced order BC/CB/BC/CB/BC/CB on CPU 11 with
+tiering, PGO, and ReadyToRun disabled:
+
+```text
+taskset -c 11 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  COMPlus_TieredCompilation=0 COMPlus_TieredPGO=0 COMPlus_ReadyToRun=0 \
+  dotnet <published-benchmark.dll> --probe-interpreter-f64-plan-setup
+```
+
+```text
+case                              baseline          candidate         change                 wins   B/op baseline→candidate
+raw, one loop                     575.180 ns        512.960 ns        -10.82%                6/6    1,008.12→816.10
+literal, one loop                 508.695 ns        476.810 ns         -6.27%                6/6      880.11→816.10
+nested outer 1M / inner 1         217.996 ms        177.576 ms        -18.54%                6/6  192,001,088→840 total
+raw, zero-loop control            418.190 ns        403.925 ns         -3.41%                4/6      816.10→816.10
+intrinsic fallback control        865.010 ns        854.065 ns         -1.27%                4/6    1,008.26→1,008.26
+cached I64 control                519.910 ns        533.775 ns         +2.67%                2/6      816.10→816.10
+nested outer 1M / inner 0          66.917 ms         67.972 ms         +1.58%                1/6          840→840 total
+nested outer 1 / inner 10M         46.249 ms         47.696 ms         +3.13%                1/6        1,032→840 total
+```
+
+Every target wins all six pairs. Raw and literal setup remove exactly one 192-byte three-node graph and one 64-byte
+literal node per execution at displayed fixed-process precision. The nested target removes 192 bytes on each of one
+million entries, leaving only 840 B for the whole invocation. The long-body lane removes the same one-time 192 B and
+is a latency control; all control medians remain inside the predeclared +5% guard. Exact F64 result bits, fuel, loop,
+sandbox allocation, host-call, and collection counters match in all 12 processes.
+
+Layout-prewarmed admission diagnostics preserve bounded cold cost:
+
+```text
+stage                  baseline B   candidate B
+first observation           1,256         1,256
+second / publication        1,008         1,200
+third / cache hit            1,008           816
+```
+
+Publication pays one bounded 192 B premium, recovered by the first hit. Frozen artifacts are
+`/tmp/dotboxd-f64-plan-4a8653dc9-baseline-v2` and `/tmp/dotboxd-f64-plan-4a8653dc9-candidate-v2`; raw logs are in
+`/tmp/dotboxd-f64-plan-4a8653dc9-pairs-v2`. The shared runner hash is
+`d425266708b06d56c244f35e739b17ee2212ee3004c35d196548241e9ff27f0d`; baseline/candidate interpreter hashes are
+`7722c92c640e7102c29e549a5175134a8104312c6b79e43ec04bf5f79220b92b` and
+`d9059dbe86c6c70a9c26ed37ef23c5bd3c991d3c5e6ed61f7019f0a531d30a86`. Focused coverage pins two-hit identity,
+multiple cached statements, fresh-frame assignment revalidation, literal plans, concurrent publication/execution,
+non-finite failure order, quotas, exact debug preorder/fuel, pre-cancellation before mutation, intrinsic and boxed
+exclusion, positive-then-negative `sqrt`, bounded nested allocation, and the adjusted branched-allocation denominator.
+No public API or sandbox accounting contract changes.
+
+## Lock-free exact-reference Auto hotness lookup
+
+The earlier Auto MRU optimization returned the LRU tail before hashing or splicing it, but still acquired the global
+hotness-table monitor on every execution. An exact plan-hash and entrypoint reference match cannot change dictionary
+membership or recency. The table now publishes its current tail through one volatile reference and returns it before
+the table gate only when both references match. Each `AutoHotnessState` retains its existing lock for run-count and
+completion history. Value-equal distinct strings, alternating keys, insertion, eviction, and all capacity churn still
+take the unchanged dictionary/LRU path.
+
+The permanent probe adds value-equal/distinct-reference and capacity-two churn controls plus exact-reference table and
+direct-state four-worker lanes. Six fresh pairs ran in balanced order BC/CB/BC/CB/BC/CB on CPUs 8-11 with tiering,
+PGO, and ReadyToRun disabled:
+
+```text
+taskset -c 8-11 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  COMPlus_TieredCompilation=0 COMPlus_TieredPGO=0 COMPlus_ReadyToRun=0 \
+  dotnet <published-benchmark.dll> --probe-auto-hotness-bookkeeping
+```
+
+```text
+case                             baseline ns   candidate ns   change    wins   baseline B/op   candidate B/op
+table built-in interpreted             42.40          35.10    -17.22%    6/6             0.0              0.0
+table built-in warmed compiled         43.75          36.40    -16.80%    6/6             0.0              0.0
+table snapshot interpreted             53.00          44.50    -16.04%    6/6            96.0             96.0
+table snapshot warmed compiled         53.30          45.65    -14.35%    6/6            96.0             96.0
+table four-worker exact refs          155.80          16.85    -89.18%    6/6             0.0              0.0
+table built-in alternating keys        98.80         100.10     +1.32%    2/6             0.0              0.0
+table equal distinct refs              55.05          56.10     +1.91%    2/6             0.0              0.0
+table capacity-two churn              160.50         162.90     +1.50%    3/6           176.0            176.0
+state built-in interpreted             34.40          33.20     -3.49%    6/6             0.0              0.0
+state built-in warmed compiled         35.45          33.95     -4.23%    6/6             0.0              0.0
+state four-worker control              12.85          12.50     -2.72%    3/6             0.0              0.0
+state snapshot interpreted             44.15          41.80     -5.32%    5/6            96.0             96.0
+state snapshot warmed compiled         44.60          43.60     -2.24%    5/6            96.0             96.0
+```
+
+All five target rows win all six pairs. Every unchanged control median is at or below the predeclared +5% one-sided
+guard; the largest slowdown is +1.91%. All 12 processes report exact checksums and byte-identical allocations:
+0 B/op for built-in, alternating, distinct-reference, and concurrent rows; 96 B/op for the required immutable custom
+selector snapshots; and 176 B/op for deliberate capacity churn.
+
+Frozen artifacts are `/tmp/dotboxd-auto-hotness-6366e1a81-baseline-v1` and
+`/tmp/dotboxd-auto-hotness-6366e1a81-candidate-isolated-v1`; raw logs and summaries are under
+`/tmp/dotboxd-auto-hotness-6366e1a81-pairs-v1`. The benchmark runner is byte-identical at
+`5f090f3450acb95202525b368976a63f2eda01636cd1fdcfe4f1c8f223d9ae04`. Baseline/candidate Hosting hashes are
+`e34e4fffe5e919b851d03c58c7dd198994fd143e19f1c23f1cbace499b06709f` and
+`6d66163306e32c6683cdf3a8b846f01bed077cb6ca1a9e3a8e41d84dfb187dac`; the isolated artifacts differ in exactly
+`DotBoxD.Hosting.dll`. Probe-source hashes are `cced335c385668bf8c9bbab26318e7697d55626ff14cd0dc113c3eb94b59399d`,
+`0d5bbc3a5b797785aad1c94108e25fdaf0aed173a804253e2e0d6b0cc52cadaf`, and
+`7f0750de0c58ede9418bd6005b0cf83d5c8481acdb80a031dd279dcc24e6021e`. The raw-log manifest, pooled summary, and
+paired summary hashes are `41755119682880dd21083345d1d9df97c535f9f4261292782cc1b9f9ac09d401`,
+`194bcf1cf85da123979521a062cee5c65234ce76e07cdf2e61c1e9e9eb13bae8`, and
+`5044baeae9a9b4a74e5a926f8fc615e4a36b5b51e53ecbb163573ebb1d56c06d`.
+
+The existing and new focused suites pass 14/14 tests; the four new concurrency/LRU/eviction/retention tests also pass
+20 repeated runs. They pin exact shared run/completion histories, value-equal distinct-reference behavior, eviction
+order, detached completion, bounded capacity, and collection of an evicted key while the table stays alive. No public
+API, compiler/verifier identity (`dotboxd-compiler-14` / `dotboxd-verifier-13`), generated ABI, persisted artifact,
+selection policy, or execution-result contract changes.
+
+## Fixed-bound composite nested F64 dispatch
+
+The preceding F64 plan cache removed the inner expression graph's recurring allocation, but the outer loop still used
+generic statement dispatch. Each outer iteration charged and redispatched the inner `ForRangeStatement`, re-probed its
+start/end expressions, and walked the full fast-path chain before finding the already-cached F64 assignment plan. The
+existing outer-1M/inner-1 probe therefore still took about 175-220 ms even though it allocated only fixed execution state.
+
+A narrow composite runner now activates only when the outer body is exactly one inner loop with one exact-layout cached
+F64 plan. Inner bounds must be literals or assigned raw-I32 slots that are neither loop slot, so the F64 body cannot mutate
+them. The runner retains the generic charge order on every outer entry: outer loop charge and slot write, inner statement,
+start, then end, followed by the existing cached F64 loop executor. It adds no cache and retains no frame or runtime value.
+
+Before making any observable mutation, the runner computes the complete fixed-bound requirement with checked arithmetic:
+
+```text
+inner executions = outer iterations * max(0, inner end - inner start)
+required loops   = outer iterations + inner executions
+required fuel    = outer iterations * 8 + inner executions * inner-plan fuel
+```
+
+Overflow or insufficient current fuel/loop capacity rejects the composite path before the first outer charge, leaving the
+incremental generic path to report the exact quota failure point. Debug tracing, cold/missing plans, unassigned required
+F64 slots, non-leaf and loop-dependent bounds, bindings/intrinsics, and every otherwise unsupported shape also fail closed.
+
+The existing permanent probe and all 170 benchmark source files were hashed before publication. Six fresh isolated pairs
+ran in balanced order BC/CB/BC/CB/BC/CB on CPU 11 with tiering, PGO, and ReadyToRun disabled:
+
+```text
+taskset -c 11 env DOTNET_TieredCompilation=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  COMPlus_TieredCompilation=0 COMPlus_TieredPGO=0 COMPlus_ReadyToRun=0 \
+  dotnet <published-benchmark.dll> --probe-interpreter-f64-plan-setup
+```
+
+```text
+case                              baseline          candidate         change    wins   allocation
+nested outer 1M / inner 1         200.245 ms         14.860 ms         -92.58%    6/6      840→840 B
+nested outer 1M / inner 0          92.722 ms          5.185 ms         -94.41%    6/6      840→840 B
+nested outer 1 / inner 10M         48.423 ms         48.209 ms          -0.44%    3/6      840→840 B
+raw, one loop                     550.690 ns        534.840 ns          -2.88%    6/6    allocation exact
+raw, zero-loop control            424.750 ns        420.690 ns          -0.96%    4/6    allocation exact
+literal, one loop                 508.765 ns        501.800 ns          -1.37%    5/6    allocation exact
+intrinsic fallback control        915.300 ns        896.540 ns          -2.05%    5/6    allocation exact
+cached I64 control                560.900 ns        553.980 ns          -1.23%    4/6    allocation exact
+```
+
+The target baseline ranges were `177.673-222.899 ms` and `68.877-129.572 ms`; candidate ranges tightened to
+`14.742-15.130 ms` and `5.020-5.303 ms`. The untouched 10M-body control stayed `48.124-49.868 ms` baseline versus
+`47.799-50.921 ms` candidate, with every paired candidate at or below baseline +5%. Every row preserved its exact
+allocation, checksum, F64 bits, fuel, loop, sandbox-allocation, host-call, and collection totals in all six pairs.
+
+An earlier six-pair batch under `/tmp/dotboxd-nested-f64-6366e1a81-pairs` is deliberately excluded: concurrent machine
+load moved both binaries' unrelated controls by 2-5x and the untouched 10M lane ranged from 46 to 164 ms. After reserving
+CPU 11, the accepted logs under `/tmp/dotboxd-nested-f64-6366e1a81-pairs-v2` restored stable controls; their raw-log
+manifest digest is `b87e909d448ec39d5653be587b2bc524c02c28845b8f989b34755ddb02bd2e42`.
+
+The frozen baseline is `/tmp/dotboxd-nested-f64-6366e1a81-baseline/publish`; the isolated candidate is
+`/tmp/dotboxd-nested-f64-6366e1a81-candidate`. They differ only in `DotBoxD.Kernels.dll`/PDB and
+`DotBoxD.Kernels.Interpreter.dll`/PDB. The shared benchmark runner hash is
+`5f090f3450acb95202525b368976a63f2eda01636cd1fdcfe4f1c8f223d9ae04`. Baseline/candidate Kernels hashes are
+`b2a849f7be566e635fcb54cdfac4912599cabade040c8340b8abd7804f0e73f5` and
+`3187565ad3887e4805a72ac3b41ee131d581ea330ff183256b38c38a76936459`; Interpreter hashes are
+`94182a45009454f1d29620e00c0d577015edb1702b9529715d23d93e32d0fee4` and
+`3d35cb7f8f52a02933bfb01c4d98a6f5aecf5dc2eb580924b756e149852e6e73`. The complete benchmark-source and key-source
+manifest digests are `b83fbad27ded6f29bcddee35d5c4c61d8d1ff30772d32fc4a7c0aea3d0bc96b5` and
+`3c729b848cb23a156371df5d8a034359c0fd5e6e6f2932544eca5740b2f09b02`; they include the unrelated finalized Auto probe
+additions and are byte-identical between baseline and candidate.
+
+Twenty-two focused nested-F64 tests cover changed/empty/descending bounds, exact success and post-loop fuel boundaries,
+aggregate fuel/loop rejection before mutation, overflow fallback, cold/unassigned/non-leaf/loop-slot-bound rejection,
+nonfinite failure order, exact debug preorder and `fuelRemaining`, pre-cancellation, concurrent frames, and bit-exact
+resource parity with a cold generic interpreter. The combined F64-plan and nested-I32/F64 suite passes 55/55, including
+the existing bounded-allocation test. No public API, compiler/verifier identity, generated ABI, persisted artifact,
+sandbox accounting, or execution-result contract changes.
+
+## Direct remote `RunLocal` completion forwarding
+
+The remote-local registry's generated raw decoder and native terminal commonly both complete synchronously, but
+`RemoteLocalHandlerRegistry.DispatchAsync` still awaited the terminal `ValueTask` in its own async state machine. This
+added a fixed completion wrapper after the dictionary lookup, direct binary decode, and handler had already finished.
+The inner decode lambdas had previously been changed to return their terminal `ValueTask` directly; this removes the
+same redundant final await at the public registry boundary.
+
+The success path now returns the handler's exact `ValueTask`. A broad `try`/`catch` is intentional and behavior-only:
+the former async method captured synchronous argument validation, cancellation, lookup, decoder, and handler throws in
+its returned `ValueTask`. The replacement sends those cold exceptions through an async
+`ExceptionDispatchInfo.Capture(exception).Throw()` helper after a completed await. Synchronously returned faulted,
+canceled, and genuinely pending handler values are forwarded untouched. Tests pin no synchronous exception escape,
+the contextual decoder exception and original inner exception, missing-handler failure, exact caller and handler
+cancellation tokens/status, one pending invocation, and zero warmed raw-Int32 dispatch allocation.
+
+The permanent `--probe-runlocal-push` matrix retains its seven encode halves as unchanged controls and now adds a
+2,000,000-call direct-control pair. Both sides use the same raw Int32 decoder and synchronous terminal; only the target
+enters the registry. Ten fresh, unfiltered pairs ran BC/CB five times on otherwise quiescent CPU 6, with tiering, PGO,
+loop quick-JIT, and ReadyToRun disabled:
+
+```text
+taskset -c 6 env \
+  DOTNET_TieredCompilation=0 DOTNET_TC_QuickJitForLoops=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  COMPlus_TieredCompilation=0 COMPlus_TieredPGO=0 COMPlus_ReadyToRun=0 \
+  dotnet <frozen-benchmark.dll> --probe-runlocal-push
+```
+
+```text
+case                              baseline ms   candidate ms   change    wins   B/op baseline→candidate
+registry raw Int32, 2M                 53.200         32.700    -38.53%   10/10          0.0→0.0
+direct decoder+handler control          9.700          9.600     -1.03%    5/10          0.0→0.0
+generated Int32, 200k                   4.900          3.650    -25.51%   10/10          0.0→0.0
+generated string, 200k                  8.500          7.400    -12.94%   10/10         40.0→40.0
+generated enum, 200k                    5.100          3.300    -35.29%   10/10          0.0→0.0
+generated List<Int32>, 200k             8.500          6.950    -18.24%   10/10         72.0→72.0
+generated DTO, 200k                    10.200          9.050    -11.27%   10/10         64.0→64.0
+generated anonymous DTO, 200k          11.200         10.000    -10.71%   10/10         64.0→64.0
+generated whole event, 200k             7.850          6.200    -21.02%   10/10         40.0→40.0
+fallback Int32, 200k                    6.700          5.100    -23.88%   10/10          0.0→0.0
+fallback string, 200k                  13.100         12.000     -8.40%   10/10         40.0→40.0
+fallback enum, 200k                     6.750          5.000    -25.93%   10/10          0.0→0.0
+fallback List<Int32>, 200k             40.650         39.050     -3.94%   10/10      336.0→336.0
+fallback DTO, 200k                     25.950         24.750     -4.62%   10/10      200.0→200.0
+fallback anonymous DTO, 200k           52.600         50.800     -3.42%   10/10      368.0→368.0
+fallback whole event, 200k             30.850         29.500     -4.38%   10/10      288.0→288.0
+```
+
+Every target wins all ten pairs. The direct control's pooled median is inside the predeclared absolute 5% guard, as
+are all seven encode controls: Int32/string/enum are median-exact, and List/DTO/anonymous/whole-event move
+`+0.85%/+2.52%/+0.83%/+0.33%`. One retained baseline direct-control sample took 29.9 ms while its other nine samples
+were 9.4-9.9 ms; no process was filtered, the candidate control spans 9.5-9.9 ms, and the pooled direct-control median
+remains -1.03% with 5/10 wins. All 20 process logs have byte-identical allocation signature
+`e25b0a0f5d92b84c594223baeb934a29286757faeb0a6bce1294df70a61e0418`; target and direct control report exactly 0 B.
+
+The accepted logs are under `/tmp/dotboxd-runlocal-dispatch-225be0a45-cpu6-pairs-accepted-v2`; their manifest digest is
+`35d86ae500c1ca339e6daac168f6d7dd54b283db80b79830a22d1c4d508f7e0a`. Frozen artifacts are
+`/tmp/dotboxd-runlocal-dispatch-225be0a45-baseline-accepted-v2` and
+`/tmp/dotboxd-runlocal-dispatch-225be0a45-candidate-accepted-v2`. The apphost and runner DLL are byte-identical at
+`48c26fa0ce2e5c25ba48fcca56347074ff257c1b5a65cbc0b6f071d6a06dd9e8` and
+`21ce7b2552a2126110688469d6238eb28b2e347c1eb7fc10d9e9ea1e57b9f6c6`; the complete non-plugin artifact manifests
+are byte-identical at `b51dd62d9a6b866ac4d4a5e2e5131796b34efa60c8087f3d137b5c881b8b6a45`. Exact baseline/candidate Plugins hashes are
+`e45cb10380fbb56225b0d82921f077c1e845e85e69abd316b9925dc3549c22fb` and
+`a2a2cf4ff14982eb5ee12377687daa3f337e34c5867f48ec9b8ab31a7f697550`. Probe, direct-control, and scenario source hashes
+are `248677340703b509ffd460ff086f5a43f8acef006b2e93fd22a580ab51700dbb`,
+`1890de2160a5e11626e5097ab5629ba06602debe570cec0a082df4d3fabcf111`, and
+`2f8696efb799e650660db756e10262e302a9f4f73893dbdbf0a2649a06b333e4`.
+
+Three earlier sets are excluded. `/tmp/dotboxd-wave5-runlocal-pairs` used a naive direct return that would let
+synchronous validation/decoder failures escape the call, so it was rejected before any claim. The exception-bridged
+`/tmp/dotboxd-wave5-runlocal-safe-pairs` was an exploratory six-pair screen using the older probe without the direct
+control. `/tmp/dotboxd-runlocal-dispatch-225be0a45-cpu6-pairs-final` used the permanent matrix but ran while unrelated
+MSBuild work was actively consuming the host, so all ten pairs are retained only as contaminated diagnostics.
+
+This is a synchronous-completion CPU claim. Allocation is unchanged rather than improved. The pending handler path is
+behavior-tested but not benchmarked, so it receives no latency/allocation claim; synchronous failure/cancellation uses
+the cold bridge and receives no speed claim. `DispatchResultAsync`, result hooks, transport, and end-to-end RPC remain
+unchanged and outside the claim. No public API or wire format changed.
+
+Post-change validation passes the 22 existing remote-local registry/cancellation/decoder/allocation tests plus seven
+new completion/allocation regressions (29/29), and all 23 architecture tests. The complete solution builds under
+`GITHUB_ACTIONS=true` with zero warnings/errors; whitespace verification, diff checks, the 300-line soft-cap budget,
+and C# file/folder layout gates pass. `RemoteLocalHandlerRegistry.cs` remains exactly 300 lines.
+
+## Closed-set `SandboxType.IsKnown` name dispatch
+
+Every recursive `SandboxTypeRules.IsKnown` call first checked `SandboxType.IsForbiddenName(type.Name)`. That lookup is
+redundant on both branches that can succeed: scalar validation accepts only the nine built-ins or a well-formed
+opaque-id brand, whose name validator already rejects forbidden names; composite validation accepts only exact
+`List`, `Record`, and `Map` names. The hot-path change removes only that preliminary lookup. Empty-name and depth
+guards remain first, scalar and composite closed sets are unchanged, and no cache, mutable state, or retained input is
+introduced. A source comment records the security-sensitive invariant so future constructor/scalar changes cannot
+silently invalidate the reasoning.
+
+`SandboxTypeTests` now pins the complete built-in scalar set and a nested built-in composite; open, declared, and
+undeclared opaque-id behavior; forbidden names as a scalar, map key, and composite; opaque/scalar/unknown names with
+arguments; and the exact accepted/rejected depth boundary. The permanent type probe hard-fails any result mismatch,
+separately labels declared/open/built-in targets, and retains undeclared, forbidden, unknown, exact-depth, over-depth,
+legacy double-walk, and unchanged `IsForbidden`-only lanes. Rejection and depth lanes are semantic controls, not speed
+claims.
+
+Six fresh process pairs ran in order BC/CB/BC/CB/BC/CB on otherwise quiescent CPU 4. Both probes used the same frozen
+runner and the following environment; only `DotBoxD.Kernels.dll` differs between directories:
+
+```text
+taskset -c 4 env \
+  DOTNET_TieredCompilation=0 DOTNET_TC_QuickJitForLoops=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  COMPlus_TieredCompilation=0 COMPlus_TieredPGO=0 COMPlus_ReadyToRun=0 \
+  dotnet <frozen-benchmark.dll> --probe-sandbox-type-validation
+
+taskset -c 4 env \
+  DOTNET_TieredCompilation=0 DOTNET_TC_QuickJitForLoops=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  COMPlus_TieredCompilation=0 COMPlus_TieredPGO=0 COMPlus_ReadyToRun=0 \
+  dotnet <frozen-benchmark.dll> --probe-compiled-return-validation
+```
+
+```text
+type-validation lane                 baseline ns   candidate ns   change    wins   B/op baseline→candidate
+declared known only                       445.10         310.95    -30.14%    6/6             0.0→0.0
+open known only                           420.95         291.00    -30.87%    6/6             0.0→0.0
+built-in known only                       367.35         238.10    -35.18%    6/6             0.0→0.0
+legacy known+forbidden                    716.90         578.70    -19.28%    6/6             0.0→0.0
+forbidden walk only (unchanged control)   261.25         260.75     -0.19%    4/6             0.0→0.0
+```
+
+The other permanent type lanes preserve their exact expected result and 1,000,000 checksum in all twelve processes,
+with exact 0 B allocation. Undeclared opaque, forbidden, unknown-composite, exact-depth, and over-depth timing is
+recorded in the logs but receives no separate performance claim. The type result/allocation signature is identical in
+all twelve logs at `9ae9a9272b5330da9871ace064a29c3406f77999d75c509bf9baefcf6efe6c1e`.
+
+The existing compiled-return probe corroborates the change at real compiled and direct structural-validation
+boundaries. Whole compiled execution naturally dilutes one type walk, while its adjacent direct-walk column isolates
+the validation contribution:
+
+```text
+compiled lane             baseline ns   candidate ns   change    wins   direct walk baseline→candidate
+unit no-op                     422.9          429.8      +1.63%    3/6                  5.5→5.5 ns
+i32 identity                   423.6          424.8      +0.26%    3/6                  6.0→6.0 ns
+empty List<I32>                612.8          586.5      -4.30%    5/6                43.5→34.2 ns
+Record<I32,String>             904.0          884.0      -2.21%    5/6              144.0→124.2 ns
+List<I32> x32                1,752.8        1,736.6      -0.92%    4/6              515.8→499.5 ns
+List<I32> x255               7,278.4        7,195.5      -1.14%    5/6            3,326.8→3,351.3 ns
+List<I32> x256               8,965.5        8,978.3      +0.14%    2/6            4,056.4→4,072.5 ns
+List<I32> x1024             32,641.0       32,462.4      -0.55%    3/6          15,501.7→15,311.4 ns
+Map<String,I32> x32          2,535.6        2,499.8      -1.41%    5/6              970.6→939.3 ns
+nested record                2,820.6        2,700.5      -4.26%    6/6              830.9→760.0 ns
+```
+
+The nested compiled boundary is the corroborating timing claim: it improves 4.26% with 6/6 wins, and its direct walk
+improves 8.53%, also 6/6. Empty-list and record medians improve, while scalar and large-list controls remain inside the
+predeclared absolute 5% guard. Every compiled process preserves exact operations, allocation totals/B-op, direct-walk
+B/op, checksums, result reference identity, execution mode and artifact identities, all twelve resource counters, and
+five direct plus five compiled malformed-value rejections. Their canonical invariant signature is identical at
+`d1a8c0b80f7cac180cad3db537feae4e1c69fd3591ce3bc265737869a80cfae7` in all twelve logs.
+
+Accepted logs are under `/tmp/dotboxd-sandboxtype-846309751-cpu4-accepted-v2`; their manifest digest is
+`5f48f18b6e07397081e376e0b28aab327d3b7fd9ca925678868b478dfb521253`. Frozen baseline/candidate directories are
+`/tmp/dotboxd-sandboxtype-846309751-baseline-frozen` and
+`/tmp/dotboxd-sandboxtype-846309751-candidate-frozen`. The apphost and runner DLL are byte-identical at
+`48c26fa0ce2e5c25ba48fcca56347074ff257c1b5a65cbc0b6f071d6a06dd9e8` and
+`de2501d7ff637082e46398ab98a4084bf964648c51f9c39e24a2dfb06306c2fc`; complete non-kernel manifests are
+byte-identical at `89ab6c11d1c630c95b2744fdebf21e6029d4a6c633af56b2fe85f08981e6c5a9`. Exact baseline/candidate Kernels hashes are
+`5f6f9bb0a6f28343c6f08903f3c306a39302e66bd8a9b8aac872781c563fc589` and
+`54c354fbfba5e108e609a07e4e88d47830d823f36bb8775306afe5739959beb1`. Probe, rules, and test source hashes are
+`671f921739c5a5a197ad43d9af438d08de735fafc7052f5b508453310ff6f122`,
+`6a2f563fc4c901ac1e464a7bcf1bb5a401d8c660aa6656c767c520e710ddd658`, and
+`a2f9381a98cf602b8d1c12c304a2d98f878d6bb9e1576e5620fd9508ad7f920f`.
+
+Three sets are excluded. `/tmp/dotboxd-sandboxtype-rules-pairs` was a directional run of the older two-lane probe;
+its sixth candidate compiled process was visibly host-contaminated (`655.3 ns` scalar envelopes and `7,543.3 ns`
+nested versus the other candidate processes' roughly `417-449 ns` and `2,735-2,823 ns`), so none of that set supports
+the accepted claim. `/tmp/dotboxd-sandboxtype-cache-pairs` evaluated a per-instance known-result cache and was rejected:
+compiled nested-record allocation increased exactly 48 B/call at displayed precision, `992.2→1,040.2 B/op`.
+`/tmp/dotboxd-sandboxtype-846309751-cpu4-accepted-v1` is not benchmark evidence; an orchestration quoting error
+overwrote runs into two literal filenames, and the set was rejected before analysis. The accepted v2 set contains the
+required twelve distinct logs per probe.
+
+This is a CPU-only structural-validation claim. Allocation is unchanged, and no timing claim is made for rejected
+names or depth-limit behavior. There is no public API, wire format, compiler/verifier identity, generated ABI,
+persisted artifact, diagnostic, resource-accounting, or malformed-input contract change.
+
+Post-change validation passes all 13 `SandboxTypeTests` and all 23 architecture tests. The complete solution builds
+under `GITHUB_ACTIONS=true` with zero warnings/errors; whitespace verification, diff checks, file-length and soft-cap
+budget, C# folder layout, and banned-API gates pass. All three changed C# files remain below 200 lines.
+
+## Bounded inline I32 local-helper assignments
+
+A raw-I32 assignment whose right-hand side called a one-argument local helper entered generic call dispatch, built the
+callee frame, boxed the helper result, and immediately unboxed it into the already-known raw target slot. The accepted
+path is deliberately narrower than general local-function dispatch: debug tracing is off; the caller argument is one
+I32 literal or variable; the helper has one I32 parameter used exactly once, an I32 return, and one return statement;
+and its body contains only I32 literals, that parameter, unary negation, and checked `+`, `-`, `*`, `/`, or `%` nodes.
+Every other shape retains generic behavior.
+
+Classification is retained in the existing interpreter cache owned per exact `ExecutionPlan`. Its fixed 16-slot
+identity-hash table stores both eligible plans and immutable negative shape results, publishes entries with
+`Interlocked.CompareExchange`, never evicts, and fails closed to generic dispatch when full. The first observation does
+not allocate the table. Variable existence, raw-I32 kind, and assignment state are rechecked on every invocation.
+Classified local misses reuse the already-resolved function through the existing `LocalFunctionCallEvaluator` and the
+existing assignment completion/await path. The shared call-precedence resolver keeps unary, numeric, and collection
+intrinsics ahead of local functions, including colliding names. Call, argument, function-entry, return-statement, and
+body-node fuel remains incremental; cancellation, depth, checked-math faults, and left-before-right order therefore
+match generic execution.
+
+The permanent scalar-assignment probe now labels the former I32 evaluator-miss lane as the eligible local-helper
+target and adds an unsupported repeated-parameter I32 helper. I64/F64 evaluator misses, raw I32 literal/variable,
+boxed targets, x0 envelopes, values, checksums, and full resource tuples remain controls. Six fresh process pairs ran
+BC/CB/BC/CB/BC/CB on CPU 5 with one byte-identical runner and exact baseline commit
+`820caecff7239e3d5fc5ee1c8b1818f60666345f`:
+
+```text
+taskset -c 5 env \
+  DOTNET_TieredCompilation=0 DOTNET_TC_QuickJitForLoops=0 DOTNET_TieredPGO=0 DOTNET_ReadyToRun=0 \
+  COMPlus_TieredCompilation=0 COMPlus_TieredPGO=0 COMPlus_ReadyToRun=0 \
+  dotnet <frozen-benchmark.dll> --probe-interpreter-scalar-assignment
+```
+
+```text
+lane                              baseline ms   candidate ms   change    wins   B/op baseline→candidate
+I32 local helper x0                    29.15          29.05      -0.34%    3/6          704.1→704.1
+I32 local helper x1                    51.40          35.65     -30.64%    6/6          800.1→704.1
+I32 local helper x4                   111.00          54.95     -50.50%    6/6        1,088.1→704.1
+I32 local helper x8                   190.95          84.70     -55.64%    6/6        1,472.2→704.1
+I32 unsupported helper x8             204.00         193.35      -5.22%    5/6        1,472.2→1,472.2
+I32 literal x8                         63.30          64.00      +1.11%                 704.1→704.1
+I32 raw variable x8                    82.00          83.85      +2.26%                 704.1→704.1
+I32 boxed target x8                    65.10          65.30      +0.31%                 712.1→712.1
+I64 evaluator miss x8                 177.60         176.65      -0.53%              1,880.2→1,880.2
+F64 evaluator miss x8                 189.40         189.05      -0.18%              1,880.2→1,880.2
+```
+
+The target removes exactly 96 B per helper call in every process; x0 and every control retain exact allocation.
+Every target checksum and resource tuple is identical (`x1 200,000 / 11/0/0/0`, `x4 500,000 / 35/0/0/0`, and
+`x8 900,000 / 67/0/0/0`). Across all 52 permanent rows, the worst non-target median is only +2.34%, inside the
+predeclared absolute 5% guard.
+
+Accepted logs are under `/tmp/dotboxd-inline-i32-salvage-cc-final-pairs`; their sorted manifest digest is
+`e51290f056d4bd87cd4cbd3af3c790ce74d396ab2689acb4fc4496f83e9e69b6`. Frozen directories are
+`/tmp/dotboxd-inline-i32-baseline` and `/tmp/dotboxd-inline-i32-candidate-final`. The benchmark runner is
+byte-identical at `9a6a218e4b683641e58f4fc7f8ef15479a0698390fdc3239b34b4dcf80f8ed46`; complete non-interpreter
+manifests are byte-identical with manifest-file digest
+`4508aaa353240f4e6cd8b0eb3870b936652da899cd66557675bf865a92cc78cc`. Baseline/candidate interpreter hashes are
+`441787efd00a770b929d97c8df43d89af1ef75d6c412635d5ed20c6773d47de5` and
+`1dcea6b4032e31d68f1ad5d05b907a1482f28f88eef09fc66edbe6311b08bc58`.
+
+Three candidates were rejected before this claim. `/tmp/dotboxd-inline-localcall-pairs` widened generic I32 call
+dispatch and slowed untouched I64/F64 helper controls by roughly 10-20%. The first narrow uncached candidate under
+`/tmp/dotboxd-inline-i32-final-pairs` improved the target but rescanned unsupported helper shape and slowed that control
+by roughly 20%. `/tmp/dotboxd-inline-i32-accepted-pairs` cached shape in a linear table, but its unsupported x8 median
+still moved `204.75→216.75 ms` (+5.86%), beyond the fixed guard, so it too was rejected. An intervening captured-LINQ
+variable-use counter also allocated during classification; the accepted counter is a noncapturing loop. No rejected
+sample contributes to the accepted numbers.
+
+The focused 39-test matrix pins supported values/operators, literal argument substitution, every fuel boundary,
+checked fault order, call depth, direct cancellation, exact debug trace/fuel fallback, unsupported shapes,
+unknown/unassigned locals and helper names, collection-intrinsic precedence, a genuinely pending helper binding and
+assignment continuation, bounded-cache overflow, shared-plan concurrency, and target/control allocation behavior.
+The combined local-call/straight-assignment suite passes 113/113 tests and architecture/quality gates pass 23/23.
+The complete solution builds under `GITHUB_ACTIONS=true` with zero warnings/errors; whitespace and diff verification
+also pass. No public API, compiler/verifier identity, generated ABI, persisted artifact, or wire format changes.

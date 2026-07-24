@@ -9,10 +9,15 @@ namespace DotBoxD.Kernels.Benchmarks.Interpreter;
 internal static class CompiledExecutionEnvelopeProbe
 {
     private const int WarmupIterations = 2_000;
-    private const int Iterations = 50_000;
-    private const double HistoricalBytesPerOperation = 808.1D;
-    private const double MaximumExpectedBytesPerOperation = 520D;
-    private static readonly SandboxExecutionOptions SuppressedOptions = new()
+    private const int Iterations = 1_000_000;
+    private const double PreviousBytesPerOperation = 512.1D;
+    private const double MaximumPooledBytesPerOperation = 200D;
+    private const double MaximumAlternatingBytesPerOperation = 200D;
+    private const double MinimumFreshBytesPerOperation = 500D;
+    private const double MaximumFreshBytesPerOperation = 520D;
+    private const double ExpectedStateSavingsBytesPerOperation = 320D;
+    private const double AllocationNoiseBytesPerOperation = 2D;
+    internal static readonly SandboxExecutionOptions SuppressedOptions = new()
     {
         Mode = ExecutionMode.Compiled,
         AllowFallbackToInterpreter = false,
@@ -24,6 +29,7 @@ internal static class CompiledExecutionEnvelopeProbe
         using var host = CreateCompiledHost();
         var policy = CreatePolicy();
         var successPlan = await PrepareAsync(host, CompiledExecutionEnvelopeModules.PureSuccess, policy);
+        var alternatePlan = await PrepareAsync(host, CompiledExecutionEnvelopeModules.PureSuccessAlternate, policy);
         var failurePlan = await PrepareAsync(host, CompiledExecutionEnvelopeModules.PureFailure, policy);
         var warmResult = await host.ExecuteAsync(
             successPlan,
@@ -31,17 +37,72 @@ internal static class CompiledExecutionEnvelopeProbe
             SandboxValue.Unit,
             SuppressedOptions);
         var expected = CompiledExecutionInvariant.FromWarmResult(successPlan, warmResult);
+        var alternateWarmResult = await host.ExecuteAsync(
+            alternatePlan,
+            "main",
+            SandboxValue.Unit,
+            SuppressedOptions);
+        var alternateExpected = CompiledExecutionInvariant.FromWarmResult(alternatePlan, alternateWarmResult);
 
-        _ = Measure(host, successPlan, expected, WarmupIterations);
+        using var cancellation = new CancellationTokenSource();
+        _ = Measure(host, successPlan, expected, cancellation.Token, WarmupIterations);
         ForceGc();
-        var measurement = Measure(host, successPlan, expected, Iterations);
-        var bytesPerOperation = measurement.Bytes / (double)Iterations;
-        if (bytesPerOperation > MaximumExpectedBytesPerOperation)
+        var providerLookup = Measure(host, successPlan, expected, cancellation.Token, Iterations);
+        _ = Measure(host, successPlan, expected, CancellationToken.None, WarmupIterations);
+        ForceGc();
+        var optimized = Measure(host, successPlan, expected, CancellationToken.None, Iterations);
+        _ = CompiledExecutionAlternationProbe.Measure(
+            host,
+            successPlan,
+            expected,
+            alternatePlan,
+            alternateExpected,
+            SuppressedOptions,
+            WarmupIterations);
+        ForceGc();
+        var alternating = CompiledExecutionAlternationProbe.Measure(
+            host,
+            successPlan,
+            expected,
+            alternatePlan,
+            alternateExpected,
+            SuppressedOptions,
+            Iterations);
+        var optimizedBytesPerOperation = optimized.Bytes / (double)Iterations;
+        var alternatingBytesPerOperation = alternating.Bytes / (double)Iterations;
+        var providerBytesPerOperation = providerLookup.Bytes / (double)Iterations;
+        var savedBytesPerOperation = providerBytesPerOperation - optimizedBytesPerOperation;
+        if (optimizedBytesPerOperation > MaximumPooledBytesPerOperation)
         {
             throw new InvalidOperationException(
                 $"expected warmed public compiled hits to allocate at most " +
-                $"{MaximumExpectedBytesPerOperation:N1} B/op, got {bytesPerOperation:N1} B/op");
+                $"{MaximumPooledBytesPerOperation:N1} B/op, got {optimizedBytesPerOperation:N1} B/op");
         }
+
+        if (alternatingBytesPerOperation > MaximumAlternatingBytesPerOperation)
+        {
+            throw new InvalidOperationException(
+                $"expected alternating warmed public compiled hits to allocate at most " +
+                $"{MaximumAlternatingBytesPerOperation:N1} B/op, got {alternatingBytesPerOperation:N1} B/op");
+        }
+
+        if (providerBytesPerOperation is < MinimumFreshBytesPerOperation or > MaximumFreshBytesPerOperation)
+        {
+            throw new InvalidOperationException(
+                $"expected cancelable provider lookups to allocate " +
+                $"{MinimumFreshBytesPerOperation:N1}-{MaximumFreshBytesPerOperation:N1} B/op, " +
+                $"got {providerBytesPerOperation:N1} B/op");
+        }
+
+        if (Math.Abs(savedBytesPerOperation - ExpectedStateSavingsBytesPerOperation) >
+            AllocationNoiseBytesPerOperation)
+        {
+            throw new InvalidOperationException(
+                $"expected pooled state to save {ExpectedStateSavingsBytesPerOperation:N1} B/op, " +
+                $"got {savedBytesPerOperation:N1} B/op");
+        }
+
+        await CompiledExecutionOverlapProbe.RunAsync(host, successPlan, expected);
 
         await CompiledExecutionEnvelopeControls.ValidateAsync(
             host,
@@ -53,16 +114,24 @@ internal static class CompiledExecutionEnvelopeProbe
         Console.WriteLine($"compiled public execution-envelope executions = {Iterations:N0}");
         Console.WriteLine("case                         total ms    allocated B       B/op   checksum");
         Console.WriteLine(
-            $"public compiled cache hit     {measurement.ElapsedMilliseconds,8:N1} {measurement.Bytes,14:N0} " +
-            $"{bytesPerOperation,10:N1} {measurement.Checksum,10:N0}");
+            $"completed executable hit       {optimized.ElapsedMilliseconds,8:N1} {optimized.Bytes,14:N0} " +
+            $"{optimizedBytesPerOperation,10:N1} {optimized.Checksum,10:N0}");
         Console.WriteLine(
-            $"allocation-only = {HistoricalBytesPerOperation:N1} B/op baseline -> " +
-            $"{bytesPerOperation:N1} B/op current");
+            $"alternating completed plans    {alternating.ElapsedMilliseconds,8:N1} {alternating.Bytes,14:N0} " +
+            $"{alternatingBytesPerOperation,10:N1} {alternating.Checksum,10:N0}");
+        Console.WriteLine(
+            $"cancelable provider + fresh    {providerLookup.ElapsedMilliseconds,8:N1} {providerLookup.Bytes,14:N0} " +
+            $"{providerBytesPerOperation,10:N1} {providerLookup.Checksum,10:N0}");
+        Console.WriteLine(
+            $"pooled state = {PreviousBytesPerOperation:N1} B/op previous -> " +
+            $"{optimizedBytesPerOperation:N1} B/op current " +
+            $"({savedBytesPerOperation:N1} B/op below fresh control)");
         Console.WriteLine(
             "resources F/Max/L/A/H/R/W/NR/NW/Log/Elem/String = " +
             CompiledExecutionInvariant.FormatUsage(expected.ResourceUsage));
         Console.WriteLine($"artifact = {expected.ArtifactHash}");
-        Console.WriteLine("controls = audited-success, compiled-failure, verifier-fallback: pinned");
+        Console.WriteLine(
+            "controls = cancelable-provider/fresh-state, audited-success, compiled-failure, verifier-fallback: pinned");
     }
 
     private static SandboxHost CreateCompiledHost()
@@ -88,10 +157,11 @@ internal static class CompiledExecutionEnvelopeProbe
         return await host.PrepareAsync(module, policy);
     }
 
-    private static CompiledEnvelopeMeasurement Measure(
+    internal static CompiledEnvelopeMeasurement Measure(
         SandboxHost host,
         ExecutionPlan plan,
         CompiledExecutionInvariant expected,
+        CancellationToken cancellationToken,
         int iterations)
     {
         long checksum = 0;
@@ -104,7 +174,7 @@ internal static class CompiledExecutionEnvelopeProbe
                 "main",
                 SandboxValue.Unit,
                 SuppressedOptions,
-                CancellationToken.None);
+                cancellationToken);
             if (!pending.IsCompletedSuccessfully)
             {
                 throw new InvalidOperationException("compiled execution-envelope probe unexpectedly became asynchronous");
@@ -128,7 +198,7 @@ internal static class CompiledExecutionEnvelopeProbe
             checksum);
     }
 
-    private static void ForceGc()
+    internal static void ForceGc()
     {
         GC.Collect();
         GC.WaitForPendingFinalizers();

@@ -2,54 +2,54 @@ using System.Text;
 using DotBoxD.Services.Protocol;
 using MessagePack;
 using MessagePack.Formatters;
+using static DotBoxD.Codecs.MessagePack.RpcRequestNameValidation;
 
 namespace DotBoxD.Codecs.MessagePack;
 
 internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
 {
-    public static readonly RpcRequestFormatter Instance = new();
-
     private static readonly byte[] MessageIdKey = Encoding.UTF8.GetBytes("MessageId");
     private static readonly byte[] ServiceNameKey = Encoding.UTF8.GetBytes("ServiceName");
     private static readonly byte[] MethodNameKey = Encoding.UTF8.GetBytes("MethodName");
     private static readonly byte[] InstanceIdKey = Encoding.UTF8.GetBytes("InstanceId");
     private static readonly byte[] StreamsKey = Encoding.UTF8.GetBytes("Streams");
-    private static readonly RpcRequestFieldName[] FieldNames =
-    [
-        new("MessageId", MessageIdKey, RpcRequestField.MessageId),
-        new("ServiceName", ServiceNameKey, RpcRequestField.ServiceName),
-        new("MethodName", MethodNameKey, RpcRequestField.MethodName),
-        new("InstanceId", InstanceIdKey, RpcRequestField.InstanceId),
-        new("Streams", StreamsKey, RpcRequestField.Streams)
-    ];
+    private RpcRequestNameCache? _requestNames;
 
-    private RpcRequestFormatter()
-    {
-    }
+    private RpcRequestNameCache RequestNames => LazyInitializer.EnsureInitialized(ref _requestNames)!;
 
     public void Serialize(
         ref MessagePackWriter writer,
         RpcRequest value,
         MessagePackSerializerOptions options)
     {
-        ThrowIfMissingRequiredName(value.ServiceName, nameof(RpcRequest.ServiceName));
-        ThrowIfMissingRequiredName(value.MethodName, nameof(RpcRequest.MethodName));
+        var requestNames = Volatile.Read(ref _requestNames);
+        var serviceNameUtf8 = ValidateRequestName(
+            requestNames,
+            value.ServiceName,
+            RpcRequestNameKind.Service,
+            nameof(RpcRequest.ServiceName));
+        var methodNameUtf8 = ValidateRequestName(
+            requestNames,
+            value.MethodName,
+            RpcRequestNameKind.Method,
+            nameof(RpcRequest.MethodName));
         RpcEnvelopeStringValidation.ThrowIfMalformedUtf16(
             value.InstanceId,
             "request",
             nameof(RpcRequest.InstanceId));
-        RpcRequestNameCache.Register(value.ServiceName);
-        RpcRequestNameCache.Register(value.MethodName);
+        requestNames ??= RequestNames;
+        serviceNameUtf8 ??= requestNames.Register(value.ServiceName, RpcRequestNameKind.Service);
+        methodNameUtf8 ??= requestNames.Register(value.MethodName, RpcRequestNameKind.Method);
 
         writer.WriteMapHeader(5);
         writer.WriteString(MessageIdKey);
         writer.Write(value.MessageId);
         writer.WriteString(ServiceNameKey);
-        WriteNullableString(ref writer, value.ServiceName);
+        RpcRequestNameWriter.Write(ref writer, value.ServiceName, serviceNameUtf8);
         writer.WriteString(MethodNameKey);
-        WriteNullableString(ref writer, value.MethodName);
+        RpcRequestNameWriter.Write(ref writer, value.MethodName, methodNameUtf8);
         writer.WriteString(InstanceIdKey);
-        WriteNullableString(ref writer, value.InstanceId);
+        writer.Write(value.InstanceId);
         writer.WriteString(StreamsKey);
         WriteStreams(ref writer, value.Streams, options);
     }
@@ -57,7 +57,7 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
     public RpcRequest Deserialize(ref MessagePackReader reader, MessagePackSerializerOptions options)
     {
         var count = reader.ReadMapHeader();
-        var state = new RpcRequestReadState(options);
+        var state = new RpcRequestReadState(options, RequestNames);
 
         for (var i = 0; i < count; i++)
         {
@@ -70,7 +70,9 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
 
     // This state is local to synchronous deserialization, so keeping it as a mutable value type
     // avoids a fixed heap allocation without introducing shared state or lifetime concerns.
-    private struct RpcRequestReadState(MessagePackSerializerOptions options)
+    private struct RpcRequestReadState(
+        MessagePackSerializerOptions options,
+        RpcRequestNameCache requestNames)
     {
         private bool _seenMessageId;
         private bool _seenServiceName;
@@ -93,12 +95,12 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
                 case RpcRequestField.ServiceName:
                     ThrowIfDuplicate(_seenServiceName, nameof(RpcRequest.ServiceName));
                     _seenServiceName = true;
-                    _request.ServiceName = ReadCachedName(ref reader)!;
+                    _request.ServiceName = ReadCachedName(ref reader, requestNames, RpcRequestNameKind.Service)!;
                     break;
                 case RpcRequestField.MethodName:
                     ThrowIfDuplicate(_seenMethodName, nameof(RpcRequest.MethodName));
                     _seenMethodName = true;
-                    _request.MethodName = ReadCachedName(ref reader)!;
+                    _request.MethodName = ReadCachedName(ref reader, requestNames, RpcRequestNameKind.Method)!;
                     break;
                 case RpcRequestField.InstanceId:
                     ThrowIfDuplicate(_seenInstanceId, nameof(RpcRequest.InstanceId));
@@ -187,39 +189,10 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
         }
     }
 
-    private static void ThrowIfEmptyOrWhitespaceRequiredName(string value, string fieldName)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            throw new RpcEnvelopeValidationException(
-                $"RPC request contains empty or whitespace required {fieldName}.");
-        }
-    }
-
-    private static void ThrowIfMissingRequiredName(string? value, string fieldName)
-    {
-        if (value is null)
-        {
-            throw new RpcEnvelopeValidationException(
-                $"RPC request is missing required {fieldName}.");
-        }
-
-        ThrowIfEmptyOrWhitespaceRequiredName(value, fieldName);
-        RpcEnvelopeStringValidation.ThrowIfMalformedUtf16(value, "request", fieldName);
-    }
-
-    private static void WriteNullableString(ref MessagePackWriter writer, string? value)
-    {
-        if (value is null)
-        {
-            writer.WriteNil();
-            return;
-        }
-
-        writer.Write(value);
-    }
-
-    private static string? ReadCachedName(ref MessagePackReader reader)
+    private static string? ReadCachedName(
+        ref MessagePackReader reader,
+        RpcRequestNameCache requestNames,
+        RpcRequestNameKind kind)
     {
         if (reader.TryReadNil())
         {
@@ -227,8 +200,8 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
         }
 
         return reader.TryReadStringSpan(out var utf8)
-            ? RpcRequestNameCache.GetOrAdd(utf8)
-            : RpcRequestNameCache.GetOrAdd(reader.ReadString()!);
+            ? requestNames.GetOrAdd(utf8, kind)
+            : requestNames.GetOrAdd(reader.ReadString()!, kind);
     }
 
     private static RpcRequestField ReadField(ref MessagePackReader reader)
@@ -243,29 +216,61 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
 
     private static RpcRequestField ReadField(ReadOnlySpan<byte> utf8)
     {
-        foreach (var field in FieldNames)
+        // Shape only selects a candidate; the full comparison remains the acceptance boundary.
+        return utf8.Length switch
         {
-            if (utf8.SequenceEqual(field.Utf8Name))
-            {
-                return field.Field;
-            }
-        }
-
-        return RpcRequestField.Unknown;
+            7 => MatchField(utf8, StreamsKey, RpcRequestField.Streams),
+            9 => MatchField(utf8, MessageIdKey, RpcRequestField.MessageId),
+            10 => ReadTenByteField(utf8),
+            11 => MatchField(utf8, ServiceNameKey, RpcRequestField.ServiceName),
+            _ => RpcRequestField.Unknown,
+        };
     }
 
     private static RpcRequestField ReadField(string? name)
     {
-        foreach (var field in FieldNames)
+        if (name is null)
         {
-            if (string.Equals(name, field.Name, StringComparison.Ordinal))
-            {
-                return field.Field;
-            }
+            return RpcRequestField.Unknown;
         }
 
-        return RpcRequestField.Unknown;
+        return name.Length switch
+        {
+            7 => MatchField(name, "Streams", RpcRequestField.Streams),
+            9 => MatchField(name, "MessageId", RpcRequestField.MessageId),
+            10 => ReadTenCharacterField(name),
+            11 => MatchField(name, "ServiceName", RpcRequestField.ServiceName),
+            _ => RpcRequestField.Unknown,
+        };
     }
+
+    private static RpcRequestField ReadTenByteField(ReadOnlySpan<byte> utf8)
+        => utf8[0] switch
+        {
+            (byte)'I' => MatchField(utf8, InstanceIdKey, RpcRequestField.InstanceId),
+            (byte)'M' => MatchField(utf8, MethodNameKey, RpcRequestField.MethodName),
+            _ => RpcRequestField.Unknown,
+        };
+
+    private static RpcRequestField ReadTenCharacterField(string name)
+        => name[0] switch
+        {
+            'I' => MatchField(name, "InstanceId", RpcRequestField.InstanceId),
+            'M' => MatchField(name, "MethodName", RpcRequestField.MethodName),
+            _ => RpcRequestField.Unknown,
+        };
+
+    private static RpcRequestField MatchField(
+        ReadOnlySpan<byte> candidate,
+        ReadOnlySpan<byte> expected,
+        RpcRequestField field) =>
+        candidate.SequenceEqual(expected) ? field : RpcRequestField.Unknown;
+
+    private static RpcRequestField MatchField(
+        string candidate,
+        string expected,
+        RpcRequestField field) =>
+        string.Equals(candidate, expected, StringComparison.Ordinal) ? field : RpcRequestField.Unknown;
 
     private enum RpcRequestField
     {
@@ -275,21 +280,5 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
         MethodName,
         InstanceId,
         Streams,
-    }
-
-    private readonly struct RpcRequestFieldName
-    {
-        public RpcRequestFieldName(string name, byte[] utf8Name, RpcRequestField field)
-        {
-            Name = name;
-            Utf8Name = utf8Name;
-            Field = field;
-        }
-
-        public string Name { get; }
-
-        public byte[] Utf8Name { get; }
-
-        public RpcRequestField Field { get; }
     }
 }

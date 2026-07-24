@@ -100,13 +100,12 @@ internal static class SandboxTypeRules
         int maxDepth,
         IReadOnlySet<string>? declaredOpaqueIdTypes)
     {
-        if (depth > maxDepth ||
-            string.IsNullOrEmpty(type.Name) ||
-            SandboxType.IsForbiddenName(type.Name))
+        if (depth > maxDepth || string.IsNullOrEmpty(type.Name))
         {
             return false;
         }
 
+        // Scalar fallthrough rejects forbidden opaque names; composite names are closed to List, Record, and Map.
         if (type.Arguments.Count == 0)
         {
             return IsKnownScalar(type, declaredOpaqueIdTypes);

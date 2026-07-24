@@ -72,10 +72,11 @@ internal sealed class GenericConstructionReachability
             return;
         }
 
+        var invocations = _invocations.ToArray();
         var constructions = BuildConstructionOrdinals(_constructions);
-        PropagateConstructionOrdinals(constructions, _invocations);
+        PropagateConstructionOrdinals(constructions, invocations);
 
-        foreach (var invocation in _invocations)
+        foreach (var invocation in invocations)
         {
             if (!constructions.TryGetValue(invocation.Target, out var ordinals))
             {
@@ -115,41 +116,77 @@ internal sealed class GenericConstructionReachability
 
     private static void PropagateConstructionOrdinals(
         Dictionary<IMethodSymbol, HashSet<GenericParameterSlot>> constructions,
-        IEnumerable<GenericInvocation> invocations)
+        GenericInvocation[] invocations)
     {
-        bool changed;
-        do
+        // Construction slots only grow. Visit calls to a method when that method gains a slot
+        // instead of repeatedly scanning every invocation until a fixed point is reached.
+        var invocationsByTarget = IndexInvocationsByTarget(invocations);
+        var pending = CreatePendingConstructions(constructions);
+
+        while (pending.Count > 0)
         {
-            changed = false;
-            foreach (var invocation in invocations)
+            var construction = pending.Dequeue();
+            if (!invocationsByTarget.TryGetValue(construction.Method, out var invocationIndices))
             {
-                if (!constructions.TryGetValue(invocation.Target, out var targetOrdinals))
+                continue;
+            }
+
+            foreach (var invocationIndex in invocationIndices)
+            {
+                var invocation = invocations[invocationIndex];
+                if (!TryGetTypeArgument(invocation, construction.Ordinal, out var typeArgument) ||
+                    typeArgument is not ITypeParameterSymbol typeParameter ||
+                    !TryGetTypeParameterSlot(invocation.Caller, typeParameter, out var callerOrdinal))
                 {
                     continue;
                 }
 
-                foreach (var ordinal in targetOrdinals.ToArray())
+                if (!constructions.TryGetValue(invocation.Caller, out var callerOrdinals))
                 {
-                    if (!TryGetTypeArgument(invocation, ordinal, out var typeArgument) ||
-                        typeArgument is not ITypeParameterSymbol typeParameter ||
-                        !TryGetTypeParameterSlot(invocation.Caller, typeParameter, out var callerOrdinal))
-                    {
-                        continue;
-                    }
+                    callerOrdinals = [];
+                    constructions.Add(invocation.Caller, callerOrdinals);
+                }
 
-                    if (!constructions.TryGetValue(invocation.Caller, out var callerOrdinals))
-                    {
-                        callerOrdinals = [];
-                        constructions.Add(invocation.Caller, callerOrdinals);
-                    }
-
-                    if (callerOrdinals.Add(callerOrdinal))
-                    {
-                        changed = true;
-                    }
+                if (callerOrdinals.Add(callerOrdinal))
+                {
+                    pending.Enqueue(new GenericConstruction(invocation.Caller, callerOrdinal));
                 }
             }
-        } while (changed);
+        }
+    }
+
+    private static Queue<GenericConstruction> CreatePendingConstructions(
+        Dictionary<IMethodSymbol, HashSet<GenericParameterSlot>> constructions)
+    {
+        var pending = new Queue<GenericConstruction>();
+        foreach (var pair in constructions)
+        {
+            foreach (var ordinal in pair.Value)
+            {
+                pending.Enqueue(new GenericConstruction(pair.Key, ordinal));
+            }
+        }
+
+        return pending;
+    }
+
+    private static Dictionary<IMethodSymbol, List<int>> IndexInvocationsByTarget(
+        GenericInvocation[] invocations)
+    {
+        var indicesByTarget = new Dictionary<IMethodSymbol, List<int>>(SymbolEqualityComparer.Default);
+        for (var index = 0; index < invocations.Length; index++)
+        {
+            var target = invocations[index].Target;
+            if (!indicesByTarget.TryGetValue(target, out var indices))
+            {
+                indices = [];
+                indicesByTarget.Add(target, indices);
+            }
+
+            indices.Add(index);
+        }
+
+        return indicesByTarget;
     }
 
     private static bool TryResolveConstructedConstructor(

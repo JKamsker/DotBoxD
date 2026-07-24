@@ -17,7 +17,7 @@ internal static class SafeHttpGrantReader
     private static SafeHttpGrantOptions CreateOptions(CapabilityGrant grant)
         => new(
             ReadSet(grant, "allowedSchemes", ["https"]),
-            ReadSet(grant, "allowedHosts", []),
+            new SafeHttpAllowedAuthorityIndex(ReadValues(grant, "allowedHosts", [])),
             ReadOptionalLong(grant, "maxRequestBytes"),
             ReadRequiredLong(grant, "maxResponseBytes"),
             ReadTimeout(grant),
@@ -25,10 +25,13 @@ internal static class SafeHttpGrantReader
             ReadBool(grant, "allowPrivateNetwork"));
 
     private static HashSet<string> ReadSet(CapabilityGrant grant, string key, string[] fallback)
+        => ReadValues(grant, key, fallback).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    private static string[] ReadValues(CapabilityGrant grant, string key, string[] fallback)
     {
         if (!grant.Parameters.TryGetValue(key, out var text))
         {
-            return fallback.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            return fallback;
         }
 
         var values = text.Split(',', StringSplitOptions.TrimEntries);
@@ -37,7 +40,7 @@ internal static class SafeHttpGrantReader
             throw Error($"parameter '{key}' is invalid");
         }
 
-        return values.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return values;
     }
 
     private static bool ReadBool(CapabilityGrant grant, string key)
@@ -90,7 +93,7 @@ internal static class SafeHttpGrantReader
 
 internal sealed record SafeHttpGrantOptions(
     IReadOnlySet<string> AllowedSchemes,
-    IReadOnlySet<string> AllowedHosts,
+    SafeHttpAllowedAuthorityIndex AllowedAuthorities,
     long? MaxRequestBytes,
     long MaxResponseBytes,
     TimeSpan Timeout,

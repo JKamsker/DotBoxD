@@ -12,6 +12,7 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
 {
     private readonly ISerializer _serializer;
     private readonly TimeSpan _timeout;
+    private readonly bool _hasFiniteTimeout;
     private readonly int _maxPendingRequests;
     private readonly bool _enableLowAllocationValueTaskInvocations;
     private readonly Action _ensureStarted;
@@ -44,6 +45,7 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
     {
         _serializer = serializer;
         _timeout = options.RequestTimeout;
+        _hasFiniteTimeout = _timeout != Timeout.InfiniteTimeSpan;
         _maxPendingRequests = options.MaxPendingRequests;
         _enableLowAllocationValueTaskInvocations = options.EnableLowAllocationValueTaskInvocations;
         _ensureStarted = ensureStarted;

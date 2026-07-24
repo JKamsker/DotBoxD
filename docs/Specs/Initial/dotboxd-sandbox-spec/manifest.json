@@ -104,8 +104,8 @@
     },
     {
       "path": "spec/07-bindings.md",
-      "sha256": "bc2bcac016fc16628cb352482d473b3454f442a32dc0b77883762de8bcad1259",
-      "bytes": 9163
+      "sha256": "9c4144b46e17ec8b27847236d3387ad4e0413ba2868559a873b4baffd09ff7c7",
+      "bytes": 9197
     },
     {
       "path": "spec/08-runtime-safe-apis.md",
@@ -149,8 +149,8 @@
     },
     {
       "path": "spec/16-public-api.md",
-      "sha256": "c2cf8a1caa193db52f2cb8022281179ff143b1436e1e1adacd520fd983105d83",
-      "bytes": 25283
+      "sha256": "c594dd2c047f24f42b05ebac858808b86d816b0be216f3d92ef8c6c6ae68ce50",
+      "bytes": 25888
     },
     {
       "path": "spec/17-implementation-plan.md",

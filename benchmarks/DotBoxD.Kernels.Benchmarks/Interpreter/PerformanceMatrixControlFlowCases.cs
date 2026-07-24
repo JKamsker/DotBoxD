@@ -129,6 +129,33 @@ internal static class PerformanceMatrixControlFlowCases
         }
         """;
 
+    public static string UnequalFuelBranchedF64LoopJson()
+        => """
+        {
+          "id": "probe-branched-f64-unequal-fuel",
+          "version": "1.0.0",
+          "functions": [
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [{ "name": "iterations", "type": "I32" }],
+              "returnType": "F64",
+              "body": [
+                { "op": "set", "name": "total", "value": { "f64": 1.0 } },
+                { "op": "forRange", "local": "i", "start": { "i32": 0 }, "end": { "var": "iterations" },
+                  "body": [
+                    { "op": "if",
+                      "condition": { "op": "lt", "left": { "op": "rem", "left": { "var": "i" }, "right": { "i32": 2 } }, "right": { "i32": 1 } },
+                      "then": [{ "op": "set", "name": "total", "value": { "op": "add", "left": { "op": "mul", "left": { "var": "total" }, "right": { "f64": 0.9 } }, "right": { "f64": 0.1 } } }],
+                      "else": [{ "op": "set", "name": "total", "value": { "f64": 1.0 } }] }
+                  ] },
+                { "op": "return", "value": { "var": "total" } }
+              ]
+            }
+          ]
+        }
+        """;
+
     public static object HandwrittenWhileLoop(int iterations)
     {
         var acc = 0;

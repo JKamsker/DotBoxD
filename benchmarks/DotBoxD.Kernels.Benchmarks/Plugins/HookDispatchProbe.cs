@@ -10,10 +10,12 @@ internal static class HookDispatchProbe
 
     public static void Run()
     {
+        using var direct = Scenario.DirectPipeline();
         using var single = Scenario.SinglePipeline();
         using var eight = Scenario.EightPipelines();
         using var miss = Scenario.EventMiss();
 
+        _ = Measure(direct, Warmup);
         _ = Measure(single, Warmup);
         _ = Measure(eight, Warmup);
         _ = Measure(miss, Warmup);
@@ -22,6 +24,7 @@ internal static class HookDispatchProbe
         GC.WaitForPendingFinalizers();
         GC.Collect();
 
+        Write("Direct empty pipeline control", Measure(direct, Iterations));
         Write("Single pipeline", Measure(single, Iterations));
         Write("Eight event pipelines", Measure(eight, Iterations));
         Write("Event miss", Measure(miss, Iterations));
@@ -29,6 +32,7 @@ internal static class HookDispatchProbe
 
     private static Measurement Measure(Scenario scenario, int iterations)
     {
+        var initialDispatchCount = scenario.DispatchCount;
         var before = GC.GetAllocatedBytesForCurrentThread();
         var watch = Stopwatch.StartNew();
         for (var i = 0; i < iterations; i++)
@@ -37,7 +41,19 @@ internal static class HookDispatchProbe
         }
 
         watch.Stop();
-        return new Measurement(watch.Elapsed, GC.GetAllocatedBytesForCurrentThread() - before, iterations);
+        var dispatchCount = scenario.DispatchCount - initialDispatchCount;
+        if (dispatchCount != iterations)
+        {
+            throw new InvalidOperationException(
+                $"Hook dispatch invariant failed: expected {iterations}, observed {dispatchCount}.");
+        }
+
+        GC.KeepAlive(scenario);
+        return new Measurement(
+            watch.Elapsed,
+            GC.GetAllocatedBytesForCurrentThread() - before,
+            iterations,
+            dispatchCount);
     }
 
     private static void Write(string name, Measurement measurement)
@@ -45,7 +61,8 @@ internal static class HookDispatchProbe
             $"{name}: {measurement.Elapsed.TotalMilliseconds:N1} ms, " +
             $"{measurement.Elapsed.TotalNanoseconds / measurement.Iterations:N1} ns/op, " +
             $"{measurement.Allocated:N0} B, " +
-            $"{(double)measurement.Allocated / measurement.Iterations:N1} B/op");
+            $"{(double)measurement.Allocated / measurement.Iterations:N1} B/op, " +
+            $"{measurement.DispatchCount:N0} dispatches");
 
     private sealed class Scenario : IDisposable
     {
@@ -56,6 +73,16 @@ internal static class HookDispatchProbe
         {
             _server = server;
             _publish = publish;
+        }
+
+        public long DispatchCount { get; private set; }
+
+        public static Scenario DirectPipeline()
+        {
+            var server = PluginServer.Create();
+            var pipeline = server.Hooks.On<BenchEvent>();
+            return new Scenario(server, () =>
+                pipeline.PublishAsync(new BenchEvent(1), CancellationToken.None).GetAwaiter().GetResult());
         }
 
         public static Scenario SinglePipeline()
@@ -96,12 +123,20 @@ internal static class HookDispatchProbe
                 server.Hooks.PublishAsync(new BenchEvent(1)).GetAwaiter().GetResult());
         }
 
-        public void Publish() => _publish();
+        public void Publish()
+        {
+            _publish();
+            DispatchCount++;
+        }
 
         public void Dispose() => _server.Dispose();
     }
 
-    private readonly record struct Measurement(TimeSpan Elapsed, long Allocated, int Iterations);
+    private readonly record struct Measurement(
+        TimeSpan Elapsed,
+        long Allocated,
+        int Iterations,
+        long DispatchCount);
 
     private readonly record struct BenchEvent(int Value);
 

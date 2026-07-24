@@ -21,6 +21,11 @@ internal static class BindingRegistryValidator
 
     public static IReadOnlyList<SandboxDiagnostic> Validate(IReadOnlyList<BindingDescriptor> bindings)
     {
+        if (bindings.Count == 0)
+        {
+            return Array.Empty<SandboxDiagnostic>();
+        }
+
         var diagnostics = new List<SandboxDiagnostic>();
         CheckDuplicateBindingIds(bindings, diagnostics);
 

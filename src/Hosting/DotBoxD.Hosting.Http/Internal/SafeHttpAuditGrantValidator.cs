@@ -20,7 +20,7 @@ internal static class SafeHttpAuditGrantValidator
 
         var options = SafeHttpGrantReader.Read(grant);
         return options.AllowedSchemes.Contains(uri.Scheme) &&
-               SafeHttpUriAudit.MatchesAllowedAuthority(options.AllowedHosts, uri) &&
+               SafeHttpUriAudit.MatchesAllowedAuthority(options.AllowedAuthorities, uri) &&
                IpLiteralMatches(options, uri) &&
                DurationMatches(options, auditEvent) &&
                ByteCapsMatch(options, auditEvent);

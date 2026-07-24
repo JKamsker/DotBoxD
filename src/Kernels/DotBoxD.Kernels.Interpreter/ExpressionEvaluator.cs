@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Interpreter.Frame;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
@@ -6,66 +8,144 @@ namespace DotBoxD.Kernels.Interpreter;
 
 using DotBoxD.Kernels;
 
-internal sealed partial class ExpressionEvaluator
+internal readonly partial struct ExpressionEvaluator
 {
-    private readonly SandboxContext _context;
     private readonly InterpreterEvaluator _interpreter;
-    private readonly IReadOnlyDictionary<string, FunctionAnalysis> _functionAnalysis;
-    private readonly SandboxExecutionOptions _options;
-    private readonly string _moduleHash;
 
-    public ExpressionEvaluator(
-        SandboxContext context,
-        InterpreterEvaluator interpreter,
-        IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis,
-        SandboxExecutionOptions options,
-        string moduleHash)
-    {
-        _context = context;
+    public ExpressionEvaluator(InterpreterEvaluator interpreter) =>
         _interpreter = interpreter;
-        _functionAnalysis = functionAnalysis;
-        _options = options;
-        _moduleHash = moduleHash;
-    }
+
+    private SandboxContext Context => _interpreter.Context;
+
+    private IReadOnlyDictionary<string, FunctionAnalysis> FunctionAnalysis => _interpreter.FunctionAnalysis;
+
+    private SandboxExecutionOptions Options => _interpreter.Options;
+
+    private string ModuleHash => _interpreter.ModuleHash;
 
     // Non-async dispatch: literals, variables, arithmetic, and pure helper calls all
     // complete synchronously, so they return a finished ValueTask without ever
     // allocating an async state machine. Only genuinely asynchronous work (a host
     // binding whose ValueTask is still pending) walks the async continuation path.
-    public ValueTask<SandboxValue> EvaluateAsync(Expression expression, InterpreterFrame frame)
+    public ValueTask<SandboxValue> EvaluateAsync(Expression expression, InterpreterFrame frame) =>
+        EvaluateCore(expression, frame, allowCompositeProbe: true);
+
+    private ValueTask<SandboxValue> EvaluateCore(
+        Expression expression,
+        InterpreterFrame frame,
+        bool allowCompositeProbe)
     {
-        if (!_options.EnableDebugTrace &&
-            I32ExpressionEvaluator.CanEvaluate(expression, frame, _interpreter))
+        var allowDescendantProbe = false;
+        if (!Options.EnableDebugTrace)
         {
-            return new ValueTask<SandboxValue>(
-                SandboxValue.FromInt32(I32ExpressionEvaluator.Evaluate(expression, frame, _context, _interpreter)));
+            if (I32ExpressionEvaluator.CanEvaluateForDispatch(
+                    expression, frame, _interpreter, allowCompositeProbe))
+            {
+                return new ValueTask<SandboxValue>(
+                    SandboxValue.FromInt32(I32ExpressionEvaluator.Evaluate(
+                        expression, frame, Context, _interpreter)));
+            }
+
+            if (TryEvaluateWidePrimitiveArithmetic(
+                expression,
+                frame,
+                allowCompositeProbe,
+                out allowDescendantProbe,
+                out var primitive))
+            {
+                return new ValueTask<SandboxValue>(primitive);
+            }
         }
 
-        _context.ChargeFuel(1);
-        InterpreterTrace.Write(
-            _context,
-            _options,
-            _moduleHash,
-            frame.FunctionId,
-            "expression",
-            expression.GetType().Name,
-            expression.Span);
+        Context.ChargeFuel(1);
+        WriteTrace(expression, frame);
         return expression switch
         {
             LiteralExpression literal => new ValueTask<SandboxValue>(ChargeLiteral(literal.Value)),
             VariableExpression variable => new ValueTask<SandboxValue>(frame.Read(variable.Name)),
-            UnaryExpression unary => EvaluateUnary(unary, frame),
-            BinaryExpression binary => EvaluateBinary(binary, frame),
+            UnaryExpression unary => EvaluateUnary(unary, frame, allowDescendantProbe),
+            BinaryExpression binary => EvaluateBinary(binary, frame, allowDescendantProbe),
             CallExpression call => EvaluateCall(call, frame),
             _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported expression"))
         };
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void WriteTrace(Expression expression, InterpreterFrame frame)
+    {
+        if (Options.EnableDebugTrace)
+        {
+            InterpreterTrace.Write(
+                Context,
+                Options,
+                ModuleHash,
+                frame.FunctionId,
+                "expression",
+                expression.GetType().Name,
+                expression.Span);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool TryEvaluateWidePrimitiveArithmetic(
+        Expression expression,
+        InterpreterFrame frame,
+        bool allowWidePrimitiveProbe,
+        out bool allowWideDescendantProbe,
+        out SandboxValue value)
+    {
+        if (!allowWidePrimitiveProbe)
+        {
+            allowWideDescendantProbe = false;
+            value = null!;
+            return false;
+        }
+
+        if (!IsPrimitiveArithmetic(expression))
+        {
+            allowWideDescendantProbe = true;
+            value = null!;
+            return false;
+        }
+
+        allowWideDescendantProbe = false;
+        return TryEvaluateWidePrimitiveArithmeticCore(expression, frame, out value);
+    }
+
+    private bool TryEvaluateWidePrimitiveArithmeticCore(
+        Expression expression,
+        InterpreterFrame frame,
+        out SandboxValue value)
+    {
+        if (!_interpreter.TryGetWideExpressionKind(expression, frame, out var kind))
+        {
+            value = null!;
+            return false;
+        }
+
+        if (kind == WideExpressionKind.I64)
+        {
+            value = SandboxValue.FromInt64(I64ExpressionEvaluator.Evaluate(
+                expression, frame, Context));
+            return true;
+        }
+
+        value = SandboxValue.FromDouble(F64ExpressionEvaluator.Evaluate(
+            expression, frame, Context));
+        return true;
+    }
+
+    private static bool IsPrimitiveArithmetic(Expression expression)
+        => expression is UnaryExpression { Operator: "-" } or
+            BinaryExpression { Operator: "+" or "-" or "*" or "/" or "%" };
+
     public bool TryEvaluateInt32(Expression expression, InterpreterFrame frame, out int value)
     {
-        if (!_options.EnableDebugTrace && I32ExpressionEvaluator.CanEvaluate(expression, frame, _interpreter))
+        if (!Options.EnableDebugTrace &&
+            I32ExpressionEvaluator.CanEvaluate(expression, frame, _interpreter))
         {
-            value = I32ExpressionEvaluator.Evaluate(expression, frame, _context, _interpreter);
+            value = I32ExpressionEvaluator.Evaluate(
+                expression, frame, Context, _interpreter);
             return true;
         }
 
@@ -75,11 +155,11 @@ internal sealed partial class ExpressionEvaluator
 
     public bool TryEvaluateInt64(Expression expression, InterpreterFrame frame, out long value)
     {
-        if (!_options.EnableDebugTrace)
+        if (!Options.EnableDebugTrace)
         {
             if (I64ExpressionEvaluator.CanEvaluate(expression, frame))
             {
-                value = I64ExpressionEvaluator.Evaluate(expression, frame, _context);
+                value = I64ExpressionEvaluator.Evaluate(expression, frame, Context);
                 return true;
             }
 
@@ -95,11 +175,11 @@ internal sealed partial class ExpressionEvaluator
 
     public bool TryEvaluateDouble(Expression expression, InterpreterFrame frame, out double value)
     {
-        if (!_options.EnableDebugTrace)
+        if (!Options.EnableDebugTrace)
         {
             if (F64ExpressionEvaluator.CanEvaluate(expression, frame))
             {
-                value = F64ExpressionEvaluator.Evaluate(expression, frame, _context);
+                value = F64ExpressionEvaluator.Evaluate(expression, frame, Context);
                 return true;
             }
 
@@ -121,8 +201,9 @@ internal sealed partial class ExpressionEvaluator
         if (expression is CallExpression { Name: "numeric.toI64", Arguments.Count: 1 } call &&
             I32ExpressionEvaluator.CanEvaluate(call.Arguments[0], frame, _interpreter))
         {
-            _context.ChargeFuel(1);
-            value = I32ExpressionEvaluator.Evaluate(call.Arguments[0], frame, _context, _interpreter);
+            Context.ChargeFuel(1);
+            value = I32ExpressionEvaluator.Evaluate(
+                call.Arguments[0], frame, Context, _interpreter);
             return true;
         }
 
@@ -144,15 +225,16 @@ internal sealed partial class ExpressionEvaluator
         var operand = call.Arguments[0];
         if (I32ExpressionEvaluator.CanEvaluate(operand, frame, _interpreter))
         {
-            _context.ChargeFuel(1);
-            value = I32ExpressionEvaluator.Evaluate(operand, frame, _context, _interpreter);
+            Context.ChargeFuel(1);
+            value = I32ExpressionEvaluator.Evaluate(
+                operand, frame, Context, _interpreter);
             return true;
         }
 
         if (I64ExpressionEvaluator.CanEvaluate(operand, frame))
         {
-            _context.ChargeFuel(1);
-            value = I64ExpressionEvaluator.Evaluate(operand, frame, _context);
+            Context.ChargeFuel(1);
+            value = I64ExpressionEvaluator.Evaluate(operand, frame, Context);
             return true;
         }
 
@@ -166,9 +248,51 @@ internal sealed partial class ExpressionEvaluator
     public ValueTask<SandboxValue> InvokeFunctionAsync(SandboxFunction function, LocalFunctionTripleArguments args)
         => _interpreter.InvokeFunctionAsync(function, args);
 
+    public ValueTask<SandboxValue> InvokeBindingAsync(
+        BindingDescriptor descriptor,
+        SandboxValue arg0,
+        string functionId)
+        => InterpreterBindingCaller.CallAsync(
+            Context,
+            Options,
+            ModuleHash,
+            descriptor,
+            arg0,
+            functionId);
+
+    public ValueTask<SandboxValue> InvokeBindingAsync(
+        BindingDescriptor descriptor,
+        SandboxValue arg0,
+        SandboxValue arg1,
+        string functionId)
+        => InterpreterBindingCaller.CallAsync(
+            Context,
+            Options,
+            ModuleHash,
+            descriptor,
+            arg0,
+            arg1,
+            functionId);
+
+    public ValueTask<SandboxValue> InvokeBindingAsync(
+        BindingDescriptor descriptor,
+        SandboxValue arg0,
+        SandboxValue arg1,
+        SandboxValue arg2,
+        string functionId)
+        => InterpreterBindingCaller.CallAsync(
+            Context,
+            Options,
+            ModuleHash,
+            descriptor,
+            arg0,
+            arg1,
+            arg2,
+            functionId);
+
     private SandboxValue ChargeLiteral(SandboxValue value)
     {
-        _context.ChargeValue(value);
+        Context.ChargeValue(value);
         return value;
     }
 

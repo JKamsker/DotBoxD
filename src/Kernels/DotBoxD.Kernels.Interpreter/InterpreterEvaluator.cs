@@ -13,7 +13,7 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
     private readonly IReadOnlyDictionary<string, SandboxFunction> _functions;
     private readonly IReadOnlyDictionary<string, FunctionAnalysis> _functionAnalysis;
     private readonly SandboxExecutionOptions _options;
-    private readonly string _moduleHash;
+    private readonly ExecutionPlan _plan;
     private readonly ExpressionEvaluator _expressions;
     private readonly StatementExecutor _statements;
     private readonly FunctionFrameLayoutCache _frameLayouts;
@@ -28,13 +28,39 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
     {
         _context = context;
         _options = options;
-        _moduleHash = plan.ModuleHash;
+        _plan = plan;
         _functions = plan.FunctionLookup;
         _functionAnalysis = plan.FunctionAnalysis;
         _frameLayouts = frameLayouts;
-        _expressions = new ExpressionEvaluator(_context, this, _functionAnalysis, _options, _moduleHash);
-        _statements = new StatementExecutor(_context, _expressions, this, _options, _moduleHash);
+        _expressions = new ExpressionEvaluator(this);
+        _statements = new StatementExecutor(this);
     }
+
+    internal SandboxContext Context => _context;
+
+    internal IReadOnlyDictionary<string, FunctionAnalysis> FunctionAnalysis => _functionAnalysis;
+
+    internal SandboxExecutionOptions Options => _options;
+
+    internal string ModuleHash => _plan.ModuleHash;
+
+    internal ExpressionEvaluator Expressions => _expressions;
+
+    internal bool TryGetInlineI32LocalFunctionCallPlan(
+        CallExpression call,
+        out InlineI32LocalFunctionCallPlan plan,
+        out SandboxFunction? genericFunction)
+        => _frameLayouts.TryGetInlineI32LocalFunctionCallPlan(
+            call,
+            this,
+            out plan,
+            out genericFunction);
+
+    internal bool TryGetWideExpressionKind(
+        Expression expression,
+        InterpreterFrame frame,
+        out WideExpressionKind kind)
+        => _frameLayouts.TryGetWideExpressionKind(expression, frame, out kind);
 
     public ValueTask<SandboxValue> ExecuteEntrypointAsync(string entrypoint, SandboxValue input)
     {
@@ -260,7 +286,7 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
             return _lastFrameLayout!;
         }
 
-        var layout = _frameLayouts.Get(function);
+        var layout = _frameLayouts.Get(function, _plan);
         _lastFrameLayoutFunction = function;
         _lastFrameLayout = layout;
         return layout;

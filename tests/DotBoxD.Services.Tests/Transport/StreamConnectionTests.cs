@@ -59,6 +59,36 @@ public class StreamConnectionTests
     }
 
     [Fact]
+    public async Task FrameChannel_ReturnsEmptyPayloadOwnerOnCleanEof()
+    {
+        await using var connection = new StreamConnection(new MemoryStream(Array.Empty<byte>()));
+
+        var pending = connection.ReceiveFrameValueAsync();
+
+        Assert.True(pending.IsCompletedSuccessfully);
+        var frame = await pending;
+        Assert.Same(Payload.Empty, frame.DetachPayload());
+    }
+
+    [Fact]
+    public async Task ReceiveValueAsync_MemoryBackedFrameCompletesSynchronously()
+    {
+        using var expected = MessageFramer.FrameToPayload(
+            17,
+            MessageType.Response,
+            ReadOnlySpan<byte>.Empty);
+        await using var connection = new StreamConnection(
+            new MemoryStream(expected.Memory.ToArray()),
+            ownsStream: false);
+
+        var pending = connection.ReceiveValueAsync();
+
+        Assert.True(pending.IsCompletedSuccessfully);
+        using var received = await pending;
+        Assert.Equal(expected.Memory.ToArray(), received.Memory.ToArray());
+    }
+
+    [Fact]
     public async Task ReceiveAsync_RejectsInvalidFrameLength()
     {
         var bytes = new byte[4];

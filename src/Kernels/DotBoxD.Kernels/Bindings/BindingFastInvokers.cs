@@ -18,3 +18,13 @@ internal interface ITwoArgumentBindingInvoker
         SandboxValue arg1,
         CancellationToken cancellationToken);
 }
+
+internal interface IThreeArgumentBindingInvoker
+{
+    ValueTask<SandboxValue> Invoke(
+        SandboxContext context,
+        SandboxValue arg0,
+        SandboxValue arg1,
+        SandboxValue arg2,
+        CancellationToken cancellationToken);
+}

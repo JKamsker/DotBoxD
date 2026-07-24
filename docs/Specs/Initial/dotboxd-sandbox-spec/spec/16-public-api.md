@@ -362,6 +362,17 @@ public sealed class ExecutionPlanSeal
 }
 ```
 
+## Execution context lifetime
+
+`SandboxContext` implements `IDisposable`. Hosts and hand-written compiled runtimes must dispose a
+context when its execution ends so an armed binding wall-time timer is released promptly. A context
+owned by an internal reusable-run facility may instead release the execution generation before reset.
+Disposed contexts reject further binding dispatch and wall-time token creation.
+
+`SandboxContext.CreateWallTimeToken()` returns a fresh caller-owned
+`CancellationTokenSource`. Cancelling or disposing that source cannot alter the context's private
+binding-deadline source.
+
 ## Interpreter API
 
 ```csharp
@@ -475,7 +486,7 @@ public sealed class PersistentCompiledArtifactCache
 
 public static class CacheKeyBuilder
 {
-    public const string CompilerVersion = "dotboxd-compiler-11";
+    public const string CompilerVersion = "dotboxd-compiler-14";
     public const string TypeSystemVersion = "dotboxd-type-system-2";
     public const string EffectAnalysisVersion = "dotboxd-effect-analysis-3";
     public const string CanonicalizerVersion = CanonicalModuleHasher.CanonicalizerVersion;

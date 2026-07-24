@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Net;
 using System.Net.Sockets;
+using DotBoxD.Services.Buffers;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Transport;
 using DotBoxD.Transports.Tcp;
@@ -31,6 +32,19 @@ public sealed class ConnectionSendCancellationOrderingRegressionTests
     }
 
     [Fact]
+    public async Task StreamConnection_OwnedFrame_WithPreCanceledTokenCancelsAndDisposesBeforeValidation()
+    {
+        await using var connection = new StreamConnection(new MemoryStream(), ownsStream: false);
+        using var cts = PreCanceledTokenSource();
+        var frame = CreateUndefinedMessageTypeOwnedFrame();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => connection.SendFrameValueAsync(frame, cts.Token).AsTask());
+
+        AssertDisposed(frame);
+    }
+
+    [Fact]
     public async Task TcpConnection_SendAsync_WithPreCanceledTokenCancelsBeforeUndersizedFrameValidation()
     {
         await using var pair = await ConnectedTcpPair.CreateAsync();
@@ -50,6 +64,19 @@ public sealed class ConnectionSendCancellationOrderingRegressionTests
             async () => await pair.Server.SendValueAsync(CreateUndefinedMessageTypeFrame(), cts.Token));
     }
 
+    [Fact]
+    public async Task TcpConnection_OwnedFrame_WithPreCanceledTokenCancelsAndDisposesBeforeValidation()
+    {
+        await using var pair = await ConnectedTcpPair.CreateAsync();
+        using var cts = PreCanceledTokenSource();
+        var frame = CreateUndefinedMessageTypeOwnedFrame();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => pair.Server.SendFrameValueAsync(frame, cts.Token).AsTask());
+
+        AssertDisposed(frame);
+    }
+
     private static CancellationTokenSource PreCanceledTokenSource()
     {
         var cts = new CancellationTokenSource();
@@ -67,6 +94,18 @@ public sealed class ConnectionSendCancellationOrderingRegressionTests
         frame[8] = 0x7F;
         return frame;
     }
+
+    private static PooledBufferWriter CreateUndefinedMessageTypeOwnedFrame()
+    {
+        var bytes = CreateUndefinedMessageTypeFrame();
+        var frame = new PooledBufferWriter(bytes.Length);
+        bytes.CopyTo(frame.GetSpan(bytes.Length));
+        frame.Advance(bytes.Length);
+        return frame;
+    }
+
+    private static void AssertDisposed(PooledBufferWriter frame) =>
+        Assert.Throws<ObjectDisposedException>(() => _ = frame.WrittenMemory);
 
     private sealed class ConnectedTcpPair : IAsyncDisposable
     {

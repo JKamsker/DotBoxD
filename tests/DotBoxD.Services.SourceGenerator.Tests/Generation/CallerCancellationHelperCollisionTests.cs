@@ -3,7 +3,7 @@ namespace DotBoxD.Services.SourceGenerator.Tests.Generation;
 public sealed class CallerCancellationHelperCollisionTests
 {
     [Fact]
-    public void Proxy_compiles_when_service_method_matches_cancellation_helper_signature()
+    public void Proxy_compiles_when_service_methods_match_cancellation_helper_signatures()
     {
         const string source = """
             using System.Threading;
@@ -16,6 +16,7 @@ public sealed class CallerCancellationHelperCollisionTests
             public interface IHelperCollision
             {
                 Task __dotboxd_observeCallerCancellationAsync(Task task, CancellationToken ct);
+                Task __dotboxd_observeCallerCancellationCoreAsync(Task task, CancellationToken ct);
             }
             """;
 

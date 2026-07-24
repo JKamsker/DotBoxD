@@ -5,7 +5,7 @@ using DotBoxD.Kernels.Sandbox.Values;
 
 namespace DotBoxD.Kernels.Sandbox;
 
-public sealed partial class SandboxContext
+public sealed partial class SandboxContext : IDisposable
 {
     private DeterministicRandom? _deterministicRandom;
     private BindingReturnCreditTracker? _returnCredits;
@@ -17,6 +17,7 @@ public sealed partial class SandboxContext
     private SandboxRunId? _runId;
     private IAuditSink? _audit;
     private int _callDepth;
+    private int _disposed;
 
     public SandboxContext(
         SandboxRunId runId,
@@ -177,6 +178,7 @@ public sealed partial class SandboxContext
 
     internal BindingDescriptor GetBindingDescriptor(string id)
     {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
         if (_lastBindingDescriptor is { } descriptor &&
             string.Equals(_lastBindingId, id, StringComparison.Ordinal))
         {
@@ -266,26 +268,17 @@ public sealed partial class SandboxContext
 
     public void ChargeLogEvent(string message) => Budget.ChargeLogEvent(message);
 
-    private SharedWallTimeTokenSource? _sharedWallTimeToken;
-
-    public CancellationTokenSource CreateWallTimeToken()
+    /// <summary>
+    /// Releases execution-scoped resources, including an armed binding wall-time timer. A disposed
+    /// context must not be used for further binding dispatch or wall-time token creation.
+    /// </summary>
+    public void Dispose()
     {
-        // Fast path: when the run token cannot be canceled there is no
-        // asynchronous run cancellation to link, so reuse one wall-time source
-        // for the whole run instead of allocating a linked source plus a fresh
-        // CancelAfter timer per binding call. The deadline is otherwise tracked
-        // by the ResourceMeter; we still (re)arm the shared timer so bindings
-        // that await external work observe the wall-time timeout.
-        if (!CancellationToken.CanBeCanceled)
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
         {
-            var shared = _sharedWallTimeToken ??= new SharedWallTimeTokenSource();
-            shared.ArmDeadline(Budget.RemainingWallTime());
-            return shared;
+            return;
         }
 
-        var timeout = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
-        timeout.CancelAfter(Budget.RemainingWallTime());
-        return timeout;
+        ReleaseExecutionResources();
     }
-
 }

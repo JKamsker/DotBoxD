@@ -1,37 +1,95 @@
+using System.Runtime.ExceptionServices;
 using DotBoxD.Services.Buffers;
 using DotBoxD.Services.Protocol;
+using DotBoxD.Services.Transport;
 
 namespace DotBoxD.Services.Streaming.Core;
 
-internal readonly struct RpcStreamFrameSender(
-    Func<ReadOnlyMemory<byte>, CancellationToken, Task> sendAsync,
-    Func<PooledBufferWriter, CancellationToken, ValueTask>? sendFrameAsync)
+internal readonly struct RpcStreamFrameSender
 {
-    public async ValueTask SendAsync(PooledBufferWriter frame, CancellationToken ct)
+    private readonly Func<ReadOnlyMemory<byte>, CancellationToken, Task> _sendAsync;
+    private readonly Func<PooledBufferWriter, CancellationToken, ValueTask>? _sendFrameAsync;
+    private readonly bool _downstreamValidates;
+
+    public RpcStreamFrameSender(
+        Func<ReadOnlyMemory<byte>, CancellationToken, Task> sendAsync,
+        Func<PooledBufferWriter, CancellationToken, ValueTask>? sendFrameAsync)
+    {
+        _sendAsync = sendAsync;
+        _sendFrameAsync = sendFrameAsync;
+        _downstreamValidates = false;
+    }
+
+    public RpcStreamFrameSender(
+        Func<ReadOnlyMemory<byte>, CancellationToken, Task> sendAsync,
+        ValidatedOwnedFrameSender sendFrameSender)
+    {
+        _sendAsync = sendAsync;
+        _sendFrameAsync = sendFrameSender.SendAsync;
+        _downstreamValidates = true;
+    }
+
+    public ValueTask SendAsync(PooledBufferWriter frame, CancellationToken ct)
+    {
+        if (!_downstreamValidates)
+        {
+            try
+            {
+                MessageFramer.ValidateOutgoingFrame(frame.WrittenSpan);
+            }
+            catch (Exception ex)
+            {
+                return DisposeAndCapture(frame, ex);
+            }
+        }
+
+        if (_sendFrameAsync is not null)
+        {
+            try
+            {
+                return _sendFrameAsync(frame, ct);
+            }
+            catch (Exception ex)
+            {
+                return DisposeAndCapture(frame, ex);
+            }
+        }
+
+        return SendMemoryAsync(_sendAsync, frame, ct);
+    }
+
+    private static async ValueTask SendMemoryAsync(
+        Func<ReadOnlyMemory<byte>, CancellationToken, Task> sendAsync,
+        PooledBufferWriter frame,
+        CancellationToken cancellationToken)
     {
         try
         {
-            MessageFramer.ValidateOutgoingFrame(frame.WrittenSpan);
-        }
-        catch
-        {
-            frame.Dispose();
-            throw;
-        }
-
-        if (sendFrameAsync is not null)
-        {
-            await sendFrameAsync(frame, ct).ConfigureAwait(false);
-            return;
-        }
-
-        try
-        {
-            await sendAsync(frame.WrittenMemory, ct).ConfigureAwait(false);
+            await sendAsync(frame.WrittenMemory, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
             frame.Dispose();
         }
+    }
+
+    private static ValueTask DisposeAndCapture(PooledBufferWriter frame, Exception exception)
+    {
+        try
+        {
+            frame.Dispose();
+        }
+        catch (Exception disposeException)
+        {
+            return CaptureExceptionAsync(disposeException);
+        }
+
+        return CaptureExceptionAsync(exception);
+    }
+
+    private static async ValueTask CaptureExceptionAsync(Exception exception)
+    {
+        await Task.CompletedTask.ConfigureAwait(false);
+        ExceptionDispatchInfo.Capture(exception).Throw();
     }
 }

@@ -27,7 +27,10 @@ internal static class InterpreterPlanSetupProbe
             .Build();
         var helperPlan = await PrepareAsync(host, HelperCallModuleJson(), policy);
         var directPlan = await PrepareAsync(host, DirectExpressionModuleJson(), policy);
-        var twoAssignmentPlan = await PrepareAsync(host, TwoAssignmentModuleJson(), policy);
+        var twoAssignmentPlan = await PrepareAsync(
+            host,
+            InterpreterMultiAssignmentPlanModules.ForRange,
+            policy);
         var interpreter = new SandboxInterpreter();
         var options = new SandboxExecutionOptions
         {
@@ -42,7 +45,33 @@ internal static class InterpreterPlanSetupProbe
         RunCase(interpreter, helperPlan, options, "helper call, one iteration", input: 1, expectedValue: 3);
         RunCase(interpreter, helperPlan, options, "helper call, zero control", input: 0, expectedValue: 0);
         RunCase(interpreter, directPlan, options, "direct expression control", input: 1, expectedValue: 3);
-        RunCase(interpreter, twoAssignmentPlan, options, "two-assignment control", input: 1, expectedValue: 6);
+        var twoAssignmentOne = RunCase(
+            interpreter,
+            twoAssignmentPlan,
+            options,
+            "two-assignment control",
+            input: 1,
+            expectedValue: TwoAssignmentExpected(1),
+            expectedUsage: TwoAssignmentUsage(1));
+        var twoAssignmentZero = RunCase(
+            interpreter,
+            twoAssignmentPlan,
+            options,
+            "two-assignment, zero loop",
+            input: 0,
+            expectedValue: TwoAssignmentExpected(0),
+            expectedUsage: TwoAssignmentUsage(0));
+        RunCase(
+            interpreter,
+            twoAssignmentPlan,
+            options,
+            "two-assignment, 20M loop",
+            input: 20_000_000,
+            expectedValue: TwoAssignmentExpected(20_000_000),
+            expectedUsage: TwoAssignmentUsage(20_000_000),
+            warmupIterations: 1,
+            measurementIterations: 1);
+        WriteSetupAllocation(twoAssignmentOne, twoAssignmentZero);
         RunCase(
             interpreter,
             directPlan,
@@ -63,13 +92,14 @@ internal static class InterpreterPlanSetupProbe
         return await host.PrepareAsync(module, policy);
     }
 
-    private static void RunCase(
+    private static Measurement RunCase(
         SandboxInterpreter interpreter,
         ExecutionPlan plan,
         SandboxExecutionOptions options,
         string name,
         int input,
         int expectedValue,
+        ResourceUsageInvariant? expectedUsage = null,
         int warmupIterations = WarmupIterations,
         int measurementIterations = Iterations)
     {
@@ -78,11 +108,26 @@ internal static class InterpreterPlanSetupProbe
         ForceGc();
         var measurement = Measure(interpreter, plan, value, options, expectedValue, measurementIterations);
         var usage = measurement.Usage;
+        if (expectedUsage is { } expected && usage != expected)
+        {
+            throw new InvalidOperationException(
+                $"resource usage changed: expected {expected}, received {usage}");
+        }
+
         Console.WriteLine(
             $"{name,-28} {measurement.ElapsedMilliseconds,8:N1} {measurement.Bytes,14:N0} " +
             $"{measurement.Bytes / (double)measurementIterations,10:N1} " +
             $"{measurement.Checksum,10:N0} {usage.FuelUsed,9:N0} {usage.LoopIterations,9:N0} " +
             $"{usage.AllocatedBytes,12:N0} {usage.HostCalls,7:N0}");
+        return measurement;
+    }
+
+    private static void WriteSetupAllocation(Measurement one, Measurement zero)
+    {
+        var bytes = one.Bytes - zero.Bytes;
+        Console.WriteLine(
+            $"two-assignment one-minus-zero allocation = {bytes:N0} B " +
+            $"({bytes / (double)Iterations:N1} B/entered loop)");
     }
 
     private static Measurement Measure(
@@ -220,49 +265,18 @@ internal static class InterpreterPlanSetupProbe
         }
         """;
 
-    private static string TwoAssignmentModuleJson()
-        => """
-        {
-          "id": "interpreter-plan-two-assignments",
-          "version": "1.0.0",
-          "functions": [{
-            "id": "main",
-            "visibility": "entrypoint",
-            "parameters": [{ "name": "iterations", "type": "I32" }],
-            "returnType": "I32",
-            "body": [
-              { "op": "set", "name": "total", "value": { "i32": 0 } },
-              { "op": "set", "name": "doubled", "value": { "i32": 0 } },
-              {
-                "op": "forRange",
-                "local": "i",
-                "start": { "i32": 0 },
-                "end": { "var": "iterations" },
-                "body": [
-                  {
-                    "op": "set",
-                    "name": "total",
-                    "value": {
-                      "op": "rem",
-                      "left": { "op": "add", "left": { "var": "total" }, "right": { "i32": 3 } },
-                      "right": { "i32": 1000003 }
-                    }
-                  },
-                  {
-                    "op": "set",
-                    "name": "doubled",
-                    "value": { "op": "add", "left": { "var": "total" }, "right": { "var": "total" } }
-                  }
-                ]
-              },
-              { "op": "return", "value": { "var": "doubled" } }
-            ]
-          }]
-        }
-        """;
-
     private static int DirectExpected(int iterations)
         => (int)((long)iterations * 3 % 1_000_003);
+
+    private static int TwoAssignmentExpected(int iterations)
+        => checked(DirectExpected(iterations) * 2);
+
+    private static ResourceUsageInvariant TwoAssignmentUsage(int iterations)
+        => new(
+            FuelUsed: 10 + (15L * iterations),
+            LoopIterations: iterations,
+            AllocatedBytes: 0,
+            HostCalls: 0);
 
     private readonly record struct ResourceUsageInvariant(
         long FuelUsed,

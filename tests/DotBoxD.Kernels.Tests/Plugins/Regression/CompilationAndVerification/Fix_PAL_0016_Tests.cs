@@ -27,6 +27,7 @@ public sealed class Fix_PAL_0016_Tests
     [InlineData(nameof(CompiledRuntime.TypeScalar))]
     [InlineData(nameof(Kernels.Runtime.CompiledRuntime.AddI32))]
     [InlineData(nameof(Kernels.Runtime.CompiledRuntime.CallBinding2))]
+    [InlineData(nameof(Kernels.Runtime.CompiledRuntime.CallBinding3))]
     [InlineData(nameof(Kernels.Runtime.CompiledRuntime.ChargeValueArray))]
     [InlineData(nameof(Kernels.Runtime.CompiledRuntime.CreateValueArray))]
     [InlineData(nameof(CompiledRuntime.ListOf))]

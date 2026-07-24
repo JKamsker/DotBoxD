@@ -76,6 +76,7 @@ public sealed record VerificationPolicy(
                 RuntimeMember("ValidateEntrypointInput", $"{SandboxValueName},{Int32Name}", VoidName),
                 RuntimeMember("GetInputArgument", $"{SandboxValueName},{Int32Name},{Int32Name},{SandboxTypeName}", SandboxValueName),
                 RuntimeMember("RequireValueType", $"{SandboxValueName},{SandboxTypeName}", SandboxValueName),
+                RuntimeMember("RequireValueTypeAndRecordValidation", $"{SandboxContextName},{SandboxValueName},{SandboxTypeName}", SandboxValueName),
                 RuntimeMember("Unit", "", SandboxValueName),
                 RuntimeMember("I32", Int32Name, SandboxValueName),
                 RuntimeMember("I64", Int64Name, SandboxValueName),
@@ -216,7 +217,8 @@ public sealed record VerificationPolicy(
                 RuntimeMember("RecordGet", $"{SandboxContextName},{SandboxValueName},{SandboxValueName}", SandboxValueName),
                 RuntimeMember("CallBinding", $"{SandboxContextName},{StringName},{SandboxValueArrayName}", SandboxValueName),
                 RuntimeMember("CallBinding1", $"{SandboxContextName},{StringName},{SandboxValueName}", SandboxValueName),
-                RuntimeMember("CallBinding2", $"{SandboxContextName},{StringName},{SandboxValueName},{SandboxValueName}", SandboxValueName)
+                RuntimeMember("CallBinding2", $"{SandboxContextName},{StringName},{SandboxValueName},{SandboxValueName}", SandboxValueName),
+                RuntimeMember("CallBinding3", $"{SandboxContextName},{StringName},{SandboxValueName},{SandboxValueName},{SandboxValueName}", SandboxValueName)
             },
             new HashSet<string>(StringComparer.Ordinal) {
                 "System.IO.", "System.Net.", "System.Reflection.", "System.Runtime.Loader.",
@@ -225,8 +227,7 @@ public sealed record VerificationPolicy(
                 "System.GC", "System.Delegate", "System.IServiceProvider",
                 "System.Linq.Expressions.", "Microsoft.CSharp."
             },
-            RuntimeFacadeIdentityDefaults(),
-            "dotboxd-verifier-11");
+            RuntimeFacadeIdentityDefaults(), "dotboxd-verifier-13");
 
     public bool IsMemberAllowed(string memberSignature)
     {
@@ -266,7 +267,6 @@ public sealed record VerificationPolicy(
     {
         var builder = new StringBuilder();
         AppendHashPart(builder, prefix);
-
         foreach (var value in values.Order(StringComparer.Ordinal))
         {
             AppendHashPart(builder, value);

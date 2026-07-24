@@ -16,6 +16,20 @@ internal static class CompiledExecutionEnvelopeModules
     }
     """;
 
+    public const string PureSuccessAlternate = """
+    {
+      "id": "compiled-execution-envelope-success-alternate",
+      "version": "1.0.0",
+      "functions": [{
+        "id": "main",
+        "visibility": "entrypoint",
+        "parameters": [],
+        "returnType": "I32",
+        "body": [{ "op": "return", "value": { "i32": 7 } }]
+      }]
+    }
+    """;
+
     public const string PureFailure = """
     {
       "id": "compiled-execution-envelope-failure",

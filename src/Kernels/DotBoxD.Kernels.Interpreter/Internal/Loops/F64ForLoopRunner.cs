@@ -23,13 +23,61 @@ internal static class F64ForLoopRunner
             return false;
         }
 
+        if (frame.Layout.LoopPlans.TryGetF64ForRangePlan(statement, frame, out var cached))
+        {
+            return TryRun(
+                statement,
+                cached.TargetSlot,
+                cached.Expression,
+                cached.FuelPerIteration,
+                binding: null,
+                start,
+                end,
+                frame,
+                context);
+        }
+
         if (!TryCreateBodyPlan(statement, frame, context.Bindings, out var body, out var fuelPerIteration, out var binding))
         {
             return false;
         }
 
+        ref var loopPlans = ref frame.Layout.LoopPlans;
+        if (body.Expression.IsReusableForLoopPlan &&
+            loopPlans.ShouldCacheF64ForRangePlan(statement))
+        {
+            loopPlans.CacheF64ForRangePlan(new F64ForLoopPlan(
+                statement,
+                body.TargetSlot,
+                body.Expression,
+                fuelPerIteration));
+        }
+
+        return TryRun(
+            statement,
+            body.TargetSlot,
+            body.Expression,
+            fuelPerIteration,
+            binding,
+            start,
+            end,
+            frame,
+            context);
+    }
+
+    private static bool TryRun(
+        ForRangeStatement statement,
+        int targetSlot,
+        F64ExpressionPlan expression,
+        long fuelPerIteration,
+        BindingDescriptor? binding,
+        int start,
+        int end,
+        InterpreterFrame frame,
+        SandboxContext context)
+    {
         var iterations = (long)end - start;
-        var bindingCalls = BindingCalls(iterations, body.Expression.BindingCallCount);
+        var bindingCalls = BindingCalls(iterations, expression.BindingCallCount);
         if (bindingCalls < 0 ||
             !context.CanBulkChargeLoopIterations(iterations, fuelPerIteration) ||
             (binding is not null && !context.CanBulkChargeBindingCalls(binding, bindingCalls)))
@@ -42,12 +90,13 @@ internal static class F64ForLoopRunner
         {
             context.ChargeBindingCalls(binding, bindingCalls);
         }
+
         var loopSlot = frame.GetSlot(statement.LocalName);
         var checkpoint = 4096;
         for (var i = start; i < end; i++)
         {
             frame.WriteRawInt32Slot(loopSlot, i);
-            frame.WriteRawDoubleSlot(body.TargetSlot, body.Expression.Evaluate(frame));
+            frame.WriteRawDoubleSlot(targetSlot, expression.Evaluate(frame));
             if (--checkpoint == 0)
             {
                 context.Checkpoint();
@@ -56,6 +105,52 @@ internal static class F64ForLoopRunner
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Runs a cached plan that the layout cache has validated for this frame. The caller
+    /// must also prove that the complete enclosing work fits the remaining fuel and loop
+    /// budgets before making any observable mutation.
+    /// </summary>
+    internal static void RunValidatedCachedSingleAssignment(
+        int start,
+        int end,
+        InterpreterFrame frame,
+        SandboxContext context,
+        int loopSlot,
+        F64ForLoopPlan plan)
+    {
+        context.ChargeLoopIterations((long)end - start, plan.FuelPerIteration);
+        Run(
+            plan.TargetSlot,
+            plan.Expression,
+            start,
+            end,
+            frame,
+            context,
+            loopSlot);
+    }
+
+    private static void Run(
+        int targetSlot,
+        F64ExpressionPlan expression,
+        int start,
+        int end,
+        InterpreterFrame frame,
+        SandboxContext context,
+        int loopSlot)
+    {
+        var checkpoint = 4096;
+        for (var i = start; i < end; i++)
+        {
+            frame.WriteRawInt32Slot(loopSlot, i);
+            frame.WriteRawDoubleSlot(targetSlot, expression.Evaluate(frame));
+            if (--checkpoint == 0)
+            {
+                context.Checkpoint();
+                checkpoint = 4096;
+            }
+        }
     }
 
     private static bool CanUseFastPath(SandboxExecutionOptions options, int start, int end)

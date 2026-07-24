@@ -6,7 +6,6 @@ using DotBoxD.Services.Transport;
 using DotBoxD.Transports.Tcp;
 using Xunit;
 using ServiceFrameReadTimeoutSource = DotBoxD.Services.Protocol.FrameReadTimeoutSource;
-using TcpFrameReadTimeoutSource = DotBoxD.Transports.Tcp.FrameReadTimeoutSource;
 
 namespace DotBoxD.Services.Tests.Transport;
 
@@ -88,15 +87,69 @@ public sealed class FrameReadIdleTimeoutRegressionTests
     }
 
     [Fact]
-    public void ServiceFrameReadTimeoutSource_Start_RecreatesDisposedCachedSource()
+    public async Task ServiceFrameReadTimeoutSource_Start_RecreatesAndRearmsDisposedCachedSource()
     {
         using var source = new ServiceFrameReadTimeoutSource();
-        source.Start(CancellationToken.None, IdleTimeout);
+        var disposedToken = source.Start(CancellationToken.None, IdleTimeout);
         DisposeInnerCancellationTokenSource(source);
 
-        var exception = Record.Exception(() => source.Start(CancellationToken.None, IdleTimeout));
+        var replacementToken = source.Start(CancellationToken.None, IdleTimeout);
+        source.CancelPendingTimeout();
+        source.CancelPendingTimeout();
 
-        Assert.Null(exception);
+        await Task.Delay(IdleTimeout + IdleTimeout);
+        Assert.NotEqual(disposedToken, replacementToken);
+        Assert.False(replacementToken.IsCancellationRequested);
+
+        var rearmedToken = source.Rearm(IdleTimeout);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, rearmedToken).WaitAsync(Guard));
+    }
+
+    [Fact]
+    public void ServiceFrameReadTimeoutSource_Start_AfterWrapperDispose_Throws()
+    {
+        var source = new ServiceFrameReadTimeoutSource();
+        source.Dispose();
+
+        try
+        {
+            Assert.Throws<ObjectDisposedException>(() =>
+                source.Start(CancellationToken.None, IdleTimeout));
+        }
+        finally
+        {
+            source.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task ServiceFrameReadTimeoutSource_RepeatedInactiveCancel_DoesNotSuppressNextTimeout()
+    {
+        using var source = new ServiceFrameReadTimeoutSource();
+        source.CancelPendingTimeout();
+        source.CancelPendingTimeout();
+
+        var token = source.Start(CancellationToken.None, IdleTimeout);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, token).WaitAsync(Guard));
+    }
+
+    [Fact]
+    public async Task ServiceFrameReadTimeoutSource_RepeatedCancel_DisarmsUntilRearmed()
+    {
+        using var source = new ServiceFrameReadTimeoutSource();
+        var token = source.Start(CancellationToken.None, IdleTimeout);
+        source.CancelPendingTimeout();
+        source.CancelPendingTimeout();
+
+        await Task.Delay(IdleTimeout + IdleTimeout);
+        Assert.False(token.IsCancellationRequested);
+
+        var rearmedToken = source.Start(CancellationToken.None, IdleTimeout);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, rearmedToken).WaitAsync(Guard));
     }
 
     [Fact]
@@ -113,34 +166,7 @@ public sealed class FrameReadIdleTimeoutRegressionTests
         Assert.Equal(buffer.Length, count);
     }
 
-    [Fact]
-    public void TcpFrameReadTimeoutSource_CancelPendingTimeout_IgnoresDisposedSource()
-    {
-        using var source = new TcpFrameReadTimeoutSource();
-        source.Start(CancellationToken.None, IdleTimeout);
-        DisposeInnerCancellationTokenSource(source);
-
-        var exception = Record.Exception(source.CancelPendingTimeout);
-
-        Assert.Null(exception);
-    }
-
-    [Fact]
-    public void TcpFrameReadTimeoutSource_Start_RecreatesDisposedCachedSource()
-    {
-        using var source = new TcpFrameReadTimeoutSource();
-        source.Start(CancellationToken.None, IdleTimeout);
-        DisposeInnerCancellationTokenSource(source);
-
-        var exception = Record.Exception(() => source.Start(CancellationToken.None, IdleTimeout));
-
-        Assert.Null(exception);
-    }
-
     private static void DisposeInnerCancellationTokenSource(ServiceFrameReadTimeoutSource timeoutSource) =>
-        timeoutSource.DisposeCurrentSourceForTest();
-
-    private static void DisposeInnerCancellationTokenSource(TcpFrameReadTimeoutSource timeoutSource) =>
         timeoutSource.DisposeCurrentSourceForTest();
 
     private sealed class PrefixThenStallStream : Stream

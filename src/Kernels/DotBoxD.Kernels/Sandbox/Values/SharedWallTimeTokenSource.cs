@@ -1,23 +1,13 @@
-using DotBoxD.Kernels.Model;
-
 namespace DotBoxD.Kernels.Sandbox.Values;
 
 /// <summary>
-/// A wall-time <see cref="CancellationTokenSource"/> that is reused for the
-/// lifetime of a single sandbox run when the run cancellation token is not
-/// cancelable. On that fast path there is no asynchronous run cancellation to
-/// link, so binding dispatch does not need a fresh linked source per call: the
-/// deadline is already tracked by the <see cref="ResourceMeter"/> and the timer
-/// is only ever (re)armed here.
+/// A wall-time <see cref="CancellationTokenSource"/> shared for one sandbox-context generation.
+/// The resource meter owns a fixed absolute deadline, so binding dispatch arms this source once
+/// and temporarily links cancelable run tokens through allocation-free registrations.
 /// </summary>
 /// <remarks>
-/// Dispatchers dispose the source they receive in their <c>finally</c> block.
-/// This type makes <see cref="Dispose(bool)"/> a no-op so the shared instance
-/// survives those calls and stays reusable. The owning <see cref="Sandbox.SandboxContext"/>
-/// arms the deadline timer via <see cref="ArmDeadline"/> before each dispatch,
-/// which reuses the internal timer (no per-call allocation) instead of creating
-/// a new source. Once the deadline fires, the enforcing <c>Timeout</c> error
-/// aborts the run, so the cancelled instance is never reused afterwards.
+/// The owning context disposes this source at the execution boundary. Public wall-time token
+/// requests receive a separate caller-owned source and cannot cancel or dispose this internal timer.
 /// </remarks>
 internal sealed class SharedWallTimeTokenSource : CancellationTokenSource
 {
@@ -32,9 +22,4 @@ internal sealed class SharedWallTimeTokenSource : CancellationTokenSource
         }
     }
 
-    // Dispatchers dispose the returned source unconditionally; keep the shared
-    // instance alive so it can be handed out and re-armed on the next call.
-    protected override void Dispose(bool disposing)
-    {
-    }
 }

@@ -5,7 +5,7 @@ namespace DotBoxD.Plugins.Runtime.Input;
 
 internal sealed class PluginEventAdapterValidationCache
 {
-    private readonly ConditionalWeakTable<object, StrongBox<PluginEventShape>> _validatedAdapters = new();
+    private readonly ConditionalWeakTable<object, StrongBox<PluginEventValidationStamp>> _validatedAdapters = new();
 
     public IReadOnlyList<Parameter> Validate<TEvent>(
         PluginManifest manifest,
@@ -18,17 +18,36 @@ internal sealed class PluginEventAdapterValidationCache
         var eventName = adapter.EventName;
         var parameters = adapter.Parameters;
         PluginEventAdapterShapeValidator.Validate(adapter, eventName, parameters);
-        PluginEventCapabilityValidator.Validate<TEvent>(plan, entrypoints, parameters);
         if (_validatedAdapters.TryGetValue(adapter, out var cached) &&
-            cached.Value.Matches(eventName, parameters))
+            cached.Value.Matches(typeof(TEvent), eventName, parameters))
         {
             return parameters;
         }
 
+        PluginEventCapabilityValidator.Validate<TEvent>(plan, entrypoints, parameters);
         var shape = new PluginEventShape(eventName, parameters);
         KernelEntrypointValidator.Validate<TEvent>(manifest, plan, entrypoints, shape);
-        _validatedAdapters.AddOrUpdate(adapter, new StrongBox<PluginEventShape>(shape));
+        var stamp = new PluginEventValidationStamp(typeof(TEvent), shape);
+        _validatedAdapters.AddOrUpdate(adapter, new StrongBox<PluginEventValidationStamp>(stamp));
         return parameters;
+    }
+
+    private readonly struct PluginEventValidationStamp
+    {
+        private readonly Type _eventType;
+        private readonly PluginEventShape _shape;
+
+        public PluginEventValidationStamp(Type eventType, PluginEventShape shape)
+        {
+            _eventType = eventType;
+            _shape = shape;
+        }
+
+        public bool Matches(
+            Type candidateEventType,
+            string eventName,
+            IReadOnlyList<Parameter> parameters)
+            => _eventType == candidateEventType && _shape.Matches(eventName, parameters);
     }
 }
 

@@ -152,7 +152,7 @@ namespace prefix such as `DotBoxD.Kernels.Runtime.*` is not enough.
 
 Avoid generating code that directly calls arbitrary app methods.
 
-The generic `CompiledRuntime.CallBinding` / `CallBinding2` path intentionally has no compile-time
+The generic `CompiledRuntime.CallBinding` / `CallBinding1` / `CallBinding2` / `CallBinding3` path intentionally has no compile-time
 capability, effect, or audit fence. It dispatches through the registered `BindingDescriptor`, and the
 runtime enforces exactly that descriptor's `RequiredCapability`, `Effects`, `AuditLevel`, cost model,
 and `IsAsync` metadata. Treat descriptor changes for a `CallBinding` stub as security-sensitive:

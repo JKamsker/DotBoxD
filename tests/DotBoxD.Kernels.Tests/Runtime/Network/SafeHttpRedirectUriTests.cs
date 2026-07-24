@@ -1,4 +1,3 @@
-using System.Reflection;
 using DotBoxD.Hosting.Http.Policy;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Serialization.Json.Hosting;
@@ -18,25 +17,50 @@ public sealed class SafeHttpRedirectUriTests
     }
 
     [Theory]
-    [InlineData("api.example.com:443", "https://api.example.com/config")]
-    [InlineData("api.example.com:443", "https://api.example.com:443/config")]
-    [InlineData("api.example.com:80", "http://api.example.com/config")]
-    [InlineData("[::1]:443", "https://[::1]/config")]
-    public void MatchesAllowedAuthority_allows_explicit_default_port_for_uri_scheme(
-        string allowedHost,
-        string uri)
+    [InlineData(null, "https://api.example.com/config", false)]
+    [InlineData("api.example.com", "https://api.example.com/config", true)]
+    [InlineData("API.EXAMPLE.COM", "https://api.example.com/config", true)]
+    [InlineData("api.example.com", "https://api.example.com:8443/config", false)]
+    [InlineData("api.example.com:8443", "https://api.example.com:8443/config", true)]
+    [InlineData("api.example.com:443", "https://api.example.com/config", true)]
+    [InlineData("api.example.com:0443", "https://api.example.com/config", true)]
+    [InlineData("api.example.com:+443", "https://api.example.com/config", false)]
+    [InlineData("api.example.com: 443", "https://api.example.com/config", false)]
+    [InlineData("api.example.com:0443", "http://api.example.com:443/config", false)]
+    [InlineData("api.example.com:443", "http://api.example.com:443/config", true)]
+    [InlineData("api.example.com:80", "http://api.example.com/config", true)]
+    [InlineData("api.example.com:080", "http://api.example.com/config", true)]
+    [InlineData("api.example.com:80", "https://api.example.com/config", false)]
+    [InlineData("api.example.com:080", "https://api.example.com:80/config", false)]
+    [InlineData("api.example.com:80", "https://api.example.com:80/config", true)]
+    [InlineData("[::1]", "https://[::1]/config", true)]
+    [InlineData("[::1]:0443", "https://[::1]/config", true)]
+    [InlineData("[::1]:8443", "https://[::1]:8443/config", true)]
+    [InlineData("[::1]:08443", "https://[::1]:8443/config", false)]
+    [InlineData("[0:0:0:0:0:0:0:1]", "https://[::1]/config", false)]
+    [InlineData("127.1", "http://127.1/config", false)]
+    [InlineData("127.0.0.1", "http://127.1/config", true)]
+    [InlineData("[fe80::1]:443", "https://[fe80::1%25eth0]/config", true)]
+    [InlineData("[fe80::1%25eth0]:443", "https://[fe80::1%25eth0]/config", false)]
+    [InlineData("bad_host", "https://bad_host/config", true)]
+    [InlineData("ftp.example.com", "ftp://ftp.example.com/config", true)]
+    [InlineData("ftp.example.com:21", "ftp://ftp.example.com/config", false)]
+    [InlineData("api.example.com:443", "custom://api.example.com:443/config", true)]
+    [InlineData("api.example.com", "https://api.example.com./config", false)]
+    public void Indexed_authorities_preserve_compatibility_matching(
+        string? allowedHost,
+        string uri,
+        bool expected)
     {
-        Assert.True(MatchesAllowedAuthority(AllowedHosts(allowedHost), new Uri(uri)));
-    }
+        var authorities = allowedHost is null ? [] : new[] { allowedHost };
+        var target = new Uri(uri);
 
-    [Theory]
-    [InlineData("api.example.com:80", "https://api.example.com/config")]
-    [InlineData("api.example.com:443", "http://api.example.com/config")]
-    public void MatchesAllowedAuthority_rejects_default_port_for_other_scheme(
-        string allowedHost,
-        string uri)
-    {
-        Assert.False(MatchesAllowedAuthority(AllowedHosts(allowedHost), new Uri(uri)));
+        Assert.Equal(expected, SafeHttpUriAudit.MatchesAllowedAuthority(
+            new SafeHttpAllowedAuthorityIndex(authorities),
+            target));
+        Assert.Equal(expected, MatchesAllowedAuthority(
+            authorities.ToHashSet(StringComparer.Ordinal),
+            target));
     }
 
     [Fact]
@@ -58,20 +82,5 @@ public sealed class SafeHttpRedirectUriTests
     }
 
     private static bool MatchesAllowedAuthority(IReadOnlySet<string> allowedHosts, Uri uri)
-    {
-        var type = typeof(SafeHttpClient).Assembly.GetType(
-            "DotBoxD.Hosting.Http.SafeHttpUriAudit",
-            throwOnError: true)!;
-        var method = type.GetMethod(
-            "MatchesAllowedAuthority",
-            BindingFlags.Public | BindingFlags.Static,
-            binder: null,
-            [typeof(IReadOnlySet<string>), typeof(Uri)],
-            modifiers: null)!;
-
-        return (bool)method.Invoke(null, [allowedHosts, uri])!;
-    }
-
-    private static HashSet<string> AllowedHosts(string allowedHost)
-        => new(StringComparer.Ordinal) { allowedHost };
+        => SafeHttpUriAudit.MatchesAllowedAuthority(allowedHosts, uri);
 }

@@ -23,7 +23,14 @@ internal static class InterpreterWhilePlanSetupProbe
             .Build();
         var singlePlan = await PrepareAsync(host, SingleAssignmentModule, policy);
         var noWhilePlan = await PrepareAsync(host, NoWhileControlModule, policy);
-        var twoAssignmentPlan = await PrepareAsync(host, TwoAssignmentModule, policy);
+        var twoAssignmentPlan = await PrepareAsync(
+            host,
+            InterpreterMultiAssignmentPlanModules.While,
+            policy);
+        var twoLocalNoWhilePlan = await PrepareAsync(
+            host,
+            InterpreterMultiAssignmentPlanModules.WhileNoLoop,
+            policy);
         var interpreter = new SandboxInterpreter();
         var options = new SandboxExecutionOptions
         {
@@ -38,7 +45,41 @@ internal static class InterpreterWhilePlanSetupProbe
         RunCase(interpreter, singlePlan, options, "one assignment, one loop", 1, 1);
         RunCase(interpreter, singlePlan, options, "one assignment, zero loop", 0, 0);
         RunCase(interpreter, noWhilePlan, options, "no-while zero control", 0, 0);
-        RunCase(interpreter, twoAssignmentPlan, options, "two-assignment control", 1, 2);
+        var twoAssignmentOne = RunCase(
+            interpreter,
+            twoAssignmentPlan,
+            options,
+            "two-assignment control",
+            input: 1,
+            expectedValue: 2,
+            expectedUsage: TwoAssignmentUsage(1));
+        var twoAssignmentZero = RunCase(
+            interpreter,
+            twoAssignmentPlan,
+            options,
+            "two-assignment, zero loop",
+            input: 0,
+            expectedValue: 0,
+            expectedUsage: TwoAssignmentUsage(0));
+        var twoLocalNoWhile = RunCase(
+            interpreter,
+            twoLocalNoWhilePlan,
+            options,
+            "two-local no-while control",
+            input: 0,
+            expectedValue: 0,
+            expectedUsage: new ResourceUsageInvariant(7, 0, 0, 0));
+        RunCase(
+            interpreter,
+            twoAssignmentPlan,
+            options,
+            "two-assignment, 20M loop",
+            input: 20_000_000,
+            expectedValue: 40_000_000,
+            expectedUsage: TwoAssignmentUsage(20_000_000),
+            warmupIterations: 1,
+            measurementIterations: 1);
+        WriteAllocationDeltas(twoAssignmentOne, twoAssignmentZero, twoLocalNoWhile);
         RunCase(
             interpreter,
             singlePlan,
@@ -48,6 +89,9 @@ internal static class InterpreterWhilePlanSetupProbe
             20_000_000,
             warmupIterations: 1,
             measurementIterations: 1);
+
+        Console.WriteLine();
+        await InterpreterNestedWhilePlanProbe.RunAsync();
     }
 
     private static async Task<ExecutionPlan> PrepareAsync(
@@ -59,13 +103,14 @@ internal static class InterpreterWhilePlanSetupProbe
         return await host.PrepareAsync(module, policy);
     }
 
-    private static void RunCase(
+    private static Measurement RunCase(
         SandboxInterpreter interpreter,
         ExecutionPlan plan,
         SandboxExecutionOptions options,
         string name,
         int input,
         int expectedValue,
+        ResourceUsageInvariant? expectedUsage = null,
         int warmupIterations = WarmupIterations,
         int measurementIterations = Iterations)
     {
@@ -74,11 +119,33 @@ internal static class InterpreterWhilePlanSetupProbe
         ForceGc();
         var measurement = Measure(interpreter, plan, value, options, expectedValue, measurementIterations);
         var usage = measurement.Usage;
+        if (expectedUsage is { } expected && usage != expected)
+        {
+            throw new InvalidOperationException(
+                $"resource usage changed: expected {expected}, received {usage}");
+        }
+
         Console.WriteLine(
             $"{name,-28} {measurement.ElapsedMilliseconds,8:N1} {measurement.Bytes,14:N0} " +
             $"{measurement.Bytes / (double)measurementIterations,10:N1} " +
             $"{measurement.Checksum,10:N0} {usage.FuelUsed,9:N0} {usage.LoopIterations,9:N0} " +
             $"{usage.AllocatedBytes,12:N0} {usage.HostCalls,7:N0}");
+        return measurement;
+    }
+
+    private static void WriteAllocationDeltas(
+        Measurement one,
+        Measurement zero,
+        Measurement noWhile)
+    {
+        var setupBytes = zero.Bytes - noWhile.Bytes;
+        var enteredBodyBytes = one.Bytes - zero.Bytes;
+        Console.WriteLine(
+            $"two-assignment zero-minus-matched-no-while allocation = {setupBytes:N0} B " +
+            $"({setupBytes / (double)Iterations:N1} B/planned loop)");
+        Console.WriteLine(
+            $"two-assignment one-minus-zero allocation = {enteredBodyBytes:N0} B " +
+            $"({enteredBodyBytes / (double)Iterations:N1} B/entered body)");
     }
 
     private static Measurement Measure(
@@ -181,39 +248,12 @@ internal static class InterpreterWhilePlanSetupProbe
     }
     """;
 
-    private const string TwoAssignmentModule = """
-    {
-      "id": "interpreter-while-two-assignments",
-      "version": "1.0.0",
-      "functions": [{
-        "id": "main",
-        "visibility": "entrypoint",
-        "parameters": [{ "name": "limit", "type": "I32" }],
-        "returnType": "I32",
-        "body": [
-          { "op": "set", "name": "counter", "value": { "i32": 0 } },
-          { "op": "set", "name": "doubled", "value": { "i32": 0 } },
-          {
-            "op": "while",
-            "condition": { "op": "lt", "left": { "var": "counter" }, "right": { "var": "limit" } },
-            "body": [
-              {
-                "op": "set",
-                "name": "counter",
-                "value": { "op": "add", "left": { "var": "counter" }, "right": { "i32": 1 } }
-              },
-              {
-                "op": "set",
-                "name": "doubled",
-                "value": { "op": "add", "left": { "var": "counter" }, "right": { "var": "counter" } }
-              }
-            ]
-          },
-          { "op": "return", "value": { "var": "doubled" } }
-        ]
-      }]
-    }
-    """;
+    private static ResourceUsageInvariant TwoAssignmentUsage(int iterations)
+        => new(
+            FuelUsed: 11 + (16L * iterations),
+            LoopIterations: iterations,
+            AllocatedBytes: 0,
+            HostCalls: 0);
 
     private readonly record struct ResourceUsageInvariant(
         long FuelUsed,

@@ -1,5 +1,6 @@
 using DotBoxD.Hosting.Internal;
 using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Serialization.Json.Hosting;
 using DotBoxD.Kernels.Tests._TestSupport;
 using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
@@ -76,6 +77,116 @@ public sealed class Fix_PAL_0030_Tests
     }
 
     [Fact]
+    public async Task Plan_and_entrypoint_delimiters_do_not_merge_distinct_hotness_entries()
+    {
+        var hotness = new AutoExecutionHotness(maxEntries: 16);
+        var template = await PrepareTemplatePlanAsync();
+
+        var first = hotness.BeginAttempt(WithPlanHash(template, "a|b"), "c");
+        var second = hotness.BeginAttempt(WithPlanHash(template, "a"), "b|c");
+
+        Assert.Equal("a|b", first.Stats.PlanHash);
+        Assert.Equal("c", first.Stats.Entrypoint);
+        Assert.Equal("a", second.Stats.PlanHash);
+        Assert.Equal("b|c", second.Stats.Entrypoint);
+        Assert.Equal(1, second.Stats.RunCount);
+        Assert.Equal(2, hotness.Count);
+    }
+
+    [Fact]
+    public async Task Run_count_attempts_share_exact_history_with_snapshot_attempts()
+    {
+        var hotness = new AutoExecutionHotness(maxEntries: 16);
+        var plan = WithPlanHash(await PrepareTemplatePlanAsync(), "shared-history");
+
+        var first = hotness.BeginRunCountAttempt(plan, "main");
+        var second = hotness.BeginRunCountAttempt(plan, "main");
+        var snapshot = hotness.BeginAttempt(plan, "main");
+
+        Assert.Equal(1, first.RunCount);
+        Assert.Equal(2, second.RunCount);
+        Assert.Equal(3, snapshot.Stats.RunCount);
+        Assert.Equal("shared-history", snapshot.Stats.PlanHash);
+        Assert.Equal("main", snapshot.Stats.Entrypoint);
+        Assert.Equal(1, hotness.Count);
+    }
+
+    [Fact]
+    public async Task Value_equal_keys_share_history_across_distinct_string_instances()
+    {
+        var hotness = new AutoExecutionHotness(maxEntries: 2);
+        var template = await PrepareTemplatePlanAsync();
+        var firstHash = DistinctString("shared-plan");
+        var secondHash = DistinctString("shared-plan");
+        var firstEntrypoint = DistinctString("main");
+        var secondEntrypoint = DistinctString("main");
+        Assert.NotSame(firstHash, secondHash);
+        Assert.NotSame(firstEntrypoint, secondEntrypoint);
+
+        var first = hotness.BeginRunCountAttempt(WithPlanHash(template, firstHash), firstEntrypoint);
+        var second = hotness.BeginRunCountAttempt(WithPlanHash(template, secondHash), secondEntrypoint);
+
+        Assert.Equal(1, first.RunCount);
+        Assert.Equal(2, second.RunCount);
+        Assert.Equal(1, hotness.Count);
+    }
+
+    [Fact]
+    public async Task Repeated_most_recent_touch_preserves_exact_eviction_order()
+    {
+        var hotness = new AutoExecutionHotness(maxEntries: 2);
+        var template = await PrepareTemplatePlanAsync();
+        var planA = WithPlanHash(template, "plan-a");
+        var planB = WithPlanHash(template, "plan-b");
+        var planC = WithPlanHash(template, "plan-c");
+
+        Assert.Equal(1, hotness.BeginRunCountAttempt(planA, "main").RunCount);
+        Assert.Equal(1, hotness.BeginRunCountAttempt(planB, "main").RunCount);
+        Assert.Equal(2, hotness.BeginRunCountAttempt(planB, "main").RunCount);
+        Assert.Equal(1, hotness.BeginRunCountAttempt(planC, "main").RunCount);
+
+        Assert.Equal(3, hotness.BeginRunCountAttempt(planB, "main").RunCount);
+        Assert.Equal(1, hotness.BeginRunCountAttempt(planA, "main").RunCount);
+        Assert.Equal(2, hotness.Count);
+    }
+
+    [Fact]
+    public async Task Concurrent_most_recent_attempts_share_one_exact_history()
+    {
+        const int attempts = 256;
+        var hotness = new AutoExecutionHotness(maxEntries: 2);
+        var plan = WithPlanHash(await PrepareTemplatePlanAsync(), "shared-plan");
+        var runCounts = new int[attempts];
+
+        Parallel.For(
+            0,
+            attempts,
+            index => runCounts[index] = hotness.BeginRunCountAttempt(plan, "main").RunCount);
+
+        Assert.Equal(Enumerable.Range(1, attempts), runCounts.Order());
+        Assert.Equal(1, hotness.Count);
+    }
+
+    [Fact]
+    public async Task Completion_of_evicted_state_does_not_resurrect_its_history()
+    {
+        var hotness = new AutoExecutionHotness(maxEntries: 1);
+        var template = await PrepareTemplatePlanAsync();
+        var planA = WithPlanHash(template, "plan-a");
+        var planB = WithPlanHash(template, "plan-b");
+        var evictedAttempt = hotness.BeginRunCountAttempt(planA, "main");
+
+        hotness.BeginRunCountAttempt(planB, "main");
+        evictedAttempt.Complete(SuccessfulResult("plan-a"), TimeSpan.FromTicks(1));
+        var recreated = hotness.BeginAttempt(planA, "main");
+
+        Assert.Equal(1, recreated.Stats.RunCount);
+        Assert.Equal(0, recreated.Stats.CompletedRunCount);
+        Assert.Null(recreated.Stats.LastRunAt);
+        Assert.Equal(1, hotness.Count);
+    }
+
+    [Fact]
     public void Rejects_non_positive_capacity()
         => Assert.Throws<ArgumentOutOfRangeException>(() => new AutoExecutionHotness(maxEntries: 0));
 
@@ -89,6 +200,22 @@ public sealed class Fix_PAL_0030_Tests
         var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         return await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
     }
+
+    private static string DistinctString(string value) => new(value.ToCharArray());
+
+    private static SandboxExecutionResult SuccessfulResult(string planHash)
+        => new()
+        {
+            Succeeded = true,
+            Value = SandboxValue.Unit,
+            ResourceUsage = new SandboxResourceUsage(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            AuditEvents = [],
+            ActualMode = ExecutionMode.Interpreted,
+            ExecutionDispatched = true,
+            ModuleHash = "module",
+            PlanHash = planHash,
+            PolicyHash = "policy",
+        };
 
     // A fresh ExecutionPlan that mirrors the prepared template but uses a distinct
     // plan hash, so each call produces a new logical plan-entrypoint key without

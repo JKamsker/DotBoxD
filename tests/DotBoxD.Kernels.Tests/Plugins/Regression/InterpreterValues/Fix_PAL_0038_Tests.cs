@@ -15,8 +15,9 @@ namespace DotBoxD.Kernels.Tests.Plugins.Regression.InterpreterValues;
 /// operands (see <c>CollectionIntrinsicDispatcher</c>) without materializing a per-call
 /// <see cref="SandboxValue"/>[]. These intrinsics complete synchronously and never let an
 /// argument escape, so the array-free path is observationally identical to the prior
-/// array-backed path. The variadic <c>list.of</c>, local functions, and host bindings keep
-/// using the array path because a callee may retain the argument list.
+/// array-backed path. The variadic <c>list.of</c> and ordinary host-binding delegates keep
+/// stable argument arrays because a callee may retain the argument list. Scalar local calls
+/// and host bindings that explicitly implement the scalar invoker interfaces avoid them.
 ///
 /// These tests pin two properties:
 /// 1. Functional equivalence: every fixed-arity collection intrinsic (including operand

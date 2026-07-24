@@ -1,6 +1,8 @@
+using System.Reflection.Emit;
 using DotBoxD.Kernels.Compiler;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Serialization.Json.Hosting;
 using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Kernels.Verifier.Generated;
@@ -30,7 +32,7 @@ public sealed class CompiledStructuralTypeEmitterTests
     }
 
     [Fact]
-    public async Task Non_direct_builtin_structural_inputs_and_returns_use_legacy_factories_and_verify()
+    public async Task Nested_eligible_structural_nodes_use_cached_factories_and_verify()
     {
         var nestedCalls = await CompileRuntimeCallsAsync(
             """
@@ -84,24 +86,48 @@ public sealed class CompiledStructuralTypeEmitterTests
 
         AssertCalls(
             nestedCalls,
-            [nameof(CompiledRuntime.TypeList), nameof(CompiledRuntime.TypeList)]);
+            [nameof(CompiledRuntime.TypeListCached), nameof(CompiledRuntime.TypeList)]);
         AssertCalls(opaqueCalls, [nameof(CompiledRuntime.TypeList)]);
         AssertCalls(
             recordCalls,
-            [nameof(CompiledRuntime.TypeRecord), nameof(CompiledRuntime.TypeList)]);
+            [nameof(CompiledRuntime.TypeRecordCached), nameof(CompiledRuntime.TypeList)]);
         AssertCalls(
             nestedMapCalls,
-            [nameof(CompiledRuntime.TypeList), nameof(CompiledRuntime.TypeMap)]);
+            [nameof(CompiledRuntime.TypeListCached), nameof(CompiledRuntime.TypeMap)]);
         AssertCalls(opaqueMapCalls, [nameof(CompiledRuntime.TypeMap)]);
         AssertCalls(opaqueKeyMapCalls, [nameof(CompiledRuntime.TypeMap)]);
         AssertCalls(
             recordMapCalls,
-            [nameof(CompiledRuntime.TypeRecord), nameof(CompiledRuntime.TypeMap)]);
+            [nameof(CompiledRuntime.TypeRecordCached), nameof(CompiledRuntime.TypeMap)]);
         AssertCalls(arityThreeRecordCalls, [nameof(CompiledRuntime.TypeRecord)]);
         AssertCalls(opaqueRecordCalls, [nameof(CompiledRuntime.TypeRecord)]);
         AssertCalls(
             nestedFieldRecordCalls,
-            [nameof(CompiledRuntime.TypeList), nameof(CompiledRuntime.TypeRecord)]);
+            [nameof(CompiledRuntime.TypeListCached), nameof(CompiledRuntime.TypeRecord)]);
+    }
+
+    [Fact]
+    public void Legacy_type_emitter_keeps_nested_structural_factories_uncached()
+    {
+        var nestedType = SandboxType.List(SandboxType.List(SandboxType.I32));
+        var method = new DynamicMethod(
+            "CreateLegacyNestedType",
+            typeof(SandboxType),
+            Type.EmptyTypes,
+            typeof(CompiledStructuralTypeEmitterTests).Module,
+            skipVisibility: true);
+        var il = method.GetILGenerator();
+        IlEmitterPrimitives.EmitSandboxType(il, nestedType);
+        il.Emit(System.Reflection.Emit.OpCodes.Ret);
+        var factory = method.CreateDelegate<Func<SandboxType>>();
+
+        var first = factory();
+        var second = factory();
+
+        Assert.Equal(nestedType, first);
+        Assert.Equal(nestedType, second);
+        Assert.NotSame(first, second);
+        Assert.NotSame(first.Arguments[0], second.Arguments[0]);
     }
 
     private static async Task<RuntimeCalls> CompileRuntimeCallsAsync(

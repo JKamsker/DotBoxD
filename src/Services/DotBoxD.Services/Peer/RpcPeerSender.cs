@@ -10,6 +10,7 @@ internal sealed class RpcPeerSender : IDisposable
     private readonly IRpcChannel _channel;
     private readonly IRpcValueTaskChannel? _valueTaskChannel;
     private readonly IRpcFrameChannel? _frameChannel;
+    private readonly IValidatedSerialFrameChannel? _validatedSerialFrameChannel;
     private readonly Func<bool> _isClosed;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
 
@@ -18,10 +19,37 @@ internal sealed class RpcPeerSender : IDisposable
         _channel = channel;
         _valueTaskChannel = channel as IRpcValueTaskChannel;
         _frameChannel = channel as IRpcFrameChannel;
+        _validatedSerialFrameChannel = channel as IValidatedSerialFrameChannel;
         _isClosed = isClosed;
+        ValidatedFrameSender = _validatedSerialFrameChannel is null
+            ? null
+            : new ValidatedOwnedFrameSender(SendFrameValueAsync);
     }
 
-    public async Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    public ValidatedOwnedFrameSender? ValidatedFrameSender { get; }
+
+    public Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    {
+        var validatedSerialFrameChannel = _validatedSerialFrameChannel;
+        if (validatedSerialFrameChannel is null)
+        {
+            return SendSlowAsync(data, ct);
+        }
+
+        if (_isClosed())
+        {
+            return Task.FromException(new ServiceConnectionException("Connection closed."));
+        }
+
+        if (ct.IsCancellationRequested)
+        {
+            return Task.FromCanceled(ct);
+        }
+
+        return validatedSerialFrameChannel.SendValueAsync(data, ct).AsTask();
+    }
+
+    private async Task SendSlowAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
     {
         // Fast-fail once the peer is closing so an outbound call started during teardown does not
         // park in WaitAsync (with a non-cancellable token) only to strand on a disposed send lock.
@@ -69,12 +97,29 @@ internal sealed class RpcPeerSender : IDisposable
         }
     }
 
-    public async ValueTask SendFrameValueAsync(PooledBufferWriter frame, CancellationToken ct)
+    public ValueTask SendFrameValueAsync(PooledBufferWriter frame, CancellationToken ct)
+    {
+        var validatedSerialFrameChannel = _validatedSerialFrameChannel;
+        if (validatedSerialFrameChannel is not null)
+        {
+            if (_isClosed())
+            {
+                return ClosedFrame(frame);
+            }
+
+            return validatedSerialFrameChannel.SendFrameValueAsync(frame, ct);
+        }
+
+        return SendFrameSlowAsync(frame, ct);
+    }
+
+    private async ValueTask SendFrameSlowAsync(PooledBufferWriter frame, CancellationToken ct)
     {
         if (_frameChannel is null)
         {
             try
             {
+                MessageFramer.ValidateOutgoingFrame(frame.WrittenSpan);
                 await SendAsync(frame.WrittenMemory, ct).ConfigureAwait(false);
             }
             finally
@@ -114,8 +159,9 @@ internal sealed class RpcPeerSender : IDisposable
             }
 
             MessageFramer.ValidateOutgoingFrame(frame.WrittenSpan);
-            await _frameChannel.SendFrameValueAsync(frame, ct).ConfigureAwait(false);
+            var pendingSend = _frameChannel.SendFrameValueAsync(frame, ct);
             frame = null!;
+            await pendingSend.ConfigureAwait(false);
         }
         finally
         {
@@ -128,6 +174,12 @@ internal sealed class RpcPeerSender : IDisposable
             {
             }
         }
+    }
+
+    private static ValueTask ClosedFrame(PooledBufferWriter frame)
+    {
+        frame.Dispose();
+        return new ValueTask(Task.FromException(new ServiceConnectionException("Connection closed.")));
     }
 
     public void Dispose() => _sendLock.Dispose();

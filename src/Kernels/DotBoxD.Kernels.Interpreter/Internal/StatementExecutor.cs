@@ -11,43 +11,42 @@ using DotBoxD.Kernels;
 /// non-async fast path whenever the underlying expression completes synchronously,
 /// allocating an async state machine only when a host binding is still pending.
 /// </summary>
-internal sealed partial class StatementExecutor
+internal readonly partial struct StatementExecutor
 {
-    private readonly SandboxContext _context;
-    private readonly ExpressionEvaluator _expressions;
-    private readonly I32CallEvaluator _calls;
-    private readonly SandboxExecutionOptions _options;
-    private readonly string _moduleHash;
-    public StatementExecutor(
-        SandboxContext context,
-        ExpressionEvaluator expressions,
-        I32CallEvaluator calls,
-        SandboxExecutionOptions options,
-        string moduleHash)
-    {
-        _context = context;
-        _expressions = expressions;
-        _calls = calls;
-        _options = options;
-        _moduleHash = moduleHash;
-    }
+    private readonly InterpreterEvaluator _interpreter;
+
+    public StatementExecutor(InterpreterEvaluator interpreter) =>
+        _interpreter = interpreter;
+
+    private SandboxContext Context => _interpreter.Context;
+
+    private ExpressionEvaluator Expressions => _interpreter.Expressions;
+
+    private SandboxExecutionOptions Options => _interpreter.Options;
+
+    private string ModuleHash => _interpreter.ModuleHash;
     public ValueTask<SandboxValue?> ExecuteStatementAsync(Statement statement, InterpreterFrame frame)
     {
-        _context.ChargeFuel(1);
-        InterpreterTrace.Write(
-            _context,
-            _options,
-            _moduleHash,
-            frame.FunctionId,
-            "statement",
-            statement.GetType().Name,
-            statement.Span);
+        Context.ChargeFuel(1);
+        if (Options.EnableDebugTrace)
+        {
+            InterpreterTrace.Write(
+                Context,
+                Options,
+                ModuleHash,
+                frame.FunctionId,
+                "statement",
+                statement.GetType().Name,
+                statement.Span);
+        }
+
         switch (statement)
         {
             case AssignmentStatement assignment:
                 return ExecuteAssignment(assignment, frame);
             case ReturnStatement ret:
-                return PrimitiveStatementExecutor.ExecuteReturn(ret, frame, _expressions);
+                return PrimitiveStatementExecutor.ExecuteReturn(
+                    ret, frame, Expressions);
             case ExpressionStatement expression:
                 return DiscardResult(EvaluateAsync(expression.Value, frame));
             case IfStatement branch:
@@ -82,15 +81,8 @@ internal sealed partial class StatementExecutor
         return default;
     }
     private ValueTask<SandboxValue?> ExecuteAssignment(AssignmentStatement assignment, InterpreterFrame frame)
-    {
-        if (_expressions.TryEvaluateInt32(assignment.Value, frame, out var i32Value))
-        {
-            frame.WriteInt32(assignment.Name, i32Value);
-            return default;
-        }
-
-        return PrimitiveStatementExecutor.ExecuteAssignment(assignment, frame, _expressions);
-    }
+        => PrimitiveStatementExecutor.ExecuteAssignment(
+            assignment, frame, Expressions);
     private static ValueTask<SandboxValue?> DiscardResult(ValueTask<SandboxValue> task)
     {
         if (task.IsCompletedSuccessfully)
@@ -125,7 +117,8 @@ internal sealed partial class StatementExecutor
     }
     private ValueTask<SandboxValue?> ExecuteWhileAsync(WhileStatement statement, InterpreterFrame frame)
     {
-        if (WhileI32ForLoopRunner.TryRun(statement, frame, _context, _options, _calls))
+        if (WhileI32ForLoopRunner.TryRun(
+                statement, frame, Context, Options, _interpreter))
         {
             return default;
         }
@@ -135,7 +128,7 @@ internal sealed partial class StatementExecutor
     {
         while (((BoolValue)await EvaluateAsync(statement.Condition, frame).ConfigureAwait(false)).Value)
         {
-            _context.ChargeLoopIteration(5);
+            Context.ChargeLoopIteration(5);
             var value = await ExecuteBlockAsync(statement.Body, frame).ConfigureAwait(false);
             if (value is not null && !LoopSignal.IsContinue(value))
             {
@@ -146,9 +139,9 @@ internal sealed partial class StatementExecutor
     }
     private ValueTask<SandboxValue?> ExecuteForAsync(ForRangeStatement statement, InterpreterFrame frame)
     {
-        if (_expressions.TryEvaluateInt32(statement.Start, frame, out var start))
+        if (Expressions.TryEvaluateInt32(statement.Start, frame, out var start))
         {
-            return _expressions.TryEvaluateInt32(statement.End, frame, out var end)
+            return Expressions.TryEvaluateInt32(statement.End, frame, out var end)
                 ? RunForLoop(statement, start, end, frame)
                 : RunForLoopFromAsyncEnd(statement, start, frame);
         }
@@ -198,7 +191,7 @@ internal sealed partial class StatementExecutor
         }
         for (var i = start; i < end; i++)
         {
-            _context.ChargeLoopIteration(5);
+            Context.ChargeLoopIteration(5);
             frame.WriteInt32(statement.LocalName, i);
             var bodyTask = ExecuteBlockAsync(statement.Body, frame);
             if (!bodyTask.IsCompletedSuccessfully)
@@ -231,7 +224,7 @@ internal sealed partial class StatementExecutor
 
         for (var i = nextIndex; i < end; i++)
         {
-            _context.ChargeLoopIteration(5);
+            Context.ChargeLoopIteration(5);
             frame.WriteInt32(statement.LocalName, i);
             value = await ExecuteBlockAsync(statement.Body, frame).ConfigureAwait(false);
             if (value is not null && !LoopSignal.IsContinue(value))
@@ -268,5 +261,5 @@ internal sealed partial class StatementExecutor
     }
 
     private ValueTask<SandboxValue> EvaluateAsync(Expression expression, InterpreterFrame frame)
-        => _expressions.EvaluateAsync(expression, frame);
+        => Expressions.EvaluateAsync(expression, frame);
 }

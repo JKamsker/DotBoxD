@@ -153,7 +153,7 @@ public IReadOnlyList<SandboxFunction> Functions { get => _functions; init => _fu
 public IReadOnlyList<SandboxType> Arguments { get; init; }
 public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = BindingParameterTypes.Copy(value, nameof(Parameters)); }
 public IReadOnlyList<SandboxValue> Fields { get => _fields; init => _fields = Snapshot(value); }
-public IReadOnlyList<SandboxValue> Values { get => this; init => _values = Snapshot(value); }
+public IReadOnlyList<SandboxValue> Values { get; init; }
 public IReadOnlyList<Statement> Body { get => _body; init => _body = ModelCopy.List(value, nameof(Body)); }
 public IReadOnlyList<Statement> Else { get => _else; init => _else = ModelCopy.List(value, nameof(Else)); }
 public IReadOnlyList<Statement> Then { get => _then; init => _then = ModelCopy.List(value, nameof(Then)); }
@@ -274,7 +274,7 @@ public sealed class ResourceMeter
 public sealed class SandboxPolicyBuilder
 public sealed class SandboxRuntimeException : Exception
 public sealed class SandboxValidationException : Exception
-public sealed partial class SandboxContext
+public sealed partial class SandboxContext : IDisposable
 public sealed record AssignmentStatement(string Name, Expression Value, SourceSpan Span) : Statement(Span)
 public sealed record BinaryExpression(Expression Left, string Operator, Expression Right, SourceSpan Span) : Expression(Span)
 public sealed record BindingCostModel( long BaseFuel, long PerByteFuel = 0, bool AllocationFromReturnBytes = false, int? MaxCallsPerRun = null)
@@ -488,6 +488,7 @@ public void ChargeValue(SandboxValue value) => Budget.ChargeValue(value, Cancell
 public void ChargeValue(SandboxValue value) => ChargeValue(value, CancellationToken.None)
 public void CheckDeadline()
 public void Checkpoint()
+public void Dispose()
 public void EnsureRequiredBindingFailureAudit( BindingDescriptor descriptor, long checkpoint, SandboxErrorCode errorCode)
 public void EnsureRequiredBindingSuccessAudit(BindingDescriptor descriptor, long checkpoint)
 public void EnterCall()

@@ -14,7 +14,7 @@ public CompiledCacheStatus CacheStatus { get; init; }
 public CompiledCacheStatus Status { get; init; }
 public CompiledRuntimeFormKind RuntimeForm { get; init; }
 public const string CanonicalizerVersion = CanonicalModuleHasher.CanonicalizerVersion
-public const string CompilerVersion = "dotboxd-compiler-11"
+public const string CompilerVersion = "dotboxd-compiler-14"
 public const string EffectAnalysisVersion = "dotboxd-effect-analysis-3"
 public const string TargetFramework = "net10.0"
 public const string TypeSystemVersion = "dotboxd-type-system-2"

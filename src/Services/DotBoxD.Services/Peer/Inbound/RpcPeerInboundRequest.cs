@@ -43,4 +43,14 @@ internal readonly struct RpcPeerInboundRequest
 
     public bool IsCancellationRequested =>
         RequestCts?.IsCancellationRequested == true;
+
+    public RpcPeerInboundRequest MaterializePayloadFrame() =>
+        new(
+            Frame.MaterializePayloadOwner(),
+            Request,
+            MessageId,
+            Body,
+            RequestCts,
+            Dispatcher,
+            RequiresStreamingContext);
 }

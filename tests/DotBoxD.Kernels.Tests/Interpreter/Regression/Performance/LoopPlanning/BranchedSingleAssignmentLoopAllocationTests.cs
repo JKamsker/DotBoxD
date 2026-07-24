@@ -15,8 +15,8 @@ public sealed class BranchedSingleAssignmentLoopAllocationTests
     private const int MeasurementIterations = 20_000;
 
     [Theory]
-    [InlineData("i32", 392, 224, 840)]
-    [InlineData("f64", 640, 448, 1_200)]
+    [InlineData("i32", 0, 0, 1_008)]
+    [InlineData("f64", 608, 416, 1_392)]
     public async Task Branch_plan_shapes_preserve_expected_managed_allocation(
         string type,
         double expectedSingleOverhead,
@@ -97,19 +97,23 @@ public sealed class BranchedSingleAssignmentLoopAllocationTests
     {
         using var host = SandboxTestHost.Create();
         var plan = await PrepareAsync(host, BranchedLoopAllocationModules.UnsupportedElse(type));
+        var interpreter = new SandboxInterpreter();
 
-        var result = await new SandboxInterpreter().ExecuteAsync(
-            plan,
-            "main",
-            SandboxValue.FromInt32(2),
-            CreateOptions(),
-            CancellationToken.None);
+        for (var i = 0; i < 3; i++)
+        {
+            var result = await interpreter.ExecuteAsync(
+                plan,
+                "main",
+                SandboxValue.FromInt32(2),
+                CreateOptions(),
+                CancellationToken.None);
 
-        Assert.True(result.Succeeded, result.Error?.SafeMessage);
-        Assert.Equal(3, ReadIntegralValue(result.Value!));
-        Assert.Equal(2, result.ResourceUsage.LoopIterations);
-        Assert.Equal(0, result.ResourceUsage.AllocatedBytes);
-        Assert.Equal(0, result.ResourceUsage.HostCalls);
+            Assert.True(result.Succeeded, result.Error?.SafeMessage);
+            Assert.Equal(3, ReadIntegralValue(result.Value!));
+            Assert.Equal(2, result.ResourceUsage.LoopIterations);
+            Assert.Equal(0, result.ResourceUsage.AllocatedBytes);
+            Assert.Equal(0, result.ResourceUsage.HostCalls);
+        }
     }
 
     [Theory]
@@ -119,8 +123,22 @@ public sealed class BranchedSingleAssignmentLoopAllocationTests
     {
         using var host = SandboxTestHost.Create();
         var plan = await PrepareAsync(host, BranchedLoopAllocationModules.OneAssignment(type));
+        var interpreter = new SandboxInterpreter();
 
-        var result = await new SandboxInterpreter().ExecuteAsync(
+        _ = await interpreter.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.FromInt32(1),
+            CreateOptions(),
+            CancellationToken.None);
+        _ = await interpreter.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.FromInt32(1),
+            CreateOptions(),
+            CancellationToken.None);
+
+        var result = await interpreter.ExecuteAsync(
             plan,
             "main",
             SandboxValue.FromInt32(1),

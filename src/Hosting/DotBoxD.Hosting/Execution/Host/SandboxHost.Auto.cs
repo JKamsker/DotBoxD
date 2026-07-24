@@ -22,59 +22,98 @@ public sealed partial class SandboxHost
             return PreDispatchCancelledResult(plan, options);
         }
 
-        if (!_compiled.IsAvailable || options.EnableDebugTrace)
+        if (MustInterpretAuto(plan, entrypoint, options))
         {
             return await ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken)
                 .ConfigureAwait(false);
         }
 
-        if (EntrypointHasAsyncBinding(plan, entrypoint))
+        AutoHotnessCompletion hotness;
+        ExecutionMode selectedMode;
+        // The built-in selector is sealed and its run-count decision is centralized
+        // in ChooseMode, so it does not need the retainable snapshot custom selectors receive.
+        if (_modeSelector is HotnessExecutionModeSelector)
         {
-            return await ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken)
-                .ConfigureAwait(false);
-        }
+            var attempt = _autoHotness.BeginRunCountAttempt(plan, entrypoint);
+            hotness = attempt.Completion;
+            if (attempt.RunCount == 1)
+            {
+                return await ExecuteTrackedInterpretedAutoAsync(
+                        hotness,
+                        plan,
+                        entrypoint,
+                        input,
+                        options,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
 
-        var hotness = _autoHotness.BeginAttempt(plan, entrypoint);
-        if (hotness.Stats.RunCount == 1)
-        {
-            return await ExecuteTrackedAutoAsync(
-                    hotness,
-                    () => ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken))
-                .ConfigureAwait(false);
+            selectedMode = HotnessExecutionModeSelector.ChooseMode(options, attempt.RunCount);
+            ThrowIfDisposed();
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return CompleteAutoResult(hotness, PreDispatchCancelledResult(plan, options));
+            }
         }
-
-        if (!TrySelectAutoMode(
-                plan,
-                options,
-                hotness.Stats,
-                cancellationToken,
-                out var selectedMode,
-                out var selectionResult))
+        else
         {
-            return CompleteAutoResult(hotness, selectionResult);
+            var attempt = _autoHotness.BeginAttempt(plan, entrypoint);
+            hotness = attempt.Completion;
+            if (attempt.Stats.RunCount == 1)
+            {
+                return await ExecuteTrackedInterpretedAutoAsync(
+                        hotness,
+                        plan,
+                        entrypoint,
+                        input,
+                        options,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            if (!TrySelectAutoMode(
+                    plan,
+                    options,
+                    attempt.Stats,
+                    cancellationToken,
+                    out selectedMode,
+                    out var selectionResult))
+            {
+                return CompleteAutoResult(hotness, selectionResult);
+            }
         }
 
         if (selectedMode == ExecutionMode.Interpreted ||
             !CompiledEntrypointSupport.CanCompile(plan, entrypoint))
         {
-            return await ExecuteTrackedAutoAsync(
+            return await ExecuteTrackedInterpretedAutoAsync(
                     hotness,
-                    () => ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken))
-                .ConfigureAwait(false);
-        }
-
-        return await ExecuteTrackedAutoAsync(
-                hotness,
-                state => ExecuteCompiledAsync(
                     plan,
                     entrypoint,
                     input,
                     options,
-                    cancellationToken,
-                    state),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        return await ExecuteTrackedCompiledAutoAsync(
+                hotness,
+                plan,
+                entrypoint,
+                input,
+                options,
+                cancellationToken,
                 reusableNoAuditState)
             .ConfigureAwait(false);
     }
+
+    private bool MustInterpretAuto(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxExecutionOptions options)
+        => !_compiled.IsAvailable ||
+           options.EnableDebugTrace ||
+           EntrypointHasAsyncBinding(plan, entrypoint);
 
     private bool TrySelectAutoMode(
         ExecutionPlan plan,
@@ -147,31 +186,47 @@ public sealed partial class SandboxHost
         return false;
     }
 
-    private static async ValueTask<SandboxExecutionResult> ExecuteTrackedAutoAsync(
-        AutoHotnessAttempt hotness,
-        Func<ValueTask<SandboxExecutionResult>> execute)
+    private async ValueTask<SandboxExecutionResult> ExecuteTrackedInterpretedAutoAsync(
+        AutoHotnessCompletion hotness,
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxValue input,
+        SandboxExecutionOptions options,
+        CancellationToken cancellationToken)
     {
-        var stopwatch = Stopwatch.StartNew();
-        var result = await execute().ConfigureAwait(false);
-        stopwatch.Stop();
-        hotness.Complete(result, stopwatch.Elapsed);
+        var started = Stopwatch.GetTimestamp();
+        var result = await ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken)
+            .ConfigureAwait(false);
+        var elapsed = Stopwatch.GetElapsedTime(started);
+        hotness.Complete(result, elapsed);
         return result;
     }
 
-    private static async ValueTask<SandboxExecutionResult> ExecuteTrackedAutoAsync(
-        AutoHotnessAttempt hotness,
-        Func<CompiledNoAuditRunState?, ValueTask<SandboxExecutionResult>> execute,
+    private async ValueTask<SandboxExecutionResult> ExecuteTrackedCompiledAutoAsync(
+        AutoHotnessCompletion hotness,
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxValue input,
+        SandboxExecutionOptions options,
+        CancellationToken cancellationToken,
         CompiledNoAuditRunState? reusableNoAuditState)
     {
-        var stopwatch = Stopwatch.StartNew();
-        var result = await execute(reusableNoAuditState).ConfigureAwait(false);
-        stopwatch.Stop();
-        hotness.Complete(result, stopwatch.Elapsed);
+        var started = Stopwatch.GetTimestamp();
+        var result = await ExecuteCompiledAsync(
+                plan,
+                entrypoint,
+                input,
+                options,
+                cancellationToken,
+                reusableNoAuditState)
+            .ConfigureAwait(false);
+        var elapsed = Stopwatch.GetElapsedTime(started);
+        hotness.Complete(result, elapsed);
         return result;
     }
 
     private static SandboxExecutionResult CompleteAutoResult(
-        AutoHotnessAttempt hotness,
+        AutoHotnessCompletion hotness,
         SandboxExecutionResult result)
     {
         hotness.Complete(result, TimeSpan.Zero);

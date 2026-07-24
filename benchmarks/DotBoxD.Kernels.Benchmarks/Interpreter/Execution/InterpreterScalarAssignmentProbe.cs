@@ -4,7 +4,6 @@ using DotBoxD.Hosting.Execution;
 using DotBoxD.Kernels.Interpreter;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
-using DotBoxD.Kernels.Serialization.Json.Hosting;
 
 namespace DotBoxD.Kernels.Benchmarks.Interpreter;
 
@@ -12,7 +11,6 @@ internal static class InterpreterScalarAssignmentProbe
 {
     private const int WarmupIterations = 50_000;
     private const int MeasurementIterations = 100_000;
-    private static readonly int[] AssignmentCounts = [0, 1, 4, 8];
 
     public static async Task RunAsync()
     {
@@ -29,13 +27,7 @@ internal static class InterpreterScalarAssignmentProbe
             AllowFallbackToInterpreter = false,
             SuppressSuccessfulRunSummaryAudit = true
         };
-        var lanes = new[]
-        {
-            await PrepareLaneAsync(host, policy, ScalarAssignmentType.I64, ScalarAssignmentRhs.Literal),
-            await PrepareLaneAsync(host, policy, ScalarAssignmentType.I64, ScalarAssignmentRhs.RawVariable),
-            await PrepareLaneAsync(host, policy, ScalarAssignmentType.F64, ScalarAssignmentRhs.Literal),
-            await PrepareLaneAsync(host, policy, ScalarAssignmentType.F64, ScalarAssignmentRhs.RawVariable)
-        };
+        var lanes = await InterpreterScalarAssignmentScenarios.PrepareAsync(host, policy);
 
         foreach (var lane in lanes)
         {
@@ -62,33 +54,10 @@ internal static class InterpreterScalarAssignmentProbe
         }
     }
 
-    private static async Task<PreparedLane> PrepareLaneAsync(
-        SandboxHost host,
-        SandboxPolicy policy,
-        ScalarAssignmentType type,
-        ScalarAssignmentRhs rhs)
-    {
-        var input = CreateInput(type, rhs);
-        var cases = new PreparedCase[AssignmentCounts.Length];
-        for (var index = 0; index < AssignmentCounts.Length; index++)
-        {
-            var assignmentCount = AssignmentCounts[index];
-            var moduleJson = InterpreterScalarAssignmentModules.Create(type, rhs, assignmentCount);
-            var module = await host.ImportJsonAsync(moduleJson);
-            cases[index] = new PreparedCase(
-                assignmentCount,
-                await host.PrepareAsync(module, policy),
-                assignmentCount + 1D,
-                ExpectedUsage(rhs, assignmentCount));
-        }
-
-        return new PreparedLane(type, rhs, input, cases);
-    }
-
     private static void RunLane(
         SandboxInterpreter interpreter,
         SandboxExecutionOptions options,
-        PreparedLane lane)
+        InterpreterScalarAssignmentLane lane)
     {
         long controlBytes = 0;
         foreach (var benchmarkCase in lane.Cases)
@@ -108,7 +77,7 @@ internal static class InterpreterScalarAssignmentProbe
                 controlBytes = measurement.AllocatedBytes;
             }
 
-            Write(lane.Type, lane.Rhs, benchmarkCase.AssignmentCount, controlBytes, measurement);
+            Write(lane.Name, benchmarkCase.AssignmentCount, controlBytes, measurement);
         }
     }
 
@@ -170,54 +139,22 @@ internal static class InterpreterScalarAssignmentProbe
             expectedUsage);
     }
 
-    private static SandboxValue CreateInput(ScalarAssignmentType type, ScalarAssignmentRhs rhs)
-    {
-        var value = type == ScalarAssignmentType.I64
-            ? SandboxValue.FromInt64(1)
-            : SandboxValue.FromDouble(1);
-        if (rhs == ScalarAssignmentRhs.Literal)
-        {
-            return value;
-        }
-
-        var step = type == ScalarAssignmentType.I64
-            ? SandboxValue.FromInt64(1)
-            : SandboxValue.FromDouble(1);
-        var itemType = type == ScalarAssignmentType.I64 ? SandboxType.I64 : SandboxType.F64;
-        return SandboxValue.FromList([value, step], itemType);
-    }
-
     private static double ReadValue(SandboxValue? value, ScalarAssignmentType type)
         => (type, value) switch
         {
+            (ScalarAssignmentType.I32, I32Value number) => number.Value,
             (ScalarAssignmentType.I64, I64Value number) => number.Value,
             (ScalarAssignmentType.F64, F64Value number) => number.Value,
             _ => throw new InvalidOperationException("unexpected scalar-assignment result type")
         };
 
-    private static SandboxResourceUsage ExpectedUsage(ScalarAssignmentRhs rhs, int assignmentCount)
-        => new(
-            FuelUsed: 3 + (4L * assignmentCount),
-            MaxFuel: long.MaxValue,
-            LoopIterations: 0,
-            AllocatedBytes: 0,
-            HostCalls: 0,
-            FileBytesRead: 0,
-            FileBytesWritten: 0,
-            NetworkBytesRead: 0,
-            NetworkBytesWritten: 0,
-            LogEvents: 0,
-            CollectionElements: rhs == ScalarAssignmentRhs.Literal ? 0 : 2,
-            StringBytes: 0);
-
     private static void Write(
-        ScalarAssignmentType type,
-        ScalarAssignmentRhs rhs,
+        string laneName,
         int assignmentCount,
         long controlBytes,
         Measurement measurement)
     {
-        var name = $"{type} {(rhs == ScalarAssignmentRhs.Literal ? "literal" : "raw variable")} x{assignmentCount}";
+        var name = $"{laneName} x{assignmentCount}";
         var incrementalBytes = assignmentCount == 0
             ? "-"
             : ((measurement.AllocatedBytes - controlBytes) /
@@ -243,15 +180,4 @@ internal static class InterpreterScalarAssignmentProbe
         double Checksum,
         SandboxResourceUsage Usage);
 
-    private readonly record struct PreparedCase(
-        int AssignmentCount,
-        ExecutionPlan Plan,
-        double ExpectedValue,
-        SandboxResourceUsage ExpectedUsage);
-
-    private sealed record PreparedLane(
-        ScalarAssignmentType Type,
-        ScalarAssignmentRhs Rhs,
-        SandboxValue Input,
-        PreparedCase[] Cases);
 }

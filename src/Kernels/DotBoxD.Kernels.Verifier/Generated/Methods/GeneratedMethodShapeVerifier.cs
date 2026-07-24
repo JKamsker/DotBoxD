@@ -77,6 +77,8 @@ internal static class GeneratedMethodShapeVerifier
         VerifyWorkHasMeterDensity(methodName, analysis, diagnostics);
         VerifyInstructionMeterDensity(methodName, analysis, diagnostics);
         VerifyRuntimeCallOrder(methodName, analysis, diagnostics);
+        var callDepth = GeneratedCallDepthVerifier.Verify(methodName, analysis, diagnostics);
+        GeneratedReturnValidationProofVerifier.Verify(methodName, analysis, callDepth, diagnostics);
         GeneratedUnchargedLiteralShapeVerifier.Verify(methodName, analysis, diagnostics);
         foreach (var instruction in analysis.Instructions.Where(i => i.IsLocalCall))
         {

@@ -47,6 +47,7 @@ public sealed class InterpreterLazyAuditAllocationTests
         AssertAllocationDifference(fullDefault, lazyDefault, expectedBytesPerExecution: 64);
         AssertAllocationDifference(fullExplicit, lazyExplicit, expectedBytesPerExecution: 32);
         AssertAllocationDifference(fullDefault, missingDefault, expectedBytesPerExecution: 0);
+        AssertAllocationCeiling(lazyExplicit, maximumBytesPerExecution: 720);
     }
 
     private static Measurement MeasureCase(
@@ -117,6 +118,14 @@ public sealed class InterpreterLazyAuditAllocationTests
         Assert.True(
             Math.Abs(actual - expectedBytesPerExecution) <= AllocationToleranceBytesPerExecution,
             $"Expected {expectedBytesPerExecution:F1} B/execution, observed {actual:F3} B/execution.");
+    }
+
+    private static void AssertAllocationCeiling(Measurement measurement, double maximumBytesPerExecution)
+    {
+        var actual = measurement.AllocatedBytes / (double)MeasurementIterations;
+        Assert.True(
+            actual <= maximumBytesPerExecution,
+            $"Expected at most {maximumBytesPerExecution:F1} B/execution, observed {actual:F3} B/execution.");
     }
 
     private static void ForceGc()
