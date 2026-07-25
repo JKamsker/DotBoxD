@@ -27,15 +27,18 @@ public sealed class PluginAnalyzerForbiddenApiDependencyInjectionReachabilityTes
             return services.BuildServiceProvider();
         }
         """,
-        "Microsoft.Extensions.DependencyInjection")]
+        "Microsoft.Extensions.DependencyInjection.ServiceCollectionContainerBuilderExtensions.BuildServiceProvider",
+        "services.BuildServiceProvider()")]
     [InlineData(
         "direct System.IO control",
         "private static readonly bool Exists = System.IO.File.Exists(\"plugin-service-provider.json\");",
-        "System.IO.File")]
+        "System.IO.File",
+        "System.IO.File.Exists(\"plugin-service-provider.json\")")]
     public async Task Reports_dependency_injection_provider_reached_from_static_initializer(
         string testCase,
         string staticMember,
-        string expectedForbiddenApi)
+        string expectedForbiddenApi,
+        string expectedDiagnosticSpan)
     {
         var source = Source(staticMember);
 
@@ -46,6 +49,10 @@ public sealed class PluginAnalyzerForbiddenApiDependencyInjectionReachabilityTes
         Assert.True(
             message.Contains(expectedForbiddenApi, StringComparison.Ordinal),
             $"{testCase}: {message}");
+
+        var sourceSpan = diagnostic.Location.SourceSpan;
+        var diagnosticSpan = source[sourceSpan.Start..sourceSpan.End];
+        Assert.Equal(expectedDiagnosticSpan, diagnosticSpan);
     }
 
     private static string Source(string staticMember)
