@@ -38,6 +38,15 @@ public sealed class ServicesHintNameSegmentationTests
         AssertCompiles(final);
 
         var generated = runResult.Results.Single().GeneratedSources;
+        generated.Where(IsProxy)
+            .Select(source => source.HintName)
+            .Should().HaveCount(2)
+            .And.OnlyHaveUniqueItems();
+        generated.Where(IsDispatcher)
+            .Select(source => source.HintName)
+            .Should().HaveCount(2)
+            .And.OnlyHaveUniqueItems();
+
         generated.Should().ContainSingle(source =>
             IsProxy(source) && ContainsServiceInterface(source, "global::A.I_B_C"));
         generated.Should().ContainSingle(source =>
