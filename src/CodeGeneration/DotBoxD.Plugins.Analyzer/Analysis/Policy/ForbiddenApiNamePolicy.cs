@@ -37,6 +37,7 @@ internal static class ForbiddenApiNamePolicy
         "System.Security.AccessControl.DirectorySecurity",
         "System.Security.AccessControl.FileSecurity",
         "Microsoft.Extensions.FileProviders.PhysicalFileProvider",
+        "Microsoft.Extensions.Localization.ResourceManagerStringLocalizerFactory",
         "Microsoft.Extensions.Logging.ConsoleLoggerExtensions",
         "Microsoft.Extensions.Logging.DebugLoggerFactoryExtensions",
         "Microsoft.Extensions.Logging.TraceSourceFactoryExtensions",
