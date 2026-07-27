@@ -37,7 +37,11 @@ public sealed partial class PluginAnalyzer
             }
 
             var type = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken).Type;
-            if (TryResolveGetPinnableReference(type, out var pinnableReference))
+            if (TryResolveGetPinnableReference(
+                    context.SemanticModel,
+                    expression,
+                    type,
+                    out var pinnableReference))
             {
                 if (TryGetForbiddenHostApi(pinnableReference.ContainingType, out var forbiddenType))
                 {
@@ -57,28 +61,43 @@ public sealed partial class PluginAnalyzer
     }
 
     private static bool TryResolveGetPinnableReference(
+        SemanticModel semanticModel,
+        ExpressionSyntax expression,
         ITypeSymbol? type,
         out IMethodSymbol pinnableReference)
     {
         pinnableReference = null!;
-        if (type is not INamedTypeSymbol namedType)
+        if (type is INamedTypeSymbol namedType)
         {
-            return false;
+            for (INamedTypeSymbol? current = namedType; current is not null; current = current.BaseType)
+            {
+                pinnableReference = current
+                    .GetMembers(GetPinnableReferenceMethodName)
+                    .OfType<IMethodSymbol>()
+                    .FirstOrDefault(static method =>
+                        !method.IsStatic &&
+                        method.Parameters.Length == 0 &&
+                        method.RefKind != RefKind.None)!;
+                if (pinnableReference is not null)
+                {
+                    return true;
+                }
+            }
         }
 
-        for (INamedTypeSymbol? current = namedType; current is not null; current = current.BaseType)
+        var invocation = SyntaxFactory.InvocationExpression(
+            SyntaxFactory.MemberAccessExpression(
+                SyntaxKind.SimpleMemberAccessExpression,
+                SyntaxFactory.ParenthesizedExpression(expression.WithoutTrivia()),
+                SyntaxFactory.IdentifierName(GetPinnableReferenceMethodName)));
+        var method = semanticModel.GetSpeculativeSymbolInfo(
+            expression.SpanStart,
+            invocation,
+            SpeculativeBindingOption.BindAsExpression).Symbol as IMethodSymbol;
+        if (method is { MethodKind: MethodKind.ReducedExtension, Parameters.Length: 0, RefKind: not RefKind.None })
         {
-            pinnableReference = current
-                .GetMembers(GetPinnableReferenceMethodName)
-                .OfType<IMethodSymbol>()
-                .FirstOrDefault(static method =>
-                    !method.IsStatic &&
-                    method.Parameters.Length == 0 &&
-                    method.RefKind != RefKind.None)!;
-            if (pinnableReference is not null)
-            {
-                return true;
-            }
+            pinnableReference = method.ReducedFrom ?? method;
+            return true;
         }
 
         return false;
