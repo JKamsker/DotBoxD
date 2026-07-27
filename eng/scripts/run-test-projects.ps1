@@ -113,7 +113,12 @@ function New-TestBatch([string] $Name, [string] $Filter) {
 }
 
 function Get-TestBatches([string] $ProjectName, [string] $SuiteName, [string] $Filter) {
-    if ($ProjectName -ne "DotBoxD.Kernels.Tests" -or $SuiteName -ne "kernels-remainder") {
+    $kernelRemainderSuites = @(
+        "kernels-remainder",
+        "kernels-remainder-core",
+        "kernels-remainder-analyzers"
+    )
+    if ($ProjectName -ne "DotBoxD.Kernels.Tests" -or $SuiteName -notin $kernelRemainderSuites) {
         return @(New-TestBatch "" $Filter)
     }
 
@@ -238,6 +243,10 @@ function Get-TestBatches([string] $ProjectName, [string] $SuiteName, [string] $F
         New-TestBatch $_.Name (Join-TestFilters $Filter $_.Filter)
     })
 
+    if ($SuiteName -eq "kernels-remainder-core") {
+        return $batches
+    }
+
     $pluginAnalyzerBatches = @(
         [pscustomobject] @{
             Name = "PluginAnalyzer-Contracts"
@@ -343,11 +352,15 @@ function Get-TestBatches([string] $ProjectName, [string] $SuiteName, [string] $F
         }
     )
 
-    $batches += @($pluginAnalyzerBatches | ForEach-Object {
+    $analyzerBatches = @($pluginAnalyzerBatches | ForEach-Object {
         New-TestBatch $_.Name (Join-TestFilters $Filter $_.Filter)
     })
 
-    return $batches
+    if ($SuiteName -eq "kernels-remainder-analyzers") {
+        return $analyzerBatches
+    }
+
+    return @($batches) + @($analyzerBatches)
 }
 
 $projectPaths = @($Projects | ForEach-Object { Resolve-ProjectPath $_ } | Where-Object {
