@@ -23,7 +23,9 @@ internal static class DotBoxDBridgeDiscovery
         }
 
         var earliestDescriptorWrite = startedAtUtc.AddSeconds(-2);
-        foreach (var descriptorPath in Directory.EnumerateFiles(directory, "*.json"))
+        foreach (var descriptorPath in Directory
+                     .EnumerateFiles(directory, "*.json")
+                     .OrderByDescending(File.GetLastWriteTimeUtc))
         {
             if (File.GetLastWriteTimeUtc(descriptorPath) < earliestDescriptorWrite ||
                 !TryGetProcessId(descriptorPath, out var processId) ||

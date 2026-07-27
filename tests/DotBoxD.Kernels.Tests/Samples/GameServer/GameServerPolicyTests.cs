@@ -23,6 +23,15 @@ public sealed class GameServerPolicyTests
         Assert.True(policy.GrantsCapability("game.world.monster.write.kill"));
     }
 
+    [Fact]
+    public void Debug_policy_preserves_capabilities_and_allows_instrumentation_headroom()
+    {
+        var policy = InvokePolicy("ForDebugKernel", "game.world.monster.write.kill");
+
+        Assert.True(policy.GrantsCapability("game.world.monster.write.kill"));
+        Assert.Equal(TimeSpan.FromSeconds(10), policy.ResourceLimits.MaxWallTime);
+    }
+
     private static SandboxPolicy InvokePolicy(string methodName, params string[] requiredCapabilities)
     {
         var gameServer = Assembly.LoadFrom(GameServerAssemblyPath());

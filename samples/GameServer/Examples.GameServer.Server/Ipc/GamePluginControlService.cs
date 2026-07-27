@@ -22,6 +22,7 @@ internal sealed class GamePluginControlService : IGamePluginControlService
     private readonly GamePluginKernelWiring _kernelWiring;
     private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _shutdown = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly bool _kernelDebugging;
 
     // Back-compat 4-arg ctor (no event-callback transport): a plugin that never uses a remote RunLocal chain
     // needs no callback. Kept as a distinct overload so reflection-based construction with four positional
@@ -37,12 +38,24 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         GameCommandSink sink,
         GameWorld world,
         IPluginEventCallback? eventCallback)
+        : this(server, session, sink, world, eventCallback, enableKernelDebugging: false)
+    {
+    }
+
+    public GamePluginControlService(
+        PluginServer server,
+        PluginSession session,
+        GameCommandSink sink,
+        GameWorld world,
+        IPluginEventCallback? eventCallback,
+        bool enableKernelDebugging)
         : this(
             server,
             session,
             sink,
             world,
-            new GamePluginKernelWiring(server, world, eventCallback))
+            new GamePluginKernelWiring(server, world, eventCallback),
+            enableKernelDebugging)
     {
     }
 
@@ -51,13 +64,15 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         PluginSession session,
         GameCommandSink sink,
         GameWorld world,
-        GamePluginKernelWiring kernelWiring)
+        GamePluginKernelWiring kernelWiring,
+        bool enableKernelDebugging)
     {
         _server = server;
         _session = session;
         _sink = sink;
         _world = world;
         _kernelWiring = kernelWiring;
+        _kernelDebugging = enableKernelDebugging;
     }
 
     /// <summary>Completes once the plugin has installed its kernels and is holding the connection.</summary>
@@ -75,7 +90,7 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         var kernel = await _session.InstallAndWireAsync(
             package,
             _kernelWiring.WireHook,
-            policy: pkg => ServerPolicy.ForKernel(_server.GetRequiredCapabilities(pkg)),
+            policy: PolicyFor,
             validate: _kernelWiring.ValidateRoute,
             ct).ConfigureAwait(false);
         Console.WriteLine($"[server] installed plugin kernel '{kernel.Manifest.PluginId}'.");
@@ -91,7 +106,7 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         var kernel = await _session.InstallAndWireAsync(
             package,
             _kernelWiring.WireSubscription,
-            policy: pkg => ServerPolicy.ForKernel(_server.GetRequiredCapabilities(pkg)),
+            policy: PolicyFor,
             validate: _kernelWiring.ValidateRoute,
             ct).ConfigureAwait(false);
         EventIndexDiagnostics.Report(kernel);
@@ -105,7 +120,7 @@ internal sealed class GamePluginControlService : IGamePluginControlService
 
         var package = PluginPackageJsonSerializer.Import(packageJson);
         Console.WriteLine($"[server] installing server extension '{package.Manifest.PluginId}'...");
-        var policy = ServerPolicy.ForKernel(_server.GetRequiredCapabilities(package));
+        var policy = PolicyFor(package);
         try
         {
             var kernel = await _session.InstallServerExtensionAsync(package, policy, ct).ConfigureAwait(false);
@@ -117,6 +132,14 @@ internal sealed class GamePluginControlService : IGamePluginControlService
             Console.Error.WriteLine($"[server] server extension install failed: {ex}");
             throw;
         }
+    }
+
+    private SandboxPolicy PolicyFor(PluginPackage package)
+    {
+        var capabilities = _server.GetRequiredCapabilities(package);
+        return _kernelDebugging
+            ? ServerPolicy.ForDebugKernel(capabilities)
+            : ServerPolicy.ForKernel(capabilities);
     }
 
     public async ValueTask<byte[]> InvokeServerExtensionAsync(

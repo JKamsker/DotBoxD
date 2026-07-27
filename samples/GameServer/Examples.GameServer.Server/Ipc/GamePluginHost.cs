@@ -33,7 +33,13 @@ internal static class GamePluginHost
                 // filtered+projected values back for remote RunLocal chains over the same bidirectional pipe.
                 var eventCallback =
                     global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.GetPluginEventCallback(peer);
-                var service = new GamePluginControlService(server, session, sink, world, eventCallback);
+                var service = new GamePluginControlService(
+                    server,
+                    session,
+                    sink,
+                    world,
+                    eventCallback,
+                    enableKernelDebugging);
 
                 // Two services per connection: the control-plane (install IR, settings, hold) and the domain
                 // world surface. ProvideGameWorldAccess is generated from [RpcService] on the interface.

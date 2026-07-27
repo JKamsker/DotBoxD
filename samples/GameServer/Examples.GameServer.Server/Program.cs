@@ -39,7 +39,7 @@ internal static class Program
         using var server = PluginServer.Create(
             messages: sink,
             configureHost: worldHost.AddBindings,
-            defaultPolicy: ServerPolicy.Create(),
+            defaultPolicy: kernelDebugging ? ServerPolicy.CreateForDebugging() : ServerPolicy.Create(),
             executionMode: ExecutionMode.Compiled,
             remoteDebugOptions: kernelDebugging ? new PluginRemoteDebugOptions
             {
