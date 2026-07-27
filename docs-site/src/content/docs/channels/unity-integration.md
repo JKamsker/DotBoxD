@@ -75,7 +75,7 @@ AOT path; Unity projects must keep an IL2CPP batch build in their own supported 
 - .NET 10.0 or newer for the server and Pushdown convenience host used in this guide
 
 ### NuGet Packages
-- `MessagePack` 3.1.7 (the repository-tested version)
+- `MessagePack` 3.1.8 (the repository-tested version)
 
 ---
 
@@ -121,7 +121,7 @@ Create `YourGame.Shared.csproj`:
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="MessagePack" Version="3.1.7" />
+    <PackageReference Include="MessagePack" Version="3.1.8" />
   </ItemGroup>
 
   <!-- Reference source generator for proxy/dispatcher generation -->
@@ -155,7 +155,7 @@ cp src/DotBoxD.Codecs.MessagePack/bin/Release/netstandard2.1/DotBoxD.Codecs.Mess
 cp src/YourGame.Shared/bin/Release/netstandard2.1/YourGame.Shared.dll "$UNITY_PLUGINS/"
 
 # Copy MessagePack (get from NuGet cache)
-cp ~/.nuget/packages/messagepack/3.1.7/lib/netstandard2.0/MessagePack.dll "$UNITY_PLUGINS/"
+cp ~/.nuget/packages/messagepack/3.1.8/lib/netstandard2.0/MessagePack.dll "$UNITY_PLUGINS/"
 
 echo "DLLs copied to Unity"
 ```
@@ -1315,7 +1315,7 @@ public class NotificationPoller : MonoBehaviour
 
 | DotBoxD Version | Unity Version | .NET Server | MessagePack |
 |----------------|---------------|-------------|-------------|
-| Current preview | 2021.3+      | 10.0+       | 3.1.7       |
+| Current preview | 2021.3+      | 10.0+       | 3.1.8       |
 
 ---
 

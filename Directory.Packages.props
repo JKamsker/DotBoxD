@@ -14,21 +14,21 @@
     <PackageVersion Include="System.Diagnostics.DiagnosticSource" Version="8.0.1" />
 
     <!-- Serialization (aligned across both families) -->
-    <PackageVersion Include="MessagePack" Version="3.1.7" />
-    <PackageVersion Include="MessagePackAnalyzer" Version="3.1.7" />
+    <PackageVersion Include="MessagePack" Version="3.1.8" />
+    <PackageVersion Include="MessagePackAnalyzer" Version="3.1.8" />
 
     <!-- Roslyn. Central = 4.8.0 so the shipped generators load in the widest range of
          consumer SDKs. Test/host projects that need newer APIs use VersionOverride
          (DotBoxD.Plugins.Analyzer + DotBoxD.Kernels.Tests -> 4.14.0, DotBoxD.Services.SourceGenerator.Tests -> 4.11.0). -->
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0" />
-    <PackageVersion Include="Microsoft.Extensions.FileProviders.Physical" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.FileProviders.Physical" Version="10.0.10" />
 
     <!-- Static-analysis layer (analyzer-only, wired in Directory.Build.props with
          PrivateAssets=all so they never flow into the package graph). Severities are
          configured centrally in .editorconfig. -->
     <PackageVersion Include="Roslynator.Analyzers" Version="4.15.0" />
-    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.105" />
+    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.131" />
 
     <PackageVersion Include="Fody" Version="6.9.3" />
     <PackageVersion Include="FodyHelpers" Version="6.9.3" />
@@ -38,9 +38,9 @@
     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
 
     <!-- Test stack (winner = newest, matches DotBoxD.Kernels.Tests config) -->
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="CsCheck" Version="4.7.0" />
     <PackageVersion Include="SharpFuzz" Version="2.3.0" />
@@ -49,9 +49,9 @@
     <PackageVersion Include="Verify.Xunit" Version="26.6.0" />
     <PackageVersion Include="Verify.SourceGenerators" Version="2.5.0" />
     <PackageVersion Include="Verify.DiffPlex" Version="3.1.2" />
-    <PackageVersion Include="FluentAssertions" Version="6.12.0" />
-    <PackageVersion Include="Basic.Reference.Assemblies.Net80" Version="1.7.9" />
+    <PackageVersion Include="FluentAssertions" Version="6.12.2" />
+    <PackageVersion Include="Basic.Reference.Assemblies.Net80" Version="1.8.10" />
     <PackageVersion Include="Microsoft.NETFramework.ReferenceAssemblies.net461" Version="1.0.3" />
-    <PackageVersion Include="System.Threading.Tasks.Extensions" Version="4.5.4" />
+    <PackageVersion Include="System.Threading.Tasks.Extensions" Version="4.6.3" />
   </ItemGroup>
 </Project>

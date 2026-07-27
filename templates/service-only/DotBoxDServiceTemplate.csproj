@@ -8,6 +8,6 @@
   <ItemGroup>
     <PackageReference Include="DotBoxD.Services" Version="0.1.0-*" />
     <PackageReference Include="DotBoxD.Codecs.MessagePack" Version="0.1.0-*" />
-    <PackageReference Include="MessagePack" Version="3.1.7" />
+    <PackageReference Include="MessagePack" Version="3.1.8" />
   </ItemGroup>
 </Project>
