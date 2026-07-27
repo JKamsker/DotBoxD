@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784533704970,
+  "lastUpdate": 1785139838442,
   "repoUrl": "https://github.com/JKamsker/DotBoxD",
   "entries": {
     "DotBoxD.Services Benchmarks": [
@@ -354,6 +354,136 @@ window.BENCHMARK_DATA = {
             "value": 93.11030895842447,
             "unit": "ns",
             "range": "± 0.0521953163469118"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jonas Kamsker",
+            "username": "JKamsker",
+            "email": "11245306+JKamsker@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "289211c6bf33b6f13e4b3c66f33990b0e88bf376",
+          "message": "Merge pull request #983 from JKamsker/codex/performance-hunt-20260721\n\nAdd lookahead capacity probe and expand performance coverage",
+          "timestamp": "2026-07-24T18:14:20Z",
+          "url": "https://github.com/JKamsker/DotBoxD/commit/289211c6bf33b6f13e4b3c66f33990b0e88bf376"
+        },
+        "date": 1785139837508,
+        "tool": "benchmarkdotnet",
+        "benches": [
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.FramingBenchmarks.ParseFrameOnly",
+            "value": 13.475295141339302,
+            "unit": "ns",
+            "range": "± 0.00586005552252534"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.FramingBenchmarks.FrameRequest",
+            "value": 471.3128154542711,
+            "unit": "ns",
+            "range": "± 0.2132297064468096"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.FramingBenchmarks.DeserializeArgument",
+            "value": 155.02162721421985,
+            "unit": "ns",
+            "range": "± 0.5127064166799672"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.PeerRoundTripBenchmarks.MovePlayerAsync(EndToEndLowAllocationProfile: False)",
+            "value": 10391.628649902344,
+            "unit": "ns",
+            "range": "± 1504.0262410288913"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.PeerRoundTripBenchmarks.MovePlayerAsync(EndToEndLowAllocationProfile: True)",
+            "value": 8801.8962890625,
+            "unit": "ns",
+            "range": "± 1447.8708759415333"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.RpcTelemetryBenchmarks.SuccessfulRequestWithoutListeners",
+            "value": 2.8181572556495667,
+            "unit": "ns",
+            "range": "± 0.008156845862117571"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ServiceGeneratorScaleBenchmarks.RunGenerators(ContractCount: 10)",
+            "value": 1096513.5125,
+            "unit": "ns",
+            "range": "± 64073.09713626704"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ServiceGeneratorScaleBenchmarks.RunGenerators(ContractCount: 100)",
+            "value": 10205980.869791666,
+            "unit": "ns",
+            "range": "± 57463.06552736874"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ServiceGeneratorScaleBenchmarks.RunGenerators(ContractCount: 500)",
+            "value": 66763202.76666667,
+            "unit": "ns",
+            "range": "± 2371968.6025644527"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.StreamedArgumentProxyBenchmarks.SingleStreamUpload",
+            "value": 19.35841258466244,
+            "unit": "ns",
+            "range": "± 0.260230912494755"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.StreamedArgumentProxyBenchmarks.TwoStreamUpload",
+            "value": 35.55638902783394,
+            "unit": "ns",
+            "range": "± 0.5197231320552295"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.RegisterPlayerFlow",
+            "value": 17.741311201453208,
+            "unit": "ns",
+            "range": "± 0.020707124251505657"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.GetPlayerStateFlow",
+            "value": 12.755243764983284,
+            "unit": "ns",
+            "range": "± 0.02121873515261159"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.MovePlayerFlow",
+            "value": 23.627054664492608,
+            "unit": "ns",
+            "range": "± 0.013868748697140103"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.PerformActionFlow",
+            "value": 19.40081142485142,
+            "unit": "ns",
+            "range": "± 0.06066441771111808"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.MissingPlayerFailureFlow",
+            "value": 10.499209970235825,
+            "unit": "ns",
+            "range": "± 0.01379136232752332"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.VoidHeartbeatFlow",
+            "value": 4.250230027569665,
+            "unit": "ns",
+            "range": "± 0.002033920675437492"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.FullGameplaySessionFlow",
+            "value": 94.12462921275034,
+            "unit": "ns",
+            "range": "± 0.07358560423055702"
           }
         ]
       }
