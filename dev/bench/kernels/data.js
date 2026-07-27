@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783929460371,
+  "lastUpdate": 1785139841761,
   "repoUrl": "https://github.com/JKamsker/DotBoxD",
   "entries": {
     "DotBoxD.Kernels Benchmarks": [
@@ -520,6 +520,526 @@ window.BENCHMARK_DATA = {
             "value": 11968003.427083334,
             "unit": "ns",
             "range": "± 323190.5937111438"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jonas Kamsker",
+            "username": "JKamsker",
+            "email": "11245306+JKamsker@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "289211c6bf33b6f13e4b3c66f33990b0e88bf376",
+          "message": "Merge pull request #983 from JKamsker/codex/performance-hunt-20260721\n\nAdd lookahead capacity probe and expand performance coverage",
+          "timestamp": "2026-07-24T18:14:20Z",
+          "url": "https://github.com/JKamsker/DotBoxD/commit/289211c6bf33b6f13e4b3c66f33990b0e88bf376"
+        },
+        "date": 1785139841404,
+        "tool": "benchmarkdotnet",
+        "benches": [
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Core.BindingReferencePlanBenchmarks.PrepareSharedHelperGraph(EntrypointCount: 1)",
+            "value": 34546.045084635414,
+            "unit": "ns",
+            "range": "± 4802.7910316065"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Core.BindingReferencePlanBenchmarks.PrepareSharedHelperGraph(EntrypointCount: 10)",
+            "value": 69571.01302083333,
+            "unit": "ns",
+            "range": "± 10218.403823314364"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Core.BindingReferencePlanBenchmarks.PrepareSharedHelperGraph(EntrypointCount: 100)",
+            "value": 481051.8072916667,
+            "unit": "ns",
+            "range": "± 36500.25324925319"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Core.MapTraversalBenchmarks.ValidateMapShape(EntryCount: 100)",
+            "value": 3335.267717997233,
+            "unit": "ns",
+            "range": "± 2.5442534191846735"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Core.MapTraversalBenchmarks.MeterMapShape(EntryCount: 100)",
+            "value": 2885.6666666666665,
+            "unit": "ns",
+            "range": "± 106.2089136246734"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Core.MapTraversalBenchmarks.ValidateMapShape(EntryCount: 1000)",
+            "value": 32434.015279134113,
+            "unit": "ns",
+            "range": "± 180.18364396561037"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Core.MapTraversalBenchmarks.MeterMapShape(EntryCount: 1000)",
+            "value": 3097.5,
+            "unit": "ns",
+            "range": "± 515.2931204664002"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Core.MapTraversalBenchmarks.ValidateMapShape(EntryCount: 10000)",
+            "value": 583043.46875,
+            "unit": "ns",
+            "range": "± 20162.231909956947"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Core.MapTraversalBenchmarks.MeterMapShape(EntryCount: 10000)",
+            "value": 3539.3333333333335,
+            "unit": "ns",
+            "range": "± 166.5332799572906"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 0, RequestCount: 1)",
+            "value": 62514.166666666664,
+            "unit": "ns",
+            "range": "± 14669.733205935729"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 0, RequestCount: 10)",
+            "value": 155477.66666666666,
+            "unit": "ns",
+            "range": "± 14911.820154941961"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 0, RequestCount: 1000)",
+            "value": 10670567,
+            "unit": "ns",
+            "range": "± 31583.547125045978"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 32, RequestCount: 1)",
+            "value": 50454.5,
+            "unit": "ns",
+            "range": "± 43.58898943540674"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 32, RequestCount: 10)",
+            "value": 143936.33333333334,
+            "unit": "ns",
+            "range": "± 1492.349936621211"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 32, RequestCount: 1000)",
+            "value": 10948979,
+            "unit": "ns",
+            "range": "± 133326.8333419796"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 1024, RequestCount: 1)",
+            "value": 51397.833333333336,
+            "unit": "ns",
+            "range": "± 480.07534130939626"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 1024, RequestCount: 10)",
+            "value": 180285.33333333334,
+            "unit": "ns",
+            "range": "± 23483.502982590424"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 1024, RequestCount: 1000)",
+            "value": 11755872.666666666,
+            "unit": "ns",
+            "range": "± 117932.12248718893"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 65536, RequestCount: 1)",
+            "value": 89247.66666666667,
+            "unit": "ns",
+            "range": "± 1006.2724945725851"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 65536, RequestCount: 10)",
+            "value": 1269497.3333333333,
+            "unit": "ns",
+            "range": "± 214093.23326376604"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Http.HttpGrantParsingBenchmarks.RepeatedHttpGets(ResponseBytes: 65536, RequestCount: 1000)",
+            "value": 63897732.666666664,
+            "unit": "ns",
+            "range": "± 289307.5419019237"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Interpreter.InterpreterExpressionBenchmarks.ExecuteArithmeticLoopAsync(Iterations: 100)",
+            "value": 21047.133728027344,
+            "unit": "ns",
+            "range": "± 15.958906112209855"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Interpreter.InterpreterExpressionBenchmarks.ExecuteArithmeticLoopAsync(Iterations: 10000)",
+            "value": 59139.33504231771,
+            "unit": "ns",
+            "range": "± 58.83652549712261"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.InMemoryRoundTripBenchmarks.IntRoundTripAsync(LowAllocationProfile: False)",
+            "value": 12170.662913004557,
+            "unit": "ns",
+            "range": "± 1884.2936168506114"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.InMemoryRoundTripBenchmarks.StructPayloadRoundTripAsync(LowAllocationProfile: False)",
+            "value": 10406.557332356771,
+            "unit": "ns",
+            "range": "± 1717.9268498334245"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.InMemoryRoundTripBenchmarks.IntRoundTripAsync(LowAllocationProfile: True)",
+            "value": 12131.041259765625,
+            "unit": "ns",
+            "range": "± 60.98870189228249"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.InMemoryRoundTripBenchmarks.StructPayloadRoundTripAsync(LowAllocationProfile: True)",
+            "value": 10823.797190348307,
+            "unit": "ns",
+            "range": "± 3516.398542666107"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.IpcRoundTripBenchmarks.IntRoundTripAsync(LowAllocationProfile: False)",
+            "value": 49718.9491780599,
+            "unit": "ns",
+            "range": "± 947.4798544271058"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.IpcRoundTripBenchmarks.StructPayloadRoundTripAsync(LowAllocationProfile: False)",
+            "value": 64815.507080078125,
+            "unit": "ns",
+            "range": "± 7229.9160530603995"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.IpcRoundTripBenchmarks.IntRoundTripAsync(LowAllocationProfile: True)",
+            "value": 47679.50459798177,
+            "unit": "ns",
+            "range": "± 408.4428338893801"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.IpcRoundTripBenchmarks.StructPayloadRoundTripAsync(LowAllocationProfile: True)",
+            "value": 47671.07627360026,
+            "unit": "ns",
+            "range": "± 440.29503164520673"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.MessagePackPayloadBenchmarks.SerializeStructPayload",
+            "value": 42.65458460648855,
+            "unit": "ns",
+            "range": "± 0.014760285441187132"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.MessagePackPayloadBenchmarks.DeserializeStructPayload",
+            "value": 57.68820955355962,
+            "unit": "ns",
+            "range": "± 0.02299777555711828"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.Encode(Projection: Int32)",
+            "value": 9.633878752589226,
+            "unit": "ns",
+            "range": "± 0.014837428700093195"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvoke(Projection: Int32)",
+            "value": 50.698847572008766,
+            "unit": "ns",
+            "range": "± 0.02416959120959287"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvokeGenerated(Projection: Int32)",
+            "value": 21.355493744214375,
+            "unit": "ns",
+            "range": "± 0.0055487886800095285"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.RoundTrip(Projection: Int32)",
+            "value": 55.0237038731575,
+            "unit": "ns",
+            "range": "± 0.08406268006394171"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.Encode(Projection: String)",
+            "value": 22.95258727669716,
+            "unit": "ns",
+            "range": "± 0.03960683692003344"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvoke(Projection: String)",
+            "value": 95.7326091726621,
+            "unit": "ns",
+            "range": "± 0.2139515395803465"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvokeGenerated(Projection: String)",
+            "value": 46.05330206950506,
+            "unit": "ns",
+            "range": "± 0.16118402611096286"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.RoundTrip(Projection: String)",
+            "value": 118.35599223772685,
+            "unit": "ns",
+            "range": "± 0.30087792186819773"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.Encode(Projection: Enum)",
+            "value": 9.626634786526362,
+            "unit": "ns",
+            "range": "± 0.03494426247787033"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvoke(Projection: Enum)",
+            "value": 50.82380204399427,
+            "unit": "ns",
+            "range": "± 0.15142523329338523"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvokeGenerated(Projection: Enum)",
+            "value": 19.82344577709834,
+            "unit": "ns",
+            "range": "± 0.1071580005690204"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.RoundTrip(Projection: Enum)",
+            "value": 55.22651787598928,
+            "unit": "ns",
+            "range": "± 0.06476512766428646"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.Encode(Projection: ListInt32)",
+            "value": 59.704211592674255,
+            "unit": "ns",
+            "range": "± 0.03341640543068017"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvoke(Projection: ListInt32)",
+            "value": 337.96657609939575,
+            "unit": "ns",
+            "range": "± 0.24450943607819572"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvokeGenerated(Projection: ListInt32)",
+            "value": 53.00055482983589,
+            "unit": "ns",
+            "range": "± 0.4284094495305792"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.RoundTrip(Projection: ListInt32)",
+            "value": 464.73568391799927,
+            "unit": "ns",
+            "range": "± 1.48082094889337"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.Encode(Projection: Dto)",
+            "value": 44.52953040599823,
+            "unit": "ns",
+            "range": "± 0.061304525102206985"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvoke(Projection: Dto)",
+            "value": 232.06443436940512,
+            "unit": "ns",
+            "range": "± 0.5785170551949577"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvokeGenerated(Projection: Dto)",
+            "value": 59.8580459356308,
+            "unit": "ns",
+            "range": "± 0.2018788972446022"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.RoundTrip(Projection: Dto)",
+            "value": 275.77432521184284,
+            "unit": "ns",
+            "range": "± 2.534584942634552"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.Encode(Projection: AnonymousDto)",
+            "value": 44.186767826477684,
+            "unit": "ns",
+            "range": "± 0.061407912681814295"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvoke(Projection: AnonymousDto)",
+            "value": 418.9172968864441,
+            "unit": "ns",
+            "range": "± 2.5885639068072948"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvokeGenerated(Projection: AnonymousDto)",
+            "value": 78.98278552293777,
+            "unit": "ns",
+            "range": "± 0.41404464750210057"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.RoundTrip(Projection: AnonymousDto)",
+            "value": 484.17371400197345,
+            "unit": "ns",
+            "range": "± 1.5576888522260013"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.Encode(Projection: WholeEvent)",
+            "value": 50.85050365328789,
+            "unit": "ns",
+            "range": "± 0.10371819870459213"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvoke(Projection: WholeEvent)",
+            "value": 285.5386633872986,
+            "unit": "ns",
+            "range": "± 0.8445142080405311"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.DecodeInvokeGenerated(Projection: WholeEvent)",
+            "value": 60.39009610811869,
+            "unit": "ns",
+            "range": "± 0.21537444231158073"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Ipc.RunLocal.RunLocalPushBenchmarks.RoundTrip(Projection: WholeEvent)",
+            "value": 336.8381573359172,
+            "unit": "ns",
+            "range": "± 0.34567454949748355"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Json.JsonImportBenchmarks.Import(StatementCount: 100, DuplicateLiterals: False)",
+            "value": 280816.3287760417,
+            "unit": "ns",
+            "range": "± 2211.264098124166"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Json.JsonImportBenchmarks.Import(StatementCount: 100, DuplicateLiterals: True)",
+            "value": 1164541.7317708333,
+            "unit": "ns",
+            "range": "± 2810.2682646102526"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Json.JsonImportBenchmarks.Import(StatementCount: 1000, DuplicateLiterals: False)",
+            "value": 3054705.2747395835,
+            "unit": "ns",
+            "range": "± 26334.40339425275"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Json.JsonImportBenchmarks.Import(StatementCount: 1000, DuplicateLiterals: True)",
+            "value": 88746435.16666667,
+            "unit": "ns",
+            "range": "± 729243.0642636125"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Json.JsonImportBenchmarks.Import(StatementCount: 5000, DuplicateLiterals: False)",
+            "value": 15496695.197916666,
+            "unit": "ns",
+            "range": "± 548536.714006763"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Json.JsonImportBenchmarks.Import(StatementCount: 5000, DuplicateLiterals: True)",
+            "value": 2125965746.3333333,
+            "unit": "ns",
+            "range": "± 7498860.828251271"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.PluginAnalyzer.PluginAnalyzerHelperGraphBenchmarks.AnalyzeHelperChain(HelperCount: 100)",
+            "value": 13100463.177083334,
+            "unit": "ns",
+            "range": "± 3524195.5522030327"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.PluginAnalyzer.PluginAnalyzerHelperGraphBenchmarks.AnalyzeHelperChain(HelperCount: 1000)",
+            "value": 115269160.55555554,
+            "unit": "ns",
+            "range": "± 5781537.495342582"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.PluginAnalyzer.PluginAnalyzerHelperGraphBenchmarks.AnalyzeHelperChain(HelperCount: 10000)",
+            "value": 1264317377.6666667,
+            "unit": "ns",
+            "range": "± 22662703.137543"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.PluginAnalyzer.PluginPackageGeneratorScaleBenchmarks.RunGenerators(KernelCount: 10)",
+            "value": 594464.716796875,
+            "unit": "ns",
+            "range": "± 14309.897078672733"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.PluginAnalyzer.PluginPackageGeneratorScaleBenchmarks.RunGenerators(KernelCount: 100)",
+            "value": 2555058.8645833335,
+            "unit": "ns",
+            "range": "± 37909.02676187174"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.PluginAnalyzer.PluginPackageGeneratorScaleBenchmarks.RunGenerators(KernelCount: 500)",
+            "value": 10586343.442708334,
+            "unit": "ns",
+            "range": "± 17799.454633618185"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Plugins.ConventionEventAdapterBenchmarks.OneProperty",
+            "value": 11.51790569225947,
+            "unit": "ns",
+            "range": "± 0.01651690297886936"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Plugins.ConventionEventAdapterBenchmarks.FiveProperties",
+            "value": 37.4463839729627,
+            "unit": "ns",
+            "range": "± 0.07570550727910691"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Plugins.ConventionEventAdapterBenchmarks.TwentyProperties",
+            "value": 182.9610169728597,
+            "unit": "ns",
+            "range": "± 0.8859358401199872"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Plugins.LiveSettingProxyBenchmarks.GetSettings(Iterations: 1000)",
+            "value": 252504.7001953125,
+            "unit": "ns",
+            "range": "± 730.1274845790925"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Plugins.LiveSettingProxyBenchmarks.SetSettings(Iterations: 1000)",
+            "value": 268801.0055338542,
+            "unit": "ns",
+            "range": "± 1874.7836624114175"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Plugins.LiveSettingProxyBenchmarks.GetSettings(Iterations: 100000)",
+            "value": 23477353.0625,
+            "unit": "ns",
+            "range": "± 101191.6142332547"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Plugins.LiveSettingProxyBenchmarks.SetSettings(Iterations: 100000)",
+            "value": 28210242.125,
+            "unit": "ns",
+            "range": "± 6575.226844054983"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Verifier.GeneratedVerifierCallBenchmarks.VerifyRepeatedRuntimeCalls(CallCount: 100)",
+            "value": 108022.47875976562,
+            "unit": "ns",
+            "range": "± 934.7549585209122"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Verifier.GeneratedVerifierCallBenchmarks.VerifyRepeatedRuntimeCalls(CallCount: 1000)",
+            "value": 1079292.0221354167,
+            "unit": "ns",
+            "range": "± 5932.732581303593"
+          },
+          {
+            "name": "DotBoxD.Kernels.Benchmarks.Verifier.GeneratedVerifierCallBenchmarks.VerifyRepeatedRuntimeCalls(CallCount: 10000)",
+            "value": 11863051.9375,
+            "unit": "ns",
+            "range": "± 243370.0552821974"
           }
         ]
       }
