@@ -109,7 +109,7 @@ internal static class GeneratorTestHelper
     {
         var prefix = string.IsNullOrEmpty(@namespace)
             ? GlobalPrefix(interfaceName)
-            : NamespaceIdentifierPrefix(@namespace) + "_" + interfaceName;
+            : NamespacedPrefix(@namespace, interfaceName);
         var suffix = kind switch
         {
             GeneratedKind.Async => "DotBoxDRpcAsync",
@@ -123,6 +123,14 @@ internal static class GeneratorTestHelper
         interfaceName.IndexOf('_') >= 0
             ? "Global-" + interfaceName
             : interfaceName;
+
+    private static string NamespacedPrefix(string @namespace, string interfaceName)
+    {
+        var prefix = NamespaceIdentifierPrefix(@namespace) + "_" + interfaceName;
+        return interfaceName.IndexOf('_') >= 0
+            ? prefix + "__" + StableHash(@namespace + "." + interfaceName)
+            : prefix;
+    }
 
     private static string NamespaceIdentifierPrefix(string namespaceName)
     {

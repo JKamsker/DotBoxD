@@ -126,7 +126,12 @@ jobs:
             prebuild: samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
             filter: FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Regression.InterpreterValues.Fix_PAL_0043_Tests
           - os: windows-latest
-            suite: kernels-remainder
+            suite: kernels-remainder-core
+            projects: tests/DotBoxD.Kernels.Tests/DotBoxD.Kernels.Tests.csproj
+            prebuild: samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
+            filter: FullyQualifiedName!~DotBoxD.Kernels.Tests.Plugins.Regression.InterpreterValues.Fix_PAL_0043_Tests
+          - os: windows-latest
+            suite: kernels-remainder-analyzers
             projects: tests/DotBoxD.Kernels.Tests/DotBoxD.Kernels.Tests.csproj
             prebuild: samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
             filter: FullyQualifiedName!~DotBoxD.Kernels.Tests.Plugins.Regression.InterpreterValues.Fix_PAL_0043_Tests

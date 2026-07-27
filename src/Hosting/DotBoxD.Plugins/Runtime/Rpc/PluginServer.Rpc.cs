@@ -25,6 +25,7 @@ public sealed partial class PluginServer
         where TKernel : class
     {
         ThrowIfDisposed();
+        ServerExtensionProxyValidation.ValidateServiceContract(typeof(TService));
         var package = KernelPackageRegistry.Resolve(typeof(TKernel));
         var kernel = await InstallServerExtensionAsync(package, policy, cancellationToken).ConfigureAwait(false);
         _serverExtensions[typeof(TService)] = new ServerExtensionRegistration(kernel.Manifest.PluginId);

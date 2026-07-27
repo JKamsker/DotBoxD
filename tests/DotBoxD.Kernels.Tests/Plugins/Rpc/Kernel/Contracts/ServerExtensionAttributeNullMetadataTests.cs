@@ -32,6 +32,33 @@ public sealed class ServerExtensionAttributeNullMetadataTests
     }
 
     [Fact]
+    public void Server_extension_with_aliased_null_id_reports_diagnostic()
+    {
+        var diagnostics = Diagnostics("""
+            using System.Threading.Tasks;
+            using DotBoxD.Abstractions;
+            using DotBoxD.Kernels;
+            using DotBoxD.Kernels.Sandbox;
+            using SE = DotBoxD.Abstractions.ServerExtensionAttribute;
+
+            namespace Sample;
+
+            public interface IEchoService
+            {
+                ValueTask<int> EchoAsync(int value);
+            }
+
+            [SE(null, typeof(IEchoService))]
+            public sealed partial class EchoKernel
+            {
+                public int Echo(int value, HookContext ctx) => value;
+            }
+            """);
+
+        AssertServerExtensionDiagnostic(diagnostics, "id");
+    }
+
+    [Fact]
     public void Server_extension_with_explicit_null_service_type_reports_diagnostic()
     {
         var diagnostics = Diagnostics("""

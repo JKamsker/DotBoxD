@@ -19,6 +19,7 @@ internal static class ForbiddenApiNamePolicy
         "System.Text.StringBuilder",
         "System.ComponentModel.LicenseManager",
         "System.Collections.Concurrent.BlockingCollection<T>",
+        "Microsoft.Extensions.ObjectPool.ObjectPool<T>",
         "System.Buffers.MemoryPool<T>",
         "System.Formats.Tar.TarFile",
         "Microsoft.Win32.Registry", "System.Linq.ParallelEnumerable", "System.Numerics.BigInteger",
@@ -36,7 +37,10 @@ internal static class ForbiddenApiNamePolicy
         "System.Security.AccessControl.DirectorySecurity",
         "System.Security.AccessControl.FileSecurity",
         "Microsoft.Extensions.FileProviders.PhysicalFileProvider",
+        "Microsoft.Extensions.Localization.ResourceManagerStringLocalizerFactory",
         "Microsoft.Extensions.Logging.ConsoleLoggerExtensions",
+        "Microsoft.Extensions.Logging.DebugLoggerFactoryExtensions",
+        "Microsoft.Extensions.Logging.TraceSourceFactoryExtensions",
         "Microsoft.Extensions.Configuration.FileConfigurationExtensions",
         "Microsoft.Extensions.Configuration.IniConfigurationExtensions",
         "Microsoft.Extensions.Configuration.JsonConfigurationExtensions",
@@ -52,15 +56,20 @@ internal static class ForbiddenApiNamePolicy
         "System.Timers.", "System.Linq.Expressions.", "System.Security.Principal.", "System.Transactions.",
         "System.Data.", "Microsoft.AspNetCore.", "Microsoft.CSharp.", "Microsoft.VisualBasic.",
         "Microsoft.EntityFrameworkCore.", "Microsoft.Extensions.Logging.Console.",
-        "Microsoft.Extensions.Logging.EventLog.", "Microsoft.Extensions.Configuration.UserSecrets.",
-        "Microsoft.Win32."
+        "Microsoft.Extensions.Logging.Debug.", "Microsoft.Extensions.Logging.EventLog.",
+        "Microsoft.Extensions.Logging.TraceSource.",
+        "Microsoft.Extensions.Configuration.UserSecrets.", "Microsoft.Win32."
     ];
 
     private static readonly string[] ExactMemberNames =
     [
         "Microsoft.Extensions.Configuration.EnvironmentVariablesExtensions.AddEnvironmentVariables",
         "Microsoft.Extensions.Logging.EventLoggerFactoryExtensions.AddEventLog",
+        "Microsoft.Extensions.Logging.EventSourceLoggerFactoryExtensions.AddEventSourceLogger",
+        "Microsoft.Extensions.Logging.TraceSourceFactoryExtensions.AddTraceSource",
+        "Microsoft.Extensions.Caching.Memory.CacheExtensions.Set",
         "Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder",
+        "Microsoft.Extensions.DependencyInjection.ServiceCollectionContainerBuilderExtensions.BuildServiceProvider",
         "System.String.Create",
         "System.Security.Cryptography.RSA.Create",
         "Microsoft.Extensions.Configuration.KeyPerFileConfigurationBuilderExtensions.AddKeyPerFile"
@@ -71,5 +80,17 @@ internal static class ForbiddenApiNamePolicy
     public static bool IsForbiddenNamespace(string name)
         => NamespacePrefixes.Any(prefix => name.StartsWith(prefix, StringComparison.Ordinal));
 
-    public static bool IsForbiddenExactMember(string name) => Array.IndexOf(ExactMemberNames, name) >= 0;
+    public static bool TryGetForbiddenExactMemberDisplayName(string name, out string displayName)
+    {
+        if (Array.IndexOf(ExactMemberNames, name) < 0)
+        {
+            displayName = null!;
+            return false;
+        }
+
+        displayName = name == "Microsoft.Extensions.Caching.Memory.CacheExtensions.Set"
+            ? "Microsoft.Extensions.Caching.Memory.MemoryCache"
+            : name;
+        return true;
+    }
 }

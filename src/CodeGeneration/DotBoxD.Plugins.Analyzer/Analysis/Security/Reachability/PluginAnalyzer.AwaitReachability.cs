@@ -15,6 +15,14 @@ public sealed partial class PluginAnalyzer
             c => AnalyzeAwait(c, helperGraph),
             SyntaxKind.AwaitExpression);
 
+    private static void RegisterAwaitUsingReachabilityAnalysis(
+        CompilationStartAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph)
+        => context.RegisterSyntaxNodeAction(
+            c => AnalyzeAwaitUsing(c, helperGraph),
+            SyntaxKind.LocalDeclarationStatement,
+            SyntaxKind.UsingStatement);
+
     private static void AnalyzeAwait(SyntaxNodeAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
         if (context.Node is not AwaitExpressionSyntax awaitExpression ||
@@ -52,8 +60,41 @@ public sealed partial class PluginAnalyzer
         ReportLocalAwaiterUseIfInvalid(context, awaiterMethod, location);
     }
 
+    private static void RecordAwaiterCall(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol method,
+        IMethodSymbol? awaiterMethod,
+        Location location)
+    {
+        if (awaiterMethod is null)
+        {
+            return;
+        }
+
+        ReportAndRecordForbiddenAwaiter(context, helperGraph, method, awaiterMethod.ContainingType, location);
+        helperGraph.RecordCall(method, awaiterMethod, location);
+        ReportAndRecordForbiddenAwaiterResult(context, helperGraph, method, awaiterMethod, location);
+        ReportLocalUseIfInvalid(context, awaiterMethod);
+    }
+
     private static void ReportAndRecordForbiddenAwaiter(
         SyntaxNodeAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol method,
+        ITypeSymbol? type,
+        Location location)
+    {
+        if (!IsForbiddenHostApi(type))
+        {
+            return;
+        }
+
+        RecordAndReportForbiddenAwaiter(context, helperGraph, method, type!, location);
+    }
+
+    private static void ReportAndRecordForbiddenAwaiter(
+        OperationAnalysisContext context,
         ForbiddenHelperCallGraph helperGraph,
         IMethodSymbol method,
         ITypeSymbol? type,
@@ -82,8 +123,42 @@ public sealed partial class PluginAnalyzer
         RecordAndReportForbiddenAwaiter(context, helperGraph, containingMethod, forbiddenType, location);
     }
 
+    private static void ReportAndRecordForbiddenAwaiterResult(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol containingMethod,
+        IMethodSymbol awaiterMethod,
+        Location location)
+    {
+        if (!TryGetForbiddenHostApi(awaiterMethod.ReturnType, out var forbiddenType))
+        {
+            return;
+        }
+
+        RecordAndReportForbiddenAwaiter(context, helperGraph, containingMethod, forbiddenType, location);
+    }
+
     private static void RecordAndReportForbiddenAwaiter(
         SyntaxNodeAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol containingMethod,
+        ITypeSymbol forbiddenType,
+        Location location)
+    {
+        helperGraph.RecordForbidden(containingMethod, forbiddenType);
+        if (!IsEventKernel(containingMethod.ContainingType))
+        {
+            return;
+        }
+
+        context.ReportDiagnostic(Diagnostic.Create(
+            ForbiddenHostApiRule,
+            location,
+            forbiddenType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
+    }
+
+    private static void RecordAndReportForbiddenAwaiter(
+        OperationAnalysisContext context,
         ForbiddenHelperCallGraph helperGraph,
         IMethodSymbol containingMethod,
         ITypeSymbol forbiddenType,
@@ -123,6 +198,50 @@ public sealed partial class PluginAnalyzer
         ForbiddenHelperCallGraph helperGraph,
         IMethodSymbol method,
         ITypeSymbol? awaitableType,
+        Location location,
+        bool extensionMethodsOnly = false)
+    {
+        if (awaitableType is null || awaitableType.DeclaringSyntaxReferences.Length == 0)
+        {
+            return;
+        }
+
+        var patternMethods = extensionMethodsOnly
+            ? AwaiterPatternResolver.ExtensionMethods(
+                context.SemanticModel,
+                awaitableType,
+                location.SourceSpan.Start,
+                context.CancellationToken)
+            : AwaiterPatternResolver.Methods(
+                context.SemanticModel,
+                awaitableType,
+                location.SourceSpan.Start,
+                context.CancellationToken);
+        foreach (var member in patternMethods)
+        {
+            RecordAwaiterCall(context, helperGraph, method, member, location);
+            if (AwaiterPatternResolver.FindMember<IPropertySymbol>(
+                member.ReturnType,
+                "IsCompleted",
+                static property => property.GetMethod is not null)?.GetMethod is { } isCompletedGetter)
+            {
+                RecordAwaiterCall(context, helperGraph, method, isCompletedGetter, location);
+            }
+
+            var getResult = AwaiterPatternResolver.FindMember<IMethodSymbol>(
+                member.ReturnType,
+                "GetResult",
+                static candidate => candidate.Parameters.Length == 0);
+            RecordAwaiterCall(context, helperGraph, method, getResult, location);
+            return;
+        }
+    }
+
+    private static void RecordAwaitablePatternCalls(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol method,
+        ITypeSymbol? awaitableType,
         Location location)
     {
         if (awaitableType is null || awaitableType.DeclaringSyntaxReferences.Length == 0)
@@ -130,26 +249,29 @@ public sealed partial class PluginAnalyzer
             return;
         }
 
-        foreach (var member in awaitableType.GetMembers("GetAwaiter").OfType<IMethodSymbol>())
+        var getAwaiter = AwaiterPatternResolver.FindMember<IMethodSymbol>(
+            awaitableType,
+            "GetAwaiter",
+            static method => method.Parameters.Length == 0 && !method.IsStatic);
+        if (getAwaiter is null)
         {
-            if (member.Parameters.Length != 0 || member.IsStatic)
-            {
-                continue;
-            }
-
-            RecordAwaiterCall(context, helperGraph, method, member, location);
-            if (member.ReturnType.GetMembers("IsCompleted").OfType<IPropertySymbol>().FirstOrDefault()?.GetMethod is
-                { } isCompletedGetter)
-            {
-                RecordAwaiterCall(context, helperGraph, method, isCompletedGetter, location);
-            }
-
-            var getResult = member.ReturnType
-                .GetMembers("GetResult")
-                .OfType<IMethodSymbol>()
-                .FirstOrDefault(static m => m.Parameters.Length == 0);
-            RecordAwaiterCall(context, helperGraph, method, getResult, location);
             return;
         }
+
+        RecordAwaiterCall(context, helperGraph, method, getAwaiter, location);
+        if (AwaiterPatternResolver.FindMember<IPropertySymbol>(
+            getAwaiter.ReturnType,
+            "IsCompleted",
+            static property => property.GetMethod is not null)?.GetMethod is { } isCompletedGetter)
+        {
+            RecordAwaiterCall(context, helperGraph, method, isCompletedGetter, location);
+        }
+
+        var getResult = AwaiterPatternResolver.FindMember<IMethodSymbol>(
+            getAwaiter.ReturnType,
+            "GetResult",
+            static method => method.Parameters.Length == 0);
+        RecordAwaiterCall(context, helperGraph, method, getResult, location);
     }
+
 }

@@ -1,7 +1,7 @@
+using System.Diagnostics;
 using System.IO.Pipes;
 using System.Net;
 using System.Net.Sockets;
-using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 
 namespace DotBoxD.LookaheadCapacityProbe;
