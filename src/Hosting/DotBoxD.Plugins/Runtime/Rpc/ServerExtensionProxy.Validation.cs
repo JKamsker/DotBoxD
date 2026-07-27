@@ -12,7 +12,7 @@ internal static class ServerExtensionProxyValidation
         }
 
         var methods = ContractMethods(serviceType).ToArray();
-        if (methods.Any(static method => method.IsSpecialName))
+        if (methods.Any(static method => method.IsSpecialName || method.IsStatic))
         {
             throw new NotSupportedException(
                 "Server extension proxy service type must declare exactly one ordinary method.");

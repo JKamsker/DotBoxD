@@ -4,6 +4,14 @@ public sealed class ServerExtensionRegistrationContractValidationTests
 {
     [Fact]
     public async Task RegisterServerExtension_rejects_invalid_service_contract_before_installing_kernel()
+        => await AssertRegistrationRejectedBeforeInstallingKernelAsync<ConcreteMonsterKillerService>();
+
+    [Fact]
+    public async Task RegisterServerExtension_rejects_static_only_contract_before_installing_kernel()
+        => await AssertRegistrationRejectedBeforeInstallingKernelAsync<StaticOnlyMonsterKillerService>();
+
+    private static async Task AssertRegistrationRejectedBeforeInstallingKernelAsync<TService>()
+        where TService : class
     {
         using var server = DotBoxD.Plugins.PluginServer.Create(
             configureHost: RpcKernelTestPackages.AddKillBinding,
@@ -12,10 +20,10 @@ public sealed class ServerExtensionRegistrationContractValidationTests
 
         var exception = await Record.ExceptionAsync(
             async () => await server
-                .RegisterServerExtensionAsync<ConcreteMonsterKillerService, BatchKillerKernel>()
+                .RegisterServerExtensionAsync<TService, BatchKillerKernel>()
                 .AsTask());
         var after = server.Kernels.Snapshot().Select(static kernel => kernel.Manifest.PluginId).ToArray();
-        var mappingException = Record.Exception(() => server.ServerExtension<ConcreteMonsterKillerService>());
+        var mappingException = Record.Exception(() => server.ServerExtension<TService>());
 
         Assert.True(
             exception is NotSupportedException &&
@@ -32,5 +40,10 @@ public sealed class ServerExtensionRegistrationContractValidationTests
     {
         public List<KillResult> KillMonsters(List<int> monsterIds)
             => throw new NotSupportedException();
+    }
+
+    private interface StaticOnlyMonsterKillerService
+    {
+        static List<KillResult> KillMonsters(List<int> monsterIds) => [];
     }
 }

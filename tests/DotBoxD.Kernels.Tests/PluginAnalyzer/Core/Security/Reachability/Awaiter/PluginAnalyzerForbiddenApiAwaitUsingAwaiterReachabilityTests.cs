@@ -130,6 +130,69 @@ public sealed class PluginAnalyzerForbiddenApiAwaitUsingAwaiterReachabilityTests
         AssertSingleForbiddenDiagnosticAt(source, diagnostics, "await using var helper = new Helper();");
     }
 
+    [Fact]
+    public async Task Reports_forbidden_api_reached_through_inherited_interface_awaiter_members()
+    {
+        const string source = """
+            namespace Sample
+            {
+                using System;
+                using System.Runtime.CompilerServices;
+                using DotBoxD.Abstractions;
+                using DotBoxD.Plugins;
+
+                public sealed class Helper
+                {
+                    public IDerivedDisposeAwaitable DisposeAsync() => new DerivedDisposeAwaitable();
+                }
+
+                public interface IDerivedDisposeAwaitable : IDisposeAwaitableCore
+                {
+                }
+
+                public interface IDisposeAwaitableCore
+                {
+                    IDerivedDisposeAwaiter GetAwaiter() => new DerivedDisposeAwaiter();
+                }
+
+                public sealed class DerivedDisposeAwaitable : IDerivedDisposeAwaitable
+                {
+                }
+
+                public interface IDerivedDisposeAwaiter : IDisposeAwaiterCore
+                {
+                }
+
+                public interface IDisposeAwaiterCore : INotifyCompletion
+                {
+                    bool IsCompleted => true;
+
+                    void INotifyCompletion.OnCompleted(Action continuation) => continuation();
+
+                    void GetResult() => _ = System.IO.File.ReadAllText("/x");
+                }
+
+                public sealed class DerivedDisposeAwaiter : IDerivedDisposeAwaiter
+                {
+                }
+
+                [Plugin("inherited-interface-await-using-awaiter-leak")]
+                public sealed class InheritedInterfaceAwaitUsingKernel : IEventKernel<string>
+                {
+                    public bool ShouldHandle(string e, HookContext context) => true;
+
+                    public async void Handle(string e, HookContext context)
+                    {
+                        await using var helper = new Helper();
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await AnalyzeAsync(source);
+        AssertSingleForbiddenDiagnosticAt(source, diagnostics, "await using var helper = new Helper();");
+    }
+
     private const string DisposeAwaitableSource = """
         public sealed class DisposeAwaitable
         {

@@ -76,6 +76,18 @@ internal static class AwaiterPatternResolver
             }
         }
 
+        if (type.TypeKind == TypeKind.Interface && type is INamedTypeSymbol namedType)
+        {
+            foreach (var inheritedInterface in namedType.AllInterfaces)
+            {
+                var member = inheritedInterface.GetMembers(name).OfType<TSymbol>().FirstOrDefault(predicate);
+                if (member is not null)
+                {
+                    return member;
+                }
+            }
+        }
+
         return null;
     }
 
