@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Hosting;
@@ -69,8 +70,20 @@ public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
         cancellationToken.ThrowIfCancellationRequested();
 
         var workerHost = WorkerHost();
-        var workerPlan = await PrepareWorkerPlanAsync(workerHost, plan, cancellationToken)
-            .ConfigureAwait(false);
+        ExecutionPlan workerPlan;
+        try
+        {
+            workerPlan = await PrepareWorkerPlanAsync(workerHost, plan, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (SandboxValidationException)
+        {
+            return Execution.SandboxHost.WorkerIsolationFailedResult(
+                plan,
+                options,
+                new SandboxError(SandboxErrorCode.HostFailure, "worker process execution failed"));
+        }
+
         return await workerHost
             .ExecuteAsync(workerPlan, entrypoint, input, options, cancellationToken)
             .ConfigureAwait(false);
