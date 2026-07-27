@@ -40,6 +40,10 @@ public sealed partial class PluginAnalyzer
             if (TryResolveDisposeMethod(resourceType, isAsynchronous, out var disposeMethod))
             {
                 helperGraph.RecordCall(method, disposeMethod, location);
+                if (isAsynchronous)
+                {
+                    RecordAwaitablePatternCalls(context, helperGraph, method, disposeMethod.ReturnType, location);
+                }
             }
         }
     }
