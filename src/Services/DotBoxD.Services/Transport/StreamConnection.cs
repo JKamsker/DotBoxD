@@ -60,6 +60,9 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
     internal void ReleaseSendGate() =>
         TransportSendGate.ReleaseAfterSend(_sendLock, ref _disposed);
 
+    internal bool OwnsStream => _ownsStream;
+    internal bool HasActiveReceive => Volatile.Read(ref _activeReceives) != 0;
+
     public bool IsConnected =>
         Volatile.Read(ref _disposed) == 0 &&
         (_stream is not PipeStream pipe || pipe.IsConnected);
@@ -197,7 +200,7 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
         TransportSendGate.WakeDisposedWaiters(_sendLock);
         StreamFrameReceiveOperationAcquisition.Remove(this);
         _frameReadTimeout?.Dispose();
-        if (_ownsStream || ReceiveConcurrencyGuard.IsActive(Volatile.Read(ref _activeReceives)))
+        if (_ownsStream)
         {
             await StreamFrameReadOperations.DisposeBestEffortAsync(_stream).ConfigureAwait(false);
         }

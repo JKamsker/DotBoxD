@@ -3,6 +3,7 @@ using DotBoxD.Services.Exceptions;
 using DotBoxD.Services.Peer.Inbound;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Server;
+using DotBoxD.Services.Transport;
 
 namespace DotBoxD.Services.Peer;
 
@@ -109,13 +110,20 @@ public sealed partial class RpcPeer
 
         if (readLoop is not null)
         {
-            try
+            if (ShouldAwaitReadLoop(readLoop))
             {
-                await readLoop.ConfigureAwait(false);
+                try
+                {
+                    await readLoop.ConfigureAwait(false);
+                }
+                catch
+                {
+                    // Best-effort shutdown.
+                }
             }
-            catch
+            else
             {
-                // Best-effort shutdown.
+                ObserveFaultedReadLoop(readLoop);
             }
         }
 
@@ -129,6 +137,19 @@ public sealed partial class RpcPeer
         {
             RpcTelemetry.PeerStopped();
         }
+    }
+
+    private bool ShouldAwaitReadLoop(Task readLoop) =>
+        readLoop.IsCompleted ||
+        _channel is not StreamConnection { OwnsStream: false, HasActiveReceive: true };
+
+    private static void ObserveFaultedReadLoop(Task readLoop)
+    {
+        _ = readLoop.ContinueWith(
+            static task => _ = task.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
     }
 
     private void RaiseProtocolError(

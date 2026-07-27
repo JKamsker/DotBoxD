@@ -101,6 +101,10 @@ function Join-AnyTestFilter([string[]] $Filters) {
     return ($Filters | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join "|"
 }
 
+function Join-AllTestFilters([string[]] $Filters) {
+    return ($Filters | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join "&"
+}
+
 function New-TestBatch([string] $Name, [string] $Filter) {
     return [pscustomobject] @{
         Name = $Name
@@ -188,8 +192,39 @@ function Get-TestBatches([string] $ProjectName, [string] $SuiteName, [string] $F
             Filter = "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Regression"
         },
         [pscustomobject] @{
-            Name = "Plugins-Rpc"
-            Filter = "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc"
+            Name = "Plugins-Rpc-Kernel"
+            Filter = "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.KernelRpc"
+        },
+        [pscustomobject] @{
+            Name = "Plugins-Rpc-Kernel-Client"
+            Filter = Join-AnyTestFilter @(
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.ServerExtensionClient",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.Kernel.")
+        },
+        [pscustomobject] @{
+            Name = "Plugins-Rpc-Generation"
+            Filter = Join-AnyTestFilter @(
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.RegistrationAccumulator",
+                (Join-AllTestFilters @(
+                    "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.RpcKernel",
+                    "FullyQualifiedName!~DotBoxD.Kernels.Tests.Plugins.Rpc.RpcKernelLiveSetting",
+                    "FullyQualifiedName!~DotBoxD.Kernels.Tests.Plugins.Rpc.RpcKernelRuntime")),
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.TaskLikeSymbolRegressionTests")
+        },
+        [pscustomobject] @{
+            Name = "Plugins-Rpc-ServerExtension"
+            Filter = Join-AllTestFilters @(
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.ServerExtension",
+                "FullyQualifiedName!~DotBoxD.Kernels.Tests.Plugins.Rpc.ServerExtensionClient")
+        },
+        [pscustomobject] @{
+            Name = "Plugins-Rpc-Runtime-Misc"
+            Filter = Join-AnyTestFilter @(
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.GeneratedMapReaderCompatibilityTests",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.GeneratedReadonlyCollectionReaderTests",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.RpcIpc",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.RpcKernelLiveSetting",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.RpcKernelRuntime")
         },
         [pscustomobject] @{
             Name = "Plugins-Runtime-Server"
