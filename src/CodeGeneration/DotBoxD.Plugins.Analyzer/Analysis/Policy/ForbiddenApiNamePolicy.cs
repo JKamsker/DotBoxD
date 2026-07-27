@@ -65,6 +65,7 @@ internal static class ForbiddenApiNamePolicy
         "Microsoft.Extensions.Logging.EventLoggerFactoryExtensions.AddEventLog",
         "Microsoft.Extensions.Logging.EventSourceLoggerFactoryExtensions.AddEventSourceLogger",
         "Microsoft.Extensions.Logging.TraceSourceFactoryExtensions.AddTraceSource",
+        "Microsoft.Extensions.Caching.Memory.CacheExtensions.Set",
         "Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder",
         "System.String.Create",
         "System.Security.Cryptography.RSA.Create",
@@ -76,5 +77,17 @@ internal static class ForbiddenApiNamePolicy
     public static bool IsForbiddenNamespace(string name)
         => NamespacePrefixes.Any(prefix => name.StartsWith(prefix, StringComparison.Ordinal));
 
-    public static bool IsForbiddenExactMember(string name) => Array.IndexOf(ExactMemberNames, name) >= 0;
+    public static bool TryGetForbiddenExactMemberDisplayName(string name, out string displayName)
+    {
+        if (Array.IndexOf(ExactMemberNames, name) < 0)
+        {
+            displayName = null!;
+            return false;
+        }
+
+        displayName = name == "Microsoft.Extensions.Caching.Memory.CacheExtensions.Set"
+            ? "Microsoft.Extensions.Caching.Memory.MemoryCache"
+            : name;
+        return true;
+    }
 }
