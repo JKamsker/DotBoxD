@@ -24,6 +24,7 @@
 
     <!-- Build the generator before this project so its assembly exists at pack time.
          ReferenceOutputAssembly=false: it ships as an analyzer, not a runtime reference. -->
+    <PackageReference Include="System.Threading.Tasks.Extensions" />
     <ProjectReference Include="..\..\CodeGeneration\DotBoxD.Services.SourceGenerator\DotBoxD.Services.SourceGenerator.csproj"
                       ReferenceOutputAssembly="false" />
   </ItemGroup>
