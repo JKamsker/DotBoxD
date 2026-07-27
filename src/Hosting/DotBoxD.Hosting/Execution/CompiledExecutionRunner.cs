@@ -1,3 +1,4 @@
+using DotBoxD.Hosting.Execution.Prepared;
 using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Compiler;
 using DotBoxD.Kernels.Model;
@@ -13,24 +14,25 @@ internal static class CompiledExecutionRunner
         SandboxValue input,
         SandboxExecutionOptions options,
         CancellationToken cancellationToken,
-        bool useInlineAwaitPump = false)
+        bool useInlineAwaitPump = false,
+        CompiledNoAuditRunState? reusableNoAuditState = null)
     {
         var artifact = executable.Artifact;
         if (CanUseNoAuditSuccessPath(plan, entrypoint, artifact, options, out var noAuditBindings))
         {
-            return ExecuteNoAuditSuccessAsync(
+            return CompiledNoAuditResultRunner.Execute(
                 executable,
                 plan,
                 entrypoint,
                 input,
                 options,
                 noAuditBindings,
-                cancellationToken);
+                cancellationToken,
+                reusableNoAuditState);
         }
-        var result = useInlineAwaitPump
-            ? CompiledAsyncWorker.RunInline(() => ExecuteCore(executable, plan, entrypoint, input, options, cancellationToken))
-            : ExecuteCore(executable, plan, entrypoint, input, options, cancellationToken);
-        return ValueTask.FromResult(result);
+        return ValueTask.FromResult(useInlineAwaitPump
+            ? CompiledAsyncWorker.RunInline(executable, plan, entrypoint, input, options, cancellationToken)
+            : ExecuteCore(executable, plan, entrypoint, input, options, cancellationToken));
     }
     public static ValueTask<SandboxExecutionResult> ExecuteOnWorkerAsync(
         CompiledExecutable executable,
@@ -41,7 +43,7 @@ internal static class CompiledExecutionRunner
         CancellationToken cancellationToken)
         => CompiledAsyncWorker.RunAsync(
             () => ExecuteCore(executable, plan, entrypoint, input, options, cancellationToken));
-    private static SandboxExecutionResult ExecuteCore(
+    internal static SandboxExecutionResult ExecuteCore(
         CompiledExecutable executable,
         ExecutionPlan plan,
         string entrypoint,
@@ -70,8 +72,14 @@ internal static class CompiledExecutionRunner
             budget.CheckDeadline();
             context.ChargeValue(input);
             WriteCacheInvalidated(audit, runId, startedAt, plan, artifact);
+            context.ClearCompiledReturnValidation();
             var value = artifact.Entrypoint(context, input);
-            EnsureReturnType(plan, entrypoint, value);
+            EnsureReturnType(
+                context,
+                plan,
+                entrypoint,
+                value,
+                executable.SupportsReturnValidationProof);
             if (!options.SuppressSuccessfulRunSummaryAudit)
             {
                 WriteSummary(audit, runId, startedAt, plan, executable, budget, true, null);
@@ -96,6 +104,10 @@ internal static class CompiledExecutionRunner
             WriteSummary(audit, runId, startedAt, plan, executable, budget, false, error);
             return Result(plan, artifact, budget, audit, false, null, error);
         }
+        finally
+        {
+            context.Dispose();
+        }
     }
 
     private static SandboxExecutionResult Result(
@@ -113,71 +125,6 @@ internal static class CompiledExecutionRunner
             Error = error,
             ResourceUsage = budget.Snapshot(),
             AuditEvents = audit.OwnedEventSnapshot(),
-            ActualMode = ExecutionMode.Compiled,
-            ExecutionDispatched = true,
-            ModuleHash = plan.ModuleHash,
-            PlanHash = plan.PlanHash,
-            PolicyHash = plan.PolicyHash,
-            ArtifactHash = artifact.ArtifactHash
-        };
-
-    private static ValueTask<SandboxExecutionResult> ExecuteNoAuditSuccessAsync(
-        CompiledExecutable executable,
-        ExecutionPlan plan,
-        string entrypoint,
-        SandboxValue input,
-        SandboxExecutionOptions options,
-        IReadOnlySet<string> allowedBindings,
-        CancellationToken cancellationToken)
-    {
-        var artifact = executable.Artifact;
-        var budget = new ResourceMeter(plan.Budget);
-        var context = new SandboxContext(
-            SandboxRunId.Suppressed,
-            plan.Policy,
-            budget,
-            plan.Bindings,
-            NoopAuditSink.Instance,
-            cancellationToken,
-            allowedBindings,
-            plan.ModuleHash,
-            plan.PolicyHash);
-
-        try
-        {
-            budget.CheckDeadline();
-            context.ChargeValue(input);
-            var value = artifact.Entrypoint(context, input);
-            EnsureReturnType(plan, entrypoint, value);
-            return ValueTask.FromResult(NoAuditSuccessResult(plan, artifact, budget, value));
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            var error = new SandboxError(SandboxErrorCode.Cancelled, "execution cancelled");
-            return ValueTask.FromResult(FailureResult(plan, executable, options, budget, error));
-        }
-        catch (SandboxRuntimeException ex)
-        {
-            return ValueTask.FromResult(FailureResult(plan, executable, options, budget, ex.Error));
-        }
-        catch (Exception)
-        {
-            var error = new SandboxError(SandboxErrorCode.HostFailure, "compiled sandbox execution failed");
-            return ValueTask.FromResult(FailureResult(plan, executable, options, budget, error));
-        }
-    }
-
-    private static SandboxExecutionResult NoAuditSuccessResult(
-        ExecutionPlan plan,
-        CompiledArtifact artifact,
-        ResourceMeter budget,
-        SandboxValue value)
-        => new()
-        {
-            Succeeded = true,
-            Value = value,
-            ResourceUsage = budget.Snapshot(),
-            AuditEvents = InMemoryAuditSink.EmptyEventSnapshot,
             ActualMode = ExecutionMode.Compiled,
             ExecutionDispatched = true,
             ModuleHash = plan.ModuleHash,
@@ -283,11 +230,23 @@ internal static class CompiledExecutionRunner
             }));
     }
 
-    internal static void EnsureReturnType(ExecutionPlan plan, string entrypoint, SandboxValue? value)
+    internal static void EnsureReturnType(
+        SandboxContext context,
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxValue? value,
+        bool supportsReturnValidationProof)
     {
         if (value is null || !plan.FunctionAnalysis.TryGetValue(entrypoint, out var analysis))
         {
             throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "function return type mismatch"));
+        }
+
+        if (supportsReturnValidationProof &&
+            analysis.ReturnType.Arguments.Count > 0 &&
+            context.TryConsumeCompiledReturnValidation(value, analysis.ReturnType))
+        {
+            return;
         }
 
         EntrypointBinder.RequireType(value, analysis.ReturnType, "function return type mismatch");

@@ -12,10 +12,10 @@ internal sealed class AutoExecutionHotness
     internal const int DefaultMaxEntries = 4096;
 
     private readonly object _gate = new();
-    private readonly Dictionary<string, LinkedListNode<AutoHotnessState>> _states =
-        new(StringComparer.Ordinal);
+    private readonly Dictionary<AutoHotnessKey, LinkedListNode<AutoHotnessState>> _states = new();
     private readonly LinkedList<AutoHotnessState> _recency = new();
     private readonly int _maxEntries;
+    private AutoHotnessState? _mostRecent;
 
     public AutoExecutionHotness()
         : this(DefaultMaxEntries)
@@ -45,29 +45,61 @@ internal sealed class AutoExecutionHotness
 
     public AutoHotnessAttempt BeginAttempt(ExecutionPlan plan, string entrypoint)
     {
-        var state = Touch(Key(plan.PlanHash, entrypoint), plan.PlanHash, entrypoint);
+        var state = Touch(new AutoHotnessKey(plan.PlanHash, entrypoint));
         return state.BeginAttempt();
     }
 
-    private AutoHotnessState Touch(string key, string planHash, string entrypoint)
+    public AutoHotnessRunCountAttempt BeginRunCountAttempt(ExecutionPlan plan, string entrypoint)
     {
+        var state = Touch(new AutoHotnessKey(plan.PlanHash, entrypoint));
+        return state.BeginRunCountAttempt();
+    }
+
+    private AutoHotnessState Touch(AutoHotnessKey key)
+    {
+        var mostRecent = Volatile.Read(ref _mostRecent);
+        if (mostRecent is not null && IsExactKey(key, mostRecent))
+        {
+            // An exact hit on the current tail cannot change eviction order. The state has
+            // its own synchronization for history, so the table lock adds no protection here.
+            return mostRecent;
+        }
+
         lock (_gate)
         {
+            if (_recency.Last is { Value: var lockedMostRecent } &&
+                IsExactKey(key, lockedMostRecent))
+            {
+                // The matching node is already most recently used, so returning it leaves the
+                // exact eviction order unchanged. Value-equal strings still use the dictionary.
+                return PublishMostRecent(lockedMostRecent);
+            }
+
             if (_states.TryGetValue(key, out var existing))
             {
                 _recency.Remove(existing);
                 _recency.AddLast(existing);
-                return existing.Value;
+                return PublishMostRecent(existing.Value);
             }
 
-            var node = _recency.AddLast(new AutoHotnessState(planHash, entrypoint));
+            var node = _recency.AddLast(new AutoHotnessState(key.PlanHash, key.Entrypoint));
             _states.Add(key, node);
             EvictIfNeeded(key);
-            return node.Value;
+            return PublishMostRecent(node.Value);
         }
     }
 
-    private void EvictIfNeeded(string addedKey)
+    private AutoHotnessState PublishMostRecent(AutoHotnessState state)
+    {
+        Volatile.Write(ref _mostRecent, state);
+        return state;
+    }
+
+    private static bool IsExactKey(AutoHotnessKey key, AutoHotnessState state)
+        => ReferenceEquals(key.Entrypoint, state.Entrypoint) &&
+           ReferenceEquals(key.PlanHash, state.PlanHash);
+
+    private void EvictIfNeeded(AutoHotnessKey addedKey)
     {
         while (_states.Count > _maxEntries)
         {
@@ -77,8 +109,8 @@ internal sealed class AutoExecutionHotness
                 return;
             }
 
-            var oldestKey = Key(oldest.Value.PlanHash, oldest.Value.Entrypoint);
-            if (StringComparer.Ordinal.Equals(oldestKey, addedKey))
+            var oldestKey = new AutoHotnessKey(oldest.Value.PlanHash, oldest.Value.Entrypoint);
+            if (oldestKey == addedKey)
             {
                 // Never evict the entry we just added in response to this attempt.
                 return;
@@ -89,16 +121,47 @@ internal sealed class AutoExecutionHotness
         }
     }
 
-    private static string Key(string planHash, string entrypoint)
-        => planHash + "|" + entrypoint;
+    private readonly record struct AutoHotnessKey(string PlanHash, string Entrypoint);
 }
 
-internal sealed class AutoHotnessAttempt(
-    AutoHotnessState state,
-    ModuleHotnessStats stats)
+internal readonly struct AutoHotnessAttempt
 {
-    public ModuleHotnessStats Stats { get; } = stats;
+    private readonly AutoHotnessState _state;
 
+    public AutoHotnessAttempt(AutoHotnessState state, ModuleHotnessStats stats)
+    {
+        _state = state;
+        Stats = stats;
+    }
+
+    public ModuleHotnessStats Stats { get; }
+
+    public AutoHotnessCompletion Completion => new(_state);
+
+    public void Complete(SandboxExecutionResult result, TimeSpan elapsed)
+        => _state.RecordResult(result, elapsed);
+}
+
+internal readonly struct AutoHotnessRunCountAttempt
+{
+    private readonly AutoHotnessState _state;
+
+    public AutoHotnessRunCountAttempt(AutoHotnessState state, int runCount)
+    {
+        _state = state;
+        RunCount = runCount;
+    }
+
+    public int RunCount { get; }
+
+    public AutoHotnessCompletion Completion => new(_state);
+
+    public void Complete(SandboxExecutionResult result, TimeSpan elapsed)
+        => _state.RecordResult(result, elapsed);
+}
+
+internal readonly struct AutoHotnessCompletion(AutoHotnessState state)
+{
     public void Complete(SandboxExecutionResult result, TimeSpan elapsed)
         => state.RecordResult(result, elapsed);
 }
@@ -123,12 +186,17 @@ internal sealed class AutoHotnessState(string planHash, string entrypoint)
     {
         lock (_gate)
         {
-            if (_runCount < int.MaxValue)
-            {
-                _runCount++;
-            }
-
+            IncrementRunCount();
             return new AutoHotnessAttempt(this, Snapshot());
+        }
+    }
+
+    public AutoHotnessRunCountAttempt BeginRunCountAttempt()
+    {
+        lock (_gate)
+        {
+            IncrementRunCount();
+            return new AutoHotnessRunCountAttempt(this, _runCount);
         }
     }
 
@@ -180,6 +248,14 @@ internal sealed class AutoHotnessState(string planHash, string entrypoint)
             _lastRunAt,
             _compileFailures,
             _lastCompiledArtifactHash);
+    }
+
+    private void IncrementRunCount()
+    {
+        if (_runCount < int.MaxValue)
+        {
+            _runCount++;
+        }
     }
 
     private static bool IsCompileFailure(SandboxExecutionResult result)

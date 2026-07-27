@@ -6,6 +6,8 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
 internal static class HookChainAliasResolver
 {
+    public const int MaxResolutionDepth = 16;
+
     public static ExpressionSyntax UnwrapTransparentExpression(ExpressionSyntax expression)
     {
         while (true)

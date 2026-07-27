@@ -51,7 +51,7 @@ public sealed class SandboxInterpreter : ISandboxInterpreter
         {
             budget.CheckDeadline();
             InterpreterNestingGuard.ThrowIfExceeded(plan);
-            var frameLayouts = _frameLayouts.GetValue(plan, static value => new FunctionFrameLayoutCache(value));
+            var frameLayouts = _frameLayouts.GetValue(plan, static _ => new FunctionFrameLayoutCache());
             var evaluator = new InterpreterEvaluator(plan, context, options, frameLayouts);
             var value = await evaluator.ExecuteEntrypointAsync(entrypoint, input).ConfigureAwait(false);
             if (!options.SuppressSuccessfulRunSummaryAudit)
@@ -77,6 +77,10 @@ public sealed class SandboxInterpreter : ISandboxInterpreter
             var error = new SandboxError(SandboxErrorCode.HostFailure, "sandbox execution failed");
             WriteSummary(context, startedAt, plan, budget, false, error);
             return Result(plan, budget, context, false, null, error);
+        }
+        finally
+        {
+            context.Dispose();
         }
     }
 

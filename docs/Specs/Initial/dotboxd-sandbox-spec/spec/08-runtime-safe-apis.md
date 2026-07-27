@@ -31,6 +31,15 @@ public sealed class SandboxContext
 
 Do not expose service providers, host containers, or arbitrary host state from `SandboxContext`.
 
+Bindings must resolve `ctx.Audit` for each invocation and write audit evidence through that
+invocation's current sink. They may cache that value across their own `await` points, but must not
+reuse a host-retained sink alias across invocations. For the default `InMemoryAuditSink`, the runtime
+uses an invocation decorator to serialize terminal binding evidence with its required fallback, so
+the runtime atomically arbitrates detailed terminal evidence against the fallback. Matching terminal
+writes received after the invocation seals are suppressed. Custom `IAuditSink` implementations
+retain the public `EventsWritten` / `HasBindingAuditSince` checkpoint contract and remain responsible
+for thread safety and atomic persistence across concurrent invocations.
+
 ## Safe file API
 
 ### Goals

@@ -22,6 +22,17 @@ internal interface I32CallEvaluator
 
 internal static class I32ExpressionEvaluator
 {
+    public static bool CanEvaluateForDispatch(
+        Expression expression,
+        InterpreterFrame frame,
+        I32CallEvaluator calls,
+        bool allowCompositeProbe)
+        // Once an arithmetic root has missed every whole-tree primitive path,
+        // probing each nested operator would repeatedly walk the same suffix.
+        // Leaves and calls keep their established direct paths.
+        => (allowCompositeProbe || expression is not UnaryExpression and not BinaryExpression) &&
+           CanEvaluate(expression, frame, calls);
+
     public static bool CanEvaluate(
         Expression expression,
         InterpreterFrame? frame,

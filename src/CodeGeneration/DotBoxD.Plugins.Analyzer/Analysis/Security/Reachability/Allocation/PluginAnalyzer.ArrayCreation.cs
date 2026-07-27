@@ -9,6 +9,11 @@ public sealed partial class PluginAnalyzer
 
     private static void AnalyzeArrayCreation(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
+        if (context.Operation.IsImplicit)
+        {
+            return;
+        }
+
         if (context.ContainingSymbol is IMethodSymbol method)
         {
             helperGraph.RecordForbidden(method, ArrayAllocationForbiddenApiName);

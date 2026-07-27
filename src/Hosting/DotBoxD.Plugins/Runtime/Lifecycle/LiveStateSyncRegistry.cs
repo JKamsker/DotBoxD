@@ -2,14 +2,19 @@ namespace DotBoxD.Plugins.Runtime.Lifecycle;
 
 internal sealed class LiveStateSyncRegistry(Func<Type, LiveUpdateMode> getUpdateMode)
 {
-    private readonly object _gate = new();
-    private readonly List<LiveStateSynchronizer> _synchronizers = [];
+    private readonly object _registrationGate = new();
+    // Registration is rare. Readers treat every published array as immutable so hot syncs do not copy it.
+    private LiveStateSynchronizer[] _synchronizers = [];
 
     public void Register(Type stateType, Action synchronize)
     {
-        lock (_gate)
+        lock (_registrationGate)
         {
-            _synchronizers.Add(new LiveStateSynchronizer(stateType, synchronize));
+            var current = _synchronizers;
+            var updated = new LiveStateSynchronizer[current.Length + 1];
+            Array.Copy(current, updated, current.Length);
+            updated[^1] = new LiveStateSynchronizer(stateType, synchronize);
+            Volatile.Write(ref _synchronizers, updated);
         }
     }
 
@@ -43,12 +48,7 @@ internal sealed class LiveStateSyncRegistry(Func<Type, LiveUpdateMode> getUpdate
     }
 
     private LiveStateSynchronizer[] Snapshot()
-    {
-        lock (_gate)
-        {
-            return [.. _synchronizers];
-        }
-    }
+        => Volatile.Read(ref _synchronizers);
 
     private sealed record LiveStateSynchronizer(Type StateType, Action Synchronize);
 }

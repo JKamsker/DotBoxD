@@ -27,7 +27,7 @@ public class ServerExtensionProxy : DispatchProxy
     public static TService Create<TService>(InstalledKernel kernel) where TService : class
     {
         ArgumentNullException.ThrowIfNull(kernel);
-        ValidateServiceContract(typeof(TService));
+        ServerExtensionProxyValidation.ValidateServiceContract(typeof(TService));
         var proxy = Create<TService, ServerExtensionProxy>();
         ((ServerExtensionProxy)(object)proxy!)._kernel = kernel;
         return proxy!;
@@ -115,105 +115,6 @@ public class ServerExtensionProxy : DispatchProxy
             var result = pending.GetAwaiter().GetResult();
             return KernelRpcMarshaller.FromSandboxValue(result, returnType);
         };
-    }
-
-    private static void ValidateServiceContract(Type serviceType)
-    {
-        if (!serviceType.IsInterface)
-        {
-            throw new NotSupportedException("Server extension proxy service type must be an interface.");
-        }
-
-        var methods = ContractMethods(serviceType).ToArray();
-        if (methods.Any(static method => method.IsSpecialName))
-        {
-            throw new NotSupportedException(
-                "Server extension proxy service type must declare exactly one ordinary method.");
-        }
-
-        if (methods.Length != 1)
-        {
-            throw new NotSupportedException(
-                "Server extension proxy service type must declare exactly one method.");
-        }
-
-        foreach (var method in methods)
-        {
-            ValidateServiceMethod(method);
-        }
-    }
-
-    private static void ValidateServiceMethod(MethodInfo method)
-    {
-        if (method.IsGenericMethodDefinition || method.ContainsGenericParameters)
-        {
-            throw new NotSupportedException("Server extension proxy service methods must be non-generic.");
-        }
-
-        var parameters = method.GetParameters();
-        for (var i = 0; i < parameters.Length; i++)
-        {
-            ValidateServiceParameter(parameters, i);
-        }
-
-        if (UnwrapReturnType(method.ReturnType) is { } payloadType)
-        {
-            ServerExtensionProxyValidation.ValidatePayloadType(payloadType);
-        }
-    }
-
-    private static void ValidateServiceParameter(ParameterInfo[] parameters, int index)
-    {
-        var parameter = parameters[index];
-        var parameterType = parameter.ParameterType;
-        if (IsCancellationToken(parameterType))
-        {
-            if (index != parameters.Length - 1)
-            {
-                throw new NotSupportedException(
-                    "Server extension proxy cancellation tokens must be the final method parameter.");
-            }
-
-            return;
-        }
-
-        ServerExtensionProxyValidation.RejectNullReferenceDefault(parameter);
-        ServerExtensionProxyValidation.ValidatePayloadType(parameterType);
-    }
-
-    private static IEnumerable<MethodInfo> ContractMethods(Type serviceType)
-    {
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        var methods = serviceType.GetMethods()
-            .Concat(serviceType.GetInterfaces().SelectMany(static inherited => inherited.GetMethods()));
-        foreach (var method in methods)
-        {
-            if (seen.Add(ContractMethodKey(method)))
-            {
-                yield return method;
-            }
-        }
-    }
-
-    private static string ContractMethodKey(MethodInfo method)
-        => method.Name + "|" + method.ReturnType.FullName + "|" +
-           string.Join("|", method.GetParameters().Select(static parameter => parameter.ParameterType.FullName));
-
-    private static Type? UnwrapReturnType(Type type)
-    {
-        if (type == typeof(void) || type == typeof(Task) || type == typeof(ValueTask))
-        {
-            return null;
-        }
-
-        if (type.IsGenericType &&
-            type.GetGenericTypeDefinition() is { } definition &&
-            (definition == typeof(Task<>) || definition == typeof(ValueTask<>)))
-        {
-            return type.GetGenericArguments()[0];
-        }
-
-        return type;
     }
 
     private static bool IsCancellationToken(Type type)

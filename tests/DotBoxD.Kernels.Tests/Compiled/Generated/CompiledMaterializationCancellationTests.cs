@@ -65,6 +65,80 @@ public sealed class CompiledMaterializationCancellationTests
     }
 
     [Fact]
+    public async Task Cancelled_artifact_waiter_does_not_cancel_shared_compile()
+    {
+        var (plan, artifact) = await CreateCompiledArtifactAsync();
+        var cache = new CompiledArtifactExecutionCache();
+        var compileStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCompile = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        CancellationToken compileToken = default;
+        async ValueTask<CompiledArtifact> CompileAsync(CancellationToken cancellationToken)
+        {
+            calls++;
+            compileToken = cancellationToken;
+            compileStarted.SetResult();
+            await releaseCompile.Task.WaitAsync(cancellationToken);
+            return artifact;
+        }
+
+        using var cancellation = new CancellationTokenSource();
+        var cancelledWaiter = cache.GetAsync(plan, "main", CompileAsync, cancellation.Token).AsTask();
+        await compileStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var survivingWaiter = cache.GetAsync(plan, "main", CompileAsync, CancellationToken.None).AsTask();
+        await cancellation.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await cancelledWaiter);
+        Assert.False(compileToken.IsCancellationRequested);
+        releaseCompile.SetResult();
+
+        Assert.Same(artifact, await survivingWaiter.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(1, calls);
+        var completedHit = cache.GetAsync(plan, "main", CompileAsync, CancellationToken.None);
+        Assert.True(completedHit.IsCompletedSuccessfully);
+        Assert.Same(artifact, await completedHit);
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public async Task Cancelled_executable_waiter_does_not_cancel_shared_materialization()
+    {
+        var (plan, artifact) = await CreateCompiledArtifactAsync();
+        var expected = new CompiledExecutable(artifact, "Miss");
+        var cache = new CompiledExecutableExecutionCache();
+        var materializationStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseMaterialization = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        CancellationToken materializationToken = default;
+        async ValueTask<CompiledExecutable> MaterializeAsync(CancellationToken cancellationToken)
+        {
+            calls++;
+            materializationToken = cancellationToken;
+            materializationStarted.SetResult();
+            await releaseMaterialization.Task.WaitAsync(cancellationToken);
+            return expected;
+        }
+
+        using var cancellation = new CancellationTokenSource();
+        var cancelledWaiter = cache.GetAsync(plan, "main", MaterializeAsync, cancellation.Token).AsTask();
+        await materializationStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var survivingWaiter = cache.GetAsync(plan, "main", MaterializeAsync, CancellationToken.None).AsTask();
+        await cancellation.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await cancelledWaiter);
+        Assert.False(materializationToken.IsCancellationRequested);
+        releaseMaterialization.SetResult();
+
+        var completed = await survivingWaiter.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal("Hit", completed.MaterializationStatus);
+        Assert.Equal(1, calls);
+        var completedHit = cache.GetAsync(plan, "main", MaterializeAsync, CancellationToken.None);
+        Assert.True(completedHit.IsCompletedSuccessfully);
+        Assert.Equal("Hit", (await completedHit).MaterializationStatus);
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
     public async Task Precancelled_reflection_emit_compile_does_not_invoke_verifier()
     {
         using var host = SandboxTestHost.Create(compiler: true);

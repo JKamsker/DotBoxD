@@ -16,12 +16,14 @@ namespace DotBoxD.Kernels.Sandbox.Values;
 /// walk, so cross-mode differential accounting and golden fuel totals are preserved; only the redundant
 /// re-walk is removed.
 ///
-/// The cache is keyed by reference identity and holds no strong references, so cached shapes never keep a
-/// value alive. Values are immutable, so a cached shape can never go stale.
+/// The persistent cache is keyed by reference identity and holds no strong references. Incrementally built
+/// results use a per-thread weak hot entry so publishing their composed shape does not allocate. Collection
+/// values are immutable except for the internal owned-list reuse path, which invalidates its persistent entry
+/// and changes a generation checked by every hot-cache hit.
 /// </summary>
 internal static class ValueShapeCache
 {
-    private static readonly ConditionalWeakTable<SandboxValue, StrongBox<ShapeInfo>> Cache = new();
+    private static readonly ConditionalWeakTable<SandboxValue, ValueShapeCachedEntry> Cache = new();
 
     /// <summary>Returns the cached shape/frame-count for a value, measuring and caching collections on miss.</summary>
     public static ShapeInfo GetOrMeasure(
@@ -36,14 +38,14 @@ internal static class ValueShapeCache
             return new ShapeInfo(MeasureScalar(value), Nodes: 1);
         }
 
-        if (Cache.TryGetValue(value, out var box))
+        if (TryGet(value, out var cached))
         {
-            return box.Value;
+            return cached;
         }
 
         var measured = SandboxValueShapeMeter.MeasureWithNodes(value, cancellationToken, meter);
         var info = new ShapeInfo(measured.Shape, measured.Nodes);
-        Cache.AddOrUpdate(value, new StrongBox<ShapeInfo>(info));
+        SetPersistent(value, info);
         return info;
     }
 
@@ -52,9 +54,20 @@ internal static class ValueShapeCache
 
     public static bool TryGet(SandboxValue value, out ShapeInfo info)
     {
-        if (Cache.TryGetValue(value, out var box))
+        if (ValueShapeHotCache.TryGet(value, out info))
         {
-            info = box.Value;
+            return true;
+        }
+
+        if (Cache.TryGetValue(value, out var box) && box.TryGet(value, out info))
+        {
+            ValueShapeHotCache.Set(value, info);
+            return true;
+        }
+
+        if (ValueShapeHotCache.TryGetPublished(value, out info))
+        {
+            ValueShapeHotCache.Set(value, info);
             return true;
         }
 
@@ -106,7 +119,7 @@ internal static class ValueShapeCache
 
     /// <summary>Records a precomputed shape for a value built by an incremental operation.</summary>
     public static void Set(SandboxValue value, ShapeInfo info)
-        => Cache.AddOrUpdate(value, new StrongBox<ShapeInfo>(info));
+        => SetPersistent(value, info);
 
     /// <summary>
     /// Charges the result of appending <paramref name="item"/> to <paramref name="source"/> (producing
@@ -131,7 +144,7 @@ internal static class ValueShapeCache
         };
         var info = new ShapeInfo(shape, sourceInfo.Nodes + itemInfo.Nodes);
         context.ChargeComposedValue(info);
-        Set(appended, info);
+        PublishIncremental(appended, info);
     }
 
     /// <summary>
@@ -160,7 +173,7 @@ internal static class ValueShapeCache
         };
         var info = new ShapeInfo(shape, sourceInfo.Nodes + keyInfo.Nodes + valueInfo.Nodes);
         context.ChargeComposedValue(info);
-        Set(updated, info);
+        PublishIncremental(updated, info);
     }
 
     /// <summary>
@@ -185,7 +198,11 @@ internal static class ValueShapeCache
         {
             var unchangedInfo = GetOrMeasure(source, context);
             context.ChargeComposedValue(unchangedInfo);
-            Set(removed, unchangedInfo);
+            if (!ReferenceEquals(source, removed))
+            {
+                PublishIncremental(removed, unchangedInfo);
+            }
+
             return true;
         }
 
@@ -203,7 +220,7 @@ internal static class ValueShapeCache
         };
         var info = new ShapeInfo(shape, sourceInfo.Nodes - 2);
         context.ChargeComposedValue(info);
-        Set(removed, info);
+        PublishIncremental(removed, info);
         return true;
     }
 
@@ -227,9 +244,26 @@ internal static class ValueShapeCache
 
         var sourceInfo = GetOrMeasure(source, context);
         context.ChargeComposedValue(sourceInfo);
-        Set(replaced, sourceInfo);
+        PublishIncremental(replaced, sourceInfo);
         return true;
     }
+
+    private static void SetPersistent(SandboxValue value, ShapeInfo info)
+    {
+        var cached = value is ListValue list
+            ? new VersionedValueShapeCachedEntry(info, list.ShapeGeneration)
+            : new ValueShapeCachedEntry(info);
+        Cache.AddOrUpdate(value, cached);
+        if (value is ListValue cachedList)
+        {
+            cachedList.MarkShapeCached();
+        }
+
+        ValueShapeHotCache.Set(value, info);
+    }
+
+    private static void PublishIncremental(SandboxValue value, ShapeInfo info) =>
+        ValueShapeHotCache.Publish(value, info);
 
     private static bool HasZeroShape(SandboxType type)
         => ReferenceEquals(type, SandboxType.Unit) ||

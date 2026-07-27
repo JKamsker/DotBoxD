@@ -1,15 +1,13 @@
-using System.Buffers.Binary;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using DotBoxD.Services.Buffers;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Transport;
 
 namespace DotBoxD.Transports.Tcp;
 
-/// <summary>
-/// TCP-based connection implementation.
-/// </summary>
-public sealed class TcpConnection : IRpcFrameChannel
+/// <summary>TCP-based connection implementation.</summary>
+public sealed class TcpConnection : IValidatedSerialFrameChannel
 {
     /// <summary>Default idle timeout applied to frame reads (30 seconds).</summary>
     public static readonly TimeSpan DefaultFrameReadIdleTimeout = TimeSpan.FromSeconds(30);
@@ -17,10 +15,10 @@ public sealed class TcpConnection : IRpcFrameChannel
     private readonly TcpClient _client;
     private readonly NetworkStream _stream;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
-    private readonly CancellationTokenSource _disposeCts = new();
     private readonly TimeSpan _frameReadIdleTimeout;
     private readonly FrameReadTimeoutSource? _frameReadTimeout;
-    private readonly byte[] _lengthBuffer = new byte[4];
+    private readonly byte[] _lengthBuffer = new byte[StreamFrameReadOperations.LengthPrefixSize];
+    private StreamFrameReceiveBuffer _receiveBuffer;
     private int _activeReceive;
     private int _disposed;
 
@@ -29,21 +27,16 @@ public sealed class TcpConnection : IRpcFrameChannel
     }
 
     /// <summary>
-    /// Creates a TCP connection. <paramref name="frameReadIdleTimeout"/> bounds how long an
-    /// frame read may stall with no data before the connection is torn down. This bounds both the first
-    /// frame byte and body reads so a slow-loris peer cannot pin a connection or rented buffer. Pass
-    /// <see cref="Timeout.InfiniteTimeSpan"/> to disable; <see langword="null"/> uses
-    /// <see cref="DefaultFrameReadIdleTimeout"/>.
+    /// Creates a TCP connection with an idle bound for both first-byte and body reads. Pass
+    /// <see cref="Timeout.InfiniteTimeSpan"/> to disable; null uses the default.
     /// </summary>
     public TcpConnection(TcpClient client, TimeSpan? frameReadIdleTimeout)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
-
         var timeout = FrameReadTimeoutSource.Resolve(
             frameReadIdleTimeout,
             DefaultFrameReadIdleTimeout,
             nameof(frameReadIdleTimeout));
-
         _frameReadIdleTimeout = timeout;
         _frameReadTimeout = timeout == Timeout.InfiniteTimeSpan ? null : new FrameReadTimeoutSource();
         _client.NoDelay = true;
@@ -55,180 +48,124 @@ public sealed class TcpConnection : IRpcFrameChannel
     }
 
     /// <summary>
-    /// Whether this connection is believed to be live. This is a best-effort <em>hint</em>: it
-    /// combines the disposed flag with <see cref="System.Net.Sockets.TcpClient.Connected"/>, which
-    /// reflects only the last known socket state and does not probe the wire. A dropped connection
-    /// is not observed here until the next send/receive fails — rely on I/O exceptions for the
-    /// authoritative state.
+    /// Best-effort liveness hint combining disposal with the socket's last known state. This does
+    /// not probe the wire; rely on I/O exceptions for authoritative connection state.
     /// </summary>
     public bool IsConnected => _client.Connected && Volatile.Read(ref _disposed) == 0;
-
     public string RemoteEndpoint { get; }
+    internal NetworkStream SendStream => _stream;
+    internal SemaphoreSlim SendGate => _sendLock;
+    internal void ThrowIfDisposedForSend() => ThrowIfDisposed();
+    internal void ReleaseSendGate() => TransportSendGate.ReleaseAfterSend(_sendLock, ref _disposed);
 
     public Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) =>
         SendValueAsync(data, ct).AsTask();
 
-    public async ValueTask SendValueAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
+    public ValueTask SendValueAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) =>
+        TcpConnectionFrameSender.SendAsync(this, data, ct);
+
+    public async Task<Payload> ReceiveAsync(CancellationToken ct = default)
+    {
+        var frame = await StartReceive(writerBacked: false, ct).ConfigureAwait(false);
+        return frame.DetachPayload();
+    }
+
+    public ValueTask<RpcFrame> ReceiveFrameValueAsync(CancellationToken ct = default) =>
+        StartReceive(writerBacked: true, ct);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private ValueTask<RpcFrame> StartReceive(bool writerBacked, CancellationToken ct)
     {
         if (Volatile.Read(ref _disposed) != 0)
         {
-            throw new ObjectDisposedException(nameof(TcpConnection));
+            return StreamFrameReadOperations.CreateFailedReceive(
+                new ObjectDisposedException(nameof(TcpConnection)));
         }
 
-        ct.ThrowIfCancellationRequested();
+        var failure = ReceiveConcurrencyGuard.TryEnter(ref _activeReceive);
+        if (failure != ReceiveEnterFailure.None)
+        {
+            return StreamFrameReadOperations.CreateFailedReceive(failure, nameof(TcpConnection));
+        }
 
-        // Reject malformed/oversized frames locally rather than shipping them to the peer, matching
-        // StreamConnection and the inbound length check in ReceiveAsync below.
-        MessageFramer.ValidateOutgoingFrame(data.Span);
+        _receiveBuffer.WriterBackedOwner = writerBacked;
+        return TcpFrameReceiveOperation.Start(this, ct);
+    }
 
-        await WaitForSendSlotAsync(ct).ConfigureAwait(false);
+    internal NetworkStream FrameReceiveStream => _stream;
+    internal TimeSpan FrameReadIdleTimeout => _frameReadIdleTimeout;
+    internal byte[] FrameReceiveLengthBuffer => _lengthBuffer;
+    internal FrameReadTimeoutSource? FrameReceiveTimeout => _frameReadTimeout;
+    internal ref StreamFrameReceiveBuffer FrameReceiveBuffer => ref _receiveBuffer;
+    internal void ThrowIfDisposedForReceive() => ThrowIfDisposed();
+    internal bool HasDedicatedReceiveOperation =>
+        TcpFrameReceiveOperationAcquisition.HasDedicatedOperation(this);
+    internal bool HasDedicatedReceiveCache =>
+        TcpFrameReceiveOperationAcquisition.HasDedicatedCache(this);
+    internal int DedicatedReceiveOperationCount =>
+        TcpFrameReceiveOperationAcquisition.GetDedicatedOperationCount(this);
+    internal int AvailableDedicatedReceiveOperationCount =>
+        TcpFrameReceiveOperationAcquisition.GetAvailableDedicatedOperationCount(this);
+    internal bool IsDisposedForReceive => Volatile.Read(ref _disposed) != 0;
+
+    internal void FinishFrameReceive(ref FrameReceiveOperationState state)
+    {
+        FinishFrameReceive(ref state.Owner, state.WriterBacked);
+    }
+
+    internal void FinishFrameReceive(ref StreamFrameReceiveOwner owner, bool writerBacked)
+    {
         try
         {
-            ThrowIfDisposed();
-            await _stream.WriteAsync(data, ct).ConfigureAwait(false);
+            owner.Dispose(writerBacked);
         }
         finally
         {
             try
             {
-                _sendLock.Release();
+                _frameReadTimeout?.CancelPendingTimeout();
             }
-            catch (ObjectDisposedException)
+            finally
             {
-                // DisposeAsync disposed the send lock while this send was in flight; the real
-                // I/O fault (if any) already propagates from the WriteAsync above.
+                ReceiveConcurrencyGuard.Exit(ref _activeReceive, ref _receiveBuffer);
             }
         }
     }
 
-    public Task<Payload> ReceiveAsync(CancellationToken ct = default) =>
-        ReceiveValueAsync(ct).AsTask();
+    public ValueTask SendFrameValueAsync(PooledBufferWriter frame, CancellationToken ct = default) =>
+        TcpConnectionFrameSender.SendAsync(this, frame, ct);
 
-    public async ValueTask<Payload> ReceiveValueAsync(CancellationToken ct = default)
+    public ValueTask<Payload> ReceiveValueAsync(CancellationToken ct = default)
     {
-        ThrowIfDisposed();
-        ReceiveConcurrencyGuard.Enter(ref _activeReceive, nameof(TcpConnection));
-
-        try
+        var pending = StartReceive(writerBacked: false, ct);
+        if (pending.IsCompletedSuccessfully)
         {
-            // Read length prefix (4 bytes). Keep this per connection instead of renting
-            // a tiny ArrayPool buffer for every received frame.
-            var lengthBuffer = _lengthBuffer;
-            var bytesRead = await ReadExactAsync(lengthBuffer.AsMemory(0, 4), ct)
-                .ConfigureAwait(false);
-            if (bytesRead == 0)
-            {
-                return Payload.Empty; // Connection closed
-            }
-
-            if (bytesRead < 4)
-            {
-                throw new InvalidDataException($"Connection closed after {bytesRead} of 4 frame length bytes.");
-            }
-
-            var totalLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBuffer.AsSpan(0, 4));
-
-            // A valid frame is at least a full header (length prefix + type + message id). Rejecting
-            // sub-header lengths (1-3) before renting also avoids the Slice(0, 4) below throwing on a
-            // too-small buffer and leaking it. Mirrors StreamConnection.ValidateIncomingLength.
-            if (totalLength < MessageFramer.HeaderSize || totalLength > MessageFramer.MaxMessageSize)
-            {
-                // A malformed length from the peer is invalid inbound DATA, not a local state error.
-                // Matches StreamConnection.ValidateIncomingLength and MessageFramer.ReadMessageAsync so
-                // the IRpcChannel contract surfaces one exception type across every transport.
-                throw new InvalidDataException($"Invalid DotBoxD frame length: {totalLength}.");
-            }
-
-            // Rent the full frame buffer and write back the length prefix we already consumed.
-            var payload = Payload.Rent(totalLength);
-            try
-            {
-                lengthBuffer.AsSpan(0, 4).CopyTo(payload.Memory.Span);
-
-                bytesRead = await ReadExactAsync(payload.Memory.Slice(4), ct)
-                    .ConfigureAwait(false);
-                if (bytesRead < totalLength - 4)
-                {
-                    throw new InvalidDataException(
-                        $"Connection closed after {bytesRead} of {totalLength - 4} frame bytes.");
-                }
-            }
-            catch
-            {
-                payload.Dispose();
-                throw;
-            }
-
-            return payload;
+            var frame = pending.Result;
+            return new ValueTask<Payload>(frame.DetachPayload());
         }
-        finally
-        {
-            ReceiveConcurrencyGuard.Exit(ref _activeReceive);
-        }
+
+        return AwaitPayloadAsync(pending);
     }
 
-    public async ValueTask SendFrameValueAsync(PooledBufferWriter frame, CancellationToken ct = default)
+    private static async ValueTask<Payload> AwaitPayloadAsync(ValueTask<RpcFrame> pending)
     {
-        try
-        {
-            await SendValueAsync(frame.WrittenMemory, ct).ConfigureAwait(false);
-        }
-        finally
-        {
-            frame.Dispose();
-        }
-    }
-
-    public async ValueTask<RpcFrame> ReceiveFrameValueAsync(CancellationToken ct = default)
-    {
-        var payload = await ReceiveValueAsync(ct).ConfigureAwait(false);
-        return new RpcFrame(payload);
-    }
-
-    private async Task<int> ReadExactAsync(Memory<byte> buffer, CancellationToken ct)
-    {
-        var totalRead = 0;
-        try
-        {
-            while (totalRead < buffer.Length)
-            {
-                var read = await ReadChunkAsync(buffer.Slice(totalRead), ct).ConfigureAwait(false);
-                if (read == 0)
-                {
-                    return totalRead; // Connection closed
-                }
-                totalRead += read;
-            }
-        }
-        finally
-        {
-            _frameReadTimeout?.CancelPendingTimeout();
-        }
-
-        return totalRead;
-    }
-
-    private async Task<int> ReadChunkAsync(
-        Memory<byte> buffer,
-        CancellationToken ct)
-    {
-        var timeout = _frameReadTimeout;
-        if (timeout is null)
-        {
-            return await _stream.ReadAsync(buffer, ct).ConfigureAwait(false);
-        }
-
-        return await timeout.ReadAsync(_stream, buffer, ct, _frameReadIdleTimeout).ConfigureAwait(false);
+        var frame = await pending.ConfigureAwait(false);
+        return frame.DetachPayload();
     }
 
     public ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        if (!ReceiveConcurrencyGuard.TryPublishDisposedAndReleaseBufferIfIdle(
+                ref _disposed,
+                ref _activeReceive,
+                hasPooledBuffer: true,
+                ref _receiveBuffer))
         {
             return default;
         }
 
-        _disposeCts.Cancel();
+        TransportSendGate.WakeDisposedWaiters(_sendLock);
+        TcpFrameReceiveOperationAcquisition.Remove(this);
         _frameReadTimeout?.Dispose();
         try
         {
@@ -251,23 +188,4 @@ public sealed class TcpConnection : IRpcFrameChannel
         }
     }
 
-    private async Task WaitForSendSlotAsync(CancellationToken ct)
-    {
-        try
-        {
-            if (ct.CanBeCanceled)
-            {
-                using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _disposeCts.Token);
-                await _sendLock.WaitAsync(linked.Token).ConfigureAwait(false);
-                return;
-            }
-
-            await _sendLock.WaitAsync(_disposeCts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested &&
-            Volatile.Read(ref _disposed) != 0)
-        {
-            throw new ObjectDisposedException(nameof(TcpConnection));
-        }
-    }
 }

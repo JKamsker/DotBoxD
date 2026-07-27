@@ -100,15 +100,14 @@ public sealed class RpcPeerOptions
     public bool DisableInboundRequestCancellation { get; init; }
 
     /// <summary>
-    /// When <see langword="true"/>, generated generic <see cref="ValueTask{TResult}"/> unary proxy
-    /// calls may use a pooled response source instead of the default <see cref="Task{TResult}"/> path.
+    /// When <see langword="true"/>, generated unary <see cref="ValueTask"/> and
+    /// <see cref="ValueTask{TResult}"/> proxy calls may use a pooled rather than task-backed response.
     /// </summary>
     /// <remarks>
-    /// The optimized path is only used when <see cref="RequestTimeout"/> is
-    /// <see cref="Timeout.InfiniteTimeSpan"/> and the caller does not pass a cancellable token. It can
-    /// run continuations inline on the peer read loop and follows the normal <see cref="ValueTask{TResult}"/>
-    /// single-consumption rules. Leave this disabled unless the peer is on a measured, trusted hot path
-    /// and every returned <see cref="ValueTask{TResult}"/> is awaited exactly once.
+    /// Finite <see cref="RequestTimeout"/> values and cancellable caller tokens are supported.
+    /// Continuations run away from the peer read loop, and returned value tasks follow normal
+    /// single-consumption rules; enable it only when every returned value task on the measured hot path
+    /// is awaited exactly once.
     /// </remarks>
     public bool EnableLowAllocationValueTaskInvocations { get; init; }
 

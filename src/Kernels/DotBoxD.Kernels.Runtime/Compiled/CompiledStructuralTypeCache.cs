@@ -57,6 +57,75 @@ internal static class CompiledStructuralTypeCache
         return Interlocked.CompareExchange(ref s_mapTypes[index], created, null) ?? created;
     }
 
+    public static SandboxType Record(SandboxType[] fieldTypes)
+    {
+        if (fieldTypes is null || fieldTypes.Length is < 1 or > 2)
+        {
+            return SandboxType.Record(fieldTypes!);
+        }
+
+        // Snapshot every mutable array element before lookup or publication. Generated IL owns its array,
+        // but this runtime facade is public for generated-code ABI reasons, so a hand-written caller can
+        // mutate an input array concurrently. A cached descriptor must never observe a later mutation or be
+        // published under an index derived from different fields than the descriptor contains.
+        var firstFieldType = fieldTypes[0];
+        if (firstFieldType is null)
+        {
+            return SandboxType.Record(fieldTypes);
+        }
+
+        var firstIndex = BuiltinScalarIndex(firstFieldType);
+        if (firstIndex < 0)
+        {
+            return SandboxType.Record(fieldTypes);
+        }
+
+        if (fieldTypes.Length == 1)
+        {
+            return OneFieldRecord(firstFieldType, firstIndex);
+        }
+
+        var secondFieldType = fieldTypes[1];
+        if (secondFieldType is null)
+        {
+            return SandboxType.Record(fieldTypes);
+        }
+
+        var secondIndex = BuiltinScalarIndex(secondFieldType);
+        return secondIndex < 0
+            ? SandboxType.Record(fieldTypes)
+            : TwoFieldRecord(firstFieldType, secondFieldType, firstIndex, secondIndex);
+    }
+
+    private static SandboxType OneFieldRecord(SandboxType fieldType, int index)
+    {
+        var cached = Volatile.Read(ref RecordCache.OneFieldTypes[index]);
+        if (cached is not null)
+        {
+            return cached;
+        }
+
+        var created = SandboxType.Record([fieldType]);
+        return Interlocked.CompareExchange(ref RecordCache.OneFieldTypes[index], created, null) ?? created;
+    }
+
+    private static SandboxType TwoFieldRecord(
+        SandboxType firstFieldType,
+        SandboxType secondFieldType,
+        int firstIndex,
+        int secondIndex)
+    {
+        var index = (firstIndex * BuiltinScalarCount) + secondIndex;
+        var cached = Volatile.Read(ref RecordCache.TwoFieldTypes[index]);
+        if (cached is not null)
+        {
+            return cached;
+        }
+
+        var created = SandboxType.Record([firstFieldType, secondFieldType]);
+        return Interlocked.CompareExchange(ref RecordCache.TwoFieldTypes[index], created, null) ?? created;
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static int BuiltinScalarIndex(SandboxType type)
     {
@@ -104,4 +173,11 @@ internal static class CompiledStructuralTypeCache
             : ReferenceEquals(type, SandboxType.Bool)
                 ? 1
                 : ReferenceEquals(type, SandboxType.Guid) ? 6 : -1;
+
+    private static class RecordCache
+    {
+        public static readonly SandboxType?[] OneFieldTypes = new SandboxType?[BuiltinScalarCount];
+        public static readonly SandboxType?[] TwoFieldTypes =
+            new SandboxType?[BuiltinScalarCount * BuiltinScalarCount];
+    }
 }

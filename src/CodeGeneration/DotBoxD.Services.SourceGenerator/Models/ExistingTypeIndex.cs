@@ -10,10 +10,18 @@ namespace DotBoxD.Services.SourceGenerator.Models;
 
 internal sealed record ExistingTypeIndex(EquatableArray<ExistingTypeKey> Types)
 {
+    public static ExistingTypeIndex Empty { get; } = new(EquatableArray<ExistingTypeKey>.Empty);
+
+    public bool IsEmpty => Types.IsEmpty;
+
     public static ExistingTypeIndex Create(ImmutableArray<ExistingTypeKey> declarations, CancellationToken ct)
     {
         var types = new List<ExistingTypeKey>(declarations);
+        return CreateCanonical(types, ct);
+    }
 
+    private static ExistingTypeIndex CreateCanonical(List<ExistingTypeKey> types, CancellationToken ct)
+    {
         types.Sort((left, right) =>
         {
             ct.ThrowIfCancellationRequested();
@@ -31,7 +39,9 @@ internal sealed record ExistingTypeIndex(EquatableArray<ExistingTypeKey> Types)
             }
         }
 
-        return new ExistingTypeIndex(uniqueTypes.ToEquatableArray());
+        return uniqueTypes.Count == 0
+            ? Empty
+            : new ExistingTypeIndex(uniqueTypes.ToEquatableArray());
     }
 
     public bool Contains(ExistingTypeKey target, CancellationToken ct)

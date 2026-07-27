@@ -136,8 +136,10 @@ public sealed class VerifierShapeHardeningTests
             d.Message.Contains("long instruction sequences", StringComparison.Ordinal));
     }
 
-    [Fact]
-    public async Task Verifier_rejects_null_sandbox_type_record_fields()
+    [Theory]
+    [InlineData(nameof(CompiledRuntime.TypeRecord))]
+    [InlineData(nameof(CompiledRuntime.TypeRecordCached))]
+    public async Task Verifier_rejects_null_sandbox_type_record_fields(string recordFactory)
     {
         var result = await VerifierTestHelpers.VerifyAsync(VerifierTestHelpers.BuildGeneratedAssembly(type =>
         {
@@ -156,7 +158,7 @@ public sealed class VerifierShapeHardeningTests
             il.Emit(OpCodes.Stelem_Ref);
             EmitChargeFuel(il);
             il.Emit(OpCodes.Ldloc, typeArray);
-            il.Emit(OpCodes.Call, RuntimeMethod(nameof(CompiledRuntime.TypeRecord)));
+            il.Emit(OpCodes.Call, RuntimeMethod(recordFactory));
             il.Emit(OpCodes.Pop);
             il.Emit(OpCodes.Ldc_I4_0);
             il.Emit(OpCodes.Call, RuntimeMethod(nameof(CompiledRuntime.I32)));

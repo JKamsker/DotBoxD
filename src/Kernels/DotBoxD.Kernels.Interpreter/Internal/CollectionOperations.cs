@@ -175,7 +175,8 @@ internal static class CollectionOperations
         var keyWasPresent = typedMap.Values.ContainsKey(key);
         var count = keyWasPresent ? typedMap.Values.Count - 1 : typedMap.Values.Count;
         context.ChargeAllocation(SandboxCollectionFuel.AllocationBytes(count, 32, minimumOne: true));
-        var removed = typedMap.RemoveEntry(key);
+        // A miss is an immutable no-op; reusing the source avoids converting dictionary-backed maps.
+        var removed = keyWasPresent ? typedMap.RemoveEntry(key) : typedMap;
         return ValueShapeCache.TryChargeScalarMapRemove(context, typedMap, removed, keyWasPresent)
             ? removed
             : Charge(context, removed);

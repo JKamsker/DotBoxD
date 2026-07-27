@@ -17,3 +17,4 @@ public static readonly TimeSpan DefaultFrameReadIdleTimeout = TimeSpan.FromSecon
 public Task StartAsync(CancellationToken ct = default)
 public Task StopAsync(CancellationToken ct = default)
 public TimeSpan? FrameReadIdleTimeout { get; init; }
+public ValueTask DisposeAsync()

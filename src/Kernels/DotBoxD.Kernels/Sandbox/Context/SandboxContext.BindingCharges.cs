@@ -3,8 +3,21 @@ using DotBoxD.Kernels.Model;
 
 namespace DotBoxD.Kernels.Sandbox;
 
-public sealed partial class SandboxContext
+public sealed partial class SandboxContext : IDisposable
 {
+    internal bool CanBulkChargeLoopWork(long loopIterations, long fuel)
+    {
+        if (loopIterations < 0 || fuel < 0)
+        {
+            return false;
+        }
+
+        var budget = Budget;
+        return loopIterations <= budget.Limits.MaxLoopIterations &&
+               budget.LoopIterations <= budget.Limits.MaxLoopIterations - loopIterations &&
+               budget.CanChargeFuel(fuel);
+    }
+
     internal bool CanBulkChargeFuel(long fuelPerUnit, long units)
     {
         if (fuelPerUnit < 0 || units < 0)

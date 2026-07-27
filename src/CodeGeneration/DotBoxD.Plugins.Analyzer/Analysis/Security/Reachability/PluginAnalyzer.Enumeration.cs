@@ -34,6 +34,8 @@ public sealed partial class PluginAnalyzer
         RecordImplicitEnumeratorMethod(context, helperGraph, method, info.GetEnumeratorMethod, location);
         RecordImplicitEnumeratorMethod(context, helperGraph, method, info.MoveNextMethod, location);
         RecordImplicitEnumeratorMethod(context, helperGraph, method, info.DisposeMethod, location);
+        RecordImplicitAwaitableEnumeratorMethod(context, helperGraph, method, info.MoveNextMethod, location);
+        RecordImplicitAwaitableEnumeratorMethod(context, helperGraph, method, info.DisposeMethod, location);
 
         if (info.CurrentProperty?.GetMethod is { } getter)
         {
@@ -57,6 +59,14 @@ public sealed partial class PluginAnalyzer
         RecordImplicitEnumeratorStaticConstructor(helperGraph, method, target, location);
         helperGraph.RecordCall(method, target, location);
     }
+
+    private static void RecordImplicitAwaitableEnumeratorMethod(
+        SyntaxNodeAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol method,
+        IMethodSymbol? target,
+        Location location)
+        => RecordAwaitablePatternCalls(context, helperGraph, method, target?.ReturnType, location);
 
     private static void ReportAndRecordImplicitEnumeratorIfForbidden(
         SyntaxNodeAnalysisContext context,

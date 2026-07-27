@@ -16,4 +16,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="DotBoxD.Kernels.Benchmarks" />
+    <InternalsVisibleTo Include="DotBoxD.Kernels.Tests" />
+  </ItemGroup>
+
 </Project>

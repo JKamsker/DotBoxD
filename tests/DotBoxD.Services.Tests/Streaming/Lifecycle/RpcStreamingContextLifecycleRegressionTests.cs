@@ -13,6 +13,16 @@ namespace DotBoxD.Services.Tests.Streaming.Lifecycle;
 public sealed class RpcStreamingContextLifecycleRegressionTests
 {
     [Fact]
+    public void DisabledContextCompletionRemainsStateless()
+    {
+        var context = RpcStreamingContext.Disabled;
+
+        Assert.Null(context.CompleteDispatch());
+        Assert.Null(context.CompleteDispatch());
+        Assert.Throws<InvalidOperationException>(() => context.SetResponse(new MemoryStream()));
+    }
+
+    [Fact]
     public async Task SetResponseAfterDispatchCompletionFailsClosed()
     {
         var serializer = new MessagePackRpcSerializer();

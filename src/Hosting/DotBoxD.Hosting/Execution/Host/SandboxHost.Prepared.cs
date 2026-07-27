@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using DotBoxD.Hosting.Execution.Prepared;
 using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Hosting.Execution;
@@ -10,7 +11,8 @@ public sealed partial class SandboxHost
         string entrypoint,
         SandboxValue input,
         SandboxExecutionOptions options,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        CompiledNoAuditRunState? reusableNoAuditState = null)
     {
         Debug.Assert(options.Isolation == SandboxIsolation.InProcess);
         Debug.Assert(Enum.IsDefined(options.Mode));
@@ -30,7 +32,13 @@ public sealed partial class SandboxHost
         {
             ExecutionMode.Compiled => ExecuteCompiledAsync(plan, entrypoint, input, options, cancellationToken),
             ExecutionMode.Interpreted => ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken),
-            ExecutionMode.Auto => ExecuteAutoAsync(plan, entrypoint, input, options, cancellationToken),
+            ExecutionMode.Auto => ExecuteAutoAsync(
+                plan,
+                entrypoint,
+                input,
+                options,
+                cancellationToken,
+                reusableNoAuditState),
             _ => ValueTask.FromResult(CompilerUnavailableResult(plan, options))
         };
         return PublishAsync(execution);

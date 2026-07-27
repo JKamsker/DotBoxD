@@ -60,17 +60,26 @@ public sealed class Fix_PAL_0040_Tests
     }
 
     [Fact]
-    public void Owned_list_value_survives_record_with_copy()
+    public void Owned_list_value_with_copy_isolated_from_owner_reuse()
     {
+        var buffer = new[] { SandboxValue.FromString("a") };
         var owned = (ListValue)SandboxValue.FromOwnedList(
-            new[] { SandboxValue.FromInt32(1), SandboxValue.FromInt32(2) },
-            SandboxType.I32);
+            buffer,
+            SandboxType.String);
 
         var copied = owned with { };
+        _ = ValueShapeCache.GetOrMeasure(copied);
 
-        Assert.Equal(owned, copied);
-        Assert.Equal(2, copied.Values.Count);
-        Assert.Equal(SandboxValue.FromInt32(1), copied.Values[0]);
+        buffer[0] = SandboxValue.FromString("a much longer value");
+        owned.ResetOwnedValues(buffer);
+
+        Assert.Equal(SandboxValue.FromString("a"), copied.Values[0]);
+        var cached = ValueShapeCache.GetOrMeasure(copied);
+        var measured = SandboxValueShapeMeter.MeasureWithNodes(copied);
+        Assert.Equal(measured.Nodes, cached.Nodes);
+        Assert.Equal(measured.Shape, cached.Shape);
+        Assert.Throws<InvalidOperationException>(
+            () => copied.ResetOwnedValues([SandboxValue.FromString("replacement")]));
     }
 
     [Fact]
@@ -87,5 +96,18 @@ public sealed class Fix_PAL_0040_Tests
 
         Assert.Equal(SandboxValue.FromInt32(5), updated.Values[0]);
         Assert.Equal(SandboxValue.FromInt32(6), updated.Values[1]);
+    }
+
+    [Fact]
+    public void Constructing_from_an_owned_list_takes_an_independent_snapshot()
+    {
+        var buffer = new[] { SandboxValue.FromInt32(1) };
+        var owned = (ListValue)SandboxValue.FromOwnedList(buffer, SandboxType.I32);
+        var snapshot = new ListValue(owned, SandboxType.I32);
+
+        buffer[0] = SandboxValue.FromInt32(99);
+        owned.ResetOwnedValues(buffer);
+
+        Assert.Equal(SandboxValue.FromInt32(1), snapshot[0]);
     }
 }

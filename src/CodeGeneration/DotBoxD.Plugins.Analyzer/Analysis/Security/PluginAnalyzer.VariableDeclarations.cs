@@ -181,9 +181,8 @@ public sealed partial class PluginAnalyzer
             method.ContainingType is { } containingType)
         {
             var displayName = ForbiddenMemberContainingTypeName(containingType) + "." + method.Name;
-            if (ForbiddenApiNamePolicy.IsForbiddenExactMember(displayName))
+            if (ForbiddenApiNamePolicy.TryGetForbiddenExactMemberDisplayName(displayName, out forbidden))
             {
-                forbidden = displayName;
                 return true;
             }
         }

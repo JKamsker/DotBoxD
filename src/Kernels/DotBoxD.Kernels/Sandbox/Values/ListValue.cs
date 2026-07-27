@@ -7,8 +7,29 @@ public sealed record ListValue(IReadOnlyList<SandboxValue> Values, SandboxType I
 {
     private IReadOnlyList<SandboxValue> _values = Snapshot(Values);
     private readonly bool _ownsValues;
+    private int _shapeVersion;
+    private bool _hasCachedShape;
 
-    public IReadOnlyList<SandboxValue> Values { get => this; init => _values = Snapshot(value); }
+    public IReadOnlyList<SandboxValue> Values
+    {
+        get => this;
+        init
+        {
+            _values = Snapshot(value);
+            InvalidateShape();
+        }
+    }
+
+    internal ValueShapeGeneration ShapeGeneration =>
+        new(_shapeVersion, ListValueShapeGeneration.Epoch);
+
+    internal void MarkShapeCached()
+    {
+        if (_ownsValues)
+        {
+            _hasCachedShape = true;
+        }
+    }
 
     /// <summary>
     /// Constructs a list value over an array the caller has just allocated, fully
@@ -35,6 +56,7 @@ public sealed record ListValue(IReadOnlyList<SandboxValue> Values, SandboxType I
         }
 
         _values = values;
+        InvalidateShape();
     }
 
     private ListValue(SandboxValue[] values, SandboxType itemType, bool ownsValues)
@@ -45,14 +67,44 @@ public sealed record ListValue(IReadOnlyList<SandboxValue> Values, SandboxType I
         _ownsValues = ownsValues;
     }
 
+    private ListValue(ListValue original)
+        : base(original)
+    {
+        _values = original._ownsValues
+            ? ModelCopy.List(original._values)
+            : original._values;
+        _ownsValues = false;
+        _shapeVersion = 0;
+        _hasCachedShape = false;
+        ItemType = original.ItemType;
+    }
+
     private static IReadOnlyList<SandboxValue> Snapshot(IReadOnlyList<SandboxValue> values)
         => values switch
         {
             null => throw new ArgumentNullException(nameof(values)),
-            ListValue list => list._values,
+            ListValue { _ownsValues: false } list => list._values,
+            ListValue list => ModelCopy.List(list._values),
             ImmutableList<SandboxValue> immutable => immutable,
             _ => ModelCopy.List(values)
         };
+
+    private void InvalidateShape()
+    {
+        // No shape was published since the last generation change, so there is nothing to invalidate.
+        // This keeps the owned-input reset path at its original field-assignment cost when it is unmeasured.
+        if (!_hasCachedShape)
+        {
+            return;
+        }
+
+        _hasCachedShape = false;
+        _shapeVersion = unchecked(_shapeVersion + 1);
+        if (_shapeVersion == 0)
+        {
+            ListValueShapeGeneration.AdvanceEpoch();
+        }
+    }
 
     /// <summary>
     /// Returns a new list with <paramref name="item"/> appended, sharing structure with this list via an

@@ -49,6 +49,25 @@ internal static partial class CompiledBindingDispatcher
         }
     }
 
+    internal static void ValidateArguments(
+        BindingDescriptor descriptor,
+        SandboxValue arg0,
+        SandboxValue arg1,
+        SandboxValue arg2)
+    {
+        if (descriptor.Parameters.Count != 3)
+        {
+            throw ArgumentCountMismatch(descriptor);
+        }
+
+        if (!TypeMatches(arg0, descriptor.Parameters[0]) ||
+            !TypeMatches(arg1, descriptor.Parameters[1]) ||
+            !TypeMatches(arg2, descriptor.Parameters[2]))
+        {
+            throw ArgumentTypeMismatch(descriptor);
+        }
+    }
+
     private static bool TypeMatches(SandboxValue value, SandboxType expected)
     {
         if (expected.Arguments.Count == 0)

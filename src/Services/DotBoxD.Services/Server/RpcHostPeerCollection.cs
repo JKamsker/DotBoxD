@@ -21,7 +21,27 @@ internal sealed class RpcHostPeerCollection
 
     public void DisposeInBackground(RpcPeer peer)
     {
-        var cleanupTask = Task.Run(async () =>
+        var cleanup = BeginCleanup();
+        CompleteCleanupInBackground(peer, cleanup);
+    }
+
+    public PendingCleanup BeginCleanup()
+    {
+        var cleanup = new PendingCleanup();
+        _cleanupTasks.TryAdd(cleanup.Task, 0);
+        _ = cleanup.Task.ContinueWith(
+            static (task, state) =>
+                ((ConcurrentDictionary<Task, byte>)state!).TryRemove(task, out _),
+            _cleanupTasks,
+            CancellationToken.None,
+            TaskContinuationOptions.None,
+            TaskScheduler.Default);
+        return cleanup;
+    }
+
+    public void CompleteCleanupInBackground(RpcPeer peer, PendingCleanup cleanup)
+    {
+        _ = Task.Run(async () =>
         {
             try
             {
@@ -31,15 +51,11 @@ internal sealed class RpcHostPeerCollection
             {
                 // Best-effort cleanup.
             }
+            finally
+            {
+                cleanup.SetResult();
+            }
         });
-        _cleanupTasks.TryAdd(cleanupTask, 0);
-        _ = cleanupTask.ContinueWith(
-            static (task, state) =>
-                ((ConcurrentDictionary<Task, byte>)state!).TryRemove(task, out _),
-            _cleanupTasks,
-            CancellationToken.None,
-            TaskContinuationOptions.None,
-            TaskScheduler.Default);
     }
 
     public async Task CloseAllAsync()
@@ -94,5 +110,15 @@ internal sealed class RpcHostPeerCollection
         {
             // Peer cleanup is best-effort and each task observes its own dispose failures.
         }
+    }
+
+    internal sealed class PendingCleanup
+    {
+        private readonly TaskCompletionSource<bool> _completion =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task Task => _completion.Task;
+
+        public void SetResult() => _completion.TrySetResult(true);
     }
 }

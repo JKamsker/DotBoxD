@@ -14,7 +14,7 @@ public sealed class InterpreterLocalFunctionScalarCallAllocationTests
     private const int MeasurementIterations = 20_000;
 
     [Fact]
-    public async Task Arity_one_and_two_omit_caller_arrays_while_arity_three_keeps_one()
+    public async Task Arity_one_through_three_omit_caller_arrays()
     {
         using var host = SandboxTestHost.Create();
         var interpreter = new SandboxInterpreter();
@@ -52,8 +52,8 @@ public sealed class InterpreterLocalFunctionScalarCallAllocationTests
             "arity two (the legacy caller array adds 40 B/execution)");
         AssertBytesPerExecution(
             three.DeltaBytes - fixedCallAndFrameBytes,
-            expected: 48,
-            "arity three generic caller array");
+            expected: 0,
+            "arity three (the legacy caller array adds 48 B/execution)");
     }
 
     private static PairMeasurement MeasurePair(

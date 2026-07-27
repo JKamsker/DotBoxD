@@ -129,16 +129,12 @@ public sealed class Round11_TruncatedFrameAndPerfTests
     }
 
     // ────────────────────────────────────────────────────────────────────
-    // PERF: StreamConnection.ReceiveAsync uses a pre-allocated field for
-    // the 4-byte length prefix instead of renting from ArrayPool per frame.
-    // Verify the field-based approach does not regress per-frame allocations.
+    // StreamConnection must preserve exact frame boundaries for arbitrary, non-owned streams.
     // ────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task StreamConnection_ReceiveAsync_UsesFieldForLengthBuffer()
+    public async Task StreamConnection_ReceiveAsync_ReadsSequentialFramesAndThenEof()
     {
-        // The fix replaces ArrayPool.Rent(4)/Return per frame with a byte[4] field.
-        // Verify by reading multiple frames: the connection should not touch ArrayPool at all.
         const int frameCount = 20;
         using var ms = new MemoryStream();
         var payload = new byte[] { 1, 2, 3 };

@@ -52,7 +52,7 @@ internal sealed partial class RpcPeerOutboundInvoker
                     _pending.TryAddUnary<TResponse>(
                         messageId,
                         ct.CanBeCanceled,
-                        _timeout != Timeout.InfiniteTimeSpan,
+                        _hasFiniteTimeout,
                         ct,
                         service,
                         method,
@@ -72,6 +72,8 @@ internal sealed partial class RpcPeerOutboundInvoker
     }
 
     private PendingValueTaskUnaryResponse<TResponse> ReservePendingValueTaskUnaryRequest<TResponse>(
+        string service,
+        string method,
         CancellationToken ct)
     {
         if (!TryEnterPendingSlot())
@@ -85,7 +87,14 @@ internal sealed partial class RpcPeerOutboundInvoker
             {
                 ct.ThrowIfCancellationRequested();
                 var messageId = NextMessageId(ct);
-                if (messageId != 0 && _pending.TryAddValueTaskUnary<TResponse>(messageId, out var pending))
+                if (messageId != 0 &&
+                    _pending.TryAddValueTaskUnary<TResponse>(
+                        messageId,
+                        service,
+                        method,
+                        this,
+                        ct,
+                        out var pending))
                 {
                     return pending;
                 }
@@ -100,7 +109,10 @@ internal sealed partial class RpcPeerOutboundInvoker
         }
     }
 
-    private PendingValueTaskNoResponse ReservePendingValueTaskNoResponseRequest(CancellationToken ct)
+    private PendingValueTaskNoResponse ReservePendingValueTaskNoResponseRequest(
+        string service,
+        string method,
+        CancellationToken ct)
     {
         if (!TryEnterPendingSlot())
         {
@@ -113,7 +125,14 @@ internal sealed partial class RpcPeerOutboundInvoker
             {
                 ct.ThrowIfCancellationRequested();
                 var messageId = NextMessageId(ct);
-                if (messageId != 0 && _pending.TryAddValueTaskNoResponse(messageId, out var pending))
+                if (messageId != 0 &&
+                    _pending.TryAddValueTaskNoResponse(
+                        messageId,
+                        service,
+                        method,
+                        this,
+                        ct,
+                        out var pending))
                 {
                     return pending;
                 }
@@ -141,6 +160,43 @@ internal sealed partial class RpcPeerOutboundInvoker
 
     private void ReleasePendingSlot() =>
         Interlocked.Decrement(ref _pendingCount);
+
+    private void CompletePooledSetupFailure(PooledPendingResponse pending)
+    {
+        var removed = _pending.Remove(pending.MessageId, pending, consumed: false);
+        if (removed)
+        {
+            pending.CompleteAbandonedAfterRemoval();
+        }
+
+        ReleasePendingSlot();
+        pending.ReleaseSetup();
+    }
+
+    internal void CompletePooledWrapper(
+        PooledPendingResponse pending,
+        bool consumed)
+    {
+        // Terminal producers remove correlation before signaling the source. Once the wrapper
+        // consumes that signal, another locked lookup can only miss.
+        if (!consumed)
+        {
+            var removed = _pending.Remove(pending.MessageId, pending, consumed: false);
+            if (removed)
+            {
+                pending.CompleteAbandonedAfterRemoval();
+            }
+        }
+
+        ReleasePendingSlot();
+        pending.ReleaseWrapper();
+    }
+
+    internal void CancelPooledByCaller(PooledPendingResponse pending) =>
+        _pending.TryCancel(pending.MessageId, pending, PendingCancellationKind.Caller);
+
+    internal void TrySendPooledCancel(int messageId) =>
+        _cancelFrames.TrySend(messageId);
 
     internal void CompleteUnaryPending(IPendingResponse pending, bool sendCancel)
     {

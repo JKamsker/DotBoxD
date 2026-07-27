@@ -2,6 +2,8 @@ namespace DotBoxD.Plugins.Runtime;
 
 public partial class HookPipeline<TEvent, TContext>
 {
+    private Hooks.ResultHookRegistrationSnapshot<TEvent>? _resultRegistrationSnapshot;
+
     public HookPipeline<TEvent, TContext> ConfigureResultDispatch<TResult>(ResultHookDispatchOptions<TResult> options)
         where TResult : struct, IHookResult
     {
@@ -45,10 +47,31 @@ public partial class HookPipeline<TEvent, TContext>
         return _resultHooks.FireAsync(e, rawContext, context, options, cancellationToken);
     }
 
-    internal Hooks.IResultHookRegistration<TEvent>[] ResultRegistrations()
-        => _resultHooks.SnapshotRegistrations(this);
+    internal Hooks.ResultHookRegistrationSnapshot<TEvent> ResultRegistrations()
+    {
+        var entries = _resultHooks.RegistrationEntries;
+        var current = Volatile.Read(ref _resultRegistrationSnapshot);
+        if (current is not null && current.IsFor(entries))
+        {
+            return current;
+        }
 
-    Hooks.IResultHookRegistration<TEvent>[] IHookPipeline<TEvent>.ResultRegistrations()
+        lock (_gate)
+        {
+            entries = _resultHooks.RegistrationEntries;
+            current = Volatile.Read(ref _resultRegistrationSnapshot);
+            if (current is not null && current.IsFor(entries))
+            {
+                return current;
+            }
+
+            var created = Hooks.ResultHookRegistrationSnapshot<TEvent>.Create(this, entries);
+            Volatile.Write(ref _resultRegistrationSnapshot, created);
+            return created;
+        }
+    }
+
+    Hooks.ResultHookRegistrationSnapshot<TEvent> IHookPipeline<TEvent>.ResultRegistrations()
         => ResultRegistrations();
 
     internal ValueTask<TResult?> FireResultEntryAsync<TResult>(

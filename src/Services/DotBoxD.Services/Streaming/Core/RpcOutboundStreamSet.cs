@@ -10,6 +10,7 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
     private readonly RpcStreamManager _manager;
     private readonly ISerializer _serializer;
     private readonly (RpcStreamAttachment Attachment, RpcStreamSendState State)[] _streams;
+    private readonly object _startGate = new();
     private readonly CancellationTokenSource? _waitCancellation;
     private readonly CancellationToken _waitToken;
     private Task[]? _tasks;
@@ -50,19 +51,29 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
 
     public void Start()
     {
-        if (Interlocked.Exchange(ref _started, 1) != 0 || IsEmpty)
+        if (IsEmpty)
         {
             return;
         }
 
-        var tasks = new Task[_streams.Length];
-        for (var i = 0; i < _streams.Length; i++)
+        lock (_startGate)
         {
-            var pair = _streams[i];
-            tasks[i] = Task.Run(() => PumpAsync(pair.Attachment, pair.State));
-        }
+            if (_started != 0 || Volatile.Read(ref _disposed) != 0)
+            {
+                return;
+            }
 
-        Volatile.Write(ref _tasks, tasks);
+            _started = 1;
+
+            var tasks = new Task[_streams.Length];
+            for (var i = 0; i < _streams.Length; i++)
+            {
+                var pair = _streams[i];
+                tasks[i] = Task.Run(() => PumpAsync(pair.Attachment, pair.State));
+            }
+
+            Volatile.Write(ref _tasks, tasks);
+        }
     }
 
     public async Task WaitAsync()
@@ -96,7 +107,7 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
                 pair.State.Cancel();
             }
 
-            var tasks = Volatile.Read(ref _tasks);
+            var tasks = GetTasksOrClaimUnstartedForDispose();
             if (tasks is { Length: > 0 })
             {
                 if (HasRunningTask(tasks))
@@ -112,7 +123,7 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
                 {
                 }
             }
-            else if (Interlocked.Exchange(ref _started, 1) == 0)
+            else if (!IsEmpty)
             {
                 await DisposeSourcesBestEffortAsync().ConfigureAwait(false);
             }
@@ -125,6 +136,21 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
             }
 
             _waitCancellation?.Dispose();
+        }
+    }
+
+    private Task[]? GetTasksOrClaimUnstartedForDispose()
+    {
+        lock (_startGate)
+        {
+            var tasks = Volatile.Read(ref _tasks);
+            if (tasks is { Length: > 0 })
+            {
+                return tasks;
+            }
+
+            _started = 1;
+            return tasks;
         }
     }
 

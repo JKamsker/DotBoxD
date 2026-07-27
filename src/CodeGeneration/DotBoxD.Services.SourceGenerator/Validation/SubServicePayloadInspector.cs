@@ -102,7 +102,7 @@ internal static class SubServicePayloadInspector
         {
             ct.ThrowIfCancellationRequested();
 
-            if (ServicesGeneratorTypeNames.IsRpcServiceAttribute(attr.AttributeClass?.ToDisplayString()))
+            if (ServicesGeneratorTypeNames.IsRpcServiceAttribute(attr.AttributeClass))
             {
                 return true;
             }

@@ -15,7 +15,7 @@ public sealed partial class PluginAnalyzer
 
         foreach (var attribute in type.GetAttributes())
         {
-            if (TryGetForbiddenAttributeMetadataType(attribute, out var forbiddenType))
+            if (FirstForbiddenAttributeValue(attribute) is { } forbiddenType)
             {
                 context.ReportDiagnostic(Diagnostic.Create(
                     ForbiddenHostApiRule,
@@ -24,51 +24,6 @@ public sealed partial class PluginAnalyzer
                 return;
             }
         }
-    }
-
-    private static bool TryGetForbiddenAttributeMetadataType(AttributeData attribute, out ITypeSymbol forbiddenType)
-    {
-        foreach (var argument in attribute.ConstructorArguments)
-        {
-            if (TryGetForbiddenAttributeMetadataType(argument, out forbiddenType))
-            {
-                return true;
-            }
-        }
-
-        foreach (var argument in attribute.NamedArguments)
-        {
-            if (TryGetForbiddenAttributeMetadataType(argument.Value, out forbiddenType))
-            {
-                return true;
-            }
-        }
-
-        forbiddenType = null!;
-        return false;
-    }
-
-    private static bool TryGetForbiddenAttributeMetadataType(TypedConstant constant, out ITypeSymbol forbiddenType)
-    {
-        if (constant.Kind == TypedConstantKind.Type &&
-            constant.Value is ITypeSymbol type)
-        {
-            return TryGetForbiddenHostApi(type, out forbiddenType);
-        }
-
-        if (constant.Kind == TypedConstantKind.Array)
-        {
-            foreach (var value in constant.Values)
-            {
-                if (TryGetForbiddenAttributeMetadataType(value, out forbiddenType))
-                {
-                    return true;
-                }
-            }
-        }
-
-        forbiddenType = null!;
-        return false;
     }
 
     private static Location? AttributeLocation(

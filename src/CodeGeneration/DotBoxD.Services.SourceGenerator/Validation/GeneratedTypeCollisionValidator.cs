@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
 using DotBoxD.Services.SourceGenerator.Models;
@@ -11,38 +12,32 @@ internal static class GeneratedTypeCollisionValidator
         ExistingTypeIndex existingTypes,
         CancellationToken ct)
     {
-        if (result.Model is null)
+        if (result.Model is null || existingTypes.IsEmpty)
         {
             return result;
         }
 
         var model = result.Model;
-        var serviceName = NamingHelpers.StripInterfacePrefix(model.InterfaceName);
-
-        var proxyName = serviceName + "Proxy";
-        var proxy = new ExistingTypeKey(model.Namespace, proxyName, 0);
+        var primaryTypes = GeneratedTypeCollisionKeys.Primary(model);
+        var proxy = primaryTypes.Proxy;
         if (existingTypes.Contains(proxy, ct))
         {
             return RejectedService(
                 model,
-                $"generated proxy type '{proxyName}' would collide with an existing type",
+                $"generated proxy type '{proxy.Name}' would collide with an existing type",
                 proxy);
         }
 
-        var dispatcherName = serviceName + "Dispatcher";
-        var dispatcher = new ExistingTypeKey(model.Namespace, dispatcherName, 0);
+        var dispatcher = primaryTypes.Dispatcher;
         if (existingTypes.Contains(dispatcher, ct))
         {
             return RejectedService(
                 model,
-                $"generated dispatcher type '{dispatcherName}' would collide with an existing type",
+                $"generated dispatcher type '{dispatcher.Name}' would collide with an existing type",
                 dispatcher);
         }
 
-        var extensions = new ExistingTypeKey(
-            ServicesGeneratorTypeNames.GeneratedNamespace,
-            ServicesGeneratorTypeNames.GeneratedExtensionsType,
-            0);
+        var extensions = GeneratedTypeCollisionKeys.Extensions;
         if (existingTypes.Contains(extensions, ct))
         {
             return RejectedService(
@@ -51,10 +46,7 @@ internal static class GeneratedTypeCollisionValidator
                 extensions);
         }
 
-        var factory = new ExistingTypeKey(
-            ServicesGeneratorTypeNames.GeneratedNamespace,
-            ServicesGeneratorTypeNames.GeneratedFactoryType,
-            0);
+        var factory = GeneratedTypeCollisionKeys.Factory;
         if (existingTypes.Contains(factory, ct))
         {
             return RejectedService(
@@ -71,19 +63,15 @@ internal static class GeneratedTypeCollisionValidator
         ExistingTypeIndex existingTypes,
         CancellationToken ct)
     {
-        if (result.Model is null)
+        if (result.Model is null ||
+            existingTypes.IsEmpty ||
+            !NamingHelpers.CanGenerateAsyncSiblingInterface(result.Model.InterfaceName))
         {
             return result;
         }
 
         var model = result.Model;
-        if (!NamingHelpers.CanGenerateAsyncSiblingInterface(model.InterfaceName))
-        {
-            return result;
-        }
-
-        var siblingName = NamingHelpers.AsyncSiblingInterfaceName(model.InterfaceName);
-        var sibling = new ExistingTypeKey(model.Namespace, siblingName, 0);
+        var sibling = GeneratedTypeCollisionKeys.AsyncSibling(model);
         if (!existingTypes.Contains(sibling, ct) || !WillGenerateAsyncSiblingInterface(model, ct))
         {
             return result;
@@ -91,7 +79,7 @@ internal static class GeneratedTypeCollisionValidator
 
         return RejectedService(
             model,
-            $"generated async sibling interface '{siblingName}' would collide with an existing type",
+            $"generated async sibling interface '{sibling.Name}' would collide with an existing type",
             sibling);
     }
 
@@ -129,4 +117,74 @@ internal static class GeneratedTypeCollisionValidator
             ? IdentifierHelpers.EscapeIdentifier(model.InterfaceName)
             : IdentifierHelpers.EscapeNamespace(model.Namespace) + "." +
                 IdentifierHelpers.EscapeIdentifier(model.InterfaceName);
+}
+
+internal sealed class PrimaryGeneratedTypeCollisionInputComparer :
+    IEqualityComparer<(ServiceResult Left, ExistingTypeIndex Right)>
+{
+    public static PrimaryGeneratedTypeCollisionInputComparer Instance { get; } = new();
+
+    public bool Equals(
+        (ServiceResult Left, ExistingTypeIndex Right) x,
+        (ServiceResult Left, ExistingTypeIndex Right) y)
+    {
+        if (!x.Left.Equals(y.Left))
+        {
+            return false;
+        }
+
+        var model = x.Left.Model;
+        if (model is null)
+        {
+            return true;
+        }
+
+        if (!HasSameMembership(x.Right, y.Right, GeneratedTypeCollisionKeys.Extensions) ||
+            !HasSameMembership(x.Right, y.Right, GeneratedTypeCollisionKeys.Factory))
+        {
+            return false;
+        }
+
+        var primaryTypes = GeneratedTypeCollisionKeys.Primary(model);
+        return HasSameMembership(x.Right, y.Right, primaryTypes.Proxy) &&
+            HasSameMembership(x.Right, y.Right, primaryTypes.Dispatcher);
+    }
+
+    public int GetHashCode((ServiceResult Left, ExistingTypeIndex Right) obj) =>
+        obj.Left.GetHashCode();
+
+    private static bool HasSameMembership(
+        ExistingTypeIndex left,
+        ExistingTypeIndex right,
+        ExistingTypeKey key) =>
+        left.Contains(key, CancellationToken.None) == right.Contains(key, CancellationToken.None);
+}
+
+internal sealed class AsyncGeneratedTypeCollisionInputComparer :
+    IEqualityComparer<(ServiceResult Left, ExistingTypeIndex Right)>
+{
+    public static AsyncGeneratedTypeCollisionInputComparer Instance { get; } = new();
+
+    public bool Equals(
+        (ServiceResult Left, ExistingTypeIndex Right) x,
+        (ServiceResult Left, ExistingTypeIndex Right) y)
+    {
+        if (!x.Left.Equals(y.Left))
+        {
+            return false;
+        }
+
+        var model = x.Left.Model;
+        if (model is null || !NamingHelpers.CanGenerateAsyncSiblingInterface(model.InterfaceName))
+        {
+            return true;
+        }
+
+        var sibling = GeneratedTypeCollisionKeys.AsyncSibling(model);
+        return x.Right.Contains(sibling, CancellationToken.None) ==
+            y.Right.Contains(sibling, CancellationToken.None);
+    }
+
+    public int GetHashCode((ServiceResult Left, ExistingTypeIndex Right) obj) =>
+        obj.Left.GetHashCode();
 }

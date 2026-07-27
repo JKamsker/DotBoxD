@@ -17,13 +17,12 @@ work is bounded elsewhere.
 
 ## Near-zero allocation unary calls
 
-The near-zero allocation path is for non-streaming unary calls returning `ValueTask<T>`.
+The near-zero allocation path is for non-streaming unary calls returning `ValueTask` or `ValueTask<T>`.
 It requires all of these conditions:
 
-- The service contract returns `ValueTask<T>` for the hot method.
-- The caller uses the generated proxy and awaits each returned `ValueTask<T>` exactly once.
-- The hot call does not pass a cancellable `CancellationToken`.
-- The caller peer has no per-call timeout and opts into pooled `ValueTask<T>` responses.
+- The service contract returns `ValueTask` or `ValueTask<T>` for the hot method.
+- The caller uses the generated proxy and awaits each returned value task exactly once.
+- The caller peer opts into pooled value-task responses. Finite per-call timeouts are supported.
 - The serving peer disables non-streaming inbound request cancellation for that trusted hot path.
 - The serving peer is externally bounded, or its inbound queue is intentionally disabled.
 - The transport implements `IRpcFrameChannel` so complete pooled frames can move without creating
@@ -56,16 +55,15 @@ If that server peer also makes outbound hot-path calls, apply the caller-side op
 
 ## Tradeoffs
 
-`EnableLowAllocationValueTaskInvocations` is default-off. When enabled, generic `ValueTask<T>`
-unary calls can use a pooled `IValueTaskSource<T>` instead of the default `Task<T>` path. This
-can run continuations inline on the peer read loop, so continuations must stay short and should
-not block. It also means normal `ValueTask<T>` rules matter: await it once, and do not call
-`AsTask()` repeatedly.
+`EnableLowAllocationValueTaskInvocations` is default-off. When enabled, unary `ValueTask` and
+`ValueTask<T>` calls can use pooled value-task sources instead of the default task-backed path.
+This keeps continuations off the peer read loop. Normal `ValueTask` rules still matter: await it
+once, and do not call `AsTask()` repeatedly.
 
 `RequestTimeout = Timeout.InfiniteTimeSpan` removes DotBoxD's per-call timeout on outbound calls.
 Use this only when the transport, protocol above DotBoxD, or application workflow already has a
-deadline. Passing a cancellable caller token keeps safety but intentionally falls back to the
-allocating `Task<T>` path.
+deadline. Finite timeouts retain the pooled response source but pay timeout-scheduler coordination.
+Cancellable caller tokens also retain the pooled source but pay cancellation registration.
 
 `DisableInboundRequestCancellation = true` avoids one inbound cancellation allocation for
 non-streaming calls. The handler receives `CancellationToken.None`, inbound Cancel frames for

@@ -14,22 +14,24 @@ internal static class PreparedValueProbe
         const int warmup = 2_000;
         const int iterations = 200_000;
         var e = new ExampleWorkflowProbe.DamageEvent("ice", 120, "player-1");
-        var summary = await MeasureShouldHandleMissAsync(warmup, iterations, e);
+        var compiled = await MeasureShouldHandleMissAsync(warmup, iterations, e, ExecutionMode.Compiled);
+        var auto = await MeasureShouldHandleMissAsync(warmup, iterations, e, ExecutionMode.Auto);
 
-        Console.WriteLine("case                         iterations   elapsed       allocated      handled");
-        Console.WriteLine(
-            $"compiled no-audit miss {iterations,14:N0} {summary.Milliseconds,8:N1} ms {summary.AllocatedBytes,13:N0} B {summary.Handled,10:N0}");
+        Console.WriteLine("case                         iterations   elapsed     allocated/op      handled");
+        WriteSummary("compiled no-audit miss", iterations, compiled);
+        WriteSummary("auto compiled miss", iterations, auto);
     }
 
     private static async Task<RunSummary> MeasureShouldHandleMissAsync(
         int warmup,
         int iterations,
-        ExampleWorkflowProbe.DamageEvent e)
+        ExampleWorkflowProbe.DamageEvent e,
+        ExecutionMode mode)
     {
         using var server = DotBoxD.Plugins.PluginServer.Create(
             new InMemoryPluginMessageSink(),
             defaultPolicy: MessageWritePolicy(),
-            executionMode: ExecutionMode.Compiled);
+            executionMode: mode);
         var kernel = await server.InstallJsonAsync(ExampleWorkflowProbe.FireDamagePackageJson());
         var adapter = ExampleWorkflowProbe.DamageEventAdapter.Instance;
 
@@ -47,7 +49,13 @@ internal static class PreparedValueProbe
         var handled = 0;
         for (var i = 0; i < iterations; i++)
         {
-            if (await kernel.ShouldHandleAsync(adapter, e))
+            var pending = kernel.ShouldHandleAsync(adapter, e);
+            if (!pending.IsCompletedSuccessfully)
+            {
+                throw new InvalidOperationException("Warmed prepared execution did not complete synchronously.");
+            }
+
+            if (pending.GetAwaiter().GetResult())
             {
                 handled++;
             }
@@ -55,8 +63,23 @@ internal static class PreparedValueProbe
 
         sw.Stop();
         var allocatedBytes = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        var observation = kernel.ExecutionObservations[^1];
+        if (handled != 0 ||
+            observation.RequestedMode != mode ||
+            observation.ActualMode != ExecutionMode.Compiled ||
+            !observation.Succeeded ||
+            observation.FallbackReason is not null ||
+            string.IsNullOrWhiteSpace(observation.ArtifactHash))
+        {
+            throw new InvalidOperationException("Prepared execution probe invariants changed.");
+        }
+
         return new RunSummary(sw.Elapsed.TotalMilliseconds, allocatedBytes, handled);
     }
+
+    private static void WriteSummary(string name, int iterations, RunSummary summary)
+        => Console.WriteLine(
+            $"{name,-24} {iterations,10:N0} {summary.Milliseconds,8:N1} ms {summary.AllocatedBytes / (double)iterations,12:N1} B {summary.Handled,12:N0}");
 
     private static SandboxPolicy MessageWritePolicy()
         => SandboxPolicyBuilder.Create()

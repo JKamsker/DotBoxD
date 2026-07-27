@@ -21,6 +21,12 @@ internal static class PluginLiveSettingRangeReader
                 $"Live setting '{property.Name}' has a range on non-numeric type '{type}'.");
         }
 
+        if (HasExclusiveBoundary(range))
+        {
+            throw new NotSupportedException(
+                $"Live setting '{property.Name}' uses an exclusive range boundary, but live setting manifests only support inclusive ranges.");
+        }
+
         var values = RangeValues(property, type, range);
         if (MinimumGreaterThanMaximum(values.Min, values.Max, type))
         {
@@ -51,6 +57,34 @@ internal static class PluginLiveSettingRangeReader
         }
 
         return null;
+    }
+
+    private static bool HasExclusiveBoundary(AttributeData range)
+    {
+        const string MinimumIsExclusive = "MinimumIsExclusive";
+        const string MaximumIsExclusive = "MaximumIsExclusive";
+
+        foreach (var argument in range.NamedArguments)
+        {
+            if (argument.Value.Value is not true)
+            {
+                continue;
+            }
+
+            if (string.Equals(
+                    argument.Key,
+                    MinimumIsExclusive,
+                    StringComparison.Ordinal) ||
+                string.Equals(
+                    argument.Key,
+                    MaximumIsExclusive,
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static (object? Min, object? Max) RangeValues(

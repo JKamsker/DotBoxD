@@ -44,7 +44,6 @@ public sealed partial class PluginAnalyzer
             helperGraph.RecordForbidden(method, attribute);
         }
 
-        AnalyzeMethodAttributeTypes(helperGraph, method);
         RecordForbiddenAttributeMetadata(context, helperGraph, method);
     }
 
@@ -234,17 +233,6 @@ public sealed partial class PluginAnalyzer
         return false;
     }
 
-    private static void AnalyzeMethodAttributeTypes(ForbiddenHelperCallGraph helperGraph, IMethodSymbol method)
-    {
-        if (method.IsImplicitlyDeclared)
-            return;
-        foreach (var attribute in MethodAndParameterAttributes(method))
-        {
-            if (FirstForbiddenAttributeType(attribute) is { } forbiddenType)
-                helperGraph.RecordForbidden(method, forbiddenType);
-        }
-    }
-
     private static IEnumerable<AttributeData> MethodAndParameterAttributes(IMethodSymbol method)
     {
         foreach (var attribute in method.GetAttributes())
@@ -257,37 +245,4 @@ public sealed partial class PluginAnalyzer
                 yield return attribute;
         }
     }
-
-    private static ITypeSymbol? FirstForbiddenAttributeType(AttributeData attribute)
-    {
-        foreach (var argument in attribute.ConstructorArguments)
-        {
-            if (FirstForbiddenAttributeType(argument) is { } forbiddenType)
-                return forbiddenType;
-        }
-        foreach (var argument in attribute.NamedArguments)
-        {
-            if (FirstForbiddenAttributeType(argument.Value) is { } forbiddenType)
-                return forbiddenType;
-        }
-        return null;
-    }
-
-    private static ITypeSymbol? FirstForbiddenAttributeType(TypedConstant constant)
-    {
-        if (constant.Kind == TypedConstantKind.Type && constant.Value is ITypeSymbol type)
-            return FirstForbiddenHostApi(type);
-        if (constant.Kind == TypedConstantKind.Array)
-        {
-            foreach (var value in constant.Values)
-            {
-                if (FirstForbiddenAttributeType(value) is { } forbiddenType)
-                    return forbiddenType;
-            }
-        }
-        return null;
-    }
-
-    private static Location? AttributeLocation(AttributeData attribute)
-        => attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation();
 }

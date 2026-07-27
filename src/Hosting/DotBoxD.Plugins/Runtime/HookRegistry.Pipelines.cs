@@ -1,9 +1,70 @@
 using DotBoxD.Kernels.Model;
+using DotBoxD.Plugins.Kernel;
 
 namespace DotBoxD.Plugins.Runtime;
 
 public sealed partial class HookRegistry
 {
+    internal void RemoveKernel(InstalledKernel kernel)
+    {
+        object[] pipelines;
+        lock (_gate)
+        {
+            pipelines = [.. _pipelines.Values];
+        }
+
+        foreach (var pipeline in pipelines)
+        {
+            ((IKernelHandlerPipeline)pipeline).RemoveKernel(kernel);
+        }
+
+        EvictPipelineFanoutCaches();
+    }
+
+    internal void RemoveKernelPool(InstalledKernelPool pool)
+    {
+        object[] pipelines;
+        lock (_gate)
+        {
+            pipelines = [.. _pipelines.Values];
+        }
+
+        foreach (var pipeline in pipelines)
+        {
+            ((IKernelHandlerPipeline)pipeline).RemoveKernelPool(pool);
+        }
+    }
+
+    private void EvictPipelineFanoutCaches()
+    {
+        lock (_gate)
+        {
+            var current = Volatile.Read(ref _pipelineFanout);
+            Dictionary<Type, (object? Single, CachedPipelineFanout Multiple)>? replacement = null;
+            foreach (var (eventType, fanout) in current)
+            {
+                if (fanout.Multiple.Count == 0)
+                {
+                    continue;
+                }
+
+                replacement ??= new(current);
+                replacement[eventType] = (
+                    fanout.Single,
+                    fanout.Multiple.CopyWithoutResultRegistrationCache());
+            }
+
+            if (replacement is null)
+            {
+                return;
+            }
+
+            // Publishing detached state owners prevents a pre-removal aggregate builder from making stale
+            // wrappers visible again. In-flight dispatches may finish against their stable old fanout.
+            Volatile.Write(ref _pipelineFanout, replacement);
+        }
+    }
+
     internal HookPipeline<TEvent, HookContext> OnForWire<TEvent>(
         IPluginEventAdapter<TEvent> adapter,
         out bool created)
@@ -32,7 +93,7 @@ public sealed partial class HookRegistry
                 _onFault,
                 NextResultOrder);
             _pipelines[key] = createdPipeline;
-            RegisterEventTypeLocked<TEvent>();
+            PublishEventFanoutLocked(typeof(TEvent));
             return createdPipeline;
         }
     }
@@ -53,25 +114,8 @@ public sealed partial class HookRegistry
 
             _pipelines.Remove(key);
             var eventType = typeof(TEvent);
-            _pipelineFanout.Remove(eventType);
-            if (!HasPipelineForEventLocked(eventType))
-            {
-                _pipelineEventTypes.Remove(eventType);
-            }
+            PublishEventFanoutLocked(eventType);
         }
-    }
-
-    private bool HasPipelineForEventLocked(Type eventType)
-    {
-        foreach (var key in _pipelines.Keys)
-        {
-            if (key.EventType == eventType)
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private void EnsureCanRegisterLocked<TEvent>(IPluginEventAdapter<TEvent> adapter)
@@ -107,19 +151,16 @@ public sealed partial class HookRegistry
         ]);
     }
 
-    private (object? Single, CachedPipelineFanout Multiple) PipelinesForEventLocked<TEvent>()
+    private (object? Single, CachedPipelineFanout Multiple) PipelinesForEvent<TEvent>()
     {
-        var eventType = typeof(TEvent);
-        if (!_pipelineEventTypes.Contains(eventType))
-        {
-            return (null, CachedPipelineFanout.Empty);
-        }
+        var snapshot = Volatile.Read(ref _pipelineFanout);
+        return snapshot.TryGetValue(typeof(TEvent), out var fanout)
+            ? fanout
+            : (null, CachedPipelineFanout.Empty);
+    }
 
-        if (_pipelineFanout.TryGetValue(eventType, out var cached))
-        {
-            return cached;
-        }
-
+    private void PublishEventFanoutLocked(Type eventType)
+    {
         object? single = null;
         List<object>? multiple = null;
         foreach (var (key, pipeline) in _pipelines)
@@ -143,15 +184,19 @@ public sealed partial class HookRegistry
         (object? Single, CachedPipelineFanout Multiple) fanout = multiple is null
             ? (single, CachedPipelineFanout.Empty)
             : (null, CachedPipelineFanout.From(multiple));
-        _pipelineFanout[eventType] = fanout;
-        return fanout;
-    }
 
-    private void RegisterEventTypeLocked<TEvent>()
-    {
-        var eventType = typeof(TEvent);
-        _pipelineEventTypes.Add(eventType);
-        _pipelineFanout.Remove(eventType);
+        var replacement = new Dictionary<Type, (object? Single, CachedPipelineFanout Multiple)>(
+            Volatile.Read(ref _pipelineFanout));
+        if (single is null && multiple is null)
+        {
+            replacement.Remove(eventType);
+        }
+        else
+        {
+            replacement[eventType] = fanout;
+        }
+
+        Volatile.Write(ref _pipelineFanout, replacement);
     }
 
     private static async ValueTask PublishManyAsync<TEvent>(
@@ -173,7 +218,7 @@ public sealed partial class HookRegistry
         CancellationToken cancellationToken)
         where TResult : struct, IHookResult
     {
-        var registrations = OrderedResultRegistrations<TEvent>(pipelines);
+        var registrations = Hooks.ResultHookRegistrationFanout.Ordered<TEvent>(pipelines);
         foreach (var registration in registrations)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -196,7 +241,7 @@ public sealed partial class HookRegistry
         CancellationToken cancellationToken)
         where TResult : struct, IHookResult
     {
-        var registrations = OrderedResultRegistrations<TEvent>(pipelines);
+        var registrations = Hooks.ResultHookRegistrationFanout.Ordered<TEvent>(pipelines);
         foreach (var registration in registrations)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -212,18 +257,4 @@ public sealed partial class HookRegistry
         return null;
     }
 
-    private static Hooks.IResultHookRegistration<TEvent>[] OrderedResultRegistrations<TEvent>(
-        CachedPipelineFanout pipelines)
-    {
-        var registrations = new List<Hooks.IResultHookRegistration<TEvent>>();
-        for (var i = 0; i < pipelines.Count; i++)
-        {
-            registrations.AddRange(((IHookPipeline<TEvent>)pipelines[i]).ResultRegistrations());
-        }
-
-        registrations.Sort(static (left, right) => left.Priority != right.Priority
-            ? right.Priority.CompareTo(left.Priority)
-            : left.Order.CompareTo(right.Order));
-        return [.. registrations];
-    }
 }

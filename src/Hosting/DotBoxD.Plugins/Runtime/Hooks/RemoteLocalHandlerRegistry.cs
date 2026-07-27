@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Runtime.ExceptionServices;
 using DotBoxD.Plugins.Runtime.Rpc;
 
 namespace DotBoxD.Plugins.Runtime.Hooks;
@@ -152,23 +153,35 @@ public sealed class RemoteLocalHandlerRegistry
     /// native delegate. <paramref name="context"/> is the client-side <see cref="HookContext"/> the delegate
     /// runs against. Throws if no handler is registered for <paramref name="subscriptionId"/>.
     /// </summary>
-    public async ValueTask DispatchAsync(
+    public ValueTask DispatchAsync(
         string subscriptionId,
         ReadOnlyMemory<byte> projectedValue,
         HookContext context,
         CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrEmpty(subscriptionId);
-        ArgumentNullException.ThrowIfNull(context);
-        ThrowIfDispatchCanceled(context, cancellationToken);
-
-        if (!_handlers.TryGetValue(subscriptionId, out var handler))
+        try
         {
-            throw new InvalidOperationException(
-                $"No remote local handler is registered for subscription '{subscriptionId}'.");
+            ArgumentException.ThrowIfNullOrEmpty(subscriptionId);
+            ArgumentNullException.ThrowIfNull(context);
+            ThrowIfDispatchCanceled(context, cancellationToken);
+            if (!_handlers.TryGetValue(subscriptionId, out var handler))
+            {
+                throw new InvalidOperationException(
+                    $"No remote local handler is registered for subscription '{subscriptionId}'.");
+            }
+            return handler.Invoke(projectedValue, context);
         }
+        catch (Exception ex)
+        {
+            // The former async method captured synchronous validation and decoder failures in its ValueTask.
+            return CaptureDispatchExceptionAsync(ex);
+        }
+    }
 
-        await handler.Invoke(projectedValue, context).ConfigureAwait(false);
+    private static async ValueTask CaptureDispatchExceptionAsync(Exception exception)
+    {
+        await Task.CompletedTask.ConfigureAwait(false);
+        ExceptionDispatchInfo.Capture(exception).Throw();
     }
 
     public async ValueTask<byte[]> DispatchResultAsync(
@@ -238,13 +251,11 @@ public sealed class RemoteLocalHandlerRegistry
 
     private bool Unregister(string subscriptionId, Handler handler)
         => !string.IsNullOrEmpty(subscriptionId) &&
-           ((ICollection<KeyValuePair<string, Handler>>)_handlers).Remove(
-               new KeyValuePair<string, Handler>(subscriptionId, handler));
+           ((ICollection<KeyValuePair<string, Handler>>)_handlers).Remove(new(subscriptionId, handler));
 
     private bool Unregister(string subscriptionId, ResultHandler handler)
         => !string.IsNullOrEmpty(subscriptionId) &&
-           ((ICollection<KeyValuePair<string, ResultHandler>>)_resultHandlers).Remove(
-               new KeyValuePair<string, ResultHandler>(subscriptionId, handler));
+           ((ICollection<KeyValuePair<string, ResultHandler>>)_resultHandlers).Remove(new(subscriptionId, handler));
 
     /// <summary>
     /// Removes all registered handlers. Called when the plugin connection tears down (session disposed / peer
@@ -274,8 +285,7 @@ public sealed class RemoteLocalHandlerRegistry
     {
         private RemoteLocalHandlerRegistry? _owner = owner;
 
-        public void Dispose()
-            => Interlocked.Exchange(ref _owner, null)?.Unregister(subscriptionId, handler);
+        public void Dispose() => Interlocked.Exchange(ref _owner, null)?.Unregister(subscriptionId, handler);
     }
 
     private sealed class ResultRegistration(
@@ -285,7 +295,6 @@ public sealed class RemoteLocalHandlerRegistry
     {
         private RemoteLocalHandlerRegistry? _owner = owner;
 
-        public void Dispose()
-            => Interlocked.Exchange(ref _owner, null)?.Unregister(subscriptionId, handler);
+        public void Dispose() => Interlocked.Exchange(ref _owner, null)?.Unregister(subscriptionId, handler);
     }
 }

@@ -12,4 +12,12 @@ public static partial class CompiledRuntime
 
     public static SandboxValue CallBinding2(SandboxContext context, string id, SandboxValue arg0, SandboxValue arg1)
         => CompiledBindingDispatcher.CallBinding2(context, id, arg0, arg1);
+
+    public static SandboxValue CallBinding3(
+        SandboxContext context,
+        string id,
+        SandboxValue arg0,
+        SandboxValue arg1,
+        SandboxValue arg2)
+        => CompiledThreeArgumentBindingDispatcher.CallBinding(context, id, arg0, arg1, arg2);
 }

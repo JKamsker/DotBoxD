@@ -186,6 +186,12 @@ internal static class DispatcherCaseGenerator
         string call,
         string instanceId)
     {
+        if (DispatcherInstanceDisposeGenerator.IsDisposableDispose(method))
+        {
+            DispatcherInstanceDisposeGenerator.GenerateSyncReturn(sb, service, call, instanceId);
+            return;
+        }
+
         if (DispatcherInstanceDisposeGenerator.IsAsyncDisposableDispose(method))
         {
             DispatcherInstanceDisposeGenerator.GenerateReturn(sb, service, call, instanceId);

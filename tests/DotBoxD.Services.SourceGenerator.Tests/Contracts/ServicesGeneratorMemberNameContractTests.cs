@@ -67,6 +67,7 @@ public sealed class ServicesGeneratorMemberNameContractTests
 
             ["InstanceRegistry.TryGet"] = nameof(IInstanceRegistry.TryGet),
             ["InstanceRegistry.Register"] = nameof(IInstanceRegistry.Register),
+            ["InstanceRegistry.Release"] = nameof(IInstanceRegistry.Release),
             ["InstanceRegistry.ReleaseAsync"] = nameof(IInstanceRegistry.ReleaseAsync),
 
             ["Serializer.Serialize"] = nameof(ISerializer.Serialize),

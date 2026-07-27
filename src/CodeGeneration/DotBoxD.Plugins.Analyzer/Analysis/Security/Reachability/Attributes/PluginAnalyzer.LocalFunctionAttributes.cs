@@ -26,7 +26,7 @@ public sealed partial class PluginAnalyzer
 
         foreach (var attribute in MethodAndParameterAttributes(method))
         {
-            if (FirstForbiddenAttributeType(attribute) is not { } forbiddenType)
+            if (FirstForbiddenAttributeValue(attribute) is not { } forbiddenType)
             {
                 continue;
             }
@@ -39,7 +39,7 @@ public sealed partial class PluginAnalyzer
 
             context.ReportDiagnostic(Diagnostic.Create(
                 ForbiddenHostApiRule,
-                AttributeLocation(attribute) ?? localFunction.Identifier.GetLocation(),
+                AttributeLocation(attribute, context.CancellationToken) ?? localFunction.Identifier.GetLocation(),
                 forbiddenType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
         }
     }

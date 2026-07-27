@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Hosting;
@@ -43,7 +44,7 @@ public interface ISandboxWorkerClient
 /// </remarks>
 public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
 {
-    private readonly ConcurrentDictionary<ExecutionPlanSeal, ExecutionPlan> _preparedPlans = new();
+    private readonly ConcurrentDictionary<WorkerPlanCacheKey, ExecutionPlan> _preparedPlans = new();
     private readonly Lazy<SandboxHost> _workerHost;
     private int _disposed;
 
@@ -66,11 +67,24 @@ public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
         ArgumentNullException.ThrowIfNull(entrypoint);
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(options);
+        EnsureInProcessOptions(options);
         cancellationToken.ThrowIfCancellationRequested();
 
         var workerHost = WorkerHost();
-        var workerPlan = await PrepareWorkerPlanAsync(workerHost, plan, cancellationToken)
-            .ConfigureAwait(false);
+        ExecutionPlan workerPlan;
+        try
+        {
+            workerPlan = await PrepareWorkerPlanAsync(workerHost, plan, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (SandboxValidationException)
+        {
+            return Execution.SandboxHost.WorkerIsolationFailedResult(
+                plan,
+                options,
+                new SandboxError(SandboxErrorCode.HostFailure, "worker process execution failed"));
+        }
+
         return await workerHost
             .ExecuteAsync(workerPlan, entrypoint, input, options, cancellationToken)
             .ConfigureAwait(false);
@@ -92,7 +106,8 @@ public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
         ExecutionPlan plan,
         CancellationToken cancellationToken)
     {
-        if (_preparedPlans.TryGetValue(plan.PlanSeal, out var cached))
+        var cacheKey = WorkerPlanCacheKey.Create(plan);
+        if (_preparedPlans.TryGetValue(cacheKey, out var cached))
         {
             return cached;
         }
@@ -100,7 +115,7 @@ public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
         var prepared = await workerHost
             .PrepareAsync(plan.Module, plan.Policy, cancellationToken)
             .ConfigureAwait(false);
-        _preparedPlans.TryAdd(plan.PlanSeal, prepared);
+        _preparedPlans.TryAdd(cacheKey, prepared);
         return prepared;
     }
 
@@ -115,6 +130,32 @@ public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
 
         workerHost.Dispose();
         throw new ObjectDisposedException(GetType().FullName);
+    }
+
+    private static void EnsureInProcessOptions(SandboxExecutionOptions options)
+    {
+        if (options.Isolation != SandboxIsolation.InProcess)
+        {
+            throw new ArgumentException(
+                "SandboxHostWorkerClient accepts only in-process execution options.",
+                nameof(options));
+        }
+    }
+
+    private sealed record WorkerPlanCacheKey(
+        ExecutionPlanSeal PlanSeal,
+        string ModuleHash,
+        string PlanHash,
+        string PolicyHash,
+        string BindingManifestHash)
+    {
+        public static WorkerPlanCacheKey Create(ExecutionPlan plan)
+            => new(
+                plan.PlanSeal,
+                plan.ModuleHash,
+                plan.PlanHash,
+                plan.PolicyHash,
+                plan.BindingManifestHash);
     }
 }
 

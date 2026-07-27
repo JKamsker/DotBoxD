@@ -173,7 +173,15 @@ internal static class ProxyStreamSetupEmitter
             var reservation = reservations[i];
             sb.AppendLine($"{indent}    if ({reservation.ReservedName})");
             sb.AppendLine($"{indent}    {{");
-            sb.AppendLine($"{indent}        this._invoker.{ServicesGeneratorMemberNames.RpcInvoker.ReleaseStream}({reservation.HandleName});");
+            sb.AppendLine($"{indent}        try");
+            sb.AppendLine($"{indent}        {{");
+            sb.AppendLine($"{indent}            this._invoker.{ServicesGeneratorMemberNames.RpcInvoker.ReleaseStream}({reservation.HandleName});");
+            sb.AppendLine($"{indent}        }}");
+            sb.AppendLine($"{indent}        catch");
+            sb.AppendLine($"{indent}        {{");
+            sb.AppendLine($"{indent}            // Best-effort release: a faulting release must not replace");
+            sb.AppendLine($"{indent}            // the original reservation failure that is about to be rethrown.");
+            sb.AppendLine($"{indent}        }}");
             sb.AppendLine($"{indent}    }}");
         }
     }

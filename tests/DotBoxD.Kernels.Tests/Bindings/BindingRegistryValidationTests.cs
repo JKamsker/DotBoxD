@@ -11,6 +11,16 @@ namespace DotBoxD.Kernels.Tests.Bindings;
 public sealed class BindingRegistryValidationTests
 {
     [Fact]
+    public void Empty_binding_registry_validation_reuses_empty_diagnostics()
+    {
+        var first = BindingRegistryValidator.Validate(Array.Empty<BindingDescriptor>());
+        var second = BindingRegistryValidator.Validate(Array.Empty<BindingDescriptor>());
+
+        Assert.Empty(first);
+        Assert.Same(first, second);
+    }
+
+    [Fact]
     public void Default_pure_bindings_contain_math_intrinsics()
     {
         var registry = new BindingRegistryBuilder()

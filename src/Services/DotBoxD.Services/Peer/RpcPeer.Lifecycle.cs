@@ -3,11 +3,15 @@ using DotBoxD.Services.Exceptions;
 using DotBoxD.Services.Peer.Inbound;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Server;
+using DotBoxD.Services.Transport;
 
 namespace DotBoxD.Services.Peer;
 
 public sealed partial class RpcPeer
 {
+    [ThreadStatic]
+    private static RpcPeer? s_disconnectedEventPeer;
+
     /// <summary>Begins the read loop. Idempotent; safe to call from a fluent chain.</summary>
     public RpcPeer Start()
     {
@@ -16,6 +20,18 @@ public sealed partial class RpcPeer
     }
 
     private void EnsureStarted()
+    {
+        if (Volatile.Read(ref _startCompleted) != 0 &&
+            Volatile.Read(ref _disposed) == 0 &&
+            Volatile.Read(ref _closed) == 0)
+        {
+            return;
+        }
+
+        EnsureStartedSlow();
+    }
+
+    private void EnsureStartedSlow()
     {
         lock (_lifecycleLock)
         {
@@ -39,6 +55,7 @@ public sealed partial class RpcPeer
             _inbound.Start(_cts.Token);
             _readLoop = Task.Run(() => _readLoopRunner.RunAsync(_cts.Token));
             RpcTelemetry.PeerStarted();
+            Volatile.Write(ref _startCompleted, 1);
         }
     }
 
@@ -69,7 +86,7 @@ public sealed partial class RpcPeer
             Interlocked.Exchange(ref _closed, 1);
             _proxyCache = null;
             cts = _cts;
-            readLoop = _readLoop;
+            readLoop = ReferenceEquals(s_disconnectedEventPeer, this) ? null : _readLoop;
             cts?.Cancel();
             disposeTask = DisposeCoreAsync(readLoop, cts);
             _disposeTask = disposeTask;
@@ -93,13 +110,20 @@ public sealed partial class RpcPeer
 
         if (readLoop is not null)
         {
-            try
+            if (ShouldAwaitReadLoop(readLoop))
             {
-                await readLoop.ConfigureAwait(false);
+                try
+                {
+                    await readLoop.ConfigureAwait(false);
+                }
+                catch
+                {
+                    // Best-effort shutdown.
+                }
             }
-            catch
+            else
             {
-                // Best-effort shutdown.
+                ObserveFaultedReadLoop(readLoop);
             }
         }
 
@@ -113,6 +137,19 @@ public sealed partial class RpcPeer
         {
             RpcTelemetry.PeerStopped();
         }
+    }
+
+    private bool ShouldAwaitReadLoop(Task readLoop) =>
+        readLoop.IsCompleted ||
+        _channel is not StreamConnection { OwnsStream: false, HasActiveReceive: true };
+
+    private static void ObserveFaultedReadLoop(Task readLoop)
+    {
+        _ = readLoop.ContinueWith(
+            static task => _ = task.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
     }
 
     private void RaiseProtocolError(
@@ -148,9 +185,20 @@ public sealed partial class RpcPeer
             this,
             new RpcReadErrorEventArgs(_channel.RemoteEndpoint, error));
 
-    private void RaiseDisconnected(Exception? error) =>
-        RpcEventHandlerInvoker.Raise(
-            Disconnected,
-            this,
-            new RpcDisconnectedEventArgs(_channel.RemoteEndpoint, error));
+    private void RaiseDisconnected(Exception? error)
+    {
+        var previousPeer = s_disconnectedEventPeer;
+        s_disconnectedEventPeer = this;
+        try
+        {
+            RpcEventHandlerInvoker.Raise(
+                Disconnected,
+                this,
+                new RpcDisconnectedEventArgs(_channel.RemoteEndpoint, error));
+        }
+        finally
+        {
+            s_disconnectedEventPeer = previousPeer;
+        }
+    }
 }

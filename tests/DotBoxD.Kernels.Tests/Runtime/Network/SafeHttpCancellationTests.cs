@@ -29,6 +29,25 @@ public sealed class SafeHttpCancellationTests
     }
 
     [Fact]
+    public async Task GetTextAsync_with_pre_canceled_token_near_wall_time_reports_cancelled()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var scenario = CreateScenario(cancellation.Token, TimeSpan.FromMilliseconds(20));
+
+        var ex = await Assert.ThrowsAsync<SandboxRuntimeException>(async () =>
+            await SafeHttpClient.GetTextAsync(
+                scenario.Context,
+                new SandboxUri("https://api.example.com/config"),
+                new SafeInMemoryHttpMessageInvoker("remote-config"),
+                scenario.Dns,
+                cancellation.Token));
+
+        Assert.Equal(SandboxErrorCode.Cancelled, ex.Error.Code);
+        AssertNoPreCancellationSideEffects(scenario);
+    }
+
+    [Fact]
     public async Task GetTextAsync_with_operation_token_cancelled_after_dns_reports_cancelled()
     {
         using var operationCancellation = new CancellationTokenSource();
@@ -124,12 +143,29 @@ public sealed class SafeHttpCancellationTests
         CancellationToken contextToken,
         Action? onDnsResolved = null,
         params IPAddress[] addresses)
+        => CreateScenario(contextToken, onDnsResolved, addresses, wallTime: null);
+
+    private static SafeHttpCancellationScenario CreateScenario(
+        CancellationToken contextToken,
+        TimeSpan wallTime)
+        => CreateScenario(contextToken, onDnsResolved: null, [], wallTime);
+
+    private static SafeHttpCancellationScenario CreateScenario(
+        CancellationToken contextToken,
+        Action? onDnsResolved,
+        IPAddress[] addresses,
+        TimeSpan? wallTime)
     {
         var audit = new InMemoryAuditSink();
-        var policy = SandboxPolicyBuilder.Create()
+        var policyBuilder = SandboxPolicyBuilder.Create()
             .GrantHttpGet(["api.example.com"], maxResponseBytes: 1024)
-            .WithFuel(5_000)
-            .Build();
+            .WithFuel(5_000);
+        if (wallTime is { } limit)
+        {
+            policyBuilder.WithWallTime(limit);
+        }
+
+        var policy = policyBuilder.Build();
         var context = new SandboxContext(
             SandboxRunId.New(),
             policy,

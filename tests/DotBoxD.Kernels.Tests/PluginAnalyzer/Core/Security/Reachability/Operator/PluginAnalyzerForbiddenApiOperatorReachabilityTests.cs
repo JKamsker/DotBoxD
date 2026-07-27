@@ -52,6 +52,80 @@ public sealed class PluginAnalyzerForbiddenApiOperatorReachabilityTests
         AssertSingleForbiddenDiagnosticAt(source, diagnostics, "if (new Helper())");
     }
 
+    [Fact]
+    public async Task Reports_forbidden_operator_reached_through_increment()
+    {
+        const string source = """
+            namespace Sample
+            {
+                using DotBoxD.Abstractions;
+                using DotBoxD.Plugins;
+
+                public sealed class Counter
+                {
+                    public static Counter operator ++(Counter value)
+                    {
+                        _ = System.IO.File.ReadAllText("/x");
+                        return value;
+                    }
+                }
+
+                [Plugin("increment-operator-leak")]
+                public sealed class OperatorKernel : IEventKernel<string>
+                {
+                    public bool ShouldHandle(string e, HookContext context)
+                    {
+                        var counter = new Counter();
+                        counter++;
+                        return false;
+                    }
+
+                    public void Handle(string e, HookContext context) { }
+                }
+            }
+            """;
+
+        var diagnostics = await AnalyzeAsync(source);
+        AssertSingleForbiddenDiagnosticAt(source, diagnostics, "counter++;");
+    }
+
+    [Fact]
+    public async Task Reports_forbidden_operator_reached_through_binary_operator()
+    {
+        const string source = """
+            namespace Sample
+            {
+                using DotBoxD.Abstractions;
+                using DotBoxD.Plugins;
+
+                public sealed class Counter
+                {
+                    public static Counter operator +(Counter left, Counter right)
+                    {
+                        _ = System.IO.File.ReadAllText("/x");
+                        return left;
+                    }
+                }
+
+                [Plugin("binary-operator-leak")]
+                public sealed class OperatorKernel : IEventKernel<string>
+                {
+                    public bool ShouldHandle(string e, HookContext context)
+                    {
+                        var counter = new Counter();
+                        counter = counter + new Counter();
+                        return false;
+                    }
+
+                    public void Handle(string e, HookContext context) { }
+                }
+            }
+            """;
+
+        var diagnostics = await AnalyzeAsync(source);
+        AssertSingleForbiddenDiagnosticAt(source, diagnostics, "counter = counter + new Counter();");
+    }
+
     private static void AssertSingleForbiddenDiagnosticAt(
         string source,
         ImmutableArray<Diagnostic> diagnostics,

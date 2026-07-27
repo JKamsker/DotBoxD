@@ -18,14 +18,14 @@ public static class SafeHttpBindings
             BindingCostModel.Fixed(75),
             AuditLevel.PerResource,
             BindingSafety.ReadOnlyExternal,
-            async (context, args, cancellationToken) =>
+            async (context, args, _) =>
             {
                 var text = await SafeHttpClient.GetTextAsync(
                     context,
                     ((SandboxUriValue)args[0]).Value,
                     invoker,
                     dnsResolver,
-                    cancellationToken).ConfigureAwait(false);
+                    CancellationToken.None).ConfigureAwait(false);
                 return SandboxValue.FromString(text);
             },
             CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),

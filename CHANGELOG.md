@@ -69,16 +69,53 @@ Services, Kernels, and Pushdown.
   after the leading parameter region. Boxed locals continue to track assignment through their null/non-null slot,
   so a frame with raw parameters and boxed locals can reuse the empty sentinel while genuine raw locals retain
   read-before-assignment validation.
-- **Array-free scalar interpreted local calls:** synchronous one- and two-argument calls to module-local functions
-  now carry evaluated values directly into the callee frame. Pending operands, host bindings, collection constructors,
-  and calls with three or more arguments retain their existing array-backed paths and ordering.
+- **Array-free scalar interpreted local calls:** synchronous one-, two-, and three-argument calls to module-local
+  functions now carry evaluated values directly into the callee frame. Pending operands, host bindings, collection
+  constructors, and calls with four or more arguments retain their existing array-backed paths and ordering.
+- **Allocation-free straight I64/F64 assignments:** interpreted non-debug assignments over I64/F64 literals and assigned
+  raw locals now evaluate checked arithmetic directly into primitive target slots. Direct `numeric.toI64`/`numeric.toF64`
+  assignments use the same primitive handoff; unsupported calls, pending operands, and debug tracing retain the generic
+  evaluator.
+- **Allocation-free I64/F64 return intermediates:** eligible non-debug unary and arithmetic return trees now remain
+  primitive until the one `SandboxValue` required by the public result. Prepared literal identity, plain-variable returns,
+  calls and pending continuations, trace order, checked/finite math, and resource accounting retain their existing paths.
+- **Allocation-free MessagePack envelope read state:** request and response formatters now keep their synchronous,
+  formatter-private field-tracking state on the stack. Field ordering, duplicate and required-field validation, unknown
+  field depth limits, stream decoding, and trailing-byte rejection are unchanged.
 - **Lazy interpreter audit envelopes:** strictly eligible in-process interpreter runs that suppress successful summaries,
   disable debug tracing, and declare no binding references now defer their normal run identity and in-memory audit sink
   until audit evidence is actually needed. Failures and unexpected audited access materialize the full envelope, preserving
   event ordering, identity, and resource accounting instead of discarding evidence through a shared no-op sink.
+- **Race-safe required binding audits:** default in-memory audits now give every required-audit call a unique flow identity,
+  including sync-declared bindings that return pending work and calls that fail during preflight. Terminal evidence is
+  claimed by its originating invocation, fallback arbitration shares the destination event gate, and matching late writes
+  are suppressed without shortening the wall-time budget. Custom sinks retain their documented checkpoint contract.
 - **Value-type compiled attempt handoff:** public compiled host executions now carry the private result-or-fallback attempt
   between host helpers in a readonly value envelope, removing one 32-byte object from each successful dispatch. Audited
   successes, compiled failures, verifier fallback, and the public and generated-code ABI remain unchanged.
+- **Allocation-free warmed compiled cache hits:** the non-persistent reflection compiler path now creates compilation and
+  materialization factories only on cache misses, while preserving atomic same-key coalescing and LRU updates. Inline-await
+  closure state is likewise created only when that pump is selected; cancellation, custom/persistent compilers, audit, and
+  fallback behavior are unchanged.
+- **Cached direct compiled record types:** generated input and return validation now uses bounded generated-code ABI sugar
+  for direct one- and two-field records of built-in scalars, removing the immutable descriptor graph while retaining the
+  metered field array. The existing public `TypeRecord` primitive, nested/opaque/noncanonical records, and records with
+  three or more fields keep their legacy paths; compiler and verifier identities advance to version 11.
+- **Reusable Auto compiled no-audit state:** serialized installed kernels now reuse their resource meter and sandbox context
+  after Auto mode has completed a successful binding-free compiled run. Auto still interprets its mandatory first run,
+  re-evaluates selector and hotness decisions, returns full execution results, and uses the host provider caches; failures,
+  fallback, cancellation-token changes, revocation, audited runs, and binding entrypoints retain their prior paths.
+- **Value-type interpreter loop comparisons:** eligible I32 `while` and branched-loop plans now embed their immutable
+  comparison plan instead of allocating a separate object per execution. F64 branched planning removes both the rejected
+  tentative I32 comparison and the selected F64 comparison allocation; evaluation order, fuel, loop accounting, and
+  unsupported/debug fallback behavior are unchanged.
+- **Allocation-free I64 plan slot predicates:** eligible I64 loop planners now carry frame assignment state and
+  source-ordered earlier targets in a readonly value instead of allocating captured slot-read predicates. Single- and
+  multi-assignment planning retain checked arithmetic, read-before-assignment validation, fuel, and whole-body fallback.
+- **Allocation-free live-state snapshots:** installed kernels now publish an immutable copy-on-write synchronizer snapshot
+  when class-shaped live state is registered instead of cloning the registry on every input build or flush. Registrations
+  made during a synchronization become visible on the next pass, callbacks remain outside the registration lock, and
+  `AsyncSet` deferred-action lists remain caller-owned.
 - **Documentation & repo polish:** new top-level README, `docs/` information architecture
   (getting-started, concepts, security, reference, contributing), `SECURITY.md`, `CONTRIBUTING.md`,
   `CODE_OF_CONDUCT.md`, and GitHub repo metadata files.

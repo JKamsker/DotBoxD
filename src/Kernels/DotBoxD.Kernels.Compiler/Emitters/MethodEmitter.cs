@@ -15,6 +15,7 @@ internal sealed class MethodEmitter
     private readonly SandboxFunction _function;
     private readonly IReadOnlyDictionary<string, SandboxFunction> _functionModels;
     private readonly IBindingCatalog _bindings;
+    private readonly bool _recordReturnValidation;
     private readonly Dictionary<string, (LocalBuilder Local, StackKind Kind)> _locals = new(StringComparer.Ordinal);
     private readonly HashSet<string> _nonNegativeF64Locals = new(StringComparer.Ordinal);
     // Branch targets for the innermost enclosing generic loop: `continue` re-enters the loop (the
@@ -29,12 +30,14 @@ internal sealed class MethodEmitter
         IReadOnlyDictionary<string, MethodInfo> functions,
         IReadOnlyDictionary<string, SandboxFunction> functionModels,
         IBindingCatalog bindings,
-        IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis)
+        IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis,
+        bool recordReturnValidation)
     {
         _il = il;
         _function = function;
         _functionModels = functionModels;
         _bindings = bindings;
+        _recordReturnValidation = recordReturnValidation;
         _stackPlan = new LocalStackKindPlanner(function, bindings, functionAnalysis);
         _expressions = new ExpressionEmitter(il, functions, bindings, functionAnalysis, _locals, _stackPlan);
     }
@@ -304,17 +307,7 @@ internal sealed class MethodEmitter
         };
 
     private void EmitReturnValue()
-    {
-        var value = _il.DeclareLocal(typeof(SandboxValue));
-        _il.Emit(OpCodes.Stloc, value);
-        _il.Emit(OpCodes.Ldloc, value);
-        CompiledTypeEmitter.EmitMetered(_il, _function.ReturnType);
-        _il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.RequireValueType)));
-        _il.Emit(OpCodes.Stloc, value);
-        CompiledMeterEmitter.ExitCall(_il);
-        _il.Emit(OpCodes.Ldloc, value);
-        _il.Emit(OpCodes.Ret);
-    }
+        => CompiledReturnEmitter.Emit(_il, _function.ReturnType, _recordReturnValidation);
 
     private static Exception Unsupported(string message)
         => new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, message));

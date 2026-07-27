@@ -6,7 +6,7 @@ namespace DotBoxD.Kernels.Interpreter.Internal.Expressions;
 // Unboxed i32 comparison (two i32 expression plans -> bool), used as the condition of a branched i32 loop body
 // so the comparison avoids boxing its operands and result. FuelCost counts nodes identically to the compiler's
 // per-subexpression metering (1 + left + right).
-internal sealed class I32ComparisonPlan
+internal readonly struct I32ComparisonPlan
 {
     private static readonly Dictionary<string, Comparison> Comparisons = new(StringComparer.Ordinal)
     {
@@ -32,6 +32,15 @@ internal sealed class I32ComparisonPlan
 
     public int FuelCost { get; }
 
+    public bool HasOnlyRawVariables()
+        => _left.HasOnlyRawVariables() && _right.HasOnlyRawVariables();
+
+    public void CollectRequiredRawSlots(List<int> slots)
+    {
+        _left.CollectRequiredRawSlots(slots);
+        _right.CollectRequiredRawSlots(slots);
+    }
+
     public bool Evaluate(InterpreterFrame frame, SandboxContext context)
     {
         var l = _left.Evaluate(frame, context);
@@ -51,14 +60,21 @@ internal sealed class I32ComparisonPlan
         Expression expression,
         InterpreterFrame frame,
         string assumedInt32Local,
-        I32CallEvaluator calls,
+        out I32ComparisonPlan plan)
+        => TryCreate(expression, frame, assumedInt32Local, calls: null, out plan);
+
+    public static bool TryCreate(
+        Expression expression,
+        InterpreterFrame frame,
+        string assumedInt32Local,
+        I32CallEvaluator? calls,
         out I32ComparisonPlan plan)
     {
-        plan = null!;
+        plan = default;
         if (expression is not BinaryExpression binary ||
             !Comparisons.TryGetValue(binary.Operator, out var op) ||
-            !I32ExpressionPlan.TryCreate(binary.Left, frame, assumedInt32Local, calls, out var left) ||
-            !I32ExpressionPlan.TryCreate(binary.Right, frame, assumedInt32Local, calls, out var right))
+            !TryCreateExpression(binary.Left, frame, assumedInt32Local, calls, out var left) ||
+            !TryCreateExpression(binary.Right, frame, assumedInt32Local, calls, out var right))
         {
             return false;
         }
@@ -66,6 +82,16 @@ internal sealed class I32ComparisonPlan
         plan = new I32ComparisonPlan(op, left, right);
         return true;
     }
+
+    private static bool TryCreateExpression(
+        Expression expression,
+        InterpreterFrame frame,
+        string assumedInt32Local,
+        I32CallEvaluator? calls,
+        out I32ExpressionPlan plan)
+        => calls is null
+            ? I32ExpressionPlan.TryCreate(expression, frame, assumedInt32Local, out plan)
+            : I32ExpressionPlan.TryCreate(expression, frame, assumedInt32Local, calls, out plan);
 
     private enum Comparison { Lt, Lte, Gt, Gte, Eq, Ne }
 }

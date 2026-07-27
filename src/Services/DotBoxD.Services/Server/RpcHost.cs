@@ -24,6 +24,7 @@ public sealed partial class RpcHost : IAsyncDisposable
     private CancellationTokenSource? _cts;
     private Task? _acceptTask;
     private Task? _stopTask;
+    private Task? _disposeTask;
     private bool _starting;
     private int _disposed;
     private int _listenerStopped;
@@ -237,12 +238,18 @@ public sealed partial class RpcHost : IAsyncDisposable
         }
 
         peer.Disconnected -= OnPeerDisconnected;
+        var cleanup = _peers.BeginCleanup();
         _peers.Remove(peer);
-        RpcEventHandlerInvoker.Raise(PeerDisconnected, this, new RpcPeerEventArgs(peer));
-
-        // Dispose off the read-loop callback so DisposeAsync can await the now-completing loop
-        // without deadlocking on itself.
-        _peers.DisposeInBackground(peer);
+        try
+        {
+            RpcEventHandlerInvoker.Raise(PeerDisconnected, this, new RpcPeerEventArgs(peer));
+        }
+        finally
+        {
+            // Dispose off the read-loop callback so DisposeAsync can await the now-completing loop
+            // without deadlocking on itself.
+            _peers.CompleteCleanupInBackground(peer, cleanup);
+        }
     }
 
 }

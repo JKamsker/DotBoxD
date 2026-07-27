@@ -48,3 +48,29 @@ internal readonly struct LocalFunctionArguments
     public static LocalFunctionArguments FromPair(SandboxValue first, SandboxValue second)
         => new(null, first, second, scalarCount: 2);
 }
+
+internal readonly struct LocalFunctionTripleArguments
+{
+    private readonly SandboxValue _first;
+    private readonly SandboxValue _second;
+    private readonly SandboxValue _third;
+
+    public LocalFunctionTripleArguments(
+        SandboxValue first,
+        SandboxValue second,
+        SandboxValue third)
+    {
+        _first = first;
+        _second = second;
+        _third = third;
+    }
+
+    public SandboxValue this[int index]
+        => index switch
+        {
+            0 => _first,
+            1 => _second,
+            2 => _third,
+            _ => throw new IndexOutOfRangeException()
+        };
+}

@@ -113,17 +113,57 @@ public sealed class InMemoryAuditSink : IAuditSink
     {
         ArgumentNullException.ThrowIfNull(auditEvent);
 
-        var events = Volatile.Read(ref _events);
-        if (events is null)
-        {
-            var created = new List<SandboxAuditEvent>();
-            events = Interlocked.CompareExchange(ref _events, created, null) ?? created;
-        }
-
+        var events = GetOrCreateEvents();
         lock (events)
         {
-            var sequence = ++_sequence;
-            events.Add(auditEvent with { SequenceNumber = sequence });
+            AppendUnderLock(events, auditEvent);
+        }
+    }
+
+    internal void WriteBindingInvocation(
+        BindingAuditInvocationSink invocation,
+        SandboxAuditEvent auditEvent)
+    {
+        ArgumentNullException.ThrowIfNull(auditEvent);
+
+        var events = GetOrCreateEvents();
+        lock (events)
+        {
+            if (invocation.ShouldSuppressTerminalUnderLock(auditEvent))
+            {
+                return;
+            }
+
+            AppendUnderLock(events, auditEvent);
+            invocation.RecordTerminalEvidenceUnderLock(auditEvent);
+        }
+    }
+
+    internal bool TrySealBindingInvocationSuccess(BindingAuditInvocationSink invocation)
+    {
+        var events = GetOrCreateEvents();
+        lock (events)
+        {
+            return invocation.TrySealSuccessUnderLock();
+        }
+    }
+
+    internal void EnsureBindingInvocationFailure(
+        BindingAuditInvocationSink invocation,
+        SandboxErrorCode errorCode)
+    {
+        var events = GetOrCreateEvents();
+        lock (events)
+        {
+            if (!invocation.HasFailureEvidenceUnderLock(errorCode))
+            {
+                // This factory reads only immutable context metadata and the clock;
+                // it cannot re-enter the audit sink while its event gate is held.
+                AppendUnderLock(events, invocation.CreateRequiredFailureAudit(errorCode));
+                invocation.RecordFailureEvidenceUnderLock(errorCode);
+            }
+
+            invocation.SealUnderLock();
         }
     }
 
@@ -164,7 +204,7 @@ public sealed class InMemoryAuditSink : IAuditSink
         }
     }
 
-    private static bool BindingAuditMatches(
+    internal static bool BindingAuditMatches(
         SandboxAuditEvent auditEvent,
         BindingDescriptor descriptor,
         bool success,
@@ -181,6 +221,24 @@ public sealed class InMemoryAuditSink : IAuditSink
            !string.IsNullOrWhiteSpace(auditEvent.ResourceId) &&
            HasRequiredFields(auditEvent, moduleHash, policyHash) &&
            ResultMatches(auditEvent, success, expectedErrorCode);
+
+    private List<SandboxAuditEvent> GetOrCreateEvents()
+    {
+        var events = Volatile.Read(ref _events);
+        if (events is not null)
+        {
+            return events;
+        }
+
+        var created = new List<SandboxAuditEvent>();
+        return Interlocked.CompareExchange(ref _events, created, null) ?? created;
+    }
+
+    private void AppendUnderLock(List<SandboxAuditEvent> events, SandboxAuditEvent auditEvent)
+    {
+        var sequence = ++_sequence;
+        events.Add(auditEvent with { SequenceNumber = sequence });
+    }
 
     private static int StartIndexAfter(long checkpoint, int eventCount)
     {
@@ -238,25 +296,4 @@ public sealed class InMemoryAuditSink : IAuditSink
                 out var parsed) &&
             parsed >= 0;
     }
-}
-
-internal sealed class NoopAuditSink : IAuditSink
-{
-    public static NoopAuditSink Instance { get; } = new();
-
-    public long EventsWritten => 0;
-
-    public void Write(SandboxAuditEvent auditEvent)
-    {
-    }
-
-    public bool HasBindingAuditSince(
-        BindingDescriptor descriptor,
-        long checkpoint,
-        bool success,
-        SandboxErrorCode? expectedErrorCode,
-        SandboxRunId runId,
-        string moduleHash,
-        string policyHash)
-        => false;
 }

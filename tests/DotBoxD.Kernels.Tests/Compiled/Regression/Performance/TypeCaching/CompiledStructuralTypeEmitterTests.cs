@@ -1,6 +1,8 @@
+using System.Reflection.Emit;
 using DotBoxD.Kernels.Compiler;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Serialization.Json.Hosting;
 using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Kernels.Verifier.Generated;
@@ -18,13 +20,19 @@ public sealed class CompiledStructuralTypeEmitterTests
             """{ "name": "List", "arguments": ["I32"] }""");
         var mapCalls = await CompileRuntimeCallsAsync(
             """{ "name": "Map", "arguments": ["String", "I32"] }""");
+        var oneFieldRecordCalls = await CompileRuntimeCallsAsync(
+            """{ "name": "Record", "arguments": ["I32"] }""");
+        var twoFieldRecordCalls = await CompileRuntimeCallsAsync(
+            """{ "name": "Record", "arguments": ["I32", "String"] }""");
 
         AssertCalls(listCalls, [nameof(CompiledRuntime.TypeListCached)]);
         AssertCalls(mapCalls, [nameof(CompiledRuntime.TypeMapCached)]);
+        AssertCalls(oneFieldRecordCalls, [nameof(CompiledRuntime.TypeRecordCached)]);
+        AssertCalls(twoFieldRecordCalls, [nameof(CompiledRuntime.TypeRecordCached)]);
     }
 
     [Fact]
-    public async Task Non_direct_builtin_structural_inputs_and_returns_use_legacy_factories_and_verify()
+    public async Task Nested_eligible_structural_nodes_use_cached_factories_and_verify()
     {
         var nestedCalls = await CompileRuntimeCallsAsync(
             """
@@ -63,22 +71,63 @@ public sealed class CompiledStructuralTypeEmitterTests
               "arguments": ["String", { "name": "Record", "arguments": ["I32"] }]
             }
             """);
+        var arityThreeRecordCalls = await CompileRuntimeCallsAsync(
+            """{ "name": "Record", "arguments": ["I32", "String", "Bool"] }""");
+        var opaqueRecordCalls = await CompileRuntimeCallsAsync(
+            """{ "name": "Record", "arguments": ["I32", "MonsterId"] }""",
+            declareOpaqueId: true);
+        var nestedFieldRecordCalls = await CompileRuntimeCallsAsync(
+            """
+            {
+              "name": "Record",
+              "arguments": ["I32", { "name": "List", "arguments": ["I32"] }]
+            }
+            """);
 
         AssertCalls(
             nestedCalls,
-            [nameof(CompiledRuntime.TypeList), nameof(CompiledRuntime.TypeList)]);
+            [nameof(CompiledRuntime.TypeListCached), nameof(CompiledRuntime.TypeList)]);
         AssertCalls(opaqueCalls, [nameof(CompiledRuntime.TypeList)]);
         AssertCalls(
             recordCalls,
-            [nameof(CompiledRuntime.TypeRecord), nameof(CompiledRuntime.TypeList)]);
+            [nameof(CompiledRuntime.TypeRecordCached), nameof(CompiledRuntime.TypeList)]);
         AssertCalls(
             nestedMapCalls,
-            [nameof(CompiledRuntime.TypeList), nameof(CompiledRuntime.TypeMap)]);
+            [nameof(CompiledRuntime.TypeListCached), nameof(CompiledRuntime.TypeMap)]);
         AssertCalls(opaqueMapCalls, [nameof(CompiledRuntime.TypeMap)]);
         AssertCalls(opaqueKeyMapCalls, [nameof(CompiledRuntime.TypeMap)]);
         AssertCalls(
             recordMapCalls,
-            [nameof(CompiledRuntime.TypeRecord), nameof(CompiledRuntime.TypeMap)]);
+            [nameof(CompiledRuntime.TypeRecordCached), nameof(CompiledRuntime.TypeMap)]);
+        AssertCalls(arityThreeRecordCalls, [nameof(CompiledRuntime.TypeRecord)]);
+        AssertCalls(opaqueRecordCalls, [nameof(CompiledRuntime.TypeRecord)]);
+        AssertCalls(
+            nestedFieldRecordCalls,
+            [nameof(CompiledRuntime.TypeListCached), nameof(CompiledRuntime.TypeRecord)]);
+    }
+
+    [Fact]
+    public void Legacy_type_emitter_keeps_nested_structural_factories_uncached()
+    {
+        var nestedType = SandboxType.List(SandboxType.List(SandboxType.I32));
+        var method = new DynamicMethod(
+            "CreateLegacyNestedType",
+            typeof(SandboxType),
+            Type.EmptyTypes,
+            typeof(CompiledStructuralTypeEmitterTests).Module,
+            skipVisibility: true);
+        var il = method.GetILGenerator();
+        IlEmitterPrimitives.EmitSandboxType(il, nestedType);
+        il.Emit(System.Reflection.Emit.OpCodes.Ret);
+        var factory = method.CreateDelegate<Func<SandboxType>>();
+
+        var first = factory();
+        var second = factory();
+
+        Assert.Equal(nestedType, first);
+        Assert.Equal(nestedType, second);
+        Assert.NotSame(first, second);
+        Assert.NotSame(first.Arguments[0], second.Arguments[0]);
     }
 
     private static async Task<RuntimeCalls> CompileRuntimeCallsAsync(
@@ -134,7 +183,8 @@ public sealed class CompiledStructuralTypeEmitterTests
                 nameof(CompiledRuntime.TypeListCached) or
                 nameof(CompiledRuntime.TypeMap) or
                 nameof(CompiledRuntime.TypeMapCached) or
-                nameof(CompiledRuntime.TypeRecord))
+                nameof(CompiledRuntime.TypeRecord) or
+                nameof(CompiledRuntime.TypeRecordCached))
             .Select(method => method.Name)
             .ToArray();
 

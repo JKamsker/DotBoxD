@@ -48,10 +48,14 @@ public sealed class EventReadRuntimeCapabilityTests
         Assert.Equal(1, adapter.MaterializedValues);
     }
 
-    [Fact]
-    public void Event_capability_validation_requires_each_entrypoint_to_declare_gated_property()
+    [Theory]
+    [InlineData("ShouldHandle", "Handle")]
+    [InlineData("Handle", "ShouldHandle")]
+    public void Event_capability_validation_requires_each_entrypoint_to_declare_gated_property(
+        string declaredEntrypoint,
+        string missingEntrypoint)
     {
-        var plan = SplitEntrypointCapabilityPlan();
+        var plan = SplitEntrypointCapabilityPlan(declaredEntrypoint);
 
         var exception = Assert.Throws<SandboxValidationException>(
             () => PluginEventCapabilityValidator.Validate<GatedRuntimeEvent>(
@@ -61,8 +65,10 @@ public sealed class EventReadRuntimeCapabilityTests
 
         var diagnostic = Assert.Single(exception.Diagnostics);
         Assert.Equal("DBXK044", diagnostic.Code);
-        Assert.Contains("Handle: event.read.health", diagnostic.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain("ShouldHandle: event.read.health", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains(
+            $"(missing: {missingEntrypoint}: event.read.health).",
+            diagnostic.Message,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -71,6 +77,17 @@ public sealed class EventReadRuntimeCapabilityTests
         var plan = ModuleCapabilityPlan("event.read.derived-health");
 
         PluginEventCapabilityValidator.Validate<DerivedGatedRuntimeEvent>(
+            plan,
+            new KernelEntrypoints("ShouldHandle", "Handle"),
+            [new Parameter("e_Health", SandboxType.I32)]);
+    }
+
+    [Fact]
+    public void Event_capability_validation_keeps_inherited_property_capability()
+    {
+        var plan = ModuleCapabilityPlan("event.read.base-health");
+
+        PluginEventCapabilityValidator.Validate<InheritedGatedRuntimeEvent>(
             plan,
             new KernelEntrypoints("ShouldHandle", "Handle"),
             [new Parameter("e_Health", SandboxType.I32)]);
@@ -132,7 +149,7 @@ public sealed class EventReadRuntimeCapabilityTests
             SandboxType.Unit,
             [new ReturnStatement(new LiteralExpression(SandboxValue.Unit, Span), Span)]);
 
-    private static ExecutionPlan SplitEntrypointCapabilityPlan()
+    private static ExecutionPlan SplitEntrypointCapabilityPlan(string declaredEntrypoint)
     {
         var binding = EventReadBinding();
         var bindings = new BindingRegistry([binding]);
@@ -149,9 +166,14 @@ public sealed class EventReadRuntimeCapabilityTests
             FunctionAnalysis(),
             new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
             {
-                ["ShouldHandle"] = new HashSet<string>([binding.Id], StringComparer.Ordinal),
-                ["Handle"] = new HashSet<string>(StringComparer.Ordinal)
+                ["ShouldHandle"] = EntrypointBindings("ShouldHandle"),
+                ["Handle"] = EntrypointBindings("Handle")
             });
+
+        IReadOnlySet<string> EntrypointBindings(string entrypoint)
+            => string.Equals(entrypoint, declaredEntrypoint, StringComparison.Ordinal)
+                ? new HashSet<string>([binding.Id], StringComparer.Ordinal)
+                : new HashSet<string>(StringComparer.Ordinal);
     }
 
     private static ExecutionPlan ModuleCapabilityPlan(string capability)
@@ -231,6 +253,8 @@ public sealed class EventReadRuntimeCapabilityTests
         [Capability("event.read.derived-health")]
         public new int Health { get; init; }
     }
+
+    private sealed class InheritedGatedRuntimeEvent : BaseGatedRuntimeEvent;
 
     private sealed class GatedRuntimeEventAdapter : IPluginEventAdapter<GatedRuntimeEvent>
     {

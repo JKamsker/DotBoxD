@@ -30,4 +30,14 @@ public sealed partial class PluginAnalyzer
             return;
         }
     }
+
+    private static void RecordGenericNewConstraintConstructorReachability(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol containingMethod,
+        IMethodSymbol targetMethod)
+        => helperGraph.RecordGenericInvocation(
+            containingMethod,
+            targetMethod,
+            context.Operation.Syntax.GetLocation());
 }

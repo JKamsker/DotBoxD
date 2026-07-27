@@ -30,13 +30,14 @@ internal sealed partial class RpcStreamManager
             serializer.Serialize(frame, item);
             ct.ThrowIfCancellationRequested();
             RpcRawFrame.Complete(frame);
-            await _frameSender.SendAsync(frame, ct).ConfigureAwait(false);
         }
         catch
         {
             frame.Dispose();
             throw;
         }
+
+        await _frameSender.SendAsync(frame, ct).ConfigureAwait(false);
     }
 
     public Task SendStreamCompleteAsync(int streamId, CancellationToken ct) =>

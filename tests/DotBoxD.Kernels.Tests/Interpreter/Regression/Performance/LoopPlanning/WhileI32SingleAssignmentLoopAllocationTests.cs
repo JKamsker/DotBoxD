@@ -41,14 +41,15 @@ public sealed class WhileI32SingleAssignmentLoopAllocationTests
                                   (double)MeasurementIterations;
         var zeroWhileOverhead = (zero.AllocatedBytes - noWhile.AllocatedBytes) /
                                 (double)MeasurementIterations;
-        var twoAssignmentBytesPerExecution = two.AllocatedBytes /
-                                             (double)MeasurementIterations;
-        // The isolated scalar-plan overhead is about 320 B/op; the legacy 40-byte plan array raises it
-        // to about 360 B/op. The lazy audit envelope lowers both absolute totals by 64 B/op. Leave room
-        // for full-suite runtime bookkeeping while keeping the scalar-plan bands separate.
-        Assert.InRange(singleWhileOverhead, 300, 340);
-        Assert.InRange(zeroWhileOverhead, 300, 340);
-        Assert.InRange(twoAssignmentBytesPerExecution, 1_375, 1_425);
+        var twoAssignmentOverhead = (two.AllocatedBytes - single.AllocatedBytes) /
+                                    (double)MeasurementIterations;
+        // The warmed function layout retains the immutable comparison and assignment plans. Both a taken
+        // and an untaken while should therefore stay in the no-while allocation band instead of rebuilding
+        // five expression-plan objects (about 280 B) on every entry. The dependent multi-assignment body
+        // likewise retains its complete plan after warmup.
+        Assert.InRange(singleWhileOverhead, 0, 8);
+        Assert.InRange(zeroWhileOverhead, 0, 8);
+        Assert.InRange(twoAssignmentOverhead, 0, 16);
     }
 
     [Fact]

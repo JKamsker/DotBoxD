@@ -29,6 +29,31 @@ public sealed class ExecutionModeSelectorContractTests
     }
 
     [Theory]
+    [InlineData(1, 1)]
+    [InlineData(1, 2)]
+    [InlineData(2, 1)]
+    [InlineData(2, 2)]
+    [InlineData(5, 4)]
+    [InlineData(5, 5)]
+    [InlineData(int.MaxValue, int.MaxValue - 1)]
+    [InlineData(int.MaxValue, int.MaxValue)]
+    public void Built_in_run_count_path_matches_public_selector(int threshold, int runCount)
+    {
+        var options = new SandboxExecutionOptions
+        {
+            Mode = ExecutionMode.Auto,
+            AutoCompileThreshold = threshold
+        };
+        var selected = new HotnessExecutionModeSelector().Choose(
+            ValidPlan(),
+            options,
+            Hotness(runCount: runCount),
+            CompiledCacheStatus.None);
+
+        Assert.Equal(selected.Mode, HotnessExecutionModeSelector.ChooseMode(options, runCount));
+    }
+
+    [Theory]
     [InlineData("PlanHash")]
     [InlineData("Entrypoint")]
     public void Module_hotness_stats_rejects_null_required_identifiers(string memberName)

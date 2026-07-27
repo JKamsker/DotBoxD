@@ -4,6 +4,12 @@ internal static class PluginProbeDispatcher
 {
     public static bool TryRun(string[] args)
     {
+        if (args.Contains("--probe-live-state-sync", StringComparer.OrdinalIgnoreCase))
+        {
+            LiveStateSyncRegistryProbe.Run();
+            return true;
+        }
+
         if (args.Contains("--probe-remote-result-hook", StringComparer.OrdinalIgnoreCase))
         {
             RemoteResultHookProbe.Run();
@@ -19,6 +25,18 @@ internal static class PluginProbeDispatcher
         if (args.Contains("--probe-hook-dispatch", StringComparer.OrdinalIgnoreCase))
         {
             HookDispatchProbe.Run();
+            return true;
+        }
+
+        if (args.Contains("--probe-result-hook-fanout", StringComparer.OrdinalIgnoreCase))
+        {
+            ResultHookFanoutProbe.Run();
+            return true;
+        }
+
+        if (args.Contains("--probe-event-adapter-validation", StringComparer.OrdinalIgnoreCase))
+        {
+            AdapterValidation.EventAdapterValidationProbe.Run();
             return true;
         }
 

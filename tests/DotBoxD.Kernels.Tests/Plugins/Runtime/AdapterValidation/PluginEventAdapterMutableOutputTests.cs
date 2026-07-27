@@ -23,6 +23,23 @@ public sealed class PluginEventAdapterMutableOutputTests
                 new MutableOutputEventAdapter(),
                 new MutableOutputEvent("player-1")).AsTask());
 
+    [Fact]
+    public async Task Cached_adapter_still_validates_output_for_every_event()
+    {
+        var messages = new InMemoryPluginMessageSink();
+        var server = PluginAddendumTestPolicies.CreateServer(messages);
+        var kernel = await server.InstallAsync(MutableInputPackage());
+        var adapter = new InvalidSecondOutputEventAdapter();
+
+        await kernel.HandleAsync(adapter, new MutableOutputEvent("player-1"));
+        var exception = await Assert.ThrowsAsync<SandboxValidationException>(
+            () => kernel.HandleAsync(adapter, new MutableOutputEvent("player-2")).AsTask());
+
+        Assert.Contains(exception.Diagnostics, diagnostic => diagnostic.Code == "DBXK036");
+        Assert.Single(messages.Messages);
+        Assert.Single(kernel.ExecutionObservations);
+    }
+
     private static async Task AssertMutableOutputRejectedAsync(Func<InstalledKernel, Task> invoke)
     {
         var messages = new InMemoryPluginMessageSink();
@@ -99,6 +116,23 @@ public sealed class PluginEventAdapterMutableOutputTests
 
         public IReadOnlyList<SandboxValue> ToSandboxValues(MutableOutputEvent e)
             => new MutatingValues(e.TargetId);
+    }
+
+    private sealed class InvalidSecondOutputEventAdapter : IPluginEventAdapter<MutableOutputEvent>
+    {
+        private int _materializations;
+
+        public string EventName => nameof(MutableOutputEvent);
+
+        public IReadOnlyList<Parameter> Parameters { get; } = [new("e_TargetId", SandboxType.String)];
+
+        public IReadOnlyList<SandboxValue> ToSandboxValues(MutableOutputEvent e)
+        {
+            _materializations++;
+            return _materializations == 1
+                ? [SandboxValue.FromString(e.TargetId)]
+                : [SandboxValue.FromInt32(42)];
+        }
     }
 
     private sealed class MutatingValues(string targetId) : IReadOnlyList<SandboxValue>

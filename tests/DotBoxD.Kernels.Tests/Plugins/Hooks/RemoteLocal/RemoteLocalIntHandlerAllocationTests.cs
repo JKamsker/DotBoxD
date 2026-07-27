@@ -87,6 +87,50 @@ public sealed class RemoteLocalIntHandlerAllocationTests
             $"expected the enum projection path to stay below boxing cost; observed {perDispatch:N2} B/op.");
     }
 
+    [Fact]
+    public void Generated_raw_int_projection_dispatch_is_allocation_free()
+    {
+        var registry = new RemoteLocalHandlerRegistry();
+        var context = new HookContext(new InMemoryPluginMessageSink(), CancellationToken.None);
+        var payload = EncodeProjected(42);
+        var checksum = 0;
+        registry.Register<int>(
+            "sub-raw-int",
+            (value, _) =>
+            {
+                checksum += value;
+                return ValueTask.CompletedTask;
+            },
+            static value =>
+            {
+                var reader = new KernelRpcPayloadReader(value.Span);
+                var result = reader.ReadInt32();
+                reader.EnsureConsumed();
+                return result;
+            });
+
+        for (var i = 0; i < WarmupIterations; i++)
+        {
+            Dispatch(registry, "sub-raw-int", payload, context);
+        }
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < MeasuredIterations; i++)
+        {
+            Dispatch(registry, "sub-raw-int", payload, context);
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.Equal(42 * (WarmupIterations + MeasuredIterations), checksum);
+        GC.KeepAlive(checksum);
+        Assert.Equal(0, allocated);
+    }
+
     private static void Dispatch(
         RemoteLocalHandlerRegistry registry,
         string subscriptionId,

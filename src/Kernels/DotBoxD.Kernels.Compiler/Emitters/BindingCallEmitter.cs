@@ -59,6 +59,12 @@ internal static class BindingCallEmitter
             return true;
         }
 
+        if (call.Arguments.Count == 3)
+        {
+            EmitThreeArgumentGenericCall(call, il, emitExpression);
+            return true;
+        }
+
         EmitArrayBackedGenericCall(call, il, emitExpression);
         return true;
     }
@@ -122,14 +128,41 @@ internal static class BindingCallEmitter
         il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
     }
 
+    private static void EmitThreeArgumentGenericCall(
+        CallExpression call,
+        ILGenerator il,
+        Action<Expression> emitExpression)
+    {
+        var arg0 = il.DeclareLocal(typeof(SandboxValue));
+        emitExpression(call.Arguments[0]);
+        il.Emit(OpCodes.Stloc, arg0);
+        var arg1 = il.DeclareLocal(typeof(SandboxValue));
+        emitExpression(call.Arguments[1]);
+        il.Emit(OpCodes.Stloc, arg1);
+        var arg2 = il.DeclareLocal(typeof(SandboxValue));
+        emitExpression(call.Arguments[2]);
+        il.Emit(OpCodes.Stloc, arg2);
+
+        il.Emit(OpCodes.Ldarg_0);
+        EmitInt32(il, call.Arguments.Count);
+        il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.ChargeValueArray)));
+
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Ldstr, call.Name);
+        il.Emit(OpCodes.Ldloc, arg0);
+        il.Emit(OpCodes.Ldloc, arg1);
+        il.Emit(OpCodes.Ldloc, arg2);
+        il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.CallBinding3)));
+    }
+
     private static bool CanEmitCompiledBinding(BindingSignature binding)
         => CanEmitGenericRuntimeStub(binding) || CanEmitDirectRuntimeMethod(binding);
 
     // SECURITY-SENSITIVE GATE. This admits ANY binding whose compiled descriptor is a CompiledRuntime
     // "RuntimeStub" pointing at CallBinding — regardless of its RequiredCapability, Safety, Effects, or
     // AuditLevel. There is deliberately NO compile-time capability/effects/audit check here: a binding
-    // routed through CallBinding is dispatched at runtime by CompiledBindingDispatcher.CallBinding /
-    // CallBinding2, which perform the SAME capability check (ChargeBindingCall), quota and return
+    // routed through CallBinding is dispatched at runtime by the CompiledBindingDispatcher entrypoints,
+    // which perform the SAME capability check (ChargeBindingCall), quota and return
     // charging, and success/failure audit as the interpreter. That runtime dispatch is therefore the
     // SOLE gate for compiled side-effecting bindings (verified by the differential parity suite under
     // tests/.../Compiled/SideEffectParity). Consequence: binding REGISTRATION is security-sensitive —

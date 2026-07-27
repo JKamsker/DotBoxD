@@ -13,3 +13,15 @@ public interface ISubServiceLifecycleChild : IAsyncDisposable
 {
     Task<int> PingAsync(CancellationToken ct = default);
 }
+
+[RpcService]
+public interface ISubServiceDisposableRoot
+{
+    Task<ISubServiceDisposableChild> CreateAsync(CancellationToken ct = default);
+}
+
+[RpcService]
+public interface ISubServiceDisposableChild : IDisposable
+{
+    Task<int> PingAsync(CancellationToken ct = default);
+}

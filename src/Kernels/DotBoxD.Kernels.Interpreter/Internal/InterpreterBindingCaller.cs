@@ -20,17 +20,81 @@ internal static class InterpreterBindingCaller
     /// <paramref name="args"/> sequence is caller-owned and may be retained by the host
     /// binding, so it must be a stable, dedicated sequence (never a pooled or reused buffer).
     /// </summary>
-    public static async ValueTask<SandboxValue> CallAsync(
+    public static ValueTask<SandboxValue> CallAsync(
         SandboxContext context,
         SandboxExecutionOptions options,
         string moduleHash,
         BindingDescriptor descriptor,
         IReadOnlyList<SandboxValue> args,
         string functionId)
+        => CallCoreAsync(
+            context,
+            options,
+            moduleHash,
+            descriptor,
+            BindingInvocationArguments.FromList(args),
+            functionId);
+
+    public static ValueTask<SandboxValue> CallAsync(
+        SandboxContext context,
+        SandboxExecutionOptions options,
+        string moduleHash,
+        BindingDescriptor descriptor,
+        SandboxValue arg0,
+        string functionId)
+        => CallCoreAsync(
+            context,
+            options,
+            moduleHash,
+            descriptor,
+            BindingInvocationArguments.FromSingle(arg0),
+            functionId);
+
+    public static ValueTask<SandboxValue> CallAsync(
+        SandboxContext context,
+        SandboxExecutionOptions options,
+        string moduleHash,
+        BindingDescriptor descriptor,
+        SandboxValue arg0,
+        SandboxValue arg1,
+        string functionId)
+        => CallCoreAsync(
+            context,
+            options,
+            moduleHash,
+            descriptor,
+            BindingInvocationArguments.FromPair(arg0, arg1),
+            functionId);
+
+    public static ValueTask<SandboxValue> CallAsync(
+        SandboxContext context,
+        SandboxExecutionOptions options,
+        string moduleHash,
+        BindingDescriptor descriptor,
+        SandboxValue arg0,
+        SandboxValue arg1,
+        SandboxValue arg2,
+        string functionId)
+        => CallCoreAsync(
+            context,
+            options,
+            moduleHash,
+            descriptor,
+            BindingInvocationArguments.FromTriple(arg0, arg1, arg2),
+            functionId);
+
+    private static async ValueTask<SandboxValue> CallCoreAsync(
+        SandboxContext context,
+        SandboxExecutionOptions options,
+        string moduleHash,
+        BindingDescriptor descriptor,
+        BindingInvocationArguments arguments,
+        string functionId)
     {
         InterpreterTrace.WriteBindingCall(context, options, moduleHash, functionId, descriptor);
-        var auditCheckpoint = context.AuditCheckpoint();
+        var auditCheckpoint = context.AuditCheckpoint(descriptor);
         using var grantClock = context.BeginBindingGrantClockScope(context.Policy.GrantClock);
+        using var auditInvocation = context.BeginBindingAuditInvocation(descriptor, auditCheckpoint);
         try
         {
             context.ChargeBindingCall(descriptor);
@@ -38,55 +102,56 @@ internal static class InterpreterBindingCaller
         }
         catch (SandboxRuntimeException ex)
         {
-            context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, ex.Error.Code);
+            context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, ex.Error.Code);
             throw;
         }
+        catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
+        {
+            context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, SandboxErrorCode.Cancelled);
+            throw;
+        }
+        catch (Exception)
+        {
+            throw BindingFailure(context, descriptor, auditInvocation);
+        }
 
-        CancellationTokenSource? timeout = null;
+        var timeout = default(BindingWallTimeTokenLease);
         try
         {
-            timeout = context.CreateWallTimeToken();
+            timeout = context.CreateBindingWallTimeToken();
             using var returnCredits = context.BeginBindingReturnCreditScope(descriptor.ReturnType);
-            var pending = descriptor.Invoke(context, args, timeout.Token);
+            var pending = arguments.Invoke(context, descriptor, timeout.Token);
             var value = pending.IsCompleted
                 ? pending.GetAwaiter().GetResult()
                 : await AwaitPendingAsync(context, pending, timeout.Token).ConfigureAwait(false);
             context.Checkpoint();
             value = context.ChargeBindingReturn(descriptor, value);
-            context.EnsureRequiredBindingSuccessAudit(descriptor, auditCheckpoint);
+            context.EnsureRequiredBindingSuccessAudit(descriptor, auditInvocation);
             return value;
         }
         catch (SandboxRuntimeException ex)
         {
-            context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, ex.Error.Code);
+            context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, ex.Error.Code);
             throw;
         }
         catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
         {
-            context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, SandboxErrorCode.Cancelled);
+            context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, SandboxErrorCode.Cancelled);
             throw;
         }
-        catch (OperationCanceledException) when (timeout?.IsCancellationRequested == true)
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
         {
             var error = new SandboxError(SandboxErrorCode.Timeout, $"binding '{descriptor.Id}' timed out");
-            context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, error.Code);
-            throw new SandboxRuntimeException(error);
-        }
-        catch (OperationCanceledException)
-        {
-            var error = new SandboxError(SandboxErrorCode.BindingFailure, $"binding '{descriptor.Id}' failed");
-            context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, error.Code);
+            context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, error.Code);
             throw new SandboxRuntimeException(error);
         }
         catch (Exception)
         {
-            var error = new SandboxError(SandboxErrorCode.BindingFailure, $"binding '{descriptor.Id}' failed");
-            context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, error.Code);
-            throw new SandboxRuntimeException(error);
+            throw BindingFailure(context, descriptor, auditInvocation);
         }
         finally
         {
-            timeout?.Dispose();
+            timeout.Dispose();
         }
     }
 
@@ -102,6 +167,16 @@ internal static class InterpreterBindingCaller
             $"binding '{descriptor.Id}' requires the '{RuntimeCapabilityIds.Async}' capability"));
     }
 
+    private static SandboxRuntimeException BindingFailure(
+        SandboxContext context,
+        BindingDescriptor descriptor,
+        BindingAuditInvocation auditInvocation)
+    {
+        var error = new SandboxError(SandboxErrorCode.BindingFailure, $"binding '{descriptor.Id}' failed");
+        context.EnsureRequiredBindingFailureAudit(descriptor, auditInvocation, error.Code);
+        return new SandboxRuntimeException(error);
+    }
+
     private static async ValueTask<SandboxValue> AwaitPendingAsync(
         SandboxContext context,
         ValueTask<SandboxValue> pending,
@@ -115,5 +190,83 @@ internal static class InterpreterBindingCaller
         }
 
         return await pending.AsTask().WaitAsync(timeoutToken).ConfigureAwait(false);
+    }
+
+    private readonly struct BindingInvocationArguments
+    {
+        // List and Triple are mutually exclusive shapes, so this slot holds either the
+        // retainable public argument list or arg2 without growing the three-reference carrier.
+        private readonly object? _listOrArg2;
+        private readonly SandboxValue? _arg0;
+        private readonly SandboxValue? _arg1;
+        private readonly InvocationShape _shape;
+
+        private BindingInvocationArguments(
+            object? listOrArg2,
+            SandboxValue? arg0,
+            SandboxValue? arg1,
+            InvocationShape shape)
+        {
+            _listOrArg2 = listOrArg2;
+            _arg0 = arg0;
+            _arg1 = arg1;
+            _shape = shape;
+        }
+
+        public static BindingInvocationArguments FromList(IReadOnlyList<SandboxValue> args)
+            => new(args, null, null, InvocationShape.List);
+
+        public static BindingInvocationArguments FromSingle(SandboxValue arg0)
+            => new(null, arg0, null, InvocationShape.Single);
+
+        public static BindingInvocationArguments FromPair(SandboxValue arg0, SandboxValue arg1)
+            => new(null, arg0, arg1, InvocationShape.Pair);
+
+        public static BindingInvocationArguments FromTriple(
+            SandboxValue arg0,
+            SandboxValue arg1,
+            SandboxValue arg2)
+            => new(arg2, arg0, arg1, InvocationShape.Triple);
+
+        public ValueTask<SandboxValue> Invoke(
+            SandboxContext context,
+            BindingDescriptor descriptor,
+            CancellationToken cancellationToken)
+            => _shape switch
+            {
+                InvocationShape.Single when descriptor.Invoke.Target is IOneArgumentBindingInvoker invoker =>
+                    invoker.Invoke(context, _arg0!, cancellationToken),
+                InvocationShape.Pair when descriptor.Invoke.Target is ITwoArgumentBindingInvoker invoker =>
+                    invoker.Invoke(context, _arg0!, _arg1!, cancellationToken),
+                InvocationShape.Single => descriptor.Invoke(context, [_arg0!], cancellationToken),
+                InvocationShape.Pair => descriptor.Invoke(context, [_arg0!, _arg1!], cancellationToken),
+                InvocationShape.Triple => InvokeTriple(context, descriptor, cancellationToken),
+                _ => descriptor.Invoke(
+                    context,
+                    (IReadOnlyList<SandboxValue>)_listOrArg2!,
+                    cancellationToken)
+            };
+
+        private ValueTask<SandboxValue> InvokeTriple(
+            SandboxContext context,
+            BindingDescriptor descriptor,
+            CancellationToken cancellationToken)
+        {
+            var arg2 = (SandboxValue)_listOrArg2!;
+            return descriptor.Invoke.Target is IThreeArgumentBindingInvoker invoker
+                ? invoker.Invoke(context, _arg0!, _arg1!, arg2, cancellationToken)
+                : descriptor.Invoke(
+                    context,
+                    new[] { _arg0!, _arg1!, arg2 },
+                    cancellationToken);
+        }
+    }
+
+    private enum InvocationShape : byte
+    {
+        List,
+        Single,
+        Pair,
+        Triple
     }
 }

@@ -13,8 +13,10 @@ public sealed class InstanceRegistry : IInstanceRegistry
     internal const int DefaultMaxInstances = 1024;
 
     private readonly ConcurrentDictionary<(string Service, string Id), object> _entries = new();
+    private readonly object _gate = new();
     private readonly int _maxInstances;
     private int _count;
+    private bool _closed;
 
     public InstanceRegistry() : this(DefaultMaxInstances) { }
 
@@ -39,19 +41,24 @@ public sealed class InstanceRegistry : IInstanceRegistry
         if (instance is null)
             throw new ArgumentNullException(nameof(instance));
 
-        // Reserve a slot atomically. A plain Count check followed by an add lets several threads
-        // pass the check before any of them adds, so concurrent sub-service creation could exceed
-        // the configured maximum. Increment-then-check-then-rollback closes that race.
-        if (Interlocked.Increment(ref _count) > _maxInstances)
+        lock (_gate)
         {
-            Interlocked.Decrement(ref _count);
-            throw new InvalidOperationException(
-                $"Instance registry limit reached ({_maxInstances}). Release unused instances before registering new ones.");
-        }
+            if (_closed)
+            {
+                throw new InvalidOperationException("Instance registry is closed.");
+            }
 
-        var id = Guid.NewGuid().ToString("N");
-        _entries[(serviceName, id)] = instance;
-        return id;
+            if (_count >= _maxInstances)
+            {
+                throw new InvalidOperationException(
+                    $"Instance registry limit reached ({_maxInstances}). Release unused instances before registering new ones.");
+            }
+
+            var id = Guid.NewGuid().ToString("N");
+            _entries[(serviceName, id)] = instance;
+            _count++;
+            return id;
+        }
     }
 
     /// <inheritdoc />
@@ -77,9 +84,18 @@ public sealed class InstanceRegistry : IInstanceRegistry
     {
         ValidateKeys(serviceName, instanceId);
 
-        if (_entries.TryRemove((serviceName, instanceId), out var instance))
+        object? instance = null;
+        lock (_gate)
         {
-            Interlocked.Decrement(ref _count);
+            if (_entries.TryRemove((serviceName, instanceId), out var removed))
+            {
+                _count--;
+                instance = removed;
+            }
+        }
+
+        if (instance is not null)
+        {
             DisposeInstance(instance);
         }
     }
@@ -89,9 +105,18 @@ public sealed class InstanceRegistry : IInstanceRegistry
     {
         ValidateKeys(serviceName, instanceId);
 
-        if (_entries.TryRemove((serviceName, instanceId), out var instance))
+        object? instance = null;
+        lock (_gate)
         {
-            Interlocked.Decrement(ref _count);
+            if (_entries.TryRemove((serviceName, instanceId), out var removed))
+            {
+                _count--;
+                instance = removed;
+            }
+        }
+
+        if (instance is not null)
+        {
             await DisposeInstanceAsync(instance).ConfigureAwait(false);
         }
     }
@@ -99,15 +124,9 @@ public sealed class InstanceRegistry : IInstanceRegistry
     /// <inheritdoc />
     public void ReleaseAll()
     {
-        // TryRemove each key (Keys is a snapshot on ConcurrentDictionary) so every instance is
-        // disposed exactly once and its slot freed, even if Release races in concurrently.
-        foreach (var key in _entries.Keys)
+        foreach (var instance in DrainAll())
         {
-            if (_entries.TryRemove(key, out var instance))
-            {
-                Interlocked.Decrement(ref _count);
-                DisposeInstance(instance);
-            }
+            DisposeInstance(instance);
         }
     }
 
@@ -119,15 +138,26 @@ public sealed class InstanceRegistry : IInstanceRegistry
     /// </summary>
     internal async Task ReleaseAllAsync()
     {
-        // TryRemove each key (Keys is a snapshot on ConcurrentDictionary) so every instance is disposed
-        // exactly once and its slot freed, even if Release races in concurrently.
-        foreach (var key in _entries.Keys)
+        foreach (var instance in DrainAll())
         {
-            if (_entries.TryRemove(key, out var instance))
+            await DisposeInstanceAsync(instance).ConfigureAwait(false);
+        }
+    }
+
+    private List<object> DrainAll()
+    {
+        lock (_gate)
+        {
+            _closed = true;
+            var instances = new List<object>(_entries.Count);
+            foreach (var instance in _entries.Values)
             {
-                Interlocked.Decrement(ref _count);
-                await DisposeInstanceAsync(instance).ConfigureAwait(false);
+                instances.Add(instance);
             }
+
+            _entries.Clear();
+            _count = 0;
+            return instances;
         }
     }
 

@@ -79,6 +79,12 @@ Runtime enforcement:
   sandbox error.
 - Interpreted debug traces are diagnostics only and never satisfy binding audit requirements.
 
+The default in-memory sink assigns required terminal evidence to a unique invocation and arbitrates
+detailed writes against runtime fallbacks atomically. A custom `IAuditSink` retains the public
+checkpoint contract and is responsible for synchronous persistence and concurrency across its own
+invocations; bindings must resolve the current `SandboxContext.Audit` sink per invocation rather
+than reusing a host-retained alias.
+
 ## Sanitization
 
 Audit logs should be useful but not leak secrets.

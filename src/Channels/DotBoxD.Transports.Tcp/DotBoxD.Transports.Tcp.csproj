@@ -11,9 +11,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Expose the internal _pendingAccept consume seam to the test assembly for a deterministic
-         red→green race test. No external surface. -->
+    <!-- Expose focused internal seams to tests and benchmarks without adding public surface. -->
     <InternalsVisibleTo Include="DotBoxD.Services.Tests" />
+    <InternalsVisibleTo Include="DotBoxD.Services.Benchmarks" />
   </ItemGroup>
 
 </Project>

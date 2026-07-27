@@ -23,6 +23,20 @@ internal static class GeneratedExecuteShapeVerifier
 
         VerifyReturnShape(analysis, diagnostics);
         VerifyCalls(analysis, diagnostics);
+        VerifyEntrypointDispatch(analysis, diagnostics);
+    }
+
+    private static void VerifyEntrypointDispatch(
+        GeneratedMethodFlow analysis,
+        List<VerificationDiagnostic> diagnostics)
+    {
+        var localCalls = analysis.Instructions.Where(instruction => instruction.IsLocalCall).ToArray();
+        if (localCalls.Length != 1 || !IsEntrypointFunctionCall(localCalls[0].CalledMember))
+        {
+            diagnostics.Add(new VerificationDiagnostic(
+                "V-COMPILED-SHAPE",
+                "Execute must dispatch exactly once to the canonical Fn_0 entrypoint"));
+        }
     }
 
     private static void VerifyCalls(GeneratedMethodFlow analysis, List<VerificationDiagnostic> diagnostics)

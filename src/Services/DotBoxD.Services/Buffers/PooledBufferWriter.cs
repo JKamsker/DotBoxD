@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Runtime.CompilerServices;
 
 namespace DotBoxD.Services.Buffers;
 
@@ -11,19 +12,14 @@ public sealed class PooledBufferWriter : IBufferWriter<byte>, IDisposable
 {
     // Largest single-dimension array the runtime allows (== Array.MaxLength, which netstandard2.1 lacks).
     private const int MaxArrayLength = 0x7FFFFFC7;
-
-    [ThreadStatic]
-    private static PooledBufferWriter? s_cachedWriter;
-    private static readonly object s_globalCacheGate = new();
-    private static PooledBufferWriter? s_globalCachedWriter;
-
     private byte[]? _buffer;
     private int _written;
     private int _maxWritten = int.MaxValue;
     private bool _returnToCache;
-    private int _cacheThreadId;
-    private int _cached;
-    private PooledBufferWriter? _nextCachedWriter;
+    private PooledBufferWriterLease _lease = PooledBufferWriterLease.Create();
+    // A retained byte[] in a hot slot, or the next writer while this entry is in locked overflow.
+    internal object? CachedResource { get; set; }
+    internal int CacheThreadId { get; set; }
 
     public PooledBufferWriter(int initialCapacity = 256)
     {
@@ -33,14 +29,14 @@ public sealed class PooledBufferWriter : IBufferWriter<byte>, IDisposable
         }
 
         _buffer = ArrayPool<byte>.Shared.Rent(initialCapacity);
-        _written = 0;
     }
 
     /// <summary>
-    /// Rents a writer object for internal one-shot framing paths. The public constructor keeps
-    /// disposed writers permanently unusable; this internal pool is only used where the writer never
-    /// escapes the method that rented it.
+    /// Rents a writer object for internal ownership-transfer framing paths. The public constructor
+    /// keeps disposed writers permanently unusable; callers of this pool must not retain a raw writer
+    /// reference after transferring its ownership.
     /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static PooledBufferWriter Rent(int initialCapacity = 256, int maxWritten = int.MaxValue)
     {
         if (maxWritten <= 0)
@@ -48,41 +44,11 @@ public sealed class PooledBufferWriter : IBufferWriter<byte>, IDisposable
             throw new ArgumentOutOfRangeException(nameof(maxWritten));
         }
 
-        var writer = s_cachedWriter;
-        if (writer is null)
-        {
-            lock (s_globalCacheGate)
-            {
-                writer = s_globalCachedWriter;
-                if (writer is not null)
-                {
-                    s_globalCachedWriter = writer._nextCachedWriter;
-                    writer._nextCachedWriter = null;
-                }
-            }
-
-            if (writer is null)
-            {
-                writer = new PooledBufferWriter(NormalizeInitialCapacity(initialCapacity, maxWritten))
-                {
-                    _maxWritten = maxWritten,
-                    _returnToCache = true,
-                };
-            }
-            else
-            {
-                writer.Reset(initialCapacity, maxWritten);
-            }
-        }
-        else
-        {
-            s_cachedWriter = null;
-            writer.Reset(initialCapacity, maxWritten);
-        }
-
-        writer._cacheThreadId = Environment.CurrentManagedThreadId;
-        return writer;
+        return PooledBufferWriterPool.Rent(initialCapacity, maxWritten);
     }
+
+    internal int RetainedBufferLength => (CachedResource as byte[])?.Length ?? 0;
+    internal long LeaseToken => _lease.CaptureActiveToken();
 
     /// <summary>
     /// The bytes written so far.
@@ -154,54 +120,109 @@ public sealed class PooledBufferWriter : IBufferWriter<byte>, IDisposable
     /// </summary>
     public Payload DetachPayload()
     {
+        var token = _lease.BeginPublicDetach();
         var buffer = Interlocked.Exchange(ref _buffer, null)
             ?? throw new InvalidOperationException("Buffer has already been detached or disposed.");
+        _lease.CompletePublicDetach(token);
         return new Payload(buffer, _written);
     }
 
     /// <summary>
     /// Returns the rented array to the pool. A no-op after <see cref="DetachPayload"/>.
     /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Dispose()
     {
-        var buffer = Interlocked.Exchange(ref _buffer, null);
+        if (_lease.TryReturnCurrent())
+        {
+            ReleaseReturnedLease();
+        }
+    }
+
+    internal ReadOnlyMemory<byte> GetWrittenMemory(long leaseToken)
+    {
+        if (!_lease.IsActive(leaseToken))
+        {
+            throw new ObjectDisposedException(nameof(PooledBufferWriter));
+        }
+
+        var buffer = _buffer ?? throw new ObjectDisposedException(nameof(PooledBufferWriter));
+        var written = _written;
+        if (!_lease.IsActive(leaseToken))
+        {
+            throw new ObjectDisposedException(nameof(PooledBufferWriter));
+        }
+
+        return buffer.AsMemory(0, written);
+    }
+
+    internal Payload DetachLeasePayload(long leaseToken)
+    {
+        if (!_lease.TryBeginFrameDetach(leaseToken))
+        {
+            throw new ObjectDisposedException(nameof(PooledBufferWriter));
+        }
+
+        var buffer = Interlocked.Exchange(ref _buffer, null)
+            ?? throw new ObjectDisposedException(nameof(PooledBufferWriter));
+        var payload = new Payload(buffer, _written);
+        _lease.CompleteFrameDetach(leaseToken);
+        ReleaseReturnedLease();
+        return payload;
+    }
+
+    internal void DisposeLease(long leaseToken)
+    {
+        if (_lease.TryReturn(leaseToken))
+        {
+            ReleaseReturnedLease();
+        }
+    }
+
+    internal static PooledBufferWriter CreatePooled(int initialCapacity, int maxWritten) =>
+        new(NormalizeInitialCapacity(initialCapacity, maxWritten))
+        {
+            _maxWritten = maxWritten,
+            _returnToCache = true,
+        };
+
+    internal void ResetForRent(byte[]? retainedBuffer, int initialCapacity, int maxWritten)
+    {
+        _maxWritten = maxWritten;
+        var requiredCapacity = NormalizeInitialCapacity(initialCapacity, maxWritten);
+        if (retainedBuffer is null || retainedBuffer.Length < requiredCapacity)
+        {
+            ReturnBuffer(retainedBuffer);
+            retainedBuffer = ArrayPool<byte>.Shared.Rent(requiredCapacity);
+        }
+
+        _buffer = retainedBuffer;
+        _written = 0;
+        _lease.Reset();
+    }
+
+    internal void PrepareForCache() => _written = 0;
+
+    internal static void ReturnBuffer(byte[]? buffer)
+    {
         if (buffer is not null)
         {
             ArrayPool<byte>.Shared.Return(buffer);
         }
-
-        if (_returnToCache)
-        {
-            if (Interlocked.Exchange(ref _cached, 1) != 0)
-            {
-                return;
-            }
-
-            _written = 0;
-            if (_cacheThreadId == Environment.CurrentManagedThreadId &&
-                s_cachedWriter is null)
-            {
-                s_cachedWriter = this;
-            }
-            else
-            {
-                lock (s_globalCacheGate)
-                {
-                    _nextCachedWriter = s_globalCachedWriter;
-                    s_globalCachedWriter = this;
-                }
-            }
-        }
     }
 
-    private void Reset(int initialCapacity, int maxWritten)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void ReleaseReturnedLease()
     {
-        _maxWritten = maxWritten;
-        _buffer = ArrayPool<byte>.Shared.Rent(NormalizeInitialCapacity(initialCapacity, maxWritten));
-        _written = 0;
-        _returnToCache = true;
-        _cached = 0;
-        _nextCachedWriter = null;
+        var buffer = Interlocked.Exchange(ref _buffer, null);
+        if (_returnToCache)
+        {
+            PooledBufferWriterPool.Return(this, buffer);
+        }
+        else
+        {
+            ReturnBuffer(buffer);
+        }
     }
 
     private void EnsureCapacity(int sizeHint)

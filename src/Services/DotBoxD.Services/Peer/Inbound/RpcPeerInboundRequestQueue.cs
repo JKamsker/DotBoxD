@@ -71,9 +71,8 @@ internal sealed class RpcPeerInboundRequestQueue
         if (_dropIncomingWhenFull)
         {
             // Drop when over the byte budget or when the count queue is full. Release the request
-            // resources but leave frame disposal to the read loop, which disposes on the Dropped
-            // return. Disposing here too would double-return the pooled buffer (benign only while
-            // Payload.Dispose stays idempotent).
+            // resources but leave frame disposal to the caller on the Dropped return. The dispatcher
+            // may have materialized a Payload owner, so its read-loop alias is not always the owner.
             if (_byteBudget.TryAdmit(bytes))
             {
                 if (_queue.Writer.TryWrite(inbound))
@@ -129,9 +128,8 @@ internal sealed class RpcPeerInboundRequestQueue
             // Any path that did not hand the frame to the queue — cancellation, a closed channel, or an
             // unexpected WriteAsync failure that propagates — must return the admitted bytes and release
             // the request. Otherwise the byte budget leaks and the peer eventually stops admitting
-            // inbound work even though nothing is in flight. On the return paths the read loop disposes
-            // the frame (EnqueueAsync returned false); on a propagating throw the read loop's finally
-            // disposes it.
+            // inbound work even though nothing is in flight. The caller disposes any frame that was
+            // not committed, both for a false return and for a propagating exception.
             if (!committed)
             {
                 _byteBudget.Release(bytes);

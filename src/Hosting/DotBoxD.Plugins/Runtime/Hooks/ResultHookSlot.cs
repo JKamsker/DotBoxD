@@ -34,22 +34,7 @@ internal sealed class ResultHookSlot<TEvent, TContext>
 
     public bool HasHandlers => _entries.Length > 0;
 
-    internal IResultHookRegistration<TEvent>[] SnapshotRegistrations(HookPipeline<TEvent, TContext> owner)
-    {
-        var entries = _entries;
-        if (entries.Length == 0)
-        {
-            return [];
-        }
-
-        var registrations = new IResultHookRegistration<TEvent>[entries.Length];
-        for (var i = 0; i < entries.Length; i++)
-        {
-            registrations[i] = new ResultHookRegistration<TEvent, TContext>(owner, entries[i]);
-        }
-
-        return registrations;
-    }
+    internal Entry[] RegistrationEntries => _entries;
 
     /// <summary>Installs a sandbox <c>Register</c> handler: the kernel's lowered <c>ShouldHandle</c> filter and
     /// result-producing <c>Handle</c> both run in the sandbox, and the returned value is decoded to the result
@@ -208,7 +193,7 @@ internal sealed class ResultHookSlot<TEvent, TContext>
             ? _invoker.InvokeRemoteAsync(entry, e, rawContext, context, options, cancellationToken)
             : entry.Invoke(e, rawContext, context, cancellationToken);
 
-    public void RemoveKernel(InstalledKernel kernel)
+    public bool RemoveKernel(InstalledKernel kernel)
     {
         lock (_gate)
         {
@@ -224,7 +209,10 @@ internal sealed class ResultHookSlot<TEvent, TContext>
             if (remaining.Count != _entries.Length)
             {
                 _entries = [.. remaining];
+                return true;
             }
+
+            return false;
         }
     }
 

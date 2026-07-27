@@ -56,12 +56,8 @@ internal readonly record struct FinalRejectionInput(
         ExistingTypeIndex existingTypes,
         CancellationToken ct) =>
         NamingHelpers.CanGenerateAsyncSiblingInterface(model.InterfaceName) &&
-        existingTypes.Contains(
-            new ExistingTypeKey(
-                model.Namespace,
-                NamingHelpers.AsyncSiblingInterfaceName(model.InterfaceName),
-                0),
-            ct);
+        !existingTypes.IsEmpty &&
+        existingTypes.Contains(GeneratedTypeCollisionKeys.AsyncSibling(model), ct);
 }
 
 internal readonly record struct FinalRejectionMethod(

@@ -18,7 +18,10 @@ internal static class HintNameBuilder
                 : model.InterfaceName;
         }
 
-        return NamespaceIdentifierPrefix(model.Namespace) + "_" + model.InterfaceName;
+        var prefix = NamespaceIdentifierPrefix(model.Namespace) + "_" + model.InterfaceName;
+        return model.InterfaceName.IndexOf('_') >= 0
+            ? prefix + "__" + StableHash(model.Namespace + "." + model.InterfaceName)
+            : prefix;
     }
 
     public static string NamespaceIdentifierPrefix(string namespaceName)

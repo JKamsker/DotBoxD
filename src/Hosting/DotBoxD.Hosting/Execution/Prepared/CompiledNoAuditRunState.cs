@@ -11,6 +11,7 @@ internal sealed class CompiledNoAuditRunState(ExecutionPlan plan)
     private Dictionary<string, CompiledExecutable>? _executables;
     private SandboxContext? _context;
     private CancellationToken _contextToken;
+    private int _disposed;
 
     public ResourceMeter Budget { get; } = new(plan.Budget);
 
@@ -18,6 +19,7 @@ internal sealed class CompiledNoAuditRunState(ExecutionPlan plan)
         IReadOnlySet<string> allowedBindings,
         CancellationToken cancellationToken)
     {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
         Budget.ResetForReuse();
         if (_context is not null && _contextToken.Equals(cancellationToken))
         {
@@ -25,6 +27,7 @@ internal sealed class CompiledNoAuditRunState(ExecutionPlan plan)
             return _context;
         }
 
+        _context?.Dispose();
         _contextToken = cancellationToken;
         _context = new SandboxContext(
             SandboxRunId.Suppressed,
@@ -63,5 +66,19 @@ internal sealed class CompiledNoAuditRunState(ExecutionPlan plan)
         _cachedEntrypoint = entrypoint;
         _cachedExecutable = executable;
         (_executables ??= new Dictionary<string, CompiledExecutable>(StringComparer.Ordinal))[entrypoint] = executable;
+    }
+
+    internal void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        _cachedEntrypoint = null;
+        _cachedExecutable = default;
+        _executables?.Clear();
+        _executables = null;
+        Interlocked.Exchange(ref _context, null)?.Dispose();
     }
 }

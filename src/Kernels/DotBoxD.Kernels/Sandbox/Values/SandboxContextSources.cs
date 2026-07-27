@@ -6,7 +6,7 @@ namespace DotBoxD.Kernels.Sandbox;
 // the logical clock (UtcNow / AuditTimestamp) and the random number source
 // (NextRandomInt32 backed by a seeded DeterministicRandom). Split into its own
 // partial file to keep SandboxContext focused; behavior is identical.
-public sealed partial class SandboxContext
+public sealed partial class SandboxContext : IDisposable
 {
     public DateTimeOffset UtcNow()
     {

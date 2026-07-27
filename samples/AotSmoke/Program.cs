@@ -20,6 +20,7 @@ await using var server = RpcPeer.Over(serverChannel, serializer).Provide<IAotPro
 await using var client = RpcPeer.Over(clientChannel, serializer).Start();
 
 var result = await client.Get<IAotProbe>().DoubleAsync(21);
+var replayFallbackSucceeded = AotConstructorReplaySmoke.Run();
 using var sandbox = SandboxHost.Create(builder => builder.UseCompilerIfAvailable());
 var span = new SourceSpan(1, 1);
 var module = new SandboxModule(
@@ -42,6 +43,7 @@ var execution = await sandbox.ExecuteAsync(
     new SandboxExecutionOptions { Mode = ExecutionMode.Auto });
 
 if (result != 42 ||
+    !replayFallbackSucceeded ||
     !execution.Succeeded ||
     execution.ActualMode != ExecutionMode.Interpreted ||
     typeof(TcpTransport).Assembly.GetName().Name != "DotBoxD.Transports.Tcp")

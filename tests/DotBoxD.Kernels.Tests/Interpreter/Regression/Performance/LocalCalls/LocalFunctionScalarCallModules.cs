@@ -12,14 +12,19 @@ internal static class LocalFunctionScalarCallModules
           "visibility": "private",
           "parameters": [
             { "name": "first", "type": "I32" },
-            { "name": "second", "type": "I32" }
+            { "name": "second", "type": "I32" },
+            { "name": "third", "type": "I32" }
           ],
           "returnType": "I32",
           "body": [{
             "op": "return",
             "value": {
               "call": "test.observeBody",
-              "args": [{ "var": "first" }, { "var": "second" }]
+              "args": [
+                { "var": "first" },
+                { "var": "second" },
+                { "var": "third" }
+              ]
             }
           }]
         },
@@ -34,7 +39,8 @@ internal static class LocalFunctionScalarCallModules
               "call": "helper",
               "args": [
                 { "call": "test.first", "args": [] },
-                { "call": "test.second", "args": [] }
+                { "call": "test.second", "args": [] },
+                { "call": "test.third", "args": [] }
               ]
             }
           }]

@@ -153,7 +153,10 @@ public sealed class ReflectionEmitSandboxCompiler : ISandboxCompiler
                 methodReferences,
                 functionModels,
                 plan.Bindings,
-                plan.FunctionAnalysis).Emit();
+                plan.FunctionAnalysis,
+                recordReturnValidation:
+                    StringComparer.Ordinal.Equals(item.Id, function.Id) &&
+                    item.ReturnType.Arguments.Count > 0).Emit();
         }
 
         type.CreateType();

@@ -75,6 +75,13 @@ public sealed class RpcStreamingContext : IRpcStreamingContext
 
     internal RpcStreamAttachment? CompleteDispatch()
     {
+        // Disabled is shared by every non-streaming dispatch and can never hold a response.
+        // Avoid serializing unrelated peers on its otherwise unnecessary monitor.
+        if (_streams is null)
+        {
+            return null;
+        }
+
         lock (_gate)
         {
             _completed = true;

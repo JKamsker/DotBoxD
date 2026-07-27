@@ -3,7 +3,7 @@ using DotBoxD.Kernels.Model;
 
 namespace DotBoxD.Kernels.Sandbox;
 
-public sealed partial class SandboxContext
+public sealed partial class SandboxContext : IDisposable
 {
     public void ChargeString(string value)
     {

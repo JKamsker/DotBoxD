@@ -32,6 +32,16 @@ internal sealed class CompiledAsyncWorker(Func<SandboxExecutionResult> execute)
         }
     }
 
+    public static SandboxExecutionResult RunInline(
+        CompiledExecutable executable,
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxValue input,
+        SandboxExecutionOptions options,
+        CancellationToken cancellationToken)
+        => RunInline(() => CompiledExecutionRunner.ExecuteCore(
+            executable, plan, entrypoint, input, options, cancellationToken));
+
     private void Start()
     {
         var thread = new Thread(Run)

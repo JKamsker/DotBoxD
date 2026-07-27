@@ -12,7 +12,7 @@ internal class PendingUnaryResponse<TResponse> :
     IPendingResponse
 {
     private RpcPeerOutboundInvoker? _directOwner;
-    private int _completed;
+    private PendingDirectCompletionHandshake _directCompletion;
 
     public PendingUnaryResponse(int messageId)
         : base(TaskCreationOptions.RunContinuationsAsynchronously)
@@ -45,12 +45,12 @@ internal class PendingUnaryResponse<TResponse> :
 
     public void EnableDirectCompletion(RpcPeerOutboundInvoker owner)
     {
-        Volatile.Write(ref _directOwner, owner);
-
-        if (Task.IsCompleted)
+        if (Interlocked.CompareExchange(ref _directOwner, owner, null) is not null)
         {
-            CompleteDirect(sendCancel: false);
+            throw new InvalidOperationException("Direct pending owner was already published.");
         }
+
+        NotifyDirectOwner(_directCompletion.PublishOwner());
     }
 
     public bool TrySetResponse(
@@ -101,12 +101,14 @@ internal class PendingUnaryResponse<TResponse> :
 
     protected bool TryCompleteCanceled(PendingCancellationKind kind)
     {
-        if (!IsDirectCompletion)
+        // Pending-send and caller-cancelable invocations retain wrapper ownership. Their wrapper
+        // translates the canceled Task into the public timeout shape and sends the cancel frame.
+        if (Volatile.Read(ref _directOwner) is null)
         {
             return TrySetCanceled();
         }
 
-        CompleteDirect(sendCancel: true);
+        PublishDirectCompletion(sendCancel: true);
         if (kind == PendingCancellationKind.Timeout)
         {
             return TrySetException(CreateTimeoutException());
@@ -124,37 +126,33 @@ internal class PendingUnaryResponse<TResponse> :
     protected virtual bool TryCancelIfCallerCanceledAfterMaterialization() =>
         false;
 
-    private bool IsDirectCompletion =>
-        Volatile.Read(ref _directOwner) is not null;
-
     private void CompleteAndSetResult(TResponse response)
     {
-        if (IsDirectCompletion)
-        {
-            CompleteDirect(sendCancel: false);
-        }
-
+        PublishDirectCompletion(sendCancel: false);
         TrySetResult(response);
     }
 
     private void CompleteAndSetException(Exception error)
     {
-        if (IsDirectCompletion)
-        {
-            CompleteDirect(sendCancel: false);
-        }
-
+        PublishDirectCompletion(sendCancel: false);
         TrySetException(error);
     }
 
-    private void CompleteDirect(bool sendCancel)
+    private void PublishDirectCompletion(bool sendCancel) =>
+        NotifyDirectOwner(_directCompletion.PublishCompletion(sendCancel));
+
+    private void NotifyDirectOwner(PendingDirectCompletionAction action)
     {
-        if (Interlocked.Exchange(ref _completed, 1) != 0)
+        if (action == PendingDirectCompletionAction.None)
         {
             return;
         }
 
-        Volatile.Read(ref _directOwner)?.CompleteUnaryPending(this, sendCancel);
+        var owner = Volatile.Read(ref _directOwner)
+            ?? throw new InvalidOperationException("Direct pending owner was not published.");
+        owner.CompleteUnaryPending(
+            this,
+            action == PendingDirectCompletionAction.ReleaseAndSendCancel);
     }
 }
 

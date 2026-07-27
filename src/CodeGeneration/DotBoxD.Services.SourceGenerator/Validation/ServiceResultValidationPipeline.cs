@@ -12,6 +12,7 @@ internal static class ServiceResultValidationPipeline
     {
         results = results
             .Combine(existingTypes)
+            .WithComparer(PrimaryGeneratedTypeCollisionInputComparer.Instance)
             .Select(static (pair, ct) =>
                 GeneratedTypeCollisionValidator.ApplyPrimaryTypes(pair.Left, pair.Right, ct))
             .WithTrackingName("ExistingTypeValidatedServiceResults");
@@ -61,6 +62,7 @@ internal static class ServiceResultValidationPipeline
 
         var finalRejectionInputs = subServiceResults
             .Combine(existingTypes)
+            .WithComparer(AsyncGeneratedTypeCollisionInputComparer.Instance)
             .Select(static (pair, ct) => FinalRejectionInput.From(pair.Left, pair.Right, ct))
             .WithTrackingName("FinalRejectionInputs");
 
@@ -99,6 +101,7 @@ internal static class ServiceResultValidationPipeline
         string trackingName) =>
         results
             .Combine(existingTypes)
+            .WithComparer(AsyncGeneratedTypeCollisionInputComparer.Instance)
             .Select(static (pair, ct) =>
                 GeneratedTypeCollisionValidator.ApplyAsyncSibling(pair.Left, pair.Right, ct))
             .WithTrackingName(trackingName);

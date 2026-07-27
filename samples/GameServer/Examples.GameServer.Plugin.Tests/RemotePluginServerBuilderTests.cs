@@ -258,7 +258,7 @@ public sealed partial class RemotePluginServerBuilderTests
             KernelPackageRegistry.Resolve<MonsterKillerKernel>);
 
         Assert.Equal("monster-killer", installedId);
-        Assert.Equal(["extension:monster-killer", "extension:monster-killer"], control.Calls);
+        Assert.Equal(["extension:monster-killer"], control.Calls);
     }
 
     private static void ConfigureSampleKernels(IGamePluginSetup setup)

@@ -66,14 +66,51 @@ public sealed class RpcTelemetryTests
         Assert.Equal(typeof(ServiceTimeoutException).FullName, ReadTag(activity, "error.type"));
     }
 
+    [Fact]
+    public void Server_request_scope_emits_resolved_duration_tags()
+    {
+        var measurements = new ConcurrentBag<DurationMeasurement>();
+        using var listener = ListenForDurationMeasurements(RpcTelemetry.InstrumentationName, measurements);
+
+        using (var scope = RpcTelemetry.StartServerRequest())
+        {
+            scope.SetResolvedOperation("GameService", "Move");
+        }
+
+        var measurement = Assert.Single(measurements);
+        Assert.True(measurement.DurationMilliseconds >= 0);
+        Assert.Equal("GameService", measurement.Service);
+        Assert.Equal("Move", measurement.Method);
+        Assert.Null(measurement.ErrorType);
+    }
+
+    [Fact]
+    public void Timeout_counter_does_not_require_request_tracing_or_duration_metrics()
+    {
+        var measurements = new ConcurrentBag<string>();
+        using var listener = ListenForLongMeasurements(
+            RpcTelemetry.InstrumentationName,
+            measurements,
+            enabledInstrumentName: "dotboxd.rpc.requests.timeouts");
+
+        using (var scope = RpcTelemetry.StartServerRequest())
+        {
+            scope.MarkFailed(new ServiceTimeoutException("timed out"));
+        }
+
+        Assert.Equal("dotboxd.rpc.requests.timeouts", Assert.Single(measurements));
+    }
+
     private static MeterListener ListenForLongMeasurements(
         string instrumentationName,
-        ConcurrentBag<string> measurements)
+        ConcurrentBag<string> measurements,
+        string? enabledInstrumentName = null)
     {
         var listener = new MeterListener();
         listener.InstrumentPublished = (instrument, currentListener) =>
         {
-            if (instrument.Meter.Name == instrumentationName)
+            if (instrument.Meter.Name == instrumentationName &&
+                (enabledInstrumentName is null || instrument.Name == enabledInstrumentName))
             {
                 currentListener.EnableMeasurementEvents(instrument);
             }
@@ -97,6 +134,51 @@ public sealed class RpcTelemetryTests
         return listener;
     }
 
+    private static MeterListener ListenForDurationMeasurements(
+        string instrumentationName,
+        ConcurrentBag<DurationMeasurement> measurements)
+    {
+        var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, currentListener) =>
+        {
+            if (instrument.Meter.Name == instrumentationName &&
+                instrument.Name == "dotboxd.rpc.server.duration")
+            {
+                currentListener.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<double>((instrument, value, tags, _) =>
+        {
+            if (instrument.Name != "dotboxd.rpc.server.duration")
+            {
+                return;
+            }
+
+            string? service = null;
+            string? method = null;
+            string? errorType = null;
+            foreach (var tag in tags)
+            {
+                switch (tag.Key)
+                {
+                    case "rpc.service":
+                        service = tag.Value as string;
+                        break;
+                    case "rpc.method":
+                        method = tag.Value as string;
+                        break;
+                    case "error.type":
+                        errorType = tag.Value as string;
+                        break;
+                }
+            }
+
+            measurements.Add(new DurationMeasurement(value, service, method, errorType));
+        });
+        listener.Start();
+        return listener;
+    }
+
     private static object? ReadTag(Activity activity, string key)
     {
         foreach (var tag in activity.TagObjects)
@@ -109,4 +191,10 @@ public sealed class RpcTelemetryTests
 
         return null;
     }
+
+    private sealed record DurationMeasurement(
+        double DurationMilliseconds,
+        string? Service,
+        string? Method,
+        string? ErrorType);
 }

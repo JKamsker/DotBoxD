@@ -38,6 +38,27 @@ internal sealed class F64ExpressionPlan
     public int BindingCallCount { get; }
     public bool PreservesNonNegative { get; }
 
+    public bool IsReusableForLoopPlan
+        => _kind switch
+        {
+            ExpressionKind.Literal or ExpressionKind.RawVariable => true,
+            ExpressionKind.Add or ExpressionKind.Sub or ExpressionKind.Mul or ExpressionKind.Div
+                => _operand!.IsReusableForLoopPlan && _right!.IsReusableForLoopPlan,
+            _ => false
+        };
+
+    public void CollectRequiredRawSlots(List<int> slots)
+    {
+        if (_kind == ExpressionKind.RawVariable)
+        {
+            slots.Add(_slot);
+            return;
+        }
+
+        _operand?.CollectRequiredRawSlots(slots);
+        _right?.CollectRequiredRawSlots(slots);
+    }
+
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
     public double Evaluate(InterpreterFrame frame)
     {

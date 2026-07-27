@@ -26,6 +26,17 @@ public sealed partial class PluginAnalyzer
             {
                 helperGraph.RecordConstructorInitializers(initializerConstructor);
                 RecordInitializerRootCall(context, helperGraph, initializerConstructor);
+                if (creation.Type is INamedTypeSymbol constructedType)
+                {
+                    foreach (var containingConstructor in InitializerContainingConstructors(context.ContainingSymbol))
+                    {
+                        helperGraph.RecordGenericObjectCreation(
+                            containingConstructor,
+                            initializerConstructor,
+                            constructedType,
+                            context.Operation.Syntax.GetLocation());
+                    }
+                }
             }
 
             return;
@@ -46,8 +57,52 @@ public sealed partial class PluginAnalyzer
         if (creation.Constructor is { } constructor)
         {
             helperGraph.RecordConstructorInitializers(constructor);
+            if (creation.Type is INamedTypeSymbol constructedType)
+            {
+                helperGraph.RecordGenericObjectCreation(
+                    method,
+                    constructor,
+                    constructedType,
+                    context.Operation.Syntax.GetLocation());
+            }
+
             helperGraph.RecordCall(method, constructor, context.Operation.Syntax.GetLocation());
         }
+    }
+
+    private static void AnalyzeTypeParameterObjectCreation(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph)
+    {
+        if (context.Operation.Type is not ITypeParameterSymbol typeParameter)
+        {
+            return;
+        }
+
+        if (context.ContainingSymbol is IMethodSymbol method)
+        {
+            helperGraph.RecordGenericTypeParameterConstruction(method, typeParameter);
+            return;
+        }
+
+        foreach (var containingConstructor in InitializerContainingConstructors(context.ContainingSymbol))
+        {
+            helperGraph.RecordGenericTypeParameterConstruction(containingConstructor, typeParameter);
+        }
+    }
+
+    private static IEnumerable<IMethodSymbol> InitializerContainingConstructors(ISymbol initializer)
+    {
+        var constructors = initializer switch
+        {
+            IFieldSymbol { IsStatic: true } field => field.ContainingType.StaticConstructors,
+            IFieldSymbol field => field.ContainingType.InstanceConstructors,
+            IPropertySymbol { IsStatic: true } property => property.ContainingType.StaticConstructors,
+            IPropertySymbol property => property.ContainingType.InstanceConstructors,
+            _ => []
+        };
+
+        return constructors;
     }
 
     private static bool IsValueTaskObjectCreation(ITypeSymbol? type, Compilation compilation)

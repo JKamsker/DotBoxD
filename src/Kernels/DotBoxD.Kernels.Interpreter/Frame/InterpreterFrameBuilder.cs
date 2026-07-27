@@ -11,6 +11,12 @@ internal static class InterpreterFrameBuilder
         LocalFunctionArguments args)
         => CreateCore(layout, function, args, entrypointInput: null);
 
+    public static InterpreterFrame Create(
+        FunctionFrameLayout layout,
+        SandboxFunction function,
+        LocalFunctionTripleArguments args)
+        => CreateCore(layout, function, args);
+
     // The evaluator validates the shape and every parameter before entering
     // the function call. Reading that immutable input here must stay unchecked.
     public static InterpreterFrame CreateValidatedEntrypoint(
@@ -41,6 +47,29 @@ internal static class InterpreterFrameBuilder
                 ? arguments[i]
                 : GetValidatedEntrypointArgument(entrypointInput, i, function.Parameters.Count);
             AssignArgumentSlot(layout, argument, i, slots, i32Slots, i64Slots, f64Slots, assigned);
+        }
+
+        return new InterpreterFrame(layout, slots, i32Slots, i64Slots, f64Slots, assigned);
+    }
+
+    private static InterpreterFrame CreateCore(
+        FunctionFrameLayout layout,
+        SandboxFunction function,
+        LocalFunctionTripleArguments arguments)
+    {
+        // Keep the established array-backed and one/two-scalar path non-generic.
+        // A shared interface would add constrained dispatch to every local call.
+        var slots = layout.HasBoxedSlots ? new SandboxValue?[layout.SlotCount] : Array.Empty<SandboxValue?>();
+        var i32Slots = layout.HasI32Slots ? new int[layout.SlotCount] : Array.Empty<int>();
+        var i64Slots = layout.HasI64Slots ? new long[layout.SlotCount] : Array.Empty<long>();
+        var f64Slots = layout.HasF64Slots ? new double[layout.SlotCount] : Array.Empty<double>();
+        var assigned = layout.RequiresRawAssignmentState
+            ? new bool[layout.SlotCount]
+            : Array.Empty<bool>();
+
+        for (var i = 0; i < function.Parameters.Count; i++)
+        {
+            AssignArgumentSlot(layout, arguments[i], i, slots, i32Slots, i64Slots, f64Slots, assigned);
         }
 
         return new InterpreterFrame(layout, slots, i32Slots, i64Slots, f64Slots, assigned);

@@ -3,10 +3,10 @@ namespace DotBoxD.Plugins.Runtime;
 internal readonly struct CachedPipelineFanout
 {
     private static readonly object[] EmptyPipelines = Array.Empty<object>();
-    private readonly object[]? _pipelines;
+    private readonly State? _state;
 
     private CachedPipelineFanout(object[] pipelines)
-        => _pipelines = pipelines;
+        => _state = new State(pipelines);
 
     public int Count => Pipelines.Length;
 
@@ -21,7 +21,29 @@ internal readonly struct CachedPipelineFanout
 
     public Enumerator GetEnumerator() => new(Pipelines);
 
-    private object[] Pipelines => _pipelines ?? EmptyPipelines;
+    internal object? ReadResultRegistrationCache()
+        => _state is null ? null : Volatile.Read(ref _state.ResultRegistrationCache);
+
+    internal object? CompareExchangeResultRegistrationCache(object value, object? comparand)
+    {
+        var state = _state ?? throw new InvalidOperationException("An empty fanout cannot cache registrations.");
+        return Interlocked.CompareExchange(ref state.ResultRegistrationCache, value, comparand);
+    }
+
+    internal CachedPipelineFanout CopyWithoutResultRegistrationCache()
+        => _state is null
+            ? Empty
+            : new CachedPipelineFanout(_state.Pipelines);
+
+    private object[] Pipelines => _state?.Pipelines ?? EmptyPipelines;
+
+    private sealed class State(object[] pipelines)
+    {
+        // The extra owner is created once with a non-empty fanout. Subscription dispatch uses only Pipelines;
+        // multi-pipeline result hooks additionally publish their lazily built aggregate through the cache field.
+        public readonly object[] Pipelines = pipelines;
+        public object? ResultRegistrationCache;
+    }
 
     internal struct Enumerator
     {

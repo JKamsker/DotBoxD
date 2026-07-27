@@ -13,8 +13,9 @@ public sealed class SubscriptionRegistry
 {
     private readonly object _gate = new();
     private readonly Dictionary<PipelineKey, object> _pipelines = [];
-    private readonly Dictionary<Type, CachedPipelineFanout> _pipelineFanout = [];
-    private readonly HashSet<Type> _pipelineEventTypes = [];
+
+    // Writers clone under _gate and publish the completed dictionary; a published instance is never mutated.
+    private Dictionary<Type, CachedPipelineFanout> _pipelineFanout = [];
     private readonly IPluginMessageSink _messages;
     private readonly PluginEventAdapterRegistry _events;
     private readonly KernelRegistry _kernels;
@@ -90,7 +91,7 @@ public sealed class SubscriptionRegistry
                 _onFault,
                 _throwIfDisposed);
             _pipelines[key] = created;
-            RegisterEventTypeLocked<TEvent>();
+            PublishEventFanoutLocked(typeof(TEvent));
             return created;
         }
     }
@@ -119,7 +120,7 @@ public sealed class SubscriptionRegistry
                 _onFault,
                 _throwIfDisposed);
             _pipelines[key] = created;
-            RegisterEventTypeLocked<TEvent>();
+            PublishEventFanoutLocked(typeof(TEvent));
             return created;
         }
     }
@@ -166,11 +167,7 @@ public sealed class SubscriptionRegistry
         ThrowIfDisposed();
         cancellationToken.ThrowIfCancellationRequested();
 
-        CachedPipelineFanout pipelines;
-        lock (_gate)
-        {
-            pipelines = PipelinesForEventLocked<TEvent>();
-        }
+        var pipelines = PipelinesForEvent<TEvent>();
 
         foreach (var pipeline in pipelines)
         {
@@ -217,19 +214,16 @@ public sealed class SubscriptionRegistry
         ]);
     }
 
-    private CachedPipelineFanout PipelinesForEventLocked<TEvent>()
+    private CachedPipelineFanout PipelinesForEvent<TEvent>()
     {
-        var eventType = typeof(TEvent);
-        if (!_pipelineEventTypes.Contains(eventType))
-        {
-            return CachedPipelineFanout.Empty;
-        }
+        var snapshot = Volatile.Read(ref _pipelineFanout);
+        return snapshot.TryGetValue(typeof(TEvent), out var fanout)
+            ? fanout
+            : CachedPipelineFanout.Empty;
+    }
 
-        if (_pipelineFanout.TryGetValue(eventType, out var cached))
-        {
-            return cached;
-        }
-
+    private void PublishEventFanoutLocked(Type eventType)
+    {
         List<object>? pipelines = null;
         foreach (var (key, pipeline) in _pipelines)
         {
@@ -241,15 +235,9 @@ public sealed class SubscriptionRegistry
         }
 
         var fanout = CachedPipelineFanout.From(pipelines);
-        _pipelineFanout[eventType] = fanout;
-        return fanout;
-    }
-
-    private void RegisterEventTypeLocked<TEvent>()
-    {
-        var eventType = typeof(TEvent);
-        _pipelineEventTypes.Add(eventType);
-        _pipelineFanout.Remove(eventType);
+        var replacement = new Dictionary<Type, CachedPipelineFanout>(Volatile.Read(ref _pipelineFanout));
+        replacement[eventType] = fanout;
+        Volatile.Write(ref _pipelineFanout, replacement);
     }
 
     private void ThrowIfDisposed()

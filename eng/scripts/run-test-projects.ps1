@@ -101,6 +101,10 @@ function Join-AnyTestFilter([string[]] $Filters) {
     return ($Filters | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join "|"
 }
 
+function Join-AllTestFilters([string[]] $Filters) {
+    return ($Filters | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join "&"
+}
+
 function New-TestBatch([string] $Name, [string] $Filter) {
     return [pscustomobject] @{
         Name = $Name
@@ -109,7 +113,12 @@ function New-TestBatch([string] $Name, [string] $Filter) {
 }
 
 function Get-TestBatches([string] $ProjectName, [string] $SuiteName, [string] $Filter) {
-    if ($ProjectName -ne "DotBoxD.Kernels.Tests" -or $SuiteName -ne "kernels-remainder") {
+    $kernelRemainderSuites = @(
+        "kernels-remainder",
+        "kernels-remainder-core",
+        "kernels-remainder-analyzers"
+    )
+    if ($ProjectName -ne "DotBoxD.Kernels.Tests" -or $SuiteName -notin $kernelRemainderSuites) {
         return @(New-TestBatch "" $Filter)
     }
 
@@ -188,8 +197,39 @@ function Get-TestBatches([string] $ProjectName, [string] $SuiteName, [string] $F
             Filter = "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Regression"
         },
         [pscustomobject] @{
-            Name = "Plugins-Rpc"
-            Filter = "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc"
+            Name = "Plugins-Rpc-Kernel"
+            Filter = "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.KernelRpc"
+        },
+        [pscustomobject] @{
+            Name = "Plugins-Rpc-Kernel-Client"
+            Filter = Join-AnyTestFilter @(
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.ServerExtensionClient",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.Kernel.")
+        },
+        [pscustomobject] @{
+            Name = "Plugins-Rpc-Generation"
+            Filter = Join-AnyTestFilter @(
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.RegistrationAccumulator",
+                (Join-AllTestFilters @(
+                    "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.RpcKernel",
+                    "FullyQualifiedName!~DotBoxD.Kernels.Tests.Plugins.Rpc.RpcKernelLiveSetting",
+                    "FullyQualifiedName!~DotBoxD.Kernels.Tests.Plugins.Rpc.RpcKernelRuntime")),
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.TaskLikeSymbolRegressionTests")
+        },
+        [pscustomobject] @{
+            Name = "Plugins-Rpc-ServerExtension"
+            Filter = Join-AllTestFilters @(
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.ServerExtension",
+                "FullyQualifiedName!~DotBoxD.Kernels.Tests.Plugins.Rpc.ServerExtensionClient")
+        },
+        [pscustomobject] @{
+            Name = "Plugins-Rpc-Runtime-Misc"
+            Filter = Join-AnyTestFilter @(
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.GeneratedMapReaderCompatibilityTests",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.GeneratedReadonlyCollectionReaderTests",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.RpcIpc",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.RpcKernelLiveSetting",
+                "FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Rpc.RpcKernelRuntime")
         },
         [pscustomobject] @{
             Name = "Plugins-Runtime-Server"
@@ -202,6 +242,10 @@ function Get-TestBatches([string] $ProjectName, [string] $SuiteName, [string] $F
     $batches += @($pluginBatches | ForEach-Object {
         New-TestBatch $_.Name (Join-TestFilters $Filter $_.Filter)
     })
+
+    if ($SuiteName -eq "kernels-remainder-core") {
+        return $batches
+    }
 
     $pluginAnalyzerBatches = @(
         [pscustomobject] @{
@@ -308,11 +352,15 @@ function Get-TestBatches([string] $ProjectName, [string] $SuiteName, [string] $F
         }
     )
 
-    $batches += @($pluginAnalyzerBatches | ForEach-Object {
+    $analyzerBatches = @($pluginAnalyzerBatches | ForEach-Object {
         New-TestBatch $_.Name (Join-TestFilters $Filter $_.Filter)
     })
 
-    return $batches
+    if ($SuiteName -eq "kernels-remainder-analyzers") {
+        return $analyzerBatches
+    }
+
+    return @($batches) + @($analyzerBatches)
 }
 
 $projectPaths = @($Projects | ForEach-Object { Resolve-ProjectPath $_ } | Where-Object {

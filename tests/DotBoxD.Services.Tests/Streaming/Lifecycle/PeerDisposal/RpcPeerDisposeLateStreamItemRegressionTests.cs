@@ -25,7 +25,10 @@ public sealed class RpcPeerDisposeLateStreamItemRegressionTests
         Task? disposeTask = null;
         try
         {
-            remoteStream = await peer.InvokeStreamAsync("Streaming", "Download").WaitAsync(Timeout);
+            await channel.WaitForInitialReceiveAsync(Timeout);
+            var invokeTask = peer.InvokeStreamAsync("Streaming", "Download");
+            await channel.WaitForRequestAsync(Timeout);
+            remoteStream = await invokeTask.WaitAsync(Timeout);
             await channel.WaitForLateReceiveAsync(Timeout);
 
             disposeTask = peer.DisposeAsync().AsTask();
@@ -63,10 +66,11 @@ public sealed class RpcPeerDisposeLateStreamItemRegressionTests
 
     private sealed class LateStreamItemAfterDisposeChannel : IRpcChannel
     {
-        private const int MessageId = 1;
         private const int StreamId = 51_001;
 
         private readonly MessagePackRpcSerializer _serializer;
+        private readonly TaskCompletionSource<bool> _initialReceiveStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<int> _requestMessageId = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<bool> _lateReceiveStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<bool> _disposeStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<bool> _lateFrameReturned = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -81,15 +85,25 @@ public sealed class RpcPeerDisposeLateStreamItemRegressionTests
 
         public string RemoteEndpoint => "late-stream-item://test";
 
-        public Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) =>
-            Task.CompletedTask;
+        public Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
+        {
+            if (MessageFramer.TryReadFrameHeader(data, out var messageId, out var messageType) &&
+                messageType == MessageType.Request)
+            {
+                _requestMessageId.TrySetResult(messageId);
+            }
+
+            return Task.CompletedTask;
+        }
 
         public async Task<Payload> ReceiveAsync(CancellationToken ct = default)
         {
             var receive = Interlocked.Increment(ref _receiveCount);
             if (receive == 1)
             {
-                return CreateStreamResponseFrame();
+                _initialReceiveStarted.TrySetResult(true);
+                var messageId = await _requestMessageId.Task.WaitAsync(ct).ConfigureAwait(false);
+                return CreateStreamResponseFrame(messageId);
             }
 
             if (receive == 2)
@@ -117,6 +131,12 @@ public sealed class RpcPeerDisposeLateStreamItemRegressionTests
 
         public void AllowDispose() => _allowDispose.TrySetResult(true);
 
+        public Task WaitForInitialReceiveAsync(TimeSpan timeout) =>
+            _initialReceiveStarted.Task.WaitAsync(timeout);
+
+        public Task WaitForRequestAsync(TimeSpan timeout) =>
+            _requestMessageId.Task.WaitAsync(timeout);
+
         public Task WaitForLateReceiveAsync(TimeSpan timeout) =>
             _lateReceiveStarted.Task.WaitAsync(timeout);
 
@@ -126,18 +146,18 @@ public sealed class RpcPeerDisposeLateStreamItemRegressionTests
         public Task WaitForLateFrameReturnedAsync(TimeSpan timeout) =>
             _lateFrameReturned.Task.WaitAsync(timeout);
 
-        private Payload CreateStreamResponseFrame()
+        private Payload CreateStreamResponseFrame(int messageId)
         {
             var response = new RpcResponse
             {
-                MessageId = MessageId,
+                MessageId = messageId,
                 IsSuccess = true,
                 Stream = new RpcStreamHandle(StreamId, RpcStreamKind.Binary),
             };
 
             return MessageFramer.FrameMessage(
                 _serializer,
-                MessageId,
+                messageId,
                 MessageType.Response,
                 response,
                 ReadOnlySpan<byte>.Empty);

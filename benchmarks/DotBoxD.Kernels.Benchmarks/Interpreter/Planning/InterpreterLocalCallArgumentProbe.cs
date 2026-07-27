@@ -24,7 +24,8 @@ internal static class InterpreterLocalCallArgumentProbe
         var plans = new PreparedPlans(
             await PrepareAsync(host, InterpreterLocalCallArgumentModules.ZeroArity(), policy),
             await PrepareAsync(host, InterpreterLocalCallArgumentModules.OneArity(), policy),
-            await PrepareAsync(host, InterpreterLocalCallArgumentModules.TwoArity(), policy));
+            await PrepareAsync(host, InterpreterLocalCallArgumentModules.TwoArity(), policy),
+            await PrepareAsync(host, InterpreterLocalCallArgumentModules.ThreeArity(), policy));
         var interpreter = new SandboxInterpreter();
         var options = new SandboxExecutionOptions
         {
@@ -62,8 +63,22 @@ internal static class InterpreterLocalCallArgumentProbe
             "arity 2",
             directUsage: new(3, 0, 4, 0),
             callUsage: new(10, 0, 4, 0));
+        var three = RunPair(
+            interpreter,
+            plans.Three,
+            SandboxValue.FromList(
+                [
+                    SandboxValue.FromString("a"),
+                    SandboxValue.FromString("b"),
+                    SandboxValue.FromString("c")
+                ],
+                SandboxType.String),
+            options,
+            "arity 3",
+            directUsage: new(3, 0, 6, 0),
+            callUsage: new(11, 0, 6, 0));
 
-        PrintDecomposition(zero, one, two);
+        PrintDecomposition(zero, one, two, three);
     }
 
     private static async Task<ExecutionPlan> PrepareAsync(
@@ -127,8 +142,9 @@ internal static class InterpreterLocalCallArgumentProbe
         int iterations)
     {
         long checksum = 0;
+        var watch = new Stopwatch();
         var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-        var watch = Stopwatch.StartNew();
+        watch.Start();
         for (var i = 0; i < iterations; i++)
         {
             var pending = interpreter.ExecuteAsync(plan, entrypoint, input, options, CancellationToken.None);
@@ -163,16 +179,19 @@ internal static class InterpreterLocalCallArgumentProbe
     private static void PrintDecomposition(
         PairMeasurement zero,
         PairMeasurement one,
-        PairMeasurement two)
+        PairMeasurement two,
+        PairMeasurement three)
     {
         var fixedCallAndFrameBytes = zero.DeltaBytes;
         var oneArgumentArrayBytes = one.DeltaBytes - fixedCallAndFrameBytes;
         var twoArgumentArrayBytes = two.DeltaBytes - fixedCallAndFrameBytes;
+        var threeArgumentArrayBytes = three.DeltaBytes - fixedCallAndFrameBytes;
         Console.WriteLine();
         Console.WriteLine("managed allocation decomposition per local call:");
         Console.WriteLine($"fixed dispatch + padded callee frame {PerExecution(fixedCallAndFrameBytes),10:N1} B/op");
         Console.WriteLine($"arity 1 caller argument array       {PerExecution(oneArgumentArrayBytes),10:N1} B/op");
         Console.WriteLine($"arity 2 caller argument array       {PerExecution(twoArgumentArrayBytes),10:N1} B/op");
+        Console.WriteLine($"arity 3 caller argument array       {PerExecution(threeArgumentArrayBytes),10:N1} B/op");
     }
 
     private static double PerExecution(long bytes) => bytes / (double)Iterations;
@@ -205,5 +224,9 @@ internal static class InterpreterLocalCallArgumentProbe
         public long DeltaBytes => Call.Bytes - Direct.Bytes;
     }
 
-    private readonly record struct PreparedPlans(ExecutionPlan Zero, ExecutionPlan One, ExecutionPlan Two);
+    private readonly record struct PreparedPlans(
+        ExecutionPlan Zero,
+        ExecutionPlan One,
+        ExecutionPlan Two,
+        ExecutionPlan Three);
 }

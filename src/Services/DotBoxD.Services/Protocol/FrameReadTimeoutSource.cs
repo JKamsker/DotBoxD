@@ -7,6 +7,8 @@ internal sealed class FrameReadTimeoutSource : IDisposable
     private CancellationTokenSource? _source;
     private CancellationToken _ownerToken;
     private bool _ownerTokenCanCancel;
+    private bool _disposed;
+    private int _timeoutArmed;
 
     public static TimeSpan Resolve(TimeSpan? timeout, string parameterName) =>
         Validate(timeout ?? DefaultIdleTimeout, parameterName);
@@ -41,8 +43,7 @@ internal sealed class FrameReadTimeoutSource : IDisposable
         }
         catch (OperationCanceledException) when (IsTimeoutCancellation(ownerToken))
         {
-            throw new IOException(
-                $"Inbound frame read stalled for longer than {timeout} with no data (possible slow-loris peer).");
+            throw CreateTimeoutException(timeout);
         }
         finally
         {
@@ -57,15 +58,21 @@ internal sealed class FrameReadTimeoutSource : IDisposable
         try
         {
             source.CancelAfter(timeout);
+            PublishTimeoutState(timeout);
         }
         catch (ObjectDisposedException)
         {
-            source = CreateSource(ownerToken);
+            source = ReplaceSource(ownerToken);
             source.CancelAfter(timeout);
+            PublishTimeoutState(timeout);
         }
 
         return source.Token;
     }
+
+    // Start establishes the frame owner. Reusing it here keeps ReadExactAsync's state machine to one
+    // token while still returning a replacement token if the cached source had to be recreated.
+    public CancellationToken Rearm(TimeSpan timeout) => Start(_ownerToken, timeout);
 
     public bool IsTimeoutCancellation(CancellationToken ownerToken)
     {
@@ -75,8 +82,18 @@ internal sealed class FrameReadTimeoutSource : IDisposable
             !ownerToken.IsCancellationRequested;
     }
 
+    public bool IsCurrentOwnerTimeoutCancellation() => IsTimeoutCancellation(_ownerToken);
+
+    public static IOException CreateTimeoutException(TimeSpan timeout) =>
+        new($"Inbound frame read stalled for longer than {timeout} with no data (possible slow-loris peer).");
+
     public void CancelPendingTimeout()
     {
+        if (Interlocked.Exchange(ref _timeoutArmed, 0) == 0)
+        {
+            return;
+        }
+
         var source = _source;
         if (source is { IsCancellationRequested: false })
         {
@@ -93,8 +110,23 @@ internal sealed class FrameReadTimeoutSource : IDisposable
 
     public void Dispose()
     {
-        _source?.Dispose();
-        _source = null;
+        // The internal wrapper never escapes its owning connection or framer, so its identity is a
+        // stable allocation-free lifecycle gate.
+        lock (this)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            var source = _source;
+            _source = null;
+            _ownerToken = default;
+            _ownerTokenCanCancel = false;
+            Volatile.Write(ref _timeoutArmed, 0);
+            source?.Dispose();
+        }
     }
 
     internal void DisposeCurrentSourceForTest() => _source?.Dispose();
@@ -107,22 +139,40 @@ internal sealed class FrameReadTimeoutSource : IDisposable
             source.IsCancellationRequested ||
             !MatchesOwner(ownerToken))
         {
-            source?.Dispose();
-            source = CreateSource(ownerToken);
+            return ReplaceSource(ownerToken);
         }
 
         return source;
     }
 
-    private CancellationTokenSource CreateSource(CancellationToken ownerToken)
+    private CancellationTokenSource ReplaceSource(CancellationToken ownerToken)
     {
-        var source = ownerToken.CanBeCanceled
-            ? CancellationTokenSource.CreateLinkedTokenSource(ownerToken)
-            : new CancellationTokenSource();
-        _source = source;
-        _ownerToken = ownerToken;
-        _ownerTokenCanCancel = ownerToken.CanBeCanceled;
-        return source;
+        lock (this)
+        {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(FrameReadTimeoutSource));
+            }
+
+            var source = _source;
+            if (source is not null &&
+                !IsDisposed(source) &&
+                !source.IsCancellationRequested &&
+                MatchesOwner(ownerToken))
+            {
+                return source;
+            }
+
+            Volatile.Write(ref _timeoutArmed, 0);
+            source?.Dispose();
+            source = ownerToken.CanBeCanceled
+                ? CancellationTokenSource.CreateLinkedTokenSource(ownerToken)
+                : new CancellationTokenSource();
+            _source = source;
+            _ownerToken = ownerToken;
+            _ownerTokenCanCancel = ownerToken.CanBeCanceled;
+            return source;
+        }
     }
 
     private static bool IsDisposed(CancellationTokenSource source)
@@ -141,4 +191,9 @@ internal sealed class FrameReadTimeoutSource : IDisposable
     private bool MatchesOwner(CancellationToken ownerToken) =>
         _ownerTokenCanCancel == ownerToken.CanBeCanceled &&
         (!_ownerTokenCanCancel || _ownerToken.Equals(ownerToken));
+
+    private void PublishTimeoutState(TimeSpan timeout) =>
+        Volatile.Write(
+            ref _timeoutArmed,
+            timeout == Timeout.InfiniteTimeSpan ? 0 : 1);
 }

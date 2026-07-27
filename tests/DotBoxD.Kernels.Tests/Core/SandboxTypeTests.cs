@@ -66,6 +66,109 @@ public sealed class SandboxTypeTests
     }
 
     [Fact]
+    public void IsKnown_accepts_the_complete_builtin_closed_set()
+    {
+        var builtInScalars = new[] {
+            SandboxType.Unit,
+            SandboxType.Bool,
+            SandboxType.I32,
+            SandboxType.I64,
+            SandboxType.F64,
+            SandboxType.String,
+            SandboxType.Guid,
+            SandboxType.SandboxPath,
+            SandboxType.SandboxUri
+        };
+        var declaredOpaqueIds = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var type in builtInScalars)
+        {
+            Assert.True(type.IsKnown());
+            Assert.True(type.IsKnown(declaredOpaqueIds));
+            Assert.True(type.IsKnownBuiltIn());
+        }
+
+        var nested = SandboxType.Record([
+            SandboxType.List(SandboxType.I64),
+            SandboxType.Map(SandboxType.String, SandboxType.SandboxUri)
+        ]);
+        Assert.True(nested.IsKnown());
+        Assert.True(nested.IsKnown(declaredOpaqueIds));
+        Assert.True(nested.IsKnownBuiltIn());
+    }
+
+    [Fact]
+    public void IsKnown_keeps_open_and_declared_opaque_id_policies_distinct()
+    {
+        var declaredOpaqueIds = new HashSet<string>(StringComparer.Ordinal) { "PlayerId" };
+        var declared = SandboxType.List(SandboxType.Scalar("PlayerId"));
+        var undeclared = SandboxType.List(SandboxType.Scalar("EnemyId"));
+
+        Assert.True(declared.IsKnown());
+        Assert.True(declared.IsKnown(declaredOpaqueIds));
+        Assert.False(declared.IsKnownBuiltIn());
+
+        Assert.True(undeclared.IsKnown());
+        Assert.False(undeclared.IsKnown(declaredOpaqueIds));
+        Assert.False(undeclared.IsKnownBuiltIn());
+    }
+
+    [Fact]
+    public void IsKnown_rejects_forbidden_names_in_every_structural_position()
+    {
+        var declaredForbiddenNames = new HashSet<string>(StringComparer.Ordinal) {
+            "Object",
+            "System.String"
+        };
+        var types = new[] {
+            SandboxType.Map(SandboxType.Scalar("Object"), SandboxType.I32),
+            SandboxType.List(SandboxType.Scalar("System.String")),
+            new SandboxType("Object", [SandboxType.I32])
+        };
+
+        foreach (var type in types)
+        {
+            Assert.False(type.IsKnown());
+            Assert.False(type.IsKnown(declaredForbiddenNames));
+            Assert.False(type.IsKnownBuiltIn());
+        }
+    }
+
+    [Fact]
+    public void IsKnown_rejects_unknown_non_scalar_shapes()
+    {
+        var declaredOpaqueIds = new HashSet<string>(StringComparer.Ordinal) { "PlayerId" };
+        var types = new[] {
+            new SandboxType("Tuple", [SandboxType.I32]),
+            new SandboxType("PlayerId", [SandboxType.I32]),
+            new SandboxType("I32", [SandboxType.I32])
+        };
+
+        foreach (var type in types)
+        {
+            Assert.False(type.IsKnown());
+            Assert.False(type.IsKnown(declaredOpaqueIds));
+            Assert.False(type.IsKnownBuiltIn());
+        }
+    }
+
+    [Fact]
+    public void IsKnown_accepts_the_depth_limit_and_rejects_the_next_level()
+    {
+        var declaredOpaqueIds = new HashSet<string>(StringComparer.Ordinal);
+        var atLimit = WrapInLists(SandboxType.I32, count: 2);
+        var beyondLimit = WrapInLists(atLimit, count: 1);
+
+        Assert.True(atLimit.IsKnown(maxDepth: 2));
+        Assert.True(atLimit.IsKnown(declaredOpaqueIds, maxDepth: 2));
+        Assert.True(atLimit.IsKnownBuiltIn(maxDepth: 2));
+
+        Assert.False(beyondLimit.IsKnown(maxDepth: 2));
+        Assert.False(beyondLimit.IsKnown(declaredOpaqueIds, maxDepth: 2));
+        Assert.False(beyondLimit.IsKnownBuiltIn(maxDepth: 2));
+    }
+
+    [Fact]
     public void IsForbidden_fails_closed_for_types_beyond_known_depth_limit()
     {
         var type = SandboxType.Scalar("PlayerId");
@@ -75,5 +178,15 @@ public sealed class SandboxTypeTests
         }
 
         Assert.True(type.IsForbidden());
+    }
+
+    private static SandboxType WrapInLists(SandboxType type, int count)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            type = SandboxType.List(type);
+        }
+
+        return type;
     }
 }

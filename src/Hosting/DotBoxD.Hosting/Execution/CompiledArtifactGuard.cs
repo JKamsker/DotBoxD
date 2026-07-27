@@ -82,7 +82,8 @@ internal static class CompiledArtifactGuard
             artifact.CacheStatus,
             artifact.CacheInvalidReason,
             copyAssemblyBytes: false),
-            loaded.Context);
+            loaded.Context,
+            supportsReturnValidationProof: true);
     }
 
     public static void ValidateExecutableEnvelope(CompiledArtifact artifact, ExecutionPlan plan, string entrypoint)

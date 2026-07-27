@@ -44,7 +44,7 @@ internal static class SubServiceReturnTypeReader
         {
             ct.ThrowIfCancellationRequested();
 
-            if (ServicesGeneratorTypeNames.IsRpcServiceAttribute(attr.AttributeClass?.ToDisplayString()))
+            if (ServicesGeneratorTypeNames.IsRpcServiceAttribute(attr.AttributeClass))
             {
                 return true;
             }
@@ -93,7 +93,7 @@ internal static class SubServiceReturnTypeReader
         {
             ct.ThrowIfCancellationRequested();
 
-            if (ServicesGeneratorTypeNames.IsRpcServiceAttribute(attr.AttributeClass?.ToDisplayString()))
+            if (ServicesGeneratorTypeNames.IsRpcServiceAttribute(attr.AttributeClass))
             {
                 serviceAttr = attr;
                 return true;

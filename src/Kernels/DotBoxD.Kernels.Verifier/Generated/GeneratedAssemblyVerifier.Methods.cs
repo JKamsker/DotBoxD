@@ -59,6 +59,7 @@ public sealed partial class GeneratedAssemblyVerifier
         MethodDefinitionSignatureCache methodSignatures)
     {
         var executeMethods = 0;
+        VerifyUniqueGeneratedFunctionNames(reader, type, diagnostics);
         foreach (var methodHandle in type.GetMethods())
         {
             var method = reader.GetMethodDefinition(methodHandle);
@@ -102,6 +103,24 @@ public sealed partial class GeneratedAssemblyVerifier
             diagnostics.Add(new VerificationDiagnostic(
                 "V-PUBLIC-SURFACE",
                 "generated type must expose exactly one public Execute method"));
+        }
+    }
+
+    private static void VerifyUniqueGeneratedFunctionNames(
+        MetadataReader reader,
+        TypeDefinition type,
+        List<VerificationDiagnostic> diagnostics)
+    {
+        var duplicate = type.GetMethods()
+            .Select(handle => reader.GetString(reader.GetMethodDefinition(handle).Name))
+            .Where(name => name.StartsWith("Fn_", StringComparison.Ordinal))
+            .GroupBy(name => name, StringComparer.Ordinal)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicate is not null)
+        {
+            diagnostics.Add(new VerificationDiagnostic(
+                "V-METHOD-NAME",
+                $"generated function method name '{duplicate.Key}' must be unique"));
         }
     }
 

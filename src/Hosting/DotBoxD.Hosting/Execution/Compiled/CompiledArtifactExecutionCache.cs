@@ -24,12 +24,39 @@ internal sealed class CompiledArtifactExecutionCache
             lookup = TouchOrAdd(key, compile);
         }
 
-        if (lookup.Completed is not null)
+        return await CompleteAsync(key, lookup, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async ValueTask<CompiledArtifact> GetAsync(
+        ExecutionPlan plan,
+        string entrypoint,
+        ISandboxCompiler compiler,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var key = new CacheKey(plan.PlanHash, entrypoint);
+        CacheLookup lookup;
+        lock (_gate)
         {
-            return lookup.Completed;
+            lookup = TouchOrAdd(key, compiler, plan, entrypoint);
         }
 
-        var lazy = lookup.Lazy!;
+        return await CompleteAsync(key, lookup, cancellationToken).ConfigureAwait(false);
+    }
+
+    private ValueTask<CompiledArtifact> CompleteAsync(
+        CacheKey key,
+        CacheLookup lookup,
+        CancellationToken cancellationToken)
+        => lookup.Completed is { } completed
+            ? ValueTask.FromResult(completed)
+            : AwaitAndMarkAsync(key, lookup.Lazy!, cancellationToken);
+
+    private async ValueTask<CompiledArtifact> AwaitAndMarkAsync(
+        CacheKey key,
+        Lazy<Task<CompiledArtifact>> lazy,
+        CancellationToken cancellationToken)
+    {
         try
         {
             var artifact = await lazy.Value.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -51,18 +78,51 @@ internal sealed class CompiledArtifactExecutionCache
         CacheKey key,
         Func<CancellationToken, ValueTask<CompiledArtifact>> compile)
     {
-        if (_entries.TryGetValue(key, out var existing))
-        {
-            _recency.Remove(existing);
-            _recency.AddLast(existing);
-            return existing.Value.Completed is null
-                ? new CacheLookup(null, existing.Value.Artifact)
-                : new CacheLookup(existing.Value.Completed, null);
-        }
+        return TryTouchExisting(key, out var existing)
+            ? existing
+            : AddEntry(key, compile);
+    }
 
+    private CacheLookup TouchOrAdd(
+        CacheKey key,
+        ISandboxCompiler compiler,
+        ExecutionPlan plan,
+        string entrypoint)
+    {
+        return TryTouchExisting(key, out var existing)
+            ? existing
+            : AddEntry(key, compiler, plan, entrypoint);
+    }
+
+    private CacheLookup AddEntry(
+        CacheKey key,
+        Func<CancellationToken, ValueTask<CompiledArtifact>> compile)
+    {
         var candidate = new Lazy<Task<CompiledArtifact>>(
             () => compile(CancellationToken.None).AsTask(),
             LazyThreadSafetyMode.ExecutionAndPublication);
+        return AddCandidate(key, candidate);
+    }
+
+    private CacheLookup AddEntry(
+        CacheKey key,
+        ISandboxCompiler compiler,
+        ExecutionPlan plan,
+        string entrypoint)
+    {
+        var candidate = new Lazy<Task<CompiledArtifact>>(
+            () => compiler.CompileAsync(
+                plan,
+                new CompileOptions(entrypoint),
+                CancellationToken.None).AsTask(),
+            LazyThreadSafetyMode.ExecutionAndPublication);
+        return AddCandidate(key, candidate);
+    }
+
+    private CacheLookup AddCandidate(
+        CacheKey key,
+        Lazy<Task<CompiledArtifact>> candidate)
+    {
         var node = _recency.AddLast(new Entry(key, candidate));
         _entries[key] = node;
         if (_entries.Count > Capacity)
@@ -73,6 +133,27 @@ internal sealed class CompiledArtifactExecutionCache
         }
 
         return new CacheLookup(null, candidate);
+    }
+
+    private bool TryTouchExisting(CacheKey key, out CacheLookup lookup)
+    {
+        if (_entries.TryGetValue(key, out var existing))
+        {
+            Touch(existing);
+            lookup = existing.Value.Completed is null
+                ? new CacheLookup(null, existing.Value.Artifact)
+                : new CacheLookup(existing.Value.Completed, null);
+            return true;
+        }
+
+        lookup = default;
+        return false;
+    }
+
+    private void Touch(LinkedListNode<Entry> entry)
+    {
+        _recency.Remove(entry);
+        _recency.AddLast(entry);
     }
 
     private void MarkCompleted(CacheKey key, Lazy<Task<CompiledArtifact>> lazy, CompiledArtifact artifact)

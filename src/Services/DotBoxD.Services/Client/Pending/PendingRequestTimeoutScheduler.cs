@@ -28,6 +28,11 @@ internal sealed class PendingRequestTimeoutScheduler : IDisposable
 
     public void Schedule(long deadline)
     {
+        if (Volatile.Read(ref _disposed) != 0 || deadline >= Volatile.Read(ref _nextTimeoutTimestamp))
+        {
+            return;
+        }
+
         lock (_gate)
         {
             if (_disposed != 0 || deadline >= _nextTimeoutTimestamp)
@@ -35,7 +40,7 @@ internal sealed class PendingRequestTimeoutScheduler : IDisposable
                 return;
             }
 
-            _nextTimeoutTimestamp = deadline;
+            Volatile.Write(ref _nextTimeoutTimestamp, deadline);
             ScheduleTimerLocked();
         }
     }
@@ -51,7 +56,7 @@ internal sealed class PendingRequestTimeoutScheduler : IDisposable
 
             if (next < _nextTimeoutTimestamp)
             {
-                _nextTimeoutTimestamp = next;
+                Volatile.Write(ref _nextTimeoutTimestamp, next);
             }
 
             ScheduleTimerLocked();
@@ -91,7 +96,7 @@ internal sealed class PendingRequestTimeoutScheduler : IDisposable
                 return false;
             }
 
-            _nextTimeoutTimestamp = long.MaxValue;
+            Volatile.Write(ref _nextTimeoutTimestamp, long.MaxValue);
             return true;
         }
     }

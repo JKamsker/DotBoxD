@@ -18,10 +18,7 @@ public static class SafeHttpClient
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(uri);
-        if (cancellationToken.IsCancellationRequested || context.CancellationToken.IsCancellationRequested)
-        {
-            throw Error(SandboxErrorCode.Cancelled, "net.http.get cancelled");
-        }
+        ThrowIfCancelledBeforeRequest(context, cancellationToken);
 
         var startedAt = DateTimeOffset.UtcNow;
         var resource = SafeHttpUriAudit.Sanitize(uri.Value);
@@ -70,7 +67,7 @@ public static class SafeHttpClient
             Audit(context, startedAt, false, resource, ObservedResponseBytes(context, networkBytesReadBefore, responseBytes), ObservedRequestBytes(context, networkBytesWrittenBefore, requestBytes), ex.Error.Code);
             throw;
         }
-        catch (OperationCanceledException) when (IsRequestTimeout(
+        catch (OperationCanceledException) when (SafeHttpTimeoutClassifier.IsRequestTimeout(
                                                    context,
                                                    cancellationToken,
                                                    requestTimeout?.IsCancellationRequested == true))
@@ -82,6 +79,13 @@ public static class SafeHttpClient
         catch (OperationCanceledException)
         {
             var error = new SandboxError(SandboxErrorCode.Cancelled, "net.http.get cancelled");
+            Audit(context, startedAt, false, resource, ObservedResponseBytes(context, networkBytesReadBefore, responseBytes), ObservedRequestBytes(context, networkBytesWrittenBefore, requestBytes), error.Code);
+            throw new SandboxRuntimeException(error);
+        }
+        catch (Exception) when (requestTimeout?.IsCancellationRequested == true ||
+                                SafeHttpTimeoutClassifier.WallTimeExpiredOrNearlyExpired(context))
+        {
+            var error = new SandboxError(SandboxErrorCode.Timeout, "net.http.get denied: request timed out");
             Audit(context, startedAt, false, resource, ObservedResponseBytes(context, networkBytesReadBefore, responseBytes), ObservedRequestBytes(context, networkBytesWrittenBefore, requestBytes), error.Code);
             throw new SandboxRuntimeException(error);
         }
@@ -98,36 +102,22 @@ public static class SafeHttpClient
         }
     }
 
-    private static bool IsRequestTimeout(
-        SandboxContext context,
-        CancellationToken cancellationToken,
-        bool requestTimeoutExpired)
+    private static void ThrowIfCancelledBeforeRequest(SandboxContext context, CancellationToken cancellationToken)
     {
-        if (requestTimeoutExpired)
-        {
-            return true;
-        }
-
-        try
-        {
-            context.Budget.CheckDeadline();
-        }
-        catch (SandboxRuntimeException ex) when (ex.Error.Code == SandboxErrorCode.Timeout)
-        {
-            return true;
-        }
-
         if (context.CancellationToken.IsCancellationRequested)
         {
-            return false;
+            throw Error(SandboxErrorCode.Cancelled, "net.http.get cancelled");
         }
-
         if (cancellationToken.IsCancellationRequested)
         {
-            return context.Budget.RemainingWallTime() <= TimeSpan.FromMilliseconds(20);
+            var code = SafeHttpTimeoutClassifier.IsRequestTimeout(context, cancellationToken, requestTimeoutExpired: false)
+                ? SandboxErrorCode.Timeout
+                : SandboxErrorCode.Cancelled;
+            var message = code == SandboxErrorCode.Timeout
+                ? "net.http.get denied: request timed out"
+                : "net.http.get cancelled";
+            throw Error(code, message);
         }
-
-        return true;
     }
 
     private static SafeHttpRequest ResolveRequest(SandboxContext context, SandboxUri sandboxUri)
@@ -177,7 +167,7 @@ public static class SafeHttpClient
 
     private static void RequireAllowedHost(SafeHttpGrantOptions grant, Uri uri)
     {
-        if (!SafeHttpUriAudit.MatchesAllowedAuthority(grant.AllowedHosts, uri))
+        if (!SafeHttpUriAudit.MatchesAllowedAuthority(grant.AllowedAuthorities, uri))
         {
             throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: host is not allowed");
         }
@@ -281,7 +271,7 @@ public static class SafeHttpClient
         long? measuredBytes)
     {
         var observedBytes = context.Budget.NetworkBytesRead - networkBytesReadBefore;
-        return observedBytes > 0 ? observedBytes : measuredBytes;
+        return observedBytes > 0 ? observedBytes : measuredBytes ?? 0;
     }
 
     private static long? ObservedRequestBytes(
@@ -290,7 +280,7 @@ public static class SafeHttpClient
         long? measuredBytes)
     {
         var observedBytes = context.Budget.NetworkBytesWritten - networkBytesWrittenBefore;
-        return observedBytes > 0 ? observedBytes : measuredBytes;
+        return observedBytes > 0 ? observedBytes : measuredBytes ?? 0;
     }
 
     private static SandboxRuntimeException Error(SandboxErrorCode code, string message) => new(new SandboxError(code, message));
