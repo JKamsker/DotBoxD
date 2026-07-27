@@ -38,6 +38,7 @@ internal static class ForbiddenApiNamePolicy
         "Microsoft.Extensions.FileProviders.PhysicalFileProvider",
         "Microsoft.Extensions.Logging.ConsoleLoggerExtensions",
         "Microsoft.Extensions.Logging.DebugLoggerFactoryExtensions",
+        "Microsoft.Extensions.Logging.TraceSourceFactoryExtensions",
         "Microsoft.Extensions.Configuration.FileConfigurationExtensions",
         "Microsoft.Extensions.Configuration.IniConfigurationExtensions",
         "Microsoft.Extensions.Configuration.JsonConfigurationExtensions",
@@ -54,6 +55,7 @@ internal static class ForbiddenApiNamePolicy
         "System.Data.", "Microsoft.AspNetCore.", "Microsoft.CSharp.", "Microsoft.VisualBasic.",
         "Microsoft.EntityFrameworkCore.", "Microsoft.Extensions.Logging.Console.",
         "Microsoft.Extensions.Logging.Debug.", "Microsoft.Extensions.Logging.EventLog.",
+        "Microsoft.Extensions.Logging.TraceSource.",
         "Microsoft.Extensions.Configuration.UserSecrets.", "Microsoft.Win32."
     ];
 
@@ -62,6 +64,7 @@ internal static class ForbiddenApiNamePolicy
         "Microsoft.Extensions.Configuration.EnvironmentVariablesExtensions.AddEnvironmentVariables",
         "Microsoft.Extensions.Logging.EventLoggerFactoryExtensions.AddEventLog",
         "Microsoft.Extensions.Logging.EventSourceLoggerFactoryExtensions.AddEventSourceLogger",
+        "Microsoft.Extensions.Logging.TraceSourceFactoryExtensions.AddTraceSource",
         "Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder",
         "System.String.Create",
         "System.Security.Cryptography.RSA.Create",
