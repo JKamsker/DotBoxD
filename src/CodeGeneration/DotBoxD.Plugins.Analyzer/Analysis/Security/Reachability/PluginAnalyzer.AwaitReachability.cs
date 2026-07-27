@@ -15,6 +15,14 @@ public sealed partial class PluginAnalyzer
             c => AnalyzeAwait(c, helperGraph),
             SyntaxKind.AwaitExpression);
 
+    private static void RegisterAwaitUsingReachabilityAnalysis(
+        CompilationStartAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph)
+        => context.RegisterSyntaxNodeAction(
+            c => AnalyzeAwaitUsing(c, helperGraph),
+            SyntaxKind.LocalDeclarationStatement,
+            SyntaxKind.UsingStatement);
+
     private static void AnalyzeAwait(SyntaxNodeAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
         if (context.Node is not AwaitExpressionSyntax awaitExpression ||
@@ -197,29 +205,28 @@ public sealed partial class PluginAnalyzer
             return;
         }
 
-        var getAwaiter = FindPatternMember<IMethodSymbol>(
+        foreach (var member in AwaiterPatternResolver.ExtensionMethods(
+            context.SemanticModel,
             awaitableType,
-            "GetAwaiter",
-            static method => method.Parameters.Length == 0 && !method.IsStatic);
-        if (getAwaiter is null)
+            location.SourceSpan.Start,
+            context.CancellationToken))
         {
+            RecordAwaiterCall(context, helperGraph, method, member, location);
+            if (AwaiterPatternResolver.FindMember<IPropertySymbol>(
+                member.ReturnType,
+                "IsCompleted",
+                static property => property.GetMethod is not null)?.GetMethod is { } isCompletedGetter)
+            {
+                RecordAwaiterCall(context, helperGraph, method, isCompletedGetter, location);
+            }
+
+            var getResult = AwaiterPatternResolver.FindMember<IMethodSymbol>(
+                member.ReturnType,
+                "GetResult",
+                static candidate => candidate.Parameters.Length == 0);
+            RecordAwaiterCall(context, helperGraph, method, getResult, location);
             return;
         }
-
-        RecordAwaiterCall(context, helperGraph, method, getAwaiter, location);
-        if (FindPatternMember<IPropertySymbol>(
-            getAwaiter.ReturnType,
-            "IsCompleted",
-            static property => property.GetMethod is not null)?.GetMethod is { } isCompletedGetter)
-        {
-            RecordAwaiterCall(context, helperGraph, method, isCompletedGetter, location);
-        }
-
-        var getResult = FindPatternMember<IMethodSymbol>(
-            getAwaiter.ReturnType,
-            "GetResult",
-            static method => method.Parameters.Length == 0);
-        RecordAwaiterCall(context, helperGraph, method, getResult, location);
     }
 
     private static void RecordAwaitablePatternCalls(
@@ -234,7 +241,7 @@ public sealed partial class PluginAnalyzer
             return;
         }
 
-        var getAwaiter = FindPatternMember<IMethodSymbol>(
+        var getAwaiter = AwaiterPatternResolver.FindMember<IMethodSymbol>(
             awaitableType,
             "GetAwaiter",
             static method => method.Parameters.Length == 0 && !method.IsStatic);
@@ -244,7 +251,7 @@ public sealed partial class PluginAnalyzer
         }
 
         RecordAwaiterCall(context, helperGraph, method, getAwaiter, location);
-        if (FindPatternMember<IPropertySymbol>(
+        if (AwaiterPatternResolver.FindMember<IPropertySymbol>(
             getAwaiter.ReturnType,
             "IsCompleted",
             static property => property.GetMethod is not null)?.GetMethod is { } isCompletedGetter)
@@ -252,28 +259,11 @@ public sealed partial class PluginAnalyzer
             RecordAwaiterCall(context, helperGraph, method, isCompletedGetter, location);
         }
 
-        var getResult = FindPatternMember<IMethodSymbol>(
+        var getResult = AwaiterPatternResolver.FindMember<IMethodSymbol>(
             getAwaiter.ReturnType,
             "GetResult",
             static method => method.Parameters.Length == 0);
         RecordAwaiterCall(context, helperGraph, method, getResult, location);
     }
 
-    private static TSymbol? FindPatternMember<TSymbol>(
-        ITypeSymbol type,
-        string name,
-        Func<TSymbol, bool> predicate)
-        where TSymbol : class, ISymbol
-    {
-        for (var current = type; current is not null; current = current.BaseType)
-        {
-            var member = current.GetMembers(name).OfType<TSymbol>().FirstOrDefault(predicate);
-            if (member is not null)
-            {
-                return member;
-            }
-        }
-
-        return null;
-    }
 }
