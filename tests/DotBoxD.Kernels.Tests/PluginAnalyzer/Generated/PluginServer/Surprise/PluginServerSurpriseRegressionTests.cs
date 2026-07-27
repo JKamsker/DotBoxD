@@ -172,7 +172,8 @@ public sealed partial class PluginServerSurpriseRegressionTests
         Assert.Contains("_setupReplayIndex++", generated, StringComparison.Ordinal);
         Assert.Contains("AwaitAnonymousKernelAsync(pluginId, install, cancellationToken)", generated, StringComparison.Ordinal);
         Assert.Contains("installTask.WaitAsync(cancellationToken)", generated, StringComparison.Ordinal);
-        Assert.Contains("InstallServerExtensionPackageAsync(factory(), default)", generated, StringComparison.Ordinal);
+        Assert.Contains("RequireInstalledPackageId(package, pluginId)", generated, StringComparison.Ordinal);
+        Assert.Contains("InstallServerExtensionPackageAsync(package, default)", generated, StringComparison.Ordinal);
         Assert.DoesNotContain("InstallServerExtensionPackageAsync(factory(), cancellationToken)", generated, StringComparison.Ordinal);
         Assert.Contains("OperationCanceledException", generated, StringComparison.Ordinal);
         Assert.Contains("_anonymousKernels).Remove", generated, StringComparison.Ordinal);
