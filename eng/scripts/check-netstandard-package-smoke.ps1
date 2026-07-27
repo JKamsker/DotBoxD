@@ -48,7 +48,7 @@ $escapedPackageRoot = [System.Security.SecurityElement]::Escape($packageRoot)
     <PackageReference Include="DotBoxD.Codecs.MessagePack" Version="$ExpectedVersion" />
     <PackageReference Include="DotBoxD.Transports.Tcp" Version="$ExpectedVersion" />
     <PackageReference Include="DotBoxD.Transports.NamedPipes" Version="$ExpectedVersion" />
-    <PackageReference Include="MessagePack" Version="3.1.7" />
+    <PackageReference Include="MessagePack" Version="3.1.8" />
   </ItemGroup>
 </Project>
 "@)
