@@ -198,18 +198,26 @@ public sealed partial class PluginAnalyzer
         ForbiddenHelperCallGraph helperGraph,
         IMethodSymbol method,
         ITypeSymbol? awaitableType,
-        Location location)
+        Location location,
+        bool extensionMethodsOnly = false)
     {
         if (awaitableType is null || awaitableType.DeclaringSyntaxReferences.Length == 0)
         {
             return;
         }
 
-        foreach (var member in AwaiterPatternResolver.ExtensionMethods(
-            context.SemanticModel,
-            awaitableType,
-            location.SourceSpan.Start,
-            context.CancellationToken))
+        var patternMethods = extensionMethodsOnly
+            ? AwaiterPatternResolver.ExtensionMethods(
+                context.SemanticModel,
+                awaitableType,
+                location.SourceSpan.Start,
+                context.CancellationToken)
+            : AwaiterPatternResolver.Methods(
+                context.SemanticModel,
+                awaitableType,
+                location.SourceSpan.Start,
+                context.CancellationToken);
+        foreach (var member in patternMethods)
         {
             RecordAwaiterCall(context, helperGraph, method, member, location);
             if (AwaiterPatternResolver.FindMember<IPropertySymbol>(

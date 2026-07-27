@@ -6,6 +6,28 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class AwaiterPatternResolver
 {
+    public static IEnumerable<IMethodSymbol> Methods(
+        SemanticModel semanticModel,
+        ITypeSymbol awaitableType,
+        int position,
+        CancellationToken cancellationToken)
+    {
+        var instanceMember = FindMember<IMethodSymbol>(
+            awaitableType,
+            "GetAwaiter",
+            static method => !method.IsStatic && method.Parameters.Length == 0);
+        if (instanceMember is not null)
+        {
+            yield return instanceMember;
+            yield break;
+        }
+
+        foreach (var method in ExtensionMethods(semanticModel, awaitableType, position, cancellationToken))
+        {
+            yield return method;
+        }
+    }
+
     public static IEnumerable<IMethodSymbol> ExtensionMethods(
         SemanticModel semanticModel,
         ITypeSymbol awaitableType,
