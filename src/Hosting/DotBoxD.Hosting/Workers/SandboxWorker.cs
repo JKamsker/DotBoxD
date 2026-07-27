@@ -44,7 +44,7 @@ public interface ISandboxWorkerClient
 /// </remarks>
 public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
 {
-    private readonly ConcurrentDictionary<ExecutionPlanSeal, ExecutionPlan> _preparedPlans = new();
+    private readonly ConcurrentDictionary<WorkerPlanCacheKey, ExecutionPlan> _preparedPlans = new();
     private readonly Lazy<SandboxHost> _workerHost;
     private int _disposed;
 
@@ -105,7 +105,8 @@ public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
         ExecutionPlan plan,
         CancellationToken cancellationToken)
     {
-        if (_preparedPlans.TryGetValue(plan.PlanSeal, out var cached))
+        var cacheKey = WorkerPlanCacheKey.Create(plan);
+        if (_preparedPlans.TryGetValue(cacheKey, out var cached))
         {
             return cached;
         }
@@ -113,7 +114,7 @@ public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
         var prepared = await workerHost
             .PrepareAsync(plan.Module, plan.Policy, cancellationToken)
             .ConfigureAwait(false);
-        _preparedPlans.TryAdd(plan.PlanSeal, prepared);
+        _preparedPlans.TryAdd(cacheKey, prepared);
         return prepared;
     }
 
@@ -128,6 +129,22 @@ public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
 
         workerHost.Dispose();
         throw new ObjectDisposedException(GetType().FullName);
+    }
+
+    private sealed record WorkerPlanCacheKey(
+        ExecutionPlanSeal PlanSeal,
+        string ModuleHash,
+        string PlanHash,
+        string PolicyHash,
+        string BindingManifestHash)
+    {
+        public static WorkerPlanCacheKey Create(ExecutionPlan plan)
+            => new(
+                plan.PlanSeal,
+                plan.ModuleHash,
+                plan.PlanHash,
+                plan.PolicyHash,
+                plan.BindingManifestHash);
     }
 }
 
