@@ -69,6 +69,7 @@ internal static class ForbiddenApiNamePolicy
         "Microsoft.Extensions.Logging.TraceSourceFactoryExtensions.AddTraceSource",
         "Microsoft.Extensions.Caching.Memory.CacheExtensions.Set",
         "Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder",
+        "Microsoft.Extensions.DependencyInjection.ServiceCollectionContainerBuilderExtensions.BuildServiceProvider",
         "System.String.Create",
         "System.Security.Cryptography.RSA.Create",
         "Microsoft.Extensions.Configuration.KeyPerFileConfigurationBuilderExtensions.AddKeyPerFile"
