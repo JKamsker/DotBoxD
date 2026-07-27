@@ -67,6 +67,7 @@ public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
         ArgumentNullException.ThrowIfNull(entrypoint);
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(options);
+        EnsureInProcessOptions(options);
         cancellationToken.ThrowIfCancellationRequested();
 
         var workerHost = WorkerHost();
@@ -129,6 +130,16 @@ public sealed class SandboxHostWorkerClient : ISandboxWorkerClient, IDisposable
 
         workerHost.Dispose();
         throw new ObjectDisposedException(GetType().FullName);
+    }
+
+    private static void EnsureInProcessOptions(SandboxExecutionOptions options)
+    {
+        if (options.Isolation != SandboxIsolation.InProcess)
+        {
+            throw new ArgumentException(
+                "SandboxHostWorkerClient accepts only in-process execution options.",
+                nameof(options));
+        }
     }
 
     private sealed record WorkerPlanCacheKey(
