@@ -36,6 +36,7 @@ public sealed class GeneratorLibraryReferenceResolutionTests
         "DotBoxD.Plugins.Analyzer",
         "DotBoxD.Plugins.Fody",
         "DotBoxD.Plugins.Generated",
+        "DotBoxD.Plugins.Runtime.HookRegistryFireAsyncExtensions",
         "DotBoxD.Services.Generated",
         "DotBoxD.Kernels.Game",
     ];
