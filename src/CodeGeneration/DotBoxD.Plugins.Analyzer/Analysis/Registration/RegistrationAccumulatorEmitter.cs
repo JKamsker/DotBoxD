@@ -23,6 +23,7 @@ internal static class RegistrationAccumulatorEmitter
         builder.Append("    private readonly ").Append(model.ReceiverTypeName).AppendLine(" _target;");
         builder.Append("    private readonly global::System.Collections.Generic.List<global::System.Func<")
             .AppendLine("global::System.Threading.Tasks.ValueTask>> _registrations = [];");
+        builder.AppendLine("    private int _registrationIndex;");
         builder.AppendLine();
         builder.Append("    public ").Append(model.AccumulatorName).Append('(')
             .Append(model.ReceiverTypeName).AppendLine(" target) => _target = target;");
@@ -116,9 +117,11 @@ internal static class RegistrationAccumulatorEmitter
     {
         builder.AppendLine("    internal async global::System.Threading.Tasks.ValueTask FlushAsync()");
         builder.AppendLine("    {");
-        builder.AppendLine("        foreach (var registration in _registrations)");
+        builder.AppendLine("        while (_registrationIndex < _registrations.Count)");
         builder.AppendLine("        {");
+        builder.AppendLine("            var registration = _registrations[_registrationIndex];");
         builder.AppendLine("            await registration().ConfigureAwait(false);");
+        builder.AppendLine("            _registrationIndex++;");
         builder.AppendLine("        }");
         builder.AppendLine("    }");
     }
