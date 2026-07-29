@@ -36,10 +36,6 @@ internal sealed class PersistentCacheEntryLock : IAsyncDisposable
             {
                 await Task.Delay(RetryDelayMilliseconds, cancellationToken).ConfigureAwait(false);
             }
-            catch (UnauthorizedAccessException)
-            {
-                await Task.Delay(RetryDelayMilliseconds, cancellationToken).ConfigureAwait(false);
-            }
         }
     }
 
