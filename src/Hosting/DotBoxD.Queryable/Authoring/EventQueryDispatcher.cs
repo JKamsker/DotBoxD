@@ -1,6 +1,4 @@
 using System.Text;
-using DotBoxD.Kernels.Model;
-using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Queryable.Ast;
 using DotBoxD.Queryable.Execution;
 using DotBoxD.Queryable.Planning;
@@ -99,8 +97,7 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
         {
             throw;
         }
-        catch (SandboxRuntimeException ex) when (context.CancellationToken.IsCancellationRequested &&
-                                                ex.Error.Code == SandboxErrorCode.Cancelled)
+        catch (Exception ex) when (context.CancellationToken.IsCancellationRequested)
         {
             throw new OperationCanceledException(null, ex, context.CancellationToken);
         }
