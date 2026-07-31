@@ -50,6 +50,20 @@ internal static class PersistentCompiledArtifactCachePublisher
         }
     }
 
+    public static void DeleteEntryIfExistsBestEffort(string path)
+    {
+        try
+        {
+            DeleteEntryIfExists(path);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
+
     public static void ValidateEntryShape(string entryPath)
     {
         var required = new HashSet<string>(StringComparer.Ordinal) {

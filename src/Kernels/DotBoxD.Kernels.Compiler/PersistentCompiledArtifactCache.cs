@@ -203,7 +203,7 @@ public sealed partial class PersistentCompiledArtifactCache
                 throw;
             }
 
-            PersistentCompiledArtifactCachePublisher.DeleteEntryIfExists(previousPath);
+            PersistentCompiledArtifactCachePublisher.DeleteEntryIfExistsBestEffort(previousPath);
         }
         finally
         {
