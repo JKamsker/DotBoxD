@@ -126,6 +126,34 @@ public sealed class EventQueryPublishCancellationTests
         Assert.Equal(0, handle.Dispatches);
     }
 
+    [Fact]
+    public async Task Nonmatching_broad_filter_does_not_swallow_caller_cancellation()
+    {
+        var host = new EventQueryHost();
+        using var cancellation = new CancellationTokenSource();
+        var handlerInvoked = false;
+
+        var handle = await host.Query<FilterCancelEvent>()
+            .Where(e => e.Damage > 10)
+            .SubscribeAsync((_, _) =>
+            {
+                handlerInvoked = true;
+                return ValueTask.CompletedTask;
+            });
+
+        var context = new HookContext(new InMemoryPluginMessageSink(), cancellation.Token);
+        var exception = await Record.ExceptionAsync(
+            async () => await host.PublishAsync(new FilterCancelEvent(cancellation), context));
+
+        var canceled = Assert.IsAssignableFrom<OperationCanceledException>(exception);
+        Assert.Equal(cancellation.Token, canceled.CancellationToken);
+        Assert.True(cancellation.IsCancellationRequested);
+        Assert.False(handlerInvoked);
+        Assert.Equal(1, handle.FilterEvaluations);
+        Assert.Equal(0, handle.Matches);
+        Assert.Equal(0, handle.Dispatches);
+    }
+
     private sealed class ProjectionCancelEvent(string attackerId, CancellationTokenSource cancellation)
     {
         public string AttackerId { get; } = attackerId;
@@ -148,6 +176,18 @@ public sealed class EventQueryPublishCancellationTests
             {
                 cancellation.Cancel();
                 return "player-2";
+            }
+        }
+    }
+
+    private sealed class FilterCancelEvent(CancellationTokenSource cancellation)
+    {
+        public int Damage
+        {
+            get
+            {
+                cancellation.Cancel();
+                return 0;
             }
         }
     }
