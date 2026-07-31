@@ -79,7 +79,7 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
         entry.Handle.RecordFilterEvaluation();
-        if (!TryEvaluate(entry, e))
+        if (!TryEvaluate(entry, e, context.CancellationToken))
         {
             return;
         }
@@ -110,11 +110,13 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
             // matching this event — they share a single forwarding host handler at the registry layer.
         }
     }
-    private bool TryEvaluate(EventQuerySubscriptionEntry<TEvent> entry, TEvent e)
+    private bool TryEvaluate(EventQuerySubscriptionEntry<TEvent> entry, TEvent e, CancellationToken cancellationToken)
     {
         try
         {
-            return entry.Matches(e, reader);
+            var matches = entry.Matches(e, reader);
+            cancellationToken.ThrowIfCancellationRequested();
+            return matches;
         }
         catch (InvalidOperationException)
         {
