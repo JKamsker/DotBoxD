@@ -9,6 +9,11 @@ public sealed partial class PluginAnalyzer
     private static void AnalyzeObjectCreation(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
         var creation = (IObjectCreationOperation)context.Operation;
+        if (ReportAndRecordUnboundedCollectionCreation(context, helperGraph, creation))
+        {
+            return;
+        }
+
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             if (ReportAndRecordValueTaskPayloadInInitializer(context, helperGraph, creation.Type))
@@ -68,6 +73,73 @@ public sealed partial class PluginAnalyzer
 
             helperGraph.RecordCall(method, constructor, context.Operation.Syntax.GetLocation());
         }
+    }
+
+    private static bool ReportAndRecordUnboundedCollectionCreation(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IObjectCreationOperation creation)
+    {
+        if (!TryGetForbiddenUnboundedCollectionCreation(creation, out var forbidden))
+        {
+            return false;
+        }
+
+        if (context.ContainingSymbol is IMethodSymbol method)
+        {
+            helperGraph.RecordForbidden(method, forbidden);
+            if (IsForbiddenApiRoot(context, method) &&
+                helperGraph.TryRecordDirectDiagnostic(method, forbidden))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    ForbiddenHostApiRule,
+                    context.Operation.Syntax.GetLocation(),
+                    forbidden));
+            }
+
+            return true;
+        }
+
+        if (context.ContainingSymbol is not IFieldSymbol and not IPropertySymbol)
+        {
+            return true;
+        }
+
+        var initializer = context.ContainingSymbol;
+        if (IsEventKernel(initializer.ContainingType))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                ForbiddenHostApiRule,
+                context.Operation.Syntax.GetLocation(),
+                forbidden));
+        }
+
+        helperGraph.RecordForbiddenInitializer(initializer, forbidden);
+        if (initializer is IPropertySymbol { GetMethod: { } getter } property &&
+            !IsEventKernel(property.ContainingType))
+        {
+            helperGraph.RecordForbidden(getter, forbidden);
+        }
+
+        return true;
+    }
+
+    private static bool TryGetForbiddenUnboundedCollectionCreation(
+        IObjectCreationOperation creation,
+        out string forbidden)
+    {
+        var typeName = creation.Type?.OriginalDefinition.ToDisplayString(
+            SymbolDisplayFormat.CSharpErrorMessageFormat);
+        if (typeName == "System.Collections.Generic.HashSet<T>" &&
+            creation.Arguments.Any(static argument =>
+                argument.Parameter is { Name: "capacity", Type.SpecialType: SpecialType.System_Int32 }))
+        {
+            forbidden = creation.Type!.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+            return true;
+        }
+
+        forbidden = null!;
+        return false;
     }
 
     private static void AnalyzeTypeParameterObjectCreation(

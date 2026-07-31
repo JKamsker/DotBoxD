@@ -177,6 +177,12 @@ public sealed partial class PluginAnalyzer
         ISymbol? symbol,
         out string forbidden)
     {
+        if (symbol is IMethodSymbol targetMethod &&
+            TryGetForbiddenUnboundedCollectionConstructor(targetMethod, out forbidden))
+        {
+            return true;
+        }
+
         if (symbol is IMethodSymbol method &&
             method.ContainingType is { } containingType)
         {
@@ -185,6 +191,25 @@ public sealed partial class PluginAnalyzer
             {
                 return true;
             }
+        }
+
+        forbidden = null!;
+        return false;
+    }
+
+    private static bool TryGetForbiddenUnboundedCollectionConstructor(
+        IMethodSymbol method,
+        out string forbidden)
+    {
+        var containingType = method.ContainingType;
+        var containingTypeName = containingType?.OriginalDefinition.ToDisplayString(
+            SymbolDisplayFormat.CSharpErrorMessageFormat);
+        if (method.MethodKind == MethodKind.Constructor &&
+            containingTypeName == "System.Collections.Generic.HashSet<T>" &&
+            method.Parameters.FirstOrDefault() is { Name: "capacity", Type.SpecialType: SpecialType.System_Int32 })
+        {
+            forbidden = containingType!.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+            return true;
         }
 
         forbidden = null!;
