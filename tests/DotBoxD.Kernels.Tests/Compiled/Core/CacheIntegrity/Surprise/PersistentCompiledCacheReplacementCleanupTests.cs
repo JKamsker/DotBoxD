@@ -1,4 +1,6 @@
 using DotBoxD.Kernels.Compiler;
+using DotBoxD.Kernels.Compiler.Internal;
+using DotBoxD.Kernels.Compiler.Internal.CacheIntegrity;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Serialization.Json.Hosting;
 using DotBoxD.Kernels.Tests._TestSupport;
@@ -10,6 +12,100 @@ namespace DotBoxD.Kernels.Tests.Compiled.Core.CacheIntegrity;
 
 public sealed class PersistentCompiledCacheReplacementCleanupTests
 {
+    [Fact]
+    public void Publisher_moves_file_entries_as_previous_cache_entries()
+    {
+        using var temp = TempDirectory.Create();
+        var finalPath = Path.Combine(temp.Path, "entry.dll");
+        var previousPath = Path.Combine(temp.Path, "old-entry.dll");
+        File.WriteAllText(finalPath, "cached");
+
+        var moved = PersistentCompiledArtifactCachePublisher.MoveExistingEntryAside(finalPath, previousPath);
+
+        Assert.True(moved);
+        Assert.False(File.Exists(finalPath));
+        Assert.Equal("cached", File.ReadAllText(previousPath));
+
+        PersistentCompiledArtifactCachePublisher.RestorePreviousEntry(finalPath, previousPath, movedPrevious: true);
+
+        Assert.Equal("cached", File.ReadAllText(finalPath));
+        Assert.False(File.Exists(previousPath));
+    }
+
+    [Fact]
+    public void Publisher_leaves_missing_entries_unmoved()
+    {
+        using var temp = TempDirectory.Create();
+        var finalPath = Path.Combine(temp.Path, "missing-entry");
+        var previousPath = Path.Combine(temp.Path, "old-missing-entry");
+
+        var moved = PersistentCompiledArtifactCachePublisher.MoveExistingEntryAside(finalPath, previousPath);
+        PersistentCompiledArtifactCachePublisher.RestorePreviousEntry(finalPath, previousPath, moved);
+
+        Assert.False(moved);
+        Assert.False(File.Exists(finalPath));
+        Assert.False(Directory.Exists(finalPath));
+        Assert.False(File.Exists(previousPath));
+        Assert.False(Directory.Exists(previousPath));
+    }
+
+    [Fact]
+    public void Publisher_restores_directory_entries_as_previous_cache_entries()
+    {
+        using var temp = TempDirectory.Create();
+        var finalPath = Path.Combine(temp.Path, "entry");
+        var previousPath = Path.Combine(temp.Path, "old-entry");
+        Directory.CreateDirectory(previousPath);
+        File.WriteAllText(Path.Combine(previousPath, "module.dll"), "cached");
+
+        PersistentCompiledArtifactCachePublisher.RestorePreviousEntry(finalPath, previousPath, movedPrevious: true);
+
+        Assert.True(Directory.Exists(finalPath));
+        Assert.Equal("cached", File.ReadAllText(Path.Combine(finalPath, "module.dll")));
+        Assert.False(Directory.Exists(previousPath));
+    }
+
+    [Fact]
+    public void Publisher_deletes_supported_entry_shapes()
+    {
+        using var temp = TempDirectory.Create();
+        var filePath = Path.Combine(temp.Path, "entry.dll");
+        var directoryPath = Path.Combine(temp.Path, "entry");
+        var nestedPath = Path.Combine(directoryPath, "module.dll");
+        File.WriteAllText(filePath, "cached");
+        Directory.CreateDirectory(directoryPath);
+        File.WriteAllText(nestedPath, "cached");
+
+        PersistentCompiledArtifactCachePublisher.DeleteEntryIfExists(filePath);
+        PersistentCompiledArtifactCachePublisher.DeleteEntryIfExists(directoryPath);
+        PersistentCompiledArtifactCachePublisher.DeleteEntryIfExists(Path.Combine(temp.Path, "missing"));
+
+        Assert.False(File.Exists(filePath));
+        Assert.False(Directory.Exists(directoryPath));
+    }
+
+    [Fact]
+    public void Publisher_rejects_malformed_entry_shapes()
+    {
+        using var temp = TempDirectory.Create();
+        var entryPath = Path.Combine(temp.Path, "entry");
+        Directory.CreateDirectory(entryPath);
+
+        var incomplete = Assert.Throws<IOException>(
+            () => PersistentCompiledArtifactCachePublisher.ValidateEntryShape(entryPath));
+
+        File.WriteAllText(Path.Combine(entryPath, "module.dll"), "cached");
+        File.WriteAllText(Path.Combine(entryPath, "manifest.json"), "{}");
+        File.WriteAllText(Path.Combine(entryPath, "verification.json"), "{}");
+        File.WriteAllText(Path.Combine(entryPath, PersistentCompiledArtifactCacheOrigin.ProofFileName), "proof");
+        File.WriteAllText(Path.Combine(entryPath, "extra.bin"), "extra");
+        var unexpected = Assert.Throws<IOException>(
+            () => PersistentCompiledArtifactCachePublisher.ValidateEntryShape(entryPath));
+
+        Assert.Equal("compiled cache entry is incomplete", incomplete.Message);
+        Assert.Equal("compiled cache entry contains unexpected file", unexpected.Message);
+    }
+
     [Fact]
     public async Task Replacement_write_does_not_report_failure_after_new_entry_is_committed()
     {
