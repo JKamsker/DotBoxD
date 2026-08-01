@@ -21,16 +21,30 @@ public sealed partial class PluginAnalyzer
 
         if (context.ContainingSymbol is IMethodSymbol method)
         {
-            helperGraph.RecordForbidden(method, QueueCapacityForbiddenApiName);
-            if (IsForbiddenApiRoot(context, method) &&
-                helperGraph.TryRecordDirectDiagnostic(method, QueueCapacityForbiddenApiName))
-            {
-                ReportQueueCapacityDiagnostic(context);
-            }
-
+            ReportAndRecordQueueCapacityInMethod(context, helperGraph, method);
             return;
         }
 
+        ReportAndRecordQueueCapacityInInitializer(context, helperGraph);
+    }
+
+    private static void ReportAndRecordQueueCapacityInMethod(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol method)
+    {
+        helperGraph.RecordForbidden(method, QueueCapacityForbiddenApiName);
+        if (IsForbiddenApiRoot(context, method) &&
+            helperGraph.TryRecordDirectDiagnostic(method, QueueCapacityForbiddenApiName))
+        {
+            ReportQueueCapacityDiagnostic(context);
+        }
+    }
+
+    private static void ReportAndRecordQueueCapacityInInitializer(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph)
+    {
         if (context.ContainingSymbol is not ISymbol initializer ||
             initializer is not (IFieldSymbol or IPropertySymbol))
         {
