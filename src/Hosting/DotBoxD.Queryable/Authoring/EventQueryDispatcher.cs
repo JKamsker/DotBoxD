@@ -85,7 +85,7 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
         }
 
         entry.Handle.RecordMatch();
-        if (!TryProject(entry, e, out var projected))
+        if (!TryProject(entry, e, context.CancellationToken, out var projected))
         {
             return;
         }
@@ -121,12 +121,22 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
             return false;
         }
     }
-    private static bool TryProject(EventQuerySubscriptionEntry<TEvent> entry, TEvent e, out object? projected)
+    private static bool TryProject(
+        EventQuerySubscriptionEntry<TEvent> entry,
+        TEvent e,
+        CancellationToken cancellationToken,
+        out object? projected)
     {
         try
         {
             projected = entry.Project(e);
             return true;
+        }
+        catch (Exception ex) when (
+            cancellationToken.IsCancellationRequested &&
+            ex is InvalidOperationException or InvalidCastException or NullReferenceException)
+        {
+            throw new OperationCanceledException(null, ex, cancellationToken);
         }
         catch (Exception ex) when (ex is InvalidOperationException or InvalidCastException or NullReferenceException)
         {
