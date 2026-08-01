@@ -23,7 +23,11 @@ internal sealed record HookResultModel(
 internal sealed record HookResultField(string Name, string TypeFullName, string ParameterName, bool IsControl);
 
 /// <summary>An author-declared member that can collide with generated hook-result builders.</summary>
-internal sealed record HookResultExistingMember(string Name, int ParameterCount, bool BlocksAllOverloads);
+internal sealed record HookResultExistingMember(
+    string Name,
+    int ParameterCount,
+    int TypeParameterCount,
+    bool BlocksAllOverloads);
 
 /// <summary>A build-time diagnostic the builder generator surfaces for a malformed <c>[HookResult]</c> type.</summary>
 internal sealed record HookResultDiagnostic(

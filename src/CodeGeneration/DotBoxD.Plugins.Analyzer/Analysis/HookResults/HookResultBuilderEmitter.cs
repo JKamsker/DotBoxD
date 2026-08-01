@@ -9,7 +9,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookResults;
 /// <c>Reject(string? reason = null)</c>, and a <c>With&lt;Field&gt;(value)</c> per non-control field — into a
 /// partial declaration. Bodies are tiny (<c>new() { Success = true }</c> / <c>this with { … }</c>) so the
 /// inliner can fold them when a <c>.Register(...)</c> handler is lowered to verified <c>record.new</c> IR.
-/// Only same-arity methods the author did not declare manually are emitted.
+/// Only methods whose name, method arity, and parameter count the author did not declare manually are emitted.
 /// </summary>
 internal static class HookResultBuilderEmitter
 {
@@ -66,7 +66,7 @@ internal static class HookResultBuilderEmitter
 
     private static void EmitOk(StringBuilder builder, string indent, HookResultModel model)
     {
-        if (Contains(model.ExistingMembers, "Ok", parameterCount: 0))
+        if (Contains(model.ExistingMembers, "Ok", parameterCount: 0, typeParameterCount: 0))
         {
             return;
         }
@@ -78,7 +78,7 @@ internal static class HookResultBuilderEmitter
 
     private static void EmitReject(StringBuilder builder, string indent, HookResultModel model)
     {
-        if (Contains(model.ExistingMembers, "Reject", parameterCount: 1))
+        if (Contains(model.ExistingMembers, "Reject", parameterCount: 1, typeParameterCount: 0))
         {
             return;
         }
@@ -91,7 +91,7 @@ internal static class HookResultBuilderEmitter
     private static void EmitWith(StringBuilder builder, string indent, HookResultModel model, HookResultField field)
     {
         var methodName = "With" + field.Name;
-        if (Contains(model.ExistingMembers, methodName, parameterCount: 1))
+        if (Contains(model.ExistingMembers, methodName, parameterCount: 1, typeParameterCount: 0))
         {
             return;
         }
@@ -117,13 +117,18 @@ internal static class HookResultBuilderEmitter
     private static string EscapeNamespace(string namespaceName)
         => string.Join(".", namespaceName.Split('.').Select(EscapeIdentifier));
 
-    private static bool Contains(EquatableArray<HookResultExistingMember> members, string name, int parameterCount)
+    private static bool Contains(
+        EquatableArray<HookResultExistingMember> members,
+        string name,
+        int parameterCount,
+        int typeParameterCount)
     {
         for (var i = 0; i < members.Count; i++)
         {
             var member = members[i];
             if (string.Equals(member.Name, name, StringComparison.Ordinal) &&
-                (member.BlocksAllOverloads || member.ParameterCount == parameterCount))
+                (member.BlocksAllOverloads ||
+                 (member.ParameterCount == parameterCount && member.TypeParameterCount == typeParameterCount)))
             {
                 return true;
             }
