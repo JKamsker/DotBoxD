@@ -45,8 +45,13 @@ public sealed partial class PluginAnalyzer
         OperationAnalysisContext context,
         ForbiddenHelperCallGraph helperGraph)
     {
-        var initializer = context.ContainingSymbol;
-        if (initializer is not (IFieldSymbol or IPropertySymbol))
+        ISymbol? initializer = context.ContainingSymbol switch
+        {
+            IFieldSymbol field => field,
+            IPropertySymbol property => property,
+            _ => null
+        };
+        if (initializer is null)
         {
             return;
         }
