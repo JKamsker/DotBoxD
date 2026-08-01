@@ -9,6 +9,7 @@ public sealed partial class PluginAnalyzer
     private static void AnalyzeObjectCreation(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
         var creation = (IObjectCreationOperation)context.Operation;
+        ReportAndRecordUnboundedQueueCapacityCreation(context, helperGraph, creation);
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             if (ReportAndRecordValueTaskPayloadInInitializer(context, helperGraph, creation.Type))
