@@ -7,14 +7,14 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 public sealed partial class PluginAnalyzer
 {
     private const string QueueCapacityForbiddenApiName = "System.Collections.Generic.Queue";
-    private const string QueueOriginalDefinitionName = "System.Collections.Generic.Queue<T>";
+    private const string QueueMetadataName = "System.Collections.Generic.Queue`1";
 
     private static void ReportAndRecordUnboundedQueueCapacityCreation(
         OperationAnalysisContext context,
         ForbiddenHelperCallGraph helperGraph,
         IObjectCreationOperation creation)
     {
-        if (!IsUnboundedQueueCapacityCreation(creation))
+        if (!IsUnboundedQueueCapacityCreation(context.Compilation, creation))
         {
             return;
         }
@@ -45,32 +45,32 @@ public sealed partial class PluginAnalyzer
         OperationAnalysisContext context,
         ForbiddenHelperCallGraph helperGraph)
     {
-        if (context.ContainingSymbol is not ISymbol initializer ||
-            initializer is not (IFieldSymbol or IPropertySymbol))
+        var initializer = context.ContainingSymbol;
+        if (initializer is not (IFieldSymbol or IPropertySymbol))
         {
             return;
         }
 
         helperGraph.RecordForbiddenInitializer(initializer, QueueCapacityForbiddenApiName);
-        if (IsEventKernel(initializer.ContainingType))
+        var isEventKernel = IsEventKernel(initializer.ContainingType);
+        if (isEventKernel)
         {
             ReportQueueCapacityDiagnostic(context);
         }
 
-        if (initializer is IPropertySymbol { GetMethod: { } getter } property &&
-            !IsEventKernel(property.ContainingType))
+        if (!isEventKernel &&
+            initializer is IPropertySymbol { GetMethod: { } getter })
         {
             helperGraph.RecordForbidden(getter, QueueCapacityForbiddenApiName);
         }
     }
 
-    private static bool IsUnboundedQueueCapacityCreation(IObjectCreationOperation creation)
+    private static bool IsUnboundedQueueCapacityCreation(Compilation compilation, IObjectCreationOperation creation)
     {
+        var queueType = compilation.GetTypeByMetadataName(QueueMetadataName);
         if (creation.Type is not INamedTypeSymbol type ||
-            !string.Equals(
-                type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
-                QueueOriginalDefinitionName,
-                StringComparison.Ordinal))
+            queueType is null ||
+            !SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, queueType))
         {
             return false;
         }
