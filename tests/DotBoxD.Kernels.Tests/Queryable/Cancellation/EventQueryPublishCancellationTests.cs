@@ -101,6 +101,34 @@ public sealed class EventQueryPublishCancellationTests
     }
 
     [Fact]
+    public async Task Projection_fault_does_not_swallow_caller_cancellation()
+    {
+        var host = new EventQueryHost();
+        using var cancellation = new CancellationTokenSource();
+        var handlerInvoked = false;
+
+        var handle = await host.Query<ProjectionFaultCancelEvent>()
+            .Where(e => e.AttackerId == "player-1")
+            .Select(e => new DamageProjection(e.Damage))
+            .SubscribeAsync((_, _) =>
+            {
+                handlerInvoked = true;
+                return ValueTask.CompletedTask;
+            });
+
+        var context = new HookContext(new InMemoryPluginMessageSink(), cancellation.Token);
+        var exception = await Record.ExceptionAsync(
+            async () => await host.PublishAsync(new ProjectionFaultCancelEvent("player-1", cancellation), context));
+
+        var cancellationException = Assert.IsAssignableFrom<OperationCanceledException>(exception);
+        Assert.Equal(cancellation.Token, cancellationException.CancellationToken);
+        Assert.False(handlerInvoked);
+        Assert.Equal(1, handle.FilterEvaluations);
+        Assert.Equal(1, handle.Matches);
+        Assert.Equal(0, handle.Dispatches);
+    }
+
+    [Fact]
     public async Task Indexed_routing_key_cancellation_stops_even_when_key_misses()
     {
         var host = new EventQueryHost();
@@ -136,6 +164,20 @@ public sealed class EventQueryPublishCancellationTests
             {
                 cancellation.Cancel();
                 return 9;
+            }
+        }
+    }
+
+    private sealed class ProjectionFaultCancelEvent(string attackerId, CancellationTokenSource cancellation)
+    {
+        public string AttackerId { get; } = attackerId;
+
+        public int Damage
+        {
+            get
+            {
+                cancellation.Cancel();
+                throw new InvalidOperationException("projection failed");
             }
         }
     }
