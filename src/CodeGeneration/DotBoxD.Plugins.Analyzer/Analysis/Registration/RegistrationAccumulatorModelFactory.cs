@@ -38,7 +38,7 @@ internal static class RegistrationAccumulatorModelFactory
 
             var method = ResolveRegistrationMethod(type, methodName, context.SemanticModel.Compilation);
             var typeParameters = TypeParameters(method);
-            ValidateGeneratedMemberName(methodName, typeParameters);
+            ValidateGeneratedMemberName(accumulatorName, methodName, typeParameters);
             var model = new RegistrationAccumulatorTargetModel(
                 Namespace(type),
                 TypeName(type),
@@ -161,9 +161,14 @@ internal static class RegistrationAccumulatorModelFactory
     }
 
     private static void ValidateGeneratedMemberName(
+        string accumulatorName,
         string methodName,
         EquatableArray<RegistrationTypeParameterModel> typeParameters)
     {
+        if (methodName == accumulatorName)
+        {
+            throw new NotSupportedException($"Registration accumulator method '{methodName}' collides with generated type '{accumulatorName}'.");
+        }
         if (methodName == FlushMemberName && typeParameters.Count == 0)
         {
             throw new NotSupportedException(
