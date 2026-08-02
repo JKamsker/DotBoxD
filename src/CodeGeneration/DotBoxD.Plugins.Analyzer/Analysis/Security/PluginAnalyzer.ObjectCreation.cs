@@ -20,6 +20,7 @@ public sealed partial class PluginAnalyzer
         }
 
         ReportAndRecordDictionaryCapacityCreation(context, helperGraph, creation);
+        ReportAndRecordUnboundedQueueCapacityCreation(context, helperGraph, creation);
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             if (ReportAndRecordValueTaskPayloadInInitializer(context, helperGraph, creation.Type))
