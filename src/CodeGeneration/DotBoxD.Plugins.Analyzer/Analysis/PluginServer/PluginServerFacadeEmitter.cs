@@ -182,6 +182,12 @@ internal static partial class PluginServerFacadeEmitter
     {
         foreach (var property in model.WorldProperties)
         {
+            if (PluginServerFacadeModelFactory.IsGeneratedReservedMemberName(property.Name))
+            {
+                AppendUnsupportedExplicitWorldProperty(builder, model, property);
+                continue;
+            }
+
             PluginServerXmlDocumentation.Append(builder, "    ", property.Documentation);
             PluginServerFlowAttributeSource.Append(builder, "    ", property.Attributes);
             builder.Append("    public ").Append(property.Type).Append(' ')
@@ -192,6 +198,12 @@ internal static partial class PluginServerFacadeEmitter
 
         foreach (var method in model.WorldMethods)
         {
+            if (PluginServerFacadeModelFactory.IsGeneratedReservedMemberName(method.Name))
+            {
+                AppendUnsupportedExplicitWorldMethod(builder, method);
+                continue;
+            }
+
             PluginServerXmlDocumentation.Append(builder, "    ", method.Documentation);
             PluginServerFlowAttributeSource.Append(builder, "    ", method.Attributes);
             PluginServerFlowAttributeSource.Append(builder, "    ", method.ReturnAttributes);
@@ -218,6 +230,28 @@ internal static partial class PluginServerFacadeEmitter
         {
             builder.AppendLine();
         }
+    }
+
+    private static void AppendUnsupportedExplicitWorldProperty(
+        StringBuilder builder,
+        PluginServerFacadeModel model,
+        PluginServerForwardedProperty property)
+    {
+        PluginServerXmlDocumentation.Append(builder, "    ", property.Documentation);
+        builder.Append("    ").Append(property.Type).Append(' ').Append(model.WorldType).Append('.')
+            .Append(PluginServerIdentifier.Escape(property.Name))
+            .AppendLine(" => throw new global::System.NotSupportedException(\"This member collides with the generated facade surface.\");");
+    }
+
+    private static void AppendUnsupportedExplicitWorldMethod(
+        StringBuilder builder,
+        PluginServerForwardedMethod method)
+    {
+        PluginServerXmlDocumentation.Append(builder, "    ", method.Documentation);
+        builder.Append("    ").Append(method.ReturnType).Append(' ').Append(method.ReceiverType).Append('.')
+            .Append(PluginServerIdentifier.Escape(method.Name))
+            .Append('(').Append(ParameterList(method, includeDefaultClause: false)).Append(')')
+            .AppendLine(" => throw new global::System.NotSupportedException(\"This member collides with the generated facade surface.\");");
     }
 
     private static void AppendWorldMethodBody(StringBuilder builder, PluginServerForwardedMethod method)
@@ -275,11 +309,11 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("    }");
     }
 
-    private static string ParameterList(PluginServerForwardedMethod method)
+    private static string ParameterList(PluginServerForwardedMethod method, bool includeDefaultClause = true)
         => string.Join(
             ", ",
             method.Parameters.Select(p =>
-                p.AttributePrefix + ParamsModifier(p) + p.Type + " @" + p.Name + p.DefaultClause));
+                p.AttributePrefix + ParamsModifier(p) + p.Type + " @" + p.Name + (includeDefaultClause ? p.DefaultClause : string.Empty)));
 
     private static string ParamsModifier(PluginServerParameter parameter)
         => parameter.IsParams ? "params " : string.Empty;
