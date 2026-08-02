@@ -74,6 +74,34 @@ public sealed class EventQueryPublishCancellationTests
     }
 
     [Fact]
+    public async Task Ordinary_handler_fault_does_not_swallow_caller_cancellation_after_dispatch()
+    {
+        var host = new EventQueryHost();
+        using var cancellation = new CancellationTokenSource();
+        var invocations = 0;
+
+        var handle = await host.Query<AttackTestEvent>()
+            .Where(e => e.AttackerId == "player-1")
+            .SubscribeAsync((_, _) =>
+            {
+                invocations++;
+                cancellation.Cancel();
+                throw new InvalidOperationException("handler failed after cancellation");
+            });
+
+        var context = new HookContext(new InMemoryPluginMessageSink(), cancellation.Token);
+        var exception = await Record.ExceptionAsync(
+            async () => await host.PublishAsync(new AttackTestEvent("player-1", "monster-1", 9, 1), context));
+
+        var canceled = Assert.IsAssignableFrom<OperationCanceledException>(exception);
+        Assert.Equal(cancellation.Token, canceled.CancellationToken);
+        Assert.Equal(1, invocations);
+        Assert.Equal(1, handle.FilterEvaluations);
+        Assert.Equal(1, handle.Matches);
+        Assert.Equal(0, handle.Dispatches);
+    }
+
+    [Fact]
     public async Task Projection_cancellation_stops_before_subscription_handler_dispatch()
     {
         var host = new EventQueryHost();
