@@ -24,12 +24,13 @@ public sealed partial class PluginAnalyzer
             }
 
             ReportAndRecordCapacityAllocationInInitializer(context, helperGraph, creation);
-            ReportForbiddenInInitializer(context, creation.Type);
-            RecordForbiddenInitializerReference(context, helperGraph, creation.Type);
+            var initializerTarget = creation.Constructor ?? (ISymbol?)creation.Type;
+            ReportForbiddenInInitializer(context, initializerTarget);
+            RecordForbiddenInitializerReference(context, helperGraph, initializerTarget);
             RecordForbiddenDelegateInitializer(context, helperGraph, creation.Type);
             RecordStaticConstructorReachability(context, helperGraph, creation.Type);
             RecordFinalizerReachability(context, helperGraph, creation.Type);
-            RecordForbiddenHelperPropertyInitializer(context, helperGraph, creation.Type);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, initializerTarget);
             if (creation.Constructor is { } initializerConstructor)
             {
                 helperGraph.RecordConstructorInitializers(initializerConstructor);

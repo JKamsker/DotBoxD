@@ -107,6 +107,8 @@ public sealed partial class PluginAnalyzer
                 return true;
             case IMethodSymbol method when TryGetForbiddenXmlFileMethod(method, out forbidden):
                 return true;
+            case IMethodSymbol method when TryGetForbiddenPriorityQueueCapacityConstructor(method, out forbidden):
+                return true;
             case IMethodSymbol method when TryGetForbiddenNondeterministicMethod(method, out forbidden):
                 return true;
             case IMethodSymbol method:
@@ -172,6 +174,25 @@ public sealed partial class PluginAnalyzer
         string? containingTypeName)
         => containingTypeName == "System.Security.Cryptography.X509Certificates.X509Chain" &&
            string.Equals(method.Name, "Build", StringComparison.Ordinal);
+
+    private static bool TryGetForbiddenPriorityQueueCapacityConstructor(
+        IMethodSymbol method,
+        out ITypeSymbol forbidden)
+    {
+        var containingType = method.ContainingType;
+        var containingTypeName = containingType?.OriginalDefinition.ToDisplayString(
+            SymbolDisplayFormat.CSharpErrorMessageFormat);
+        if (method.MethodKind == MethodKind.Constructor &&
+            containingTypeName == "System.Collections.Generic.PriorityQueue<TElement, TPriority>" &&
+            method.Parameters.FirstOrDefault()?.Type.SpecialType == SpecialType.System_Int32)
+        {
+            forbidden = containingType!;
+            return true;
+        }
+
+        forbidden = null!;
+        return false;
+    }
 
     private static bool TryGetForbiddenMemberDisplayName(
         ISymbol? symbol,
