@@ -107,7 +107,8 @@ public sealed partial class PluginAnalyzer
                 return true;
             case IMethodSymbol method when TryGetForbiddenXmlFileMethod(method, out forbidden):
                 return true;
-            case IMethodSymbol method when TryGetForbiddenPriorityQueueCapacityConstructor(method, out forbidden):
+            case IMethodSymbol method when
+                ForbiddenCollectionCapacityPolicy.TryGetPriorityQueueType(method, out forbidden):
                 return true;
             case IMethodSymbol method when TryGetForbiddenNondeterministicMethod(method, out forbidden):
                 return true;
@@ -175,31 +176,12 @@ public sealed partial class PluginAnalyzer
         => containingTypeName == "System.Security.Cryptography.X509Certificates.X509Chain" &&
            string.Equals(method.Name, "Build", StringComparison.Ordinal);
 
-    private static bool TryGetForbiddenPriorityQueueCapacityConstructor(
-        IMethodSymbol method,
-        out ITypeSymbol forbidden)
-    {
-        var containingType = method.ContainingType;
-        var containingTypeName = containingType?.OriginalDefinition.ToDisplayString(
-            SymbolDisplayFormat.CSharpErrorMessageFormat);
-        if (method.MethodKind == MethodKind.Constructor &&
-            containingTypeName == "System.Collections.Generic.PriorityQueue<TElement, TPriority>" &&
-            method.Parameters.FirstOrDefault()?.Type.SpecialType == SpecialType.System_Int32)
-        {
-            forbidden = containingType!;
-            return true;
-        }
-
-        forbidden = null!;
-        return false;
-    }
-
     private static bool TryGetForbiddenMemberDisplayName(
         ISymbol? symbol,
         out string forbidden)
     {
         if (symbol is IMethodSymbol targetMethod &&
-            TryGetForbiddenUnboundedCollectionConstructor(targetMethod, out forbidden))
+            ForbiddenCollectionCapacityPolicy.TryGetHashSetDisplayName(targetMethod, out forbidden))
         {
             return true;
         }
@@ -212,25 +194,6 @@ public sealed partial class PluginAnalyzer
             {
                 return true;
             }
-        }
-
-        forbidden = null!;
-        return false;
-    }
-
-    private static bool TryGetForbiddenUnboundedCollectionConstructor(
-        IMethodSymbol method,
-        out string forbidden)
-    {
-        var containingType = method.ContainingType;
-        var containingTypeName = containingType?.OriginalDefinition.ToDisplayString(
-            SymbolDisplayFormat.CSharpErrorMessageFormat);
-        if (method.MethodKind == MethodKind.Constructor &&
-            containingTypeName == "System.Collections.Generic.HashSet<T>" &&
-            method.Parameters.FirstOrDefault() is { Name: "capacity", Type.SpecialType: SpecialType.System_Int32 })
-        {
-            forbidden = containingType!.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-            return true;
         }
 
         forbidden = null!;
