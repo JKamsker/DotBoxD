@@ -77,7 +77,7 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
         entry.Handle.RecordFilterEvaluation();
-        if (!TryEvaluate(entry, e))
+        if (!TryEvaluate(entry, e, context.CancellationToken))
         {
             return;
         }
@@ -107,11 +107,13 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
             // matching this event — they share a single forwarding host handler at the registry layer.
         }
     }
-    private bool TryEvaluate(EventQuerySubscriptionEntry<TEvent> entry, TEvent e)
+    private bool TryEvaluate(EventQuerySubscriptionEntry<TEvent> entry, TEvent e, CancellationToken cancellationToken)
     {
         try
         {
-            return entry.Matches(e, reader);
+            var matches = entry.Matches(e, reader);
+            cancellationToken.ThrowIfCancellationRequested();
+            return matches;
         }
         catch (InvalidOperationException)
         {
@@ -168,13 +170,13 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
 
         private readonly EventQuerySubscriptionEntry<TEvent>[] _all;
         private readonly EventQuerySubscriptionEntry<TEvent>[] _broad;
-        private readonly RoutingGroup[] _groups;
+        private readonly EventQueryRoutingGroup<TEvent>[] _groups;
 
         private Snapshot(EventQuerySubscriptionEntry<TEvent>[] all)
         {
             _all = all;
             var broad = new List<EventQuerySubscriptionEntry<TEvent>>();
-            var builders = new Dictionary<string, RoutingGroup>(StringComparer.Ordinal);
+            var builders = new Dictionary<string, EventQueryRoutingGroup<TEvent>>(StringComparer.Ordinal);
             foreach (var entry in all)
             {
                 if (!entry.IsRoutable)
@@ -192,7 +194,7 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
                 var groupKey = string.Join(Separator, paths);
                 if (!builders.TryGetValue(groupKey, out var group))
                 {
-                    group = new RoutingGroup(paths);
+                    group = new EventQueryRoutingGroup<TEvent>(paths);
                     builders[groupKey] = group;
                 }
 
@@ -206,7 +208,7 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
         public bool IsEmpty => _all.Length == 0;
 
         public EventQuerySubscriptionEntry<TEvent>[] Broad => _broad;
-        public RoutingGroup[] Groups => _groups;
+        public EventQueryRoutingGroup<TEvent>[] Groups => _groups;
         public Snapshot With(EventQuerySubscriptionEntry<TEvent> entry) => new([.. _all, entry]);
         public Snapshot Without(EventQuerySubscriptionEntry<TEvent> entry)
             => new(_all.Where(e => !ReferenceEquals(e, entry)).ToArray());
@@ -277,21 +279,4 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
         }
     }
 
-    private sealed class RoutingGroup(string[] paths)
-    {
-        private readonly Dictionary<string, List<EventQuerySubscriptionEntry<TEvent>>> _byValue =
-            new(StringComparer.Ordinal);
-        public string[] Paths { get; } = paths;
-        public void Add(string compositeKey, EventQuerySubscriptionEntry<TEvent> entry)
-        {
-            if (!_byValue.TryGetValue(compositeKey, out var bucket))
-            {
-                bucket = [];
-                _byValue[compositeKey] = bucket;
-            }
-            bucket.Add(entry);
-        }
-        public bool TryGet(string compositeKey, out List<EventQuerySubscriptionEntry<TEvent>> bucket)
-            => _byValue.TryGetValue(compositeKey, out bucket!);
-    }
 }
