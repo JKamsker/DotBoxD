@@ -14,6 +14,7 @@ public sealed partial class PluginAnalyzer
             return;
         }
 
+        ReportAndRecordDictionaryCapacityCreation(context, helperGraph, creation);
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             if (ReportAndRecordValueTaskPayloadInInitializer(context, helperGraph, creation.Type))
