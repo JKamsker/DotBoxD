@@ -149,10 +149,12 @@ public static class PluginMessageBindings
             var send = sink.SendAsync(targetId, message, cancellationToken);
             if (!send.IsCompletedSuccessfully)
             {
-                return AwaitSendAsync(send, context, targetId, message);
+                return AwaitSendAsync(send, context, targetId, message, cancellationToken);
             }
 
             send.GetAwaiter().GetResult();
+            cancellationToken.ThrowIfCancellationRequested();
+            context.CancellationToken.ThrowIfCancellationRequested();
             WriteAudit(context, targetId, message);
             return ValueTask.FromResult(SandboxValue.Unit);
         }
@@ -161,9 +163,12 @@ public static class PluginMessageBindings
             ValueTask send,
             SandboxContext context,
             string targetId,
-            string message)
+            string message,
+            CancellationToken cancellationToken)
         {
             await send.ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            context.CancellationToken.ThrowIfCancellationRequested();
             WriteAudit(context, targetId, message);
             return SandboxValue.Unit;
         }
