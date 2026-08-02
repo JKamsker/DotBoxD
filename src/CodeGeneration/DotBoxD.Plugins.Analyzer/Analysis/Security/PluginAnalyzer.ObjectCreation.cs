@@ -16,6 +16,7 @@ public sealed partial class PluginAnalyzer
                 return;
             }
 
+            ReportAndRecordCapacityAllocationInInitializer(context, helperGraph, creation);
             ReportForbiddenInInitializer(context, creation.Type);
             RecordForbiddenInitializerReference(context, helperGraph, creation.Type);
             RecordForbiddenDelegateInitializer(context, helperGraph, creation.Type);
@@ -42,6 +43,7 @@ public sealed partial class PluginAnalyzer
             return;
         }
 
+        ReportAndRecordCapacityAllocationIfForbidden(context, helperGraph, method, creation);
         if (ReportAndRecordValueTaskPayloadIfForbidden(context, helperGraph, method, creation.Type))
         {
             return;
