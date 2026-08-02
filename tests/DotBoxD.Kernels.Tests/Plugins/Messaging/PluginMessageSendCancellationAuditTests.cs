@@ -9,11 +9,14 @@ namespace DotBoxD.Kernels.Tests.Plugins.Messaging;
 
 public sealed class PluginMessageSendCancellationAuditTests
 {
-    [Fact]
-    public async Task Host_message_send_does_not_record_success_audit_after_sink_cancels_caller()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Host_message_send_does_not_record_success_audit_after_sink_cancels_caller(
+        bool completeAsynchronously)
     {
         using var caller = new CancellationTokenSource();
-        var messages = new CancellingPluginMessageSink(caller);
+        var messages = new CancellingPluginMessageSink(caller, completeAsynchronously);
         var host = SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
@@ -65,7 +68,9 @@ public sealed class PluginMessageSendCancellationAuditTests
         Assert.Equal(SandboxErrorCode.Cancelled, summary.ErrorCode);
     }
 
-    private sealed class CancellingPluginMessageSink(CancellationTokenSource caller) : IPluginMessageSink
+    private sealed class CancellingPluginMessageSink(
+        CancellationTokenSource caller,
+        bool completeAsynchronously) : IPluginMessageSink
     {
         public int Calls { get; private set; }
 
@@ -76,7 +81,9 @@ public sealed class PluginMessageSendCancellationAuditTests
         {
             Calls++;
             caller.Cancel();
-            return ValueTask.CompletedTask;
+            return completeAsynchronously ? CompleteAsync() : ValueTask.CompletedTask;
         }
+
+        private static async ValueTask CompleteAsync() => await Task.Yield();
     }
 }

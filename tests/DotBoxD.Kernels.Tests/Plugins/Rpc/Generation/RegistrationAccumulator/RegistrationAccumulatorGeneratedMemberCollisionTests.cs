@@ -97,4 +97,49 @@ public sealed class RegistrationAccumulatorGeneratedMemberCollisionTests
                           diagnostic.GetMessage().Contains("collides", StringComparison.Ordinal));
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id is "CS0102" or "CS0111");
     }
+
+    [Fact]
+    public void Target_accumulator_named_like_flush_helper_reports_dbxk100()
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
+            using System.Threading.Tasks;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [GeneratePluginRegistrationAccumulator("FlushAsync", "RegisterAsync")]
+            internal sealed class RemoteServiceControl
+            {
+                public ValueTask<string> RegisterAsync()
+                    => ValueTask.FromResult("service");
+            }
+            """);
+
+        Assert.Contains(
+            diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                          diagnostic.GetMessage().Contains("FlushAsync", StringComparison.Ordinal) &&
+                          diagnostic.GetMessage().Contains("collides", StringComparison.Ordinal));
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "CS0542");
+    }
+
+    [Fact]
+    public void Root_accumulator_named_like_flush_helper_reports_dbxk100()
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [GeneratePluginRegistrationRootAccumulator("FlushAsync")]
+            internal sealed class RemoteWorldControl;
+            """);
+
+        Assert.Contains(
+            diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                          diagnostic.GetMessage().Contains("FlushAsync", StringComparison.Ordinal) &&
+                          diagnostic.GetMessage().Contains("collides", StringComparison.Ordinal));
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "CS0542");
+    }
 }

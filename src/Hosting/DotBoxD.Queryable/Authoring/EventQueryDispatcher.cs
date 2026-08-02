@@ -114,6 +114,10 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
             cancellationToken.ThrowIfCancellationRequested();
             return matches;
         }
+        catch (InvalidOperationException ex) when (cancellationToken.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(null, ex, cancellationToken);
+        }
         catch (InvalidOperationException)
         {
             return false;

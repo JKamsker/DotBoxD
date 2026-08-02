@@ -21,6 +21,7 @@ internal sealed class PersistentCacheEntryLock : IAsyncDisposable
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ThrowIfLockPathIsDirectory(path);
             try
             {
                 var stream = new FileStream(
@@ -31,6 +32,12 @@ internal sealed class PersistentCacheEntryLock : IAsyncDisposable
                     bufferSize: 1,
                     FileOptions.Asynchronous | FileOptions.DeleteOnClose);
                 return new PersistentCacheEntryLock(stream);
+            }
+            catch (IOException ex) when (Directory.Exists(path))
+            {
+                throw new UnauthorizedAccessException(
+                    $"Cache lock path '{path}' is an existing directory.",
+                    ex);
             }
             catch (IOException)
             {
@@ -47,4 +54,12 @@ internal sealed class PersistentCacheEntryLock : IAsyncDisposable
 
     private static string LockPath(string rootDirectory, string cacheKey)
         => Path.Combine(rootDirectory, ".locks", cacheKey[..2], cacheKey[2..4], cacheKey + ".lock");
+
+    private static void ThrowIfLockPathIsDirectory(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            throw new UnauthorizedAccessException($"Cache lock path '{path}' is an existing directory.");
+        }
+    }
 }

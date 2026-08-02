@@ -6,78 +6,48 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 public sealed partial class PluginAnalyzer
 {
-    private const string StackOfTOriginalDefinition = "System.Collections.Generic.Stack<T>";
-
-    private static void ReportAndRecordCapacityAllocationIfForbidden(
-        OperationAnalysisContext context,
-        ForbiddenHelperCallGraph helperGraph,
-        IMethodSymbol method,
-        IObjectCreationOperation creation)
-    {
-        if (!TryGetForbiddenCapacityAllocationDisplayName(creation, out var forbidden))
-        {
-            return;
-        }
-
-        helperGraph.RecordForbidden(method, forbidden);
-        if (!IsForbiddenApiRoot(context, method) ||
-            !helperGraph.TryRecordDirectDiagnostic(method, forbidden))
-        {
-            return;
-        }
-
-        ReportCapacityAllocationDiagnostic(context, forbidden);
-    }
-
-    private static void ReportAndRecordCapacityAllocationInInitializer(
+    private static void ReportAndRecordCollectionCapacityCreation(
         OperationAnalysisContext context,
         ForbiddenHelperCallGraph helperGraph,
         IObjectCreationOperation creation)
     {
-        if (!TryGetForbiddenCapacityAllocationDisplayName(creation, out var forbidden))
+        if (!ForbiddenCollectionCapacityPolicy.TryGetDisplayName(creation.Constructor, out var forbidden))
         {
             return;
         }
 
-        if (context.ContainingSymbol is IFieldSymbol or IPropertySymbol)
+        if (context.ContainingSymbol is IMethodSymbol method)
         {
-            helperGraph.RecordForbiddenInitializer(context.ContainingSymbol, forbidden);
+            helperGraph.RecordForbidden(method, forbidden);
+            if (IsForbiddenApiRoot(context, method) &&
+                helperGraph.TryRecordDirectDiagnostic(method, forbidden))
+            {
+                ReportCollectionCapacityDiagnostic(context, forbidden);
+            }
+
+            return;
         }
 
-        if (context.ContainingSymbol is IPropertySymbol { GetMethod: { } getter } property &&
-            !IsEventKernel(property.ContainingType))
+        if (context.ContainingSymbol is not IFieldSymbol and not IPropertySymbol)
+        {
+            return;
+        }
+
+        var initializer = context.ContainingSymbol;
+        helperGraph.RecordForbiddenInitializer(initializer, forbidden);
+        var isEventKernel = IsEventKernel(initializer.ContainingType);
+        if (isEventKernel)
+        {
+            ReportCollectionCapacityDiagnostic(context, forbidden);
+        }
+
+        if (!isEventKernel && initializer is IPropertySymbol { GetMethod: { } getter })
         {
             helperGraph.RecordForbidden(getter, forbidden);
         }
-
-        if (context.ContainingSymbol is IFieldSymbol or IPropertySymbol &&
-            IsEventKernel(context.ContainingSymbol.ContainingType))
-        {
-            ReportCapacityAllocationDiagnostic(context, forbidden);
-        }
     }
 
-    private static bool TryGetForbiddenCapacityAllocationDisplayName(
-        IObjectCreationOperation creation,
-        out string forbidden)
-    {
-        if (creation.Type is not INamedTypeSymbol namedType ||
-            creation.Constructor is not { Parameters.Length: 1 } constructor ||
-            constructor.Parameters[0].Type.SpecialType != SpecialType.System_Int32 ||
-            !string.Equals(
-                namedType.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
-                StackOfTOriginalDefinition,
-                StringComparison.Ordinal))
-        {
-            forbidden = null!;
-            return false;
-        }
-
-        forbidden = namedType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-        return true;
-    }
-
-    private static void ReportCapacityAllocationDiagnostic(OperationAnalysisContext context, string forbidden)
+    private static void ReportCollectionCapacityDiagnostic(OperationAnalysisContext context, string forbidden)
         => context.ReportDiagnostic(Diagnostic.Create(
             ForbiddenHostApiRule,
             context.Operation.Syntax.GetLocation(),

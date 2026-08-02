@@ -13,8 +13,6 @@ internal static class RegistrationAccumulatorModelFactory
 
     private static readonly SymbolDisplayFormat FullyQualifiedFormat = SymbolDisplayFormat.FullyQualifiedFormat;
 
-    private const string FlushMemberName = "FlushAsync";
-
     public static RegistrationAccumulatorGenerationResult? CreateTarget(
         GeneratorAttributeSyntaxContext context,
         CancellationToken cancellationToken)
@@ -34,11 +32,15 @@ internal static class RegistrationAccumulatorModelFactory
             var methodName = RequiredStringArgument(attribute, 1, "method name");
             ValidateIdentifier(accumulatorName, "Accumulator", allowEscaped: false);
             ValidateIdentifier(methodName, "Registration method");
+            RegistrationAccumulatorNameValidator.ValidateAccumulatorName(accumulatorName);
             ValidateGeneratedTypeName(type, accumulatorName);
 
             var method = ResolveRegistrationMethod(type, methodName, context.SemanticModel.Compilation);
             var typeParameters = TypeParameters(method);
-            ValidateGeneratedMemberName(accumulatorName, methodName, typeParameters);
+            RegistrationAccumulatorNameValidator.ValidateGeneratedMemberName(
+                accumulatorName,
+                methodName,
+                typeParameters);
             var model = new RegistrationAccumulatorTargetModel(
                 Namespace(type),
                 TypeName(type),
@@ -72,6 +74,7 @@ internal static class RegistrationAccumulatorModelFactory
             EnsureSupportedReceiverType(type, declaration);
             var accumulatorName = RequiredStringArgument(context.Attributes[0], 0, "accumulator name");
             ValidateIdentifier(accumulatorName, "Accumulator", allowEscaped: false);
+            RegistrationAccumulatorNameValidator.ValidateAccumulatorName(accumulatorName);
             ValidateGeneratedTypeName(type, accumulatorName);
             var model = new RegistrationRootAccumulatorModel(
                 Namespace(type),
@@ -158,22 +161,6 @@ internal static class RegistrationAccumulatorModelFactory
         }
 
         return method;
-    }
-
-    private static void ValidateGeneratedMemberName(
-        string accumulatorName,
-        string methodName,
-        EquatableArray<RegistrationTypeParameterModel> typeParameters)
-    {
-        if (methodName == accumulatorName)
-        {
-            throw new NotSupportedException($"Registration accumulator method '{methodName}' collides with generated type '{accumulatorName}'.");
-        }
-        if (methodName == FlushMemberName && typeParameters.Count == 0)
-        {
-            throw new NotSupportedException(
-                $"Registration accumulator method '{methodName}' collides with generated member '{FlushMemberName}'.");
-        }
     }
 
     private static bool IsResultBearingAwaitableRegistrationReturn(

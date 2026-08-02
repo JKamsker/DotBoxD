@@ -4,48 +4,45 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class ForbiddenCollectionCapacityPolicy
 {
+    private const string DictionaryTypeName = "System.Collections.Generic.Dictionary<TKey, TValue>";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
+    private const string ListTypeName = "System.Collections.Generic.List<T>";
     private const string PriorityQueueTypeName =
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
+    private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
+    private const string StackTypeName = "System.Collections.Generic.Stack<T>";
 
-    public static bool TryGetHashSetDisplayName(IMethodSymbol method, out string forbidden)
+    public static bool TryGetDisplayName(IMethodSymbol? method, out string forbidden)
     {
-        if (!TryGetCapacityContainingType(method, HashSetTypeName, requireCapacityName: true, out var type))
+        if (method is not { MethodKind: MethodKind.Constructor } ||
+            !HasCapacityParameter(method))
         {
             forbidden = null!;
             return false;
         }
 
-        forbidden = type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-        return true;
-    }
-
-    public static bool TryGetPriorityQueueType(IMethodSymbol method, out ITypeSymbol forbidden)
-    {
-        if (!TryGetCapacityContainingType(method, PriorityQueueTypeName, requireCapacityName: false, out var type))
+        var type = method.ContainingType;
+        var typeName = type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+        forbidden = typeName switch
         {
-            forbidden = null!;
-            return false;
-        }
+            ListTypeName => "System.Collections.Generic.List",
+            DictionaryTypeName => "System.Collections.Generic.Dictionary",
+            QueueTypeName => "System.Collections.Generic.Queue",
+            StackTypeName or HashSetTypeName or PriorityQueueTypeName =>
+                type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
+            _ => null!
+        };
 
-        forbidden = type;
-        return true;
+        return forbidden is not null;
     }
 
-    private static bool TryGetCapacityContainingType(
-        IMethodSymbol method,
-        string expectedTypeName,
-        bool requireCapacityName,
-        out INamedTypeSymbol type)
+    private static bool HasCapacityParameter(IMethodSymbol method)
     {
-        type = method.ContainingType;
-        var parameter = method.Parameters.FirstOrDefault();
-        return method.MethodKind == MethodKind.Constructor &&
-            string.Equals(
-                type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
-                expectedTypeName,
-                StringComparison.Ordinal) &&
-            parameter?.Type.SpecialType == SpecialType.System_Int32 &&
-            (!requireCapacityName || string.Equals(parameter.Name, "capacity", StringComparison.Ordinal));
+        var typeName = method.ContainingType.OriginalDefinition.ToDisplayString(
+            SymbolDisplayFormat.CSharpErrorMessageFormat);
+        var capacityName = typeName == PriorityQueueTypeName ? "initialCapacity" : "capacity";
+        return method.Parameters.Any(parameter =>
+            parameter.Type.SpecialType == SpecialType.System_Int32 &&
+            string.Equals(parameter.Name, capacityName, StringComparison.Ordinal));
     }
 }

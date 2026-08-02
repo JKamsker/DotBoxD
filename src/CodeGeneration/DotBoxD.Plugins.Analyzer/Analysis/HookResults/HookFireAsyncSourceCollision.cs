@@ -6,9 +6,6 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookResults;
 
 internal static class HookFireAsyncSourceCollision
 {
-    private const string RuntimeNamespace = "DotBoxD.Plugins.Runtime";
-    private const string HelperTypeName = "HookRegistryFireAsyncExtensions";
-
     public static IncrementalValueProvider<ImmutableArray<PluginDiagnosticLocation>> Collect(
         IncrementalGeneratorInitializationContext context)
         => context.SyntaxProvider.CreateSyntaxProvider(
@@ -33,7 +30,7 @@ internal static class HookFireAsyncSourceCollision
             context.ReportDiagnostic(Diagnostic.Create(
                 PluginAnalyzerDiagnostics.UnsupportedKernelShapeRule,
                 collision.ToLocation(),
-                "Generated FireAsync extension type 'DotBoxD.Plugins.Runtime.HookRegistryFireAsyncExtensions' "
+                $"Generated FireAsync extension type '{HookFireAsyncExtensionNames.FullyQualifiedHelperTypeName}' "
                 + "collides with an existing source type; rename the existing type or call "
                 + "HookRegistry.FireAsync<TContext, TResult>(...) directly."));
         }
@@ -48,7 +45,10 @@ internal static class HookFireAsyncSourceCollision
         };
 
     private static bool IsHelperName(SyntaxToken identifier)
-        => string.Equals(identifier.ValueText, HelperTypeName, StringComparison.Ordinal);
+        => string.Equals(
+            identifier.ValueText,
+            HookFireAsyncExtensionNames.HelperTypeName,
+            StringComparison.Ordinal);
 
     private static PluginDiagnosticLocation? Location(GeneratorSyntaxContext context, CancellationToken cancellationToken)
     {
@@ -56,8 +56,14 @@ internal static class HookFireAsyncSourceCollision
             {
                 ContainingType: null
             } type ||
-            !string.Equals(type.MetadataName, HelperTypeName, StringComparison.Ordinal) ||
-            !string.Equals(type.ContainingNamespace.ToDisplayString(), RuntimeNamespace, StringComparison.Ordinal))
+            !string.Equals(
+                type.MetadataName,
+                HookFireAsyncExtensionNames.HelperTypeName,
+                StringComparison.Ordinal) ||
+            !string.Equals(
+                type.ContainingNamespace.ToDisplayString(),
+                HookFireAsyncExtensionNames.RuntimeNamespace,
+                StringComparison.Ordinal))
         {
             return null;
         }

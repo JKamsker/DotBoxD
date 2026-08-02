@@ -107,9 +107,6 @@ public sealed partial class PluginAnalyzer
                 return true;
             case IMethodSymbol method when TryGetForbiddenXmlFileMethod(method, out forbidden):
                 return true;
-            case IMethodSymbol method when
-                ForbiddenCollectionCapacityPolicy.TryGetPriorityQueueType(method, out forbidden):
-                return true;
             case IMethodSymbol method when TryGetForbiddenNondeterministicMethod(method, out forbidden):
                 return true;
             case IMethodSymbol method:
@@ -180,12 +177,6 @@ public sealed partial class PluginAnalyzer
         ISymbol? symbol,
         out string forbidden)
     {
-        if (symbol is IMethodSymbol targetMethod &&
-            ForbiddenCollectionCapacityPolicy.TryGetHashSetDisplayName(targetMethod, out forbidden))
-        {
-            return true;
-        }
-
         if (symbol is IMethodSymbol method &&
             method.ContainingType is { } containingType)
         {
