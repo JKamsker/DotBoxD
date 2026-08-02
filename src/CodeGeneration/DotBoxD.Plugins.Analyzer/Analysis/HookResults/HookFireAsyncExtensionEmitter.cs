@@ -6,9 +6,12 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookResults;
 
 internal static class HookFireAsyncExtensionEmitter
 {
-    public static void Emit(SourceProductionContext context, ImmutableArray<HookFireAsyncModel> models)
+    public static void Emit(
+        SourceProductionContext context,
+        ImmutableArray<HookFireAsyncModel> models,
+        ImmutableArray<PluginDiagnosticLocation> sourceCollisions)
     {
-        if (models.IsDefaultOrEmpty)
+        if (models.IsDefaultOrEmpty || !sourceCollisions.IsDefaultOrEmpty)
         {
             return;
         }
