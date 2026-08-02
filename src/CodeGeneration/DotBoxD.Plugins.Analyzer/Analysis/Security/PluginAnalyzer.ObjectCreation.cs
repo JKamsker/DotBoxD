@@ -9,12 +9,7 @@ public sealed partial class PluginAnalyzer
     private static void AnalyzeObjectCreation(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
         var creation = (IObjectCreationOperation)context.Operation;
-        if (ReportAndRecordListCapacityCreation(context, helperGraph, creation))
-        {
-            return;
-        }
-
-        if (ReportAndRecordUnboundedCollectionCreation(context, helperGraph, creation))
+        if (ReportAndRecordHandledCollectionCapacityCreation(context, helperGraph, creation))
         {
             return;
         }
@@ -83,6 +78,13 @@ public sealed partial class PluginAnalyzer
             helperGraph.RecordCall(method, constructor, context.Operation.Syntax.GetLocation());
         }
     }
+
+    private static bool ReportAndRecordHandledCollectionCapacityCreation(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IObjectCreationOperation creation)
+        => ReportAndRecordListCapacityCreation(context, helperGraph, creation) ||
+           ReportAndRecordUnboundedCollectionCreation(context, helperGraph, creation);
 
     private static bool ReportAndRecordUnboundedCollectionCreation(
         OperationAnalysisContext context,
