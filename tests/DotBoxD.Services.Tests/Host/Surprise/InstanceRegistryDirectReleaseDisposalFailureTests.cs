@@ -34,17 +34,29 @@ public sealed class InstanceRegistryDirectReleaseDisposalFailureTests
     public void ReleaseAll_RemainsBestEffortWhenDisposalFails()
     {
         var registry = new InstanceRegistry();
-        var expected = new InvalidOperationException("teardown dispose failed");
-        registry.Register("svc", new ThrowingDisposable(expected));
+        var first = new ThrowingDisposable(
+            new InvalidOperationException("first teardown dispose failed"));
+        var second = new ThrowingDisposable(
+            new InvalidOperationException("second teardown dispose failed"));
+        registry.Register("svc", first);
+        registry.Register("svc", second);
 
         var actual = Record.Exception(registry.ReleaseAll);
 
         Assert.Null(actual);
+        Assert.True(first.DisposeCalled);
+        Assert.True(second.DisposeCalled);
     }
 
     private sealed class ThrowingDisposable(Exception error) : IDisposable
     {
-        public void Dispose() => throw error;
+        public bool DisposeCalled { get; private set; }
+
+        public void Dispose()
+        {
+            DisposeCalled = true;
+            throw error;
+        }
     }
 
     private sealed class ThrowingAsyncDisposable(Exception error) : IAsyncDisposable
