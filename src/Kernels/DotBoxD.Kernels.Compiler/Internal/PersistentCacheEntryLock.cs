@@ -43,6 +43,13 @@ internal sealed class PersistentCacheEntryLock : IAsyncDisposable
             {
                 await Task.Delay(RetryDelayMilliseconds, cancellationToken).ConfigureAwait(false);
             }
+            catch (UnauthorizedAccessException) when (!Directory.Exists(path))
+            {
+                // Windows can surface a delete-on-close sharing conflict as access denied while
+                // another process owns the lock file. Directory-shaped lock paths are rejected
+                // above; retry the remaining access-denied case as lock contention.
+                await Task.Delay(RetryDelayMilliseconds, cancellationToken).ConfigureAwait(false);
+            }
         }
     }
 
