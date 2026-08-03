@@ -6,6 +6,7 @@ internal static class ForbiddenCollectionCapacityPolicy
 {
     private const string DictionaryTypeName = "System.Collections.Generic.Dictionary<TKey, TValue>";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
+    private const string ImmutableArrayTypeName = "System.Collections.Immutable.ImmutableArray";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
     private const string PriorityQueueTypeName =
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
@@ -14,8 +15,7 @@ internal static class ForbiddenCollectionCapacityPolicy
 
     public static bool TryGetDisplayName(IMethodSymbol? method, out string forbidden)
     {
-        if (method is not { MethodKind: MethodKind.Constructor } ||
-            !HasCapacityParameter(method))
+        if (method is null || !HasCapacityParameter(method))
         {
             forbidden = null!;
             return false;
@@ -23,6 +23,18 @@ internal static class ForbiddenCollectionCapacityPolicy
 
         var type = method.ContainingType;
         var typeName = type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+        if (IsImmutableArrayCreateBuilder(method, typeName))
+        {
+            forbidden = "System.Collections.Immutable.ImmutableArray";
+            return true;
+        }
+
+        if (method.MethodKind != MethodKind.Constructor)
+        {
+            forbidden = null!;
+            return false;
+        }
+
         forbidden = typeName switch
         {
             ListTypeName => "System.Collections.Generic.List",
@@ -36,11 +48,16 @@ internal static class ForbiddenCollectionCapacityPolicy
         return forbidden is not null;
     }
 
+    private static bool IsImmutableArrayCreateBuilder(IMethodSymbol method, string typeName)
+        => method is { IsStatic: true, Name: "CreateBuilder" } &&
+           string.Equals(typeName, ImmutableArrayTypeName, StringComparison.Ordinal);
+
     private static bool HasCapacityParameter(IMethodSymbol method)
     {
         var typeName = method.ContainingType.OriginalDefinition.ToDisplayString(
             SymbolDisplayFormat.CSharpErrorMessageFormat);
-        var capacityName = typeName == PriorityQueueTypeName ? "initialCapacity" : "capacity";
+        var capacityName =
+            typeName is PriorityQueueTypeName or ImmutableArrayTypeName ? "initialCapacity" : "capacity";
         return method.Parameters.Any(parameter =>
             parameter.Type.SpecialType == SpecialType.System_Int32 &&
             string.Equals(parameter.Name, capacityName, StringComparison.Ordinal));
