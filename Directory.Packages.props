@@ -28,7 +28,7 @@
          PrivateAssets=all so they never flow into the package graph). Severities are
          configured centrally in .editorconfig. -->
     <PackageVersion Include="Roslynator.Analyzers" Version="4.15.0" />
-    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.131" />
+    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.138" />
 
     <PackageVersion Include="Fody" Version="6.9.3" />
     <PackageVersion Include="FodyHelpers" Version="6.9.3" />
@@ -40,15 +40,16 @@
     <!-- Test stack (winner = newest, matches DotBoxD.Kernels.Tests config) -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="CsCheck" Version="4.7.0" />
     <PackageVersion Include="SharpFuzz" Version="2.3.0" />
 
     <!-- Source-generator snapshot/verification stack -->
-    <PackageVersion Include="Verify.Xunit" Version="26.6.0" />
+    <PackageVersion Include="Verify.XunitV3" Version="31.24.1" />
     <PackageVersion Include="Verify.SourceGenerators" Version="2.5.0" />
-    <PackageVersion Include="Verify.DiffPlex" Version="3.1.2" />
+    <PackageVersion Include="Verify.DiffPlex" Version="3.3.1" />
     <PackageVersion Include="FluentAssertions" Version="6.12.2" />
     <PackageVersion Include="Basic.Reference.Assemblies.Net80" Version="1.8.10" />
     <PackageVersion Include="Microsoft.NETFramework.ReferenceAssemblies.net461" Version="1.0.3" />
