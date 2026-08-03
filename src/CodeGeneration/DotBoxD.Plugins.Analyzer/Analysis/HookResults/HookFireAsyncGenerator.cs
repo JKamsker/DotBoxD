@@ -26,10 +26,16 @@ internal static class HookFireAsyncGenerator
             .Where(static result => result.Model is not null)
             .Select(static (result, _) => result.Model!)
             .Collect();
+        var sourceCollisions = HookFireAsyncSourceCollision.Collect(context);
         GeneratorGuard.RegisterOutput(
             context,
-            models,
+            models.Combine(sourceCollisions),
+            "hook FireAsync extension source collision diagnostic output",
+            static (sourceContext, pair) => HookFireAsyncSourceCollision.Report(sourceContext, pair.Left, pair.Right));
+        GeneratorGuard.RegisterOutput(
+            context,
+            models.Combine(sourceCollisions),
             "hook FireAsync extension source output",
-            static (sourceContext, models) => HookFireAsyncExtensionEmitter.Emit(sourceContext, models));
+            static (sourceContext, pair) => HookFireAsyncExtensionEmitter.Emit(sourceContext, pair.Left, pair.Right));
     }
 }

@@ -9,6 +9,7 @@ public sealed partial class PluginAnalyzer
     private static void AnalyzeObjectCreation(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
         var creation = (IObjectCreationOperation)context.Operation;
+        ReportAndRecordCollectionCapacityCreation(context, helperGraph, creation);
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             if (ReportAndRecordValueTaskPayloadInInitializer(context, helperGraph, creation.Type))
@@ -16,12 +17,13 @@ public sealed partial class PluginAnalyzer
                 return;
             }
 
-            ReportForbiddenInInitializer(context, creation.Type);
-            RecordForbiddenInitializerReference(context, helperGraph, creation.Type);
+            var initializerTarget = creation.Constructor ?? (ISymbol?)creation.Type;
+            ReportForbiddenInInitializer(context, initializerTarget);
+            RecordForbiddenInitializerReference(context, helperGraph, initializerTarget);
             RecordForbiddenDelegateInitializer(context, helperGraph, creation.Type);
             RecordStaticConstructorReachability(context, helperGraph, creation.Type);
             RecordFinalizerReachability(context, helperGraph, creation.Type);
-            RecordForbiddenHelperPropertyInitializer(context, helperGraph, creation.Type);
+            RecordForbiddenHelperPropertyInitializer(context, helperGraph, initializerTarget);
             if (creation.Constructor is { } initializerConstructor)
             {
                 helperGraph.RecordConstructorInitializers(initializerConstructor);

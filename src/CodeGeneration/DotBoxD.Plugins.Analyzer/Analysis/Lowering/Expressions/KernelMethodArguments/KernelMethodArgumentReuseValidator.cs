@@ -65,7 +65,7 @@ internal static class KernelMethodArgumentReuseValidator
         foreach (var identifier in body.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (IsInsideNameof(identifier))
+            if (IsInsideNameof(identifier, bodySemanticModel, cancellationToken))
             {
                 continue;
             }
@@ -92,7 +92,7 @@ internal static class KernelMethodArgumentReuseValidator
         foreach (var identifier in body.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (IsInsideNameof(identifier))
+            if (IsInsideNameof(identifier, bodySemanticModel, cancellationToken))
             {
                 continue;
             }
@@ -259,8 +259,21 @@ internal static class KernelMethodArgumentReuseValidator
         => compilation.GetTypeByMetadataName(metadataName) is { } expected &&
            SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected);
 
-    private static bool IsInsideNameof(IdentifierNameSyntax identifier)
+    private static bool IsInsideNameof(
+        IdentifierNameSyntax identifier,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
         => identifier.Ancestors().OfType<InvocationExpressionSyntax>().Any(invocation =>
             invocation.Expression is IdentifierNameSyntax { Identifier.ValueText: "nameof" } &&
-            invocation.ArgumentList.Span.Contains(identifier.SpanStart));
+            invocation.ArgumentList.Span.Contains(identifier.SpanStart) &&
+            IsNameofOperator(invocation, semanticModel, cancellationToken));
+
+    private static bool IsNameofOperator(
+        InvocationExpressionSyntax invocation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var symbolInfo = semanticModel.GetSymbolInfo(invocation, cancellationToken);
+        return symbolInfo.Symbol is null && symbolInfo.CandidateSymbols.Length == 0;
+    }
 }

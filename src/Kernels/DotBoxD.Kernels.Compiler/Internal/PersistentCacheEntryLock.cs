@@ -21,6 +21,7 @@ internal sealed class PersistentCacheEntryLock : IAsyncDisposable
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ThrowIfLockPathIsDirectory(path);
             try
             {
                 var stream = new FileStream(
@@ -32,12 +33,21 @@ internal sealed class PersistentCacheEntryLock : IAsyncDisposable
                     FileOptions.Asynchronous | FileOptions.DeleteOnClose);
                 return new PersistentCacheEntryLock(stream);
             }
+            catch (IOException ex) when (Directory.Exists(path))
+            {
+                throw new UnauthorizedAccessException(
+                    $"Cache lock path '{path}' is an existing directory.",
+                    ex);
+            }
             catch (IOException)
             {
                 await Task.Delay(RetryDelayMilliseconds, cancellationToken).ConfigureAwait(false);
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException) when (!Directory.Exists(path))
             {
+                // Windows can surface a delete-on-close sharing conflict as access denied while
+                // another process owns the lock file. Directory-shaped lock paths are rejected
+                // above; retry the remaining access-denied case as lock contention.
                 await Task.Delay(RetryDelayMilliseconds, cancellationToken).ConfigureAwait(false);
             }
         }
@@ -51,4 +61,12 @@ internal sealed class PersistentCacheEntryLock : IAsyncDisposable
 
     private static string LockPath(string rootDirectory, string cacheKey)
         => Path.Combine(rootDirectory, ".locks", cacheKey[..2], cacheKey[2..4], cacheKey + ".lock");
+
+    private static void ThrowIfLockPathIsDirectory(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            throw new UnauthorizedAccessException($"Cache lock path '{path}' is an existing directory.");
+        }
+    }
 }

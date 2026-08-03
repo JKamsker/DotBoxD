@@ -26,6 +26,7 @@ internal static partial class PluginServerFacadeModelFactory
             "NotStartedMessage",
             "NoWorldProxyMessage",
             "Initialize",
+            "RequireFacade",
             "RequireControl",
             "RequireWorld",
             "RequireInstalledPackageId",
@@ -43,6 +44,41 @@ internal static partial class PluginServerFacadeModelFactory
             "GetType",
             "ToString",
         };
+
+    internal static bool IsGeneratedReservedMemberName(string name)
+        => GeneratedReservedMemberNames().Contains(name);
+
+    internal static PluginKernelDiagnostic? GeneratedReservedWorldMemberCollisionDiagnostic(
+        PluginServerFacadeModel model,
+        SyntaxToken location)
+    {
+        foreach (var property in model.WorldProperties)
+        {
+            if (IsGeneratedReservedMemberName(property.Name))
+            {
+                return PluginKernelDiagnostic.Create(
+                    location,
+                    GeneratedReservedWorldMemberCollisionMessage(model.WorldType, property.Name));
+            }
+        }
+
+        foreach (var methodName in model.WorldMethods
+            .Select(static method => method.Name)
+            .Distinct(StringComparer.Ordinal))
+        {
+            if (IsGeneratedReservedMemberName(methodName))
+            {
+                return PluginKernelDiagnostic.Create(
+                    location,
+                    GeneratedReservedWorldMemberCollisionMessage(model.WorldType, methodName));
+            }
+        }
+
+        return null;
+    }
+
+    private static string GeneratedReservedWorldMemberCollisionMessage(string worldType, string memberName)
+        => $"Generated plugin server world '{worldType}' member '{memberName}' collides with the generated facade surface.";
 
     internal static void ValidateGeneratedSiblingTypeCollisions(
         INamedTypeSymbol serverType,

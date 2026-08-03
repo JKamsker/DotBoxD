@@ -74,6 +74,34 @@ public sealed class EventQueryPublishCancellationTests
     }
 
     [Fact]
+    public async Task Ordinary_handler_fault_does_not_swallow_caller_cancellation_after_dispatch()
+    {
+        var host = new EventQueryHost();
+        using var cancellation = new CancellationTokenSource();
+        var invocations = 0;
+
+        var handle = await host.Query<AttackTestEvent>()
+            .Where(e => e.AttackerId == "player-1")
+            .SubscribeAsync((_, _) =>
+            {
+                invocations++;
+                cancellation.Cancel();
+                throw new InvalidOperationException("handler failed after cancellation");
+            });
+
+        var context = new HookContext(new InMemoryPluginMessageSink(), cancellation.Token);
+        var exception = await Record.ExceptionAsync(
+            async () => await host.PublishAsync(new AttackTestEvent("player-1", "monster-1", 9, 1), context));
+
+        var canceled = Assert.IsAssignableFrom<OperationCanceledException>(exception);
+        Assert.Equal(cancellation.Token, canceled.CancellationToken);
+        Assert.Equal(1, invocations);
+        Assert.Equal(1, handle.FilterEvaluations);
+        Assert.Equal(1, handle.Matches);
+        Assert.Equal(0, handle.Dispatches);
+    }
+
+    [Fact]
     public async Task Projection_cancellation_stops_before_subscription_handler_dispatch()
     {
         var host = new EventQueryHost();
@@ -94,6 +122,34 @@ public sealed class EventQueryPublishCancellationTests
             async () => await host.PublishAsync(new ProjectionCancelEvent("player-1", cancellation), context));
 
         Assert.True(cancellation.IsCancellationRequested);
+        Assert.False(handlerInvoked);
+        Assert.Equal(1, handle.FilterEvaluations);
+        Assert.Equal(1, handle.Matches);
+        Assert.Equal(0, handle.Dispatches);
+    }
+
+    [Fact]
+    public async Task Projection_fault_does_not_swallow_caller_cancellation()
+    {
+        var host = new EventQueryHost();
+        using var cancellation = new CancellationTokenSource();
+        var handlerInvoked = false;
+
+        var handle = await host.Query<ProjectionFaultCancelEvent>()
+            .Where(e => e.AttackerId == "player-1")
+            .Select(e => new DamageProjection(e.Damage))
+            .SubscribeAsync((_, _) =>
+            {
+                handlerInvoked = true;
+                return ValueTask.CompletedTask;
+            });
+
+        var context = new HookContext(new InMemoryPluginMessageSink(), cancellation.Token);
+        var exception = await Record.ExceptionAsync(
+            async () => await host.PublishAsync(new ProjectionFaultCancelEvent("player-1", cancellation), context));
+
+        var cancellationException = Assert.IsAssignableFrom<OperationCanceledException>(exception);
+        Assert.Equal(cancellation.Token, cancellationException.CancellationToken);
         Assert.False(handlerInvoked);
         Assert.Equal(1, handle.FilterEvaluations);
         Assert.Equal(1, handle.Matches);
@@ -126,6 +182,34 @@ public sealed class EventQueryPublishCancellationTests
         Assert.Equal(0, handle.Dispatches);
     }
 
+    [Fact]
+    public async Task Nonmatching_broad_filter_does_not_swallow_caller_cancellation()
+    {
+        var host = new EventQueryHost();
+        using var cancellation = new CancellationTokenSource();
+        var handlerInvoked = false;
+
+        var handle = await host.Query<FilterCancelEvent>()
+            .Where(e => e.Damage > 10)
+            .SubscribeAsync((_, _) =>
+            {
+                handlerInvoked = true;
+                return ValueTask.CompletedTask;
+            });
+
+        var context = new HookContext(new InMemoryPluginMessageSink(), cancellation.Token);
+        var exception = await Record.ExceptionAsync(
+            async () => await host.PublishAsync(new FilterCancelEvent(cancellation), context));
+
+        var canceled = Assert.IsAssignableFrom<OperationCanceledException>(exception);
+        Assert.Equal(cancellation.Token, canceled.CancellationToken);
+        Assert.True(cancellation.IsCancellationRequested);
+        Assert.False(handlerInvoked);
+        Assert.Equal(1, handle.FilterEvaluations);
+        Assert.Equal(0, handle.Matches);
+        Assert.Equal(0, handle.Dispatches);
+    }
+
     private sealed class ProjectionCancelEvent(string attackerId, CancellationTokenSource cancellation)
     {
         public string AttackerId { get; } = attackerId;
@@ -140,6 +224,20 @@ public sealed class EventQueryPublishCancellationTests
         }
     }
 
+    private sealed class ProjectionFaultCancelEvent(string attackerId, CancellationTokenSource cancellation)
+    {
+        public string AttackerId { get; } = attackerId;
+
+        public int Damage
+        {
+            get
+            {
+                cancellation.Cancel();
+                throw new InvalidOperationException("projection failed");
+            }
+        }
+    }
+
     private sealed class RoutingCancelEvent(CancellationTokenSource cancellation)
     {
         public string AttackerId
@@ -148,6 +246,18 @@ public sealed class EventQueryPublishCancellationTests
             {
                 cancellation.Cancel();
                 return "player-2";
+            }
+        }
+    }
+
+    private sealed class FilterCancelEvent(CancellationTokenSource cancellation)
+    {
+        public int Damage
+        {
+            get
+            {
+                cancellation.Cancel();
+                return 0;
             }
         }
     }

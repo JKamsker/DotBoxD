@@ -82,8 +82,7 @@ internal static class PluginServerSurfaceCollisionValidator
     {
         if (reserved.Contains(name))
         {
-            throw new NotSupportedException(
-                $"Generated plugin server world '{worldType.ToDisplayString()}' member '{name}' collides with the generated facade surface.");
+            return;
         }
 
         EnsureSingleFacadeCategory(generatedMembers, worldType, name);

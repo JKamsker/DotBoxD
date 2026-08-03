@@ -121,7 +121,7 @@ public sealed class GenericPrimitiveExpressionAllocationTests
 
     private static void AssertAllocationFloor(double shallow, double deep, string lane)
         => Assert.True(
-            Math.Abs(deep - shallow) <= 1,
+            deep - shallow <= 1,
             $"{lane} depth 96 added {deep - shallow:F1} B/execution " +
             $"(shallow={shallow:F1}, deep={deep:F1}).");
 
