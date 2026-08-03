@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785139838442,
+  "lastUpdate": 1785744405372,
   "repoUrl": "https://github.com/JKamsker/DotBoxD",
   "entries": {
     "DotBoxD.Services Benchmarks": [
@@ -484,6 +484,136 @@ window.BENCHMARK_DATA = {
             "value": 94.12462921275034,
             "unit": "ns",
             "range": "± 0.07358560423055702"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jonas Kamsker",
+            "username": "JKamsker",
+            "email": "11245306+JKamsker@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "6f7e8299d53a16479e9cb8cc20b569f127927e12",
+          "message": "Merge applicable Dependabot updates (#1001)\n\nAggregate the applicable NuGet, test SDK, and GitHub Actions updates from Dependabot PRs #998, #972, and #875.\\n\\nRoll Meziantou.Analyzer past its false-positive release, retain the compatible Verify.DiffPlex version, regenerate affected gh-aw locks, and align MessagePack consumer pins so the complete CI and package validation matrix remains green.",
+          "timestamp": "2026-07-27T12:10:34Z",
+          "url": "https://github.com/JKamsker/DotBoxD/commit/6f7e8299d53a16479e9cb8cc20b569f127927e12"
+        },
+        "date": 1785744394534,
+        "tool": "benchmarkdotnet",
+        "benches": [
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.FramingBenchmarks.ParseFrameOnly",
+            "value": 13.329155766301685,
+            "unit": "ns",
+            "range": "± 0.010035599784197234"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.FramingBenchmarks.FrameRequest",
+            "value": 441.2676263332367,
+            "unit": "ns",
+            "range": "± 2.549230550046812"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.FramingBenchmarks.DeserializeArgument",
+            "value": 157.5802195072174,
+            "unit": "ns",
+            "range": "± 0.1660687357089922"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.PeerRoundTripBenchmarks.MovePlayerAsync(EndToEndLowAllocationProfile: False)",
+            "value": 10287.326440429688,
+            "unit": "ns",
+            "range": "± 1562.5242864698391"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.PeerRoundTripBenchmarks.MovePlayerAsync(EndToEndLowAllocationProfile: True)",
+            "value": 8728.248052978515,
+            "unit": "ns",
+            "range": "± 1335.7357472026517"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.RpcTelemetryBenchmarks.SuccessfulRequestWithoutListeners",
+            "value": 2.8640986047685146,
+            "unit": "ns",
+            "range": "± 0.05475020942307058"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ServiceGeneratorScaleBenchmarks.RunGenerators(ContractCount: 10)",
+            "value": 1153875.33203125,
+            "unit": "ns",
+            "range": "± 48013.88962390019"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ServiceGeneratorScaleBenchmarks.RunGenerators(ContractCount: 100)",
+            "value": 10624492.3484375,
+            "unit": "ns",
+            "range": "± 169835.69046293752"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ServiceGeneratorScaleBenchmarks.RunGenerators(ContractCount: 500)",
+            "value": 67945594.26666667,
+            "unit": "ns",
+            "range": "± 2345555.2783655557"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.StreamedArgumentProxyBenchmarks.SingleStreamUpload",
+            "value": 21.45874169766903,
+            "unit": "ns",
+            "range": "± 0.08642198274841788"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.StreamedArgumentProxyBenchmarks.TwoStreamUpload",
+            "value": 37.44768342971802,
+            "unit": "ns",
+            "range": "± 0.4025109001665612"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.RegisterPlayerFlow",
+            "value": 17.71790865659714,
+            "unit": "ns",
+            "range": "± 0.018748620395579035"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.GetPlayerStateFlow",
+            "value": 12.192787610822254,
+            "unit": "ns",
+            "range": "± 0.010441554268135976"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.MovePlayerFlow",
+            "value": 23.629567470815445,
+            "unit": "ns",
+            "range": "± 0.014606894532885367"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.PerformActionFlow",
+            "value": 19.23558090031147,
+            "unit": "ns",
+            "range": "± 0.011711223014842677"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.MissingPlayerFailureFlow",
+            "value": 10.453668304615551,
+            "unit": "ns",
+            "range": "± 0.0031942578969640684"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.VoidHeartbeatFlow",
+            "value": 4.279315458403693,
+            "unit": "ns",
+            "range": "± 0.04933169476450882"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.FullGameplaySessionFlow",
+            "value": 93.84719675117069,
+            "unit": "ns",
+            "range": "± 0.14890945461209612"
           }
         ]
       }
