@@ -15,38 +15,55 @@ internal static class ForbiddenCollectionCapacityPolicy
 
     public static bool TryGetDisplayName(IMethodSymbol? method, out string forbidden)
     {
+        forbidden = null!;
         if (method is null || !HasCapacityParameter(method))
         {
-            forbidden = null!;
             return false;
         }
 
-        var type = method.ContainingType;
-        var typeName = type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-        if (IsImmutableArrayCreateBuilder(method, typeName))
-        {
-            forbidden = "System.Collections.Immutable.ImmutableArray";
-            return true;
-        }
+        var typeName = CapacityTypeName(method);
+        return TryGetFactoryDisplayName(method, typeName, out forbidden) ||
+               TryGetConstructorDisplayName(method, typeName, out forbidden);
+    }
 
+    private static bool TryGetFactoryDisplayName(IMethodSymbol method, string typeName, out string forbidden)
+    {
+        forbidden = IsImmutableArrayCreateBuilder(method, typeName)
+            ? "System.Collections.Immutable.ImmutableArray"
+            : null!;
+        return forbidden is not null;
+    }
+
+    private static bool TryGetConstructorDisplayName(IMethodSymbol method, string typeName, out string forbidden)
+    {
         if (method.MethodKind != MethodKind.Constructor)
         {
             forbidden = null!;
             return false;
         }
 
-        forbidden = typeName switch
+        var type = method.ContainingType;
+        var displayName = ConstructorDisplayName(type, typeName);
+        if (displayName is null)
+        {
+            forbidden = null!;
+            return false;
+        }
+
+        forbidden = displayName;
+        return true;
+    }
+
+    private static string? ConstructorDisplayName(INamedTypeSymbol type, string typeName)
+        => typeName switch
         {
             ListTypeName => "System.Collections.Generic.List",
             DictionaryTypeName => "System.Collections.Generic.Dictionary",
             QueueTypeName => "System.Collections.Generic.Queue",
             StackTypeName or HashSetTypeName or PriorityQueueTypeName =>
                 type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
-            _ => null!
+            _ => null
         };
-
-        return forbidden is not null;
-    }
 
     private static bool IsImmutableArrayCreateBuilder(IMethodSymbol method, string typeName)
         => method is { IsStatic: true, Name: "CreateBuilder" } &&
@@ -54,12 +71,14 @@ internal static class ForbiddenCollectionCapacityPolicy
 
     private static bool HasCapacityParameter(IMethodSymbol method)
     {
-        var typeName = method.ContainingType.OriginalDefinition.ToDisplayString(
-            SymbolDisplayFormat.CSharpErrorMessageFormat);
+        var typeName = CapacityTypeName(method);
         var capacityName =
             typeName is PriorityQueueTypeName or ImmutableArrayTypeName ? "initialCapacity" : "capacity";
         return method.Parameters.Any(parameter =>
             parameter.Type.SpecialType == SpecialType.System_Int32 &&
             string.Equals(parameter.Name, capacityName, StringComparison.Ordinal));
     }
+
+    private static string CapacityTypeName(IMethodSymbol method)
+        => method.ContainingType.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
 }
