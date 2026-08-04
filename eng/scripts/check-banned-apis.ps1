@@ -46,7 +46,7 @@ function ConvertFrom-JsonElement([System.Text.Json.JsonElement] $element) {
                 $items.Add((ConvertFrom-JsonElement -element $item))
             }
 
-            return $items.ToArray()
+            return ,$items.ToArray()
         }
         ([System.Text.Json.JsonValueKind]::String) {
             return $element.GetString()
