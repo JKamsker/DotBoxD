@@ -47,6 +47,49 @@ public sealed partial class PluginAnalyzer
         }
     }
 
+    private static void ReportAndRecordCollectionCapacitySetter(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IPropertySymbol property,
+        bool usesSetter)
+    {
+        if (!usesSetter ||
+            !ForbiddenCollectionCapacityPolicy.TryGetDisplayName(property, out var forbidden))
+        {
+            return;
+        }
+
+        if (context.ContainingSymbol is IMethodSymbol method)
+        {
+            helperGraph.RecordForbidden(method, forbidden);
+            if (IsForbiddenApiRoot(context, method) &&
+                helperGraph.TryRecordDirectDiagnostic(method, forbidden))
+            {
+                ReportCollectionCapacityDiagnostic(context, forbidden);
+            }
+
+            return;
+        }
+
+        if (context.ContainingSymbol is not IFieldSymbol and not IPropertySymbol)
+        {
+            return;
+        }
+
+        var initializer = context.ContainingSymbol;
+        helperGraph.RecordForbiddenInitializer(initializer, forbidden);
+        var isEventKernel = IsEventKernel(initializer.ContainingType);
+        if (isEventKernel)
+        {
+            ReportCollectionCapacityDiagnostic(context, forbidden);
+        }
+
+        if (!isEventKernel && initializer is IPropertySymbol { GetMethod: { } getter })
+        {
+            helperGraph.RecordForbidden(getter, forbidden);
+        }
+    }
+
     private static void ReportCollectionCapacityDiagnostic(OperationAnalysisContext context, string forbidden)
         => context.ReportDiagnostic(Diagnostic.Create(
             ForbiddenHostApiRule,
