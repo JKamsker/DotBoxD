@@ -26,38 +26,9 @@ internal static class HookFireAsyncModelFactory
                 continue;
             }
 
-            if (IsFileLocalOrNestedInFileLocal(contextType, cancellationToken))
+            if (UnsupportedContextDiagnostic(contextType, declaration, cancellationToken) is { } diagnostic)
             {
-                return new HookFireAsyncModelResult(
-                    null,
-                    PluginKernelDiagnostic.Create(
-                        declaration.Identifier,
-                        $"hook context '{contextType.Name}' is file-local and cannot be referenced by generated "
-                        + "HookRegistry.FireAsync(context) extensions; use a non-file-local context type or call "
-                        + "HookRegistry.FireAsync<TContext, TResult>(...) from the same file"));
-            }
-
-            if (IsErrorObsoleteOrNestedInErrorObsolete(contextType))
-            {
-                return new HookFireAsyncModelResult(
-                    null,
-                    PluginKernelDiagnostic.Create(
-                        declaration.Identifier,
-                        $"hook context '{contextType.Name}' is marked [Obsolete(..., error: true)] or nested in a "
-                        + "type marked that way; generated HookRegistry.FireAsync(context) extensions cannot "
-                        + "reference compiler-error obsolete context types"));
-            }
-
-            if (!IsAccessibleFromGeneratedFireAsyncSource(contextType))
-            {
-                return new HookFireAsyncModelResult(
-                    null,
-                    PluginKernelDiagnostic.Create(
-                        declaration.Identifier,
-                        $"hook context '{contextType.Name}' is private or nested in a type that is not accessible "
-                        + "from generated HookRegistry.FireAsync(context) extensions; use an internal or public "
-                        + "context type or call HookRegistry.FireAsync<TContext, TResult>(...) from an accessible "
-                        + "scope"));
+                return new HookFireAsyncModelResult(null, diagnostic);
             }
 
             return new HookFireAsyncModelResult(
@@ -71,6 +42,42 @@ internal static class HookFireAsyncModelFactory
         }
 
         return null;
+    }
+
+    private static PluginKernelDiagnostic? UnsupportedContextDiagnostic(
+        INamedTypeSymbol contextType,
+        TypeDeclarationSyntax declaration,
+        CancellationToken cancellationToken)
+    {
+        if (IsFileLocalOrNestedInFileLocal(contextType, cancellationToken))
+        {
+            return PluginKernelDiagnostic.Create(
+                declaration.Identifier,
+                $"hook context '{contextType.Name}' is file-local and cannot be referenced by generated "
+                + "HookRegistry.FireAsync(context) extensions; use a non-file-local context type or call "
+                + "HookRegistry.FireAsync<TContext, TResult>(...) from the same file");
+        }
+
+        if (IsErrorObsoleteOrNestedInErrorObsolete(contextType))
+        {
+            return PluginKernelDiagnostic.Create(
+                declaration.Identifier,
+                $"hook context '{contextType.Name}' is marked [Obsolete(..., error: true)] or nested in a "
+                + "type marked that way; generated HookRegistry.FireAsync(context) extensions cannot "
+                + "reference compiler-error obsolete context types");
+        }
+
+        if (IsAccessibleFromGeneratedFireAsyncSource(contextType))
+        {
+            return null;
+        }
+
+        return PluginKernelDiagnostic.Create(
+            declaration.Identifier,
+            $"hook context '{contextType.Name}' is private or nested in a type that is not accessible "
+            + "from generated HookRegistry.FireAsync(context) extensions; use an internal or public "
+            + "context type or call HookRegistry.FireAsync<TContext, TResult>(...) from an accessible "
+            + "scope");
     }
 
     private static bool TryGetHookResultType(
