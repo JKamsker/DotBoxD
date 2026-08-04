@@ -48,6 +48,18 @@ internal static class HookFireAsyncModelFactory
                         + "reference compiler-error obsolete context types"));
             }
 
+            if (!IsAccessibleFromGeneratedFireAsyncSource(contextType))
+            {
+                return new HookFireAsyncModelResult(
+                    null,
+                    PluginKernelDiagnostic.Create(
+                        declaration.Identifier,
+                        $"hook context '{contextType.Name}' is private or nested in a type that is not accessible "
+                        + "from generated HookRegistry.FireAsync(context) extensions; use an internal or public "
+                        + "context type or call HookRegistry.FireAsync<TContext, TResult>(...) from an accessible "
+                        + "scope"));
+            }
+
             return new HookFireAsyncModelResult(
                 new HookFireAsyncModel(
                     contextType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
@@ -142,6 +154,22 @@ internal static class HookFireAsyncModelFactory
 
         return false;
     }
+
+    private static bool IsAccessibleFromGeneratedFireAsyncSource(INamedTypeSymbol type)
+    {
+        for (var current = type; current is not null; current = current.ContainingType)
+        {
+            if (!CanSameAssemblyNonDerivedSourceAccess(current.DeclaredAccessibility))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool CanSameAssemblyNonDerivedSourceAccess(Accessibility accessibility)
+        => accessibility is Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal;
 
     private static bool IsEffectivelyPublic(INamedTypeSymbol type)
     {
