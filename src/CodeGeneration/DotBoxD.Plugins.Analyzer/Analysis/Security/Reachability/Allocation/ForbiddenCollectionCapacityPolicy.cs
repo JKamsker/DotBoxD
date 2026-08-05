@@ -14,8 +14,8 @@ internal static class ForbiddenCollectionCapacityPolicy
 
     public static bool TryGetDisplayName(IMethodSymbol? method, out string forbidden)
     {
-        if (method is not { MethodKind: MethodKind.Constructor } ||
-            !HasCapacityParameter(method))
+        if (method is null ||
+            !IsCapacityAllocationMethod(method))
         {
             forbidden = null!;
             return false;
@@ -36,13 +36,23 @@ internal static class ForbiddenCollectionCapacityPolicy
         return forbidden is not null;
     }
 
-    private static bool HasCapacityParameter(IMethodSymbol method)
+    private static bool IsCapacityAllocationMethod(IMethodSymbol method)
     {
         var typeName = method.ContainingType.OriginalDefinition.ToDisplayString(
             SymbolDisplayFormat.CSharpErrorMessageFormat);
-        var capacityName = typeName == PriorityQueueTypeName ? "initialCapacity" : "capacity";
-        return method.Parameters.Any(parameter =>
+        if (method.MethodKind == MethodKind.Constructor)
+        {
+            var capacityName = typeName == PriorityQueueTypeName ? "initialCapacity" : "capacity";
+            return HasCapacityParameter(method, capacityName);
+        }
+
+        return method.MethodKind == MethodKind.Ordinary &&
+            string.Equals(method.Name, "EnsureCapacity", StringComparison.Ordinal) &&
+            HasCapacityParameter(method, "capacity");
+    }
+
+    private static bool HasCapacityParameter(IMethodSymbol method, string capacityName)
+        => method.Parameters.Any(parameter =>
             parameter.Type.SpecialType == SpecialType.System_Int32 &&
             string.Equals(parameter.Name, capacityName, StringComparison.Ordinal));
-    }
 }

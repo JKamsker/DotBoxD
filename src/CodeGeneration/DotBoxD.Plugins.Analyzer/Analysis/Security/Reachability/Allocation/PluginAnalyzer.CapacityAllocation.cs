@@ -10,8 +10,20 @@ public sealed partial class PluginAnalyzer
         OperationAnalysisContext context,
         ForbiddenHelperCallGraph helperGraph,
         IObjectCreationOperation creation)
+        => ReportAndRecordCollectionCapacityAllocation(context, helperGraph, creation.Constructor);
+
+    private static void ReportAndRecordCollectionCapacityInvocation(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IInvocationOperation invocation)
+        => ReportAndRecordCollectionCapacityAllocation(context, helperGraph, invocation.TargetMethod);
+
+    private static void ReportAndRecordCollectionCapacityAllocation(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol? allocationMethod)
     {
-        if (!ForbiddenCollectionCapacityPolicy.TryGetDisplayName(creation.Constructor, out var forbidden))
+        if (!ForbiddenCollectionCapacityPolicy.TryGetDisplayName(allocationMethod, out var forbidden))
         {
             return;
         }
