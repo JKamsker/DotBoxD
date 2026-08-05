@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using TypeNames = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNames.TypeNames;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
@@ -72,6 +73,12 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         if (string.Equals(member.Name.Identifier.ValueText, "ContainsKey", StringComparison.Ordinal) &&
             invocation.ArgumentList.Arguments.Count == 1)
         {
+            if (_model.GetSymbolInfo(invocation, _cancellationToken).Symbol is not IMethodSymbol method ||
+                !IsSupportedMapContainsKey(method))
+            {
+                return null;
+            }
+
             return Call(
                 "map.containsKey",
                 null,
@@ -84,6 +91,21 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
         throw new NotSupportedException(
             $"Server extension map operation '{invocation}' is not supported; supported map calls are ContainsKey.");
+    }
+
+    private static bool IsSupportedMapContainsKey(IMethodSymbol method)
+    {
+        if (!string.Equals(method.Name, "ContainsKey", StringComparison.Ordinal) ||
+            method.Parameters.Length != 1 ||
+            method.ReturnType.SpecialType != SpecialType.System_Boolean ||
+            method.ContainingType is not { IsGenericType: true } containingType)
+        {
+            return false;
+        }
+
+        return containingType.ConstructedFrom.ToDisplayString() is TypeNames.DictionaryOriginal
+            or TypeNames.ReadOnlyDictionaryOriginal
+            or TypeNames.DictionaryInterfaceOriginal;
     }
 
     /// <summary>
