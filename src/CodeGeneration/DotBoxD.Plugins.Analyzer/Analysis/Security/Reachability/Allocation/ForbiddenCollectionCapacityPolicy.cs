@@ -36,6 +36,28 @@ internal static class ForbiddenCollectionCapacityPolicy
         return forbidden is not null;
     }
 
+    public static bool TryGetDisplayName(IPropertySymbol? property, out string forbidden)
+    {
+        if (property is not
+            {
+                IsStatic: false,
+                Name: "Capacity",
+                SetMethod: not null,
+                Type.SpecialType: SpecialType.System_Int32
+            })
+        {
+            forbidden = null!;
+            return false;
+        }
+
+        var typeName = property.ContainingType.OriginalDefinition.ToDisplayString(
+            SymbolDisplayFormat.CSharpErrorMessageFormat);
+        forbidden = typeName == ListTypeName
+            ? "System.Collections.Generic.List"
+            : null!;
+        return forbidden is not null;
+    }
+
     private static bool HasCapacityParameter(IMethodSymbol method)
     {
         var typeName = method.ContainingType.OriginalDefinition.ToDisplayString(

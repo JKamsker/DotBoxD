@@ -52,4 +52,45 @@ public sealed partial class PluginAnalyzer
             ForbiddenHostApiRule,
             context.Operation.Syntax.GetLocation(),
             forbidden));
+
+    private static void ReportAndRecordCollectionCapacitySetter(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IPropertySymbol property,
+        bool writesProperty)
+    {
+        if (!writesProperty ||
+            !ForbiddenCollectionCapacityPolicy.TryGetDisplayName(property, out var forbidden))
+        {
+            return;
+        }
+
+        switch (context.ContainingSymbol)
+        {
+            case IMethodSymbol method:
+                helperGraph.RecordForbidden(method, forbidden);
+                if (IsForbiddenApiRoot(context, method) &&
+                    helperGraph.TryRecordDirectDiagnostic(method, forbidden))
+                {
+                    ReportCollectionCapacityDiagnostic(context, forbidden);
+                }
+
+                break;
+            case IFieldSymbol or IPropertySymbol:
+                helperGraph.RecordForbiddenInitializer(context.ContainingSymbol, forbidden);
+                var isEventKernel = IsEventKernel(context.ContainingSymbol.ContainingType);
+                if (isEventKernel)
+                {
+                    ReportCollectionCapacityDiagnostic(context, forbidden);
+                }
+
+                if (!isEventKernel &&
+                    context.ContainingSymbol is IPropertySymbol { GetMethod: { } getter })
+                {
+                    helperGraph.RecordForbidden(getter, forbidden);
+                }
+
+                break;
+        }
+    }
 }
