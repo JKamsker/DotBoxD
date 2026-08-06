@@ -172,6 +172,7 @@ internal static class RpcJsonExpressionStatementLowerer
         if (invocation.Expression is not MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Add" } member ||
             member.Expression is not IdentifierNameSyntax list ||
             invocation.ArgumentList.Arguments.Count != 1 ||
+            !IsListAddInvocation(lowerer, invocation) ||
             DotBoxDRpcTypeMapper.ListElementType(lowerer.TypeOf(member.Expression)) is not { } elementType)
         {
             return null;
@@ -187,5 +188,20 @@ internal static class RpcJsonExpressionStatementLowerer
         return DotBoxDRpcJsonLowerer.SetStatement(
             listName,
             DotBoxDRpcJsonLowerer.Call("list.add", null, DotBoxDRpcJsonLowerer.Var(listName), item));
+    }
+
+    private static bool IsListAddInvocation(
+        DotBoxDRpcJsonLowerer lowerer,
+        InvocationExpressionSyntax invocation)
+    {
+        if (lowerer.Model.GetSymbolInfo(invocation, lowerer.CancellationToken).Symbol is not IMethodSymbol method)
+        {
+            return false;
+        }
+
+        return method.ReducedFrom is null &&
+               !method.IsStatic &&
+               method.Parameters.Length == 1 &&
+               method.ReturnsVoid;
     }
 }
