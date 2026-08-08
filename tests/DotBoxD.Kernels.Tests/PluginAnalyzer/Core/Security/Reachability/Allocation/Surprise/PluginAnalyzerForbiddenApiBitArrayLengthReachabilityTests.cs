@@ -1,3 +1,5 @@
+using Microsoft.CodeAnalysis;
+
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 
 public sealed class PluginAnalyzerForbiddenApiBitArrayLengthReachabilityTests
@@ -16,8 +18,9 @@ public sealed class PluginAnalyzerForbiddenApiBitArrayLengthReachabilityTests
         string staticMember,
         string expectedApi)
     {
+        var source = Source(staticMember);
         var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
-            Source(staticMember),
+            source,
             "DotBoxDPluginAnalyzerBitArrayLengthReachabilityTest");
 
         var diagnostic = Assert.Single(diagnostics.Where(d => d.Id == "DBXK001"));
@@ -25,6 +28,7 @@ public sealed class PluginAnalyzerForbiddenApiBitArrayLengthReachabilityTests
         Assert.True(
             message.Contains(expectedApi, StringComparison.Ordinal),
             $"{testCase}: {message}");
+        AssertDiagnosticLine(source, diagnostic, staticMember);
     }
 
     [Fact]
@@ -58,4 +62,10 @@ public sealed class PluginAnalyzerForbiddenApiBitArrayLengthReachabilityTests
             }
             """;
 
+    private static void AssertDiagnosticLine(string source, Diagnostic diagnostic, string expectedLine)
+    {
+        var position = diagnostic.Location.GetLineSpan().StartLinePosition;
+        var actualLine = source.Split('\n')[position.Line].Trim();
+        Assert.Equal(expectedLine, actualLine);
+    }
 }

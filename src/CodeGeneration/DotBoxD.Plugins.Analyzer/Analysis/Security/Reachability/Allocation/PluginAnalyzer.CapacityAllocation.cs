@@ -11,7 +11,7 @@ public sealed partial class PluginAnalyzer
         ForbiddenHelperCallGraph helperGraph,
         IObjectCreationOperation creation)
     {
-        if (!ForbiddenCollectionCapacityPolicy.TryGetDisplayName(creation.Constructor, out var forbidden))
+        if (!ForbiddenCollectionCapacityPolicy.TryGetDisplayName(creation, out var forbidden))
         {
             return;
         }
