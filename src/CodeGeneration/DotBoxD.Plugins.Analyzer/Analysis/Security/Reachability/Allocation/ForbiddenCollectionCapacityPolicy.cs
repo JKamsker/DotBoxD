@@ -22,20 +22,45 @@ internal static class ForbiddenCollectionCapacityPolicy
             return false;
         }
 
-        var type = method.ContainingType;
-        var typeName = type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-        forbidden = typeName switch
-        {
-            ArrayListTypeName => ArrayListTypeName,
-            ListTypeName => "System.Collections.Generic.List",
-            DictionaryTypeName => "System.Collections.Generic.Dictionary",
-            QueueTypeName => "System.Collections.Generic.Queue",
-            StackTypeName or HashSetTypeName or PriorityQueueTypeName =>
-                type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
-            _ => null!
-        };
+        return TryGetTypeDisplayName(method.ContainingType, out forbidden);
+    }
 
-        return forbidden is not null;
+    private static bool TryGetTypeDisplayName(INamedTypeSymbol type, out string forbidden)
+    {
+        var typeName = type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+
+        if (typeName == ArrayListTypeName)
+        {
+            forbidden = ArrayListTypeName;
+            return true;
+        }
+
+        if (typeName == ListTypeName)
+        {
+            forbidden = "System.Collections.Generic.List";
+            return true;
+        }
+
+        if (typeName == DictionaryTypeName)
+        {
+            forbidden = "System.Collections.Generic.Dictionary";
+            return true;
+        }
+
+        if (typeName == QueueTypeName)
+        {
+            forbidden = "System.Collections.Generic.Queue";
+            return true;
+        }
+
+        if (typeName is StackTypeName or HashSetTypeName or PriorityQueueTypeName)
+        {
+            forbidden = type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+            return true;
+        }
+
+        forbidden = null!;
+        return false;
     }
 
     private static bool HasCapacityParameter(IMethodSymbol method)
