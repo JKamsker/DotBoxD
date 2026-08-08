@@ -18,6 +18,7 @@ internal static partial class PluginServerFacadeModelFactory
             "HoldUntilShutdownAsync",
             "Dispose",
             "DisposeAsync",
+            "GetOrStartDisposeAsync", "DisposeCoreAsync",
             "InvokeAsync",
             "Get",
             "PluginId",
