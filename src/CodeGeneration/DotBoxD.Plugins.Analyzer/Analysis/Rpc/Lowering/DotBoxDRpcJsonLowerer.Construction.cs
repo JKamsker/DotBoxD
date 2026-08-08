@@ -163,7 +163,8 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 fieldIndex < 0)
             {
                 throw new NotSupportedException(
-                    $"Server extension constructor for '{named.Name}' must map one argument per field.");
+                    $"Server extension DTO '{named.Name}' must expose a constructor matching its public fields; " +
+                    "each constructor argument must map to one field without transforming it.");
             }
 
             args[fieldIndex] = lowered[i];
