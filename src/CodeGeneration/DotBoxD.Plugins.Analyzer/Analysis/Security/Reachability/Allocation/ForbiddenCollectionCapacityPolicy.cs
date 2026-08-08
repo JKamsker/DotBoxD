@@ -26,6 +26,14 @@ internal static class ForbiddenCollectionCapacityPolicy
 
         var type = method.ContainingType;
         var typeName = type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+        return TryGetForbiddenTypeDisplayName(type, typeName, out forbidden);
+    }
+
+    private static bool TryGetForbiddenTypeDisplayName(
+        INamedTypeSymbol type,
+        string typeName,
+        out string forbidden)
+    {
         forbidden = typeName switch
         {
             BitArrayTypeName => BitArrayTypeName,
