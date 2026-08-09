@@ -146,6 +146,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
     {
         var property = ((IPropertyReferenceOperation)context.Operation).Property;
         var (usesGetter, usesSetter) = AccessorUsage(context.Operation);
+        ReportAndRecordCollectionCapacitySetter(context, helperGraph, property, usesSetter);
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, property);

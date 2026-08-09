@@ -11,7 +11,20 @@ public sealed partial class PluginAnalyzer
         ForbiddenHelperCallGraph helperGraph,
         IObjectCreationOperation creation)
     {
-        if (!ForbiddenCollectionCapacityPolicy.TryGetDisplayName(creation.Constructor, out var forbidden))
+        if (ForbiddenCollectionCapacityPolicy.TryGetDisplayName(creation.Constructor, out var forbidden))
+        {
+            ReportAndRecordCollectionCapacityOperation(context, helperGraph, forbidden);
+        }
+    }
+
+    private static void ReportAndRecordCollectionCapacitySetter(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IPropertySymbol property,
+        bool usesSetter)
+    {
+        if (!usesSetter ||
+            !ForbiddenCollectionCapacityPolicy.TryGetDisplayName(property, out var forbidden))
         {
             return;
         }
