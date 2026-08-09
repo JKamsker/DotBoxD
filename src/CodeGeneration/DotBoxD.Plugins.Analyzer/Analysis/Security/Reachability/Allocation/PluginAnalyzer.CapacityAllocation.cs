@@ -16,6 +16,27 @@ public sealed partial class PluginAnalyzer
             return;
         }
 
+        ReportAndRecordCollectionCapacityOperation(context, helperGraph, forbidden);
+    }
+
+    private static void ReportAndRecordCollectionCapacityInvocation(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IInvocationOperation invocation)
+    {
+        if (!ForbiddenCollectionCapacityPolicy.TryGetDisplayName(invocation.TargetMethod, out var forbidden))
+        {
+            return;
+        }
+
+        ReportAndRecordCollectionCapacityOperation(context, helperGraph, forbidden);
+    }
+
+    private static void ReportAndRecordCollectionCapacityOperation(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        string forbidden)
+    {
         if (context.ContainingSymbol is IMethodSymbol method)
         {
             helperGraph.RecordForbidden(method, forbidden);

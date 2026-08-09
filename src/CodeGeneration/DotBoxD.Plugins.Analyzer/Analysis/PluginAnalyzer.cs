@@ -112,6 +112,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeInvocation(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
         var invocation = (IInvocationOperation)context.Operation;
+        ReportAndRecordCollectionCapacityInvocation(context, helperGraph, invocation);
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, invocation.TargetMethod);
