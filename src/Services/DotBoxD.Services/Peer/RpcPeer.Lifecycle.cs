@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using DotBoxD.Services.Diagnostics;
 using DotBoxD.Services.Exceptions;
 using DotBoxD.Services.Peer.Inbound;
@@ -98,17 +99,10 @@ public sealed partial class RpcPeer
     private async Task DisposeCoreAsync(Task? readLoop, CancellationTokenSource? cts)
     {
         _outbound.FailPending(new ServiceConnectionException("Connection closed."));
-        Exception? channelDisposeFailure = null;
-
-        try
-        {
-            await _channel.DisposeAsync().ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            RpcDiagnostics.Report("Channel dispose during peer teardown failed", ex);
-            channelDisposeFailure = ex;
-        }
+        var teardownFailure = await CaptureTeardownFailureAsync(
+            async () => await _channel.DisposeAsync().ConfigureAwait(false),
+            "Channel dispose during peer teardown failed",
+            firstFailure: null).ConfigureAwait(false);
 
         if (readLoop is not null)
         {
@@ -129,21 +123,78 @@ public sealed partial class RpcPeer
             }
         }
 
-        await _outbound.StopCancelFramesAsync().ConfigureAwait(false);
-        _streams.Stop();
-        await _inbound.StopAsync().ConfigureAwait(false);
+        teardownFailure = await CaptureTeardownFailureAsync(
+            _outbound.StopCancelFramesAsync,
+            "Outbound shutdown during peer teardown failed",
+            teardownFailure).ConfigureAwait(false);
+        teardownFailure = CaptureTeardownFailure(
+            _streams.Stop,
+            "Stream shutdown during peer teardown failed",
+            teardownFailure);
+        teardownFailure = await CaptureTeardownFailureAsync(
+            _inbound.StopAsync,
+            "Inbound shutdown during peer teardown failed",
+            teardownFailure).ConfigureAwait(false);
+        teardownFailure = CaptureTeardownFailure(
+            _sender.Dispose,
+            "Sender dispose during peer teardown failed",
+            teardownFailure);
+        if (cts is not null)
+        {
+            teardownFailure = CaptureTeardownFailure(
+                cts.Dispose,
+                "Cancellation source dispose during peer teardown failed",
+                teardownFailure);
+        }
 
-        _sender.Dispose();
-        cts?.Dispose();
         if (readLoop is not null)
         {
-            RpcTelemetry.PeerStopped();
+            teardownFailure = CaptureTeardownFailure(
+                RpcTelemetry.PeerStopped,
+                "Peer stopped telemetry during peer teardown failed",
+                teardownFailure);
         }
 
-        if (channelDisposeFailure is not null)
+        if (teardownFailure is not null)
         {
-            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(channelDisposeFailure).Throw();
+            ExceptionDispatchInfo.Capture(teardownFailure).Throw();
         }
+    }
+
+    private static async Task<Exception?> CaptureTeardownFailureAsync(
+        Func<Task> teardown,
+        string diagnostic,
+        Exception? firstFailure)
+    {
+        try
+        {
+            await teardown().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            RpcDiagnostics.Report(diagnostic, ex);
+            return firstFailure ?? ex;
+        }
+
+        return firstFailure;
+    }
+
+    private static Exception? CaptureTeardownFailure(
+        Action teardown,
+        string diagnostic,
+        Exception? firstFailure)
+    {
+        try
+        {
+            teardown();
+        }
+        catch (Exception ex)
+        {
+            RpcDiagnostics.Report(diagnostic, ex);
+            return firstFailure ?? ex;
+        }
+
+        return firstFailure;
     }
 
     private bool ShouldAwaitReadLoop(Task readLoop) =>
