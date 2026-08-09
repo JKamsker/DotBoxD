@@ -28,6 +28,7 @@ public static class SafeHttpClient
         long? requestBytes = null;
         CancellationTokenSource? requestTimeout = null;
         CancellationTokenSource? timeout = null;
+        string text;
         try
         {
             var request = ResolveRequest(context, uri);
@@ -59,8 +60,7 @@ public static class SafeHttpClient
                     timeout.Token)
                 .ConfigureAwait(false);
             responseBytes = metadataBytes + body.BytesRead;
-            Audit(context, startedAt, true, resource, responseBytes, requestBytes, null);
-            return body.Text;
+            text = body.Text;
         }
         catch (SandboxRuntimeException ex)
         {
@@ -100,6 +100,9 @@ public static class SafeHttpClient
             timeout?.Dispose();
             requestTimeout?.Dispose();
         }
+
+        Audit(context, startedAt, true, resource, responseBytes, requestBytes, null);
+        return text;
     }
 
     private static void ThrowIfCancelledBeforeRequest(SandboxContext context, CancellationToken cancellationToken)
