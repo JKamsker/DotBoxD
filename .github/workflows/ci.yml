@@ -289,6 +289,15 @@ jobs:
         shell: pwsh
         run: ./eng/scripts/check-codeql-workflow.ps1
 
+      - name: Install pinned gh-aw compiler
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh extension install JKamsker/gh-aw --pin v0.82.0-jk.1 --force
+
+      - name: Agentic workflow lock integrity
+        shell: pwsh
+        run: ./eng/scripts/check-gh-aw-locks.ps1
+
       - name: Release readiness
         shell: pwsh
         run: ./eng/scripts/check-release-readiness.ps1 -RequireComplete

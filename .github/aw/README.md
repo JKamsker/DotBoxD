@@ -165,8 +165,13 @@ After regeneration, run:
 
 ```powershell
 gh aw compile --no-emit --validate --approve
+./eng/scripts/check-gh-aw-locks.ps1
 git diff --check
 ```
+
+The lock-integrity script compares the compiled metadata hash with a fresh
+`gh aw hash-frontmatter` result for every source/lock pair. This catches stale
+locks that structural validation alone does not reject.
 
 For changes that affect CI behavior, also run the usual repository validation:
 
