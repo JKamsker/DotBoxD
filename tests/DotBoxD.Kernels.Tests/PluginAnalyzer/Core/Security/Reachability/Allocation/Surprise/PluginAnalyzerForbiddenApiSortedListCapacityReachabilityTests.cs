@@ -8,6 +8,10 @@ public sealed class PluginAnalyzerForbiddenApiSortedListCapacityReachabilityTest
         "private static readonly System.Collections.Generic.SortedList<string, string> Retained = new(int.MaxValue);",
         "System.Collections.Generic.SortedList")]
     [InlineData(
+        "SortedList<string, string> Capacity property",
+        "private static readonly System.Collections.Generic.SortedList<string, string> Retained = new() { Capacity = int.MaxValue };",
+        "System.Collections.Generic.SortedList")]
+    [InlineData(
         "direct System.IO control",
         "private static readonly bool Retained = System.IO.File.Exists(\"plugin-sorted-list.txt\");",
         "System.IO.File")]

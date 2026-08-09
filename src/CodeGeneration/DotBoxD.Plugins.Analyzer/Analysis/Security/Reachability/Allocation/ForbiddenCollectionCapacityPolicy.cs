@@ -104,6 +104,7 @@ internal static class ForbiddenCollectionCapacityPolicy
             (BitArrayTypeName, "Length") => BitArrayTypeName,
             (ImmutableArrayBuilderTypeName, "Capacity") => "System.Collections.Immutable.ImmutableArray",
             (ListTypeName, "Capacity") => "System.Collections.Generic.List",
+            (SortedListTypeName, "Capacity") => "System.Collections.Generic.SortedList",
             _ => null!
         };
         return forbidden is not null;
