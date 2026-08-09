@@ -21,6 +21,8 @@ on:
 concurrency:
   group: surprise-red-test-${{ github.run_id }}
   cancel-in-progress: false
+  # Keep gh-aw's generated cleanup jobs independent for fan-out runs.
+  job-discriminator: ${{ github.run_id }}
 
 permissions:
   contents: read
@@ -60,7 +62,7 @@ safe-outputs:
     protected-files: fallback-to-issue
     # Full token override: open the PR as the PAT's user (not github-actions[bot]) so
     # its CI runs execute without manual approval. A PAT-created PR is not subject to
-    # recursion-prevention, so CI triggers directly — no extra empty commit needed.
+    # recursion-prevention, so CI triggers directly - no extra empty commit needed.
     # Requires the PAT to have Contents:R/W + Pull requests:R/W (verified via _probe-ci-token).
     github-token: ${{ secrets.GH_AW_CI_TRIGGER_TOKEN }}
   dispatch-workflow:
@@ -72,6 +74,10 @@ safe-outputs:
   missing-data: false
   report-incomplete:
     create-issue: false
+
+features:
+  # Every fan-out run has a unique discriminator, so queue-max adds no safety.
+  group-concurrency-queue: false
 
 engine:
   id: codex
@@ -279,8 +285,8 @@ open `sweep:lens` issues (`gh issue list --label "sweep:lens" --state open`, the
 Ignore the entry for **this run's own candidate** (same `candidate_title` / same `lens_issue` as
 the handoff). If another lens's recent entry describes the same underlying defect and its comment
 is **older** than this run's dispatch, treat it as a duplicate-in-flight: call `noop` naming that
-lens issue and candidate. If this run's entry is the older one — or the overlap is genuinely
-ambiguous — proceed; a later integration pass dedups residual twins.
+lens issue and candidate. If this run's entry is the older one - or the overlap is genuinely
+ambiguous - proceed; a later integration pass dedups residual twins.
 
 If any open PR already covers the same bug or substantially overlapping failing
 shape, do not create a second PR. Leave the workspace unchanged and call `noop`
@@ -299,7 +305,7 @@ are processed.
 4. Add focused tests in the repository's existing style. Assert the
    user-visible behavior: diagnostic presence/absence, generated source shape,
    runtime round trip, validation error, or exact failure mode.
-   **Place each new test file in a themed subfolder — never in a folder that
+   **Place each new test file in a themed subfolder - never in a folder that
    already holds 15 `.cs` files.** CodeEnforcer fails the PR with `CE0004` when a
    folder exceeds 15 C# files. Broad generated-test roots such as
    `tests/DotBoxD.Kernels.Tests/PluginAnalyzer/Generated/PluginServer/` are split
@@ -330,7 +336,7 @@ safe-output processing is downstream of the agent job, and broad test runs can
 hide focused race repros. The in-run focused failing command is the authority.
 
 The companion fixer is driven by the `Library Surprise Fix Dispatcher`, which scans open unfixed
-`[surprise-red-test]` PRs (it does NOT depend on PR CI — this run's in-run red proof is the
+`[surprise-red-test]` PRs (it does NOT depend on PR CI - this run's in-run red proof is the
 evidence). **Whenever you call `create_pull_request`, also call the dedicated
 `library_surprise_fix_dispatcher` safe-output tool once (no inputs)** so the fixer picks the new
 PR up immediately instead of waiting for the dispatcher's cron. Do not call it when you `noop`.
@@ -352,14 +358,14 @@ The PR body must include these sections:
 - `Validation`: restore/build commands that passed and the focused test command
   that failed as expected.
 
-## Protected files — never touch them
+## Protected files - never touch them
 
 Never include top-level protected files in your patch: `README.md`, `CONTRIBUTING.md`,
 `CHANGELOG.md`, `AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`,
 `Directory.Packages.props`, `NuGet.Config`, `global.json`, lockfiles, or anything under dot-folders.
 The push layer hard-blocks the ENTIRE patch when it contains any of them (your work is discarded
 into a "[gh-aw] Protected Files" issue instead of landing). Documented samples and doc pages live
-under `docs/**`, which is allowed — put documentation updates there. If a protected file genuinely
+under `docs/**`, which is allowed - put documentation updates there. If a protected file genuinely
 must change for correctness, say so in a comment/PR body and leave the file itself untouched for a
 human.
 

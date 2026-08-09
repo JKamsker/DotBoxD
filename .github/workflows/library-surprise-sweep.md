@@ -12,7 +12,8 @@ on:
   workflow_dispatch:
 
 timeout-minutes: 45
-max-ai-credits: 2000
+max-ai-credits: 8000
+max-daily-ai-credits: 20000
 
 permissions:
   contents: read
@@ -54,6 +55,10 @@ safe-outputs:
   missing-data: false
   report-incomplete:
     create-issue: false
+
+features:
+  # Manual runs do not need compiler-generated queue-max retention.
+  group-concurrency-queue: false
 
 engine:
   id: codex
