@@ -123,7 +123,7 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
     {
         if (context.ContextWorldType is not INamedTypeSymbol worldType ||
             invocation.Expression is not MemberAccessExpressionSyntax access ||
-            !IsGeneratedWorldReceiver(access.Expression))
+            !IsGeneratedWorldReceiver(access.Expression, worldType, context))
         {
             return null;
         }
@@ -147,7 +147,24 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
             : null;
     }
 
-    private static bool IsGeneratedWorldReceiver(ExpressionSyntax expression)
+    private static bool IsGeneratedWorldReceiver(
+        ExpressionSyntax expression,
+        INamedTypeSymbol worldType,
+        DotBoxDExpressionLoweringContext context)
+    {
+        if (!HasGeneratedWorldReceiverSyntax(expression))
+        {
+            return false;
+        }
+
+        var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
+        var semanticType = typeInfo.Type ?? typeInfo.ConvertedType;
+        return semanticType is null ||
+               semanticType.TypeKind == TypeKind.Error ||
+               SymbolEqualityComparer.Default.Equals(semanticType, worldType);
+    }
+
+    private static bool HasGeneratedWorldReceiverSyntax(ExpressionSyntax expression)
         => expression is IdentifierNameSyntax { Identifier.ValueText: "World" } ||
            expression is MemberAccessExpressionSyntax
            {
