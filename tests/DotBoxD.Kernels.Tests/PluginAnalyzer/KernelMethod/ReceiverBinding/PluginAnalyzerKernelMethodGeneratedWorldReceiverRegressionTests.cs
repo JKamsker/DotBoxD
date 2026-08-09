@@ -7,7 +7,7 @@ public sealed class PluginAnalyzerKernelMethodGeneratedWorldReceiverRegressionTe
     [Fact]
     public void Context_KernelMethod_parameter_named_World_does_not_lower_string_receiver_as_world_binding()
     {
-        var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator("""
+        const string source = """
             using System.Threading;
             using System.Threading.Tasks;
             using DotBoxD.Abstractions;
@@ -46,7 +46,8 @@ public sealed class PluginAnalyzerKernelMethodGeneratedWorldReceiverRegressionTe
                     ValueTask HoldUntilShutdownAsync(CancellationToken ct = default);
                 }
             }
-            """);
+            """;
+        var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator(source);
         var descriptorSource = string.Join(
             "\n",
             result.GeneratedTrees
@@ -54,11 +55,19 @@ public sealed class PluginAnalyzerKernelMethodGeneratedWorldReceiverRegressionTe
                 .Where(source => source.Contains(
                     "GeneratedKernelMethodDescriptorAttribute",
                     StringComparison.Ordinal)));
+        const string expectedReceiverDiagnostic =
+            "Unsupported plugin invocation 'World.Contains(value)'.";
+        var hasReceiverDiagnostic = result.Diagnostics.Any(diagnostic =>
+            diagnostic.Id == "DBXK100" &&
+            string.Equals(
+                diagnostic.GetMessage(),
+                expectedReceiverDiagnostic,
+                StringComparison.Ordinal));
 
         Assert.True(
-            result.Diagnostics.Any(diagnostic => diagnostic.Id == "DBXK100") ||
+            hasReceiverDiagnostic ||
             descriptorSource.Contains("GeneratedKernelMethodDescriptorAttribute", StringComparison.Ordinal),
-            "Expected either a focused DBXK100 unsupported-shape diagnostic or a generated descriptor.");
+            "Expected either a receiver-specific DBXK100 diagnostic or a generated descriptor.");
         Assert.DoesNotContain("host.Probe.IGameWorld.Contains", descriptorSource, StringComparison.Ordinal);
         Assert.DoesNotContain("probe.read.contains", descriptorSource, StringComparison.Ordinal);
     }
