@@ -81,10 +81,10 @@ features:
 
 engine:
   id: codex
-  model: gpt-5.5
+  model: gpt-5.6-terra
   args:
     - " -c"
-    - model_reasoning_effort="high"
+    - model_reasoning_effort="xhigh"
 
 pre-agent-steps:
   - name: Write surprise candidate handoff
