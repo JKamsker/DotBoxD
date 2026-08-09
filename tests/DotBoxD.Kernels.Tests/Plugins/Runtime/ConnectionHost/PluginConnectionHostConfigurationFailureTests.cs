@@ -35,9 +35,11 @@ public sealed class PluginConnectionHostConfigurationFailureTests
             () => host.Connected.WaitAsync(Timeout));
         Assert.Same(sentinel, connectedFailure);
 
-        var probe = session.Get<IConnectionHostProbeService>();
-        var invokeFailure = await Record.ExceptionAsync(
-            () => probe.IncrementAsync(41).AsTask().WaitAsync(Timeout));
+        var invokeFailure = await Record.ExceptionAsync(async () =>
+        {
+            var probe = session.Get<IConnectionHostProbeService>();
+            await probe.IncrementAsync(41).AsTask().WaitAsync(Timeout);
+        });
 
         Assert.NotNull(invokeFailure);
         Assert.IsNotType<TimeoutException>(invokeFailure);
