@@ -17,35 +17,27 @@ internal static class ForbiddenCollectionCapacityPolicy
 
     public static bool TryGetDisplayName(IMethodSymbol? method, out string forbidden)
     {
-        forbidden = null!;
-        if (method is null || !HasCapacityParameter(method))
-        {
-            return false;
-        }
-
-        var typeName = CapacityTypeName(method);
-        return TryGetFactoryDisplayName(method, typeName, out forbidden) ||
-               TryGetConstructorDisplayName(method, typeName, out forbidden);
-    }
-
-    private static bool TryGetFactoryDisplayName(IMethodSymbol method, string typeName, out string forbidden)
-    {
-        forbidden = IsImmutableArrayCreateBuilder(method, typeName)
-            ? "System.Collections.Immutable.ImmutableArray"
-            : null!;
-        return forbidden is not null;
-    }
-
-    private static bool TryGetConstructorDisplayName(IMethodSymbol method, string typeName, out string forbidden)
-    {
-        if (method.MethodKind != MethodKind.Constructor)
+        if (method is null)
         {
             forbidden = null!;
             return false;
         }
 
+        var typeName = CapacityTypeName(method);
+        if (!IsCapacityAllocationMethod(method, typeName))
+        {
+            forbidden = null!;
+            return false;
+        }
+
+        if (IsImmutableArrayCreateBuilder(method, typeName))
+        {
+            forbidden = "System.Collections.Immutable.ImmutableArray";
+            return true;
+        }
+
         var type = method.ContainingType;
-        var displayName = ConstructorDisplayName(type, typeName);
+        var displayName = CollectionDisplayName(type, typeName);
         if (displayName is null)
         {
             forbidden = null!;
@@ -56,7 +48,7 @@ internal static class ForbiddenCollectionCapacityPolicy
         return true;
     }
 
-    private static string? ConstructorDisplayName(INamedTypeSymbol type, string typeName)
+    private static string? CollectionDisplayName(INamedTypeSymbol type, string typeName)
         => typeName switch
         {
             ListTypeName => "System.Collections.Generic.List",
@@ -92,15 +84,33 @@ internal static class ForbiddenCollectionCapacityPolicy
         return forbidden is not null;
     }
 
-    private static bool HasCapacityParameter(IMethodSymbol method)
+    private static bool IsCapacityAllocationMethod(IMethodSymbol method, string typeName)
     {
-        var typeName = CapacityTypeName(method);
-        var capacityName =
-            typeName is PriorityQueueTypeName or ImmutableArrayTypeName ? "initialCapacity" : "capacity";
-        return method.Parameters.Any(parameter =>
+        if (method.MethodKind == MethodKind.Constructor)
+        {
+            var capacityName = typeName == PriorityQueueTypeName ? "initialCapacity" : "capacity";
+            return HasCapacityParameter(method, capacityName);
+        }
+
+        if (method.MethodKind != MethodKind.Ordinary)
+        {
+            return false;
+        }
+
+        if (IsImmutableArrayCreateBuilder(method, typeName))
+        {
+            return HasCapacityParameter(method, "initialCapacity");
+        }
+
+        return string.Equals(typeName, DictionaryTypeName, StringComparison.Ordinal) &&
+               string.Equals(method.Name, "EnsureCapacity", StringComparison.Ordinal) &&
+               HasCapacityParameter(method, "capacity");
+    }
+
+    private static bool HasCapacityParameter(IMethodSymbol method, string capacityName)
+        => method.Parameters.Any(parameter =>
             parameter.Type.SpecialType == SpecialType.System_Int32 &&
             string.Equals(parameter.Name, capacityName, StringComparison.Ordinal));
-    }
 
     private static string CapacityTypeName(IMethodSymbol method)
         => method.ContainingType.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);

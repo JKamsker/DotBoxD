@@ -10,11 +10,25 @@ public sealed partial class PluginAnalyzer
         OperationAnalysisContext context,
         ForbiddenHelperCallGraph helperGraph,
         IObjectCreationOperation creation)
+        => ReportAndRecordCollectionCapacityAllocation(context, helperGraph, creation.Constructor);
+
+    private static void ReportAndRecordCollectionCapacityInvocation(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IInvocationOperation invocation)
+        => ReportAndRecordCollectionCapacityAllocation(context, helperGraph, invocation.TargetMethod);
+
+    private static void ReportAndRecordCollectionCapacityAllocation(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol? allocationMethod)
     {
-        if (ForbiddenCollectionCapacityPolicy.TryGetDisplayName(creation.Constructor, out var forbidden))
+        if (!ForbiddenCollectionCapacityPolicy.TryGetDisplayName(allocationMethod, out var forbidden))
         {
-            ReportAndRecordCollectionCapacityOperation(context, helperGraph, forbidden);
+            return;
         }
+
+        ReportAndRecordCollectionCapacityOperation(context, helperGraph, forbidden);
     }
 
     private static void ReportAndRecordCollectionCapacitySetter(
@@ -25,19 +39,6 @@ public sealed partial class PluginAnalyzer
     {
         if (!usesSetter ||
             !ForbiddenCollectionCapacityPolicy.TryGetDisplayName(property, out var forbidden))
-        {
-            return;
-        }
-
-        ReportAndRecordCollectionCapacityOperation(context, helperGraph, forbidden);
-    }
-
-    private static void ReportAndRecordCollectionCapacityInvocation(
-        OperationAnalysisContext context,
-        ForbiddenHelperCallGraph helperGraph,
-        IInvocationOperation invocation)
-    {
-        if (!ForbiddenCollectionCapacityPolicy.TryGetDisplayName(invocation.TargetMethod, out var forbidden))
         {
             return;
         }
