@@ -10,7 +10,14 @@ public sealed partial class PluginAnalyzer
         OperationAnalysisContext context,
         ForbiddenHelperCallGraph helperGraph,
         IObjectCreationOperation creation)
-        => ReportAndRecordCollectionCapacityAllocation(context, helperGraph, creation.Constructor);
+    {
+        if (!ForbiddenCollectionCapacityPolicy.TryGetDisplayName(creation, out var forbidden))
+        {
+            return;
+        }
+
+        ReportAndRecordCollectionCapacityOperation(context, helperGraph, forbidden);
+    }
 
     private static void ReportAndRecordCollectionCapacityInvocation(
         OperationAnalysisContext context,

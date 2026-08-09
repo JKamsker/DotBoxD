@@ -1,10 +1,12 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class ForbiddenCollectionCapacityPolicy
 {
     private const string ArrayListTypeName = "System.Collections.ArrayList";
+    private const string BitArrayTypeName = "System.Collections.BitArray";
     private const string DictionaryTypeName = "System.Collections.Generic.Dictionary<TKey, TValue>";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string ImmutableArrayTypeName = "System.Collections.Immutable.ImmutableArray";
@@ -37,8 +39,7 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
-        var type = method.ContainingType;
-        var displayName = CollectionDisplayName(type, typeName);
+        var displayName = CollectionDisplayName(method.ContainingType, typeName);
         if (displayName is null)
         {
             forbidden = null!;
@@ -49,21 +50,26 @@ internal static class ForbiddenCollectionCapacityPolicy
         return true;
     }
 
-    private static string? CollectionDisplayName(INamedTypeSymbol type, string typeName)
-        => typeName switch
+    public static bool TryGetDisplayName(IObjectCreationOperation creation, out string forbidden)
+    {
+        var method = creation.Constructor;
+        if (method is null)
         {
-            ArrayListTypeName => ArrayListTypeName,
-            ListTypeName => "System.Collections.Generic.List",
-            DictionaryTypeName => "System.Collections.Generic.Dictionary",
-            QueueTypeName => "System.Collections.Generic.Queue",
-            StackTypeName or HashSetTypeName or PriorityQueueTypeName =>
-                type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
-            _ => null
-        };
+            forbidden = null!;
+            return false;
+        }
 
-    private static bool IsImmutableArrayCreateBuilder(IMethodSymbol method, string typeName)
-        => method is { IsStatic: true, Name: "CreateBuilder" } &&
-           string.Equals(typeName, ImmutableArrayTypeName, StringComparison.Ordinal);
+        var typeName = CapacityTypeName(method);
+        if (string.Equals(typeName, BitArrayTypeName, StringComparison.Ordinal) &&
+            HasCapacityParameter(method, "length") &&
+            HasNonZeroLengthArgument(creation))
+        {
+            forbidden = BitArrayTypeName;
+            return true;
+        }
+
+        return TryGetDisplayName(method, out forbidden);
+    }
 
     public static bool TryGetDisplayName(IPropertySymbol? property, out string forbidden)
     {
@@ -90,6 +96,18 @@ internal static class ForbiddenCollectionCapacityPolicy
         return forbidden is not null;
     }
 
+    private static string? CollectionDisplayName(INamedTypeSymbol type, string typeName)
+        => typeName switch
+        {
+            ArrayListTypeName => ArrayListTypeName,
+            ListTypeName => "System.Collections.Generic.List",
+            DictionaryTypeName => "System.Collections.Generic.Dictionary",
+            QueueTypeName => "System.Collections.Generic.Queue",
+            StackTypeName or HashSetTypeName or PriorityQueueTypeName =>
+                type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
+            _ => null
+        };
+
     private static bool IsCapacityAllocationMethod(IMethodSymbol method, string typeName)
     {
         if (method.MethodKind == MethodKind.Constructor)
@@ -113,10 +131,19 @@ internal static class ForbiddenCollectionCapacityPolicy
                HasCapacityParameter(method, "capacity");
     }
 
+    private static bool IsImmutableArrayCreateBuilder(IMethodSymbol method, string typeName)
+        => method is { IsStatic: true, Name: "CreateBuilder" } &&
+           string.Equals(typeName, ImmutableArrayTypeName, StringComparison.Ordinal);
+
     private static bool HasCapacityParameter(IMethodSymbol method, string capacityName)
         => method.Parameters.Any(parameter =>
             parameter.Type.SpecialType == SpecialType.System_Int32 &&
             string.Equals(parameter.Name, capacityName, StringComparison.Ordinal));
+
+    private static bool HasNonZeroLengthArgument(IObjectCreationOperation creation)
+        => creation.Arguments.Any(static argument =>
+            argument.Parameter is { Type.SpecialType: SpecialType.System_Int32, Name: "length" } &&
+            argument.Value.ConstantValue is not { HasValue: true, Value: 0 });
 
     private static string CapacityTypeName(IMethodSymbol method)
         => method.ContainingType.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
