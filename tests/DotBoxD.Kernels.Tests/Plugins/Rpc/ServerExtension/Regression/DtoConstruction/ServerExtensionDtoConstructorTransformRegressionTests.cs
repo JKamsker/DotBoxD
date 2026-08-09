@@ -1,4 +1,7 @@
 using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
+using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 
@@ -46,6 +49,44 @@ public sealed class ServerExtensionDtoConstructorTransformRegressionTests
                 {
                 }
             """);
+
+    [Fact]
+    public void Constructor_assignment_verification_handles_symbol_from_another_compilation()
+    {
+        var sourceTree = CSharpSyntaxTree.ParseText("""
+            public sealed class Score
+            {
+                public Score(int value)
+                {
+                    Value = value;
+                }
+
+                public int Value { get; }
+            }
+            """);
+        var sourceCompilation = CSharpCompilation.Create(
+            "Source",
+            [sourceTree],
+            [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)],
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var type = Assert.IsAssignableFrom<INamedTypeSymbol>(
+            sourceCompilation.GetTypeByMetadataName("Score"));
+        var constructor = Assert.Single(type.InstanceConstructors, candidate => candidate.Parameters.Length == 1);
+        var property = Assert.IsAssignableFrom<IPropertySymbol>(
+            type.GetMembers("Value").Single());
+        var member = new RecordMember(property.Name, property.Type, property);
+        var otherCompilation = sourceCompilation
+            .RemoveAllSyntaxTrees()
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(string.Empty));
+
+        var preservesMember = RpcDtoConstructorAssignmentVerifier.ConstructorPreservesMember(
+            constructor,
+            member,
+            constructor.Parameters[0],
+            otherCompilation);
+
+        Assert.True(preservesMember);
+    }
 
     private static void AssertConstructorRejected(string constructor)
     {

@@ -37,6 +37,26 @@ public sealed class PluginAnalyzerForbiddenApiArrayListCapacityReachabilityTests
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "DBXK001");
     }
 
+    [Fact]
+    public async Task Reports_array_list_capacity_setter_reachable_from_static_initializer()
+    {
+        var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
+            Source("""
+                private static readonly int Retained = Reserve();
+
+                private static int Reserve()
+                {
+                    var list = new System.Collections.ArrayList();
+                    list.Capacity = int.MaxValue;
+                    return list.Count;
+                }
+                """),
+            "DotBoxDPluginAnalyzerArrayListCapacitySetterReachabilityTest");
+
+        var diagnostic = Assert.Single(diagnostics.Where(d => d.Id == "DBXK001"));
+        Assert.Contains("System.Collections.ArrayList", diagnostic.GetMessage(), StringComparison.Ordinal);
+    }
+
     private static string Source(string memberDeclaration)
         => $$"""
             #nullable enable

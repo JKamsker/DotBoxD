@@ -48,6 +48,23 @@ public sealed class InstanceRegistryDirectReleaseDisposalFailureTests
         Assert.True(second.DisposeCalled);
     }
 
+    [Fact]
+    public async Task ReleaseAllAsync_RemainsBestEffortWhenDisposalFails()
+    {
+        var registry = new InstanceRegistry();
+        var first = new ThrowingAsyncDisposable(
+            new InvalidOperationException("async teardown dispose failed"));
+        var second = new TrackingAsyncDisposable();
+        registry.Register("svc", first);
+        registry.Register("svc", second);
+
+        var actual = await Record.ExceptionAsync(registry.ReleaseAllAsync);
+
+        Assert.Null(actual);
+        Assert.True(first.DisposeCalled);
+        Assert.True(second.DisposeCalled);
+    }
+
     private sealed class ThrowingDisposable(Exception error) : IDisposable
     {
         public bool DisposeCalled { get; private set; }
@@ -61,6 +78,23 @@ public sealed class InstanceRegistryDirectReleaseDisposalFailureTests
 
     private sealed class ThrowingAsyncDisposable(Exception error) : IAsyncDisposable
     {
-        public ValueTask DisposeAsync() => throw error;
+        public bool DisposeCalled { get; private set; }
+
+        public ValueTask DisposeAsync()
+        {
+            DisposeCalled = true;
+            throw error;
+        }
+    }
+
+    private sealed class TrackingAsyncDisposable : IAsyncDisposable
+    {
+        public bool DisposeCalled { get; private set; }
+
+        public ValueTask DisposeAsync()
+        {
+            DisposeCalled = true;
+            return default;
+        }
     }
 }

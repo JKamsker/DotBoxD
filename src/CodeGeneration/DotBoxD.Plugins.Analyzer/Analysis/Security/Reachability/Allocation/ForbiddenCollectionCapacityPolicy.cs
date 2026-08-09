@@ -76,7 +76,6 @@ internal static class ForbiddenCollectionCapacityPolicy
         if (property is not
             {
                 IsStatic: false,
-                Name: "Capacity",
                 SetMethod: not null,
                 Type.SpecialType: SpecialType.System_Int32
             })
@@ -87,10 +86,12 @@ internal static class ForbiddenCollectionCapacityPolicy
 
         var typeName = property.ContainingType.OriginalDefinition.ToDisplayString(
             SymbolDisplayFormat.CSharpErrorMessageFormat);
-        forbidden = typeName switch
+        forbidden = (typeName, property.Name) switch
         {
-            ImmutableArrayBuilderTypeName => "System.Collections.Immutable.ImmutableArray",
-            ListTypeName => "System.Collections.Generic.List",
+            (ArrayListTypeName, "Capacity") => ArrayListTypeName,
+            (BitArrayTypeName, "Length") => BitArrayTypeName,
+            (ImmutableArrayBuilderTypeName, "Capacity") => "System.Collections.Immutable.ImmutableArray",
+            (ListTypeName, "Capacity") => "System.Collections.Generic.List",
             _ => null!
         };
         return forbidden is not null;

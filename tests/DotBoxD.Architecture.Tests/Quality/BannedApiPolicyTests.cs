@@ -70,7 +70,7 @@ public sealed class BannedApiPolicyTests
         using var repo = TempRepo.Create();
         repo.Write(".config/code-enforcer/banned-apis.json", ProcessPolicy("[]"));
         repo.Write(
-            "src/Hosting/AllowedLayer.cs",
+            "src/Kernels/AllowedLayer.cs",
             """
             namespace Sample;
             public static class AllowedLayer

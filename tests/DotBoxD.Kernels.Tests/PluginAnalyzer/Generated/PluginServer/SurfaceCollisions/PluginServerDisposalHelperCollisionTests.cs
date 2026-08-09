@@ -4,11 +4,13 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
 public sealed class PluginServerDisposalHelperCollisionTests
 {
-    [Fact]
-    public void World_method_named_like_generated_disposal_helper_reports_dbxk100()
+    [Theory]
+    [InlineData("GetOrStartDisposeAsync")]
+    [InlineData("DisposeCoreAsync")]
+    public void World_method_named_like_generated_disposal_helper_reports_dbxk100(string helperName)
     {
         var (generated, outputCompilation, generatorDiagnostics) =
-            PluginServerGenerationTestDriver.RunWithDiagnostics("""
+            PluginServerGenerationTestDriver.RunWithDiagnostics($$"""
                 using System.Threading;
                 using System.Threading.Tasks;
                 using DotBoxD.Abstractions;
@@ -20,7 +22,7 @@ public sealed class PluginServerDisposalHelperCollisionTests
                     [RpcService]
                     public interface IGameWorldAccess
                     {
-                        Task GetOrStartDisposeAsync();
+                        Task {{helperName}}();
                     }
                 }
 
@@ -75,20 +77,20 @@ public sealed class PluginServerDisposalHelperCollisionTests
             diagnostic => diagnostic.Id == "DBXK100" &&
                           diagnostic.Severity == DiagnosticSeverity.Error &&
                           diagnostic.GetMessage().Contains("collides with the generated facade surface", StringComparison.Ordinal) &&
-                          diagnostic.GetMessage().Contains("GetOrStartDisposeAsync", StringComparison.Ordinal));
+                          diagnostic.GetMessage().Contains(helperName, StringComparison.Ordinal));
         var rawGeneratedCollisions = outputCompilation.GetDiagnostics()
             .Where(diagnostic => diagnostic.Id == "CS0111" &&
-                                 diagnostic.GetMessage().Contains("GetOrStartDisposeAsync", StringComparison.Ordinal) &&
+                                 diagnostic.GetMessage().Contains(helperName, StringComparison.Ordinal) &&
                                  diagnostic.Location.SourceTree != inputTree)
             .ToArray();
 
         Assert.True(
             hasCollisionDiagnostic && rawGeneratedCollisions.Length == 0,
             $"""
-            Expected a focused DBXK100 GetOrStartDisposeAsync collision diagnostic and no raw generated CS0111.
+            Expected a focused DBXK100 {helperName} collision diagnostic and no raw generated CS0111.
             Has DBXK100: {hasCollisionDiagnostic}
             Raw generated collisions: {rawGeneratedCollisions.Length}
-            Generated source contains private GetOrStartDisposeAsync helper: {generated.Contains("private global::System.Threading.Tasks.Task GetOrStartDisposeAsync()", StringComparison.Ordinal)}
+            Generated source contains private helper: {generated.Contains("private global::System.Threading.Tasks.Task " + helperName + "()", StringComparison.Ordinal)}
             Diagnostics:
             {string.Join("\n", generatorDiagnostics.Concat(outputCompilation.GetDiagnostics()).Select(diagnostic => diagnostic.ToString()))}
             """);

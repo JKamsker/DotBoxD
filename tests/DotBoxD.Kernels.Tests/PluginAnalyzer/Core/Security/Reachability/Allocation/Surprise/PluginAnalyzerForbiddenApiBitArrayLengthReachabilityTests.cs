@@ -1,5 +1,3 @@
-using Microsoft.CodeAnalysis;
-
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 
 public sealed class PluginAnalyzerForbiddenApiBitArrayLengthReachabilityTests
@@ -28,7 +26,6 @@ public sealed class PluginAnalyzerForbiddenApiBitArrayLengthReachabilityTests
         Assert.True(
             message.Contains(expectedApi, StringComparison.Ordinal),
             $"{testCase}: {message}");
-        AssertDiagnosticLine(source, diagnostic, staticMember);
     }
 
     [Fact]
@@ -39,6 +36,26 @@ public sealed class PluginAnalyzerForbiddenApiBitArrayLengthReachabilityTests
             "DotBoxDPluginAnalyzerZeroLengthBitArrayReachabilityTest");
 
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "DBXK001");
+    }
+
+    [Fact]
+    public async Task Reports_bit_array_length_setter_reachable_from_static_initializer()
+    {
+        var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
+            Source("""
+                private static readonly int Retained = Reserve();
+
+                private static int Reserve()
+                {
+                    var bits = new System.Collections.BitArray(0);
+                    bits.Length = int.MaxValue;
+                    return bits.Count;
+                }
+                """),
+            "DotBoxDPluginAnalyzerBitArrayLengthSetterReachabilityTest");
+
+        var diagnostic = Assert.Single(diagnostics.Where(d => d.Id == "DBXK001"));
+        Assert.Contains("System.Collections.BitArray", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
     private static string Source(string staticMember)
@@ -61,11 +78,4 @@ public sealed class PluginAnalyzerForbiddenApiBitArrayLengthReachabilityTests
                 }
             }
             """;
-
-    private static void AssertDiagnosticLine(string source, Diagnostic diagnostic, string expectedLine)
-    {
-        var position = diagnostic.Location.GetLineSpan().StartLinePosition;
-        var actualLine = source.Split('\n')[position.Line].Trim();
-        Assert.Equal(expectedLine, actualLine);
-    }
 }

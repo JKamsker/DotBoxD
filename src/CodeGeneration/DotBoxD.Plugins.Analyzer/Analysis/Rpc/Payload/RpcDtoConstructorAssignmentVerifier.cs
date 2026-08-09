@@ -68,7 +68,9 @@ internal static class RpcDtoConstructorAssignmentVerifier
                 continue;
             }
 
-            var model = compilation?.GetSemanticModel(declaration.SyntaxTree);
+            var model = compilation?.ContainsSyntaxTree(declaration.SyntaxTree) == true
+                ? compilation.GetSemanticModel(declaration.SyntaxTree)
+                : null;
             if (ConstructorBodyPreservesMember(declaration, member, parameter, model))
             {
                 return true;
