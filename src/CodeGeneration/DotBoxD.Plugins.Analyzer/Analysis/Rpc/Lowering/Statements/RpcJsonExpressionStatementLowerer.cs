@@ -194,12 +194,14 @@ internal static class RpcJsonExpressionStatementLowerer
         DotBoxDRpcJsonLowerer lowerer,
         InvocationExpressionSyntax invocation)
     {
-        if (lowerer.Model.GetSymbolInfo(invocation, lowerer.CancellationToken).Symbol is not IMethodSymbol method)
+        if (lowerer.Model.GetSymbolInfo(invocation, lowerer.CancellationToken).Symbol is not IMethodSymbol method ||
+            !string.Equals(method.Name, "Add", StringComparison.Ordinal))
         {
             return false;
         }
 
-        return method.ReducedFrom is null &&
+        return !method.IsExtensionMethod &&
+               method.ReducedFrom is null &&
                !method.IsStatic &&
                method.Parameters.Length == 1 &&
                method.ReturnsVoid;
