@@ -22,6 +22,9 @@ public static class SafeFileSystem
 
         var startedAt = DateTimeOffset.UtcNow;
         var fileBytesReadBefore = context.Budget.FileBytesRead;
+        string sanitizedPath;
+        int length;
+        string text;
         try
         {
             var resolved = SafeFilePathResolver.Resolve(context, path, "file.read", "file.readText");
@@ -38,14 +41,13 @@ public static class SafeFileSystem
             }
 
             using var bytes = await ReadLimitedBytesAsync(context, resolved, maxBytes, cancellationToken).ConfigureAwait(false);
-            var length = CheckedLength(bytes.Length);
+            length = CheckedLength(bytes.Length);
             var buffer = bytes.GetBuffer();
             context.ChargeFuel(length);
             context.ChargeStringAllocation(Encoding.UTF8.GetCharCount(buffer, 0, length));
-            var text = Encoding.UTF8.GetString(buffer, 0, length);
+            text = Encoding.UTF8.GetString(buffer, 0, length);
             context.RecordStringReturnCredit(text);
-            SafeFileAudit.Read(context, startedAt, true, resolved.SanitizedPath, length, null);
-            return text;
+            sanitizedPath = resolved.SanitizedPath;
         }
         catch (SandboxRuntimeException ex)
         {
@@ -71,6 +73,9 @@ public static class SafeFileSystem
             SafeFileAudit.Read(context, startedAt, false, SafeFilePathResolver.FailureResource(path, "file.read"), ObservedReadBytes(context, fileBytesReadBefore), error.Code);
             throw new SandboxRuntimeException(error);
         }
+
+        SafeFileAudit.Read(context, startedAt, true, sanitizedPath, length, null);
+        return text;
     }
 
     public static async ValueTask WriteTextAsync(
@@ -89,11 +94,14 @@ public static class SafeFileSystem
         }
 
         var startedAt = DateTimeOffset.UtcNow;
+        string sanitizedPath;
+        int byteCount;
+        bool targetExisted;
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
             var resolved = SafeFilePathResolver.Resolve(context, path, "file.write", "file.writeText");
-            var byteCount = Encoding.UTF8.GetByteCount(text);
+            byteCount = Encoding.UTF8.GetByteCount(text);
             var permission = SafeFileWritePublisher.EnsureAllowed(resolved.Grant, resolved.FullPath, byteCount);
             context.Budget.ChargeFileWrite(byteCount);
             context.ChargeAllocation(byteCount);
@@ -128,14 +136,8 @@ public static class SafeFileSystem
                 SafeFileWritePublisher.TryDelete(tempPath);
             }
 
-            SafeFileAudit.Write(
-                context,
-                startedAt,
-                true,
-                resolved.SanitizedPath,
-                byteCount,
-                permission.TargetExisted,
-                null);
+            sanitizedPath = resolved.SanitizedPath;
+            targetExisted = permission.TargetExisted;
         }
         catch (SandboxRuntimeException ex)
         {
@@ -189,6 +191,15 @@ public static class SafeFileSystem
                 error.Code);
             throw new SandboxRuntimeException(error);
         }
+
+        SafeFileAudit.Write(
+            context,
+            startedAt,
+            true,
+            sanitizedPath,
+            byteCount,
+            targetExisted,
+            null);
     }
 
     private static long? ObservedReadBytes(SandboxContext context, long fileBytesReadBefore)

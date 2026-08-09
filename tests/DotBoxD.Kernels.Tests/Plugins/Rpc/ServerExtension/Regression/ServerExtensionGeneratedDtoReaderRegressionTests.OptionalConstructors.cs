@@ -7,9 +7,9 @@ namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 public sealed partial class ServerExtensionGeneratedDtoReaderRegressionTests
 {
     [Fact]
-    public void Direct_extension_rejects_full_constructor_that_drops_a_public_read_only_member()
+    public void Direct_extension_diagnoses_full_constructor_that_drops_a_public_read_only_member()
     {
-        var assembly = PluginAnalyzerGeneratedPackageFactory.CreateAssembly("""
+        var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator("""
             using DotBoxD.Kernels;
             using DotBoxD.Kernels.Sandbox;
             using DotBoxD.Plugins;
@@ -58,21 +58,13 @@ public sealed partial class ServerExtensionGeneratedDtoReaderRegressionTests
                 public static Profile Read(RemoteWorldControl control, int x) => control.Read(x);
             }
             """);
-        var control = CreateControl(
-            assembly,
-            "constructor-drop",
-            KernelRpcBinaryCodec.EncodeValue(KernelRpcValue.Record(
-            [
-                KernelRpcValue.Int32(3),
-                KernelRpcValue.Int32(9)
-            ])));
 
-        var ex = Assert.Throws<TargetInvocationException>(() => assembly.GetType("Sample.Probe", throwOnError: true)!
-            .GetMethod("Read", BindingFlags.Public | BindingFlags.Static)!
-            .Invoke(null, [control, 3]));
-
-        var inner = Assert.IsType<NotSupportedException>(ex.InnerException);
-        Assert.Contains("Rank", inner.Message, StringComparison.Ordinal);
+        Assert.Contains(
+            result.Diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                diagnostic.GetMessage().Contains("Profile", StringComparison.Ordinal) &&
+                diagnostic.GetMessage().Contains("constructor", StringComparison.Ordinal));
+        Assert.Empty(result.GeneratedTrees);
     }
 
     [Fact]

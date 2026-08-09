@@ -11,11 +11,53 @@ public sealed partial class PluginAnalyzer
         ForbiddenHelperCallGraph helperGraph,
         IObjectCreationOperation creation)
     {
-        if (!ForbiddenCollectionCapacityPolicy.TryGetDisplayName(creation.Constructor, out var forbidden))
+        if (!ForbiddenCollectionCapacityPolicy.TryGetDisplayName(creation, out var forbidden))
         {
             return;
         }
 
+        ReportAndRecordCollectionCapacityOperation(context, helperGraph, forbidden);
+    }
+
+    private static void ReportAndRecordCollectionCapacityInvocation(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IInvocationOperation invocation)
+        => ReportAndRecordCollectionCapacityAllocation(context, helperGraph, invocation.TargetMethod);
+
+    private static void ReportAndRecordCollectionCapacityAllocation(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol? allocationMethod)
+    {
+        if (!ForbiddenCollectionCapacityPolicy.TryGetDisplayName(allocationMethod, out var forbidden))
+        {
+            return;
+        }
+
+        ReportAndRecordCollectionCapacityOperation(context, helperGraph, forbidden);
+    }
+
+    private static void ReportAndRecordCollectionCapacitySetter(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IPropertySymbol property,
+        bool usesSetter)
+    {
+        if (!usesSetter ||
+            !ForbiddenCollectionCapacityPolicy.TryGetDisplayName(property, out var forbidden))
+        {
+            return;
+        }
+
+        ReportAndRecordCollectionCapacityOperation(context, helperGraph, forbidden);
+    }
+
+    private static void ReportAndRecordCollectionCapacityOperation(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        string forbidden)
+    {
         if (context.ContainingSymbol is IMethodSymbol method)
         {
             helperGraph.RecordForbidden(method, forbidden);

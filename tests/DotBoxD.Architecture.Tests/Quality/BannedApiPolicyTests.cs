@@ -64,6 +64,29 @@ public sealed class BannedApiPolicyTests
         Assert.Contains("Banned API policy passed.", result.Output, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Guard_treats_empty_allowed_in_as_empty_allowlist()
+    {
+        using var repo = TempRepo.Create();
+        repo.Write(".config/code-enforcer/banned-apis.json", ProcessPolicy("[]"));
+        repo.Write(
+            "src/Kernels/AllowedLayer.cs",
+            """
+            namespace Sample;
+            public static class AllowedLayer
+            {
+                public static void Run()
+                {
+                }
+            }
+            """);
+
+        var result = await RunGuardAsync(repo.Path);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Banned API policy passed.", result.Output, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("new Random();")]
     [InlineData("new System.Random();")]

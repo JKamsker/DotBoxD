@@ -72,6 +72,7 @@ internal sealed partial class InvokeAsyncCallShape
                 {
                     Name.Identifier.ValueText: "Add"
                 } member &&
+                IsCollectionAddInvocation(invocation, model) &&
                 MutableCaptureName(member.Expression, model, capturedName, aliases) is { } name)
             {
                 throw new NotSupportedException(
@@ -184,7 +185,18 @@ internal sealed partial class InvokeAsyncCallShape
 
     private static bool IsMutableCollection(ITypeSymbol type)
         => DotBoxDRpcTypeMapper.ListElementType(type) is not null ||
-           DotBoxDRpcTypeMapper.MapTypes(type) is not null;
+               DotBoxDRpcTypeMapper.MapTypes(type) is not null;
+
+    private static bool IsCollectionAddInvocation(InvocationExpressionSyntax invocation, SemanticModel model)
+    {
+        if (model.GetSymbolInfo(invocation).Symbol is not IMethodSymbol method ||
+            !string.Equals(method.Name, "Add", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return !method.IsExtensionMethod && method.ReducedFrom is null;
+    }
 
     private static ITypeSymbol TypeOf(ExpressionSyntax expression, SemanticModel model)
         => model.GetTypeInfo(expression).ConvertedType ??

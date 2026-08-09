@@ -5,23 +5,98 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Resolve-RepositoryPath([string] $path) {
+    return [System.IO.Path]::GetFullPath($path)
+}
+
+function Read-TextFile([string] $path) {
+    return [System.IO.File]::ReadAllText($path)
+}
+
+function Test-FileExists([string] $path) {
+    return [System.IO.File]::Exists($path)
+}
+
+function Write-Line([string] $message) {
+    [System.Console]::WriteLine($message)
+}
+
+function Get-SourceFiles([string] $path) {
+    return [System.IO.Directory]::EnumerateFiles(
+        $path,
+        "*.cs",
+        [System.IO.SearchOption]::AllDirectories) | ForEach-Object {
+            [System.IO.FileInfo]::new($_)
+        }
+}
+
+function ConvertFrom-JsonElement([System.Text.Json.JsonElement] $element) {
+    switch ($element.ValueKind) {
+        ([System.Text.Json.JsonValueKind]::Object) {
+            $properties = [ordered] @{}
+            foreach ($property in $element.EnumerateObject()) {
+                $properties[$property.Name] = ConvertFrom-JsonElement -element $property.Value
+            }
+
+            return [pscustomobject] $properties
+        }
+        ([System.Text.Json.JsonValueKind]::Array) {
+            $items = [System.Collections.Generic.List[object]]::new()
+            foreach ($item in $element.EnumerateArray()) {
+                $items.Add((ConvertFrom-JsonElement -element $item))
+            }
+
+            return ,$items.ToArray()
+        }
+        ([System.Text.Json.JsonValueKind]::String) {
+            return $element.GetString()
+        }
+        ([System.Text.Json.JsonValueKind]::Number) {
+            $value = 0L
+            if ($element.TryGetInt64([ref] $value)) {
+                return $value
+            }
+
+            return $element.GetDouble()
+        }
+        ([System.Text.Json.JsonValueKind]::True) {
+            return $true
+        }
+        ([System.Text.Json.JsonValueKind]::False) {
+            return $false
+        }
+        default {
+            return $null
+        }
+    }
+}
+
+function Read-JsonFile([string] $path) {
+    $document = [System.Text.Json.JsonDocument]::Parse((Read-TextFile -path $path))
+    try {
+        return ConvertFrom-JsonElement -element $document.RootElement
+    } finally {
+        $document.Dispose()
+    }
+}
+
 $root = if ([string]::IsNullOrWhiteSpace($RootPath)) {
-    Resolve-Path (Join-Path $PSScriptRoot "../..")
+    Resolve-RepositoryPath -path ([System.IO.Path]::Combine($PSScriptRoot, "../.."))
 } else {
-    Resolve-Path $RootPath
+    Resolve-RepositoryPath -path $RootPath
 }
 
 $policyFile = if ([System.IO.Path]::IsPathRooted($PolicyPath)) {
     $PolicyPath
 } else {
-    Join-Path $root $PolicyPath
+    [System.IO.Path]::Combine($root, $PolicyPath)
 }
 
-if (-not (Test-Path -LiteralPath $policyFile)) {
+if (-not (Test-FileExists -path $policyFile)) {
     throw "Banned API policy does not exist: $policyFile"
 }
 
-$policy = Get-Content -Raw -LiteralPath $policyFile | ConvertFrom-Json
+$policy = Read-JsonFile -path $policyFile
 
 function ConvertTo-RelativePath([string] $path) {
     return $path.Replace('\', '/').TrimStart('/')
@@ -183,7 +258,7 @@ foreach ($rule in @($policy.rules)) {
     })
 }
 
-$sourceFiles = Get-ChildItem -Path $root -Recurse -Filter "*.cs" -File | Where-Object {
+$sourceFiles = Get-SourceFiles -path $root | Where-Object {
     -not (Test-SkippedDirectory -path $_.DirectoryName)
 }
 
@@ -227,11 +302,11 @@ foreach ($file in $sourceFiles) {
 }
 
 if ($violations.Count -gt 0) {
-    Write-Host "Banned API policy found $($violations.Count) violation(s):"
+    Write-Line -message "Banned API policy found $($violations.Count) violation(s):"
     foreach ($violation in $violations) {
-        Write-Host $violation
+        Write-Line -message $violation
     }
     throw "Banned API policy failed."
 }
 
-Write-Host "Banned API policy passed."
+Write-Line -message "Banned API policy passed."
