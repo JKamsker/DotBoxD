@@ -126,7 +126,7 @@ public sealed class InstanceRegistry : IInstanceRegistry
     {
         foreach (var instance in DrainAll())
         {
-            DisposeInstance(instance);
+            DisposeInstanceBestEffort(instance);
         }
     }
 
@@ -140,7 +140,7 @@ public sealed class InstanceRegistry : IInstanceRegistry
     {
         foreach (var instance in DrainAll())
         {
-            await DisposeInstanceAsync(instance).ConfigureAwait(false);
+            await DisposeInstanceAsyncBestEffort(instance).ConfigureAwait(false);
         }
     }
 
@@ -178,22 +178,26 @@ public sealed class InstanceRegistry : IInstanceRegistry
     private static bool IsInvalidKey(string? value) => string.IsNullOrWhiteSpace(value);
 
     // Sub-service instances are connection-scoped and owned by the registry (see IInstanceRegistry),
-    // so they are disposed when released. Best-effort: a faulting dispose is reported via diagnostics
-    // but never breaks teardown. IAsyncDisposable is preferred when present; run it away from the
-    // caller's SynchronizationContext before blocking so user disposers that capture context can finish.
+    // so they are disposed when released. IAsyncDisposable is preferred when present; run it away from
+    // the caller's SynchronizationContext before blocking so user disposers that capture context can finish.
     private static void DisposeInstance(object instance)
+    {
+        switch (instance)
+        {
+            case IAsyncDisposable asyncDisposable:
+                DisposeAsyncSynchronously(asyncDisposable);
+                break;
+            case IDisposable disposable:
+                disposable.Dispose();
+                break;
+        }
+    }
+
+    private static void DisposeInstanceBestEffort(object instance)
     {
         try
         {
-            switch (instance)
-            {
-                case IAsyncDisposable asyncDisposable:
-                    DisposeAsyncSynchronously(asyncDisposable);
-                    break;
-                case IDisposable disposable:
-                    disposable.Dispose();
-                    break;
-            }
+            DisposeInstance(instance);
         }
         catch (Exception ex)
         {
@@ -208,22 +212,26 @@ public sealed class InstanceRegistry : IInstanceRegistry
             .GetResult();
     }
 
-    // Async counterpart of DisposeInstance for the teardown drain: awaits IAsyncDisposable.DisposeAsync
-    // (preferred when present) instead of blocking on it, so a suspending user disposer never sync-blocks
-    // a pooled thread. Same best-effort contract: a faulting dispose is reported, never rethrown.
+    // Async counterpart of DisposeInstance: awaits IAsyncDisposable.DisposeAsync (preferred when present)
+    // instead of blocking on it, so a suspending user disposer never sync-blocks a pooled thread.
     private static async Task DisposeInstanceAsync(object instance)
+    {
+        switch (instance)
+        {
+            case IAsyncDisposable asyncDisposable:
+                await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+                break;
+            case IDisposable disposable:
+                disposable.Dispose();
+                break;
+        }
+    }
+
+    private static async Task DisposeInstanceAsyncBestEffort(object instance)
     {
         try
         {
-            switch (instance)
-            {
-                case IAsyncDisposable asyncDisposable:
-                    await asyncDisposable.DisposeAsync().ConfigureAwait(false);
-                    break;
-                case IDisposable disposable:
-                    disposable.Dispose();
-                    break;
-            }
+            await DisposeInstanceAsync(instance).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
