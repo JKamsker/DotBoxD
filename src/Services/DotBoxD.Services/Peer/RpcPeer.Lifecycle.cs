@@ -98,6 +98,7 @@ public sealed partial class RpcPeer
     private async Task DisposeCoreAsync(Task? readLoop, CancellationTokenSource? cts)
     {
         _outbound.FailPending(new ServiceConnectionException("Connection closed."));
+        Exception? channelDisposeFailure = null;
 
         try
         {
@@ -106,6 +107,7 @@ public sealed partial class RpcPeer
         catch (Exception ex)
         {
             RpcDiagnostics.Report("Channel dispose during peer teardown failed", ex);
+            channelDisposeFailure = ex;
         }
 
         if (readLoop is not null)
@@ -136,6 +138,11 @@ public sealed partial class RpcPeer
         if (readLoop is not null)
         {
             RpcTelemetry.PeerStopped();
+        }
+
+        if (channelDisposeFailure is not null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(channelDisposeFailure).Throw();
         }
     }
 
