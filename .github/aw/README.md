@@ -61,11 +61,13 @@ It should not emit `github/gh-aw-actions/setup` for these workflows.
 ## Codex Models
 
 The active graph explorer and the legacy manual discovery workflow pin `gpt-5.6-sol`, run with high
-reasoning effort, and have a 45-minute / 2000-AI-credit research budget:
+reasoning effort, and have a 45-minute / 8,000-AI-credit per-run research budget plus a 20,000-AIC
+rolling daily ceiling:
 
 ```yaml
 timeout-minutes: 45
-max-ai-credits: 2000
+max-ai-credits: 8000
+max-daily-ai-credits: 20000
 
 engine:
   id: codex
@@ -83,6 +85,11 @@ The leading space in the first `engine.args` entry is intentional for
 after the structured-output path in threat-detection runs; without the explicit
 separator it generates `detection_result.json-c ...`. Remove the leading space
 only after the fork emits that separator itself.
+
+All compiled workflows disable `features.group-concurrency-queue`. Fan-out workers use
+`concurrency.job-discriminator` to scope generated cleanup groups to their lens, run, or PR;
+retaining every stale pending cleanup job with gh-aw's `queue: max` extension would only consume
+queue capacity.
 
 ## Custom Endpoint and Tokens
 
@@ -130,7 +137,7 @@ gh-aw token secret names:
 
 The library-surprise automation is intentionally split across specialized runs:
 
-1. `.github/workflows/library-surprise-dispatcher.md` selects one eligible lens every four hours.
+1. `.github/workflows/library-surprise-dispatcher.md` selects one eligible lens every 30 minutes.
    This schedule is the only autonomous discovery source and the hard discovery-rate governor.
 2. `.github/workflows/library-surprise-explore.md` is the active per-lens discovery agent. It mines
    one coherent seam, performs graph-wide duplicate checks, and dispatches at most one strongest
@@ -145,7 +152,7 @@ The library-surprise automation is intentionally split across specialized runs:
 6. `.github/workflows/library-surprise-fix-dispatcher.yml` drains new red-test PRs and polish work
    with six fallback scans per hour, at most four dispatches per tick, and a hard pool limit of four
    fix workers. Ticks fail closed while four or more repository runs are queued/pending. Discovery
-   remains separately bounded to one candidate every four hours.
+   remains separately bounded to one candidate every 30 minutes.
 7. `.github/workflows/library-surprise-fix.md` checks out the same PR branch, fixes the production
    issue, addresses actionable CodeRabbit feedback, validates the full build/test suite, and pushes
    the fix back to the PR branch.

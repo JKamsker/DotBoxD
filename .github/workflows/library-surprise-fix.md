@@ -1,8 +1,8 @@
 ---
 description: |
   Fixes the production issue behind one open [surprise-red-test] PR on the same
-  PR branch (FIX mode), or — for an already-sweep:fixed PR re-dispatched because
-  its CI is red or CodeRabbit is unaddressed — merges main, makes CI green, and
+  PR branch (FIX mode), or - for an already-sweep:fixed PR re-dispatched because
+  its CI is red or CodeRabbit is unaddressed - merges main, makes CI green, and
   addresses/resolves CodeRabbit (GREEN/POLISH mode). Dispatched per-PR by
   library-surprise-fix-dispatcher; re-proves the red regression test locally
   (red then green) inside this run rather than depending on the approval-gated
@@ -23,6 +23,9 @@ run-name: "fix #${{ inputs.pr_number }}"
 concurrency:
   group: surprise-fix-${{ inputs.pr_number }}
   cancel-in-progress: false
+  # A distinct PR can clean up concurrently instead of waiting on one workflow-wide
+  # gh-aw conclusion-job lock. Same-PR work remains serialized by the group above.
+  job-discriminator: ${{ inputs.pr_number }}
 
 permissions:
   actions: read
@@ -65,7 +68,7 @@ safe-outputs:
     protected-files: fallback-to-issue
     # Full token override: push the fix commit as the PAT's user (not github-actions[bot]) so
     # the resulting pull_request CI runs execute without manual approval. A PAT push is not
-    # subject to recursion-prevention, so CI triggers directly — no extra empty commit needed.
+    # subject to recursion-prevention, so CI triggers directly - no extra empty commit needed.
     # Mirrors library-surprise-red-test.md's create-pull-request override; without this the
     # fix commit was bot-pushed and every fixed PR's final CI sat at action_required (#266).
     # Requires the PAT to have Contents:R/W + Pull requests:R/W.
@@ -92,6 +95,10 @@ safe-outputs:
   # self-heal: the fix-dispatcher re-dispatches the PR (retry cap 4), so a genuinely
   # stuck PR surfaces as one that stays unfixed past the cap, not as per-blip noise.
   report-failure-as-issue: false
+
+features:
+  # Same-PR work is already serialized; stale generated cleanup jobs need not queue.
+  group-concurrency-queue: false
 
 engine:
   id: codex
@@ -357,7 +364,7 @@ pre-agent-steps:
       if [ "${surprise_should_run:-false}" = "true" ]; then
         # The dispatcher has already merged the latest main into this PR branch
         # (server-side, via the PAT) before dispatching, so the checkout below is
-        # already refreshed — stale-branch CI gates that main has since cleared do
+        # already refreshed - stale-branch CI gates that main has since cleared do
         # not need handling here.
         gh pr checkout "$surprise_pr_number" --repo "$GITHUB_REPOSITORY"
         original_head="$(git rev-parse HEAD)"
@@ -477,14 +484,14 @@ post-steps:
   # library-surprise-fix-dispatcher.yml, which reads the resolve marker from the
   # summary comment on a later tick. That comment is posted through the
   # detection-gated safe_outputs job, so resolution only ever acts on agent output
-  # that already passed threat detection — a post-step here would run BEFORE the
+  # that already passed threat detection - a post-step here would run BEFORE the
   # detection job and could resolve threads from a manipulated agent output.
 
   # NOTE: we intentionally do NOT run `dotnet test DotBoxD.slnx` here. The whole-solution
   # test run OOM-kills the DotBoxD.Kernels.Tests host (exit 137) under this job's memory
   # ceiling, and a memory-safe per-project sequential run does not fit the 45-min timeout on
   # top of the agent. The authoritative full-suite gate is the PR's own CI, which now runs
-  # automatically and ungated on the fix push (per-project matrix, real runners — see
+  # automatically and ungated on the fix push (per-project matrix, real runners - see
   # library-surprise-red-test.md / the GH_AW_CI_TRIGGER_TOKEN override on the push below).
   # The restore+build above stays as a fast cross-project compile gate.
 ---
@@ -498,10 +505,10 @@ workflow.
 
 This worker runs in one of two modes on the same PR branch:
 
-- **FIX** — the bug is not fixed yet (`is_fixed` is `false` in the target and the
+- **FIX** - the bug is not fixed yet (`is_fixed` is `false` in the target and the
   red test still FAILS). Implement the production fix, prove red->green in this
   run, push, label `sweep:fixed`.
-- **GREEN / POLISH** — the PR is already `sweep:fixed` (`is_fixed` is `true`), but
+- **GREEN / POLISH** - the PR is already `sweep:fixed` (`is_fixed` is `true`), but
   it was re-dispatched because its real PR CI is red and/or it still has
   unresolved or unaddressed CodeRabbit feedback. The bug is already fixed; your
   job is to make the PR's CI fully green and to address + resolve CodeRabbit.
@@ -510,9 +517,9 @@ The red->green proof lives in this run: in FIX mode you confirm the red test
 FAILS on the checked-out branch, implement the fix, then confirm it PASSES by
 running the ENTIRE test project that owns the red test (this catches sibling-test
 regressions), and confirm the whole solution BUILDS. Do not run the whole
-solution's tests here — a full `dotnet test DotBoxD.slnx` OOM-kills the
+solution's tests here - a full `dotnet test DotBoxD.slnx` OOM-kills the
 DotBoxD.Kernels.Tests host in this sandbox (exit 137); run only the owning
-project (Kernels.Tests excepted — for it run the focused `--filter`ed tests
+project (Kernels.Tests excepted - for it run the focused `--filter`ed tests
 only). The authoritative full-suite gate is the PR's own CI, which now runs
 automatically and ungated on your push (per-project, on real runners).
 
@@ -524,13 +531,13 @@ If `SURPRISE_FIX_SHOULD_RUN` is not `true`, leave the workspace unchanged and
 call `noop` with the recorded reason. This workflow is intentionally selective:
 it may only act on an open, same-repository PR whose title starts with
 `[surprise-red-test] `, and has the `bug` and `.NET` labels. A `sweep:fixed`
-label does NOT disqualify a PR — that is the GREEN/POLISH entry point.
+label does NOT disqualify a PR - that is the GREEN/POLISH entry point.
 
 Before dispatching you, the dispatcher **merged the latest `main`** into this PR
 branch (server-side, as the PAT), so your checkout is already refreshed. That is
 how stale-branch CI gates main has since cleared (e.g. the repo-wide CE0006
 file-length budget) get resolved without you touching unrelated files. If main
-and the branch had a merge conflict the merge was skipped — resolve what you can
+and the branch had a merge conflict the merge was skipped - resolve what you can
 or note it for a human. Confirm the checked-out branch still contains the red
 tests from the PR.
 
@@ -542,7 +549,7 @@ Read `is_fixed` in the target and run the focused regression test once:
 - `is_fixed` false **and** red test already PASSES → someone already fixed it:
   leave the workspace unchanged and `noop`.
 - `is_fixed` true → **GREEN/POLISH** mode. (If the red test unexpectedly FAILS
-  again, the fix regressed — re-implement it as in FIX mode, then continue with
+  again, the fix regressed - re-implement it as in FIX mode, then continue with
   the GREEN steps.)
 
 ## FIX mode
@@ -560,7 +567,7 @@ Read `is_fixed` in the target and run the focused regression test once:
    Running the whole owning project catches regressions in sibling tests that a
    single `--filter` misses (e.g. an ArgumentException with the wrong ParamName).
    Do NOT run `GITHUB_ACTIONS=true dotnet test DotBoxD.slnx` (the whole solution)
-   — it OOM-kills the DotBoxD.Kernels.Tests host in this sandbox (exit 137). The
+   - it OOM-kills the DotBoxD.Kernels.Tests host in this sandbox (exit 137). The
    ONE exception is DotBoxD.Kernels.Tests itself: its full run also OOMs here, so
    if the red test lives in DotBoxD.Kernels.Tests, run only the focused
    `--filter`ed test(s) and rely on the PR CI for the rest. Every other test
@@ -580,17 +587,17 @@ and clear CodeRabbit.
 1. Find what is red: `gh pr checks <pr>` and read the failing job's log (the
    "Security & quality gates" job runs the gate scripts in
    `.github/workflows/ci.yml`). Common causes and fixes:
-   - **CE0006 file-length budget / CE0002 soft-limit** — usually cleared already
+   - **CE0006 file-length budget / CE0002 soft-limit** - usually cleared already
      by the main merge. If any file the CI still flags is over the limit, split
      it into cohesive partial(s) or a themed helper.
-   - **`dotnet format` whitespace** — run
+   - **`dotnet format` whitespace** - run
      `dotnet format whitespace DotBoxD.slnx --no-restore` and commit the result.
-   - **Public API baseline** — a public surface changed; refresh the affected
+   - **Public API baseline** - a public surface changed; refresh the affected
      package's `docs/api-baselines/*.txt` (commit ONLY the intended package's
      file; `-Update` churns EOL/collation across all files on Windows).
-   - **CE0004 folder file-count** — move a test file into a themed subfolder.
+   - **CE0004 folder file-count** - move a test file into a themed subfolder.
    Do whatever it takes to make CI green, even when the root cause is repo-wide
-   rather than this PR's own diff — but never weaken the red regression test and
+   rather than this PR's own diff - but never weaken the red regression test and
    never touch protected files.
 2. Do the **CodeRabbit pass** (below).
 3. Re-run `dotnet restore` + `GITHUB_ACTIONS=true dotnet build DotBoxD.slnx -c
@@ -608,7 +615,7 @@ and clear CodeRabbit.
 GraphQL node `id`, `path`, `line`, `isResolved`, `isOutdated`, and `body`), its
 top-level `reviews` (summary bodies, which hold "🧹 Nitpick" and other items that
 are NOT inline threads), and a `truncated` flag. If `truncated` is `true`, the PR
-has more CodeRabbit items than were captured — fetch the remainder via `gh` before
+has more CodeRabbit items than were captured - fetch the remainder via `gh` before
 judging completeness.
 
 If CodeRabbit has not posted yet, poll at most **3 times (~30s apart, ≤2 minutes
@@ -634,14 +641,14 @@ Post exactly one `add_comment` on the PR. The dispatcher parses this comment to
 know a polish pass ran and which CodeRabbit threads to resolve, so its shape is
 load-bearing. Its body MUST:
 
-1. **Start with a `Mode:` line** — literally `Mode: FIX` or `Mode: GREEN/POLISH`
+1. **Start with a `Mode:` line** - literally `Mode: FIX` or `Mode: GREEN/POLISH`
    as the very first line. (This is what the dispatcher reads to stop re-picking
-   the PR — do not omit or reword it.)
+   the PR - do not omit or reword it.)
 2. Summarize what you changed (CI fixes + the production fix) and give a
    per-thread CodeRabbit disposition: `fixed`, or `dismissed` with a one-line
    reason.
 3. **List the thread node ids you handled** (fixed, or consciously
-   dismissed-with-reason) verbatim — e.g. `` `PRRT_kwABC...` `` — under a clear
+   dismissed-with-reason) verbatim - e.g. `` `PRRT_kwABC...` `` - under a clear
    `Resolved threads:` heading. The dispatcher resolves exactly the `PRRT_...`
    ids it finds here that are still open, on a later tick, after this comment has
    passed threat detection. List ONLY threads you actually handled; never list a
@@ -660,14 +667,14 @@ Use the `id` values from `coderabbit.json`.
 
 If the PR is no longer eligible, leave the workspace unchanged and call `noop`.
 
-## Protected files — never touch them
+## Protected files - never touch them
 
 Never include top-level protected files in your patch: `README.md`, `CONTRIBUTING.md`,
 `CHANGELOG.md`, `AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`,
 `Directory.Packages.props`, `NuGet.Config`, `global.json`, lockfiles, or anything under dot-folders.
 The push layer hard-blocks the ENTIRE patch when it contains any of them (your work is discarded
 into a "[gh-aw] Protected Files" issue instead of landing). Documented samples and doc pages live
-under `docs/**`, which is allowed — put documentation updates there. If a protected file genuinely
+under `docs/**`, which is allowed - put documentation updates there. If a protected file genuinely
 must change for correctness, say so in a comment/PR body and leave the file itself untouched for a
 human.
 

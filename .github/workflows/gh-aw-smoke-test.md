@@ -19,6 +19,10 @@ sandbox:
       openai:
         base-url-secret: CODEX_LB_BASE_URL
 
+features:
+  # Do not retain every pending compiler-generated concurrency job behind a lock.
+  group-concurrency-queue: false
+
 engine:
   id: codex
   model: gpt-5.5

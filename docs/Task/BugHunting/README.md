@@ -7,23 +7,23 @@ with red CI is machine-checkable proof that a bug is real.
 Status: **implemented in capacity-safe scheduled mode**. Historical design decisions and launch
 notes remain below because they explain the safety constraints.
 
-## Current operating mode (2026-07-15)
+## Current operating mode (2026-08-09)
 
-The production loop is deliberately rate-limited to protect product CI. The dispatcher selects at
-most one eligible lens on a fuzzy four-hour schedule; explore runs never self-chain. Per-lens concurrency still
-prevents overlap, while the dispatcher selects the least-recently-dispatched active lens and uses
-severity only as a tie-breaker. A missed GitHub schedule delays discovery safely instead of
-triggering catch-up fanout.
+The production loop dispatches at most one eligible lens on a fuzzy 30-minute schedule; explore
+runs never self-chain. Per-lens concurrency still prevents overlap, while the dispatcher selects
+the least-recently-dispatched active lens and uses severity only as a tie-breaker. A missed GitHub
+schedule delays discovery safely instead of triggering catch-up fanout.
 
-Explores use `gpt-5.6-sol` with high reasoning, a 45-minute job timeout, a 2000-AI-credit budget,
-and a 10-minute per-tool ceiling. A run investigates one coherent seam and dispatches at most one
-strongest concrete candidate; additional leads are recorded in the lens ledger for later runs.
-Every candidate still goes through the dedicated red-test proof before a PR can exist.
+Explores use `gpt-5.6-sol` with high reasoning, a 45-minute job timeout, an 8,000-AI-credit per-run
+budget, a 20,000-AIC rolling daily ceiling, and a 10-minute per-tool ceiling. A run investigates one
+coherent seam and dispatches at most one strongest concrete candidate; additional leads are recorded
+in the lens ledger for later runs. Every candidate still goes through the dedicated red-test proof
+before a PR can exist.
 
 The fix dispatcher gets six fallback opportunities per hour (plus the existing event kick),
 dispatches at most four workers per tick, and permits at most four fix workers globally. This wider
 pool drains proven-red work promptly while the separately bounded discovery side can add at most one
-candidate every four hours. A tick fails closed when the repository already has four queued/pending
+candidate every 30 minutes. A tick fails closed when the repository already has four queued/pending
 runs, then automatically retries on later schedule opportunities. Canceled/failed red-test handoffs
 remain safe to rediscover because the lens ledger is not considered authoritative coverage until a
 matching PR or `sweep:bug` issue exists.
@@ -544,7 +544,7 @@ plan above:
 - **Lens issues** - #145 security, #146 concurrency, #147 wire, #148 error-path, #149 codegen
   (each `sweep:lens` + `sweep:active` + `vein:*`, with a charter body).
 - **`library-surprise-dispatcher.md`** - capacity-bounded orchestrator (§13 sketch, realized).
-  Computes the eligible-lens frontier and dispatches one explore every four hours (cap 1).
+  Computes the eligible-lens frontier and dispatches one explore every 30 minutes (cap 1).
 - **`library-surprise-explore.md`** - per-lens discovery agent. `run-name` + per-lens
   `concurrency` lock; safe-outputs `add-comment`/`add-labels` (`target: "*"`), `create-issue`
   (`sweep:bug`), `dispatch-workflow` (at most one red-test). Reuses the
@@ -579,7 +579,7 @@ kicked by every red-test PR delivery. It drains open fix/polish work on its own 
 `MAX_INFLIGHT=4`, retry-capped). The in-flight cap is the hard fix-side capacity boundary; additional
 ticks become no-ops while the pool is full. `MAX_REPO_WAITING=4` also makes a tick fail closed when
 four or more repository runs are queued/pending, so fixer refill cannot deepen an existing product-CI
-backlog. The discovery `library-surprise-dispatcher` adds at most one new explore every four hours, so
+backlog. The discovery `library-surprise-dispatcher` adds at most one new explore every 30 minutes, so
 the faster fixer cannot recreate an unbounded arrival loop. Disable discovery to stop new bug
 discovery while leaving the fix dispatcher to drain the existing backlog. Either workflow is paused
 with `gh workflow disable`. `GH_AW_CI_TRIGGER_TOKEN` alone does **not** bypass the CI approval gate -

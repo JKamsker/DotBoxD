@@ -10,9 +10,9 @@ description: |
 
 on:
   workflow_dispatch:
-  # One lens every four hours is the hard discovery-rate governor. gh-aw scatters the
+  # One lens every 30 minutes is the hard discovery-rate governor. gh-aw scatters the
   # minute deterministically to avoid a shared schedule boundary.
-  schedule: every 4h
+  schedule: every 30m
 
 concurrency:
   group: surprise-hunt-dispatcher
@@ -53,6 +53,10 @@ safe-outputs:
   missing-data: false
   report-incomplete:
     create-issue: false
+
+features:
+  # Scheduled ticks are self-healing; retaining stale pending jobs wastes capacity.
+  group-concurrency-queue: false
 
 engine:
   id: codex

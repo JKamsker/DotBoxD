@@ -24,10 +24,16 @@ run-name: "explore #${{ inputs.lens_issue }} ${{ inputs.vein }}"
 concurrency:
   group: explore-${{ inputs.lens_issue }}
   cancel-in-progress: false
+  # Scope gh-aw's generated conclusion-job lock to the lens instead of serializing
+  # cleanup for every explore run through one workflow-wide slot.
+  job-discriminator: ${{ inputs.lens_issue }}
 
 # Preserve a deep high-reasoning pass while bounding how long it can occupy a runner.
 timeout-minutes: 45
-max-ai-credits: 2000
+max-ai-credits: 8000
+# The compiler otherwise applies its 5,000-AIC rolling daily default, which would
+# undercut the larger per-run budget and denser autonomous schedule.
+max-daily-ai-credits: 20000
 
 permissions:
   contents: read
@@ -79,6 +85,11 @@ safe-outputs:
   missing-data: false
   report-incomplete:
     create-issue: false
+
+features:
+  # Per-lens workflow concurrency is sufficient; do not accumulate generated
+  # cleanup jobs behind gh-aw's queue-max lock.
+  group-concurrency-queue: false
 
 engine:
   id: codex
