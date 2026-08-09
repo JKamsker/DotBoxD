@@ -37,8 +37,8 @@ internal static class ConditionalHookChainDiagnosticFactory
 
         if (context.SemanticModel.GetTypeInfo(conditional.Expression, cancellationToken).Type
                 is not INamedTypeSymbol receiverType ||
-            HookChainModelFactory.ReceiverKind(receiverType, context.SemanticModel.Compilation) is null ||
-            !IsHookChainTerminal(invocation, context.SemanticModel, cancellationToken))
+            HookChainModelFactory.ReceiverKind(receiverType, context.SemanticModel.Compilation) is not { } receiverKind ||
+            !IsHookChainTerminal(invocation, receiverKind, context.SemanticModel, cancellationToken))
         {
             return null;
         }
@@ -53,19 +53,40 @@ internal static class ConditionalHookChainDiagnosticFactory
 
     private static bool IsHookChainTerminal(
         InvocationExpressionSyntax invocation,
+        HookChainReceiverKind receiverKind,
         SemanticModel model,
         CancellationToken cancellationToken)
     {
         var method = model.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
-        if (PipelineRoleReader.RoleOf(method, model.Compilation) is PipelineCallRole.Run or
-            PipelineCallRole.RunLocal or PipelineCallRole.Register or PipelineCallRole.RegisterLocal)
+        if (PipelineRoleReader.RoleOf(method, model.Compilation) is { } role &&
+            HookChainInstallKindResolver.Resolve(role, receiverKind, generatedRemoteKind: null) is { } installKind)
         {
-            return true;
+            return HookChainModelFactory.HasTerminalShape(invocation, installKind, model, cancellationToken);
         }
 
         return method?.ContainingType is { } containingType &&
             PipelineRoleReader.Transport(containingType, model.Compilation) is not null &&
-            method.Name is "Use" or "UseGeneratedChain" or "UseGeneratedLocalChain" or
-                "UseGeneratedResultChain" or "UseGeneratedLocalResultChain";
+            IsGeneratedTerminal(invocation, method.Name, model, cancellationToken);
     }
+
+    private static bool IsGeneratedTerminal(
+        InvocationExpressionSyntax invocation,
+        string methodName,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+        => methodName switch
+        {
+            "Use" or "UseGeneratedChain" or "UseGeneratedResultChain" => true,
+            "UseGeneratedLocalChain" => HookChainModelFactory.HasTerminalShape(
+                invocation,
+                HookChainInterceptorInstallKind.LocalCallback,
+                model,
+                cancellationToken),
+            "UseGeneratedLocalResultChain" => HookChainModelFactory.HasTerminalShape(
+                invocation,
+                HookChainInterceptorInstallKind.LocalResultChain,
+                model,
+                cancellationToken),
+            _ => false,
+        };
 }

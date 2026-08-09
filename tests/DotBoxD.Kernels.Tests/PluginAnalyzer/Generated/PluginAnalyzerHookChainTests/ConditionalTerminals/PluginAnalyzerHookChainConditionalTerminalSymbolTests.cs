@@ -62,4 +62,34 @@ public sealed class PluginAnalyzerHookChainConditionalTerminalSymbolTests
         Assert.Contains("Run", diagnostic.GetMessage(), StringComparison.Ordinal);
         Assert.Contains("conditional access", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Conditional_role_terminal_with_invalid_lambda_shape_does_not_report_DBXK100()
+    {
+        var result = RunGenerator("""
+            using System;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [PipelineSurface(PipelineTransport.Remote)]
+            public sealed class Flow<TEvent>
+            {
+                public Flow<TEvent> Run(
+                    Action handler,
+                    [IRBodyOf(nameof(handler))] global::DotBoxD.Plugins.IRKernel? irHandler = null)
+                    => this;
+            }
+
+            public static class Usage
+            {
+                public static void Configure(Flow<string>? flow)
+                {
+                    flow?.Run(() => { });
+                }
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK100");
+    }
 }
