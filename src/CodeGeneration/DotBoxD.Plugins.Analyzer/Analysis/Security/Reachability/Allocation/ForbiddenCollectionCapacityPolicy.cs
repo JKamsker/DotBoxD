@@ -20,6 +20,16 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string SortedListTypeName = "System.Collections.Generic.SortedList<TKey, TValue>";
     private const string StackTypeName = "System.Collections.Generic.Stack<T>";
 
+    private static readonly Dictionary<string, string> FixedDisplayNames = new(StringComparer.Ordinal)
+    {
+        [ArrayListTypeName] = ArrayListTypeName,
+        [DictionaryTypeName] = "System.Collections.Generic.Dictionary",
+        [HashtableTypeName] = "System.Collections.Hashtable",
+        [ListTypeName] = "System.Collections.Generic.List",
+        [QueueTypeName] = "System.Collections.Generic.Queue",
+        [SortedListTypeName] = "System.Collections.Generic.SortedList"
+    };
+
     public static bool TryGetDisplayName(IMethodSymbol? method, out string forbidden)
     {
         if (method is null)
@@ -100,18 +110,19 @@ internal static class ForbiddenCollectionCapacityPolicy
     }
 
     private static string? CollectionDisplayName(INamedTypeSymbol type, string typeName)
-        => typeName switch
+    {
+        if (FixedDisplayNames.TryGetValue(typeName, out var displayName))
         {
-            ArrayListTypeName => ArrayListTypeName,
-            ListTypeName => "System.Collections.Generic.List",
-            DictionaryTypeName => "System.Collections.Generic.Dictionary",
-            QueueTypeName => "System.Collections.Generic.Queue",
-            SortedListTypeName => "System.Collections.Generic.SortedList",
-            HashtableTypeName => "System.Collections.Hashtable",
-            StackTypeName or HashSetTypeName or PriorityQueueTypeName =>
-                type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
-            _ => null
-        };
+            return displayName;
+        }
+
+        return UsesOriginalTypeDisplayName(typeName)
+            ? type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
+            : null;
+    }
+
+    private static bool UsesOriginalTypeDisplayName(string typeName)
+        => typeName is StackTypeName or HashSetTypeName or PriorityQueueTypeName;
 
     private static bool IsCapacityAllocationMethod(IMethodSymbol method, string typeName)
     {
