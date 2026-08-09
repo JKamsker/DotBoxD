@@ -17,6 +17,7 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string PriorityQueueTypeName =
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
     private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
+    private const string SortedListTypeName = "System.Collections.Generic.SortedList<TKey, TValue>";
     private const string StackTypeName = "System.Collections.Generic.Stack<T>";
 
     public static bool TryGetDisplayName(IMethodSymbol? method, out string forbidden)
@@ -105,6 +106,7 @@ internal static class ForbiddenCollectionCapacityPolicy
             ListTypeName => "System.Collections.Generic.List",
             DictionaryTypeName => "System.Collections.Generic.Dictionary",
             QueueTypeName => "System.Collections.Generic.Queue",
+            SortedListTypeName => "System.Collections.Generic.SortedList",
             HashtableTypeName => "System.Collections.Hashtable",
             StackTypeName or HashSetTypeName or PriorityQueueTypeName =>
                 type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
