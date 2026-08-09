@@ -118,7 +118,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             constructor.Parameters,
             $"Server extension constructor for '{named.Name}'");
         var assigned = new bool[fields.Count];
-        BindConstructorArguments(constructor, fields, named, lowered, args, assigned);
+        BindConstructorArguments(constructor, fields, named, lowered, args, assigned, _model.Compilation);
         if (creation.Initializer is { } initializer)
         {
             BindInitializer(initializer, fields, named, args, assigned, requireAllFields: false);
@@ -148,31 +148,27 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         INamedTypeSymbol named,
         IReadOnlyList<string> lowered,
         string[] args,
-        bool[] assigned)
+        bool[] assigned,
+        Compilation compilation)
     {
         for (var i = 0; i < constructor.Parameters.Length; i++)
         {
-            BindConstructorArgument(constructor.Parameters[i], fields, named, lowered[i], args, assigned);
-        }
-    }
+            if (!RpcDtoConstructorAssignmentVerifier.TryAssignConstructorParameter(
+                    constructor,
+                    fields,
+                    assigned,
+                    constructor.Parameters[i],
+                    compilation,
+                    out var fieldIndex) ||
+                fieldIndex < 0)
+            {
+                throw new NotSupportedException(
+                    $"Server extension DTO '{named.Name}' must expose a constructor matching its public fields; " +
+                    "each constructor argument must map to one field without transforming it.");
+            }
 
-    private static void BindConstructorArgument(
-        IParameterSymbol parameter,
-        IReadOnlyList<RecordMember> fields,
-        INamedTypeSymbol named,
-        string lowered,
-        string[] args,
-        bool[] assigned)
-    {
-        var fieldIndex = ConstructorFieldIndex(fields, parameter, named);
-        if (assigned[fieldIndex])
-        {
-            throw new NotSupportedException(
-                $"Server extension constructor for '{named.Name}' must map one argument per field.");
+            args[fieldIndex] = lowered[i];
         }
-
-        args[fieldIndex] = lowered;
-        assigned[fieldIndex] = true;
     }
 
     private bool TryBindInitializerCreation(
@@ -281,18 +277,4 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         throw new NotSupportedException($"Server extension '{named.Name}' has no field '{name}'.");
     }
 
-    private static int ConstructorFieldIndex(
-        IReadOnlyList<RecordMember> fields,
-        IParameterSymbol parameter,
-        INamedTypeSymbol named)
-    {
-        var index = RpcDtoFieldMatcher.FieldIndex(fields, parameter);
-        if (index >= 0)
-        {
-            return index;
-        }
-
-        throw new NotSupportedException(
-            $"Server extension DTO '{named.Name}' must expose a constructor matching its public fields.");
-    }
 }

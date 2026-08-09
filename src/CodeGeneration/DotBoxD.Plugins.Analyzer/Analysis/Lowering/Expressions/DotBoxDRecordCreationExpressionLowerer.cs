@@ -90,9 +90,6 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
             throw new System.NotSupportedException();
         }
 
-        // record.new wants its arguments in the DTO's declared field order. Map each declared field to the
-        // constructor argument that fills it (positional records line up 1:1; named/reordered constructors are
-        // resolved by parameter name) and lower that argument with the field's expected type.
         var positionalSources = new string?[fields.Count];
         var positionalAssigned = new bool[fields.Count];
         var positionalAllocates = LowerConstructorArguments(
@@ -145,8 +142,14 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
 
             assignedParameters[parameterIndex] = true;
             var parameter = constructor.Parameters[parameterIndex];
-            var fieldIndex = RpcDtoFieldMatcher.FieldIndex(fields, parameter);
-            if (fieldIndex < 0 || assigned[fieldIndex])
+            if (!RpcDtoConstructorAssignmentVerifier.TryAssignConstructorParameter(
+                    constructor,
+                    fields,
+                    assigned,
+                    parameter,
+                    context.SemanticModel.Compilation,
+                    out var fieldIndex) ||
+                fieldIndex < 0)
             {
                 throw new System.NotSupportedException();
             }
@@ -156,8 +159,6 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
                 throw new NotSupportedException("DTO constructor arguments must match DTO field order to preserve remote projection evaluation order.");
             }
 
-            // record.new declares the field's sandbox type. Require the constructor parameter's value to carry the
-            // exact field shape; otherwise coarse manifest tags could hide a mismatched CLR payload type.
             var lowered = LowerFieldValue(
                 arguments[i].Expression,
                 fields[fieldIndex].Type,
@@ -165,7 +166,6 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
                 lowerExpression);
 
             fieldSources[fieldIndex] = lowered.Source;
-            assigned[fieldIndex] = true;
             allocates |= lowered.Allocates;
         }
 

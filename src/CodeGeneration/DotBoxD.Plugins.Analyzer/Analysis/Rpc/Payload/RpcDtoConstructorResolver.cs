@@ -73,32 +73,17 @@ internal static class RpcDtoConstructorResolver
 
         foreach (var parameter in constructor.Parameters)
         {
-            if (!TryAssignConstructorParameter(fields, assigned, parameter))
+            if (!RpcDtoConstructorAssignmentVerifier.TryAssignConstructorParameter(
+                    constructor,
+                    fields,
+                    assigned,
+                    parameter,
+                    compilation))
             {
                 return false;
             }
         }
 
-        return true;
-    }
-
-    private static bool TryAssignConstructorParameter(
-        IReadOnlyList<RecordMember> fields,
-        bool[] assigned,
-        IParameterSymbol parameter)
-    {
-        var fieldIndex = RpcDtoFieldMatcher.FieldIndex(fields, parameter);
-        if (fieldIndex < 0)
-        {
-            return parameter.HasExplicitDefaultValue;
-        }
-
-        if (assigned[fieldIndex])
-        {
-            return false;
-        }
-
-        assigned[fieldIndex] = true;
         return true;
     }
 
