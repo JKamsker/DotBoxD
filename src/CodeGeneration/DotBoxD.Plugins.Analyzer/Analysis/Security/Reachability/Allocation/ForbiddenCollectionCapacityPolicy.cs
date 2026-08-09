@@ -4,6 +4,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class ForbiddenCollectionCapacityPolicy
 {
+    private const string ArrayListTypeName = "System.Collections.ArrayList";
     private const string DictionaryTypeName = "System.Collections.Generic.Dictionary<TKey, TValue>";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string ImmutableArrayTypeName = "System.Collections.Immutable.ImmutableArray";
@@ -51,6 +52,7 @@ internal static class ForbiddenCollectionCapacityPolicy
     private static string? CollectionDisplayName(INamedTypeSymbol type, string typeName)
         => typeName switch
         {
+            ArrayListTypeName => ArrayListTypeName,
             ListTypeName => "System.Collections.Generic.List",
             DictionaryTypeName => "System.Collections.Generic.Dictionary",
             QueueTypeName => "System.Collections.Generic.Queue",
