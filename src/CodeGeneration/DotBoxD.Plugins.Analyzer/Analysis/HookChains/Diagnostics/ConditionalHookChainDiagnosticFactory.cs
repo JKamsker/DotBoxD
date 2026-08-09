@@ -30,14 +30,15 @@ internal static class ConditionalHookChainDiagnosticFactory
         if (conditional.WhenNotNull is not InvocationExpressionSyntax
             {
                 Expression: MemberBindingExpressionSyntax binding
-            })
+            } invocation)
         {
             return null;
         }
 
         if (context.SemanticModel.GetTypeInfo(conditional.Expression, cancellationToken).Type
                 is not INamedTypeSymbol receiverType ||
-            HookChainModelFactory.ReceiverKind(receiverType, context.SemanticModel.Compilation) is null)
+            HookChainModelFactory.ReceiverKind(receiverType, context.SemanticModel.Compilation) is null ||
+            !IsHookChainTerminal(invocation, context.SemanticModel, cancellationToken))
         {
             return null;
         }
@@ -48,5 +49,23 @@ internal static class ConditionalHookChainDiagnosticFactory
                 Message,
                 binding.Name.Identifier.ValueText),
             PluginDiagnosticLocation.From(binding.Name.GetLocation()));
+    }
+
+    private static bool IsHookChainTerminal(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        var method = model.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
+        if (PipelineRoleReader.RoleOf(method, model.Compilation) is PipelineCallRole.Run or
+            PipelineCallRole.RunLocal or PipelineCallRole.Register or PipelineCallRole.RegisterLocal)
+        {
+            return true;
+        }
+
+        return method?.ContainingType is { } containingType &&
+            PipelineRoleReader.Transport(containingType, model.Compilation) is not null &&
+            method.Name is "Use" or "UseGeneratedChain" or "UseGeneratedLocalChain" or
+                "UseGeneratedResultChain" or "UseGeneratedLocalResultChain";
     }
 }
