@@ -56,6 +56,11 @@ internal static class RpcDtoConstructorAssignmentVerifier
             return true;
         }
 
+        if (constructor.DeclaringSyntaxReferences.Length == 0)
+        {
+            return true;
+        }
+
         foreach (var reference in constructor.DeclaringSyntaxReferences)
         {
             if (reference.GetSyntax() is not ConstructorDeclarationSyntax declaration)
@@ -79,6 +84,12 @@ internal static class RpcDtoConstructorAssignmentVerifier
         IParameterSymbol parameter,
         SemanticModel? model)
     {
+        if (declaration.Initializer?.IsKind(SyntaxKind.ThisConstructorInitializer) == true)
+        {
+            return false;
+        }
+
+        var matched = false;
         foreach (var assignment in ConstructorAssignments(declaration))
         {
             if (!IsMemberTarget(assignment.Left, member, model))
@@ -86,14 +97,18 @@ internal static class RpcDtoConstructorAssignmentVerifier
                 continue;
             }
 
-            if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
-                !PreservesParameter(assignment.Right, parameter, assignment, model))
+            if (matched ||
+                !IsDirectConstructorAssignment(declaration, assignment) ||
+                !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                !PreservesParameter(assignment.Right, parameter, model))
             {
                 return false;
             }
+
+            matched = true;
         }
 
-        return true;
+        return matched;
     }
 
     private static IEnumerable<AssignmentExpressionSyntax> ConstructorAssignments(
@@ -118,6 +133,19 @@ internal static class RpcDtoConstructorAssignmentVerifier
         }
     }
 
+    private static bool IsDirectConstructorAssignment(
+        ConstructorDeclarationSyntax declaration,
+        AssignmentExpressionSyntax assignment)
+    {
+        if (declaration.ExpressionBody?.Expression == assignment)
+        {
+            return true;
+        }
+
+        return assignment.Parent is ExpressionStatementSyntax statement &&
+            statement.Parent == declaration.Body;
+    }
+
     private static bool IsMemberTarget(
         ExpressionSyntax target,
         RecordMember member,
@@ -134,7 +162,6 @@ internal static class RpcDtoConstructorAssignmentVerifier
     private static bool PreservesParameter(
         ExpressionSyntax expression,
         IParameterSymbol parameter,
-        SyntaxNode syntax,
         SemanticModel? model)
     {
         expression = StripParentheses(expression);
@@ -150,7 +177,7 @@ internal static class RpcDtoConstructorAssignmentVerifier
 
         return expression is ConditionalExpressionSyntax conditional &&
             TryEvaluateBoolean(conditional.Condition, parameter.ContainingSymbol, model) is { } condition &&
-            PreservesParameter(condition ? conditional.WhenTrue : conditional.WhenFalse, parameter, syntax, model);
+            PreservesParameter(condition ? conditional.WhenTrue : conditional.WhenFalse, parameter, model);
     }
 
     private static ExpressionSyntax StripParentheses(ExpressionSyntax expression)

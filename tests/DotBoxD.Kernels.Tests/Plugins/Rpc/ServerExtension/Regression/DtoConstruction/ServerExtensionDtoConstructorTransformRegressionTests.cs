@@ -6,8 +6,50 @@ public sealed class ServerExtensionDtoConstructorTransformRegressionTests
 {
     [Fact]
     public void Server_extension_rejects_dto_constructor_that_transforms_matching_member()
+        => AssertConstructorRejected("""
+                public Score(int value)
+                {
+                    Value = value + 1;
+                }
+            """);
+
+    [Fact]
+    public void Server_extension_rejects_dto_constructor_that_omits_matching_member_assignment()
+        => AssertConstructorRejected("""
+                public Score(int value)
+                {
+                }
+            """);
+
+    [Fact]
+    public void Server_extension_rejects_dto_constructor_that_assigns_matching_member_conditionally()
+        => AssertConstructorRejected("""
+                public Score(int value)
+                {
+                    if (value >= 0)
+                    {
+                        Value = value;
+                    }
+                }
+            """);
+
+    [Fact]
+    public void Server_extension_rejects_dto_constructor_that_delegates_matching_member_assignment()
+        => AssertConstructorRejected("""
+                public Score()
+                {
+                    Value = 0;
+                }
+
+                public Score(int value)
+                    : this()
+                {
+                }
+            """);
+
+    private static void AssertConstructorRejected(string constructor)
     {
-        var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator("""
+        var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator($$"""
             using DotBoxD.Kernels;
             using DotBoxD.Kernels.Sandbox;
             using DotBoxD.Plugins;
@@ -17,10 +59,7 @@ public sealed class ServerExtensionDtoConstructorTransformRegressionTests
 
             public sealed class Score
             {
-                public Score(int value)
-                {
-                    Value = value + 1;
-                }
+            {{constructor}}
 
                 public int Value { get; }
             }
