@@ -73,6 +73,7 @@ internal sealed record ServiceModel(
     string ServiceName,
     EquatableArray<MethodModel> Methods,
     EquatableArray<ServicePropertyModel> Properties,
+    EquatableArray<string> ExternAliases = default,
     string RawServiceName = "",
     string ObsoleteAttribute = "",
     string TypeAttributePrefix = "",
@@ -117,7 +118,9 @@ internal sealed record MethodModel(
     SubServiceInfo? SubService = null,
     string RawRpcName = "",
     string MetadataReturnType = "",
-    string? MetadataResultType = null);
+    string? MetadataResultType = null,
+    EquatableArray<string> ExternAliases = default,
+    bool IsLookalikeTaskLike = false);
 
 /// <summary>
 /// Immutable, value-equatable representation of a method parameter.

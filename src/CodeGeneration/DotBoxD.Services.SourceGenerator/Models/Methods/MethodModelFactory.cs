@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using DotBoxD.Services.SourceGenerator.Generation;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
@@ -27,9 +29,10 @@ internal static partial class MethodModelFactory
         ct.ThrowIfCancellationRequested();
 
         var returnType = methodSymbol.ReturnType;
+        var declaredReturn = GetDeclaredReturnType(methodSymbol, returnType, ct);
         var returnKind = ReturnTypeClassifier.Classify(returnType, ct, out var unwrappedReturnType, out var subService);
+        var isLookalikeTaskLike = ReturnTypeClassifier.IsLookalikeTaskLike(returnType);
         var metadataTypes = MethodMetadataTypesFactory.Get(methodSymbol, returnKind, ct);
-        var declaredReturnType = returnType.ToDisplayString(s_qualifiedFormat);
         var typeParameterList = MethodSignatureFormatter.GetTypeParameterList(methodSymbol, ct);
         var constraintClauses = MethodSignatureFormatter.GetConstraintClauses(methodSymbol, ct);
         string? unsupportedReason = null;
@@ -90,8 +93,9 @@ internal static partial class MethodModelFactory
             Name: IdentifierHelpers.EscapeIdentifier(methodSymbol.Name),
             ExplicitImplementationType: GetExplicitImplementationType(methodSymbol.ContainingType),
             RpcName: LiteralHelpers.EscapeStringLiteral(configuredRpcName),
+            ExternAliases: declaredReturn.ExternAliases,
             ReturnKind: returnKind,
-            DeclaredReturnType: declaredReturnType,
+            DeclaredReturnType: declaredReturn.Type,
             UnwrappedReturnType: unwrappedReturnType,
             MemberAttributePrefix: MemberAttributeFormatter.BuildPrefix(methodSymbol, ct) +
                 BuildMemberAttributePrefix(methodSymbol, ct),
@@ -108,11 +112,55 @@ internal static partial class MethodModelFactory
             SubService: subService,
             RawRpcName: configuredRpcName,
             MetadataReturnType: metadataTypes.ReturnType,
-            MetadataResultType: metadataTypes.ResultType);
+            MetadataResultType: metadataTypes.ResultType,
+            IsLookalikeTaskLike: isLookalikeTaskLike);
     }
 
     internal static string GetExplicitImplementationType(INamedTypeSymbol type) =>
         type.ToDisplayString(s_qualifiedFormat);
+
+    private static (string Type, EquatableArray<string> ExternAliases) GetDeclaredReturnType(
+        IMethodSymbol methodSymbol,
+        ITypeSymbol returnType,
+        CancellationToken ct)
+    {
+        var declaredReturnType = returnType.ToDisplayString(s_qualifiedFormat);
+        foreach (var syntaxReference in methodSymbol.DeclaringSyntaxReferences)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (syntaxReference.GetSyntax(ct) is not Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax declaration)
+            {
+                continue;
+            }
+
+            var aliases = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var externAlias in declaration.SyntaxTree.GetRoot(ct)
+                         .DescendantNodes()
+                         .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ExternAliasDirectiveSyntax>())
+            {
+                aliases.Add(externAlias.Identifier.ValueText);
+            }
+
+            var usedAliases = new List<string>();
+            foreach (var aliasName in declaration.ReturnType
+                         .DescendantNodesAndSelf()
+                         .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.AliasQualifiedNameSyntax>())
+            {
+                var alias = aliasName.Alias.Identifier.ValueText;
+                if (aliases.Contains(alias) && !usedAliases.Contains(alias, StringComparer.Ordinal))
+                {
+                    usedAliases.Add(alias);
+                }
+            }
+
+            if (usedAliases.Count > 0)
+            {
+                return (declaration.ReturnType.ToString(), usedAliases.ToEquatableArray());
+            }
+        }
+
+        return (declaredReturnType, EquatableArray<string>.Empty);
+    }
 
     private static string? GetConfiguredMethodName(IMethodSymbol methodSymbol)
     {

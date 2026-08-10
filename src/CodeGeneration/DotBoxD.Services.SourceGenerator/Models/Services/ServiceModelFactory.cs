@@ -141,6 +141,14 @@ internal static partial class ServiceModelFactory
 
         WireNameValidator.MarkDuplicateWireNames(displayName, methods, methodLocations, methodDiagnostics, ct);
         var experimentalAttribute = ExperimentalAttributeFormatter.From(interfaceSymbol);
+        var externAliases = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var method in methods)
+        {
+            foreach (var externAlias in method.ExternAliases.Array)
+            {
+                externAliases.Add(externAlias);
+            }
+        }
 
         return new ServiceResult(
             Model: new ServiceModel(
@@ -149,6 +157,7 @@ internal static partial class ServiceModelFactory
                 ServiceName: LiteralHelpers.EscapeStringLiteral(serviceName),
                 Methods: methods.ToEquatableArray(),
                 Properties: properties.ToEquatableArray(),
+                ExternAliases: externAliases.ToEquatableArray(),
                 RawServiceName: serviceName,
                 ObsoleteAttribute: obsoleteAttribute.Source,
                 TypeAttributePrefix: experimentalAttribute.AttributePrefix,

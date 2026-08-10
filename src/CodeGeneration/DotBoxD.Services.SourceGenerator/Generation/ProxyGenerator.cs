@@ -54,7 +54,7 @@ internal static partial class ProxyGenerator
 
         var declaredReturn = method.DeclaredReturnType;
         // Stubs stay non-async so out-parameters are definitely assigned by throw.
-        var asyncKeyword = method.UnsupportedReason is null && RequiresAsyncStateMachine(method.ReturnKind)
+        var asyncKeyword = method.UnsupportedReason is null && !method.IsLookalikeTaskLike && RequiresAsyncStateMachine(method.ReturnKind)
             ? "async "
             : string.Empty;
         var unsafeKeyword = method.RequiresUnsafeSignature ? "unsafe " : string.Empty;
@@ -68,9 +68,10 @@ internal static partial class ProxyGenerator
         sb.AppendLine($"        {access}{unsafeKeyword}{asyncKeyword}{method.ReturnRefKindKeyword}{declaredReturn} {target}{method.TypeParameterList}({paramList}){method.ConstraintClauses}");
         sb.AppendLine("        {");
 
-        if (method.UnsupportedReason is not null)
+        if (method.UnsupportedReason is not null || method.IsLookalikeTaskLike)
         {
-            sb.AppendLine($"            throw new {ServicesGeneratorTypeNames.GlobalNotSupportedException}(\"DotBoxD cannot marshal '{IdentifierHelpers.UnescapeIdentifier(method.Name)}': {LiteralHelpers.EscapeStringLiteral(method.UnsupportedReason)}\");");
+            var reason = method.UnsupportedReason ?? "return types named 'Task' or 'ValueTask' must be the framework types from System.Runtime";
+            sb.AppendLine($"            throw new {ServicesGeneratorTypeNames.GlobalNotSupportedException}(\"DotBoxD cannot marshal '{IdentifierHelpers.UnescapeIdentifier(method.Name)}': {LiteralHelpers.EscapeStringLiteral(reason)}\");");
         }
         else
         {
