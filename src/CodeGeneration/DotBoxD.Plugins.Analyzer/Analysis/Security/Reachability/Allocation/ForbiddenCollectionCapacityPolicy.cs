@@ -108,10 +108,13 @@ internal static class ForbiddenCollectionCapacityPolicy
             QueueTypeName => "System.Collections.Generic.Queue",
             HashtableTypeName => "System.Collections.Hashtable",
             HybridDictionaryTypeName => HybridDictionaryTypeName,
-            StackTypeName or HashSetTypeName or PriorityQueueTypeName =>
-                type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
-            _ => null
+            _ => GenericCollectionDisplayName(type, typeName)
         };
+
+    private static string? GenericCollectionDisplayName(INamedTypeSymbol type, string typeName)
+        => typeName is StackTypeName or HashSetTypeName or PriorityQueueTypeName
+            ? type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
+            : null;
 
     private static bool IsCapacityAllocationMethod(IMethodSymbol method, string typeName)
     {
