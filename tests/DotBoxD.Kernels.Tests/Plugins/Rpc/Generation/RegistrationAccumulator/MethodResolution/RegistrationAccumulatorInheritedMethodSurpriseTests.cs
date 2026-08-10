@@ -49,6 +49,31 @@ public sealed class RegistrationAccumulatorInheritedMethodSurpriseTests
     }
 
     [Fact]
+    public void Overridden_registration_method_remains_unambiguous()
+    {
+        var generated = string.Join("\n", PluginAnalyzerGeneratedPackageFactory.GeneratedSources("""
+            using System.Threading.Tasks;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public class ControlBase
+            {
+                public virtual ValueTask<string> Replace() => ValueTask.FromResult("base");
+            }
+
+            [GeneratePluginRegistrationAccumulator("ControlAccumulator", "Replace")]
+            public sealed class Control : ControlBase
+            {
+                public override ValueTask<string> Replace() => ValueTask.FromResult("derived");
+            }
+            """));
+
+        Assert.Contains("ControlAccumulator", generated, StringComparison.Ordinal);
+        Assert.Contains("Replace()", generated, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Hidden_registration_methods_remain_rejected_as_ambiguous()
     {
         var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
