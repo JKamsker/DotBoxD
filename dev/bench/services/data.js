@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785744405372,
+  "lastUpdate": 1786341748076,
   "repoUrl": "https://github.com/JKamsker/DotBoxD",
   "entries": {
     "DotBoxD.Services Benchmarks": [
@@ -614,6 +614,136 @@ window.BENCHMARK_DATA = {
             "value": 93.84719675117069,
             "unit": "ns",
             "range": "± 0.14890945461209612"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jonas Kamsker",
+            "username": "JKamsker",
+            "email": "11245306+JKamsker@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "Jonas Kamsker",
+            "username": "JKamsker",
+            "email": "11245306+JKamsker@users.noreply.github.com"
+          },
+          "id": "36e4ee5c405258f8d796c94f0aa629729fe71ee3",
+          "message": "Upgrade lighter agentic workflows to GPT-5.6 Terra\n\nRun the smoke test, discovery dispatcher, red-test worker, and fix worker with gpt-5.6-terra at xhigh reasoning instead of gpt-5.5 at high reasoning.\n\nRegenerate their gh-aw lock files so both the agent and threat-detection phases use the requested model configuration.",
+          "timestamp": "2026-08-09T19:07:37Z",
+          "url": "https://github.com/JKamsker/DotBoxD/commit/36e4ee5c405258f8d796c94f0aa629729fe71ee3"
+        },
+        "date": 1786341747307,
+        "tool": "benchmarkdotnet",
+        "benches": [
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.FramingBenchmarks.ParseFrameOnly",
+            "value": 17.79829130238957,
+            "unit": "ns",
+            "range": "± 0.00933599192182659"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.FramingBenchmarks.FrameRequest",
+            "value": 441.50329542160034,
+            "unit": "ns",
+            "range": "± 0.21263676850994281"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.FramingBenchmarks.DeserializeArgument",
+            "value": 165.80821353197098,
+            "unit": "ns",
+            "range": "± 0.031924639663965984"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.PeerRoundTripBenchmarks.MovePlayerAsync(EndToEndLowAllocationProfile: False)",
+            "value": 8894.185083007813,
+            "unit": "ns",
+            "range": "± 1276.637443299412"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.PeerRoundTripBenchmarks.MovePlayerAsync(EndToEndLowAllocationProfile: True)",
+            "value": 6915.939056396484,
+            "unit": "ns",
+            "range": "± 241.92558053863738"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.RpcTelemetryBenchmarks.SuccessfulRequestWithoutListeners",
+            "value": 2.598578305542469,
+            "unit": "ns",
+            "range": "± 0.04748056192873063"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ServiceGeneratorScaleBenchmarks.RunGenerators(ContractCount: 10)",
+            "value": 929877.9828125,
+            "unit": "ns",
+            "range": "± 4678.532354006444"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ServiceGeneratorScaleBenchmarks.RunGenerators(ContractCount: 100)",
+            "value": 9484459.09375,
+            "unit": "ns",
+            "range": "± 348040.31067669933"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ServiceGeneratorScaleBenchmarks.RunGenerators(ContractCount: 500)",
+            "value": 62579985.037037045,
+            "unit": "ns",
+            "range": "± 1369298.6536376171"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.StreamedArgumentProxyBenchmarks.SingleStreamUpload",
+            "value": 18.504666576782864,
+            "unit": "ns",
+            "range": "± 0.02046277375918209"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.StreamedArgumentProxyBenchmarks.TwoStreamUpload",
+            "value": 41.628823240598045,
+            "unit": "ns",
+            "range": "± 0.05268366641071443"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.RegisterPlayerFlow",
+            "value": 19.397318813204766,
+            "unit": "ns",
+            "range": "± 0.02443962326102173"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.GetPlayerStateFlow",
+            "value": 13.325577944517136,
+            "unit": "ns",
+            "range": "± 0.015891779328048947"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.MovePlayerFlow",
+            "value": 27.009593963623047,
+            "unit": "ns",
+            "range": "± 0.02043680299738075"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.PerformActionFlow",
+            "value": 20.323244631290436,
+            "unit": "ns",
+            "range": "± 0.003244458394587628"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.MissingPlayerFailureFlow",
+            "value": 11.84417108198007,
+            "unit": "ns",
+            "range": "± 0.00618130582653022"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.VoidHeartbeatFlow",
+            "value": 5.438774055242538,
+            "unit": "ns",
+            "range": "± 0.00866164668003911"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.FullGameplaySessionFlow",
+            "value": 104.89155173301697,
+            "unit": "ns",
+            "range": "± 0.0319637570044911"
           }
         ]
       }
