@@ -26,7 +26,7 @@ internal static partial class HookResultModelFactory
                 continue;
             }
 
-            if (member is IPropertySymbol or IFieldSymbol or IEventSymbol)
+            if (member is IPropertySymbol or IFieldSymbol or IEventSymbol or INamedTypeSymbol)
             {
                 yield return new HookResultExistingMember(
                     member.Name,
