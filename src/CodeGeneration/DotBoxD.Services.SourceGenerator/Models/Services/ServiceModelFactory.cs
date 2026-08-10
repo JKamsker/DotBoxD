@@ -88,44 +88,19 @@ internal static partial class ServiceModelFactory
         var seenSignatureIndexes = new Dictionary<string, int>(StringComparer.Ordinal);
         var validationCache = SharedRpcTypeValidationCache.Get(context.SemanticModel.Compilation);
 
-        foreach (var methodSymbol in members.Methods)
-        {
-            ct.ThrowIfCancellationRequested();
-
-            var sigKey = MethodSignatureFacts.GetSignatureKey(methodSymbol, ct);
-            if (TryApplyInheritedMethod(
-                    buildContext,
-                    methodSymbol,
-                    sigKey,
-                    seenSignatures,
-                    seenSignatureIndexes,
-                    methods,
-                    ct,
-                    out var rejectedMethod,
-                    out var hasRejectedMethod))
-            {
-                if (hasRejectedMethod)
-                {
-                    return rejectedMethod;
-                }
-
-                continue;
-            }
-
-            seenSignatures[sigKey] = methodSymbol;
-            seenSignatureIndexes[sigKey] = methods.Count;
-
-            var method = MethodModelFactory.Build(
-                buildContext.DisplayName,
-                methodSymbol,
+        if (BuildMethods(
+                members.Methods,
+                buildContext,
                 cancellationTokenSymbol,
                 validationCache,
+                methods,
+                methodLocations,
                 methodDiagnostics,
-                ct,
-                out var methodLocation);
-
-            methods.Add(method);
-            methodLocations.Add(methodLocation);
+                seenSignatures,
+                seenSignatureIndexes,
+                ct) is { } rejectedMethod)
+        {
+            return rejectedMethod;
         }
 
         foreach (var propertySymbol in members.Properties)
@@ -169,6 +144,61 @@ internal static partial class ServiceModelFactory
             ServiceLocation: buildContext.ServiceLocation,
             QualifiedInterfaceName: buildContext.QualifiedInterfaceName,
             ServiceDiagnostic: null);
+    }
+
+    private static ServiceResult? BuildMethods(
+        List<IMethodSymbol> methodSymbols,
+        ServiceBuildContext buildContext,
+        INamedTypeSymbol? cancellationTokenSymbol,
+        RpcTypeValidationCache validationCache,
+        List<MethodModel> methods,
+        List<DiagnosticLocation> methodLocations,
+        List<MethodDiagnostic> methodDiagnostics,
+        Dictionary<string, IMethodSymbol> seenSignatures,
+        Dictionary<string, int> seenSignatureIndexes,
+        CancellationToken ct)
+    {
+        foreach (var methodSymbol in methodSymbols)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var sigKey = MethodSignatureFacts.GetSignatureKey(methodSymbol, ct);
+            if (TryApplyInheritedMethod(
+                    buildContext,
+                    methodSymbol,
+                    sigKey,
+                    seenSignatures,
+                    seenSignatureIndexes,
+                    methods,
+                    ct,
+                    out var rejectedMethod,
+                    out var hasRejectedMethod))
+            {
+                if (hasRejectedMethod)
+                {
+                    return rejectedMethod;
+                }
+
+                continue;
+            }
+
+            seenSignatures[sigKey] = methodSymbol;
+            seenSignatureIndexes[sigKey] = methods.Count;
+
+            var method = MethodModelFactory.Build(
+                buildContext.DisplayName,
+                methodSymbol,
+                cancellationTokenSymbol,
+                validationCache,
+                methodDiagnostics,
+                ct,
+                out var methodLocation);
+
+            methods.Add(method);
+            methodLocations.Add(methodLocation);
+        }
+
+        return null;
     }
 
     private static ServiceResult? ValidateServiceSymbol(

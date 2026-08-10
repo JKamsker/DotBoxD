@@ -68,6 +68,18 @@ internal static partial class ProxyGenerator
         sb.AppendLine($"        {access}{unsafeKeyword}{asyncKeyword}{method.ReturnRefKindKeyword}{declaredReturn} {target}{method.TypeParameterList}({paramList}){method.ConstraintClauses}");
         sb.AppendLine("        {");
 
+        EmitProxyMethodBody(sb, service, method, ctArg, ct);
+
+        sb.AppendLine("        }");
+    }
+
+    private static void EmitProxyMethodBody(
+        StringBuilder sb,
+        ServiceModel service,
+        MethodModel method,
+        string ctArg,
+        CancellationToken ct)
+    {
         if (method.UnsupportedReason is not null || method.IsLookalikeTaskLike)
         {
             var reason = method.UnsupportedReason ?? "return types named 'Task' or 'ValueTask' must be the framework types from System.Runtime";
@@ -93,8 +105,6 @@ internal static partial class ProxyGenerator
                     ct);
             }
         }
-
-        sb.AppendLine("        }");
     }
 
     /// <summary>
