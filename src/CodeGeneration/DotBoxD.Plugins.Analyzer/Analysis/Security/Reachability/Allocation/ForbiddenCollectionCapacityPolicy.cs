@@ -101,6 +101,11 @@ internal static class ForbiddenCollectionCapacityPolicy
     }
 
     private static string? CollectionDisplayName(INamedTypeSymbol type, string typeName)
+        => typeName == NameValueCollectionTypeName
+            ? NameValueCollectionTypeName
+            : StandardCollectionDisplayName(type, typeName);
+
+    private static string? StandardCollectionDisplayName(INamedTypeSymbol type, string typeName)
         => typeName switch
         {
             ArrayListTypeName => ArrayListTypeName,
@@ -108,7 +113,6 @@ internal static class ForbiddenCollectionCapacityPolicy
             DictionaryTypeName => "System.Collections.Generic.Dictionary",
             QueueTypeName => "System.Collections.Generic.Queue",
             HashtableTypeName => "System.Collections.Hashtable",
-            NameValueCollectionTypeName => NameValueCollectionTypeName,
             StackTypeName or HashSetTypeName or PriorityQueueTypeName =>
                 type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
             _ => null
