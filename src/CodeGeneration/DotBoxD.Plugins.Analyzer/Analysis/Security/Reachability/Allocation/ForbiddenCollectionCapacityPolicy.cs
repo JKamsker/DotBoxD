@@ -14,6 +14,8 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string ImmutableArrayBuilderTypeName =
         "System.Collections.Immutable.ImmutableArray<T>.Builder";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
+    private const string NameValueCollectionTypeName =
+        "System.Collections.Specialized.NameValueCollection";
     private const string PriorityQueueTypeName =
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
     private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
@@ -106,6 +108,7 @@ internal static class ForbiddenCollectionCapacityPolicy
             DictionaryTypeName => "System.Collections.Generic.Dictionary",
             QueueTypeName => "System.Collections.Generic.Queue",
             HashtableTypeName => "System.Collections.Hashtable",
+            NameValueCollectionTypeName => NameValueCollectionTypeName,
             StackTypeName or HashSetTypeName or PriorityQueueTypeName =>
                 type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
             _ => null
