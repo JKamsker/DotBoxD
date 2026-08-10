@@ -67,8 +67,19 @@ public sealed partial class RpcPeer
     /// </remarks>
     public async Task CloseAsync(CancellationToken ct = default)
     {
-        ct.ThrowIfCancellationRequested();
-        await DisposeAsync().ConfigureAwait(false);
+        Task? disposeTask;
+        lock (_lifecycleLock)
+        {
+            disposeTask = _disposeTask;
+        }
+
+        if (disposeTask is null)
+        {
+            ct.ThrowIfCancellationRequested();
+            disposeTask = DisposeAsync().AsTask();
+        }
+
+        await disposeTask.ConfigureAwait(false);
     }
 
     public ValueTask DisposeAsync()
