@@ -7,6 +7,7 @@ internal static class ForbiddenCollectionCapacityPolicy
 {
     private const string ArrayListTypeName = "System.Collections.ArrayList";
     private const string BitArrayTypeName = "System.Collections.BitArray";
+    private const string CollectionsUtilTypeName = "System.Collections.Specialized.CollectionsUtil";
     private const string DictionaryTypeName = "System.Collections.Generic.Dictionary<TKey, TValue>";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string HashtableTypeName = "System.Collections.Hashtable";
@@ -28,6 +29,12 @@ internal static class ForbiddenCollectionCapacityPolicy
         }
 
         var typeName = CapacityTypeName(method);
+        if (IsCollectionsUtilHashtableFactory(method, typeName))
+        {
+            forbidden = HashtableTypeName;
+            return true;
+        }
+
         if (!IsCapacityAllocationMethod(method, typeName))
         {
             forbidden = null!;
@@ -137,6 +144,11 @@ internal static class ForbiddenCollectionCapacityPolicy
     private static bool IsImmutableArrayCreateBuilder(IMethodSymbol method, string typeName)
         => method is { IsStatic: true, Name: "CreateBuilder" } &&
            string.Equals(typeName, ImmutableArrayTypeName, StringComparison.Ordinal);
+
+    private static bool IsCollectionsUtilHashtableFactory(IMethodSymbol method, string typeName)
+        => method is { IsStatic: true, Name: "CreateCaseInsensitiveHashtable" } &&
+           string.Equals(typeName, CollectionsUtilTypeName, StringComparison.Ordinal) &&
+           HasCapacityParameter(method, "capacity");
 
     private static bool HasCapacityParameter(IMethodSymbol method, string capacityName)
         => method.Parameters.Any(parameter =>
