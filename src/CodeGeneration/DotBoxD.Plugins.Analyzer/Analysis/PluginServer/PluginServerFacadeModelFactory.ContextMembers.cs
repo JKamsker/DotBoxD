@@ -7,7 +7,10 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 
 internal static partial class PluginServerFacadeModelFactory
 {
-    private static void ValidateContextMembers(INamedTypeSymbol contextType, CancellationToken cancellationToken)
+    private static void ValidateContextMembers(
+        INamedTypeSymbol contextType,
+        Compilation compilation,
+        CancellationToken cancellationToken)
     {
         foreach (var member in ContextMembersIncludingInherited(contextType))
         {
@@ -27,7 +30,7 @@ internal static partial class PluginServerFacadeModelFactory
                 continue;
             }
 
-            ValidateNoContextHostBinding(contextType, member);
+            ValidateNoContextHostBinding(contextType, member, compilation);
 
             if (string.Equals(member.Name, "OnCreated", StringComparison.Ordinal))
             {
@@ -123,14 +126,15 @@ internal static partial class PluginServerFacadeModelFactory
         => new(
             $"Generated plugin server context '{contextType.ToDisplayString()}' member '{memberName}' collides with the generated context surface.");
 
-    private static void ValidateNoContextHostBinding(INamedTypeSymbol contextType, ISymbol member)
+    private static void ValidateNoContextHostBinding(
+        INamedTypeSymbol contextType,
+        ISymbol member,
+        Compilation compilation)
     {
         foreach (var attribute in member.GetAttributes())
         {
-            if (string.Equals(
-                    attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDMetadataNames.HostBindingAttribute,
-                    StringComparison.Ordinal))
+            if (compilation.GetTypeByMetadataName(DotBoxDMetadataNames.HostBindingAttribute) is { } expected &&
+                SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected))
             {
                 throw new NotSupportedException(
                     $"Generated plugin server context '{contextType.ToDisplayString()}' must not declare [HostBinding] members; expose host services through [RpcService] selectors.");
