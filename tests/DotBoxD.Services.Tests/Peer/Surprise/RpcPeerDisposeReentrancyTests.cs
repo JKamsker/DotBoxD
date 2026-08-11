@@ -14,7 +14,11 @@ public sealed class RpcPeerDisposeReentrancyTests
     [Fact]
     public async Task DisposeAsync_WhenDiagnosticHandlerReenters_PublishesOneSharedTerminalBeforeTeardown()
     {
-        await s_diagnosticsGate.WaitAsync(TimeSpan.FromSeconds(30));
+        if (!await s_diagnosticsGate.WaitAsync(TimeSpan.FromSeconds(30)))
+        {
+            throw new TimeoutException("Timed out waiting to acquire the diagnostics test gate.");
+        }
+
         try
         {
             var sentinel = new InvalidOperationException("channel dispose failed");
