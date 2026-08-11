@@ -71,7 +71,7 @@ internal static class ForbiddenCollectionCapacityPolicy
         }
 
         if (string.Equals(typeName, OrderedDictionaryTypeName, StringComparison.Ordinal) &&
-            !HasCollectionInitializer(creation))
+            !HasNonEmptyInitializer(creation))
         {
             forbidden = null!;
             return false;
@@ -157,8 +157,8 @@ internal static class ForbiddenCollectionCapacityPolicy
             argument.Parameter is { Type.SpecialType: SpecialType.System_Int32, Name: "length" } &&
             argument.Value.ConstantValue is not { HasValue: true, Value: 0 });
 
-    private static bool HasCollectionInitializer(IObjectCreationOperation creation)
-        => creation.Initializer?.Initializers.Any(static initializer => initializer is IInvocationOperation) == true;
+    private static bool HasNonEmptyInitializer(IObjectCreationOperation creation)
+        => creation.Initializer?.Initializers.Any() == true;
 
     private static string CapacityTypeName(IMethodSymbol method)
         => method.ContainingType.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);

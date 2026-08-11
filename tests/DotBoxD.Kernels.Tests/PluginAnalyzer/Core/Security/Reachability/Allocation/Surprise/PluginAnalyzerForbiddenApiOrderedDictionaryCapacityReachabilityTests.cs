@@ -18,6 +18,21 @@ public sealed class PluginAnalyzerForbiddenApiOrderedDictionaryCapacityReachabil
     }
 
     [Fact]
+    public async Task Reports_capacity_realized_by_ordered_dictionary_index_initializer()
+    {
+        var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
+            Source(
+                "private static readonly OrderedDictionary Retained = new(int.MaxValue) { [\"key\"] = \"value\" };"),
+            "DotBoxDPluginAnalyzerOrderedDictionaryIndexInitializerCapacityReachabilityTest");
+
+        var diagnostic = Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DBXK001"));
+        Assert.Contains(
+            "System.Collections.Specialized.OrderedDictionary",
+            diagnostic.GetMessage(),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Allows_lazy_ordered_dictionary_capacity_without_insertion()
     {
         var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
