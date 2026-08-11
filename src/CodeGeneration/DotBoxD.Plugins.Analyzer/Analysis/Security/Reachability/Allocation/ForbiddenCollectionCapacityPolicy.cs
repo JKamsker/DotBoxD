@@ -100,17 +100,25 @@ internal static class ForbiddenCollectionCapacityPolicy
     }
 
     private static string? CollectionDisplayName(INamedTypeSymbol type, string typeName)
-        => typeName switch
+    {
+        if (IsGenericCollection(typeName))
+        {
+            return type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+        }
+
+        return typeName switch
         {
             ArrayListTypeName => ArrayListTypeName,
             ListTypeName => "System.Collections.Generic.List",
             DictionaryTypeName => "System.Collections.Generic.Dictionary",
             QueueTypeName => "System.Collections.Generic.Queue",
             HashtableTypeName => "System.Collections.Hashtable",
-            StackTypeName or HashSetTypeName or PriorityQueueTypeName =>
-                type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
             _ => InheritsCollectionBase(type) ? CollectionBaseTypeName : null
         };
+    }
+
+    private static bool IsGenericCollection(string typeName)
+        => typeName is StackTypeName or HashSetTypeName or PriorityQueueTypeName;
 
     private static bool InheritsCollectionBase(INamedTypeSymbol type)
     {
