@@ -203,6 +203,7 @@ internal static partial class PluginServerFacadeModelFactory
         if (!method.IsStatic ||
             method.IsGenericMethod ||
             method.Parameters.Length != 1 ||
+            method.Parameters[0].RefKind != RefKind.None ||
             !SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, hookContextType) ||
             !SymbolEqualityComparer.Default.Equals(method.ReturnType, contextType))
         {
