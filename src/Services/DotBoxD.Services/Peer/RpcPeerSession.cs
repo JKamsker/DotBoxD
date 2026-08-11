@@ -57,7 +57,13 @@ public sealed class RpcPeerSession : IAsyncDisposable
     {
         lock (_disposeLock)
         {
-            _disposeTask ??= DisposeCoreAsync();
+            if (_disposeTask is null)
+            {
+                var completionSource = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+                _disposeTask = completionSource.Task;
+                _ = CompleteDisposeAsync(completionSource);
+            }
+
             return new ValueTask(_disposeTask);
         }
     }
@@ -132,6 +138,19 @@ public sealed class RpcPeerSession : IAsyncDisposable
         if (first is not null)
         {
             ExceptionDispatchInfo.Capture(first).Throw();
+        }
+    }
+
+    private async Task CompleteDisposeAsync(TaskCompletionSource<object?> completionSource)
+    {
+        try
+        {
+            await DisposeCoreAsync().ConfigureAwait(false);
+            completionSource.SetResult(null);
+        }
+        catch (Exception ex)
+        {
+            completionSource.SetException(ex);
         }
     }
 
