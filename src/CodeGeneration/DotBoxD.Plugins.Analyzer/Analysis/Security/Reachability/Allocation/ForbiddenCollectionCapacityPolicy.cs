@@ -16,6 +16,7 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string ListTypeName = "System.Collections.Generic.List<T>";
     private const string PriorityQueueTypeName =
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
+    private const string NonGenericQueueTypeName = "System.Collections.Queue";
     private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
     private const string StackTypeName = "System.Collections.Generic.Stack<T>";
 
@@ -104,6 +105,7 @@ internal static class ForbiddenCollectionCapacityPolicy
             ArrayListTypeName => ArrayListTypeName,
             ListTypeName => "System.Collections.Generic.List",
             DictionaryTypeName => "System.Collections.Generic.Dictionary",
+            NonGenericQueueTypeName => NonGenericQueueTypeName,
             QueueTypeName => "System.Collections.Generic.Queue",
             HashtableTypeName => "System.Collections.Hashtable",
             StackTypeName or HashSetTypeName or PriorityQueueTypeName =>
