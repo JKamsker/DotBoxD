@@ -133,8 +133,9 @@ internal static partial class PluginServerFacadeModelFactory
     {
         foreach (var attribute in member.GetAttributes())
         {
-            if (compilation.GetTypeByMetadataName(DotBoxDMetadataNames.HostBindingAttribute) is { } expected &&
-                SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected))
+            if (SymbolEqualityComparer.Default.Equals(
+                    attribute.AttributeClass,
+                    compilation.GetTypeByMetadataName(DotBoxDMetadataNames.HostBindingAttribute)))
             {
                 throw new NotSupportedException(
                     $"Generated plugin server context '{contextType.ToDisplayString()}' must not declare [HostBinding] members; expose host services through [RpcService] selectors.");
