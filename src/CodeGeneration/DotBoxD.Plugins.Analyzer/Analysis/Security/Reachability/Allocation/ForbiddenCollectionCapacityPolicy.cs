@@ -115,6 +115,12 @@ internal static class ForbiddenCollectionCapacityPolicy
             QueueTypeName => "System.Collections.Generic.Queue",
             HashtableTypeName => "System.Collections.Hashtable",
             OrderedDictionaryTypeName => OrderedDictionaryTypeName,
+            _ => GenericCollectionDisplayName(type, typeName)
+        };
+
+    private static string? GenericCollectionDisplayName(INamedTypeSymbol type, string typeName)
+        => typeName switch
+        {
             StackTypeName or HashSetTypeName or PriorityQueueTypeName =>
                 type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
             _ => null
