@@ -202,7 +202,7 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
         _frameReadTimeout?.Dispose();
         if (_ownsStream)
         {
-            await StreamFrameReadOperations.DisposeBestEffortAsync(_stream).ConfigureAwait(false);
+            await _stream.DisposeAsync().ConfigureAwait(false);
         }
     }
 
