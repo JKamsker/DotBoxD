@@ -14,6 +14,7 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string ImmutableArrayBuilderTypeName =
         "System.Collections.Immutable.ImmutableArray<T>.Builder";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
+    private const string OrderedDictionaryTypeName = "System.Collections.Specialized.OrderedDictionary";
     private const string PriorityQueueTypeName =
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
     private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
@@ -69,6 +70,13 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
+        if (string.Equals(typeName, OrderedDictionaryTypeName, StringComparison.Ordinal) &&
+            !HasCollectionInitializer(creation))
+        {
+            forbidden = null!;
+            return false;
+        }
+
         return TryGetDisplayName(method, out forbidden);
     }
 
@@ -106,6 +114,7 @@ internal static class ForbiddenCollectionCapacityPolicy
             DictionaryTypeName => "System.Collections.Generic.Dictionary",
             QueueTypeName => "System.Collections.Generic.Queue",
             HashtableTypeName => "System.Collections.Hashtable",
+            OrderedDictionaryTypeName => OrderedDictionaryTypeName,
             StackTypeName or HashSetTypeName or PriorityQueueTypeName =>
                 type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
             _ => null
@@ -147,6 +156,9 @@ internal static class ForbiddenCollectionCapacityPolicy
         => creation.Arguments.Any(static argument =>
             argument.Parameter is { Type.SpecialType: SpecialType.System_Int32, Name: "length" } &&
             argument.Value.ConstantValue is not { HasValue: true, Value: 0 });
+
+    private static bool HasCollectionInitializer(IObjectCreationOperation creation)
+        => creation.Initializer?.Initializers.Any(static initializer => initializer is IInvocationOperation) == true;
 
     private static string CapacityTypeName(IMethodSymbol method)
         => method.ContainingType.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
