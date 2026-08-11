@@ -7,6 +7,7 @@ internal static class ForbiddenCollectionCapacityPolicy
 {
     private const string ArrayListTypeName = "System.Collections.ArrayList";
     private const string BitArrayTypeName = "System.Collections.BitArray";
+    private const string CollectionBaseTypeName = "System.Collections.CollectionBase";
     private const string DictionaryTypeName = "System.Collections.Generic.Dictionary<TKey, TValue>";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string HashtableTypeName = "System.Collections.Hashtable";
@@ -108,8 +109,24 @@ internal static class ForbiddenCollectionCapacityPolicy
             HashtableTypeName => "System.Collections.Hashtable",
             StackTypeName or HashSetTypeName or PriorityQueueTypeName =>
                 type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
-            _ => null
+            _ => InheritsCollectionBase(type) ? CollectionBaseTypeName : null
         };
+
+    private static bool InheritsCollectionBase(INamedTypeSymbol type)
+    {
+        for (var baseType = type.BaseType; baseType is not null; baseType = baseType.BaseType)
+        {
+            if (string.Equals(
+                    baseType.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
+                    CollectionBaseTypeName,
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private static bool IsCapacityAllocationMethod(IMethodSymbol method, string typeName)
     {
