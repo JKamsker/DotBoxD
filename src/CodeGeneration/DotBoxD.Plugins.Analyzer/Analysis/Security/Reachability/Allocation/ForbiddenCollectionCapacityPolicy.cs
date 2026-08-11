@@ -14,6 +14,8 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string ImmutableArrayBuilderTypeName =
         "System.Collections.Immutable.ImmutableArray<T>.Builder";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
+    private const string NameObjectCollectionBaseTypeName =
+        "System.Collections.Specialized.NameObjectCollectionBase";
     private const string PriorityQueueTypeName =
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
     private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
@@ -108,8 +110,24 @@ internal static class ForbiddenCollectionCapacityPolicy
             HashtableTypeName => "System.Collections.Hashtable",
             StackTypeName or HashSetTypeName or PriorityQueueTypeName =>
                 type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
-            _ => null
+            _ => InheritsNameObjectCollectionBase(type) ? NameObjectCollectionBaseTypeName : null
         };
+
+    private static bool InheritsNameObjectCollectionBase(INamedTypeSymbol type)
+    {
+        for (var baseType = type.BaseType; baseType is not null; baseType = baseType.BaseType)
+        {
+            if (string.Equals(
+                    baseType.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
+                    NameObjectCollectionBaseTypeName,
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private static bool IsCapacityAllocationMethod(IMethodSymbol method, string typeName)
     {
