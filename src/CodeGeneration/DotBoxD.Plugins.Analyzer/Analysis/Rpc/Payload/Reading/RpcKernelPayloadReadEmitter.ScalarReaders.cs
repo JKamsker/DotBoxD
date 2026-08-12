@@ -85,6 +85,7 @@ internal sealed partial class RpcKernelPayloadReadEmitter
         => RpcEnumRangeGuardSource.AppendInt64EnumRangeGuard(
             _helpers,
             enumType,
+            _compilation,
             "        ",
             "Server extension enum payload is outside the target enum underlying range.");
 

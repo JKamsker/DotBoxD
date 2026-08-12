@@ -9,6 +9,7 @@ internal static class RpcEnumRangeGuardSource
     public static void AppendInt64EnumRangeGuard(
         StringBuilder builder,
         INamedTypeSymbol enumType,
+        Compilation? compilation,
         string indent,
         string message)
     {
@@ -20,7 +21,7 @@ internal static class RpcEnumRangeGuardSource
 
         if (enumType.EnumUnderlyingType?.SpecialType == SpecialType.System_UInt64)
         {
-            AppendUInt64NegativeGuard(builder, enumType, indent, message);
+            AppendUInt64NegativeGuard(builder, enumType, compilation, indent, message);
         }
     }
 
@@ -42,13 +43,14 @@ internal static class RpcEnumRangeGuardSource
     private static void AppendUInt64NegativeGuard(
         StringBuilder builder,
         INamedTypeSymbol enumType,
+        Compilation? compilation,
         string indent,
         string message)
     {
         builder.Append(indent).AppendLine("if (__value < 0)");
         builder.Append(indent).AppendLine("{");
         builder.Append(indent).AppendLine("    var __bits = unchecked((ulong)__value);");
-        if (HasFlagsAttribute(enumType))
+        if (HasFlagsAttribute(enumType, compilation))
         {
             builder.Append(indent).Append("    if ((__bits & ~").Append(UInt64Literal(DeclaredMask(enumType)))
                 .AppendLine(") != 0UL)");
@@ -95,11 +97,10 @@ internal static class RpcEnumRangeGuardSource
         builder.AppendLine(")");
     }
 
-    private static bool HasFlagsAttribute(INamedTypeSymbol enumType)
-        => enumType.GetAttributes().Any(static attribute => string.Equals(
-            attribute.AttributeClass?.ToDisplayString(),
-            "System.FlagsAttribute",
-            StringComparison.Ordinal));
+    private static bool HasFlagsAttribute(INamedTypeSymbol enumType, Compilation? compilation)
+        => compilation?.GetTypeByMetadataName("System.FlagsAttribute") is { } expected &&
+           enumType.GetAttributes().Any(attribute =>
+               SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected));
 
     private static ulong DeclaredMask(INamedTypeSymbol enumType)
     {

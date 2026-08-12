@@ -85,6 +85,7 @@ internal sealed partial class RpcKernelValueConversionEmitter
         => RpcEnumRangeGuardSource.AppendInt64EnumRangeGuard(
             _helpers,
             enumType,
+            _compilation,
             "        ",
             "Server extension enum result is outside the target enum underlying range.");
 
