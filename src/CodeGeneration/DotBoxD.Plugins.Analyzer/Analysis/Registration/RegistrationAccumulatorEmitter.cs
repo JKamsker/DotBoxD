@@ -23,6 +23,7 @@ internal static class RegistrationAccumulatorEmitter
         builder.Append("    private readonly ").Append(model.ReceiverTypeName).AppendLine(" _target;");
         builder.Append("    private readonly global::System.Collections.Generic.List<global::System.Func<")
             .AppendLine("global::System.Threading.Tasks.ValueTask>> _registrations = [];");
+        builder.AppendLine("    private readonly global::System.Threading.SemaphoreSlim _flushGate = new(1, 1);");
         builder.AppendLine("    private int _registrationIndex;");
         builder.AppendLine();
         builder.Append("    public ").Append(model.AccumulatorName).Append('(')
@@ -117,11 +118,19 @@ internal static class RegistrationAccumulatorEmitter
     {
         builder.AppendLine("    internal async global::System.Threading.Tasks.ValueTask FlushAsync()");
         builder.AppendLine("    {");
-        builder.AppendLine("        while (_registrationIndex < _registrations.Count)");
+        builder.AppendLine("        await _flushGate.WaitAsync().ConfigureAwait(false);");
+        builder.AppendLine("        try");
         builder.AppendLine("        {");
-        builder.AppendLine("            var registration = _registrations[_registrationIndex];");
-        builder.AppendLine("            await registration().ConfigureAwait(false);");
-        builder.AppendLine("            _registrationIndex++;");
+        builder.AppendLine("            while (_registrationIndex < _registrations.Count)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                var registration = _registrations[_registrationIndex];");
+        builder.AppendLine("                await registration().ConfigureAwait(false);");
+        builder.AppendLine("                _registrationIndex++;");
+        builder.AppendLine("            }");
+        builder.AppendLine("        }");
+        builder.AppendLine("        finally");
+        builder.AppendLine("        {");
+        builder.AppendLine("            _flushGate.Release();");
         builder.AppendLine("        }");
         builder.AppendLine("    }");
     }
