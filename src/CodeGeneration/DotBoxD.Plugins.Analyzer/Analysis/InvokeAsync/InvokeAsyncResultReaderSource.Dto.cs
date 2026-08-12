@@ -259,11 +259,11 @@ internal sealed partial class InvokeAsyncResultReaderSource
             _ => false,
         };
 
-    private static bool HasSetsRequiredMembers(IMethodSymbol constructor)
-        => constructor.GetAttributes().Any(attribute => string.Equals(
-            attribute.AttributeClass?.ToDisplayString(),
-            "System.Diagnostics.CodeAnalysis.SetsRequiredMembersAttribute",
-            StringComparison.Ordinal));
+    private bool HasSetsRequiredMembers(IMethodSymbol constructor)
+        => _compilation?.GetTypeByMetadataName(
+            "System.Diagnostics.CodeAnalysis.SetsRequiredMembersAttribute") is { } expected &&
+           constructor.GetAttributes().Any(attribute =>
+               SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected));
 
     private sealed record ResolvedDtoConstructor(IMethodSymbol Symbol, bool[] Assigned, int AssignedCount);
 }
