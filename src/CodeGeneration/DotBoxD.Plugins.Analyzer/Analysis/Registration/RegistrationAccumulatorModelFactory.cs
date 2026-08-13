@@ -130,10 +130,7 @@ internal static class RegistrationAccumulatorModelFactory
         string methodName,
         Compilation compilation)
     {
-        var methods = type.GetMembers(methodName)
-            .OfType<IMethodSymbol>()
-            .Where(static method => method.MethodKind == MethodKind.Ordinary && !method.IsStatic)
-            .ToArray();
+        var methods = RegistrationAccumulatorMethodResolver.FindInstanceMethods(type, methodName);
         if (methods.Length != 1)
         {
             throw new NotSupportedException(
