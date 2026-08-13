@@ -231,7 +231,7 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
-        return string.Equals(typeName, DictionaryTypeName, StringComparison.Ordinal) &&
+        return typeName is DictionaryTypeName or PriorityQueueTypeName &&
                string.Equals(method.Name, "EnsureCapacity", StringComparison.Ordinal) &&
                HasCapacityParameter(method, "capacity");
     }
