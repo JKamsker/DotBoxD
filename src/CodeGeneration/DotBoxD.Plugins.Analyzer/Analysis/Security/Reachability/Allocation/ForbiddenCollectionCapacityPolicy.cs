@@ -26,6 +26,8 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string OrderedDictionaryTypeName = "System.Collections.Specialized.OrderedDictionary";
     private const string PriorityQueueTypeName =
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
+    private const string NonGenericQueueTypeName = "System.Collections.Queue";
+    private const string NonGenericQueueTypeName = "System.Collections.Queue";
     private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
     private const string SortedListTypeName = "System.Collections.Generic.SortedList<TKey, TValue>";
     private const string StackTypeName = "System.Collections.Generic.Stack<T>";
@@ -39,6 +41,7 @@ internal static class ForbiddenCollectionCapacityPolicy
         [HybridDictionaryTypeName] = HybridDictionaryTypeName,
         [ListTypeName] = "System.Collections.Generic.List",
         [NameValueCollectionTypeName] = NameValueCollectionTypeName,
+        [NonGenericQueueTypeName] = NonGenericQueueTypeName,
         [OrderedDictionaryTypeName] = OrderedDictionaryTypeName,
         [QueueTypeName] = "System.Collections.Generic.Queue",
         [SortedListTypeName] = "System.Collections.Generic.SortedList"
