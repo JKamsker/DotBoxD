@@ -27,8 +27,8 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string PriorityQueueTypeName =
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
     private const string NonGenericQueueTypeName = "System.Collections.Queue";
-    private const string NonGenericQueueTypeName = "System.Collections.Queue";
     private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
+    private const string NonGenericSortedListTypeName = "System.Collections.SortedList";
     private const string SortedListTypeName = "System.Collections.Generic.SortedList<TKey, TValue>";
     private const string StackTypeName = "System.Collections.Generic.Stack<T>";
 
@@ -42,6 +42,7 @@ internal static class ForbiddenCollectionCapacityPolicy
         [ListTypeName] = "System.Collections.Generic.List",
         [NameValueCollectionTypeName] = NameValueCollectionTypeName,
         [NonGenericQueueTypeName] = NonGenericQueueTypeName,
+        [NonGenericSortedListTypeName] = NonGenericSortedListTypeName,
         [OrderedDictionaryTypeName] = OrderedDictionaryTypeName,
         [QueueTypeName] = "System.Collections.Generic.Queue",
         [SortedListTypeName] = "System.Collections.Generic.SortedList"
@@ -134,6 +135,7 @@ internal static class ForbiddenCollectionCapacityPolicy
             (BitArrayTypeName, "Length") => BitArrayTypeName,
             (ImmutableArrayBuilderTypeName, "Capacity") => "System.Collections.Immutable.ImmutableArray",
             (ListTypeName, "Capacity") => "System.Collections.Generic.List",
+            (NonGenericSortedListTypeName, "Capacity") => NonGenericSortedListTypeName,
             (SortedListTypeName, "Capacity") => "System.Collections.Generic.SortedList",
             _ => null!
         };
@@ -187,7 +189,7 @@ internal static class ForbiddenCollectionCapacityPolicy
         {
             var capacityName = typeName switch
             {
-                PriorityQueueTypeName => "initialCapacity",
+                PriorityQueueTypeName or NonGenericSortedListTypeName => "initialCapacity",
                 HybridDictionaryTypeName => "initialSize",
                 _ => "capacity"
             };
