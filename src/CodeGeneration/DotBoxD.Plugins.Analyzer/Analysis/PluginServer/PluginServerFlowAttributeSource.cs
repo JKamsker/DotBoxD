@@ -28,7 +28,7 @@ internal static class PluginServerFlowAttributeSource
                 continue;
             }
 
-            switch (attribute.AttributeClass?.ToDisplayString())
+            switch (GetFrameworkAttributeName(attribute))
             {
                 case "System.Diagnostics.CodeAnalysis.AllowNullAttribute":
                     AppendSimpleAttributePrefix(
@@ -123,7 +123,7 @@ internal static class PluginServerFlowAttributeSource
 
     private static string? AttributeLine(AttributeData attribute, bool targetReturn, bool includeExperimental)
     {
-        switch (attribute.AttributeClass?.ToDisplayString())
+        switch (GetFrameworkAttributeName(attribute))
         {
             case "System.Diagnostics.CodeAnalysis.MaybeNullAttribute":
                 return SimpleAttribute(
@@ -155,6 +155,24 @@ internal static class PluginServerFlowAttributeSource
             default:
                 return null;
         }
+    }
+
+    private static string? GetFrameworkAttributeName(AttributeData attribute)
+    {
+        var attributeClass = attribute.AttributeClass;
+        return attributeClass is not null &&
+               attributeClass.ContainingAssembly.Identity.Name == "System.Private.CoreLib" &&
+               HasBclPublicKeyToken(attributeClass.ContainingAssembly.Identity)
+            ? attributeClass.ToDisplayString()
+            : null;
+    }
+
+    private static bool HasBclPublicKeyToken(AssemblyIdentity identity)
+    {
+        var token = identity.PublicKeyToken;
+        return token.Length == 8 &&
+               token[0] == 0x7c && token[1] == 0xec && token[2] == 0x85 && token[3] == 0xd7 &&
+               token[4] == 0xbe && token[5] == 0xa7 && token[6] == 0x79 && token[7] == 0x8e;
     }
 
     private static string? MemberOnlyAttribute(bool targetReturn, string? source) => targetReturn ? null : source;
