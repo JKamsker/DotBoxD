@@ -123,6 +123,13 @@ internal static partial class HookChainModelFactory
             installKind);
     }
 
+    internal static bool HasTerminalShape(
+        InvocationExpressionSyntax invocation,
+        HookChainInterceptorInstallKind installKind,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+        => TryTerminalShape(invocation, installKind, model, cancellationToken, out _);
+
     private static bool TryTerminalShape(
         InvocationExpressionSyntax invocation,
         HookChainInterceptorInstallKind installKind,
