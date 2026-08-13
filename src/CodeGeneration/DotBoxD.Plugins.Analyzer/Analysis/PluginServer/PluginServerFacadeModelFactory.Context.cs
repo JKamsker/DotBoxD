@@ -31,7 +31,7 @@ internal static partial class PluginServerFacadeModelFactory
         var factoryName = ContextFactoryName(attribute);
         if (factoryName is not null)
         {
-            ValidateContextFactory(contextType, factoryName);
+            ValidateContextFactory(contextType, factoryName, compilation);
         }
 
         var ns = contextType.ContainingNamespace.IsGlobalNamespace
@@ -178,7 +178,10 @@ internal static partial class PluginServerFacadeModelFactory
         }
     }
 
-    private static void ValidateContextFactory(INamedTypeSymbol contextType, string factoryName)
+    private static void ValidateContextFactory(
+        INamedTypeSymbol contextType,
+        string factoryName,
+        Compilation compilation)
     {
         var methods = contextType.GetMembers(factoryName).OfType<IMethodSymbol>()
             .Where(static method => method.MethodKind == MethodKind.Ordinary)
@@ -196,13 +199,12 @@ internal static partial class PluginServerFacadeModelFactory
         }
 
         var method = methods[0];
+        var hookContextType = compilation.GetTypeByMetadataName(DotBoxDMetadataNames.HookContextType);
         if (!method.IsStatic ||
             method.IsGenericMethod ||
             method.Parameters.Length != 1 ||
-            !string.Equals(
-                method.Parameters[0].Type.ToDisplayString(),
-                DotBoxDMetadataNames.HookContextType,
-                StringComparison.Ordinal) ||
+            method.Parameters[0].RefKind != RefKind.None ||
+            !SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, hookContextType) ||
             !SymbolEqualityComparer.Default.Equals(method.ReturnType, contextType))
         {
             throw new NotSupportedException(
