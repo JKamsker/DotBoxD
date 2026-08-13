@@ -199,21 +199,27 @@ internal static class ForbiddenCollectionCapacityPolicy
     {
         if (method.MethodKind == MethodKind.Constructor)
         {
-            var capacityName = typeName switch
-            {
-                PriorityQueueTypeName or NonGenericSortedListTypeName or ArrayBufferWriterTypeName =>
-                    "initialCapacity",
-                HybridDictionaryTypeName => "initialSize",
-                _ => "capacity"
-            };
-            return HasCapacityParameter(method, capacityName);
+            return HasConstructorCapacityParameter(method, typeName);
         }
 
-        if (method.MethodKind != MethodKind.Ordinary)
+        return method.MethodKind == MethodKind.Ordinary &&
+               IsCapacityAllocationOrdinaryMethod(method, typeName);
+    }
+
+    private static bool HasConstructorCapacityParameter(IMethodSymbol method, string typeName)
+    {
+        var capacityName = typeName switch
         {
-            return false;
-        }
+            PriorityQueueTypeName or NonGenericSortedListTypeName or ArrayBufferWriterTypeName =>
+                "initialCapacity",
+            HybridDictionaryTypeName => "initialSize",
+            _ => "capacity"
+        };
+        return HasCapacityParameter(method, capacityName);
+    }
 
+    private static bool IsCapacityAllocationOrdinaryMethod(IMethodSymbol method, string typeName)
+    {
         if (IsImmutableArrayCreateBuilder(method, typeName))
         {
             return HasCapacityParameter(method, "initialCapacity");
