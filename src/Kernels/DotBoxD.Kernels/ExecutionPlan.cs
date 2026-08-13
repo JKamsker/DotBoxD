@@ -1,4 +1,5 @@
 using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Debugging;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 
@@ -13,6 +14,7 @@ public sealed class ExecutionPlan
     private ExecutionPlanEntrypointMetadata? _moduleOnlyEntrypointMetadata;
     private FrozenDictionary<string, ExecutionPlanEntrypointMetadata>? _entrypointMetadataLookup;
     private FrozenDictionary<string, SandboxFunction>? _functionLookup;
+    private SandboxNodeMap? _debugNodeMap;
 
     public ExecutionPlan(
         string moduleHash,
@@ -62,6 +64,9 @@ public sealed class ExecutionPlan
     public IReadOnlyDictionary<string, FunctionAnalysis> FunctionAnalysis { get; }
     public IReadOnlyDictionary<string, IReadOnlySet<string>> BindingReferences { get; }
 
+    internal SandboxNodeMap DebugNodeMap
+        => Volatile.Read(ref _debugNodeMap) ?? BuildDebugNodeMap();
+
     // The module function set is immutable for the lifetime of a prepared plan, so the id->function
     // index is built once and reused across every interpreted run instead of being rebuilt per
     // execution. Lazy + Volatile keeps construction race-free without locking on the hot path.
@@ -81,6 +86,13 @@ public sealed class ExecutionPlan
         var lookup = Module.Functions.ToFrozenDictionary(f => f.Id, StringComparer.Ordinal);
         Volatile.Write(ref _functionLookup, lookup);
         return lookup;
+    }
+
+    private SandboxNodeMap BuildDebugNodeMap()
+    {
+        var map = SandboxNodeMap.Create(Module);
+        Interlocked.CompareExchange(ref _debugNodeMap, map, null);
+        return _debugNodeMap;
     }
 
     private FrozenDictionary<string, ExecutionPlanEntrypointMetadata> BuildEntrypointMetadataLookup()
@@ -249,6 +261,9 @@ public sealed record SandboxExecutionOptions
     public bool RequireDeterministic { get; init; }
     public SandboxRunId? RunId { get; init; }
     public int AutoCompileThreshold { get; init; } = 20;
+    public ISandboxExecutionDebugHook? DebugHook { get; init; }
+
+    internal bool RequiresInterpreter => EnableDebugTrace || DebugHook is not null;
 
     /// <summary>
     /// Drops the successful-run <c>RunSummary</c> audit event to avoid its allocation on the hot

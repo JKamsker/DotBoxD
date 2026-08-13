@@ -295,4 +295,5 @@ internal readonly partial struct ExpressionEvaluator
 
     private static bool IsNumericConversion(string name)
         => name is "numeric.toI64" or "numeric.toF64";
+
 }

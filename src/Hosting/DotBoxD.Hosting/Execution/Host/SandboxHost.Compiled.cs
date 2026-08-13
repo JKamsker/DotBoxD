@@ -19,10 +19,10 @@ public sealed partial class SandboxHost
         CancellationToken cancellationToken,
         CompiledNoAuditRunState? reusableNoAuditState = null)
     {
-        if (!_compiled.IsAvailable || options.EnableDebugTrace)
+        if (!_compiled.IsAvailable || options.RequiresInterpreter)
         {
-            var reason = !_compiled.IsAvailable ? CompilerUnavailableError() : DebugTraceFallbackError();
-            return options.AllowFallbackToInterpreter
+            var reason = !_compiled.IsAvailable ? CompilerUnavailableError() : DebugFallbackError(options);
+            return options.DebugHook is not null || options.AllowFallbackToInterpreter
                 ? await ExecuteFallbackToInterpreterAsync(
                         plan,
                         entrypoint,
@@ -66,7 +66,11 @@ public sealed partial class SandboxHost
         CancellationToken cancellationToken)
     {
         var runId = options.RunId ?? SandboxRunId.New();
-        var fallbackOptions = options with { RunId = runId };
+        var fallbackOptions = options with
+        {
+            Mode = ExecutionMode.Interpreted,
+            RunId = runId
+        };
         var result = await ExecuteInterpretedAsync(plan, entrypoint, input, fallbackOptions, cancellationToken)
             .ConfigureAwait(false);
         var audit = new InMemoryAuditSink();
@@ -286,8 +290,10 @@ public sealed partial class SandboxHost
     private static SandboxError CompilerUnavailableError()
         => new(SandboxErrorCode.ValidationError, "compiled execution is not available for this run");
 
-    private static SandboxError DebugTraceFallbackError()
-        => new(SandboxErrorCode.ValidationError, "compiled execution is disabled while debug tracing is enabled");
+    private static SandboxError DebugFallbackError(SandboxExecutionOptions options)
+        => options.DebugHook is not null
+            ? new SandboxError(SandboxErrorCode.ValidationError, "compiled execution is disabled while interpreter debugging is attached")
+            : new SandboxError(SandboxErrorCode.ValidationError, "compiled execution is disabled while debug tracing is enabled");
 
     private readonly record struct CompiledAttempt(SandboxExecutionResult? Result, SandboxError? FallbackReason);
 }

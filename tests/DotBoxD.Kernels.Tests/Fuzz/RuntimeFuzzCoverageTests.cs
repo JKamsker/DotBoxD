@@ -27,6 +27,10 @@ public sealed class RuntimeFuzzCoverageTests
         => Assert.False(SandboxDescriptorGuards.ContainsForbiddenDescriptor(ModuleId(seed)));
 
     [Fact]
+    public async Task Numeric_seed_does_not_look_like_a_compact_metadata_reference()
+        => await RunPureCaseAsync(23757449);
+
+    [Fact]
     public async Task Generated_pure_module_ids_do_not_embed_compact_metadata_tokens()
         => await RunPureCaseAsync(23_928_915);
 
@@ -135,7 +139,7 @@ public sealed class RuntimeFuzzCoverageTests
     private static string PureModuleJson(int index, string expression)
         => $$"""
         {
-          "id": "{{ModuleId(index)}}",
+          "id": "{{FuzzModuleId.FromSeed("runtime-fuzz", index)}}",
           "version": "1.0.0",
           "functions": [
             {

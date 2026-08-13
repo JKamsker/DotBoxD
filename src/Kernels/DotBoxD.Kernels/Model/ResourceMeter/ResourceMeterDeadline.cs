@@ -5,6 +5,14 @@ namespace DotBoxD.Kernels.Model;
 
 internal static class ResourceMeterDeadline
 {
+    public static long Timestamp() => Stopwatch.GetTimestamp();
+
+    public static long BeginSuspension(long deadline)
+    {
+        ThrowIfElapsed(deadline);
+        return Timestamp();
+    }
+
     public static long Create(ResourceLimits limits)
     {
         var now = Stopwatch.GetTimestamp();
@@ -38,5 +46,11 @@ internal static class ResourceMeterDeadline
         }
 
         return TimeSpan.FromTicks(Math.Max(1L, (long)timespanTicks));
+    }
+
+    public static long Extend(long deadline, long suspensionStartedAt)
+    {
+        var elapsed = Math.Max(0, Stopwatch.GetTimestamp() - suspensionStartedAt);
+        return elapsed >= long.MaxValue - deadline ? long.MaxValue : deadline + elapsed;
     }
 }

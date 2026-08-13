@@ -5,7 +5,8 @@
       "commandName": "Project",
       "commandLineArgs": "dotboxd-game-debug-0123456789abcdef",
       "environmentVariables": {
-        "DOTNET_ENVIRONMENT": "Development"
+        "DOTNET_ENVIRONMENT": "Development",
+        "DOTBOXD_KERNEL_DEBUG": "1"
       }
     }
   }

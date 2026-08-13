@@ -148,6 +148,8 @@ public sealed record LoweredPipelineStep(
     private IReadOnlyList<string> _requiredCapabilities = CopyList(RequiredCapabilities);
     private IReadOnlyList<string> _effects = CopyList(Effects);
 
+    public LoweredPipelineDebugInfo? DebugInfo { get; init; }
+
     public IReadOnlyList<Parameter> Parameters
     {
         get => _parameters;

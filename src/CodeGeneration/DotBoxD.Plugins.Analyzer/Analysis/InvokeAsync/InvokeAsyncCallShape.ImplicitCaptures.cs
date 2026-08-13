@@ -45,6 +45,7 @@ internal sealed partial class InvokeAsyncCallShape
             BuildReturnTypeJson(returnType, syncOuts, compilation),
             ImplicitArgumentsExpression(captures.All),
             captures.All.Select(static capture => capture.Type).ToArray(),
+            captures.All.Select(static capture => capture.Name).ToArray(),
             new EquatableArray<InvokeAsyncSyncOut>(syncOuts),
             [],
             assignmentOverride: null,

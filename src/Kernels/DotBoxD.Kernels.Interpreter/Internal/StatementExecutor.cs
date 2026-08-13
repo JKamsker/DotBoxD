@@ -1,3 +1,4 @@
+using DotBoxD.Kernels.Interpreter.Debugging;
 using DotBoxD.Kernels.Interpreter.Frame;
 using DotBoxD.Kernels.Interpreter.Internal.Loops;
 using DotBoxD.Kernels.Model;
@@ -25,7 +26,21 @@ internal readonly partial struct StatementExecutor
     private SandboxExecutionOptions Options => _interpreter.Options;
 
     private string ModuleHash => _interpreter.ModuleHash;
+
+    private InterpreterDebugStatementExecutor? DebugStatements => _interpreter.DebugStatements;
+
     public ValueTask<SandboxValue?> ExecuteStatementAsync(Statement statement, InterpreterFrame frame)
+    {
+        var debugStatements = DebugStatements;
+        if (debugStatements is not null)
+        {
+            return debugStatements.ExecuteAsync(statement, frame);
+        }
+
+        return ExecuteStatementCore(statement, frame);
+    }
+
+    internal ValueTask<SandboxValue?> ExecuteStatementCore(Statement statement, InterpreterFrame frame)
     {
         Context.ChargeFuel(1);
         if (Options.EnableDebugTrace)
@@ -48,7 +63,7 @@ internal readonly partial struct StatementExecutor
                 return PrimitiveStatementExecutor.ExecuteReturn(
                     ret, frame, Expressions);
             case ExpressionStatement expression:
-                return DiscardResult(EvaluateAsync(expression.Value, frame));
+                return StatementValueTaskAdapter.DiscardResult(EvaluateAsync(expression.Value, frame));
             case IfStatement branch:
                 return ExecuteIfAsync(branch, frame);
             case WhileStatement loop:
@@ -83,20 +98,6 @@ internal readonly partial struct StatementExecutor
     private ValueTask<SandboxValue?> ExecuteAssignment(AssignmentStatement assignment, InterpreterFrame frame)
         => PrimitiveStatementExecutor.ExecuteAssignment(
             assignment, frame, Expressions);
-    private static ValueTask<SandboxValue?> DiscardResult(ValueTask<SandboxValue> task)
-    {
-        if (task.IsCompletedSuccessfully)
-        {
-            _ = task.Result;
-            return default;
-        }
-        return AwaitDiscard(task);
-    }
-    private static async ValueTask<SandboxValue?> AwaitDiscard(ValueTask<SandboxValue> task)
-    {
-        _ = await task.ConfigureAwait(false);
-        return null;
-    }
     private ValueTask<SandboxValue?> ExecuteIfAsync(IfStatement statement, InterpreterFrame frame)
     {
         var conditionTask = EvaluateAsync(statement.Condition, frame);
@@ -129,6 +130,11 @@ internal readonly partial struct StatementExecutor
         while (((BoolValue)await EvaluateAsync(statement.Condition, frame).ConfigureAwait(false)).Value)
         {
             Context.ChargeLoopIteration(5);
+            var debugStatements = DebugStatements;
+            if (debugStatements is not null)
+            {
+                await debugStatements.CheckpointLoopIterationAsync(statement, frame).ConfigureAwait(false);
+            }
             var value = await ExecuteBlockAsync(statement.Body, frame).ConfigureAwait(false);
             if (value is not null && !LoopSignal.IsContinue(value))
             {
@@ -185,6 +191,12 @@ internal readonly partial struct StatementExecutor
     }
     private ValueTask<SandboxValue?> RunForLoop(ForRangeStatement statement, int start, int end, InterpreterFrame frame)
     {
+        var debugStatements = DebugStatements;
+        if (debugStatements is not null)
+        {
+            return debugStatements.RunForLoopAsync(statement, start, end, frame);
+        }
+
         if (TryRunForLoopFastPath(statement, start, end, frame))
         {
             return default;
@@ -208,6 +220,7 @@ internal readonly partial struct StatementExecutor
         }
         return default;
     }
+
 
     private async ValueTask<SandboxValue?> AwaitForIteration(
         ForRangeStatement statement,

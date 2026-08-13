@@ -14,6 +14,7 @@ namespace DotBoxD.Kernels.Game.Server;
 /// </summary>
 internal static class ServerPolicy
 {
+    private static readonly TimeSpan DebugWallTime = TimeSpan.FromSeconds(10);
     private const string MonsterReadPrefix = "game.world.monster.read.";
     private const string MonsterWritePrefix = "game.world.monster.write.";
     private const string EntityReadPrefix = "game.world.entity.read.";
@@ -22,16 +23,33 @@ internal static class ServerPolicy
     /// <summary>The base ceiling applied to a kernel with no extra capability needs.</summary>
     public static SandboxPolicy Create() => ForKernel([]);
 
+    /// <summary>The base ceiling used while the opt-in remote debugger instruments kernel execution.</summary>
+    public static SandboxPolicy CreateForDebugging() => ForDebugKernel([]);
+
     /// <summary>
     /// Builds the policy granting exactly what server-side package analysis says the verified IR needs.
     /// </summary>
     public static SandboxPolicy ForKernel(IReadOnlyList<string> requiredCapabilities)
+        => Build(requiredCapabilities, debugWallTime: false);
+
+    /// <summary>Builds the same least-privilege policy with debugger instrumentation headroom.</summary>
+    public static SandboxPolicy ForDebugKernel(IReadOnlyList<string> requiredCapabilities)
+        => Build(requiredCapabilities, debugWallTime: true);
+
+    private static SandboxPolicy Build(
+        IReadOnlyList<string> requiredCapabilities,
+        bool debugWallTime)
     {
         var builder = SandboxPolicyBuilder.Create()
             .GrantLogging()
             .GrantHostMessageWrite()
             .WithFuel(100_000)
             .WithMaxHostCalls(1_000);
+
+        if (debugWallTime)
+        {
+            builder.WithWallTime(DebugWallTime);
+        }
 
         if (RequiresPrefix(requiredCapabilities, MonsterReadPrefix))
         {

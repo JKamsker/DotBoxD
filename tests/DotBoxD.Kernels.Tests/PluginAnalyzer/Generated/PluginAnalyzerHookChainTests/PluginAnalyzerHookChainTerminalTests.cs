@@ -190,8 +190,9 @@ public sealed class PluginAnalyzerHookChainTerminalTests
             result.GeneratedTrees.Select(tree => tree.GetText().ToString()));
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
-        Assert.Contains("\"combat.damage\"", generated, StringComparison.Ordinal);
-        Assert.DoesNotContain("\"Sample.DamageCtx\"", generated, StringComparison.Ordinal);
+        Assert.Contains("\"IEventKernel<combat.damage>\"", generated, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"IEventKernel<Sample.DamageCtx>\"", generated, StringComparison.Ordinal);
+        Assert.Contains("\"Sample.DamageCtx\"", generated, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -223,8 +224,9 @@ public sealed class PluginAnalyzerHookChainTerminalTests
             result.GeneratedTrees.Select(tree => tree.GetText().ToString()));
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK100");
-        Assert.Contains("\"combat.damage\"", generated, StringComparison.Ordinal);
-        Assert.DoesNotContain("\"Sample.DamageCtx\"", generated, StringComparison.Ordinal);
+        Assert.Contains("\"IEventKernel<combat.damage>\"", generated, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"IEventKernel<Sample.DamageCtx>\"", generated, StringComparison.Ordinal);
+        Assert.Contains("\"Sample.DamageCtx\"", generated, StringComparison.Ordinal);
     }
 
     [Fact]

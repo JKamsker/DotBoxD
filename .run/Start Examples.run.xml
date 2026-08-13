@@ -1,0 +1,32 @@
+﻿<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Start Examples" type="com.intellij.execution.configurations.multilaunch" factoryName="MultiLaunchConfiguration">
+    <!-- These debug profiles publish the bridge used by Rider's Attach to DotBoxD Kernels action. -->
+    <rows>
+      <ExecutableRowSnapshot>
+        <option name="condition">
+          <ConditionSnapshot>
+            <option name="type" value="immediately" />
+          </ConditionSnapshot>
+        </option>
+        <option name="executable">
+          <ExecutableSnapshot>
+            <option name="id" value="runConfig:.NET Launch Settings Profile.Examples.GameServer.Server: GameServer - Wait for Plugin (Debug)" />
+          </ExecutableSnapshot>
+        </option>
+      </ExecutableRowSnapshot>
+      <ExecutableRowSnapshot>
+        <option name="condition">
+          <ConditionSnapshot>
+            <option name="type" value="immediately" />
+          </ConditionSnapshot>
+        </option>
+        <option name="executable">
+          <ExecutableSnapshot>
+            <option name="id" value="runConfig:.NET Launch Settings Profile.Examples.GameServer.Plugin: GameServer Plugin (Debug)" />
+          </ExecutableSnapshot>
+        </option>
+      </ExecutableRowSnapshot>
+    </rows>
+    <method v="2" />
+  </configuration>
+</component>

@@ -32,18 +32,31 @@ public sealed partial class PluginServer
             .ConfigureAwait(false);
         PluginPackageValidator.ValidatePrepared(package, plan, Events, installPolicy);
         var kernels = new InstalledKernel[degreeOfParallelism];
-        for (var i = 0; i < kernels.Length; i++)
+        var created = 0;
+        try
         {
-            kernels[i] = new InstalledKernel(_host, plan, package, _executionMode);
-        }
+            for (; created < kernels.Length; created++)
+            {
+                kernels[created] = CreateInstalledKernel(plan, package, owner: null);
+            }
 
-        var pool = new InstalledKernelPool(kernels);
-        lock (_poolGate)
+            var pool = new InstalledKernelPool(kernels);
+            lock (_poolGate)
+            {
+                _kernelPools.Add(pool);
+            }
+
+            return pool;
+        }
+        catch
         {
-            _kernelPools.Add(pool);
-        }
+            for (var index = 0; index < created; index++)
+            {
+                kernels[index].Revoke();
+            }
 
-        return pool;
+            throw;
+        }
     }
 
     private async ValueTask<InstalledKernel> InstallServerExtensionCoreAsync(
@@ -60,15 +73,23 @@ public sealed partial class PluginServer
         var plan = await _host.PrepareAsync(sandboxModule, sandboxPolicy, cancellationToken)
             .ConfigureAwait(false);
         RpcKernelPackageValidator.ValidatePrepared(package, plan, installPolicy);
-        var kernel = new InstalledKernel(_host, plan, package, _executionMode, owner);
-        var replaced = AddKernel(kernel);
-        if (replaced is not null)
+        var kernel = CreateInstalledKernel(plan, package, owner);
+        try
         {
-            RemoveKernelReferences(replaced);
-        }
+            var replaced = AddKernel(kernel);
+            if (replaced is not null)
+            {
+                RemoveKernelReferences(replaced);
+            }
 
-        ClearServerExtensionRegistrations(package.Manifest.PluginId);
-        return kernel;
+            ClearServerExtensionRegistrations(package.Manifest.PluginId);
+            return kernel;
+        }
+        catch
+        {
+            kernel.Revoke();
+            throw;
+        }
     }
 
     private async ValueTask<InstalledKernel> InstallCoreAsync(
@@ -89,23 +110,31 @@ public sealed partial class PluginServer
                 cancellationToken)
             .ConfigureAwait(false);
         PluginPackageValidator.ValidatePrepared(package, plan, Events, installPolicy);
-        var kernel = new InstalledKernel(_host, plan, package, _executionMode, owner);
-        if (deferActivation)
+        var kernel = CreateInstalledKernel(plan, package, owner);
+        try
         {
-            // Register as a non-current instance only; the caller wires it and then promotes it (which revokes the
-            // incumbent). A wiring failure rolls this instance back with the incumbent untouched.
-            Kernels.AddInstance(kernel);
-            RegisterKernelRevocationCleanup(kernel);
+            if (deferActivation)
+            {
+                // Register as a non-current instance only; the caller wires it and then promotes it (which revokes the
+                // incumbent). A wiring failure rolls this instance back with the incumbent untouched.
+                Kernels.AddInstance(kernel);
+                RegisterKernelRevocationCleanup(kernel);
+                return kernel;
+            }
+
+            var replaced = AddKernel(kernel);
+            if (replaced is not null)
+            {
+                RemoveKernelReferences(replaced);
+            }
+
             return kernel;
         }
-
-        var replaced = AddKernel(kernel);
-        if (replaced is not null)
+        catch
         {
-            RemoveKernelReferences(replaced);
+            kernel.Revoke();
+            throw;
         }
-
-        return kernel;
     }
 
     private InstalledKernel? AddKernel(InstalledKernel kernel)
@@ -120,6 +149,13 @@ public sealed partial class PluginServer
         Kernels.AddInstance(kernel);
         RegisterKernelRevocationCleanup(kernel);
         return null;
+    }
+
+    private InstalledKernel CreateInstalledKernel(ExecutionPlan plan, PluginPackage package, object? owner)
+    {
+        var kernel = new InstalledKernel(_host, plan, package, _executionMode, owner, _debugCoordinator);
+        kernel.RegisterWithDebugger();
+        return kernel;
     }
 
     private void RegisterKernelRevocationCleanup(InstalledKernel kernel)

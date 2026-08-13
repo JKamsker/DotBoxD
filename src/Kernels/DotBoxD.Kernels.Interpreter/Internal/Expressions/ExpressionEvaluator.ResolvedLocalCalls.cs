@@ -10,12 +10,21 @@ internal readonly partial struct ExpressionEvaluator
         InterpreterFrame frame,
         out int value,
         out SandboxFunction? genericFunction)
-        => InlineI32LocalFunctionCallEvaluator.TryEvaluate(
+    {
+        if (Options.RequiresInterpreter)
+        {
+            value = 0;
+            genericFunction = null;
+            return false;
+        }
+
+        return InlineI32LocalFunctionCallEvaluator.TryEvaluate(
             expression,
             frame,
             _interpreter,
             out value,
             out genericFunction);
+    }
 
     internal static bool CanReuseResolvedLocalCall(CallExpression call)
         => ResolveCallPrecedence(call) == CallPrecedence.LocalOrBinding;

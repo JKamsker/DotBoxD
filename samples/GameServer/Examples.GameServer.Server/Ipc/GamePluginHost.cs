@@ -17,17 +17,29 @@ internal static class GamePluginHost
         PluginServer server,
         GameCommandSink sink,
         GameWorld world,
-        string? pipeName = null)
+        string? pipeName = null,
+        bool enableKernelDebugging = false,
+        bool allowIdleConnection = false)
         => PluginConnectionHost<GamePluginControlService>.StartAsync(
             server,
             string.IsNullOrWhiteSpace(pipeName) ? "dotboxd-game-" + Guid.NewGuid().ToString("N") : pipeName,
             (peer, session) =>
             {
+                peer.Disconnected += (_, args) => Console.Error.WriteLine(
+                    args.Error is null
+                        ? "[server] plugin peer closed without a read error."
+                        : $"[server] plugin peer read failed: {args.Error}");
                 // Reverse-direction proxy: the plugin PROVIDES IPluginEventCallback, the server GETS it to push
                 // filtered+projected values back for remote RunLocal chains over the same bidirectional pipe.
                 var eventCallback =
                     global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.GetPluginEventCallback(peer);
-                var service = new GamePluginControlService(server, session, sink, world, eventCallback);
+                var service = new GamePluginControlService(
+                    server,
+                    session,
+                    sink,
+                    world,
+                    eventCallback,
+                    enableKernelDebugging);
 
                 // Two services per connection: the control-plane (install IR, settings, hold) and the domain
                 // world surface. ProvideGameWorldAccess is generated from [RpcService] on the interface.
@@ -38,5 +50,9 @@ internal static class GamePluginHost
                     peer,
                     new GameWorldAccess(world));
                 return service;
-            });
+            },
+            new PluginConnectionDebugOptions(enableKernelDebugging),
+            allowIdleConnection
+                ? new NamedPipeTransportOptions { FrameReadIdleTimeout = Timeout.InfiniteTimeSpan }
+                : NamedPipeTransportOptions.Default);
 }

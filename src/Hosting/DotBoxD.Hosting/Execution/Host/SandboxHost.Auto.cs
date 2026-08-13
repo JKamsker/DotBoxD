@@ -112,7 +112,7 @@ public sealed partial class SandboxHost
         string entrypoint,
         SandboxExecutionOptions options)
         => !_compiled.IsAvailable ||
-           options.EnableDebugTrace ||
+           options.RequiresInterpreter ||
            EntrypointHasAsyncBinding(plan, entrypoint);
 
     private bool TrySelectAutoMode(

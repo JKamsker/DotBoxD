@@ -1,5 +1,6 @@
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Plugins.Debugging;
 using DotBoxD.Plugins.Runtime;
 using DotBoxD.Plugins.Runtime.Input;
 using DotBoxD.Plugins.Runtime.Lifecycle;
@@ -25,7 +26,7 @@ public sealed partial class InstalledKernel
     private readonly PendingLiveUpdateQueue _pendingLiveUpdates = new();
     private readonly CancellationTokenSource _revocation = new();
     private readonly object? _ownerId;
-    private readonly SandboxExecutionOptions _executionOptions;
+    private SandboxExecutionOptions _executionOptions;
     private readonly SandboxFunction? _rpcEntrypointFunction;
     private readonly int _rpcCallerArgumentCount;
     private int _revoked;
@@ -35,7 +36,8 @@ public sealed partial class InstalledKernel
         ExecutionPlan plan,
         PluginPackage package,
         ExecutionMode executionMode,
-        object? ownerId = null)
+        object? ownerId = null,
+        PluginDebugCoordinator? debugCoordinator = null)
     {
         _host = host;
         _plan = plan;
@@ -48,6 +50,7 @@ public sealed partial class InstalledKernel
         _entrypoints = package.Entrypoints;
         _liveStateSync = new LiveStateSyncRegistry(GetUpdateMode);
         _executionOptions = new SandboxExecutionOptions { Mode = executionMode, SuppressSuccessfulRunSummaryAudit = true };
+        DebugCoordinator = debugCoordinator;
         _rpcEntrypointFunction = FindRpcEntrypoint(package);
         _rpcCallerArgumentCount = _rpcEntrypointFunction is null
             ? 0

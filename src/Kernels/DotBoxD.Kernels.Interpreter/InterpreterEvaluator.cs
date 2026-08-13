@@ -1,3 +1,4 @@
+using DotBoxD.Kernels.Interpreter.Debugging;
 using DotBoxD.Kernels.Interpreter.Frame;
 using DotBoxD.Kernels.Interpreter.Internal.Expressions;
 using DotBoxD.Kernels.Model;
@@ -16,6 +17,7 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
     private readonly ExecutionPlan _plan;
     private readonly ExpressionEvaluator _expressions;
     private readonly StatementExecutor _statements;
+    private readonly InterpreterDebugRuntime? _debug;
     private readonly FunctionFrameLayoutCache _frameLayouts;
     private SandboxFunction? _lastFrameLayoutFunction;
     private FunctionFrameLayout? _lastFrameLayout;
@@ -34,6 +36,14 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
         _frameLayouts = frameLayouts;
         _expressions = new ExpressionEvaluator(this);
         _statements = new StatementExecutor(this);
+        _debug = options.DebugHook is null
+            ? null
+            : new InterpreterDebugRuntime(
+                options.DebugHook,
+                plan.DebugNodeMap,
+                context,
+                _statements,
+                GetFrameLayout);
     }
 
     internal SandboxContext Context => _context;
@@ -45,6 +55,14 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
     internal string ModuleHash => _plan.ModuleHash;
 
     internal ExpressionEvaluator Expressions => _expressions;
+
+    internal StatementExecutor Statements => _statements;
+
+    internal InterpreterDebugState? Debug => _debug?.State;
+
+    internal InterpreterDebugStatementExecutor? DebugStatements => _debug?.Statements;
+
+    internal InterpreterDebugFunctionExecutor? DebugFunctions => _debug?.Functions;
 
     internal bool TryGetInlineI32LocalFunctionCallPlan(
         CallExpression call,
@@ -71,7 +89,7 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
 
         _context.ChargeValue(input);
         ValidateEntrypointArguments(function, input);
-        return InvokeFunctionCoreAsync(function, arguments: default, entrypointInput: input);
+        return InterpreterFunctionExecutor.Invoke(this, function, arguments: default, entrypointInput: input);
     }
 
     public bool TryGetFunction(string id, out SandboxFunction function) => _functions.TryGetValue(id, out function!);
@@ -143,94 +161,10 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
     // host binding) completes without ever allocating an async state machine, so a
     // helper called inside a loop costs only its indexed frame object per call.
     public ValueTask<SandboxValue> InvokeFunctionAsync(SandboxFunction function, LocalFunctionArguments args)
-        => InvokeFunctionCoreAsync(function, args, entrypointInput: null);
+        => InterpreterFunctionExecutor.Invoke(this, function, args, entrypointInput: null);
 
     public ValueTask<SandboxValue> InvokeFunctionAsync(SandboxFunction function, LocalFunctionTripleArguments args)
-        => InvokeTripleFunctionCoreAsync(function, args);
-
-    private ValueTask<SandboxValue> InvokeFunctionCoreAsync(
-        SandboxFunction function,
-        LocalFunctionArguments arguments,
-        SandboxValue? entrypointInput)
-    {
-        _context.EnterCall();
-        var exited = false;
-        try
-        {
-            _context.ChargeFuel(1);
-            var layout = GetFrameLayout(function);
-            var frame = entrypointInput is null
-                ? InterpreterFrame.Create(layout, function, arguments)
-                : InterpreterFrame.CreateValidatedEntrypoint(layout, function, entrypointInput);
-            var body = function.Body;
-            for (var i = 0; i < body.Count; i++)
-            {
-                var statementTask = _statements.ExecuteStatementAsync(body[i], frame);
-                if (!statementTask.IsCompletedSuccessfully)
-                {
-                    exited = true;
-                    return AwaitInvoke(function, statementTask, frame, i + 1);
-                }
-
-                var result = statementTask.Result;
-                if (result is not null)
-                {
-                    EntrypointBinder.RequireType(result, function.ReturnType, "function return type mismatch");
-                    return new ValueTask<SandboxValue>(result);
-                }
-            }
-
-            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, $"function '{function.Id}' returned no value"));
-        }
-        finally
-        {
-            if (!exited)
-            {
-                _context.ExitCall();
-            }
-        }
-    }
-
-    private ValueTask<SandboxValue> InvokeTripleFunctionCoreAsync(
-        SandboxFunction function,
-        LocalFunctionTripleArguments arguments)
-    {
-        // This overload deliberately leaves the existing one/two-argument hot path unchanged.
-        _context.EnterCall();
-        var exited = false;
-        try
-        {
-            _context.ChargeFuel(1);
-            var layout = GetFrameLayout(function);
-            var frame = InterpreterFrameBuilder.Create(layout, function, arguments);
-            var body = function.Body;
-            for (var i = 0; i < body.Count; i++)
-            {
-                var statementTask = _statements.ExecuteStatementAsync(body[i], frame);
-                if (!statementTask.IsCompletedSuccessfully)
-                {
-                    exited = true;
-                    return AwaitInvoke(function, statementTask, frame, i + 1);
-                }
-
-                var result = statementTask.Result;
-                if (result is not null)
-                {
-                    EntrypointBinder.RequireType(result, function.ReturnType, "function return type mismatch");
-                    return new ValueTask<SandboxValue>(result);
-                }
-            }
-
-            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, $"function '{function.Id}' returned no value"));
-        }
-        finally
-        {
-            if (!exited)
-            {
-                _context.ExitCall();
-            }
-        }
-    }
+        => InterpreterFunctionExecutor.Invoke(this, function, args);
 
     private static void ValidateEntrypointArguments(SandboxFunction function, SandboxValue input)
     {
@@ -242,44 +176,10 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
         }
     }
 
-    private async ValueTask<SandboxValue> AwaitInvoke(
-        SandboxFunction function,
-        ValueTask<SandboxValue?> pendingTask,
-        InterpreterFrame frame,
-        int nextStatement)
-    {
-        try
-        {
-            var result = await pendingTask.ConfigureAwait(false);
-            if (result is not null)
-            {
-                EntrypointBinder.RequireType(result, function.ReturnType, "function return type mismatch");
-                return result;
-            }
-
-            var body = function.Body;
-            for (var i = nextStatement; i < body.Count; i++)
-            {
-                result = await _statements.ExecuteStatementAsync(body[i], frame).ConfigureAwait(false);
-                if (result is not null)
-                {
-                    EntrypointBinder.RequireType(result, function.ReturnType, "function return type mismatch");
-                    return result;
-                }
-            }
-
-            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, $"function '{function.Id}' returned no value"));
-        }
-        finally
-        {
-            _context.ExitCall();
-        }
-    }
-
     // The function set is fixed for the prepared plan. Keep the most recently used
     // layout on the evaluator for tight helper-call loops, while the shared cache
     // preserves layouts across separate executions of the same plan.
-    private FunctionFrameLayout GetFrameLayout(SandboxFunction function)
+    internal FunctionFrameLayout GetFrameLayout(SandboxFunction function)
     {
         if (ReferenceEquals(function, _lastFrameLayoutFunction))
         {

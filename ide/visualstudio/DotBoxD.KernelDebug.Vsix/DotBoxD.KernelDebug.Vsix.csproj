@@ -1,0 +1,72 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <RootNamespace>DotBoxD.KernelDebug.VisualStudio</RootNamespace>
+    <AssemblyName>DotBoxD.KernelDebug.Vsix</AssemblyName>
+    <VersionPrefix>0.1.14</VersionPrefix>
+    <GeneratePkgDefFile>true</GeneratePkgDefFile>
+    <UseCodebase>true</UseCodebase>
+    <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
+    <IncludeDebugSymbolsInVSIXContainer>false</IncludeDebugSymbolsInVSIXContainer>
+    <CopyBuildOutputToOutputDirectory>false</CopyBuildOutputToOutputDirectory>
+    <CopyOutputSymbolsToOutputDirectory>false</CopyOutputSymbolsToOutputDirectory>
+    <CopyVsixManifestToOutput>false</CopyVsixManifestToOutput>
+    <IsPackable>false</IsPackable>
+    <DotBoxDDisableExtraAnalyzers>true</DotBoxDDisableExtraAnalyzers>
+    <!-- Microsoft.VisualStudio.Shell.15.0 brings MessagePack 2.5.192 only as a compile-time SDK
+         dependency. Runtime assets are excluded below; Visual Studio supplies its own host assemblies. -->
+    <NoWarn>$(NoWarn);NU1902;NU1903</NoWarn>
+    <DebugAdapterPublishDir>$(BaseIntermediateOutputPath)debug-adapter\</DebugAdapterPublishDir>
+    <VsixIntermediateOutputPath>$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\vsix\</VsixIntermediateOutputPath>
+    <FileManifest>$(VsixIntermediateOutputPath)files.json</FileManifest>
+    <TemplateFileManifest>$(VsixIntermediateOutputPath)templateFiles.json</TemplateFileManifest>
+    <ResourceManifest>$(VsixIntermediateOutputPath)resources.json</ResourceManifest>
+    <CtoFileManifest>$(VsixIntermediateOutputPath)ctoFiles.json</CtoFileManifest>
+    <CtoCacheFile>$(VsixIntermediateOutputPath)mergeCto.cache</CtoCacheFile>
+    <CreateTemplateManifestsCacheFile>$(VsixIntermediateOutputPath)createTemplateManifests.cache</CreateTemplateManifestsCacheFile>
+    <TemplateOutputDirectory>$(VsixIntermediateOutputPath)</TemplateOutputDirectory>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.VisualStudio.Shell.15.0" PrivateAssets="all" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.VisualStudio.Shell.Interop" PrivateAssets="all" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.VisualStudio.Debugger.DebugAdapterHost.Interfaces" PrivateAssets="all" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.VSSDK.BuildTools" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="extension.vsixmanifest" />
+    <None Include="source.extension.vsixmanifest" />
+    <Content Include="AdapterRegistration.pkgdef">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+  </ItemGroup>
+
+  <Target Name="PublishDotBoxDDebugAdapter" BeforeTargets="GetVsixSourceItems">
+    <RemoveDir Directories="$(DebugAdapterPublishDir)" />
+    <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)\..\..\..\tools\DotBoxD.DebugAdapter\DotBoxD.DebugAdapter.csproj&quot; -c $(Configuration) -r win-x64 --self-contained false -o &quot;$(DebugAdapterPublishDir)&quot;" />
+    <ItemGroup>
+      <Content Include="$(DebugAdapterPublishDir)**\*">
+        <IncludeInVSIX>true</IncludeInVSIX>
+        <VSIXSubPath>adapter</VSIXSubPath>
+        <Link>adapter\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      </Content>
+    </ItemGroup>
+  </Target>
+
+  <Import Project="$(VSToolsPath)\vssdk\Microsoft.VsSDK.targets" />
+  <Target Name="SetPkgDefAssemblyToProcess" BeforeTargets="GeneratePkgDef">
+    <PropertyGroup>
+      <CreatePkgDefAssemblyToProcess>$(IntermediateOutputPath)$(TargetName).dll</CreatePkgDefAssemblyToProcess>
+    </PropertyGroup>
+  </Target>
+  <Target Name="PrepareVsixIntermediateOutput" BeforeTargets="GenerateFileManifest">
+    <MakeDir Directories="$(VsixIntermediateOutputPath)" />
+  </Target>
+  <Target Name="BuildVsixContainer"
+          AfterTargets="Build"
+          DependsOnTargets="GeneratePkgDef;CreateVsixContainer"
+          Condition="'$(OS)' == 'Windows_NT'" />
+</Project>

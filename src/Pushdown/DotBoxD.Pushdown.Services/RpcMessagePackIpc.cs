@@ -89,7 +89,13 @@ public static class RpcMessagePackIpc
         RpcPeerOptions? options = null)
     {
         ValidatePipeName(pipeName, namedPipeOptions);
-        return Listen(new NamedPipeServerTransport(pipeName), configurePeer, options);
+        return Listen(
+            new NamedPipeServerTransport(pipeName)
+            {
+                FrameReadIdleTimeout = namedPipeOptions.FrameReadIdleTimeout
+            },
+            configurePeer,
+            options);
     }
 
     public static Task<RpcPeerSession> ConnectNamedPipeAsync(
@@ -120,7 +126,13 @@ public static class RpcMessagePackIpc
         CancellationToken cancellationToken = default)
     {
         ValidatePipeName(pipeName, namedPipeOptions);
-        return ConnectAsync(new NamedPipeClientTransport(serverName, pipeName), options, cancellationToken);
+        return ConnectAsync(
+            new NamedPipeClientTransport(serverName, pipeName)
+            {
+                FrameReadIdleTimeout = namedPipeOptions.FrameReadIdleTimeout
+            },
+            options,
+            cancellationToken);
     }
 
     /// <summary>
@@ -138,7 +150,10 @@ public static class RpcMessagePackIpc
     {
         var pipeOptions = namedPipeOptions ?? NamedPipeTransportOptions.Default;
         ValidatePipeName(pipeName, pipeOptions);
-        var transport = new NamedPipeClientTransport(".", pipeName);
+        var transport = new NamedPipeClientTransport(".", pipeName)
+        {
+            FrameReadIdleTimeout = pipeOptions.FrameReadIdleTimeout
+        };
         return configurePeer is null
             ? ConnectAsync(transport, options, cancellationToken)
             : ConnectAsync(transport, configurePeer, options, cancellationToken);
@@ -174,6 +189,8 @@ public static class RpcMessagePackIpc
 
 public sealed record NamedPipeTransportOptions(bool AllowUnsafeLowEntropyName = false)
 {
+    public TimeSpan? FrameReadIdleTimeout { get; init; }
+
     public static NamedPipeTransportOptions Default { get; } = new();
     public static NamedPipeTransportOptions UnsafeDevelopment { get; } = new(AllowUnsafeLowEntropyName: true);
 }

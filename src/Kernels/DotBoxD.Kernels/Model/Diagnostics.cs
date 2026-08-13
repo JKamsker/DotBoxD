@@ -9,6 +9,12 @@ public enum DiagnosticSeverity
     Error
 }
 
+public enum SourceSequencePointKind
+{
+    Normal,
+    Hidden
+}
+
 public sealed record SandboxDiagnostic(
     string Code,
     string Message,
@@ -40,19 +46,61 @@ public sealed record SandboxDiagnostic(
             : throw new ArgumentOutOfRangeException(nameof(Severity), severity, "Unsupported diagnostic severity.");
 }
 
-public sealed record SourceSpan(int Line, int Column)
+public sealed record SourceSpan(
+    int Line,
+    int Column,
+    string? DocumentId = null,
+    int? EndLine = null,
+    int? EndColumn = null,
+    SourceSequencePointKind SequencePointKind = SourceSequencePointKind.Normal)
 {
+    public SourceSpan(int line, int column)
+        : this(line, column, null, null, null, SourceSequencePointKind.Normal)
+    {
+    }
+
     private int _line = ValidateCoordinate(Line, nameof(Line));
     private int _column = ValidateCoordinate(Column, nameof(Column));
+    private string? _documentId = ValidateDocumentId(DocumentId);
+    private int? _endLine = ValidateOptionalCoordinate(EndLine, nameof(EndLine));
+    private int? _endColumn = ValidateOptionalCoordinate(EndColumn, nameof(EndColumn));
+    private SourceSequencePointKind _sequencePointKind = ValidateSequencePointKind(SequencePointKind);
 
     public int Line { get => _line; init => _line = ValidateCoordinate(value, nameof(Line)); }
 
     public int Column { get => _column; init => _column = ValidateCoordinate(value, nameof(Column)); }
 
+    public string? DocumentId { get => _documentId; init => _documentId = ValidateDocumentId(value); }
+
+    public int? EndLine { get => _endLine; init => _endLine = ValidateOptionalCoordinate(value, nameof(EndLine)); }
+
+    public int? EndColumn { get => _endColumn; init => _endColumn = ValidateOptionalCoordinate(value, nameof(EndColumn)); }
+
+    public SourceSequencePointKind SequencePointKind
+    {
+        get => _sequencePointKind;
+        init => _sequencePointKind = ValidateSequencePointKind(value);
+    }
+
     private static int ValidateCoordinate(int value, string paramName)
         => value >= 0
             ? value
             : throw new ArgumentOutOfRangeException(paramName, value, "Source coordinates must be non-negative.");
+
+    private static int? ValidateOptionalCoordinate(int? value, string paramName)
+        => value is null || value >= 0
+            ? value
+            : throw new ArgumentOutOfRangeException(paramName, value, "Source coordinates must be non-negative.");
+
+    private static string? ValidateDocumentId(string? value)
+        => value is null || !string.IsNullOrWhiteSpace(value)
+            ? value
+            : throw new ArgumentException("Source document IDs must not be blank.", nameof(DocumentId));
+
+    private static SourceSequencePointKind ValidateSequencePointKind(SourceSequencePointKind value)
+        => Enum.IsDefined(value)
+            ? value
+            : throw new ArgumentOutOfRangeException(nameof(SequencePointKind), value, "Unsupported sequence-point kind.");
 }
 
 public sealed class SandboxValidationException : Exception

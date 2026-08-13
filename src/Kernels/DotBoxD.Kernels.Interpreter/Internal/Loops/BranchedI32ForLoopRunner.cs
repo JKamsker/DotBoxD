@@ -229,5 +229,5 @@ internal static class BranchedI32ForLoopRunner
         SandboxExecutionOptions options,
         int start,
         int end)
-        => !options.EnableDebugTrace && start < end;
+        => !options.RequiresInterpreter && start < end;
 }

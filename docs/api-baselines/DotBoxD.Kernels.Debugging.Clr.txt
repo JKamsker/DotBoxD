@@ -1,0 +1,20 @@
+# DotBoxD.Kernels public API baseline
+# Package: DotBoxD.Kernels.Debugging.Clr
+# Update intentionally with scripts/check-api-compat-baseline.ps1 -Update when approving public API changes.
+
+public IReadOnlyCollection<Assembly> References { get; init; } = Array.Empty<Assembly>()
+public IReadOnlyCollection<string> Imports { get; init; } = Array.Empty<string>()
+public IReadOnlyCollection<string> ReferencePaths { get; init; } = Array.Empty<string>()
+public IReadOnlyDictionary<string, object?> Arguments { get; }
+public IReadOnlyDictionary<string, object?> Context { get; }
+public IReadOnlyDictionary<string, object?> Context { get; init; } =
+public IReadOnlyDictionary<string, object?> Locals { get; }
+public IReadOnlyDictionary<string, SandboxValue> Context { get; init; } =
+public long MemoryLimitBytes { get; init; } = 512L * 1024 * 1024
+public sealed class ClrDebugScriptGlobals
+public sealed record TrustedInProcessDebugEvaluatorOptions
+public sealed record TrustedWorkerDebugEvaluatorOptions
+public static class ClrPluginDebugEvaluators
+public static IPluginDebugEvaluatorProvider CreateTrustedInProcess( TrustedInProcessDebugEvaluatorOptions options) =>
+public static IPluginDebugEvaluatorProvider CreateTrustedWorker(TrustedWorkerDebugEvaluatorOptions options) =>
+public TimeSpan TimeLimit { get; init; } = TimeSpan.FromSeconds(5)

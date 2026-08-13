@@ -1,3 +1,4 @@
+using DotBoxD.Plugins.Analyzer.Analysis.Debugging;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -62,7 +63,9 @@ internal static partial class RpcKernelModelFactory
         RpcKernelClientMethodExtension? directClientMethod,
         RpcServerExtensionGraft? graft,
         bool hasReceiverId,
-        Compilation compilation)
+        Compilation compilation,
+        KernelSourceLocationModel debugSource,
+        IReadOnlyList<(string SlotName, string SourceName)> debugBindings)
     {
         var methodName = method.Name;
         var returnType = DotBoxDRpcReturnType.JsonType(method.ReturnType, compilation);
@@ -116,7 +119,9 @@ internal static partial class RpcKernelModelFactory
                 directClientMethod,
                 graft,
                 method,
-                compilation),
+                compilation,
+                debugSource,
+                debugBindings),
             Namespace(type),
             PackageName(type.Name));
     }
@@ -130,7 +135,9 @@ internal static partial class RpcKernelModelFactory
         RpcKernelClientMethodExtension? directClientMethod,
         RpcServerExtensionGraft? graft,
         IMethodSymbol kernelMethod,
-        Compilation compilation)
+        Compilation compilation,
+        KernelSourceLocationModel debugSource,
+        IReadOnlyList<(string SlotName, string SourceName)> debugBindings)
     {
         var ns = type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString();
         var builder = new System.Text.StringBuilder();
@@ -155,9 +162,17 @@ internal static partial class RpcKernelModelFactory
         builder.Append("public static class ").AppendLine(PackageName(type.Name));
         builder.AppendLine("{");
         builder.Append("    public static ").Append(TypeNames.GlobalPluginPackage).AppendLine(" Create()");
-        builder.Append("        => ").Append(TypeNames.GlobalPluginPackageJsonSerializer).Append(".Import(\"")
+        builder.AppendLine("    {");
+        builder.Append("        var package = ").Append(TypeNames.GlobalPluginPackageJsonSerializer).Append(".Import(\"")
             .Append(json.Replace("\\", "\\\\").Replace("\"", "\\\""))
             .AppendLine("\");");
+        SingleFunctionDebugInfoSourceEmitter.Emit(
+            builder,
+            kernelMethod.Name,
+            debugSource,
+            debugBindings);
+        builder.AppendLine("        return package with { Module = module, DebugInfo = debugInfo };");
+        builder.AppendLine("    }");
         builder.AppendLine("}");
         if (serviceType is not null && serviceMethod is not null)
         {

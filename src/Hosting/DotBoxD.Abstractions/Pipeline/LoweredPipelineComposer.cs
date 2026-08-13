@@ -16,7 +16,7 @@ public static class LoweredPipelineComposer
     private const string CurrentVariablePrefix = "current";
     private const string RequiredCapabilitiesMetadataKey = "dotboxd.requiredCapabilities";
     private const string EffectsMetadataKey = "dotboxd.effects";
-    private static readonly SourceSpan Span = new(1, 1);
+    private static readonly SourceSpan Span = new(1, 1, SequencePointKind: SourceSequencePointKind.Hidden);
 
     public static SandboxModule Compose(LoweredPipelineComposition composition)
     {
@@ -71,14 +71,14 @@ public static class LoweredPipelineComposer
             {
                 body.Add(new IfStatement(
                     new UnaryExpression("!", value, Span),
-                    [new ReturnStatement(Bool(false), Span)],
+                    [new ReturnStatement(Bool(false), value.Span)],
                     [],
-                    Span));
+                    value.Span));
             }
             else
             {
                 current = NextVariable(current);
-                body.Add(new AssignmentStatement(current, value, Span));
+                body.Add(new AssignmentStatement(current, value, value.Span));
             }
         }
 
@@ -116,7 +116,7 @@ public static class LoweredPipelineComposer
 
             var value = Rewrite(step.Value, current);
             current = NextVariable(current);
-            body.Add(new AssignmentStatement(current, value, Span));
+            body.Add(new AssignmentStatement(current, value, value.Span));
         }
 
         body.Add(new ReturnStatement(new VariableExpression(current, Span), Span));
@@ -138,7 +138,7 @@ public static class LoweredPipelineComposer
             VariableExpression variable => throw new NotSupportedException(
                 $"a fragment expression may only reference the '{CurrentPlaceholder}' placeholder, not the " +
                 $"variable '{variable.Name}' (which could collide with the composer's reserved running-value slots)."),
-            LiteralExpression => expression,
+            LiteralExpression literal => new LiteralExpression(literal.Value, literal.Span),
             UnaryExpression unary => new UnaryExpression(unary.Operator, Rewrite(unary.Operand, current), unary.Span),
             BinaryExpression binary => new BinaryExpression(
                 Rewrite(binary.Left, current), binary.Operator, Rewrite(binary.Right, current), binary.Span),

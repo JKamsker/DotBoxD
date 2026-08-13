@@ -50,11 +50,7 @@ internal static class DotBoxDPackageSourceEmitter
 
     private static void EmitBody(StringBuilder builder, PluginKernelModel model)
     {
-        builder.Append("    private static readonly ").Append(TypeNames.GlobalSourceSpan).Append(" Span = new(")
-            .Append(DotBoxDGenerationNames.GeneratedSpanLine)
-            .Append(", ")
-            .Append(DotBoxDGenerationNames.GeneratedSpanColumn)
-            .AppendLine(");");
+        DotBoxDDebugInfoSourceEmitter.EmitDefaultSpan(builder);
         builder.AppendLine();
         builder.Append("    public static ").Append(TypeNames.GlobalPluginPackage).AppendLine(" Create()");
         builder.AppendLine("    {");
@@ -68,7 +64,7 @@ internal static class DotBoxDPackageSourceEmitter
         builder.AppendLine("            settings,");
         DotBoxDSubscriptionSourceEmitter.Emit(builder, model);
         EmitRequiredCapabilities(builder, model.RequiredCapabilities);
-        builder.Append("        return ").Append(TypeNames.GlobalPluginPackage).AppendLine(".Create(manifest, CreateModule(settings));");
+        DotBoxDDebugInfoSourceEmitter.EmitPackageReturn(builder, model);
         builder.AppendLine("    }");
         builder.AppendLine();
         EmitModule(builder, model);

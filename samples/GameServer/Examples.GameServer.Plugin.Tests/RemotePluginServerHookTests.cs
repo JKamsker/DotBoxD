@@ -79,12 +79,13 @@ public sealed class RemotePluginServerHookTests
 
         Program.ConfigureRuntimeHooks(server);
 
-        // Two inline hooks: the original MonsterAggroEvent calm plus PlayerTargetedEvent, whose Where calls
-        // an unannotated public method inherited from [HostBindingObject] defaults. Then two AttackEvent
-        // subscription chains:
+        // Three inline hooks: the filtered calm and whole-event observe chains plus PlayerTargetedEvent,
+        // whose Where calls an unannotated public method inherited from [HostBindingObject] defaults.
+        // Then two AttackEvent subscription chains:
         // the original taunt and the indexed taunt that ships index metadata (issue #47).
         Assert.Collection(
             control.Calls,
+            call => Assert.StartsWith("kernel:chain-", call, StringComparison.Ordinal),
             call => Assert.StartsWith("kernel:chain-", call, StringComparison.Ordinal),
             call => Assert.StartsWith("kernel:chain-", call, StringComparison.Ordinal),
             call => Assert.StartsWith("subscription:chain-", call, StringComparison.Ordinal),

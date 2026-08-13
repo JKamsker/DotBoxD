@@ -65,7 +65,7 @@ internal static class ListGetI32ForLoopRunner
     }
 
     private static bool CanUseFastPath(SandboxExecutionOptions options, int start, int end)
-        => !options.EnableDebugTrace && start < end;
+        => !options.RequiresInterpreter && start < end;
 
     private static int ReadItem(int[] items, int index)
     {

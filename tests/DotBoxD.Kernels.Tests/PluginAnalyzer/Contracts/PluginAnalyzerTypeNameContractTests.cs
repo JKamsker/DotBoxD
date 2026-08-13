@@ -3,6 +3,7 @@ extern alias GameServerPlugin;
 
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
+using DotBoxD.Kernels.Debugging;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins;
@@ -165,6 +166,11 @@ public sealed class PluginAnalyzerTypeNameContractTests
             [nameof(TypeNames.GlobalUnaryExpression)] = GlobalTypeName(typeof(UnaryExpression)),
             [nameof(TypeNames.GlobalBinaryExpression)] = GlobalTypeName(typeof(BinaryExpression)),
             [nameof(TypeNames.GlobalSourceSpan)] = GlobalTypeName(typeof(SourceSpan)),
+            [nameof(TypeNames.GlobalSourceSequencePointKind)] = GlobalTypeName(typeof(SourceSequencePointKind)),
+            [nameof(TypeNames.GlobalKernelDebugDocument)] = GlobalTypeName(typeof(KernelDebugDocument)),
+            [nameof(TypeNames.GlobalKernelDebugInfo)] = GlobalTypeName(typeof(KernelDebugInfo)),
+            [nameof(TypeNames.GlobalKernelDebugModuleMapper)] = GlobalTypeName(typeof(KernelDebugModuleMapper)),
+            [nameof(TypeNames.GlobalKernelDebugVariableBinding)] = GlobalTypeName(typeof(KernelDebugVariableBinding)),
             [nameof(TypeNames.GlobalSemVersion)] = GlobalTypeName(typeof(SemVersion)),
             [nameof(TypeNames.GlobalSandboxType)] = GlobalTypeName(typeof(SandboxType)),
             [nameof(TypeNames.GlobalSandboxValue)] = GlobalTypeName(typeof(SandboxValue)),

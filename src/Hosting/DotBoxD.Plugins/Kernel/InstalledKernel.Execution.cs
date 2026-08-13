@@ -18,12 +18,14 @@ public sealed partial class InstalledKernel
         using var executionCancellation = PluginExecutionCancellation.Create(
             cancellationToken,
             _revocation.Token);
+        await WaitForDebugDispatchAsync(executionCancellation.Token).ConfigureAwait(false);
+        var executionOptions = Volatile.Read(ref _executionOptions);
         var reusableNoAuditState = ReusableNoAuditState(entrypoint);
         var result = await _host.ExecutePreparedValueInProcessAsync(
                 _plan,
                 entrypoint,
                 input,
-                _executionOptions,
+                executionOptions,
                 executionCancellation.Token,
                 reusableNoAuditState)
             .ConfigureAwait(false);

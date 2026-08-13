@@ -61,6 +61,14 @@ $expectedPackageMetadata = @{
         Description = "DotBoxD.Kernels JSON IR import and export helpers for the module envelope."
         Tags = @("dotboxd", "json", "serialization")
     }
+    "DotBoxD.Kernels.Debugging.Clr" = @{
+        Description = "Opt-in trusted Roslyn evaluators for DotBoxD remote kernel debugging."
+        Tags = @("dotboxd", "kernels", "debugging", "roslyn", "trusted")
+        ExtraEntries = @(
+            "lib/net10.0/DotBoxD.Kernels.Debugging.Clr.runtimeconfig.json",
+            "lib/net10.0/DotBoxD.Kernels.Debugging.Clr.deps.json"
+        )
+    }
     "DotBoxD.Abstractions" = @{
         Description = "DotBoxD.Kernels plugin-to-host contracts: plugin marker attribute, event kernel, hook context, message sink, and event adapter abstractions."
         Tags = @("dotboxd", "plugins", "contracts", "abstractions")
@@ -380,6 +388,7 @@ $expectedIds = [string[]] @(
     "DotBoxD.Kernels.Validation",
     "DotBoxD.Kernels.Runtime",
     "DotBoxD.Kernels.Serialization.Json",
+    "DotBoxD.Kernels.Debugging.Clr",
     "DotBoxD.Hosting.Http",
     "DotBoxD.Pushdown.Services",
     "DotBoxD.Kernels.Interpreter",

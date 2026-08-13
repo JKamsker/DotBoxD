@@ -16,6 +16,10 @@ public sealed class InvokeAsyncGenerationTests
         Assert.Contains("$anon:", source, StringComparison.Ordinal);
         Assert.Contains("host.world.getHealth", source, StringComparison.Ordinal);
         Assert.Contains("game.world.monster.read.health", source, StringComparison.Ordinal);
+        Assert.Contains("KernelDebugInfo.Create(module, documents, bindings)", source, StringComparison.Ordinal);
+        Assert.Contains("ApplyFunctionSequenceSpans(package.Module", source, StringComparison.Ordinal);
+        Assert.True(Regex.Matches(source, "new global::DotBoxD.Kernels.Model.SourceSpan\\(").Count > 3);
+        Assert.Contains("DebugInfo = debugInfo", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -144,6 +148,7 @@ public sealed class InvokeAsyncGenerationTests
         Assert.Contains("InvokeAsync_", source, StringComparison.Ordinal);
         Assert.Contains("host.world.getHealth", source, StringComparison.Ordinal);
         Assert.Contains("\\\"op\\\":\\\"add\\\"", source, StringComparison.Ordinal);
+        Assert.Contains("ApplyFunctionSequenceSpans(package.Module", source, StringComparison.Ordinal);
     }
 
     [Fact]

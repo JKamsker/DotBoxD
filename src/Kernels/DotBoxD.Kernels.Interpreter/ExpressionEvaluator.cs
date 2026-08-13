@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Interpreter.Debugging;
 using DotBoxD.Kernels.Interpreter.Frame;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
@@ -15,13 +16,15 @@ internal readonly partial struct ExpressionEvaluator
     public ExpressionEvaluator(InterpreterEvaluator interpreter) =>
         _interpreter = interpreter;
 
-    private SandboxContext Context => _interpreter.Context;
+    internal SandboxContext Context => _interpreter.Context;
 
     private IReadOnlyDictionary<string, FunctionAnalysis> FunctionAnalysis => _interpreter.FunctionAnalysis;
 
     private SandboxExecutionOptions Options => _interpreter.Options;
 
     private string ModuleHash => _interpreter.ModuleHash;
+
+    private InterpreterDebugState? Debug => _interpreter.Debug;
 
     // Non-async dispatch: literals, variables, arithmetic, and pure helper calls all
     // complete synchronously, so they return a finished ValueTask without ever
@@ -35,8 +38,14 @@ internal readonly partial struct ExpressionEvaluator
         InterpreterFrame frame,
         bool allowCompositeProbe)
     {
+        var debug = Debug;
+        if (debug is not null)
+        {
+            return InterpreterExpressionInstrumentation.EvaluateDebugAsync(this, debug, expression, frame);
+        }
+
         var allowDescendantProbe = false;
-        if (!Options.EnableDebugTrace)
+        if (!Options.RequiresInterpreter)
         {
             if (I32ExpressionEvaluator.CanEvaluateForDispatch(
                     expression, frame, _interpreter, allowCompositeProbe))
@@ -58,8 +67,15 @@ internal readonly partial struct ExpressionEvaluator
         }
 
         Context.ChargeFuel(1);
-        WriteTrace(expression, frame);
-        return expression switch
+        InterpreterExpressionInstrumentation.WriteTrace(Context, Options, ModuleHash, expression, frame);
+        return EvaluateNode(expression, frame, allowDescendantProbe);
+    }
+
+    internal ValueTask<SandboxValue> EvaluateNode(
+        Expression expression,
+        InterpreterFrame frame,
+        bool allowDescendantProbe)
+        => expression switch
         {
             LiteralExpression literal => new ValueTask<SandboxValue>(ChargeLiteral(literal.Value)),
             VariableExpression variable => new ValueTask<SandboxValue>(frame.Read(variable.Name)),
@@ -68,23 +84,6 @@ internal readonly partial struct ExpressionEvaluator
             CallExpression call => EvaluateCall(call, frame),
             _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported expression"))
         };
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void WriteTrace(Expression expression, InterpreterFrame frame)
-    {
-        if (Options.EnableDebugTrace)
-        {
-            InterpreterTrace.Write(
-                Context,
-                Options,
-                ModuleHash,
-                frame.FunctionId,
-                "expression",
-                expression.GetType().Name,
-                expression.Span);
-        }
-    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool TryEvaluateWidePrimitiveArithmetic(
@@ -141,7 +140,7 @@ internal readonly partial struct ExpressionEvaluator
 
     public bool TryEvaluateInt32(Expression expression, InterpreterFrame frame, out int value)
     {
-        if (!Options.EnableDebugTrace &&
+        if (!Options.RequiresInterpreter &&
             I32ExpressionEvaluator.CanEvaluate(expression, frame, _interpreter))
         {
             value = I32ExpressionEvaluator.Evaluate(
@@ -155,7 +154,7 @@ internal readonly partial struct ExpressionEvaluator
 
     public bool TryEvaluateInt64(Expression expression, InterpreterFrame frame, out long value)
     {
-        if (!Options.EnableDebugTrace)
+        if (!Options.RequiresInterpreter)
         {
             if (I64ExpressionEvaluator.CanEvaluate(expression, frame))
             {
@@ -175,7 +174,7 @@ internal readonly partial struct ExpressionEvaluator
 
     public bool TryEvaluateDouble(Expression expression, InterpreterFrame frame, out double value)
     {
-        if (!Options.EnableDebugTrace)
+        if (!Options.RequiresInterpreter)
         {
             if (F64ExpressionEvaluator.CanEvaluate(expression, frame))
             {

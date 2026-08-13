@@ -1,6 +1,8 @@
 using DotBoxD.Kernels.Game.Plugin.Authoring;
 using DotBoxD.Kernels.Game.Plugin.Kernels;
 using DotBoxD.Kernels.Game.Server.Abstractions.Events;
+using DotBoxD.Pushdown.Services;
+using DotBoxD.Services.Peer;
 
 namespace DotBoxD.Kernels.Game.Plugin;
 
@@ -43,8 +45,28 @@ internal static class Program
 
         Console.WriteLine($"[plugin] connecting to server pipe '{pipeName}'...");
 
-        using IGameWorldServer server = GamePluginServerBuilder
-            .FromPipeName(pipeName)
+        await using var debugBridge = KernelDebuggingRequested()
+            ? PluginDebugBridge.Start(new PluginDebugBridgeOptions
+            {
+                // Continuous debug rounds make late attachment safe and keep the compound launch non-blocking.
+                WaitForDebuggerBeforeInstall = false
+            })
+            : null;
+        if (debugBridge is not null)
+        {
+            Console.WriteLine($"[plugin] kernel debug bridge ready for PID {debugBridge.Descriptor.ProcessId}.");
+        }
+
+        var transportOptions = new NamedPipeTransportOptions { FrameReadIdleTimeout = Timeout.InfiniteTimeSpan };
+        var connectionOptions = new RpcPeerOptions { RequestTimeout = Timeout.InfiniteTimeSpan };
+        var builder = debugBridge is null
+            ? GamePluginServerBuilder.FromPipeName(pipeName, transportOptions, connectionOptions)
+            : GamePluginServerBuilder.FromPipeNameWithKernelDebugging(
+                pipeName,
+                debugBridge,
+                transportOptions,
+                connectionOptions);
+        using IGameWorldServer server = builder
             .Setup(s =>
             {
                 // Build() is sync and does no I/O; StartAsync() ships the recorded IR.
@@ -72,13 +94,20 @@ internal static class Program
             .ApplyAsync(atomic: true);
 
         // The advanced surface (handles, server-extension calls, InvokeAsync probes) lives in its own file.
-        await AdvancedUsage.RunAsync(server);
+        // The Rider E2E harness skips it so Guardian breakpoint coverage has no dependency on unrelated demos.
+        if (PluginLaunchMode.RunAdvancedUsage)
+        {
+            await AdvancedUsage.RunAsync(server);
+        }
 
         Console.WriteLine("[plugin] kernels live; holding until server completes...");
         await server.HoldUntilShutdownAsync();
 
         return 0;
     }
+
+    private static bool KernelDebuggingRequested()
+        => string.Equals(Environment.GetEnvironmentVariable("DOTBOXD_KERNEL_DEBUG"), "1", StringComparison.Ordinal);
 
     internal static void ConfigureRuntimeHooks(IGameWorldServer server)
     {
@@ -88,6 +117,9 @@ internal static class Program
             .Where(e => e.Distance <= 4)
             .Select(e => e.MonsterId)
             .Run((monsterId, ctx) => ctx.Messages.Send(monsterId, "calm:inline"));
+
+        server.Hooks.On<MonsterAggroEvent>().Run(
+            (e, ctx) => ctx.Messages.Send(e.MonsterId, "observe:inline"));
 
         // PlayerTargetContext opts all eligible public instance methods into host binding defaults. The plugin
         // calls IsBelowLevel like an ordinary SDK helper; DotBoxD lowers the receiver plus argument into a

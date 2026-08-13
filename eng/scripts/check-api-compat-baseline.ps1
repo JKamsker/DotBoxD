@@ -18,6 +18,7 @@ $packages = @(
     @{ Id = "DotBoxD.Kernels.Validation"; Path = "src/Kernels/DotBoxD.Kernels.Validation" },
     @{ Id = "DotBoxD.Kernels.Runtime"; Path = "src/Kernels/DotBoxD.Kernels.Runtime" },
     @{ Id = "DotBoxD.Kernels.Serialization.Json"; Path = "src/Kernels/DotBoxD.Kernels.Serialization.Json" },
+    @{ Id = "DotBoxD.Kernels.Debugging.Clr"; Path = "src/Kernels/DotBoxD.Kernels.Debugging.Clr" },
     @{ Id = "DotBoxD.Hosting.Http"; Path = "src/Hosting/DotBoxD.Hosting.Http" },
     @{ Id = "DotBoxD.Pushdown.Services"; Path = "src/Pushdown/DotBoxD.Pushdown.Services" },
     @{ Id = "DotBoxD.Services"; Path = "src/Services/DotBoxD.Services" },

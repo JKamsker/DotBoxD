@@ -57,6 +57,7 @@ $requiredIds = @(
     "DotBoxD.Hosting",
     "DotBoxD.Kernels.Runtime",
     "DotBoxD.Kernels.Serialization.Json",
+    "DotBoxD.Kernels.Debugging.Clr",
     "DotBoxD.Hosting.Http",
     "DotBoxD.Plugins",
     "DotBoxD.Abstractions",
@@ -158,6 +159,7 @@ $project = @"
     <PackageReference Include="DotBoxD.Hosting" Version="$($versions["DotBoxD.Hosting"])" />
     <PackageReference Include="DotBoxD.Kernels.Runtime" Version="$($versions["DotBoxD.Kernels.Runtime"])" />
     <PackageReference Include="DotBoxD.Kernels.Serialization.Json" Version="$($versions["DotBoxD.Kernels.Serialization.Json"])" />
+    <PackageReference Include="DotBoxD.Kernels.Debugging.Clr" Version="$($versions["DotBoxD.Kernels.Debugging.Clr"])" />
     <PackageReference Include="DotBoxD.Hosting.Http" Version="$($versions["DotBoxD.Hosting.Http"])" />
     <PackageReference Include="DotBoxD.Plugins" Version="$($versions["DotBoxD.Plugins"])" />
     <PackageReference Include="DotBoxD.Abstractions" Version="$($versions["DotBoxD.Abstractions"])" />

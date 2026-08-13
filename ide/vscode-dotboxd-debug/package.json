@@ -1,0 +1,98 @@
+{
+  "name": "dotboxd-kernel-debug",
+  "displayName": "DotBoxD Kernel Debugger",
+  "description": "Debug server-executed DotBoxD kernels through the .NET DAP adapter.",
+  "version": "0.1.0",
+  "publisher": "dotboxd",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Debuggers"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onDebug:dotboxd-kernel",
+    "onCommand:dotboxd.pickKernelProcess"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "dotboxd.pickKernelProcess",
+        "title": "DotBoxD: Pick Kernel Debug Process"
+      }
+    ],
+    "configuration": {
+      "title": "DotBoxD Kernel Debugger",
+      "properties": {
+        "dotboxd.kernelDebug.adapterPath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to DotBoxD.DebugAdapter.dll. Empty uses the bundled or workspace adapter."
+        }
+      }
+    },
+    "debuggers": [
+      {
+        "type": "dotboxd-kernel",
+        "label": "DotBoxD Kernel",
+        "languages": [
+          "csharp"
+        ],
+        "configurationAttributes": {
+          "attach": {
+            "required": [
+              "processId"
+            ],
+            "properties": {
+              "processId": {
+                "type": [
+                  "integer",
+                  "string"
+                ],
+                "description": "PID of the plugin process that started PluginDebugBridge."
+              },
+              "pluginId": {
+                "type": "string",
+                "description": "Optional package filter. Omit to bind source breakpoints across all packages in the plugin session."
+              },
+              "pauseScope": {
+                "type": "string",
+                "enum": [
+                  "server",
+                  "pluginSession",
+                  "execution"
+                ],
+                "description": "Requested pause scope; the host's allow-list remains authoritative."
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "dotboxd-kernel",
+            "request": "attach",
+            "name": "Attach to DotBoxD kernels",
+            "processId": "${command:dotboxd.pickKernelProcess}"
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "DotBoxD Kernel: Attach",
+            "description": "Attach to the protected debug bridge in a plugin process.",
+            "body": {
+              "type": "dotboxd-kernel",
+              "request": "attach",
+              "name": "${1:DotBoxD Kernel}",
+              "processId": "${command:dotboxd.pickKernelProcess}"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

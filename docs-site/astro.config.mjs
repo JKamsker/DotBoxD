@@ -69,6 +69,7 @@ export default defineConfig({
                 { label: 'Kernels', slug: 'concepts/kernels' },
                 { label: 'Host bindings', slug: 'concepts/host-bindings' },
                 { label: 'Kernel runtime (advanced)', slug: 'concepts/runtime' },
+                { label: 'Remote kernel debugging', slug: 'concepts/remote-kernel-debugging' },
                 { label: 'Determinism (advanced)', slug: 'concepts/determinism' },
               ],
             },
@@ -121,6 +122,7 @@ export default defineConfig({
             { label: 'Diagnostics (DBXS / DBXK)', slug: 'reference/diagnostics' },
             { label: 'Consumer testing kit', slug: 'reference/testing' },
             { label: 'Schemas', slug: 'reference/schemas' },
+            { label: 'Remote debug protocol v1', slug: 'reference/remote-debug-protocol' },
             {
               label: 'Specifications',
               link: 'https://github.com/JKamsker/DotBoxD/tree/main/docs/Specs',
