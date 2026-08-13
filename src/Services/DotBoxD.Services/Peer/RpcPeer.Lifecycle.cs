@@ -100,11 +100,30 @@ public sealed partial class RpcPeer
             cts = _cts;
             readLoop = ReferenceEquals(s_disconnectedEventPeer, this) ? null : _readLoop;
             cts?.Cancel();
-            disposeTask = DisposeCoreAsync(readLoop, cts);
+            var disposeCompletion = new TaskCompletionSource<object?>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            disposeTask = disposeCompletion.Task;
             _disposeTask = disposeTask;
+            _ = CompleteDisposeAsync(readLoop, cts, disposeCompletion);
         }
 
         return new ValueTask(disposeTask);
+    }
+
+    private async Task CompleteDisposeAsync(
+        Task? readLoop,
+        CancellationTokenSource? cts,
+        TaskCompletionSource<object?> completion)
+    {
+        try
+        {
+            await DisposeCoreAsync(readLoop, cts).ConfigureAwait(false);
+            completion.TrySetResult(null);
+        }
+        catch (Exception ex)
+        {
+            completion.TrySetException(ex);
+        }
     }
 
     private async Task DisposeCoreAsync(Task? readLoop, CancellationTokenSource? cts)
