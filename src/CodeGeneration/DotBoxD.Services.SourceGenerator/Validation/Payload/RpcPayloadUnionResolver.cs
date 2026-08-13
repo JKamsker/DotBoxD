@@ -23,12 +23,15 @@ internal static class RpcPayloadUnionResolver
         {
             ct.ThrowIfCancellationRequested();
 
-            var attrName = attr.AttributeClass?.ToDisplayString();
+            var attributeClass = attr.AttributeClass;
+            var attrName = attributeClass?.ToDisplayString();
             var attrReason = attrName switch
             {
                 ServicesGeneratorTypeNames.MessagePackUnionAttribute => builder.AddMessagePackUnion(attr),
-                ServicesGeneratorTypeNames.JsonPolymorphicAttribute => builder.AddJsonPolymorphic(),
-                ServicesGeneratorTypeNames.JsonDerivedTypeAttribute => builder.AddJsonDerivedType(attr),
+                ServicesGeneratorTypeNames.JsonPolymorphicAttribute when IsSystemTextJsonAttribute(attributeClass) =>
+                    builder.AddJsonPolymorphic(),
+                ServicesGeneratorTypeNames.JsonDerivedTypeAttribute when IsSystemTextJsonAttribute(attributeClass) =>
+                    builder.AddJsonDerivedType(attr),
                 _ => null,
             };
             if (attrReason is not null)
@@ -41,6 +44,9 @@ internal static class RpcPayloadUnionResolver
 
         return builder.TryBuild(out cases, out reason);
     }
+
+    private static bool IsSystemTextJsonAttribute(INamedTypeSymbol? attributeClass)
+        => attributeClass?.ContainingAssembly.Name == JsonSource;
 
     private sealed class Builder
     {
