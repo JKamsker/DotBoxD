@@ -102,7 +102,6 @@ internal static class ForbiddenCollectionCapacityPolicy
     private static string? CollectionDisplayName(INamedTypeSymbol type, string typeName)
         => typeName switch
         {
-            ArrayBufferWriterTypeName => type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
             ArrayListTypeName => ArrayListTypeName,
             ListTypeName => "System.Collections.Generic.List",
             DictionaryTypeName => "System.Collections.Generic.Dictionary",
@@ -110,8 +109,13 @@ internal static class ForbiddenCollectionCapacityPolicy
             HashtableTypeName => "System.Collections.Hashtable",
             StackTypeName or HashSetTypeName or PriorityQueueTypeName =>
                 type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
-            _ => null
+            _ => ArrayBufferWriterDisplayName(type, typeName)
         };
+
+    private static string? ArrayBufferWriterDisplayName(INamedTypeSymbol type, string typeName)
+        => typeName == ArrayBufferWriterTypeName
+            ? type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
+            : null;
 
     private static bool IsCapacityAllocationMethod(IMethodSymbol method, string typeName)
     {
