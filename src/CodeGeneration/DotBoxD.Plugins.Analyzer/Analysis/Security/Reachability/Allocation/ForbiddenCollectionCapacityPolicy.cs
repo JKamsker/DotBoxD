@@ -5,6 +5,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class ForbiddenCollectionCapacityPolicy
 {
+    private const string ArrayBufferWriterTypeName = "System.Buffers.ArrayBufferWriter<T>";
     private const string ArrayListTypeName = "System.Collections.ArrayList";
     private const string BitArrayTypeName = "System.Collections.BitArray";
     private const string DictionaryTypeName = "System.Collections.Generic.Dictionary<TKey, TValue>";
@@ -101,6 +102,7 @@ internal static class ForbiddenCollectionCapacityPolicy
     private static string? CollectionDisplayName(INamedTypeSymbol type, string typeName)
         => typeName switch
         {
+            ArrayBufferWriterTypeName => type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
             ArrayListTypeName => ArrayListTypeName,
             ListTypeName => "System.Collections.Generic.List",
             DictionaryTypeName => "System.Collections.Generic.Dictionary",
@@ -115,7 +117,9 @@ internal static class ForbiddenCollectionCapacityPolicy
     {
         if (method.MethodKind == MethodKind.Constructor)
         {
-            var capacityName = typeName == PriorityQueueTypeName ? "initialCapacity" : "capacity";
+            var capacityName = typeName is PriorityQueueTypeName or ArrayBufferWriterTypeName
+                ? "initialCapacity"
+                : "capacity";
             return HasCapacityParameter(method, capacityName);
         }
 
