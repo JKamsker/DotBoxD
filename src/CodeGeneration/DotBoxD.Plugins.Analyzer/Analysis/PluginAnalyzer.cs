@@ -263,10 +263,14 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         => ForbiddenApiNamePolicy.IsForbiddenNamespace(typeName);
 
     internal static bool IsEventKernel(INamedTypeSymbol? type)
-        => type?.AllInterfaces.Any(i => string.Equals(
-            i.OriginalDefinition.ToDisplayString(),
+        => type?.AllInterfaces.Any(IsEventKernelInterface) == true;
+
+    internal static bool IsEventKernelInterface(INamedTypeSymbol type)
+        => string.Equals(
+            type.OriginalDefinition.ToDisplayString(),
             DotBoxDMetadataNames.EventKernelInterface,
-            StringComparison.Ordinal)) == true;
+            StringComparison.Ordinal) &&
+           string.Equals(type.ContainingAssembly.Name, "DotBoxD.Abstractions", StringComparison.Ordinal);
 
     private static bool IsAllowedLiveSettingType(ITypeSymbol type)
         => DotBoxDTypeNameReader.IsSupportedLiveSettingType(type);
