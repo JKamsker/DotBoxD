@@ -7,6 +7,7 @@ internal static class ForbiddenCollectionCapacityPolicy
 {
     private const string ArrayListTypeName = "System.Collections.ArrayList";
     private const string BitArrayTypeName = "System.Collections.BitArray";
+    private const string CollectionBaseTypeName = "System.Collections.CollectionBase";
     private const string ConcurrentDictionaryTypeName =
         "System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>";
     private const string CollectionsUtilTypeName = "System.Collections.Specialized.CollectionsUtil";
@@ -148,21 +149,26 @@ internal static class ForbiddenCollectionCapacityPolicy
             return type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
         }
 
-        return InheritsNameObjectCollectionBase(type)
-            ? NameObjectCollectionBaseTypeName
+        if (InheritsCollectionBase(type, NameObjectCollectionBaseTypeName))
+        {
+            return NameObjectCollectionBaseTypeName;
+        }
+
+        return InheritsCollectionBase(type, CollectionBaseTypeName)
+            ? CollectionBaseTypeName
             : null;
     }
 
     private static bool UsesOriginalTypeDisplayName(string typeName)
         => typeName is StackTypeName or HashSetTypeName or PriorityQueueTypeName;
 
-    private static bool InheritsNameObjectCollectionBase(INamedTypeSymbol type)
+    private static bool InheritsCollectionBase(INamedTypeSymbol type, string baseTypeName)
     {
         for (var baseType = type.BaseType; baseType is not null; baseType = baseType.BaseType)
         {
             if (string.Equals(
                     baseType.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
-                    NameObjectCollectionBaseTypeName,
+                    baseTypeName,
                     StringComparison.Ordinal))
             {
                 return true;
