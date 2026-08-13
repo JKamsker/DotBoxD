@@ -5,6 +5,8 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class ForbiddenCollectionCapacityPolicy
 {
+    private const string ArrayBufferWriterTypeName = "System.Buffers.ArrayBufferWriter<T>";
+    private const string ArrayBufferWriterTypeName = "System.Buffers.ArrayBufferWriter<T>";
     private const string ArrayListTypeName = "System.Collections.ArrayList";
     private const string BitArrayTypeName = "System.Collections.BitArray";
     private const string CollectionBaseTypeName = "System.Collections.CollectionBase";
@@ -159,8 +161,13 @@ internal static class ForbiddenCollectionCapacityPolicy
             return NameObjectCollectionBaseTypeName;
         }
 
-        return InheritsCollectionBase(type, CollectionBaseTypeName)
-            ? CollectionBaseTypeName
+        if (InheritsCollectionBase(type, CollectionBaseTypeName))
+        {
+            return CollectionBaseTypeName;
+        }
+
+        return typeName == ArrayBufferWriterTypeName
+            ? type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
             : null;
     }
 
@@ -189,7 +196,8 @@ internal static class ForbiddenCollectionCapacityPolicy
         {
             var capacityName = typeName switch
             {
-                PriorityQueueTypeName or NonGenericSortedListTypeName => "initialCapacity",
+                PriorityQueueTypeName or NonGenericSortedListTypeName or ArrayBufferWriterTypeName =>
+                    "initialCapacity",
                 HybridDictionaryTypeName => "initialSize",
                 _ => "capacity"
             };
