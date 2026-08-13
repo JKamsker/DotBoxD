@@ -19,6 +19,7 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string ListTypeName = "System.Collections.Generic.List<T>";
     private const string NameValueCollectionTypeName =
         "System.Collections.Specialized.NameValueCollection";
+    private const string OrderedDictionaryTypeName = "System.Collections.Specialized.OrderedDictionary";
     private const string PriorityQueueTypeName =
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
     private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
@@ -34,6 +35,7 @@ internal static class ForbiddenCollectionCapacityPolicy
         [HybridDictionaryTypeName] = HybridDictionaryTypeName,
         [ListTypeName] = "System.Collections.Generic.List",
         [NameValueCollectionTypeName] = NameValueCollectionTypeName,
+        [OrderedDictionaryTypeName] = OrderedDictionaryTypeName,
         [QueueTypeName] = "System.Collections.Generic.Queue",
         [SortedListTypeName] = "System.Collections.Generic.SortedList"
     };
@@ -86,6 +88,13 @@ internal static class ForbiddenCollectionCapacityPolicy
         {
             forbidden = BitArrayTypeName;
             return true;
+        }
+
+        if (string.Equals(typeName, OrderedDictionaryTypeName, StringComparison.Ordinal) &&
+            !HasNonEmptyInitializer(creation))
+        {
+            forbidden = null!;
+            return false;
         }
 
         return TryGetDisplayName(method, out forbidden);
@@ -174,6 +183,9 @@ internal static class ForbiddenCollectionCapacityPolicy
         => creation.Arguments.Any(static argument =>
             argument.Parameter is { Type.SpecialType: SpecialType.System_Int32, Name: "length" } &&
             argument.Value.ConstantValue is not { HasValue: true, Value: 0 });
+
+    private static bool HasNonEmptyInitializer(IObjectCreationOperation creation)
+        => creation.Initializer?.Initializers.Any() == true;
 
     private static string CapacityTypeName(IMethodSymbol method)
         => method.ContainingType.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
