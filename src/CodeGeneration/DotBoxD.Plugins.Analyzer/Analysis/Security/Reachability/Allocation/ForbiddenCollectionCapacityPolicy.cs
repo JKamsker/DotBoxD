@@ -7,6 +7,8 @@ internal static class ForbiddenCollectionCapacityPolicy
 {
     private const string ArrayListTypeName = "System.Collections.ArrayList";
     private const string BitArrayTypeName = "System.Collections.BitArray";
+    private const string ConcurrentDictionaryTypeName =
+        "System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>";
     private const string DictionaryTypeName = "System.Collections.Generic.Dictionary<TKey, TValue>";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string HashtableTypeName = "System.Collections.Hashtable";
@@ -23,6 +25,7 @@ internal static class ForbiddenCollectionCapacityPolicy
     private static readonly Dictionary<string, string> FixedDisplayNames = new(StringComparer.Ordinal)
     {
         [ArrayListTypeName] = ArrayListTypeName,
+        [ConcurrentDictionaryTypeName] = "System.Collections.Concurrent.ConcurrentDictionary",
         [DictionaryTypeName] = "System.Collections.Generic.Dictionary",
         [HashtableTypeName] = "System.Collections.Hashtable",
         [ListTypeName] = "System.Collections.Generic.List",
