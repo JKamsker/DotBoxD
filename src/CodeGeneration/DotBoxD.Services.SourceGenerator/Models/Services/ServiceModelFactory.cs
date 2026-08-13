@@ -88,7 +88,77 @@ internal static partial class ServiceModelFactory
         var seenSignatureIndexes = new Dictionary<string, int>(StringComparer.Ordinal);
         var validationCache = SharedRpcTypeValidationCache.Get(context.SemanticModel.Compilation);
 
-        foreach (var methodSymbol in members.Methods)
+        if (BuildMethods(
+                members.Methods,
+                buildContext,
+                cancellationTokenSymbol,
+                validationCache,
+                methods,
+                methodLocations,
+                methodDiagnostics,
+                seenSignatures,
+                seenSignatureIndexes,
+                ct) is { } rejectedMethod)
+        {
+            return rejectedMethod;
+        }
+
+        foreach (var propertySymbol in members.Properties)
+        {
+            if (!ServicePropertyModelFactory.TryBuild(propertySymbol, ct, out var property, out var propertyLocation))
+            {
+                continue;
+            }
+
+            properties.Add(property);
+            propertyLocations.Add(propertyLocation);
+        }
+
+        WireNameValidator.MarkDuplicateWireNames(displayName, methods, methodLocations, methodDiagnostics, ct);
+        var experimentalAttribute = ExperimentalAttributeFormatter.From(interfaceSymbol);
+        var externAliases = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var method in methods)
+        {
+            foreach (var externAlias in method.ExternAliases.Array)
+            {
+                externAliases.Add(externAlias);
+            }
+        }
+
+        return new ServiceResult(
+            Model: new ServiceModel(
+                Namespace: buildContext.ServiceNamespace,
+                InterfaceName: interfaceSymbol.Name,
+                ServiceName: LiteralHelpers.EscapeStringLiteral(serviceName),
+                Methods: methods.ToEquatableArray(),
+                Properties: properties.ToEquatableArray(),
+                ExternAliases: externAliases.ToEquatableArray(),
+                RawServiceName: serviceName,
+                ObsoleteAttribute: obsoleteAttribute.Source,
+                TypeAttributePrefix: experimentalAttribute.AttributePrefix,
+                ExperimentalDiagnosticId: experimentalAttribute.DiagnosticId),
+            Error: null,
+            MethodDiagnostics: methodDiagnostics.ToEquatableArray(),
+            MethodLocations: methodLocations.ToEquatableArray(),
+            PropertyLocations: propertyLocations.ToEquatableArray(),
+            ServiceLocation: buildContext.ServiceLocation,
+            QualifiedInterfaceName: buildContext.QualifiedInterfaceName,
+            ServiceDiagnostic: null);
+    }
+
+    private static ServiceResult? BuildMethods(
+        List<IMethodSymbol> methodSymbols,
+        ServiceBuildContext buildContext,
+        INamedTypeSymbol? cancellationTokenSymbol,
+        RpcTypeValidationCache validationCache,
+        List<MethodModel> methods,
+        List<DiagnosticLocation> methodLocations,
+        List<MethodDiagnostic> methodDiagnostics,
+        Dictionary<string, IMethodSymbol> seenSignatures,
+        Dictionary<string, int> seenSignatureIndexes,
+        CancellationToken ct)
+    {
+        foreach (var methodSymbol in methodSymbols)
         {
             ct.ThrowIfCancellationRequested();
 
@@ -128,38 +198,7 @@ internal static partial class ServiceModelFactory
             methodLocations.Add(methodLocation);
         }
 
-        foreach (var propertySymbol in members.Properties)
-        {
-            if (!ServicePropertyModelFactory.TryBuild(propertySymbol, ct, out var property, out var propertyLocation))
-            {
-                continue;
-            }
-
-            properties.Add(property);
-            propertyLocations.Add(propertyLocation);
-        }
-
-        WireNameValidator.MarkDuplicateWireNames(displayName, methods, methodLocations, methodDiagnostics, ct);
-        var experimentalAttribute = ExperimentalAttributeFormatter.From(interfaceSymbol);
-
-        return new ServiceResult(
-            Model: new ServiceModel(
-                Namespace: buildContext.ServiceNamespace,
-                InterfaceName: interfaceSymbol.Name,
-                ServiceName: LiteralHelpers.EscapeStringLiteral(serviceName),
-                Methods: methods.ToEquatableArray(),
-                Properties: properties.ToEquatableArray(),
-                RawServiceName: serviceName,
-                ObsoleteAttribute: obsoleteAttribute.Source,
-                TypeAttributePrefix: experimentalAttribute.AttributePrefix,
-                ExperimentalDiagnosticId: experimentalAttribute.DiagnosticId),
-            Error: null,
-            MethodDiagnostics: methodDiagnostics.ToEquatableArray(),
-            MethodLocations: methodLocations.ToEquatableArray(),
-            PropertyLocations: propertyLocations.ToEquatableArray(),
-            ServiceLocation: buildContext.ServiceLocation,
-            QualifiedInterfaceName: buildContext.QualifiedInterfaceName,
-            ServiceDiagnostic: null);
+        return null;
     }
 
     private static ServiceResult? ValidateServiceSymbol(

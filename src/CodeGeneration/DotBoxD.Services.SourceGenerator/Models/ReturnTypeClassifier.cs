@@ -43,6 +43,12 @@ internal static partial class ReturnTypeClassifier
         return null;
     }
 
+    public static bool IsLookalikeTaskLike(ITypeSymbol type) =>
+        type is INamedTypeSymbol named &&
+        named.ContainingNamespace?.ToDisplayString() == SystemThreadingTasks &&
+        (named.Name == "Task" || named.Name == "ValueTask") &&
+        !IsFrameworkTaskLike(named);
+
     public static MethodReturnKind Classify(
         ITypeSymbol returnType,
         CancellationToken ct,
@@ -96,7 +102,8 @@ internal static partial class ReturnTypeClassifier
         unwrappedReturnType = null;
         subService = null;
         if (returnType is not INamedTypeSymbol { IsGenericType: true } named ||
-            named.ContainingNamespace?.ToDisplayString() != SystemThreadingTasks)
+            named.ContainingNamespace?.ToDisplayString() != SystemThreadingTasks ||
+            !IsFrameworkTaskLike(named))
         {
             return false;
         }
@@ -164,7 +171,9 @@ internal static partial class ReturnTypeClassifier
     private static bool TryClassifyNonGenericTaskLike(ITypeSymbol returnType, out MethodReturnKind kind)
     {
         kind = default;
-        if (returnType.ContainingNamespace?.ToDisplayString() != SystemThreadingTasks)
+        if (returnType is not INamedTypeSymbol named ||
+            named.ContainingNamespace?.ToDisplayString() != SystemThreadingTasks ||
+            !IsFrameworkTaskLike(named))
         {
             return false;
         }
@@ -183,6 +192,9 @@ internal static partial class ReturnTypeClassifier
 
         return false;
     }
+
+    private static bool IsFrameworkTaskLike(INamedTypeSymbol type) =>
+        type.ContainingAssembly.Identity.Name is "System.Runtime" or "mscorlib" or "System.Private.CoreLib" or "netstandard" or "System.Threading.Tasks";
 
     private static bool TryClassifyDirectShape(
         ITypeSymbol returnType,
