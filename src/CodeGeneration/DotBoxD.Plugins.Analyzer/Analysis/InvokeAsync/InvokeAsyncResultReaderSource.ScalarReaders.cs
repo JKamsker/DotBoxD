@@ -86,6 +86,7 @@ internal sealed partial class InvokeAsyncResultReaderSource
         => RpcEnumRangeGuardSource.AppendInt64EnumRangeGuard(
             _helpers,
             enumType,
+            _compilation,
             "            ",
             "InvokeAsync enum result is outside the target enum underlying range.");
 
