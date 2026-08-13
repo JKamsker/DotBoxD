@@ -162,7 +162,14 @@ public sealed partial class RpcHost : IAsyncDisposable
             RpcDiagnostics.Report("Accepted peer configuration failed", ex);
             RpcEventHandlerInvoker.Raise(AcceptError, this, new RpcHostErrorEventArgs(ex));
             admission.Dispose();
-            await peer.DisposeAsync().ConfigureAwait(false);
+            try
+            {
+                await peer.DisposeAsync().ConfigureAwait(false);
+            }
+            catch
+            {
+            }
+
             return false;
         }
     }
