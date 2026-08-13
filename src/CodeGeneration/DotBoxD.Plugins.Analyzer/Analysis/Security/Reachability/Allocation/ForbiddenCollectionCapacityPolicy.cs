@@ -12,6 +12,7 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string DictionaryTypeName = "System.Collections.Generic.Dictionary<TKey, TValue>";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string HashtableTypeName = "System.Collections.Hashtable";
+    private const string HybridDictionaryTypeName = "System.Collections.Specialized.HybridDictionary";
     private const string ImmutableArrayTypeName = "System.Collections.Immutable.ImmutableArray";
     private const string ImmutableArrayBuilderTypeName =
         "System.Collections.Immutable.ImmutableArray<T>.Builder";
@@ -30,6 +31,7 @@ internal static class ForbiddenCollectionCapacityPolicy
         [ConcurrentDictionaryTypeName] = "System.Collections.Concurrent.ConcurrentDictionary",
         [DictionaryTypeName] = "System.Collections.Generic.Dictionary",
         [HashtableTypeName] = "System.Collections.Hashtable",
+        [HybridDictionaryTypeName] = HybridDictionaryTypeName,
         [ListTypeName] = "System.Collections.Generic.List",
         [NameValueCollectionTypeName] = NameValueCollectionTypeName,
         [QueueTypeName] = "System.Collections.Generic.Queue",
@@ -135,7 +137,12 @@ internal static class ForbiddenCollectionCapacityPolicy
     {
         if (method.MethodKind == MethodKind.Constructor)
         {
-            var capacityName = typeName == PriorityQueueTypeName ? "initialCapacity" : "capacity";
+            var capacityName = typeName switch
+            {
+                PriorityQueueTypeName => "initialCapacity",
+                HybridDictionaryTypeName => "initialSize",
+                _ => "capacity"
+            };
             return HasCapacityParameter(method, capacityName);
         }
 
