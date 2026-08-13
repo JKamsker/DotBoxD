@@ -15,6 +15,7 @@ internal static partial class DotBoxDRpcTypeMapper
         "System.Runtime.Serialization.IgnoreDataMemberAttribute";
     private const string JsonIgnoreAttribute =
         "System.Text.Json.Serialization.JsonIgnoreAttribute";
+    private const string JsonSerializationAssembly = "System.Text.Json";
     private const string MessagePackIgnoreMemberAttribute =
         "MessagePack.IgnoreMemberAttribute";
 
@@ -203,7 +204,7 @@ internal static partial class DotBoxDRpcTypeMapper
     {
         foreach (var attribute in member.GetAttributes())
         {
-            if (IsIgnoreAttribute(attribute.AttributeClass?.ToDisplayString()))
+            if (IsIgnoreAttribute(attribute.AttributeClass))
             {
                 return true;
             }
@@ -212,8 +213,11 @@ internal static partial class DotBoxDRpcTypeMapper
         return false;
     }
 
-    private static bool IsIgnoreAttribute(string? typeName) =>
-        typeName is IgnoreDataMemberAttribute
-            or JsonIgnoreAttribute
-            or MessagePackIgnoreMemberAttribute;
+    private static bool IsIgnoreAttribute(INamedTypeSymbol? attributeType)
+    {
+        var typeName = attributeType?.ToDisplayString();
+        return typeName is IgnoreDataMemberAttribute or MessagePackIgnoreMemberAttribute ||
+               typeName == JsonIgnoreAttribute &&
+               attributeType!.ContainingAssembly.Name == JsonSerializationAssembly;
+    }
 }

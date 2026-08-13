@@ -179,13 +179,13 @@ public static partial class KernelRpcMarshaller
 
     // A member marked with a known serializer ignore attribute is non-wire: lazily-resolved or computed
     // state, not serialized data. Exclude it from the marshalled record shape so the analyzer, convention
-    // event adapter, and record decoder agree on the wire field set. Matched by name via
-    // GetCustomAttributesData so the attribute need not load.
+    // event adapter, and record decoder agree on the wire field set. Custom attribute metadata avoids
+    // instantiating attributes while retaining their declaring assembly identity.
     internal static bool IsIgnoredMember(MemberInfo member)
     {
         foreach (var attribute in member.GetCustomAttributesData())
         {
-            if (IsIgnoreAttribute(attribute.AttributeType.FullName))
+            if (IsIgnoreAttribute(attribute.AttributeType))
             {
                 return true;
             }
@@ -194,10 +194,14 @@ public static partial class KernelRpcMarshaller
         return false;
     }
 
-    private static bool IsIgnoreAttribute(string? typeName) =>
-        typeName is "System.Runtime.Serialization.IgnoreDataMemberAttribute"
-            or "System.Text.Json.Serialization.JsonIgnoreAttribute"
-            or "MessagePack.IgnoreMemberAttribute";
+    private static bool IsIgnoreAttribute(Type attributeType)
+    {
+        var typeName = attributeType.FullName;
+        return typeName is "System.Runtime.Serialization.IgnoreDataMemberAttribute"
+            or "MessagePack.IgnoreMemberAttribute" ||
+               typeName == "System.Text.Json.Serialization.JsonIgnoreAttribute" &&
+               attributeType.Assembly.GetName().Name == "System.Text.Json";
+    }
 
     private readonly record struct OptionalType(Type? Value);
 
