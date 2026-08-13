@@ -11,7 +11,7 @@ public sealed partial class PluginAnalyzer
         IMethodSymbol method,
         IMethodSymbol target)
     {
-        if (!TryGetUnsafeAccessorAttribute(target, out var attribute))
+        if (!TryGetUnsafeAccessorAttribute(target, context.Compilation, out var attribute))
         {
             return false;
         }

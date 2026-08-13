@@ -39,7 +39,7 @@ public sealed partial class PluginAnalyzer
     {
         var method = (IMethodSymbol)context.Symbol;
         helperGraph.RecordDispatchImplementations(method);
-        if (TryGetUnsafeAccessorAttribute(method, out var attribute))
+        if (TryGetUnsafeAccessorAttribute(method, context.Compilation, out var attribute))
         {
             helperGraph.RecordForbidden(method, attribute);
         }
@@ -219,13 +219,23 @@ public sealed partial class PluginAnalyzer
         return null;
     }
 
-    private static bool TryGetUnsafeAccessorAttribute(IMethodSymbol method, out INamedTypeSymbol attributeType)
+    private static bool TryGetUnsafeAccessorAttribute(
+        IMethodSymbol method,
+        Compilation compilation,
+        out INamedTypeSymbol attributeType)
     {
+        var unsafeAccessorAttribute = compilation.GetTypeByMetadataName(DotBoxDMetadataNames.UnsafeAccessorAttribute);
+        if (unsafeAccessorAttribute is null)
+        {
+            attributeType = null!;
+            return false;
+        }
+
         foreach (var attribute in method.GetAttributes())
         {
-            if (attribute.AttributeClass is { } attributeClass && string.Equals(attributeClass.ToDisplayString(), DotBoxDMetadataNames.UnsafeAccessorAttribute, StringComparison.Ordinal))
+            if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, unsafeAccessorAttribute))
             {
-                attributeType = attributeClass;
+                attributeType = unsafeAccessorAttribute;
                 return true;
             }
         }

@@ -48,6 +48,47 @@ public sealed class PluginAnalyzerForbiddenApiUnsafeAccessorReachabilityTests
     }
 
     [Fact]
+    public async Task Does_not_report_foreign_unsafe_accessor_lookalike_on_managed_helper()
+    {
+        var foreignUnsafeAccessorReference = CompileReference(
+            """
+            namespace System.Runtime.CompilerServices
+            {
+                [System.AttributeUsage(System.AttributeTargets.Method)]
+                public sealed class UnsafeAccessorAttribute : System.Attribute
+                {
+                    public UnsafeAccessorAttribute() { }
+                }
+            }
+            """,
+            "ForeignUnsafeAccessor");
+        const string source = """
+            extern alias ForeignUnsafeAccessor;
+
+            namespace Sample
+            {
+                using DotBoxD.Abstractions;
+                using DotBoxD.Plugins;
+
+                [Plugin("foreign-unsafe-accessor-lookalike")]
+                public sealed class ForeignUnsafeAccessorLookalikeKernel : IEventKernel<string>
+                {
+                    public bool ShouldHandle(string e, HookContext context) => IsNonEmpty(e);
+
+                    public void Handle(string e, HookContext context) { }
+
+                    [ForeignUnsafeAccessor::System.Runtime.CompilerServices.UnsafeAccessor]
+                    private static bool IsNonEmpty(string value) => value.Length > 0;
+                }
+            }
+            """;
+
+        var diagnostics = await AnalyzeAsync(source, foreignUnsafeAccessorReference);
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "DBXK001");
+    }
+
+    [Fact]
     public async Task Reports_direct_forbidden_call_control()
     {
         const string source = """
@@ -76,9 +117,11 @@ public sealed class PluginAnalyzerForbiddenApiUnsafeAccessorReachabilityTests
         Assert.Contains("System.IO.File", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
-    private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string source)
+    private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+        string source,
+        params MetadataReference[] additionalReferences)
     {
-        var compilation = CreateCompilation(source);
+        var compilation = CreateCompilation(source, additionalReferences);
         var compilerErrors = compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error);
         Assert.Empty(compilerErrors);
 
@@ -86,7 +129,9 @@ public sealed class PluginAnalyzerForbiddenApiUnsafeAccessorReachabilityTests
         return await compilation.WithAnalyzers(analyzers).GetAnalyzerDiagnosticsAsync();
     }
 
-    private static CSharpCompilation CreateCompilation(string source)
+    private static CSharpCompilation CreateCompilation(
+        string source,
+        params MetadataReference[] additionalReferences)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, ParseOptions);
         return CSharpCompilation.Create(
@@ -94,8 +139,24 @@ public sealed class PluginAnalyzerForbiddenApiUnsafeAccessorReachabilityTests
             [syntaxTree],
             TrustedPlatformReferences()
                 .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
-                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location)),
+                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
+                .Concat(additionalReferences),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    }
+
+    private static MetadataReference CompileReference(string source, string alias)
+    {
+        var compilation = CSharpCompilation.Create(
+            "ForeignUnsafeAccessor_" + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(source, ParseOptions)],
+            TrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var assemblyStream = new MemoryStream();
+        var emitResult = compilation.Emit(assemblyStream);
+        Assert.Empty(emitResult.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+
+        return MetadataReference.CreateFromImage(assemblyStream.ToArray())
+            .WithAliases(ImmutableArray.Create(alias));
     }
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()
