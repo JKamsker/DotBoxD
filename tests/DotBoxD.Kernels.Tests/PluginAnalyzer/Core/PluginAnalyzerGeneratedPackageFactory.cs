@@ -116,6 +116,11 @@ internal static class PluginAnalyzerGeneratedPackageFactory
     public static IReadOnlyList<Diagnostic> Diagnostics(string source, params Type[] additionalReferenceTypes)
         => Diagnostics(source, ParseOptions.LanguageVersion, additionalReferenceTypes);
 
+    public static IReadOnlyList<Diagnostic> DiagnosticsWithReferences(
+        string source,
+        params MetadataReference[] additionalReferences)
+        => Diagnostics(CreateCompilation(source, additionalReferences), ParseOptions);
+
     public static IReadOnlyList<Diagnostic> Diagnostics(
         string source,
         LanguageVersion languageVersion,
@@ -123,6 +128,13 @@ internal static class PluginAnalyzerGeneratedPackageFactory
     {
         var parseOptions = ParseOptions.WithLanguageVersion(languageVersion);
         var compilation = CreateCompilation(source, parseOptions, additionalReferenceTypes);
+        return Diagnostics(compilation, parseOptions);
+    }
+
+    private static IReadOnlyList<Diagnostic> Diagnostics(
+        CSharpCompilation compilation,
+        CSharpParseOptions parseOptions)
+    {
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: parseOptions);

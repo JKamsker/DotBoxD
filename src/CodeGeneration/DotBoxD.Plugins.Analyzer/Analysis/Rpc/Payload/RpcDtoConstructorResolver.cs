@@ -41,7 +41,7 @@ internal static class RpcDtoConstructorResolver
         IMethodSymbol constructor,
         Compilation? compilation)
     {
-        if (HasSetsRequiredMembers(constructor))
+        if (HasSetsRequiredMembers(constructor, compilation))
         {
             return;
         }
@@ -124,11 +124,11 @@ internal static class RpcDtoConstructorResolver
             _ => false,
         };
 
-    private static bool HasSetsRequiredMembers(IMethodSymbol constructor)
-        => constructor.GetAttributes().Any(attribute => string.Equals(
-            attribute.AttributeClass?.ToDisplayString(),
-            "System.Diagnostics.CodeAnalysis.SetsRequiredMembersAttribute",
-            StringComparison.Ordinal));
+    private static bool HasSetsRequiredMembers(IMethodSymbol constructor, Compilation? compilation)
+        => compilation?.GetTypeByMetadataName(
+            "System.Diagnostics.CodeAnalysis.SetsRequiredMembersAttribute") is { } expected &&
+           constructor.GetAttributes().Any(attribute =>
+               SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected));
 }
 
 internal sealed record ResolvedDtoConstructor(IMethodSymbol Symbol, bool[] Assigned, int AssignedCount);
