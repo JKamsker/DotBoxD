@@ -25,7 +25,7 @@ internal static partial class PluginServerFacadeModelFactory
                 $"Generated plugin server '{serverType.Name}' must declare Context = typeof(TContext).");
 
         ValidateContextShape(serverType, contextType, cancellationToken);
-        ValidateContextMembers(contextType, cancellationToken);
+        ValidateContextMembers(contextType, compilation, cancellationToken);
         EnsureSingleServerOwnsContext(serverType, contextType, compilation, cancellationToken);
 
         var factoryName = ContextFactoryName(attribute);
