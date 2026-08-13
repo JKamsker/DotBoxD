@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
 using Microsoft.CodeAnalysis;
@@ -46,7 +47,18 @@ internal static class RpcPayloadUnionResolver
     }
 
     private static bool IsSystemTextJsonAttribute(INamedTypeSymbol? attributeClass)
-        => attributeClass?.ContainingAssembly.Name == JsonSource;
+    {
+        var token = attributeClass?.ContainingAssembly.Identity.PublicKeyToken ?? default;
+        return attributeClass is not null &&
+               attributeClass.Locations.Any(static location => location.IsInMetadata) &&
+               attributeClass.ContainingAssembly.Name == JsonSource &&
+               IsSystemTextJsonToken(token);
+    }
+
+    private static bool IsSystemTextJsonToken(System.Collections.Immutable.ImmutableArray<byte> token) =>
+        token.Length == 8 &&
+        token[0] == 0xcc && token[1] == 0x7b && token[2] == 0x13 && token[3] == 0xff &&
+        token[4] == 0xcd && token[5] == 0x2d && token[6] == 0xdd && token[7] == 0x51;
 
     private sealed class Builder
     {

@@ -6,6 +6,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 internal static class ForbiddenCollectionCapacityPolicy
 {
     private const string ArrayBufferWriterTypeName = "System.Buffers.ArrayBufferWriter<T>";
+    private const string BufferWriterInterfaceTypeName = "System.Buffers.IBufferWriter<T>";
     private const string ArrayListTypeName = "System.Collections.ArrayList";
     private const string BitArrayTypeName = "System.Collections.BitArray";
     private const string CollectionBaseTypeName = "System.Collections.CollectionBase";
@@ -246,7 +247,7 @@ internal static class ForbiddenCollectionCapacityPolicy
 
     private static bool IsArrayBufferWriterGrowthHint(IMethodSymbol method, string typeName)
         => method.Name is "GetMemory" or "GetSpan" &&
-           string.Equals(typeName, ArrayBufferWriterTypeName, StringComparison.Ordinal) &&
+           typeName is ArrayBufferWriterTypeName or BufferWriterInterfaceTypeName &&
            HasCapacityParameter(method, "sizeHint");
 
     private static bool HasCapacityParameter(IMethodSymbol method, string capacityName)

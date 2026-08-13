@@ -1,3 +1,4 @@
+using System.Linq;
 using Microsoft.CodeAnalysis;
 
 namespace DotBoxD.Services.SourceGenerator.Validation;
@@ -30,8 +31,24 @@ internal static class RpcPayloadIgnoredMember
     {
         var typeName = attribute.AttributeClass?.ToDisplayString();
         return typeName is IgnoreDataMemberAttribute or MessagePackIgnoreMemberAttribute ||
-               typeName == JsonIgnoreAttribute && IsUnconditionalJsonIgnore(attribute);
+               typeName == JsonIgnoreAttribute &&
+               IsSystemTextJsonAttribute(attribute.AttributeClass) &&
+               IsUnconditionalJsonIgnore(attribute);
     }
+
+    private static bool IsSystemTextJsonAttribute(INamedTypeSymbol? attributeType)
+    {
+        var token = attributeType?.ContainingAssembly.Identity.PublicKeyToken ?? default;
+        return attributeType is not null &&
+               attributeType.Locations.Any(static location => location.IsInMetadata) &&
+               attributeType.ContainingAssembly.Name == "System.Text.Json" &&
+               IsSystemTextJsonToken(token);
+    }
+
+    private static bool IsSystemTextJsonToken(System.Collections.Immutable.ImmutableArray<byte> token) =>
+        token.Length == 8 &&
+        token[0] == 0xcc && token[1] == 0x7b && token[2] == 0x13 && token[3] == 0xff &&
+        token[4] == 0xcd && token[5] == 0x2d && token[6] == 0xdd && token[7] == 0x51;
 
     private static bool IsUnconditionalJsonIgnore(AttributeData attribute)
     {

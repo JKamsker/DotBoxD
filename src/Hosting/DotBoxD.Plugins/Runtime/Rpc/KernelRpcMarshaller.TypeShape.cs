@@ -199,8 +199,7 @@ public static partial class KernelRpcMarshaller
         var typeName = attributeType.FullName;
         return typeName is "System.Runtime.Serialization.IgnoreDataMemberAttribute"
             or "MessagePack.IgnoreMemberAttribute" ||
-               typeName == "System.Text.Json.Serialization.JsonIgnoreAttribute" &&
-               attributeType.Assembly.GetName().Name == "System.Text.Json";
+               attributeType == typeof(System.Text.Json.Serialization.JsonIgnoreAttribute);
     }
 
     private readonly record struct OptionalType(Type? Value);

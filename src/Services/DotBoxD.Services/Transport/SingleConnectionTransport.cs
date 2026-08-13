@@ -35,6 +35,8 @@ public sealed class SingleConnectionTransport : ITransport
 
     public ValueTask DisposeAsync()
     {
+        TaskCompletionSource<bool> disposal;
+        Task disposeTask;
         lock (_disposeLock)
         {
             if (_disposeTask is not null)
@@ -43,11 +45,12 @@ public sealed class SingleConnectionTransport : ITransport
             }
 
             Interlocked.Exchange(ref _disposed, 1);
-            var disposal = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            disposal = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             _disposeTask = disposal.Task;
-            _ = CompleteDisposalAsync(_connection, _ownsConnection, disposal);
-            return new ValueTask(_disposeTask);
+            disposeTask = _disposeTask;
         }
+        _ = CompleteDisposalAsync(_connection, _ownsConnection, disposal);
+        return new ValueTask(disposeTask);
     }
 
     private static async Task CompleteDisposalAsync(
@@ -198,6 +201,8 @@ public sealed class SingleConnectionServerTransport : IServerTransport
 
     public ValueTask DisposeAsync()
     {
+        TaskCompletionSource<bool> disposal;
+        Task disposeTask;
         lock (_disposeLock)
         {
             if (_disposeTask is not null)
@@ -215,11 +220,12 @@ public sealed class SingleConnectionServerTransport : IServerTransport
             }
 
             stopped.TrySetResult(true);
-            var disposal = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            disposal = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             _disposeTask = disposal.Task;
-            _ = CompleteDisposalAsync(_connection, _ownsConnection, disposal);
-            return new ValueTask(_disposeTask);
+            disposeTask = _disposeTask;
         }
+        _ = CompleteDisposalAsync(_connection, _ownsConnection, disposal);
+        return new ValueTask(disposeTask);
     }
 
     private static async Task CompleteDisposalAsync(

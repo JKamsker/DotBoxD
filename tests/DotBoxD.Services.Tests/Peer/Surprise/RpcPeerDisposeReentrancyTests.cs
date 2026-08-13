@@ -9,15 +9,10 @@ namespace DotBoxD.Services.Tests.Peer.Surprise;
 
 public sealed class RpcPeerDisposeReentrancyTests
 {
-    private static readonly SemaphoreSlim s_diagnosticsGate = new(1, 1);
-
     [Fact]
     public async Task DisposeAsync_WhenDiagnosticHandlerReenters_PublishesOneSharedTerminalBeforeTeardown()
     {
-        if (!await s_diagnosticsGate.WaitAsync(TimeSpan.FromSeconds(30)))
-        {
-            throw new TimeoutException("Timed out waiting to acquire the diagnostics test gate.");
-        }
+        await RpcDiagnosticsTestGate.EnterAsync();
 
         try
         {
@@ -61,7 +56,7 @@ public sealed class RpcPeerDisposeReentrancyTests
         }
         finally
         {
-            s_diagnosticsGate.Release();
+            RpcDiagnosticsTestGate.Exit();
         }
     }
 
@@ -87,4 +82,19 @@ public sealed class RpcPeerDisposeReentrancyTests
         public Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) =>
             Task.CompletedTask;
     }
+}
+
+internal static class RpcDiagnosticsTestGate
+{
+    private static readonly SemaphoreSlim s_gate = new(1, 1);
+
+    public static async Task EnterAsync()
+    {
+        if (!await s_gate.WaitAsync(TimeSpan.FromSeconds(30)))
+        {
+            throw new TimeoutException("Timed out waiting to acquire the diagnostics test gate.");
+        }
+    }
+
+    public static void Exit() => s_gate.Release();
 }

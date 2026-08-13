@@ -218,6 +218,14 @@ internal static partial class DotBoxDRpcTypeMapper
         var typeName = attributeType?.ToDisplayString();
         return typeName is IgnoreDataMemberAttribute or MessagePackIgnoreMemberAttribute ||
                typeName == JsonIgnoreAttribute &&
-               attributeType!.ContainingAssembly.Name == JsonSerializationAssembly;
+               attributeType!.Locations.Any(static location => location.IsInMetadata) &&
+               attributeType.ContainingAssembly.Name == JsonSerializationAssembly &&
+               HasSystemTextJsonPublicKeyToken(attributeType.ContainingAssembly.Identity.PublicKeyToken);
     }
+
+    private static bool HasSystemTextJsonPublicKeyToken(
+        System.Collections.Immutable.ImmutableArray<byte> token) =>
+        token.Length == 8 &&
+        token[0] == 0xcc && token[1] == 0x7b && token[2] == 0x13 && token[3] == 0xff &&
+        token[4] == 0xcd && token[5] == 0x2d && token[6] == 0xdd && token[7] == 0x51;
 }

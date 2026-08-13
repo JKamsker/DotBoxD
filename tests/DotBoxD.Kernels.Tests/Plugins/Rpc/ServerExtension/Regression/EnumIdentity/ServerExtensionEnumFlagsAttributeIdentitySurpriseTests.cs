@@ -69,7 +69,9 @@ public sealed class ServerExtensionEnumFlagsAttributeIdentitySurpriseTests
                 namespace System;
 
                 [AttributeUsage(AttributeTargets.Enum)]
-                public sealed class FlagsAttribute : Attribute;
+                public sealed class FlagsAttribute : Attribute
+                {
+                }
                 """)],
             TrustedPlatformReferences(),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));

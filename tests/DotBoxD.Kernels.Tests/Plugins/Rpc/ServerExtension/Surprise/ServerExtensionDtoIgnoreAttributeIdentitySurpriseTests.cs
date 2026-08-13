@@ -47,7 +47,7 @@ public sealed class ServerExtensionDtoIgnoreAttributeIdentitySurpriseTests
     private static MetadataReference CompileForeignJsonIgnoreReference()
     {
         var compilation = CSharpCompilation.Create(
-            "LookalikeJsonIgnore_" + Guid.NewGuid().ToString("N"),
+            "System.Text.Json",
             [CSharpSyntaxTree.ParseText(
                 """
                 namespace System.Text.Json.Serialization;

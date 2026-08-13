@@ -20,7 +20,7 @@ public class ExternAliasReturnTypeTests
             public sealed class Task<TResult>
             {
             }
-            """);
+            """, "System.Runtime");
         var compilation = CreateCompilation("""
             extern alias Lookalike;
 
@@ -48,10 +48,10 @@ public class ExternAliasReturnTypeTests
             .BeEmpty("the generator must preserve the extern-aliased Task<TResult> identity or reject it with a focused diagnostic");
     }
 
-    private static MetadataReference CompileReference(string source)
+    private static MetadataReference CompileReference(string source, string assemblyName)
     {
         var compilation = CSharpCompilation.Create(
-            assemblyName: "LookalikeTask_" + Guid.NewGuid().ToString("N"),
+            assemblyName: assemblyName,
             syntaxTrees: new[] { CSharpSyntaxTree.ParseText(source, s_parseOptions) },
             references: Basic.Reference.Assemblies.Net80.References.All,
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));

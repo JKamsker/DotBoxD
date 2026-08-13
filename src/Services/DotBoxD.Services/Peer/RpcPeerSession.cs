@@ -55,17 +55,25 @@ public sealed class RpcPeerSession : IAsyncDisposable
 
     public ValueTask DisposeAsync()
     {
+        TaskCompletionSource<object?>? completionSource = null;
+        Task disposeTask;
         lock (_disposeLock)
         {
             if (_disposeTask is null)
             {
-                var completionSource = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+                completionSource = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
                 _disposeTask = completionSource.Task;
-                _ = CompleteDisposeAsync(completionSource);
             }
 
-            return new ValueTask(_disposeTask);
+            disposeTask = _disposeTask;
         }
+
+        if (completionSource is not null)
+        {
+            _ = CompleteDisposeAsync(completionSource);
+        }
+
+        return new ValueTask(disposeTask);
     }
 
     private static async Task<RpcPeerSession> ConnectCoreAsync(

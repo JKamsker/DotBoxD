@@ -12,6 +12,19 @@ public sealed class RpcPeerSessionDisposeReentrancyTests
     [Fact]
     public async Task DisposeAsync_WhenTransportFailureReportsDiagnostic_ReusesOriginalTeardown()
     {
+        await RpcDiagnosticsTestGate.EnterAsync();
+        try
+        {
+            await VerifyReentrantDisposalAsync();
+        }
+        finally
+        {
+            RpcDiagnosticsTestGate.Exit();
+        }
+    }
+
+    private static async Task VerifyReentrantDisposalAsync()
+    {
         var channelFailure = new InvalidOperationException("channel disposal failed");
         var transportFailure = new InvalidOperationException("transport disposal failed");
         var channel = new ThrowingDisposeChannel(channelFailure);

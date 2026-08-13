@@ -87,6 +87,7 @@ public sealed partial class RpcPeer
         Task? readLoop;
         CancellationTokenSource? cts;
         Task disposeTask;
+        TaskCompletionSource<object?> disposeCompletion;
         lock (_lifecycleLock)
         {
             if (_disposeTask is not null)
@@ -100,13 +101,13 @@ public sealed partial class RpcPeer
             cts = _cts;
             readLoop = ReferenceEquals(s_disconnectedEventPeer, this) ? null : _readLoop;
             cts?.Cancel();
-            var disposeCompletion = new TaskCompletionSource<object?>(
+            disposeCompletion = new TaskCompletionSource<object?>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
             disposeTask = disposeCompletion.Task;
             _disposeTask = disposeTask;
-            _ = CompleteDisposeAsync(readLoop, cts, disposeCompletion);
         }
 
+        _ = CompleteDisposeAsync(readLoop, cts, disposeCompletion);
         return new ValueTask(disposeTask);
     }
 
