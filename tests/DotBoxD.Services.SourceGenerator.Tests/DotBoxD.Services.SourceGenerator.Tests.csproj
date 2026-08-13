@@ -26,6 +26,7 @@
     </PackageReference>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="4.11.0" />
     <PackageReference Include="Basic.Reference.Assemblies.Net80" />
+    <PackageReference Include="MessagePack" ExcludeAssets="analyzers" />
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="Verify.XunitV3" />
     <PackageReference Include="Verify.SourceGenerators" />

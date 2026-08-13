@@ -196,11 +196,21 @@ public static partial class KernelRpcMarshaller
 
     private static bool IsIgnoreAttribute(Type attributeType)
     {
-        var typeName = attributeType.FullName;
-        return typeName is "System.Runtime.Serialization.IgnoreDataMemberAttribute"
-            or "MessagePack.IgnoreMemberAttribute" ||
-               attributeType == typeof(System.Text.Json.Serialization.JsonIgnoreAttribute);
+        if (attributeType == typeof(System.Runtime.Serialization.IgnoreDataMemberAttribute) ||
+            attributeType == typeof(System.Text.Json.Serialization.JsonIgnoreAttribute))
+        {
+            return true;
+        }
+
+        return attributeType.FullName == "MessagePack.IgnoreMemberAttribute" &&
+               attributeType.Assembly.GetName().Name is "MessagePack" or "MessagePack.Annotations" &&
+               HasMessagePackPublicKeyToken(attributeType.Assembly.GetName().GetPublicKeyToken());
     }
+
+    private static bool HasMessagePackPublicKeyToken(byte[]? token) =>
+        token is { Length: 8 } &&
+        token[0] == 0xb4 && token[1] == 0xa0 && token[2] == 0x36 && token[3] == 0x95 &&
+        token[4] == 0x45 && token[5] == 0xf0 && token[6] == 0xa1 && token[7] == 0xbe;
 
     private readonly record struct OptionalType(Type? Value);
 
