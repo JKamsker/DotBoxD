@@ -63,14 +63,6 @@ public sealed class DtoPayloadIgnoreAttributeTests
             using System.Text.Json.Serialization;
             using System.Threading.Tasks;
 
-            namespace MessagePack
-            {
-                [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
-                public sealed class IgnoreMemberAttribute : Attribute
-                {
-                }
-            }
-
             namespace Regress.DtoPayloadIgnore
             {
                 public readonly record struct JsonHandle(ulong Value)
@@ -130,14 +122,6 @@ public sealed class DtoPayloadIgnoreAttributeTests
             using System.Runtime.Serialization;
             using System.Text.Json.Serialization;
             using System.Threading.Tasks;
-
-            namespace MessagePack
-            {
-                [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
-                public sealed class IgnoreMemberAttribute : Attribute
-                {
-                }
-            }
 
             namespace Regress.DtoPayloadIgnore
             {

@@ -129,6 +129,43 @@ public sealed partial class PluginServerContextContractTests
         }
         """,
         "must be static and have signature")]
+    [InlineData(
+        """
+        [GeneratePluginServer(Context = typeof(GameContext), ContextFactory = nameof(GameContext.Create))]
+        public partial class RemotePluginServer : Sample.Game.IGameWorld;
+
+        public sealed partial class GameContext
+        {
+            public static GameContext Create(ref HookContext raw) => new();
+        }
+        """,
+        "must be static and have signature")]
+    [InlineData(
+        """
+        [GeneratePluginServer(Context = typeof(GameContext), ContextFactory = nameof(GameContext.Create))]
+        public partial class RemotePluginServer : Sample.Game.IGameWorld;
+
+        public sealed partial class GameContext
+        {
+            public static GameContext Create(in HookContext raw) => new();
+        }
+        """,
+        "must be static and have signature")]
+    [InlineData(
+        """
+        [GeneratePluginServer(Context = typeof(GameContext), ContextFactory = nameof(GameContext.Create))]
+        public partial class RemotePluginServer : Sample.Game.IGameWorld;
+
+        public sealed partial class GameContext
+        {
+            public static GameContext Create(out HookContext raw)
+            {
+                raw = new();
+                return new();
+            }
+        }
+        """,
+        "must be static and have signature")]
     public void Invalid_context_factory_reports_generation_diagnostic(string source, string expectedMessage)
     {
         var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(MinimalServer(source));

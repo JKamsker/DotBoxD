@@ -77,19 +77,19 @@ public sealed class RegistrationAccumulatorAssignableChildTests
 
             namespace Sample;
 
-            [GeneratePluginRegistrationAccumulator("RemoteMonsterBaseAccumulator", "Extend")]
+            [GeneratePluginRegistrationAccumulator("RemoteMonsterBaseAccumulator", "ExtendBase")]
             internal class RemoteMonsterControlBase
             {
-                public ValueTask<string> Extend<TService, TKernel>()
+                public ValueTask<string> ExtendBase<TService, TKernel>()
                     where TService : class
                     where TKernel : class
                     => ValueTask.FromResult("base");
             }
 
-            [GeneratePluginRegistrationAccumulator("RemoteMonsterDerivedAccumulator", "Extend")]
+            [GeneratePluginRegistrationAccumulator("RemoteMonsterDerivedAccumulator", "ExtendDerived")]
             internal sealed class RemoteMonsterControl : RemoteMonsterControlBase
             {
-                public new ValueTask<string> Extend<TService, TKernel>()
+                public ValueTask<string> ExtendDerived<TService, TKernel>()
                     where TService : class
                     where TKernel : class
                     => ValueTask.FromResult("derived");

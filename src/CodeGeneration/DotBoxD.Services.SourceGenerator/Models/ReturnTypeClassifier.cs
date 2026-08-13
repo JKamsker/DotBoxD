@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
 using Microsoft.CodeAnalysis;
@@ -42,6 +43,12 @@ internal static partial class ReturnTypeClassifier
 
         return null;
     }
+
+    public static bool IsLookalikeTaskLike(ITypeSymbol type) =>
+        type is INamedTypeSymbol named &&
+        named.ContainingNamespace?.ToDisplayString() == SystemThreadingTasks &&
+        (named.Name == "Task" || named.Name == "ValueTask") &&
+        !IsFrameworkTaskLike(named);
 
     public static MethodReturnKind Classify(
         ITypeSymbol returnType,
@@ -96,7 +103,8 @@ internal static partial class ReturnTypeClassifier
         unwrappedReturnType = null;
         subService = null;
         if (returnType is not INamedTypeSymbol { IsGenericType: true } named ||
-            named.ContainingNamespace?.ToDisplayString() != SystemThreadingTasks)
+            named.ContainingNamespace?.ToDisplayString() != SystemThreadingTasks ||
+            !IsFrameworkTaskLike(named))
         {
             return false;
         }
@@ -164,7 +172,9 @@ internal static partial class ReturnTypeClassifier
     private static bool TryClassifyNonGenericTaskLike(ITypeSymbol returnType, out MethodReturnKind kind)
     {
         kind = default;
-        if (returnType.ContainingNamespace?.ToDisplayString() != SystemThreadingTasks)
+        if (returnType is not INamedTypeSymbol named ||
+            named.ContainingNamespace?.ToDisplayString() != SystemThreadingTasks ||
+            !IsFrameworkTaskLike(named))
         {
             return false;
         }
@@ -183,6 +193,30 @@ internal static partial class ReturnTypeClassifier
 
         return false;
     }
+
+    private static bool IsFrameworkTaskLike(INamedTypeSymbol type)
+    {
+        var token = type.ContainingAssembly.Identity.PublicKeyToken;
+        return type.Locations.Any(static location => location.IsInMetadata) &&
+               token.Length == 8 &&
+               (TokenEquals(token, 0x7c, 0xec, 0x85, 0xd7, 0xbe, 0xa7, 0x79, 0x8e) ||
+                TokenEquals(token, 0xb7, 0x7a, 0x5c, 0x56, 0x19, 0x34, 0xe0, 0x89) ||
+                TokenEquals(token, 0xb0, 0x3f, 0x5f, 0x7f, 0x11, 0xd5, 0x0a, 0x3a) ||
+                TokenEquals(token, 0xcc, 0x7b, 0x13, 0xff, 0xcd, 0x2d, 0xdd, 0x51));
+    }
+
+    private static bool TokenEquals(
+        System.Collections.Immutable.ImmutableArray<byte> token,
+        byte b0,
+        byte b1,
+        byte b2,
+        byte b3,
+        byte b4,
+        byte b5,
+        byte b6,
+        byte b7) =>
+        token[0] == b0 && token[1] == b1 && token[2] == b2 && token[3] == b3 &&
+        token[4] == b4 && token[5] == b5 && token[6] == b6 && token[7] == b7;
 
     private static bool TryClassifyDirectShape(
         ITypeSymbol returnType,

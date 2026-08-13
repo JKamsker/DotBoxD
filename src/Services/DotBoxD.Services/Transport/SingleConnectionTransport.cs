@@ -35,6 +35,8 @@ public sealed class SingleConnectionTransport : ITransport
 
     public ValueTask DisposeAsync()
     {
+        TaskCompletionSource<bool> disposal;
+        Task disposeTask;
         lock (_disposeLock)
         {
             if (_disposeTask is not null)
@@ -43,13 +45,37 @@ public sealed class SingleConnectionTransport : ITransport
             }
 
             Interlocked.Exchange(ref _disposed, 1);
-            _disposeTask = _ownsConnection ? DisposeConnectionAsync(_connection) : Task.CompletedTask;
-            return new ValueTask(_disposeTask);
+            disposal = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _disposeTask = disposal.Task;
+            disposeTask = _disposeTask;
         }
+        _ = CompleteDisposalAsync(_connection, _ownsConnection, disposal);
+        return new ValueTask(disposeTask);
     }
 
-    private static async Task DisposeConnectionAsync(IRpcChannel connection)
-        => await connection.DisposeAsync().ConfigureAwait(false);
+    private static async Task CompleteDisposalAsync(
+        IRpcChannel connection,
+        bool ownsConnection,
+        TaskCompletionSource<bool> disposal)
+    {
+        try
+        {
+            if (ownsConnection)
+            {
+                await connection.DisposeAsync().ConfigureAwait(false);
+            }
+
+            disposal.TrySetResult(true);
+        }
+        catch (OperationCanceledException exception)
+        {
+            disposal.TrySetCanceled(exception.CancellationToken);
+        }
+        catch (Exception exception)
+        {
+            disposal.TrySetException(exception);
+        }
+    }
 }
 
 /// <summary>
@@ -175,6 +201,8 @@ public sealed class SingleConnectionServerTransport : IServerTransport
 
     public ValueTask DisposeAsync()
     {
+        TaskCompletionSource<bool> disposal;
+        Task disposeTask;
         lock (_disposeLock)
         {
             if (_disposeTask is not null)
@@ -192,13 +220,37 @@ public sealed class SingleConnectionServerTransport : IServerTransport
             }
 
             stopped.TrySetResult(true);
-            _disposeTask = _ownsConnection ? DisposeConnectionAsync(_connection) : Task.CompletedTask;
-            return new ValueTask(_disposeTask);
+            disposal = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _disposeTask = disposal.Task;
+            disposeTask = _disposeTask;
         }
+        _ = CompleteDisposalAsync(_connection, _ownsConnection, disposal);
+        return new ValueTask(disposeTask);
     }
 
-    private static async Task DisposeConnectionAsync(IRpcChannel connection)
-        => await connection.DisposeAsync().ConfigureAwait(false);
+    private static async Task CompleteDisposalAsync(
+        IRpcChannel connection,
+        bool ownsConnection,
+        TaskCompletionSource<bool> disposal)
+    {
+        try
+        {
+            if (ownsConnection)
+            {
+                await connection.DisposeAsync().ConfigureAwait(false);
+            }
+
+            disposal.TrySetResult(true);
+        }
+        catch (OperationCanceledException exception)
+        {
+            disposal.TrySetCanceled(exception.CancellationToken);
+        }
+        catch (Exception exception)
+        {
+            disposal.TrySetException(exception);
+        }
+    }
 
     private static TaskCompletionSource<bool> CreateStoppedSignal()
         => new(TaskCreationOptions.RunContinuationsAsynchronously);

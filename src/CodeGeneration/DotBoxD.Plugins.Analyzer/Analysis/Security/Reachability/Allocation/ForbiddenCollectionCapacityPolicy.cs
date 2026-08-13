@@ -5,19 +5,50 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class ForbiddenCollectionCapacityPolicy
 {
+    private const string ArrayBufferWriterTypeName = "System.Buffers.ArrayBufferWriter<T>";
+    private const string BufferWriterInterfaceTypeName = "System.Buffers.IBufferWriter<T>";
     private const string ArrayListTypeName = "System.Collections.ArrayList";
     private const string BitArrayTypeName = "System.Collections.BitArray";
+    private const string CollectionBaseTypeName = "System.Collections.CollectionBase";
+    private const string ConcurrentDictionaryTypeName =
+        "System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>";
+    private const string CollectionsUtilTypeName = "System.Collections.Specialized.CollectionsUtil";
     private const string DictionaryTypeName = "System.Collections.Generic.Dictionary<TKey, TValue>";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string HashtableTypeName = "System.Collections.Hashtable";
+    private const string HybridDictionaryTypeName = "System.Collections.Specialized.HybridDictionary";
     private const string ImmutableArrayTypeName = "System.Collections.Immutable.ImmutableArray";
     private const string ImmutableArrayBuilderTypeName =
         "System.Collections.Immutable.ImmutableArray<T>.Builder";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
+    private const string NameObjectCollectionBaseTypeName =
+        "System.Collections.Specialized.NameObjectCollectionBase";
+    private const string NameValueCollectionTypeName =
+        "System.Collections.Specialized.NameValueCollection";
+    private const string OrderedDictionaryTypeName = "System.Collections.Specialized.OrderedDictionary";
     private const string PriorityQueueTypeName =
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
+    private const string NonGenericQueueTypeName = "System.Collections.Queue";
     private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
+    private const string NonGenericSortedListTypeName = "System.Collections.SortedList";
+    private const string SortedListTypeName = "System.Collections.Generic.SortedList<TKey, TValue>";
     private const string StackTypeName = "System.Collections.Generic.Stack<T>";
+
+    private static readonly Dictionary<string, string> FixedDisplayNames = new(StringComparer.Ordinal)
+    {
+        [ArrayListTypeName] = ArrayListTypeName,
+        [ConcurrentDictionaryTypeName] = "System.Collections.Concurrent.ConcurrentDictionary",
+        [DictionaryTypeName] = "System.Collections.Generic.Dictionary",
+        [HashtableTypeName] = "System.Collections.Hashtable",
+        [HybridDictionaryTypeName] = HybridDictionaryTypeName,
+        [ListTypeName] = "System.Collections.Generic.List",
+        [NameValueCollectionTypeName] = NameValueCollectionTypeName,
+        [NonGenericQueueTypeName] = NonGenericQueueTypeName,
+        [NonGenericSortedListTypeName] = NonGenericSortedListTypeName,
+        [OrderedDictionaryTypeName] = OrderedDictionaryTypeName,
+        [QueueTypeName] = "System.Collections.Generic.Queue",
+        [SortedListTypeName] = "System.Collections.Generic.SortedList"
+    };
 
     public static bool TryGetDisplayName(IMethodSymbol? method, out string forbidden)
     {
@@ -28,6 +59,12 @@ internal static class ForbiddenCollectionCapacityPolicy
         }
 
         var typeName = CapacityTypeName(method);
+        if (IsCollectionsUtilHashtableFactory(method, typeName))
+        {
+            forbidden = HashtableTypeName;
+            return true;
+        }
+
         if (!IsCapacityAllocationMethod(method, typeName))
         {
             forbidden = null!;
@@ -37,6 +74,12 @@ internal static class ForbiddenCollectionCapacityPolicy
         if (IsImmutableArrayCreateBuilder(method, typeName))
         {
             forbidden = "System.Collections.Immutable.ImmutableArray";
+            return true;
+        }
+
+        if (IsArrayBufferWriterGrowthHint(method, typeName))
+        {
+            forbidden = method.ContainingType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
             return true;
         }
 
@@ -69,6 +112,13 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
+        if (string.Equals(typeName, OrderedDictionaryTypeName, StringComparison.Ordinal) &&
+            !HasNonEmptyInitializer(creation))
+        {
+            forbidden = null!;
+            return false;
+        }
+
         return TryGetDisplayName(method, out forbidden);
     }
 
@@ -93,40 +143,92 @@ internal static class ForbiddenCollectionCapacityPolicy
             (BitArrayTypeName, "Length") => BitArrayTypeName,
             (ImmutableArrayBuilderTypeName, "Capacity") => "System.Collections.Immutable.ImmutableArray",
             (ListTypeName, "Capacity") => "System.Collections.Generic.List",
+            (NonGenericSortedListTypeName, "Capacity") => NonGenericSortedListTypeName,
+            (SortedListTypeName, "Capacity") => "System.Collections.Generic.SortedList",
             _ => null!
         };
         return forbidden is not null;
     }
 
     private static string? CollectionDisplayName(INamedTypeSymbol type, string typeName)
-        => typeName switch
+    {
+        if (FixedDisplayNames.TryGetValue(typeName, out var displayName))
         {
-            ArrayListTypeName => ArrayListTypeName,
-            ListTypeName => "System.Collections.Generic.List",
-            DictionaryTypeName => "System.Collections.Generic.Dictionary",
-            QueueTypeName => "System.Collections.Generic.Queue",
-            HashtableTypeName => "System.Collections.Hashtable",
-            StackTypeName or HashSetTypeName or PriorityQueueTypeName =>
-                type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
-            _ => null
-        };
+            return displayName;
+        }
+
+        if (UsesOriginalTypeDisplayName(typeName))
+        {
+            return type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+        }
+
+        if (InheritsCollectionBase(type, NameObjectCollectionBaseTypeName))
+        {
+            return NameObjectCollectionBaseTypeName;
+        }
+
+        if (InheritsCollectionBase(type, CollectionBaseTypeName))
+        {
+            return CollectionBaseTypeName;
+        }
+
+        return typeName == ArrayBufferWriterTypeName
+            ? type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
+            : null;
+    }
+
+    private static bool UsesOriginalTypeDisplayName(string typeName)
+        => typeName is StackTypeName or HashSetTypeName or PriorityQueueTypeName;
+
+    private static bool InheritsCollectionBase(INamedTypeSymbol type, string baseTypeName)
+    {
+        for (var baseType = type.BaseType; baseType is not null; baseType = baseType.BaseType)
+        {
+            if (string.Equals(
+                    baseType.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
+                    baseTypeName,
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private static bool IsCapacityAllocationMethod(IMethodSymbol method, string typeName)
     {
         if (method.MethodKind == MethodKind.Constructor)
         {
-            var capacityName = typeName == PriorityQueueTypeName ? "initialCapacity" : "capacity";
-            return HasCapacityParameter(method, capacityName);
+            return HasConstructorCapacityParameter(method, typeName);
         }
 
-        if (method.MethodKind != MethodKind.Ordinary)
+        return method.MethodKind == MethodKind.Ordinary &&
+               IsCapacityAllocationOrdinaryMethod(method, typeName);
+    }
+
+    private static bool HasConstructorCapacityParameter(IMethodSymbol method, string typeName)
+    {
+        var capacityName = typeName switch
         {
-            return false;
-        }
+            PriorityQueueTypeName or NonGenericSortedListTypeName or ArrayBufferWriterTypeName =>
+                "initialCapacity",
+            HybridDictionaryTypeName => "initialSize",
+            _ => "capacity"
+        };
+        return HasCapacityParameter(method, capacityName);
+    }
 
+    private static bool IsCapacityAllocationOrdinaryMethod(IMethodSymbol method, string typeName)
+    {
         if (IsImmutableArrayCreateBuilder(method, typeName))
         {
             return HasCapacityParameter(method, "initialCapacity");
+        }
+
+        if (IsArrayBufferWriterGrowthHint(method, typeName))
+        {
+            return true;
         }
 
         return string.Equals(typeName, DictionaryTypeName, StringComparison.Ordinal) &&
@@ -138,6 +240,16 @@ internal static class ForbiddenCollectionCapacityPolicy
         => method is { IsStatic: true, Name: "CreateBuilder" } &&
            string.Equals(typeName, ImmutableArrayTypeName, StringComparison.Ordinal);
 
+    private static bool IsCollectionsUtilHashtableFactory(IMethodSymbol method, string typeName)
+        => method is { IsStatic: true, Name: "CreateCaseInsensitiveHashtable" } &&
+           string.Equals(typeName, CollectionsUtilTypeName, StringComparison.Ordinal) &&
+           HasCapacityParameter(method, "capacity");
+
+    private static bool IsArrayBufferWriterGrowthHint(IMethodSymbol method, string typeName)
+        => method.Name is "GetMemory" or "GetSpan" &&
+           typeName is ArrayBufferWriterTypeName or BufferWriterInterfaceTypeName &&
+           HasCapacityParameter(method, "sizeHint");
+
     private static bool HasCapacityParameter(IMethodSymbol method, string capacityName)
         => method.Parameters.Any(parameter =>
             parameter.Type.SpecialType == SpecialType.System_Int32 &&
@@ -147,6 +259,9 @@ internal static class ForbiddenCollectionCapacityPolicy
         => creation.Arguments.Any(static argument =>
             argument.Parameter is { Type.SpecialType: SpecialType.System_Int32, Name: "length" } &&
             argument.Value.ConstantValue is not { HasValue: true, Value: 0 });
+
+    private static bool HasNonEmptyInitializer(IObjectCreationOperation creation)
+        => creation.Initializer?.Initializers.Any() == true;
 
     private static string CapacityTypeName(IMethodSymbol method)
         => method.ContainingType.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);

@@ -187,6 +187,7 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
                     _useReceiveLookahead,
                     ref _receiveBuffer);
                 _closeTask = Task.Run(CloseCoreAsync);
+                ObserveFault(_closeTask);
             }
 
             closeTask = _closeTask;
@@ -202,9 +203,16 @@ public sealed class StreamConnection : IValidatedSerialFrameChannel
         _frameReadTimeout?.Dispose();
         if (_ownsStream)
         {
-            await StreamFrameReadOperations.DisposeBestEffortAsync(_stream).ConfigureAwait(false);
+            await _stream.DisposeAsync().ConfigureAwait(false);
         }
     }
+
+    private static void ObserveFault(Task task) =>
+        _ = task.ContinueWith(
+            static completed => _ = completed.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnFaulted,
+            TaskScheduler.Default);
 
     public ValueTask DisposeAsync() => new(CloseAsync());
 

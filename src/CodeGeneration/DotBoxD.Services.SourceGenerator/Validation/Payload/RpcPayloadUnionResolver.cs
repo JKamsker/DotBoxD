@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
 using Microsoft.CodeAnalysis;
@@ -23,12 +24,15 @@ internal static class RpcPayloadUnionResolver
         {
             ct.ThrowIfCancellationRequested();
 
-            var attrName = attr.AttributeClass?.ToDisplayString();
+            var attributeClass = attr.AttributeClass;
+            var attrName = attributeClass?.ToDisplayString();
             var attrReason = attrName switch
             {
                 ServicesGeneratorTypeNames.MessagePackUnionAttribute => builder.AddMessagePackUnion(attr),
-                ServicesGeneratorTypeNames.JsonPolymorphicAttribute => builder.AddJsonPolymorphic(),
-                ServicesGeneratorTypeNames.JsonDerivedTypeAttribute => builder.AddJsonDerivedType(attr),
+                ServicesGeneratorTypeNames.JsonPolymorphicAttribute when IsSystemTextJsonAttribute(attributeClass) =>
+                    builder.AddJsonPolymorphic(),
+                ServicesGeneratorTypeNames.JsonDerivedTypeAttribute when IsSystemTextJsonAttribute(attributeClass) =>
+                    builder.AddJsonDerivedType(attr),
                 _ => null,
             };
             if (attrReason is not null)
@@ -41,6 +45,20 @@ internal static class RpcPayloadUnionResolver
 
         return builder.TryBuild(out cases, out reason);
     }
+
+    private static bool IsSystemTextJsonAttribute(INamedTypeSymbol? attributeClass)
+    {
+        var token = attributeClass?.ContainingAssembly.Identity.PublicKeyToken ?? default;
+        return attributeClass is not null &&
+               attributeClass.Locations.Any(static location => location.IsInMetadata) &&
+               attributeClass.ContainingAssembly.Name == JsonSource &&
+               IsSystemTextJsonToken(token);
+    }
+
+    private static bool IsSystemTextJsonToken(System.Collections.Immutable.ImmutableArray<byte> token) =>
+        token.Length == 8 &&
+        token[0] == 0xcc && token[1] == 0x7b && token[2] == 0x13 && token[3] == 0xff &&
+        token[4] == 0xcd && token[5] == 0x2d && token[6] == 0xdd && token[7] == 0x51;
 
     private sealed class Builder
     {
