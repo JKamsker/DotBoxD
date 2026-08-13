@@ -5,6 +5,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class ForbiddenCollectionCapacityPolicy
 {
+    private const string ArrayBufferWriterTypeName = "System.Buffers.ArrayBufferWriter<T>";
     private const string ArrayListTypeName = "System.Collections.ArrayList";
     private const string BitArrayTypeName = "System.Collections.BitArray";
     private const string DictionaryTypeName = "System.Collections.Generic.Dictionary<TKey, TValue>";
@@ -37,6 +38,12 @@ internal static class ForbiddenCollectionCapacityPolicy
         if (IsImmutableArrayCreateBuilder(method, typeName))
         {
             forbidden = "System.Collections.Immutable.ImmutableArray";
+            return true;
+        }
+
+        if (IsArrayBufferWriterGrowthHint(method, typeName))
+        {
+            forbidden = method.ContainingType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
             return true;
         }
 
@@ -129,6 +136,11 @@ internal static class ForbiddenCollectionCapacityPolicy
             return HasCapacityParameter(method, "initialCapacity");
         }
 
+        if (IsArrayBufferWriterGrowthHint(method, typeName))
+        {
+            return true;
+        }
+
         return string.Equals(typeName, DictionaryTypeName, StringComparison.Ordinal) &&
                string.Equals(method.Name, "EnsureCapacity", StringComparison.Ordinal) &&
                HasCapacityParameter(method, "capacity");
@@ -137,6 +149,11 @@ internal static class ForbiddenCollectionCapacityPolicy
     private static bool IsImmutableArrayCreateBuilder(IMethodSymbol method, string typeName)
         => method is { IsStatic: true, Name: "CreateBuilder" } &&
            string.Equals(typeName, ImmutableArrayTypeName, StringComparison.Ordinal);
+
+    private static bool IsArrayBufferWriterGrowthHint(IMethodSymbol method, string typeName)
+        => method.Name is "GetMemory" or "GetSpan" &&
+           string.Equals(typeName, ArrayBufferWriterTypeName, StringComparison.Ordinal) &&
+           HasCapacityParameter(method, "sizeHint");
 
     private static bool HasCapacityParameter(IMethodSymbol method, string capacityName)
         => method.Parameters.Any(parameter =>
