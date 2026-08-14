@@ -59,6 +59,20 @@ public sealed class KernelPackageRegistryTests
     }
 
     [Fact]
+    public void Resolve_retries_a_convention_factory_after_a_transient_failure()
+    {
+        Assert.Throws<InvalidOperationException>(
+            () => KernelPackageRegistry.Resolve<TransientConventionKernel>());
+
+        var resolved = KernelPackageRegistry.Resolve<TransientConventionKernel>();
+        var cached = KernelPackageRegistry.Resolve<TransientConventionKernel>();
+
+        Assert.Equal("cached-convention", resolved.Manifest.PluginId);
+        Assert.Same(resolved, cached);
+        Assert.Equal(2, TransientConventionPluginPackage.CreateCalls);
+    }
+
+    [Fact]
     public void Resolve_throws_a_clear_error_when_no_package_exists()
     {
         var ex = Assert.Throws<InvalidOperationException>(
@@ -75,6 +89,8 @@ public sealed class KernelPackageRegistryTests
 }
 
 public sealed class CachedConventionKernel;
+
+public sealed class TransientConventionKernel;
 
 public static class CachedConventionPluginPackage
 {
@@ -104,5 +120,22 @@ public static class CachedConventionPluginPackage
             []);
 
         return PluginPackage.Create(manifest, module, new KernelEntrypoints("Handle", "Handle"));
+    }
+}
+
+public static class TransientConventionPluginPackage
+{
+    private static int createCalls;
+
+    public static int CreateCalls => Volatile.Read(ref createCalls);
+
+    public static PluginPackage Create()
+    {
+        if (Interlocked.Increment(ref createCalls) == 1)
+        {
+            throw new InvalidOperationException("Transient package factory failure.");
+        }
+
+        return CachedConventionPluginPackage.Create();
     }
 }
