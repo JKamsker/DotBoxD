@@ -108,10 +108,11 @@ internal static class PluginKernelModelFactory
 
         var shouldHandle = InterfaceMethodSyntax(context, type, DotBoxDGenerationNames.Entrypoints.ShouldHandle, cancellationToken);
         var handle = InterfaceMethodSyntax(context, type, DotBoxDGenerationNames.Entrypoints.Handle, cancellationToken);
-        var eventProperties = PluginSymbolReader.EventProperties(eventType);
+        var eventProperties = PluginSymbolReader.EventProperties(eventType, context.SemanticModel.Compilation);
         if (ContainsUnsupported(eventProperties))
         {
-            throw new NotSupportedException(PluginKernelUnsupportedShapeMessage.EventProperties(eventType));
+            throw new NotSupportedException(
+                PluginKernelUnsupportedShapeMessage.EventProperties(eventType, context.SemanticModel.Compilation));
         }
 
         var liveSettings = PluginSymbolReader.LiveSettings(type, context.SemanticModel, cancellationToken);

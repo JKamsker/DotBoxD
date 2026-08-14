@@ -48,7 +48,9 @@ internal static class PluginSymbolReader
             DotBoxDMetadataNames.EventKernelInterface,
             StringComparison.Ordinal);
 
-    public static EquatableArray<EventPropertyModel> EventProperties(INamedTypeSymbol eventType)
+    public static EquatableArray<EventPropertyModel> EventProperties(
+        INamedTypeSymbol eventType,
+        Compilation compilation)
     {
         var properties = PluginEventPropertyReader.Read(eventType);
         if (properties.Length == 0)
@@ -61,7 +63,7 @@ internal static class PluginSymbolReader
         {
             var property = properties[i];
             RejectNullableReferenceEventProperty(eventType, property);
-            if (PolymorphicHandleMetadataReader.TryResolve(property.Type, out var handle))
+            if (PolymorphicHandleMetadataReader.TryResolve(property.Type, compilation, out var handle))
             {
                 models[i] = new EventPropertyModel(
                     property.Name,

@@ -130,7 +130,10 @@ internal static partial class DotBoxDPatternExpressionLowerer
         subtype = null!;
         if (context.SemanticModel.GetTypeInfo(valueSyntax, context.CancellationToken).Type is not { } handleType ||
             context.SemanticModel.GetTypeInfo(typeSyntax, context.CancellationToken).Type is not INamedTypeSymbol resolvedSubtype ||
-            !PolymorphicHandleMetadataReader.TryResolve(handleType, out var handle) ||
+            !PolymorphicHandleMetadataReader.TryResolve(
+                handleType,
+                context.SemanticModel.Compilation,
+                out var handle) ||
             !handle.TrySubtype(resolvedSubtype, out var subtypeMetadata) ||
             !string.Equals(value.Type, handle.KeyManifestTag, StringComparison.Ordinal))
         {
