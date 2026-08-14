@@ -6,6 +6,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 internal static class ForbiddenCollectionCapacityPolicy
 {
     private const string ArrayBufferWriterTypeName = "System.Buffers.ArrayBufferWriter<T>";
+    private const string ArrayTypeName = "System.Array";
     private const string BufferWriterInterfaceTypeName = "System.Buffers.IBufferWriter<T>";
     private const string ArrayListTypeName = "System.Collections.ArrayList";
     private const string BitArrayTypeName = "System.Collections.BitArray";
@@ -59,6 +60,12 @@ internal static class ForbiddenCollectionCapacityPolicy
         }
 
         var typeName = CapacityTypeName(method);
+        if (IsArrayResize(method, typeName))
+        {
+            forbidden = ArrayTypeName;
+            return true;
+        }
+
         if (IsCollectionsUtilHashtableFactory(method, typeName))
         {
             forbidden = HashtableTypeName;
@@ -244,6 +251,11 @@ internal static class ForbiddenCollectionCapacityPolicy
         => method is { IsStatic: true, Name: "CreateCaseInsensitiveHashtable" } &&
            string.Equals(typeName, CollectionsUtilTypeName, StringComparison.Ordinal) &&
            HasCapacityParameter(method, "capacity");
+
+    private static bool IsArrayResize(IMethodSymbol method, string typeName)
+        => method is { IsStatic: true, Name: "Resize" } &&
+           string.Equals(typeName, ArrayTypeName, StringComparison.Ordinal) &&
+           HasCapacityParameter(method, "newSize");
 
     private static bool IsArrayBufferWriterGrowthHint(IMethodSymbol method, string typeName)
         => method.Name is "GetMemory" or "GetSpan" &&
