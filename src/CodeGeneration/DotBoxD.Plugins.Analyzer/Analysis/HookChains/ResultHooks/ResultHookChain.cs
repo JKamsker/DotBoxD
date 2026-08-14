@@ -48,7 +48,7 @@ internal static partial class ResultHookChain
             }
         }
 
-        if (!TryResolveHook(contextType, out var hookName, out var resultType))
+        if (!TryResolveHook(contextType, model.Compilation, out var hookName, out var resultType))
         {
             throw new NotSupportedException("Result hook context types must declare [Hook(name, typeof(TResult))].");
         }
@@ -224,6 +224,7 @@ internal static partial class ResultHookChain
 
     private static bool TryResolveHook(
         INamedTypeSymbol contextType,
+        Compilation compilation,
         out string hookName,
         out INamedTypeSymbol resultType)
     {
@@ -231,7 +232,7 @@ internal static partial class ResultHookChain
         resultType = null!;
         foreach (var attribute in contextType.GetAttributes())
         {
-            if (!EventTypeName.TryHookName(attribute, out var declaredName))
+            if (!EventTypeName.TryHookName(attribute, compilation, out var declaredName))
             {
                 continue;
             }
