@@ -103,7 +103,15 @@ public static class KernelPackageRegistry
         }
 
         var factory = create.CreateDelegate<Func<PluginPackage>>();
-        var package = new Lazy<PluginPackage>(() => PluginModelCopy.Package(CreatePackage(kernelType, factory)));
-        return () => package.Value;
+        var packageGate = new object();
+        PluginPackage? package = null;
+        return () =>
+        {
+            lock (packageGate)
+            {
+                package ??= PluginModelCopy.Package(CreatePackage(kernelType, factory));
+                return package;
+            }
+        };
     }
 }
