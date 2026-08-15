@@ -72,6 +72,7 @@ internal static class ForbiddenApiNamePolicy
         "Microsoft.Extensions.DependencyInjection.ServiceCollectionContainerBuilderExtensions.BuildServiceProvider",
         "System.String.Create",
         "System.Collections.Generic.List<T>.EnsureCapacity",
+        "System.Linq.Enumerable.ToDictionary",
         "System.Security.Cryptography.RSA.Create",
         "Microsoft.Extensions.Configuration.KeyPerFileConfigurationBuilderExtensions.AddKeyPerFile"
     ];
