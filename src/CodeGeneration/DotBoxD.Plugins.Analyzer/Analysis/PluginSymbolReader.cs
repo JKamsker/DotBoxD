@@ -43,10 +43,7 @@ internal static class PluginSymbolReader
     }
 
     private static bool IsEventKernelInterface(INamedTypeSymbol type)
-        => string.Equals(
-            type.OriginalDefinition.ToDisplayString(),
-            DotBoxDMetadataNames.EventKernelInterface,
-            StringComparison.Ordinal);
+        => PluginAnalyzer.IsEventKernelInterface(type);
 
     public static EquatableArray<EventPropertyModel> EventProperties(INamedTypeSymbol eventType)
     {

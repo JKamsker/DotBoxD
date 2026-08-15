@@ -265,10 +265,7 @@ internal static class PluginKernelModelFactory
     {
         foreach (var @interface in type.AllInterfaces)
         {
-            if (!string.Equals(
-                    @interface.OriginalDefinition.ToDisplayString(),
-                    DotBoxDMetadataNames.EventKernelInterface,
-                    StringComparison.Ordinal))
+            if (!PluginAnalyzer.IsEventKernelInterface(@interface))
             {
                 continue;
             }
