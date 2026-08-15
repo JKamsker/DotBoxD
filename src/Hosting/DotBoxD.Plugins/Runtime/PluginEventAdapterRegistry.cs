@@ -21,21 +21,12 @@ public sealed class PluginEventAdapterRegistry
 
     private void RegisterCore<TEvent>(IPluginEventAdapter<TEvent> adapter, Action? validateRegistration)
     {
-        ArgumentNullException.ThrowIfNull(adapter);
-        var eventName = adapter.EventName;
-        var parameters = adapter.Parameters;
-        PluginEventAdapterShapeValidator.Validate(adapter, eventName, parameters);
-        var shape = new PluginEventShape(eventName, parameters);
+        var registration = CreateRegistration(adapter);
         validateRegistration?.Invoke();
         lock (_gate)
         {
             validateRegistration?.Invoke();
-            ValidateEventNameShape(typeof(TEvent), shape);
-            // Capture the type-erased wire closure here — the single store site both the explicit Register path and
-            // the lazy Resolve auto-register path flow through — so the router can wire by event name with no
-            // reflection, over the SAME adapter instance Resolve returns (preserving pipeline adapter identity).
-            _adapters[typeof(TEvent)] = new(adapter, shape, new ErasedPluginEventAdapter<TEvent>(adapter));
-            _adapterSnapshot = _adapters.ToArray();
+            StoreRegistration<TEvent>(registration);
         }
     }
 
@@ -50,8 +41,34 @@ public sealed class PluginEventAdapterRegistry
         }
 
         var discovered = TryDiscoverAdapter<TEvent>() ?? ConventionEventAdapter<TEvent>.Create();
-        Register(discovered);
-        return discovered;
+        var registration = CreateRegistration(discovered);
+        lock (_gate)
+        {
+            if (_adapters.TryGetValue(typeof(TEvent), out var registered))
+            {
+                return (IPluginEventAdapter<TEvent>)registered.Adapter;
+            }
+
+            StoreRegistration<TEvent>(registration);
+            return discovered;
+        }
+    }
+
+    private static RegisteredPluginEventAdapter CreateRegistration<TEvent>(IPluginEventAdapter<TEvent> adapter)
+    {
+        ArgumentNullException.ThrowIfNull(adapter);
+        var eventName = adapter.EventName;
+        var parameters = adapter.Parameters;
+        PluginEventAdapterShapeValidator.Validate(adapter, eventName, parameters);
+        var shape = new PluginEventShape(eventName, parameters);
+        return new(adapter, shape, new ErasedPluginEventAdapter<TEvent>(adapter));
+    }
+
+    private void StoreRegistration<TEvent>(RegisteredPluginEventAdapter registration)
+    {
+        ValidateEventNameShape(typeof(TEvent), registration.Shape);
+        _adapters[typeof(TEvent)] = registration;
+        _adapterSnapshot = _adapters.ToArray();
     }
 
     internal bool TryResolveShape(string eventName, out PluginEventShape shape)
