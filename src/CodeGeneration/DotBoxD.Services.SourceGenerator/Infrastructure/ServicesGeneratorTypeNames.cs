@@ -8,6 +8,8 @@ internal static class ServicesGeneratorTypeNames
 
     public const string RpcServiceAttribute = "DotBoxD.Services.Attributes.RpcServiceAttribute";
     public const string RpcMethodAttribute = "DotBoxD.Services.Attributes.RpcMethodAttribute";
+
+    private const string ServicesAssemblyName = "DotBoxD.Services";
     public const string MessagePackUnionAttribute = "MessagePack.UnionAttribute";
     public const string JsonPolymorphicAttribute = "System.Text.Json.Serialization.JsonPolymorphicAttribute";
     public const string JsonDerivedTypeAttribute = "System.Text.Json.Serialization.JsonDerivedTypeAttribute";
@@ -103,7 +105,8 @@ internal static class ServicesGeneratorTypeNames
     {
         for (var current = type; current is not null; current = current.BaseType)
         {
-            if (current.ToDisplayString() == metadataName)
+            if (current.ContainingAssembly.Name == ServicesAssemblyName &&
+                current.ToDisplayString() == metadataName)
             {
                 return true;
             }
