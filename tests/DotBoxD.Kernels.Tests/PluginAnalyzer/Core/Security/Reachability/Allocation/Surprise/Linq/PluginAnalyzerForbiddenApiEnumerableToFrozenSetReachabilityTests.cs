@@ -10,7 +10,7 @@ public sealed class PluginAnalyzerForbiddenApiEnumerableToFrozenSetReachabilityT
             "DotBoxDPluginAnalyzerEnumerableToFrozenSetReachabilityTest");
 
         var diagnostic = Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DBXK001"));
-        Assert.Contains("System.Linq.Enumerable.ToFrozenSet", diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains("System.Collections.Frozen.FrozenSet.ToFrozenSet", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
     private static string Source()

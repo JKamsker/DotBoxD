@@ -76,7 +76,7 @@ internal static class ForbiddenCollectionCapacityPolicy
 
         if (IsFrozenSetToFrozenSet(method, typeName))
         {
-            forbidden = "System.Linq.Enumerable.ToFrozenSet";
+            forbidden = "System.Collections.Frozen.FrozenSet.ToFrozenSet";
             return true;
         }
 
