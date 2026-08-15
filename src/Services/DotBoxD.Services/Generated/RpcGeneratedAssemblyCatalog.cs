@@ -110,8 +110,7 @@ internal static class RpcGeneratedAssemblyCatalog
             ReadLegacyServicesProperty(assembly, generatedType, property) is IReadOnlyList<GeneratedService> legacyServices)
         {
             var snapshot = GeneratedServiceCatalogSnapshot.Snapshot(legacyServices, validateImplementationTypes: false);
-            s_serviceCatalogs[assembly] = snapshot;
-            return snapshot;
+            return s_serviceCatalogs.GetOrAdd(assembly, snapshot);
         }
 
         throw new InvalidOperationException(
