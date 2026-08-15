@@ -73,6 +73,7 @@ internal static class ForbiddenApiNamePolicy
         "System.String.Create",
         "System.Collections.Generic.List<T>.EnsureCapacity",
         "System.Linq.Enumerable.ToDictionary",
+        "System.Collections.Frozen.FrozenDictionary.ToFrozenDictionary",
         "System.Security.Cryptography.RSA.Create",
         "Microsoft.Extensions.Configuration.KeyPerFileConfigurationBuilderExtensions.AddKeyPerFile"
     ];
@@ -90,9 +91,12 @@ internal static class ForbiddenApiNamePolicy
             return false;
         }
 
-        displayName = name == "Microsoft.Extensions.Caching.Memory.CacheExtensions.Set"
-            ? "Microsoft.Extensions.Caching.Memory.MemoryCache"
-            : name;
+        displayName = name switch
+        {
+            "Microsoft.Extensions.Caching.Memory.CacheExtensions.Set" => "Microsoft.Extensions.Caching.Memory.MemoryCache",
+            "System.Collections.Frozen.FrozenDictionary.ToFrozenDictionary" => "System.Linq.Enumerable.ToFrozenDictionary",
+            _ => name
+        };
         return true;
     }
 }
