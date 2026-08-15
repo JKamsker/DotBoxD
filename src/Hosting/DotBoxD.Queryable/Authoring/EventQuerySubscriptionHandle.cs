@@ -58,6 +58,8 @@ public sealed class EventQuerySubscriptionHandle : IDisposable
     /// <summary>Whether this subscription's filter has been promoted to the compiled (hot-path) tier.</summary>
     public bool IsCompiled => _isCompiled();
 
+    internal bool IsDisposed => Volatile.Read(ref _unsubscribe) is null;
+
     /// <summary>Renders the human-readable diagnostic fact lines for this subscription.</summary>
     public IReadOnlyList<string> Describe() => EventQueryDiagnostics.Describe(this);
 
