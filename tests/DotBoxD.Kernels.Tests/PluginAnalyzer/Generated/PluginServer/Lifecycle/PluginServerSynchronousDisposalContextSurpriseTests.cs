@@ -27,8 +27,6 @@ public sealed class PluginServerSynchronousDisposalContextSurpriseTests
         var control = Activator.CreateInstance(assembly.GetType("Regression.Game.Ipc.NoopControlService", throwOnError: true)!)!;
         var server = Activator.CreateInstance(serverType, [control, null])!;
 
-        await DisposeAsync(server);
-
         var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var disposalThread = new Thread(() =>
         {
@@ -36,6 +34,7 @@ public sealed class PluginServerSynchronousDisposalContextSurpriseTests
 
             try
             {
+                DisposeAsync(server).GetAwaiter().GetResult();
                 serverType.GetMethod("Dispose", Type.EmptyTypes)!.Invoke(server, null);
                 completed.SetResult();
             }
