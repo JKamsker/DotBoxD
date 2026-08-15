@@ -229,6 +229,18 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             metadataName,
             StringComparison.Ordinal));
 
+    private static bool HasNativeOnlyAttribute(ISymbol symbol)
+        => symbol.GetAttributes().Any(attribute =>
+            attribute.AttributeClass is { } attributeClass &&
+            string.Equals(
+                attributeClass.ToDisplayString(),
+                DotBoxDMetadataNames.NativeOnlyAttribute,
+                StringComparison.Ordinal) &&
+            string.Equals(
+                attributeClass.ContainingAssembly.Name,
+                "DotBoxD.Abstractions",
+                StringComparison.Ordinal));
+
     private static void ReportAndRecordIfForbidden(
         OperationAnalysisContext context,
         ForbiddenHelperCallGraph helperGraph,

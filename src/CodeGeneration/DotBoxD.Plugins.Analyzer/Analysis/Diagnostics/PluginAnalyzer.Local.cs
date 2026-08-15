@@ -81,7 +81,7 @@ public sealed partial class PluginAnalyzer
     private static void ReportLocalUseIfInvalid(OperationAnalysisContext context, ISymbol target)
     {
         var model = context.Operation.SemanticModel;
-        if (!HasAttribute(target, DotBoxDMetadataNames.NativeOnlyAttribute) ||
+        if (!HasNativeOnlyAttribute(target) ||
             model is null ||
             !IsLocalUseForbidden(context.Operation.Syntax, context.ContainingSymbol, model, context.CancellationToken))
         {

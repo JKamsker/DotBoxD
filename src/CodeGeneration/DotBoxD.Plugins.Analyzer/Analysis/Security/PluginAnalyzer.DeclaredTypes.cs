@@ -29,7 +29,7 @@ public sealed partial class PluginAnalyzer
     {
         var method = (IMethodSymbol)context.Symbol;
         ReportForbiddenDeclaredMethodSignature(context, method);
-        if (HasAttribute(method, DotBoxDMetadataNames.NativeOnlyAttribute))
+        if (HasNativeOnlyAttribute(method))
         {
             ValidateLocalMember(context, method, method);
         }
@@ -51,7 +51,7 @@ public sealed partial class PluginAnalyzer
     {
         var property = (IPropertySymbol)context.Symbol;
         ReportForbiddenDeclaredPropertySignature(context, property);
-        if (HasAttribute(property, DotBoxDMetadataNames.NativeOnlyAttribute))
+        if (HasNativeOnlyAttribute(property))
         {
             ValidateLocalMember(context, property, property);
         }
