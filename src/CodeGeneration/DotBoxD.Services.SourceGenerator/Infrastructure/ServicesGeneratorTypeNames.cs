@@ -99,11 +99,14 @@ internal static class ServicesGeneratorTypeNames
     public static bool IsRpcMethodAttribute(INamedTypeSymbol? type) =>
         IsOrInheritsFrom(type, RpcMethodAttribute);
 
+    private const string ServicesAssemblyName = "DotBoxD.Services";
+
     private static bool IsOrInheritsFrom(INamedTypeSymbol? type, string metadataName)
     {
         for (var current = type; current is not null; current = current.BaseType)
         {
-            if (current.ToDisplayString() == metadataName)
+            if (current.ToDisplayString() == metadataName &&
+                current.ContainingAssembly.Identity.Name == ServicesAssemblyName)
             {
                 return true;
             }
