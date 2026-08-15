@@ -6,6 +6,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 internal static class ForbiddenCollectionCapacityPolicy
 {
     private const string ArrayBufferWriterTypeName = "System.Buffers.ArrayBufferWriter<T>";
+    private const string ArrayTypeName = "System.Array";
     private const string BufferWriterInterfaceTypeName = "System.Buffers.IBufferWriter<T>";
     private const string ArrayListTypeName = "System.Collections.ArrayList";
     private const string BitArrayTypeName = "System.Collections.BitArray";
@@ -14,6 +15,7 @@ internal static class ForbiddenCollectionCapacityPolicy
         "System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>";
     private const string CollectionsUtilTypeName = "System.Collections.Specialized.CollectionsUtil";
     private const string DictionaryTypeName = "System.Collections.Generic.Dictionary<TKey, TValue>";
+    private const string EnumerableTypeName = "System.Linq.Enumerable";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string HashtableTypeName = "System.Collections.Hashtable";
     private const string HybridDictionaryTypeName = "System.Collections.Specialized.HybridDictionary";
@@ -59,6 +61,18 @@ internal static class ForbiddenCollectionCapacityPolicy
         }
 
         var typeName = CapacityTypeName(method);
+        if (IsArrayResize(method, typeName))
+        {
+            forbidden = ArrayTypeName;
+            return true;
+        }
+
+        if (IsEnumerableToArray(method, typeName))
+        {
+            forbidden = "System.Linq.Enumerable.ToArray";
+            return true;
+        }
+
         if (IsCollectionsUtilHashtableFactory(method, typeName))
         {
             forbidden = HashtableTypeName;
@@ -231,7 +245,7 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
-        return string.Equals(typeName, DictionaryTypeName, StringComparison.Ordinal) &&
+        return typeName is DictionaryTypeName or HashSetTypeName or PriorityQueueTypeName or QueueTypeName or StackTypeName &&
                string.Equals(method.Name, "EnsureCapacity", StringComparison.Ordinal) &&
                HasCapacityParameter(method, "capacity");
     }
@@ -244,6 +258,15 @@ internal static class ForbiddenCollectionCapacityPolicy
         => method is { IsStatic: true, Name: "CreateCaseInsensitiveHashtable" } &&
            string.Equals(typeName, CollectionsUtilTypeName, StringComparison.Ordinal) &&
            HasCapacityParameter(method, "capacity");
+
+    private static bool IsArrayResize(IMethodSymbol method, string typeName)
+        => method is { IsStatic: true, Name: "Resize" } &&
+           string.Equals(typeName, ArrayTypeName, StringComparison.Ordinal) &&
+           HasCapacityParameter(method, "newSize");
+
+    private static bool IsEnumerableToArray(IMethodSymbol method, string typeName)
+        => method is { IsStatic: true, Name: "ToArray" } &&
+           string.Equals(typeName, EnumerableTypeName, StringComparison.Ordinal);
 
     private static bool IsArrayBufferWriterGrowthHint(IMethodSymbol method, string typeName)
         => method.Name is "GetMemory" or "GetSpan" &&

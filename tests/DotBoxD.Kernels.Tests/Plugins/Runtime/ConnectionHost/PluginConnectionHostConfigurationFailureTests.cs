@@ -45,6 +45,43 @@ public sealed class PluginConnectionHostConfigurationFailureTests
         Assert.IsNotType<TimeoutException>(invokeFailure);
     }
 
+    [Fact]
+    public async Task Configure_null_result_faults_lifecycle_and_rejects_partial_services()
+    {
+        var (serverChannel, clientChannel) = InMemoryRpcChannel.CreatePair();
+        using var server = PluginServer.Create();
+
+        await using var host = await PluginConnectionHost<object>.StartAsync(
+            server,
+            new SingleConnectionServerTransport(serverChannel, ownsConnection: true),
+            (peer, _) =>
+            {
+                peer.Provide<IConnectionHostProbeService>(new ConnectionHostProbeService());
+                return null!;
+            });
+
+        await using var session = await RpcMessagePackIpc.ConnectAsync(
+            new SingleConnectionTransport(clientChannel, ownsConnection: true),
+            new RpcPeerOptions { RequestTimeout = Timeout });
+
+        var connectedFailure = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => host.Connected.WaitAsync(Timeout));
+        Assert.Contains("configure", connectedFailure.Message, StringComparison.OrdinalIgnoreCase);
+
+        var disconnectedFailure = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => host.Disconnected.WaitAsync(Timeout));
+        Assert.Contains("configure", disconnectedFailure.Message, StringComparison.OrdinalIgnoreCase);
+
+        var invokeFailure = await Record.ExceptionAsync(async () =>
+        {
+            var probe = session.Get<IConnectionHostProbeService>();
+            await probe.IncrementAsync(41).AsTask().WaitAsync(Timeout);
+        });
+
+        Assert.NotNull(invokeFailure);
+        Assert.IsNotType<TimeoutException>(invokeFailure);
+    }
+
     private sealed class ConnectionHostProbeService : IConnectionHostProbeService
     {
         public ValueTask<int> IncrementAsync(int value, CancellationToken cancellationToken = default)

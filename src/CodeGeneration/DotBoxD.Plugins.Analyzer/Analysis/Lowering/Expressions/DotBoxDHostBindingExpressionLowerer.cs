@@ -42,7 +42,10 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         }
 
         if (!method.IsStatic &&
-            PolymorphicHandleMetadataReader.TryResolve(method.ContainingType, out _))
+            PolymorphicHandleMetadataReader.TryResolve(
+                method.ContainingType,
+                context.SemanticModel.Compilation,
+                out _))
         {
             throw new NotSupportedException(
                 $"Polymorphic handle binding '{bindingId}' must be called on a pattern-captured subtype.");

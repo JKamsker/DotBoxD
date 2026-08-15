@@ -114,7 +114,7 @@ internal static class DotBoxDKernelMethodArgumentLowerer
 
         foreach (var property in recordType.GetMembers(propertyName).OfType<IPropertySymbol>())
         {
-            if (PluginSymbolReader.Capability(property) is { } capability)
+            if (PluginSymbolReader.Capability(property, context.SemanticModel.Compilation) is { } capability)
             {
                 context.Capabilities.Add(capability);
             }

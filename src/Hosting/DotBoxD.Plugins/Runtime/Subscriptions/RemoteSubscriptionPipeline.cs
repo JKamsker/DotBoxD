@@ -35,7 +35,7 @@ public sealed class RemoteSubscriptionPipeline<TEvent>
     {
         ArgumentNullException.ThrowIfNull(package);
         ValidateSubscription(package);
-        _install(package).AsTask().GetAwaiter().GetResult();
+        Task.Run(() => _install(package).AsTask()).GetAwaiter().GetResult();
         return this;
     }
 
@@ -179,8 +179,7 @@ public sealed class RemoteSubscriptionPipeline<TEvent>
     {
         try
         {
-            _install(LocalTerminalIdentity.WithCallbackSubscriptionId(package, subscriptionId))
-                .AsTask()
+            Task.Run(() => _install(LocalTerminalIdentity.WithCallbackSubscriptionId(package, subscriptionId)).AsTask())
                 .GetAwaiter()
                 .GetResult();
         }

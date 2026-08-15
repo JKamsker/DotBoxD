@@ -1,4 +1,3 @@
-using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -181,7 +180,7 @@ public sealed partial class PluginAnalyzer
         ISymbol target,
         Location location)
     {
-        if (!HasAttribute(target, DotBoxDMetadataNames.NativeOnlyAttribute) ||
+        if (!HasNativeOnlyAttribute(target) ||
             !IsLocalUseForbidden(context.Node, context.ContainingSymbol, context.SemanticModel, context.CancellationToken))
         {
             return;

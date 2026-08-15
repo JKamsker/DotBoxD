@@ -19,7 +19,7 @@ internal static class PluginKernelModelFactory
             return null;
         }
 
-        var pluginId = PluginSymbolReader.PluginId(context.Attributes) ?? KernelId(type.Name);
+        var pluginId = PluginSymbolReader.PluginId(context.Attributes) ?? PluginKernelNaming.KernelId(type.Name);
         var eventTypes = PluginSymbolReader.EventTypes(type);
         if (ValidateKernelDeclaration(type, declaration, pluginId, eventTypes) is { } validationFailure)
         {
@@ -108,10 +108,11 @@ internal static class PluginKernelModelFactory
 
         var shouldHandle = InterfaceMethodSyntax(context, type, DotBoxDGenerationNames.Entrypoints.ShouldHandle, cancellationToken);
         var handle = InterfaceMethodSyntax(context, type, DotBoxDGenerationNames.Entrypoints.Handle, cancellationToken);
-        var eventProperties = PluginSymbolReader.EventProperties(eventType);
+        var eventProperties = PluginSymbolReader.EventProperties(eventType, context.SemanticModel.Compilation);
         if (ContainsUnsupported(eventProperties))
         {
-            throw new NotSupportedException(PluginKernelUnsupportedShapeMessage.EventProperties(eventType));
+            throw new NotSupportedException(
+                PluginKernelUnsupportedShapeMessage.EventProperties(eventType, context.SemanticModel.Compilation));
         }
 
         var liveSettings = PluginSymbolReader.LiveSettings(type, context.SemanticModel, cancellationToken);
@@ -178,7 +179,7 @@ internal static class PluginKernelModelFactory
             PluginId: pluginId,
             Namespace: type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString(),
             KernelName: type.Name,
-            PackageName: PackageName(type.Name),
+            PackageName: PluginKernelNaming.PackageName(type.Name),
             GeneratedPackageAttributes: GeneratedPackageAttributeSource.FromKernel(type),
             GeneratedAttributeSource: string.Empty,
             EventName: hookMetadata.EventName,
@@ -265,10 +266,7 @@ internal static class PluginKernelModelFactory
     {
         foreach (var @interface in type.AllInterfaces)
         {
-            if (!string.Equals(
-                    @interface.OriginalDefinition.ToDisplayString(),
-                    DotBoxDMetadataNames.EventKernelInterface,
-                    StringComparison.Ordinal))
+            if (!PluginAnalyzer.IsEventKernelInterface(@interface))
             {
                 continue;
             }
@@ -283,43 +281,6 @@ internal static class PluginKernelModelFactory
         }
 
         return null;
-    }
-
-    private static string PackageName(string kernelName)
-        => kernelName.EndsWith(DotBoxDGenerationNames.KernelSuffix, StringComparison.Ordinal)
-            ? kernelName.Substring(0, kernelName.Length - DotBoxDGenerationNames.KernelSuffix.Length) +
-                DotBoxDGenerationNames.PluginPackageSuffix
-            : kernelName + DotBoxDGenerationNames.PluginPackageSuffix;
-
-    private static string KernelId(string kernelName)
-    {
-        var name = kernelName.EndsWith(DotBoxDGenerationNames.KernelSuffix, StringComparison.Ordinal)
-            ? kernelName.Substring(0, kernelName.Length - DotBoxDGenerationNames.KernelSuffix.Length)
-            : kernelName;
-        return ToKebabCase(name);
-    }
-
-    private static string ToKebabCase(string value)
-    {
-        var builder = new System.Text.StringBuilder(value.Length + 4);
-        for (var i = 0; i < value.Length; i++)
-        {
-            var ch = value[i];
-            if (char.IsUpper(ch))
-            {
-                if (builder.Length > 0)
-                {
-                    builder.Append('-');
-                }
-
-                builder.Append(char.ToLowerInvariant(ch));
-                continue;
-            }
-
-            builder.Append(ch);
-        }
-
-        return builder.ToString();
     }
 
     private static bool ContainsUnsupported(EquatableArray<EventPropertyModel> eventProperties)

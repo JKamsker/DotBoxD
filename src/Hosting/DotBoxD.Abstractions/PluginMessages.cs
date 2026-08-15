@@ -35,7 +35,7 @@ public sealed record PluginMessage(string TargetId, string Message)
 public interface IPluginMessageSink
 {
     void Send(string targetId, string message)
-        => SendAsync(targetId, message).AsTask().GetAwaiter().GetResult();
+        => _ = SendAsync(targetId, message);
 
     ValueTask SendAsync(string targetId, string message, CancellationToken cancellationToken = default);
 }

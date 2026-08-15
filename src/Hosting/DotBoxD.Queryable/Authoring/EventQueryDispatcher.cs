@@ -75,8 +75,18 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
         HookContext context)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
+        if (entry.Handle.IsDisposed)
+        {
+            return;
+        }
+
         entry.Handle.RecordFilterEvaluation();
         if (!TryEvaluate(entry, e, context.CancellationToken))
+        {
+            return;
+        }
+
+        if (entry.Handle.IsDisposed)
         {
             return;
         }
@@ -87,6 +97,11 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
             return;
         }
         context.CancellationToken.ThrowIfCancellationRequested();
+        if (entry.Handle.IsDisposed)
+        {
+            return;
+        }
+
         try
         {
             await entry.Dispatch(projected, context).ConfigureAwait(false);

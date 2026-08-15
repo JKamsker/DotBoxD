@@ -5,11 +5,11 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class PluginKernelUnsupportedShapeMessage
 {
-    public static string EventProperties(INamedTypeSymbol eventType)
+    public static string EventProperties(INamedTypeSymbol eventType, Compilation compilation)
     {
         foreach (var property in PluginEventPropertyReader.Read(eventType))
         {
-            if (PolymorphicHandleMetadataReader.TryResolve(property.Type, out _) ||
+            if (PolymorphicHandleMetadataReader.TryResolve(property.Type, compilation, out _) ||
                 SandboxTypeSourceEmitter.TryEmit(property.Type) is not null)
             {
                 continue;

@@ -96,7 +96,7 @@ public sealed partial class RemoteHookPipeline<TEvent>
         ArgumentNullException.ThrowIfNull(package);
         ValidateSubscription(package);
         ValidateResultSubscription<TResult>(package, resultLocalTerminal: false);
-        _install(WithPriority(package, priority)).AsTask().GetAwaiter().GetResult();
+        Task.Run(() => _install(WithPriority(package, priority)).AsTask()).GetAwaiter().GetResult();
         return this;
     }
 
@@ -185,8 +185,7 @@ public sealed partial class RemoteHookPipeline<TEvent>
         var registration = _localHandlers.RegisterResult(subscriptionId, handler);
         try
         {
-            _install(LocalTerminalIdentity.WithCallbackSubscriptionId(WithPriority(package, priority), subscriptionId))
-                .AsTask()
+            Task.Run(() => _install(LocalTerminalIdentity.WithCallbackSubscriptionId(WithPriority(package, priority), subscriptionId)).AsTask())
                 .GetAwaiter()
                 .GetResult();
         }

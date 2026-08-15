@@ -43,12 +43,11 @@ internal static class PluginSymbolReader
     }
 
     private static bool IsEventKernelInterface(INamedTypeSymbol type)
-        => string.Equals(
-            type.OriginalDefinition.ToDisplayString(),
-            DotBoxDMetadataNames.EventKernelInterface,
-            StringComparison.Ordinal);
+        => PluginAnalyzer.IsEventKernelInterface(type);
 
-    public static EquatableArray<EventPropertyModel> EventProperties(INamedTypeSymbol eventType)
+    public static EquatableArray<EventPropertyModel> EventProperties(
+        INamedTypeSymbol eventType,
+        Compilation compilation)
     {
         var properties = PluginEventPropertyReader.Read(eventType);
         if (properties.Length == 0)
@@ -61,13 +60,13 @@ internal static class PluginSymbolReader
         {
             var property = properties[i];
             RejectNullableReferenceEventProperty(eventType, property);
-            if (PolymorphicHandleMetadataReader.TryResolve(property.Type, out var handle))
+            if (PolymorphicHandleMetadataReader.TryResolve(property.Type, compilation, out var handle))
             {
                 models[i] = new EventPropertyModel(
                     property.Name,
                     handle.KeyManifestTag,
                     handle.KeySandboxTypeSource,
-                    Capability(property));
+                    Capability(property, compilation));
                 continue;
             }
 
@@ -80,7 +79,7 @@ internal static class PluginSymbolReader
                 property.Name,
                 SandboxTypeSourceEmitter.ManifestTag(property.Type),
                 source ?? string.Empty,
-                Capability(property));
+                Capability(property, compilation));
         }
 
         return EquatableArray<EventPropertyModel>.FromOwned(models);
@@ -100,14 +99,11 @@ internal static class PluginSymbolReader
         }
     }
 
-    public static string? Capability(IPropertySymbol property)
+    public static string? Capability(IPropertySymbol property, Compilation compilation)
     {
         foreach (var attribute in property.GetAttributes())
         {
-            if (!string.Equals(
-                    attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDMetadataNames.CapabilityAttribute,
-                    StringComparison.Ordinal))
+            if (!IsDotBoxDAttribute(attribute, compilation, DotBoxDMetadataNames.CapabilityAttribute))
             {
                 continue;
             }
@@ -133,6 +129,10 @@ internal static class PluginSymbolReader
         return null;
     }
 
+    private static bool IsDotBoxDAttribute(AttributeData attribute, Compilation compilation, string metadataName)
+        => compilation.GetTypeByMetadataName(metadataName) is { } expected &&
+           SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected);
+
     private static bool ContainsControlCharacter(string value)
     {
         for (var i = 0; i < value.Length; i++)
@@ -151,7 +151,14 @@ internal static class PluginSymbolReader
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var count = CountLiveSettingProperties(kernelType);
+        var liveSettingAttribute = semanticModel.Compilation.GetTypeByMetadataName(
+            DotBoxDMetadataNames.LiveSettingAttribute);
+        if (liveSettingAttribute is null)
+        {
+            return default;
+        }
+
+        var count = CountLiveSettingProperties(kernelType, liveSettingAttribute);
         if (count == 0)
         {
             return default;
@@ -160,7 +167,7 @@ internal static class PluginSymbolReader
         var names = new HashSet<string>(StringComparer.Ordinal);
         var settings = new LiveSettingModel[count];
         var index = 0;
-        foreach (var property in LiveSettingProperties(kernelType))
+        foreach (var property in LiveSettingProperties(kernelType, liveSettingAttribute))
         {
             if (!names.Add(property.Name))
             {
@@ -174,13 +181,15 @@ internal static class PluginSymbolReader
         return EquatableArray<LiveSettingModel>.FromOwned(settings);
     }
 
-    private static IEnumerable<IPropertySymbol> LiveSettingProperties(INamedTypeSymbol kernelType)
+    private static IEnumerable<IPropertySymbol> LiveSettingProperties(
+        INamedTypeSymbol kernelType,
+        INamedTypeSymbol liveSettingAttribute)
     {
         for (var current = kernelType; current is not null; current = current.BaseType)
         {
             foreach (var member in current.GetMembers())
             {
-                if (member is IPropertySymbol property && IsLiveSetting(property))
+                if (member is IPropertySymbol property && IsLiveSetting(property, liveSettingAttribute))
                 {
                     ValidateLiveSettingProperty(property);
                     yield return property;
@@ -189,10 +198,12 @@ internal static class PluginSymbolReader
         }
     }
 
-    private static int CountLiveSettingProperties(INamedTypeSymbol kernelType)
+    private static int CountLiveSettingProperties(
+        INamedTypeSymbol kernelType,
+        INamedTypeSymbol liveSettingAttribute)
     {
         var count = 0;
-        foreach (var property in LiveSettingProperties(kernelType))
+        foreach (var property in LiveSettingProperties(kernelType, liveSettingAttribute))
         {
             _ = property;
             count++;
@@ -201,14 +212,11 @@ internal static class PluginSymbolReader
         return count;
     }
 
-    private static bool IsLiveSetting(IPropertySymbol property)
+    private static bool IsLiveSetting(IPropertySymbol property, INamedTypeSymbol liveSettingAttribute)
     {
         foreach (var attribute in property.GetAttributes())
         {
-            if (string.Equals(
-                    attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDMetadataNames.LiveSettingAttribute,
-                    StringComparison.Ordinal))
+            if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, liveSettingAttribute))
             {
                 return true;
             }
