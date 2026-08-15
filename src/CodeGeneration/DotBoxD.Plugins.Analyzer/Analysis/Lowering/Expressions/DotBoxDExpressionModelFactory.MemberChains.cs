@@ -212,7 +212,7 @@ internal static partial class DotBoxDExpressionModelFactory
             return;
         }
 
-        if (PluginSymbolReader.Capability(property) is { } capability)
+        if (PluginSymbolReader.Capability(property, context.SemanticModel.Compilation) is { } capability)
         {
             context.Capabilities.Add(capability);
         }
@@ -224,7 +224,7 @@ internal static partial class DotBoxDExpressionModelFactory
     {
         if (context.Capabilities is not null &&
             member.Symbol is IPropertySymbol property &&
-            PluginSymbolReader.Capability(property) is { } capability)
+            PluginSymbolReader.Capability(property, context.SemanticModel.Compilation) is { } capability)
         {
             context.Capabilities.Add(capability);
         }

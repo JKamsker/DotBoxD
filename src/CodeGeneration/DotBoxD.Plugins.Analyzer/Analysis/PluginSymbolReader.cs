@@ -48,7 +48,7 @@ internal static class PluginSymbolReader
             DotBoxDMetadataNames.EventKernelInterface,
             StringComparison.Ordinal);
 
-    public static EquatableArray<EventPropertyModel> EventProperties(INamedTypeSymbol eventType)
+    public static EquatableArray<EventPropertyModel> EventProperties(INamedTypeSymbol eventType, Compilation compilation)
     {
         var properties = PluginEventPropertyReader.Read(eventType);
         if (properties.Length == 0)
@@ -67,7 +67,7 @@ internal static class PluginSymbolReader
                     property.Name,
                     handle.KeyManifestTag,
                     handle.KeySandboxTypeSource,
-                    Capability(property));
+                    Capability(property, compilation));
                 continue;
             }
 
@@ -80,7 +80,7 @@ internal static class PluginSymbolReader
                 property.Name,
                 SandboxTypeSourceEmitter.ManifestTag(property.Type),
                 source ?? string.Empty,
-                Capability(property));
+                Capability(property, compilation));
         }
 
         return EquatableArray<EventPropertyModel>.FromOwned(models);
@@ -100,14 +100,11 @@ internal static class PluginSymbolReader
         }
     }
 
-    public static string? Capability(IPropertySymbol property)
+    public static string? Capability(IPropertySymbol property, Compilation compilation)
     {
         foreach (var attribute in property.GetAttributes())
         {
-            if (!string.Equals(
-                    attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDMetadataNames.CapabilityAttribute,
-                    StringComparison.Ordinal))
+            if (!IsDotBoxDAttribute(attribute, compilation, DotBoxDMetadataNames.CapabilityAttribute))
             {
                 continue;
             }
@@ -132,6 +129,10 @@ internal static class PluginSymbolReader
 
         return null;
     }
+
+    private static bool IsDotBoxDAttribute(AttributeData attribute, Compilation compilation, string metadataName)
+        => compilation.GetTypeByMetadataName(metadataName) is { } expected &&
+           SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected);
 
     private static bool ContainsControlCharacter(string value)
     {
