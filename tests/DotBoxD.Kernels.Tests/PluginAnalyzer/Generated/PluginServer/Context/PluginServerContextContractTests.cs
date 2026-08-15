@@ -252,7 +252,9 @@ public sealed partial class PluginServerContextContractTests
             {{extraSource}}
             """;
 
-    private static async Task<ImmutableArray<Diagnostic>> AnalyzerDiagnosticsAsync(string source)
+    private static async Task<ImmutableArray<Diagnostic>> AnalyzerDiagnosticsAsync(
+        string source,
+        params MetadataReference[] additionalReferences)
     {
         var compilation = CSharpCompilation.Create(
             "DotBoxDPluginServerContextContractTest",
@@ -262,7 +264,8 @@ public sealed partial class PluginServerContextContractTests
                 .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(
-                    typeof(DotBoxD.Services.Attributes.RpcServiceAttribute).Assembly.Location)),
+                    typeof(DotBoxD.Services.Attributes.RpcServiceAttribute).Assembly.Location))
+                .Concat(additionalReferences),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(new RuntimePluginAnalyzer());
         return await compilation.WithAnalyzers(analyzers).GetAnalyzerDiagnosticsAsync();
