@@ -19,7 +19,8 @@ internal static class PluginKernelModelFactory
             return null;
         }
 
-        var pluginId = PluginSymbolReader.PluginId(context.Attributes) ?? PluginKernelNaming.KernelId(type.Name);
+        var pluginId = PluginSymbolReader.PluginId(context.Attributes, context.SemanticModel.Compilation) ??
+                       PluginKernelNaming.KernelId(type.Name);
         var eventTypes = PluginSymbolReader.EventTypes(type);
         if (ValidateKernelDeclaration(type, declaration, pluginId, eventTypes) is { } validationFailure)
         {

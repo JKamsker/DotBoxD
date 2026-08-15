@@ -7,15 +7,18 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class PluginSymbolReader
 {
-    public static string? PluginId(IReadOnlyList<AttributeData> attributes)
+    public static string? PluginId(IReadOnlyList<AttributeData> attributes, Compilation compilation)
     {
+        var pluginAttribute = compilation.GetTypeByMetadataName(DotBoxDMetadataNames.PluginAttribute);
+        if (pluginAttribute is null)
+        {
+            return null;
+        }
+
         for (var i = 0; i < attributes.Count; i++)
         {
             var attribute = attributes[i];
-            if (string.Equals(
-                    attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDMetadataNames.PluginAttribute,
-                    StringComparison.Ordinal))
+            if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, pluginAttribute))
             {
                 return attribute.ConstructorArguments.Length > 0
                     ? attribute.ConstructorArguments[0].Value as string
