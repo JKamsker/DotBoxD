@@ -13,7 +13,7 @@ internal static class PluginKernelHookMetadataReader
     {
         foreach (var attribute in eventType.GetAttributes())
         {
-            if (!EventTypeName.TryHookName(attribute, out var hookName))
+            if (!EventTypeName.TryHookName(attribute, compilation, out var hookName))
             {
                 continue;
             }

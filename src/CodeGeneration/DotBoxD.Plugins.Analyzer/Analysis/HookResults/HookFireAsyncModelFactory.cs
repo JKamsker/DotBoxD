@@ -87,10 +87,7 @@ internal static class HookFireAsyncModelFactory
         out INamedTypeSymbol resultType)
     {
         resultType = null!;
-        if (!string.Equals(
-                attribute.AttributeClass?.ToDisplayString(),
-                DotBoxDMetadataNames.HookAttribute,
-                StringComparison.Ordinal))
+        if (!EventTypeName.IsHookAttribute(attribute, compilation))
         {
             return false;
         }

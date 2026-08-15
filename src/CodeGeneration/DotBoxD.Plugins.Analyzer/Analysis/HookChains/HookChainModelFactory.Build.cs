@@ -145,6 +145,7 @@ internal static partial class HookChainModelFactory
             prepared,
             eventShape,
             lowered,
+            model.Compilation,
             collectors,
             indexPredicates,
             indexCoversPredicate);
@@ -155,6 +156,7 @@ internal static partial class HookChainModelFactory
         PreparedHookChain prepared,
         HookChainEventShape eventShape,
         SendHookLowering lowered,
+        Compilation compilation,
         HookChainCollectors collectors,
         EquatableArray<IndexPredicateModel> indexPredicates,
         bool indexCoversPredicate)
@@ -170,7 +172,7 @@ internal static partial class HookChainModelFactory
             GeneratedAttributeSource: ExperimentalAttributeSource.FromTypes(
                 eventShape.EventType,
                 lowered.ProjectedTypeSymbol),
-            EventName: EventTypeName.HookOrQualified(eventShape.EventType),
+            EventName: EventTypeName.HookOrQualified(eventShape.EventType, compilation),
             EventParameterName: DotBoxDGenerationNames.DefaultEventParameterName,
             ContextParameterName: prepared.TerminalContextParam ?? DotBoxDGenerationNames.DefaultContextParameterName,
             HandleEventParameterName: prepared.TerminalElementParam,

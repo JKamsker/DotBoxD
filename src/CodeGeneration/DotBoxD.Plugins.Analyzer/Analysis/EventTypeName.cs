@@ -1,5 +1,6 @@
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis;
 
@@ -20,11 +21,11 @@ internal static class EventTypeName
     public static string Qualified(INamedTypeSymbol eventType)
         => TypeName(eventType);
 
-    public static string HookOrQualified(INamedTypeSymbol eventType)
+    public static string HookOrQualified(INamedTypeSymbol eventType, Compilation compilation)
     {
         foreach (var attribute in eventType.GetAttributes())
         {
-            if (TryHookName(attribute, out var declaredName))
+            if (TryHookName(attribute, compilation, out var declaredName))
             {
                 return declaredName;
             }
@@ -33,19 +34,15 @@ internal static class EventTypeName
         return Qualified(eventType);
     }
 
-    public static bool TryHookName(AttributeData attribute, out string hookName)
+    public static bool TryHookName(AttributeData attribute, Compilation compilation, out string hookName)
     {
         hookName = string.Empty;
-        if (!string.Equals(
-                attribute.AttributeClass?.ToDisplayString(),
-                DotBoxDMetadataNames.HookAttribute,
-                StringComparison.Ordinal))
+        if (!IsHookAttribute(attribute, compilation))
         {
             return false;
         }
 
-        if (attribute.ConstructorArguments.Length == 0 ||
-            attribute.ConstructorArguments[0].Value is not string declaredName ||
+        if (DeclaredName(attribute) is not { } declaredName ||
             string.IsNullOrWhiteSpace(declaredName))
         {
             throw new NotSupportedException("[Hook] name must not be empty or whitespace.");
@@ -58,6 +55,32 @@ internal static class EventTypeName
 
         hookName = declaredName;
         return true;
+    }
+
+    public static bool IsHookAttribute(AttributeData attribute, Compilation compilation)
+    {
+        if (attribute.AttributeClass is not { } attributeClass ||
+            !string.Equals(attributeClass.ToDisplayString(), DotBoxDMetadataNames.HookAttribute, StringComparison.Ordinal) ||
+            compilation.GetTypeByMetadataName("DotBoxD.Abstractions.IEventKernel`1") is not { } eventKernel)
+        {
+            return false;
+        }
+
+        return SymbolEqualityComparer.Default.Equals(attributeClass.ContainingAssembly, eventKernel.ContainingAssembly);
+    }
+
+    private static string? DeclaredName(AttributeData attribute)
+    {
+        if (attribute.ConstructorArguments.FirstOrDefault().Value is string declaredName)
+        {
+            return declaredName;
+        }
+
+        var syntax = attribute.ApplicationSyntaxReference?.GetSyntax() as AttributeSyntax;
+        return syntax?.ArgumentList?.Arguments.Count == 1 &&
+            syntax.ArgumentList.Arguments[0].Expression is LiteralExpressionSyntax { Token.Value: string value }
+            ? value
+            : null;
     }
 
     private static bool HasDottedIdentifierGrammar(string value)
