@@ -74,7 +74,8 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
-        if (IsFrozenSetToFrozenSet(method, typeName))
+        if (method is { IsStatic: true, Name: "ToFrozenSet" } &&
+            string.Equals(typeName, FrozenSetTypeName, StringComparison.Ordinal))
         {
             forbidden = "System.Collections.Frozen.FrozenSet.ToFrozenSet";
             return true;
@@ -274,10 +275,6 @@ internal static class ForbiddenCollectionCapacityPolicy
     private static bool IsEnumerableToArray(IMethodSymbol method, string typeName)
         => method is { IsStatic: true, Name: "ToArray" } &&
            string.Equals(typeName, EnumerableTypeName, StringComparison.Ordinal);
-
-    private static bool IsFrozenSetToFrozenSet(IMethodSymbol method, string typeName)
-        => method is { IsStatic: true, Name: "ToFrozenSet" } &&
-           string.Equals(typeName, FrozenSetTypeName, StringComparison.Ordinal);
 
     private static bool IsArrayBufferWriterGrowthHint(IMethodSymbol method, string typeName)
         => method.Name is "GetMemory" or "GetSpan" &&
