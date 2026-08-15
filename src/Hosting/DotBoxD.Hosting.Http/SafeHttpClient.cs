@@ -190,8 +190,12 @@ public static class SafeHttpClient
 
         var addresses = await dnsResolver(host, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
-        if (addresses.Count == 0 ||
-            !grant.AllowPrivateNetwork && addresses.Any(SafeIpAddressClassifier.IsNonGlobal))
+        if (addresses.Count == 0)
+        {
+            throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: DNS resolution returned no addresses");
+        }
+
+        if (!grant.AllowPrivateNetwork && addresses.Any(SafeIpAddressClassifier.IsNonGlobal))
         {
             throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: private network targets are not allowed");
         }
