@@ -34,7 +34,7 @@ public sealed partial class RemoteHookPipeline<TEvent>
     {
         ArgumentNullException.ThrowIfNull(package);
         ValidateSubscription(package);
-        _install(package).AsTask().GetAwaiter().GetResult();
+        Task.Run(() => _install(package).AsTask()).GetAwaiter().GetResult();
         return this;
     }
 
