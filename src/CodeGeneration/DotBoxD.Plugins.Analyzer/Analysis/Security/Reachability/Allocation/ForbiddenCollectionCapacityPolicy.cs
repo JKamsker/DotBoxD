@@ -16,6 +16,7 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string CollectionsUtilTypeName = "System.Collections.Specialized.CollectionsUtil";
     private const string DictionaryTypeName = "System.Collections.Generic.Dictionary<TKey, TValue>";
     private const string EnumerableTypeName = "System.Linq.Enumerable";
+    private const string FrozenSetTypeName = "System.Collections.Frozen.FrozenSet";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string HashtableTypeName = "System.Collections.Hashtable";
     private const string HybridDictionaryTypeName = "System.Collections.Specialized.HybridDictionary";
@@ -70,6 +71,12 @@ internal static class ForbiddenCollectionCapacityPolicy
         if (IsEnumerableToArray(method, typeName))
         {
             forbidden = "System.Linq.Enumerable.ToArray";
+            return true;
+        }
+
+        if (IsFrozenSetToFrozenSet(method, typeName))
+        {
+            forbidden = "System.Linq.Enumerable.ToFrozenSet";
             return true;
         }
 
@@ -267,6 +274,10 @@ internal static class ForbiddenCollectionCapacityPolicy
     private static bool IsEnumerableToArray(IMethodSymbol method, string typeName)
         => method is { IsStatic: true, Name: "ToArray" } &&
            string.Equals(typeName, EnumerableTypeName, StringComparison.Ordinal);
+
+    private static bool IsFrozenSetToFrozenSet(IMethodSymbol method, string typeName)
+        => method is { IsStatic: true, Name: "ToFrozenSet" } &&
+           string.Equals(typeName, FrozenSetTypeName, StringComparison.Ordinal);
 
     private static bool IsArrayBufferWriterGrowthHint(IMethodSymbol method, string typeName)
         => method.Name is "GetMemory" or "GetSpan" &&
