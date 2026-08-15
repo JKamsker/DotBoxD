@@ -22,8 +22,7 @@ public sealed partial class RemoteHookPipeline<TEvent>
         var registration = _localHandlers.Register(subscriptionId, handler);
         try
         {
-            _install(LocalTerminalIdentity.WithCallbackSubscriptionId(package, subscriptionId))
-                .AsTask()
+            Task.Run(() => _install(LocalTerminalIdentity.WithCallbackSubscriptionId(package, subscriptionId)).AsTask())
                 .GetAwaiter()
                 .GetResult();
         }
@@ -56,8 +55,7 @@ public sealed partial class RemoteHookPipeline<TEvent>
         var registration = _localHandlers.Register(subscriptionId, handler, decoder);
         try
         {
-            _install(LocalTerminalIdentity.WithCallbackSubscriptionId(package, subscriptionId))
-                .AsTask()
+            Task.Run(() => _install(LocalTerminalIdentity.WithCallbackSubscriptionId(package, subscriptionId)).AsTask())
                 .GetAwaiter()
                 .GetResult();
         }
@@ -86,8 +84,7 @@ public sealed partial class RemoteHookPipeline<TEvent>
         var registration = _localHandlers.Register(subscriptionId, handler, decoder);
         try
         {
-            _install(LocalTerminalIdentity.WithCallbackSubscriptionId(package, subscriptionId))
-                .AsTask()
+            Task.Run(() => _install(LocalTerminalIdentity.WithCallbackSubscriptionId(package, subscriptionId)).AsTask())
                 .GetAwaiter()
                 .GetResult();
         }
