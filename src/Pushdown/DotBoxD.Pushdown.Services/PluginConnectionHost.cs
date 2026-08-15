@@ -125,6 +125,11 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
                 };
 
                 var connection = configure(peer, session);
+                if (connection is null)
+                {
+                    throw new InvalidOperationException("The configure callback returned null.");
+                }
+
                 self._connected.TrySetResult(connection);
             }
             catch (Exception ex)
