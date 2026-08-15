@@ -17,10 +17,15 @@ public sealed class GeneratedServiceCatalogPublicationRaceTests
         var assembly = CreateLegacyCatalogAssembly();
 
         var loading = Task.Run(() => GeneratedServiceRegistry.GetServices(assembly));
-        await gate.GetterEntered.Task.WaitAsync(Timeout);
-
-        GeneratedServiceRegistry.RegisterServices(assembly, explicitServices);
-        gate.Release.TrySetResult(true);
+        try
+        {
+            await gate.GetterEntered.Task.WaitAsync(Timeout);
+            GeneratedServiceRegistry.RegisterServices(assembly, explicitServices);
+        }
+        finally
+        {
+            gate.Release.TrySetResult(true);
+        }
 
         var inFlightServices = await loading.WaitAsync(Timeout);
         var laterServices = GeneratedServiceRegistry.GetServices(assembly);
