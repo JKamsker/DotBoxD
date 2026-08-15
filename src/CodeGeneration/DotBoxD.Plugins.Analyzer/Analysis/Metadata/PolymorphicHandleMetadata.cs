@@ -190,15 +190,16 @@ internal sealed record HandleSubtypeMetadata(
 
 internal static class PolymorphicHandleMetadataReader
 {
-    public static bool TryResolve(ITypeSymbol type, out PolymorphicHandleMetadata metadata)
+    public static bool TryResolve(
+        ITypeSymbol type,
+        Compilation compilation,
+        out PolymorphicHandleMetadata metadata)
     {
         for (var current = type as INamedTypeSymbol; current is not null; current = current.BaseType)
         {
             foreach (var attribute in current.GetAttributes())
             {
-                if (!PolymorphicHandleMetadata.IsAttribute(
-                        attribute,
-                        DotBoxDMetadataNames.PolymorphicHandleAttribute))
+                if (!IsPolymorphicHandleAttribute(attribute, compilation))
                 {
                     continue;
                 }
@@ -230,6 +231,10 @@ internal static class PolymorphicHandleMetadataReader
         metadata = null!;
         return false;
     }
+
+    private static bool IsPolymorphicHandleAttribute(AttributeData attribute, Compilation compilation)
+        => compilation.GetTypeByMetadataName(DotBoxDMetadataNames.PolymorphicHandleAttribute) is { } expected &&
+           SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected);
 
     private static ISymbol? KeyMemberSymbol(INamedTypeSymbol handleType, string keyMember)
     {

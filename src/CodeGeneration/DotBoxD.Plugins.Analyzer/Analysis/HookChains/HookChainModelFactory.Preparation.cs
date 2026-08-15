@@ -226,7 +226,7 @@ internal static partial class HookChainModelFactory
         }
 
         ValidateEventType(eventType, seed, cancellationToken);
-        var eventProperties = PluginSymbolReader.EventProperties(eventType);
+        var eventProperties = PluginSymbolReader.EventProperties(eventType, model.Compilation);
         if (ContainsUnsupported(eventProperties))
         {
             throw new NotSupportedException(
