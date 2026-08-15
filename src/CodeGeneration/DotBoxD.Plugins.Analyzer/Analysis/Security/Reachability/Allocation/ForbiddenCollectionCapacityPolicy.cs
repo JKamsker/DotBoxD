@@ -67,9 +67,9 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
-        if (IsEnumerableToArray(method, typeName))
+        if (IsEnumerableMaterialization(method, typeName))
         {
-            forbidden = "System.Linq.Enumerable.ToArray";
+            forbidden = $"System.Linq.Enumerable.{method.Name}";
             return true;
         }
 
@@ -264,8 +264,9 @@ internal static class ForbiddenCollectionCapacityPolicy
            string.Equals(typeName, ArrayTypeName, StringComparison.Ordinal) &&
            HasCapacityParameter(method, "newSize");
 
-    private static bool IsEnumerableToArray(IMethodSymbol method, string typeName)
-        => method is { IsStatic: true, Name: "ToArray" } &&
+    private static bool IsEnumerableMaterialization(IMethodSymbol method, string typeName)
+        => method is { IsStatic: true } &&
+           method.Name is "ToArray" or "ToLookup" &&
            string.Equals(typeName, EnumerableTypeName, StringComparison.Ordinal);
 
     private static bool IsArrayBufferWriterGrowthHint(IMethodSymbol method, string typeName)
