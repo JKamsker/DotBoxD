@@ -10,11 +10,17 @@ internal static class ExperimentalAttributeFormatter
     private const string GlobalExperimentalAttributeName =
         "global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute";
 
-    public static ExperimentalAttributeInfo From(INamedTypeSymbol type)
+    public static ExperimentalAttributeInfo From(INamedTypeSymbol type, Compilation compilation)
     {
+        var experimentalAttribute = compilation.GetTypeByMetadataName(ExperimentalAttributeName);
+        if (experimentalAttribute is null)
+        {
+            return ExperimentalAttributeInfo.None;
+        }
+
         foreach (var attr in type.GetAttributes())
         {
-            if (attr.AttributeClass?.ToDisplayString() != ExperimentalAttributeName ||
+            if (!SymbolEqualityComparer.Default.Equals(attr.AttributeClass, experimentalAttribute) ||
                 attr.ConstructorArguments.Length == 0 ||
                 attr.ConstructorArguments[0].Value is not string diagnosticId ||
                 string.IsNullOrWhiteSpace(diagnosticId))
