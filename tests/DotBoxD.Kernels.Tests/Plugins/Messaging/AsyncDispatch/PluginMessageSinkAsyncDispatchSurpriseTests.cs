@@ -5,6 +5,17 @@ namespace DotBoxD.Kernels.Tests.Plugins.Messaging;
 public sealed class PluginMessageSinkAsyncDispatchSurpriseTests
 {
     [Fact]
+    public void Default_send_propagates_an_already_completed_async_failure()
+    {
+        var sink = new FaultingPluginMessageSink();
+
+        var exception = Assert.Throws<SentinelException>(
+            () => ((IPluginMessageSink)sink).Send("target-1", "message"));
+
+        Assert.Equal("SendAsync failed.", exception.Message);
+    }
+
+    [Fact]
     public async Task Default_send_completes_for_async_only_sink_without_pumping_captured_context()
     {
         var context = new ControllableSynchronizationContext();
@@ -40,6 +51,20 @@ public sealed class PluginMessageSinkAsyncDispatchSurpriseTests
 
         Assert.True(completedWithoutPumping, "The default Send implementation must not block an async sink's captured continuation.");
         Assert.Equal(1, sink.SendCount);
+    }
+
+    private sealed class FaultingPluginMessageSink : IPluginMessageSink
+    {
+        public ValueTask SendAsync(string targetId, string message, CancellationToken cancellationToken = default)
+            => ValueTask.FromException(new SentinelException("SendAsync failed."));
+    }
+
+    private sealed class SentinelException : Exception
+    {
+        public SentinelException(string message)
+            : base(message)
+        {
+        }
     }
 
     private sealed class YieldingPluginMessageSink : IPluginMessageSink
