@@ -73,6 +73,13 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
+        if (method is { IsStatic: true, Name: "ToImmutableDictionary" } &&
+            string.Equals(typeName, "System.Collections.Immutable.ImmutableDictionary", StringComparison.Ordinal))
+        {
+            forbidden = "System.Collections.Immutable.ImmutableDictionary.ToImmutableDictionary";
+            return true;
+        }
+
         if (IsCollectionsUtilHashtableFactory(method, typeName))
         {
             forbidden = HashtableTypeName;
