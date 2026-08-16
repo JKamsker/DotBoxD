@@ -75,7 +75,7 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
-        if (IsImmutableSortedSetBuilderUnionWith(method, typeName))
+        if (method is { IsStatic: false, Name: "UnionWith" } && typeName == ImmutableSortedSetBuilderTypeName)
         {
             forbidden = ImmutableSortedSetBuilderTypeName + ".UnionWith";
             return true;
@@ -275,10 +275,6 @@ internal static class ForbiddenCollectionCapacityPolicy
     private static bool IsEnumerableToArray(IMethodSymbol method, string typeName)
         => method is { IsStatic: true, Name: "ToArray" } &&
            string.Equals(typeName, EnumerableTypeName, StringComparison.Ordinal);
-
-    private static bool IsImmutableSortedSetBuilderUnionWith(IMethodSymbol method, string typeName)
-        => method is { IsStatic: false, Name: "UnionWith" } &&
-           string.Equals(typeName, ImmutableSortedSetBuilderTypeName, StringComparison.Ordinal);
 
     private static bool IsArrayBufferWriterGrowthHint(IMethodSymbol method, string typeName)
         => method.Name is "GetMemory" or "GetSpan" &&
