@@ -22,8 +22,6 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string ImmutableArrayTypeName = "System.Collections.Immutable.ImmutableArray";
     private const string ImmutableArrayBuilderTypeName =
         "System.Collections.Immutable.ImmutableArray<T>.Builder";
-    private const string ImmutableHashSetBuilderTypeName =
-        "System.Collections.Immutable.ImmutableHashSet<T>.Builder";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
     private const string NameObjectCollectionBaseTypeName =
         "System.Collections.Specialized.NameObjectCollectionBase";
@@ -81,9 +79,9 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
-        if (IsImmutableHashSetBuilderUnionWith(method, typeName))
+        if (ImmutableHashSetBuilderCapacityPolicy.IsUnionWith(method, typeName))
         {
-            forbidden = $"{ImmutableHashSetBuilderTypeName}.UnionWith";
+            forbidden = ImmutableHashSetBuilderCapacityPolicy.UnionWithDisplayName;
             return true;
         }
 
@@ -261,10 +259,6 @@ internal static class ForbiddenCollectionCapacityPolicy
     private static bool IsImmutableArrayCreateBuilder(IMethodSymbol method, string typeName)
         => method is { IsStatic: true, Name: "CreateBuilder" } &&
            string.Equals(typeName, ImmutableArrayTypeName, StringComparison.Ordinal);
-
-    private static bool IsImmutableHashSetBuilderUnionWith(IMethodSymbol method, string typeName)
-        => method is { MethodKind: MethodKind.Ordinary, Name: "UnionWith" } &&
-           string.Equals(typeName, ImmutableHashSetBuilderTypeName, StringComparison.Ordinal);
 
     private static bool IsCollectionsUtilHashtableFactory(IMethodSymbol method, string typeName)
         => method is { IsStatic: true, Name: "CreateCaseInsensitiveHashtable" } &&
