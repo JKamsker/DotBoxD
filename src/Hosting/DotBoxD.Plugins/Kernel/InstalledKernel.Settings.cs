@@ -83,8 +83,25 @@ public sealed partial class InstalledKernel
         lock (_lifecycleGate)
         {
             PluginKernelRevocation.ThrowIfRevoked(IsRevoked);
-            Value.SetMany(values);
-            RefreshTypedValuesFromStore();
+            var previousValues = Value.ToObjectValues(Manifest.LiveSettings);
+            try
+            {
+                Value.SetMany(values);
+                RefreshTypedValuesFromStore();
+            }
+            catch
+            {
+                try
+                {
+                    Value.SetMany(previousValues);
+                    RefreshTypedValuesFromStore();
+                }
+                catch
+                {
+                }
+
+                throw;
+            }
         }
     }
 
