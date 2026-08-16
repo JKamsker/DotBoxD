@@ -19,9 +19,6 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string HashtableTypeName = "System.Collections.Hashtable";
     private const string HybridDictionaryTypeName = "System.Collections.Specialized.HybridDictionary";
-    private const string ImmutableArrayTypeName = "System.Collections.Immutable.ImmutableArray";
-    private const string ImmutableArrayBuilderTypeName =
-        "System.Collections.Immutable.ImmutableArray<T>.Builder";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
     private const string NameObjectCollectionBaseTypeName =
         "System.Collections.Specialized.NameObjectCollectionBase";
@@ -85,16 +82,8 @@ internal static class ForbiddenCollectionCapacityPolicy
             return false;
         }
 
-        if (IsImmutableArrayCreateBuilder(method, typeName))
+        if (ImmutableArrayCapacityPolicy.TryGetDisplayName(method, typeName, out forbidden))
         {
-            forbidden = "System.Collections.Immutable.ImmutableArray";
-            return true;
-        }
-
-        if (IsImmutableArrayBuilderAddRange(method, typeName))
-        {
-            forbidden =
-                $"{method.ContainingType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)}.{method.Name}";
             return true;
         }
 
@@ -158,11 +147,15 @@ internal static class ForbiddenCollectionCapacityPolicy
 
         var typeName = property.ContainingType.OriginalDefinition.ToDisplayString(
             SymbolDisplayFormat.CSharpErrorMessageFormat);
+        if (ImmutableArrayCapacityPolicy.TryGetPropertyDisplayName(typeName, property.Name, out forbidden))
+        {
+            return true;
+        }
+
         forbidden = (typeName, property.Name) switch
         {
             (ArrayListTypeName, "Capacity") => ArrayListTypeName,
             (BitArrayTypeName, "Length") => BitArrayTypeName,
-            (ImmutableArrayBuilderTypeName, "Capacity") => "System.Collections.Immutable.ImmutableArray",
             (ListTypeName, "Capacity") => "System.Collections.Generic.List",
             (NonGenericSortedListTypeName, "Capacity") => NonGenericSortedListTypeName,
             (SortedListTypeName, "Capacity") => "System.Collections.Generic.SortedList",
@@ -242,12 +235,7 @@ internal static class ForbiddenCollectionCapacityPolicy
 
     private static bool IsCapacityAllocationOrdinaryMethod(IMethodSymbol method, string typeName)
     {
-        if (IsImmutableArrayCreateBuilder(method, typeName))
-        {
-            return HasCapacityParameter(method, "initialCapacity");
-        }
-
-        if (IsImmutableArrayBuilderAddRange(method, typeName))
+        if (ImmutableArrayCapacityPolicy.IsCapacityAllocationMethod(method, typeName))
         {
             return true;
         }
@@ -261,14 +249,6 @@ internal static class ForbiddenCollectionCapacityPolicy
                string.Equals(method.Name, "EnsureCapacity", StringComparison.Ordinal) &&
                HasCapacityParameter(method, "capacity");
     }
-
-    private static bool IsImmutableArrayCreateBuilder(IMethodSymbol method, string typeName)
-        => method is { IsStatic: true, Name: "CreateBuilder" } &&
-           string.Equals(typeName, ImmutableArrayTypeName, StringComparison.Ordinal);
-
-    private static bool IsImmutableArrayBuilderAddRange(IMethodSymbol method, string typeName)
-        => method is { IsStatic: false, Name: "AddRange" } &&
-           string.Equals(typeName, ImmutableArrayBuilderTypeName, StringComparison.Ordinal);
 
     private static bool IsCollectionsUtilHashtableFactory(IMethodSymbol method, string typeName)
         => method is { IsStatic: true, Name: "CreateCaseInsensitiveHashtable" } &&
