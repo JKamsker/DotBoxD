@@ -91,6 +91,13 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
+        if (IsImmutableArrayBuilderAddRange(method, typeName))
+        {
+            forbidden =
+                $"{method.ContainingType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)}.{method.Name}";
+            return true;
+        }
+
         if (IsArrayBufferWriterGrowthHint(method, typeName))
         {
             forbidden = method.ContainingType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
@@ -240,6 +247,11 @@ internal static class ForbiddenCollectionCapacityPolicy
             return HasCapacityParameter(method, "initialCapacity");
         }
 
+        if (IsImmutableArrayBuilderAddRange(method, typeName))
+        {
+            return true;
+        }
+
         if (IsArrayBufferWriterGrowthHint(method, typeName))
         {
             return true;
@@ -253,6 +265,10 @@ internal static class ForbiddenCollectionCapacityPolicy
     private static bool IsImmutableArrayCreateBuilder(IMethodSymbol method, string typeName)
         => method is { IsStatic: true, Name: "CreateBuilder" } &&
            string.Equals(typeName, ImmutableArrayTypeName, StringComparison.Ordinal);
+
+    private static bool IsImmutableArrayBuilderAddRange(IMethodSymbol method, string typeName)
+        => method is { IsStatic: false, Name: "AddRange" } &&
+           string.Equals(typeName, ImmutableArrayBuilderTypeName, StringComparison.Ordinal);
 
     private static bool IsCollectionsUtilHashtableFactory(IMethodSymbol method, string typeName)
         => method is { IsStatic: true, Name: "CreateCaseInsensitiveHashtable" } &&
