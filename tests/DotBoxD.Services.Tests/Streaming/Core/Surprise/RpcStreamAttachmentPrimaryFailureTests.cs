@@ -40,6 +40,7 @@ public sealed class RpcStreamAttachmentPrimaryFailureTests
             var terminal = await streamError.Task.WaitAsync(Timeout);
             await outbound.WaitAsync().WaitAsync(Timeout);
 
+            await outbound.DisposeAsync();
             Assert.Equal(1, source.DisposeCount);
             Assert.Equal(ReadAndDisposeFailingStream.PrimaryFailureMessage, diagnostic.Error.Message);
             Assert.Equal(ReadAndDisposeFailingStream.PrimaryFailureMessage, terminal.ErrorMessage);
