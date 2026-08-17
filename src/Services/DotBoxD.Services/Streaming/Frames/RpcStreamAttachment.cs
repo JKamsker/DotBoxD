@@ -85,6 +85,18 @@ public abstract class RpcStreamAttachment
         }
     }
 
+    internal async ValueTask DisposeSourceAfterPumpAsync(Exception? pumpFailure)
+    {
+        try
+        {
+            await DisposeSourceOnceAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex) when (pumpFailure is not null)
+        {
+            RpcDiagnostics.Report("Outbound stream source cleanup failed", ex);
+        }
+    }
+
     private static void RequireHandle(RpcStreamHandle handle, RpcStreamKind expected)
     {
         if (handle.StreamId <= 0)
@@ -117,6 +129,7 @@ public abstract class RpcStreamAttachment
             CancellationToken ct)
         {
             var buffer = ArrayPool<byte>.Shared.Rent(ChunkSize);
+            Exception? pumpFailure = null;
             try
             {
                 while (true)
@@ -131,10 +144,15 @@ public abstract class RpcStreamAttachment
                         .ConfigureAwait(false);
                 }
             }
+            catch (Exception ex)
+            {
+                pumpFailure = ex;
+                throw;
+            }
             finally
             {
                 ArrayPool<byte>.Shared.Return(buffer);
-                await DisposeSourceOnceAsync().ConfigureAwait(false);
+                await DisposeSourceAfterPumpAsync(pumpFailure).ConfigureAwait(false);
             }
         }
 
@@ -159,6 +177,7 @@ public abstract class RpcStreamAttachment
             ISerializer serializer,
             CancellationToken ct)
         {
+            Exception? pumpFailure = null;
             try
             {
                 while (true)
@@ -191,9 +210,14 @@ public abstract class RpcStreamAttachment
                     }
                 }
             }
+            catch (Exception ex)
+            {
+                pumpFailure = ex;
+                throw;
+            }
             finally
             {
-                await DisposeSourceOnceAsync().ConfigureAwait(false);
+                await DisposeSourceAfterPumpAsync(pumpFailure).ConfigureAwait(false);
             }
         }
 

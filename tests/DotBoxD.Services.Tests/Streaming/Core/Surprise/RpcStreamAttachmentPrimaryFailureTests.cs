@@ -24,7 +24,7 @@ public sealed class RpcStreamAttachmentPrimaryFailureTests
         var streams = new RpcStreamManager(
             serializer,
             SendFrameAsync,
-            exceptionTransformer: null);
+            exceptionTransformer: static ex => new RpcErrorInfo(ex.Message, ex.GetType().Name));
         var handle = streams.ReserveOutbound(RpcStreamKind.Binary);
         expectedStreamId = handle.StreamId;
         await using var outbound = streams.RegisterOutbound(
