@@ -75,7 +75,7 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
-        if (method is { IsStatic: false, Name: "UnionWith" } && typeName == ImmutableSortedSetBuilderTypeName)
+        if (IsImmutableSortedSetBuilderUnionWith(method, typeName))
         {
             forbidden = ImmutableSortedSetBuilderTypeName + ".UnionWith";
             return true;
@@ -228,6 +228,10 @@ internal static class ForbiddenCollectionCapacityPolicy
         return method.MethodKind == MethodKind.Ordinary &&
                IsCapacityAllocationOrdinaryMethod(method, typeName);
     }
+
+    private static bool IsImmutableSortedSetBuilderUnionWith(IMethodSymbol method, string typeName)
+        => method is { IsStatic: false, Name: "UnionWith" } &&
+           typeName == ImmutableSortedSetBuilderTypeName;
 
     private static bool HasConstructorCapacityParameter(IMethodSymbol method, string typeName)
     {
