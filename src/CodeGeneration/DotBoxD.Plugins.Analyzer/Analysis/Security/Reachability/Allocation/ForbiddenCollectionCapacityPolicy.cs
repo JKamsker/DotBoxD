@@ -22,8 +22,6 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string ImmutableArrayTypeName = "System.Collections.Immutable.ImmutableArray";
     private const string ImmutableArrayBuilderTypeName =
         "System.Collections.Immutable.ImmutableArray<T>.Builder";
-    private const string ImmutableSortedDictionaryBuilderTypeName =
-        "System.Collections.Immutable.ImmutableSortedDictionary<TKey, TValue>.Builder";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
     private const string NameObjectCollectionBaseTypeName =
         "System.Collections.Specialized.NameObjectCollectionBase";
@@ -81,9 +79,9 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
-        if (IsImmutableSortedDictionaryBuilderAddRange(method, typeName))
+        if (ImmutableSortedDictionaryBuilderPolicy.IsAddRange(method, typeName))
         {
-            forbidden = $"{ImmutableSortedDictionaryBuilderTypeName}.AddRange";
+            forbidden = ImmutableSortedDictionaryBuilderPolicy.AddRangeDisplayName;
             return true;
         }
 
@@ -261,10 +259,6 @@ internal static class ForbiddenCollectionCapacityPolicy
     private static bool IsImmutableArrayCreateBuilder(IMethodSymbol method, string typeName)
         => method is { IsStatic: true, Name: "CreateBuilder" } &&
            string.Equals(typeName, ImmutableArrayTypeName, StringComparison.Ordinal);
-
-    private static bool IsImmutableSortedDictionaryBuilderAddRange(IMethodSymbol method, string typeName)
-        => method is { MethodKind: MethodKind.Ordinary, Name: "AddRange" } &&
-           string.Equals(typeName, ImmutableSortedDictionaryBuilderTypeName, StringComparison.Ordinal);
 
     private static bool IsCollectionsUtilHashtableFactory(IMethodSymbol method, string typeName)
         => method is { IsStatic: true, Name: "CreateCaseInsensitiveHashtable" } &&
