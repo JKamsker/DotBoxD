@@ -22,8 +22,6 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string ImmutableArrayTypeName = "System.Collections.Immutable.ImmutableArray";
     private const string ImmutableArrayBuilderTypeName =
         "System.Collections.Immutable.ImmutableArray<T>.Builder";
-    private const string ImmutableSortedSetBuilderTypeName =
-        "System.Collections.Immutable.ImmutableSortedSet<T>.Builder";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
     private const string NameObjectCollectionBaseTypeName =
         "System.Collections.Specialized.NameObjectCollectionBase";
@@ -75,9 +73,9 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
-        if (IsImmutableSortedSetBuilderUnionWith(method, typeName))
+        if (ImmutableSortedSetBuilderCapacityPolicy.IsUnboundedUnionWith(method, typeName))
         {
-            forbidden = ImmutableSortedSetBuilderTypeName + ".UnionWith";
+            forbidden = ImmutableSortedSetBuilderCapacityPolicy.UnionWithDisplayName;
             return true;
         }
 
@@ -228,10 +226,6 @@ internal static class ForbiddenCollectionCapacityPolicy
         return method.MethodKind == MethodKind.Ordinary &&
                IsCapacityAllocationOrdinaryMethod(method, typeName);
     }
-
-    private static bool IsImmutableSortedSetBuilderUnionWith(IMethodSymbol method, string typeName)
-        => method is { IsStatic: false, Name: "UnionWith" } &&
-           typeName == ImmutableSortedSetBuilderTypeName;
 
     private static bool HasConstructorCapacityParameter(IMethodSymbol method, string typeName)
     {
