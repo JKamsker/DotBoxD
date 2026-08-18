@@ -117,25 +117,13 @@ public sealed partial class RpcPeer
     {
         try
         {
-            CancelReadLoop(cts);
+            RpcPeerCancellation.CancelReadLoop(cts);
             await DisposeCoreAsync(readLoop, cts).ConfigureAwait(false);
             completion.TrySetResult(null);
         }
         catch (Exception ex)
         {
             completion.TrySetException(ex);
-        }
-    }
-
-    private static void CancelReadLoop(CancellationTokenSource? cts)
-    {
-        try
-        {
-            cts?.Cancel();
-        }
-        catch (Exception ex)
-        {
-            RpcDiagnostics.Report("Read loop cancellation during peer teardown failed", ex);
         }
     }
 
