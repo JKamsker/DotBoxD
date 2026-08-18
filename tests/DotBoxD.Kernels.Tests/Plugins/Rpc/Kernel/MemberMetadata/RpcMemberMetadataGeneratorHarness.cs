@@ -17,12 +17,14 @@ internal static class RpcMemberMetadataGeneratorHarness
     public static CSharpParseOptions ParseOptions { get; } =
         CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
 
-    public static RpcMemberMetadataGeneratorResult RunGenerator(string source)
+    public static RpcMemberMetadataGeneratorResult RunGenerator(
+        string source,
+        params MetadataReference[] additionalReferences)
     {
         var compilation = CSharpCompilation.Create(
             "DotBoxDGeneratedPackageMemberMetadataTest",
             [CSharpSyntaxTree.ParseText(source, ParseOptions)],
-            References(),
+            References().Concat(additionalReferences),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new PluginPackageGenerator().AsSourceGenerator()],
