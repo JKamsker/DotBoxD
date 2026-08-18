@@ -190,9 +190,32 @@ internal static partial class PluginServerFacadeModelFactory
     }
 
     private static bool AssemblyEnablesClsCompliance(Compilation compilation)
-        => compilation.GetTypeByMetadataName("System.CLSCompliantAttribute") is { } clsCompliantAttribute &&
-           compilation.Assembly.GetAttributes().Any(attribute =>
-            SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, clsCompliantAttribute) &&
+    {
+        return compilation.Assembly.GetAttributes().Any(attribute =>
+            IsFrameworkClsCompliantAttribute(attribute, compilation) &&
             attribute.ConstructorArguments.Length == 1 &&
             attribute.ConstructorArguments[0].Value is true);
+    }
+
+    private static bool IsFrameworkClsCompliantAttribute(AttributeData attribute, Compilation compilation)
+    {
+        foreach (var reference in compilation.References)
+        {
+            var aliases = reference.Properties.Aliases;
+            if (!aliases.IsDefaultOrEmpty && !aliases.Contains("global", StringComparer.Ordinal))
+            {
+                continue;
+            }
+
+            if (compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol assembly &&
+                SymbolEqualityComparer.Default.Equals(
+                    attribute.AttributeClass,
+                    assembly.GetTypeByMetadataName("System.CLSCompliantAttribute")))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

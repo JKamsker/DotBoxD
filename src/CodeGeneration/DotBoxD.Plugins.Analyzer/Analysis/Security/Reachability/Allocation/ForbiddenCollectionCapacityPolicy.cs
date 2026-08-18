@@ -15,8 +15,6 @@ internal static class ForbiddenCollectionCapacityPolicy
         "System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>";
     private const string CollectionsUtilTypeName = "System.Collections.Specialized.CollectionsUtil";
     private const string DictionaryTypeName = "System.Collections.Generic.Dictionary<TKey, TValue>";
-    private const string EnumerableTypeName = "System.Linq.Enumerable";
-    private const string FrozenSetTypeName = "System.Collections.Frozen.FrozenSet";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string HashtableTypeName = "System.Collections.Hashtable";
     private const string HybridDictionaryTypeName = "System.Collections.Specialized.HybridDictionary";
@@ -66,33 +64,9 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
-        if (IsEnumerableMaterialization(method, typeName))
+        if (CollectionMaterializationPolicy.TryGetDisplayName(method, typeName, out forbidden) ||
+            CollectionBulkGrowthPolicy.TryGetDisplayName(method, typeName, out forbidden))
         {
-            forbidden = $"System.Linq.Enumerable.{method.Name}";
-            return true;
-        }
-
-        if (IsFrozenSetToFrozenSet(method, typeName))
-        {
-            forbidden = "System.Collections.Frozen.FrozenSet.ToFrozenSet";
-            return true;
-        }
-
-        if (IsImmutableListToImmutableList(method, typeName))
-        {
-            forbidden = "System.Collections.Immutable.ImmutableList.ToImmutableList";
-            return true;
-        }
-
-        if (IsImmutableDictionaryMaterialization(method, typeName))
-        {
-            forbidden = "System.Collections.Immutable.ImmutableDictionary.ToImmutableDictionary";
-            return true;
-        }
-
-        if (ImmutableSortedSetBuilderCapacityPolicy.IsUnboundedUnionWith(method, typeName))
-        {
-            forbidden = ImmutableSortedSetBuilderCapacityPolicy.UnionWithDisplayName;
             return true;
         }
 
@@ -102,24 +76,14 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
-        if (ImmutableHashSetBuilderCapacityPolicy.IsUnionWith(method, typeName))
-        {
-            forbidden = ImmutableHashSetBuilderCapacityPolicy.UnionWithDisplayName;
-            return true;
-        }
+        return TryGetCapacityDisplayName(method, typeName, out forbidden);
+    }
 
-        if (ImmutableSortedDictionaryBuilderPolicy.IsAddRange(method, typeName))
-        {
-            forbidden = ImmutableSortedDictionaryBuilderPolicy.AddRangeDisplayName;
-            return true;
-        }
-
-        if (IsPriorityQueueEnqueueRange(method, typeName))
-        {
-            forbidden = "System.Collections.Generic.PriorityQueue.EnqueueRange";
-            return true;
-        }
-
+    private static bool TryGetCapacityDisplayName(
+        IMethodSymbol method,
+        string typeName,
+        out string forbidden)
+    {
         if (!IsCapacityAllocationMethod(method, typeName))
         {
             forbidden = null!;
@@ -137,21 +101,8 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
-        var displayName = CollectionDisplayName(method.ContainingType, typeName);
-        if (displayName is null)
-        {
-            forbidden = null!;
-            return false;
-        }
-
-        forbidden = displayName;
-        return true;
-    }
-
-    private static bool IsImmutableDictionaryMaterialization(IMethodSymbol method, string typeName)
-    {
-        return method is { IsStatic: true, Name: "ToImmutableDictionary" } &&
-            string.Equals(typeName, "System.Collections.Immutable.ImmutableDictionary", StringComparison.Ordinal);
+        forbidden = CollectionDisplayName(method.ContainingType, typeName)!;
+        return forbidden is not null;
     }
 
     public static bool TryGetDisplayName(IObjectCreationOperation creation, out string forbidden)
@@ -311,25 +262,10 @@ internal static class ForbiddenCollectionCapacityPolicy
            string.Equals(typeName, CollectionsUtilTypeName, StringComparison.Ordinal) &&
            HasCapacityParameter(method, "capacity");
 
-    private static bool IsPriorityQueueEnqueueRange(IMethodSymbol method, string typeName) =>
-        method is { IsStatic: false, Name: "EnqueueRange" } && string.Equals(typeName, PriorityQueueTypeName, StringComparison.Ordinal);
-
     private static bool IsArrayResize(IMethodSymbol method, string typeName)
         => method is { IsStatic: true, Name: "Resize" } &&
            string.Equals(typeName, ArrayTypeName, StringComparison.Ordinal) &&
            HasCapacityParameter(method, "newSize");
-
-    private static bool IsEnumerableMaterialization(IMethodSymbol method, string typeName)
-        => method is { IsStatic: true } &&
-           method.Name is "ToArray" or "ToList" or "ToLookup" &&
-           string.Equals(typeName, EnumerableTypeName, StringComparison.Ordinal);
-
-    private static bool IsFrozenSetToFrozenSet(IMethodSymbol method, string typeName)
-        => method is { IsStatic: true, Name: "ToFrozenSet" } &&
-           string.Equals(typeName, FrozenSetTypeName, StringComparison.Ordinal);
-
-    private static bool IsImmutableListToImmutableList(IMethodSymbol method, string typeName)
-        => method is { IsStatic: true, Name: "ToImmutableList" } && typeName == "System.Collections.Immutable.ImmutableList";
 
     private static bool IsArrayBufferWriterGrowthHint(IMethodSymbol method, string typeName)
         => method.Name is "GetMemory" or "GetSpan" &&

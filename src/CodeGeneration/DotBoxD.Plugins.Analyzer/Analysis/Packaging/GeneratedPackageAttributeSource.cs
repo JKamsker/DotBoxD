@@ -7,12 +7,12 @@ internal static class GeneratedPackageAttributeSource
 {
     private const string ExperimentalAttribute = "System.Diagnostics.CodeAnalysis.ExperimentalAttribute";
 
-    public static EquatableArray<string> FromKernel(INamedTypeSymbol kernelType)
+    public static EquatableArray<string> FromKernel(INamedTypeSymbol kernelType, Compilation compilation)
     {
         var attributes = new List<string>();
         foreach (var attribute in kernelType.GetAttributes())
         {
-            if (attribute.AttributeClass?.ToDisplayString() == ExperimentalAttribute &&
+            if (IsFrameworkExperimentalAttribute(attribute, compilation) &&
                 TryExperimentalAttribute(attribute) is { } source)
             {
                 attributes.Add(source);
@@ -20,6 +20,28 @@ internal static class GeneratedPackageAttributeSource
         }
 
         return EquatableArray<string>.FromOwned([.. attributes]);
+    }
+
+    private static bool IsFrameworkExperimentalAttribute(AttributeData attribute, Compilation compilation)
+    {
+        foreach (var reference in compilation.References)
+        {
+            var aliases = reference.Properties.Aliases;
+            if (!aliases.IsDefaultOrEmpty && !aliases.Contains("global", StringComparer.Ordinal))
+            {
+                continue;
+            }
+
+            if (compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol assembly &&
+                SymbolEqualityComparer.Default.Equals(
+                    attribute.AttributeClass,
+                    assembly.GetTypeByMetadataName(ExperimentalAttribute)))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string? TryExperimentalAttribute(AttributeData attribute)

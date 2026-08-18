@@ -7,7 +7,7 @@ public sealed class PluginServerClsComplianceSurpriseTests
     [Fact]
     public void Generated_plugin_server_facade_does_not_emit_cls_warnings()
     {
-        var (_, outputCompilation, generatorDiagnostics) = PluginServerGenerationTestDriver.RunWithDiagnostics("""
+        var (generated, outputCompilation, generatorDiagnostics) = PluginServerGenerationTestDriver.RunWithDiagnostics("""
             using System;
             using System.Threading;
             using System.Threading.Tasks;
@@ -96,7 +96,7 @@ public sealed class PluginServerClsComplianceSurpriseTests
             .ToArray();
 
         Assert.Empty(clsDiagnostics);
-        Assert.Contains("[global::System.CLSCompliant(false)]", outputCompilation.SyntaxTrees.Select(tree => tree.ToString()));
+        Assert.Contains("[global::System.CLSCompliant(false)]", generated, StringComparison.Ordinal);
     }
 
     [Fact]
