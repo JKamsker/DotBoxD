@@ -23,6 +23,7 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string ImmutableArrayBuilderTypeName =
         "System.Collections.Immutable.ImmutableArray<T>.Builder";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
+    private const string LinkedListTypeName = "System.Collections.Generic.LinkedList<T>";
     private const string NameObjectCollectionBaseTypeName =
         "System.Collections.Specialized.NameObjectCollectionBase";
     private const string NameValueCollectionTypeName =
@@ -44,6 +45,7 @@ internal static class ForbiddenCollectionCapacityPolicy
         [HashtableTypeName] = "System.Collections.Hashtable",
         [HybridDictionaryTypeName] = HybridDictionaryTypeName,
         [ListTypeName] = "System.Collections.Generic.List",
+        [LinkedListTypeName] = "System.Collections.Generic.LinkedList",
         [NameValueCollectionTypeName] = NameValueCollectionTypeName,
         [NonGenericQueueTypeName] = NonGenericQueueTypeName,
         [NonGenericSortedListTypeName] = NonGenericSortedListTypeName,
@@ -214,12 +216,18 @@ internal static class ForbiddenCollectionCapacityPolicy
     {
         if (method.MethodKind == MethodKind.Constructor)
         {
-            return HasConstructorCapacityParameter(method, typeName);
+            return HasConstructorCapacityParameter(method, typeName) ||
+                   IsLinkedListEnumerableConstructor(method, typeName);
         }
 
         return method.MethodKind == MethodKind.Ordinary &&
                IsCapacityAllocationOrdinaryMethod(method, typeName);
     }
+
+    private static bool IsLinkedListEnumerableConstructor(IMethodSymbol method, string typeName)
+        => string.Equals(typeName, LinkedListTypeName, StringComparison.Ordinal) &&
+           method.Parameters.Length == 1 &&
+           string.Equals(method.Parameters[0].Name, "collection", StringComparison.Ordinal);
 
     private static bool HasConstructorCapacityParameter(IMethodSymbol method, string typeName)
     {
