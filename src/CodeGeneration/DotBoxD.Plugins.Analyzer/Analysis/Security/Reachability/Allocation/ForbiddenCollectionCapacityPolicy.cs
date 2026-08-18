@@ -112,6 +112,12 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
+        if (IsPriorityQueueEnqueueRange(method, typeName))
+        {
+            forbidden = "System.Collections.Generic.PriorityQueue.EnqueueRange";
+            return true;
+        }
+
         if (!IsCapacityAllocationMethod(method, typeName))
         {
             forbidden = null!;
@@ -296,6 +302,9 @@ internal static class ForbiddenCollectionCapacityPolicy
         => method is { IsStatic: true, Name: "CreateCaseInsensitiveHashtable" } &&
            string.Equals(typeName, CollectionsUtilTypeName, StringComparison.Ordinal) &&
            HasCapacityParameter(method, "capacity");
+
+    private static bool IsPriorityQueueEnqueueRange(IMethodSymbol method, string typeName) =>
+        method is { IsStatic: false, Name: "EnqueueRange" } && string.Equals(typeName, PriorityQueueTypeName, StringComparison.Ordinal);
 
     private static bool IsArrayResize(IMethodSymbol method, string typeName)
         => method is { IsStatic: true, Name: "Resize" } &&
