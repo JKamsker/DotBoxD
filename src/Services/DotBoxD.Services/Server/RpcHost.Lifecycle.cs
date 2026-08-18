@@ -174,7 +174,7 @@ public sealed partial class RpcHost
                 await Task.Yield();
                 await StopListenerOnceAsync(CancellationToken.None).ConfigureAwait(false);
             }
-            TryCancel(cts);
+            RpcHostCancellation.TryCancel(cts);
             cancellationStarted = true;
             if (acceptTask is not null)
             {
@@ -193,39 +193,11 @@ public sealed partial class RpcHost
         {
             if (cancellationStarted)
             {
-                DisposeCts(cts);
+                RpcHostCancellation.Dispose(cts);
             }
             CompleteStop(cts, completed);
         }
     }
-    private static void TryCancel(CancellationTokenSource cts)
-    {
-        try
-        {
-            cts.Cancel();
-        }
-        catch (ObjectDisposedException)
-        {
-            // CTS was disposed by a prior failed stop attempt.
-        }
-        catch (Exception ex)
-        {
-            RpcDiagnostics.Report("Host cancellation callback failed during shutdown", ex);
-        }
-    }
-
-    private static void DisposeCts(CancellationTokenSource cts)
-    {
-        try
-        {
-            cts.Dispose();
-        }
-        catch (ObjectDisposedException)
-        {
-            // Already disposed by a prior failed stop attempt.
-        }
-    }
-
     private static async Task ObserveAcceptShutdownAsync(Task acceptTask)
     {
         try
