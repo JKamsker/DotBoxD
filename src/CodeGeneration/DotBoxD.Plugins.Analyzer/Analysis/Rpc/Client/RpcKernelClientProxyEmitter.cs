@@ -56,6 +56,7 @@ internal static partial class RpcKernelClientProxyEmitter
         private readonly INamedTypeSymbol _kernelType;
         private readonly INamedTypeSymbol _serviceType;
         private readonly IMethodSymbol _serviceMethod;
+        private readonly Compilation _compilation;
         private readonly ITypeSymbol? _payloadReturnType;
         private readonly ReturnShape _returnShape;
         private readonly RpcKernelValueConversionEmitter _conv;
@@ -70,6 +71,7 @@ internal static partial class RpcKernelClientProxyEmitter
             _kernelType = kernelType;
             _serviceType = serviceType;
             _serviceMethod = serviceMethod;
+            _compilation = compilation;
             _conv = new RpcKernelValueConversionEmitter(
                 compilation,
                 reservedMemberName: serviceMethod.Name);
@@ -122,7 +124,7 @@ internal static partial class RpcKernelClientProxyEmitter
             var payloadParameterCount = RpcKernelClientParameters.PayloadParameterCount(_serviceMethod);
 
             RpcMethodMetadataAttributeSource.Append(builder, _serviceMethod, "    ");
-            RpcReturnFlowAttributeSource.Append(builder, _serviceMethod, "    ");
+            RpcReturnFlowAttributeSource.Append(builder, _serviceMethod, _compilation, "    ");
             builder.Append("    public ");
             if (_returnShape != ReturnShape.Direct)
             {

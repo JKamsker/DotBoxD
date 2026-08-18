@@ -5,27 +5,30 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 internal static class RpcReturnFlowAttributeSource
 {
-    public static void Append(StringBuilder builder, IMethodSymbol method, string indent)
+    public static void Append(StringBuilder builder, IMethodSymbol method, Compilation compilation, string indent)
     {
         foreach (var attribute in method.GetReturnTypeAttributes())
         {
             switch (attribute.AttributeClass?.ToDisplayString())
             {
-                case "System.Diagnostics.CodeAnalysis.MaybeNullAttribute":
+                case "System.Diagnostics.CodeAnalysis.MaybeNullAttribute"
+                    when IsFrameworkAttribute(compilation, attribute, "System.Diagnostics.CodeAnalysis.MaybeNullAttribute"):
                     AppendSimple(
                         builder,
                         indent,
                         "global::System.Diagnostics.CodeAnalysis.MaybeNullAttribute");
                     break;
 
-                case "System.Diagnostics.CodeAnalysis.NotNullAttribute":
+                case "System.Diagnostics.CodeAnalysis.NotNullAttribute"
+                    when IsFrameworkAttribute(compilation, attribute, "System.Diagnostics.CodeAnalysis.NotNullAttribute"):
                     AppendSimple(
                         builder,
                         indent,
                         "global::System.Diagnostics.CodeAnalysis.NotNullAttribute");
                     break;
 
-                case "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute":
+                case "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute"
+                    when IsFrameworkAttribute(compilation, attribute, "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute"):
                     AppendStringArgument(
                         builder,
                         indent,
@@ -35,6 +38,10 @@ internal static class RpcReturnFlowAttributeSource
             }
         }
     }
+
+    private static bool IsFrameworkAttribute(Compilation compilation, AttributeData attribute, string metadataName)
+        => compilation.GetTypeByMetadataName(metadataName) is { } frameworkAttribute &&
+           SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, frameworkAttribute);
 
     private static void AppendSimple(
         StringBuilder builder,

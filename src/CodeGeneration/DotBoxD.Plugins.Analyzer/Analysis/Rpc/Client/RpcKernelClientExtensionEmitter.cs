@@ -24,7 +24,8 @@ internal static class RpcKernelClientExtensionEmitter
         INamedTypeSymbol kernelType,
         INamedTypeSymbol serviceType,
         IMethodSymbol serviceMethod,
-        RpcKernelClientExtensions extensions)
+        RpcKernelClientExtensions extensions,
+        Compilation compilation)
     {
         if (extensions.IsEmpty)
         {
@@ -38,13 +39,13 @@ internal static class RpcKernelClientExtensionEmitter
         if (extensions.Property is { } property)
         {
             var method = SameReceiver(property, extensions.Method) ? extensions.Method : null;
-            AppendBlock(builder, kernelType, serviceType, serviceMethod, property.ReceiverType, property, method);
+            AppendBlock(builder, kernelType, serviceType, serviceMethod, property.ReceiverType, property, method, compilation);
         }
 
         if (extensions.Method is { } methodExtension &&
             !SameReceiver(extensions.Property, methodExtension))
         {
-            AppendBlock(builder, kernelType, serviceType, serviceMethod, methodExtension.ReceiverType, null, methodExtension);
+            AppendBlock(builder, kernelType, serviceType, serviceMethod, methodExtension.ReceiverType, null, methodExtension, compilation);
         }
 
         builder.AppendLine("}");
@@ -58,7 +59,8 @@ internal static class RpcKernelClientExtensionEmitter
         IMethodSymbol serviceMethod,
         INamedTypeSymbol receiverType,
         RpcKernelClientPropertyExtension? property,
-        RpcKernelClientMethodExtension? method)
+        RpcKernelClientMethodExtension? method,
+        Compilation compilation)
     {
         var receiver = ReceiverParameterName(serviceMethod);
 
@@ -76,7 +78,7 @@ internal static class RpcKernelClientExtensionEmitter
                 builder.AppendLine();
             }
 
-            AppendMethod(builder, kernelType, serviceType, serviceMethod, method, receiver);
+            AppendMethod(builder, kernelType, serviceType, serviceMethod, method, receiver, compilation);
         }
 
         builder.AppendLine("    }");
@@ -111,10 +113,11 @@ internal static class RpcKernelClientExtensionEmitter
         INamedTypeSymbol serviceType,
         IMethodSymbol serviceMethod,
         RpcKernelClientMethodExtension method,
-        string receiver)
+        string receiver,
+        Compilation compilation)
     {
         RpcMethodMetadataAttributeSource.Append(builder, serviceMethod, "        ");
-        RpcReturnFlowAttributeSource.Append(builder, serviceMethod, "        ");
+        RpcReturnFlowAttributeSource.Append(builder, serviceMethod, compilation, "        ");
         builder.Append("        public ").Append(TypeName(serviceMethod.ReturnType)).Append(' ')
             .Append(Identifier(method.Name)).Append('(')
             .Append(RpcKernelClientParameterSource.ParameterList(serviceMethod)).AppendLine(")");
