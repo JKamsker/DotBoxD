@@ -57,7 +57,7 @@ internal static class RpcKernelDirectClientExtensionEmitter
             var response = locals.Next("__response");
             var result = locals.Next("__result");
             RpcMethodMetadataAttributeSource.Append(builder, kernelMethod, "    ");
-            RpcReturnFlowAttributeSource.Append(builder, kernelMethod, "    ");
+            RpcReturnFlowAttributeSource.Append(builder, kernelMethod, compilation, "    ");
             builder.Append("    public static ");
             if (isAsyncReturn)
             {

@@ -166,7 +166,7 @@ internal static partial class RpcKernelModelFactory
             if (clientExtensions is { IsEmpty: false })
             {
                 builder.AppendLine();
-                builder.Append(RpcKernelClientExtensionEmitter.Emit(type, serviceType, serviceMethod, clientExtensions));
+                builder.Append(RpcKernelClientExtensionEmitter.Emit(type, serviceType, serviceMethod, clientExtensions, compilation));
             }
         }
         else if (graft is not null &&
