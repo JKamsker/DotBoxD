@@ -141,13 +141,38 @@ internal sealed class ErasedPluginEventAdapter<TEvent> : IErasedPluginEventAdapt
                     return;
                 }
 
-                subscriptions.On<TEvent>(_adapter).Use(kernel);
+                var pipeline = subscriptions.OnForWire<TEvent>(_adapter, out var created);
+                try
+                {
+                    pipeline.Use(kernel);
+                }
+                catch
+                {
+                    if (created)
+                    {
+                        subscriptions.RemoveWirePipeline(_adapter, pipeline);
+                    }
+
+                    throw;
+                }
                 break;
             case KernelWireKind.Projecting:
                 var callbackId = RequireCallbackId(terminal, kernel);
                 var push = RequirePush(callbacks);
-                subscriptions.On<TEvent>(_adapter)
-                    .UseProjecting(kernel, callbackId, push);
+                var projectingPipeline = subscriptions.OnForWire<TEvent>(_adapter, out var projectingCreated);
+                try
+                {
+                    projectingPipeline.UseProjecting(kernel, callbackId, push);
+                }
+                catch
+                {
+                    if (projectingCreated)
+                    {
+                        subscriptions.RemoveWirePipeline(_adapter, projectingPipeline);
+                    }
+
+                    throw;
+                }
                 break;
             default:
                 throw new InvalidOperationException(
