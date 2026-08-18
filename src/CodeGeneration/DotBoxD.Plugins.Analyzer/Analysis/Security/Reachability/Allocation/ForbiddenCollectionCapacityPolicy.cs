@@ -16,6 +16,7 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string CollectionsUtilTypeName = "System.Collections.Specialized.CollectionsUtil";
     private const string DictionaryTypeName = "System.Collections.Generic.Dictionary<TKey, TValue>";
     private const string EnumerableTypeName = "System.Linq.Enumerable";
+    private const string FrozenSetTypeName = "System.Collections.Frozen.FrozenSet";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string HashtableTypeName = "System.Collections.Hashtable";
     private const string HybridDictionaryTypeName = "System.Collections.Specialized.HybridDictionary";
@@ -51,7 +52,6 @@ internal static class ForbiddenCollectionCapacityPolicy
         [QueueTypeName] = "System.Collections.Generic.Queue",
         [SortedListTypeName] = "System.Collections.Generic.SortedList"
     };
-
     public static bool TryGetDisplayName(IMethodSymbol? method, out string forbidden)
     {
         if (method is null)
@@ -70,6 +70,12 @@ internal static class ForbiddenCollectionCapacityPolicy
         if (IsEnumerableMaterialization(method, typeName))
         {
             forbidden = $"System.Linq.Enumerable.{method.Name}";
+            return true;
+        }
+
+        if (IsFrozenSetToFrozenSet(method, typeName))
+        {
+            forbidden = "System.Collections.Frozen.FrozenSet.ToFrozenSet";
             return true;
         }
 
@@ -268,6 +274,8 @@ internal static class ForbiddenCollectionCapacityPolicy
         => method is { IsStatic: true } &&
            method.Name is "ToArray" or "ToList" or "ToLookup" &&
            string.Equals(typeName, EnumerableTypeName, StringComparison.Ordinal);
+
+    private static bool IsFrozenSetToFrozenSet(IMethodSymbol method, string typeName) => method is { IsStatic: true, Name: "ToFrozenSet" } && string.Equals(typeName, FrozenSetTypeName, StringComparison.Ordinal);
 
     private static bool IsArrayBufferWriterGrowthHint(IMethodSymbol method, string typeName)
         => method.Name is "GetMemory" or "GetSpan" &&
