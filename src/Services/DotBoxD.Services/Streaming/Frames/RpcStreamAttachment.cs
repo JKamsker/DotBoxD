@@ -12,6 +12,7 @@ namespace DotBoxD.Services.Streaming.Frames;
 /// </summary>
 public abstract class RpcStreamAttachment
 {
+    private int _outboundRegistrationClaimed;
     private int _sourceDisposed;
 
     private protected RpcStreamAttachment(RpcStreamHandle handle) => Handle = handle;
@@ -63,6 +64,12 @@ public abstract class RpcStreamAttachment
         RpcStreamManager streams,
         ISerializer serializer,
         CancellationToken ct);
+
+    internal bool TryClaimOutboundRegistration() =>
+        Interlocked.CompareExchange(ref _outboundRegistrationClaimed, 1, 0) == 0;
+
+    internal void ReleaseOutboundRegistration() =>
+        Volatile.Write(ref _outboundRegistrationClaimed, 0);
 
     // Releases the owned source exactly once, whether the call comes from the pump's own finally or
     // from a sibling stream's best-effort cleanup while this pump has already completed. The set owns
