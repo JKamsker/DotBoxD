@@ -100,7 +100,6 @@ public sealed partial class RpcPeer
             _proxyCache = null;
             cts = _cts;
             readLoop = ReferenceEquals(s_disconnectedEventPeer, this) ? null : _readLoop;
-            cts?.Cancel();
             disposeCompletion = new TaskCompletionSource<object?>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
             disposeTask = disposeCompletion.Task;
@@ -118,12 +117,25 @@ public sealed partial class RpcPeer
     {
         try
         {
+            CancelReadLoop(cts);
             await DisposeCoreAsync(readLoop, cts).ConfigureAwait(false);
             completion.TrySetResult(null);
         }
         catch (Exception ex)
         {
             completion.TrySetException(ex);
+        }
+    }
+
+    private static void CancelReadLoop(CancellationTokenSource? cts)
+    {
+        try
+        {
+            cts?.Cancel();
+        }
+        catch (Exception ex)
+        {
+            RpcDiagnostics.Report("Read loop cancellation during peer teardown failed", ex);
         }
     }
 
