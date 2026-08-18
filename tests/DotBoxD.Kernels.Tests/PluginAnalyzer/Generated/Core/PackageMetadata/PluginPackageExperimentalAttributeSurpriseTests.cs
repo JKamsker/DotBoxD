@@ -1,6 +1,6 @@
+using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Analyzer.Analysis;
-using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
