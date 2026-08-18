@@ -208,6 +208,10 @@ public sealed partial class RpcHost
         {
             // CTS was disposed by a prior failed stop attempt.
         }
+        catch (Exception ex)
+        {
+            RpcDiagnostics.Report("Host cancellation callback failed during shutdown", ex);
+        }
     }
 
     private static void DisposeCts(CancellationTokenSource cts)
