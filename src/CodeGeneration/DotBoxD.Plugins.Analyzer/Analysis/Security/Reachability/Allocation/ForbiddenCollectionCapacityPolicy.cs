@@ -84,6 +84,13 @@ internal static class ForbiddenCollectionCapacityPolicy
             forbidden = "System.Collections.Immutable.ImmutableList.ToImmutableList";
             return true;
         }
+
+        if (IsImmutableDictionaryMaterialization(method, typeName))
+        {
+            forbidden = "System.Collections.Immutable.ImmutableDictionary.ToImmutableDictionary";
+            return true;
+        }
+
         if (IsCollectionsUtilHashtableFactory(method, typeName))
         {
             forbidden = HashtableTypeName;
@@ -117,6 +124,12 @@ internal static class ForbiddenCollectionCapacityPolicy
 
         forbidden = displayName;
         return true;
+    }
+
+    private static bool IsImmutableDictionaryMaterialization(IMethodSymbol method, string typeName)
+    {
+        return method is { IsStatic: true, Name: "ToImmutableDictionary" } &&
+            string.Equals(typeName, "System.Collections.Immutable.ImmutableDictionary", StringComparison.Ordinal);
     }
 
     public static bool TryGetDisplayName(IObjectCreationOperation creation, out string forbidden)
