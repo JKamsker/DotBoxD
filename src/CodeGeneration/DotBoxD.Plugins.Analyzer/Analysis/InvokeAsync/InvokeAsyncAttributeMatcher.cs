@@ -8,8 +8,19 @@ internal static class InvokeAsyncAttributeMatcher
     public static bool HasGeneratePluginServerAttribute(INamedTypeSymbol type)
         => HasAttribute(type, DotBoxDMetadataNames.GeneratePluginServerAttribute);
 
-    public static bool HasRpcServiceAttribute(INamedTypeSymbol type)
-        => HasAttribute(type, DotBoxDMetadataNames.RpcServiceAttribute);
+    public static bool HasRpcServiceAttribute(INamedTypeSymbol type, Compilation compilation)
+        => HasAttribute(type, compilation.GetTypeByMetadataName(DotBoxDMetadataNames.RpcServiceAttribute));
+
+    private static bool HasAttribute(INamedTypeSymbol type, INamedTypeSymbol? expectedAttribute)
+    {
+        if (expectedAttribute is null)
+        {
+            return false;
+        }
+
+        return type.GetAttributes().Any(attribute =>
+            SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expectedAttribute));
+    }
 
     private static bool HasAttribute(INamedTypeSymbol type, string metadataName)
     {

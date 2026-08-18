@@ -18,7 +18,7 @@ internal static partial class InvokeAsyncReceiverResolver
         worldType = null!;
 
         var semanticType = model.GetTypeInfo(receiver, cancellationToken).Type as INamedTypeSymbol;
-        if (semanticType is not null && TryResolveGeneratedFacadeType(semanticType, out receiverType, out serverAccessType, out worldType))
+        if (semanticType is not null && TryResolveGeneratedFacadeType(model.Compilation, semanticType, out receiverType, out serverAccessType, out worldType))
         {
             return true;
         }
@@ -42,7 +42,7 @@ internal static partial class InvokeAsyncReceiverResolver
                 receiver,
                 cancellationToken,
                 out var generatedType) &&
-            TryResolveWorld(generatedType, out worldType))
+            TryResolveWorld(model.Compilation, generatedType, out worldType))
         {
             receiverType = PluginServerInterfaceTypeName(worldType);
             serverAccessType = ServerInterfaceTypeName(generatedType, worldType);
@@ -59,6 +59,7 @@ internal static partial class InvokeAsyncReceiverResolver
     }
 
     internal static bool TryResolveGeneratedFacadeType(
+        Compilation compilation,
         INamedTypeSymbol type,
         out string receiverType,
         out string? serverAccessType,
@@ -67,13 +68,13 @@ internal static partial class InvokeAsyncReceiverResolver
         receiverType = string.Empty;
         serverAccessType = null;
         worldType = null!;
-        if (TryResolveWorld(type, out worldType))
+        if (TryResolveWorld(compilation, type, out worldType))
         {
             receiverType = TypeName(type);
             return true;
         }
 
-        if (!TryResolveGeneratedFacadeBase(type, out var facadeBaseType, out worldType))
+        if (!TryResolveGeneratedFacadeBase(compilation, type, out var facadeBaseType, out worldType))
         {
             return false;
         }
@@ -83,18 +84,20 @@ internal static partial class InvokeAsyncReceiverResolver
     }
 
     private static bool TryResolveGeneratedFacadeBase(
+        Compilation compilation,
         INamedTypeSymbol type,
         out INamedTypeSymbol worldType)
-        => TryResolveGeneratedFacadeBase(type, out _, out worldType);
+        => TryResolveGeneratedFacadeBase(compilation, type, out _, out worldType);
 
     private static bool TryResolveGeneratedFacadeBase(
+        Compilation compilation,
         INamedTypeSymbol type,
         out INamedTypeSymbol facadeBaseType,
         out INamedTypeSymbol worldType)
     {
         for (var current = type.BaseType; current is not null; current = current.BaseType)
         {
-            if (TryResolveWorld(current, out worldType))
+            if (TryResolveWorld(compilation, current, out worldType))
             {
                 facadeBaseType = current;
                 return true;
@@ -170,6 +173,7 @@ internal static partial class InvokeAsyncReceiverResolver
            type.GetMembers("EnsureAnonymousKernelAsync").OfType<IMethodSymbol>().Any();
 
     private static bool TryResolveWorld(
+        Compilation compilation,
         INamedTypeSymbol type,
         out INamedTypeSymbol worldType)
     {
@@ -182,7 +186,7 @@ internal static partial class InvokeAsyncReceiverResolver
         var found = false;
         foreach (var candidate in type.Interfaces)
         {
-            if (HasRpcServiceAttribute(candidate))
+            if (HasRpcServiceAttribute(candidate, compilation))
             {
                 if (found)
                 {
@@ -201,6 +205,6 @@ internal static partial class InvokeAsyncReceiverResolver
     private static bool HasGeneratePluginServerAttribute(INamedTypeSymbol type)
         => InvokeAsyncAttributeMatcher.HasGeneratePluginServerAttribute(type);
 
-    private static bool HasRpcServiceAttribute(INamedTypeSymbol type)
-        => InvokeAsyncAttributeMatcher.HasRpcServiceAttribute(type);
+    private static bool HasRpcServiceAttribute(INamedTypeSymbol type, Compilation compilation)
+        => InvokeAsyncAttributeMatcher.HasRpcServiceAttribute(type, compilation);
 }

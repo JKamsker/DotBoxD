@@ -40,7 +40,7 @@ internal static partial class PluginServerFacadeModelFactory
     {
         PluginServerTargetValidator.Validate(type, cancellationToken);
 
-        var worldType = ResolveWorldType(type)
+        var worldType = ResolveWorldType(type, compilation)
             ?? throw new NotSupportedException(
                 $"Generated plugin server '{type.Name}' must directly implement one [RpcService] world interface.");
         ValidateWorldType(type, compilation, worldType);
