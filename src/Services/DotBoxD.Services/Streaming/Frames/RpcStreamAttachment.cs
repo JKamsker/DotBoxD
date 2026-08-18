@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.IO.Pipelines;
 using DotBoxD.Services.Diagnostics;
+using DotBoxD.Services.Exceptions;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Serialization;
 using DotBoxD.Services.Streaming.Core;
@@ -78,7 +79,17 @@ public abstract class RpcStreamAttachment
     internal ValueTask DisposeSourceOnceAsync() =>
         Interlocked.Exchange(ref _sourceDisposed, 1) == 0 ? DisposeSourceCoreAsync() : default;
 
+    internal void ThrowIfOwnedSourceDisposed()
+    {
+        if (OwnsSource && Volatile.Read(ref _sourceDisposed) != 0)
+        {
+            throw new ServiceProtocolException("An owned stream attachment cannot be reused after its source is disposed.");
+        }
+    }
+
     private protected virtual ValueTask DisposeSourceCoreAsync() => default;
+
+    private protected virtual bool OwnsSource => false;
 
     internal async ValueTask DisposeSourceBestEffortAsync(string operation)
     {
@@ -165,6 +176,8 @@ public abstract class RpcStreamAttachment
 
         private protected override ValueTask DisposeSourceCoreAsync() =>
             _leaveOpen ? default : DisposeStreamAsync(_stream);
+
+        private protected override bool OwnsSource => !_leaveOpen;
     }
 
     private sealed class PipeAttachment : RpcStreamAttachment
@@ -230,6 +243,8 @@ public abstract class RpcStreamAttachment
 
         private protected override ValueTask DisposeSourceCoreAsync() =>
             _completeReader ? _pipe.Reader.CompleteAsync() : default;
+
+        private protected override bool OwnsSource => _completeReader;
     }
 
     private sealed class AsyncEnumerableAttachment<T> : RpcStreamAttachment

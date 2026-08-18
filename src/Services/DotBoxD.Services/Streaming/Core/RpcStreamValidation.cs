@@ -87,6 +87,7 @@ internal static class RpcStreamValidation
             throw new ArgumentNullException(nameof(attachment), "Outbound stream attachment must not be null.");
         }
 
+        attachment.ThrowIfOwnedSourceDisposed();
         ValidateStreamId(attachment.Handle.StreamId);
 
         ValidateKind(attachment.Handle.Kind);
