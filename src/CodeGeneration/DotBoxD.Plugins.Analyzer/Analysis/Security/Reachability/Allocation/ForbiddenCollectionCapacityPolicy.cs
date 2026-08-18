@@ -266,7 +266,7 @@ internal static class ForbiddenCollectionCapacityPolicy
 
     private static bool IsEnumerableMaterialization(IMethodSymbol method, string typeName)
         => method is { IsStatic: true } &&
-           method.Name is "ToArray" or "ToList" &&
+           method.Name is "ToArray" or "ToList" or "ToLookup" &&
            string.Equals(typeName, EnumerableTypeName, StringComparison.Ordinal);
 
     private static bool IsArrayBufferWriterGrowthHint(IMethodSymbol method, string typeName)
