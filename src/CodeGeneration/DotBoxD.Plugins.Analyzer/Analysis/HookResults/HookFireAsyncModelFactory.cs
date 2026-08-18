@@ -35,7 +35,7 @@ internal static class HookFireAsyncModelFactory
                 new HookFireAsyncModel(
                     contextType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
                     resultType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-                    ContextAttributes(contextType),
+                    ContextAttributes(contextType, context.SemanticModel.Compilation),
                     IsEffectivelyPublic(contextType) && IsEffectivelyPublic(resultType) ? "public" : "internal",
                     IsAssemblyClsCompliant(context.SemanticModel.Compilation)),
                 null);
@@ -205,14 +205,17 @@ internal static class HookFireAsyncModelFactory
         return false;
     }
 
-    private static EquatableArray<string> ContextAttributes(INamedTypeSymbol contextType)
+    private static EquatableArray<string> ContextAttributes(
+        INamedTypeSymbol contextType,
+        Compilation compilation)
     {
+        var experimentalAttribute = compilation.GetTypeByMetadataName(DotBoxDMetadataNames.ExperimentalAttribute);
         var attributes = new List<string>();
         foreach (var attribute in contextType.GetAttributes())
         {
-            if (ExperimentalAttribute(attribute) is { } experimentalAttribute)
+            if (ExperimentalAttribute(attribute, experimentalAttribute) is { } experimentalAttributeSource)
             {
-                attributes.Add(experimentalAttribute);
+                attributes.Add(experimentalAttributeSource);
             }
         }
 
@@ -220,10 +223,11 @@ internal static class HookFireAsyncModelFactory
         return new EquatableArray<string>(attributes);
     }
 
-    private static string? ExperimentalAttribute(AttributeData attribute)
+    private static string? ExperimentalAttribute(
+        AttributeData attribute,
+        INamedTypeSymbol? experimentalAttribute)
     {
-        if (attribute.AttributeClass?.ToDisplayString() !=
-            DotBoxDMetadataNames.ExperimentalAttribute ||
+        if (!SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, experimentalAttribute) ||
             attribute.ConstructorArguments.Length != 1 ||
             attribute.ConstructorArguments[0].Value is not string diagnosticId)
         {
