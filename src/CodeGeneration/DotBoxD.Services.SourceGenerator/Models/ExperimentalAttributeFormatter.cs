@@ -10,14 +10,17 @@ internal static class ExperimentalAttributeFormatter
     private const string GlobalExperimentalAttributeName =
         "global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute";
 
-    public static ExperimentalAttributeInfo From(INamedTypeSymbol type)
+    public static ExperimentalAttributeInfo From(INamedTypeSymbol type, Compilation compilation)
     {
+        var experimentalAttribute = compilation.GetTypeByMetadataName(ExperimentalAttributeName);
+        if (experimentalAttribute is null)
+        {
+            return ExperimentalAttributeInfo.None;
+        }
+
         foreach (var attr in type.GetAttributes())
         {
-            if (attr.AttributeClass?.ToDisplayString() != ExperimentalAttributeName ||
-                attr.ConstructorArguments.Length == 0 ||
-                attr.ConstructorArguments[0].Value is not string diagnosticId ||
-                string.IsNullOrWhiteSpace(diagnosticId))
+            if (!TryGetDiagnosticId(attr, experimentalAttribute, out var diagnosticId))
             {
                 continue;
             }
@@ -49,6 +52,24 @@ internal static class ExperimentalAttributeFormatter
         }
 
         return ExperimentalAttributeInfo.None;
+    }
+
+    private static bool TryGetDiagnosticId(
+        AttributeData attribute,
+        INamedTypeSymbol experimentalAttribute,
+        out string diagnosticId)
+    {
+        diagnosticId = string.Empty;
+        if (!SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, experimentalAttribute) ||
+            attribute.ConstructorArguments.Length == 0 ||
+            attribute.ConstructorArguments[0].Value is not string value ||
+            string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        diagnosticId = value;
+        return true;
     }
 }
 
