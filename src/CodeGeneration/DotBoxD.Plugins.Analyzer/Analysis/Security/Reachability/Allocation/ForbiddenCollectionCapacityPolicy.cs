@@ -88,6 +88,12 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
+        if (ImmutableSortedSetBuilderCapacityPolicy.IsUnboundedUnionWith(method, typeName))
+        {
+            forbidden = ImmutableSortedSetBuilderCapacityPolicy.UnionWithDisplayName;
+            return true;
+        }
+
         if (IsCollectionsUtilHashtableFactory(method, typeName))
         {
             forbidden = HashtableTypeName;
