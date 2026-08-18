@@ -36,6 +36,8 @@ internal sealed class ResultHookSlot<TEvent, TContext>
 
     internal Entry[] RegistrationEntries => _entries;
 
+    internal void ReportFault(Exception exception) => _invoker.Report(exception);
+
     /// <summary>Installs a sandbox <c>Register</c> handler: the kernel's lowered <c>ShouldHandle</c> filter and
     /// result-producing <c>Handle</c> both run in the sandbox, and the returned value is decoded to the result
     /// type. A non-matching filter contributes no result.</summary>
