@@ -76,13 +76,21 @@ internal sealed partial class RpcStreamManager
     {
         var rows = new (RpcStreamAttachment Attachment, RpcStreamSendState State)[attachments.Length];
         var added = new RpcStreamSendState[attachments.Length];
+        var claimed = new RpcStreamAttachment[attachments.Length];
         var addedCount = 0;
+        var claimedCount = 0;
         try
         {
             RpcStreamValidation.ValidateOutboundAttachments(attachments);
             ct.ThrowIfCancellationRequested();
             for (var i = 0; i < attachments.Length; i++)
             {
+                if (!attachments[i].TryClaimOutboundRegistration())
+                {
+                    throw new ServiceProtocolException("Outbound stream attachment is already registered.");
+                }
+
+                claimed[claimedCount++] = attachments[i];
                 var state = new RpcStreamSendState(attachments[i].Handle.StreamId, ct);
                 if (!_senders.TryAdd(state.StreamId, state))
                 {
@@ -104,6 +112,11 @@ internal sealed partial class RpcStreamManager
                 RemoveOutbound(added[i].StreamId);
             }
 
+            for (var i = 0; i < claimedCount; i++)
+            {
+                claimed[i].ReleaseOutboundRegistration();
+            }
+
             foreach (var attachment in attachments)
             {
                 if (attachment is not null)
@@ -120,6 +133,11 @@ internal sealed partial class RpcStreamManager
     {
         RpcStreamValidation.ValidateOutboundAttachment(attachment);
         ct.ThrowIfCancellationRequested();
+        if (!attachment.TryClaimOutboundRegistration())
+        {
+            throw new ServiceProtocolException("Outbound stream attachment is already registered.");
+        }
+
         var rows = new (RpcStreamAttachment Attachment, RpcStreamSendState State)[1];
         var state = new RpcStreamSendState(attachment.Handle.StreamId, ct);
         var added = false;
@@ -146,6 +164,7 @@ internal sealed partial class RpcStreamManager
                 state.Dispose();
             }
 
+            attachment.ReleaseOutboundRegistration();
             ReleaseOutboundReservation(attachment.Handle.StreamId);
             throw;
         }
