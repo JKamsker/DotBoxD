@@ -5,12 +5,12 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 
 internal static partial class PluginServerFacadeModelFactory
 {
-    private static INamedTypeSymbol? ResolveWorldType(INamedTypeSymbol type)
+    private static INamedTypeSymbol? ResolveWorldType(INamedTypeSymbol type, Compilation compilation)
     {
         INamedTypeSymbol? worldType = null;
         foreach (var candidate in type.Interfaces)
         {
-            if (!HasAttribute(candidate, DotBoxDMetadataNames.RpcServiceAttribute))
+            if (!HasRpcServiceAttribute(candidate, compilation))
             {
                 continue;
             }
@@ -26,6 +26,11 @@ internal static partial class PluginServerFacadeModelFactory
 
         return worldType;
     }
+
+    private static bool HasRpcServiceAttribute(INamedTypeSymbol type, Compilation compilation)
+        => compilation.GetTypeByMetadataName(DotBoxDMetadataNames.RpcServiceAttribute) is { } expectedAttribute &&
+           type.GetAttributes().Any(attribute =>
+               SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expectedAttribute));
 
     private static void ValidateWorldType(
         INamedTypeSymbol serverType,

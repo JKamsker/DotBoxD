@@ -97,13 +97,32 @@ public sealed class InvokeAsyncForeignRpcServiceAttributeIdentitySurpriseTests
             int Read();
         }
 
-        [GeneratePluginServer]
+        namespace Ipc
+        {
+            public readonly record struct LiveSettingUpdate(string Name, string Value);
+
+            public interface IGamePluginControlService : DotBoxD.Plugins.IServerExtensionWireClient
+            {
+                ValueTask<string> InstallPluginAsync(string packageJson, System.Threading.CancellationToken ct = default);
+                ValueTask<string> InstallSubscriptionAsync(string packageJson, System.Threading.CancellationToken ct = default);
+                ValueTask<string> InstallServerExtensionAsync(string packageJson, System.Threading.CancellationToken ct = default);
+                ValueTask UpdateSettingsAsync(string pluginId, LiveSettingUpdate[] updates, bool atomic = false, System.Threading.CancellationToken ct = default);
+                ValueTask HoldUntilShutdownAsync(System.Threading.CancellationToken ct = default);
+            }
+        }
+
+        [GeneratePluginServer(Context = typeof(PluginContext))]
         public partial class PluginServer : IForeignWorld, IRealWorld;
+
+        public sealed partial class PluginContext;
 
         public static class Usage
         {
             public static ValueTask<int> Run(PluginServer server)
-                => server.InvokeAsync(async (IRealWorld world) => world.Read());
+                => server.InvokeAsync(async (IRealWorld world) =>
+                {
+                    return world.Read();
+                });
         }
         """;
 }

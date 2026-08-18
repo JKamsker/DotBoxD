@@ -30,11 +30,11 @@ internal static partial class InvokeAsyncReceiverResolver
             return false;
         }
 
-        if (TryResolveWorld(facadeType, out worldType))
+        if (TryResolveWorld(model.Compilation, facadeType, out worldType))
         {
             serverFacadeType = facadeType;
         }
-        else if (!TryResolveGeneratedFacadeBase(facadeType, out serverFacadeType, out worldType))
+        else if (!TryResolveGeneratedFacadeBase(model.Compilation, facadeType, out serverFacadeType, out worldType))
         {
             return false;
         }
