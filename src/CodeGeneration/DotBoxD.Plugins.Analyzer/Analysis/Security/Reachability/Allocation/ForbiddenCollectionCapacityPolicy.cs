@@ -94,6 +94,12 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
+        if (ImmutableHashSetBuilderCapacityPolicy.IsUnionWith(method, typeName))
+        {
+            forbidden = ImmutableHashSetBuilderCapacityPolicy.UnionWithDisplayName;
+            return true;
+        }
+
         if (!IsCapacityAllocationMethod(method, typeName))
         {
             forbidden = null!;
