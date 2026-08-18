@@ -79,6 +79,11 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
+        if (IsImmutableListToImmutableList(method, typeName))
+        {
+            forbidden = "System.Collections.Immutable.ImmutableList.ToImmutableList";
+            return true;
+        }
         if (IsCollectionsUtilHashtableFactory(method, typeName))
         {
             forbidden = HashtableTypeName;
@@ -275,7 +280,12 @@ internal static class ForbiddenCollectionCapacityPolicy
            method.Name is "ToArray" or "ToList" or "ToLookup" &&
            string.Equals(typeName, EnumerableTypeName, StringComparison.Ordinal);
 
-    private static bool IsFrozenSetToFrozenSet(IMethodSymbol method, string typeName) => method is { IsStatic: true, Name: "ToFrozenSet" } && string.Equals(typeName, FrozenSetTypeName, StringComparison.Ordinal);
+    private static bool IsFrozenSetToFrozenSet(IMethodSymbol method, string typeName)
+        => method is { IsStatic: true, Name: "ToFrozenSet" } &&
+           string.Equals(typeName, FrozenSetTypeName, StringComparison.Ordinal);
+
+    private static bool IsImmutableListToImmutableList(IMethodSymbol method, string typeName)
+        => method is { IsStatic: true, Name: "ToImmutableList" } && typeName == "System.Collections.Immutable.ImmutableList";
 
     private static bool IsArrayBufferWriterGrowthHint(IMethodSymbol method, string typeName)
         => method.Name is "GetMemory" or "GetSpan" &&
