@@ -106,6 +106,12 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
+        if (ImmutableSortedDictionaryBuilderPolicy.IsAddRange(method, typeName))
+        {
+            forbidden = ImmutableSortedDictionaryBuilderPolicy.AddRangeDisplayName;
+            return true;
+        }
+
         if (!IsCapacityAllocationMethod(method, typeName))
         {
             forbidden = null!;
