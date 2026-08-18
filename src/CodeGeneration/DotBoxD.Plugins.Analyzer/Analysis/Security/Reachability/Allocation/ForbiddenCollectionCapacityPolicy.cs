@@ -30,8 +30,6 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string OrderedDictionaryTypeName = "System.Collections.Specialized.OrderedDictionary";
     private const string PriorityQueueTypeName =
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
-    private const string PriorityQueueEnqueueRangeDisplayName =
-        "System.Collections.Generic.PriorityQueue.EnqueueRange";
     private const string NonGenericQueueTypeName = "System.Collections.Queue";
     private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
     private const string NonGenericSortedListTypeName = "System.Collections.SortedList";
@@ -83,7 +81,7 @@ internal static class ForbiddenCollectionCapacityPolicy
 
         if (IsPriorityQueueEnqueueRange(method, typeName))
         {
-            forbidden = PriorityQueueEnqueueRangeDisplayName;
+            forbidden = "System.Collections.Generic.PriorityQueue.EnqueueRange";
             return true;
         }
 
@@ -267,9 +265,8 @@ internal static class ForbiddenCollectionCapacityPolicy
            string.Equals(typeName, CollectionsUtilTypeName, StringComparison.Ordinal) &&
            HasCapacityParameter(method, "capacity");
 
-    private static bool IsPriorityQueueEnqueueRange(IMethodSymbol method, string typeName)
-        => method is { IsStatic: false, Name: "EnqueueRange" } &&
-           string.Equals(typeName, PriorityQueueTypeName, StringComparison.Ordinal);
+    private static bool IsPriorityQueueEnqueueRange(IMethodSymbol method, string typeName) =>
+        method is { IsStatic: false, Name: "EnqueueRange" } && string.Equals(typeName, PriorityQueueTypeName, StringComparison.Ordinal);
 
     private static bool IsArrayResize(IMethodSymbol method, string typeName)
         => method is { IsStatic: true, Name: "Resize" } &&
