@@ -73,6 +73,7 @@ internal static class ForbiddenApiNamePolicy
         "System.String.Create",
         "System.Collections.Generic.List<T>.EnsureCapacity",
         "System.Collections.Immutable.ImmutableArray.ToImmutableArray",
+        "System.Collections.Immutable.ImmutableHashSet.ToImmutableHashSet",
         "System.Linq.Enumerable.ToDictionary",
         "System.Collections.Frozen.FrozenDictionary.ToFrozenDictionary",
         "System.Security.Cryptography.RSA.Create",
