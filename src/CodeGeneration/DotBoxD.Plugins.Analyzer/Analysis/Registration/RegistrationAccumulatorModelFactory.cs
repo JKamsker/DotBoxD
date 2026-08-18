@@ -46,8 +46,9 @@ internal static class RegistrationAccumulatorModelFactory
                 TypeName(type),
                 accumulatorName,
                 methodName,
-                RegistrationAccumulatorMetadataAttributeSource.TypeAttributes(type),
-                RegistrationAccumulatorMetadataAttributeSource.MethodAttributes(method),
+                RegistrationAccumulatorMetadataAttributeSource.TypeAttributes(type, context.SemanticModel.Compilation),
+                RegistrationAccumulatorMetadataAttributeSource.MethodAttributes(method, context.SemanticModel.Compilation),
+                RegistrationAccumulatorMetadataAttributeSource.RequiresExperimentalWarningSuppression(type, method),
                 typeParameters,
                 Location(declaration));
             return new RegistrationAccumulatorGenerationResult(model, null, null);
@@ -80,7 +81,7 @@ internal static class RegistrationAccumulatorModelFactory
                 Namespace(type),
                 TypeName(type),
                 accumulatorName,
-                RegistrationAccumulatorMetadataAttributeSource.TypeAttributes(type),
+                RegistrationAccumulatorMetadataAttributeSource.TypeAttributes(type, context.SemanticModel.Compilation),
                 PublicInstanceProperties(type, context.SemanticModel.Compilation),
                 Location(declaration));
             return new RegistrationAccumulatorGenerationResult(null, model, null);

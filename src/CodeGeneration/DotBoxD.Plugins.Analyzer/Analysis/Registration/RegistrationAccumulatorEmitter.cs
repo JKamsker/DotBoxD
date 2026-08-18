@@ -47,8 +47,17 @@ internal static class RegistrationAccumulatorEmitter
         builder.AppendLine("    {");
         builder.AppendLine("        _registrations.Add(async () =>");
         builder.AppendLine("        {");
+        if (model.RequiresExperimentalWarningSuppression)
+        {
+            builder.AppendLine("#pragma warning disable");
+        }
+
         builder.Append("            _ = await _target.").Append(Identifier(model.MethodName))
             .Append(genericList).AppendLine("().ConfigureAwait(false);");
+        if (model.RequiresExperimentalWarningSuppression)
+        {
+            builder.AppendLine("#pragma warning restore");
+        }
         builder.AppendLine("        });");
         builder.AppendLine("        return this;");
         builder.AppendLine("    }");
