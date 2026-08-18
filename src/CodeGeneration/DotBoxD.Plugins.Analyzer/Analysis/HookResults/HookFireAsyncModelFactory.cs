@@ -26,7 +26,11 @@ internal static class HookFireAsyncModelFactory
                 continue;
             }
 
-            if (UnsupportedContextDiagnostic(contextType, declaration, cancellationToken) is { } diagnostic)
+            if (UnsupportedContextDiagnostic(
+                    contextType,
+                    declaration,
+                    context.SemanticModel.Compilation,
+                    cancellationToken) is { } diagnostic)
             {
                 return new HookFireAsyncModelResult(null, diagnostic);
             }
@@ -47,6 +51,7 @@ internal static class HookFireAsyncModelFactory
     private static PluginKernelDiagnostic? UnsupportedContextDiagnostic(
         INamedTypeSymbol contextType,
         TypeDeclarationSyntax declaration,
+        Compilation compilation,
         CancellationToken cancellationToken)
     {
         if (IsFileLocalOrNestedInFileLocal(contextType, cancellationToken))
@@ -58,7 +63,7 @@ internal static class HookFireAsyncModelFactory
                 + "HookRegistry.FireAsync<TContext, TResult>(...) from the same file");
         }
 
-        if (IsErrorObsoleteOrNestedInErrorObsolete(contextType))
+        if (IsErrorObsoleteOrNestedInErrorObsolete(contextType, compilation))
         {
             return PluginKernelDiagnostic.Create(
                 declaration.Identifier,
@@ -131,11 +136,17 @@ internal static class HookFireAsyncModelFactory
         return false;
     }
 
-    private static bool IsErrorObsoleteOrNestedInErrorObsolete(INamedTypeSymbol type)
+    private static bool IsErrorObsoleteOrNestedInErrorObsolete(INamedTypeSymbol type, Compilation compilation)
     {
+        var obsoleteAttribute = compilation.GetTypeByMetadataName("System.ObsoleteAttribute");
+        if (obsoleteAttribute is null)
+        {
+            return false;
+        }
+
         for (var current = type; current is not null; current = current.ContainingType)
         {
-            if (HasErrorObsoleteAttribute(current.GetAttributes()))
+            if (HasErrorObsoleteAttribute(current.GetAttributes(), obsoleteAttribute))
             {
                 return true;
             }
@@ -144,11 +155,13 @@ internal static class HookFireAsyncModelFactory
         return false;
     }
 
-    private static bool HasErrorObsoleteAttribute(IEnumerable<AttributeData> attributes)
+    private static bool HasErrorObsoleteAttribute(
+        IEnumerable<AttributeData> attributes,
+        INamedTypeSymbol obsoleteAttribute)
     {
         foreach (var attribute in attributes)
         {
-            if (attribute.AttributeClass?.ToDisplayString() == "System.ObsoleteAttribute" &&
+            if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, obsoleteAttribute) &&
                 attribute.ConstructorArguments.Length >= 2 &&
                 attribute.ConstructorArguments[1].Value is true)
             {
