@@ -190,10 +190,15 @@ internal static class HookFireAsyncModelFactory
 
     private static bool IsAssemblyClsCompliant(Compilation compilation)
     {
+        var clsCompliantAttribute = compilation.GetTypeByMetadataName("System.CLSCompliantAttribute");
+        if (clsCompliantAttribute is null)
+        {
+            return false;
+        }
+
         foreach (var attribute in compilation.Assembly.GetAttributes())
         {
-            if (attribute.AttributeClass?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) !=
-                "global::System.CLSCompliantAttribute")
+            if (!SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, clsCompliantAttribute))
             {
                 continue;
             }
