@@ -244,13 +244,22 @@ internal static partial class ReturnTypeClassifier
         }
 
         if (named.Name != "IAsyncEnumerable" ||
-            named.ContainingNamespace?.ToDisplayString() != SystemCollectionsGeneric)
+            named.ContainingNamespace?.ToDisplayString() != SystemCollectionsGeneric ||
+            !IsFrameworkAsyncEnumerable(named))
         {
             return false;
         }
 
         itemType = named.TypeArguments[0];
         return true;
+    }
+
+    private static bool IsFrameworkAsyncEnumerable(INamedTypeSymbol type)
+    {
+        var token = type.ContainingAssembly.Identity.PublicKeyToken;
+        return type.Locations.Any(static location => location.IsInMetadata) &&
+               token.Length == 8 &&
+               TokenEquals(token, 0xb0, 0x3f, 0x5f, 0x7f, 0x11, 0xd5, 0x0a, 0x3a);
     }
 
     public static bool IsStream(ITypeSymbol type) =>

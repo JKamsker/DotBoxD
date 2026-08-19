@@ -31,6 +31,10 @@ internal static partial class MethodModelFactory
         var returnType = methodSymbol.ReturnType;
         var declaredReturn = GetDeclaredReturnType(methodSymbol, returnType, ct);
         var returnKind = ReturnTypeClassifier.Classify(returnType, ct, out var unwrappedReturnType, out var subService);
+        if (returnKind == MethodReturnKind.Sync && declaredReturn.ExternAliases.Array.Length > 0)
+        {
+            unwrappedReturnType = declaredReturn.Type;
+        }
         var isLookalikeTaskLike = ReturnTypeClassifier.IsLookalikeTaskLike(returnType);
         var metadataTypes = MethodMetadataTypesFactory.Get(methodSymbol, returnKind, ct);
         var typeParameterList = MethodSignatureFormatter.GetTypeParameterList(methodSymbol, ct);
