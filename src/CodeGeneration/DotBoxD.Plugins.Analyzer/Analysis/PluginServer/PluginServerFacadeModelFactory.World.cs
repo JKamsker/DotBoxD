@@ -5,12 +5,12 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 
 internal static partial class PluginServerFacadeModelFactory
 {
-    private static INamedTypeSymbol? ResolveWorldType(INamedTypeSymbol type)
+    private static INamedTypeSymbol? ResolveWorldType(INamedTypeSymbol type, Compilation compilation)
     {
         INamedTypeSymbol? worldType = null;
         foreach (var candidate in type.Interfaces)
         {
-            if (!HasAttribute(candidate, DotBoxDMetadataNames.RpcServiceAttribute))
+            if (!HasRpcServiceAttribute(candidate, compilation))
             {
                 continue;
             }
@@ -26,6 +26,11 @@ internal static partial class PluginServerFacadeModelFactory
 
         return worldType;
     }
+
+    private static bool HasRpcServiceAttribute(INamedTypeSymbol type, Compilation compilation)
+        => compilation.GetTypeByMetadataName(DotBoxDMetadataNames.RpcServiceAttribute) is { } expectedAttribute &&
+           type.GetAttributes().Any(attribute =>
+               SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expectedAttribute));
 
     private static void ValidateWorldType(
         INamedTypeSymbol serverType,
@@ -185,8 +190,32 @@ internal static partial class PluginServerFacadeModelFactory
     }
 
     private static bool AssemblyEnablesClsCompliance(Compilation compilation)
-        => compilation.Assembly.GetAttributes().Any(static attribute =>
-            string.Equals(attribute.AttributeClass?.ToDisplayString(), "System.CLSCompliantAttribute", StringComparison.Ordinal) &&
+    {
+        return compilation.Assembly.GetAttributes().Any(attribute =>
+            IsFrameworkClsCompliantAttribute(attribute, compilation) &&
             attribute.ConstructorArguments.Length == 1 &&
             attribute.ConstructorArguments[0].Value is true);
+    }
+
+    private static bool IsFrameworkClsCompliantAttribute(AttributeData attribute, Compilation compilation)
+    {
+        foreach (var reference in compilation.References)
+        {
+            var aliases = reference.Properties.Aliases;
+            if (!aliases.IsDefaultOrEmpty && !aliases.Contains("global", StringComparer.Ordinal))
+            {
+                continue;
+            }
+
+            if (compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol assembly &&
+                SymbolEqualityComparer.Default.Equals(
+                    attribute.AttributeClass,
+                    assembly.GetTypeByMetadataName("System.CLSCompliantAttribute")))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

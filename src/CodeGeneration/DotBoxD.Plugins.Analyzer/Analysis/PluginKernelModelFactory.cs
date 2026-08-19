@@ -19,7 +19,8 @@ internal static class PluginKernelModelFactory
             return null;
         }
 
-        var pluginId = PluginSymbolReader.PluginId(context.Attributes) ?? PluginKernelNaming.KernelId(type.Name);
+        var pluginId = PluginSymbolReader.PluginId(context.Attributes, context.SemanticModel.Compilation) ??
+                       PluginKernelNaming.KernelId(type.Name);
         var eventTypes = PluginSymbolReader.EventTypes(type);
         if (ValidateKernelDeclaration(type, declaration, pluginId, eventTypes) is { } validationFailure)
         {
@@ -180,7 +181,9 @@ internal static class PluginKernelModelFactory
             Namespace: type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString(),
             KernelName: type.Name,
             PackageName: PluginKernelNaming.PackageName(type.Name),
-            GeneratedPackageAttributes: GeneratedPackageAttributeSource.FromKernel(type),
+            GeneratedPackageAttributes: GeneratedPackageAttributeSource.FromKernel(
+                type,
+                context.SemanticModel.Compilation),
             GeneratedAttributeSource: string.Empty,
             EventName: hookMetadata.EventName,
             EventParameterName: eventParameterName,

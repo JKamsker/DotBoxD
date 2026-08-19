@@ -6,10 +6,13 @@ using Microsoft.CodeAnalysis.CSharp;
 
 internal static class RpcKernelClientExtensionModelFactory
 {
-    public static RpcKernelClientExtensions Resolve(INamedTypeSymbol kernelType, IMethodSymbol kernelMethod)
+    public static RpcKernelClientExtensions Resolve(
+        INamedTypeSymbol kernelType,
+        IMethodSymbol kernelMethod,
+        Compilation compilation)
     {
-        var property = ResolveClientProperty(kernelType);
-        var method = ResolveClientMethod(kernelMethod);
+        var property = ResolveClientProperty(kernelType, compilation);
+        var method = ResolveClientMethod(kernelMethod, compilation);
         if (property is null && method is null)
         {
             return new RpcKernelClientExtensions(null, null);
@@ -56,18 +59,18 @@ internal static class RpcKernelClientExtensionModelFactory
             "extensions use C# extension blocks; set LangVersion to 14.0/preview or remove the receiver extension attributes.");
     }
 
-    public static bool HasExtensionAttribute(ISymbol symbol)
-        => HasAttribute(symbol, DotBoxDMetadataNames.ServerExtensionClientAttribute) ||
-           HasAttribute(symbol, DotBoxDMetadataNames.ServerExtensionMethodAttribute);
+    public static bool HasExtensionAttribute(ISymbol symbol, Compilation compilation)
+        => HasAttribute(symbol, compilation, DotBoxDMetadataNames.ServerExtensionClientAttribute) ||
+           HasAttribute(symbol, compilation, DotBoxDMetadataNames.ServerExtensionMethodAttribute);
 
-    public static bool HasClientPropertyAttribute(ISymbol symbol)
-        => HasAttribute(symbol, DotBoxDMetadataNames.ServerExtensionClientAttribute);
+    public static bool HasClientPropertyAttribute(ISymbol symbol, Compilation compilation)
+        => HasAttribute(symbol, compilation, DotBoxDMetadataNames.ServerExtensionClientAttribute);
 
-    public static bool HasReceiverExtensionAttribute(ISymbol symbol)
+    public static bool HasReceiverExtensionAttribute(ISymbol symbol, Compilation compilation)
     {
         foreach (var attribute in symbol.GetAttributes())
         {
-            if (AttributeMatches(attribute, DotBoxDMetadataNames.ServerExtensionMethodAttribute) &&
+            if (AttributeMatches(attribute, compilation, DotBoxDMetadataNames.ServerExtensionMethodAttribute) &&
                 attribute.ConstructorArguments.Length > 0 &&
                 attribute.ConstructorArguments[0].Value is INamedTypeSymbol)
             {
@@ -78,11 +81,13 @@ internal static class RpcKernelClientExtensionModelFactory
         return false;
     }
 
-    private static RpcKernelClientPropertyExtension? ResolveClientProperty(INamedTypeSymbol kernelType)
+    private static RpcKernelClientPropertyExtension? ResolveClientProperty(
+        INamedTypeSymbol kernelType,
+        Compilation compilation)
     {
         foreach (var attribute in kernelType.GetAttributes())
         {
-            if (!AttributeMatches(attribute, DotBoxDMetadataNames.ServerExtensionClientAttribute))
+            if (!AttributeMatches(attribute, compilation, DotBoxDMetadataNames.ServerExtensionClientAttribute))
             {
                 continue;
             }
@@ -98,11 +103,12 @@ internal static class RpcKernelClientExtensionModelFactory
 
     public static RpcKernelClientMethodExtension? ResolveClientMethod(
         IMethodSymbol kernelMethod,
+        Compilation compilation,
         INamedTypeSymbol? defaultReceiverType = null)
     {
         foreach (var attribute in kernelMethod.GetAttributes())
         {
-            if (!AttributeMatches(attribute, DotBoxDMetadataNames.ServerExtensionMethodAttribute))
+            if (!AttributeMatches(attribute, compilation, DotBoxDMetadataNames.ServerExtensionMethodAttribute))
             {
                 continue;
             }
@@ -213,11 +219,11 @@ internal static class RpcKernelClientExtensionModelFactory
     private static void EnsureAccessibleFromGeneratedClient(ITypeSymbol type, string description)
         => RpcGeneratedClientAccessibility.EnsureAccessible(type, description);
 
-    private static bool HasAttribute(ISymbol symbol, string metadataName)
+    private static bool HasAttribute(ISymbol symbol, Compilation compilation, string metadataName)
     {
         foreach (var attribute in symbol.GetAttributes())
         {
-            if (AttributeMatches(attribute, metadataName))
+            if (AttributeMatches(attribute, compilation, metadataName))
             {
                 return true;
             }
@@ -226,8 +232,9 @@ internal static class RpcKernelClientExtensionModelFactory
         return false;
     }
 
-    private static bool AttributeMatches(AttributeData attribute, string metadataName)
-        => string.Equals(attribute.AttributeClass?.ToDisplayString(), metadataName, StringComparison.Ordinal);
+    private static bool AttributeMatches(AttributeData attribute, Compilation compilation, string metadataName)
+        => compilation.GetTypeByMetadataName(metadataName) is { } expected &&
+           SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected);
 
     private static string DefaultPropertyName(string kernelName)
         => kernelName.EndsWith(DotBoxDGenerationNames.KernelSuffix, StringComparison.Ordinal)

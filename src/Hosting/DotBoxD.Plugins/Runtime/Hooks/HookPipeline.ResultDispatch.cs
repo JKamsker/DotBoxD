@@ -85,7 +85,21 @@ public partial class HookPipeline<TEvent, TContext>
         var rawContext = cancellationToken.CanBeCanceled
             ? new HookContext(_messages, cancellationToken)
             : _defaultRawContext;
-        var context = _contextFactory.Create(rawContext);
+        TContext context;
+        try
+        {
+            context = _contextFactory.Create(rawContext);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            _resultHooks.ReportFault(exception);
+            return new ValueTask<TResult?>((TResult?)null);
+        }
+
         return _resultHooks.FireEntryAsync(
             entry,
             e,

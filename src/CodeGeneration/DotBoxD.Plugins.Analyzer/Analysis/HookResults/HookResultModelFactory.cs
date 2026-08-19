@@ -30,6 +30,11 @@ internal static partial class HookResultModelFactory
             return null;
         }
 
+        if (!HasHookResultAttribute(type, context.SemanticModel.Compilation))
+        {
+            return null;
+        }
+
         if (TryGetInvalidDeclarationResult(type, declaration, context.SemanticModel.Compilation) is { } invalid)
         {
             return invalid;
@@ -86,7 +91,7 @@ internal static partial class HookResultModelFactory
         }
 
         return IsValueTypeImplementingHookResult(type, compilation) ||
-            IsValidGeneratedHookResult(type, cancellationToken);
+            IsValidGeneratedHookResult(type, compilation, cancellationToken);
     }
 
     private static bool IsValueTypeImplementingHookResult(INamedTypeSymbol type, Compilation compilation)
@@ -113,11 +118,14 @@ internal static partial class HookResultModelFactory
         return false;
     }
 
-    private static bool IsValidGeneratedHookResult(INamedTypeSymbol type, CancellationToken cancellationToken)
+    private static bool IsValidGeneratedHookResult(
+        INamedTypeSymbol type,
+        Compilation compilation,
+        CancellationToken cancellationToken)
     {
         if (type is not { IsValueType: true, IsReadOnly: true, IsRecord: true, ContainingType: null } ||
             type.TypeParameters.Length > 0 ||
-            !HasHookResultAttribute(type))
+            !HasHookResultAttribute(type, compilation))
         {
             return false;
         }
@@ -144,14 +152,17 @@ internal static partial class HookResultModelFactory
         return false;
     }
 
-    private static bool HasHookResultAttribute(INamedTypeSymbol type)
+    private static bool HasHookResultAttribute(INamedTypeSymbol type, Compilation compilation)
     {
+        var hookResultAttribute = compilation.GetTypeByMetadataName(DotBoxDMetadataNames.HookResultAttribute);
+        if (hookResultAttribute is null)
+        {
+            return false;
+        }
+
         foreach (var attribute in type.GetAttributes())
         {
-            if (string.Equals(
-                    attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDMetadataNames.HookResultAttribute,
-                    StringComparison.Ordinal))
+            if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, hookResultAttribute))
             {
                 return true;
             }

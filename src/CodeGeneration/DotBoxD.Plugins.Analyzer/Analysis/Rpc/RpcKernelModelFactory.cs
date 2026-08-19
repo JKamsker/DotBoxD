@@ -139,7 +139,7 @@ internal static partial class RpcKernelModelFactory
         builder.Append("#pragma warning disable CS0612, CS0618, CS3001, CS3002, CS3003");
         if (serviceType is not null)
         {
-            foreach (var diagnosticId in RpcTypeMetadataAttributeSource.ExperimentalDiagnosticIds(serviceType))
+            foreach (var diagnosticId in RpcTypeMetadataAttributeSource.ExperimentalDiagnosticIds(serviceType, compilation))
             {
                 builder.Append(", ").Append(diagnosticId);
             }
@@ -166,7 +166,7 @@ internal static partial class RpcKernelModelFactory
             if (clientExtensions is { IsEmpty: false })
             {
                 builder.AppendLine();
-                builder.Append(RpcKernelClientExtensionEmitter.Emit(type, serviceType, serviceMethod, clientExtensions));
+                builder.Append(RpcKernelClientExtensionEmitter.Emit(type, serviceType, serviceMethod, clientExtensions, compilation));
             }
         }
         else if (graft is not null &&

@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.IO.Pipelines;
 using DotBoxD.Services.Diagnostics;
+using DotBoxD.Services.Exceptions;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Serialization;
 using DotBoxD.Services.Streaming.Core;
@@ -12,6 +13,7 @@ namespace DotBoxD.Services.Streaming.Frames;
 /// </summary>
 public abstract class RpcStreamAttachment
 {
+    private int _outboundRegistrationClaimed;
     private int _sourceDisposed;
 
     private protected RpcStreamAttachment(RpcStreamHandle handle) => Handle = handle;
@@ -64,6 +66,12 @@ public abstract class RpcStreamAttachment
         ISerializer serializer,
         CancellationToken ct);
 
+    internal bool TryClaimOutboundRegistration() =>
+        Interlocked.CompareExchange(ref _outboundRegistrationClaimed, 1, 0) == 0;
+
+    internal void ReleaseOutboundRegistration() =>
+        Volatile.Write(ref _outboundRegistrationClaimed, 0);
+
     // Releases the owned source exactly once, whether the call comes from the pump's own finally or
     // from a sibling stream's best-effort cleanup while this pump has already completed. The set owns
     // the source (leaveOpen:false / completeReader:true), so disposing it twice would violate the
@@ -71,7 +79,17 @@ public abstract class RpcStreamAttachment
     internal ValueTask DisposeSourceOnceAsync() =>
         Interlocked.Exchange(ref _sourceDisposed, 1) == 0 ? DisposeSourceCoreAsync() : default;
 
+    internal void ThrowIfOwnedSourceDisposed()
+    {
+        if (OwnsSource && Volatile.Read(ref _sourceDisposed) != 0)
+        {
+            throw new ServiceProtocolException("An owned stream attachment cannot be reused after its source is disposed.");
+        }
+    }
+
     private protected virtual ValueTask DisposeSourceCoreAsync() => default;
+
+    private protected virtual bool OwnsSource => false;
 
     internal async ValueTask DisposeSourceBestEffortAsync(string operation)
     {
@@ -82,6 +100,18 @@ public abstract class RpcStreamAttachment
         catch (Exception ex)
         {
             RpcDiagnostics.Report(operation, ex);
+        }
+    }
+
+    internal async ValueTask DisposeSourceAfterPumpAsync(Exception? pumpFailure)
+    {
+        try
+        {
+            await DisposeSourceOnceAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex) when (pumpFailure is not null)
+        {
+            RpcDiagnostics.Report("Outbound stream source cleanup failed", ex);
         }
     }
 
@@ -117,6 +147,7 @@ public abstract class RpcStreamAttachment
             CancellationToken ct)
         {
             var buffer = ArrayPool<byte>.Shared.Rent(ChunkSize);
+            Exception? pumpFailure = null;
             try
             {
                 while (true)
@@ -131,15 +162,22 @@ public abstract class RpcStreamAttachment
                         .ConfigureAwait(false);
                 }
             }
+            catch (Exception ex)
+            {
+                pumpFailure = ex;
+                throw;
+            }
             finally
             {
                 ArrayPool<byte>.Shared.Return(buffer);
-                await DisposeSourceOnceAsync().ConfigureAwait(false);
+                await DisposeSourceAfterPumpAsync(pumpFailure).ConfigureAwait(false);
             }
         }
 
         private protected override ValueTask DisposeSourceCoreAsync() =>
             _leaveOpen ? default : DisposeStreamAsync(_stream);
+
+        private protected override bool OwnsSource => !_leaveOpen;
     }
 
     private sealed class PipeAttachment : RpcStreamAttachment
@@ -159,6 +197,7 @@ public abstract class RpcStreamAttachment
             ISerializer serializer,
             CancellationToken ct)
         {
+            Exception? pumpFailure = null;
             try
             {
                 while (true)
@@ -191,14 +230,21 @@ public abstract class RpcStreamAttachment
                     }
                 }
             }
+            catch (Exception ex)
+            {
+                pumpFailure = ex;
+                throw;
+            }
             finally
             {
-                await DisposeSourceOnceAsync().ConfigureAwait(false);
+                await DisposeSourceAfterPumpAsync(pumpFailure).ConfigureAwait(false);
             }
         }
 
         private protected override ValueTask DisposeSourceCoreAsync() =>
             _completeReader ? _pipe.Reader.CompleteAsync() : default;
+
+        private protected override bool OwnsSource => _completeReader;
     }
 
     private sealed class AsyncEnumerableAttachment<T> : RpcStreamAttachment

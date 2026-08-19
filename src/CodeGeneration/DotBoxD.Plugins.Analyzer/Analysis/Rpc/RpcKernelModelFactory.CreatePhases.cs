@@ -115,10 +115,10 @@ internal static partial class RpcKernelModelFactory
 
         if (graft is not null)
         {
-            return ResolveGraftedClientGeneration(type, method, graft);
+            return ResolveGraftedClientGeneration(type, method, graft, context.SemanticModel.Compilation);
         }
 
-        RejectUnsupportedClientGeneration(type, method);
+        RejectUnsupportedClientGeneration(type, method, context.SemanticModel.Compilation);
         return default;
     }
 
@@ -132,7 +132,10 @@ internal static partial class RpcKernelModelFactory
             serviceType,
             method,
             context.SemanticModel.Compilation);
-        var clientExtensions = RpcKernelClientExtensionModelFactory.Resolve(type, method);
+        var clientExtensions = RpcKernelClientExtensionModelFactory.Resolve(
+            type,
+            method,
+            context.SemanticModel.Compilation);
         RpcKernelClientExtensionModelFactory.ValidateLanguageVersion(
             clientExtensions,
             context.SemanticModel.SyntaxTree.Options);
@@ -143,9 +146,13 @@ internal static partial class RpcKernelModelFactory
     private static RpcClientGeneration ResolveGraftedClientGeneration(
         INamedTypeSymbol type,
         IMethodSymbol method,
-        RpcServerExtensionGraft graft)
+        RpcServerExtensionGraft graft,
+        Compilation compilation)
     {
-        var directClientMethod = RpcKernelClientExtensionModelFactory.ResolveClientMethod(method, graft.ReceiverType);
+        var directClientMethod = RpcKernelClientExtensionModelFactory.ResolveClientMethod(
+            method,
+            compilation,
+            graft.ReceiverType);
         ValidateDirectClientReceiver(directClientMethod, graft);
         if (directClientMethod is not null)
         {
@@ -168,15 +175,18 @@ internal static partial class RpcKernelModelFactory
         }
     }
 
-    private static void RejectUnsupportedClientGeneration(INamedTypeSymbol type, IMethodSymbol method)
+    private static void RejectUnsupportedClientGeneration(
+        INamedTypeSymbol type,
+        IMethodSymbol method,
+        Compilation compilation)
     {
-        if (RpcKernelClientExtensionModelFactory.HasClientPropertyAttribute(type))
+        if (RpcKernelClientExtensionModelFactory.HasClientPropertyAttribute(type, compilation))
         {
             RejectClientPropertyWithoutService(type);
             return;
         }
 
-        if (RpcKernelClientExtensionModelFactory.HasReceiverExtensionAttribute(method))
+        if (RpcKernelClientExtensionModelFactory.HasReceiverExtensionAttribute(method, compilation))
         {
             throw new NotSupportedException(
                 "[ServerExtensionMethod] requires a service-backed or receiver-grafted [ServerExtension] class.");

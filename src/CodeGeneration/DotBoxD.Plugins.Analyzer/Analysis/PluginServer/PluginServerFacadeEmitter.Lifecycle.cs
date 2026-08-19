@@ -95,7 +95,7 @@ internal static partial class PluginServerFacadeEmitter
             builder,
             "    ",
             "Synchronously releases the generated plugin server session and any owned connection.");
-        builder.AppendLine("    public void Dispose() => DisposeAsync().AsTask().GetAwaiter().GetResult();");
+        builder.AppendLine("    public void Dispose() => global::System.Threading.Tasks.Task.Run(() => DisposeAsync().AsTask()).GetAwaiter().GetResult();");
         PluginServerXmlDocumentation.AppendSummary(
             builder,
             "    ",

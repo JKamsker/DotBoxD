@@ -15,14 +15,11 @@ internal static class ForbiddenCollectionCapacityPolicy
         "System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>";
     private const string CollectionsUtilTypeName = "System.Collections.Specialized.CollectionsUtil";
     private const string DictionaryTypeName = "System.Collections.Generic.Dictionary<TKey, TValue>";
-    private const string EnumerableTypeName = "System.Linq.Enumerable";
     private const string HashSetTypeName = "System.Collections.Generic.HashSet<T>";
     private const string HashtableTypeName = "System.Collections.Hashtable";
     private const string HybridDictionaryTypeName = "System.Collections.Specialized.HybridDictionary";
-    private const string ImmutableArrayTypeName = "System.Collections.Immutable.ImmutableArray";
-    private const string ImmutableArrayBuilderTypeName =
-        "System.Collections.Immutable.ImmutableArray<T>.Builder";
     private const string ListTypeName = "System.Collections.Generic.List<T>";
+    private const string LinkedListTypeName = "System.Collections.Generic.LinkedList<T>";
     private const string NameObjectCollectionBaseTypeName =
         "System.Collections.Specialized.NameObjectCollectionBase";
     private const string NameValueCollectionTypeName =
@@ -44,6 +41,7 @@ internal static class ForbiddenCollectionCapacityPolicy
         [HashtableTypeName] = "System.Collections.Hashtable",
         [HybridDictionaryTypeName] = HybridDictionaryTypeName,
         [ListTypeName] = "System.Collections.Generic.List",
+        [LinkedListTypeName] = "System.Collections.Generic.LinkedList",
         [NameValueCollectionTypeName] = NameValueCollectionTypeName,
         [NonGenericQueueTypeName] = NonGenericQueueTypeName,
         [NonGenericSortedListTypeName] = NonGenericSortedListTypeName,
@@ -51,7 +49,6 @@ internal static class ForbiddenCollectionCapacityPolicy
         [QueueTypeName] = "System.Collections.Generic.Queue",
         [SortedListTypeName] = "System.Collections.Generic.SortedList"
     };
-
     public static bool TryGetDisplayName(IMethodSymbol? method, out string forbidden)
     {
         if (method is null)
@@ -67,9 +64,9 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
-        if (IsEnumerableToArray(method, typeName))
+        if (CollectionMaterializationPolicy.TryGetDisplayName(method, typeName, out forbidden) ||
+            CollectionBulkGrowthPolicy.TryGetDisplayName(method, typeName, out forbidden))
         {
-            forbidden = "System.Linq.Enumerable.ToArray";
             return true;
         }
 
@@ -79,15 +76,22 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
+        return TryGetCapacityDisplayName(method, typeName, out forbidden);
+    }
+
+    private static bool TryGetCapacityDisplayName(
+        IMethodSymbol method,
+        string typeName,
+        out string forbidden)
+    {
         if (!IsCapacityAllocationMethod(method, typeName))
         {
             forbidden = null!;
             return false;
         }
 
-        if (IsImmutableArrayCreateBuilder(method, typeName))
+        if (ImmutableArrayCapacityPolicy.TryGetDisplayName(method, typeName, out forbidden))
         {
-            forbidden = "System.Collections.Immutable.ImmutableArray";
             return true;
         }
 
@@ -97,15 +101,8 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
-        var displayName = CollectionDisplayName(method.ContainingType, typeName);
-        if (displayName is null)
-        {
-            forbidden = null!;
-            return false;
-        }
-
-        forbidden = displayName;
-        return true;
+        forbidden = CollectionDisplayName(method.ContainingType, typeName)!;
+        return forbidden is not null;
     }
 
     public static bool TryGetDisplayName(IObjectCreationOperation creation, out string forbidden)
@@ -151,11 +148,15 @@ internal static class ForbiddenCollectionCapacityPolicy
 
         var typeName = property.ContainingType.OriginalDefinition.ToDisplayString(
             SymbolDisplayFormat.CSharpErrorMessageFormat);
+        if (ImmutableArrayCapacityPolicy.TryGetPropertyDisplayName(typeName, property.Name, out forbidden))
+        {
+            return true;
+        }
+
         forbidden = (typeName, property.Name) switch
         {
             (ArrayListTypeName, "Capacity") => ArrayListTypeName,
             (BitArrayTypeName, "Length") => BitArrayTypeName,
-            (ImmutableArrayBuilderTypeName, "Capacity") => "System.Collections.Immutable.ImmutableArray",
             (ListTypeName, "Capacity") => "System.Collections.Generic.List",
             (NonGenericSortedListTypeName, "Capacity") => NonGenericSortedListTypeName,
             (SortedListTypeName, "Capacity") => "System.Collections.Generic.SortedList",
@@ -214,12 +215,18 @@ internal static class ForbiddenCollectionCapacityPolicy
     {
         if (method.MethodKind == MethodKind.Constructor)
         {
-            return HasConstructorCapacityParameter(method, typeName);
+            return HasConstructorCapacityParameter(method, typeName) ||
+                   IsLinkedListEnumerableConstructor(method, typeName);
         }
 
         return method.MethodKind == MethodKind.Ordinary &&
                IsCapacityAllocationOrdinaryMethod(method, typeName);
     }
+
+    private static bool IsLinkedListEnumerableConstructor(IMethodSymbol method, string typeName)
+        => string.Equals(typeName, LinkedListTypeName, StringComparison.Ordinal) &&
+           method.Parameters.Length == 1 &&
+           string.Equals(method.Parameters[0].Name, "collection", StringComparison.Ordinal);
 
     private static bool HasConstructorCapacityParameter(IMethodSymbol method, string typeName)
     {
@@ -235,9 +242,9 @@ internal static class ForbiddenCollectionCapacityPolicy
 
     private static bool IsCapacityAllocationOrdinaryMethod(IMethodSymbol method, string typeName)
     {
-        if (IsImmutableArrayCreateBuilder(method, typeName))
+        if (ImmutableArrayCapacityPolicy.IsCapacityAllocationMethod(method, typeName))
         {
-            return HasCapacityParameter(method, "initialCapacity");
+            return true;
         }
 
         if (IsArrayBufferWriterGrowthHint(method, typeName))
@@ -250,10 +257,6 @@ internal static class ForbiddenCollectionCapacityPolicy
                HasCapacityParameter(method, "capacity");
     }
 
-    private static bool IsImmutableArrayCreateBuilder(IMethodSymbol method, string typeName)
-        => method is { IsStatic: true, Name: "CreateBuilder" } &&
-           string.Equals(typeName, ImmutableArrayTypeName, StringComparison.Ordinal);
-
     private static bool IsCollectionsUtilHashtableFactory(IMethodSymbol method, string typeName)
         => method is { IsStatic: true, Name: "CreateCaseInsensitiveHashtable" } &&
            string.Equals(typeName, CollectionsUtilTypeName, StringComparison.Ordinal) &&
@@ -263,10 +266,6 @@ internal static class ForbiddenCollectionCapacityPolicy
         => method is { IsStatic: true, Name: "Resize" } &&
            string.Equals(typeName, ArrayTypeName, StringComparison.Ordinal) &&
            HasCapacityParameter(method, "newSize");
-
-    private static bool IsEnumerableToArray(IMethodSymbol method, string typeName)
-        => method is { IsStatic: true, Name: "ToArray" } &&
-           string.Equals(typeName, EnumerableTypeName, StringComparison.Ordinal);
 
     private static bool IsArrayBufferWriterGrowthHint(IMethodSymbol method, string typeName)
         => method.Name is "GetMemory" or "GetSpan" &&

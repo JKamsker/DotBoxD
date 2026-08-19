@@ -285,9 +285,8 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
         var rawContext = cancellationToken.CanBeCanceled
             ? new HookContext(_messages, cancellationToken)
             : _defaultRawContext;
-        var context = _contextFactory.Create(rawContext);
         var onFault = _onFault;
-        SubscriptionDelivery.Queue(filters, handlers, e, rawContext, context, onFault);
+        SubscriptionDelivery.Queue(filters, handlers, e, rawContext, _contextFactory.Create, onFault);
     }
 
     void ISubscriptionPipeline<TEvent>.Publish(TEvent e, CancellationToken cancellationToken)
