@@ -216,15 +216,15 @@ internal static class ForbiddenCollectionCapacityPolicy
         if (method.MethodKind == MethodKind.Constructor)
         {
             return HasConstructorCapacityParameter(method, typeName) ||
-                   IsLinkedListEnumerableConstructor(method, typeName);
+                   IsUnboundedEnumerableConstructor(method, typeName);
         }
 
         return method.MethodKind == MethodKind.Ordinary &&
                IsCapacityAllocationOrdinaryMethod(method, typeName);
     }
 
-    private static bool IsLinkedListEnumerableConstructor(IMethodSymbol method, string typeName)
-        => string.Equals(typeName, LinkedListTypeName, StringComparison.Ordinal) &&
+    private static bool IsUnboundedEnumerableConstructor(IMethodSymbol method, string typeName)
+        => typeName is LinkedListTypeName or QueueTypeName &&
            method.Parameters.Length == 1 &&
            string.Equals(method.Parameters[0].Name, "collection", StringComparison.Ordinal);
 
