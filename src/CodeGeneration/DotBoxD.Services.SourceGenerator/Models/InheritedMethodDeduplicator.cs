@@ -10,11 +10,11 @@ internal static class InheritedMethodDeduplicator
 {
     public static string? GetDuplicateSignatureRejectionReason(
         IMethodSymbol existingMethod,
-        IMethodSymbol methodSymbol,
+        IMethodSymbol methodSymbol, Compilation compilation,
         CancellationToken ct)
     {
         var shapeReason = GetShapeRejectionReason(existingMethod, methodSymbol, ct);
-        return shapeReason ?? GetContractRejectionReason(existingMethod, methodSymbol, ct);
+        return shapeReason ?? GetContractRejectionReason(existingMethod, methodSymbol, compilation, ct);
     }
 
     private static string? GetShapeRejectionReason(
@@ -52,7 +52,7 @@ internal static class InheritedMethodDeduplicator
 
     private static string? GetContractRejectionReason(
         IMethodSymbol existingMethod,
-        IMethodSymbol methodSymbol,
+        IMethodSymbol methodSymbol, Compilation compilation,
         CancellationToken ct)
     {
         if (!HasSameNullableAnnotations(existingMethod, methodSymbol, ct))
@@ -65,7 +65,7 @@ internal static class InheritedMethodDeduplicator
             return $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible flow attributes";
         }
 
-        if (!HasSameCallerInfoAttributes(existingMethod, methodSymbol, ct))
+        if (!HasSameCallerInfoAttributes(existingMethod, methodSymbol, compilation, ct))
         {
             return $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible caller info attributes";
         }
@@ -174,7 +174,7 @@ internal static class InheritedMethodDeduplicator
 
     public static bool HasSameCallerInfoAttributes(
         IMethodSymbol left,
-        IMethodSymbol right,
+        IMethodSymbol right, Compilation compilation,
         CancellationToken ct)
     {
         if (left.Parameters.Length != right.Parameters.Length)
@@ -186,7 +186,8 @@ internal static class InheritedMethodDeduplicator
         {
             ct.ThrowIfCancellationRequested();
 
-            if (GetCallerInfoKey(left.Parameters[i], ct) != GetCallerInfoKey(right.Parameters[i], ct))
+            if (GetCallerInfoKey(left.Parameters[i], compilation, ct) !=
+                GetCallerInfoKey(right.Parameters[i], compilation, ct))
             {
                 return false;
             }
@@ -201,14 +202,17 @@ internal static class InheritedMethodDeduplicator
         CancellationToken ct) =>
         InheritedNullableTypeKey.Get(type, method, ct);
 
-    private static string GetCallerInfoKey(IParameterSymbol parameter, CancellationToken ct)
+    private static string GetCallerInfoKey(IParameterSymbol parameter, Compilation compilation, CancellationToken ct)
     {
         var attributes = new List<string>();
         foreach (var attr in parameter.GetAttributes())
         {
             ct.ThrowIfCancellationRequested();
+            if (attr.AttributeClass is not { } attributeClass ||
+                !SymbolEqualityComparer.Default.Equals(attributeClass, compilation.GetTypeByMetadataName(attributeClass.ToDisplayString())))
+                continue;
 
-            switch (attr.AttributeClass?.ToDisplayString())
+            switch (attributeClass.ToDisplayString())
             {
                 case "System.Runtime.CompilerServices.CallerMemberNameAttribute":
                     attributes.Add("member");

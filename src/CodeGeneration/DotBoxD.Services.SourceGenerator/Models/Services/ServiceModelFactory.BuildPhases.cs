@@ -107,6 +107,7 @@ internal static partial class ServiceModelFactory
     }
 
     private static bool TryApplyInheritedMethod(
+        Compilation compilation,
         ServiceBuildContext context,
         IMethodSymbol methodSymbol,
         string signatureKey,
@@ -124,7 +125,7 @@ internal static partial class ServiceModelFactory
             return false;
         }
 
-        if (TryRejectIncompatibleInheritedMethod(context, existingMethod, methodSymbol, ct, out rejected))
+        if (TryRejectIncompatibleInheritedMethod(compilation, context, existingMethod, methodSymbol, ct, out rejected))
         {
             hasRejected = true;
             return true;
@@ -138,13 +139,18 @@ internal static partial class ServiceModelFactory
     }
 
     private static bool TryRejectIncompatibleInheritedMethod(
+        Compilation compilation,
         ServiceBuildContext context,
         IMethodSymbol existingMethod,
         IMethodSymbol methodSymbol,
         CancellationToken ct,
         out ServiceResult rejected)
     {
-        var reason = InheritedMethodDeduplicator.GetDuplicateSignatureRejectionReason(existingMethod, methodSymbol, ct);
+        var reason = InheritedMethodDeduplicator.GetDuplicateSignatureRejectionReason(
+            existingMethod,
+            methodSymbol,
+            compilation,
+            ct);
         if (reason is null)
         {
             rejected = default;
