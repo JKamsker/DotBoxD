@@ -5,39 +5,43 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 internal static class RpcTypeMetadataAttributeSource
 {
-    private const string ExperimentalAttribute = "System.Diagnostics.CodeAnalysis.ExperimentalAttribute";
-    private const string ObsoleteAttribute = "System.ObsoleteAttribute";
+    private const string ExperimentalAttributeMetadataName = "System.Diagnostics.CodeAnalysis.ExperimentalAttribute";
+    private const string ObsoleteAttributeMetadataName = "System.ObsoleteAttribute";
 
-    public static void Append(StringBuilder builder, INamedTypeSymbol sourceType, string indent)
+    public static void Append(
+        StringBuilder builder,
+        INamedTypeSymbol sourceType,
+        string indent,
+        Compilation compilation)
     {
+        var experimentalAttribute = compilation.GetTypeByMetadataName(ExperimentalAttributeMetadataName);
+        var obsoleteAttribute = compilation.GetTypeByMetadataName(ObsoleteAttributeMetadataName);
         foreach (var attribute in sourceType.GetAttributes())
         {
-            switch (attribute.AttributeClass?.ToDisplayString())
+            if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, experimentalAttribute))
             {
-                case ExperimentalAttribute:
-                    if (HasStringDiagnosticId(attribute))
-                    {
-                        AppendAttribute(
-                            builder,
-                            attribute,
-                            indent,
-                            "global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute");
-                    }
-
-                    break;
-
-                case ObsoleteAttribute:
-                    AppendAttribute(builder, attribute, indent, "global::System.ObsoleteAttribute");
-                    break;
+                if (HasStringDiagnosticId(attribute))
+                {
+                    AppendAttribute(
+                        builder,
+                        attribute,
+                        indent,
+                        "global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute");
+                }
+            }
+            else if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, obsoleteAttribute))
+            {
+                AppendAttribute(builder, attribute, indent, "global::System.ObsoleteAttribute");
             }
         }
     }
 
-    public static IEnumerable<string> ExperimentalDiagnosticIds(INamedTypeSymbol sourceType)
+    public static IEnumerable<string> ExperimentalDiagnosticIds(INamedTypeSymbol sourceType, Compilation compilation)
     {
+        var experimentalAttribute = compilation.GetTypeByMetadataName(ExperimentalAttributeMetadataName);
         foreach (var attribute in sourceType.GetAttributes())
         {
-            if (attribute.AttributeClass?.ToDisplayString() == ExperimentalAttribute &&
+            if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, experimentalAttribute) &&
                 TryGetPragmaSafeExperimentalDiagnosticId(attribute, out var diagnosticId))
             {
                 yield return diagnosticId;

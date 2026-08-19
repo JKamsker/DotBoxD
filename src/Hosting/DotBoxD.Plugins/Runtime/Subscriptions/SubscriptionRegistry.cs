@@ -50,6 +50,59 @@ public sealed class SubscriptionRegistry
         ThrowIfDisposed();
         return OnHookContext(adapter, ServerContextFactory<HookContext>.Identity);
     }
+
+    internal SubscriptionPipeline<TEvent, HookContext> OnForWire<TEvent>(
+        IPluginEventAdapter<TEvent> adapter,
+        out bool created)
+    {
+        ArgumentNullException.ThrowIfNull(adapter);
+        ThrowIfDisposed();
+        lock (_gate)
+        {
+            EnsureCanRegisterLocked(adapter);
+            var key = new PipelineKey(typeof(TEvent), typeof(HookContext));
+            if (_pipelines.TryGetValue(key, out var existing))
+            {
+                created = false;
+                var pipeline = (SubscriptionPipeline<TEvent, HookContext>)existing;
+                EnsureContextFactoryMatches(pipeline.UsesContextFactory, ServerContextFactory<HookContext>.Identity, "subscription");
+                return pipeline;
+            }
+
+            created = true;
+            var createdPipeline = new SubscriptionPipeline<TEvent, HookContext>(
+                adapter,
+                _messages,
+                new ServerContextFactory<HookContext>(ServerContextFactory<HookContext>.Identity),
+                _kernels,
+                _installer,
+                _onFault,
+                _throwIfDisposed);
+            _pipelines[key] = createdPipeline;
+            PublishEventFanoutLocked(typeof(TEvent));
+            return createdPipeline;
+        }
+    }
+
+    internal void RemoveWirePipeline<TEvent>(
+        IPluginEventAdapter<TEvent> adapter,
+        SubscriptionPipeline<TEvent, HookContext> pipeline)
+    {
+        lock (_gate)
+        {
+            var key = new PipelineKey(typeof(TEvent), typeof(HookContext));
+            if (!_pipelines.TryGetValue(key, out var existing) ||
+                !ReferenceEquals(existing, pipeline) ||
+                !pipeline.UsesAdapter(adapter))
+            {
+                return;
+            }
+
+            _pipelines.Remove(key);
+            PublishEventFanoutLocked(typeof(TEvent));
+        }
+    }
+
     public SubscriptionPipeline<TEvent, TContext> On<TEvent, TContext>(Func<HookContext, TContext> createContext)
     {
         ArgumentNullException.ThrowIfNull(createContext);

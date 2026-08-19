@@ -7,7 +7,12 @@ internal static class CallerInfoAttributeFormatter
 {
     public static bool TryAppend(StringBuilder builder, AttributeData attr)
     {
-        switch (attr.AttributeClass?.ToDisplayString())
+        if (!IsFrameworkCallerInfoAttribute(attr.AttributeClass))
+        {
+            return false;
+        }
+
+        switch (attr.AttributeClass!.ToDisplayString())
         {
             case "System.Runtime.CompilerServices.CallerMemberNameAttribute":
                 builder.Append("[global::System.Runtime.CompilerServices.CallerMemberNameAttribute] ");
@@ -29,6 +34,13 @@ internal static class CallerInfoAttributeFormatter
                 return false;
         }
     }
+
+    private static bool IsFrameworkCallerInfoAttribute(INamedTypeSymbol? attributeClass) =>
+        attributeClass?.ContainingAssembly.Name is
+            "System.Runtime" or
+            "System.Private.CoreLib" or
+            "mscorlib" or
+            "netstandard";
 
     private static void AppendCallerArgumentExpressionAttribute(StringBuilder builder, AttributeData attr)
     {

@@ -160,6 +160,12 @@ public sealed class RegistryFanoutConcurrencyTests
 
         server.Subscriptions.Publish(Event);
 
+        Assert.True(
+            SpinWait.SpinUntil(
+                () => Volatile.Read(ref firstFactoryCalls) == 1 &&
+                      Volatile.Read(ref secondFactoryCalls) == 1,
+                TimeSpan.FromSeconds(5)),
+            "The published subscription fanout did not dispatch through both registered contexts.");
         Assert.Equal(1, Volatile.Read(ref firstFactoryCalls));
         Assert.Equal(1, Volatile.Read(ref secondFactoryCalls));
     }

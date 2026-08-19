@@ -100,7 +100,6 @@ public sealed partial class RpcPeer
             _proxyCache = null;
             cts = _cts;
             readLoop = ReferenceEquals(s_disconnectedEventPeer, this) ? null : _readLoop;
-            cts?.Cancel();
             disposeCompletion = new TaskCompletionSource<object?>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
             disposeTask = disposeCompletion.Task;
@@ -118,6 +117,7 @@ public sealed partial class RpcPeer
     {
         try
         {
+            RpcPeerCancellation.CancelReadLoop(cts);
             await DisposeCoreAsync(readLoop, cts).ConfigureAwait(false);
             completion.TrySetResult(null);
         }

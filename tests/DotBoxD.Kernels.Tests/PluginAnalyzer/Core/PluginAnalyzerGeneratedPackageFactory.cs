@@ -89,6 +89,27 @@ internal static class PluginAnalyzerGeneratedPackageFactory
             .ToArray();
     }
 
+    public static IReadOnlyList<string> GeneratedSourcesWithReferences(
+        string source,
+        params MetadataReference[] additionalReferences)
+    {
+        var compilation = CreateCompilation(source, additionalReferences);
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            [new PluginPackageGenerator().AsSourceGenerator()],
+            parseOptions: ParseOptions);
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var outputCompilation,
+            out var diagnostics);
+
+        Assert.Empty(diagnostics.Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
+        Assert.Empty(outputCompilation.GetDiagnostics().Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
+
+        return PluginGeneratorAssert.NoUnexpectedSourceGeneratorFailures(driver.GetRunResult()).GeneratedTrees
+            .Select(tree => tree.GetText().ToString())
+            .ToArray();
+    }
+
     public static GeneratorDriverRunResult RunGenerator(
         string source,
         params Type[] additionalReferenceTypes)

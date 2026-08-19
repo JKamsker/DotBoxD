@@ -133,6 +133,7 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
             foreach (var pair in _streams)
             {
                 _manager.RemoveOutbound(pair.State.StreamId);
+                pair.Attachment.ReleaseOutboundRegistration();
             }
 
             _waitCancellation?.Dispose();

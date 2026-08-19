@@ -54,7 +54,12 @@ internal static partial class ServiceModelFactory
             interfaceSymbol.Name);
 
         var buildContext = new ServiceBuildContext(displayName, serviceLocation, serviceNamespace, qualifiedInterfaceName);
-        if (ValidateServiceSymbol(interfaceSymbol, buildContext, ct, out var obsoleteAttribute) is { } rejectedService)
+        if (ValidateServiceSymbol(
+                interfaceSymbol,
+                context.SemanticModel.Compilation,
+                buildContext,
+                ct,
+                out var obsoleteAttribute) is { } rejectedService)
         {
             return rejectedService;
         }
@@ -115,7 +120,7 @@ internal static partial class ServiceModelFactory
         }
 
         WireNameValidator.MarkDuplicateWireNames(displayName, methods, methodLocations, methodDiagnostics, ct);
-        var experimentalAttribute = ExperimentalAttributeFormatter.From(interfaceSymbol);
+        var experimentalAttribute = ExperimentalAttributeFormatter.From(interfaceSymbol, context.SemanticModel.Compilation);
         var externAliases = new HashSet<string>(StringComparer.Ordinal);
         foreach (var method in methods)
         {
@@ -203,6 +208,7 @@ internal static partial class ServiceModelFactory
 
     private static ServiceResult? ValidateServiceSymbol(
         INamedTypeSymbol interfaceSymbol,
+        Compilation compilation,
         ServiceBuildContext buildContext,
         CancellationToken ct,
         out (string Source, bool IsError) obsoleteAttribute)
@@ -213,7 +219,7 @@ internal static partial class ServiceModelFactory
             return rejectedInterface;
         }
 
-        obsoleteAttribute = BuildObsoleteAttribute(interfaceSymbol, ct);
+        obsoleteAttribute = BuildObsoleteAttribute(interfaceSymbol, compilation, ct);
         if (!obsoleteAttribute.IsError)
         {
             return null;
@@ -256,12 +262,14 @@ internal static partial class ServiceModelFactory
 
     private static (string Source, bool IsError) BuildObsoleteAttribute(
         INamedTypeSymbol interfaceSymbol,
+        Compilation compilation,
         CancellationToken ct)
     {
+        var obsoleteAttributeSymbol = compilation.GetTypeByMetadataName("System.ObsoleteAttribute");
         foreach (var attr in interfaceSymbol.GetAttributes())
         {
             ct.ThrowIfCancellationRequested();
-            if (attr.AttributeClass?.ToDisplayString() == "System.ObsoleteAttribute")
+            if (SymbolEqualityComparer.Default.Equals(attr.AttributeClass, obsoleteAttributeSymbol))
             {
                 return ObsoleteAttributeFormatter.Format(attr);
             }

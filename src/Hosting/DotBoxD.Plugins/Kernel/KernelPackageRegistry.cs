@@ -65,7 +65,7 @@ public static class KernelPackageRegistry
             }
         }
 
-        return factory();
+        return CreatePackage(kernelType, factory);
     }
 
     private static PluginPackage CreatePackage(Type kernelType, Func<PluginPackage> factory)

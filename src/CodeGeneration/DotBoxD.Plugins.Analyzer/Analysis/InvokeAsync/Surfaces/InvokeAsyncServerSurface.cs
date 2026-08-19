@@ -23,6 +23,7 @@ internal static class InvokeAsyncServerSurface
         var containingType = model.GetEnclosingSymbol(invocation.SpanStart, cancellationToken)?.ContainingType;
         return containingType is not null &&
                InvokeAsyncReceiverResolver.TryResolveGeneratedFacadeType(
+                   model.Compilation,
                    containingType,
                    out receiverType,
                    out serverAccessType,
@@ -53,7 +54,7 @@ internal static class InvokeAsyncServerSurface
             return true;
         }
 
-        return IsGeneratedPluginServerFacadeType(method.ContainingType);
+        return IsGeneratedPluginServerFacadeType(method.ContainingType, compilation);
     }
 
     public static bool BindsToUserInvokeAsync(
@@ -66,7 +67,7 @@ internal static class InvokeAsyncServerSurface
         }
 
         if (string.Equals(method.Name, InvokeAsyncMethod, StringComparison.Ordinal) &&
-            IsGeneratedPluginServerFacadeType(method.ContainingType) &&
+            IsGeneratedPluginServerFacadeType(method.ContainingType, compilation) &&
             HasExplicitIrInvocationCompanion(method, compilation))
         {
             return false;
@@ -222,9 +223,9 @@ internal static class InvokeAsyncServerSurface
         => compilation.GetTypeByMetadataName(metadataName) is { } expected &&
            SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected);
 
-    private static bool IsGeneratedPluginServerFacadeType(ITypeSymbol? type)
+    private static bool IsGeneratedPluginServerFacadeType(ITypeSymbol? type, Compilation compilation)
         => type is INamedTypeSymbol named &&
-           InvokeAsyncReceiverResolver.TryResolveGeneratedFacadeType(named, out _, out _, out _);
+           InvokeAsyncReceiverResolver.TryResolveGeneratedFacadeType(compilation, named, out _, out _, out _);
 
     private static SimpleNameSyntax? InvocationName(InvocationExpressionSyntax invocation)
         => invocation.Expression switch

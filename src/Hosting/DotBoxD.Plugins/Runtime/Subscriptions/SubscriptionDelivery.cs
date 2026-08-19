@@ -12,11 +12,20 @@ internal static class SubscriptionDelivery
         Func<TEvent, HookContext, TContext, ValueTask>[] handlers,
         TEvent e,
         HookContext rawContext,
-        TContext context,
+        Func<HookContext, TContext> createContext,
         Action<SubscriptionDeliveryFault>? onFault)
     {
-        _ = Task.Run(() => PublishSafelyAsync(filters, handlers, e, rawContext, context, onFault).AsTask());
+        _ = Task.Run(() => PublishSafelyAsync(filters, handlers, e, rawContext, createContext, onFault).AsTask());
     }
+
+    internal static void Queue<TEvent, TContext>(
+        Func<TEvent, TContext, ValueTask<bool>>[] filters,
+        Func<TEvent, HookContext, TContext, ValueTask>[] handlers,
+        TEvent e,
+        HookContext rawContext,
+        TContext context,
+        Action<SubscriptionDeliveryFault>? onFault)
+        => Queue(filters, handlers, e, rawContext, _ => context, onFault);
 
     // Delivery runs on a background task (it must not block the publishing game loop), so a throwing filter or
     // handler cannot propagate to a caller and is caught here. Swallowing it silently is what makes a broken
@@ -28,11 +37,30 @@ internal static class SubscriptionDelivery
         Func<TEvent, HookContext, TContext, ValueTask>[] handlers,
         TEvent e,
         HookContext rawContext,
-        TContext context,
+        Func<HookContext, TContext> createContext,
         Action<SubscriptionDeliveryFault>? onFault)
     {
         if (rawContext.CancellationToken.IsCancellationRequested)
         {
+            return;
+        }
+
+        TContext context;
+        try
+        {
+            context = createContext(rawContext);
+        }
+        catch (OperationCanceledException) when (rawContext.CancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (SandboxRuntimeException ex) when (WasCallerCancelled(ex, rawContext.CancellationToken))
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            Report<TEvent>(onFault, ex, SubscriptionDeliveryStage.Handler);
             return;
         }
 
@@ -43,6 +71,15 @@ internal static class SubscriptionDelivery
 
         await PublishHandlersSafelyAsync(handlers, e, rawContext, context, onFault).ConfigureAwait(false);
     }
+
+    internal static ValueTask PublishSafelyAsync<TEvent, TContext>(
+        Func<TEvent, TContext, ValueTask<bool>>[] filters,
+        Func<TEvent, HookContext, TContext, ValueTask>[] handlers,
+        TEvent e,
+        HookContext rawContext,
+        TContext context,
+        Action<SubscriptionDeliveryFault>? onFault)
+        => PublishSafelyAsync(filters, handlers, e, rawContext, _ => context, onFault);
 
     private static async ValueTask<bool> FiltersPassAsync<TEvent, TContext>(
         Func<TEvent, TContext, ValueTask<bool>>[] filters,

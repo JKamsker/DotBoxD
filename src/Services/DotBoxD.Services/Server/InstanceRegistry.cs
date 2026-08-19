@@ -90,7 +90,10 @@ public sealed class InstanceRegistry : IInstanceRegistry
             if (_entries.TryRemove((serviceName, instanceId), out var removed))
             {
                 _count--;
-                instance = removed;
+                if (!ContainsReference(_entries.Values, removed))
+                {
+                    instance = removed;
+                }
             }
         }
 
@@ -111,7 +114,10 @@ public sealed class InstanceRegistry : IInstanceRegistry
             if (_entries.TryRemove((serviceName, instanceId), out var removed))
             {
                 _count--;
-                instance = removed;
+                if (!ContainsReference(_entries.Values, removed))
+                {
+                    instance = removed;
+                }
             }
         }
 
@@ -152,7 +158,10 @@ public sealed class InstanceRegistry : IInstanceRegistry
             var instances = new List<object>(_entries.Count);
             foreach (var instance in _entries.Values)
             {
-                instances.Add(instance);
+                if (!ContainsReference(instances, instance))
+                {
+                    instances.Add(instance);
+                }
             }
 
             _entries.Clear();
@@ -176,6 +185,19 @@ public sealed class InstanceRegistry : IInstanceRegistry
     }
 
     private static bool IsInvalidKey(string? value) => string.IsNullOrWhiteSpace(value);
+
+    private static bool ContainsReference(IEnumerable<object> instances, object candidate)
+    {
+        foreach (var instance in instances)
+        {
+            if (ReferenceEquals(instance, candidate))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     // Sub-service instances are connection-scoped and owned by the registry (see IInstanceRegistry),
     // so they are disposed when released. IAsyncDisposable is preferred when present; run it away from

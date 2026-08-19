@@ -1,3 +1,4 @@
+using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Analyzer.Analysis;
 using Microsoft.CodeAnalysis;
@@ -74,6 +75,52 @@ public sealed class PluginPackageExperimentalAttributeSurpriseTests
             consumerDiagnostics,
             d => d.Id == "DBXEXP_PACKAGE" &&
                  d.Location.GetLineSpan().Path == ConsumerPath);
+    }
+
+    [Fact]
+    public void Generated_plugin_package_ignores_aliased_lookalike_experimental_attribute()
+    {
+        var foreignExperimentalAttribute = PluginServerGenerationTestDriver.CompileReference(
+                """
+                namespace System.Diagnostics.CodeAnalysis;
+
+                [System.AttributeUsage(System.AttributeTargets.Class)]
+                public sealed class ExperimentalAttribute(string diagnosticId) : System.Attribute
+                {
+                }
+                """,
+                "ForeignExperimentalAttribute")
+            .WithProperties(
+                MetadataReferenceProperties.Assembly.WithAliases(["ForeignExperimentalAttribute"]));
+        var result = PluginAnalyzerGeneratedPackageFactory.RunGeneratorWithReferences(
+            """
+            extern alias ForeignExperimentalAttribute;
+
+            using DotBoxD.Abstractions;
+            using DotBoxD.Plugins;
+
+            namespace Sample;
+
+            public sealed record DamageEvent(string TargetId);
+
+            [ForeignExperimentalAttribute::System.Diagnostics.CodeAnalysis.Experimental("FOREIGN_PACKAGE_EXP")]
+            [Plugin("foreign-experimental")]
+            public sealed partial class ForeignExperimentalDamageKernel : IEventKernel<DamageEvent>
+            {
+                public bool ShouldHandle(DamageEvent e, HookContext ctx) => true;
+
+                public void Handle(DamageEvent e, HookContext ctx)
+                    => ctx.Messages.Send(e.TargetId, "foreign experimental");
+            }
+            """,
+            foreignExperimentalAttribute);
+        var generated = Assert.Single(result.GeneratedTrees).GetText().ToString();
+
+        Assert.DoesNotContain(
+            "global::System.Diagnostics.CodeAnalysis.ExperimentalAttribute",
+            generated,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("FOREIGN_PACKAGE_EXP", generated, StringComparison.Ordinal);
     }
 
     private static CSharpCompilation CreateCompilation(string source)

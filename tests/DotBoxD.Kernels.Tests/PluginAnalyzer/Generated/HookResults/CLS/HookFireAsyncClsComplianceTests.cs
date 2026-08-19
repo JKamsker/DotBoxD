@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Analyzer.Analysis;
 using DotBoxD.Plugins.Runtime;
@@ -52,6 +53,7 @@ public sealed class HookFireAsyncClsComplianceTests
             .Where(static tree => tree.FilePath.EndsWith("DotBoxDHookFireAsyncExtensions.g.cs", StringComparison.Ordinal))
             .ToArray();
         Assert.Single(fireAsyncTrees);
+        Assert.Contains("[global::System.CLSCompliant(false)]", fireAsyncTrees[0].ToString(), StringComparison.Ordinal);
 
         var generatedTrees = runResult.GeneratedTrees.ToHashSet();
         var diagnostics = outputCompilation.GetDiagnostics();
@@ -73,6 +75,45 @@ public sealed class HookFireAsyncClsComplianceTests
             "Generated FireAsync sources should not emit CLS diagnostics:" +
             Environment.NewLine +
             string.Join(Environment.NewLine, generatedClsDiagnostics));
+    }
+
+    [Fact]
+    public void Generated_fire_async_extensions_ignore_extern_aliased_lookalike_cls_compliance_attribute()
+    {
+        var foreignClsCompliant = CompileForeignClsCompliantAttribute()
+            .WithAliases(ImmutableArray.Create("Foreign"));
+        var compilation = CreateCompilation(
+            """
+            extern alias Foreign;
+
+            using DotBoxD.Abstractions;
+
+            [assembly: Foreign::System.CLSCompliant(true)]
+
+            namespace Sample;
+
+            [Hook("damage", typeof(DamageResult))]
+            public sealed record DamageContext(int Amount);
+
+            [HookResult]
+            public readonly partial record struct DamageResult(bool Success, string? Reason, int Amount);
+            """,
+            foreignClsCompliant);
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            [new PluginPackageGenerator().AsSourceGenerator()],
+            parseOptions: s_parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var outputCompilation,
+            out var generatorDiagnostics);
+
+        Assert.Empty(generatorDiagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(outputCompilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+
+        var fireAsyncTree = Assert.Single(driver.GetRunResult().GeneratedTrees.Where(
+            static tree => tree.FilePath.EndsWith("DotBoxDHookFireAsyncExtensions.g.cs", StringComparison.Ordinal)));
+        Assert.DoesNotContain("[global::System.CLSCompliant(false)]", fireAsyncTree.ToString(), StringComparison.Ordinal);
     }
 
     private static bool TryAssertFocusedClsFailClosed(
@@ -97,7 +138,31 @@ public sealed class HookFireAsyncClsComplianceTests
     private static IEnumerable<Diagnostic> ClsDiagnostics(IEnumerable<Diagnostic> diagnostics)
         => diagnostics.Where(static diagnostic => s_clsDiagnosticIds.Contains(diagnostic.Id));
 
-    private static CSharpCompilation CreateCompilation(string source)
+    private static MetadataReference CompileForeignClsCompliantAttribute()
+    {
+        var compilation = CSharpCompilation.Create(
+            "ForeignClsCompliant",
+            [CSharpSyntaxTree.ParseText("""
+                namespace System;
+
+                [AttributeUsage(AttributeTargets.Assembly)]
+                public sealed class CLSCompliantAttribute : Attribute
+                {
+                    public CLSCompliantAttribute(bool isCompliant)
+                    {
+                    }
+                }
+                """, s_parseOptions)],
+            TrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        using var stream = new MemoryStream();
+        var emitResult = compilation.Emit(stream);
+        Assert.True(emitResult.Success, string.Join(Environment.NewLine, emitResult.Diagnostics));
+        return MetadataReference.CreateFromImage(stream.ToArray());
+    }
+
+    private static CSharpCompilation CreateCompilation(string source, params MetadataReference[] additionalReferences)
         => CSharpCompilation.Create(
             "DotBoxDFireAsyncClsComplianceTest",
             [CSharpSyntaxTree.ParseText(source, s_parseOptions)],
@@ -106,7 +171,8 @@ public sealed class HookFireAsyncClsComplianceTests
                 .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(RpcServiceAttribute).Assembly.Location))
-                .Append(MetadataReference.CreateFromFile(typeof(HookRegistry).Assembly.Location)),
+                .Append(MetadataReference.CreateFromFile(typeof(HookRegistry).Assembly.Location))
+                .Concat(additionalReferences),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()

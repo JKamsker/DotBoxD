@@ -9,6 +9,7 @@ internal sealed record RegistrationAccumulatorTargetModel(
     string MethodName,
     EquatableArray<string> Attributes,
     EquatableArray<string> MethodAttributes,
+    bool RequiresExperimentalWarningSuppression,
     EquatableArray<RegistrationTypeParameterModel> TypeParameters,
     PluginDiagnosticLocation Location);
 
