@@ -142,7 +142,6 @@ internal sealed partial class RpcStreamManager
             {
                 throw new ServiceProtocolException("Outbound stream attachment is already registered.");
             }
-
             state = new RpcStreamSendState(attachment.Handle.StreamId, ct);
             if (!_senders.TryAdd(state.StreamId, state))
             {
