@@ -238,7 +238,20 @@ internal static class RpcPayloadReconstructibilityInspector
         }
 
         var ns = type.ContainingNamespace;
-        return ns is null || ns.IsGlobalNamespace || !IsSystemNamespace(ns);
+        return ns is null || ns.IsGlobalNamespace || !IsSystemNamespace(ns) || IsSourceDefined(type);
+    }
+
+    private static bool IsSourceDefined(INamedTypeSymbol type)
+    {
+        foreach (var location in type.Locations)
+        {
+            if (location.IsInSource)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool HasRpcServiceAttribute(INamedTypeSymbol type, CancellationToken ct)
