@@ -117,9 +117,18 @@ public sealed class SandboxPolicyBuilder
     public SandboxPolicyBuilder DeclareOpaqueIdTypes(IEnumerable<string> names)
     {
         ArgumentNullException.ThrowIfNull(names);
-        foreach (var name in names)
+        var declaredNames = names.ToList();
+        foreach (var name in declaredNames)
         {
-            DeclareOpaqueIdType(name);
+            if (!SandboxType.IsWellFormedOpaqueIdName(name))
+            {
+                throw new ArgumentException(SandboxPolicy.OpaqueIdTypeNameValidationMessage, nameof(name));
+            }
+        }
+
+        foreach (var name in declaredNames)
+        {
+            _declaredOpaqueIdTypes.Add(name);
         }
 
         return this;
