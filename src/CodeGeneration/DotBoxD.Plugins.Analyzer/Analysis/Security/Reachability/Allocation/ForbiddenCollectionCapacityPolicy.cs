@@ -31,6 +31,7 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
     private const string NonGenericSortedListTypeName = "System.Collections.SortedList";
     private const string SortedListTypeName = "System.Collections.Generic.SortedList<TKey, TValue>";
+    private const string SortedSetTypeName = "System.Collections.Generic.SortedSet<T>";
     private const string StackTypeName = "System.Collections.Generic.Stack<T>";
 
     private static readonly Dictionary<string, string> FixedDisplayNames = new(StringComparer.Ordinal)
@@ -47,7 +48,8 @@ internal static class ForbiddenCollectionCapacityPolicy
         [NonGenericSortedListTypeName] = NonGenericSortedListTypeName,
         [OrderedDictionaryTypeName] = OrderedDictionaryTypeName,
         [QueueTypeName] = "System.Collections.Generic.Queue",
-        [SortedListTypeName] = "System.Collections.Generic.SortedList"
+        [SortedListTypeName] = "System.Collections.Generic.SortedList",
+        [SortedSetTypeName] = "System.Collections.Generic.SortedSet"
     };
     public static bool TryGetDisplayName(IMethodSymbol? method, out string forbidden)
     {
@@ -216,15 +218,15 @@ internal static class ForbiddenCollectionCapacityPolicy
         if (method.MethodKind == MethodKind.Constructor)
         {
             return HasConstructorCapacityParameter(method, typeName) ||
-                   IsLinkedListEnumerableConstructor(method, typeName);
+                   IsEnumerableConstructor(method, typeName);
         }
 
         return method.MethodKind == MethodKind.Ordinary &&
                IsCapacityAllocationOrdinaryMethod(method, typeName);
     }
 
-    private static bool IsLinkedListEnumerableConstructor(IMethodSymbol method, string typeName)
-        => string.Equals(typeName, LinkedListTypeName, StringComparison.Ordinal) &&
+    private static bool IsEnumerableConstructor(IMethodSymbol method, string typeName)
+        => typeName is LinkedListTypeName or SortedSetTypeName &&
            method.Parameters.Length == 1 &&
            string.Equals(method.Parameters[0].Name, "collection", StringComparison.Ordinal);
 
