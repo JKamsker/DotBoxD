@@ -82,6 +82,7 @@ public sealed class StreamingResponseStreamCancelRegressionTests
         RpcStreamManager? streams = null;
         RpcPeerInboundDispatcher? inbound = null;
         const int MessageId = 43;
+        int? responseStreamId = null;
         var responseSent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         streams = new RpcStreamManager(serializer, SendAndCancelInboundAsync, exceptionTransformer: null);
         var dispatcher = new CancelInboundResponseDispatcher();
@@ -111,7 +112,14 @@ public sealed class StreamingResponseStreamCancelRegressionTests
 
         var sourceStarted = await SourceStartedWithinAsync(dispatcher.ResponseStream.ReadStarted);
         Assert.False(sourceStarted);
+        Assert.Equal(1, dispatcher.ResponseStream.DisposeCount);
         Assert.Equal(0, streams!.OutboundSenderCount);
+        using var credit = RpcRawFrame.FrameInt32(
+            responseStreamId!.Value,
+            MessageType.StreamCredit,
+            1);
+        Assert.True(streams.TryAddCredit(credit));
+        Assert.Equal(0, streams.PendingCreditCount);
 
         Task SendAndCancelInboundAsync(ReadOnlyMemory<byte> frame, CancellationToken ct)
         {
@@ -124,11 +132,12 @@ public sealed class StreamingResponseStreamCancelRegressionTests
             if (type == MessageType.Response)
             {
                 var response = serializer.Deserialize<RpcResponse>(envelope);
-                if (response.Stream is null)
+                if (response.Stream is not { } handle)
                 {
                     throw new InvalidOperationException("Expected a streamed response.");
                 }
 
+                responseStreamId = handle.StreamId;
                 inbound!.Cancel(MessageId);
                 responseSent.TrySetResult();
             }
@@ -230,6 +239,8 @@ public sealed class StreamingResponseStreamCancelRegressionTests
 
         public Task ReadStarted => _readStarted.Task;
 
+        public int DisposeCount { get; private set; }
+
         public override bool CanRead => true;
 
         public override bool CanSeek => false;
@@ -269,5 +280,15 @@ public sealed class StreamingResponseStreamCancelRegressionTests
 
         public override void Write(byte[] buffer, int offset, int count) =>
             throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                DisposeCount++;
+            }
+
+            base.Dispose(disposing);
+        }
     }
 }
