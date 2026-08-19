@@ -7,23 +7,25 @@ public sealed class SandboxPolicyBuilderOpaqueIdBatchAtomicityTests
     [Fact]
     public void DeclareOpaqueIdTypes_rejects_invalid_name_without_retaining_prior_batch_names()
     {
-        var builder = SandboxPolicyBuilder.Create();
+        var builder = SandboxPolicyBuilder.Create()
+            .DeclareOpaqueIdType("ExistingId");
 
         var exception = Assert.Throws<ArgumentException>(() =>
             builder.DeclareOpaqueIdTypes(["TenantId", "String"]));
 
         Assert.Equal("name", exception.ParamName);
-        Assert.Empty(builder.Build().DeclaredOpaqueIdTypes);
+        Assert.Equal(["ExistingId"], builder.Build().DeclaredOpaqueIdTypes.Order());
     }
 
     [Fact]
     public void DeclareOpaqueIdTypes_propagates_enumeration_failure_without_retaining_prior_batch_names()
     {
-        var builder = SandboxPolicyBuilder.Create();
+        var builder = SandboxPolicyBuilder.Create()
+            .DeclareOpaqueIdType("ExistingId");
 
         Assert.Throws<SentinelException>(() => builder.DeclareOpaqueIdTypes(ValidNameThenThrows()));
 
-        Assert.Empty(builder.Build().DeclaredOpaqueIdTypes);
+        Assert.Equal(["ExistingId"], builder.Build().DeclaredOpaqueIdTypes.Order());
     }
 
     [Fact]
