@@ -146,7 +146,8 @@ internal static class RpcPayloadMemberInspector
         bool allowTopLevelAsyncWrapper,
         bool allowCurrentTransportShape,
         bool allowCurrentCancellationToken,
-        ITypeSymbol? cancellationTokenSymbol) =>
+        ITypeSymbol? cancellationTokenSymbol,
+        ITypeSymbol? rpcStreamHandleSymbol) =>
         Inspect(
             type,
             role,
@@ -155,6 +156,7 @@ internal static class RpcPayloadMemberInspector
             allowCurrentTransportShape,
             allowCurrentCancellationToken,
             cancellationTokenSymbol,
+            rpcStreamHandleSymbol,
             new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default));
 
     private static string? Inspect(
@@ -165,6 +167,7 @@ internal static class RpcPayloadMemberInspector
         bool allowCurrentTransportShape,
         bool allowCurrentCancellationToken,
         ITypeSymbol? cancellationTokenSymbol,
+        ITypeSymbol? rpcStreamHandleSymbol,
         HashSet<INamedTypeSymbol> visitedOriginalDefinitions)
     {
         ct.ThrowIfCancellationRequested();
@@ -179,6 +182,7 @@ internal static class RpcPayloadMemberInspector
                 allowCurrentTransportShape: false,
                 allowCurrentCancellationToken: false,
                 cancellationTokenSymbol,
+                rpcStreamHandleSymbol,
                 visitedOriginalDefinitions);
         }
 
@@ -196,6 +200,7 @@ internal static class RpcPayloadMemberInspector
                 allowCurrentTransportShape,
                 allowCurrentCancellationToken: false,
                 cancellationTokenSymbol,
+                rpcStreamHandleSymbol,
                 visitedOriginalDefinitions);
         }
 
@@ -206,6 +211,7 @@ internal static class RpcPayloadMemberInspector
             allowCurrentTransportShape: false,
             allowCurrentCancellationToken: false,
             cancellationTokenSymbol,
+            rpcStreamHandleSymbol,
             visitedOriginalDefinitions);
         if (argumentReason is not null)
         {
@@ -218,7 +224,7 @@ internal static class RpcPayloadMemberInspector
             ct,
             visitedOriginalDefinitions,
             (memberType, memberRole, memberCt, memberVisited) =>
-                UnsupportedMemberReason(memberType, memberRole, memberCt, cancellationTokenSymbol, memberVisited));
+                UnsupportedMemberReason(memberType, memberRole, memberCt, cancellationTokenSymbol, rpcStreamHandleSymbol, memberVisited));
     }
 
     private static string? InspectTypeArguments(
@@ -228,6 +234,7 @@ internal static class RpcPayloadMemberInspector
         bool allowCurrentTransportShape,
         bool allowCurrentCancellationToken,
         ITypeSymbol? cancellationTokenSymbol,
+        ITypeSymbol? rpcStreamHandleSymbol,
         HashSet<INamedTypeSymbol> visitedOriginalDefinitions)
     {
         foreach (var arg in named.TypeArguments)
@@ -241,7 +248,8 @@ internal static class RpcPayloadMemberInspector
                 allowTopLevelAsyncWrapper: false,
                 allowCurrentTransportShape,
                 allowCurrentCancellationToken,
-                cancellationTokenSymbol: cancellationTokenSymbol);
+                cancellationTokenSymbol: cancellationTokenSymbol,
+                rpcStreamHandleSymbol: rpcStreamHandleSymbol);
             if (directReason is not null)
             {
                 return directReason;
@@ -255,6 +263,7 @@ internal static class RpcPayloadMemberInspector
                 allowCurrentTransportShape,
                 allowCurrentCancellationToken,
                 cancellationTokenSymbol,
+                rpcStreamHandleSymbol,
                 visitedOriginalDefinitions);
             if (memberReason is not null)
             {
@@ -270,6 +279,7 @@ internal static class RpcPayloadMemberInspector
         string role,
         CancellationToken ct,
         ITypeSymbol? cancellationTokenSymbol,
+        ITypeSymbol? rpcStreamHandleSymbol,
         HashSet<INamedTypeSymbol> visitedOriginalDefinitions)
     {
         var directReason = RpcTypeValidator.GetUnsupportedDirectTypeReason(
@@ -286,6 +296,7 @@ internal static class RpcPayloadMemberInspector
             allowCurrentTransportShape: false,
             allowCurrentCancellationToken: false,
             cancellationTokenSymbol,
+            rpcStreamHandleSymbol,
             visitedOriginalDefinitions);
     }
 

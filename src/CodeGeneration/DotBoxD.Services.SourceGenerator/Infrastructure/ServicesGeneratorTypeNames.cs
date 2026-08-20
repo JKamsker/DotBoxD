@@ -12,6 +12,7 @@ internal static class ServicesGeneratorTypeNames
     public const string JsonPolymorphicAttribute = "System.Text.Json.Serialization.JsonPolymorphicAttribute";
     public const string JsonDerivedTypeAttribute = "System.Text.Json.Serialization.JsonDerivedTypeAttribute";
     public const string CancellationTokenMetadata = "System.Threading.CancellationToken";
+    public const string RpcStreamHandleMetadata = "DotBoxD.Services.Protocol.RpcStreamHandle";
 
     public const string GeneratedNamespace = "DotBoxD.Services.Generated";
     public const string GeneratedFactoryType = "DotBoxDGenerated";
@@ -56,7 +57,7 @@ internal static class ServicesGeneratorTypeNames
         GlobalPrefix + GeneratedNamespace + ".IRpcGeneratedServiceRegistrationSink";
 
     public const string GlobalRpcPeer = GlobalPrefix + "DotBoxD.Services.Peer.RpcPeer";
-    public const string GlobalRpcStreamHandle = GlobalPrefix + "DotBoxD.Services.Protocol.RpcStreamHandle";
+    public const string GlobalRpcStreamHandle = GlobalPrefix + RpcStreamHandleMetadata;
     public const string GlobalRpcStreamKind = GlobalPrefix + "DotBoxD.Services.Protocol.RpcStreamKind";
     public const string GlobalServiceHandle = GlobalPrefix + "DotBoxD.Services.Protocol.ServiceHandle";
     public const string GlobalInstanceRegistry = GlobalPrefix + "DotBoxD.Services.Server.IInstanceRegistry";

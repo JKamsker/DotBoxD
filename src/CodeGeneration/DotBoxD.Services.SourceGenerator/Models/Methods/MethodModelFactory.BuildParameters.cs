@@ -15,6 +15,7 @@ internal static partial class MethodModelFactory
         ITypeSymbol returnType,
         MethodReturnKind returnKind,
         INamedTypeSymbol? cancellationTokenSymbol,
+        INamedTypeSymbol? rpcStreamHandleSymbol,
         RpcTypeValidationCache validationCache,
         CancellationToken ct,
         DiagnosticLocation methodLocation,
@@ -34,7 +35,7 @@ internal static partial class MethodModelFactory
         SetUnsupported(
             ref unsupportedReason,
             ref unsupportedLocation,
-            UnsupportedReturnTypeReason(returnType, returnKind, cancellationTokenSymbol, ct),
+            UnsupportedReturnTypeReason(returnType, returnKind, cancellationTokenSymbol, rpcStreamHandleSymbol, ct),
             methodLocation);
         SetUnsupported(
             ref unsupportedReason,
@@ -62,6 +63,7 @@ internal static partial class MethodModelFactory
         ITypeSymbol returnType,
         MethodReturnKind returnKind,
         INamedTypeSymbol? cancellationTokenSymbol,
+        INamedTypeSymbol? rpcStreamHandleSymbol,
         CancellationToken ct)
         => RpcTypeValidator.GetUnsupportedTypeReason(
             returnType,
@@ -69,7 +71,8 @@ internal static partial class MethodModelFactory
             ct,
             allowTopLevelAsyncWrapper: true,
             allowCurrentTransportShape: IsCurrentTransportReturn(returnKind),
-            cancellationTokenSymbol: cancellationTokenSymbol);
+            cancellationTokenSymbol: cancellationTokenSymbol,
+            rpcStreamHandleSymbol: rpcStreamHandleSymbol);
 
     private static bool IsCurrentTransportReturn(MethodReturnKind returnKind)
         => NamingHelpers.IsStreamReturn(returnKind) ||
@@ -104,6 +107,7 @@ internal static partial class MethodModelFactory
     private static ParameterBuildResult BuildParameters(
         IMethodSymbol methodSymbol,
         INamedTypeSymbol? cancellationTokenSymbol,
+        INamedTypeSymbol? rpcStreamHandleSymbol,
         RpcTypeValidationCache validationCache,
         CancellationToken ct,
         ref string? unsupportedReason,
@@ -120,6 +124,7 @@ internal static partial class MethodModelFactory
                 methodSymbol,
                 parameterIndex,
                 cancellationTokenSymbol,
+                rpcStreamHandleSymbol,
                 validationCache,
                 ct,
                 ref cancellationTokenCount,
@@ -137,6 +142,7 @@ internal static partial class MethodModelFactory
         IMethodSymbol methodSymbol,
         int parameterIndex,
         INamedTypeSymbol? cancellationTokenSymbol,
+        INamedTypeSymbol? rpcStreamHandleSymbol,
         RpcTypeValidationCache validationCache,
         CancellationToken ct,
         ref int cancellationTokenCount,
@@ -155,6 +161,7 @@ internal static partial class MethodModelFactory
             streamKind,
             streamItemType,
             cancellationTokenSymbol,
+            rpcStreamHandleSymbol,
             validationCache,
             ct,
             parameterLocation,
@@ -174,6 +181,7 @@ internal static partial class MethodModelFactory
         ParameterStreamKind streamKind,
         ITypeSymbol? streamItemType,
         INamedTypeSymbol? cancellationTokenSymbol,
+        INamedTypeSymbol? rpcStreamHandleSymbol,
         RpcTypeValidationCache validationCache,
         CancellationToken ct,
         DiagnosticLocation parameterLocation,
@@ -201,6 +209,7 @@ internal static partial class MethodModelFactory
                 parameter.Name,
                 isCancellationToken,
                 cancellationTokenSymbol,
+                rpcStreamHandleSymbol,
                 ct),
             parameterLocation);
         SetUnsupported(

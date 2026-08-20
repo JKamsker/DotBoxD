@@ -21,6 +21,7 @@ internal static partial class MethodModelFactory
         string displayName,
         IMethodSymbol methodSymbol,
         INamedTypeSymbol? cancellationTokenSymbol,
+        INamedTypeSymbol? rpcStreamHandleSymbol,
         RpcTypeValidationCache validationCache,
         List<MethodDiagnostic> methodDiagnostics,
         CancellationToken ct,
@@ -57,6 +58,7 @@ internal static partial class MethodModelFactory
             returnType,
             returnKind,
             cancellationTokenSymbol,
+            rpcStreamHandleSymbol,
             validationCache,
             ct,
             methodLocation,
@@ -70,6 +72,7 @@ internal static partial class MethodModelFactory
         var parameterResult = BuildParameters(
             methodSymbol,
             cancellationTokenSymbol,
+            rpcStreamHandleSymbol,
             validationCache,
             ct,
             ref unsupportedReason,

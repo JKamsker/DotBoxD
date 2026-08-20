@@ -16,7 +16,8 @@ internal static partial class RpcTypeValidator
         bool allowTopLevelAsyncWrapper,
         bool allowCurrentTransportShape = false,
         bool allowCurrentCancellationToken = false,
-        ITypeSymbol? cancellationTokenSymbol = null) =>
+        ITypeSymbol? cancellationTokenSymbol = null,
+        ITypeSymbol? rpcStreamHandleSymbol = null) =>
         GetUnsupportedTypeReasonCore(
             type,
             role,
@@ -25,6 +26,7 @@ internal static partial class RpcTypeValidator
             allowCurrentTransportShape,
             allowCurrentCancellationToken,
             cancellationTokenSymbol,
+            rpcStreamHandleSymbol,
             inspectDtoMembers: true);
 
     internal static string? GetUnsupportedDirectTypeReason(
@@ -34,7 +36,8 @@ internal static partial class RpcTypeValidator
         bool allowTopLevelAsyncWrapper,
         bool allowCurrentTransportShape = false,
         bool allowCurrentCancellationToken = false,
-        ITypeSymbol? cancellationTokenSymbol = null) =>
+        ITypeSymbol? cancellationTokenSymbol = null,
+        ITypeSymbol? rpcStreamHandleSymbol = null) =>
         GetUnsupportedTypeReasonCore(
             type,
             role,
@@ -43,6 +46,7 @@ internal static partial class RpcTypeValidator
             allowCurrentTransportShape,
             allowCurrentCancellationToken,
             cancellationTokenSymbol,
+            rpcStreamHandleSymbol,
             inspectDtoMembers: false);
 
     private static string? GetUnsupportedTypeReasonCore(
@@ -53,6 +57,7 @@ internal static partial class RpcTypeValidator
         bool allowCurrentTransportShape = false,
         bool allowCurrentCancellationToken = false,
         ITypeSymbol? cancellationTokenSymbol = null,
+        ITypeSymbol? rpcStreamHandleSymbol = null,
         bool inspectDtoMembers = true)
     {
         if (GetUnsupportedAsyncOrStreamingReason(
@@ -62,7 +67,8 @@ internal static partial class RpcTypeValidator
                 allowTopLevelAsyncWrapper,
                 allowCurrentTransportShape,
                 allowCurrentCancellationToken,
-                cancellationTokenSymbol) is { } asyncOrStreamingReason)
+                cancellationTokenSymbol,
+                rpcStreamHandleSymbol) is { } asyncOrStreamingReason)
         {
             return asyncOrStreamingReason;
         }
@@ -106,7 +112,8 @@ internal static partial class RpcTypeValidator
                 allowTopLevelAsyncWrapper,
                 allowCurrentTransportShape,
                 allowCurrentCancellationToken,
-                cancellationTokenSymbol)
+                cancellationTokenSymbol,
+                rpcStreamHandleSymbol)
             : null;
     }
 
@@ -117,7 +124,8 @@ internal static partial class RpcTypeValidator
         bool allowTopLevelAsyncWrapper,
         bool allowCurrentTransportShape,
         bool allowCurrentCancellationToken,
-        ITypeSymbol? cancellationTokenSymbol)
+        ITypeSymbol? cancellationTokenSymbol,
+        ITypeSymbol? rpcStreamHandleSymbol)
     {
         if (ContainsTaskLikePayloadType(type, ct, allowCurrent: allowTopLevelAsyncWrapper))
         {
@@ -135,7 +143,8 @@ internal static partial class RpcTypeValidator
                 allowCurrentTransportShape,
                 allowCurrentCancellationToken,
                 allowTopLevelAsyncWrapper,
-                cancellationTokenSymbol))
+                cancellationTokenSymbol,
+                rpcStreamHandleSymbol))
         {
             return $"{role} uses a streaming or control type as an RPC payload; Stream, Pipe, IAsyncEnumerable<T>, RpcStreamHandle, and CancellationToken are only supported as direct streaming/control RPC shapes";
         }

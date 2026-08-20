@@ -84,6 +84,9 @@ internal static partial class ServiceModelFactory
         }
 
         var cancellationTokenSymbol = context.SemanticModel.Compilation.GetTypeByMetadataName(CancellationTokenFullName);
+        var rpcStreamHandleSymbol = GetDotBoxDServicesType(
+            context.SemanticModel.Compilation,
+            ServicesGeneratorTypeNames.RpcStreamHandleMetadata);
         var methods = new List<MethodModel>();
         var properties = new List<ServicePropertyModel>();
         var methodLocations = new List<DiagnosticLocation>();
@@ -97,6 +100,7 @@ internal static partial class ServiceModelFactory
                 members.Methods,
                 buildContext,
                 cancellationTokenSymbol,
+                rpcStreamHandleSymbol,
                 validationCache,
                 methods,
                 methodLocations,
@@ -151,10 +155,24 @@ internal static partial class ServiceModelFactory
             ServiceDiagnostic: null);
     }
 
+    private static INamedTypeSymbol? GetDotBoxDServicesType(Compilation compilation, string metadataName)
+    {
+        foreach (var reference in compilation.References)
+        {
+            if (compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol { Name: "DotBoxD.Services" } assembly)
+            {
+                return assembly.GetTypeByMetadataName(metadataName);
+            }
+        }
+
+        return null;
+    }
+
     private static ServiceResult? BuildMethods(
         List<IMethodSymbol> methodSymbols,
         ServiceBuildContext buildContext,
         INamedTypeSymbol? cancellationTokenSymbol,
+        INamedTypeSymbol? rpcStreamHandleSymbol,
         RpcTypeValidationCache validationCache,
         List<MethodModel> methods,
         List<DiagnosticLocation> methodLocations,
@@ -194,6 +212,7 @@ internal static partial class ServiceModelFactory
                 buildContext.DisplayName,
                 methodSymbol,
                 cancellationTokenSymbol,
+                rpcStreamHandleSymbol,
                 validationCache,
                 methodDiagnostics,
                 ct,

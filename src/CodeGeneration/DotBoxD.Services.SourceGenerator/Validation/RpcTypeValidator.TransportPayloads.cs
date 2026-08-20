@@ -12,7 +12,8 @@ internal static partial class RpcTypeValidator
         bool allowCurrentTransportShape,
         bool allowCurrentCancellationToken,
         bool allowCurrentTaskWrapper,
-        ITypeSymbol? cancellationTokenSymbol)
+        ITypeSymbol? cancellationTokenSymbol,
+        ITypeSymbol? rpcStreamHandleSymbol)
     {
         ct.ThrowIfCancellationRequested();
 
@@ -24,7 +25,8 @@ internal static partial class RpcTypeValidator
                 allowCurrentTransportShape: false,
                 allowCurrentCancellationToken: false,
                 allowCurrentTaskWrapper: false,
-                cancellationTokenSymbol);
+                cancellationTokenSymbol,
+                rpcStreamHandleSymbol);
         }
 
         if (type is not INamedTypeSymbol named)
@@ -38,7 +40,8 @@ internal static partial class RpcTypeValidator
             allowCurrentTransportShape,
             allowCurrentCancellationToken,
             allowCurrentTaskWrapper,
-            cancellationTokenSymbol);
+            cancellationTokenSymbol,
+            rpcStreamHandleSymbol);
     }
 
     private static bool ContainsNamedStreamingOrControlPayloadType(
@@ -47,21 +50,22 @@ internal static partial class RpcTypeValidator
         bool allowCurrentTransportShape,
         bool allowCurrentCancellationToken,
         bool allowCurrentTaskWrapper,
-        ITypeSymbol? cancellationTokenSymbol)
+        ITypeSymbol? cancellationTokenSymbol,
+        ITypeSymbol? rpcStreamHandleSymbol)
     {
         if (IsCancellationToken(named, cancellationTokenSymbol))
         {
             return !allowCurrentCancellationToken;
         }
 
-        if (IsRpcStreamHandle(named))
+        if (IsRpcStreamHandle(named, rpcStreamHandleSymbol))
         {
             return true;
         }
 
         if (IsTaskLike(named) && allowCurrentTaskWrapper)
         {
-            return ContainsTypeArguments(named, ct, allowCurrentTransportShape, cancellationTokenSymbol);
+            return ContainsTypeArguments(named, ct, allowCurrentTransportShape, cancellationTokenSymbol, rpcStreamHandleSymbol);
         }
 
         if (ReturnTypeClassifier.TryGetAsyncEnumerableItemType(named, out _))
@@ -71,7 +75,8 @@ internal static partial class RpcTypeValidator
                     named,
                     ct,
                     allowCurrentTransportShape: false,
-                    cancellationTokenSymbol);
+                    cancellationTokenSymbol,
+                    rpcStreamHandleSymbol);
         }
 
         if (ReturnTypeClassifier.IsStream(named) || ReturnTypeClassifier.IsPipe(named))
@@ -83,14 +88,16 @@ internal static partial class RpcTypeValidator
             named,
             ct,
             allowCurrentTransportShape: false,
-            cancellationTokenSymbol);
+            cancellationTokenSymbol,
+            rpcStreamHandleSymbol);
     }
 
     private static bool ContainsTypeArguments(
         INamedTypeSymbol named,
         CancellationToken ct,
         bool allowCurrentTransportShape,
-        ITypeSymbol? cancellationTokenSymbol)
+        ITypeSymbol? cancellationTokenSymbol,
+        ITypeSymbol? rpcStreamHandleSymbol)
     {
         foreach (var arg in named.TypeArguments)
         {
@@ -102,7 +109,8 @@ internal static partial class RpcTypeValidator
                     allowCurrentTransportShape,
                     allowCurrentCancellationToken: false,
                     allowCurrentTaskWrapper: false,
-                    cancellationTokenSymbol))
+                    cancellationTokenSymbol,
+                    rpcStreamHandleSymbol))
             {
                 return true;
             }
@@ -116,9 +124,9 @@ internal static partial class RpcTypeValidator
             ? SymbolEqualityComparer.Default.Equals(type, cancellationTokenSymbol)
             : type.Name == nameof(CancellationToken) && type.ContainingNamespace?.ToDisplayString() == "System.Threading";
 
-    private static bool IsRpcStreamHandle(INamedTypeSymbol type) =>
-        type.Name == "RpcStreamHandle" &&
-        type.ContainingNamespace?.ToDisplayString() == "DotBoxD.Services.Protocol";
+    private static bool IsRpcStreamHandle(INamedTypeSymbol type, ITypeSymbol? rpcStreamHandleSymbol) =>
+        rpcStreamHandleSymbol is not null &&
+        SymbolEqualityComparer.Default.Equals(type, rpcStreamHandleSymbol);
 
     private static bool ContainsPointerType(ITypeSymbol type, CancellationToken ct)
     {
