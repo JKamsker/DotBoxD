@@ -47,26 +47,37 @@ internal static class InheritedTypeAssemblyIdentityComparer
             return true;
         }
 
-        if (left is IArrayTypeSymbol leftArray && right is IArrayTypeSymbol rightArray)
+        return (left, right) switch
         {
-            return leftArray.Rank == rightArray.Rank &&
-                HaveSameIdentities(leftArray.ElementType, rightArray.ElementType, ct);
-        }
+            (IArrayTypeSymbol leftArray, IArrayTypeSymbol rightArray) =>
+                HaveSameArrayIdentities(leftArray, rightArray, ct),
+            (INamedTypeSymbol leftNamed, INamedTypeSymbol rightNamed) =>
+                HaveSameNamedTypeIdentities(leftNamed, rightNamed, ct),
+            _ => true,
+        };
+    }
 
-        if (left is not INamedTypeSymbol leftNamed || right is not INamedTypeSymbol rightNamed)
-        {
-            return true;
-        }
+    private static bool HaveSameArrayIdentities(
+        IArrayTypeSymbol left,
+        IArrayTypeSymbol right,
+        CancellationToken ct) =>
+        left.Rank == right.Rank &&
+        HaveSameIdentities(left.ElementType, right.ElementType, ct);
 
-        if (!leftNamed.ContainingAssembly.Identity.Equals(rightNamed.ContainingAssembly.Identity) ||
-            leftNamed.TypeArguments.Length != rightNamed.TypeArguments.Length)
+    private static bool HaveSameNamedTypeIdentities(
+        INamedTypeSymbol left,
+        INamedTypeSymbol right,
+        CancellationToken ct)
+    {
+        if (!left.ContainingAssembly.Identity.Equals(right.ContainingAssembly.Identity) ||
+            left.TypeArguments.Length != right.TypeArguments.Length)
         {
             return false;
         }
 
-        for (var i = 0; i < leftNamed.TypeArguments.Length; i++)
+        for (var i = 0; i < left.TypeArguments.Length; i++)
         {
-            if (!HaveSameIdentities(leftNamed.TypeArguments[i], rightNamed.TypeArguments[i], ct))
+            if (!HaveSameIdentities(left.TypeArguments[i], right.TypeArguments[i], ct))
             {
                 return false;
             }

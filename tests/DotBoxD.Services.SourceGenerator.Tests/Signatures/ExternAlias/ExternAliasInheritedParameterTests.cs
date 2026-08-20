@@ -48,9 +48,22 @@ public class ExternAliasInheritedParameterTests
         var final = compilation.AddSyntaxTrees(runResult.GeneratedTrees);
         var finalErrors = final.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
 
-        (finalErrors.Length == 0 || runResult.Diagnostics.Any(d => d.Id == "DBXS003"))
-            .Should()
-            .BeTrue("assembly-distinct inherited parameter overloads must be preserved or rejected with DBXS003 instead of leaking compiler errors");
+        finalErrors.Should().BeEmpty("the generator must not emit invalid source");
+
+        var inheritedOverloadConflict = runResult.Diagnostics.Any(d => d.Id == "DBXS003" &&
+            d.GetMessage().Contains("inherited") &&
+            d.GetMessage().Contains("different assemblies"));
+
+        if (inheritedOverloadConflict)
+        {
+            runResult.Results.Single().GeneratedSources
+                .Should().NotContain(g => g.HintName.Contains("ICombined."));
+        }
+        else
+        {
+            runResult.Results.Single().GeneratedSources
+                .Should().Contain(g => g.HintName.Contains("ICombined."));
+        }
     }
 
     private static MetadataReference CompileReference(string assemblyName)
