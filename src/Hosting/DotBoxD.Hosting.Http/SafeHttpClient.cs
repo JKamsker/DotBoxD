@@ -188,7 +188,10 @@ public static class SafeHttpClient
             return [address];
         }
 
-        var addresses = await dnsResolver(host, cancellationToken).ConfigureAwait(false);
+        var addresses = await dnsResolver(host, cancellationToken)
+            .AsTask()
+            .WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         if (addresses.Count == 0)
         {
