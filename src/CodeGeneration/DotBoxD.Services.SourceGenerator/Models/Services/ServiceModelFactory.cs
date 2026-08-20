@@ -84,6 +84,9 @@ internal static partial class ServiceModelFactory
         }
 
         var cancellationTokenSymbol = context.SemanticModel.Compilation.GetTypeByMetadataName(CancellationTokenFullName);
+        var rpcStreamHandleSymbol = GetDotBoxDServicesType(
+            context.SemanticModel.Compilation,
+            ServicesGeneratorTypeNames.RpcStreamHandleMetadata);
         var methods = new List<MethodModel>();
         var properties = new List<ServicePropertyModel>();
         var methodLocations = new List<DiagnosticLocation>();
@@ -97,6 +100,7 @@ internal static partial class ServiceModelFactory
                 members.Methods,
                 buildContext,
                 cancellationTokenSymbol,
+                rpcStreamHandleSymbol,
                 validationCache,
                 methods,
                 methodLocations,
@@ -151,10 +155,24 @@ internal static partial class ServiceModelFactory
             ServiceDiagnostic: null);
     }
 
+    private static INamedTypeSymbol? GetDotBoxDServicesType(Compilation compilation, string metadataName)
+    {
+        foreach (var reference in compilation.References)
+        {
+            if (compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol { Name: "DotBoxD.Services" } assembly)
+            {
+                return assembly.GetTypeByMetadataName(metadataName);
+            }
+        }
+
+        return null;
+    }
+
     private static ServiceResult? BuildMethods(
         List<IMethodSymbol> methodSymbols,
         ServiceBuildContext buildContext,
         INamedTypeSymbol? cancellationTokenSymbol,
+        INamedTypeSymbol? rpcStreamHandleSymbol,
         RpcTypeValidationCache validationCache,
         List<MethodModel> methods,
         List<DiagnosticLocation> methodLocations,
@@ -194,6 +212,7 @@ internal static partial class ServiceModelFactory
                 buildContext.DisplayName,
                 methodSymbol,
                 cancellationTokenSymbol,
+                rpcStreamHandleSymbol,
                 validationCache,
                 methodDiagnostics,
                 ct,
@@ -247,50 +266,4 @@ internal static partial class ServiceModelFactory
             QualifiedInterfaceName: qualifiedInterfaceName,
             ServiceDiagnostic: new ServiceDiagnostic(displayName, reason, location));
 
-    private static string? GetConfiguredServiceName(AttributeData serviceAttribute)
-    {
-        foreach (var namedArg in serviceAttribute.NamedArguments)
-        {
-            if (namedArg.Key == "Name" && namedArg.Value.Value is string s)
-            {
-                return s;
-            }
-        }
-
-        return null;
-    }
-
-    private static (string Source, bool IsError) BuildObsoleteAttribute(
-        INamedTypeSymbol interfaceSymbol,
-        Compilation compilation,
-        CancellationToken ct)
-    {
-        var obsoleteAttributeSymbol = compilation.GetTypeByMetadataName("System.ObsoleteAttribute");
-        foreach (var attr in interfaceSymbol.GetAttributes())
-        {
-            ct.ThrowIfCancellationRequested();
-            if (SymbolEqualityComparer.Default.Equals(attr.AttributeClass, obsoleteAttributeSymbol))
-            {
-                return ObsoleteAttributeFormatter.Format(attr);
-            }
-        }
-
-        return (string.Empty, false);
-    }
-
-    private static string GetNamespace(INamespaceSymbol namespaceSymbol)
-    {
-        if (namespaceSymbol.IsGlobalNamespace)
-        {
-            return string.Empty;
-        }
-
-        var parts = new Stack<string>();
-        for (var current = namespaceSymbol; !current.IsGlobalNamespace; current = current.ContainingNamespace)
-        {
-            parts.Push(current.Name);
-        }
-
-        return string.Join(".", parts);
-    }
 }
