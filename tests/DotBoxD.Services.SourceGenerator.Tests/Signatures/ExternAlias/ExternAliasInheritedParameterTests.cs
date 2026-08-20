@@ -66,6 +66,47 @@ public class ExternAliasInheritedParameterTests
         }
     }
 
+    [Fact]
+    public void InheritedAssemblyDistinctFunctionPointerParameters_ReportDistinctAssemblyDiagnostic()
+    {
+        var leftPayloadReference = CompileReference("LeftPayload");
+        var rightPayloadReference = CompileReference("RightPayload")
+            .WithAliases(ImmutableArray.Create("Lookalike"));
+        var compilation = CreateCompilation("""
+            extern alias Lookalike;
+
+            using DotBoxD.Services.Attributes;
+
+            namespace Regress.ExternAlias;
+
+            [RpcService]
+            public unsafe interface ILeft
+            {
+                void Send(delegate*<Contracts.Payload, void> callback);
+            }
+
+            [RpcService]
+            public unsafe interface IRight
+            {
+                void Send(delegate*<Lookalike::Contracts.Payload, void> callback);
+            }
+
+            [RpcService]
+            public interface ICombined : ILeft, IRight
+            {
+            }
+            """, leftPayloadReference, rightPayloadReference, allowUnsafe: true);
+
+        compilation.GetDiagnostics().Should().NotContain(d => d.Severity == DiagnosticSeverity.Error);
+
+        var runResult = GeneratorTestHelper.CreateDriver().RunGenerators(compilation).GetRunResult();
+
+        runResult.Diagnostics.Should().Contain(d => d.Id == "DBXS002" &&
+            d.GetMessage().Contains("function pointer type"));
+        runResult.Diagnostics.Should().Contain(d => d.Id == "DBXS003" &&
+            d.GetMessage().Contains("different assemblies"));
+    }
+
     private static MetadataReference CompileReference(string assemblyName)
     {
         const string source = """
@@ -96,7 +137,8 @@ public class ExternAliasInheritedParameterTests
     private static CSharpCompilation CreateCompilation(
         string source,
         MetadataReference leftPayloadReference,
-        MetadataReference rightPayloadReference) =>
+        MetadataReference rightPayloadReference,
+        bool allowUnsafe = false) =>
         CSharpCompilation.Create(
             assemblyName: "ExternAliasInheritedParameter_" + Guid.NewGuid().ToString("N"),
             syntaxTrees: new[] { CSharpSyntaxTree.ParseText(source, s_parseOptions) },
@@ -104,5 +146,5 @@ public class ExternAliasInheritedParameterTests
                 .Append(MetadataReference.CreateFromFile(typeof(RpcServiceAttribute).Assembly.Location))
                 .Append(leftPayloadReference)
                 .Append(rightPayloadReference),
-            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: allowUnsafe));
 }

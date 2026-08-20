@@ -51,6 +51,10 @@ internal static class InheritedTypeAssemblyIdentityComparer
         {
             (IArrayTypeSymbol leftArray, IArrayTypeSymbol rightArray) =>
                 HaveSameArrayIdentities(leftArray, rightArray, ct),
+            (IPointerTypeSymbol leftPointer, IPointerTypeSymbol rightPointer) =>
+                HaveSameIdentities(leftPointer.PointedAtType, rightPointer.PointedAtType, ct),
+            (IFunctionPointerTypeSymbol leftFunctionPointer, IFunctionPointerTypeSymbol rightFunctionPointer) =>
+                HaveSameFunctionPointerIdentities(leftFunctionPointer, rightFunctionPointer, ct),
             (INamedTypeSymbol leftNamed, INamedTypeSymbol rightNamed) =>
                 HaveSameNamedTypeIdentities(leftNamed, rightNamed, ct),
             _ => true,
@@ -63,6 +67,29 @@ internal static class InheritedTypeAssemblyIdentityComparer
         CancellationToken ct) =>
         left.Rank == right.Rank &&
         HaveSameIdentities(left.ElementType, right.ElementType, ct);
+
+    private static bool HaveSameFunctionPointerIdentities(
+        IFunctionPointerTypeSymbol left,
+        IFunctionPointerTypeSymbol right,
+        CancellationToken ct)
+    {
+        if (!HaveSameIdentities(left.Signature.ReturnType, right.Signature.ReturnType, ct) ||
+            left.Signature.Parameters.Length != right.Signature.Parameters.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < left.Signature.Parameters.Length; i++)
+        {
+            if (left.Signature.Parameters[i].RefKind != right.Signature.Parameters[i].RefKind ||
+                !HaveSameIdentities(left.Signature.Parameters[i].Type, right.Signature.Parameters[i].Type, ct))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     private static bool HaveSameNamedTypeIdentities(
         INamedTypeSymbol left,
