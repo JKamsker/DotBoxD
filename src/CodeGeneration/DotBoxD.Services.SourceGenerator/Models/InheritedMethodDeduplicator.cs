@@ -22,7 +22,7 @@ internal static class InheritedMethodDeduplicator
         IMethodSymbol methodSymbol,
         CancellationToken ct)
     {
-        if (!HasCompatibleReturnShape(existingMethod, methodSymbol, ct))
+        if (!InheritedTypeAssemblyIdentityComparer.HasCompatibleReturnShape(existingMethod, methodSymbol, ct))
         {
             return $"inherited method '{methodSymbol.Name}' has the same signature as another method but an incompatible return type";
         }
@@ -30,6 +30,11 @@ internal static class InheritedMethodDeduplicator
         if (!HasSameParameterRefKinds(existingMethod, methodSymbol))
         {
             return $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible parameter ref kinds";
+        }
+
+        if (!InheritedTypeAssemblyIdentityComparer.HaveSameParameterIdentities(existingMethod, methodSymbol, ct))
+        {
+            return $"inherited method '{methodSymbol.Name}' has the same signature as another method but parameters from different assemblies";
         }
 
         if (!HasSameParameterNames(existingMethod, methodSymbol))
@@ -82,14 +87,6 @@ internal static class InheritedMethodDeduplicator
 
         return null;
     }
-
-    public static bool HasCompatibleReturnShape(
-        IMethodSymbol left,
-        IMethodSymbol right,
-        CancellationToken ct) =>
-        left.RefKind == right.RefKind &&
-        MethodSignatureFacts.GetCanonicalType(left.ReturnType, left, ct) ==
-        MethodSignatureFacts.GetCanonicalType(right.ReturnType, right, ct);
 
     public static bool HasSameParameterRefKinds(IMethodSymbol left, IMethodSymbol right)
     {
