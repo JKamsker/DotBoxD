@@ -1,13 +1,42 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
 using DotBoxD.Services.SourceGenerator.Validation;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Services.SourceGenerator.Models;
 
 internal static partial class ServiceModelFactory
 {
+    public static ServiceResult? GetServiceResult(GeneratorSyntaxContext context, CancellationToken ct)
+    {
+        try
+        {
+            return BuildServiceResult(context, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            var name = context.Node is InterfaceDeclarationSyntax declaration
+                ? declaration.Identifier.ValueText
+                : "<unknown>";
+            return new ServiceResult(
+                Model: null,
+                Error: new GeneratorError(name, ex.ToString()),
+                MethodDiagnostics: EquatableArray<MethodDiagnostic>.Empty,
+                MethodLocations: EquatableArray<DiagnosticLocation>.Empty,
+                PropertyLocations: EquatableArray<DiagnosticLocation>.Empty,
+                ServiceLocation: default,
+                QualifiedInterfaceName: string.Empty,
+                ServiceDiagnostic: null);
+        }
+    }
+
     private static ServiceResult? ValidateInterfaceSymbol(
         INamedTypeSymbol interfaceSymbol,
         ServiceBuildContext context)
@@ -41,6 +70,7 @@ internal static partial class ServiceModelFactory
 
     private static bool TryCollectServiceMembers(
         INamedTypeSymbol interfaceSymbol,
+        Compilation compilation,
         ServiceBuildContext context,
         CancellationToken ct,
         out ServiceMembers members,
@@ -50,6 +80,7 @@ internal static partial class ServiceModelFactory
         var interfaceProperties = new List<IPropertySymbol>();
         var unsupportedMemberDiagnostic = ServiceShapeValidator.CollectMembers(
             interfaceSymbol,
+            compilation,
             interfaceMethods,
             interfaceProperties,
             ct);
