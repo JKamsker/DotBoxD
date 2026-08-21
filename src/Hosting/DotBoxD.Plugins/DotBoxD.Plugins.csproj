@@ -11,6 +11,7 @@
     <ProjectReference Include="..\..\Kernels\DotBoxD.Kernels.Runtime\DotBoxD.Kernels.Runtime.csproj" />
     <ProjectReference Include="..\..\Kernels\DotBoxD.Kernels.Serialization.Json\DotBoxD.Kernels.Serialization.Json.csproj" />
     <ProjectReference Include="..\DotBoxD.Abstractions\DotBoxD.Abstractions.csproj" />
+    <ProjectReference Include="..\..\Services\DotBoxD.Services\DotBoxD.Services.csproj" />
   </ItemGroup>
 
   <ItemGroup>
