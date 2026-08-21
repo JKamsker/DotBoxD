@@ -34,12 +34,12 @@ public sealed class SandboxPolicyBuilder
     {
         ArgumentNullException.ThrowIfNull(capabilityId);
         ArgumentNullException.ThrowIfNull(parameters);
+        var grant = new CapabilityGrant(capabilityId, ParameterReader.Read(parameters));
+        var limits = configureLimits is null ? _limits : configureLimits(_limits);
+
         _allowedEffects |= allowedEffects;
-        _grants.Add(new CapabilityGrant(capabilityId, ParameterReader.Read(parameters)));
-        if (configureLimits is not null)
-        {
-            _limits = configureLimits(_limits);
-        }
+        _grants.Add(grant);
+        _limits = limits;
         return this;
     }
     public SandboxPolicyBuilder GrantFileRead(string root, long maxBytesPerRun)
