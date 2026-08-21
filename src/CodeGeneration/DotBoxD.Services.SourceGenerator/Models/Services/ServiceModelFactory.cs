@@ -64,7 +64,13 @@ internal static partial class ServiceModelFactory
             return rejectedService;
         }
 
-        if (!TryCollectServiceMembers(interfaceSymbol, buildContext, ct, out var members, out var rejectedMembers))
+        if (!TryCollectServiceMembers(
+                interfaceSymbol,
+                context.SemanticModel.Compilation,
+                buildContext,
+                ct,
+                out var members,
+                out var rejectedMembers))
         {
             return rejectedMembers;
         }

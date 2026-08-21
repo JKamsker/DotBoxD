@@ -41,6 +41,7 @@ internal static partial class ServiceModelFactory
 
     private static bool TryCollectServiceMembers(
         INamedTypeSymbol interfaceSymbol,
+        Compilation compilation,
         ServiceBuildContext context,
         CancellationToken ct,
         out ServiceMembers members,
@@ -50,6 +51,7 @@ internal static partial class ServiceModelFactory
         var interfaceProperties = new List<IPropertySymbol>();
         var unsupportedMemberDiagnostic = ServiceShapeValidator.CollectMembers(
             interfaceSymbol,
+            compilation,
             interfaceMethods,
             interfaceProperties,
             ct);

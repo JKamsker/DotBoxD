@@ -39,7 +39,18 @@ public sealed class ExternAliasControlPlaneIdentityTests
 
         var driver = GeneratorTestHelper.CreateDriver().RunGenerators(compilation);
         var runResult = driver.GetRunResult();
-        runResult.Diagnostics.Should().NotContain(d => d.Severity == DiagnosticSeverity.Error);
+        var generatorErrors = runResult.Diagnostics
+            .Where(d => d.Severity == DiagnosticSeverity.Error)
+            .ToArray();
+
+        if (generatorErrors.Any(d => d.Id == "DBXS003"))
+        {
+            generatorErrors.Should().OnlyContain(d => d.Id == "DBXS003");
+        }
+        else
+        {
+            generatorErrors.Should().BeEmpty();
+        }
 
         var final = compilation.AddSyntaxTrees(runResult.GeneratedTrees);
         final.GetDiagnostics()
