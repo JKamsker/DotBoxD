@@ -6,7 +6,7 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 public sealed class PluginServerLiveSettingsInstallationSurpriseTests
 {
     [Fact]
-    public async Task Generated_live_settings_handle_rejects_kernel_type_that_was_never_installed()
+    public async Task Generated_live_settings_handle_rejects_never_installed_kernel_before_invoking_callback()
     {
         var (_, outputCompilation) = PluginServerGenerationTestDriver.Run("""
             using System;
@@ -41,6 +41,8 @@ public sealed class PluginServerLiveSettingsInstallationSurpriseTests
 
                 public sealed class RecordingControl : IGamePluginControlService
                 {
+                    public int UpdateCount { get; private set; }
+
                     public ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default)
                         => throw new InvalidOperationException("not used");
 
@@ -55,7 +57,10 @@ public sealed class PluginServerLiveSettingsInstallationSurpriseTests
                         LiveSettingUpdate[] updates,
                         bool atomic = false,
                         CancellationToken ct = default)
-                        => ValueTask.CompletedTask;
+                    {
+                        UpdateCount++;
+                        return ValueTask.CompletedTask;
+                    }
 
                     public ValueTask HoldUntilShutdownAsync(CancellationToken ct = default)
                         => throw new InvalidOperationException("not used");
@@ -104,10 +109,26 @@ public sealed class PluginServerLiveSettingsInstallationSurpriseTests
 
                 public static class LiveSettingsProbe
                 {
-                    public static async Task RunAsync()
+                    public static async Task<object?[]> RunAsync()
                     {
-                        var server = new RemotePluginServer(new RecordingControl(), world: null);
-                        await server.Get<GuardianKernel>().SetValuesAsync(kernel => kernel.AggroRange = 6);
+                        var control = new RecordingControl();
+                        var server = new RemotePluginServer(control, world: null);
+                        var callbackCount = 0;
+                        Exception? caught = null;
+                        try
+                        {
+                            await server.Get<GuardianKernel>().SetValuesAsync(kernel =>
+                            {
+                                callbackCount++;
+                                kernel.AggroRange = 6;
+                            });
+                        }
+                        catch (Exception exception)
+                        {
+                            caught = exception;
+                        }
+
+                        return new object?[] { caught?.GetType().FullName, callbackCount, control.UpdateCount };
                     }
                 }
             }
@@ -118,8 +139,11 @@ public sealed class PluginServerLiveSettingsInstallationSurpriseTests
         var probe = assembly.GetType("Regression.Plugin.LiveSettingsProbe", throwOnError: true)!;
         var runAsync = probe.GetMethod("RunAsync", BindingFlags.Public | BindingFlags.Static)!;
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => InvokeAsync(runAsync));
-        Assert.Contains("installed", exception.Message, StringComparison.OrdinalIgnoreCase);
+        var result = await InvokeAsync(runAsync);
+
+        Assert.Equal(typeof(InvalidOperationException).FullName, result[0]);
+        Assert.Equal(0, result[1]);
+        Assert.Equal(0, result[2]);
     }
 
     private static Assembly Load(Compilation compilation)
@@ -132,9 +156,9 @@ public sealed class PluginServerLiveSettingsInstallationSurpriseTests
         return Assembly.Load(stream.ToArray());
     }
 
-    private static async Task InvokeAsync(MethodInfo method)
+    private static async Task<object?[]> InvokeAsync(MethodInfo method)
     {
         var result = method.Invoke(null, null);
-        await Assert.IsAssignableFrom<Task>(result);
+        return await Assert.IsType<Task<object?[]>>(result);
     }
 }
