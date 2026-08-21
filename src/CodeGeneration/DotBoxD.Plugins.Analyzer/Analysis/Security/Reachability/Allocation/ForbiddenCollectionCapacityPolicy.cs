@@ -216,6 +216,7 @@ internal static class ForbiddenCollectionCapacityPolicy
         if (method.MethodKind == MethodKind.Constructor)
         {
             return HasConstructorCapacityParameter(method, typeName) ||
+                   IsSortedListDictionaryConstructor(method, typeName) ||
                    IsLinkedListEnumerableConstructor(method, typeName);
         }
 
@@ -227,6 +228,11 @@ internal static class ForbiddenCollectionCapacityPolicy
         => string.Equals(typeName, LinkedListTypeName, StringComparison.Ordinal) &&
            method.Parameters.Length == 1 &&
            string.Equals(method.Parameters[0].Name, "collection", StringComparison.Ordinal);
+
+    private static bool IsSortedListDictionaryConstructor(IMethodSymbol method, string typeName)
+        => string.Equals(typeName, SortedListTypeName, StringComparison.Ordinal) &&
+           method.Parameters.Any(static parameter =>
+               string.Equals(parameter.Name, "dictionary", StringComparison.Ordinal));
 
     private static bool HasConstructorCapacityParameter(IMethodSymbol method, string typeName)
     {
