@@ -76,6 +76,12 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
+        if (IsHashtableDictionaryConstructor(method, typeName))
+        {
+            forbidden = HashtableDictionaryConstructorDisplayName(method);
+            return true;
+        }
+
         return TryGetCapacityDisplayName(method, typeName, out forbidden);
     }
 
@@ -216,7 +222,6 @@ internal static class ForbiddenCollectionCapacityPolicy
         if (method.MethodKind == MethodKind.Constructor)
         {
             return HasConstructorCapacityParameter(method, typeName) ||
-                   IsHashtableDictionaryConstructor(method, typeName) ||
                    IsLinkedListEnumerableConstructor(method, typeName);
         }
 
@@ -236,6 +241,10 @@ internal static class ForbiddenCollectionCapacityPolicy
                    parameter.Type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
                    "System.Collections.IDictionary",
                    StringComparison.Ordinal));
+
+    private static string HashtableDictionaryConstructorDisplayName(IMethodSymbol method)
+        => $"{HashtableTypeName}..ctor({string.Join(", ", method.Parameters.Select(static parameter =>
+            parameter.Type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)))})";
 
     private static bool HasConstructorCapacityParameter(IMethodSymbol method, string typeName)
     {

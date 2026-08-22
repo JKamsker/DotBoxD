@@ -3,12 +3,22 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 public sealed class PluginAnalyzerForbiddenApiHashtableDictionaryConstructionReachabilityTests
 {
     [Theory]
-    [InlineData("dictionary copy", "new(Source)")]
-    [InlineData("dictionary copy with load factor", "new(Source, 0.75f)")]
-    [InlineData("dictionary copy with load factor and comparer", "new(Source, 0.75f, null)")]
+    [InlineData(
+        "dictionary copy",
+        "new(Source)",
+        "System.Collections.Hashtable..ctor(System.Collections.IDictionary)")]
+    [InlineData(
+        "dictionary copy with load factor",
+        "new(Source, 0.75f)",
+        "System.Collections.Hashtable..ctor(System.Collections.IDictionary, float)")]
+    [InlineData(
+        "dictionary copy with load factor and comparer",
+        "new(Source, 0.75f, null)",
+        "System.Collections.Hashtable..ctor(System.Collections.IDictionary, float, System.Collections.IEqualityComparer?)")]
     public async Task Reports_hashtable_dictionary_copy_static_initializer(
         string testCase,
-        string construction)
+        string construction,
+        string expectedConstructor)
     {
         var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
             Source(construction),
@@ -17,7 +27,7 @@ public sealed class PluginAnalyzerForbiddenApiHashtableDictionaryConstructionRea
         var diagnostic = Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DBXK001"));
         var message = diagnostic.GetMessage();
         Assert.True(
-            message.Contains("System.Collections.Hashtable", StringComparison.Ordinal),
+            message.Contains(expectedConstructor, StringComparison.Ordinal),
             $"{testCase}: {message}");
     }
 
