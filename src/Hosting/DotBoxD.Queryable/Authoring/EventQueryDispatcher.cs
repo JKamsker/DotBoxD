@@ -149,13 +149,11 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
             projected = entry.Project(e);
             return true;
         }
-        catch (Exception ex) when (
-            cancellationToken.IsCancellationRequested &&
-            ex is InvalidOperationException or InvalidCastException or NullReferenceException)
+        catch (Exception ex) when (cancellationToken.IsCancellationRequested)
         {
             throw new OperationCanceledException(null, ex, cancellationToken);
         }
-        catch (Exception ex) when (ex is InvalidOperationException or InvalidCastException or NullReferenceException)
+        catch
         {
             projected = null;
             return false;
