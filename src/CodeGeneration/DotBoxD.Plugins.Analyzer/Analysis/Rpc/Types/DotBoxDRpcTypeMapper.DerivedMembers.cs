@@ -200,6 +200,7 @@ internal static partial class DotBoxDRpcTypeMapper
         {
             if (method.IsStatic ||
                 method.MethodKind != MethodKind.Ordinary ||
+                method.Arity != 0 ||
                 method.Parameters.Length != 0)
             {
                 continue;
