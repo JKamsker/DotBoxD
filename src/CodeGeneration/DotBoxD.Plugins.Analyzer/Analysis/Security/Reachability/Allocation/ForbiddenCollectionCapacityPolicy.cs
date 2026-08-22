@@ -28,6 +28,7 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string PriorityQueueTypeName =
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
     private const string NonGenericQueueTypeName = "System.Collections.Queue";
+    private const string NonGenericStackTypeName = "System.Collections.Stack";
     private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
     private const string NonGenericSortedListTypeName = "System.Collections.SortedList";
     private const string SortedListTypeName = "System.Collections.Generic.SortedList<TKey, TValue>";
@@ -44,6 +45,7 @@ internal static class ForbiddenCollectionCapacityPolicy
         [LinkedListTypeName] = "System.Collections.Generic.LinkedList",
         [NameValueCollectionTypeName] = NameValueCollectionTypeName,
         [NonGenericQueueTypeName] = NonGenericQueueTypeName,
+        [NonGenericStackTypeName] = NonGenericStackTypeName,
         [NonGenericSortedListTypeName] = NonGenericSortedListTypeName,
         [OrderedDictionaryTypeName] = OrderedDictionaryTypeName,
         [QueueTypeName] = "System.Collections.Generic.Queue",
@@ -216,7 +218,8 @@ internal static class ForbiddenCollectionCapacityPolicy
         if (method.MethodKind == MethodKind.Constructor)
         {
             return HasConstructorCapacityParameter(method, typeName) ||
-                   IsLinkedListEnumerableConstructor(method, typeName);
+                   IsLinkedListEnumerableConstructor(method, typeName) ||
+                   IsNonGenericStackCollectionConstructor(method, typeName);
         }
 
         return method.MethodKind == MethodKind.Ordinary &&
@@ -228,11 +231,16 @@ internal static class ForbiddenCollectionCapacityPolicy
            method.Parameters.Length == 1 &&
            string.Equals(method.Parameters[0].Name, "collection", StringComparison.Ordinal);
 
+    private static bool IsNonGenericStackCollectionConstructor(IMethodSymbol method, string typeName)
+        => string.Equals(typeName, NonGenericStackTypeName, StringComparison.Ordinal) &&
+           method.Parameters.Length == 1 &&
+           string.Equals(method.Parameters[0].Name, "col", StringComparison.Ordinal);
+
     private static bool HasConstructorCapacityParameter(IMethodSymbol method, string typeName)
     {
         var capacityName = typeName switch
         {
-            PriorityQueueTypeName or NonGenericSortedListTypeName or ArrayBufferWriterTypeName =>
+            PriorityQueueTypeName or NonGenericSortedListTypeName or NonGenericStackTypeName or ArrayBufferWriterTypeName =>
                 "initialCapacity",
             HybridDictionaryTypeName => "initialSize",
             _ => "capacity"
