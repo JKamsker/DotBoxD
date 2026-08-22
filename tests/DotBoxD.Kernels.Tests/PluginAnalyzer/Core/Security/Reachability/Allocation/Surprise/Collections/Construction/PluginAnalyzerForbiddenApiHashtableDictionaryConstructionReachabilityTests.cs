@@ -12,6 +12,10 @@ public sealed class PluginAnalyzerForbiddenApiHashtableDictionaryConstructionRea
         "new(Source, 0.75f)",
         "System.Collections.Hashtable..ctor(System.Collections.IDictionary, float)")]
     [InlineData(
+        "dictionary copy with comparer",
+        "new(Source, null)",
+        "System.Collections.Hashtable..ctor(System.Collections.IDictionary, System.Collections.IEqualityComparer?)")]
+    [InlineData(
         "dictionary copy with load factor and comparer",
         "new(Source, 0.75f, null)",
         "System.Collections.Hashtable..ctor(System.Collections.IDictionary, float, System.Collections.IEqualityComparer?)")]
