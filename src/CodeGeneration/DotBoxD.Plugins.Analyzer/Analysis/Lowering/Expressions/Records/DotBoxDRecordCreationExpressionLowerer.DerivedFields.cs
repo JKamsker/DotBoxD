@@ -96,11 +96,18 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
                 continue;
             }
 
-            bindings[fields[i].Name] = new DotBoxDExpressionModel(
+            if (fields[i].Symbol is not IPropertySymbol member)
+            {
+                continue;
+            }
+
+            bindings[MemberSymbolKey(member)] = new DotBoxDExpressionModel(
                 source,
                 SandboxTypeSourceEmitter.ManifestTag(fields[i].Type),
                 false);
         }
+
+        AddIgnoredDefaultBindings(property.ContainingType, bindings);
 
         var bodyModel = context.SemanticModel.Compilation.GetSemanticModel(body.SyntaxTree);
         var bodyContext = new DotBoxDExpressionLoweringContext(
@@ -109,7 +116,7 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
             liveSettings: default,
             bodyModel,
             context.CancellationToken,
-            inlinedBindings: bindings);
+            derivedMemberBindings: bindings);
         var lowered = DotBoxDExpressionModelFactory.Create(body, bodyContext);
         if (!string.Equals(lowered.Type, SandboxTypeSourceEmitter.ManifestTag(field.Type), StringComparison.Ordinal))
         {
@@ -121,6 +128,43 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
 
     private static bool IsComputedProperty(RecordMember field)
         => field.Symbol is IPropertySymbol { SetMethod: null };
+
+    private static void AddIgnoredDefaultBindings(
+        INamedTypeSymbol type,
+        Dictionary<string, DotBoxDExpressionModel> bindings)
+    {
+        for (var current = type; current is not null; current = current.BaseType)
+        {
+            foreach (var member in current.GetMembers())
+            {
+                if (member is not IPropertySymbol
+                    {
+                        DeclaredAccessibility: Accessibility.Public,
+                        IsStatic: false,
+                        GetMethod: { DeclaredAccessibility: Accessibility.Public }
+                    } ignored ||
+                    !DotBoxDRpcTypeMapper.IsIgnoredDataMember(ignored))
+                {
+                    continue;
+                }
+
+                var key = MemberSymbolKey(ignored);
+                if (!bindings.ContainsKey(key))
+                {
+                    bindings.Add(
+                        key,
+                        new DotBoxDExpressionModel(
+                            ZeroSource(ignored.Type),
+                            SandboxTypeSourceEmitter.ManifestTag(ignored.Type),
+                            false));
+                }
+            }
+        }
+    }
+
+    private static string MemberSymbolKey(IPropertySymbol property)
+        => property.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
+            "." + property.MetadataName;
 
     private static string NonNullableZeroSource(ITypeSymbol fieldType)
         => SandboxTypeSourceEmitter.ManifestTag(fieldType) switch
