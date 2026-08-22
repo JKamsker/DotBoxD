@@ -28,6 +28,7 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string PriorityQueueTypeName =
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
     private const string NonGenericQueueTypeName = "System.Collections.Queue";
+    private const string NonGenericCollectionInterfaceTypeName = "System.Collections.ICollection";
     private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
     private const string NonGenericSortedListTypeName = "System.Collections.SortedList";
     private const string SortedListTypeName = "System.Collections.Generic.SortedList<TKey, TValue>";
@@ -216,6 +217,7 @@ internal static class ForbiddenCollectionCapacityPolicy
         if (method.MethodKind == MethodKind.Constructor)
         {
             return HasConstructorCapacityParameter(method, typeName) ||
+                   IsArrayListCollectionConstructor(method, typeName) ||
                    IsLinkedListEnumerableConstructor(method, typeName);
         }
 
@@ -227,6 +229,14 @@ internal static class ForbiddenCollectionCapacityPolicy
         => string.Equals(typeName, LinkedListTypeName, StringComparison.Ordinal) &&
            method.Parameters.Length == 1 &&
            string.Equals(method.Parameters[0].Name, "collection", StringComparison.Ordinal);
+
+    private static bool IsArrayListCollectionConstructor(IMethodSymbol method, string typeName)
+        => string.Equals(typeName, ArrayListTypeName, StringComparison.Ordinal) &&
+           method.Parameters.Length == 1 &&
+           string.Equals(
+               method.Parameters[0].Type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
+               NonGenericCollectionInterfaceTypeName,
+               StringComparison.Ordinal);
 
     private static bool HasConstructorCapacityParameter(IMethodSymbol method, string typeName)
     {
