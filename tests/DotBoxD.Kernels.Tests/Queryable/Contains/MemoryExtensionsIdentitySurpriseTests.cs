@@ -17,7 +17,7 @@ public sealed class MemoryExtensionsIdentitySurpriseTests
 
         Assert.Equal(QueryFilterKind.In, filter.Kind);
         Assert.Equal(nameof(AttackTestEvent.Damage), filter.Field);
-        Assert.Single(filter.Values);
+        Assert.Equal(QueryValue.FromInteger(5), Assert.Single(filter.Values));
     }
 
     [Fact]
