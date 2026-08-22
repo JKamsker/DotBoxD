@@ -216,6 +216,7 @@ internal static class ForbiddenCollectionCapacityPolicy
         if (method.MethodKind == MethodKind.Constructor)
         {
             return HasConstructorCapacityParameter(method, typeName) ||
+                   IsArrayListCollectionConstructor(method, typeName) ||
                    IsLinkedListEnumerableConstructor(method, typeName);
         }
 
@@ -227,6 +228,10 @@ internal static class ForbiddenCollectionCapacityPolicy
         => string.Equals(typeName, LinkedListTypeName, StringComparison.Ordinal) &&
            method.Parameters.Length == 1 &&
            string.Equals(method.Parameters[0].Name, "collection", StringComparison.Ordinal);
+
+    private static bool IsArrayListCollectionConstructor(IMethodSymbol method, string typeName)
+        => string.Equals(typeName, ArrayListTypeName, StringComparison.Ordinal) &&
+           method.Parameters.Length == 1;
 
     private static bool HasConstructorCapacityParameter(IMethodSymbol method, string typeName)
     {
