@@ -216,7 +216,8 @@ internal static class ForbiddenCollectionCapacityPolicy
         if (method.MethodKind == MethodKind.Constructor)
         {
             return HasConstructorCapacityParameter(method, typeName) ||
-                   IsLinkedListEnumerableConstructor(method, typeName);
+                   IsLinkedListEnumerableConstructor(method, typeName) ||
+                   IsNonGenericQueueCollectionConstructor(method, typeName);
         }
 
         return method.MethodKind == MethodKind.Ordinary &&
@@ -227,6 +228,11 @@ internal static class ForbiddenCollectionCapacityPolicy
         => string.Equals(typeName, LinkedListTypeName, StringComparison.Ordinal) &&
            method.Parameters.Length == 1 &&
            string.Equals(method.Parameters[0].Name, "collection", StringComparison.Ordinal);
+
+    private static bool IsNonGenericQueueCollectionConstructor(IMethodSymbol method, string typeName)
+        => string.Equals(typeName, NonGenericQueueTypeName, StringComparison.Ordinal) &&
+           method.Parameters.Length == 1 &&
+           string.Equals(method.Parameters[0].Name, "col", StringComparison.Ordinal);
 
     private static bool HasConstructorCapacityParameter(IMethodSymbol method, string typeName)
     {
