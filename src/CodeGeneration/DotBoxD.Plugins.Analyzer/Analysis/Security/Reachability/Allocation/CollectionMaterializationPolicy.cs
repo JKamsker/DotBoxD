@@ -42,6 +42,8 @@ internal static class CollectionMaterializationPolicy
                 "System.Collections.Immutable.ImmutableList.ToImmutableList",
             ("ToImmutableDictionary", ImmutableDictionaryTypeName) when method.IsStatic =>
                 "System.Collections.Immutable.ImmutableDictionary.ToImmutableDictionary",
+            ("ConvertAll", ListTypeName) when !method.IsStatic =>
+                "System.Collections.Generic.List.ConvertAll",
             ("GetRange", ListTypeName) when !method.IsStatic =>
                 "System.Collections.Generic.List.GetRange",
             _ => null!
