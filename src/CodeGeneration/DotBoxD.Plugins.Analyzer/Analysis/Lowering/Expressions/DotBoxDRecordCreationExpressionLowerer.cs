@@ -61,6 +61,7 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
                     lowerExpression);
                 return LowerInitializer(
                     fields,
+                    recordType,
                     recordTypeSource,
                     initializer,
                     context,
@@ -73,6 +74,7 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
 
             return LowerInitializer(
                 fields,
+                recordType,
                 recordTypeSource,
                 initializer,
                 context,
@@ -104,6 +106,7 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
             fields,
             positionalSources,
             positionalAssigned,
+            recordType,
             context,
             allowStoredZero: false,
             allocates: positionalAllocates);
@@ -202,6 +205,7 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
     // zero-fill convention.
     private static DotBoxDExpressionModel LowerInitializer(
         IReadOnlyList<RecordMember> fields,
+        INamedTypeSymbol recordType,
         string recordTypeSource,
         InitializerExpressionSyntax initializer,
         DotBoxDExpressionLoweringContext context,
@@ -246,6 +250,7 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
             fields,
             fieldSources,
             assigned,
+            recordType,
             context,
             allowStoredZero,
             allocates: allocates);

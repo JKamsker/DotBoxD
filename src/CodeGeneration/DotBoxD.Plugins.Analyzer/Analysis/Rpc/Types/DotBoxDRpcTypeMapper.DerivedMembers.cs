@@ -35,7 +35,8 @@ internal static partial class DotBoxDRpcTypeMapper
     public static bool IsDerivedFromAssignedFields(
         RecordMember member,
         IReadOnlyList<RecordMember> fields,
-        bool[] assigned)
+        bool[] assigned,
+        INamedTypeSymbol? dispatchType = null)
     {
         if (member.Symbol is not IPropertySymbol
             {
@@ -46,7 +47,7 @@ internal static partial class DotBoxDRpcTypeMapper
             return false;
         }
 
-        if (TryGetDerivedGetterExpression(property) is not { } body)
+        if (TryGetDerivedGetterExpression(property, dispatchType) is not { } body)
         {
             return false;
         }
@@ -133,7 +134,9 @@ internal static partial class DotBoxDRpcTypeMapper
            unary.IsKind(SyntaxKind.UnaryMinusExpression) ||
            unary.IsKind(SyntaxKind.UnaryPlusExpression);
 
-    internal static ExpressionSyntax? TryGetDerivedGetterExpression(IPropertySymbol property)
+    internal static ExpressionSyntax? TryGetDerivedGetterExpression(
+        IPropertySymbol property,
+        INamedTypeSymbol? dispatchType = null)
     {
         foreach (var reference in property.DeclaringSyntaxReferences)
         {
@@ -144,20 +147,20 @@ internal static partial class DotBoxDRpcTypeMapper
 
             if (declaration.ExpressionBody is { } arrow)
             {
-                return ExpandDerivedGetterExpression(property.ContainingType, arrow.Expression);
+                return ExpandDerivedGetterExpression(property.ContainingType, arrow.Expression, dispatchType);
             }
 
             var getter = declaration.AccessorList?.Accessors
                 .FirstOrDefault(accessor => accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
             if (getter?.ExpressionBody is { } getterArrow)
             {
-                return ExpandDerivedGetterExpression(property.ContainingType, getterArrow.Expression);
+                return ExpandDerivedGetterExpression(property.ContainingType, getterArrow.Expression, dispatchType);
             }
 
             if (getter?.Body is { Statements.Count: 1 } getterBody &&
                 getterBody.Statements[0] is ReturnStatementSyntax { Expression: { } returned })
             {
-                return ExpandDerivedGetterExpression(property.ContainingType, returned);
+                return ExpandDerivedGetterExpression(property.ContainingType, returned, dispatchType);
             }
         }
 
@@ -167,6 +170,7 @@ internal static partial class DotBoxDRpcTypeMapper
     private static ExpressionSyntax ExpandDerivedGetterExpression(
         INamedTypeSymbol containingType,
         ExpressionSyntax expression,
+        INamedTypeSymbol? dispatchType,
         int depth = 0)
     {
         if (depth >= 4 ||
@@ -175,12 +179,12 @@ internal static partial class DotBoxDRpcTypeMapper
                 ArgumentList.Arguments.Count: 0
             } invocation ||
             HelperName(invocation.Expression) is not { } helperName ||
-            TryGetParameterlessHelperExpression(containingType, helperName) is not { } helperBody)
+            TryGetParameterlessHelperExpression(containingType, helperName, dispatchType) is not { } helperBody)
         {
             return expression;
         }
 
-        return ExpandDerivedGetterExpression(containingType, helperBody, depth + 1);
+        return ExpandDerivedGetterExpression(containingType, helperBody, dispatchType, depth + 1);
     }
 
     private static string? HelperName(ExpressionSyntax expression)
@@ -194,18 +198,21 @@ internal static partial class DotBoxDRpcTypeMapper
 
     private static ExpressionSyntax? TryGetParameterlessHelperExpression(
         INamedTypeSymbol containingType,
-        string helperName)
+        string helperName,
+        INamedTypeSymbol? dispatchType)
     {
         foreach (var method in containingType.GetMembers(helperName).OfType<IMethodSymbol>())
         {
             if (method.IsStatic ||
                 method.MethodKind != MethodKind.Ordinary ||
+                method.Arity != 0 ||
                 method.Parameters.Length != 0)
             {
                 continue;
             }
 
-            foreach (var reference in method.DeclaringSyntaxReferences)
+            var dispatchTarget = ResolveDispatchTarget(method, dispatchType);
+            foreach (var reference in dispatchTarget.DeclaringSyntaxReferences)
             {
                 if (reference.GetSyntax() is not MethodDeclarationSyntax declaration)
                 {
@@ -226,5 +233,39 @@ internal static partial class DotBoxDRpcTypeMapper
         }
 
         return null;
+    }
+
+    private static IMethodSymbol ResolveDispatchTarget(IMethodSymbol method, INamedTypeSymbol? dispatchType)
+    {
+        if (!method.IsVirtual || dispatchType is null)
+        {
+            return method;
+        }
+
+        for (var current = dispatchType; current is not null; current = current.BaseType)
+        {
+            foreach (var candidate in current.GetMembers(method.Name).OfType<IMethodSymbol>())
+            {
+                if (Overrides(candidate, method))
+                {
+                    return candidate;
+                }
+            }
+        }
+
+        return method;
+    }
+
+    private static bool Overrides(IMethodSymbol candidate, IMethodSymbol method)
+    {
+        for (var current = candidate.OverriddenMethod; current is not null; current = current.OverriddenMethod)
+        {
+            if (SymbolEqualityComparer.Default.Equals(current, method))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

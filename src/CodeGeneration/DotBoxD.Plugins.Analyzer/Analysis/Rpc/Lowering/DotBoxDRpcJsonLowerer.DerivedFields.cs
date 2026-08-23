@@ -14,7 +14,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     {
         for (var i = 0; i < fields.Count; i++)
         {
-            if (!assigned[i] && DotBoxDRpcTypeMapper.IsDerivedFromAssignedFields(fields[i], fields, assigned))
+            if (!assigned[i] && DotBoxDRpcTypeMapper.IsDerivedFromAssignedFields(fields[i], fields, assigned, named))
             {
                 args[i] = LowerDerivedField(fields, assigned, args, named, fields[i]);
                 assigned[i] = true;
@@ -40,7 +40,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         RecordMember derived)
     {
         if (derived.Symbol is not IPropertySymbol { GetMethod: not null } property ||
-            DotBoxDRpcTypeMapper.TryGetDerivedGetterExpression(property) is not { } body)
+            DotBoxDRpcTypeMapper.TryGetDerivedGetterExpression(property, named) is not { } body)
         {
             throw new System.NotSupportedException(
                 $"Server extension constructor for '{named.Name}' cannot reconstruct the derived member '{derived.Name}' " +

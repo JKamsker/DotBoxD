@@ -23,11 +23,12 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
         IReadOnlyList<RecordMember> fields,
         string?[] fieldSources,
         bool[] assigned,
+        INamedTypeSymbol recordType,
         DotBoxDExpressionLoweringContext context,
         bool allowStoredZero,
         bool allocates)
     {
-        while (TryFillDerivedField(fields, fieldSources, assigned, context, ref allocates))
+        while (TryFillDerivedField(fields, fieldSources, assigned, recordType, context, ref allocates))
         {
         }
 
@@ -54,18 +55,19 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
         IReadOnlyList<RecordMember> fields,
         string?[] fieldSources,
         bool[] assigned,
+        INamedTypeSymbol recordType,
         DotBoxDExpressionLoweringContext context,
         ref bool allocates)
     {
         for (var i = 0; i < fields.Count; i++)
         {
             if (assigned[i] ||
-                !DotBoxDRpcTypeMapper.IsDerivedFromAssignedFields(fields[i], fields, assigned))
+                !DotBoxDRpcTypeMapper.IsDerivedFromAssignedFields(fields[i], fields, assigned, recordType))
             {
                 continue;
             }
 
-            var lowered = LowerDerivedField(fields, fieldSources, assigned, context, fields[i]);
+            var lowered = LowerDerivedField(fields, fieldSources, assigned, recordType, context, fields[i]);
             fieldSources[i] = lowered.Source;
             assigned[i] = true;
             allocates |= lowered.Allocates;
@@ -79,11 +81,12 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
         IReadOnlyList<RecordMember> fields,
         string?[] fieldSources,
         bool[] assigned,
+        INamedTypeSymbol recordType,
         DotBoxDExpressionLoweringContext context,
         RecordMember field)
     {
         if (field.Symbol is not IPropertySymbol property ||
-            DotBoxDRpcTypeMapper.TryGetDerivedGetterExpression(property) is not { } body)
+            DotBoxDRpcTypeMapper.TryGetDerivedGetterExpression(property, recordType) is not { } body)
         {
             throw new NotSupportedException();
         }
