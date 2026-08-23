@@ -59,30 +59,10 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
                     assigned,
                     context,
                     lowerExpression);
-                return LowerInitializer(
-                    fields,
-                    recordType,
-                    recordTypeSource,
-                    initializer,
-                    context,
-                    lowerExpression,
-                    fieldSources,
-                    assigned,
-                    allowStoredZero,
-                    allocates);
+                return LowerInitializer(fields, recordType, recordTypeSource, initializer, context, lowerExpression, fieldSources, assigned, allowStoredZero, allocates);
             }
 
-            return LowerInitializer(
-                fields,
-                recordType,
-                recordTypeSource,
-                initializer,
-                context,
-                lowerExpression,
-                fieldSources: null,
-                assigned: null,
-                allowStoredZero,
-                allocates: true);
+            return LowerInitializer(fields, recordType, recordTypeSource, initializer, context, lowerExpression, fieldSources: null, assigned: null, allowStoredZero, allocates: true);
         }
 
         if (arguments.Count != constructor.Parameters.Length || constructor.Parameters.Length > fields.Count)
