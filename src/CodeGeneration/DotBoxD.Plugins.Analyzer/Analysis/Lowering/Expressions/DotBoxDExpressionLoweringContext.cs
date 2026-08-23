@@ -22,6 +22,7 @@ internal sealed class DotBoxDExpressionLoweringContext
         ICollection<string>? capabilities = null,
         ICollection<string>? effects = null,
         IReadOnlyDictionary<string, DotBoxDExpressionModel>? inlinedBindings = null,
+        IReadOnlyDictionary<string, DotBoxDExpressionModel>? derivedMemberBindings = null,
         IReadOnlyDictionary<string, PatternCaptureBinding>? patternCaptures = null,
         IReadOnlyCollection<string>? inlineStack = null)
     {
@@ -40,6 +41,7 @@ internal sealed class DotBoxDExpressionLoweringContext
         Capabilities = capabilities;
         Effects = effects;
         InlinedBindings = inlinedBindings;
+        DerivedMemberBindings = derivedMemberBindings;
         PatternCaptures = patternCaptures;
         _inlineStack = inlineStack;
     }
@@ -205,6 +207,13 @@ internal sealed class DotBoxDExpressionLoweringContext
     public IReadOnlyDictionary<string, DotBoxDExpressionModel>? InlinedBindings { get; }
 
     /// <summary>
+    /// Member-symbol bindings used only while lowering a computed DTO getter. Unlike
+    /// <see cref="InlinedBindings"/>, these keys identify the declaring member so a hidden property does not
+    /// accidentally bind to another member with the same name.
+    /// </summary>
+    public IReadOnlyDictionary<string, DotBoxDExpressionModel>? DerivedMemberBindings { get; }
+
+    /// <summary>
     /// Pattern variables introduced by the supported <c>handle is T local &amp;&amp; rhs</c> shape. Each variable is
     /// the already-lowered handle key plus the subtype whose instance host bindings are valid on that key.
     /// </summary>
@@ -262,6 +271,7 @@ internal sealed class DotBoxDExpressionLoweringContext
             capabilities: Capabilities,
             effects: Effects,
             inlinedBindings: bindings,
+            derivedMemberBindings: null,
             inlineStack: stack);
     }
 
@@ -293,6 +303,7 @@ internal sealed class DotBoxDExpressionLoweringContext
             Capabilities,
             Effects,
             InlinedBindings,
+            DerivedMemberBindings,
             captures,
             _inlineStack);
     }
