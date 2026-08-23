@@ -23,6 +23,17 @@ internal static class PluginAnalyzerGeneratedPackageFactory
         return Assert.IsType<PluginPackage>(create.Invoke(null, null));
     }
 
+    public static PluginPackage Create(
+        IReadOnlyList<string> sources,
+        string factoryTypeName,
+        params Type[] additionalReferenceTypes)
+    {
+        var loaded = CreateAssembly(sources, additionalReferenceTypes);
+        var factory = loaded.GetType(factoryTypeName, throwOnError: true)!;
+        var create = factory.GetMethod("Create", BindingFlags.Public | BindingFlags.Static)!;
+        return Assert.IsType<PluginPackage>(create.Invoke(null, null));
+    }
+
     public static PluginPackage CreateWithReferences(
         string source,
         string factoryTypeName,
@@ -37,6 +48,14 @@ internal static class PluginAnalyzerGeneratedPackageFactory
     public static Assembly CreateAssembly(string source, params Type[] additionalReferenceTypes)
     {
         var compilation = CreateCompilation(source, additionalReferenceTypes);
+        return CreateAssembly(compilation);
+    }
+
+    public static Assembly CreateAssembly(
+        IReadOnlyList<string> sources,
+        params Type[] additionalReferenceTypes)
+    {
+        var compilation = CreateCompilation(sources, additionalReferenceTypes);
         return CreateAssembly(compilation);
     }
 
@@ -176,6 +195,20 @@ internal static class PluginAnalyzerGeneratedPackageFactory
             source,
             ParseOptions,
             AdditionalReferences(additionalReferenceTypes));
+
+    private static CSharpCompilation CreateCompilation(
+        IReadOnlyList<string> sources,
+        params Type[] additionalReferenceTypes)
+        => CSharpCompilation.Create(
+            "DotBoxDGeneratedPackageRuntimeTest",
+            sources.Select(source => CSharpSyntaxTree.ParseText(source, ParseOptions)),
+            TrustedPlatformReferences()
+                .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(RpcServiceAttribute).Assembly.Location))
+                .Concat(AdditionalReferences(additionalReferenceTypes)),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
     private static CSharpCompilation CreateCompilation(string source, IEnumerable<MetadataReference> additionalReferences)
         => CreateCompilation(source, ParseOptions, additionalReferences);

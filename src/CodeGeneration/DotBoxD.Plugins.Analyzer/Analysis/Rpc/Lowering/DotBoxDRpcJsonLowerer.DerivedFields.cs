@@ -6,6 +6,22 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 internal sealed partial class DotBoxDRpcJsonLowerer
 {
+    private static readonly IReadOnlyDictionary<SpecialType, object?> DefaultLiteralValues =
+        new Dictionary<SpecialType, object?>
+        {
+            [SpecialType.System_Boolean] = false,
+            [SpecialType.System_Byte] = 0,
+            [SpecialType.System_Int16] = 0,
+            [SpecialType.System_Int32] = 0,
+            [SpecialType.System_UInt16] = 0,
+            [SpecialType.System_UInt32] = 0L,
+            [SpecialType.System_Int64] = 0L,
+            [SpecialType.System_UInt64] = 0L,
+            [SpecialType.System_Single] = 0D,
+            [SpecialType.System_Double] = 0D,
+            [SpecialType.System_String] = string.Empty,
+        };
+
     private bool TryLowerDerivedField(
         IReadOnlyList<RecordMember> fields,
         bool[] assigned,
@@ -14,7 +30,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     {
         for (var i = 0; i < fields.Count; i++)
         {
-            if (!assigned[i] && DotBoxDRpcTypeMapper.IsDerivedFromAssignedFields(fields[i], fields, assigned))
+            if (!assigned[i] && DotBoxDRpcTypeMapper.IsDerivedFromAssignedFields(fields[i], fields, assigned, named))
             {
                 args[i] = LowerDerivedField(fields, assigned, args, named, fields[i]);
                 assigned[i] = true;
@@ -40,7 +56,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         RecordMember derived)
     {
         if (derived.Symbol is not IPropertySymbol { GetMethod: not null } property ||
-            DotBoxDRpcTypeMapper.TryGetDerivedGetterExpression(property) is not { } body)
+            DotBoxDRpcTypeMapper.TryGetDerivedGetterExpression(property, named) is not { } body)
         {
             throw new System.NotSupportedException(
                 $"Server extension constructor for '{named.Name}' cannot reconstruct the derived member '{derived.Name}' " +
@@ -48,14 +64,16 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 $"'{named.Name}' where the value is available, or expose '{derived.Name}' as a constructor parameter.");
         }
 
-        var memberBindings = new Dictionary<string, string>(System.StringComparer.Ordinal);
+        var memberBindings = new Dictionary<ISymbol, string>(SymbolEqualityComparer.Default);
         for (var i = 0; i < fields.Count; i++)
         {
             if (assigned[i])
             {
-                memberBindings[fields[i].Name] = args[i];
+                memberBindings[fields[i].Symbol] = args[i];
             }
         }
+
+        AddIgnoredDefaultBindings(property.ContainingType, memberBindings);
 
         return ApplyNumericConversion(
             body,
@@ -65,7 +83,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
     private string LowerDerivedExpression(
         ExpressionSyntax expression,
-        IReadOnlyDictionary<string, string> memberBindings,
+        IReadOnlyDictionary<ISymbol, string> memberBindings,
         INamedTypeSymbol named,
         RecordMember derived)
     {
@@ -79,7 +97,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
     private string? TryLowerDerivedTerminal(
         ExpressionSyntax expression,
-        IReadOnlyDictionary<string, string> memberBindings,
+        IReadOnlyDictionary<ISymbol, string> memberBindings,
         INamedTypeSymbol named,
         RecordMember derived)
         => expression switch
@@ -88,19 +106,58 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 LowerDerivedExpression(parenthesized.Expression, memberBindings, named, derived),
             LiteralExpressionSyntax literal =>
                 LiteralJson(literal.Token.Value),
-            IdentifierNameSyntax identifier =>
-                BoundDerivedMember(memberBindings, identifier.Identifier.ValueText),
+            IdentifierNameSyntax identifier => BoundDerivedMember(memberBindings, identifier),
             MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } thisMember =>
-                BoundDerivedMember(memberBindings, thisMember.Name.Identifier.ValueText),
+                BoundDerivedMember(memberBindings, thisMember),
             _ => null
         };
 
-    private static string? BoundDerivedMember(IReadOnlyDictionary<string, string> memberBindings, string name)
-        => memberBindings.TryGetValue(name, out var bound) ? bound : null;
+    private string? BoundDerivedMember(
+        IReadOnlyDictionary<ISymbol, string> memberBindings,
+        ExpressionSyntax expression)
+    {
+        return ModelFor(expression).GetSymbolInfo(expression, _cancellationToken).Symbol is { } member &&
+           memberBindings.TryGetValue(member, out var bound)
+            ? bound
+            : null;
+    }
+
+    private void AddIgnoredDefaultBindings(
+        INamedTypeSymbol type,
+        Dictionary<ISymbol, string> memberBindings)
+    {
+        for (var current = type; current is not null; current = current.BaseType)
+        {
+            foreach (var member in current.GetMembers())
+            {
+                if (member is not IPropertySymbol
+                    {
+                        DeclaredAccessibility: Accessibility.Public,
+                        IsStatic: false,
+                        GetMethod: { DeclaredAccessibility: Accessibility.Public }
+                    } ignored ||
+                    !DotBoxDRpcTypeMapper.IsIgnoredDataMember(ignored) ||
+                    memberBindings.ContainsKey(ignored))
+                {
+                    continue;
+                }
+
+                if (TryDefaultLiteralJson(ignored.Type) is { } defaultValue)
+                {
+                    memberBindings.Add(ignored, defaultValue);
+                }
+            }
+        }
+    }
+
+    private static string? TryDefaultLiteralJson(ITypeSymbol type)
+        => DefaultLiteralValues.TryGetValue(type.SpecialType, out var value)
+            ? LiteralJson(value)
+            : null;
 
     private string? TryLowerDerivedUnary(
         ExpressionSyntax expression,
-        IReadOnlyDictionary<string, string> memberBindings,
+        IReadOnlyDictionary<ISymbol, string> memberBindings,
         INamedTypeSymbol named,
         RecordMember derived)
     {
@@ -125,7 +182,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
     private string? TryLowerDerivedBinary(
         ExpressionSyntax expression,
-        IReadOnlyDictionary<string, string> memberBindings,
+        IReadOnlyDictionary<ISymbol, string> memberBindings,
         INamedTypeSymbol named,
         RecordMember derived)
         => expression is BinaryExpressionSyntax binary

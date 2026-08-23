@@ -10,11 +10,11 @@ internal static class InheritedMethodDeduplicator
 {
     public static string? GetDuplicateSignatureRejectionReason(
         IMethodSymbol existingMethod,
-        IMethodSymbol methodSymbol,
+        IMethodSymbol methodSymbol, Compilation compilation,
         CancellationToken ct)
     {
         var shapeReason = GetShapeRejectionReason(existingMethod, methodSymbol, ct);
-        return shapeReason ?? GetContractRejectionReason(existingMethod, methodSymbol, ct);
+        return shapeReason ?? GetContractRejectionReason(existingMethod, methodSymbol, compilation, ct);
     }
 
     private static string? GetShapeRejectionReason(
@@ -22,7 +22,7 @@ internal static class InheritedMethodDeduplicator
         IMethodSymbol methodSymbol,
         CancellationToken ct)
     {
-        if (!HasCompatibleReturnShape(existingMethod, methodSymbol, ct))
+        if (!InheritedTypeAssemblyIdentityComparer.HasCompatibleReturnShape(existingMethod, methodSymbol, ct))
         {
             return $"inherited method '{methodSymbol.Name}' has the same signature as another method but an incompatible return type";
         }
@@ -30,6 +30,11 @@ internal static class InheritedMethodDeduplicator
         if (!HasSameParameterRefKinds(existingMethod, methodSymbol))
         {
             return $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible parameter ref kinds";
+        }
+
+        if (!InheritedTypeAssemblyIdentityComparer.HaveSameParameterIdentities(existingMethod, methodSymbol, ct))
+        {
+            return $"inherited method '{methodSymbol.Name}' has the same signature as another method but parameters from different assemblies";
         }
 
         if (!HasSameParameterNames(existingMethod, methodSymbol))
@@ -52,7 +57,7 @@ internal static class InheritedMethodDeduplicator
 
     private static string? GetContractRejectionReason(
         IMethodSymbol existingMethod,
-        IMethodSymbol methodSymbol,
+        IMethodSymbol methodSymbol, Compilation compilation,
         CancellationToken ct)
     {
         if (!HasSameNullableAnnotations(existingMethod, methodSymbol, ct))
@@ -65,7 +70,7 @@ internal static class InheritedMethodDeduplicator
             return $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible flow attributes";
         }
 
-        if (!HasSameCallerInfoAttributes(existingMethod, methodSymbol, ct))
+        if (!HasSameCallerInfoAttributes(existingMethod, methodSymbol, compilation, ct))
         {
             return $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible caller info attributes";
         }
@@ -82,14 +87,6 @@ internal static class InheritedMethodDeduplicator
 
         return null;
     }
-
-    public static bool HasCompatibleReturnShape(
-        IMethodSymbol left,
-        IMethodSymbol right,
-        CancellationToken ct) =>
-        left.RefKind == right.RefKind &&
-        MethodSignatureFacts.GetCanonicalType(left.ReturnType, left, ct) ==
-        MethodSignatureFacts.GetCanonicalType(right.ReturnType, right, ct);
 
     public static bool HasSameParameterRefKinds(IMethodSymbol left, IMethodSymbol right)
     {
@@ -174,7 +171,7 @@ internal static class InheritedMethodDeduplicator
 
     public static bool HasSameCallerInfoAttributes(
         IMethodSymbol left,
-        IMethodSymbol right,
+        IMethodSymbol right, Compilation compilation,
         CancellationToken ct)
     {
         if (left.Parameters.Length != right.Parameters.Length)
@@ -182,11 +179,13 @@ internal static class InheritedMethodDeduplicator
             return false;
         }
 
+        var callerInfoSymbols = CallerInfoAttributeIdentity.Resolve(compilation);
         for (var i = 0; i < left.Parameters.Length; i++)
         {
             ct.ThrowIfCancellationRequested();
 
-            if (GetCallerInfoKey(left.Parameters[i], ct) != GetCallerInfoKey(right.Parameters[i], ct))
+            if (CallerInfoAttributeIdentity.GetKey(left.Parameters[i], callerInfoSymbols, ct) !=
+                CallerInfoAttributeIdentity.GetKey(right.Parameters[i], callerInfoSymbols, ct))
             {
                 return false;
             }
@@ -200,48 +199,6 @@ internal static class InheritedMethodDeduplicator
         IMethodSymbol method,
         CancellationToken ct) =>
         InheritedNullableTypeKey.Get(type, method, ct);
-
-    private static string GetCallerInfoKey(IParameterSymbol parameter, CancellationToken ct)
-    {
-        var attributes = new List<string>();
-        foreach (var attr in parameter.GetAttributes())
-        {
-            ct.ThrowIfCancellationRequested();
-
-            switch (attr.AttributeClass?.ToDisplayString())
-            {
-                case "System.Runtime.CompilerServices.CallerMemberNameAttribute":
-                    attributes.Add("member");
-                    break;
-
-                case "System.Runtime.CompilerServices.CallerFilePathAttribute":
-                    attributes.Add("file");
-                    break;
-
-                case "System.Runtime.CompilerServices.CallerLineNumberAttribute":
-                    attributes.Add("line");
-                    break;
-
-                case "System.Runtime.CompilerServices.CallerArgumentExpressionAttribute":
-                    attributes.Add("argument:" + GetCallerArgumentExpressionTarget(attr));
-                    break;
-            }
-        }
-
-        attributes.Sort(System.StringComparer.Ordinal);
-        return string.Join("|", attributes);
-    }
-
-    private static string GetCallerArgumentExpressionTarget(AttributeData attr)
-    {
-        if (attr.ConstructorArguments.Length == 1 &&
-            attr.ConstructorArguments[0].Value is string target)
-        {
-            return target;
-        }
-
-        return string.Empty;
-    }
 
     public static bool HasSameEffectiveWireName(IMethodSymbol left, IMethodSymbol right) =>
         GetEffectiveWireName(left) == GetEffectiveWireName(right);

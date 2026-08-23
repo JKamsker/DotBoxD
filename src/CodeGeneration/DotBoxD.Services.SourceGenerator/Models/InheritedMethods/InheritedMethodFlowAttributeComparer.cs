@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 
@@ -90,6 +91,11 @@ internal static class InheritedMethodFlowAttributeComparer
         IMethodSymbol? containingMethod,
         bool includeParameterOnlyAttributes)
     {
+        if (!IsFrameworkAttribute(attr.AttributeClass))
+        {
+            return null;
+        }
+
         var name = attr.AttributeClass?.ToDisplayString();
         if (name is null)
         {
@@ -109,6 +115,32 @@ internal static class InheritedMethodFlowAttributeComparer
 
         return null;
     }
+
+    private static bool IsFrameworkAttribute(INamedTypeSymbol? attributeType)
+    {
+        if (attributeType is null || !attributeType.Locations.Any(static location => location.IsInMetadata))
+        {
+            return false;
+        }
+
+        if (attributeType.ContainingAssembly is not { } assembly)
+        {
+            return false;
+        }
+
+        var token = assembly.Identity.PublicKeyToken;
+        return IsMicrosoftToken(token) || IsEcmaToken(token);
+    }
+
+    private static bool IsMicrosoftToken(System.Collections.Immutable.ImmutableArray<byte> token) =>
+        token.Length == 8 &&
+        token[0] == 0xb0 && token[1] == 0x3f && token[2] == 0x5f && token[3] == 0x7f &&
+        token[4] == 0x11 && token[5] == 0xd5 && token[6] == 0x0a && token[7] == 0x3a;
+
+    private static bool IsEcmaToken(System.Collections.Immutable.ImmutableArray<byte> token) =>
+        token.Length == 8 &&
+        token[0] == 0xb7 && token[1] == 0x7a && token[2] == 0x5c && token[3] == 0x56 &&
+        token[4] == 0x19 && token[5] == 0x34 && token[6] == 0xe0 && token[7] == 0x89;
 
     private static string? BooleanAttributeKey(AttributeData attr, string name) =>
         attr.ConstructorArguments.Length == 1 && attr.ConstructorArguments[0].Value is bool value

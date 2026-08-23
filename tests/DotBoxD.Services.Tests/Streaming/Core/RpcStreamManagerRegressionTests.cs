@@ -72,6 +72,23 @@ public sealed class RpcStreamManagerRegressionTests
     }
 
     [Fact]
+    public async Task Duplicate_single_registration_does_not_release_the_active_attachment_claim()
+    {
+        var streams = CreateStreamManager();
+        var handle = streams.ReserveOutbound(RpcStreamKind.Binary);
+        var attachment = RpcStreamAttachment.FromStream(handle, new MemoryStream());
+        await using var outbound = streams.RegisterOutbound(attachment, CancellationToken.None);
+
+        var second = Assert.Throws<ServiceProtocolException>(() =>
+            streams.RegisterOutbound(attachment, CancellationToken.None));
+        var third = Assert.Throws<ServiceProtocolException>(() =>
+            streams.RegisterOutbound(attachment, CancellationToken.None));
+
+        Assert.Contains("already registered", second.Message, StringComparison.Ordinal);
+        Assert.Contains("already registered", third.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PendingCreditAddedAfterReservationRelease_IsPruned()
     {
         var streams = CreateStreamManager();

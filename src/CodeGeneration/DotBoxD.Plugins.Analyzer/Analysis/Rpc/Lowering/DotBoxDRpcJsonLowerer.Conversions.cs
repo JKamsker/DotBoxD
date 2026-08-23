@@ -20,7 +20,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
     internal string ApplyNumericConversion(ExpressionSyntax expression, string lowered)
     {
-        var type = _model.GetTypeInfo(expression, _cancellationToken);
+        var type = ModelFor(expression).GetTypeInfo(expression, _cancellationToken);
         if (type.Type is null ||
             type.ConvertedType is null)
         {
@@ -32,7 +32,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
     internal string ApplyNumericConversion(ExpressionSyntax expression, ITypeSymbol targetType, string lowered)
     {
-        var sourceType = _model.GetTypeInfo(expression, _cancellationToken).Type;
+        var sourceType = ModelFor(expression).GetTypeInfo(expression, _cancellationToken).Type;
         return sourceType is null ? lowered : ApplyNumericConversion(sourceType, targetType, lowered);
     }
 
@@ -155,7 +155,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     private ITypeSymbol? FallbackLocalType(ExpressionSyntax expression)
     {
         if (expression is not IdentifierNameSyntax identifier ||
-            _model.GetSymbolInfo(identifier, _cancellationToken).Symbol is not { } symbol)
+            ModelFor(identifier).GetSymbolInfo(identifier, _cancellationToken).Symbol is not { } symbol)
         {
             return null;
         }

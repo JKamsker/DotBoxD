@@ -141,10 +141,13 @@ public static class GeneratedServiceRegistry
             throw new ArgumentNullException(nameof(sink));
         }
 
+        var stagedSink = new StagedServiceRegistrationSink();
         foreach (var assembly in SnapshotAssemblies(assemblies))
         {
-            RpcGeneratedAssemblyCatalog.RegisterServices(assembly, sink);
+            RpcGeneratedAssemblyCatalog.RegisterServices(assembly, stagedSink);
         }
+
+        stagedSink.CommitTo(sink);
     }
 
     /// <summary>
@@ -164,10 +167,13 @@ public static class GeneratedServiceRegistry
             throw new ArgumentNullException(nameof(sink));
         }
 
+        var stagedSink = new StagedGeneratedServiceRegistrationSink();
         foreach (var assembly in SnapshotAssemblies(assemblies))
         {
-            RpcGeneratedAssemblyCatalog.RegisterGeneratedServices(assembly, sink);
+            RpcGeneratedAssemblyCatalog.RegisterGeneratedServices(assembly, stagedSink);
         }
+
+        stagedSink.CommitTo(sink);
     }
 
     private static List<Assembly> SnapshotAssemblies(IEnumerable<Assembly> assemblies)

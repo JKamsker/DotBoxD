@@ -34,12 +34,12 @@ public sealed class SandboxPolicyBuilder
     {
         ArgumentNullException.ThrowIfNull(capabilityId);
         ArgumentNullException.ThrowIfNull(parameters);
+        var grant = new CapabilityGrant(capabilityId, ParameterReader.Read(parameters));
+        var limits = configureLimits is null ? _limits : configureLimits(_limits);
+
         _allowedEffects |= allowedEffects;
-        _grants.Add(new CapabilityGrant(capabilityId, ParameterReader.Read(parameters)));
-        if (configureLimits is not null)
-        {
-            _limits = configureLimits(_limits);
-        }
+        _grants.Add(grant);
+        _limits = limits;
         return this;
     }
     public SandboxPolicyBuilder GrantFileRead(string root, long maxBytesPerRun)
@@ -117,9 +117,18 @@ public sealed class SandboxPolicyBuilder
     public SandboxPolicyBuilder DeclareOpaqueIdTypes(IEnumerable<string> names)
     {
         ArgumentNullException.ThrowIfNull(names);
-        foreach (var name in names)
+        var declaredNames = names.ToList();
+        foreach (var name in declaredNames)
         {
-            DeclareOpaqueIdType(name);
+            if (!SandboxType.IsWellFormedOpaqueIdName(name))
+            {
+                throw new ArgumentException(SandboxPolicy.OpaqueIdTypeNameValidationMessage, nameof(name));
+            }
+        }
+
+        foreach (var name in declaredNames)
+        {
+            _declaredOpaqueIdTypes.Add(name);
         }
 
         return this;

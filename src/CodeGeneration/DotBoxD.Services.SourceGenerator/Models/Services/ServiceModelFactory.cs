@@ -4,40 +4,12 @@ using System.Threading;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
 using DotBoxD.Services.SourceGenerator.Validation;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Services.SourceGenerator.Models;
 
 internal static partial class ServiceModelFactory
 {
     private const string CancellationTokenFullName = ServicesGeneratorTypeNames.CancellationTokenMetadata;
-
-    public static ServiceResult? GetServiceResult(GeneratorSyntaxContext context, CancellationToken ct)
-    {
-        try
-        {
-            return BuildServiceResult(context, ct);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            var name = context.Node is InterfaceDeclarationSyntax declaration
-                ? declaration.Identifier.ValueText
-                : "<unknown>";
-            return new ServiceResult(
-                Model: null,
-                Error: new GeneratorError(name, ex.ToString()),
-                MethodDiagnostics: EquatableArray<MethodDiagnostic>.Empty,
-                MethodLocations: EquatableArray<DiagnosticLocation>.Empty,
-                PropertyLocations: EquatableArray<DiagnosticLocation>.Empty,
-                ServiceLocation: default,
-                QualifiedInterfaceName: string.Empty,
-                ServiceDiagnostic: null);
-        }
-    }
 
     private static ServiceResult? BuildServiceResult(GeneratorSyntaxContext context, CancellationToken ct)
     {
@@ -64,7 +36,13 @@ internal static partial class ServiceModelFactory
             return rejectedService;
         }
 
-        if (!TryCollectServiceMembers(interfaceSymbol, buildContext, ct, out var members, out var rejectedMembers))
+        if (!TryCollectServiceMembers(
+                interfaceSymbol,
+                context.SemanticModel.Compilation,
+                buildContext,
+                ct,
+                out var members,
+                out var rejectedMembers))
         {
             return rejectedMembers;
         }
@@ -84,6 +62,8 @@ internal static partial class ServiceModelFactory
         }
 
         var cancellationTokenSymbol = context.SemanticModel.Compilation.GetTypeByMetadataName(CancellationTokenFullName);
+        var rpcStreamHandleSymbol = GetRpcServiceAssembly(serviceAttribute.AttributeClass)?
+            .GetTypeByMetadataName(ServicesGeneratorTypeNames.RpcStreamHandleMetadata);
         var methods = new List<MethodModel>();
         var properties = new List<ServicePropertyModel>();
         var methodLocations = new List<DiagnosticLocation>();
@@ -95,8 +75,10 @@ internal static partial class ServiceModelFactory
 
         if (BuildMethods(
                 members.Methods,
+                context.SemanticModel.Compilation,
                 buildContext,
                 cancellationTokenSymbol,
+                rpcStreamHandleSymbol,
                 validationCache,
                 methods,
                 methodLocations,
@@ -151,10 +133,25 @@ internal static partial class ServiceModelFactory
             ServiceDiagnostic: null);
     }
 
+    private static IAssemblySymbol? GetRpcServiceAssembly(INamedTypeSymbol? attributeType)
+    {
+        for (var current = attributeType; current is not null; current = current.BaseType)
+        {
+            if (ServicesGeneratorTypeNames.IsRpcServiceAttribute(current.ToDisplayString()))
+            {
+                return current.ContainingAssembly;
+            }
+        }
+
+        return null;
+    }
+
     private static ServiceResult? BuildMethods(
         List<IMethodSymbol> methodSymbols,
+        Compilation compilation,
         ServiceBuildContext buildContext,
         INamedTypeSymbol? cancellationTokenSymbol,
+        INamedTypeSymbol? rpcStreamHandleSymbol,
         RpcTypeValidationCache validationCache,
         List<MethodModel> methods,
         List<DiagnosticLocation> methodLocations,
@@ -169,6 +166,7 @@ internal static partial class ServiceModelFactory
 
             var sigKey = MethodSignatureFacts.GetSignatureKey(methodSymbol, ct);
             if (TryApplyInheritedMethod(
+                    compilation,
                     buildContext,
                     methodSymbol,
                     sigKey,
@@ -194,6 +192,7 @@ internal static partial class ServiceModelFactory
                 buildContext.DisplayName,
                 methodSymbol,
                 cancellationTokenSymbol,
+                rpcStreamHandleSymbol,
                 validationCache,
                 methodDiagnostics,
                 ct,
@@ -247,50 +246,4 @@ internal static partial class ServiceModelFactory
             QualifiedInterfaceName: qualifiedInterfaceName,
             ServiceDiagnostic: new ServiceDiagnostic(displayName, reason, location));
 
-    private static string? GetConfiguredServiceName(AttributeData serviceAttribute)
-    {
-        foreach (var namedArg in serviceAttribute.NamedArguments)
-        {
-            if (namedArg.Key == "Name" && namedArg.Value.Value is string s)
-            {
-                return s;
-            }
-        }
-
-        return null;
-    }
-
-    private static (string Source, bool IsError) BuildObsoleteAttribute(
-        INamedTypeSymbol interfaceSymbol,
-        Compilation compilation,
-        CancellationToken ct)
-    {
-        var obsoleteAttributeSymbol = compilation.GetTypeByMetadataName("System.ObsoleteAttribute");
-        foreach (var attr in interfaceSymbol.GetAttributes())
-        {
-            ct.ThrowIfCancellationRequested();
-            if (SymbolEqualityComparer.Default.Equals(attr.AttributeClass, obsoleteAttributeSymbol))
-            {
-                return ObsoleteAttributeFormatter.Format(attr);
-            }
-        }
-
-        return (string.Empty, false);
-    }
-
-    private static string GetNamespace(INamespaceSymbol namespaceSymbol)
-    {
-        if (namespaceSymbol.IsGlobalNamespace)
-        {
-            return string.Empty;
-        }
-
-        var parts = new Stack<string>();
-        for (var current = namespaceSymbol; !current.IsGlobalNamespace; current = current.ContainingNamespace)
-        {
-            parts.Push(current.Name);
-        }
-
-        return string.Join(".", parts);
-    }
 }

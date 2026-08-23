@@ -28,9 +28,13 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string PriorityQueueTypeName =
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
     private const string NonGenericQueueTypeName = "System.Collections.Queue";
+    private const string NonGenericStackTypeName = "System.Collections.Stack";
     private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
     private const string NonGenericSortedListTypeName = "System.Collections.SortedList";
     private const string SortedListTypeName = "System.Collections.Generic.SortedList<TKey, TValue>";
+    private const string SortedDictionaryTypeName =
+        "System.Collections.Generic.SortedDictionary<TKey, TValue>";
+    private const string SortedSetTypeName = "System.Collections.Generic.SortedSet<T>";
     private const string StackTypeName = "System.Collections.Generic.Stack<T>";
 
     private static readonly Dictionary<string, string> FixedDisplayNames = new(StringComparer.Ordinal)
@@ -44,10 +48,13 @@ internal static class ForbiddenCollectionCapacityPolicy
         [LinkedListTypeName] = "System.Collections.Generic.LinkedList",
         [NameValueCollectionTypeName] = NameValueCollectionTypeName,
         [NonGenericQueueTypeName] = NonGenericQueueTypeName,
+        [NonGenericStackTypeName] = NonGenericStackTypeName,
         [NonGenericSortedListTypeName] = NonGenericSortedListTypeName,
         [OrderedDictionaryTypeName] = OrderedDictionaryTypeName,
         [QueueTypeName] = "System.Collections.Generic.Queue",
-        [SortedListTypeName] = "System.Collections.Generic.SortedList"
+        [SortedDictionaryTypeName] = "System.Collections.Generic.SortedDictionary",
+        [SortedListTypeName] = "System.Collections.Generic.SortedList",
+        [SortedSetTypeName] = "System.Collections.Generic.SortedSet"
     };
     public static bool TryGetDisplayName(IMethodSymbol? method, out string forbidden)
     {
@@ -73,6 +80,12 @@ internal static class ForbiddenCollectionCapacityPolicy
         if (IsCollectionsUtilHashtableFactory(method, typeName))
         {
             forbidden = HashtableTypeName;
+            return true;
+        }
+
+        if (HashtableDictionaryConstructionPolicy.IsMatch(method, typeName))
+        {
+            forbidden = HashtableDictionaryConstructionPolicy.DisplayName(method);
             return true;
         }
 
@@ -116,8 +129,7 @@ internal static class ForbiddenCollectionCapacityPolicy
 
         var typeName = CapacityTypeName(method);
         if (string.Equals(typeName, BitArrayTypeName, StringComparison.Ordinal) &&
-            HasCapacityParameter(method, "length") &&
-            HasNonZeroLengthArgument(creation))
+            IsUnboundedBitArrayCreation(creation))
         {
             forbidden = BitArrayTypeName;
             return true;
@@ -216,23 +228,18 @@ internal static class ForbiddenCollectionCapacityPolicy
         if (method.MethodKind == MethodKind.Constructor)
         {
             return HasConstructorCapacityParameter(method, typeName) ||
-                   IsLinkedListEnumerableConstructor(method, typeName);
+                   CollectionSourceConstructorPolicy.IsMatch(method, typeName);
         }
 
         return method.MethodKind == MethodKind.Ordinary &&
                IsCapacityAllocationOrdinaryMethod(method, typeName);
     }
 
-    private static bool IsLinkedListEnumerableConstructor(IMethodSymbol method, string typeName)
-        => string.Equals(typeName, LinkedListTypeName, StringComparison.Ordinal) &&
-           method.Parameters.Length == 1 &&
-           string.Equals(method.Parameters[0].Name, "collection", StringComparison.Ordinal);
-
     private static bool HasConstructorCapacityParameter(IMethodSymbol method, string typeName)
     {
         var capacityName = typeName switch
         {
-            PriorityQueueTypeName or NonGenericSortedListTypeName or ArrayBufferWriterTypeName =>
+            PriorityQueueTypeName or NonGenericSortedListTypeName or NonGenericStackTypeName or ArrayBufferWriterTypeName =>
                 "initialCapacity",
             HybridDictionaryTypeName => "initialSize",
             _ => "capacity"
@@ -277,10 +284,10 @@ internal static class ForbiddenCollectionCapacityPolicy
             parameter.Type.SpecialType == SpecialType.System_Int32 &&
             string.Equals(parameter.Name, capacityName, StringComparison.Ordinal));
 
-    private static bool HasNonZeroLengthArgument(IObjectCreationOperation creation)
-        => creation.Arguments.Any(static argument =>
+    private static bool IsUnboundedBitArrayCreation(IObjectCreationOperation creation)
+        => !creation.Arguments.Any(static argument =>
             argument.Parameter is { Type.SpecialType: SpecialType.System_Int32, Name: "length" } &&
-            argument.Value.ConstantValue is not { HasValue: true, Value: 0 });
+            argument.Value.ConstantValue is { HasValue: true, Value: 0 });
 
     private static bool HasNonEmptyInitializer(IObjectCreationOperation creation)
         => creation.Initializer?.Initializers.Any() == true;

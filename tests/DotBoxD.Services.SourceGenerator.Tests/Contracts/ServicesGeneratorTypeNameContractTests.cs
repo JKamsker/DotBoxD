@@ -46,6 +46,7 @@ public sealed class ServicesGeneratorTypeNameContractTests
             [nameof(ServicesGeneratorTypeNames.JsonDerivedTypeAttribute)] =
                 "System.Text.Json.Serialization.JsonDerivedTypeAttribute",
             [nameof(ServicesGeneratorTypeNames.CancellationTokenMetadata)] = TypeName(typeof(CancellationToken)),
+            [nameof(ServicesGeneratorTypeNames.RpcStreamHandleMetadata)] = TypeName(typeof(RpcStreamHandle)),
 
             [nameof(ServicesGeneratorTypeNames.GeneratedNamespace)] = typeof(GeneratedService).Namespace!,
             [nameof(ServicesGeneratorTypeNames.GeneratedFactoryType)] = "DotBoxDGenerated",

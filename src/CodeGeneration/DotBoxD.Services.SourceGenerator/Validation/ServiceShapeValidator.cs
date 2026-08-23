@@ -14,12 +14,14 @@ internal static class ServiceShapeValidator
 
     public static UnsupportedMemberDiagnostic? GetUnsupportedMemberDiagnostic(
         INamedTypeSymbol interfaceSymbol,
+        Compilation compilation,
         CancellationToken ct)
     {
+        var controlTypes = GetControlTypes(compilation);
         foreach (var member in EnumerateInterfaceMembers(interfaceSymbol, ct))
         {
             ct.ThrowIfCancellationRequested();
-            var diagnostic = GetUnsupportedMemberDiagnostic(member);
+            var diagnostic = GetUnsupportedMemberDiagnostic(member, controlTypes);
             if (diagnostic is not null)
             {
                 return diagnostic;
@@ -31,14 +33,16 @@ internal static class ServiceShapeValidator
 
     public static UnsupportedMemberDiagnostic? CollectMembers(
         INamedTypeSymbol interfaceSymbol,
+        Compilation compilation,
         List<IMethodSymbol> methods,
         List<IPropertySymbol> properties,
         CancellationToken ct)
     {
+        var controlTypes = GetControlTypes(compilation);
         foreach (var member in EnumerateInterfaceMembers(interfaceSymbol, ct))
         {
             ct.ThrowIfCancellationRequested();
-            var diagnostic = GetUnsupportedMemberDiagnostic(member);
+            var diagnostic = GetUnsupportedMemberDiagnostic(member, controlTypes);
             if (diagnostic is not null)
             {
                 return diagnostic;
@@ -46,7 +50,7 @@ internal static class ServiceShapeValidator
 
             if (member is IMethodSymbol { MethodKind: MethodKind.Ordinary } method)
             {
-                if (IsControlPlaneMethod(method))
+                if (IsControlPlaneMethod(method, controlTypes))
                 {
                     continue;
                 }
@@ -55,7 +59,7 @@ internal static class ServiceShapeValidator
             }
             else if (member is IPropertySymbol property)
             {
-                if (IsControlPlaneProperty(property))
+                if (IsControlPlaneProperty(property, controlTypes))
                 {
                     continue;
                 }
@@ -67,25 +71,31 @@ internal static class ServiceShapeValidator
         return null;
     }
 
-    private static UnsupportedMemberDiagnostic? GetUnsupportedMemberDiagnostic(ISymbol member)
+    private static UnsupportedMemberDiagnostic? GetUnsupportedMemberDiagnostic(
+        ISymbol member,
+        ControlPlaneTypes controlTypes)
         => member switch
         {
-            IPropertySymbol property => GetUnsupportedPropertyMemberDiagnostic(property),
+            IPropertySymbol property => GetUnsupportedPropertyMemberDiagnostic(property, controlTypes),
             IEventSymbol eventSymbol => CreateDiagnostic(
                 eventSymbol,
                 $"interface event '{eventSymbol.Name}' is not supported; DotBoxD services may declare methods only"),
-            IMethodSymbol method => GetUnsupportedMethodDiagnostic(method),
+            IMethodSymbol method => GetUnsupportedMethodDiagnostic(method, controlTypes),
             _ => null
         };
 
-    private static UnsupportedMemberDiagnostic? GetUnsupportedPropertyMemberDiagnostic(IPropertySymbol property)
-        => IsControlPlaneProperty(property)
+    private static UnsupportedMemberDiagnostic? GetUnsupportedPropertyMemberDiagnostic(
+        IPropertySymbol property,
+        ControlPlaneTypes controlTypes)
+        => IsControlPlaneProperty(property, controlTypes)
             ? null
             : GetUnsupportedPropertyDiagnostic(property);
 
-    private static UnsupportedMemberDiagnostic? GetUnsupportedMethodDiagnostic(IMethodSymbol method)
+    private static UnsupportedMemberDiagnostic? GetUnsupportedMethodDiagnostic(
+        IMethodSymbol method,
+        ControlPlaneTypes controlTypes)
     {
-        if (IsControlPlaneMethod(method))
+        if (IsControlPlaneMethod(method, controlTypes))
         {
             return null;
         }
@@ -167,17 +177,24 @@ internal static class ServiceShapeValidator
         string.Equals(property.Name, "Id", StringComparison.Ordinal) &&
         property.Type.SpecialType == SpecialType.System_String;
 
-    private static bool IsControlPlaneMethod(IMethodSymbol method)
-    {
-        var containingType = method.ContainingType.ToDisplayString();
-        return containingType == ExtensibleControlType || containingType == ServiceControlType;
-    }
+    private static bool IsControlPlaneMethod(IMethodSymbol method, ControlPlaneTypes controlTypes)
+        => IsControlPlaneType(method.ContainingType, controlTypes);
 
-    private static bool IsControlPlaneProperty(IPropertySymbol property)
-    {
-        var containingType = property.ContainingType.ToDisplayString();
-        return containingType == ExtensibleControlType || containingType == ServiceControlType;
-    }
+    private static bool IsControlPlaneProperty(IPropertySymbol property, ControlPlaneTypes controlTypes)
+        => IsControlPlaneType(property.ContainingType, controlTypes);
+
+    private static ControlPlaneTypes GetControlTypes(Compilation compilation) =>
+        new(
+            compilation.GetTypeByMetadataName(ExtensibleControlType),
+            compilation.GetTypeByMetadataName(ServiceControlType));
+
+    private static bool IsControlPlaneType(INamedTypeSymbol type, ControlPlaneTypes controlTypes)
+        => SymbolEqualityComparer.Default.Equals(type, controlTypes.ExtensibleControl) ||
+           SymbolEqualityComparer.Default.Equals(type, controlTypes.ServiceControl);
+
+    private sealed record ControlPlaneTypes(
+        INamedTypeSymbol? ExtensibleControl,
+        INamedTypeSymbol? ServiceControl);
 
     private static IEnumerable<ISymbol> EnumerateInterfaceMembers(
         INamedTypeSymbol interfaceSymbol,

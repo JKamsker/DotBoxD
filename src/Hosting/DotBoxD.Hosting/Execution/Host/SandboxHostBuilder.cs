@@ -100,13 +100,14 @@ public sealed class SandboxHostBuilder
 
     internal SandboxHost Build()
     {
+        var bindings = _bindings.Build();
         _interpreter ??= new SandboxInterpreter();
         if (_useCompiler)
         {
             _compiler ??= CreateDefaultCompiler();
         }
 
-        return new SandboxHost(_bindings.Build(), _interpreter, _compiler, _modeSelector, _auditObserver, _worker);
+        return new SandboxHost(bindings, _interpreter, _compiler, _modeSelector, _auditObserver, _worker);
     }
 
     private ISandboxCompiler CreateDefaultCompiler()

@@ -21,6 +21,7 @@ internal static partial class MethodModelFactory
         string displayName,
         IMethodSymbol methodSymbol,
         INamedTypeSymbol? cancellationTokenSymbol,
+        INamedTypeSymbol? rpcStreamHandleSymbol,
         RpcTypeValidationCache validationCache,
         List<MethodDiagnostic> methodDiagnostics,
         CancellationToken ct,
@@ -31,6 +32,10 @@ internal static partial class MethodModelFactory
         var returnType = methodSymbol.ReturnType;
         var declaredReturn = GetDeclaredReturnType(methodSymbol, returnType, ct);
         var returnKind = ReturnTypeClassifier.Classify(returnType, ct, out var unwrappedReturnType, out var subService);
+        if (returnKind == MethodReturnKind.Sync && declaredReturn.ExternAliases.Array.Length > 0)
+        {
+            unwrappedReturnType = declaredReturn.Type;
+        }
         var isLookalikeTaskLike = ReturnTypeClassifier.IsLookalikeTaskLike(returnType);
         var metadataTypes = MethodMetadataTypesFactory.Get(methodSymbol, returnKind, ct);
         var typeParameterList = MethodSignatureFormatter.GetTypeParameterList(methodSymbol, ct);
@@ -57,6 +62,7 @@ internal static partial class MethodModelFactory
             returnType,
             returnKind,
             cancellationTokenSymbol,
+            rpcStreamHandleSymbol,
             validationCache,
             ct,
             methodLocation,
@@ -70,6 +76,7 @@ internal static partial class MethodModelFactory
         var parameterResult = BuildParameters(
             methodSymbol,
             cancellationTokenSymbol,
+            rpcStreamHandleSymbol,
             validationCache,
             ct,
             ref unsupportedReason,

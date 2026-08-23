@@ -6,12 +6,13 @@ using Microsoft.CodeAnalysis;
 
 internal static class RegistrationObsoleteAttributeSource
 {
-    public static EquatableArray<string> Attributes(ISymbol symbol)
+    public static EquatableArray<string> Attributes(ISymbol symbol, Compilation compilation)
     {
         var lines = new List<string>();
+        var obsoleteAttribute = compilation.GetTypeByMetadataName("System.ObsoleteAttribute");
         foreach (var attribute in symbol.GetAttributes())
         {
-            if (TryFormat(attribute) is { } source)
+            if (TryFormat(attribute, obsoleteAttribute) is { } source)
             {
                 lines.Add(source);
             }
@@ -20,9 +21,9 @@ internal static class RegistrationObsoleteAttributeSource
         return EquatableArray<string>.FromOwned(lines.ToArray());
     }
 
-    private static string? TryFormat(AttributeData attribute)
+    private static string? TryFormat(AttributeData attribute, INamedTypeSymbol? obsoleteAttribute)
     {
-        if (!string.Equals(attribute.AttributeClass?.ToDisplayString(), "System.ObsoleteAttribute", StringComparison.Ordinal))
+        if (!SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, obsoleteAttribute))
         {
             return null;
         }

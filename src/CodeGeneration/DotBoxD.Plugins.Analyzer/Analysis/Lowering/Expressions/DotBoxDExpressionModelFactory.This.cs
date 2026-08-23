@@ -62,7 +62,14 @@ internal static partial class DotBoxDExpressionModelFactory
             }
         }
 
-        if (context.InlinedBindings is { } fallbackBindings &&
+        if (context.DerivedMemberBindings is { } derivedBindings &&
+            derivedBindings.TryGetValue(LiveSettingSymbolKey(property), out var derivedBound))
+        {
+            return derivedBound;
+        }
+
+        if (context.DerivedMemberBindings is null &&
+            context.InlinedBindings is { } fallbackBindings &&
             fallbackBindings.TryGetValue(memberName, out var fallbackBound))
         {
             return fallbackBound;
