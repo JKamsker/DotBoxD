@@ -15,12 +15,16 @@ public static class HostServiceBindingExtensions
 
         var visited = new HashSet<Type>();
         var registeredBindings = new Dictionary<string, HostServiceBindingRegistration>(StringComparer.Ordinal);
-        AddServiceBindings(builder, typeof(TService), implementation, visited, registeredBindings);
+        AddServiceBindings(typeof(TService), implementation, visited, registeredBindings);
+        foreach (var registration in registeredBindings.Values)
+        {
+            builder.AddBinding(registration.Descriptor);
+        }
+
         return builder;
     }
 
     private static void AddServiceBindings(
-        SandboxHostBuilder builder,
         Type serviceType,
         object implementation,
         HashSet<Type> visited,
@@ -37,12 +41,11 @@ public static class HostServiceBindingExtensions
             return;
         }
 
-        AddServiceMethodBindings(builder, serviceType, implementation, registeredBindings);
-        AddNestedServiceBindings(builder, serviceType, implementation, visited, registeredBindings);
+        AddServiceMethodBindings(serviceType, implementation, registeredBindings);
+        AddNestedServiceBindings(serviceType, implementation, visited, registeredBindings);
     }
 
     private static void AddServiceMethodBindings(
-        SandboxHostBuilder builder,
         Type serviceType,
         object implementation,
         Dictionary<string, HostServiceBindingRegistration> registeredBindings)
@@ -55,7 +58,7 @@ public static class HostServiceBindingExtensions
                 continue;
             }
 
-            if (TryAddHandleServiceBindings(builder, serviceType, implementation, method, registeredBindings))
+            if (TryAddHandleServiceBindings(serviceType, implementation, method, registeredBindings))
             {
                 continue;
             }
@@ -68,7 +71,6 @@ public static class HostServiceBindingExtensions
             if (binding is not null)
             {
                 AddBinding(
-                    builder,
                     registeredBindings,
                     HostServiceBindingFactory.CreateBinding(method, target, implementation, capability, binding),
                     HostServiceBindingRouteSignature.ForMethod(method));
@@ -77,7 +79,6 @@ public static class HostServiceBindingExtensions
             if (capability is not null || binding is null)
             {
                 AddBinding(
-                    builder,
                     registeredBindings,
                     HostServiceBindingFactory.CreateBinding(method, target, implementation, capability, binding: null),
                     HostServiceBindingRouteSignature.ForMethod(method));
@@ -86,7 +87,6 @@ public static class HostServiceBindingExtensions
     }
 
     private static void AddNestedServiceBindings(
-        SandboxHostBuilder builder,
         Type serviceType,
         object implementation,
         HashSet<Type> visited,
@@ -101,7 +101,7 @@ public static class HostServiceBindingExtensions
                 continue;
             }
 
-            if (TryAddPropertyBinding(builder, serviceType, implementation, property, registeredBindings))
+            if (TryAddPropertyBinding(serviceType, implementation, property, registeredBindings))
             {
                 continue;
             }
@@ -118,12 +118,11 @@ public static class HostServiceBindingExtensions
                     $"Host service property '{serviceType.FullName}.{property.Name}' returned null.");
             }
 
-            AddServiceBindings(builder, property.PropertyType, child, visited, registeredBindings);
+            AddServiceBindings(property.PropertyType, child, visited, registeredBindings);
         }
     }
 
     private static bool TryAddHandleServiceBindings(
-        SandboxHostBuilder builder,
         Type parentServiceType,
         object parentImplementation,
         MethodInfo factoryMethod,
@@ -162,7 +161,6 @@ public static class HostServiceBindingExtensions
             if (binding is not null)
             {
                 AddBinding(
-                    builder,
                     registeredBindings,
                     HostServiceBindingFactory.CreateHandleBinding(
                         factoryMethod,
@@ -179,7 +177,6 @@ public static class HostServiceBindingExtensions
             }
 
             AddBinding(
-                builder,
                 registeredBindings,
                 HostServiceBindingFactory.CreateHandleBinding(
                     factoryMethod,
@@ -194,7 +191,6 @@ public static class HostServiceBindingExtensions
     }
 
     private static bool TryAddPropertyBinding(
-        SandboxHostBuilder builder,
         Type serviceType,
         object implementation,
         PropertyInfo property,
@@ -217,7 +213,6 @@ public static class HostServiceBindingExtensions
         var declaringType = getter.DeclaringType ?? serviceType;
         var targetGetter = ResolveTargetMethod(declaringType, implementation.GetType(), getter);
         AddBinding(
-            builder,
             registeredBindings,
             HostServiceBindingFactory.CreatePropertyBinding(property, targetGetter, implementation, binding),
             HostServiceBindingRouteSignature.ForProperty(property));
@@ -225,7 +220,6 @@ public static class HostServiceBindingExtensions
     }
 
     private static void AddBinding(
-        SandboxHostBuilder builder,
         Dictionary<string, HostServiceBindingRegistration> registeredBindings,
         BindingDescriptor descriptor,
         HostServiceBindingRouteSignature signature)
@@ -251,7 +245,6 @@ public static class HostServiceBindingExtensions
                 "Overloaded host service methods must use distinct binding routes.");
         }
 
-        builder.AddBinding(descriptor);
     }
 
     private static bool BindingShapesMatch(BindingDescriptor left, BindingDescriptor right)
