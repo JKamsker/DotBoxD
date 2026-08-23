@@ -114,7 +114,7 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("        private static bool IsLiveSetting(global::System.Reflection.PropertyInfo property)");
         builder.AppendLine("            => property.GetCustomAttributes(typeof(global::DotBoxD.Abstractions.LiveSettingAttribute), inherit: true).Length != 0;");
         builder.AppendLine("        private static bool IsRequired(global::System.Reflection.PropertyInfo property)");
-        builder.AppendLine("            => property.GetCustomAttributes(inherit: true).Any(static attribute => string.Equals(attribute.GetType().FullName, \"System.Runtime.CompilerServices.RequiredMemberAttribute\", global::System.StringComparison.Ordinal));");
+        builder.AppendLine("            => property.GetCustomAttributes(inherit: true).Any(static attribute => attribute.GetType() == typeof(global::System.Runtime.CompilerServices.RequiredMemberAttribute));");
         builder.AppendLine("        private static bool CanObserveMissingRequiredValue(global::System.Reflection.PropertyInfo property)");
         builder.AppendLine("            => !property.PropertyType.IsValueType || global::System.Nullable.GetUnderlyingType(property.PropertyType) is not null;");
         builder.AppendLine("        private static object? CoerceLiveSettingValue(global::System.Reflection.PropertyInfo property, object? value)");
