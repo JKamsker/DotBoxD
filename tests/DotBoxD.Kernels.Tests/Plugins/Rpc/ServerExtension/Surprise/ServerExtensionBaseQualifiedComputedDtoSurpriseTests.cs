@@ -29,12 +29,17 @@ public sealed partial class ServerExtensionGeneratedDtoReaderRegressionTests
             public DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }
         }
 
-        public class ProfileBase
+        public class ProfileRoot
         {
             public int Health { get; init; }
             public int Rank { get; init; }
 
             protected int ComputeScore() => Health + Rank;
+        }
+
+        public class ProfileBase : ProfileRoot
+        {
+            protected new int ComputeScore() => base.ComputeScore();
         }
 
         public sealed class Profile : ProfileBase

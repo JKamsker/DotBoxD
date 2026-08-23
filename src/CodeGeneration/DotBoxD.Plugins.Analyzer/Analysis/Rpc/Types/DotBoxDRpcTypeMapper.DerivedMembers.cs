@@ -183,12 +183,12 @@ internal static partial class DotBoxDRpcTypeMapper
                 containingType,
                 helperCall.Name,
                 helperCall.IsBaseQualified ? null : dispatchType,
-                helperCall.IsBaseQualified) is not { } helperBody)
+                helperCall.IsBaseQualified) is not { } helper)
         {
             return expression;
         }
 
-        return ExpandDerivedGetterExpression(containingType, helperBody, dispatchType, depth + 1);
+        return ExpandDerivedGetterExpression(helper.ContainingType, helper.Expression, dispatchType, depth + 1);
     }
 
     private static (string Name, bool IsBaseQualified)? TryGetHelperCall(ExpressionSyntax expression)
@@ -202,7 +202,7 @@ internal static partial class DotBoxDRpcTypeMapper
             _ => null,
         };
 
-    private static ExpressionSyntax? TryGetParameterlessHelperExpression(
+    private static (INamedTypeSymbol ContainingType, ExpressionSyntax Expression)? TryGetParameterlessHelperExpression(
         INamedTypeSymbol containingType,
         string helperName,
         INamedTypeSymbol? dispatchType,
@@ -221,7 +221,7 @@ internal static partial class DotBoxDRpcTypeMapper
                 var dispatchTarget = isBaseQualified ? method : ResolveDispatchTarget(method, dispatchType);
                 if (TryGetMethodReturnExpression(dispatchTarget) is { } expression)
                 {
-                    return expression;
+                    return (currentType, expression);
                 }
             }
         }
