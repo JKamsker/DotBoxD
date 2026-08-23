@@ -59,28 +59,10 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
                     assigned,
                     context,
                     lowerExpression);
-                return LowerInitializer(
-                    fields,
-                    recordTypeSource,
-                    initializer,
-                    context,
-                    lowerExpression,
-                    fieldSources,
-                    assigned,
-                    allowStoredZero,
-                    allocates);
+                return LowerInitializer(fields, recordType, recordTypeSource, initializer, context, lowerExpression, fieldSources, assigned, allowStoredZero, allocates);
             }
 
-            return LowerInitializer(
-                fields,
-                recordTypeSource,
-                initializer,
-                context,
-                lowerExpression,
-                fieldSources: null,
-                assigned: null,
-                allowStoredZero,
-                allocates: true);
+            return LowerInitializer(fields, recordType, recordTypeSource, initializer, context, lowerExpression, fieldSources: null, assigned: null, allowStoredZero, allocates: true);
         }
 
         if (arguments.Count != constructor.Parameters.Length || constructor.Parameters.Length > fields.Count)
@@ -104,6 +86,7 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
             fields,
             positionalSources,
             positionalAssigned,
+            recordType,
             context,
             allowStoredZero: false,
             allocates: positionalAllocates);
@@ -202,6 +185,7 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
     // zero-fill convention.
     private static DotBoxDExpressionModel LowerInitializer(
         IReadOnlyList<RecordMember> fields,
+        INamedTypeSymbol recordType,
         string recordTypeSource,
         InitializerExpressionSyntax initializer,
         DotBoxDExpressionLoweringContext context,
@@ -246,6 +230,7 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
             fields,
             fieldSources,
             assigned,
+            recordType,
             context,
             allowStoredZero,
             allocates: allocates);
