@@ -198,9 +198,7 @@ internal static partial class DotBoxDRpcTypeMapper
     {
         foreach (var method in containingType.GetMembers(helperName).OfType<IMethodSymbol>())
         {
-            if (method.IsStatic ||
-                method.MethodKind != MethodKind.Ordinary ||
-                method.Parameters.Length != 0)
+            if (!IsParameterlessInstanceHelper(method))
             {
                 continue;
             }
@@ -227,4 +225,10 @@ internal static partial class DotBoxDRpcTypeMapper
 
         return null;
     }
+
+    private static bool IsParameterlessInstanceHelper(IMethodSymbol method)
+        => !method.IsStatic &&
+           method.MethodKind == MethodKind.Ordinary &&
+           method.Arity == 0 &&
+           method.Parameters.Length == 0;
 }
