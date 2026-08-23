@@ -116,8 +116,7 @@ internal static class ForbiddenCollectionCapacityPolicy
 
         var typeName = CapacityTypeName(method);
         if (string.Equals(typeName, BitArrayTypeName, StringComparison.Ordinal) &&
-            HasCapacityParameter(method, "length") &&
-            HasNonZeroLengthArgument(creation))
+            IsUnboundedBitArrayCreation(creation))
         {
             forbidden = BitArrayTypeName;
             return true;
@@ -277,10 +276,10 @@ internal static class ForbiddenCollectionCapacityPolicy
             parameter.Type.SpecialType == SpecialType.System_Int32 &&
             string.Equals(parameter.Name, capacityName, StringComparison.Ordinal));
 
-    private static bool HasNonZeroLengthArgument(IObjectCreationOperation creation)
-        => creation.Arguments.Any(static argument =>
+    private static bool IsUnboundedBitArrayCreation(IObjectCreationOperation creation)
+        => !creation.Arguments.Any(static argument =>
             argument.Parameter is { Type.SpecialType: SpecialType.System_Int32, Name: "length" } &&
-            argument.Value.ConstantValue is not { HasValue: true, Value: 0 });
+            argument.Value.ConstantValue is { HasValue: true, Value: 0 });
 
     private static bool HasNonEmptyInitializer(IObjectCreationOperation creation)
         => creation.Initializer?.Initializers.Any() == true;
