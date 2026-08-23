@@ -13,6 +13,7 @@ public sealed class InstanceRegistry : IInstanceRegistry
     internal const int DefaultMaxInstances = 1024;
 
     private readonly ConcurrentDictionary<(string Service, string Id), object> _entries = new();
+    private readonly List<object> _disposing = [];
     private readonly object _gate = new();
     private readonly int _maxInstances;
     private int _count;
@@ -46,6 +47,11 @@ public sealed class InstanceRegistry : IInstanceRegistry
             if (_closed)
             {
                 throw new InvalidOperationException("Instance registry is closed.");
+            }
+
+            if (ContainsReference(_disposing, instance))
+            {
+                throw new InvalidOperationException("Cannot register an instance while it is being disposed.");
             }
 
             if (_count >= _maxInstances)
@@ -84,22 +90,18 @@ public sealed class InstanceRegistry : IInstanceRegistry
     {
         ValidateKeys(serviceName, instanceId);
 
-        object? instance = null;
-        lock (_gate)
-        {
-            if (_entries.TryRemove((serviceName, instanceId), out var removed))
-            {
-                _count--;
-                if (!ContainsReference(_entries.Values, removed))
-                {
-                    instance = removed;
-                }
-            }
-        }
+        var instance = RemoveForDisposal(serviceName, instanceId);
 
         if (instance is not null)
         {
-            DisposeInstance(instance);
+            try
+            {
+                DisposeInstance(instance);
+            }
+            finally
+            {
+                CompleteDisposal(instance);
+            }
         }
     }
 
@@ -108,22 +110,18 @@ public sealed class InstanceRegistry : IInstanceRegistry
     {
         ValidateKeys(serviceName, instanceId);
 
-        object? instance = null;
-        lock (_gate)
-        {
-            if (_entries.TryRemove((serviceName, instanceId), out var removed))
-            {
-                _count--;
-                if (!ContainsReference(_entries.Values, removed))
-                {
-                    instance = removed;
-                }
-            }
-        }
+        var instance = RemoveForDisposal(serviceName, instanceId);
 
         if (instance is not null)
         {
-            await DisposeInstanceAsync(instance).ConfigureAwait(false);
+            try
+            {
+                await DisposeInstanceAsync(instance).ConfigureAwait(false);
+            }
+            finally
+            {
+                CompleteDisposal(instance);
+            }
         }
     }
 
@@ -170,6 +168,34 @@ public sealed class InstanceRegistry : IInstanceRegistry
         }
     }
 
+    private object? RemoveForDisposal(string serviceName, string instanceId)
+    {
+        lock (_gate)
+        {
+            if (!_entries.TryRemove((serviceName, instanceId), out var instance))
+            {
+                return null;
+            }
+
+            _count--;
+            if (ContainsReference(_entries.Values, instance))
+            {
+                return null;
+            }
+
+            _disposing.Add(instance);
+            return instance;
+        }
+    }
+
+    private void CompleteDisposal(object instance)
+    {
+        lock (_gate)
+        {
+            RemoveReference(_disposing, instance);
+        }
+    }
+
     private static void ValidateKeys(string serviceName, string instanceId)
     {
         ThrowIfInvalidKey(serviceName, nameof(serviceName), "Service name");
@@ -197,6 +223,18 @@ public sealed class InstanceRegistry : IInstanceRegistry
         }
 
         return false;
+    }
+
+    private static void RemoveReference(List<object> instances, object candidate)
+    {
+        for (var index = 0; index < instances.Count; index++)
+        {
+            if (ReferenceEquals(instances[index], candidate))
+            {
+                instances.RemoveAt(index);
+                return;
+            }
+        }
     }
 
     // Sub-service instances are connection-scoped and owned by the registry (see IInstanceRegistry),
