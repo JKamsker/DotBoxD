@@ -4,8 +4,12 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class CollectionBulkGrowthPolicy
 {
+    private const string DictionaryInterfaceTypeName =
+        "System.Collections.Generic.IDictionary<TKey, TValue>";
     private const string PriorityQueueTypeName =
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
+    private const string SortedDictionaryTypeName =
+        "System.Collections.Generic.SortedDictionary<TKey, TValue>";
 
     public static bool TryGetDisplayName(IMethodSymbol method, string typeName, out string forbidden)
     {
@@ -34,7 +38,21 @@ internal static class CollectionBulkGrowthPolicy
             return true;
         }
 
+        if (IsSortedDictionaryCopyConstructor(method, typeName))
+        {
+            forbidden = "System.Collections.Generic.SortedDictionary";
+            return true;
+        }
+
         forbidden = null!;
         return false;
     }
+
+    private static bool IsSortedDictionaryCopyConstructor(IMethodSymbol method, string typeName)
+        => method.MethodKind == MethodKind.Constructor &&
+           string.Equals(typeName, SortedDictionaryTypeName, StringComparison.Ordinal) &&
+           method.Parameters.Any(parameter => string.Equals(
+               parameter.Type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
+               DictionaryInterfaceTypeName,
+               StringComparison.Ordinal));
 }
