@@ -22,7 +22,7 @@ internal static class RegistrationAccumulatorMetadataAttributeSource
     private static EquatableArray<string> AttributeLines(ISymbol symbol, Compilation compilation)
     {
         var lines = new List<string>();
-        lines.AddRange(RegistrationObsoleteAttributeSource.Attributes(symbol));
+        lines.AddRange(RegistrationObsoleteAttributeSource.Attributes(symbol, compilation));
 
         var experimentalAttribute = compilation.GetTypeByMetadataName(
             "System.Diagnostics.CodeAnalysis.ExperimentalAttribute");
