@@ -89,7 +89,7 @@ internal static class RpcPayloadReconstructibilityInspector
         CancellationToken ct,
         HashSet<INamedTypeSymbol> visitedOriginalDefinitions)
     {
-        if (!CanInspectDtoMembers(named) || !visitedOriginalDefinitions.Add(named.OriginalDefinition))
+        if (!DtoPayloadTypeInspector.CanInspectMembers(named) || !visitedOriginalDefinitions.Add(named.OriginalDefinition))
         {
             return null;
         }
@@ -192,7 +192,7 @@ internal static class RpcPayloadReconstructibilityInspector
         CancellationToken ct,
         HashSet<INamedTypeSymbol> visitedOriginalDefinitions)
     {
-        if (!IsUserDtoNamespace(type) || HasRpcServiceAttribute(type, ct))
+        if (!DtoPayloadTypeInspector.IsUserDtoNamespace(type) || HasRpcServiceAttribute(type, ct))
         {
             return null;
         }
@@ -219,28 +219,6 @@ internal static class RpcPayloadReconstructibilityInspector
                 Inspect)
             : defaultReason;
     }
-
-    private static bool CanInspectDtoMembers(INamedTypeSymbol type)
-    {
-        if (type.SpecialType != SpecialType.None ||
-            type.TypeKind is not (TypeKind.Class or TypeKind.Struct))
-        {
-            return false;
-        }
-        return IsUserDtoNamespace(type);
-    }
-
-    private static bool IsUserDtoNamespace(INamedTypeSymbol type)
-    {
-        if (type.SpecialType != SpecialType.None)
-        {
-            return false;
-        }
-
-        var ns = type.ContainingNamespace;
-        return ns is null || ns.IsGlobalNamespace || !IsSystemNamespace(ns);
-    }
-
     private static bool HasRpcServiceAttribute(INamedTypeSymbol type, CancellationToken ct)
     {
         foreach (var attr in type.GetAttributes())
@@ -251,21 +229,6 @@ internal static class RpcPayloadReconstructibilityInspector
             {
                 return true;
             }
-        }
-
-        return false;
-    }
-
-    private static bool IsSystemNamespace(INamespaceSymbol ns)
-    {
-        while (!ns.IsGlobalNamespace)
-        {
-            if (ns.ContainingNamespace.IsGlobalNamespace)
-            {
-                return ns.Name == "System";
-            }
-
-            ns = ns.ContainingNamespace;
         }
 
         return false;

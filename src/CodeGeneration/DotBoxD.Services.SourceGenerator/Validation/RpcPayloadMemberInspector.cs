@@ -23,7 +23,7 @@ internal static class DtoPayloadMemberInspector
         HashSet<INamedTypeSymbol> visitedOriginalDefinitions,
         DtoPayloadTypePredicate contains)
     {
-        if (!CanInspectDtoMembers(type) || !visitedOriginalDefinitions.Add(type.OriginalDefinition))
+        if (!DtoPayloadTypeInspector.CanInspectMembers(type) || !visitedOriginalDefinitions.Add(type.OriginalDefinition))
         {
             return false;
         }
@@ -57,7 +57,7 @@ internal static class DtoPayloadMemberInspector
         HashSet<INamedTypeSymbol> visitedOriginalDefinitions,
         DtoPayloadTypeReasonSelector getReason)
     {
-        if (!CanInspectDtoMembers(type) || !visitedOriginalDefinitions.Add(type.OriginalDefinition))
+        if (!DtoPayloadTypeInspector.CanInspectMembers(type) || !visitedOriginalDefinitions.Add(type.OriginalDefinition))
         {
             return null;
         }
@@ -108,33 +108,6 @@ internal static class DtoPayloadMemberInspector
             } field when !RpcPayloadIgnoredMember.IsIgnored(field) => field.Type,
             _ => null,
         };
-
-    private static bool CanInspectDtoMembers(INamedTypeSymbol type)
-    {
-        if (type.SpecialType != SpecialType.None ||
-            type.TypeKind is not (TypeKind.Class or TypeKind.Struct))
-        {
-            return false;
-        }
-
-        var ns = type.ContainingNamespace;
-        return ns is null || ns.IsGlobalNamespace || !IsSystemNamespace(ns);
-    }
-
-    private static bool IsSystemNamespace(INamespaceSymbol ns)
-    {
-        while (!ns.IsGlobalNamespace)
-        {
-            if (ns.ContainingNamespace.IsGlobalNamespace)
-            {
-                return ns.Name == "System";
-            }
-
-            ns = ns.ContainingNamespace;
-        }
-
-        return false;
-    }
 }
 
 internal static class RpcPayloadMemberInspector
