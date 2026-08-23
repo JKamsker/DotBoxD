@@ -54,6 +54,7 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("        {");
         builder.AppendLine("            _owner.ThrowIfDisposed();");
         builder.AppendLine("            if (set is null) throw new global::System.ArgumentNullException(nameof(set));");
+        builder.AppendLine("            _owner.RequireInstalledKernel<TKernel>(_pluginId);");
         builder.AppendLine("            var currentValues = _owner.SnapshotLiveSettingValues(_pluginId);");
         builder.AppendLine("            var draft = new TKernel();");
         builder.AppendLine("            var properties = typeof(TKernel).GetProperties(global::System.Reflection.BindingFlags.Public | global::System.Reflection.BindingFlags.Instance)");
