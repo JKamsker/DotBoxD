@@ -6,6 +6,8 @@ internal static class CollectionBulkGrowthPolicy
 {
     private const string DictionaryInterfaceTypeName =
         "System.Collections.Generic.IDictionary<TKey, TValue>";
+    private const string NonGenericDictionaryInterfaceTypeName = "System.Collections.IDictionary";
+    private const string NonGenericSortedListTypeName = "System.Collections.SortedList";
     private const string PriorityQueueTypeName =
         "System.Collections.Generic.PriorityQueue<TElement, TPriority>";
     private const string SortedDictionaryTypeName =
@@ -44,6 +46,12 @@ internal static class CollectionBulkGrowthPolicy
             return true;
         }
 
+        if (IsNonGenericSortedListDictionaryCopyConstructor(method, typeName))
+        {
+            forbidden = NonGenericSortedListTypeName;
+            return true;
+        }
+
         forbidden = null!;
         return false;
     }
@@ -54,5 +62,15 @@ internal static class CollectionBulkGrowthPolicy
            method.Parameters.Any(parameter => string.Equals(
                parameter.Type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
                DictionaryInterfaceTypeName,
+               StringComparison.Ordinal));
+
+    private static bool IsNonGenericSortedListDictionaryCopyConstructor(
+        IMethodSymbol method,
+        string typeName)
+        => method.MethodKind == MethodKind.Constructor &&
+           string.Equals(typeName, NonGenericSortedListTypeName, StringComparison.Ordinal) &&
+           method.Parameters.Any(parameter => string.Equals(
+               parameter.Type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
+               NonGenericDictionaryInterfaceTypeName,
                StringComparison.Ordinal));
 }
