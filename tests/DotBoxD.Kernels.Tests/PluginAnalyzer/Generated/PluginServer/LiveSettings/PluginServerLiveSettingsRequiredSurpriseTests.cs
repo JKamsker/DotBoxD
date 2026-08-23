@@ -17,11 +17,16 @@ public sealed class PluginServerLiveSettingsRequiredSurpriseTests
         var server = Activator.CreateInstance(serverType, [wire, null])!;
         var kernelType = assembly.GetType("Sample.Plugin.FireDamageKernel", throwOnError: true)!;
 
+        var install = serverType.GetMethod("InstallKernelForTestAsync")!
+            .MakeGenericMethod(kernelType)
+            .Invoke(server, null)!;
+        await Assert.IsAssignableFrom<Task>(install);
+
         var handle = serverType.GetMethod("Get")!
             .MakeGenericMethod(kernelType)
             .Invoke(server, null)!;
         var setValuesAsync = handle.GetType().GetMethod("SetValuesAsync")!;
-        var action = CreateSetMinDamageOnlyAction(kernelType);
+        var action = CreateMissingDamageTypeAction(kernelType);
 
         var exception = await CaptureExceptionAsync(async () =>
         {
@@ -131,7 +136,14 @@ public sealed class PluginServerLiveSettingsRequiredSurpriseTests
             }
 
             [GeneratePluginServer(Context = typeof(RemotePluginContext))]
-            public partial class RemotePluginServer : IGameWorldAccess;
+            public partial class RemotePluginServer : IGameWorldAccess
+            {
+                public async Task InstallKernelForTestAsync<TKernel>() where TKernel : class, new()
+                {
+                    var package = DotBoxD.Plugins.Kernel.KernelPackageRegistry.Resolve<TKernel>();
+                    await EnsureAnonymousKernelAsync(package.Manifest.PluginId, () => package);
+                }
+            }
 
             public sealed partial class RemotePluginContext;
         }
@@ -184,11 +196,11 @@ public sealed class PluginServerLiveSettingsRequiredSurpriseTests
         return Assembly.Load(stream.ToArray());
     }
 
-    private static Delegate CreateSetMinDamageOnlyAction(Type kernelType)
+    private static Delegate CreateMissingDamageTypeAction(Type kernelType)
     {
         var actionType = typeof(Action<>).MakeGenericType(kernelType);
         var method = typeof(PluginServerLiveSettingsRequiredSurpriseTests)
-            .GetMethod(nameof(SetMinDamageOnly), BindingFlags.NonPublic | BindingFlags.Static)!
+            .GetMethod(nameof(SetMinDamageAndClearDamageType), BindingFlags.NonPublic | BindingFlags.Static)!
             .MakeGenericMethod(kernelType);
         return Delegate.CreateDelegate(actionType, method);
     }
@@ -202,9 +214,11 @@ public sealed class PluginServerLiveSettingsRequiredSurpriseTests
         return Delegate.CreateDelegate(actionType, method);
     }
 
-    private static void SetMinDamageOnly<TKernel>(TKernel kernel)
+    private static void SetMinDamageAndClearDamageType<TKernel>(TKernel kernel)
         where TKernel : class
     {
+        typeof(TKernel).GetProperty("DamageType", BindingFlags.Public | BindingFlags.Instance)!
+            .SetValue(kernel, null);
         typeof(TKernel).GetProperty("MinDamage", BindingFlags.Public | BindingFlags.Instance)!
             .SetValue(kernel, 250);
     }

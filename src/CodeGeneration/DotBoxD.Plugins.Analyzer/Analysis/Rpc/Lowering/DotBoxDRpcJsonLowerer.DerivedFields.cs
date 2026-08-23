@@ -6,6 +6,22 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 internal sealed partial class DotBoxDRpcJsonLowerer
 {
+    private static readonly IReadOnlyDictionary<SpecialType, object?> DefaultLiteralValues =
+        new Dictionary<SpecialType, object?>
+        {
+            [SpecialType.System_Boolean] = false,
+            [SpecialType.System_Byte] = 0,
+            [SpecialType.System_Int16] = 0,
+            [SpecialType.System_Int32] = 0,
+            [SpecialType.System_UInt16] = 0,
+            [SpecialType.System_UInt32] = 0L,
+            [SpecialType.System_Int64] = 0L,
+            [SpecialType.System_UInt64] = 0L,
+            [SpecialType.System_Single] = 0D,
+            [SpecialType.System_Double] = 0D,
+            [SpecialType.System_String] = null,
+        };
+
     private bool TryLowerDerivedField(
         IReadOnlyList<RecordMember> fields,
         bool[] assigned,
@@ -51,9 +67,9 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         var memberBindings = new Dictionary<ISymbol, string>(SymbolEqualityComparer.Default);
         for (var i = 0; i < fields.Count; i++)
         {
-            if (assigned[i] && fields[i].Symbol is IPropertySymbol member)
+            if (assigned[i])
             {
-                memberBindings[member] = args[i];
+                memberBindings[fields[i].Symbol] = args[i];
             }
         }
 
@@ -130,21 +146,9 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     }
 
     private static string DefaultLiteralJson(ITypeSymbol type)
-        => type.SpecialType switch
-        {
-            SpecialType.System_Boolean => LiteralJson(false),
-            SpecialType.System_Byte or
-            SpecialType.System_Int16 or
-            SpecialType.System_Int32 or
-            SpecialType.System_UInt16 => LiteralJson(0),
-            SpecialType.System_UInt32 or
-            SpecialType.System_Int64 or
-            SpecialType.System_UInt64 => LiteralJson(0L),
-            SpecialType.System_Single or
-            SpecialType.System_Double => LiteralJson(0D),
-            SpecialType.System_String => LiteralJson(null),
-            _ => throw new NotSupportedException()
-        };
+        => DefaultLiteralValues.TryGetValue(type.SpecialType, out var value)
+            ? LiteralJson(value)
+            : throw new NotSupportedException();
 
     private string? TryLowerDerivedUnary(
         ExpressionSyntax expression,

@@ -228,54 +228,12 @@ internal static class ForbiddenCollectionCapacityPolicy
         if (method.MethodKind == MethodKind.Constructor)
         {
             return HasConstructorCapacityParameter(method, typeName) ||
-                   IsUnboundedEnumerableConstructor(method, typeName) ||
-                   IsArrayListCollectionConstructor(method, typeName) ||
-                   IsNonGenericQueueCollectionConstructor(method, typeName) ||
-                   IsNonGenericStackCollectionConstructor(method, typeName) ||
-                   IsSortedListDictionaryConstructor(method, typeName) ||
-                   IsSortedDictionaryDictionaryConstructor(method, typeName);
+                   CollectionSourceConstructorPolicy.IsMatch(method, typeName);
         }
 
         return method.MethodKind == MethodKind.Ordinary &&
                IsCapacityAllocationOrdinaryMethod(method, typeName);
     }
-
-    private static bool IsUnboundedEnumerableConstructor(IMethodSymbol method, string typeName)
-        => typeName is HashSetTypeName or SortedSetTypeName
-            ? method.Parameters.Any(parameter => string.Equals(
-                parameter.Name,
-                "collection",
-                StringComparison.Ordinal))
-            : typeName is ConcurrentDictionaryTypeName
-                          or LinkedListTypeName
-                          or QueueTypeName
-                          or StackTypeName &&
-              method.Parameters.Length == 1 &&
-              string.Equals(method.Parameters[0].Name, "collection", StringComparison.Ordinal);
-
-    private static bool IsSortedDictionaryDictionaryConstructor(IMethodSymbol method, string typeName)
-        => string.Equals(typeName, SortedDictionaryTypeName, StringComparison.Ordinal) &&
-           method.Parameters.Length == 1 &&
-           string.Equals(method.Parameters[0].Name, "dictionary", StringComparison.Ordinal);
-
-    private static bool IsSortedListDictionaryConstructor(IMethodSymbol method, string typeName)
-        => string.Equals(typeName, SortedListTypeName, StringComparison.Ordinal) &&
-           method.Parameters.Any(static parameter =>
-               string.Equals(parameter.Name, "dictionary", StringComparison.Ordinal));
-
-    private static bool IsArrayListCollectionConstructor(IMethodSymbol method, string typeName)
-        => string.Equals(typeName, ArrayListTypeName, StringComparison.Ordinal) &&
-           method.Parameters.Length == 1;
-
-    private static bool IsNonGenericQueueCollectionConstructor(IMethodSymbol method, string typeName)
-        => string.Equals(typeName, NonGenericQueueTypeName, StringComparison.Ordinal) &&
-           method.Parameters.Length == 1 &&
-           string.Equals(method.Parameters[0].Name, "col", StringComparison.Ordinal);
-
-    private static bool IsNonGenericStackCollectionConstructor(IMethodSymbol method, string typeName)
-        => string.Equals(typeName, NonGenericStackTypeName, StringComparison.Ordinal) &&
-           method.Parameters.Length == 1 &&
-           string.Equals(method.Parameters[0].Name, "col", StringComparison.Ordinal);
 
     private static bool HasConstructorCapacityParameter(IMethodSymbol method, string typeName)
     {

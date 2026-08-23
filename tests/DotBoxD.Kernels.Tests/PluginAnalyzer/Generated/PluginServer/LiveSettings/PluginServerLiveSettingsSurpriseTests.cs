@@ -11,6 +11,10 @@ public sealed class PluginServerLiveSettingsSurpriseTests
         var control = Activator.CreateInstance(assembly.GetType("Sample.RecordingControlService", throwOnError: true)!)!;
         var serverType = assembly.GetType("Sample.RemotePluginServer", throwOnError: true)!;
         var server = Activator.CreateInstance(serverType, [control, null])!;
+        var install = serverType.GetMethod("InstallKernelForTestAsync")!
+            .MakeGenericMethod(assembly.GetType("Sample.FireDamageKernel", throwOnError: true)!)
+            .Invoke(server, null)!;
+        await Assert.IsAssignableFrom<Task>(install);
         var run = assembly.GetType("Sample.Usage", throwOnError: true)!
             .GetMethod("SetMixedValues", BindingFlags.Public | BindingFlags.Static)!;
 
@@ -89,7 +93,14 @@ public sealed class PluginServerLiveSettingsSurpriseTests
             [GeneratePluginServer(
                 Context = typeof(RemotePluginContext),
                 ControlService = typeof(IGamePluginControlService))]
-            public partial class RemotePluginServer : IGameWorldAccess;
+            public partial class RemotePluginServer : IGameWorldAccess
+            {
+                public async Task InstallKernelForTestAsync<TKernel>() where TKernel : class, new()
+                {
+                    var package = DotBoxD.Plugins.Kernel.KernelPackageRegistry.Resolve<TKernel>();
+                    await EnsureAnonymousKernelAsync(package.Manifest.PluginId, () => package);
+                }
+            }
 
             public sealed partial class RemotePluginContext;
 
@@ -131,7 +142,7 @@ public sealed class PluginServerLiveSettingsSurpriseTests
                     => ValueTask.FromResult("plugin-id");
 
                 public ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default)
-                    => ValueTask.FromResult("plugin-id");
+                    => ValueTask.FromResult("fire-damage");
 
                 public ValueTask UpdateSettingsAsync(
                     string pluginId,
