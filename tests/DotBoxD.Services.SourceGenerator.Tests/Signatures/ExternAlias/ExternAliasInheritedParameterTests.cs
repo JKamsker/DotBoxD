@@ -50,20 +50,11 @@ public class ExternAliasInheritedParameterTests
 
         finalErrors.Should().BeEmpty("the generator must not emit invalid source");
 
-        var inheritedOverloadConflict = runResult.Diagnostics.Any(d => d.Id == "DBXS003" &&
-            d.GetMessage().Contains("inherited") &&
-            d.GetMessage().Contains("different assemblies"));
-
-        if (inheritedOverloadConflict)
-        {
-            runResult.Results.Single().GeneratedSources
-                .Should().NotContain(g => g.HintName.Contains("ICombined."));
-        }
-        else
-        {
-            runResult.Results.Single().GeneratedSources
-                .Should().Contain(g => g.HintName.Contains("ICombined."));
-        }
+        runResult.Diagnostics.Should().ContainSingle(d => d.Id == "DBXS003" &&
+            d.GetMessage().Contains("inherited", StringComparison.Ordinal) &&
+            d.GetMessage().Contains("different assemblies", StringComparison.Ordinal));
+        runResult.Results.Single().GeneratedSources
+            .Should().NotContain(g => g.HintName.Contains("ICombined.", StringComparison.Ordinal));
     }
 
     [Fact]

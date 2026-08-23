@@ -179,12 +179,13 @@ internal static class InheritedMethodDeduplicator
             return false;
         }
 
+        var callerInfoSymbols = CallerInfoAttributeIdentity.Resolve(compilation);
         for (var i = 0; i < left.Parameters.Length; i++)
         {
             ct.ThrowIfCancellationRequested();
 
-            if (GetCallerInfoKey(left.Parameters[i], compilation, ct) !=
-                GetCallerInfoKey(right.Parameters[i], compilation, ct))
+            if (CallerInfoAttributeIdentity.GetKey(left.Parameters[i], callerInfoSymbols, ct) !=
+                CallerInfoAttributeIdentity.GetKey(right.Parameters[i], callerInfoSymbols, ct))
             {
                 return false;
             }
@@ -198,51 +199,6 @@ internal static class InheritedMethodDeduplicator
         IMethodSymbol method,
         CancellationToken ct) =>
         InheritedNullableTypeKey.Get(type, method, ct);
-
-    private static string GetCallerInfoKey(IParameterSymbol parameter, Compilation compilation, CancellationToken ct)
-    {
-        var attributes = new List<string>();
-        foreach (var attr in parameter.GetAttributes())
-        {
-            ct.ThrowIfCancellationRequested();
-            if (attr.AttributeClass is not { } attributeClass ||
-                !SymbolEqualityComparer.Default.Equals(attributeClass, compilation.GetTypeByMetadataName(attributeClass.ToDisplayString())))
-                continue;
-
-            switch (attributeClass.ToDisplayString())
-            {
-                case "System.Runtime.CompilerServices.CallerMemberNameAttribute":
-                    attributes.Add("member");
-                    break;
-
-                case "System.Runtime.CompilerServices.CallerFilePathAttribute":
-                    attributes.Add("file");
-                    break;
-
-                case "System.Runtime.CompilerServices.CallerLineNumberAttribute":
-                    attributes.Add("line");
-                    break;
-
-                case "System.Runtime.CompilerServices.CallerArgumentExpressionAttribute":
-                    attributes.Add("argument:" + GetCallerArgumentExpressionTarget(attr));
-                    break;
-            }
-        }
-
-        attributes.Sort(System.StringComparer.Ordinal);
-        return string.Join("|", attributes);
-    }
-
-    private static string GetCallerArgumentExpressionTarget(AttributeData attr)
-    {
-        if (attr.ConstructorArguments.Length == 1 &&
-            attr.ConstructorArguments[0].Value is string target)
-        {
-            return target;
-        }
-
-        return string.Empty;
-    }
 
     public static bool HasSameEffectiveWireName(IMethodSymbol left, IMethodSymbol right) =>
         GetEffectiveWireName(left) == GetEffectiveWireName(right);

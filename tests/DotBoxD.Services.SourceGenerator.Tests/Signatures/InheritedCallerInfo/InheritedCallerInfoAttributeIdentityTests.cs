@@ -78,6 +78,42 @@ public sealed class InheritedCallerInfoAttributeIdentityTests
             .Should().NotContain(g => g.HintName.Contains("ICombined.", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void FrameworkCallerMemberName_RemainsDistinctWhenForeignDefinitionIsAlsoReferenced()
+    {
+        var compilation = CreateCompilation("""
+            extern alias Foreign;
+
+            using DotBoxD.Services.Attributes;
+            using System.Runtime.CompilerServices;
+
+            namespace Regress.AmbiguousCallerMemberName
+            {
+                public interface ILeft
+                {
+                    void Trace([CallerMemberName] string member = "");
+                }
+
+                public interface IRight
+                {
+                    void Trace(string member = "");
+                }
+
+                [RpcService]
+                public interface ICombined : ILeft, IRight
+                {
+                }
+            }
+            """);
+
+        var runResult = Run(compilation);
+
+        runResult.Diagnostics.Should().Contain(d => d.Id == "DBXS003" &&
+            d.GetMessage().Contains("caller info attributes", StringComparison.Ordinal));
+        runResult.Results.Single().GeneratedSources
+            .Should().NotContain(g => g.HintName.Contains("ICombined.", StringComparison.Ordinal));
+    }
+
     private static GeneratorDriverRunResult Run(CSharpCompilation compilation) =>
         GeneratorTestHelper.CreateDriver().RunGenerators(compilation).GetRunResult();
 

@@ -62,9 +62,8 @@ internal static partial class ServiceModelFactory
         }
 
         var cancellationTokenSymbol = context.SemanticModel.Compilation.GetTypeByMetadataName(CancellationTokenFullName);
-        var rpcStreamHandleSymbol = GetDotBoxDServicesType(
-            context.SemanticModel.Compilation,
-            ServicesGeneratorTypeNames.RpcStreamHandleMetadata);
+        var rpcStreamHandleSymbol = GetRpcServiceAssembly(serviceAttribute.AttributeClass)?
+            .GetTypeByMetadataName(ServicesGeneratorTypeNames.RpcStreamHandleMetadata);
         var methods = new List<MethodModel>();
         var properties = new List<ServicePropertyModel>();
         var methodLocations = new List<DiagnosticLocation>();
@@ -134,13 +133,13 @@ internal static partial class ServiceModelFactory
             ServiceDiagnostic: null);
     }
 
-    private static INamedTypeSymbol? GetDotBoxDServicesType(Compilation compilation, string metadataName)
+    private static IAssemblySymbol? GetRpcServiceAssembly(INamedTypeSymbol? attributeType)
     {
-        foreach (var reference in compilation.References)
+        for (var current = attributeType; current is not null; current = current.BaseType)
         {
-            if (compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol { Name: "DotBoxD.Services" } assembly)
+            if (ServicesGeneratorTypeNames.IsRpcServiceAttribute(current.ToDisplayString()))
             {
-                return assembly.GetTypeByMetadataName(metadataName);
+                return current.ContainingAssembly;
             }
         }
 

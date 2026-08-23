@@ -47,6 +47,11 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     internal string? ReturnRecordType => _returnRecordType;
     internal RpcAssignmentOverride? AssignmentOverride => _assignmentOverride;
 
+    private SemanticModel ModelFor(SyntaxNode node) =>
+        node.SyntaxTree == _model.SyntaxTree
+            ? _model
+            : _model.Compilation.GetSemanticModel(node.SyntaxTree);
+
     public string LowerBody(BlockSyntax block) => LowerBody(block, [], [], returnRecordType: null, assignmentOverride: null);
     internal string LowerBody(BlockSyntax block, ITypeSymbol? returnValueType)
         => LowerBody(

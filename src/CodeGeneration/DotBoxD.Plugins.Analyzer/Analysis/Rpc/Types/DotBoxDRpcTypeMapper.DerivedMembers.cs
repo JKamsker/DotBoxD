@@ -243,7 +243,7 @@ internal static partial class DotBoxDRpcTypeMapper
 
     private static IMethodSymbol ResolveDispatchTarget(IMethodSymbol method, INamedTypeSymbol? dispatchType)
     {
-        if (!method.IsVirtual || dispatchType is null)
+        if (!(method.IsVirtual || method.IsAbstract || method.IsOverride) || dispatchType is null)
         {
             return method;
         }

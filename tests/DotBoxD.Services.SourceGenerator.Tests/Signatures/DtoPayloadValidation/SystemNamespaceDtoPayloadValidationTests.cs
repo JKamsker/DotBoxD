@@ -44,6 +44,10 @@ public sealed class SystemNamespaceDtoPayloadValidationTests
         diagnostics.Should().HaveCount(2);
         diagnostics.Should().OnlyContain(diagnostic =>
             diagnostic.GetMessage().Contains("streaming or control type", StringComparison.Ordinal));
+        diagnostics.Should().Contain(diagnostic =>
+            diagnostic.GetMessage().Contains("SendHiddenAsync", StringComparison.Ordinal));
+        diagnostics.Should().Contain(diagnostic =>
+            diagnostic.GetMessage().Contains("SendControlAsync", StringComparison.Ordinal));
     }
 
     private static GeneratorDriverRunResult Compile(string source)

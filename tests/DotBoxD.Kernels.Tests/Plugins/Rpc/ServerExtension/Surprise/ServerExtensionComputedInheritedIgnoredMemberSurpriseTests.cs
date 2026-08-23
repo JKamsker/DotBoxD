@@ -19,6 +19,15 @@ public sealed class ServerExtensionComputedInheritedIgnoredMemberSurpriseTests
             [JsonIgnore]
             public int Value { get; init; }
 
+            [JsonIgnore]
+            public string Label { get; init; } = "";
+
+            [JsonIgnore]
+            public System.Guid CorrelationId { get; init; }
+
+            [JsonIgnore]
+            public System.Collections.Generic.List<int> History { get; init; } = new();
+
             public int Computed => Value + 1;
         }
 

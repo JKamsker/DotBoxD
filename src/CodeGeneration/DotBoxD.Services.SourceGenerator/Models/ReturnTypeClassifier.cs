@@ -196,7 +196,12 @@ internal static partial class ReturnTypeClassifier
 
     private static bool IsFrameworkTaskLike(INamedTypeSymbol type)
     {
-        var token = type.ContainingAssembly.Identity.PublicKeyToken;
+        if (type.ContainingAssembly is not { } assembly)
+        {
+            return false;
+        }
+
+        var token = assembly.Identity.PublicKeyToken;
         return type.Locations.Any(static location => location.IsInMetadata) &&
                token.Length == 8 &&
                (TokenEquals(token, 0x7c, 0xec, 0x85, 0xd7, 0xbe, 0xa7, 0x79, 0x8e) ||

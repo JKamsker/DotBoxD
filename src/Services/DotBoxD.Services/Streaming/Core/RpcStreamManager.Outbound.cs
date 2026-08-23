@@ -89,7 +89,6 @@ internal sealed partial class RpcStreamManager
                 {
                     throw new ServiceProtocolException("Outbound stream attachment is already registered.");
                 }
-
                 claimed[claimedCount++] = attachments[i];
                 var state = new RpcStreamSendState(attachments[i].Handle.StreamId, ct);
                 if (!_senders.TryAdd(state.StreamId, state))
@@ -97,12 +96,10 @@ internal sealed partial class RpcStreamManager
                     state.Dispose();
                     throw new ServiceProtocolException($"Duplicate outbound stream id '{attachments[i].Handle.StreamId}'.");
                 }
-
                 added[addedCount++] = state;
                 CompleteOutboundRegistration(state);
                 rows[i] = (attachments[i], state);
             }
-
             return new RpcOutboundStreamSet(this, _serializer, rows);
         }
         catch
@@ -111,12 +108,10 @@ internal sealed partial class RpcStreamManager
             {
                 RemoveOutbound(added[i].StreamId);
             }
-
             for (var i = 0; i < claimedCount; i++)
             {
                 claimed[i].ReleaseOutboundRegistration();
             }
-
             foreach (var attachment in attachments)
             {
                 if (attachment is not null)
@@ -134,20 +129,23 @@ internal sealed partial class RpcStreamManager
         RpcStreamValidation.ValidateOutboundAttachment(attachment);
         var rows = new (RpcStreamAttachment Attachment, RpcStreamSendState State)[1];
         RpcStreamSendState? state = null;
+        var claimed = false;
+        var releaseReservation = true;
         var added = false;
         try
         {
             ct.ThrowIfCancellationRequested();
             if (!attachment.TryClaimOutboundRegistration())
             {
+                releaseReservation = false;
                 throw new ServiceProtocolException("Outbound stream attachment is already registered.");
             }
+            claimed = true;
             state = new RpcStreamSendState(attachment.Handle.StreamId, ct);
             if (!_senders.TryAdd(state.StreamId, state))
             {
                 throw new ServiceProtocolException($"Duplicate outbound stream id '{attachment.Handle.StreamId}'.");
             }
-
             added = true;
             CompleteOutboundRegistration(state);
             rows[0] = (attachment, state);
@@ -163,16 +161,19 @@ internal sealed partial class RpcStreamManager
             {
                 state?.Dispose();
             }
-
-            attachment.ReleaseOutboundRegistration();
-            ReleaseOutboundReservation(attachment.Handle.StreamId);
+            if (claimed)
+            {
+                attachment.ReleaseOutboundRegistration();
+            }
+            if (releaseReservation)
+            {
+                ReleaseOutboundReservation(attachment.Handle.StreamId);
+            }
             throw;
         }
     }
-
     public bool TryAddCredit(Payload frame) =>
         TryAddCredit(frame.Memory);
-
     public bool TryAddCredit(ReadOnlyMemory<byte> frame)
     {
         if (!MessageFramer.TryReadFrameHeader(frame, out var streamId, out _) ||
@@ -182,7 +183,6 @@ internal sealed partial class RpcStreamManager
         {
             return false;
         }
-
         if (_senders.TryGetValue(streamId, out var state))
         {
             return state.AddCredit(count);

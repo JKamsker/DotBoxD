@@ -19,7 +19,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             [SpecialType.System_UInt64] = 0L,
             [SpecialType.System_Single] = 0D,
             [SpecialType.System_Double] = 0D,
-            [SpecialType.System_String] = null,
+            [SpecialType.System_String] = string.Empty,
         };
 
     private bool TryLowerDerivedField(
@@ -115,10 +115,12 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     private string? BoundDerivedMember(
         IReadOnlyDictionary<ISymbol, string> memberBindings,
         ExpressionSyntax expression)
-        => _model.GetSymbolInfo(expression, _cancellationToken).Symbol is { } member &&
+    {
+        return ModelFor(expression).GetSymbolInfo(expression, _cancellationToken).Symbol is { } member &&
            memberBindings.TryGetValue(member, out var bound)
             ? bound
             : null;
+    }
 
     private void AddIgnoredDefaultBindings(
         INamedTypeSymbol type,
@@ -140,15 +142,18 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                     continue;
                 }
 
-                memberBindings.Add(ignored, DefaultLiteralJson(ignored.Type));
+                if (TryDefaultLiteralJson(ignored.Type) is { } defaultValue)
+                {
+                    memberBindings.Add(ignored, defaultValue);
+                }
             }
         }
     }
 
-    private static string DefaultLiteralJson(ITypeSymbol type)
+    private static string? TryDefaultLiteralJson(ITypeSymbol type)
         => DefaultLiteralValues.TryGetValue(type.SpecialType, out var value)
             ? LiteralJson(value)
-            : throw new NotSupportedException();
+            : null;
 
     private string? TryLowerDerivedUnary(
         ExpressionSyntax expression,

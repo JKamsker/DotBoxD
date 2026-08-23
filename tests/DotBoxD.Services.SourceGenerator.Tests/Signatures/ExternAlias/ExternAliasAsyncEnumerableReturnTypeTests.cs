@@ -40,12 +40,17 @@ public class ExternAliasAsyncEnumerableReturnTypeTests
         var driver = GeneratorTestHelper.CreateDriver().RunGenerators(compilation);
         var runResult = driver.GetRunResult();
         runResult.Diagnostics.Should().NotContain(d => d.Severity == DiagnosticSeverity.Error);
+        var generatedSource = string.Join(
+            "\n",
+            runResult.Results.Single().GeneratedSources.Select(source => source.SourceText.ToString()));
+        generatedSource.Should().Contain("Foreign::System.Collections.Generic.IAsyncEnumerable<int>");
+        generatedSource.Should().NotContain("InvokeStreamAsync(\"ICounter\", \"CountAsync\"");
 
         var final = compilation.AddSyntaxTrees(runResult.GeneratedTrees);
         final.GetDiagnostics()
             .Where(d => d.Severity == DiagnosticSeverity.Error)
             .Should()
-            .BeEmpty("the generator must preserve the foreign async-enumerable return type or reject it with a focused diagnostic");
+            .BeEmpty("the generator must preserve the foreign async-enumerable return type as a non-streaming return");
     }
 
     private static MetadataReference CompileReference(string source, string assemblyName)

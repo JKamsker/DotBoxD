@@ -18,22 +18,40 @@ public sealed class ServerExtensionComputedVirtualDispatchSurpriseTests
 
         namespace Sample;
 
-        public record BaseDto(int Value)
+        public abstract record AbstractBaseDto(int Value)
         {
             public int Computed => Calculate();
 
+            protected abstract int Calculate();
+        }
+
+        public sealed record AbstractDerivedDto(int Value) : AbstractBaseDto(Value)
+        {
+            protected override int Calculate() => Value + 2;
+        }
+
+        public record BaseDto(int Value)
+        {
             protected virtual int Calculate() => Value + 1;
         }
 
-        public sealed record DerivedDto(int Value) : BaseDto(Value)
+        public record MiddleDto(int Value) : BaseDto(Value)
         {
+            public int Computed => Calculate();
+
             protected override int Calculate() => Value + 2;
+        }
+
+        public sealed record DerivedDto(int Value) : MiddleDto(Value)
+        {
+            protected override int Calculate() => Value + 3;
         }
 
         [ServerExtension("computed-virtual-dispatch")]
         public sealed partial class ComputedVirtualDispatchKernel
         {
-            public int Read(int value, HookContext ctx) => new DerivedDto(value).Computed;
+            public int Read(int value, HookContext ctx)
+                => (new AbstractDerivedDto(value).Computed * 10) + new DerivedDto(value).Computed;
         }
         """;
 
@@ -47,6 +65,6 @@ public sealed class ServerExtensionComputedVirtualDispatchSurpriseTests
         var kernel = await server.InstallServerExtensionAsync(package);
         var service = ServerExtensionProxy.Create<IComputedVirtualDispatchService>(kernel);
 
-        Assert.Equal(5, service.Read(3));
+        Assert.Equal(56, service.Read(3));
     }
 }

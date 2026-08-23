@@ -2,11 +2,15 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 
 public sealed class PluginAnalyzerForbiddenApiConcurrentDictionaryEnumerableConstructorReachabilityTests
 {
-    [Fact]
-    public async Task Reports_unbounded_concurrent_dictionary_enumerable_constructor_static_initializer()
+    [Theory]
+    [InlineData("new ConcurrentDictionary<int, int>(Enumerable.Range(0, int.MaxValue).Select(static value => new KeyValuePair<int, int>(value, value)))")]
+    [InlineData("new ConcurrentDictionary<int, int>(Enumerable.Range(0, int.MaxValue).Select(static value => new KeyValuePair<int, int>(value, value)), EqualityComparer<int>.Default)")]
+    [InlineData("new ConcurrentDictionary<int, int>(1, Enumerable.Range(0, int.MaxValue).Select(static value => new KeyValuePair<int, int>(value, value)), EqualityComparer<int>.Default)")]
+    public async Task Reports_unbounded_concurrent_dictionary_enumerable_constructor_static_initializer(
+        string initializer)
     {
         var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
-            Source("new ConcurrentDictionary<int, int>(Enumerable.Range(0, int.MaxValue).Select(static value => new KeyValuePair<int, int>(value, value)))"),
+            Source(initializer),
             "DotBoxDPluginAnalyzerConcurrentDictionaryEnumerableConstructorReachabilityTest");
 
         var diagnostic = Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DBXK001"));

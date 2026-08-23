@@ -43,20 +43,15 @@ public sealed class ExternAliasControlPlaneIdentityTests
             .Where(d => d.Severity == DiagnosticSeverity.Error)
             .ToArray();
 
-        if (generatorErrors.Any(d => d.Id == "DBXS003"))
-        {
-            generatorErrors.Should().OnlyContain(d => d.Id == "DBXS003");
-        }
-        else
-        {
-            generatorErrors.Should().BeEmpty();
-        }
+        generatorErrors.Should().BeEmpty();
+        runResult.Results.Single().GeneratedSources
+            .Should().Contain(source => source.SourceText.ToString().Contains("PingAsync", StringComparison.Ordinal));
 
         var final = compilation.AddSyntaxTrees(runResult.GeneratedTrees);
         final.GetDiagnostics()
             .Where(d => d.Severity == DiagnosticSeverity.Error)
             .Should()
-            .BeEmpty("the generator must preserve the foreign control member or reject the foreign base with a focused diagnostic");
+            .BeEmpty("the generator must preserve the foreign control member");
     }
 
     private static MetadataReference CompileReference(string source, string assemblyName)

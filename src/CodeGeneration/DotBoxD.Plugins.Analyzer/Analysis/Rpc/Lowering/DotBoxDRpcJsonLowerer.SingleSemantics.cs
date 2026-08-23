@@ -7,14 +7,15 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 {
     internal void ValidateBinarySingleSemantics(BinaryExpressionSyntax binary)
     {
-        if (_model.GetConstantValue(binary, _cancellationToken).HasValue)
+        var model = ModelFor(binary);
+        if (model.GetConstantValue(binary, _cancellationToken).HasValue)
         {
             return;
         }
 
         var description = $"Server extension binary operator '{binary.OperatorToken.Text}'";
         RejectRuntimeSingleResult(
-            _model.GetTypeInfo(binary, _cancellationToken).Type,
+            model.GetTypeInfo(binary, _cancellationToken).Type,
             description);
         ValidateBinarySingleOperand(binary.Left, description);
         ValidateBinarySingleOperand(binary.Right, description);
@@ -30,7 +31,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
     private void ValidateBinarySingleOperand(ExpressionSyntax operand, string description)
     {
-        var type = _model.GetTypeInfo(operand, _cancellationToken);
+        var type = ModelFor(operand).GetTypeInfo(operand, _cancellationToken);
         if (type.ConvertedType?.SpecialType == SpecialType.System_Single &&
             type.Type?.SpecialType != SpecialType.System_Single)
         {

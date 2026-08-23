@@ -27,10 +27,11 @@ internal static class CollectionSourceConstructorPolicy
            IsSortedListDictionaryConstructor(method, typeName);
 
     private static bool IsUnboundedEnumerableConstructor(IMethodSymbol method, string typeName)
-        => typeName is HashSetTypeName or SortedSetTypeName
+        => typeName is ConcurrentDictionaryTypeName
+            ? HasParameter(method, "collection") || HasParameter(method, "dictionary")
+            : typeName is HashSetTypeName or SortedSetTypeName
             ? HasParameter(method, "collection")
-            : typeName is ConcurrentDictionaryTypeName
-                          or LinkedListTypeName
+            : typeName is LinkedListTypeName
                           or QueueTypeName
                           or StackTypeName &&
               method.Parameters.Length == 1 &&

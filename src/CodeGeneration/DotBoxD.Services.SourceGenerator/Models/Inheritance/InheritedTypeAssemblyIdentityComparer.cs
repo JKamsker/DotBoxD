@@ -96,7 +96,11 @@ internal static class InheritedTypeAssemblyIdentityComparer
         INamedTypeSymbol right,
         CancellationToken ct)
     {
-        if (!left.ContainingAssembly.Identity.Equals(right.ContainingAssembly.Identity) ||
+        var leftAssembly = left.ContainingAssembly;
+        var rightAssembly = right.ContainingAssembly;
+        if (leftAssembly is null ||
+            rightAssembly is null ||
+            !leftAssembly.Identity.Equals(rightAssembly.Identity) ||
             left.TypeArguments.Length != right.TypeArguments.Length)
         {
             return false;

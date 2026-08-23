@@ -228,7 +228,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             return serverContextType;
         }
 
-        var type = _model.GetTypeInfo(expression, _cancellationToken);
+        var type = ModelFor(expression).GetTypeInfo(expression, _cancellationToken);
         return type.Type
                ?? type.ConvertedType
                ?? throw new NotSupportedException($"Server extension could not resolve the type of '{expression}'.");

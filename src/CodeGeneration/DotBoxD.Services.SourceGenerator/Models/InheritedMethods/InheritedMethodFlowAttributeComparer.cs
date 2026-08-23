@@ -123,7 +123,12 @@ internal static class InheritedMethodFlowAttributeComparer
             return false;
         }
 
-        var token = attributeType.ContainingAssembly.Identity.PublicKeyToken;
+        if (attributeType.ContainingAssembly is not { } assembly)
+        {
+            return false;
+        }
+
+        var token = assembly.Identity.PublicKeyToken;
         return IsMicrosoftToken(token) || IsEcmaToken(token);
     }
 
