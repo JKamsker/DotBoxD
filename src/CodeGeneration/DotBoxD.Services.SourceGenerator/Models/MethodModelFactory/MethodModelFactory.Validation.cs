@@ -110,6 +110,7 @@ internal static partial class MethodModelFactory
         string parameterName,
         bool isCancellationToken,
         INamedTypeSymbol? cancellationTokenSymbol,
+        INamedTypeSymbol? rpcStreamHandleSymbol,
         CancellationToken ct)
     {
         var target = streamKind == ParameterStreamKind.AsyncEnumerable && streamItemType is not null
@@ -123,7 +124,8 @@ internal static partial class MethodModelFactory
             allowCurrentTransportShape:
                 streamKind is ParameterStreamKind.Stream or ParameterStreamKind.Pipe,
             allowCurrentCancellationToken: isCancellationToken,
-            cancellationTokenSymbol: cancellationTokenSymbol);
+            cancellationTokenSymbol: cancellationTokenSymbol,
+            rpcStreamHandleSymbol: rpcStreamHandleSymbol);
     }
 
     private static string? GetUnsupportedNullableStreamingReturnReason(
