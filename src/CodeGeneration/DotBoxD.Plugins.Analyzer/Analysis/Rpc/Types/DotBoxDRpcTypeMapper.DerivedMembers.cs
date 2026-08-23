@@ -178,8 +178,12 @@ internal static partial class DotBoxDRpcTypeMapper
             {
                 ArgumentList.Arguments.Count: 0
             } invocation ||
-            HelperName(invocation.Expression) is not { } helperName ||
-            TryGetParameterlessHelperExpression(containingType, helperName, dispatchType) is not { } helperBody)
+            TryGetHelperCall(invocation.Expression) is not { } helperCall ||
+            TryGetParameterlessHelperExpression(
+                containingType,
+                helperCall.Name,
+                helperCall.IsBaseQualified ? null : dispatchType,
+                helperCall.IsBaseQualified) is not { } helperBody)
         {
             return expression;
         }
@@ -187,21 +191,25 @@ internal static partial class DotBoxDRpcTypeMapper
         return ExpandDerivedGetterExpression(containingType, helperBody, dispatchType, depth + 1);
     }
 
-    private static string? HelperName(ExpressionSyntax expression)
+    private static (string Name, bool IsBaseQualified)? TryGetHelperCall(ExpressionSyntax expression)
         => expression switch
         {
-            IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
+            IdentifierNameSyntax identifier => (identifier.Identifier.ValueText, false),
             MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } member =>
-                member.Name.Identifier.ValueText,
+                (member.Name.Identifier.ValueText, false),
+            MemberAccessExpressionSyntax { Expression: BaseExpressionSyntax } member =>
+                (member.Name.Identifier.ValueText, true),
             _ => null,
         };
 
     private static ExpressionSyntax? TryGetParameterlessHelperExpression(
         INamedTypeSymbol containingType,
         string helperName,
-        INamedTypeSymbol? dispatchType)
+        INamedTypeSymbol? dispatchType,
+        bool isBaseQualified)
     {
-        for (var currentType = containingType; currentType is not null; currentType = currentType.BaseType)
+        var startType = isBaseQualified ? containingType.BaseType : containingType;
+        for (var currentType = startType; currentType is not null; currentType = currentType.BaseType)
         {
             foreach (var method in currentType.GetMembers(helperName).OfType<IMethodSymbol>())
             {
@@ -210,7 +218,7 @@ internal static partial class DotBoxDRpcTypeMapper
                     continue;
                 }
 
-                var dispatchTarget = ResolveDispatchTarget(method, dispatchType);
+                var dispatchTarget = isBaseQualified ? method : ResolveDispatchTarget(method, dispatchType);
                 foreach (var reference in dispatchTarget.DeclaringSyntaxReferences)
                 {
                     if (reference.GetSyntax() is not MethodDeclarationSyntax declaration)
