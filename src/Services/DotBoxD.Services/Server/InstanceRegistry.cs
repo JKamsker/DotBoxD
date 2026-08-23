@@ -221,7 +221,6 @@ public sealed class InstanceRegistry : IInstanceRegistry
                 return true;
             }
         }
-
         return false;
     }
 
