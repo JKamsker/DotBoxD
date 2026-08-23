@@ -34,6 +34,19 @@ internal static class CollectionMaterializationPolicy
     }
 
     private static string GetCollectionDisplayName(IMethodSymbol method, string typeName)
+        => !method.IsStatic && string.Equals(typeName, ListTypeName, StringComparison.Ordinal)
+            ? GetListDisplayName(method.Name)
+            : GetStaticCollectionDisplayName(method, typeName);
+
+    private static string GetListDisplayName(string methodName)
+        => methodName switch
+        {
+            "ConvertAll" => "System.Collections.Generic.List.ConvertAll",
+            "GetRange" => "System.Collections.Generic.List.GetRange",
+            _ => null!
+        };
+
+    private static string GetStaticCollectionDisplayName(IMethodSymbol method, string typeName)
         => (method.Name, typeName) switch
         {
             ("ToFrozenSet", FrozenSetTypeName) when method.IsStatic =>
@@ -42,10 +55,6 @@ internal static class CollectionMaterializationPolicy
                 "System.Collections.Immutable.ImmutableList.ToImmutableList",
             ("ToImmutableDictionary", ImmutableDictionaryTypeName) when method.IsStatic =>
                 "System.Collections.Immutable.ImmutableDictionary.ToImmutableDictionary",
-            ("ConvertAll", ListTypeName) when !method.IsStatic =>
-                "System.Collections.Generic.List.ConvertAll",
-            ("GetRange", ListTypeName) when !method.IsStatic =>
-                "System.Collections.Generic.List.GetRange",
             _ => null!
         };
 
