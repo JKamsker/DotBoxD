@@ -1,6 +1,6 @@
-using Microsoft.CodeAnalysis;
-using System.Threading;
 using System.Collections.Generic;
+using System.Threading;
+using Microsoft.CodeAnalysis;
 
 namespace DotBoxD.Services.SourceGenerator.Validation;
 
