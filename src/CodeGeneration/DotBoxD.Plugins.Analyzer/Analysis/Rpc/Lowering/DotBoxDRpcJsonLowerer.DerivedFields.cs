@@ -89,6 +89,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     {
         var lowered = TryLowerDerivedTerminal(expression, memberBindings, named, derived) ??
                       TryLowerDerivedUnary(expression, memberBindings, named, derived) ??
+                      TryLowerDerivedCast(expression, memberBindings, named, derived) ??
                       TryLowerDerivedBinary(expression, memberBindings, named, derived) ??
                       throw DerivedNotSupported(named, derived);
 
@@ -188,6 +189,27 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         => expression is BinaryExpressionSyntax binary
             ? LowerBinary(binary, part => LowerDerivedExpression(part, memberBindings, named, derived))
             : null;
+
+    private string? TryLowerDerivedCast(
+        ExpressionSyntax expression,
+        IReadOnlyDictionary<ISymbol, string> memberBindings,
+        INamedTypeSymbol named,
+        RecordMember derived)
+    {
+        if (expression is not CastExpressionSyntax cast)
+        {
+            return null;
+        }
+
+        var targetType = ModelFor(cast).GetTypeInfo(cast, _cancellationToken).Type
+                         ?? ModelFor(cast).GetTypeInfo(cast, _cancellationToken).ConvertedType
+                         ?? throw DerivedNotSupported(named, derived);
+        return ApplyRequiredConversion(
+            cast.Expression,
+            targetType,
+            LowerDerivedExpression(cast.Expression, memberBindings, named, derived),
+            $"Server extension derived member '{derived.Name}' cast '{cast}'");
+    }
 
     private static System.NotSupportedException DerivedNotSupported(INamedTypeSymbol named, RecordMember derived)
         => new(

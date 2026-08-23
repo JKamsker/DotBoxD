@@ -123,6 +123,8 @@ internal static partial class DotBoxDRpcTypeMapper
                 assignedNames.Contains(thisMember.Name.Identifier.ValueText),
             PrefixUnaryExpressionSyntax unary => IsSupportedUnary(unary) &&
                 IsExpressionOverAssignedFields(unary.Operand, assignedNames),
+            CastExpressionSyntax cast =>
+                IsExpressionOverAssignedFields(cast.Expression, assignedNames),
             BinaryExpressionSyntax binary =>
                 IsExpressionOverAssignedFields(binary.Left, assignedNames) &&
                 IsExpressionOverAssignedFields(binary.Right, assignedNames),
