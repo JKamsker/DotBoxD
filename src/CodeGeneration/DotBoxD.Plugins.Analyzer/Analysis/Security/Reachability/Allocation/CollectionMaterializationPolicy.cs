@@ -12,13 +12,29 @@ internal static class CollectionMaterializationPolicy
 
     public static bool TryGetDisplayName(IMethodSymbol method, string typeName, out string forbidden)
     {
+        if (TryGetEnumerableDisplayName(method, typeName, out forbidden))
+        {
+            return true;
+        }
+
+        forbidden = GetCollectionDisplayName(method, typeName);
+        return forbidden is not null;
+    }
+
+    private static bool TryGetEnumerableDisplayName(IMethodSymbol method, string typeName, out string forbidden)
+    {
         if (IsEnumerableMaterialization(method, typeName))
         {
             forbidden = $"System.Linq.Enumerable.{method.Name}";
             return true;
         }
 
-        forbidden = (method.Name, typeName) switch
+        forbidden = null!;
+        return false;
+    }
+
+    private static string GetCollectionDisplayName(IMethodSymbol method, string typeName)
+        => (method.Name, typeName) switch
         {
             ("ToFrozenSet", FrozenSetTypeName) when method.IsStatic =>
                 "System.Collections.Frozen.FrozenSet.ToFrozenSet",
@@ -30,8 +46,6 @@ internal static class CollectionMaterializationPolicy
                 "System.Collections.Generic.List.GetRange",
             _ => null!
         };
-        return forbidden is not null;
-    }
 
     private static bool IsEnumerableMaterialization(IMethodSymbol method, string typeName)
         => method is { IsStatic: true } &&
