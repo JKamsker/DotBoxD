@@ -156,7 +156,7 @@ internal static class ContainsMethodFilterTranslator
 
     private static bool IsSupportedStaticContains(MethodInfo method) =>
         method.DeclaringType == typeof(Enumerable) ||
-        string.Equals(method.DeclaringType?.FullName, "System.MemoryExtensions", StringComparison.Ordinal);
+        method.DeclaringType == typeof(MemoryExtensions);
 
     private static bool IsSupportedInstanceContains(MethodInfo method)
     {
