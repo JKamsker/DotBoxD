@@ -1,11 +1,10 @@
 using System.Reflection;
+using DotBoxD.Services.Attributes;
 
 namespace DotBoxD.Hosting.Execution;
 
 internal static class HostServiceBindingMemberDiscovery
 {
-    private const string RpcServiceAttributeType = "DotBoxD.Services.Attributes.RpcServiceAttribute";
-
     public static IEnumerable<MethodInfo> ServiceMethods(Type serviceType)
         => ServiceTypes(serviceType).SelectMany(static type => type.GetMethods());
 
@@ -69,8 +68,5 @@ internal static class HostServiceBindingMemberDiscovery
 
     private static bool HasDirectRpcServiceAttribute(Type type)
         => type.GetCustomAttributes(inherit: false)
-            .Any(attribute => string.Equals(
-                attribute.GetType().FullName,
-                RpcServiceAttributeType,
-                StringComparison.Ordinal));
+            .Any(static attribute => attribute.GetType() == typeof(RpcServiceAttribute));
 }
