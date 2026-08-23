@@ -30,6 +30,7 @@ public sealed partial class PluginServer
                 sandboxPolicy,
                 cancellationToken)
             .ConfigureAwait(false);
+        ThrowIfDisposed();
         PluginPackageValidator.ValidatePrepared(package, plan, Events, installPolicy);
         var kernels = new InstalledKernel[degreeOfParallelism];
         for (var i = 0; i < kernels.Length; i++)
