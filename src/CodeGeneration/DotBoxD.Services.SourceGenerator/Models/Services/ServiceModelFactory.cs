@@ -95,6 +95,7 @@ internal static partial class ServiceModelFactory
 
         if (BuildMethods(
                 members.Methods,
+                context.SemanticModel.Compilation,
                 buildContext,
                 cancellationTokenSymbol,
                 validationCache,
@@ -153,6 +154,7 @@ internal static partial class ServiceModelFactory
 
     private static ServiceResult? BuildMethods(
         List<IMethodSymbol> methodSymbols,
+        Compilation compilation,
         ServiceBuildContext buildContext,
         INamedTypeSymbol? cancellationTokenSymbol,
         RpcTypeValidationCache validationCache,
@@ -169,6 +171,7 @@ internal static partial class ServiceModelFactory
 
             var sigKey = MethodSignatureFacts.GetSignatureKey(methodSymbol, ct);
             if (TryApplyInheritedMethod(
+                    compilation,
                     buildContext,
                     methodSymbol,
                     sigKey,
