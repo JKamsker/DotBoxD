@@ -226,7 +226,12 @@ internal static class ForbiddenCollectionCapacityPolicy
     }
 
     private static bool IsUnboundedEnumerableConstructor(IMethodSymbol method, string typeName)
-        => typeName is HashSetTypeName or LinkedListTypeName or QueueTypeName or SortedSetTypeName or StackTypeName &&
+        => typeName is ConcurrentDictionaryTypeName
+                       or HashSetTypeName
+                       or LinkedListTypeName
+                       or QueueTypeName
+                       or SortedSetTypeName
+                       or StackTypeName &&
            method.Parameters.Length == 1 &&
            string.Equals(method.Parameters[0].Name, "collection", StringComparison.Ordinal);
 
