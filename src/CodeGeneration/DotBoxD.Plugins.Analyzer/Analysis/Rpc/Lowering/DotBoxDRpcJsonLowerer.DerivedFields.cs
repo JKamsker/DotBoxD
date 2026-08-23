@@ -90,6 +90,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         var lowered = TryLowerDerivedTerminal(expression, memberBindings, named, derived) ??
                       TryLowerDerivedUnary(expression, memberBindings, named, derived) ??
                       TryLowerDerivedBinary(expression, memberBindings, named, derived) ??
+                      TryLowerDerivedConditional(expression, memberBindings, named, derived) ??
                       throw DerivedNotSupported(named, derived);
 
         return ApplyNumericConversion(expression, lowered);
@@ -188,6 +189,26 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         => expression is BinaryExpressionSyntax binary
             ? LowerBinary(binary, part => LowerDerivedExpression(part, memberBindings, named, derived))
             : null;
+
+    private string? TryLowerDerivedConditional(
+        ExpressionSyntax expression,
+        IReadOnlyDictionary<ISymbol, string> memberBindings,
+        INamedTypeSymbol named,
+        RecordMember derived)
+    {
+        if (expression is not ConditionalExpressionSyntax conditional)
+        {
+            return null;
+        }
+
+        var localName = ReserveGeneratedLocal("__sir_derived");
+        AddExpressionPrelude(Obj(
+            ("op", Str("if")),
+            ("condition", LowerDerivedExpression(conditional.Condition, memberBindings, named, derived)),
+            ("then", "[" + SetStatement(localName, LowerDerivedExpression(conditional.WhenTrue, memberBindings, named, derived)) + "]"),
+            ("else", "[" + SetStatement(localName, LowerDerivedExpression(conditional.WhenFalse, memberBindings, named, derived)) + "]")));
+        return Var(localName);
+    }
 
     private static System.NotSupportedException DerivedNotSupported(INamedTypeSymbol named, RecordMember derived)
         => new(

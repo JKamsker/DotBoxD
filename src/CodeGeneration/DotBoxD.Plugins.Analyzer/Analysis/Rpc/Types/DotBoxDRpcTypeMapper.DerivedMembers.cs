@@ -126,6 +126,10 @@ internal static partial class DotBoxDRpcTypeMapper
             BinaryExpressionSyntax binary =>
                 IsExpressionOverAssignedFields(binary.Left, assignedNames) &&
                 IsExpressionOverAssignedFields(binary.Right, assignedNames),
+            ConditionalExpressionSyntax conditional =>
+                IsExpressionOverAssignedFields(conditional.Condition, assignedNames) &&
+                IsExpressionOverAssignedFields(conditional.WhenTrue, assignedNames) &&
+                IsExpressionOverAssignedFields(conditional.WhenFalse, assignedNames),
             _ => false
         };
 
