@@ -219,24 +219,34 @@ internal static partial class DotBoxDRpcTypeMapper
                 }
 
                 var dispatchTarget = isBaseQualified ? method : ResolveDispatchTarget(method, dispatchType);
-                foreach (var reference in dispatchTarget.DeclaringSyntaxReferences)
+                if (TryGetMethodReturnExpression(dispatchTarget) is { } expression)
                 {
-                    if (reference.GetSyntax() is not MethodDeclarationSyntax declaration)
-                    {
-                        continue;
-                    }
-
-                    if (declaration.ExpressionBody is { } arrow)
-                    {
-                        return arrow.Expression;
-                    }
-
-                    if (declaration.Body is { Statements.Count: 1 } body &&
-                        body.Statements[0] is ReturnStatementSyntax { Expression: { } returned })
-                    {
-                        return returned;
-                    }
+                    return expression;
                 }
+            }
+        }
+
+        return null;
+    }
+
+    private static ExpressionSyntax? TryGetMethodReturnExpression(IMethodSymbol method)
+    {
+        foreach (var reference in method.DeclaringSyntaxReferences)
+        {
+            if (reference.GetSyntax() is not MethodDeclarationSyntax declaration)
+            {
+                continue;
+            }
+
+            if (declaration.ExpressionBody is { } arrow)
+            {
+                return arrow.Expression;
+            }
+
+            if (declaration.Body is { Statements.Count: 1 } body &&
+                body.Statements[0] is ReturnStatementSyntax { Expression: { } returned })
+            {
+                return returned;
             }
         }
 
