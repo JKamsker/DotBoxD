@@ -222,6 +222,7 @@ internal static class ForbiddenCollectionCapacityPolicy
         {
             return HasConstructorCapacityParameter(method, typeName) ||
                    IsUnboundedEnumerableConstructor(method, typeName) ||
+                   IsArrayListCollectionConstructor(method, typeName) ||
                    IsSortedListDictionaryConstructor(method, typeName) ||
                    IsSortedDictionaryDictionaryConstructor(method, typeName);
         }
@@ -252,6 +253,10 @@ internal static class ForbiddenCollectionCapacityPolicy
         => string.Equals(typeName, SortedListTypeName, StringComparison.Ordinal) &&
            method.Parameters.Any(static parameter =>
                string.Equals(parameter.Name, "dictionary", StringComparison.Ordinal));
+
+    private static bool IsArrayListCollectionConstructor(IMethodSymbol method, string typeName)
+        => string.Equals(typeName, ArrayListTypeName, StringComparison.Ordinal) &&
+           method.Parameters.Length == 1;
 
     private static bool HasConstructorCapacityParameter(IMethodSymbol method, string typeName)
     {
