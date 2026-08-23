@@ -83,6 +83,12 @@ internal static class ForbiddenCollectionCapacityPolicy
             return true;
         }
 
+        if (HashtableDictionaryConstructionPolicy.IsMatch(method, typeName))
+        {
+            forbidden = HashtableDictionaryConstructionPolicy.DisplayName(method);
+            return true;
+        }
+
         return TryGetCapacityDisplayName(method, typeName, out forbidden);
     }
 
