@@ -201,30 +201,33 @@ internal static partial class DotBoxDRpcTypeMapper
         string helperName,
         INamedTypeSymbol? dispatchType)
     {
-        foreach (var method in containingType.GetMembers(helperName).OfType<IMethodSymbol>())
+        for (var currentType = containingType; currentType is not null; currentType = currentType.BaseType)
         {
-            if (!IsParameterlessInstanceHelper(method))
+            foreach (var method in currentType.GetMembers(helperName).OfType<IMethodSymbol>())
             {
-                continue;
-            }
-
-            var dispatchTarget = ResolveDispatchTarget(method, dispatchType);
-            foreach (var reference in dispatchTarget.DeclaringSyntaxReferences)
-            {
-                if (reference.GetSyntax() is not MethodDeclarationSyntax declaration)
+                if (!IsParameterlessInstanceHelper(method))
                 {
                     continue;
                 }
 
-                if (declaration.ExpressionBody is { } arrow)
+                var dispatchTarget = ResolveDispatchTarget(method, dispatchType);
+                foreach (var reference in dispatchTarget.DeclaringSyntaxReferences)
                 {
-                    return arrow.Expression;
-                }
+                    if (reference.GetSyntax() is not MethodDeclarationSyntax declaration)
+                    {
+                        continue;
+                    }
 
-                if (declaration.Body is { Statements.Count: 1 } body &&
-                    body.Statements[0] is ReturnStatementSyntax { Expression: { } returned })
-                {
-                    return returned;
+                    if (declaration.ExpressionBody is { } arrow)
+                    {
+                        return arrow.Expression;
+                    }
+
+                    if (declaration.Body is { Statements.Count: 1 } body &&
+                        body.Statements[0] is ReturnStatementSyntax { Expression: { } returned })
+                    {
+                        return returned;
+                    }
                 }
             }
         }
