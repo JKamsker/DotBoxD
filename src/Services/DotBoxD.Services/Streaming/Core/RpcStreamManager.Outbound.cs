@@ -132,17 +132,17 @@ internal sealed partial class RpcStreamManager
     public RpcOutboundStreamSet RegisterOutbound(RpcStreamAttachment attachment, CancellationToken ct)
     {
         RpcStreamValidation.ValidateOutboundAttachment(attachment);
-        ct.ThrowIfCancellationRequested();
-        if (!attachment.TryClaimOutboundRegistration())
-        {
-            throw new ServiceProtocolException("Outbound stream attachment is already registered.");
-        }
-
         var rows = new (RpcStreamAttachment Attachment, RpcStreamSendState State)[1];
-        var state = new RpcStreamSendState(attachment.Handle.StreamId, ct);
+        RpcStreamSendState? state = null;
         var added = false;
         try
         {
+            ct.ThrowIfCancellationRequested();
+            if (!attachment.TryClaimOutboundRegistration())
+            {
+                throw new ServiceProtocolException("Outbound stream attachment is already registered.");
+            }
+            state = new RpcStreamSendState(attachment.Handle.StreamId, ct);
             if (!_senders.TryAdd(state.StreamId, state))
             {
                 throw new ServiceProtocolException($"Duplicate outbound stream id '{attachment.Handle.StreamId}'.");
@@ -157,11 +157,11 @@ internal sealed partial class RpcStreamManager
         {
             if (added)
             {
-                RemoveOutbound(state.StreamId);
+                RemoveOutbound(state!.StreamId);
             }
             else
             {
-                state.Dispose();
+                state?.Dispose();
             }
 
             attachment.ReleaseOutboundRegistration();
