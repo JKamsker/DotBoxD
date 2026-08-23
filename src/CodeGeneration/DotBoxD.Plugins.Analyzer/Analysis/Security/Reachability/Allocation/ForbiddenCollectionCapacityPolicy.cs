@@ -31,6 +31,8 @@ internal static class ForbiddenCollectionCapacityPolicy
     private const string QueueTypeName = "System.Collections.Generic.Queue<T>";
     private const string NonGenericSortedListTypeName = "System.Collections.SortedList";
     private const string SortedListTypeName = "System.Collections.Generic.SortedList<TKey, TValue>";
+    private const string SortedDictionaryTypeName =
+        "System.Collections.Generic.SortedDictionary<TKey, TValue>";
     private const string SortedSetTypeName = "System.Collections.Generic.SortedSet<T>";
     private const string StackTypeName = "System.Collections.Generic.Stack<T>";
 
@@ -48,6 +50,7 @@ internal static class ForbiddenCollectionCapacityPolicy
         [NonGenericSortedListTypeName] = NonGenericSortedListTypeName,
         [OrderedDictionaryTypeName] = OrderedDictionaryTypeName,
         [QueueTypeName] = "System.Collections.Generic.Queue",
+        [SortedDictionaryTypeName] = "System.Collections.Generic.SortedDictionary",
         [SortedListTypeName] = "System.Collections.Generic.SortedList",
         [SortedSetTypeName] = "System.Collections.Generic.SortedSet"
     };
@@ -218,7 +221,8 @@ internal static class ForbiddenCollectionCapacityPolicy
         if (method.MethodKind == MethodKind.Constructor)
         {
             return HasConstructorCapacityParameter(method, typeName) ||
-                   IsUnboundedEnumerableConstructor(method, typeName);
+                   IsUnboundedEnumerableConstructor(method, typeName) ||
+                   IsSortedDictionaryDictionaryConstructor(method, typeName);
         }
 
         return method.MethodKind == MethodKind.Ordinary &&
@@ -234,6 +238,11 @@ internal static class ForbiddenCollectionCapacityPolicy
                        or StackTypeName &&
            method.Parameters.Length == 1 &&
            string.Equals(method.Parameters[0].Name, "collection", StringComparison.Ordinal);
+
+    private static bool IsSortedDictionaryDictionaryConstructor(IMethodSymbol method, string typeName)
+        => string.Equals(typeName, SortedDictionaryTypeName, StringComparison.Ordinal) &&
+           method.Parameters.Length == 1 &&
+           string.Equals(method.Parameters[0].Name, "dictionary", StringComparison.Ordinal);
 
     private static bool HasConstructorCapacityParameter(IMethodSymbol method, string typeName)
     {
