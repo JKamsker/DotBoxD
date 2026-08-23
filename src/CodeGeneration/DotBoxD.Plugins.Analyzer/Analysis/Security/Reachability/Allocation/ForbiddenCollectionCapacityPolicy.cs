@@ -230,13 +230,12 @@ internal static class ForbiddenCollectionCapacityPolicy
     }
 
     private static bool IsUnboundedEnumerableConstructor(IMethodSymbol method, string typeName)
-        => typeName == SortedSetTypeName
+        => typeName is HashSetTypeName or SortedSetTypeName
             ? method.Parameters.Any(parameter => string.Equals(
                 parameter.Name,
                 "collection",
                 StringComparison.Ordinal))
             : typeName is ConcurrentDictionaryTypeName
-                          or HashSetTypeName
                           or LinkedListTypeName
                           or QueueTypeName
                           or StackTypeName &&
