@@ -121,6 +121,8 @@ internal static partial class DotBoxDRpcTypeMapper
             IdentifierNameSyntax identifier => assignedNames.Contains(identifier.Identifier.ValueText),
             MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } thisMember =>
                 assignedNames.Contains(thisMember.Name.Identifier.ValueText),
+            MemberAccessExpressionSyntax { Expression: BaseExpressionSyntax } baseMember =>
+                assignedNames.Contains(baseMember.Name.Identifier.ValueText),
             PrefixUnaryExpressionSyntax unary => IsSupportedUnary(unary) &&
                 IsExpressionOverAssignedFields(unary.Operand, assignedNames),
             BinaryExpressionSyntax binary =>
