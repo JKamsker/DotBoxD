@@ -106,6 +106,9 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 LowerDerivedExpression(parenthesized.Expression, memberBindings, named, derived),
             LiteralExpressionSyntax literal =>
                 LiteralJson(literal.Token.Value),
+            InvocationExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.Text: "nameof" } } nameofExpression when
+                ModelFor(nameofExpression).GetConstantValue(nameofExpression, _cancellationToken) is { HasValue: true, Value: string name } =>
+                LiteralJson(name),
             IdentifierNameSyntax identifier => BoundDerivedMember(memberBindings, identifier),
             MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } thisMember =>
                 BoundDerivedMember(memberBindings, thisMember),

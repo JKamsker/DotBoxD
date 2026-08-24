@@ -118,6 +118,7 @@ internal static partial class DotBoxDRpcTypeMapper
             ParenthesizedExpressionSyntax parenthesized =>
                 IsExpressionOverAssignedFields(parenthesized.Expression, assignedNames),
             LiteralExpressionSyntax => true,
+            InvocationExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.Text: "nameof" } } nameofExpression => true,
             IdentifierNameSyntax identifier => assignedNames.Contains(identifier.Identifier.ValueText),
             MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } thisMember =>
                 assignedNames.Contains(thisMember.Name.Identifier.ValueText),
