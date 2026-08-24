@@ -113,10 +113,20 @@ internal static partial class DotBoxDRpcTypeMapper
     private static bool IsExpressionOverAssignedFields(
         ExpressionSyntax expression,
         ISet<string> assignedNames)
+    {
+        if (expression is ParenthesizedExpressionSyntax parenthesized)
+        {
+            return IsExpressionOverAssignedFields(parenthesized.Expression, assignedNames);
+        }
+
+        return IsUnparenthesizedExpressionOverAssignedFields(expression, assignedNames);
+    }
+
+    private static bool IsUnparenthesizedExpressionOverAssignedFields(
+        ExpressionSyntax expression,
+        ISet<string> assignedNames)
         => expression switch
         {
-            ParenthesizedExpressionSyntax parenthesized =>
-                IsExpressionOverAssignedFields(parenthesized.Expression, assignedNames),
             LiteralExpressionSyntax => true,
             InterpolatedStringExpressionSyntax { Contents: var contents } =>
                 contents.All(static content => content is InterpolatedStringTextSyntax),
