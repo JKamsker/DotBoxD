@@ -41,8 +41,7 @@ internal static class CollectionBulkGrowthPolicy
             return true;
         }
 
-        if (method is { IsStatic: false, Name: "AddRange" or "InsertRange" } &&
-            string.Equals(typeName, ListTypeName, StringComparison.Ordinal))
+        if (IsListRangeMutator(method, typeName))
         {
             forbidden = $"System.Collections.Generic.List.{method.Name}";
             return true;
@@ -71,6 +70,10 @@ internal static class CollectionBulkGrowthPolicy
                parameter.Type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
                DictionaryInterfaceTypeName,
                StringComparison.Ordinal));
+
+    private static bool IsListRangeMutator(IMethodSymbol method, string typeName)
+        => method is { IsStatic: false, Name: "AddRange" or "InsertRange" } &&
+           string.Equals(typeName, ListTypeName, StringComparison.Ordinal);
 
     private static bool IsNonGenericSortedListDictionaryCopyConstructor(
         IMethodSymbol method,
