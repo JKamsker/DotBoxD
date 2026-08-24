@@ -113,13 +113,23 @@ internal static partial class DotBoxDRpcTypeMapper
     private static bool IsExpressionOverAssignedFields(
         ExpressionSyntax expression,
         ISet<string> assignedNames)
+    {
+        if (expression is PostfixUnaryExpressionSyntax postfix &&
+            postfix.IsKind(SyntaxKind.SuppressNullableWarningExpression))
+        {
+            return IsExpressionOverAssignedFields(postfix.Operand, assignedNames);
+        }
+
+        return IsExpressionWithoutNullForgiving(expression, assignedNames);
+    }
+
+    private static bool IsExpressionWithoutNullForgiving(
+        ExpressionSyntax expression,
+        ISet<string> assignedNames)
         => expression switch
         {
             ParenthesizedExpressionSyntax parenthesized =>
                 IsExpressionOverAssignedFields(parenthesized.Expression, assignedNames),
-            PostfixUnaryExpressionSyntax postfix
-                when postfix.IsKind(SyntaxKind.SuppressNullableWarningExpression) =>
-                IsExpressionOverAssignedFields(postfix.Operand, assignedNames),
             LiteralExpressionSyntax => true,
             IdentifierNameSyntax identifier => assignedNames.Contains(identifier.Identifier.ValueText),
             MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } thisMember =>
