@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786943800844,
+  "lastUpdate": 1787548854095,
   "repoUrl": "https://github.com/JKamsker/DotBoxD",
   "entries": {
     "DotBoxD.Services Benchmarks": [
@@ -874,6 +874,136 @@ window.BENCHMARK_DATA = {
             "value": 104.27813039223354,
             "unit": "ns",
             "range": "± 0.048785126851310694"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jonas Kamsker",
+            "username": "JKamsker",
+            "email": "11245306+JKamsker@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "1e689eb9e1080175bbf552b765a3736d7c6aef7e",
+          "message": "Merge pull request #1208 from JKamsker/codex/sweep-fixed-20260823\n\nIntegrate fixed surprise sweep",
+          "timestamp": "2026-08-23T14:50:47Z",
+          "url": "https://github.com/JKamsker/DotBoxD/commit/1e689eb9e1080175bbf552b765a3736d7c6aef7e"
+        },
+        "date": 1787548853404,
+        "tool": "benchmarkdotnet",
+        "benches": [
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.FramingBenchmarks.ParseFrameOnly",
+            "value": 13.344282180070877,
+            "unit": "ns",
+            "range": "± 0.011021642285819387"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.FramingBenchmarks.FrameRequest",
+            "value": 434.9297725359599,
+            "unit": "ns",
+            "range": "± 0.4937843164362853"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.FramingBenchmarks.DeserializeArgument",
+            "value": 155.1277367538876,
+            "unit": "ns",
+            "range": "± 0.2506695784701038"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.PeerRoundTripBenchmarks.MovePlayerAsync(EndToEndLowAllocationProfile: False)",
+            "value": 9891.086279296875,
+            "unit": "ns",
+            "range": "± 550.0084341386889"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.PeerRoundTripBenchmarks.MovePlayerAsync(EndToEndLowAllocationProfile: True)",
+            "value": 9427.175823974609,
+            "unit": "ns",
+            "range": "± 1345.7718302676753"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.RpcTelemetryBenchmarks.SuccessfulRequestWithoutListeners",
+            "value": 2.813513368368149,
+            "unit": "ns",
+            "range": "± 0.0021270267339120416"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ServiceGeneratorScaleBenchmarks.RunGenerators(ContractCount: 10)",
+            "value": 1414469.06875,
+            "unit": "ns",
+            "range": "± 14280.824296960278"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ServiceGeneratorScaleBenchmarks.RunGenerators(ContractCount: 100)",
+            "value": 30545537.959375,
+            "unit": "ns",
+            "range": "± 221690.13392301046"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ServiceGeneratorScaleBenchmarks.RunGenerators(ContractCount: 500)",
+            "value": 521052445.4,
+            "unit": "ns",
+            "range": "± 2017488.5005561411"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.StreamedArgumentProxyBenchmarks.SingleStreamUpload",
+            "value": 21.896299669146536,
+            "unit": "ns",
+            "range": "± 0.048968843935464815"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.StreamedArgumentProxyBenchmarks.TwoStreamUpload",
+            "value": 23.238711974024774,
+            "unit": "ns",
+            "range": "± 0.046662878705549804"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.RegisterPlayerFlow",
+            "value": 17.728730854060913,
+            "unit": "ns",
+            "range": "± 0.017555168854457067"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.GetPlayerStateFlow",
+            "value": 12.183753389120103,
+            "unit": "ns",
+            "range": "± 0.015178121012313604"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.MovePlayerFlow",
+            "value": 23.629125651386047,
+            "unit": "ns",
+            "range": "± 0.016243991671176863"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.PerformActionFlow",
+            "value": 19.226755622360443,
+            "unit": "ns",
+            "range": "± 0.004992253212475921"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.MissingPlayerFailureFlow",
+            "value": 10.48810855448246,
+            "unit": "ns",
+            "range": "± 0.013218826695704832"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.VoidHeartbeatFlow",
+            "value": 4.248872108757496,
+            "unit": "ns",
+            "range": "± 0.0029928537208586447"
+          },
+          {
+            "name": "DotBoxD.Services.Benchmarks.Benchmarks.ZeroAllocUserFlowBenchmarks.FullGameplaySessionFlow",
+            "value": 93.53162174754672,
+            "unit": "ns",
+            "range": "± 0.029970101773582652"
           }
         ]
       }
