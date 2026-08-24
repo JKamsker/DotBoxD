@@ -44,6 +44,8 @@ internal static class CollectionMaterializationPolicy
                 "System.Collections.Immutable.ImmutableDictionary.ToImmutableDictionary",
             ("GetRange", ListTypeName) when !method.IsStatic =>
                 "System.Collections.Generic.List.GetRange",
+            ("Slice", ListTypeName) when !method.IsStatic =>
+                "System.Collections.Generic.List.Slice",
             _ => null!
         };
 
