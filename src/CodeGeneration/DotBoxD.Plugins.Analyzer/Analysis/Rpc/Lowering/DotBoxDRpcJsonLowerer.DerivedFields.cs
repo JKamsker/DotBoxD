@@ -104,6 +104,9 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         {
             ParenthesizedExpressionSyntax parenthesized =>
                 LowerDerivedExpression(parenthesized.Expression, memberBindings, named, derived),
+            PostfixUnaryExpressionSyntax postfix
+                when postfix.IsKind(SyntaxKind.SuppressNullableWarningExpression) =>
+                LowerDerivedExpression(postfix.Operand, memberBindings, named, derived),
             LiteralExpressionSyntax literal =>
                 LiteralJson(literal.Token.Value),
             IdentifierNameSyntax identifier => BoundDerivedMember(memberBindings, identifier),

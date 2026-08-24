@@ -23,10 +23,10 @@ public sealed class ServerExtensionNullForgivingComputedDtoSurpriseTests
 
         public sealed class RemoteWorldControl : IRemoteWorldControl, IServerExtensionClientAccessor
         {
-            public RemoteWorldControl(IServerExtensionClientRegistry serverExtensions)
+            public RemoteWorldControl(DotBoxD.Abstractions.IServerExtensionClientRegistry serverExtensions)
                 => ServerExtensions = serverExtensions;
 
-            public IServerExtensionClientRegistry ServerExtensions { get; }
+            public DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }
         }
 
         public sealed class Profile
@@ -75,7 +75,7 @@ public sealed class ServerExtensionNullForgivingComputedDtoSurpriseTests
         return Activator.CreateInstance(controlType, [new RecordingRegistry(response)])!;
     }
 
-    private sealed class RecordingRegistry(byte[] response) : DotBoxD.Plugins.IServerExtensionClientRegistry
+    private sealed class RecordingRegistry(byte[] response) : DotBoxD.Abstractions.IServerExtensionClientRegistry
     {
         public string PluginId<TService>()
             where TService : class

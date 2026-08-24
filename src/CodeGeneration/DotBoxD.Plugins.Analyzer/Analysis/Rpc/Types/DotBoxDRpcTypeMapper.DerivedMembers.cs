@@ -117,6 +117,9 @@ internal static partial class DotBoxDRpcTypeMapper
         {
             ParenthesizedExpressionSyntax parenthesized =>
                 IsExpressionOverAssignedFields(parenthesized.Expression, assignedNames),
+            PostfixUnaryExpressionSyntax postfix
+                when postfix.IsKind(SyntaxKind.SuppressNullableWarningExpression) =>
+                IsExpressionOverAssignedFields(postfix.Operand, assignedNames),
             LiteralExpressionSyntax => true,
             IdentifierNameSyntax identifier => assignedNames.Contains(identifier.Identifier.ValueText),
             MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } thisMember =>
