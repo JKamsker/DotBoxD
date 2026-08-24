@@ -23,10 +23,10 @@ public sealed class ServerExtensionConstantInterpolatedComputedDtoSurpriseTests
 
         public sealed class RemoteWorldControl : IRemoteWorldControl, IServerExtensionClientAccessor
         {
-            public RemoteWorldControl(IServerExtensionClientRegistry serverExtensions)
+            public RemoteWorldControl(DotBoxD.Abstractions.IServerExtensionClientRegistry serverExtensions)
                 => ServerExtensions = serverExtensions;
 
-            public IServerExtensionClientRegistry ServerExtensions { get; }
+            public DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }
         }
 
         public sealed class Profile

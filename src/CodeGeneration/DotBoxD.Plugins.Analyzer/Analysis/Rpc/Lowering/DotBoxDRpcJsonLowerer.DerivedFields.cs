@@ -106,6 +106,10 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 LowerDerivedExpression(parenthesized.Expression, memberBindings, named, derived),
             LiteralExpressionSyntax literal =>
                 LiteralJson(literal.Token.Value),
+            InterpolatedStringExpressionSyntax { Contents: var contents } when
+                contents.All(static content => content is InterpolatedStringTextSyntax) =>
+                LiteralJson(string.Concat(contents.Select(static content =>
+                    ((InterpolatedStringTextSyntax)content).TextToken.ValueText))),
             IdentifierNameSyntax identifier => BoundDerivedMember(memberBindings, identifier),
             MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } thisMember =>
                 BoundDerivedMember(memberBindings, thisMember),
