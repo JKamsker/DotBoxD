@@ -113,22 +113,37 @@ internal static partial class DotBoxDRpcTypeMapper
     private static bool IsExpressionOverAssignedFields(
         ExpressionSyntax expression,
         ISet<string> assignedNames)
+        => IsNameofExpression(expression) || IsExpressionOverAssignedFieldsCore(expression, assignedNames);
+
+    private static bool IsExpressionOverAssignedFieldsCore(
+        ExpressionSyntax expression,
+        ISet<string> assignedNames)
         => expression switch
         {
             ParenthesizedExpressionSyntax parenthesized =>
                 IsExpressionOverAssignedFields(parenthesized.Expression, assignedNames),
             LiteralExpressionSyntax => true,
-            InvocationExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.Text: "nameof" } } nameofExpression => true,
             IdentifierNameSyntax identifier => assignedNames.Contains(identifier.Identifier.ValueText),
             MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } thisMember =>
                 assignedNames.Contains(thisMember.Name.Identifier.ValueText),
-            PrefixUnaryExpressionSyntax unary => IsSupportedUnary(unary) &&
-                IsExpressionOverAssignedFields(unary.Operand, assignedNames),
-            BinaryExpressionSyntax binary =>
-                IsExpressionOverAssignedFields(binary.Left, assignedNames) &&
-                IsExpressionOverAssignedFields(binary.Right, assignedNames),
+            PrefixUnaryExpressionSyntax unary => IsSupportedUnaryExpression(unary, assignedNames),
+            BinaryExpressionSyntax binary => IsSupportedBinaryExpression(binary, assignedNames),
             _ => false
         };
+
+    private static bool IsSupportedUnaryExpression(
+        PrefixUnaryExpressionSyntax unary,
+        ISet<string> assignedNames)
+        => IsSupportedUnary(unary) && IsExpressionOverAssignedFields(unary.Operand, assignedNames);
+
+    private static bool IsSupportedBinaryExpression(
+        BinaryExpressionSyntax binary,
+        ISet<string> assignedNames)
+        => IsExpressionOverAssignedFields(binary.Left, assignedNames) &&
+            IsExpressionOverAssignedFields(binary.Right, assignedNames);
+
+    private static bool IsNameofExpression(ExpressionSyntax expression)
+        => expression is InvocationExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.Text: "nameof" } };
 
     private static bool IsSupportedUnary(PrefixUnaryExpressionSyntax unary)
         => unary.IsKind(SyntaxKind.LogicalNotExpression) ||
