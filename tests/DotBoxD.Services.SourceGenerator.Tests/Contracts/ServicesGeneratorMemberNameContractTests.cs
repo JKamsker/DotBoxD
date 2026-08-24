@@ -66,6 +66,7 @@ public sealed class ServicesGeneratorMemberNameContractTests
             ["ServiceDispatcher.DispatchOnInstanceAsync"] = nameof(IServiceDispatcher.DispatchOnInstanceAsync),
 
             ["InstanceRegistry.TryGet"] = nameof(IInstanceRegistry.TryGet),
+            ["InstanceRegistry.TryAcquire"] = nameof(IInstanceRegistry.TryAcquire),
             ["InstanceRegistry.Register"] = nameof(IInstanceRegistry.Register),
             ["InstanceRegistry.Release"] = nameof(IInstanceRegistry.Release),
             ["InstanceRegistry.ReleaseAsync"] = nameof(IInstanceRegistry.ReleaseAsync),

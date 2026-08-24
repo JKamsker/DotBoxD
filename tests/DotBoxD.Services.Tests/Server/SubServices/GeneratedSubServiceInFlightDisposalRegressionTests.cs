@@ -34,12 +34,13 @@ public sealed class GeneratedSubServiceInFlightDisposalRegressionTests
         await service.PingEntered.Task.WaitAsync(Timeout);
 
         var dispose = registry.ReleaseAsync(descriptor.ServiceName, instanceId).AsTask();
-        await service.Disposed.Task.WaitAsync(Timeout);
+        Assert.False(service.Disposed.Task.IsCompleted);
 
         service.AllowPing.SetResult();
 
         await call.WaitAsync(Timeout);
         await dispose.WaitAsync(Timeout);
+        Assert.True(service.Disposed.Task.IsCompleted);
         Assert.False(registry.TryGet(descriptor.ServiceName, instanceId, out _));
     }
 
