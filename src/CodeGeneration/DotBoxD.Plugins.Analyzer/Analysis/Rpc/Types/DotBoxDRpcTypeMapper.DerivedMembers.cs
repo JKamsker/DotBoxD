@@ -126,8 +126,19 @@ internal static partial class DotBoxDRpcTypeMapper
             BinaryExpressionSyntax binary =>
                 IsExpressionOverAssignedFields(binary.Left, assignedNames) &&
                 IsExpressionOverAssignedFields(binary.Right, assignedNames),
+            SwitchExpressionSyntax switchExpression =>
+                IsExpressionOverAssignedFields(switchExpression.GoverningExpression, assignedNames) &&
+                switchExpression.Arms.Count > 0 &&
+                switchExpression.Arms[switchExpression.Arms.Count - 1].Pattern is DiscardPatternSyntax &&
+                switchExpression.Arms.All(arm =>
+                    arm.WhenClause is null &&
+                    IsSupportedSwitchPattern(arm.Pattern) &&
+                    IsExpressionOverAssignedFields(arm.Expression, assignedNames)),
             _ => false
         };
+
+    private static bool IsSupportedSwitchPattern(PatternSyntax pattern)
+        => pattern is DiscardPatternSyntax or ConstantPatternSyntax or RelationalPatternSyntax;
 
     private static bool IsSupportedUnary(PrefixUnaryExpressionSyntax unary)
         => unary.IsKind(SyntaxKind.LogicalNotExpression) ||
