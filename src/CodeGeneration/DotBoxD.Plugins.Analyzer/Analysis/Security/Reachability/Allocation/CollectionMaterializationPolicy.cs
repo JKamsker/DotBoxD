@@ -34,20 +34,43 @@ internal static class CollectionMaterializationPolicy
     }
 
     private static string GetCollectionDisplayName(IMethodSymbol method, string typeName)
-        => (method.Name, typeName) switch
+    {
+        if (TryGetStaticCollectionDisplayName(method, typeName, out var forbidden))
         {
-            ("ToFrozenSet", FrozenSetTypeName) when method.IsStatic =>
-                "System.Collections.Frozen.FrozenSet.ToFrozenSet",
-            ("ToImmutableList", ImmutableListTypeName) when method.IsStatic =>
-                "System.Collections.Immutable.ImmutableList.ToImmutableList",
-            ("ToImmutableDictionary", ImmutableDictionaryTypeName) when method.IsStatic =>
-                "System.Collections.Immutable.ImmutableDictionary.ToImmutableDictionary",
-            ("GetRange", ListTypeName) when !method.IsStatic =>
-                "System.Collections.Generic.List.GetRange",
-            ("RemoveRange", ListTypeName) when !method.IsStatic =>
-                "System.Collections.Generic.List.RemoveRange",
-            _ => null!
-        };
+            return forbidden;
+        }
+
+        return GetListDisplayName(method, typeName);
+    }
+
+    private static bool TryGetStaticCollectionDisplayName(
+        IMethodSymbol method,
+        string typeName,
+        out string forbidden)
+    {
+        forbidden = method.IsStatic
+            ? (method.Name, typeName) switch
+            {
+                ("ToFrozenSet", FrozenSetTypeName) => "System.Collections.Frozen.FrozenSet.ToFrozenSet",
+                ("ToImmutableList", ImmutableListTypeName) => "System.Collections.Immutable.ImmutableList.ToImmutableList",
+                ("ToImmutableDictionary", ImmutableDictionaryTypeName) =>
+                    "System.Collections.Immutable.ImmutableDictionary.ToImmutableDictionary",
+                _ => null!
+            }
+            : null!;
+
+        return forbidden is not null;
+    }
+
+    private static string GetListDisplayName(IMethodSymbol method, string typeName)
+        => !method.IsStatic && string.Equals(typeName, ListTypeName, StringComparison.Ordinal)
+            ? method.Name switch
+            {
+                "GetRange" => "System.Collections.Generic.List.GetRange",
+                "RemoveRange" => "System.Collections.Generic.List.RemoveRange",
+                _ => null!
+            }
+            : null!;
 
     private static bool IsEnumerableMaterialization(IMethodSymbol method, string typeName)
         => method is { IsStatic: true } &&
