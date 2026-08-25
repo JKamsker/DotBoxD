@@ -125,7 +125,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return member is { } && memberBindings.TryGetValue(member, out var bound)
             ? bound
             : member is IFieldSymbol { IsConst: true, HasConstantValue: true } constant
-                ? LiteralJson(constant.ConstantValue)
+                ? LiteralJson(expression, constant.ConstantValue)
                 : null;
     }
 
