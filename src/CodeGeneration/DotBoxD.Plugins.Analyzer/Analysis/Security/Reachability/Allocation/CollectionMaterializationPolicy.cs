@@ -44,6 +44,8 @@ internal static class CollectionMaterializationPolicy
                 "System.Collections.Immutable.ImmutableDictionary.ToImmutableDictionary",
             ("GetRange", ListTypeName) when !method.IsStatic =>
                 "System.Collections.Generic.List.GetRange",
+            ("Reverse", ListTypeName) when !method.IsStatic =>
+                "System.Collections.Generic.List.Reverse",
             _ => null!
         };
 
