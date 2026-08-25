@@ -200,6 +200,7 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
 
             if (!filter.Result)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 return ValueTask.CompletedTask;
             }
         }
