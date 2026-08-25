@@ -113,6 +113,28 @@ internal static partial class DotBoxDRpcTypeMapper
     private static bool IsExpressionOverAssignedFields(
         ExpressionSyntax expression,
         ISet<string> assignedNames)
+    {
+        if (IsTerminalExpressionOverAssignedFields(expression, assignedNames) is { } terminal)
+        {
+            return terminal;
+        }
+
+        return expression switch
+        {
+            PrefixUnaryExpressionSyntax unary => IsSupportedUnary(unary) &&
+                IsExpressionOverAssignedFields(unary.Operand, assignedNames),
+            BinaryExpressionSyntax binary =>
+                IsExpressionOverAssignedFields(binary.Left, assignedNames) &&
+                IsExpressionOverAssignedFields(binary.Right, assignedNames),
+            BaseObjectCreationExpressionSyntax creation =>
+                CreationIsOverAssignedFields(creation, assignedNames),
+            _ => false
+        };
+    }
+
+    private static bool? IsTerminalExpressionOverAssignedFields(
+        ExpressionSyntax expression,
+        ISet<string> assignedNames)
         => expression switch
         {
             ParenthesizedExpressionSyntax parenthesized =>
@@ -121,19 +143,14 @@ internal static partial class DotBoxDRpcTypeMapper
             IdentifierNameSyntax identifier => assignedNames.Contains(identifier.Identifier.ValueText),
             MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } thisMember =>
                 assignedNames.Contains(thisMember.Name.Identifier.ValueText),
-            PrefixUnaryExpressionSyntax unary => IsSupportedUnary(unary) &&
-                IsExpressionOverAssignedFields(unary.Operand, assignedNames),
-            BinaryExpressionSyntax binary =>
-                IsExpressionOverAssignedFields(binary.Left, assignedNames) &&
-                IsExpressionOverAssignedFields(binary.Right, assignedNames),
-            ObjectCreationExpressionSyntax creation =>
-                ArgumentsAreOverAssignedFields(creation.ArgumentList?.Arguments, assignedNames) &&
-                InitializerIsOverAssignedFields(creation.Initializer, assignedNames),
-            ImplicitObjectCreationExpressionSyntax creation =>
-                ArgumentsAreOverAssignedFields(creation.ArgumentList?.Arguments, assignedNames) &&
-                InitializerIsOverAssignedFields(creation.Initializer, assignedNames),
-            _ => false
+            _ => null
         };
+
+    private static bool CreationIsOverAssignedFields(
+        BaseObjectCreationExpressionSyntax creation,
+        ISet<string> assignedNames)
+        => ArgumentsAreOverAssignedFields(creation.ArgumentList?.Arguments, assignedNames) &&
+           InitializerIsOverAssignedFields(creation.Initializer, assignedNames);
 
     private static bool ArgumentsAreOverAssignedFields(SeparatedSyntaxList<ArgumentSyntax>? arguments, ISet<string> assignedNames)
         => arguments is not { } argumentList ||
