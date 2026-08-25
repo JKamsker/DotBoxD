@@ -7,7 +7,11 @@ public sealed class PluginAnalyzerForbiddenApiListRemoveRangeReachabilityTests
     {
         var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
             Source("""
-                Retained.Add(0);
+                if (Retained.Count < 1)
+                {
+                    Retained.Add(0);
+                }
+
                 Retained.RemoveRange(0, Retained.Count);
                 """),
             "DotBoxDPluginAnalyzerListRemoveRangeReachabilityTest");
@@ -23,7 +27,12 @@ public sealed class PluginAnalyzerForbiddenApiListRemoveRangeReachabilityTests
     public async Task Does_not_report_bounded_list_add_in_reachable_event_handler()
     {
         var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
-            Source("Retained.Add(0);"),
+            Source("""
+                if (Retained.Count < 1)
+                {
+                    Retained.Add(0);
+                }
+                """),
             "DotBoxDPluginAnalyzerBoundedListAddReachabilityTest");
 
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "DBXK001");
@@ -42,7 +51,7 @@ public sealed class PluginAnalyzerForbiddenApiListRemoveRangeReachabilityTests
                 [Plugin("list-remove-range-reachability")]
                 public sealed class ListRemoveRangeKernel : IEventKernel<string>
                 {
-                    private static readonly List<byte> Retained = new();
+                    private static readonly List<byte> Retained = new() { 0 };
 
                     public bool ShouldHandle(string e, HookContext context) => true;
 
