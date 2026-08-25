@@ -52,16 +52,16 @@ internal static partial class DotBoxDRpcTypeMapper
             return false;
         }
 
-        var assignedNames = new HashSet<string>(StringComparer.Ordinal);
+        var assignedFields = new Dictionary<string, ITypeSymbol>(StringComparer.Ordinal);
         for (var i = 0; i < fields.Count; i++)
         {
             if (assigned[i])
             {
-                assignedNames.Add(fields[i].Name);
+                assignedFields.Add(fields[i].Name, fields[i].Type);
             }
         }
 
-        return IsExpressionOverAssignedFields(body, assignedNames);
+        return IsExpressionOverAssignedFields(body, assignedFields);
     }
 
     private static bool[] ObjectInitializerAssigned(
@@ -112,23 +112,51 @@ internal static partial class DotBoxDRpcTypeMapper
 
     private static bool IsExpressionOverAssignedFields(
         ExpressionSyntax expression,
-        ISet<string> assignedNames)
+        IReadOnlyDictionary<string, ITypeSymbol> assignedFields)
         => expression switch
         {
             ParenthesizedExpressionSyntax parenthesized =>
-                IsExpressionOverAssignedFields(parenthesized.Expression, assignedNames),
+                IsExpressionOverAssignedFields(parenthesized.Expression, assignedFields),
             LiteralExpressionSyntax => true,
-            IdentifierNameSyntax identifier => assignedNames.Contains(identifier.Identifier.ValueText),
+            IdentifierNameSyntax identifier => assignedFields.ContainsKey(identifier.Identifier.ValueText),
             MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } thisMember =>
-                assignedNames.Contains(thisMember.Name.Identifier.ValueText),
+                assignedFields.ContainsKey(thisMember.Name.Identifier.ValueText),
             MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Count" } count =>
-                IsExpressionOverAssignedFields(count.Expression, assignedNames),
+                IsSupportedListCountReceiver(count.Expression, assignedFields) &&
+                IsExpressionOverAssignedFields(count.Expression, assignedFields),
             PrefixUnaryExpressionSyntax unary => IsSupportedUnary(unary) &&
-                IsExpressionOverAssignedFields(unary.Operand, assignedNames),
+                IsExpressionOverAssignedFields(unary.Operand, assignedFields),
             BinaryExpressionSyntax binary =>
-                IsExpressionOverAssignedFields(binary.Left, assignedNames) &&
-                IsExpressionOverAssignedFields(binary.Right, assignedNames),
+                IsExpressionOverAssignedFields(binary.Left, assignedFields) &&
+                IsExpressionOverAssignedFields(binary.Right, assignedFields),
             _ => false
+        };
+
+    private static bool IsSupportedListCountReceiver(
+        ExpressionSyntax expression,
+        IReadOnlyDictionary<string, ITypeSymbol> assignedFields)
+        => TryGetAssignedFieldType(expression, assignedFields, out var type) &&
+           ListElementType(type) is not null;
+
+    private static bool TryGetAssignedFieldType(
+        ExpressionSyntax expression,
+        IReadOnlyDictionary<string, ITypeSymbol> assignedFields,
+        out ITypeSymbol type)
+    {
+        type = null!;
+        var name = expression is ParenthesizedExpressionSyntax parenthesized
+            ? GetAssignedFieldName(parenthesized.Expression)
+            : GetAssignedFieldName(expression);
+
+        return name is not null && assignedFields.TryGetValue(name, out type);
+    }
+
+    private static string? GetAssignedFieldName(ExpressionSyntax expression)
+        => expression switch
+        {
+            IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
+            MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } member => member.Name.Identifier.ValueText,
+            _ => null
         };
 
     private static bool IsSupportedUnary(PrefixUnaryExpressionSyntax unary)
