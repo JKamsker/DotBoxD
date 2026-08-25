@@ -61,7 +61,7 @@ internal static partial class DotBoxDRpcTypeMapper
             }
         }
 
-        return IsExpressionOverAssignedFields(body, assignedNames);
+        return DotBoxDRpcDerivedFieldExpressionValidator.IsExpressionOverAssignedFields(body, assignedNames);
     }
 
     private static bool[] ObjectInitializerAssigned(
@@ -109,65 +109,6 @@ internal static partial class DotBoxDRpcTypeMapper
         => type.InstanceConstructors.Any(constructor =>
             constructor.Parameters.Length == 0 &&
             IsAccessibleFromGeneratedCode(constructor, compilation));
-
-    private static bool IsExpressionOverAssignedFields(
-        ExpressionSyntax expression,
-        ISet<string> assignedNames)
-    {
-        if (IsTerminalExpressionOverAssignedFields(expression, assignedNames) is { } terminal)
-        {
-            return terminal;
-        }
-
-        return expression switch
-        {
-            PrefixUnaryExpressionSyntax unary => IsSupportedUnary(unary) &&
-                IsExpressionOverAssignedFields(unary.Operand, assignedNames),
-            BinaryExpressionSyntax binary =>
-                IsExpressionOverAssignedFields(binary.Left, assignedNames) &&
-                IsExpressionOverAssignedFields(binary.Right, assignedNames),
-            BaseObjectCreationExpressionSyntax creation =>
-                CreationIsOverAssignedFields(creation, assignedNames),
-            _ => false
-        };
-    }
-
-    private static bool? IsTerminalExpressionOverAssignedFields(
-        ExpressionSyntax expression,
-        ISet<string> assignedNames)
-        => expression switch
-        {
-            ParenthesizedExpressionSyntax parenthesized =>
-                IsExpressionOverAssignedFields(parenthesized.Expression, assignedNames),
-            LiteralExpressionSyntax => true,
-            IdentifierNameSyntax identifier => assignedNames.Contains(identifier.Identifier.ValueText),
-            MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } thisMember =>
-                assignedNames.Contains(thisMember.Name.Identifier.ValueText),
-            _ => null
-        };
-
-    private static bool CreationIsOverAssignedFields(
-        BaseObjectCreationExpressionSyntax creation,
-        ISet<string> assignedNames)
-        => ArgumentsAreOverAssignedFields(creation.ArgumentList?.Arguments, assignedNames) &&
-           InitializerIsOverAssignedFields(creation.Initializer, assignedNames);
-
-    private static bool ArgumentsAreOverAssignedFields(SeparatedSyntaxList<ArgumentSyntax>? arguments, ISet<string> assignedNames)
-        => arguments is not { } argumentList ||
-           argumentList.All(argument =>
-               argument.RefKindKeyword.ValueText.Length == 0 &&
-               IsExpressionOverAssignedFields(argument.Expression, assignedNames));
-
-    private static bool InitializerIsOverAssignedFields(InitializerExpressionSyntax? initializer, ISet<string> assignedNames)
-        => initializer is null ||
-           initializer.Expressions.All(expression =>
-               expression is AssignmentExpressionSyntax { Left: IdentifierNameSyntax, Right: { } value } &&
-               IsExpressionOverAssignedFields(value, assignedNames));
-
-    private static bool IsSupportedUnary(PrefixUnaryExpressionSyntax unary)
-        => unary.IsKind(SyntaxKind.LogicalNotExpression) ||
-           unary.IsKind(SyntaxKind.UnaryMinusExpression) ||
-           unary.IsKind(SyntaxKind.UnaryPlusExpression);
 
     internal static ExpressionSyntax? TryGetDerivedGetterExpression(
         IPropertySymbol property,

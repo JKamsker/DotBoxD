@@ -9,6 +9,11 @@ public interface IObjectCreationComputedProfileService
     int ReadSnapshotHealth(int health);
 }
 
+public interface IObjectCreationLiteralComputedProfileService
+{
+    int ReadSnapshotHealth();
+}
+
 public sealed class ServerExtensionObjectCreationComputedDtoSurpriseTests
 {
     private const string Source = """
@@ -38,6 +43,33 @@ public sealed class ServerExtensionObjectCreationComputedDtoSurpriseTests
         }
         """;
 
+    private const string LiteralArgumentSource = """
+        using DotBoxD.Abstractions;
+        using DotBoxD.Kernels.Sandbox;
+        using DotBoxD.Plugins;
+
+        namespace Sample;
+
+        public sealed record Stats(int Health);
+
+        public sealed class Profile
+        {
+            public int Seed { get; init; }
+
+            public Stats Snapshot => new Stats(7);
+        }
+
+        [ServerExtension("object-creation-literal-computed-profile")]
+        public sealed partial class ObjectCreationLiteralComputedProfileKernel
+        {
+            public int ReadSnapshotHealth(HookContext ctx)
+            {
+                var profile = new Profile { Seed = 0 };
+                return profile.Snapshot.Health;
+            }
+        }
+        """;
+
     [Fact]
     public async Task Server_extension_reconstructs_a_dto_with_an_object_creation_computed_member()
     {
@@ -49,5 +81,18 @@ public sealed class ServerExtensionObjectCreationComputedDtoSurpriseTests
         var service = ServerExtensionProxy.Create<IObjectCreationComputedProfileService>(kernel);
 
         Assert.Equal(7, service.ReadSnapshotHealth(7));
+    }
+
+    [Fact]
+    public async Task Server_extension_reconstructs_a_computed_dto_with_a_literal_constructor_argument()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create(
+            LiteralArgumentSource,
+            "Sample.ObjectCreationLiteralComputedProfilePluginPackage");
+        using var server = PluginServer.Create();
+        var kernel = await server.InstallServerExtensionAsync(package);
+        var service = ServerExtensionProxy.Create<IObjectCreationLiteralComputedProfileService>(kernel);
+
+        Assert.Equal(7, service.ReadSnapshotHealth());
     }
 }

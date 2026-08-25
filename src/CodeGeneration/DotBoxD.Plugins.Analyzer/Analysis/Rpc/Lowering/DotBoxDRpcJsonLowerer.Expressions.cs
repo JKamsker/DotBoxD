@@ -106,7 +106,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
     private string LiteralJson(ExpressionSyntax expression, object? value)
     {
-        var converted = _model.GetTypeInfo(expression, _cancellationToken).ConvertedType;
+        var converted = ModelFor(expression).GetTypeInfo(expression, _cancellationToken).ConvertedType;
         if (converted is INamedTypeSymbol { TypeKind: TypeKind.Enum } enumType)
         {
             return EnumLiteralJson(enumType, value);
