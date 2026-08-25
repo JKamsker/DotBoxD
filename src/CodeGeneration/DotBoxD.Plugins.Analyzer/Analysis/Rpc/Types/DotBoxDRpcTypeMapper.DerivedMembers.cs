@@ -25,7 +25,7 @@ internal static partial class DotBoxDRpcTypeMapper
         Compilation? compilation = null)
     {
         var reconstructable = ObjectInitializerAssigned(fields, assigned, compilation);
-        while (TryMarkDerivedField(fields, reconstructable))
+        while (TryMarkDerivedField(fields, reconstructable, compilation))
         {
         }
 
@@ -36,7 +36,8 @@ internal static partial class DotBoxDRpcTypeMapper
         RecordMember member,
         IReadOnlyList<RecordMember> fields,
         bool[] assigned,
-        INamedTypeSymbol? dispatchType = null)
+        INamedTypeSymbol? dispatchType = null,
+        Compilation? compilation = null)
     {
         if (member.Symbol is not IPropertySymbol
             {
@@ -61,7 +62,7 @@ internal static partial class DotBoxDRpcTypeMapper
             }
         }
 
-        return IsExpressionOverAssignedFields(body, assignedNames);
+        return IsExpressionOverAssignedFields(body, assignedNames, compilation);
     }
 
     private static bool[] ObjectInitializerAssigned(
@@ -91,11 +92,14 @@ internal static partial class DotBoxDRpcTypeMapper
         return assigned;
     }
 
-    private static bool TryMarkDerivedField(IReadOnlyList<RecordMember> fields, bool[] assigned)
+    private static bool TryMarkDerivedField(
+        IReadOnlyList<RecordMember> fields,
+        bool[] assigned,
+        Compilation? compilation)
     {
         for (var i = 0; i < fields.Count; i++)
         {
-            if (!assigned[i] && IsDerivedFromAssignedFields(fields[i], fields, assigned))
+            if (!assigned[i] && IsDerivedFromAssignedFields(fields[i], fields, assigned, compilation: compilation))
             {
                 assigned[i] = true;
                 return true;
@@ -112,21 +116,30 @@ internal static partial class DotBoxDRpcTypeMapper
 
     private static bool IsExpressionOverAssignedFields(
         ExpressionSyntax expression,
-        ISet<string> assignedNames)
+        ISet<string> assignedNames,
+        Compilation? compilation)
         => expression switch
         {
             ParenthesizedExpressionSyntax parenthesized =>
-                IsExpressionOverAssignedFields(parenthesized.Expression, assignedNames),
+                IsExpressionOverAssignedFields(parenthesized.Expression, assignedNames, compilation),
             LiteralExpressionSyntax => true,
-            IdentifierNameSyntax identifier => assignedNames.Contains(identifier.Identifier.ValueText),
+            IdentifierNameSyntax identifier =>
+                assignedNames.Contains(identifier.Identifier.ValueText) || IsConstant(identifier, compilation),
             MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } thisMember =>
-                assignedNames.Contains(thisMember.Name.Identifier.ValueText),
+                assignedNames.Contains(thisMember.Name.Identifier.ValueText) || IsConstant(thisMember, compilation),
             PrefixUnaryExpressionSyntax unary => IsSupportedUnary(unary) &&
-                IsExpressionOverAssignedFields(unary.Operand, assignedNames),
+                IsExpressionOverAssignedFields(unary.Operand, assignedNames, compilation),
             BinaryExpressionSyntax binary =>
-                IsExpressionOverAssignedFields(binary.Left, assignedNames) &&
-                IsExpressionOverAssignedFields(binary.Right, assignedNames),
+                IsExpressionOverAssignedFields(binary.Left, assignedNames, compilation) &&
+                IsExpressionOverAssignedFields(binary.Right, assignedNames, compilation),
             _ => false
+        };
+
+    private static bool IsConstant(ExpressionSyntax expression, Compilation? compilation)
+        => compilation?.GetSemanticModel(expression.SyntaxTree).GetSymbolInfo(expression).Symbol is IFieldSymbol
+        {
+            IsConst: true,
+            HasConstantValue: true
         };
 
     private static bool IsSupportedUnary(PrefixUnaryExpressionSyntax unary)

@@ -30,7 +30,12 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     {
         for (var i = 0; i < fields.Count; i++)
         {
-            if (!assigned[i] && DotBoxDRpcTypeMapper.IsDerivedFromAssignedFields(fields[i], fields, assigned, named))
+            if (!assigned[i] && DotBoxDRpcTypeMapper.IsDerivedFromAssignedFields(
+                    fields[i],
+                    fields,
+                    assigned,
+                    named,
+                    _model.Compilation))
             {
                 args[i] = LowerDerivedField(fields, assigned, args, named, fields[i]);
                 assigned[i] = true;
@@ -116,10 +121,12 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         IReadOnlyDictionary<ISymbol, string> memberBindings,
         ExpressionSyntax expression)
     {
-        return ModelFor(expression).GetSymbolInfo(expression, _cancellationToken).Symbol is { } member &&
-           memberBindings.TryGetValue(member, out var bound)
+        var member = ModelFor(expression).GetSymbolInfo(expression, _cancellationToken).Symbol;
+        return member is { } && memberBindings.TryGetValue(member, out var bound)
             ? bound
-            : null;
+            : member is IFieldSymbol { IsConst: true, HasConstantValue: true } constant
+                ? LiteralJson(constant.ConstantValue)
+                : null;
     }
 
     private void AddIgnoredDefaultBindings(
