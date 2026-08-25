@@ -60,7 +60,7 @@ It should not emit `github/gh-aw-actions/setup` for these workflows.
 
 ## Codex Models
 
-The active graph explorer and the legacy manual discovery workflow pin `gpt-5.6-sol`, run with high
+The active graph explorer and the legacy manual discovery workflow pin `gpt-5.5`, run with high
 reasoning effort, and have a 45-minute / 8,000-AI-credit per-run research budget plus a 20,000-AIC
 rolling daily ceiling:
 
@@ -71,14 +71,20 @@ max-daily-ai-credits: 20000
 
 engine:
   id: codex
-  model: gpt-5.6-sol
+  model: gpt-5.5
   args:
     - " -c"
     - model_reasoning_effort="high"
 ```
 
-The mechanical dispatcher, proof/fix workers, and smoke test remain pinned to `gpt-5.5` with high
-reasoning effort. Models are explicit in every source workflow; do not rely on a moving default.
+The mechanical dispatcher, proof/fix workers, and smoke test are also pinned to `gpt-5.5` with high
+reasoning effort. The pinned gh-aw firewall allowlist currently ends at `gpt-5.5`; newer model names
+must not be selected until that runtime accepts them. Models are explicit in every source workflow;
+do not rely on a moving default.
+
+The proof and fix workers run `eng/scripts/install-codex-apply-patch.sh` before the agent. That shared
+setup installs and probes the Codex `apply_patch` compatibility entry point so editing failures are
+reported before an agent spends its run budget.
 
 The leading space in the first `engine.args` entry is intentional for
 `JKamsker/gh-aw@v0.82.0-jk.1`. That compiler appends custom Codex args directly

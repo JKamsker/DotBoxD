@@ -60,10 +60,10 @@ features:
 
 engine:
   id: codex
-  model: gpt-5.6-terra
+  model: gpt-5.5
   args:
     - " -c"
-    - model_reasoning_effort="xhigh"
+    - model_reasoning_effort="high"
 
 pre-agent-steps:
   - name: Compute eligible lenses
