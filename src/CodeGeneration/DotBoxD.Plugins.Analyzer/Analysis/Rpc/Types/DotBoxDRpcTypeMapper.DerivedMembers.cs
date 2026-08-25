@@ -124,9 +124,9 @@ internal static partial class DotBoxDRpcTypeMapper
                 IsExpressionOverAssignedFields(parenthesized.Expression, assignedNames, compilation),
             LiteralExpressionSyntax => true,
             IdentifierNameSyntax identifier =>
-                assignedNames.Contains(identifier.Identifier.ValueText) || IsConstant(identifier, compilation),
+                IsAssignedOrConstant(identifier, identifier.Identifier.ValueText, assignedNames, compilation),
             MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } thisMember =>
-                assignedNames.Contains(thisMember.Name.Identifier.ValueText) || IsConstant(thisMember, compilation),
+                IsAssignedOrConstant(thisMember, thisMember.Name.Identifier.ValueText, assignedNames, compilation),
             PrefixUnaryExpressionSyntax unary => IsSupportedUnary(unary) &&
                 IsExpressionOverAssignedFields(unary.Operand, assignedNames, compilation),
             BinaryExpressionSyntax binary =>
@@ -134,6 +134,13 @@ internal static partial class DotBoxDRpcTypeMapper
                 IsExpressionOverAssignedFields(binary.Right, assignedNames, compilation),
             _ => false
         };
+
+    private static bool IsAssignedOrConstant(
+        ExpressionSyntax expression,
+        string name,
+        ISet<string> assignedNames,
+        Compilation? compilation)
+        => assignedNames.Contains(name) || IsConstant(expression, compilation);
 
     private static bool IsConstant(ExpressionSyntax expression, Compilation? compilation)
         => compilation?.GetSemanticModel(expression.SyntaxTree).GetSymbolInfo(expression).Symbol is IFieldSymbol
