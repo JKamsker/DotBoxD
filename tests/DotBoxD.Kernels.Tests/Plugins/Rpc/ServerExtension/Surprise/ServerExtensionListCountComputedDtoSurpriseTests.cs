@@ -9,6 +9,8 @@ public sealed class ListCountProfile
     public List<int> Values { get; init; } = [];
 
     public int Count => Values.Count;
+
+    public int ServerCount { get; init; }
 }
 
 public interface IListCountProfileService
@@ -33,13 +35,19 @@ public sealed class ServerExtensionListCountComputedDtoSurpriseTests
             public List<int> Values { get; init; } = [];
 
             public int Count => Values.Count;
+
+            public int ServerCount { get; init; }
         }
 
         [ServerExtension("list-count-profile")]
         public sealed partial class ListCountProfileKernel
         {
             public ListCountProfile Create(List<int> values, HookContext ctx)
-                => new() { Values = values };
+                => new()
+                {
+                    Values = values,
+                    ServerCount = new ListCountProfile { Values = values, ServerCount = 0 }.Count
+                };
         }
         """;
 
@@ -53,6 +61,7 @@ public sealed class ServerExtensionListCountComputedDtoSurpriseTests
 
         var profile = service.Create([3, 5, 8]);
 
+        Assert.Equal(3, profile.ServerCount);
         Assert.Equal([3, 5, 8], profile.Values);
         Assert.Equal(profile.Values.Count, profile.Count);
     }
