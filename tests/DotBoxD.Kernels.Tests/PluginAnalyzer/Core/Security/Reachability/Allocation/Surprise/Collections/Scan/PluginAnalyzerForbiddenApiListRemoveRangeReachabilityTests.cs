@@ -23,7 +23,12 @@ public sealed class PluginAnalyzerForbiddenApiListRemoveRangeReachabilityTests
     public async Task Does_not_report_bounded_list_add_in_reachable_event_handler()
     {
         var diagnostics = await PluginAnalyzerCapacityTestHarness.AnalyzeAsync(
-            Source("Retained.Add(0);"),
+            Source("""
+                if (Retained.Count < 1)
+                {
+                    Retained.Add(0);
+                }
+                """),
             "DotBoxDPluginAnalyzerBoundedListAddReachabilityTest");
 
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "DBXK001");
