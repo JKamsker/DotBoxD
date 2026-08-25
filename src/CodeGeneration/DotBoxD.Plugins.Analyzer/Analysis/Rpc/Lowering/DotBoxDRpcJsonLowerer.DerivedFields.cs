@@ -88,6 +88,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         RecordMember derived)
     {
         var lowered = TryLowerDerivedTerminal(expression, memberBindings, named, derived) ??
+                      TryLowerDerivedCreation(expression, memberBindings, named, derived) ??
                       TryLowerDerivedUnary(expression, memberBindings, named, derived) ??
                       TryLowerDerivedBinary(expression, memberBindings, named, derived) ??
                       throw DerivedNotSupported(named, derived);
@@ -111,6 +112,42 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 BoundDerivedMember(memberBindings, thisMember),
             _ => null
         };
+
+    private string? TryLowerDerivedCreation(
+        ExpressionSyntax expression,
+        IReadOnlyDictionary<ISymbol, string> memberBindings,
+        INamedTypeSymbol named,
+        RecordMember derived)
+        => expression switch
+        {
+            ObjectCreationExpressionSyntax creation =>
+                LowerDerivedCreation(creation, memberBindings, named, derived),
+            ImplicitObjectCreationExpressionSyntax creation =>
+                LowerDerivedCreation(creation, memberBindings, named, derived),
+            _ => null
+        };
+
+    private string LowerDerivedCreation(
+        BaseObjectCreationExpressionSyntax creation,
+        IReadOnlyDictionary<ISymbol, string> memberBindings,
+        INamedTypeSymbol named,
+        RecordMember derived)
+    {
+        var previousOverride = _expressionOverride;
+        _expressionOverride = part => BoundDerivedMember(memberBindings, part) ?? previousOverride?.Invoke(part);
+        try
+        {
+            return LowerRecordCreation(creation);
+        }
+        catch (NotSupportedException ex)
+        {
+            throw DerivedNotSupported(named, derived, ex);
+        }
+        finally
+        {
+            _expressionOverride = previousOverride;
+        }
+    }
 
     private string? BoundDerivedMember(
         IReadOnlyDictionary<ISymbol, string> memberBindings,
@@ -189,9 +226,13 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             ? LowerBinary(binary, part => LowerDerivedExpression(part, memberBindings, named, derived))
             : null;
 
-    private static System.NotSupportedException DerivedNotSupported(INamedTypeSymbol named, RecordMember derived)
+    private static System.NotSupportedException DerivedNotSupported(
+        INamedTypeSymbol named,
+        RecordMember derived,
+        Exception? innerException = null)
         => new(
             $"Server extension constructor for '{named.Name}' cannot build the derived member '{derived.Name}' in the " +
             "sandbox: its getter is not a simple expression over the constructor's parameters. Pass the value as a " +
-            $"constructor parameter, or construct '{named.Name}' where the value is available.");
+            $"constructor parameter, or construct '{named.Name}' where the value is available.",
+            innerException);
 }

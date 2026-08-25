@@ -31,7 +31,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     private bool TryLowerConstantExpression(ExpressionSyntax expression, out string lowered)
     {
         lowered = string.Empty;
-        if (_model.GetConstantValue(expression, _cancellationToken) is not { HasValue: true } constant)
+        if (ModelFor(expression).GetConstantValue(expression, _cancellationToken) is not { HasValue: true } constant)
         {
             return false;
         }

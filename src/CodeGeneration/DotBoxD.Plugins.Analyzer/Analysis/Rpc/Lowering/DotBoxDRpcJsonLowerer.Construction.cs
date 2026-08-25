@@ -133,7 +133,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         INamedTypeSymbol named,
         IReadOnlyList<RecordMember> fields)
     {
-        if (_model.GetSymbolInfo(creation, _cancellationToken).Symbol is IMethodSymbol constructor &&
+        if (ModelFor(creation).GetSymbolInfo(creation, _cancellationToken).Symbol is IMethodSymbol constructor &&
             constructor.Parameters.Length <= fields.Count)
         {
             return constructor;

@@ -126,8 +126,26 @@ internal static partial class DotBoxDRpcTypeMapper
             BinaryExpressionSyntax binary =>
                 IsExpressionOverAssignedFields(binary.Left, assignedNames) &&
                 IsExpressionOverAssignedFields(binary.Right, assignedNames),
+            ObjectCreationExpressionSyntax creation =>
+                ArgumentsAreOverAssignedFields(creation.ArgumentList?.Arguments, assignedNames) &&
+                InitializerIsOverAssignedFields(creation.Initializer, assignedNames),
+            ImplicitObjectCreationExpressionSyntax creation =>
+                ArgumentsAreOverAssignedFields(creation.ArgumentList?.Arguments, assignedNames) &&
+                InitializerIsOverAssignedFields(creation.Initializer, assignedNames),
             _ => false
         };
+
+    private static bool ArgumentsAreOverAssignedFields(SeparatedSyntaxList<ArgumentSyntax>? arguments, ISet<string> assignedNames)
+        => arguments is not { } argumentList ||
+           argumentList.All(argument =>
+               argument.RefKindKeyword.ValueText.Length == 0 &&
+               IsExpressionOverAssignedFields(argument.Expression, assignedNames));
+
+    private static bool InitializerIsOverAssignedFields(InitializerExpressionSyntax? initializer, ISet<string> assignedNames)
+        => initializer is null ||
+           initializer.Expressions.All(expression =>
+               expression is AssignmentExpressionSyntax { Left: IdentifierNameSyntax, Right: { } value } &&
+               IsExpressionOverAssignedFields(value, assignedNames));
 
     private static bool IsSupportedUnary(PrefixUnaryExpressionSyntax unary)
         => unary.IsKind(SyntaxKind.LogicalNotExpression) ||
