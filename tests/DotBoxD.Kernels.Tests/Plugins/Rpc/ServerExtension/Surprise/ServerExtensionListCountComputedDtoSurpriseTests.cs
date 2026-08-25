@@ -34,7 +34,7 @@ public sealed class ServerExtensionListCountComputedDtoSurpriseTests
         {
             public List<int> Values { get; init; } = [];
 
-            public int Count => Values.Count;
+            public int Count => ((Values)).Count;
 
             public int ServerCount { get; init; }
         }

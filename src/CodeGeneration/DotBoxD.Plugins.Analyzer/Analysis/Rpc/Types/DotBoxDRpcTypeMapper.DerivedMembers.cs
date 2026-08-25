@@ -144,9 +144,7 @@ internal static partial class DotBoxDRpcTypeMapper
         out ITypeSymbol type)
     {
         type = null!;
-        var name = expression is ParenthesizedExpressionSyntax parenthesized
-            ? GetAssignedFieldName(parenthesized.Expression)
-            : GetAssignedFieldName(expression);
+        var name = GetAssignedFieldName(expression);
 
         return name is not null && assignedFields.TryGetValue(name, out type);
     }
@@ -154,6 +152,7 @@ internal static partial class DotBoxDRpcTypeMapper
     private static string? GetAssignedFieldName(ExpressionSyntax expression)
         => expression switch
         {
+            ParenthesizedExpressionSyntax parenthesized => GetAssignedFieldName(parenthesized.Expression),
             IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
             MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } member => member.Name.Identifier.ValueText,
             _ => null
