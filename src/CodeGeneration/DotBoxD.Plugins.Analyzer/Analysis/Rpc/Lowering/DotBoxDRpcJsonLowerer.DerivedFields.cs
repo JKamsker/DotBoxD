@@ -88,6 +88,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         RecordMember derived)
     {
         var lowered = TryLowerDerivedTerminal(expression, memberBindings, named, derived) ??
+                      TryLowerDerivedListCount(expression, memberBindings, named, derived) ??
                       TryLowerDerivedUnary(expression, memberBindings, named, derived) ??
                       TryLowerDerivedBinary(expression, memberBindings, named, derived) ??
                       throw DerivedNotSupported(named, derived);
@@ -111,6 +112,21 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 BoundDerivedMember(memberBindings, thisMember),
             _ => null
         };
+
+    private string? TryLowerDerivedListCount(
+        ExpressionSyntax expression,
+        IReadOnlyDictionary<ISymbol, string> memberBindings,
+        INamedTypeSymbol named,
+        RecordMember derived)
+    {
+        if (expression is not MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Count" } count ||
+            DotBoxDRpcTypeMapper.ListElementType(TypeOf(count.Expression)) is null)
+        {
+            return null;
+        }
+
+        return Call("list.count", null, LowerDerivedExpression(count.Expression, memberBindings, named, derived));
+    }
 
     private string? BoundDerivedMember(
         IReadOnlyDictionary<ISymbol, string> memberBindings,
