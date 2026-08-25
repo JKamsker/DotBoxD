@@ -81,12 +81,16 @@ features:
 
 engine:
   id: codex
-  model: gpt-5.6-terra
+  model: gpt-5.5
   args:
     - " -c"
-    - model_reasoning_effort="xhigh"
+    - model_reasoning_effort="high"
 
 pre-agent-steps:
+  - name: Install Codex apply_patch compatibility shim
+    shell: bash
+    run: bash eng/scripts/install-codex-apply-patch.sh
+
   - name: Write surprise candidate handoff
     shell: bash
     run: |

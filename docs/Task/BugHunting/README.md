@@ -14,7 +14,7 @@ runs never self-chain. Per-lens concurrency still prevents overlap, while the di
 the least-recently-dispatched active lens and uses severity only as a tie-breaker. A missed GitHub
 schedule delays discovery safely instead of triggering catch-up fanout.
 
-Explores use `gpt-5.6-sol` with high reasoning, a 45-minute job timeout, an 8,000-AI-credit per-run
+Explores use `gpt-5.5` with high reasoning, a 45-minute job timeout, an 8,000-AI-credit per-run
 budget, a 20,000-AIC rolling daily ceiling, and a 10-minute per-tool ceiling. A run investigates one
 coherent seam and dispatches at most one strongest concrete candidate; additional leads are recorded
 in the lens ledger for later runs. Every candidate still goes through the dedicated red-test proof
