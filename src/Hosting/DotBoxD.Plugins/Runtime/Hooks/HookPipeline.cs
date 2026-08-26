@@ -189,6 +189,7 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
             ? new HookContext(_messages, cancellationToken)
             : _defaultRawContext;
         var context = _contextFactory.Create(rawContext);
+        cancellationToken.ThrowIfCancellationRequested();
         for (var i = 0; i < filters.Length; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
