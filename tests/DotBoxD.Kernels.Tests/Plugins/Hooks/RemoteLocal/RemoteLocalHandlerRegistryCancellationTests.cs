@@ -98,6 +98,58 @@ public sealed class RemoteLocalHandlerRegistryCancellationTests
         Assert.Equal((typeof(OperationCanceledException), null), (exception?.GetType(), response));
     }
 
+    [Fact]
+    public async Task DispatchAsync_observes_caller_cancellation_after_raw_decoder_handler_returns()
+    {
+        var registry = new RemoteLocalHandlerRegistry();
+        using var cancellation = new CancellationTokenSource();
+        var invocations = 0;
+        registry.Register(
+            "sub-caller-cancel",
+            (string _, HookContext _) =>
+            {
+                invocations++;
+                cancellation.Cancel();
+                return ValueTask.CompletedTask;
+            },
+            static (ReadOnlyMemory<byte> _) => "payload");
+
+        var exception = await Record.ExceptionAsync(
+            async () => await registry.DispatchAsync(
+                "sub-caller-cancel",
+                EncodeProjected("payload"),
+                new HookContext(new InMemoryPluginMessageSink(), CancellationToken.None),
+                cancellation.Token));
+
+        var canceled = exception as OperationCanceledException;
+        Assert.Equal((typeof(OperationCanceledException), cancellation.Token, 1), (exception?.GetType(), canceled?.CancellationToken, invocations));
+    }
+
+    [Fact]
+    public async Task DispatchAsync_observes_context_cancellation_after_raw_decoder_handler_returns()
+    {
+        var registry = new RemoteLocalHandlerRegistry();
+        using var contextCancellation = new CancellationTokenSource();
+        var invocations = 0;
+        registry.Register(
+            "sub-context-cancel",
+            (string _, HookContext _) =>
+            {
+                invocations++;
+                contextCancellation.Cancel();
+                return ValueTask.CompletedTask;
+            },
+            static (ReadOnlyMemory<byte> _) => "payload");
+
+        var exception = await Record.ExceptionAsync(
+            async () => await registry.DispatchAsync(
+                "sub-context-cancel",
+                EncodeProjected("payload"),
+                new HookContext(new InMemoryPluginMessageSink(), contextCancellation.Token)));
+
+        Assert.Equal((typeof(OperationCanceledException), 1), (exception?.GetType(), invocations));
+    }
+
     private static byte[] EncodeProjected<T>(T value)
     {
         var sandboxValue = KernelRpcMarshaller.ToSandboxValue(value, typeof(T));
