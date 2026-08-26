@@ -70,6 +70,79 @@ public sealed class RemoteTypedServerContextTests
     }
 
     [Fact]
+    public async Task Remote_hook_context_factory_cancellation_prevents_local_handler_invocation()
+    {
+        var localHandlers = new RemoteLocalHandlerRegistry();
+        string? subscriptionId = null;
+        var registry = new RemoteHookRegistry(package =>
+        {
+            subscriptionId = package.CallbackSubscriptionId ?? package.Manifest.PluginId;
+            return ValueTask.FromResult(subscriptionId);
+        }, localHandlers);
+        using var cancellation = new CancellationTokenSource();
+        var handlerInvoked = false;
+
+        registry.On<RemoteEvent, RemoteContext>(context =>
+            {
+                cancellation.Cancel();
+                return new RemoteContext(context, "hook");
+            })
+            .UseGeneratedLocalChain(
+                PackageFor<RemoteEvent>(projectedType: "global::" + typeof(RemoteEvent).FullName),
+                (RemoteEvent _, RemoteContext _) =>
+                {
+                    handlerInvoked = true;
+                    return ValueTask.CompletedTask;
+                });
+
+        var exception = await Record.ExceptionAsync(
+            async () => await localHandlers.DispatchAsync(
+                subscriptionId!, Encode(new RemoteEvent("evt")), RawContext(cancellation.Token), cancellation.Token));
+
+        var canceled = exception as OperationCanceledException;
+        Assert.Equal(
+            (typeof(OperationCanceledException), cancellation.Token, false),
+            (exception?.GetType(), canceled?.CancellationToken, handlerInvoked));
+    }
+
+    [Fact]
+    public async Task Remote_subscription_context_factory_cancellation_prevents_local_handler_invocation()
+    {
+        var localHandlers = new RemoteLocalHandlerRegistry();
+        string? subscriptionId = null;
+        var registry = new RemoteSubscriptionRegistry(package =>
+        {
+            subscriptionId = package.CallbackSubscriptionId ?? package.Manifest.PluginId;
+            return ValueTask.FromResult(subscriptionId);
+        }, localHandlers);
+        using var cancellation = new CancellationTokenSource();
+        var handlerInvoked = false;
+
+        registry.On<RemoteEvent, RemoteContext>(context =>
+            {
+                cancellation.Cancel();
+                return new RemoteContext(context, "subscription");
+            })
+            .Select(e => e.Id, RemoteIrTestSteps.Ir<RemoteEvent, string>(LoweredPipelineStepKind.Projection))
+            .UseGeneratedLocalChain(
+                PackageFor<RemoteEvent>(projectedType: "string"),
+                (string _, RemoteContext _) =>
+                {
+                    handlerInvoked = true;
+                    return ValueTask.CompletedTask;
+                });
+
+        var exception = await Record.ExceptionAsync(
+            async () => await localHandlers.DispatchAsync(
+                subscriptionId!, Encode("projected"), RawContext(cancellation.Token), cancellation.Token));
+
+        var canceled = exception as OperationCanceledException;
+        Assert.Equal(
+            (typeof(OperationCanceledException), cancellation.Token, false),
+            (exception?.GetType(), canceled?.CancellationToken, handlerInvoked));
+    }
+
+    [Fact]
     public async Task Remote_hook_RegisterLocal_invokes_the_configured_context_type()
     {
         var localHandlers = new RemoteLocalHandlerRegistry();
@@ -102,8 +175,8 @@ public sealed class RemoteTypedServerContextTests
         Assert.Equal(3, result.Items[2].Int32Value);
     }
 
-    private static HookContext RawContext()
-        => new(new InMemoryPluginMessageSink(), CancellationToken.None);
+    private static HookContext RawContext(CancellationToken cancellationToken = default)
+        => new(new InMemoryPluginMessageSink(), cancellationToken);
 
     private static byte[] Encode<T>(T value)
     {
