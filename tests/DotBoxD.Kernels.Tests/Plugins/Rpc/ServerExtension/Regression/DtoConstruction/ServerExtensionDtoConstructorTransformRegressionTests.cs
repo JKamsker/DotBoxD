@@ -88,6 +88,45 @@ public sealed class ServerExtensionDtoConstructorTransformRegressionTests
         Assert.True(preservesMember);
     }
 
+    [Fact]
+    public void Constructor_assignment_verification_accepts_direct_assignment_after_safe_constructor_chain()
+    {
+        var tree = CSharpSyntaxTree.ParseText("""
+            public sealed class Score
+            {
+                public Score()
+                {
+                }
+
+                public Score(int value)
+                    : this()
+                {
+                    Value = value;
+                }
+
+                public int Value { get; }
+            }
+            """);
+        var compilation = CSharpCompilation.Create(
+            "Source",
+            [tree],
+            [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)],
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var type = Assert.IsAssignableFrom<INamedTypeSymbol>(
+            compilation.GetTypeByMetadataName("Score"));
+        var constructor = Assert.Single(type.InstanceConstructors, candidate => candidate.Parameters.Length == 1);
+        var property = Assert.IsAssignableFrom<IPropertySymbol>(
+            type.GetMembers("Value").Single());
+
+        var preservesMember = RpcDtoConstructorAssignmentVerifier.ConstructorPreservesMember(
+            constructor,
+            new RecordMember(property.Name, property.Type, property),
+            constructor.Parameters[0],
+            compilation);
+
+        Assert.True(preservesMember);
+    }
+
     private static void AssertConstructorRejected(string constructor)
     {
         var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator($$"""
