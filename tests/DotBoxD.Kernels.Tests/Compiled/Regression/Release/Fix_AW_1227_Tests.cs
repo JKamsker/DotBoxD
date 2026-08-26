@@ -46,6 +46,17 @@ public sealed class Fix_AW_1227_Tests
     }
 
     [Fact]
+    public void Explore_worker_emits_its_ledger_comment_once_with_json_stdin()
+    {
+        var source = ReadRepositoryText(".github/workflows/library-surprise-explore.md");
+
+        Assert.Contains("Safe-output declarations are immutable", source, StringComparison.Ordinal);
+        Assert.Contains("safeoutputs add_comment .", source, StringComparison.Ordinal);
+        Assert.Contains("never pass a safe-output", source, StringComparison.Ordinal);
+        Assert.Contains("temporary_id` as `comment_id`", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Editing_workers_install_and_probe_apply_patch_before_the_agent_runs()
     {
         foreach (var workflowName in new[] { "library-surprise-red-test", "library-surprise-fix" })

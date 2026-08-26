@@ -157,6 +157,13 @@ Post one concise progress comment on lens issue **#${{ inputs.lens_issue }}**
 running red-test from another lens detect an in-flight duplicate before its PR exists. Keep it
 short and specific.
 
+Safe-output declarations are immutable. Build the final Markdown body first, submit it exactly
+once by piping a JSON object on stdin to `safeoutputs add_comment .`, and never try to correct,
+replace, or reply to that pending declaration. In particular, never pass a safe-output
+`temporary_id` as `comment_id` or `reply_to_id`; those fields accept only existing positive GitHub
+IDs. If the one declaration is malformed, record the limitation in the final response instead of
+emitting a second comment.
+
 ## 5. Outcome
 
 Exactly one of:
