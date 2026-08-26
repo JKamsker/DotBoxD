@@ -14,10 +14,11 @@ runs never self-chain. Per-lens concurrency still prevents overlap, while the di
 the least-recently-dispatched active lens and uses severity only as a tie-breaker. A missed GitHub
 schedule delays discovery safely instead of triggering catch-up fanout.
 
-Explores use `gpt-5.6-sol` with high reasoning, a 45-minute job timeout, an 8,000-AI-credit per-run
-budget, a 20,000-AIC rolling daily ceiling, and a 10-minute per-tool ceiling. A run investigates one
-coherent seam and dispatches at most one strongest concrete candidate; additional leads are recorded
-in the lens ledger for later runs. Every candidate still goes through the dedicated red-test proof
+Explores use Codex CLI `0.149.1` with `gpt-5.6-sol` at high reasoning, a 45-minute job timeout, an
+8,000-AI-credit per-run budget, a 20,000-AIC rolling daily ceiling, and a 10-minute per-tool ceiling.
+A run investigates one coherent seam and dispatches at most one strongest concrete candidate;
+additional leads are recorded in the lens ledger for later runs. Every candidate still goes through
+the dedicated red-test proof
 before a PR can exist.
 
 The fix dispatcher gets six fallback opportunities per hour (plus the existing event kick),
@@ -409,6 +410,7 @@ safe-outputs:
 
 engine:
   id: codex
+  version: 0.149.1
   model: gpt-5.6-terra
   args:
     - " -c"                    # intentional leading space (fork quirk; see .github/aw/README.md)

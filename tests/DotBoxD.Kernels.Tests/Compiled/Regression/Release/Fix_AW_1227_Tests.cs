@@ -24,10 +24,13 @@ public sealed class Fix_AW_1227_Tests
             var lockFile = ReadRepositoryText($".github/workflows/{workflowName}.lock.yml");
 
             Assert.Contains($"model: {model}", source, StringComparison.Ordinal);
+            Assert.Contains("version: 0.149.1", source, StringComparison.Ordinal);
             Assert.DoesNotContain("model: gpt-5.5", source, StringComparison.Ordinal);
             Assert.Contains($"\"agent_model\":\"{model}\"", lockFile, StringComparison.Ordinal);
             Assert.Contains($"GH_AW_MODEL_AGENT_CODEX: {model}", lockFile, StringComparison.Ordinal);
             Assert.Contains("\"compiler_version\":\"v0.82.0-jk.2\"", lockFile, StringComparison.Ordinal);
+            Assert.Contains("\"engine_versions\":{\"codex\":\"0.149.1\"}", lockFile, StringComparison.Ordinal);
+            Assert.Contains("@openai/codex@0.149.1", lockFile, StringComparison.Ordinal);
         }
     }
 

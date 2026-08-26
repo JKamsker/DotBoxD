@@ -62,6 +62,7 @@ features:
 
 engine:
   id: codex
+  version: 0.149.1
   model: gpt-5.6-sol
   args:
     - " -c"

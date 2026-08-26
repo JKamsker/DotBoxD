@@ -71,6 +71,7 @@ max-daily-ai-credits: 20000
 
 engine:
   id: codex
+  version: 0.149.1
   model: gpt-5.6-sol
   args:
     - " -c"
@@ -78,8 +79,9 @@ engine:
 ```
 
 The mechanical dispatcher, proof/fix workers, and smoke test pin `gpt-5.6-terra` with high reasoning
-effort. The `v0.82.0-jk.2` fork adds explicit AWF firewall aliases for Sol, Terra, and Luna. Models
-are explicit in every source workflow; do not rely on a moving default.
+effort. All workflows pin Codex CLI `0.149.1`, which has native GPT-5.6 model metadata. The
+`v0.82.0-jk.2` fork adds explicit AWF firewall aliases for Sol, Terra, and Luna. Models and the CLI
+version are explicit in every source workflow; do not rely on moving defaults.
 
 The proof and fix workers run `eng/scripts/install-codex-apply-patch.sh` before the agent. That shared
 setup installs and probes the Codex `apply_patch` compatibility entry point so editing failures are
