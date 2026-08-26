@@ -1,9 +1,9 @@
 {
   "entries": {
-    "JKamsker/gh-aw/actions/setup@v0.82.0-jk.1": {
+    "JKamsker/gh-aw/actions/setup@v0.82.0-jk.2": {
       "repo": "JKamsker/gh-aw/actions/setup",
-      "version": "v0.82.0-jk.1",
-      "sha": "21e402d7a4b5367258a7692cbb84fee60b507598"
+      "version": "v0.82.0-jk.2",
+      "sha": "4014cb8ef0fe6f5d5adc79599f163c32ffe01d37"
     },
     "actions/setup-dotnet@v4": {
       "repo": "actions/setup-dotnet",

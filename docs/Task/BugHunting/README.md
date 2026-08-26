@@ -14,7 +14,7 @@ runs never self-chain. Per-lens concurrency still prevents overlap, while the di
 the least-recently-dispatched active lens and uses severity only as a tie-breaker. A missed GitHub
 schedule delays discovery safely instead of triggering catch-up fanout.
 
-Explores use `gpt-5.5` with high reasoning, a 45-minute job timeout, an 8,000-AI-credit per-run
+Explores use `gpt-5.6-sol` with high reasoning, a 45-minute job timeout, an 8,000-AI-credit per-run
 budget, a 20,000-AIC rolling daily ceiling, and a 10-minute per-tool ceiling. A run investigates one
 coherent seam and dispatches at most one strongest concrete candidate; additional leads are recorded
 in the lens ledger for later runs. Every candidate still goes through the dedicated red-test proof
@@ -409,7 +409,7 @@ safe-outputs:
 
 engine:
   id: codex
-  model: gpt-5.5
+  model: gpt-5.6-terra
   args:
     - " -c"                    # intentional leading space (fork quirk; see .github/aw/README.md)
     - model_reasoning_effort="high"
@@ -520,7 +520,7 @@ in the compiled lock or add fork support.)
 
 ### Caveats - verify before building
 
-- **Fork safe-output support.** Confirm `JKamsker/gh-aw v0.82.0-jk.1` ships `create-issue` /
+- **Fork safe-output support.** Confirm `JKamsker/gh-aw v0.82.0-jk.2` ships `create-issue` /
   `add-comment` / `add-labels` / `update-issue`. The current workflows only exercise
   `dispatch-workflow` / `create-pull-request` / `push-to-pull-request-branch` / `noop`. If a
   safe-output is missing, either add it to the fork or have the handler shell out to `gh` with
@@ -528,7 +528,7 @@ in the compiled lock or add fork support.)
 - **Spam / cost.** A continuous issue-creating loop will flood issues without tight `max:` caps
   on `create-issue` per run **and** strict dedup. Keep the existing `noop` discipline.
 - **Recompile locks** after editing sources: `gh aw compile --approve --force-refresh-action-pins
-  --gh-aw-ref v0.82.0-jk.1` (see `.github/aw/README.md`); never hand-edit `*.lock.yml`.
+  --gh-aw-ref v0.82.0-jk.2` (see `.github/aw/README.md`); never hand-edit `*.lock.yml`.
 - **Codex engine quirk** - preserve the intentional leading space in `engine.args[0]` for this
   fork (documented in `.github/aw/README.md`).
 

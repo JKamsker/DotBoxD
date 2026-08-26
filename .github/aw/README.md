@@ -7,8 +7,8 @@ We use the DotBoxD fork of `gh-aw`, not the upstream GitHub release:
 
 https://github.com/JKamsker/gh-aw
 
-The pinned fork release is `v0.82.0-jk.1`. This fork carries the secret-backed
-OpenAI-compatible endpoint support DotBoxD needs for Codex workflows.
+The pinned fork release is `v0.82.0-jk.2`. This fork carries the secret-backed
+OpenAI-compatible endpoint support and GPT-5.6 firewall aliases DotBoxD needs for Codex workflows.
 
 ## File Layout
 
@@ -32,14 +32,14 @@ Install the forked extension:
 
 ```powershell
 gh extension remove gh-aw
-gh extension install JKamsker/gh-aw --pin v0.82.0-jk.1
+gh extension install JKamsker/gh-aw --pin v0.82.0-jk.2
 gh aw version
 ```
 
 Expected version output:
 
 ```text
-gh aw version v0.82.0-jk.1
+gh aw version v0.82.0-jk.2
 ```
 
 ## Editing Workflow Sources
@@ -47,20 +47,20 @@ gh aw version v0.82.0-jk.1
 Edit the `.md` source workflow, then regenerate the lock files:
 
 ```powershell
-gh aw compile --approve --force-refresh-action-pins --gh-aw-ref v0.82.0-jk.1
+gh aw compile --approve --force-refresh-action-pins --gh-aw-ref v0.82.0-jk.2
 ```
 
 The forked compiler should emit setup actions pinned to this repository:
 
 ```yaml
-uses: JKamsker/gh-aw/actions/setup@<commit-sha> # v0.82.0-jk.1
+uses: JKamsker/gh-aw/actions/setup@<commit-sha> # v0.82.0-jk.2
 ```
 
 It should not emit `github/gh-aw-actions/setup` for these workflows.
 
 ## Codex Models
 
-The active graph explorer and the legacy manual discovery workflow pin `gpt-5.5`, run with high
+The active graph explorer and the legacy manual discovery workflow pin `gpt-5.6-sol`, run with high
 reasoning effort, and have a 45-minute / 8,000-AI-credit per-run research budget plus a 20,000-AIC
 rolling daily ceiling:
 
@@ -71,23 +71,22 @@ max-daily-ai-credits: 20000
 
 engine:
   id: codex
-  model: gpt-5.5
+  model: gpt-5.6-sol
   args:
     - " -c"
     - model_reasoning_effort="high"
 ```
 
-The mechanical dispatcher, proof/fix workers, and smoke test are also pinned to `gpt-5.5` with high
-reasoning effort. The pinned gh-aw firewall allowlist currently ends at `gpt-5.5`; newer model names
-must not be selected until that runtime accepts them. Models are explicit in every source workflow;
-do not rely on a moving default.
+The mechanical dispatcher, proof/fix workers, and smoke test pin `gpt-5.6-terra` with high reasoning
+effort. The `v0.82.0-jk.2` fork adds explicit AWF firewall aliases for Sol, Terra, and Luna. Models
+are explicit in every source workflow; do not rely on a moving default.
 
 The proof and fix workers run `eng/scripts/install-codex-apply-patch.sh` before the agent. That shared
 setup installs and probes the Codex `apply_patch` compatibility entry point so editing failures are
 reported before an agent spends its run budget.
 
 The leading space in the first `engine.args` entry is intentional for
-`JKamsker/gh-aw@v0.82.0-jk.1`. That compiler appends custom Codex args directly
+`JKamsker/gh-aw@v0.82.0-jk.2`. That compiler appends custom Codex args directly
 after the structured-output path in threat-detection runs; without the explicit
 separator it generates `detection_result.json-c ...`. Remove the leading space
 only after the fork emits that separator itself.

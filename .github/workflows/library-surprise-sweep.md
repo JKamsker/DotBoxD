@@ -62,7 +62,7 @@ features:
 
 engine:
   id: codex
-  model: gpt-5.5
+  model: gpt-5.6-sol
   args:
     - " -c"
     - model_reasoning_effort="high"

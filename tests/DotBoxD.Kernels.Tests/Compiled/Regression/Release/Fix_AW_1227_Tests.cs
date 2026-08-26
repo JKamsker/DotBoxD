@@ -5,28 +5,40 @@ namespace DotBoxD.Kernels.Tests.Compiled.Regression;
 /// </summary>
 public sealed class Fix_AW_1227_Tests
 {
-    private static readonly string[] AgenticWorkflowNames =
+    private static readonly (string WorkflowName, string Model)[] AgenticWorkflows =
     [
-        "gh-aw-smoke-test",
-        "library-surprise-dispatcher",
-        "library-surprise-explore",
-        "library-surprise-fix",
-        "library-surprise-red-test",
-        "library-surprise-sweep",
+        ("gh-aw-smoke-test", "gpt-5.6-terra"),
+        ("library-surprise-dispatcher", "gpt-5.6-terra"),
+        ("library-surprise-explore", "gpt-5.6-sol"),
+        ("library-surprise-fix", "gpt-5.6-terra"),
+        ("library-surprise-red-test", "gpt-5.6-terra"),
+        ("library-surprise-sweep", "gpt-5.6-sol"),
     ];
 
     [Fact]
     public void Agentic_workflows_use_the_model_supported_by_the_pinned_runtime()
     {
-        foreach (var workflowName in AgenticWorkflowNames)
+        foreach (var (workflowName, model) in AgenticWorkflows)
         {
             var source = ReadRepositoryText($".github/workflows/{workflowName}.md");
             var lockFile = ReadRepositoryText($".github/workflows/{workflowName}.lock.yml");
 
-            Assert.Contains("model: gpt-5.5", source, StringComparison.Ordinal);
-            Assert.DoesNotContain("model: gpt-5.6", source, StringComparison.Ordinal);
-            Assert.Contains("\"agent_model\":\"gpt-5.5\"", lockFile, StringComparison.Ordinal);
-            Assert.DoesNotContain("GH_AW_MODEL_AGENT_CODEX: gpt-5.6", lockFile, StringComparison.Ordinal);
+            Assert.Contains($"model: {model}", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("model: gpt-5.5", source, StringComparison.Ordinal);
+            Assert.Contains($"\"agent_model\":\"{model}\"", lockFile, StringComparison.Ordinal);
+            Assert.Contains($"GH_AW_MODEL_AGENT_CODEX: {model}", lockFile, StringComparison.Ordinal);
+            Assert.Contains("\"compiler_version\":\"v0.82.0-jk.2\"", lockFile, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void Pinned_runtime_maps_each_gpt_5_6_tier_to_supported_providers()
+    {
+        var lockFile = ReadRepositoryText(".github/workflows/gh-aw-smoke-test.lock.yml");
+        foreach (var model in new[] { "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna" })
+        {
+            var expected = $"\\\"{model}\\\":[\\\"copilot/{model}*\\\",\\\"openai/{model}*\\\"]";
+            Assert.Contains(expected, lockFile, StringComparison.Ordinal);
         }
     }
 

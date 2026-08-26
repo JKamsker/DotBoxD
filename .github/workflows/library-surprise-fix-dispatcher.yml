@@ -177,7 +177,7 @@ jobs:
           _RESOLVE_MUTATION = ("mutation($id:ID!){resolveReviewThread(input:{threadId:$id})"
                                "{thread{id isResolved}}}")
           # The worker reliably starts its summary with a "Mode: FIX|GREEN|POLISH"
-          # line but (gpt-5.5) does NOT reliably emit the hidden HTML markers. So a
+          # line but does not reliably emit the hidden HTML markers. So a
           # trusted summary comment is itself the "polished" signal, and the review
           # thread node ids the worker lists in prose (PRRT_...) are the resolve
           # fallback. Both are still cross-checked: has_marker only trusts our own

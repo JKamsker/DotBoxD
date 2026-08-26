@@ -292,7 +292,7 @@ jobs:
       - name: Install pinned gh-aw compiler
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh extension install JKamsker/gh-aw --pin v0.82.0-jk.1 --force
+        run: gh extension install JKamsker/gh-aw --pin v0.82.0-jk.2 --force
 
       - name: Agentic workflow lock integrity
         shell: pwsh
