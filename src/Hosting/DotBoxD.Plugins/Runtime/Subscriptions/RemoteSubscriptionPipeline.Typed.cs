@@ -256,7 +256,8 @@ public sealed class RemoteSubscriptionPipeline<TEvent, TContext>
         Func<TProjected, TContext, ValueTask> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
-        _inner.InstallLocal<TProjected>(package, (value, rawContext) => handler(value, _createContext(rawContext)));
+        _inner.InstallLocal<TProjected>(package, (value, rawContext) =>
+            TypedRemoteContextInvoker.Invoke(value, rawContext, _createContext, handler));
         return this;
     }
     internal RemoteSubscriptionPipeline<TEvent, TContext> InstallLocal<TProjected>(
@@ -265,7 +266,8 @@ public sealed class RemoteSubscriptionPipeline<TEvent, TContext>
         Func<KernelRpcValue, TProjected> decoder)
     {
         ArgumentNullException.ThrowIfNull(handler);
-        _inner.InstallLocal(package, (value, rawContext) => handler(value, _createContext(rawContext)), decoder);
+        _inner.InstallLocal(package, (value, rawContext) =>
+            TypedRemoteContextInvoker.Invoke(value, rawContext, _createContext, handler), decoder);
         return this;
     }
     internal RemoteSubscriptionPipeline<TEvent, TContext> InstallLocal<TProjected>(
@@ -274,7 +276,8 @@ public sealed class RemoteSubscriptionPipeline<TEvent, TContext>
         Func<ReadOnlyMemory<byte>, TProjected> decoder)
     {
         ArgumentNullException.ThrowIfNull(handler);
-        _inner.InstallLocal(package, (value, rawContext) => handler(value, _createContext(rawContext)), decoder);
+        _inner.InstallLocal(package, (value, rawContext) =>
+            TypedRemoteContextInvoker.Invoke(value, rawContext, _createContext, handler), decoder);
         return this;
     }
     internal RemoteSubscriptionPipeline<TEvent, TContext> AppendStep<TInput, TOutput>(
