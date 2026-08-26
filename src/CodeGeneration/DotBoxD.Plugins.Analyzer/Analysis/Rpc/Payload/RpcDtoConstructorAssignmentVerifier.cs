@@ -264,7 +264,11 @@ internal static class RpcDtoConstructorAssignmentVerifier
         }
 
         expression = StripParentheses(expression);
-        return model.GetSymbolInfo(expression).Symbol is IFieldSymbol field &&
+        var expressionModel = model.Compilation.ContainsSyntaxTree(expression.SyntaxTree)
+            ? model.Compilation.GetSemanticModel(expression.SyntaxTree)
+            : null;
+
+        return expressionModel?.GetSymbolInfo(expression).Symbol is IFieldSymbol field &&
             SymbolEqualityComparer.Default.Equals(field.ContainingType, property.ContainingType)
                 ? field
                 : null;
