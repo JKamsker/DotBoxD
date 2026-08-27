@@ -43,8 +43,9 @@ public static class InMemoryRpcChannel
         PairState state) : IRpcChannel
     {
         private int _disposed;
+        private int _remoteClosed;
 
-        public bool IsConnected => Volatile.Read(ref _disposed) == 0;
+        public bool IsConnected => Volatile.Read(ref _disposed) == 0 && Volatile.Read(ref _remoteClosed) == 0;
 
         public string RemoteEndpoint { get; } = remoteEndpoint;
 
@@ -82,6 +83,7 @@ public static class InMemoryRpcChannel
                 }
             }
 
+            Volatile.Write(ref _remoteClosed, 1);
             return Payload.Empty;
         }
 
