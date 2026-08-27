@@ -102,7 +102,7 @@ internal static class RpcDtoConstructorAssignmentVerifier
             if (matched ||
                 !IsDirectConstructorAssignment(declaration, assignment) ||
                 !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
-                !PreservesParameter(assignment.Right, parameter, model))
+                !PreservesParameterOrDefaultState(assignment.Right, member, parameter, model))
             {
                 return false;
             }
@@ -111,6 +111,20 @@ internal static class RpcDtoConstructorAssignmentVerifier
         }
 
         return matched;
+    }
+
+    private static bool PreservesParameterOrDefaultState(
+        ExpressionSyntax expression,
+        RecordMember member,
+        IParameterSymbol parameter,
+        SemanticModel? model)
+    {
+        expression = StripParentheses(expression);
+        return PreservesParameter(expression, parameter, model) ||
+            expression is BinaryExpressionSyntax coalesce &&
+            coalesce.IsKind(SyntaxKind.CoalesceExpression) &&
+            PreservesParameter(coalesce.Left, parameter, model) &&
+            IsMemberTarget(coalesce.Right, member, model);
     }
 
     private static IEnumerable<AssignmentExpressionSyntax> ConstructorAssignments(

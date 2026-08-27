@@ -34,12 +34,12 @@ public sealed class ServerExtensionDtoConstructorDefaultStateCoalescingSurpriseT
 
             public sealed class Profile
             {
-                public Profile(string? name)
+                public Profile(string name)
                 {
                     Name = name ?? Name;
                 }
 
-                public string? Name { get; }
+                public string Name { get; }
             }
 
             [ServerExtension(typeof(IRemoteWorldControl), "profile-default-state")]
