@@ -94,15 +94,26 @@ internal static class RpcDtoConstructorAssignmentVerifier
         var matched = false;
         foreach (var assignment in ConstructorAssignments(declaration))
         {
-            if (!IsMemberTarget(assignment.Left, member, model))
+            if (IsMemberTarget(assignment.Left, member, model))
+            {
+                if (matched ||
+                    !IsDirectConstructorAssignment(declaration, assignment) ||
+                    !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                    !PreservesParameter(assignment.Right, parameter, model))
+                {
+                    return false;
+                }
+
+                matched = true;
+                continue;
+            }
+
+            if (!TryGetTupleAssignmentMemberSource(declaration, assignment, member, model, out var source))
             {
                 continue;
             }
 
-            if (matched ||
-                !IsDirectConstructorAssignment(declaration, assignment) ||
-                !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
-                !PreservesParameter(assignment.Right, parameter, model))
+            if (matched || source is null || !PreservesParameter(source, parameter, model))
             {
                 return false;
             }
@@ -111,6 +122,48 @@ internal static class RpcDtoConstructorAssignmentVerifier
         }
 
         return matched;
+    }
+
+    private static bool TryGetTupleAssignmentMemberSource(
+        ConstructorDeclarationSyntax declaration,
+        AssignmentExpressionSyntax assignment,
+        RecordMember member,
+        SemanticModel? model,
+        out ExpressionSyntax? source)
+    {
+        source = null;
+        if (!IsDirectConstructorAssignment(declaration, assignment) ||
+            !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+            StripParentheses(assignment.Left) is not TupleExpressionSyntax targets ||
+            StripParentheses(assignment.Right) is not TupleExpressionSyntax values ||
+            targets.Arguments.Count != values.Arguments.Count)
+        {
+            return false;
+        }
+
+        var memberIndex = -1;
+        for (var i = 0; i < targets.Arguments.Count; i++)
+        {
+            if (!IsMemberTarget(targets.Arguments[i].Expression, member, model))
+            {
+                continue;
+            }
+
+            if (memberIndex >= 0)
+            {
+                return true;
+            }
+
+            memberIndex = i;
+        }
+
+        if (memberIndex >= 0)
+        {
+            source = values.Arguments[memberIndex].Expression;
+            return true;
+        }
+
+        return false;
     }
 
     private static IEnumerable<AssignmentExpressionSyntax> ConstructorAssignments(
