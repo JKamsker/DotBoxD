@@ -96,10 +96,12 @@ internal static class RpcDtoConstructorAssignmentVerifier
         {
             if (IsMemberTarget(assignment.Left, member, model))
             {
-                if (matched ||
-                    !IsDirectConstructorAssignment(declaration, assignment) ||
-                    !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
-                    !PreservesParameter(assignment.Right, parameter, model))
+                if (!IsPreservingDirectMemberAssignment(
+                        declaration,
+                        assignment,
+                        parameter,
+                        model,
+                        matched))
                 {
                     return false;
                 }
@@ -123,6 +125,17 @@ internal static class RpcDtoConstructorAssignmentVerifier
 
         return matched;
     }
+
+    private static bool IsPreservingDirectMemberAssignment(
+        ConstructorDeclarationSyntax declaration,
+        AssignmentExpressionSyntax assignment,
+        IParameterSymbol parameter,
+        SemanticModel? model,
+        bool alreadyMatched)
+        => !alreadyMatched &&
+            IsDirectConstructorAssignment(declaration, assignment) &&
+            assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
+            PreservesParameter(assignment.Right, parameter, model);
 
     private static bool TryGetTupleAssignmentMemberSource(
         ConstructorDeclarationSyntax declaration,
