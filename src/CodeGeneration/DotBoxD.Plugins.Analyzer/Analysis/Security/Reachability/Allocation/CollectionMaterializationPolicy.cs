@@ -17,8 +17,15 @@ internal static class CollectionMaterializationPolicy
             return true;
         }
 
-        forbidden = GetCollectionDisplayName(method, typeName);
-        return forbidden is not null;
+        var collectionDisplayName = GetCollectionDisplayName(method, typeName);
+        if (collectionDisplayName is null)
+        {
+            forbidden = null!;
+            return false;
+        }
+
+        forbidden = collectionDisplayName;
+        return true;
     }
 
     private static bool TryGetEnumerableDisplayName(IMethodSymbol method, string typeName, out string forbidden)
@@ -33,7 +40,10 @@ internal static class CollectionMaterializationPolicy
         return false;
     }
 
-    private static string GetCollectionDisplayName(IMethodSymbol method, string typeName)
+    private static string? GetCollectionDisplayName(IMethodSymbol method, string typeName)
+        => GetImmutableCollectionDisplayName(method, typeName) ?? GetListDisplayName(method, typeName);
+
+    private static string? GetImmutableCollectionDisplayName(IMethodSymbol method, string typeName)
         => (method.Name, typeName) switch
         {
             ("ToFrozenSet", FrozenSetTypeName) when method.IsStatic =>
@@ -42,11 +52,17 @@ internal static class CollectionMaterializationPolicy
                 "System.Collections.Immutable.ImmutableList.ToImmutableList",
             ("ToImmutableDictionary", ImmutableDictionaryTypeName) when method.IsStatic =>
                 "System.Collections.Immutable.ImmutableDictionary.ToImmutableDictionary",
+            _ => null
+        };
+
+    private static string? GetListDisplayName(IMethodSymbol method, string typeName)
+        => (method.Name, typeName) switch
+        {
             ("Find", ListTypeName) when !method.IsStatic =>
                 "System.Collections.Generic.List.Find",
             ("GetRange", ListTypeName) when !method.IsStatic =>
                 "System.Collections.Generic.List.GetRange",
-            _ => null!
+            _ => null
         };
 
     private static bool IsEnumerableMaterialization(IMethodSymbol method, string typeName)
