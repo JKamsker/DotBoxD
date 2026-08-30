@@ -47,6 +47,32 @@ public sealed class FaultInjectingRpcChannelDisposalRegressionTests
         }
     }
 
+    [Fact]
+    public async Task DisposeAsync_ReentrantInnerDisposalSharesOneTerminal()
+    {
+        var failure = new InvalidOperationException("inner disposal failed");
+        var inner = new ReentrantFaultingChannel(failure);
+        var wrapper = new FaultInjectingRpcChannel(
+            inner,
+            static (_, _, _) => default);
+        inner.Attach(wrapper);
+
+        var outerDispose = wrapper.DisposeAsync().AsTask();
+        var nestedDispose = inner.NestedDispose
+            ?? throw new InvalidOperationException("The inner channel did not reenter disposal.");
+
+        Assert.Equal(1, inner.DisposeEntries);
+        Assert.Same(outerDispose, nestedDispose);
+
+        var outerFailure = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => outerDispose.WaitAsync(Timeout));
+        var nestedFailure = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => nestedDispose.WaitAsync(Timeout));
+
+        Assert.Same(failure, outerFailure);
+        Assert.Same(failure, nestedFailure);
+    }
+
     private sealed class GatedFaultingChannel(InvalidOperationException failure) : IRpcChannel
     {
         private readonly TaskCompletionSource _firstDisposeEntered =
@@ -82,6 +108,38 @@ public sealed class FaultInjectingRpcChannelDisposalRegressionTests
             _firstDisposeEntered.SetResult();
             await _release.Task.ConfigureAwait(false);
             throw failure;
+        }
+    }
+
+    private sealed class ReentrantFaultingChannel(InvalidOperationException failure) : IRpcChannel
+    {
+        private FaultInjectingRpcChannel? _wrapper;
+        private int _disposeEntries;
+
+        public Task? NestedDispose { get; private set; }
+
+        public int DisposeEntries => Volatile.Read(ref _disposeEntries);
+
+        public bool IsConnected => true;
+
+        public string RemoteEndpoint => "reentrant://faulting";
+
+        public void Attach(FaultInjectingRpcChannel wrapper) => _wrapper = wrapper;
+
+        public Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) =>
+            Task.FromException(new NotSupportedException());
+
+        public Task<Payload> ReceiveAsync(CancellationToken ct = default) =>
+            Task.FromException<Payload>(new NotSupportedException());
+
+        public ValueTask DisposeAsync()
+        {
+            if (Interlocked.Increment(ref _disposeEntries) == 1)
+            {
+                NestedDispose = _wrapper!.DisposeAsync().AsTask();
+            }
+
+            return ValueTask.FromException(failure);
         }
     }
 }
