@@ -144,8 +144,20 @@ internal static class RpcDtoConstructorAssignmentVerifier
             return true;
         }
 
-        return assignment.Parent is ExpressionStatementSyntax statement &&
-            statement.Parent == declaration.Body;
+        if (assignment.Parent is not ExpressionStatementSyntax statement)
+        {
+            return false;
+        }
+
+        for (SyntaxNode? parent = statement.Parent; parent is BlockSyntax block; parent = block.Parent)
+        {
+            if (block == declaration.Body)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsMemberTarget(
