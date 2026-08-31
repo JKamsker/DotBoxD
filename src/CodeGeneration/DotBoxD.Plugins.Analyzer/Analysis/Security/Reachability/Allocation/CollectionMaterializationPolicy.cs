@@ -34,7 +34,18 @@ internal static class CollectionMaterializationPolicy
     }
 
     private static string GetCollectionDisplayName(IMethodSymbol method, string typeName)
-        => (method.Name, typeName) switch
+    {
+        if (IsListInstanceMethod(method, typeName, "GetRange"))
+        {
+            return "System.Collections.Generic.List.GetRange";
+        }
+
+        if (IsListInstanceMethod(method, typeName, "LastIndexOf"))
+        {
+            return "System.Collections.Generic.List.LastIndexOf";
+        }
+
+        return (method.Name, typeName) switch
         {
             ("ToFrozenSet", FrozenSetTypeName) when method.IsStatic =>
                 "System.Collections.Frozen.FrozenSet.ToFrozenSet",
@@ -42,12 +53,14 @@ internal static class CollectionMaterializationPolicy
                 "System.Collections.Immutable.ImmutableList.ToImmutableList",
             ("ToImmutableDictionary", ImmutableDictionaryTypeName) when method.IsStatic =>
                 "System.Collections.Immutable.ImmutableDictionary.ToImmutableDictionary",
-            ("GetRange", ListTypeName) when !method.IsStatic =>
-                "System.Collections.Generic.List.GetRange",
-            ("LastIndexOf", ListTypeName) when !method.IsStatic =>
-                "System.Collections.Generic.List.LastIndexOf",
             _ => null!
         };
+    }
+
+    private static bool IsListInstanceMethod(IMethodSymbol method, string typeName, string methodName)
+        => !method.IsStatic &&
+           string.Equals(method.Name, methodName, StringComparison.Ordinal) &&
+           string.Equals(typeName, ListTypeName, StringComparison.Ordinal);
 
     private static bool IsEnumerableMaterialization(IMethodSymbol method, string typeName)
         => method is { IsStatic: true } &&
