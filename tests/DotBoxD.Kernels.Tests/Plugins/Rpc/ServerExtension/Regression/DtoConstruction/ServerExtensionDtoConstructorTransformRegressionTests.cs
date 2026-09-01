@@ -62,6 +62,20 @@ public sealed class ServerExtensionDtoConstructorTransformRegressionTests
             "public int Value { get; private set; }");
 
     [Fact]
+    public void Server_extension_rejects_dto_constructor_that_hides_matching_member_assignment_in_local_function()
+        => AssertConstructorRejected(
+            """
+                public Score(int value)
+                {
+                    void Assign()
+                    {
+                        Value = value;
+                    }
+                }
+            """,
+            "public int Value { get; private set; }");
+
+    [Fact]
     public void Constructor_assignment_verification_handles_symbol_from_another_compilation()
     {
         var sourceTree = CSharpSyntaxTree.ParseText("""
