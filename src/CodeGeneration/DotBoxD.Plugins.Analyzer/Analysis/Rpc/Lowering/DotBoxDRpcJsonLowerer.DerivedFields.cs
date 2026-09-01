@@ -94,11 +94,11 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     {
         var lowered = TryLowerDerivedTerminal(expression, memberBindings, named, derived) ??
                       TryLowerDerivedListCount(expression, memberBindings, named, derived) ??
+                      TryLowerDerivedCreation(expression, memberBindings, named, derived) ??
                       TryLowerDerivedUnary(expression, memberBindings, named, derived) ??
                       TryLowerDerivedCast(expression, memberBindings, named, derived) ??
                       TryLowerDerivedBinary(expression, memberBindings, named, derived) ??
-                      TryLowerDerivedConditional(expression, memberBindings, named, derived) ??
-                      TryLowerDerivedSwitch(expression, memberBindings, named, derived) ??
+                      TryLowerDerivedControlFlow(expression, memberBindings, named, derived) ??
                       throw DerivedNotSupported(named, derived);
 
         return ApplyNumericConversion(expression, lowered);
@@ -134,45 +134,6 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 LowerDerivedMemberAccess(member, memberBindings, named, derived),
             _ => null
         };
-
-    private string? TryLowerDerivedListCount(
-        ExpressionSyntax expression,
-        IReadOnlyDictionary<ISymbol, string> memberBindings,
-        INamedTypeSymbol named,
-        RecordMember derived)
-    {
-        if (expression is not MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Count" } count ||
-            DotBoxDRpcTypeMapper.ListElementType(TypeOf(count.Expression)) is null)
-        {
-            return null;
-        }
-
-        return Call("list.count", null, LowerDerivedExpression(count.Expression, memberBindings, named, derived));
-    }
-
-    private string? LowerDerivedMemberAccess(
-        MemberAccessExpressionSyntax member,
-        IReadOnlyDictionary<ISymbol, string> memberBindings,
-        INamedTypeSymbol named,
-        RecordMember derived)
-    {
-        if (TypeOf(member.Expression) is not INamedTypeSymbol receiver ||
-             !DotBoxDRpcTypeMapper.IsRecordDto(receiver))
-        {
-            return null;
-        }
-
-        var fields = DotBoxDRpcTypeMapper.RecordFields(receiver);
-        for (var i = 0; i < fields.Count; i++)
-        {
-            if (string.Equals(fields[i].Name, member.Name.Identifier.ValueText, StringComparison.Ordinal))
-            {
-                return RecordGet(LowerDerivedExpression(member.Expression, memberBindings, named, derived), i);
-            }
-        }
-
-        return null;
-    }
 
     private string? BoundDerivedMember(
         IReadOnlyDictionary<ISymbol, string> memberBindings,
@@ -274,97 +235,24 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             $"Server extension derived member '{derived.Name}' cast '{cast}'");
     }
 
-    private string? TryLowerDerivedConditional(
+    private string? TryLowerDerivedControlFlow(
         ExpressionSyntax expression,
         IReadOnlyDictionary<ISymbol, string> memberBindings,
         INamedTypeSymbol named,
         RecordMember derived)
-    {
-        if (expression is not ConditionalExpressionSyntax conditional)
-        {
-            return null;
-        }
+        => new DotBoxDRpcDerivedControlFlowLowerer(
+            part => LowerDerivedExpression(part, memberBindings, named, derived),
+            ReserveGeneratedLocal,
+            AddExpressionPrelude,
+            () => DerivedNotSupported(named, derived)).TryLower(expression);
 
-        var localName = ReserveGeneratedLocal("__sir_derived");
-        AddExpressionPrelude(Obj(
-            ("op", Str("if")),
-            ("condition", LowerDerivedExpression(conditional.Condition, memberBindings, named, derived)),
-            ("then", "[" + SetStatement(localName, LowerDerivedExpression(conditional.WhenTrue, memberBindings, named, derived)) + "]"),
-            ("else", "[" + SetStatement(localName, LowerDerivedExpression(conditional.WhenFalse, memberBindings, named, derived)) + "]")));
-        return Var(localName);
-    }
-
-    private string? TryLowerDerivedSwitch(
-        ExpressionSyntax expression,
-        IReadOnlyDictionary<ISymbol, string> memberBindings,
+    private static System.NotSupportedException DerivedNotSupported(
         INamedTypeSymbol named,
-        RecordMember derived)
-    {
-        if (expression is not SwitchExpressionSyntax { Arms.Count: > 0 } switchExpression ||
-             switchExpression.Arms[switchExpression.Arms.Count - 1].Pattern is not DiscardPatternSyntax)
-        {
-            return null;
-        }
-
-        var localName = ReserveGeneratedLocal("__sir_derived");
-        AddExpressionPrelude(SetStatement(
-            localName,
-            LowerDerivedExpression(switchExpression.Arms[switchExpression.Arms.Count - 1].Expression, memberBindings, named, derived)));
-
-        var value = LowerDerivedExpression(switchExpression.GoverningExpression, memberBindings, named, derived);
-        for (var i = switchExpression.Arms.Count - 2; i >= 0; i--)
-        {
-            var arm = switchExpression.Arms[i];
-            if (arm.WhenClause is not null ||
-                TryLowerDerivedSwitchCondition(arm.Pattern, value, memberBindings, named, derived) is not { } condition)
-            {
-                throw DerivedNotSupported(named, derived);
-            }
-
-            AddExpressionPrelude(Obj(
-                ("op", Str("if")),
-                ("condition", condition),
-                ("then", "[" + SetStatement(
-                    localName,
-                    LowerDerivedExpression(arm.Expression, memberBindings, named, derived)) + "]"),
-                ("else", "[]")));
-        }
-
-        return Var(localName);
-    }
-
-    private string? TryLowerDerivedSwitchCondition(
-        PatternSyntax pattern,
-        string value,
-        IReadOnlyDictionary<ISymbol, string> memberBindings,
-        INamedTypeSymbol named,
-        RecordMember derived)
-        => pattern switch
-        {
-            ConstantPatternSyntax constant => BinaryJson(
-                "eq",
-                value,
-                LowerDerivedExpression(constant.Expression, memberBindings, named, derived)),
-            RelationalPatternSyntax relational => BinaryJson(
-                DerivedRelationalOperator(relational),
-                value,
-                LowerDerivedExpression(relational.Expression, memberBindings, named, derived)),
-            _ => null
-        };
-
-    private static string DerivedRelationalOperator(RelationalPatternSyntax pattern)
-        => pattern.OperatorToken.Kind() switch
-        {
-            SyntaxKind.GreaterThanToken => "gt",
-            SyntaxKind.GreaterThanEqualsToken => "gte",
-            SyntaxKind.LessThanToken => "lt",
-            SyntaxKind.LessThanEqualsToken => "lte",
-            _ => throw new NotSupportedException($"Unsupported switch pattern '{pattern}'.")
-        };
-
-    private static System.NotSupportedException DerivedNotSupported(INamedTypeSymbol named, RecordMember derived)
+        RecordMember derived,
+        Exception? innerException = null)
         => new(
             $"Server extension constructor for '{named.Name}' cannot build the derived member '{derived.Name}' in the " +
             "sandbox: its getter is not a simple expression over the constructor's parameters. Pass the value as a " +
-            $"constructor parameter, or construct '{named.Name}' where the value is available.");
+            $"constructor parameter, or construct '{named.Name}' where the value is available.",
+            innerException);
 }

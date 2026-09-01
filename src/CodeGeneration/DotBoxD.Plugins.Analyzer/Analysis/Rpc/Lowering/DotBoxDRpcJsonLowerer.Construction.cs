@@ -133,7 +133,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         INamedTypeSymbol named,
         IReadOnlyList<RecordMember> fields)
     {
-        if (_model.GetSymbolInfo(creation, _cancellationToken).Symbol is IMethodSymbol constructor &&
+        if (ModelFor(creation).GetSymbolInfo(creation, _cancellationToken).Symbol is IMethodSymbol constructor &&
             constructor.Parameters.Length <= fields.Count)
         {
             return constructor;
@@ -262,6 +262,42 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         var localName = ReserveGeneratedLocal("__sir_arg");
         AddExpressionPrelude(SetStatement(localName, value));
         return Var(localName);
+    }
+
+    private string? TryLowerDerivedCreation(
+        ExpressionSyntax expression,
+        IReadOnlyDictionary<ISymbol, string> memberBindings,
+        INamedTypeSymbol named,
+        RecordMember derived)
+        => expression switch
+        {
+            ObjectCreationExpressionSyntax creation =>
+                LowerDerivedCreation(creation, memberBindings, named, derived),
+            ImplicitObjectCreationExpressionSyntax creation =>
+                LowerDerivedCreation(creation, memberBindings, named, derived),
+            _ => null
+        };
+
+    private string LowerDerivedCreation(
+        BaseObjectCreationExpressionSyntax creation,
+        IReadOnlyDictionary<ISymbol, string> memberBindings,
+        INamedTypeSymbol named,
+        RecordMember derived)
+    {
+        var previousOverride = _expressionOverride;
+        _expressionOverride = part => BoundDerivedMember(memberBindings, part) ?? previousOverride?.Invoke(part);
+        try
+        {
+            return LowerRecordCreation(creation);
+        }
+        catch (NotSupportedException ex)
+        {
+            throw DerivedNotSupported(named, derived, ex);
+        }
+        finally
+        {
+            _expressionOverride = previousOverride;
+        }
     }
 
     private static int IndexOfField(IReadOnlyList<RecordMember> fields, string name, INamedTypeSymbol named)

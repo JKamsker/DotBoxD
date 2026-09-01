@@ -88,7 +88,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         string lowered,
         string description)
     {
-        var typeInfo = _model.GetTypeInfo(expression, _cancellationToken);
+        var typeInfo = ModelFor(expression).GetTypeInfo(expression, _cancellationToken);
         if (EffectiveSourceType(expression, typeInfo) is not { } sourceType)
         {
             throw UnsupportedConversion(description);
@@ -105,7 +105,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return ApplyRequiredTypeConversion(
             effectiveType,
             targetType,
-            _model.Compilation,
+            ModelFor(expression).Compilation,
             lowered,
             description);
     }
