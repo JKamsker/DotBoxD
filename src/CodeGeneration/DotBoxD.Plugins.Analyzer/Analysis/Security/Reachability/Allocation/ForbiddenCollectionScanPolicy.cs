@@ -9,7 +9,7 @@ internal static class ForbiddenCollectionScanPolicy
     public static bool TryGetDisplayName(IMethodSymbol method, out string forbidden)
     {
         if (method is { IsStatic: false, MethodKind: MethodKind.Ordinary } &&
-            method.Name is "Contains" or "IndexOf" &&
+            method.Name is "BinarySearch" or "Contains" or "IndexOf" &&
             string.Equals(
                 method.ContainingType.OriginalDefinition.ToDisplayString(
                     SymbolDisplayFormat.CSharpErrorMessageFormat),
