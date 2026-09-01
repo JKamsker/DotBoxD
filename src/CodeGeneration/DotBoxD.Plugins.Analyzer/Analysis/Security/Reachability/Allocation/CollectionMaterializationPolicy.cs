@@ -17,8 +17,7 @@ internal static class CollectionMaterializationPolicy
             return true;
         }
 
-        forbidden = GetCollectionDisplayName(method, typeName);
-        return forbidden is not null;
+        return TryGetCollectionDisplayName(method, typeName, out forbidden);
     }
 
     private static bool TryGetEnumerableDisplayName(IMethodSymbol method, string typeName, out string forbidden)
@@ -33,21 +32,13 @@ internal static class CollectionMaterializationPolicy
         return false;
     }
 
-    private static string GetCollectionDisplayName(IMethodSymbol method, string typeName)
-        => !method.IsStatic && string.Equals(typeName, ListTypeName, StringComparison.Ordinal)
-            ? GetListDisplayName(method.Name)
-            : GetStaticCollectionDisplayName(method, typeName);
+    private static bool TryGetCollectionDisplayName(IMethodSymbol method, string typeName, out string forbidden)
+        => TryGetStaticCollectionDisplayName(method, typeName, out forbidden) ||
+           TryGetListDisplayName(method, typeName, out forbidden);
 
-    private static string GetListDisplayName(string methodName)
-        => methodName switch
-        {
-            "ConvertAll" => "System.Collections.Generic.List.ConvertAll",
-            "GetRange" => "System.Collections.Generic.List.GetRange",
-            _ => null!
-        };
-
-    private static string GetStaticCollectionDisplayName(IMethodSymbol method, string typeName)
-        => (method.Name, typeName) switch
+    private static bool TryGetStaticCollectionDisplayName(IMethodSymbol method, string typeName, out string forbidden)
+    {
+        forbidden = (method.Name, typeName) switch
         {
             ("ToFrozenSet", FrozenSetTypeName) when method.IsStatic =>
                 "System.Collections.Frozen.FrozenSet.ToFrozenSet",
@@ -57,6 +48,25 @@ internal static class CollectionMaterializationPolicy
                 "System.Collections.Immutable.ImmutableDictionary.ToImmutableDictionary",
             _ => null!
         };
+
+        return forbidden is not null;
+    }
+
+    private static bool TryGetListDisplayName(IMethodSymbol method, string typeName, out string forbidden)
+    {
+        forbidden = (method.Name, typeName) switch
+        {
+            ("ConvertAll", ListTypeName) when !method.IsStatic =>
+                "System.Collections.Generic.List.ConvertAll",
+            ("GetRange", ListTypeName) when !method.IsStatic =>
+                "System.Collections.Generic.List.GetRange",
+            ("Reverse", ListTypeName) when !method.IsStatic =>
+                "System.Collections.Generic.List.Reverse",
+            _ => null!
+        };
+
+        return forbidden is not null;
+    }
 
     private static bool IsEnumerableMaterialization(IMethodSymbol method, string typeName)
         => method is { IsStatic: true } &&
