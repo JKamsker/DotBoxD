@@ -38,7 +38,7 @@ internal static class RpcDtoConstructorMemberAssignmentInspector
                 continue;
             }
 
-            if (matched || source is null || !PreservesParameter(source, parameter, model))
+            if (matched || source is null || !PreservesParameter(source, parameter, declaration, model))
             {
                 return false;
             }
@@ -59,7 +59,7 @@ internal static class RpcDtoConstructorMemberAssignmentInspector
         => !alreadyMatched &&
             IsDirectConstructorAssignment(declaration, assignment) &&
             assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
-            PreservesParameterOrDefaultState(assignment.Right, member, parameter, model);
+            PreservesParameterOrDefaultState(assignment.Right, member, parameter, declaration, model);
 
     private static bool TryGetTupleAssignmentMemberSource(
         ConstructorDeclarationSyntax declaration,
@@ -145,22 +145,33 @@ internal static class RpcDtoConstructorMemberAssignmentInspector
         ExpressionSyntax expression,
         RecordMember member,
         IParameterSymbol parameter,
+        ConstructorDeclarationSyntax declaration,
         SemanticModel? model)
-        => PreservesParameter(expression, parameter, model) ||
+        => PreservesParameter(expression, parameter, declaration, model) ||
            StripParentheses(expression) is BinaryExpressionSyntax coalesce &&
            coalesce.IsKind(SyntaxKind.CoalesceExpression) &&
-           PreservesParameter(coalesce.Left, parameter, model) &&
+           PreservesParameter(coalesce.Left, parameter, declaration, model) &&
            RpcDtoConstructorTargetMatcher.IsMemberOrBackingFieldTarget(coalesce.Right, member, model);
 
     private static bool PreservesParameter(
         ExpressionSyntax expression,
         IParameterSymbol parameter,
+        ConstructorDeclarationSyntax declaration,
         SemanticModel? model)
     {
         expression = StripIdentityConversions(StripParentheses(expression), model);
         if (model?.GetSymbolInfo(expression).Symbol is { } symbol)
         {
-            return SymbolEqualityComparer.Default.Equals(symbol, parameter);
+            if (SymbolEqualityComparer.Default.Equals(symbol, parameter))
+            {
+                return true;
+            }
+
+            if (symbol is ILocalSymbol local &&
+                LocalAliasPreservesParameter(local, parameter, declaration, model))
+            {
+                return true;
+            }
         }
 
         if (expression is IdentifierNameSyntax identifier)
@@ -170,8 +181,52 @@ internal static class RpcDtoConstructorMemberAssignmentInspector
 
         return expression is ConditionalExpressionSyntax conditional &&
             TryEvaluateBoolean(conditional.Condition, parameter.ContainingSymbol, model) is { } condition &&
-            PreservesParameter(condition ? conditional.WhenTrue : conditional.WhenFalse, parameter, model);
+            PreservesParameter(
+                condition ? conditional.WhenTrue : conditional.WhenFalse,
+                parameter,
+                declaration,
+                model);
     }
+
+    private static bool LocalAliasPreservesParameter(
+        ILocalSymbol local,
+        IParameterSymbol parameter,
+        ConstructorDeclarationSyntax declaration,
+        SemanticModel model)
+    {
+        if (local.DeclaringSyntaxReferences.Length != 1 ||
+            local.DeclaringSyntaxReferences[0].GetSyntax() is not VariableDeclaratorSyntax declarator ||
+            declarator.Initializer is not { Value: { } initializer } ||
+            LocalIsAssigned(declaration, local, model))
+        {
+            return false;
+        }
+
+        return PreservesParameter(initializer, parameter, declaration, model);
+    }
+
+    private static bool LocalIsAssigned(
+        ConstructorDeclarationSyntax declaration,
+        ILocalSymbol local,
+        SemanticModel model)
+        => declaration.DescendantNodes().Any(node =>
+            WrittenSymbol(node, model) is { } symbol &&
+            SymbolEqualityComparer.Default.Equals(symbol, local));
+
+    private static ISymbol? WrittenSymbol(SyntaxNode node, SemanticModel model)
+        => node switch
+        {
+            AssignmentExpressionSyntax assignment => model.GetSymbolInfo(assignment.Left).Symbol,
+            PrefixUnaryExpressionSyntax unary when unary.IsKind(SyntaxKind.PreIncrementExpression) ||
+                                                  unary.IsKind(SyntaxKind.PreDecrementExpression) =>
+                model.GetSymbolInfo(unary.Operand).Symbol,
+            PostfixUnaryExpressionSyntax unary when unary.IsKind(SyntaxKind.PostIncrementExpression) ||
+                                                   unary.IsKind(SyntaxKind.PostDecrementExpression) =>
+                model.GetSymbolInfo(unary.Operand).Symbol,
+            ArgumentSyntax { RefKindKeyword.RawKind: not 0, Expression: var written } =>
+                model.GetSymbolInfo(written).Symbol,
+            _ => null,
+        };
 
     private static ExpressionSyntax StripIdentityConversions(ExpressionSyntax expression, SemanticModel? model)
     {
