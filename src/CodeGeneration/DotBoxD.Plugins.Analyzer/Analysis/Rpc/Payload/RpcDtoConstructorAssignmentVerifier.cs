@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
@@ -166,7 +167,7 @@ internal static class RpcDtoConstructorAssignmentVerifier
         IParameterSymbol parameter,
         SemanticModel? model)
     {
-        expression = StripParentheses(expression);
+        expression = StripIdentityConversions(StripParentheses(expression), model);
         if (model?.GetSymbolInfo(expression).Symbol is { } symbol)
         {
             return SymbolEqualityComparer.Default.Equals(symbol, parameter);
@@ -187,6 +188,19 @@ internal static class RpcDtoConstructorAssignmentVerifier
         while (expression is ParenthesizedExpressionSyntax parenthesized)
         {
             expression = parenthesized.Expression;
+        }
+
+        return expression;
+    }
+
+    private static ExpressionSyntax StripIdentityConversions(
+        ExpressionSyntax expression,
+        SemanticModel? model)
+    {
+        while (model?.GetOperation(expression) is IConversionOperation { Conversion.IsIdentity: true } conversion &&
+               conversion.Operand.Syntax is ExpressionSyntax operand)
+        {
+            expression = StripParentheses(operand);
         }
 
         return expression;
