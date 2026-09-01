@@ -121,13 +121,25 @@ internal static partial class DotBoxDRpcTypeMapper
             IdentifierNameSyntax identifier => assignedNames.Contains(identifier.Identifier.ValueText),
             MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } thisMember =>
                 assignedNames.Contains(thisMember.Name.Identifier.ValueText),
-            PrefixUnaryExpressionSyntax unary => IsSupportedUnary(unary) &&
-                IsExpressionOverAssignedFields(unary.Operand, assignedNames),
-            BinaryExpressionSyntax binary =>
-                IsExpressionOverAssignedFields(binary.Left, assignedNames) &&
-                IsExpressionOverAssignedFields(binary.Right, assignedNames),
+            PrefixUnaryExpressionSyntax unary => IsSupportedDerivedUnary(unary, assignedNames),
+            BinaryExpressionSyntax binary => IsSupportedDerivedBinary(binary, assignedNames),
+            ConditionalExpressionSyntax conditional => IsSupportedDerivedConditional(conditional, assignedNames),
             _ => false
         };
+
+    private static bool IsSupportedDerivedUnary(PrefixUnaryExpressionSyntax unary, ISet<string> assignedNames)
+        => IsSupportedUnary(unary) && IsExpressionOverAssignedFields(unary.Operand, assignedNames);
+
+    private static bool IsSupportedDerivedBinary(BinaryExpressionSyntax binary, ISet<string> assignedNames)
+        => IsExpressionOverAssignedFields(binary.Left, assignedNames) &&
+           IsExpressionOverAssignedFields(binary.Right, assignedNames);
+
+    private static bool IsSupportedDerivedConditional(
+        ConditionalExpressionSyntax conditional,
+        ISet<string> assignedNames)
+        => IsExpressionOverAssignedFields(conditional.Condition, assignedNames) &&
+           IsExpressionOverAssignedFields(conditional.WhenTrue, assignedNames) &&
+           IsExpressionOverAssignedFields(conditional.WhenFalse, assignedNames);
 
     private static bool IsSupportedUnary(PrefixUnaryExpressionSyntax unary)
         => unary.IsKind(SyntaxKind.LogicalNotExpression) ||
