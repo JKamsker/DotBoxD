@@ -60,6 +60,8 @@ internal static class CollectionMaterializationPolicy
                 "System.Collections.Generic.List.ConvertAll",
             ("GetRange", ListTypeName) when !method.IsStatic =>
                 "System.Collections.Generic.List.GetRange",
+            ("RemoveRange", ListTypeName) when !method.IsStatic =>
+                "System.Collections.Generic.List.RemoveRange",
             ("Reverse", ListTypeName) when !method.IsStatic =>
                 "System.Collections.Generic.List.Reverse",
             _ => null!
