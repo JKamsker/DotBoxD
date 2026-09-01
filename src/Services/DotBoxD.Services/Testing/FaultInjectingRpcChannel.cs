@@ -49,6 +49,7 @@ public sealed class FaultInjectingRpcChannel : IRpcChannel
     {
         var operation = Interlocked.Increment(ref _sends);
         await _beforeOperation(RpcChannelOperation.Send, operation, ct).ConfigureAwait(false);
+        ct.ThrowIfCancellationRequested();
         var transformed = await _transformSend(data, operation, ct).ConfigureAwait(false);
         await _inner.SendAsync(transformed, ct).ConfigureAwait(false);
     }
