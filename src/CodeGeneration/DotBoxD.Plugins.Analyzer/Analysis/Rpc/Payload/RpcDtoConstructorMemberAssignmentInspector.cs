@@ -137,8 +137,20 @@ internal static class RpcDtoConstructorMemberAssignmentInspector
             return true;
         }
 
-        return assignment.Parent is ExpressionStatementSyntax statement &&
-            statement.Parent == declaration.Body;
+        if (assignment.Parent is not ExpressionStatementSyntax statement)
+        {
+            return false;
+        }
+
+        for (SyntaxNode? parent = statement.Parent; parent is BlockSyntax block; parent = block.Parent)
+        {
+            if (block == declaration.Body)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool PreservesParameterOrDefaultState(
@@ -168,7 +180,11 @@ internal static class RpcDtoConstructorMemberAssignmentInspector
             }
 
             if (symbol is ILocalSymbol local &&
-                LocalAliasPreservesParameter(local, parameter, declaration, model))
+                RpcDtoConstructorLocalAliasInspector.PreservesParameter(
+                    local,
+                    declaration,
+                    model,
+                    initializer => PreservesParameter(initializer, parameter, declaration, model)))
             {
                 return true;
             }
@@ -187,46 +203,6 @@ internal static class RpcDtoConstructorMemberAssignmentInspector
                 declaration,
                 model);
     }
-
-    private static bool LocalAliasPreservesParameter(
-        ILocalSymbol local,
-        IParameterSymbol parameter,
-        ConstructorDeclarationSyntax declaration,
-        SemanticModel model)
-    {
-        if (local.DeclaringSyntaxReferences.Length != 1 ||
-            local.DeclaringSyntaxReferences[0].GetSyntax() is not VariableDeclaratorSyntax declarator ||
-            declarator.Initializer is not { Value: { } initializer } ||
-            LocalIsAssigned(declaration, local, model))
-        {
-            return false;
-        }
-
-        return PreservesParameter(initializer, parameter, declaration, model);
-    }
-
-    private static bool LocalIsAssigned(
-        ConstructorDeclarationSyntax declaration,
-        ILocalSymbol local,
-        SemanticModel model)
-        => declaration.DescendantNodes().Any(node =>
-            WrittenSymbol(node, model) is { } symbol &&
-            SymbolEqualityComparer.Default.Equals(symbol, local));
-
-    private static ISymbol? WrittenSymbol(SyntaxNode node, SemanticModel model)
-        => node switch
-        {
-            AssignmentExpressionSyntax assignment => model.GetSymbolInfo(assignment.Left).Symbol,
-            PrefixUnaryExpressionSyntax unary when unary.IsKind(SyntaxKind.PreIncrementExpression) ||
-                                                  unary.IsKind(SyntaxKind.PreDecrementExpression) =>
-                model.GetSymbolInfo(unary.Operand).Symbol,
-            PostfixUnaryExpressionSyntax unary when unary.IsKind(SyntaxKind.PostIncrementExpression) ||
-                                                   unary.IsKind(SyntaxKind.PostDecrementExpression) =>
-                model.GetSymbolInfo(unary.Operand).Symbol,
-            ArgumentSyntax { RefKindKeyword.RawKind: not 0, Expression: var written } =>
-                model.GetSymbolInfo(written).Symbol,
-            _ => null,
-        };
 
     private static ExpressionSyntax StripIdentityConversions(ExpressionSyntax expression, SemanticModel? model)
     {

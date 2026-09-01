@@ -51,6 +51,31 @@ public sealed class ServerExtensionDtoConstructorTransformRegressionTests
             """);
 
     [Fact]
+    public void Server_extension_rejects_dto_constructor_that_hides_matching_member_assignment_in_lambda()
+        => AssertConstructorRejected(
+            """
+                public Score(int value)
+                {
+                    System.Action assign = () => Value = value;
+                }
+            """,
+            "public int Value { get; private set; }");
+
+    [Fact]
+    public void Server_extension_rejects_dto_constructor_that_hides_matching_member_assignment_in_local_function()
+        => AssertConstructorRejected(
+            """
+                public Score(int value)
+                {
+                    void Assign()
+                    {
+                        Value = value;
+                    }
+                }
+            """,
+            "public int Value { get; private set; }");
+
+    [Fact]
     public void Constructor_assignment_verification_handles_symbol_from_another_compilation()
     {
         var sourceTree = CSharpSyntaxTree.ParseText("""
@@ -162,7 +187,9 @@ public sealed class ServerExtensionDtoConstructorTransformRegressionTests
         Assert.True(preservesMember);
     }
 
-    private static void AssertConstructorRejected(string constructor)
+    private static void AssertConstructorRejected(
+        string constructor,
+        string member = "public int Value { get; }")
     {
         var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator($$"""
             using DotBoxD.Kernels;
@@ -176,7 +203,7 @@ public sealed class ServerExtensionDtoConstructorTransformRegressionTests
             {
             {{constructor}}
 
-                public int Value { get; }
+            {{member}}
             }
 
             [ServerExtension("score-transform")]
